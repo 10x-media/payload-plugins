@@ -1,0 +1,71 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+	"root": false,
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	"files": {
+		"ignoreUnknown": true,
+		"includes": [
+			"**",
+			"!**/node_modules",
+			"!**/dist",
+			"!**/.turbo",
+			"!**/.next",
+			"!**/coverage",
+			"!docs/superpowers",
+			"!apps/docs/.contentlayer",
+			"!apps/docs/.source",
+			"!**/payload-types.ts",
+			"!**/next-env.d.ts",
+			"!.claude/skills/**/*.md",
+			"!.claude/settings.local.json",
+			"!.changeset/*.md",
+			"!packages/*/dev/app/(payload)/admin/importMap.js"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"formatWithErrors": false,
+		"indentStyle": "tab",
+		"indentWidth": 2,
+		"lineEnding": "lf",
+		"lineWidth": 100,
+		"useEditorconfig": true
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"complexity": {
+				"useMaxParams": { "level": "error", "options": { "max": 3 } }
+			},
+			"correctness": { "noUnusedVariables": "warn" },
+			"suspicious": { "noExplicitAny": "error", "noTsIgnore": "error" }
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"jsxQuoteStyle": "double",
+			"quoteProperties": "asNeeded",
+			"trailingCommas": "es5",
+			"semicolons": "asNeeded",
+			"arrowParentheses": "always",
+			"quoteStyle": "single",
+			"bracketSpacing": true
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["*.{yml,yaml,md,mdx}"],
+			"formatter": { "indentStyle": "space" }
+		},
+		{
+			"includes": ["**/dev/**", "**/tests/**"],
+			"linter": {
+				"rules": {
+					"suspicious": { "noExplicitAny": "warn" }
+				}
+			}
+		}
+	],
+	"assist": { "enabled": true, "actions": { "source": { "organizeImports": "on" } } }
+}

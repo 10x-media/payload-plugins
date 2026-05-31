@@ -1,0 +1,9 @@
+{
+	"name": "@10x-media/biome-config",
+	"version": "0.0.0",
+	"private": true,
+	"files": [
+		"biome.json",
+		"plugins/"
+	]
+}

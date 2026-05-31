@@ -1,0 +1,5 @@
+language js
+
+`export default ($args) => $body` where {
+	register_diagnostic(span=$args, message="Plugin packages should use named exports (e.g. export const fooPlugin = ...) instead of default-exported arrow functions. Config files that use `export default defineConfig(...)` are not affected.", severity="warn")
+}

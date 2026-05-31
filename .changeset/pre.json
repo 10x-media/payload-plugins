@@ -1,0 +1,10 @@
+{
+	"mode": "pre",
+	"tag": "beta",
+	"initialVersions": {
+		"@10x-media/automations": "0.0.0",
+		"@10x-media/jobs": "0.0.0",
+		"@10x-media/webhooks": "0.0.0"
+	},
+	"changesets": []
+}

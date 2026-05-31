@@ -1,0 +1,6 @@
+language js
+
+`process.$prop` where {
+	$prop <: `env`,
+	register_diagnostic(span=$prop, message="Use validated env module instead of direct process.env access. Env-boundary files (env.ts, vitest setup) can use a biome-ignore comment.", severity="error")
+}

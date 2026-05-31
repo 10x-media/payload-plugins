@@ -1,0 +1,53 @@
+{
+	"$schema": "https://docs.anthropic.com/claude-code/settings.schema.json",
+	"env": {
+		"PAYLOAD_SKIP_AUTOGEN": "1"
+	},
+	"permissions": {
+		"allow": [
+			"Bash(pnpm:*)",
+			"Bash(turbo:*)",
+			"Bash(biome:*)",
+			"Bash(vitest:*)",
+			"Bash(tsx:*)",
+			"Bash(node:*)",
+			"Bash(git status)",
+			"Bash(git diff:*)",
+			"Bash(git log:*)",
+			"Bash(git show:*)",
+			"Bash(gh:*)",
+			"Bash(ls:*)",
+			"Bash(cat:*)",
+			"Bash(grep:*)",
+			"Bash(rg:*)",
+			"Bash(find:*)",
+			"Bash(bash scripts/payload.sh:*)",
+			"Bash(bash ../../../scripts/payload.sh:*)"
+		],
+		"deny": [
+			"Bash(pnpm exec payload generate:*)",
+			"Bash(pnpm exec payload migrate:*)",
+			"Bash(pnpm exec payload migrate)",
+			"Bash(pnpm payload generate:*)",
+			"Bash(pnpm payload migrate:*)",
+			"Bash(pnpm --filter * exec payload generate:*)",
+			"Bash(pnpm --filter * exec payload migrate:*)",
+			"Bash(pnpm --filter * payload generate:*)",
+			"Bash(pnpm --filter * payload migrate:*)",
+			"Bash(npx payload generate:*)",
+			"Bash(npx payload migrate:*)",
+			"Bash(payload generate:*)",
+			"Bash(payload migrate:*)",
+			"Bash(node */payload/bin.js generate:*)",
+			"Bash(node */payload/bin.js migrate:*)"
+		]
+	},
+	"hooks": {
+		"SessionStart": [
+			{
+				"matcher": "*",
+				"hooks": [{ "type": "command", "command": ".claude/hooks/session-start.sh" }]
+			}
+		]
+	}
+}
