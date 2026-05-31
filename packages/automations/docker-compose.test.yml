@@ -1,0 +1,33 @@
+services:
+  mongo:
+    image: mongo:8
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    ports:
+      - '37017:27017'
+    healthcheck:
+      test: |
+        mongosh --quiet --eval '
+          try {
+            rs.status().ok
+          } catch (e) {
+            rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]}).ok
+          }
+        '
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: automations_e2e
+    ports:
+      - '35432:5432'
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'e2e', '-d', 'automations_e2e']
+      interval: 2s
+      timeout: 5s
+      retries: 30

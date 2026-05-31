@@ -1,0 +1,122 @@
+{
+	"name": "@10x-media/automations",
+	"version": "0.0.0",
+	"private": true,
+	"description": "No-code automations engine for Payload",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/10x-media/payload-plugins.git",
+		"directory": "packages/automations"
+	},
+	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/automations",
+	"bugs": "https://github.com/10x-media/payload-plugins/issues",
+	"keywords": ["payload", "payloadcms", "plugin"],
+	"author": "10x-media",
+	"engines": {
+		"node": ">=22.18.0"
+	},
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./types": {
+			"development": "./src/exports/types.ts",
+			"types": "./src/exports/types.ts",
+			"default": "./dist/exports/types.js"
+		},
+		"./client": {
+			"development": "./src/exports/client.ts",
+			"types": "./src/exports/client.ts",
+			"default": "./dist/exports/client.js"
+		},
+		"./i18n": {
+			"development": "./src/exports/i18n.ts",
+			"types": "./src/exports/i18n.ts",
+			"default": "./dist/exports/i18n.js"
+		}
+	},
+	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"scripts": {
+		"build": "tsdown",
+		"lint": "biome check src tests dev",
+		"lint:fix": "biome check --write src tests dev",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run",
+		"test:unit": "vitest run src",
+		"test:int": "vitest run tests/int",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:e2e": "bash scripts/e2e.sh",
+		"dev": "pnpm --filter @10x-media/automations-dev dev",
+		"start": "pnpm --filter @10x-media/automations-dev start",
+		"gen": "pnpm --filter @10x-media/automations-dev gen",
+		"gen:types": "pnpm --filter @10x-media/automations-dev gen:types",
+		"gen:importmap": "pnpm --filter @10x-media/automations-dev gen:importmap",
+		"migrate": "pnpm --filter @10x-media/automations-dev migrate",
+		"migrate:create": "pnpm --filter @10x-media/automations-dev migrate:create",
+		"migrate:down": "pnpm --filter @10x-media/automations-dev migrate:down",
+		"migrate:refresh": "pnpm --filter @10x-media/automations-dev migrate:refresh",
+		"migrate:reset": "pnpm --filter @10x-media/automations-dev migrate:reset",
+		"migrate:status": "pnpm --filter @10x-media/automations-dev migrate:status",
+		"migrate:fresh": "pnpm --filter @10x-media/automations-dev migrate:fresh",
+		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
+	},
+	"peerDependencies": {
+		"@payloadcms/ui": "^3.82.0",
+		"payload": "^3.82.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"devDependencies": {
+		"@10x-media/jobs": "workspace:*",
+		"@10x-media/payload-test-harness": "workspace:*",
+		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/vitest-config": "workspace:*",
+		"@10x-media/webhooks": "workspace:*",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"@playwright/test": "catalog:",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"payload": "catalog:",
+		"playwright": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true,
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js",
+				"default": "./dist/index.js"
+			},
+			"./types": {
+				"types": "./dist/exports/types.d.ts",
+				"import": "./dist/exports/types.js",
+				"default": "./dist/exports/types.js"
+			},
+			"./client": {
+				"types": "./dist/exports/client.d.ts",
+				"import": "./dist/exports/client.js",
+				"default": "./dist/exports/client.js"
+			},
+			"./i18n": {
+				"types": "./dist/exports/i18n.d.ts",
+				"import": "./dist/exports/i18n.js",
+				"default": "./dist/exports/i18n.js"
+			}
+		}
+	}
+}
