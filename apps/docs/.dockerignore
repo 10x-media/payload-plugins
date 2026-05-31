@@ -1,0 +1,9 @@
+node_modules
+.next
+.turbo
+.contentlayer
+.source
+coverage
+*.log
+.env*
+!.env.example

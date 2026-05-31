@@ -1,0 +1,53 @@
+{
+	"name": "@10x-media/payload-test-harness",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./src/index.ts",
+			"default": "./src/index.ts"
+		},
+		"./db/mongo": {
+			"development": "./src/db/mongo.ts",
+			"types": "./src/db/mongo.ts",
+			"default": "./src/db/mongo.ts"
+		},
+		"./db/mongo-container": {
+			"development": "./src/db/mongo-container.ts",
+			"types": "./src/db/mongo-container.ts",
+			"default": "./src/db/mongo-container.ts"
+		},
+		"./db/postgres-container": {
+			"development": "./src/db/postgres-container.ts",
+			"types": "./src/db/postgres-container.ts",
+			"default": "./src/db/postgres-container.ts"
+		}
+	},
+	"scripts": {
+		"lint": "biome check src tests",
+		"lint:fix": "biome check --write src tests",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"mongodb-memory-server": "^10.1.0",
+		"testcontainers": "^12.0.1"
+	},
+	"peerDependencies": {
+		"payload": "^3.82.0",
+		"vitest": "^4.0.0"
+	},
+	"devDependencies": {
+		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/vitest-config": "workspace:*",
+		"@types/node": "catalog:",
+		"payload": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

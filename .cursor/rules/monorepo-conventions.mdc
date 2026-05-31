@@ -1,0 +1,14 @@
+---
+description: Monorepo conventions
+globs: ["**/*.{ts,tsx,json,md}"]
+alwaysApply: true
+---
+
+- Package manager: pnpm 10. Never run `npm install` or `yarn`.
+- Use the short positional commands (`pnpm <task> [name]`); never type raw `pnpm --filter`. `scripts/run.ts` routes cacheable tasks (build, lint, typecheck, test) through turbo and interactive tasks (dev, gen, migrate) through pnpm filters.
+- Plugins live under `packages/`. Internal tools under `tooling/`. Shared configs under `config/`. The docs app is `apps/docs/`.
+- Tests: unit tests are co-located with their source as `src/**/*.test.ts` (next to the file they cover); integration tests are `tests/int/**/*.int.spec.ts` and e2e tests `tests/e2e/**/*.e2e.spec.ts`. Do not put unit tests under `tests/unit/`. Only `dist/` is published, so co-located tests never ship.
+- All published packages use the `@10x-media` npm scope.
+- Never publish anything in `tooling/` or `config/` (they are in `.changeset/config.json` ignore list).
+- After any change to `packages/*/src/`, add a changeset (`pnpm changeset`) unless the PR has the `no-release` label.
+- The repo is in beta pre-mode (`.changeset/pre.json`). Releases publish as `*-beta.N` until `pnpm changeset pre exit` is run.

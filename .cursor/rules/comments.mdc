@@ -1,0 +1,24 @@
+---
+description: Comment policy for this repo
+globs: ["**/*.{ts,tsx,js,jsx,mjs,mts,sh,md,mdx}"]
+alwaysApply: true
+---
+
+Write comments as a senior engineer helping the next reader. Default to no comment. Add one only when it adds objective value the code itself cannot convey.
+
+Encouraged:
+- JSDoc on anything meaningful and useful, not just public exports. Internal helpers, types, complex local logic. Keep it high quality and concise.
+- One-line comments explaining a hidden invariant, an intentional workaround for a specific upstream bug, a constraint the reader cannot see.
+
+Cut:
+- Comments that restate what well-named code already says.
+- Comments summarizing the PR or task ("added for the X flow", "fix for #123").
+- Section banners using `=====`, `-----`, ASCII art, or boxed headers.
+- Em-dashes anywhere (code, markdown, configs). Use commas, periods, or parentheses.
+- Low-signal filler: "Note:", "Important:", "TL;DR:", "In summary:" preambles, and first-person narration ("Let me", "I will", "we should"). State the fact directly instead of announcing it.
+- Aspirational TODOs without a real owner or trigger condition.
+- Multi-paragraph prose embedded in code explaining a system. Put that in a doc.
+
+Why this matters: comments rot faster than code. A comment that drifts is worse than no comment. The reader cost of redundant prose is real. JSDoc earns its keep because tools surface it on hover; freeform comments do not.
+
+Scope: applies to all committed files. `.superpowers/` and other gitignored paths are exempt.

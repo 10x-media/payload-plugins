@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "automations",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "PAYLOAD_SKIP_AUTOGEN=1 PORT=3100 pnpm dev automations"],
+      "port": 3100
+    }
+  ]
+}

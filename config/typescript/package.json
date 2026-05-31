@@ -1,0 +1,10 @@
+{
+	"name": "@10x-media/tsconfig",
+	"version": "0.0.0",
+	"private": true,
+	"files": [
+		"base.json",
+		"plugin.json",
+		"next-app.json"
+	]
+}

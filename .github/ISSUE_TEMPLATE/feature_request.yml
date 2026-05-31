@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a new feature or enhancement for a @10x-media plugin.
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [Discussions](https://github.com/10x-media/payload-plugins/discussions) first. Questions and open-ended ideas fit better there than as issues.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What problem does this solve? What is the current limitation?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should it work? API shape, config options, behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you evaluated, and why you prefer the proposed one.
+    validations:
+      required: false
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Which plugin does this relate to?
+      options:
+        - automations
+        - new plugin (describe in proposal)
+        - repo-level (tooling, docs, CI)
+    validations:
+      required: true

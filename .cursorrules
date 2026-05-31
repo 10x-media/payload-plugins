@@ -1,0 +1,7 @@
+See .cursor/rules/ for the structured rule files. The most important ones:
+- comments.mdc:when (and when not) to write comments
+- monorepo-conventions.mdc:workspace, scripts, releases
+- plugin-shape.mdc:how every plugin in packages/ is structured
+
+This repo uses pnpm 10, Turborepo, Biome 2.4, tsdown, vitest, changesets, and fumadocs.
+Always run via pnpm. Never npm or yarn.

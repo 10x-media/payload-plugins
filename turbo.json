@@ -1,0 +1,81 @@
+{
+	"$schema": "https://turbo.build/schema.json",
+	"ui": "tui",
+	"globalDependencies": ["tsconfig.json", "biome.json", "config/**", ".npmrc"],
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"inputs": ["src/**", "package.json", "tsconfig.json", "tsdown.config.ts"],
+			"outputs": ["dist/**", "*.tsbuildinfo"]
+		},
+		"dev": {
+			"cache": false,
+			"persistent": true
+		},
+		"start": {
+			"cache": false,
+			"persistent": true
+		},
+		"lint": {
+			"inputs": ["src/**", "tests/**", "dev/**", "biome.json"],
+			"outputs": []
+		},
+		"typecheck": {
+			"dependsOn": ["^typecheck"],
+			"inputs": ["src/**", "tests/**", "dev/**", "tsconfig.json", "**/*.ts", "**/*.tsx"],
+			"outputs": []
+		},
+		"test": {
+			"dependsOn": ["^typecheck"],
+			"inputs": ["src/**", "tests/**", "dev/**", "vitest.config.ts"],
+			"outputs": []
+		},
+		"test:unit": {
+			"dependsOn": ["^typecheck"],
+			"inputs": ["src/**", "tests/unit/**", "vitest.config.ts"],
+			"outputs": []
+		},
+		"test:int": {
+			"dependsOn": ["^typecheck"],
+			"inputs": ["src/**", "tests/int/**", "vitest.config.ts"],
+			"outputs": []
+		},
+		"test:matrix": {
+			"inputs": ["src/**", "tests/int/**", "vitest.config.ts"],
+			"outputs": [],
+			"cache": false,
+			"env": ["DB_MATRIX"]
+		},
+		"test:container": {
+			"inputs": ["src/**", "tests/int/**", "vitest.config.ts"],
+			"outputs": [],
+			"cache": false,
+			"env": ["DB_MATRIX", "TEST_DB"]
+		},
+		"test:e2e": {
+			"dependsOn": ["^build"],
+			"inputs": ["src/**", "tests/e2e/**", "playwright.config.ts", "docker-compose.test.yml"],
+			"outputs": ["playwright-report/**", "test-results/**"],
+			"cache": false
+		},
+		"gen": {
+			"cache": false
+		},
+		"gen:types": {
+			"cache": false
+		},
+		"gen:importmap": {
+			"cache": false
+		},
+		"migrate": { "cache": false },
+		"migrate:create": { "cache": false },
+		"migrate:down": { "cache": false },
+		"migrate:refresh": { "cache": false },
+		"migrate:reset": { "cache": false },
+		"migrate:status": { "cache": false },
+		"migrate:fresh": { "cache": false },
+		"clean": {
+			"cache": false
+		}
+	}
+}

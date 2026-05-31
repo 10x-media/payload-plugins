@@ -1,0 +1,68 @@
+{
+	"name": "@10x-media/monorepo",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Public Payload v3 plugins by 10x-media",
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.18.0",
+		"pnpm": ">=10"
+	},
+	"packageManager": "pnpm@10.14.0",
+	"scripts": {
+		"build": "tsx scripts/run.ts build",
+		"dev": "tsx scripts/run.ts dev",
+		"start": "tsx scripts/run.ts start",
+		"lint": "tsx scripts/run.ts lint",
+		"lint:fix": "tsx scripts/run.ts lint:fix",
+		"format": "biome format --write .",
+		"typecheck": "tsx scripts/run.ts typecheck",
+		"test": "tsx scripts/run.ts test",
+		"test:unit": "tsx scripts/run.ts test:unit",
+		"test:int": "tsx scripts/run.ts test:int",
+		"test:matrix": "tsx scripts/run.ts test:matrix",
+		"test:container": "tsx scripts/run.ts test:container",
+		"test:e2e": "tsx scripts/run.ts test:e2e",
+		"gen": "tsx scripts/run.ts gen",
+		"gen:types": "tsx scripts/run.ts gen:types",
+		"gen:importmap": "tsx scripts/run.ts gen:importmap",
+		"migrate": "tsx scripts/run.ts migrate",
+		"migrate:create": "tsx scripts/run.ts migrate:create",
+		"migrate:down": "tsx scripts/run.ts migrate:down",
+		"migrate:refresh": "tsx scripts/run.ts migrate:refresh",
+		"migrate:reset": "tsx scripts/run.ts migrate:reset",
+		"migrate:status": "tsx scripts/run.ts migrate:status",
+		"migrate:fresh": "tsx scripts/run.ts migrate:fresh",
+		"new": "tsx scripts/gen-plugin.ts",
+		"clean": "turbo run clean && rm -rf node_modules",
+		"clean:processes": "bash scripts/cleanup.sh",
+		"check:processes": "bash scripts/cleanup.sh --dry-run",
+		"changeset": "changeset",
+		"version-packages": "changeset version",
+		"release": "turbo run build --filter='./packages/*' && changeset publish",
+		"prepare": "test -d .git && husky || echo 'husky: skipping (not a git repo yet)'"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.16",
+		"@clack/prompts": "^1.4.0",
+		"@changesets/changelog-github": "^0.7.0",
+		"@changesets/cli": "^2.27.0",
+		"@commitlint/cli": "^19.6.0",
+		"@commitlint/config-conventional": "^19.6.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^17.0.0",
+		"tsx": "^4.19.2",
+		"turbo": "^2.3.0",
+		"typescript": "catalog:"
+	},
+	"lint-staged": {
+		"*.{ts,tsx,js,jsx,mjs,mts,json,jsonc,css,md,mdx}": "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"esbuild",
+			"mongodb-memory-server"
+		]
+	}
+}

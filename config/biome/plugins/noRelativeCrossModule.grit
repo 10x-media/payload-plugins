@@ -1,0 +1,5 @@
+language js
+
+`import $items from "../../$path"` where {
+	register_diagnostic(span=$path, message="Cross-module relative imports (../../) are not allowed. Use sub-path imports or restructure.", severity="error")
+}
