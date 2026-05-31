@@ -1,0 +1,6 @@
+language js
+
+`t($key)` where {
+	$key <: `"$_"`,
+	register_diagnostic(span=$key, message="Translation lookups must use the typed `keys` constant from translations/keys.ts, not string literals.", severity="error")
+}

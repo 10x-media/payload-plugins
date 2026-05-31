@@ -1,0 +1,33 @@
+{
+	"name": "@10x-media/docs",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "next dev --turbo",
+		"build": "next build",
+		"start": "next start",
+		"lint": "biome check app content lib components",
+		"lint:fix": "biome check --write app content lib components",
+		"typecheck": "fumadocs-mdx && next typegen && tsc -p tsconfig.json --noEmit"
+	},
+	"dependencies": {
+		"fumadocs-core": "^16.9.2",
+		"fumadocs-mdx": "^15.0.9",
+		"fumadocs-ui": "^16.9.2",
+		"next": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:"
+	},
+	"devDependencies": {
+		"@10x-media/tsconfig": "workspace:*",
+		"@tailwindcss/postcss": "4.3.0",
+		"@types/mdx": "^2.0.13",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"postcss": "8.5.15",
+		"tailwindcss": "4.3.0",
+		"typescript": "catalog:"
+	}
+}

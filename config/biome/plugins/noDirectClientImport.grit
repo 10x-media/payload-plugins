@@ -1,0 +1,5 @@
+language js
+
+`import $items from "./exports/client"` where {
+	register_diagnostic(span=$items, message="Server-side files cannot import from ./exports/client. Move shared code to a server-safe module.", severity="error")
+}

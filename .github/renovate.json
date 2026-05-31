@@ -1,0 +1,23 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended", ":semanticCommits", "helpers:pinGitHubActionDigests"],
+	"labels": ["dependencies"],
+	"schedule": ["before 6am on monday"],
+	"packageRules": [
+		{
+			"description": "Group Payload core and adapters into one PR",
+			"matchPackageNames": ["payload", "@payloadcms/*"],
+			"groupName": "payload"
+		},
+		{
+			"description": "Group the React ecosystem",
+			"matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
+			"groupName": "react"
+		},
+		{
+			"description": "Group fumadocs packages",
+			"matchPackageNames": ["fumadocs*"],
+			"groupName": "fumadocs"
+		}
+	]
+}

@@ -1,0 +1,44 @@
+# deps
+node_modules/
+.pnp
+.pnp.js
+
+# build
+dist/
+.turbo/
+*.tsbuildinfo
+*.tgz
+
+# next (docs + plugin dev apps)
+**/.next/
+apps/docs/out/
+apps/docs/.contentlayer/
+apps/docs/.source/
+next-env.d.ts
+
+# test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# env
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.pem
+
+# local scratch / superpowers state (internal planning, not part of the published repo)
+.superpowers/
+docs/superpowers/
+
+# per-developer Claude Code overrides (settings.json is committed)
+.claude/settings.local.json
+
+# misc
+note.md
+*.log

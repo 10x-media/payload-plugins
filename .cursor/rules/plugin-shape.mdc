@@ -1,0 +1,15 @@
+---
+description: Plugin shape conventions
+globs: ["packages/*/src/**/*.{ts,tsx}"]
+alwaysApply: true
+---
+
+Every plugin in `packages/` follows the same shape:
+
+- `src/index.ts` exports a single factory: `export const <name>Plugin = (options): Plugin => (incoming) => { ... }`.
+- Sub-path exports live under `src/exports/{types,client,i18n}.ts` and are mirrored in `package.json` `exports`.
+- Server-side files MUST NOT import from `./exports/client`. Client files use the `'use client'` directive.
+- Translation lookups MUST use the typed `keys` constant from `src/translations/keys.ts`. No string literal translation keys.
+- No direct `process.env.X` access. Use a validated `env` module.
+- No relative imports crossing two or more `../` levels. Restructure or use sub-path imports.
+- All plugins set `sideEffects: false` and use named exports only (no barrel re-exports of non-tree-shakeable surfaces).

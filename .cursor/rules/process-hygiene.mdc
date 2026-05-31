@@ -1,0 +1,50 @@
+---
+description: Process hygiene and the payload bin hang
+globs: ["**/*.{ts,tsx,sh,yml,yaml,json,md}"]
+alwaysApply: true
+---
+
+Before declaring any task complete, run `pnpm check:processes`. If anything is listed, `pnpm clean:processes` removes only this repo's stale processes (it will never kill the host's system mongod, Cursor/VSCode, or other projects).
+
+## The Payload bin hang
+
+Payload v3's bin commands (`generate:*`, `migrate:*`) write their output successfully but the node process refuses to exit (Mongoose holds the event loop open; bin doesn't call `process.exit(0)`). For `generate:*` it's compounded: `payload.init()` and `payload.reload()` auto-spawn `void payload.bin(...)` whenever `NODE_ENV !== 'production'` AND the per-config `autoGenerate` flag isn't false. Every `getPayload({ config })` call leaks one. Symptom: `node ...payload/bin.js <command>` pinned at ~98% CPU.
+
+This repo controls the spawn via Payload's native config fields:
+
+```ts
+typescript: { autoGenerate },
+admin: { importMap: { autoGenerate } },
+```
+
+Where `autoGenerate` is conditional on the `PAYLOAD_SKIP_AUTOGEN` env var:
+
+- **User local dev** (no env var): `autoGenerate = true`. Standard Payload behavior, HMR regenerates types and importMap as the user works.
+- **Agent contexts** (`.claude/settings.json` sets `PAYLOAD_SKIP_AUTOGEN=1`): `autoGenerate = false`. Zero auto-spawn, zero leaks.
+- **Test harness** (`tooling/test-harness/src/bootPayload.ts`): hardcoded `false`. Tests never need generated output.
+
+Do not remove these patterns from any Payload config in this repo.
+
+## Manual generate + migrate
+
+```bash
+pnpm gen <slug>                                  # types + importmap
+pnpm gen:types <slug> / pnpm gen:importmap <slug>
+pnpm migrate <slug>                              # apply pending
+pnpm migrate:create <slug> <migration-name>      # create migration file
+pnpm migrate:status <slug>
+pnpm migrate:down/refresh/reset/fresh <slug>
+```
+
+These call Payload's CLI through `scripts/payload.sh`, which enforces a 120-second deadline and force-kills the child if the bin hangs after writing its output. Exit code 124 means the deadline tripped (the file is still written). Do not call `pnpm exec payload <generate:*|migrate:*>` directly; `.claude/settings.json` denies it for agents anyway.
+
+## Test infra (Payload-aligned)
+
+- Mongo: in-memory via `mongodb-memory-server` (matches Payload's own monorepo test pattern).
+- Postgres: always real Docker via `testcontainers` (`postgres:16`). No in-process Postgres.
+- E2E: docker compose stack + Next production build + Playwright.
+
+## Long-running processes from your work
+
+- `next dev`, `next start`, `tsdown --watch`, `vitest --watch`: capture the PID when spawned, kill before declaring done. `packages/<plugin>/scripts/e2e.sh` handles this for the e2e flow via a `trap`.
+- Docker containers from `docker-compose.test.yml`: the e2e script's trap tears them down. Manual: `docker compose -f packages/<plugin>/docker-compose.test.yml down -v`.

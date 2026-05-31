@@ -1,0 +1,19 @@
+{
+	"name": "@10x-media/vitest-config",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./vitest.shared": {
+			"development": "./vitest.shared.ts",
+			"types": "./vitest.shared.ts",
+			"default": "./vitest.shared.ts"
+		}
+	},
+	"files": [
+		"vitest.shared.ts"
+	],
+	"dependencies": {
+		"vitest": "catalog:"
+	}
+}
