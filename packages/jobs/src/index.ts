@@ -1,0 +1,103 @@
+import { type Config, definePlugin } from 'payload'
+
+import type { JobsPluginOptions } from './options'
+import { registerJobsEnhancements } from './plugin/registerJobsEnhancements'
+import { registerTranslations } from './plugin/registerTranslations'
+import { resolveQueueControlOptions } from './queueControl/options'
+import { registerQueueControl } from './queueControl/registerQueueControl'
+import { resolveReliabilityOptions } from './reliability/options'
+import { registerReliability } from './reliability/registerReliability'
+
+declare module 'payload' {
+	interface RegisteredPlugins {
+		'@10x-media/jobs': JobsPluginOptions
+	}
+}
+
+/**
+ * Jobs plugin for Payload v3. Enhances the built-in `payload-jobs` collection
+ * with an ops dashboard (status, queue health, error and log panels) and the
+ * supporting i18n. Authored with `definePlugin` so the automations and webhooks
+ * plugins can detect it by slug. Runs first (`order: 0`).
+ */
+export const jobs = definePlugin<JobsPluginOptions>({
+	slug: '@10x-media/jobs',
+	order: 0,
+	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+		if (options.disabled === true) {
+			return config
+		}
+		registerTranslations(config)
+		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
+		registerJobsEnhancements(config, options)
+		const reliability = resolveReliabilityOptions(options.reliability)
+		if (reliability) {
+			registerReliability(config, reliability)
+		}
+		const queueControl = resolveQueueControlOptions(options.queueControl)
+		if (queueControl) {
+			registerQueueControl(config, queueControl, reliability)
+		}
+		return config
+	},
+})
+
+export {
+	type AutoRunConfigOptions,
+	type AutoRunQueueConfig,
+	autoRunConfig,
+} from './execution/autoRunConfig'
+export { type DrainDeps, type DrainOptions, type DrainResult, drainWorker } from './execution/drain'
+export { type CreateWorkerArgs, createWorker, type Worker } from './execution/worker'
+export type { JobStatus, JobStatusInput } from './jobs/deriveJobStatus'
+export { deriveJobStatus } from './jobs/deriveJobStatus'
+export type { JobsOptions, JobsPluginOptions, JobsPluginOptions as PluginOptions } from './options'
+export {
+	multiNodePreset,
+	serverlessPreset,
+	singleNodePreset,
+	type TopologyPreset,
+	type VercelCron,
+	vercelCrons,
+} from './presets/presets'
+export { cronSecretAccess, type JobAccess, loggedInAccess } from './queueControl/access'
+export type { QueueControlOptions } from './queueControl/options'
+export type { PauseState } from './queueControl/pauseState'
+export { createPauseStore, type PauseStore } from './queueControl/pauseStore'
+export {
+	type GetQueueHealthOptions,
+	getQueueHealth,
+	type QueueHealth,
+	type QueueHealthReport,
+} from './queueControl/queueHealth'
+export {
+	type IdempotencyStore,
+	withIdempotencyKey,
+} from './reliability/concurrencyContract'
+export {
+	createJobLeaseStore,
+	type DeadLetterArgs,
+	type JobId,
+	type JobLeaseResult,
+	type JobLeaseRow,
+	type JobLeaseStore,
+	type StampResult,
+} from './reliability/jobLeaseStore'
+export {
+	createLeaderController,
+	type LeaderController,
+} from './reliability/leaderController'
+export {
+	createLeaseStore,
+	type LeaseRecord,
+	type LeaseResult,
+	type LeaseStore,
+} from './reliability/leaseStore'
+export { JOBS_LOCKS_SLUG, LEADER_ROLES, type LeaderRole } from './reliability/locksCollection'
+export type { ReliabilityOptions } from './reliability/options'
+export {
+	type ResolvedReliabilityOptions,
+	resolveReliabilityOptions,
+} from './reliability/options'
+export { decideRecovery, type RecoveryDecision } from './reliability/recoveryDecision'
+export { type RunSweepArgs, runSweep, type SweepResult } from './reliability/sweeper'
