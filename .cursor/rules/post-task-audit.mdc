@@ -1,0 +1,26 @@
+---
+description: Audit and cleanup after every task
+globs: ["**/*"]
+alwaysApply: true
+---
+
+Before declaring any feature, fix, refactor, or change "done", perform a post-task audit. Cleanup and verification are not optional, they are part of the task.
+
+## Always run
+
+1. **Comment policy sweep** of files you touched. See `.cursor/rules/comments.mdc`. Common offenders: em-dashes, low-signal filler comments, banner art, multi-paragraph prose inside code.
+2. **Stale-reference check.** Search for references to anything you renamed, moved, or removed. Update or delete every hit.
+3. **Doc alignment.** Any change to scripts, commands, or workflows: update `CLAUDE.md`, `README.md`, plugin `README.md`, the spec/plan in `docs/superpowers/`, and `.claude/skills/**/SKILL.md` to match. Drift is debt.
+4. **Process hygiene.** Run `pnpm check:processes` and confirm no stale repo-owned processes. See `.cursor/rules/process-hygiene.mdc`.
+5. **Lint + typecheck.** `pnpm lint` and `pnpm typecheck`. Zero errors before declaring done. New warnings get explained or fixed.
+6. **Tests.** Run the relevant tier (`pnpm test [name]` minimum). For changes that touch the build, run `pnpm build [name]` too.
+
+## When the audit finds debt
+
+Fix it inline as part of the same task. Do not promise to clean up later. "Clean up later" means "never".
+
+If the debt is genuinely out of scope, surface it explicitly with file paths and a concrete reason. Do not let it sink.
+
+## Why this rule exists
+
+Drift between code and docs, ignored lint warnings, leaked processes, half-renamed symbols, dead comments referring to old behavior. Each one is cheap to leave behind and expensive to discover later. The audit step makes the cost visible at the right time, before the work is "done" in your head.

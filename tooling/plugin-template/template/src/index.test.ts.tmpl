@@ -1,0 +1,16 @@
+import type { Config } from 'payload'
+import { describe, expect, it } from 'vitest'
+
+import { {{pluginCamel}} } from './index'
+
+const fakeConfig = { collections: [] } as unknown as Config
+
+describe('{{pluginCamel}} factory', () => {
+	it('returns a Payload plugin function', () => {
+		expect(typeof {{pluginCamel}}({})).toBe('function')
+	})
+
+	it('returns the incoming config untouched (passthrough scaffold)', () => {
+		expect({{pluginCamel}}({})(fakeConfig)).toBe(fakeConfig)
+	})
+})

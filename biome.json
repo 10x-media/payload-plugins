@@ -1,0 +1,11 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+	"extends": ["./config/biome/biome.json"],
+	"plugins": [
+		"./config/biome/plugins/noProcessEnv.grit",
+		"./config/biome/plugins/noRelativeCrossModule.grit",
+		"./config/biome/plugins/requirePluginFactoryShape.grit",
+		"./config/biome/plugins/requireI18nKeysTyped.grit",
+		"./config/biome/plugins/noDirectClientImport.grit"
+	]
+}

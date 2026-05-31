@@ -1,0 +1,4 @@
+# Default owner and required reviewer for all changes.
+# Enforced once "Require review from Code Owners" is enabled in branch protection.
+# https://docs.github.com/en/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+* @HarleySalas

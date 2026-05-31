@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PAYLOAD_SKIP_AUTOGEN: '1'
+  # Primary Node version for single-version jobs. The test matrix below pins the
+  # versions to forward-test. Bump both together when moving to the next LTS.
+  NODE_VERSION: '22'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Current and next Node LTS. Floor is 22.18 (native .ts config support,
+        # see engines); 24 is forward-coverage for the next LTS.
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Pre-cache the Mongo binary (avoid a parallel-download lockfile race)
+        run: >-
+          pnpm --filter @10x-media/payload-test-harness exec node -e
+          "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
+      - run: pnpm test
+
+  test-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Pre-cache the Mongo binary (avoid a parallel-download lockfile race)
+        run: >-
+          pnpm --filter @10x-media/payload-test-harness exec node -e
+          "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
+      - run: pnpm test:matrix
+
+  # Heavier tiers run on demand (PR label or manual dispatch), not on every push,
+  # so main stays fast. test-matrix already covers Postgres-in-Docker on push.
+  test-container:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'parity')
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:container
+
+  e2e:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'e2e')
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @10x-media/jobs exec playwright install --with-deps chromium
+      - run: pnpm -r test:e2e
+
+  changeset-required:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-release')
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify changeset exists when packages changed
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD | grep -E '^packages/[^/]+/src/' || true)
+          if [ -n "$CHANGED" ]; then
+            CHANGES=$(pnpm changeset status --since=origin/main --output=/dev/stdout 2>/dev/null | grep -c 'releases:' || echo 0)
+            if [ "$CHANGES" -eq 0 ]; then
+              echo "::error::Packages changed but no changeset present. Run 'pnpm changeset' or apply 'no-release' label."
+              exit 1
+            fi
+          fi

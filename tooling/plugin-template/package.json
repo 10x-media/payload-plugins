@@ -1,0 +1,6 @@
+{
+	"name": "@10x-media/plugin-template",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Template files for scaffolding new plugins. Consumed by scripts/gen-plugin.ts."
+}

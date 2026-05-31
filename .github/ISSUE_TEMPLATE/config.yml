@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and discussions
+    url: https://github.com/10x-media/payload-plugins/discussions
+    about: Ask questions, share ideas, and get help here rather than opening an issue.
