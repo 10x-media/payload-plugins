@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/jobs",
-	"version": "0.0.0",
+	"version": "0.1.0-beta.0",
 	"description": "Jobs ops dashboard, execution helpers, and reliability tooling for Payload",
 	"license": "MIT",
 	"repository": {
@@ -10,7 +10,11 @@
 	},
 	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/jobs",
 	"bugs": "https://github.com/10x-media/payload-plugins/issues",
-	"keywords": ["payload", "payloadcms", "plugin"],
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin"
+	],
 	"author": "10x-media",
 	"engines": {
 		"node": ">=22.18.0"
@@ -44,7 +48,12 @@
 			"default": "./dist/exports/i18n.js"
 		}
 	},
-	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsdown",
 		"lint": "biome check src tests dev",
