@@ -4,7 +4,16 @@
 	"initialVersions": {
 		"@10x-media/automations": "0.0.0",
 		"@10x-media/jobs": "0.0.0",
-		"@10x-media/webhooks": "0.0.0"
+		"@10x-media/webhooks": "0.0.0",
+		"@10x-media/docs": "0.0.0",
+		"@10x-media/biome-config": "0.0.0",
+		"@10x-media/tsconfig": "0.0.0",
+		"@10x-media/vitest-config": "0.0.0",
+		"@10x-media/automations-dev": "0.0.0",
+		"@10x-media/jobs-dev": "0.0.0",
+		"@10x-media/webhooks-dev": "0.0.0",
+		"@10x-media/plugin-template": "0.0.0",
+		"@10x-media/payload-test-harness": "0.0.0"
 	},
-	"changesets": []
+	"changesets": ["jobs-initial-beta"]
 }
