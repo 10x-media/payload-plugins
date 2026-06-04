@@ -56,10 +56,14 @@ export type JobsPluginOptions = JobsOptions & {
 	disabled?: boolean
 	/**
 	 * Reliability layer: stuck-job recovery, a heartbeat lease, and multi-node
-	 * leader election. Opt-in (default off) because it adds fields to `payload-jobs`
-	 * and a `payload-jobs-locks` collection, so adopters run one `migrate:create`.
+	 * leader election. Off by default; pass `true` for defaults or an object to
+	 * tune it. It adds fields to `payload-jobs` and a `payload-jobs-locks`
+	 * collection, so adopters run one `migrate:create`.
 	 */
-	reliability?: false | ReliabilityOptions
-	/** Queue-control: pause/resume, a status endpoint, and a hardened run endpoint. Default off. */
-	queueControl?: false | QueueControlOptions
+	reliability?: boolean | ReliabilityOptions
+	/**
+	 * Queue control: pause/resume, a status endpoint, and a hardened run endpoint.
+	 * Off by default; pass `true` for defaults or an object to tune it.
+	 */
+	queueControl?: boolean | QueueControlOptions
 }

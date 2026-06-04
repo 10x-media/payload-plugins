@@ -14,13 +14,15 @@ export type ResolvedQueueControlOptions = {
 
 /** Resolve queue-control options to a fully-defaulted object, or `null` when disabled. */
 export const resolveQueueControlOptions = (
-	options: QueueControlOptions | false | undefined
+	options: QueueControlOptions | boolean | undefined
 ): ResolvedQueueControlOptions | null => {
 	if (options === undefined || options === false) {
 		return null
 	}
+	// `true` enables it with defaults; an object customizes it.
+	const opts: QueueControlOptions = options === true ? {} : options
 	return {
-		access: options.access ?? loggedInAccess,
-		queues: options.queues ?? ['default'],
+		access: opts.access ?? loggedInAccess,
+		queues: opts.queues ?? ['default'],
 	}
 }

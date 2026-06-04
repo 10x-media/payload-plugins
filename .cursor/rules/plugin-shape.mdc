@@ -13,3 +13,4 @@ Every plugin in `packages/` follows the same shape:
 - No direct `process.env.X` access. Use a validated `env` module.
 - No relative imports crossing two or more `../` levels. Restructure or use sub-path imports.
 - All plugins set `sideEffects: false` and use named exports only (no barrel re-exports of non-tree-shakeable surfaces).
+- Opt-in feature options follow Payload's form: `false`/omitted disables, `true` enables with defaults, an object customizes. The resolver normalizes `true` to `{}` then fills defaults (see jobs' `resolveReliabilityOptions`).

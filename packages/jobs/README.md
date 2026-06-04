@@ -38,8 +38,8 @@ export default buildConfig({
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `disabled` | `boolean` | `false` | When `true`, returns the incoming config unchanged. Useful for toggling the plugin per environment. |
-| `reliability` | `ReliabilityOptions \| false` | off | Job leases, the orphan sweeper, leader election, and serverless staleness. Opt in with `{}` (defaults) or a tuned object. |
-| `queueControl` | `QueueControlOptions \| false` | off | Cluster-wide pause/resume, hardened run/sweep/status endpoints, and access guards. Opt in with `{}` (defaults) or a tuned object. |
+| `reliability` | `ReliabilityOptions \| boolean` | off | Job leases, the orphan sweeper, leader election, and serverless staleness. Opt in with `true` (defaults) or a tuned object. |
+| `queueControl` | `QueueControlOptions \| boolean` | off | Cluster-wide pause/resume, hardened run/sweep/status endpoints, and access guards. Opt in with `true` (defaults) or a tuned object. |
 
 <!-- Add new options to this table as you build them. -->
 
@@ -52,9 +52,9 @@ The plugin ships four opt-in layers. You add only the ones your deployment needs
 | Layer | What it adds | How to enable |
 |---|---|---|
 | Observability | The jobs ops dashboard (status, queue health, error and log panels) and i18n. | Always on (just adding `jobs()`). |
-| Reliability | Job leases, an orphan sweeper, leader election, serverless staleness. | `reliability: {}` (or a tuned `ReliabilityOptions`). |
+| Reliability | Job leases, an orphan sweeper, leader election, serverless staleness. | `reliability: true` (or a tuned `ReliabilityOptions`). |
 | Execution | A standalone worker (`createWorker`) that runs jobs everywhere and schedules/sweeps only while holding the leader lease, with a graceful SIGTERM drain. | Run the worker entrypoint as its own process. |
-| Queue control | Cluster-wide pause/resume plus hardened `/api/payload-jobs/queue-run`, `/queue-sweep`, and `/queue-status` endpoints with access guards. | `queueControl: {}` (or a tuned `QueueControlOptions`). |
+| Queue control | Cluster-wide pause/resume plus hardened `/api/payload-jobs/queue-run`, `/queue-sweep`, and `/queue-status` endpoints with access guards. | `queueControl: true` (or a tuned `QueueControlOptions`). |
 
 Every layer is opt-in. The observability dashboard is always present once the plugin is installed. The other three you turn on as your topology demands.
 

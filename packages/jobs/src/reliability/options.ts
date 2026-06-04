@@ -39,20 +39,22 @@ export type ResolvedReliabilityOptions = {
 
 /** Resolve user reliability options to a fully-defaulted object, or `null` when disabled. */
 export const resolveReliabilityOptions = (
-	options: ReliabilityOptions | false | undefined
+	options: ReliabilityOptions | boolean | undefined
 ): ResolvedReliabilityOptions | null => {
 	if (options === undefined || options === false) {
 		return null
 	}
-	const jobLeaseTtlMs = options.jobLeaseTtlMs ?? 300_000
+	// `true` enables the layer with every default; an object customizes it.
+	const opts: ReliabilityOptions = options === true ? {} : options
+	const jobLeaseTtlMs = opts.jobLeaseTtlMs ?? 300_000
 	return {
-		heartbeatIntervalMs: options.heartbeatIntervalMs ?? Math.floor(jobLeaseTtlMs / 3),
+		heartbeatIntervalMs: opts.heartbeatIntervalMs ?? Math.floor(jobLeaseTtlMs / 3),
 		jobLeaseTtlMs,
-		leaderId: options.leaderId ?? null,
-		leaderLeaseTtlMs: options.leaderLeaseTtlMs ?? 30_000,
-		maxRecoveries: options.maxRecoveries ?? 3,
-		requireConcurrencyControl: options.requireConcurrencyControl ?? false,
-		serverlessMaxDurationMs: options.serverless?.maxDurationMs ?? null,
-		sweepIntervalMs: options.sweepIntervalMs ?? 60_000,
+		leaderId: opts.leaderId ?? null,
+		leaderLeaseTtlMs: opts.leaderLeaseTtlMs ?? 30_000,
+		maxRecoveries: opts.maxRecoveries ?? 3,
+		requireConcurrencyControl: opts.requireConcurrencyControl ?? false,
+		serverlessMaxDurationMs: opts.serverless?.maxDurationMs ?? null,
+		sweepIntervalMs: opts.sweepIntervalMs ?? 60_000,
 	}
 }

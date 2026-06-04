@@ -19,6 +19,11 @@ describe('resolveReliabilityOptions', () => {
 		expect(resolved?.serverlessMaxDurationMs).toBeNull()
 	})
 
+	it('treats true as enabling with all defaults (same as {})', () => {
+		expect(resolveReliabilityOptions(true)).toEqual(resolveReliabilityOptions({}))
+		expect(resolveReliabilityOptions(true)).not.toBeNull()
+	})
+
 	it('derives heartbeatIntervalMs from jobLeaseTtlMs when not given', () => {
 		expect(resolveReliabilityOptions({ jobLeaseTtlMs: 30_000 })?.heartbeatIntervalMs).toBe(10_000)
 	})
