@@ -4,9 +4,9 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "next dev --turbo -p ${PORT:-3100}",
+		"dev": "next dev --turbo -p ${PORT:-3000}",
 		"build": "next build",
-		"start": "next start -p ${PORT:-3100}",
+		"start": "next start -p ${PORT:-3000}",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"generate": "pnpm generate:types && pnpm generate:importmap",
 		"generate:types": "bash ../../../scripts/payload.sh . generate:types",

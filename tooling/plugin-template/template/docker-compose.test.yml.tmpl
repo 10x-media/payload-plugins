@@ -25,7 +25,7 @@ services:
       POSTGRES_PASSWORD: e2e
       POSTGRES_DB: {{pluginSlug}}_e2e
     ports:
-      - '35432:5432'
+      - '${PG_E2E_PORT:-35432}:5432'
     healthcheck:
       test: ['CMD', 'pg_isready', '-U', 'e2e', '-d', '{{pluginSlug}}_e2e']
       interval: 2s

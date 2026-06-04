@@ -53,15 +53,11 @@ There is no in-process Postgres option. Postgres tiers always use a real Docker 
 
 ## Parallel development and worktrees
 
-The unit, int, matrix, and container tiers are safe to run in parallel across multiple git worktrees. They allocate ephemeral testcontainer ports (the OS assigns a free host port per container, never a fixed one), each worktree has its own `node_modules`, and the turbo cache is keyed by content hash, so concurrent runs do not collide.
+Everything is safe to run in parallel across multiple git worktrees, with no per-worktree setup:
 
-The e2e tier is the exception: it defaults to fixed host ports (`37017` for Mongo, `35432` for Postgres, `3100` for the Next dev server), which is fine for a single worktree. To run e2e in two worktrees at once, set `MONGO_E2E_PORT`, `PG_E2E_PORT`, and `E2E_NEXT_PORT` to distinct values per worktree:
-
-```bash
-MONGO_E2E_PORT=37117 PG_E2E_PORT=35532 E2E_NEXT_PORT=3101 pnpm test:e2e jobs
-```
-
-The e2e compose project is also namespaced per worktree (`COMPOSE_PROJECT_NAME`), so containers from different worktrees never clash.
+- **Tests** (unit, int, matrix, container) bind ephemeral ports: testcontainers let the OS assign a free host port per container, and in-memory Mongo picks a random port. Each worktree has its own `node_modules`, and the turbo cache is content-hashed, so concurrent runs never collide.
+- **e2e self-isolates.** `scripts/e2e.sh` derives both its `COMPOSE_PROJECT_NAME` and its host ports (Mongo/Postgres/Next) from the worktree, so two worktrees can run e2e at once untouched. Pin them with `MONGO_E2E_PORT` / `PG_E2E_PORT` / `E2E_NEXT_PORT` if you ever need fixed ports.
+- **Dev server.** `pnpm dev <name>` defaults to port 3000 (`${PORT:-3000}`); set `PORT` to run a second dev server from another worktree.
 
 ## Writing tests
 
