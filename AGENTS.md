@@ -31,7 +31,7 @@ pnpm test:int [name]
 pnpm test:matrix [name]       # Docker required
 pnpm test:container [name]    # Docker required
 pnpm test:e2e <name>          # Docker required
-pnpm gen <name>
+pnpm generate <name>
 pnpm migrate <name>
 pnpm lint [name]
 pnpm typecheck [name]
@@ -41,7 +41,7 @@ pnpm check:processes
 pnpm clean:processes
 ```
 
-`<name>` is a plugin under `packages/` (e.g. `automations`) or an app under `apps/` (e.g. `docs`). Apps do not support `gen` or `migrate`.
+`<name>` is a plugin under `packages/` (e.g. `automations`) or an app under `apps/` (e.g. `docs`). Apps do not support `generate` or `migrate`.
 
 ## Test tiers
 
@@ -56,7 +56,7 @@ pnpm clean:processes
 ## Process hygiene
 
 - Run `pnpm check:processes` before declaring any task done.
-- Never invoke `payload generate:*` or `payload migrate:*` directly. Use `pnpm gen <name>` and `pnpm migrate <name>`, which route through `scripts/payload.sh` (120-second deadline, auto-kills on hang).
+- Never invoke `payload generate:*` or `payload migrate:*` directly. Use `pnpm generate <name>` and `pnpm migrate <name>`, which route through `scripts/payload.sh` (120-second deadline, auto-kills on hang).
 - After any long-running command (dev server, watcher, container), verify it is stopped before finishing.
 
 ## Comment and style policy

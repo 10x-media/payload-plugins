@@ -11,7 +11,11 @@
 	},
 	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/webhooks",
 	"bugs": "https://github.com/10x-media/payload-plugins/issues",
-	"keywords": ["payload", "payloadcms", "plugin"],
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin"
+	],
 	"author": "10x-media",
 	"engines": {
 		"node": ">=22.18.0"
@@ -40,7 +44,12 @@
 			"default": "./dist/exports/i18n.js"
 		}
 	},
-	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsdown",
 		"lint": "biome check src tests dev",
@@ -54,9 +63,9 @@
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/webhooks-dev dev",
 		"start": "pnpm --filter @10x-media/webhooks-dev start",
-		"gen": "pnpm --filter @10x-media/webhooks-dev gen",
-		"gen:types": "pnpm --filter @10x-media/webhooks-dev gen:types",
-		"gen:importmap": "pnpm --filter @10x-media/webhooks-dev gen:importmap",
+		"generate": "pnpm --filter @10x-media/webhooks-dev generate",
+		"generate:types": "pnpm --filter @10x-media/webhooks-dev generate:types",
+		"generate:importmap": "pnpm --filter @10x-media/webhooks-dev generate:importmap",
 		"migrate": "pnpm --filter @10x-media/webhooks-dev migrate",
 		"migrate:create": "pnpm --filter @10x-media/webhooks-dev migrate:create",
 		"migrate:down": "pnpm --filter @10x-media/webhooks-dev migrate:down",

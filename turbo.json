@@ -58,13 +58,13 @@
 			"outputs": ["playwright-report/**", "test-results/**"],
 			"cache": false
 		},
-		"gen": {
+		"generate": {
 			"cache": false
 		},
-		"gen:types": {
+		"generate:types": {
 			"cache": false
 		},
-		"gen:importmap": {
+		"generate:importmap": {
 			"cache": false
 		},
 		"migrate": { "cache": false },

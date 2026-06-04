@@ -28,8 +28,8 @@ Do not remove these patterns from any Payload config in this repo.
 ## Manual generate + migrate
 
 ```bash
-pnpm gen <slug>                                  # types + importmap
-pnpm gen:types <slug> / pnpm gen:importmap <slug>
+pnpm generate <slug>                                  # types + importmap
+pnpm generate:types <slug> / pnpm generate:importmap <slug>
 pnpm migrate <slug>                              # apply pending
 pnpm migrate:create <slug> <migration-name>      # create migration file
 pnpm migrate:status <slug>

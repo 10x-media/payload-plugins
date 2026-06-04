@@ -48,9 +48,9 @@ pnpm test:container [name]              # both DBs via testcontainers (Mongo con
 pnpm test:e2e <name>                    # docker compose + build + Playwright
 
 # Generation (manual; agent contexts skip auto-gen via env var, see below)
-pnpm gen <name>                         # regenerate types + importmap for one plugin
-pnpm gen:types <name>
-pnpm gen:importmap <name>
+pnpm generate <name>                         # regenerate types + importmap for one plugin
+pnpm generate:types <name>
+pnpm generate:importmap <name>
 
 # Migrations (Payload's standard CLI, routed through scripts/payload.sh)
 pnpm migrate <name>                              # apply pending migrations
@@ -75,7 +75,7 @@ pnpm check:processes                    # dry-run stale-process scan
 pnpm clean:processes                    # kill them
 ```
 
-`<name>` is a plugin directory under `packages/` (e.g. `automations`) or an app under `apps/` (e.g. `docs`, so `pnpm dev docs` and `pnpm build docs` work). `scripts/run.ts` runs cacheable tasks (`build`/`lint`/`typecheck`/`test*`) through turbo and routes `dev`/`start`/`gen*`/`migrate*` to a plugin's `-dev` package via pnpm; apps have no `-dev` companion and do not support `gen`/`migrate`. Unknown names get a "Did you mean: ..." suggestion.
+`<name>` is a plugin directory under `packages/` (e.g. `automations`) or an app under `apps/` (e.g. `docs`, so `pnpm dev docs` and `pnpm build docs` work). `scripts/run.ts` runs cacheable tasks (`build`/`lint`/`typecheck`/`test*`) through turbo and routes `dev`/`start`/`generate*`/`migrate*` to a plugin's `-dev` package via pnpm; apps have no `-dev` companion and do not support `generate`/`migrate`. Unknown names get a "Did you mean: ..." suggestion.
 
 Migrations live at `packages/<plugin>/dev/migrations/`. Each plugin's `dev/payload.config.ts` sets `db.migrationDir` accordingly. Use `pnpm migrate:create <plugin> <migration-name>` in real projects, exactly mirroring Payload v3's standard workflow.
 
@@ -137,7 +137,7 @@ export default buildConfig({
 
 **Test harness** (`tooling/test-harness/src/bootPayload.ts`) hardcodes both flags to `false` regardless of env. Tests never need generated output and should never spawn generate subprocesses.
 
-**Manual regeneration / migrations.** The user-facing short commands (`pnpm gen <name>`, `pnpm migrate <name>`, `pnpm migrate:create <name> <migration-name>`, etc.) all route through `scripts/payload.sh`, which:
+**Manual regeneration / migrations.** The user-facing short commands (`pnpm generate <name>`, `pnpm migrate <name>`, `pnpm migrate:create <name> <migration-name>`, etc.) all route through `scripts/payload.sh`, which:
 
 - Enforces a 120-second deadline (override via `PAYLOAD_CMD_DEADLINE=N`)
 - Force-kills the child + node subprocesses if exceeded

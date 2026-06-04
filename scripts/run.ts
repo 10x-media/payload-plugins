@@ -4,7 +4,7 @@
  *
  * Cacheable, dependency-aware tasks (build, lint, typecheck, test*) run through
  * turbo so they gain caching and dependency-aware ordering. Interactive or
- * side-effecting tasks (dev, start, gen*, migrate*, test:e2e, lint:fix) run
+ * side-effecting tasks (dev, start, generate*, migrate*, test:e2e, lint:fix) run
  * through pnpm filters.
  *
  * A target can be a plugin under `packages/` (e.g. automations) or an app
@@ -42,19 +42,24 @@ const MIGRATE_TASKS = [
 const DEV_PACKAGE_TASKS = new Set([
 	'dev',
 	'start',
-	'gen',
-	'gen:types',
-	'gen:importmap',
+	'generate',
+	'generate:types',
+	'generate:importmap',
 	...MIGRATE_TASKS,
 ])
 // Tasks that only make sense for plugins (they rely on the `-dev` companion app).
-const PLUGIN_ONLY_TASKS = new Set(['gen', 'gen:types', 'gen:importmap', ...MIGRATE_TASKS])
+const PLUGIN_ONLY_TASKS = new Set([
+	'generate',
+	'generate:types',
+	'generate:importmap',
+	...MIGRATE_TASKS,
+])
 const REQUIRE_TARGET = new Set([
 	'dev',
 	'start',
-	'gen',
-	'gen:types',
-	'gen:importmap',
+	'generate',
+	'generate:types',
+	'generate:importmap',
 	'test:e2e',
 	...MIGRATE_TASKS,
 ])
@@ -154,7 +159,7 @@ const main = (): void => {
 		return
 	}
 
-	// Plugins route dev/start/gen*/migrate* to their `-dev` companion; apps run on themselves.
+	// Plugins route dev/start/generate*/migrate* to their `-dev` companion; apps run on themselves.
 	const useDevPackage = isPlugin && DEV_PACKAGE_TASKS.has(task)
 	const filter = useDevPackage ? `${SCOPE}/${bare}-dev` : `${SCOPE}/${bare}`
 	run('pnpm', ['--filter', filter, 'run', task, ...passThrough])
