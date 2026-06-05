@@ -42,7 +42,7 @@ const resolveListening = async (args: {
 		overrideAccess: true,
 		req: args.req,
 	})
-	if (res.docs.length === SUBSCRIPTION_SCAN_LIMIT) {
+	if (res.docs.length >= SUBSCRIPTION_SCAN_LIMIT) {
 		args.req.payload.logger.warn(
 			`@10x-media/webhooks: subscription scan hit the ${SUBSCRIPTION_SCAN_LIMIT} cap; some subscriptions may be skipped for ${args.event}.`
 		)
@@ -113,7 +113,7 @@ const dispatch = async (args: {
 			continue
 		}
 
-		// Inline: bounded-await; a delivery failure must never throw into the write.
+		// best-effort: a delivery failure must never abort the caller's write
 		try {
 			const result = await sendDelivery({
 				subscription,
@@ -127,7 +127,7 @@ const dispatch = async (args: {
 				collection: deps.deliveriesSlug,
 				id: deliveryId,
 				data: {
-					status: result.ok ? 'success' : 'failed',
+					status: result.ok ? 'success' : 'dead',
 					attempt: 1,
 					responseStatus: result.responseStatus,
 					responseBody: result.responseBody,

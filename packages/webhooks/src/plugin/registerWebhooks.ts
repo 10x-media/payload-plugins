@@ -34,6 +34,7 @@ export const registerWebhooks = (args: {
 		configured: delivery.mode,
 		hasAutoRun: Boolean(config.jobs?.autoRun),
 		hasJobsPlugin: args.hasJobsPlugin,
+		// config-build time: payload.logger does not exist yet, so console is the only channel
 		warn: (m) => console.warn(m),
 	})
 

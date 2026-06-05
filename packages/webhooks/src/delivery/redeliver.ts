@@ -82,7 +82,7 @@ export const redeliverDelivery = async (args: {
 		collection: deps.deliveriesSlug,
 		id: newId,
 		data: {
-			status: result.ok ? 'success' : 'failed',
+			status: result.ok ? 'success' : 'dead',
 			attempt: 1,
 			responseStatus: result.responseStatus,
 			responseBody: result.responseBody,
