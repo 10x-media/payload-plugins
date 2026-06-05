@@ -11,6 +11,9 @@ describe('buildDeliveriesCollection', () => {
 		expect(c.slug).toBe('webhook-deliveries')
 		expect(c.access?.create?.({} as never)).toBe(false)
 		expect(c.access?.update?.({} as never)).toBe(false)
+		expect(c.access?.read?.({ req: {} } as never)).toBe(false)
+		expect(c.access?.read?.({ req: { user: { id: '1' } } } as never)).toBe(true)
+		expect(c.access?.delete?.({ req: {} } as never)).toBe(false)
 	})
 
 	it('wires the status cell and stores the payload', () => {
