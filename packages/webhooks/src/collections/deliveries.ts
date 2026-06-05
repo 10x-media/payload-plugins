@@ -43,5 +43,10 @@ export const buildDeliveriesCollection = (args: {
 		{ name: 'durationMs', type: 'number' },
 		{ name: 'jobId', type: 'text' },
 		{ name: 'payload', type: 'json' },
+		{
+			name: 'redeliver',
+			type: 'ui',
+			admin: { components: { Field: '@10x-media/webhooks/client#RedeliverButton' } },
+		},
 	],
 })
