@@ -49,7 +49,7 @@ export const buildSubscriptionsCollection = (args: {
 			label: labelForKey(keys.fieldEvents),
 			options: args.events.length
 				? args.events.map((e) => ({ label: e, value: e }))
-				: [{ label: '—', value: '__none__' }],
+				: [{ label: '(none)', value: '__none__' }],
 		},
 		{
 			name: 'secret',
