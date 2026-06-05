@@ -19,6 +19,12 @@ const users: CollectionConfig = {
 	fields: [],
 }
 
+const posts: CollectionConfig = {
+	slug: 'posts',
+	admin: { useAsTitle: 'title' },
+	fields: [{ name: 'title', type: 'text' }],
+}
+
 const db =
 	useDb === 'postgres'
 		? postgresAdapter({
@@ -39,8 +45,21 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [webhooks({})],
+	collections: [users, posts],
+	endpoints: [
+		{
+			path: '/webhook-sink',
+			method: 'post',
+			handler: async (req) => {
+				const body = req.text ? await req.text() : ''
+				req.payload.logger.info(
+					`[webhook-sink] ${req.headers.get('x-webhook-event')} ${body.slice(0, 200)}`
+				)
+				return Response.json({ received: true }, { status: 200 })
+			},
+		},
+	],
+	plugins: [webhooks({ collections: { posts: true }, delivery: 'inline' })],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
