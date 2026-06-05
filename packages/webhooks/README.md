@@ -163,7 +163,7 @@ Additional headers sent on every request: `X-Webhook-Id`, `X-Webhook-Event`, `X-
 
 The plugin adds a **Webhooks** group with two collections.
 
-**Webhook Subscriptions**: create and manage endpoint records. A random 48-character hex secret is auto-generated on create (displayed read-only; rotate by deleting and recreating the record).
+**Webhook Subscriptions**: create and manage endpoint records. A random 48-character hex secret is auto-generated on create and shown in full **exactly once** on that create response -- copy it to your receiver then. On every later read it is masked (`__redacted__`); the raw value is still used internally to sign deliveries but is never returned through the API or admin again. Rotate by deleting and recreating the record.
 
 **Webhook Deliveries**: an append-only delivery log. Each row shows the event, subscription, status, HTTP response code, and a **Redeliver** button that replays the original payload to the original URL. Access requires a logged-in admin.
 
@@ -173,7 +173,13 @@ When `@10x-media/jobs` is installed, `delivery` mode auto-resolves to `'queue'` 
 
 ## Composing with `@10x-media/automations`
 
-When `@10x-media/automations` is installed, the plugin registers a `webhook` trigger in the automations catalog so automations can fire on incoming webhooks. No extra config is needed.
+When `@10x-media/automations` is installed, the plugin contributes a `webhook` trigger slug to the automations catalog, reserving it for future inbound-webhook support. This plugin is outbound-only today and does not yet fire that trigger -- the contribution simply registers the slug so a later inbound phase can use it. No extra config is needed.
+
+## Security
+
+- **Signing secrets are reveal-once.** A subscription's secret is shown in full only on the create response and masked (`__redacted__`) on every read thereafter; the raw value is used internally to sign deliveries and is never returned via REST, GraphQL, or the admin again. It is currently stored unencrypted at rest -- encryption-at-rest is planned.
+- **Outbound requests target operator-supplied URLs (SSRF).** Deliveries POST to whatever URL a subscription specifies, including private or internal hosts. Subscriptions are created by authenticated admins, so treat that as a trusted operation; if your admins are not fully trusted, restrict outbound egress at the network layer or front your receivers with an allowlist.
+- **Admin access is the trust boundary.** Both collections require a logged-in user, and the redeliver endpoint authorizes by login only (any authenticated user may redeliver any delivery). Tighten the collections with your own access control if you need finer-grained permissions.
 
 ## License
 

@@ -55,6 +55,7 @@ export const registerWebhooks = (args: {
 		path: '/:id/redeliver',
 		method: 'post',
 		handler: async (req) => {
+			// coarse auth: any logged-in user may redeliver any delivery (matches the deliveries collection access)
 			if (!req.user) {
 				return Response.json({ error: 'unauthorized' }, { status: 401 })
 			}
