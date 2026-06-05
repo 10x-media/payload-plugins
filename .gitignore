@@ -38,6 +38,8 @@ docs/superpowers/
 
 # per-developer Claude Code overrides (settings.json is committed)
 .claude/settings.local.json
+# isolated worktrees created by Claude Code (EnterWorktree); not part of the repo
+.claude/worktrees/
 
 # misc
 note.md
