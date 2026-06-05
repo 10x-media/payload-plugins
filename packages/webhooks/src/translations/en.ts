@@ -7,7 +7,6 @@ import { keys, type TranslationKey } from './keys'
  */
 export const en: Record<TranslationKey, string> = {
 	[keys.pluginName]: 'Webhooks',
-	[keys.adminGroup]: 'Webhooks',
 	[keys.subscriptionSingular]: 'Subscription',
 	[keys.subscriptionPlural]: 'Subscriptions',
 	[keys.deliverySingular]: 'Delivery',

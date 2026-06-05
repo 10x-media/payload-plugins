@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
 
+import { ADMIN_GROUP } from '../constants'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 
@@ -18,7 +19,6 @@ export const buildSubscriptionsCollection = (args: {
 	slug: string
 	events: string[]
 	hidden: boolean
-	adminGroup?: string
 }): CollectionConfig => ({
 	slug: args.slug,
 	labels: {
@@ -26,7 +26,7 @@ export const buildSubscriptionsCollection = (args: {
 		plural: labelForKey(keys.subscriptionPlural),
 	},
 	admin: {
-		group: args.adminGroup,
+		group: ADMIN_GROUP,
 		useAsTitle: 'name',
 		defaultColumns: ['name', 'url', 'enabled'],
 		hidden: args.hidden,

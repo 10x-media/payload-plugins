@@ -5,7 +5,6 @@
  */
 export const keys = {
 	pluginName: 'webhooks:pluginName',
-	adminGroup: 'webhooks:adminGroup',
 	subscriptionSingular: 'webhooks:subscriptionSingular',
 	subscriptionPlural: 'webhooks:subscriptionPlural',
 	deliverySingular: 'webhooks:deliverySingular',
