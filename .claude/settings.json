@@ -48,6 +48,12 @@
 				"matcher": "*",
 				"hooks": [{ "type": "command", "command": ".claude/hooks/session-start.sh" }]
 			}
+		],
+		"SessionEnd": [
+			{
+				"matcher": "*",
+				"hooks": [{ "type": "command", "command": ".claude/hooks/session-end.sh" }]
+			}
 		]
 	}
 }
