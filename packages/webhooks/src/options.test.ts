@@ -7,7 +7,7 @@ describe('resolveDeliveryOptions', () => {
 			mode: 'auto',
 			timeoutMs: 10_000,
 			retries: 4,
-			queue: 'webhooks',
+			queue: 'default',
 		})
 	})
 
@@ -20,7 +20,7 @@ describe('resolveDeliveryOptions', () => {
 			mode: 'queue',
 			timeoutMs: 500,
 			retries: 4,
-			queue: 'webhooks',
+			queue: 'default',
 		})
 	})
 })
