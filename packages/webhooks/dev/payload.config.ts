@@ -11,6 +11,8 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
+const port = process.env.PORT ?? '3000'
+const serverURL = process.env.PAYLOAD_PUBLIC_SERVER_URL ?? `http://localhost:${port}`
 
 const users: CollectionConfig = {
 	slug: 'users',
@@ -44,6 +46,7 @@ const db =
 
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
+	serverURL,
 	db,
 	collections: [users, posts],
 	endpoints: [
