@@ -17,7 +17,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldEvents]: 'Events',
 	[keys.fieldSecret]: 'Signing secret',
 	[keys.fieldSecretHelp]:
-		'Generated once on create. Used to sign deliveries; store it on the receiver.',
+		'Shown in full once on create, masked afterward. Used to sign deliveries; copy it to the receiver now.',
 	[keys.fieldHeaders]: 'Custom headers',
 	[keys.fieldDescription]: 'Description',
 	[keys.statusPending]: 'Pending',

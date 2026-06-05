@@ -1,15 +1,38 @@
 import { randomBytes } from 'node:crypto'
-import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
+import type {
+	CollectionAfterChangeHook,
+	CollectionBeforeChangeHook,
+	CollectionConfig,
+	FieldHook,
+} from 'payload'
 
-import { ADMIN_GROUP } from '../constants'
+import { ADMIN_GROUP, SECRET_MASK, SECRET_REVEAL_CONTEXT } from '../constants'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 
-const generateSecret: CollectionBeforeChangeHook = ({ data, operation }) => {
+const generateSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => {
 	if (operation === 'create' && !data.secret) {
+		req.context[SECRET_REVEAL_CONTEXT.once] = true
 		return { ...data, secret: randomBytes(24).toString('hex') }
 	}
 	return data
+}
+
+/**
+ * The DB always stores the raw secret; this mask only shapes read output. It runs even under
+ * `overrideAccess` (field hooks are not gated by access), so the raw value reaches a reader only
+ * when a reveal flag is set: `once` on the create response, `forSigning` on internal delivery reads.
+ */
+const maskSecret: FieldHook = ({ value, req }) => {
+	if (req.context[SECRET_REVEAL_CONTEXT.forSigning] || req.context[SECRET_REVEAL_CONTEXT.once]) {
+		return value
+	}
+	return value == null ? value : SECRET_MASK
+}
+
+const clearRevealOnce: CollectionAfterChangeHook = ({ doc, req }) => {
+	req.context[SECRET_REVEAL_CONTEXT.once] = false
+	return doc
 }
 
 const loggedIn = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
@@ -32,7 +55,7 @@ export const buildSubscriptionsCollection = (args: {
 		hidden: args.hidden,
 	},
 	access: { read: loggedIn, create: loggedIn, update: loggedIn, delete: loggedIn },
-	hooks: { beforeChange: [generateSecret] },
+	hooks: { beforeChange: [generateSecret], afterChange: [clearRevealOnce] },
 	fields: [
 		{ name: 'name', type: 'text', required: true, label: labelForKey(keys.fieldName) },
 		{ name: 'url', type: 'text', required: true, label: labelForKey(keys.fieldUrl) },
@@ -57,6 +80,7 @@ export const buildSubscriptionsCollection = (args: {
 			label: labelForKey(keys.fieldSecret),
 			admin: { readOnly: true, description: labelForKey(keys.fieldSecretHelp) },
 			access: { update: () => false },
+			hooks: { afterRead: [maskSecret] },
 		},
 		{
 			name: 'headers',

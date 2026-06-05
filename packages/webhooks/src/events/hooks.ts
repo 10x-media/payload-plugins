@@ -1,6 +1,6 @@
 import type { CollectionAfterChangeHook, CollectionAfterDeleteHook, PayloadRequest } from 'payload'
 
-import { WEBHOOK_DELIVER_TASK } from '../constants'
+import { SECRET_REVEAL_CONTEXT, WEBHOOK_DELIVER_TASK } from '../constants'
 import { buildPayload } from '../delivery/buildPayload'
 import { sendDelivery } from '../delivery/sendDelivery'
 import type { CodeSubscription, CollectionWebhookConfig, WebhookOperation } from '../options'
@@ -34,14 +34,20 @@ const resolveListening = async (args: {
 	req: PayloadRequest
 }): Promise<ResolvedSubscription[]> => {
 	const code = args.deps.codeSubscriptions.map(fromCodeSubscription)
-	const res = await args.req.payload.find({
-		collection: args.deps.subscriptionsSlug,
-		where: { enabled: { not_equals: false } },
-		limit: SUBSCRIPTION_SCAN_LIMIT,
-		depth: 0,
-		overrideAccess: true,
-		req: args.req,
-	})
+	args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = true
+	let res: Awaited<ReturnType<typeof args.req.payload.find>>
+	try {
+		res = await args.req.payload.find({
+			collection: args.deps.subscriptionsSlug,
+			where: { enabled: { not_equals: false } },
+			limit: SUBSCRIPTION_SCAN_LIMIT,
+			depth: 0,
+			overrideAccess: true,
+			req: args.req,
+		})
+	} finally {
+		args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = false
+	}
 	if (res.docs.length >= SUBSCRIPTION_SCAN_LIMIT) {
 		args.req.payload.logger.warn(
 			`@10x-media/webhooks: subscription scan hit the ${SUBSCRIPTION_SCAN_LIMIT} cap; some subscriptions may be skipped for ${args.event}.`

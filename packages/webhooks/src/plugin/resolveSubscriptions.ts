@@ -1,5 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 
+import { SECRET_REVEAL_CONTEXT } from '../constants'
 import type { CodeSubscription } from '../options'
 
 /** A subscription resolved from either source, ready to deliver to. */
@@ -75,14 +76,19 @@ export const resolveSubscriptionById = async (args: {
 	if (code) {
 		return fromCodeSubscription(code)
 	}
-	const res = await args.payload.find({
-		collection: args.subscriptionsSlug,
-		where: { id: { equals: args.id } },
-		limit: 1,
-		depth: 0,
-		overrideAccess: true,
-		req: args.req,
-	})
-	const row = res.docs[0] as Parameters<typeof fromCollectionRow>[0] | undefined
-	return row ? fromCollectionRow(row) : null
+	args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = true
+	try {
+		const res = await args.payload.find({
+			collection: args.subscriptionsSlug,
+			where: { id: { equals: args.id } },
+			limit: 1,
+			depth: 0,
+			overrideAccess: true,
+			req: args.req,
+		})
+		const row = res.docs[0] as Parameters<typeof fromCollectionRow>[0] | undefined
+		return row ? fromCollectionRow(row) : null
+	} finally {
+		args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = false
+	}
 }
