@@ -1,27 +1,24 @@
-import type { Config, Plugin } from 'payload'
-
+import { type Config, definePlugin } from 'payload'
 import { registerTranslations } from './plugin/registerTranslations'
 
-export interface FormBuilderOptions {
-	/**
-	 * Disable the plugin entirely (incoming config returned untouched).
-	 * Useful for opting out per environment without removing the plugin call.
-	 */
+export type FormBuilderPluginOptions = {
 	disabled?: boolean
 }
 
-/**
- * Form Builder plugin for Payload v3. Currently registers this plugin's
- * translations; future releases will add feature behavior.
- */
-export const formBuilder =
-	(options: FormBuilderOptions = {}): Plugin =>
-	(incoming: Config): Config => {
-		if (options.disabled === true) {
-			return incoming
-		}
-		registerTranslations(incoming)
-		return incoming
+declare module 'payload' {
+	interface RegisteredPlugins {
+		'@10x-media/form-builder': FormBuilderPluginOptions
 	}
+}
 
-export type { FormBuilderOptions as PluginOptions }
+export const formBuilder = definePlugin<FormBuilderPluginOptions>({
+	slug: '@10x-media/form-builder',
+	order: 50,
+	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+		if (options.disabled === true) return config
+		registerTranslations(config)
+		return config
+	},
+})
+
+export type { FormBuilderPluginOptions as PluginOptions }

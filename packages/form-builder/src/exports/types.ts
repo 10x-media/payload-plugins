@@ -1,1 +1,1 @@
-export type { FormBuilderOptions } from '../index'
+export type { FormBuilderPluginOptions } from '../index'

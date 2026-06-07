@@ -1,16 +1,18 @@
 import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
-
 import { formBuilder } from './index'
 
-const fakeConfig = { collections: [] } as unknown as Config
-
 describe('formBuilder factory', () => {
-	it('returns a Payload plugin function', () => {
-		expect(typeof formBuilder({})).toBe('function')
+	it('is a definePlugin plugin carrying the package slug', () => {
+		const plugin = formBuilder({})
+		expect(typeof plugin).toBe('function')
+		expect(plugin.slug).toBe('@10x-media/form-builder')
 	})
 
-	it('returns the incoming config untouched (passthrough scaffold)', () => {
-		expect(formBuilder({})(fakeConfig)).toBe(fakeConfig)
+	it('returns the config untouched when disabled', async () => {
+		const plugin = formBuilder({ disabled: true })
+		const config = { collections: [{ slug: 'users', fields: [] }] } as unknown as Config
+		const result = await Promise.resolve(plugin(config))
+		expect(result.collections).toHaveLength(1)
 	})
 })
