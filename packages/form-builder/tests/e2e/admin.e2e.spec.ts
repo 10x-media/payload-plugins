@@ -6,7 +6,7 @@ test('admin panel loads with formBuilder plugin enabled', async ({ page }) => {
 	await expect(page.locator('body')).toBeVisible()
 })
 
-test('payload health endpoint responds', async ({ request }) => {
+test('admin route responds', async ({ request }) => {
 	const response = await request.get('/admin')
 	expect(response.status()).toBeLessThan(500)
 })

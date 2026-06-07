@@ -11,7 +11,8 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)
-- React 19 (peer)
+- React 19 (peer: `react@^19.0.0`, `react-dom@^19.0.0`)
+- `@payloadcms/ui@^3.82.0` (peer)
 
 ## Installation
 
@@ -35,6 +36,7 @@ export default buildConfig({
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `disabled` | `boolean` | `false` | When `true`, returns the incoming config unchanged. Useful for toggling the plugin per environment. |
+| `events` | `FormEventSink` | `undefined` | Pluggable sink for form lifecycle events; defaults to a no-op. Consumed by the submission pipeline in a later phase. |
 
 ## License
 
