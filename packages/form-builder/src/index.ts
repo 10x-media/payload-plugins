@@ -1,9 +1,12 @@
 import { type Config, definePlugin } from 'payload'
+import type { FormEventSink } from './events/types'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 
 export type FormBuilderPluginOptions = {
 	disabled?: boolean
+	/** Pluggable sink for form lifecycle events. Defaults to a no-op; analytics adapters or a future analytics plugin subscribe here. */
+	events?: FormEventSink
 }
 
 declare module 'payload' {
