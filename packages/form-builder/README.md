@@ -1,12 +1,12 @@
 # @10x-media/form-builder
 
-End-to-end forms platform for Payload: author, validate, render, collect, aggregate, and act..
+An end-to-end forms platform for Payload v3: author, validate, render, collect, aggregate, and act on forms. Built to be the default forms solution for Payload projects, simple by default for non-technical editors, with real depth for power users and developers, and 100% native to Payload.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/form-builder?style=flat-square)](https://www.npmjs.com/package/@10x-media/form-builder)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Beta scaffold: this plugin currently returns the Payload config unchanged. Replace this note and fill in the sections below as you add behavior.
+> Status: alpha. Foundation only. The plugin currently registers a `definePlugin` factory, skeletal `forms` and `form-submissions` collections, the i18n setup, and a pluggable (no-op by default) event-sink seam. The field-type registry, validation subsystem, renderer, and post-submit pipeline land in subsequent phases.
 
 ## Requirements
 
@@ -26,12 +26,7 @@ import { buildConfig } from 'payload'
 import { formBuilder } from '@10x-media/form-builder'
 
 export default buildConfig({
-  // ...
-  plugins: [
-    formBuilder({
-      // options
-    }),
-  ],
+  plugins: [formBuilder({})],
 })
 ```
 
@@ -40,8 +35,6 @@ export default buildConfig({
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `disabled` | `boolean` | `false` | When `true`, returns the incoming config unchanged. Useful for toggling the plugin per environment. |
-
-<!-- Add new options to this table as you build them. -->
 
 ## License
 
