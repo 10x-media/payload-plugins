@@ -7,4 +7,5 @@ import { keys, type TranslationKey } from './keys'
  */
 export const en: Record<TranslationKey, string> = {
 	[keys.pluginName]: 'Form Builder',
+	[keys.fieldTitle]: 'Title',
 }

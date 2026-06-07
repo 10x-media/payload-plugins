@@ -5,6 +5,7 @@
  */
 export const keys = {
 	pluginName: 'formBuilder:pluginName',
+	fieldTitle: 'formBuilder:fieldTitle',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
