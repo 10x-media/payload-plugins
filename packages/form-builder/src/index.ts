@@ -1,4 +1,5 @@
 import { type Config, definePlugin } from 'payload'
+import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 
 export type FormBuilderPluginOptions = {
@@ -17,6 +18,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 	plugin: ({ config, plugins: _plugins, ...options }): Config => {
 		if (options.disabled === true) return config
 		registerTranslations(config)
+		registerCollections(config)
 		return config
 	},
 })
