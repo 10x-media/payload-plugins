@@ -1,8 +1,8 @@
-import type { Config, Plugin } from 'payload'
+import { type Config, definePlugin } from 'payload'
 
 import { registerTranslations } from './plugin/registerTranslations'
 
-export interface {{pluginPascal}}Options {
+export type {{pluginPascal}}PluginOptions = {
 	/**
 	 * Disable the plugin entirely (incoming config returned untouched).
 	 * Useful for opting out per environment without removing the plugin call.
@@ -10,18 +10,26 @@ export interface {{pluginPascal}}Options {
 	disabled?: boolean
 }
 
+declare module 'payload' {
+	interface RegisteredPlugins {
+		'@10x-media/{{pluginSlug}}': {{pluginPascal}}PluginOptions
+	}
+}
+
 /**
  * {{pluginTitle}} plugin for Payload v3. Currently registers this plugin's
- * translations; future releases will add feature behavior.
+ * translations; future releases will add feature behavior. Authored with
+ * `definePlugin` so sibling plugins can detect it by slug.
  */
-export const {{pluginCamel}} =
-	(options: {{pluginPascal}}Options = {}): Plugin =>
-	(incoming: Config): Config => {
+export const {{pluginCamel}} = definePlugin<{{pluginPascal}}PluginOptions>({
+	slug: '@10x-media/{{pluginSlug}}',
+	plugin: ({ config, plugins: _plugins, ...options }): Config => {
 		if (options.disabled === true) {
-			return incoming
+			return config
 		}
-		registerTranslations(incoming)
-		return incoming
-	}
+		registerTranslations(config)
+		return config
+	},
+})
 
-export type { {{pluginPascal}}Options as PluginOptions }
+export type { {{pluginPascal}}PluginOptions as PluginOptions }

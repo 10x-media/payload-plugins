@@ -6,7 +6,7 @@ alwaysApply: true
 
 Every plugin in `packages/` follows the same shape:
 
-- `src/index.ts` exports a single factory: `export const <name>Plugin = (options): Plugin => (incoming) => { ... }`.
+- `src/index.ts` exports a single factory authored with Payload's `definePlugin`: `export const <camelName> = definePlugin<<Pascal>PluginOptions>({ slug: '@10x-media/<slug>', plugin: ({ config, plugins, ...options }) => { ...; return config } })`. The export is the bare camel name (`jobs`, `webhooks`, `analytics`), not `<name>Plugin`. Register the slug for cross-plugin detection: `declare module 'payload' { interface RegisteredPlugins { '@10x-media/<slug>': <Pascal>PluginOptions } }`. The options type MUST be a `type`, not an `interface` (definePlugin's generic constrains `TOptions extends Record<string, unknown>`, which an interface fails to satisfy). Disable via an `options.disabled` flag.
 - Sub-path exports live under `src/exports/{types,client,i18n}.ts` and are mirrored in `package.json` `exports`.
 - Server-side files MUST NOT import from `./exports/client`. Client files use the `'use client'` directive.
 - Translation lookups MUST use the typed `keys` constant from `src/translations/keys.ts`. No string literal translation keys.
