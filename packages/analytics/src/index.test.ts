@@ -10,9 +10,9 @@ describe('analytics factory', () => {
 	it('returns a Payload plugin function', () => {
 		expect(typeof analytics({ adapters: [memoryAdapter()] })).toBe('function')
 	})
-	it('returns the incoming config when disabled (false)', () => {
+	it('returns the incoming config when disabled', () => {
 		const cfg = fakeConfig()
-		expect(analytics(false)(cfg)).toBe(cfg)
+		expect(analytics({ disabled: true })(cfg)).toBe(cfg)
 	})
 	it('registers translations when enabled', () => {
 		const out = analytics({ adapters: [memoryAdapter()] })(fakeConfig()) as Config

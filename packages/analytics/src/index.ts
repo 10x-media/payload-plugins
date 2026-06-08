@@ -1,20 +1,27 @@
-import type { Config, Plugin } from 'payload'
+import { type Config, definePlugin } from 'payload'
 
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry } from './core/registry'
 import { registerTranslations } from './plugin/registerTranslations'
 
-export const analytics =
-	(options: AnalyticsPluginOptions | false): Plugin =>
-	(incoming: Config): Config => {
-		if (options === false) {
-			return incoming
+declare module 'payload' {
+	interface RegisteredPlugins {
+		'@10x-media/analytics': AnalyticsPluginOptions
+	}
+}
+
+export const analytics = definePlugin<AnalyticsPluginOptions>({
+	slug: '@10x-media/analytics',
+	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+		if (options.disabled === true) {
+			return config
 		}
 		const resolved = resolveOptions(options)
-		registerTranslations(incoming)
+		registerTranslations(config)
 		createRegistry(resolved.adapters, resolved.defaultAdapter)
-		return incoming
-	}
+		return config
+	},
+})
 
 export type {
 	AnalyticsPluginOptions,

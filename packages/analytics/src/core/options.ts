@@ -1,7 +1,8 @@
 import type { AnalyticsAdapter } from './contract'
 
 export type AnalyticsPluginOptions = {
-	adapters: AnalyticsAdapter[]
+	disabled?: boolean
+	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	cache?: { ttl?: { aggregate?: number; realtime?: number } }
 }
