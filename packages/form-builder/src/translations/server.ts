@@ -17,3 +17,13 @@ export const labelForKey =
 	(key: TranslationKey): LabelFunction =>
 	({ t }) =>
 		asTranslate(t)(key)
+
+/**
+ * A `label`/`description` from an arbitrary key string (a field-type-supplied label, which may be a
+ * host-registered key or a literal; Payload's `t` returns the input unchanged when unknown). Distinct
+ * from `labelForKey`, which constrains to this plugin's typed keys.
+ */
+export const labelFor =
+	(key: string): LabelFunction =>
+	({ t }) =>
+		asTranslate(t)(key as TranslationKey)

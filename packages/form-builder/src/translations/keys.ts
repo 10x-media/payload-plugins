@@ -6,6 +6,21 @@
 export const keys = {
 	pluginName: 'formBuilder:pluginName',
 	fieldTitle: 'formBuilder:fieldTitle',
+	fieldTypeText: 'formBuilder:fieldType.text',
+	fieldTypeTextarea: 'formBuilder:fieldType.textarea',
+	fieldTypeEmail: 'formBuilder:fieldType.email',
+	fieldTypeNumber: 'formBuilder:fieldType.number',
+	fieldTypeSelect: 'formBuilder:fieldType.select',
+	fieldTypeCheckbox: 'formBuilder:fieldType.checkbox',
+	configOptions: 'formBuilder:config.options',
+	configOption: 'formBuilder:config.option',
+	configOptionLabel: 'formBuilder:config.optionLabel',
+	configOptionValue: 'formBuilder:config.optionValue',
+	validationEmail: 'formBuilder:validation.email',
+	validationNumber: 'formBuilder:validation.number',
+	validationSelect: 'formBuilder:validation.select',
+	formatYes: 'formBuilder:format.yes',
+	formatNo: 'formBuilder:format.no',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
