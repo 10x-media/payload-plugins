@@ -94,6 +94,7 @@
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
+		"maxmind": "^4.3.24",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/ui": "catalog:",
