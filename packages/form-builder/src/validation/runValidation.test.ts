@@ -227,6 +227,18 @@ describe('runValidation', () => {
 		expect(result.errors).toEqual([])
 	})
 
+	it('does not interpolate reserved instance keys into custom messages', async () => {
+		const field: FormFieldInstance = {
+			blockType: 'text',
+			name: 'a',
+			validations: [
+				{ blockType: 'minLength', min: 3, message: 'min {min} sev {severity}', severity: 'error' },
+			],
+		}
+		const result = await run(field, 'ab')
+		expect(result.errors).toEqual([{ message: 'min 3 sev {severity}', severity: 'error' }])
+	})
+
 	it('runs a field-definition Standard Schema and maps its issues', async () => {
 		const schema = {
 			'~standard': {

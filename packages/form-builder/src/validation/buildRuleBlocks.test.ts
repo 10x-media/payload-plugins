@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { buildRuleBlocks } from './buildRuleBlocks'
 import { defaultValidationRules } from './builtin'
+import { defineValidationRule } from './defineValidationRule'
 import { buildRuleRegistry } from './registry'
+import type { AnyValidationRuleDefinition } from './types'
 
 const registry = buildRuleRegistry(defaultValidationRules)
 
@@ -23,5 +25,17 @@ describe('buildRuleBlocks', () => {
 			'name' in field ? field.name : undefined
 		)
 		expect(names).toEqual(['min', 'message', 'severity'])
+	})
+	it('throws when a custom rule declares a reserved param name', () => {
+		const bad = buildRuleRegistry([
+			defineValidationRule({
+				type: 'bad',
+				label: 'Bad',
+				defaultMessage: 'm',
+				params: [{ name: 'severity', type: 'text' }],
+				validate: () => true,
+			}) as AnyValidationRuleDefinition,
+		])
+		expect(() => buildRuleBlocks(bad, 'text')).toThrow(/reserved param name/)
 	})
 })

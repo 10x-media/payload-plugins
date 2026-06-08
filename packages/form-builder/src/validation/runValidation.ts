@@ -45,11 +45,12 @@ const makeMessage = (
 	defaultMessageKey: string,
 	t: Translate
 ): MessageFn => {
+	const { blockType: _blockType, message: _message, severity: _severity, ...params } = instance
 	const template =
 		typeof instance.message === 'string' && instance.message.length > 0
 			? instance.message
 			: t(defaultMessageKey)
-	return (vars = {}) => resolveMessage(template, { ...instance, ...vars })
+	return (vars = {}) => resolveMessage(template, { ...params, ...vars })
 }
 
 const toIssue = (
