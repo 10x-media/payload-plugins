@@ -40,11 +40,11 @@ export default buildConfig({
 })
 ```
 
-Add a custom field type with `defineFormField`. The `value` kind types the value passed to `validate` and `format`:
+Add a custom field type with `defineFormField`. The `value` kind types the value passed to `validate` and `format`. Field types are authored with precise generics, so cast each registry entry to `FieldTypeOption` (the registry stores the erased type, the same boundary the built-ins use):
 
 ```ts
 import { buildConfig } from 'payload'
-import { formBuilder, defineFormField } from '@10x-media/form-builder'
+import { formBuilder, defineFormField, type FieldTypeOption } from '@10x-media/form-builder'
 
 export default buildConfig({
 	plugins: [
@@ -56,7 +56,7 @@ export default buildConfig({
 					value: 'number',
 					validate: ({ value }) => (value == null || value <= 5 ? true : 'Too high'),
 					format: ({ value }) => `${value ?? 0} / 5`,
-				}),
+				}) as FieldTypeOption,
 			},
 		}),
 	],
