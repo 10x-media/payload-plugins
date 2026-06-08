@@ -122,6 +122,22 @@ export const runValidation = async (input: RunValidationInput): Promise<RunValid
 		}
 	}
 
+	if (fieldDefinition?.schema) {
+		try {
+			const outcome = await fieldDefinition.schema['~standard'].validate(value)
+			if (outcome.issues) {
+				for (const issue of outcome.issues) {
+					errors.push({ message: issue.message, severity: 'error' })
+				}
+			}
+		} catch (error) {
+			req?.payload?.logger?.error?.(
+				{ err: error, field: field.name },
+				'form-builder field schema threw'
+			)
+		}
+	}
+
 	const instances = (Array.isArray(field.validations) ? field.validations : []) as RuleInstance[]
 	for (const instance of instances) {
 		const rule = ruleRegistry.get(instance.blockType)

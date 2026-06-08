@@ -226,4 +226,31 @@ describe('runValidation', () => {
 		})
 		expect(result.errors).toEqual([])
 	})
+
+	it('runs a field-definition Standard Schema and maps its issues', async () => {
+		const schema = {
+			'~standard': {
+				version: 1 as const,
+				vendor: 'test',
+				validate: (value: unknown) =>
+					typeof value === 'string' && value.startsWith('x')
+						? { value }
+						: { issues: [{ message: 'must start with x' }] },
+			},
+		}
+		const result = await runValidation({
+			field: { blockType: 'text', name: 'a' },
+			fieldDefinition: { type: 'text', label: 'Text', value: 'text', schema },
+			value: 'nope',
+			fieldType: 'text',
+			ruleRegistry,
+			answers: {},
+			locale: 'en',
+			t,
+			operation: 'create',
+			event: 'submit',
+			mode: 'server',
+		})
+		expect(result.errors).toEqual([{ message: 'must start with x', severity: 'error' }])
+	})
 })

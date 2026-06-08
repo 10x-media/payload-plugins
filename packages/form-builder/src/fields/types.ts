@@ -1,3 +1,4 @@
+import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { Field } from 'payload'
 
 /** The stored value shapes a field type can declare. Drives `validate`/`format` typing and value coercion. */
@@ -67,6 +68,8 @@ export type FormFieldDefinition<
 	validate?: FormFieldValidate<K, TConfig>
 	format?: FormFieldFormat<K, TConfig>
 	Field?: string
+	/** Optional Standard Schema validator (Zod/Valibot/etc.), run by the engine after the intrinsic validator. */
+	schema?: StandardSchemaV1
 	icon?: string
 	group?: string
 }
@@ -97,6 +100,7 @@ export type AnyFormFieldDefinition = {
 	validate?: AnyFormFieldValidate
 	format?: AnyFormFieldFormat
 	Field?: string
+	schema?: StandardSchemaV1
 	icon?: string
 	group?: string
 }
