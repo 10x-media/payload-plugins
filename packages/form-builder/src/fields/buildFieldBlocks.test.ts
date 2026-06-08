@@ -1,5 +1,7 @@
 import type { Field } from 'payload'
 import { describe, expect, it } from 'vitest'
+import { defaultValidationRules } from '../validation/builtin'
+import { buildRuleRegistry } from '../validation/registry'
 import { buildFieldBlocks } from './buildFieldBlocks'
 import { defaultFieldDefinitions } from './builtin'
 import { buildRegistry } from './registry'
@@ -7,7 +9,10 @@ import { buildRegistry } from './registry'
 const fieldName = (field: Field) => ('name' in field ? field.name : undefined)
 
 describe('buildFieldBlocks', () => {
-	const blocks = buildFieldBlocks(buildRegistry(defaultFieldDefinitions))
+	const blocks = buildFieldBlocks(
+		buildRegistry(defaultFieldDefinitions),
+		buildRuleRegistry(defaultValidationRules)
+	)
 
 	it('builds one block per registered type in registry order', () => {
 		expect(blocks.map((block) => block.slug)).toEqual([
@@ -37,6 +42,7 @@ describe('buildFieldBlocks', () => {
 			'width',
 			'placeholder',
 			'description',
+			'validations',
 		])
 	})
 })

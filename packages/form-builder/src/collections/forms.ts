@@ -9,7 +9,7 @@ export const FORMS_SLUG = 'forms'
 
 export const buildFormsCollection = (
 	registry: FieldTypeRegistry,
-	_ruleRegistry: ValidationRuleRegistry
+	ruleRegistry: ValidationRuleRegistry
 ): CollectionConfig => ({
 	slug: FORMS_SLUG,
 	labels: { singular: 'Form', plural: 'Forms' },
@@ -17,6 +17,6 @@ export const buildFormsCollection = (
 	access: { read: () => true },
 	fields: [
 		{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
-		{ name: 'fields', type: 'blocks', blocks: buildFieldBlocks(registry) },
+		{ name: 'fields', type: 'blocks', blocks: buildFieldBlocks(registry, ruleRegistry) },
 	],
 })
