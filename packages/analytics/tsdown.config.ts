@@ -7,6 +7,7 @@ export default defineConfig({
 		'exports/client': 'src/exports/client.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 		'testing/memoryAdapter': 'src/testing/memoryAdapter.ts',
+		'exports/geo': 'src/exports/geo.ts',
 		'exports/adapters/native': 'src/exports/adapters/native.ts',
 	},
 	format: 'esm',

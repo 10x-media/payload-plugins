@@ -42,6 +42,11 @@
 			"types": "./src/exports/i18n.ts",
 			"default": "./dist/exports/i18n.js"
 		},
+		"./geo": {
+			"development": "./src/exports/geo.ts",
+			"types": "./src/exports/geo.ts",
+			"default": "./dist/exports/geo.js"
+		},
 		"./testing": {
 			"development": "./src/testing/memoryAdapter.ts",
 			"types": "./src/testing/memoryAdapter.ts",
@@ -133,6 +138,11 @@
 				"types": "./dist/exports/i18n.d.ts",
 				"import": "./dist/exports/i18n.js",
 				"default": "./dist/exports/i18n.js"
+			},
+			"./geo": {
+				"types": "./dist/exports/geo.d.ts",
+				"import": "./dist/exports/geo.js",
+				"default": "./dist/exports/geo.js"
 			},
 			"./testing": {
 				"types": "./dist/testing/memoryAdapter.d.ts",

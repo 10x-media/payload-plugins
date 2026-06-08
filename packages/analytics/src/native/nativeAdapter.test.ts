@@ -20,4 +20,8 @@ describe('native adapter', () => {
 			)
 		).rejects.toThrow(/before init/i)
 	})
+
+	it('still constructs with a (possibly missing) geo database path', () => {
+		expect(typeof native({ geoDbPath: '/nonexistent/GeoLite2-City.mmdb' }).query).toBe('function')
+	})
 })

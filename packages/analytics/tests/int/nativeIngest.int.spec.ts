@@ -3,7 +3,9 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { ROLLUPS_SLUG } from '../../src/native/collections/rollups'
+import { composeGeoResolvers } from '../../src/native/geo/composeGeoResolvers'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
+import { maxmindResolver } from '../../src/native/geo/maxmindResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
 import { kvCacheStore } from '../../src/surfacing/cacheStore'
@@ -61,5 +63,28 @@ describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 		})
 		expect(result.totals?.pageviews).toBe(2)
 		expect(result.totals?.avgDuration).toBe(500)
+	})
+
+	it('ingests with a missing MaxMind db, falling back to the platform-header country', async () => {
+		const composed = composeGeoResolvers(
+			platformHeaderResolver,
+			maxmindResolver({ dbPath: '/nonexistent/GeoLite2-City.mmdb' })
+		)
+		const res = await makeIngestHandler(composed)({
+			payload: booted.payload,
+			headers: new Headers({
+				'content-type': 'application/json',
+				'user-agent': 'UA',
+				'x-vercel-ip-country': 'US',
+			}),
+			json: async () => ({ type: 'pageview', path: '/geo', hostname: 'h' }),
+		} as never)
+		expect(res.status).toBe(202)
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/geo' } },
+			pagination: false,
+		})
+		expect((docs[0] as { country?: string } | undefined)?.country).toBe('US')
 	})
 })

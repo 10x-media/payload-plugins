@@ -9,11 +9,14 @@ import type {
 } from '../core/contract'
 import { eventsCollection } from './collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from './collections/rollups'
+import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
+import { maxmindResolver } from './geo/maxmindResolver'
 import { makeIngestHandler } from './ingest/endpoint'
 
 export interface NativeOptions {
 	geoResolver?: GeoResolver
+	geoDbPath?: string
 	ingestPath?: string
 }
 
@@ -36,7 +39,11 @@ const capabilities: AnalyticsCapabilities = {
 type RollupDoc = { pageviews: number; events: number; durationMs: number }
 
 export function native(options: NativeOptions = {}): AnalyticsAdapter {
-	const geoResolver = options.geoResolver ?? platformHeaderResolver
+	const geoResolver =
+		options.geoResolver ??
+		(options.geoDbPath
+			? composeGeoResolvers(platformHeaderResolver, maxmindResolver({ dbPath: options.geoDbPath }))
+			: platformHeaderResolver)
 	let payloadRef: Payload | null = null
 
 	return {
