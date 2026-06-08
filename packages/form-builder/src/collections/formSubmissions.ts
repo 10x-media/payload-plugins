@@ -1,9 +1,10 @@
 import type { CollectionConfig } from 'payload'
+import type { FieldTypeRegistry } from '../fields/registry'
 import { FORMS_SLUG } from './forms'
 
 export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 
-export const buildSubmissionsCollection = (): CollectionConfig => ({
+export const buildSubmissionsCollection = (_registry: FieldTypeRegistry): CollectionConfig => ({
 	slug: FORM_SUBMISSIONS_SLUG,
 	labels: { singular: 'Submission', plural: 'Submissions' },
 	admin: { group: 'Forms' },

@@ -26,6 +26,21 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 		expect(booted.payload.collections['form-submissions']).toBeDefined()
 	})
 
+	it('stores a form with a fields blocks array', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Contact',
+				fields: [
+					{ blockType: 'text', name: 'fullName', label: 'Full name', required: true },
+					{ blockType: 'email', name: 'email', label: 'Email', required: true },
+				],
+			},
+		})
+		expect(Array.isArray(form.fields)).toBe(true)
+		expect(form.fields).toHaveLength(2)
+	})
+
 	it('creates a submission linked to a form', async () => {
 		const form = await booted.payload.create({ collection: 'forms', data: { title: 'Contact' } })
 		const submission = await booted.payload.create({
