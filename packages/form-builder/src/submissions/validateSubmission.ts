@@ -25,7 +25,7 @@ export const validateSubmission =
 
 		const form = await req.payload.findByID({
 			collection: FORMS_SLUG,
-			id: formId as string,
+			id: formId as string | number,
 			depth: 0,
 			locale: req.locale,
 			req,
