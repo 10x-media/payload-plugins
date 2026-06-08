@@ -60,3 +60,46 @@ Registering the adapter adds two hidden collections (`analytics-events` and `ana
 Supported metrics: `pageviews`, `events`, `avgDuration`.
 
 Upcoming: unique visitors, sessions, retention, and dimension breakdowns (referrer, country, device).
+
+### Geo resolution
+
+The native engine resolves the visitor country, region, and city from each ingest request. Resolution is layered: platform-injected headers (`x-vercel-ip-country`, `cf-ipcountry`, and friends) are checked first. MaxMind GeoLite2 is tried only when headers do not already supply a country.
+
+**MaxMind (optional)** Pass `geoDbPath` to enable IP-level lookup:
+
+```ts
+native({ geoDbPath: '/data/GeoLite2-City.mmdb' })
+```
+
+This requires the optional `maxmind` peer dependency and a downloaded `.mmdb` file. If the library is not installed, the file is missing or unreadable, or a lookup fails, geo resolution degrades to empty fields. A single warning is logged and ingestion continues unaffected.
+
+**Custom geo pipeline** The `@10x-media/analytics/geo` subpath exports the building blocks for your own resolver:
+
+```ts
+import {
+  platformHeaderResolver,
+  maxmindResolver,
+  composeGeoResolvers,
+  noopResolver,
+  type GeoResolver,
+  type Geo,
+} from '@10x-media/analytics/geo'
+```
+
+Compose resolvers left-to-right; the first non-empty value wins:
+
+```ts
+native({
+  geoResolver: composeGeoResolvers(platformHeaderResolver, maxmindResolver({ dbPath: '...' })),
+})
+```
+
+### Retention pruning
+
+Pass `retentionDays` to register a nightly Payload task that deletes raw `analytics-events` older than N days:
+
+```ts
+native({ retentionDays: 90 })
+```
+
+The task runs at 03:00 UTC. If `retentionDays` is not set, no task is registered and raw events are kept indefinitely.
