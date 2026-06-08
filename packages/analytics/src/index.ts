@@ -19,6 +19,9 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		const resolved = resolveOptions(options)
 		registerTranslations(config)
 		createRegistry(resolved.adapters, resolved.defaultAdapter)
+		for (const adapter of resolved.adapters) {
+			adapter.register?.(config)
+		}
 		return config
 	},
 })

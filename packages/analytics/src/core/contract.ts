@@ -1,3 +1,5 @@
+import type { Config } from 'payload'
+
 export type MetricKey =
 	| 'pageviews'
 	| 'visitors'
@@ -102,6 +104,7 @@ export interface AnalyticsAdapter {
 	isConfigured(): boolean
 	query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
 	realtime?(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
+	register?(config: Config): void
 }
 
 export type AnalyticsAdapterFactory<Config> = (config: Config) => AnalyticsAdapter
