@@ -1,4 +1,5 @@
 import { keys } from '../../translations/keys'
+import { labelFor } from '../../translations/server'
 import { defineValidationRule } from '../defineValidationRule'
 
 const tryRegExp = (pattern: string, flags?: string): RegExp | undefined => {
@@ -14,8 +15,8 @@ export const patternRule = defineValidationRule<{ pattern: string; flags?: strin
 	label: keys.rulePattern,
 	appliesTo: ['text', 'textarea', 'email'],
 	params: [
-		{ name: 'pattern', type: 'text', required: true, label: keys.ruleParamPattern },
-		{ name: 'flags', type: 'text', label: keys.ruleParamFlags },
+		{ name: 'pattern', type: 'text', required: true, label: labelFor(keys.ruleParamPattern) },
+		{ name: 'flags', type: 'text', label: labelFor(keys.ruleParamFlags) },
 	],
 	defaultMessage: keys.rulePatternMessage,
 	validate: ({ value, params, message }) => {

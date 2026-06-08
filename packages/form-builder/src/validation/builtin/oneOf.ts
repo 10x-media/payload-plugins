@@ -1,4 +1,5 @@
 import { keys } from '../../translations/keys'
+import { labelFor } from '../../translations/server'
 import { defineValidationRule } from '../defineValidationRule'
 
 export const oneOfRule = defineValidationRule<{ values?: { value: string }[] }, string>({
@@ -9,7 +10,7 @@ export const oneOfRule = defineValidationRule<{ values?: { value: string }[] }, 
 		{
 			name: 'values',
 			type: 'array',
-			label: keys.ruleParamValues,
+			label: labelFor(keys.ruleParamValues),
 			fields: [{ name: 'value', type: 'text', required: true }],
 		},
 	],
