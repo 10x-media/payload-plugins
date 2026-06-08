@@ -33,4 +33,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 	},
 })
 
+export { defineFormField } from './fields/defineFormField'
+export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from './fields/registry'
+export type {
+	AnyFormFieldDefinition,
+	FormFieldDefinition,
+	FormFieldFormat,
+	FormFieldValidate,
+	FormFieldValueKind,
+} from './fields/types'
 export type { FormBuilderPluginOptions as PluginOptions }

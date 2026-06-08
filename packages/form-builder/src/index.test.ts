@@ -15,4 +15,9 @@ describe('formBuilder factory', () => {
 		const result = await Promise.resolve(plugin(config))
 		expect(result.collections).toHaveLength(1)
 	})
+
+	it('exports the defineFormField primitive', async () => {
+		const moduleExports = await import('./index')
+		expect(typeof moduleExports.defineFormField).toBe('function')
+	})
 })
