@@ -1,4 +1,5 @@
 import type { Block } from 'payload'
+import { buildConditionTypeMap } from '../conditions/conditionType'
 import { keys } from '../translations/keys'
 import { labelFor } from '../translations/server'
 import { buildRuleBlocks } from '../validation/buildRuleBlocks'
@@ -11,13 +12,14 @@ export const buildFieldBlocks = (
 	registry: FieldTypeRegistry,
 	ruleRegistry: ValidationRuleRegistry
 ): Block[] => {
+	const conditionTypes = buildConditionTypeMap(registry)
 	const blocks: Block[] = []
 	for (const definition of registry.values()) {
 		blocks.push({
 			slug: definition.type,
 			labels: { singular: labelFor(definition.label), plural: labelFor(definition.label) },
 			fields: [
-				...sharedFieldConfig(),
+				...sharedFieldConfig(conditionTypes),
 				...(definition.config ?? []),
 				{
 					name: 'validations',
