@@ -46,6 +46,11 @@
 			"development": "./src/testing/memoryAdapter.ts",
 			"types": "./src/testing/memoryAdapter.ts",
 			"default": "./dist/testing/memoryAdapter.js"
+		},
+		"./adapters/native": {
+			"development": "./src/exports/adapters/native.ts",
+			"types": "./src/exports/adapters/native.ts",
+			"default": "./dist/exports/adapters/native.js"
 		}
 	},
 	"files": [
@@ -132,6 +137,11 @@
 				"types": "./dist/testing/memoryAdapter.d.ts",
 				"import": "./dist/testing/memoryAdapter.js",
 				"default": "./dist/testing/memoryAdapter.js"
+			},
+			"./adapters/native": {
+				"types": "./dist/exports/adapters/native.d.ts",
+				"import": "./dist/exports/adapters/native.js",
+				"default": "./dist/exports/adapters/native.js"
 			}
 		}
 	}

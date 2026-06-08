@@ -44,3 +44,19 @@ An adapter declares its `capabilities` (which metrics and dimensions it supports
 ## Testing
 
 `@10x-media/analytics/testing` exports `memoryAdapter()`, a deterministic in-memory adapter for tests and local development.
+
+## Native engine (beta)
+
+`@10x-media/analytics/adapters/native` exports `native()`, a self-hosted analytics engine that stores data inside Payload itself.
+
+```ts
+import { native } from '@10x-media/analytics/adapters/native'
+
+analytics({ adapters: [native()] })
+```
+
+Registering the adapter adds two hidden collections (`analytics-events` and `analytics-rollups`) and a `POST /api/analytics/ingest` beacon endpoint. Events are written atomically via `$inc` (Mongo) or `ON CONFLICT DO UPDATE` (Postgres), so concurrent ingestion is safe.
+
+Supported metrics: `pageviews`, `events`, `avgDuration`.
+
+Upcoming: unique visitors, sessions, retention, and dimension breakdowns (referrer, country, device).
