@@ -8,6 +8,7 @@ import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { maxmindResolver } from '../../src/native/geo/maxmindResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
+import { pruneEventsTask } from '../../src/native/retention/pruneTask'
 import { kvCacheStore } from '../../src/surfacing/cacheStore'
 import { createEngine } from '../../src/surfacing/engine'
 
@@ -86,5 +87,30 @@ describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 			pagination: false,
 		})
 		expect((docs[0] as { country?: string } | undefined)?.country).toBe('US')
+	})
+})
+
+describeForDb('native retention', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native({ retentionDays: 30 })] }),
+			db,
+		})
+	})
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('prunes raw events older than the cutoff', async () => {
+		await ingest(booted, '/old')
+		const task = pruneEventsTask(0)
+		const handler = task.handler as (args: {
+			req: { payload: typeof booted.payload }
+		}) => Promise<{ output: { deleted: number } }>
+		const result = await handler({ req: { payload: booted.payload } })
+		expect(result.output.deleted).toBeGreaterThan(0)
+		const { totalDocs } = await booted.payload.count({ collection: EVENTS_SLUG as never })
+		expect(totalDocs).toBe(0)
 	})
 })

@@ -13,11 +13,13 @@ import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
 import { maxmindResolver } from './geo/maxmindResolver'
 import { makeIngestHandler } from './ingest/endpoint'
+import { pruneEventsTask } from './retention/pruneTask'
 
 export interface NativeOptions {
 	geoResolver?: GeoResolver
 	geoDbPath?: string
 	ingestPath?: string
+	retentionDays?: number
 }
 
 const metrics: ReadonlySet<MetricKey> = new Set(['pageviews', 'events', 'avgDuration'])
@@ -61,6 +63,12 @@ export function native(options: NativeOptions = {}): AnalyticsAdapter {
 					handler: makeIngestHandler(geoResolver),
 				},
 			]
+			if (options.retentionDays && options.retentionDays > 0) {
+				config.jobs = {
+					...config.jobs,
+					tasks: [...(config.jobs?.tasks ?? []), pruneEventsTask(options.retentionDays)],
+				}
+			}
 			const prevOnInit = config.onInit
 			config.onInit = async (p) => {
 				await prevOnInit?.(p)
