@@ -1,6 +1,8 @@
 /** Replace `{key}` placeholders with `String(vars[key])`; unknown placeholders are left as-is. */
 export const resolveMessage = (template: string, vars: Record<string, unknown>): string =>
-	template.replace(/\{(\w+)\}/g, (match, key: string) => (key in vars ? String(vars[key]) : match))
+	template.replace(/\{(\w+)\}/g, (match, key: string) =>
+		Object.hasOwn(vars, key) ? String(vars[key]) : match
+	)
 
 /**
  * Race a (possibly async) rule against a deadline so a hung server rule cannot stall the submit path.
