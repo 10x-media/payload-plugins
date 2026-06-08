@@ -11,6 +11,9 @@ export function createRegistry(adapters: AnalyticsAdapter[], defaultId?: string)
 	if (adapters.length === 0) throw new Error('analytics: at least one adapter is required')
 	const first = adapters[0] as AnalyticsAdapter
 	const byId = new Map(adapters.map((a) => [a.id, a]))
+	if (defaultId !== undefined && !byId.has(defaultId)) {
+		throw new Error(`analytics: unknown default adapter "${defaultId}"`)
+	}
 	const fallback = defaultId ?? first.id
 	return {
 		get(id) {

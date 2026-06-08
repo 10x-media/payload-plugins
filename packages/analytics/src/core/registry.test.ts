@@ -20,4 +20,7 @@ describe('createRegistry', () => {
 	it('throws on an unknown id', () => {
 		expect(() => createRegistry([memoryAdapter()]).get('nope')).toThrow(/unknown adapter/i)
 	})
+	it('throws on an unknown default adapter id', () => {
+		expect(() => createRegistry([memoryAdapter()], 'nope')).toThrow(/unknown default adapter/i)
+	})
 })
