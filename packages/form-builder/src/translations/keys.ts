@@ -16,6 +16,7 @@ export const keys = {
 	configOption: 'formBuilder:config.option',
 	configOptionLabel: 'formBuilder:config.optionLabel',
 	configOptionValue: 'formBuilder:config.optionValue',
+	validationRequired: 'formBuilder:validation.required',
 	validationEmail: 'formBuilder:validation.email',
 	validationNumber: 'formBuilder:validation.number',
 	validationSelect: 'formBuilder:validation.select',

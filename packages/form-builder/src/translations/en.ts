@@ -18,6 +18,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.configOption]: 'Option',
 	[keys.configOptionLabel]: 'Option label',
 	[keys.configOptionValue]: 'Option value',
+	[keys.validationRequired]: 'This field is required',
 	[keys.validationEmail]: 'Enter a valid email address',
 	[keys.validationNumber]: 'Enter a valid number',
 	[keys.validationSelect]: 'Choose a valid option',
