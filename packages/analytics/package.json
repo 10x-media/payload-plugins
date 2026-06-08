@@ -41,6 +41,11 @@
 			"development": "./src/exports/i18n.ts",
 			"types": "./src/exports/i18n.ts",
 			"default": "./dist/exports/i18n.js"
+		},
+		"./testing": {
+			"development": "./src/testing/memoryAdapter.ts",
+			"types": "./src/testing/memoryAdapter.ts",
+			"default": "./dist/testing/memoryAdapter.js"
 		}
 	},
 	"files": [
@@ -122,6 +127,11 @@
 				"types": "./dist/exports/i18n.d.ts",
 				"import": "./dist/exports/i18n.js",
 				"default": "./dist/exports/i18n.js"
+			},
+			"./testing": {
+				"types": "./dist/testing/memoryAdapter.d.ts",
+				"import": "./dist/testing/memoryAdapter.js",
+				"default": "./dist/testing/memoryAdapter.js"
 			}
 		}
 	}

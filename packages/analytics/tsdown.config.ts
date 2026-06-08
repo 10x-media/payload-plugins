@@ -6,6 +6,7 @@ export default defineConfig({
 		'exports/types': 'src/exports/types.ts',
 		'exports/client': 'src/exports/client.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
+		'testing/memoryAdapter': 'src/testing/memoryAdapter.ts',
 	},
 	format: 'esm',
 	dts: true,
