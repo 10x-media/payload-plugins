@@ -116,4 +116,15 @@ describe('runSubmission', () => {
 		expect(result.values).toEqual([])
 		expect(result.descriptors).toEqual([])
 	})
+
+	it('rejects a non-numeric value for a number field', async () => {
+		const fields: FormFieldInstance[] = [{ blockType: 'number', name: 'age', label: 'Age' }]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'age', value: 'abc' }],
+		})
+		expect(result.errors).toEqual([{ path: 'age', message: 'formBuilder:validation.number' }])
+		expect(result.values).toEqual([])
+	})
 })
