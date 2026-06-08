@@ -28,6 +28,8 @@ export const keys = {
 	configWidth: 'formBuilder:config.width',
 	configPlaceholder: 'formBuilder:config.placeholder',
 	configDescription: 'formBuilder:config.description',
+	submissionAnswers: 'formBuilder:submission.answers',
+	submissionNoAnswers: 'formBuilder:submission.noAnswers',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -1,10 +1,11 @@
 import type { CollectionConfig } from 'payload'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { validateSubmission } from '../submissions/validateSubmission'
 import { FORMS_SLUG } from './forms'
 
 export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 
-export const buildSubmissionsCollection = (_registry: FieldTypeRegistry): CollectionConfig => ({
+export const buildSubmissionsCollection = (registry: FieldTypeRegistry): CollectionConfig => ({
 	slug: FORM_SUBMISSIONS_SLUG,
 	labels: { singular: 'Submission', plural: 'Submissions' },
 	admin: { group: 'Forms' },
@@ -13,6 +14,7 @@ export const buildSubmissionsCollection = (_registry: FieldTypeRegistry): Collec
 		read: ({ req }) => Boolean(req.user),
 		update: () => false,
 	},
+	hooks: { beforeValidate: [validateSubmission(registry)] },
 	fields: [
 		{ name: 'form', type: 'relationship', relationTo: FORMS_SLUG, required: true },
 		{
@@ -29,5 +31,12 @@ export const buildSubmissionsCollection = (_registry: FieldTypeRegistry): Collec
 		{ name: 'descriptors', type: 'json' },
 		{ name: 'consent', type: 'json' },
 		{ name: 'meta', type: 'json' },
+		{
+			name: 'answers',
+			type: 'ui',
+			admin: {
+				components: { Field: '@10x-media/form-builder/rsc#SubmissionAnswers' },
+			},
+		},
 	],
 })

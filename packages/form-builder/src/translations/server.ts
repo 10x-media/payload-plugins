@@ -1,5 +1,6 @@
 import type { LabelFunction } from 'payload'
 
+import type { Translate as FieldTranslate } from '../fields/types'
 import type { TranslationKey } from './keys'
 
 /** A `t`-like function narrowed to this plugin's typed keys. */
@@ -11,6 +12,13 @@ type Translate = (key: TranslationKey) => string
  * cast only widens the compile-time key domain.
  */
 export const asTranslate = (t: unknown): Translate => t as Translate
+
+/**
+ * Adapt a Payload request `t` to the engine-facing `Translate` the submission core and field-type
+ * `format`/`validate` speak (any key string). Same runtime function as `asTranslate`; this widening
+ * accepts arbitrary keys because the engine resolves both this plugin's and a host's registered keys.
+ */
+export const asFieldTranslate = (t: unknown): FieldTranslate => t as FieldTranslate
 
 /** A field `label`/`description` backed by a typed key, resolved per request. */
 export const labelForKey =

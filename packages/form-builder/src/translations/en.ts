@@ -30,4 +30,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.configWidth]: 'Width',
 	[keys.configPlaceholder]: 'Placeholder',
 	[keys.configDescription]: 'Description',
+	[keys.submissionAnswers]: 'Answers',
+	[keys.submissionNoAnswers]: 'No answers',
 }
