@@ -1,27 +1,22 @@
 import type { Config, Plugin } from 'payload'
 
+import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
+import { createRegistry } from './core/registry'
 import { registerTranslations } from './plugin/registerTranslations'
 
-export interface AnalyticsOptions {
-	/**
-	 * Disable the plugin entirely (incoming config returned untouched).
-	 * Useful for opting out per environment without removing the plugin call.
-	 */
-	disabled?: boolean
-}
-
-/**
- * Analytics plugin for Payload v3. Currently registers this plugin's
- * translations; future releases will add feature behavior.
- */
 export const analytics =
-	(options: AnalyticsOptions = {}): Plugin =>
+	(options: AnalyticsPluginOptions | false): Plugin =>
 	(incoming: Config): Config => {
-		if (options.disabled === true) {
+		if (options === false) {
 			return incoming
 		}
+		const resolved = resolveOptions(options)
 		registerTranslations(incoming)
+		createRegistry(resolved.adapters, resolved.defaultAdapter)
 		return incoming
 	}
 
-export type { AnalyticsOptions as PluginOptions }
+export type {
+	AnalyticsPluginOptions,
+	AnalyticsPluginOptions as PluginOptions,
+} from './core/options'

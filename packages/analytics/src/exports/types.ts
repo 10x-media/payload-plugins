@@ -1,2 +1,2 @@
 export * from '../core/contract'
-export type { AnalyticsOptions } from '../index'
+export type { AnalyticsPluginOptions } from '../index'

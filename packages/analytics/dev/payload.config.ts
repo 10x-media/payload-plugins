@@ -5,6 +5,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { analytics } from '../src/index'
+import { memoryAdapter } from '../src/testing/memoryAdapter'
 import { seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -40,7 +41,7 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	collections: [users],
-	plugins: [analytics({})],
+	plugins: [analytics({ adapters: [memoryAdapter()] })],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
