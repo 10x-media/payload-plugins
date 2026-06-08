@@ -63,6 +63,17 @@ export const keys = {
 	validationSeverityLabel: 'formBuilder:validations.severity',
 	validationSeverityError: 'formBuilder:validations.severity.error',
 	validationSeverityWarning: 'formBuilder:validations.severity.warning',
+	conditionAddCondition: 'formBuilder:condition.addCondition',
+	conditionAddOr: 'formBuilder:condition.addOr',
+	conditionAnd: 'formBuilder:condition.and',
+	conditionOr: 'formBuilder:condition.or',
+	conditionRemove: 'formBuilder:condition.remove',
+	conditionNoFields: 'formBuilder:condition.noFields',
+	conditionEmpty: 'formBuilder:condition.empty',
+	conditionSelectField: 'formBuilder:condition.selectField',
+	conditionValuePlaceholder: 'formBuilder:condition.value',
+	conditionTrue: 'formBuilder:condition.true',
+	conditionFalse: 'formBuilder:condition.false',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
