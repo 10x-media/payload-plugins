@@ -1,5 +1,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { Field } from 'payload'
+import type { ConditionFieldType } from '../conditions/fieldTypes'
 
 /** The stored value shapes a field type can declare. Drives `validate`/`format` typing and value coercion. */
 export type FormFieldValueKind = 'text' | 'number' | 'boolean' | 'date' | 'text[]'
@@ -72,6 +73,8 @@ export type FormFieldDefinition<
 	schema?: StandardSchemaV1
 	icon?: string
 	group?: string
+	/** How this field appears in the condition builder. Defaults from `value` (see `defaultConditionType`). */
+	conditionType?: ConditionFieldType
 }
 
 /** The erased shape stored in the heterogeneous registry. Value is `unknown`; config re-narrows per matched type at execution (spec 7.5). */
@@ -103,4 +106,6 @@ export type AnyFormFieldDefinition = {
 	schema?: StandardSchemaV1
 	icon?: string
 	group?: string
+	/** How this field appears in the condition builder. Defaults from `value` (see `defaultConditionType`). */
+	conditionType?: ConditionFieldType
 }

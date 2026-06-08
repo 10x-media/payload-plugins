@@ -9,6 +9,7 @@ export const selectField = defineFormField<'text', SelectConfig>({
 	type: 'select',
 	label: keys.fieldTypeSelect,
 	value: 'text',
+	conditionType: 'select',
 	config: [
 		{
 			name: 'options',
