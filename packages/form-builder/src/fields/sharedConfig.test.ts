@@ -14,6 +14,8 @@ describe('sharedFieldConfig', () => {
 			'width',
 			'placeholder',
 			'description',
+			'visibleWhen',
+			'validateWhen',
 		])
 	})
 

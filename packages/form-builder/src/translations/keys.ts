@@ -28,6 +28,8 @@ export const keys = {
 	configWidth: 'formBuilder:config.width',
 	configPlaceholder: 'formBuilder:config.placeholder',
 	configDescription: 'formBuilder:config.description',
+	configVisibleWhen: 'formBuilder:config.visibleWhen',
+	configValidateWhen: 'formBuilder:config.validateWhen',
 	submissionAnswers: 'formBuilder:submission.answers',
 	submissionNoAnswers: 'formBuilder:submission.noAnswers',
 	ruleMinLength: 'formBuilder:rule.minLength.label',

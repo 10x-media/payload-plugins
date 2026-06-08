@@ -42,6 +42,8 @@ describe('buildFieldBlocks', () => {
 			'width',
 			'placeholder',
 			'description',
+			'visibleWhen',
+			'validateWhen',
 			'validations',
 		])
 	})

@@ -1,3 +1,5 @@
+import type { Where } from 'payload'
+
 /** A single answered field: the field's machine name and its typed value. */
 export type SubmissionValue = { field: string; value: unknown }
 
@@ -18,5 +20,7 @@ export type FormFieldInstance = {
 	name: string
 	label?: string
 	required?: boolean
+	visibleWhen?: Where
+	validateWhen?: Where
 	[key: string]: unknown
 }

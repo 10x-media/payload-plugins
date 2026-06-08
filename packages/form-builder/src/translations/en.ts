@@ -30,6 +30,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.configWidth]: 'Width',
 	[keys.configPlaceholder]: 'Placeholder',
 	[keys.configDescription]: 'Description',
+	[keys.configVisibleWhen]: 'Show this field when',
+	[keys.configValidateWhen]: 'Validate this field only when',
 	[keys.submissionAnswers]: 'Answers',
 	[keys.submissionNoAnswers]: 'No answers',
 	[keys.ruleMinLength]: 'Minimum length',

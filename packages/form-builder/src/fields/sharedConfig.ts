@@ -26,4 +26,6 @@ export const sharedFieldConfig = (): Field[] => [
 	},
 	{ name: 'placeholder', type: 'text', label: labelFor(keys.configPlaceholder) },
 	{ name: 'description', type: 'textarea', label: labelFor(keys.configDescription) },
+	{ name: 'visibleWhen', type: 'json', label: labelFor(keys.configVisibleWhen) },
+	{ name: 'validateWhen', type: 'json', label: labelFor(keys.configValidateWhen) },
 ]
