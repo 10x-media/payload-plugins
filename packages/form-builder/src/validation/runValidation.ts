@@ -25,6 +25,8 @@ export type RunValidationInput = {
 	req?: PayloadRequest
 	payload?: Payload
 	formId?: number | string
+	/** Override the per-rule timeout in ms. Defaults to RULE_TIMEOUT_MS; primarily for tests. */
+	timeoutMs?: number
 }
 
 export type RunValidationResult = { errors: ValidationIssue[] }
@@ -86,7 +88,9 @@ export const runValidation = async (input: RunValidationInput): Promise<RunValid
 		req,
 		payload,
 		formId,
+		timeoutMs,
 	} = input
+	const timeout = timeoutMs ?? RULE_TIMEOUT_MS
 	const errors: ValidationIssue[] = []
 
 	if (field.required && isEmpty(value)) {
@@ -97,16 +101,24 @@ export const runValidation = async (input: RunValidationInput): Promise<RunValid
 	}
 
 	if (fieldDefinition?.validate) {
-		const result = await fieldDefinition.validate({
-			value,
-			config: field,
-			siblingData: answers,
-			data: answers,
-			locale,
-			t,
-		})
-		if (result !== true) {
-			errors.push({ message: result, severity: 'error' })
+		try {
+			const ran = fieldDefinition.validate({
+				value,
+				config: field,
+				siblingData: answers,
+				data: answers,
+				locale,
+				t,
+			})
+			const result = ran instanceof Promise ? await withTimeout(ran, timeout, true) : ran
+			if (result !== true) {
+				errors.push({ message: result, severity: 'error' })
+			}
+		} catch (error) {
+			req?.payload?.logger?.error?.(
+				{ err: error, field: field.name },
+				'form-builder intrinsic field validator threw'
+			)
 		}
 	}
 
@@ -137,7 +149,7 @@ export const runValidation = async (input: RunValidationInput): Promise<RunValid
 				payload: mode === 'server' ? payload : undefined,
 				formId: mode === 'server' ? formId : undefined,
 			})
-			const result = ran instanceof Promise ? await withTimeout(ran, RULE_TIMEOUT_MS, true) : ran
+			const result = ran instanceof Promise ? await withTimeout(ran, timeout, true) : ran
 			const issue = toIssue(result, fallbackSeverity)
 			if (issue) {
 				errors.push(issue)

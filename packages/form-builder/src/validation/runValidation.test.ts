@@ -1,13 +1,44 @@
+import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { defaultFieldDefinitions } from '../fields/builtin'
 import { buildRegistry } from '../fields/registry'
+import type { AnyFormFieldDefinition } from '../fields/types'
 import type { FormFieldInstance } from '../submissions/types'
 import { defaultValidationRules } from './builtin'
+import { defineValidationRule } from './defineValidationRule'
 import { buildRuleRegistry } from './registry'
 import { runValidation } from './runValidation'
+import type { AnyValidationRuleDefinition } from './types'
 
 const fieldRegistry = buildRegistry(defaultFieldDefinitions)
 const ruleRegistry = buildRuleRegistry(defaultValidationRules)
+const throwingRule = defineValidationRule({
+	type: 'throwing',
+	label: 'Throwing',
+	defaultMessage: 'm',
+	validate: () => {
+		throw new Error('boom')
+	},
+})
+const slowRule = defineValidationRule({
+	type: 'slow',
+	label: 'Slow',
+	defaultMessage: 'm',
+	client: false,
+	validate: () => new Promise<true>((resolve) => setTimeout(() => resolve(true), 50)),
+})
+const wantsReqRule = defineValidationRule({
+	type: 'wantsReq',
+	label: 'WantsReq',
+	defaultMessage: 'has req',
+	validate: ({ req, message }) => (req ? message() : true),
+})
+const extendedRegistry = buildRuleRegistry([
+	...defaultValidationRules,
+	throwingRule as AnyValidationRuleDefinition,
+	slowRule as AnyValidationRuleDefinition,
+	wantsReqRule as AnyValidationRuleDefinition,
+])
 const t = (key: string) => key
 
 const run = (field: FormFieldInstance, value: unknown, answers: Record<string, unknown> = {}) =>
@@ -115,6 +146,84 @@ describe('runValidation', () => {
 			validations: [{ blockType: 'minLength', min: 3 }],
 		}
 		const result = await run(field, '')
+		expect(result.errors).toEqual([])
+	})
+
+	it('fails open when a declarative rule throws', async () => {
+		const result = await runValidation({
+			field: { blockType: 'text', name: 'a', validations: [{ blockType: 'throwing' }] },
+			fieldDefinition: fieldRegistry.get('text'),
+			value: 'x',
+			fieldType: 'text',
+			ruleRegistry: extendedRegistry,
+			answers: {},
+			locale: 'en',
+			t,
+			operation: 'create',
+			event: 'submit',
+			mode: 'server',
+		})
+		expect(result.errors).toEqual([])
+	})
+
+	it('fails open when an async rule exceeds the timeout', async () => {
+		const result = await runValidation({
+			field: { blockType: 'text', name: 'a', validations: [{ blockType: 'slow' }] },
+			fieldDefinition: fieldRegistry.get('text'),
+			value: 'x',
+			fieldType: 'text',
+			ruleRegistry: extendedRegistry,
+			answers: {},
+			locale: 'en',
+			t,
+			operation: 'create',
+			event: 'submit',
+			mode: 'server',
+			timeoutMs: 5,
+		})
+		expect(result.errors).toEqual([])
+	})
+
+	it('fails open when the intrinsic field validator throws', async () => {
+		const throwingField = {
+			type: 'boom',
+			label: 'Boom',
+			value: 'text',
+			validate: () => {
+				throw new Error('boom')
+			},
+		} as AnyFormFieldDefinition
+		const result = await runValidation({
+			field: { blockType: 'boom', name: 'a' },
+			fieldDefinition: throwingField,
+			value: 'x',
+			fieldType: 'boom',
+			ruleRegistry: extendedRegistry,
+			answers: {},
+			locale: 'en',
+			t,
+			operation: 'create',
+			event: 'submit',
+			mode: 'server',
+		})
+		expect(result.errors).toEqual([])
+	})
+
+	it('nulls server-only context for a client-enabled rule in client mode', async () => {
+		const result = await runValidation({
+			field: { blockType: 'text', name: 'a', validations: [{ blockType: 'wantsReq' }] },
+			fieldDefinition: fieldRegistry.get('text'),
+			value: 'x',
+			fieldType: 'text',
+			ruleRegistry: extendedRegistry,
+			answers: {},
+			locale: 'en',
+			t,
+			operation: 'create',
+			event: 'onChange',
+			mode: 'client',
+			req: {} as unknown as PayloadRequest,
+		})
 		expect(result.errors).toEqual([])
 	})
 })
