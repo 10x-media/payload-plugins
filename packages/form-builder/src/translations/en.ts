@@ -23,4 +23,10 @@ export const en: Record<TranslationKey, string> = {
 	[keys.validationSelect]: 'Choose a valid option',
 	[keys.formatYes]: 'Yes',
 	[keys.formatNo]: 'No',
+	[keys.configName]: 'Name',
+	[keys.configLabel]: 'Label',
+	[keys.configRequired]: 'Required',
+	[keys.configWidth]: 'Width',
+	[keys.configPlaceholder]: 'Placeholder',
+	[keys.configDescription]: 'Description',
 }

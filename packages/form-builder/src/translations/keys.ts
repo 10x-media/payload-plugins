@@ -21,6 +21,12 @@ export const keys = {
 	validationSelect: 'formBuilder:validation.select',
 	formatYes: 'formBuilder:format.yes',
 	formatNo: 'formBuilder:format.no',
+	configName: 'formBuilder:config.name',
+	configLabel: 'formBuilder:config.label',
+	configRequired: 'formBuilder:config.required',
+	configWidth: 'formBuilder:config.width',
+	configPlaceholder: 'formBuilder:config.placeholder',
+	configDescription: 'formBuilder:config.description',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
