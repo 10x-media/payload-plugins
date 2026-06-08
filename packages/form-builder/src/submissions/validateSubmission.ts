@@ -3,17 +3,21 @@ import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { asFieldTranslate } from '../translations/server'
+import type { ValidationRuleRegistry } from '../validation/registry'
 import { runSubmission } from './runSubmission'
 import type { FormFieldInstance, SubmissionValue } from './types'
 
 /**
  * Server-authoritative submission validation. On create it loads the referenced form, re-runs every
- * field's intrinsic validator through `runSubmission`, throws a Payload `ValidationError` with
- * per-field paths when anything fails, and writes the typed values plus the localized descriptor
- * snapshot. The client is never trusted. The declarative rule registry (Phase 2) threads through here.
+ * field's required check, intrinsic validator, and declarative rules through `runSubmission`, threading
+ * `req`/`payload` so server-only async rules can hit the DB, and throws a Payload `ValidationError` with
+ * per-field paths on any error-severity failure. The client is never trusted.
  */
 export const validateSubmission =
-	(registry: FieldTypeRegistry): CollectionBeforeValidateHook =>
+	(
+		registry: FieldTypeRegistry,
+		ruleRegistry: ValidationRuleRegistry
+	): CollectionBeforeValidateHook =>
 	async ({ data, operation, req }) => {
 		if (operation !== 'create' || !data) {
 			return data
@@ -36,7 +40,18 @@ export const validateSubmission =
 		const locale = req.locale ?? 'en'
 		const t = asFieldTranslate(req.i18n.t)
 
-		const result = await runSubmission({ fields, values: incoming, registry, locale, t })
+		const result = await runSubmission({
+			fields,
+			values: incoming,
+			registry,
+			ruleRegistry,
+			locale,
+			t,
+			operation: 'create',
+			req,
+			payload: req.payload,
+			formId: formId as number | string,
+		})
 
 		if (result.errors.length > 0) {
 			throw new ValidationError({ collection: FORM_SUBMISSIONS_SLUG, errors: result.errors }, req.t)

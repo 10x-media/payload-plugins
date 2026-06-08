@@ -1,11 +1,15 @@
 import type { CollectionConfig } from 'payload'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { validateSubmission } from '../submissions/validateSubmission'
+import type { ValidationRuleRegistry } from '../validation/registry'
 import { FORMS_SLUG } from './forms'
 
 export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 
-export const buildSubmissionsCollection = (registry: FieldTypeRegistry): CollectionConfig => ({
+export const buildSubmissionsCollection = (
+	registry: FieldTypeRegistry,
+	ruleRegistry: ValidationRuleRegistry
+): CollectionConfig => ({
 	slug: FORM_SUBMISSIONS_SLUG,
 	labels: { singular: 'Submission', plural: 'Submissions' },
 	admin: { group: 'Forms' },
@@ -14,7 +18,7 @@ export const buildSubmissionsCollection = (registry: FieldTypeRegistry): Collect
 		read: ({ req }) => Boolean(req.user),
 		update: () => false,
 	},
-	hooks: { beforeValidate: [validateSubmission(registry)] },
+	hooks: { beforeValidate: [validateSubmission(registry, ruleRegistry)] },
 	fields: [
 		{ name: 'form', type: 'relationship', relationTo: FORMS_SLUG, required: true },
 		{

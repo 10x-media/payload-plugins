@@ -4,6 +4,8 @@ import { defaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
+import { defaultValidationRules } from './validation/builtin'
+import { resolveValidationRules, type ValidationRulesConfig } from './validation/registry'
 
 export type FormBuilderPluginOptions = {
 	disabled?: boolean
@@ -11,6 +13,8 @@ export type FormBuilderPluginOptions = {
 	events?: FormEventSink
 	/** Add, override, or remove field types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	fields?: FieldTypesConfig
+	/** Add, override, or remove validation rule types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
+	rules?: ValidationRulesConfig
 }
 
 declare module 'payload' {
@@ -27,8 +31,9 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			return config
 		}
 		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
+		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
 		registerTranslations(config)
-		registerCollections(config, registry)
+		registerCollections(config, registry, ruleRegistry)
 		return config
 	},
 })

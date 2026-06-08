@@ -1,6 +1,8 @@
+import type { Payload, PayloadRequest } from 'payload'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { Translate } from '../fields/types'
-import { keys } from '../translations/keys'
+import type { ValidationRuleRegistry } from '../validation/registry'
+import { runValidation } from '../validation/runValidation'
 import type {
 	FormFieldInstance,
 	SubmissionDescriptor,
@@ -46,8 +48,13 @@ export type RunSubmissionInput = {
 	fields: FormFieldInstance[]
 	values: SubmissionValue[]
 	registry: FieldTypeRegistry
+	ruleRegistry: ValidationRuleRegistry
 	locale: string
 	t: Translate
+	operation: 'create' | 'update'
+	req?: PayloadRequest
+	payload?: Payload
+	formId?: number | string
 }
 
 export type RunSubmissionResult = {
@@ -57,15 +64,29 @@ export type RunSubmissionResult = {
 }
 
 /**
- * Pure submission core: validate every defined field against its incoming value, snapshot a localized
- * descriptor per answered field, and normalize stored values to their typed kind. No DB or request
- * access, so it is fully unit-testable; the `beforeValidate` hook is a thin adapter over this. Phase 2
- * threads the declarative rule registry through the same loop.
+ * Pure submission core, two-pass: first coerce every answered field to its typed kind (so cross-field
+ * rules see coerced siblings), then validate each field through `runValidation` (required, intrinsic
+ * facet, declarative rules), snapshotting a localized descriptor per answered field. Only `error`
+ * severity blocks; warnings are computed but not surfaced server-side (the Phase 4 renderer shows them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
-	const { fields, values, registry, locale, t } = input
+	const { fields, values, registry, ruleRegistry, locale, t, operation, req, payload, formId } =
+		input
 	const incoming = new Map(values.map((entry) => [entry.field, entry.value]))
-	const answers = Object.fromEntries(incoming)
+
+	const coercedAnswers: Record<string, unknown> = {}
+	const coercedByName = new Map<string, unknown>()
+	for (const instance of fields) {
+		const definition = registry.get(instance.blockType)
+		const raw = incoming.get(instance.name)
+		if (!definition || isEmpty(raw)) {
+			continue
+		}
+		const value = coerce(definition.value, raw)
+		coercedAnswers[instance.name] = value
+		coercedByName.set(instance.name, value)
+	}
+
 	const errors: SubmissionFieldError[] = []
 	const outValues: SubmissionValue[] = []
 	const descriptors: SubmissionDescriptor[] = []
@@ -76,28 +97,33 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 			continue
 		}
 		const raw = incoming.get(instance.name)
+		const value = coercedByName.has(instance.name) ? coercedByName.get(instance.name) : raw
 
-		if (instance.required && isEmpty(raw)) {
-			errors.push({ path: instance.name, message: t(keys.validationRequired) })
+		const { errors: issues } = await runValidation({
+			field: instance,
+			fieldDefinition: definition,
+			value,
+			fieldType: instance.blockType,
+			ruleRegistry,
+			answers: coercedAnswers,
+			locale,
+			t,
+			operation,
+			event: 'submit',
+			mode: 'server',
+			req,
+			payload,
+			formId,
+		})
+		const blocking = issues.filter((issue) => issue.severity === 'error')
+		if (blocking.length > 0) {
+			for (const issue of blocking) {
+				errors.push({ path: instance.name, message: issue.message })
+			}
 			continue
 		}
 		if (isEmpty(raw)) {
 			continue
-		}
-		const value = coerce(definition.value, raw)
-		if (definition.validate) {
-			const result = await definition.validate({
-				value,
-				config: instance,
-				siblingData: answers,
-				data: answers,
-				locale,
-				t,
-			})
-			if (result !== true) {
-				errors.push({ path: instance.name, message: result })
-				continue
-			}
 		}
 
 		outValues.push({ field: instance.name, value })

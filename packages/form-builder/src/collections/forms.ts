@@ -3,10 +3,14 @@ import { buildFieldBlocks } from '../fields/buildFieldBlocks'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
+import type { ValidationRuleRegistry } from '../validation/registry'
 
 export const FORMS_SLUG = 'forms'
 
-export const buildFormsCollection = (registry: FieldTypeRegistry): CollectionConfig => ({
+export const buildFormsCollection = (
+	registry: FieldTypeRegistry,
+	_ruleRegistry: ValidationRuleRegistry
+): CollectionConfig => ({
 	slug: FORMS_SLUG,
 	labels: { singular: 'Form', plural: 'Forms' },
 	admin: { group: 'Forms', useAsTitle: 'title' },

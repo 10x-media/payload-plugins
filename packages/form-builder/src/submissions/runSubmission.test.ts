@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { defaultFieldDefinitions } from '../fields/builtin'
 import { buildRegistry } from '../fields/registry'
+import { defaultValidationRules } from '../validation/builtin'
+import { buildRuleRegistry } from '../validation/registry'
 import { runSubmission } from './runSubmission'
 import type { FormFieldInstance } from './types'
 
 const registry = buildRegistry(defaultFieldDefinitions)
+const ruleRegistry = buildRuleRegistry(defaultValidationRules)
 const t = (key: string) => key
-const base = { registry, locale: 'en', t }
+const base = { registry, ruleRegistry, locale: 'en', t, operation: 'create' as const }
 
 describe('runSubmission', () => {
 	it('validates required and email, snapshots descriptors, returns typed values', async () => {
@@ -126,5 +129,47 @@ describe('runSubmission', () => {
 		})
 		expect(result.errors).toEqual([{ path: 'age', message: 'formBuilder:validation.number' }])
 		expect(result.values).toEqual([])
+	})
+
+	it('enforces a declarative minLength rule with the coerced value', async () => {
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'text',
+				name: 'code',
+				label: 'Code',
+				validations: [{ blockType: 'minLength', min: 4 }],
+			},
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'code', value: 'ab' }],
+		})
+		expect(result.errors).toEqual([{ path: 'code', message: 'formBuilder:rule.minLength.message' }])
+	})
+
+	it('resolves matchesField against coerced sibling answers', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'number', name: 'a', label: 'A' },
+			{
+				blockType: 'number',
+				name: 'b',
+				label: 'B',
+				validations: [{ blockType: 'matchesField', field: 'a' }],
+			},
+		]
+		const ok = await runSubmission({
+			...base,
+			fields,
+			values: [
+				{ field: 'a', value: '5' },
+				{ field: 'b', value: '5' },
+			],
+		})
+		expect(ok.errors).toEqual([])
+		expect(ok.values).toEqual([
+			{ field: 'a', value: 5 },
+			{ field: 'b', value: 5 },
+		])
 	})
 })
