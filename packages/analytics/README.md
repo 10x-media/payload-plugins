@@ -1,19 +1,10 @@
 # @10x-media/analytics
 
-Adapter-based analytics for Payload: providers, a native engine, dashboard widgets, and portable fields..
+Adapter-based analytics for Payload v3: a unified adapter contract and a cached surfacing engine. Provider adapters (GA4, Plausible, Umami, PostHog), the native analytics engine, dashboard widgets, and portable fields land in subsequent releases.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/analytics?style=flat-square)](https://www.npmjs.com/package/@10x-media/analytics)
+> Status: foundation (beta). This release ships the adapter contract and the surfacing engine. It is not useful on its own yet without an adapter.
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
-
-> Beta scaffold: this plugin currently returns the Payload config unchanged. Replace this note and fill in the sections below as you add behavior.
-
-## Requirements
-
-- Payload v3 (peer: `payload@^3.82.0`)
-- React 19 (peer)
-
-## Installation
+## Install
 
 ```bash
 pnpm add @10x-media/analytics
@@ -26,23 +17,30 @@ import { buildConfig } from 'payload'
 import { analytics } from '@10x-media/analytics'
 
 export default buildConfig({
-  // ...
   plugins: [
     analytics({
-      // options
+      adapters: [/* one or more AnalyticsAdapter instances */],
     }),
   ],
 })
 ```
 
-## Options
+Pass `false` to disable without removing the call:
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `disabled` | `boolean` | `false` | When `true`, returns the incoming config unchanged. Useful for toggling the plugin per environment. |
+```ts
+analytics(false)
+```
 
-<!-- Add new options to this table as you build them. -->
+## The adapter contract
 
-## License
+Every provider and the native engine implement one `AnalyticsAdapter` interface. Author your own adapter against the published types:
 
-[MIT](./LICENSE). Copyright 10x Media GmbH.
+```ts
+import type { AnalyticsAdapter } from '@10x-media/analytics/types'
+```
+
+An adapter declares its `capabilities` (which metrics and dimensions it supports, realtime, rate limits, recommended cache TTLs). The surfacing engine reads through `payload.kv` with request coalescing, a bounded queue, and exponential backoff, so unconfigured adapters and provider outages degrade gracefully.
+
+## Testing
+
+`@10x-media/analytics/testing` exports `memoryAdapter()`, a deterministic in-memory adapter for tests and local development.
