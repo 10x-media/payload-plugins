@@ -35,14 +35,14 @@ export interface NormalizeArgs {
 	now: Date
 }
 
-export function normalizeEvent({
+export async function normalizeEvent({
 	raw,
 	headers,
 	geoResolver,
 	salt,
 	now,
-}: NormalizeArgs): StoredEvent {
-	const geo = geoResolver(headers)
+}: NormalizeArgs): Promise<StoredEvent> {
+	const geo = await geoResolver(headers)
 	const ip = (
 		headers.get('x-forwarded-for')?.split(',')[0] ??
 		headers.get('x-real-ip') ??

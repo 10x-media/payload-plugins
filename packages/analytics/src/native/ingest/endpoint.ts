@@ -20,7 +20,7 @@ export const makeIngestHandler =
 		}
 		const now = new Date()
 		const salt = await dailySalt(req.payload, now)
-		const event = normalizeEvent({ raw, headers: req.headers, geoResolver, salt, now })
+		const event = await normalizeEvent({ raw, headers: req.headers, geoResolver, salt, now })
 		await writeEvent(req.payload, event)
 		await applyRollupDeltas(req.payload, computeRollupDeltas(event))
 		return Response.json({ ok: true }, { status: 202 })

@@ -4,7 +4,7 @@ export interface Geo {
 	city?: string
 }
 
-export type GeoResolver = (headers: Headers) => Geo
+export type GeoResolver = (headers: Headers) => Geo | Promise<Geo>
 
 export const platformHeaderResolver: GeoResolver = (headers) => ({
 	country: headers.get('x-vercel-ip-country') ?? headers.get('cf-ipcountry') ?? undefined,
