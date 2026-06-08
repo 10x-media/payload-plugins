@@ -20,4 +20,9 @@ describe('formBuilder factory', () => {
 		const moduleExports = await import('./index')
 		expect(typeof moduleExports.defineFormField).toBe('function')
 	})
+
+	it('exports the defineValidationRule primitive', async () => {
+		const moduleExports = await import('./index')
+		expect(typeof moduleExports.defineValidationRule).toBe('function')
+	})
 })

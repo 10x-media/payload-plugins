@@ -13,3 +13,14 @@ export type {
 	SubmissionFieldError,
 	SubmissionValue,
 } from '../submissions/types'
+export type {
+	ValidationRuleOption,
+	ValidationRuleRegistry,
+	ValidationRulesConfig,
+} from '../validation/registry'
+export type {
+	AnyValidationRuleDefinition,
+	ValidationRuleDefinition,
+	ValidationRuleResult,
+	ValidationSeverity,
+} from '../validation/types'

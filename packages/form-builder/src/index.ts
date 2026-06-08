@@ -47,4 +47,16 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 } from './fields/types'
+export { defineValidationRule } from './validation/defineValidationRule'
+export type {
+	ValidationRuleOption,
+	ValidationRuleRegistry,
+	ValidationRulesConfig,
+} from './validation/registry'
+export type {
+	AnyValidationRuleDefinition,
+	ValidationRuleDefinition,
+	ValidationRuleResult,
+	ValidationSeverity,
+} from './validation/types'
 export type { FormBuilderPluginOptions as PluginOptions }
