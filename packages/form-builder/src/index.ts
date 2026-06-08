@@ -38,6 +38,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 	},
 })
 
+export { evaluateCondition } from './conditions/evaluate'
+export type { FieldCondition } from './conditions/types'
 export { defineFormField } from './fields/defineFormField'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from './fields/registry'
 export type {

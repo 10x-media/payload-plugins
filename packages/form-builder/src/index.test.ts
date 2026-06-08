@@ -25,4 +25,9 @@ describe('formBuilder factory', () => {
 		const moduleExports = await import('./index')
 		expect(typeof moduleExports.defineValidationRule).toBe('function')
 	})
+
+	it('exports the evaluateCondition engine', async () => {
+		const moduleExports = await import('./index')
+		expect(typeof moduleExports.evaluateCondition).toBe('function')
+	})
 })

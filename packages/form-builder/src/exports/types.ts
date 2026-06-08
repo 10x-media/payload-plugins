@@ -1,3 +1,4 @@
+export type { FieldCondition } from '../conditions/types'
 export type { FormEvent, FormEventSink } from '../events/types'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from '../fields/registry'
 export type {
