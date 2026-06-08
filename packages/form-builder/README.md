@@ -6,7 +6,7 @@ An end-to-end forms platform for Payload v3: author, validate, render, collect, 
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Status: alpha. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field, enforced server-side by a pure isomorphic engine (conditions are authored as JSON for now; the native Where-style condition builder UI follows in a later release). The renderer, the client-side live-validation adapter, and the post-submit pipeline land in subsequent phases.
+> Status: alpha. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field with a native, Payload-style condition builder UI (field/operator/value, the same look as Payload's list filters), enforced server-side by a pure isomorphic engine. The renderer, the client-side live-validation adapter, and the post-submit pipeline land in subsequent phases.
 
 ## What ships in Phase 1
 
@@ -31,8 +31,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Hidden fields are skipped entirely**: when `visibleWhen` evaluates false, the field is not validated, its value is not stored, and any value the client sent for it is ignored. A hidden field cannot leak data into a submission.
 - **`validateWhen` gates validation, not storage**: when `validateWhen` evaluates false, the field's validation rules are skipped but its value is still stored. Use it for answers that are only required under certain conditions.
 - **Server-authoritative, pure, and isomorphic**: conditions are enforced server-side by `evaluateCondition`, a pure engine that mirrors Payload's query-operator semantics (coerce then compare) with no `req` or database access. It is exported so the renderer and your own code can reuse the exact same logic client-side.
-
-> In this alpha, conditions are authored as JSON in Payload's `Where` shape. The native Where-style condition builder UI lands in a later release.
+- **Native condition builder UI**: conditions are authored with a Payload-style condition builder on each field (field, operator, value -- the same look as Payload's list filters), stored as a canonical `Where`, normalized and validated server-side. The serializable format means the renderer reuses the exact same `evaluateCondition` client-side.
 
 ## Requirements
 
