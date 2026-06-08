@@ -109,23 +109,38 @@ const evaluateOperator = (operator: Operator, answer: unknown, value: unknown): 
 	}
 }
 
-const evaluateRow = (row: Where, answers: Record<string, unknown>): boolean =>
-	Object.entries(row).every(([field, constraint]) => {
-		if (field === 'and' || field === 'or' || constraint == null || typeof constraint !== 'object') {
+/**
+ * Evaluate one `Where` node: every top-level key is ANDed. `or` is a disjunction of sub-conditions
+ * (an empty `or` matches), `and` is a conjunction, and any other key is a field path whose
+ * `{ operator: value }` constraints are ANDed. Recurses, so nested `or`/`and` groups are supported.
+ */
+const evaluateWhere = (where: Where, answers: Record<string, unknown>): boolean =>
+	Object.entries(where).every(([key, constraint]) => {
+		if (key === 'or') {
+			const groups = (Array.isArray(constraint) ? constraint : []) as Where[]
+			return groups.length === 0 || groups.some((group) => evaluateWhere(group, answers))
+		}
+		if (key === 'and') {
+			const groups = (Array.isArray(constraint) ? constraint : []) as Where[]
+			return groups.every((group) => evaluateWhere(group, answers))
+		}
+		if (constraint == null || typeof constraint !== 'object' || Array.isArray(constraint)) {
 			return false
 		}
 		return Object.entries(constraint as Record<string, unknown>).every(([operator, value]) =>
-			evaluateOperator(operator as Operator, answers[field], value)
+			evaluateOperator(operator as Operator, answers[key], value)
 		)
 	})
 
 /**
  * Evaluate a serializable `Where`-shaped condition against a flat map of (already coerced) form answers.
  * An absent or empty condition matches (returns true). Operator semantics mirror Payload's query
- * adapters (coerce then compare; `not_equals`/`not_in` are null-inclusive; `exists` treats `''`/absent
- * as not-existing; `like` space-splits and ANDs; `contains` is a single case-insensitive substring).
- * Geo and `all` operators are out of scope and evaluate to false. Isomorphic: no `req`/DB access, so
- * the renderer reuses it client-side.
+ * adapters: coerce then compare; `not_equals`/`not_in` are null-inclusive; `exists` treats `''`/absent
+ * as not-existing; `like` is case-insensitive and space-splits (every word must be a substring), and
+ * `not_like` is its logical negation (at least one word absent); `contains` is a single case-insensitive
+ * substring; comma-delimited `in`/`not_in` string values are split and trimmed. Geo (`near`/`within`/
+ * `intersects`) and `all` are out of scope and evaluate to false. Isomorphic: no `req`/DB access, so the
+ * renderer reuses it client-side.
  */
 export const evaluateCondition = (
 	where: Where | null | undefined,
@@ -134,13 +149,5 @@ export const evaluateCondition = (
 	if (!where || Object.keys(where).length === 0) {
 		return true
 	}
-	const canonical = transformWhereQuery(where)
-	const groups = (canonical.or ?? []) as Where[]
-	if (groups.length === 0) {
-		return true
-	}
-	return groups.some((group) => {
-		const rows = (group.and ?? []) as Where[]
-		return rows.every((row) => evaluateRow(row, answers))
-	})
+	return evaluateWhere(transformWhereQuery(where), answers)
 }

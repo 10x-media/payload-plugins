@@ -62,6 +62,32 @@ describe('evaluateCondition', () => {
 		expect(evaluateCondition(cond('s', 'not_like', 'foo'), { s: 'bar' })).toBe(true)
 	})
 
+	it('not_like is the logical negation of like (at least one word absent)', () => {
+		expect(evaluateCondition(cond('s', 'not_like', 'foo bar'), { s: 'has foo only' })).toBe(true)
+		expect(evaluateCondition(cond('s', 'not_like', 'foo bar'), { s: 'foo and bar' })).toBe(false)
+	})
+
+	it('ANDs a top-level or and and sibling', () => {
+		const where: Where = {
+			or: [{ and: [{ a: { equals: 'x' } }] }],
+			and: [{ b: { equals: 'y' } }],
+		}
+		expect(evaluateCondition(where, { a: 'x', b: 'y' })).toBe(true)
+		expect(evaluateCondition(where, { a: 'x', b: 'z' })).toBe(false)
+	})
+
+	it('evaluates a nested or within an and group', () => {
+		const where: Where = {
+			or: [
+				{
+					and: [{ a: { equals: 'x' } }, { or: [{ b: { equals: 'y' } }, { b: { equals: 'z' } }] }],
+				},
+			],
+		}
+		expect(evaluateCondition(where, { a: 'x', b: 'z' })).toBe(true)
+		expect(evaluateCondition(where, { a: 'x', b: 'w' })).toBe(false)
+	})
+
 	it('contains: case-insensitive substring, not space-split', () => {
 		expect(evaluateCondition(cond('s', 'contains', 'oo b'), { s: 'FOO BAR' })).toBe(true)
 		expect(evaluateCondition(cond('s', 'contains', 'foo bar'), { s: 'foo and bar' })).toBe(false)
