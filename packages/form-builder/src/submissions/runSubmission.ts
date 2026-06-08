@@ -1,4 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
+import { evaluateCondition } from '../conditions/evaluate'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { Translate } from '../fields/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -66,8 +67,11 @@ export type RunSubmissionResult = {
 /**
  * Pure submission core, two-pass: first coerce every answered field to its typed kind (so cross-field
  * rules see coerced siblings), then validate each field through `runValidation` (required, intrinsic
- * facet, declarative rules), snapshotting a localized descriptor per answered field. Only `error`
- * severity blocks; warnings are computed but not surfaced server-side (the Phase 4 renderer shows them).
+ * facet, declarative rules), snapshotting a localized descriptor per answered field. Conditions gate
+ * the second pass against the coerced answers: a field whose `visibleWhen` is false is skipped entirely
+ * (never validated, never stored, so a client-sent value for it is ignored), and a visible field whose
+ * `validateWhen` is false stores its value but skips validation. Only `error` severity blocks; warnings
+ * are computed but not surfaced server-side (the Phase 4 renderer shows them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
 	const { fields, values, registry, ruleRegistry, locale, t, operation, req, payload, formId } =
@@ -99,29 +103,36 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		const raw = incoming.get(instance.name)
 		const value = coercedByName.has(instance.name) ? coercedByName.get(instance.name) : raw
 
-		const { errors: issues } = await runValidation({
-			field: instance,
-			fieldDefinition: definition,
-			value,
-			fieldType: instance.blockType,
-			ruleRegistry,
-			answers: coercedAnswers,
-			locale,
-			t,
-			operation,
-			event: 'submit',
-			mode: 'server',
-			req,
-			payload,
-			formId,
-		})
-		const blocking = issues.filter((issue) => issue.severity === 'error')
-		if (blocking.length > 0) {
-			for (const issue of blocking) {
-				errors.push({ path: instance.name, message: issue.message })
-			}
+		if (!evaluateCondition(instance.visibleWhen, coercedAnswers)) {
 			continue
 		}
+
+		if (evaluateCondition(instance.validateWhen, coercedAnswers)) {
+			const { errors: issues } = await runValidation({
+				field: instance,
+				fieldDefinition: definition,
+				value,
+				fieldType: instance.blockType,
+				ruleRegistry,
+				answers: coercedAnswers,
+				locale,
+				t,
+				operation,
+				event: 'submit',
+				mode: 'server',
+				req,
+				payload,
+				formId,
+			})
+			const blocking = issues.filter((issue) => issue.severity === 'error')
+			if (blocking.length > 0) {
+				for (const issue of blocking) {
+					errors.push({ path: instance.name, message: issue.message })
+				}
+				continue
+			}
+		}
+
 		if (isEmpty(raw)) {
 			continue
 		}

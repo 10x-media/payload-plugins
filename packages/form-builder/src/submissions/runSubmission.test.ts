@@ -172,4 +172,73 @@ describe('runSubmission', () => {
 			{ field: 'b', value: 5 },
 		])
 	})
+
+	it('skips a hidden field entirely (no validation, no stored value)', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'plan', label: 'Plan' },
+			{
+				blockType: 'text',
+				name: 'detail',
+				label: 'Detail',
+				required: true,
+				visibleWhen: { or: [{ and: [{ plan: { equals: 'pro' } }] }] },
+			},
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [
+				{ field: 'plan', value: 'free' },
+				{ field: 'detail', value: '' },
+			],
+		})
+		expect(result.errors).toEqual([])
+		expect(result.values).toEqual([{ field: 'plan', value: 'free' }])
+		expect(result.descriptors.map((descriptor) => descriptor.field)).toEqual(['plan'])
+	})
+
+	it('validates a visible conditional field', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'plan', label: 'Plan' },
+			{
+				blockType: 'text',
+				name: 'detail',
+				label: 'Detail',
+				required: true,
+				visibleWhen: { or: [{ and: [{ plan: { equals: 'pro' } }] }] },
+			},
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [
+				{ field: 'plan', value: 'pro' },
+				{ field: 'detail', value: '' },
+			],
+		})
+		expect(result.errors).toEqual([{ path: 'detail', message: 'formBuilder:validation.required' }])
+	})
+
+	it('validateWhen false stores the value but skips validation', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'plan', label: 'Plan' },
+			{
+				blockType: 'text',
+				name: 'code',
+				label: 'Code',
+				validations: [{ blockType: 'minLength', min: 4 }],
+				validateWhen: { or: [{ and: [{ plan: { equals: 'pro' } }] }] },
+			},
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [
+				{ field: 'plan', value: 'free' },
+				{ field: 'code', value: 'ab' },
+			],
+		})
+		expect(result.errors).toEqual([])
+		expect(result.values).toContainEqual({ field: 'code', value: 'ab' })
+	})
 })
