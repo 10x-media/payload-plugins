@@ -60,8 +60,16 @@ const applyVars = (content: string, vars: PluginVars): string =>
  */
 const formatGenerated = (slug: string): void => {
 	const targets = ['src', 'tests', 'dev'].map((dir) => join('packages', slug, dir))
+	const [cmd, cmdArgs] =
+		process.platform === 'win32'
+			? ([
+					//biome-ignore lint/plugin/noProcessEnv: process.env is allowed in this context
+					process.env.ComSpec ?? 'cmd.exe',
+					['/c', 'pnpm', 'exec', 'biome', 'check', '--write', ...targets],
+				] as const)
+			: (['pnpm', ['exec', 'biome', 'check', '--write', ...targets]] as const)
 	try {
-		execFileSync('pnpm', ['exec', 'biome', 'check', '--write', ...targets], {
+		execFileSync(cmd, cmdArgs, {
 			cwd: REPO_ROOT,
 			stdio: 'inherit',
 		})
