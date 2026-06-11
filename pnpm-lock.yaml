@@ -77,6 +77,9 @@ importers:
       '@commitlint/config-conventional':
         specifier: ^19.6.0
         version: 19.8.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.19
       husky:
         specifier: ^9.1.7
         version: 9.1.7
