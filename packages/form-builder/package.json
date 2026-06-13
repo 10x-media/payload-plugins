@@ -37,6 +37,12 @@
 			"types": "./src/exports/client.ts",
 			"default": "./dist/exports/client.js"
 		},
+		"./react": {
+			"development": "./src/exports/react.ts",
+			"types": "./src/exports/react.ts",
+			"default": "./dist/exports/react.js"
+		},
+		"./styles.css": "./styles/form-builder.css",
 		"./rsc": {
 			"development": "./src/exports/rsc.ts",
 			"types": "./src/exports/rsc.ts",
@@ -50,6 +56,7 @@
 	},
 	"files": [
 		"dist",
+		"styles",
 		"README.md",
 		"CHANGELOG.md",
 		"LICENSE"
@@ -124,6 +131,12 @@
 				"import": "./dist/exports/client.js",
 				"default": "./dist/exports/client.js"
 			},
+			"./react": {
+				"types": "./dist/exports/react.d.ts",
+				"import": "./dist/exports/react.js",
+				"default": "./dist/exports/react.js"
+			},
+			"./styles.css": "./styles/form-builder.css",
 			"./rsc": {
 				"types": "./dist/exports/rsc.d.ts",
 				"import": "./dist/exports/rsc.js",
