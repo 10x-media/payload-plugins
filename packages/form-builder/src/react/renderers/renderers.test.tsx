@@ -1,0 +1,126 @@
+import { cleanup, fireEvent, render, within } from '@testing-library/react'
+import { createElement } from 'react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { FieldRendererProps } from '../contract'
+import { checkboxRenderer } from './checkbox'
+import { emailRenderer } from './email'
+import { numberRenderer } from './number'
+import { selectRenderer } from './select'
+import { textRenderer } from './text'
+import { textareaRenderer } from './textarea'
+
+afterEach(() => {
+	cleanup()
+})
+
+const baseProps = <T,>(overrides: Partial<FieldRendererProps<T>>): FieldRendererProps<T> => ({
+	field: { blockType: 'text', name: 'f', label: 'Field' },
+	id: 'x',
+	name: 'f',
+	value: undefined,
+	onChange: () => {},
+	onBlur: () => {},
+	errors: [],
+	required: false,
+	locale: 'en',
+	t: (key) => key,
+	...overrides,
+})
+
+describe('built-in field renderers', () => {
+	it('text: reflects value, fires onChange, shows error with aria-invalid', () => {
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(textRenderer, baseProps<string>({ value: 'hi', onChange, errors: ['Bad'] }))
+		)
+		const input = within(container).getByRole('textbox')
+		expect(input).toHaveValue('hi')
+		expect(input).toHaveAttribute('aria-invalid', 'true')
+		expect(within(container).getByRole('alert')).toHaveTextContent('Bad')
+		fireEvent.change(input, { target: { value: 'bye' } })
+		expect(onChange).toHaveBeenCalledWith('bye')
+	})
+
+	it('email: renders an email-typed input', () => {
+		const { container } = render(
+			createElement(
+				emailRenderer,
+				baseProps<string>({ field: { blockType: 'email', name: 'e', label: 'E' } })
+			)
+		)
+		expect(within(container).getByRole('textbox')).toHaveAttribute('type', 'email')
+	})
+
+	it('textarea: renders a textarea and fires onChange', () => {
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				textareaRenderer,
+				baseProps<string>({ field: { blockType: 'textarea', name: 'ta', label: 'TA' }, onChange })
+			)
+		)
+		const textarea = within(container).getByRole('textbox')
+		expect(textarea.tagName).toBe('TEXTAREA')
+		fireEvent.change(textarea, { target: { value: 'long' } })
+		expect(onChange).toHaveBeenCalledWith('long')
+	})
+
+	it('number: emits a number, and undefined when cleared', () => {
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				numberRenderer,
+				baseProps<number | undefined>({
+					field: { blockType: 'number', name: 'n', label: 'N' },
+					value: 5,
+					onChange,
+				})
+			)
+		)
+		const input = within(container).getByRole('spinbutton')
+		fireEvent.change(input, { target: { value: '42' } })
+		expect(onChange).toHaveBeenCalledWith(42)
+		fireEvent.change(input, { target: { value: '' } })
+		expect(onChange).toHaveBeenCalledWith(undefined)
+	})
+
+	it('select: renders options and emits the chosen value', () => {
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				selectRenderer,
+				baseProps<string>({
+					field: {
+						blockType: 'select',
+						name: 's',
+						label: 'S',
+						options: [
+							{ label: 'A', value: 'a' },
+							{ label: 'B', value: 'b' },
+						],
+					},
+					onChange,
+				})
+			)
+		)
+		const select = within(container).getByRole('combobox')
+		fireEvent.change(select, { target: { value: 'b' } })
+		expect(onChange).toHaveBeenCalledWith('b')
+	})
+
+	it('checkbox: emits a boolean', () => {
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				checkboxRenderer,
+				baseProps<boolean>({
+					field: { blockType: 'checkbox', name: 'c', label: 'C' },
+					value: false,
+					onChange,
+				})
+			)
+		)
+		fireEvent.click(within(container).getByRole('checkbox'))
+		expect(onChange).toHaveBeenCalledWith(true)
+	})
+})
