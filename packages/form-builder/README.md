@@ -6,7 +6,7 @@ An end-to-end forms platform for Payload v3: author, validate, render, collect, 
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Status: alpha. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field with a native, Payload-style condition builder UI (field/operator/value, the same look as Payload's list filters), enforced server-side by a pure isomorphic engine. The renderer, the client-side live-validation adapter, and the post-submit pipeline land in subsequent phases.
+> Status: alpha. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field with a native, Payload-style condition builder UI (field/operator/value, the same look as Payload's list filters), enforced server-side by a pure isomorphic engine. Phase 4 begins the headless `@10x-media/form-builder/react` renderer (the renderer contract, registry, accessible primitives, built-in field renderers, and an optional container-query layout grid); the orchestrating `<Form>`, client-side live validation, and the post-submit pipeline land in subsequent phases.
 
 ## What ships in Phase 1
 
@@ -32,6 +32,95 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **`validateWhen` gates validation, not storage**: when `validateWhen` evaluates false, the field's validation rules are skipped but its value is still stored. Use it for answers that are only required under certain conditions.
 - **Server-authoritative, pure, and isomorphic**: conditions are enforced server-side by `evaluateCondition`, a pure engine that mirrors Payload's query-operator semantics (coerce then compare) with no `req` or database access. It is exported so the renderer and your own code can reuse the exact same logic client-side.
 - **Native condition builder UI**: conditions are authored with a Payload-style condition builder on each field (field, operator, value -- the same look as Payload's list filters), stored as a canonical `Where`, normalized and validated server-side. The serializable format means the renderer reuses the exact same `evaluateCondition` client-side.
+
+## Headless renderer foundation (Phase 4a)
+
+`@10x-media/form-builder/react` exports the headless renderer layer. It has no opinion on styling; bring your own CSS or opt into the included container-query grid.
+
+### Subpath
+
+```ts
+import { defineFieldRenderer, resolveRenderers, defaultRenderers } from '@10x-media/form-builder/react'
+```
+
+### Renderer contract
+
+A field renderer is a React component that maps `FieldRendererProps` to output. Use `defineFieldRenderer` to pin the type and get prop inference:
+
+```ts
+import { defineFieldRenderer } from '@10x-media/form-builder/react'
+
+const myTextRenderer = defineFieldRenderer<string>(({ id, name, value, onChange, onBlur, errors, required, disabled, t }) => (
+  <input
+    id={id}
+    name={name}
+    value={value ?? ''}
+    onChange={(e) => onChange(e.target.value)}
+    onBlur={onBlur}
+    required={required}
+    disabled={disabled}
+    aria-invalid={errors.length > 0 || undefined}
+  />
+))
+```
+
+`FieldRendererProps<TValue>` carries the field instance, stable `id`, machine `name`, `value`, `onChange`/`onBlur`, `errors`/`warnings`, `required`, `disabled`, `locale`, and a `t` translator.
+
+### Renderer registry
+
+`resolveRenderers` merges a base renderer map with a consumer override config. The same `false/true/object` convention used throughout the plugin applies here: `false` removes a type, `true` keeps the default, a renderer adds or replaces one.
+
+```ts
+import { defaultRenderers, resolveRenderers } from '@10x-media/form-builder/react'
+
+const registry = resolveRenderers(defaultRenderers, {
+  text: myTextRenderer,   // replace the built-in text renderer
+  number: false,          // remove the number renderer entirely
+  rating: ratingRenderer, // add a custom type
+})
+```
+
+### Unstyled accessible primitives
+
+The six control primitives are exported for use inside custom renderers. Each is an unstyled, accessible HTML control that wires `aria-invalid` and `aria-describedby` but leaves visual styling to you:
+
+| Primitive | Element |
+|---|---|
+| `Input` | text, email, or number `<input>` |
+| `Textarea` | `<textarea>` |
+| `Select` | `<select>` with typed `SelectOption[]` |
+| `Checkbox` | `<input type="checkbox">` |
+| `FieldShell` | Label + control slot + description + error/warning messages |
+
+Pair them with `FieldShell`, which renders the `<label>`, the control slot, and the description/error/warning region with the matching `aria-describedby` wiring.
+
+### Built-in renderers
+
+`defaultRenderers` is a `Record<string, FieldRenderer>` keyed by field-type slug, covering `text`, `textarea`, `email`, `number`, `select`, and `checkbox`. Each built-in renderer uses `FieldShell` and the matching primitive.
+
+### Optional layout grid
+
+To enable the container-query layout grid, import the stylesheet once at the app boundary:
+
+```ts
+import '@10x-media/form-builder/styles.css'
+```
+
+Then use `FormLayout` and `widthProps` to place fields in a responsive grid:
+
+```tsx
+import { FormLayout, widthProps } from '@10x-media/form-builder/react'
+
+<FormLayout>
+  <div {...widthProps('half')}>{/* first name */}</div>
+  <div {...widthProps('half')}>{/* last name */}</div>
+  <div {...widthProps('full')}>{/* message */}</div>
+</FormLayout>
+```
+
+`FieldWidth` values: `full`, `half`, `third`, `twoThirds`. Omit the import for your own layout; `FormLayout` still renders a plain container wrapper with no grid class when `enabled={false}`.
+
+> The orchestrating `<Form>` component, hooks, live client-side validation, and submission land in the next release (Phase 4b).
 
 ## Requirements
 
