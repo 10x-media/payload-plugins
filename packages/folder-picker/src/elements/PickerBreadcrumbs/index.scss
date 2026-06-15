@@ -1,0 +1,53 @@
+@layer payload-default {
+  .droppable-button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-family: inherit;
+
+    &:hover {
+      cursor: pointer;
+    }
+  }
+
+  .folderBreadcrumbs {
+    display: flex;
+
+    &__crumb,
+    &__crumb-item.droppable-button {
+      font-size: var(--font-size-h4);
+      font-weight: 600;
+      letter-spacing: unset;
+      display: flex;
+      align-items: center;
+      margin: 0;
+    }
+
+    &__crumb-item {
+      font-size: var(--font-size-h4);
+      font-weight: 600;
+    }
+
+    &__crumb-chevron {
+      position: relative;
+      top: 1px;
+      width: 1em;
+      height: 1em;
+
+      .stroke {
+        stroke: var(--theme-elevation-250);
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    .folderBreadcrumbs {
+      &__crumb,
+      &__crumb-item {
+        font-size: var(--base);
+      }
+    }
+  }
+}
