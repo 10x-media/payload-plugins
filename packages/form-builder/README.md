@@ -120,7 +120,116 @@ import { FormLayout, widthProps } from '@10x-media/form-builder/react'
 
 `FieldWidth` values: `full`, `half`, `third`, `twoThirds`. Omit the import for your own layout; `FormLayout` still renders a plain container wrapper with no grid class when `enabled={false}`.
 
-> The orchestrating `<Form>` component, hooks, live client-side validation, and submission land in the next release (Phase 4b).
+## Headless renderer: Form controller (Phase 4b)
+
+Phase 4b ships the orchestrating `<Form>` component and the hooks that power fully custom layouts.
+
+### Basic usage
+
+```tsx
+import { Form } from '@10x-media/form-builder/react'
+
+export function MyForm({ form }) {
+  return (
+    <Form
+      form={form}
+      onSuccess={(submissionId) => console.log('submitted', submissionId)}
+      onError={(message) => console.error(message)}
+    />
+  )
+}
+```
+
+`form` is a `FormDocument`: `{ id: string | number; fields: FormFieldInstance[] }`. Pass the document fetched from the Payload API directly.
+
+### Progressive validation
+
+Validation runs on blur, re-validates on change once a field has been touched, then validates all visible fields on submit. Hidden fields (those whose `visibleWhen` condition evaluates false) are excluded from validation and from the submitted values. Server-returned field errors are mapped back to the correct field after submission.
+
+### Submission transport
+
+By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Override the route via `apiRoute`:
+
+```tsx
+<Form form={form} apiRoute="/api/v2" />
+```
+
+Provide a fully custom transport via `onSubmit`. The handler receives `{ formId, values }` and must return a `SubmitFormResult`:
+
+```tsx
+<Form
+  form={form}
+  onSubmit={async ({ formId, values }) => {
+    const res = await myClient.submitForm(formId, values)
+    return res.ok ? { ok: true } : { ok: false, message: res.error }
+  }}
+/>
+```
+
+### Lifecycle events
+
+Pass an `events` sink to observe form lifecycle:
+
+```tsx
+import type { FormEventSink } from '@10x-media/form-builder/react'
+
+const sink: FormEventSink = {
+  emit: (event) => analytics.track(event.type, event),
+}
+
+<Form form={form} events={sink} />
+```
+
+Events emitted: `form.viewed`, `form.started`, `field.errored`, `submission.created`, `form.abandoned`.
+
+### FormProps reference
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `form` | `FormDocument` | required | The form document (id + fields). |
+| `fieldTypes` | `AnyFormFieldDefinition[]` | `undefined` | Extra field-type definitions to resolve renderers for custom types. |
+| `rules` | `AnyValidationRuleDefinition[]` | `undefined` | Extra validation rule definitions. |
+| `renderers` | `RenderersConfig` | `undefined` | Renderer overrides (same `false/true/object` convention). |
+| `apiRoute` | `string` | `'/api'` | Payload API route prefix for the built-in transport. |
+| `onSubmit` | `SubmitHandler` | `undefined` | Custom transport override. |
+| `onSuccess` | `(submissionId?: string) => void` | `undefined` | Called after a successful submission. |
+| `onError` | `(message: string) => void` | `undefined` | Called when submission fails. |
+| `events` | `FormEventSink` | `undefined` | Lifecycle event sink. |
+| `t` | `RendererTranslate` | `(key) => key` | Translator for renderer labels. |
+| `locale` | `string` | `'en'` | Locale passed to renderers and validation. |
+| `layout` | `boolean` | `true` | Pass `false` to disable the container-query grid wrapper. |
+| `submitLabel` | `string` | `'Submit'` | Label for the submit button. |
+| `successMessage` | `string` | `'Thank you.'` | Message shown after a successful submission. |
+
+### Custom layouts with `useFormState` and `useField`
+
+For fully custom layouts, render inside `<Form>` and consume the context hooks directly. `useFormState` returns the whole `FormState`; `useField(name)` binds one field:
+
+```tsx
+import { Form, useField, useFormState } from '@10x-media/form-builder/react'
+
+function NameField() {
+  const { value, errors, setValue, onBlur } = useField<string>('name')
+  return (
+    <label>
+      Name
+      <input
+        value={value ?? ''}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={onBlur}
+        aria-invalid={errors.length > 0 || undefined}
+      />
+      {errors.map((e) => <span key={e}>{e}</span>)}
+    </label>
+  )
+}
+```
+
+`UseFieldResult<TValue>` carries: `value`, `errors`, `warnings`, `touched`, `setValue`, and `onBlur`.
+
+`FormState` carries: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, and `submitError`.
+
+> Multi-step forms and presentation-only steps are a later phase.
 
 ## Requirements
 
