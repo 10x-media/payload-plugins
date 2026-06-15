@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { ROLLUPS_SLUG, rollupsCollection } from '../../src/native/collections/rollups'
 import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
+import { bumpRollup } from '../../src/native/rollups/bumpRollup'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
 describeForDb('analytics cross-db', {}, (db) => {
@@ -57,5 +58,35 @@ describeForDb('native rollup atomic apply', {}, (db) => {
 		expect(docs[0]?.pageviews).toBe(2)
 		expect(docs[0]?.durationMs).toBe(200)
 		expect(docs[0]?.samples).toBe(2)
+	})
+})
+
+describeForDb('native bumpRollup baseline', {}, (db) => {
+	let booted: BootedPayload
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: rollupsOnly, db })
+	})
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it(`initializes the full metric baseline when a partial bump creates the row on ${db}`, async () => {
+		const key = {
+			granularity: 'day' as const,
+			period: new Date('2026-03-01T00:00:00Z'),
+			path: '/baseline',
+			dimension: '',
+			dimvalue: '',
+		}
+		await bumpRollup(booted.payload, key, { visitors: 1 })
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/baseline' } },
+			pagination: false,
+		})
+		const row = docs[0] as { visitors: number; sessions: number; pageviews: number } | undefined
+		expect(row?.visitors).toBe(1)
+		expect(row?.sessions).toBe(0)
+		expect(row?.pageviews).toBe(0)
 	})
 })

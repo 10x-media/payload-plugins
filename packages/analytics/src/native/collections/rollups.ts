@@ -15,6 +15,8 @@ export const rollupsCollection = (): CollectionConfig => ({
 		{ name: 'pageviews', type: 'number', required: true, defaultValue: 0 },
 		{ name: 'events', type: 'number', required: true, defaultValue: 0 },
 		{ name: 'durationMs', type: 'number', required: true, defaultValue: 0 },
+		{ name: 'visitors', type: 'number', required: true, defaultValue: 0 },
+		{ name: 'sessions', type: 'number', required: true, defaultValue: 0 },
 		{ name: 'samples', type: 'number', required: true, defaultValue: 0 },
 	],
 	indexes: [{ fields: ['granularity', 'period', 'path', 'dimension', 'dimvalue'], unique: true }],

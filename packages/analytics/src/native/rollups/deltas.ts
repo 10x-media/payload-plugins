@@ -8,6 +8,14 @@ export interface RollupKey {
 	dimvalue: string
 }
 
+export type RollupMetric =
+	| 'pageviews'
+	| 'events'
+	| 'durationMs'
+	| 'samples'
+	| 'visitors'
+	| 'sessions'
+
 export interface RollupDelta {
 	key: RollupKey
 	inc: { pageviews: number; events: number; durationMs: number; samples: number }
