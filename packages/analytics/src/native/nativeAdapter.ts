@@ -9,6 +9,7 @@ import type {
 } from '../core/contract'
 import { eventsCollection } from './collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from './collections/rollups'
+import { seenCollection } from './collections/seen'
 import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
 import { maxmindResolver } from './geo/maxmindResolver'
@@ -54,7 +55,12 @@ export function native(options: NativeOptions = {}): AnalyticsAdapter {
 		capabilities,
 		isConfigured: () => true,
 		register(config: Config) {
-			config.collections = [...(config.collections ?? []), eventsCollection(), rollupsCollection()]
+			config.collections = [
+				...(config.collections ?? []),
+				eventsCollection(),
+				rollupsCollection(),
+				seenCollection(),
+			]
 			config.endpoints = [
 				...(config.endpoints ?? []),
 				{
