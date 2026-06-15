@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FormEventSink } from '../events/types'
 import type { FormFieldInstance } from '../submissions/types'
 import { Form, type FormDocument } from './Form'
+import { useField } from './useField'
 
 afterEach(() => {
 	cleanup()
@@ -97,5 +98,37 @@ describe('Form', () => {
 		})
 		const viewed = emit.mock.calls.find(([e]) => e.type === 'form.viewed')?.[0]
 		expect(typeof viewed.at).toBe('string')
+	})
+
+	it('renders custom children bound via useField and submits their values', async () => {
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '3' })
+		const fields: FormFieldInstance[] = [{ blockType: 'text', name: 'name', label: 'Name' }]
+		const Custom = () => {
+			const { value, setValue, onBlur } = useField<string>('name')
+			return (
+				<input
+					aria-label="custom"
+					value={value ?? ''}
+					onChange={(event) => setValue(event.target.value)}
+					onBlur={onBlur}
+				/>
+			)
+		}
+		render(
+			<Form form={doc(fields, 5)} onSubmit={onSubmit}>
+				<Custom />
+				<button type="submit">Send</button>
+			</Form>
+		)
+
+		fireEvent.change(screen.getByLabelText('custom'), { target: { value: 'Grace' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+		await waitFor(() => {
+			expect(onSubmit).toHaveBeenCalledWith({
+				formId: 5,
+				values: [{ field: 'name', value: 'Grace' }],
+			})
+		})
 	})
 })

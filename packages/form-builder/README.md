@@ -6,7 +6,7 @@ An end-to-end forms platform for Payload v3: author, validate, render, collect, 
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Status: alpha. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field with a native, Payload-style condition builder UI (field/operator/value, the same look as Payload's list filters), enforced server-side by a pure isomorphic engine. Phase 4 begins the headless `@10x-media/form-builder/react` renderer (the renderer contract, registry, accessible primitives, built-in field renderers, and an optional container-query layout grid); the orchestrating `<Form>`, client-side live validation, and the post-submit pipeline land in subsequent phases.
+> Status: alpha. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field with a native, Payload-style condition builder UI (field/operator/value, the same look as Payload's list filters), enforced server-side by a pure isomorphic engine. Phase 4 ships the headless `@10x-media/form-builder/react` renderer: the renderer contract, registry, accessible primitives, built-in field renderers, an optional container-query layout grid, and the orchestrating `<Form>` with progressive client-side validation, conditional visibility, submission, and lifecycle events. The post-submit action pipeline (email, webhooks) lands in a subsequent phase.
 
 ## What ships in Phase 1
 
@@ -31,7 +31,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Hidden fields are skipped entirely**: when `visibleWhen` evaluates false, the field is not validated, its value is not stored, and any value the client sent for it is ignored. A hidden field cannot leak data into a submission.
 - **`validateWhen` gates validation, not storage**: when `validateWhen` evaluates false, the field's validation rules are skipped but its value is still stored. Use it for answers that are only required under certain conditions.
 - **Server-authoritative, pure, and isomorphic**: conditions are enforced server-side by `evaluateCondition`, a pure engine that mirrors Payload's query-operator semantics (coerce then compare) with no `req` or database access. It is exported so the renderer and your own code can reuse the exact same logic client-side.
-- **Native condition builder UI**: conditions are authored with a Payload-style condition builder on each field (field, operator, value -- the same look as Payload's list filters), stored as a canonical `Where`, normalized and validated server-side. The serializable format means the renderer reuses the exact same `evaluateCondition` client-side.
+- **Native condition builder UI**: conditions are authored with a Payload-style condition builder on each field (field, operator, value, the same look as Payload's list filters), stored as a canonical `Where`, normalized and validated server-side. The serializable format means the renderer reuses the exact same `evaluateCondition` client-side.
 
 ## Headless renderer foundation (Phase 4a)
 
@@ -203,7 +203,7 @@ Events emitted: `form.viewed`, `form.started`, `field.errored`, `submission.crea
 
 ### Custom layouts with `useFormState` and `useField`
 
-For fully custom layouts, render inside `<Form>` and consume the context hooks directly. `useFormState` returns the whole `FormState`; `useField(name)` binds one field:
+For fully custom layouts, pass your own markup as `children` of `<Form>` and bind each field with the context hooks. `useFormState` returns the whole `FormState`; `useField(name)` binds one field:
 
 ```tsx
 import { Form, useField, useFormState } from '@10x-media/form-builder/react'
@@ -223,7 +223,19 @@ function NameField() {
     </label>
   )
 }
+
+// Pass fields as children; <Form> provides the context and owns submission.
+function ContactForm({ form }) {
+  return (
+    <Form form={form}>
+      <NameField />
+      <button type="submit">Send</button>
+    </Form>
+  )
+}
 ```
+
+When you pass `children`, `<Form>` renders them inside its context (instead of the auto-rendered field loop and default submit button), so you control the entire layout.
 
 `UseFieldResult<TValue>` carries: `value`, `errors`, `warnings`, `touched`, `setValue`, and `onBlur`.
 

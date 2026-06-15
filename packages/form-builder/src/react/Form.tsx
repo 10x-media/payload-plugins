@@ -3,6 +3,7 @@
 import {
 	createElement,
 	type FormEvent as ReactFormEvent,
+	type ReactNode,
 	useCallback,
 	useEffect,
 	useId,
@@ -44,6 +45,8 @@ export type FormProps = {
 	layout?: boolean
 	submitLabel?: string
 	successMessage?: string
+	/** Custom layout: render fields with `useField`/`useFormState` instead of the auto-rendered field loop. */
+	children?: ReactNode
 }
 
 const isEmpty = (value: unknown): boolean =>
@@ -92,6 +95,7 @@ export const Form = ({
 	layout,
 	submitLabel = 'Submit',
 	successMessage = 'Thank you.',
+	children,
 }: FormProps) => {
 	const registry = useMemo(() => buildFieldTypeRegistry(fieldTypes), [fieldTypes])
 	const ruleRegistry = useMemo(() => buildValidationRuleRegistry(rules), [rules])
@@ -185,6 +189,14 @@ export const Form = ({
 		for (const result of results) {
 			if (result.errors.length > 0) {
 				errors[result.field.name] = result.errors
+				const [firstError] = result.errors
+				if (firstError !== undefined) {
+					emitFormEvent(sinkRef.current, formIdRef.current, {
+						type: 'field.errored',
+						field: result.field.name,
+						message: firstError,
+					})
+				}
 			}
 			if (result.warnings.length > 0) {
 				warnings[result.field.name] = result.warnings
@@ -221,6 +233,18 @@ export const Form = ({
 		}
 	}
 
+	const contextValue = { state, dispatch, validateField, locale }
+
+	if (children !== undefined) {
+		return (
+			<FormContext.Provider value={contextValue}>
+				<form className="fb-form-root" noValidate onSubmit={handleSubmit}>
+					{children}
+				</form>
+			</FormContext.Provider>
+		)
+	}
+
 	if (state.submitted) {
 		return (
 			<p role="status" className="fb-form__success">
@@ -232,7 +256,7 @@ export const Form = ({
 	const visible = visibleFields(form.fields, state.values)
 
 	return (
-		<FormContext.Provider value={{ state, dispatch, validateField, locale }}>
+		<FormContext.Provider value={contextValue}>
 			<form className="fb-form-root" noValidate onSubmit={handleSubmit}>
 				<FormLayout enabled={layout !== false}>
 					{visible.map((field) => {
