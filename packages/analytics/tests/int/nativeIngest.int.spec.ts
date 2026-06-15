@@ -102,6 +102,24 @@ describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 		})
 		expect((docs[0] as { country?: string } | undefined)?.country).toBe('US')
 	})
+
+	it('serves a site-wide country breakdown through the native adapter', async () => {
+		await ingest(booted, '/country-a')
+		await ingest(booted, '/country-b')
+		const result = await adapter.query(
+			{
+				metrics: ['pageviews', 'visitors'],
+				dimensions: ['country'],
+				dateRange: { start: new Date('2020-01-01'), end: new Date('2030-01-01') },
+			},
+			{}
+		)
+		const us = result.rows.find((r) => r.dimensions?.country === 'US')
+		expect(us?.metrics.pageviews).toBeGreaterThanOrEqual(2)
+		// Every request in this suite shares one visitor hash, so the US country bucket
+		// holds exactly one distinct visitor regardless of how many pages were hit.
+		expect(us?.metrics.visitors).toBe(1)
+	})
 })
 
 describeForDb('native retention', { dbs: ['mongo'] }, (db) => {

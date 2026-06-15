@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { native } from './nativeAdapter'
 
 describe('native adapter', () => {
-	it('advertises pageviews but not visitors (deferred)', () => {
+	it('advertises visitors, sessions, and the country dimension', () => {
 		const caps = native().capabilities
 		expect(caps.metrics.has('pageviews')).toBe(true)
-		expect(caps.metrics.has('visitors')).toBe(false)
+		expect(caps.metrics.has('visitors')).toBe(true)
+		expect(caps.metrics.has('sessions')).toBe(true)
+		expect(caps.dimensions.has('country')).toBe(true)
 	})
 
 	it('is configured', () => {

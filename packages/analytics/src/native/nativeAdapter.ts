@@ -4,6 +4,7 @@ import type {
 	AnalyticsCapabilities,
 	AnalyticsQuery,
 	AnalyticsResult,
+	AnalyticsRow,
 	DimensionKey,
 	MetricKey,
 } from '../core/contract'
@@ -23,8 +24,14 @@ export interface NativeOptions {
 	retentionDays?: number
 }
 
-const metrics: ReadonlySet<MetricKey> = new Set(['pageviews', 'events', 'avgDuration'])
-const dimensions: ReadonlySet<DimensionKey> = new Set(['page'])
+const metrics: ReadonlySet<MetricKey> = new Set([
+	'pageviews',
+	'visitors',
+	'sessions',
+	'events',
+	'avgDuration',
+])
+const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'country'])
 
 const capabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
@@ -39,7 +46,45 @@ const capabilities: AnalyticsCapabilities = {
 	recommendedTtl: { realtime: 60, aggregate: 300 },
 }
 
-type RollupDoc = { pageviews: number; events: number; durationMs: number }
+type RollupDoc = {
+	path: string
+	dimvalue: string
+	pageviews: number
+	events: number
+	durationMs: number
+	visitors: number
+	sessions: number
+}
+
+interface Acc {
+	pageviews: number
+	events: number
+	durationMs: number
+	visitors: number
+	sessions: number
+}
+
+const emptyAcc = (): Acc => ({ pageviews: 0, events: 0, durationMs: 0, visitors: 0, sessions: 0 })
+
+const add = (acc: Acc, d: RollupDoc): void => {
+	acc.pageviews += d.pageviews
+	acc.events += d.events
+	acc.durationMs += d.durationMs
+	acc.visitors += d.visitors
+	acc.sessions += d.sessions
+}
+
+const selectMetrics = (acc: Acc, wanted: MetricKey[]): Partial<Record<MetricKey, number>> => {
+	const out: Partial<Record<MetricKey, number>> = {}
+	if (wanted.includes('pageviews')) out.pageviews = acc.pageviews
+	if (wanted.includes('events')) out.events = acc.events
+	if (wanted.includes('visitors')) out.visitors = acc.visitors
+	if (wanted.includes('sessions')) out.sessions = acc.sessions
+	if (wanted.includes('avgDuration')) {
+		out.avgDuration = acc.pageviews > 0 ? Math.round(acc.durationMs / acc.pageviews) : 0
+	}
+	return out
+}
 
 export function native(options: NativeOptions = {}): AnalyticsAdapter {
 	const geoResolver =
@@ -48,6 +93,19 @@ export function native(options: NativeOptions = {}): AnalyticsAdapter {
 			? composeGeoResolvers(platformHeaderResolver, maxmindResolver({ dbPath: options.geoDbPath }))
 			: platformHeaderResolver)
 	let payloadRef: Payload | null = null
+
+	const readRollups = async (
+		payload: Payload,
+		where: Record<string, unknown>
+	): Promise<RollupDoc[]> => {
+		const { docs } = await payload.find({
+			collection: ROLLUPS_SLUG as never,
+			where: where as never,
+			limit: 100_000,
+			pagination: false,
+		})
+		return docs as unknown as RollupDoc[]
+	}
 
 	return {
 		id: 'native',
@@ -85,46 +143,67 @@ export function native(options: NativeOptions = {}): AnalyticsAdapter {
 			if (!payloadRef) {
 				throw new Error('analytics: native adapter queried before init')
 			}
-			const where: Record<string, unknown> = {
+			const fetchedAt = q.dateRange.end.toISOString()
+			const periodWhere = {
+				greater_than_equal: q.dateRange.start.toISOString(),
+				less_than_equal: q.dateRange.end.toISOString(),
+			}
+			const dim = q.dimensions?.find((d) => dimensions.has(d))
+
+			// Distinct metrics (visitors/sessions) must not be summed across breakdown rows.
+			// Totals always come from the non-dimensioned aggregate row. A dimensioned query
+			// reports site-wide totals (path=''), a plain query uses the path-scoped row.
+			const totalsPath = dim ? '' : (q.path ?? '')
+			const totalsAcc = emptyAcc()
+			for (const d of await readRollups(payloadRef, {
 				granularity: { equals: 'day' },
 				dimension: { equals: '' },
-				period: {
-					greater_than_equal: q.dateRange.start.toISOString(),
-					less_than_equal: q.dateRange.end.toISOString(),
-				},
+				path: { equals: totalsPath },
+				period: periodWhere,
+			})) {
+				add(totalsAcc, d)
 			}
-			if (q.path) {
-				where.path = { equals: q.path }
+			const totals = selectMetrics(totalsAcc, q.metrics)
+
+			if (!dim) {
+				return { rows: [{ metrics: totals }], totals, meta: { provider: 'native', fetchedAt } }
 			}
-			const { docs } = await payloadRef.find({
-				collection: ROLLUPS_SLUG as never,
-				where: where as never,
-				limit: 100_000,
-				pagination: false,
-			})
-			let pageviews = 0
-			let events = 0
-			let durationMs = 0
-			for (const d of docs as unknown as RollupDoc[]) {
-				pageviews += d.pageviews
-				events += d.events
-				durationMs += d.durationMs
+
+			const breakdownWhere =
+				dim === 'page'
+					? {
+							granularity: { equals: 'day' },
+							dimension: { equals: '' },
+							path: { not_equals: '' },
+							period: periodWhere,
+						}
+					: {
+							granularity: { equals: 'day' },
+							dimension: { equals: 'country' },
+							path: { equals: '' },
+							period: periodWhere,
+						}
+			const groups = new Map<string, Acc>()
+			for (const d of await readRollups(payloadRef, breakdownWhere)) {
+				const value = dim === 'page' ? d.path : d.dimvalue
+				let acc = groups.get(value)
+				if (!acc) {
+					acc = emptyAcc()
+					groups.set(value, acc)
+				}
+				add(acc, d)
 			}
-			const totals: AnalyticsResult['totals'] = {}
-			if (q.metrics.includes('pageviews')) {
-				totals.pageviews = pageviews
+			let rows: AnalyticsRow[] = [...groups].map(([value, acc]) => ({
+				dimensions: { [dim]: value } as Partial<Record<DimensionKey, string>>,
+				metrics: selectMetrics(acc, q.metrics),
+			}))
+			const sortMetric = q.order?.metric ?? 'pageviews'
+			const direction = (q.order?.direction ?? 'desc') === 'asc' ? 1 : -1
+			rows.sort((a, b) => ((a.metrics[sortMetric] ?? 0) - (b.metrics[sortMetric] ?? 0)) * direction)
+			if (q.limit) {
+				rows = rows.slice(0, q.limit)
 			}
-			if (q.metrics.includes('events')) {
-				totals.events = events
-			}
-			if (q.metrics.includes('avgDuration')) {
-				totals.avgDuration = pageviews > 0 ? Math.round(durationMs / pageviews) : 0
-			}
-			return {
-				rows: [{ metrics: totals }],
-				totals,
-				meta: { provider: 'native', fetchedAt: q.dateRange.end.toISOString() },
-			}
+			return { rows, totals, meta: { provider: 'native', fetchedAt } }
 		},
 	}
 }
