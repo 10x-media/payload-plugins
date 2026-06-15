@@ -66,6 +66,20 @@ describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(result.totals?.avgDuration).toBe(500)
 	})
 
+	it('counts unique visitors and sessions across repeated ingests', async () => {
+		await ingest(booted, '/u')
+		await ingest(booted, '/u')
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG as never,
+			where: { path: { equals: '/u' }, dimension: { equals: '' } },
+			pagination: false,
+		})
+		const row = docs[0] as { pageviews: number; visitors: number; sessions: number } | undefined
+		expect(row?.pageviews).toBe(2)
+		expect(row?.visitors).toBe(1)
+		expect(row?.sessions).toBe(1)
+	})
+
 	it('ingests with a missing MaxMind db, falling back to the platform-header country', async () => {
 		const composed = composeGeoResolvers(
 			platformHeaderResolver,
