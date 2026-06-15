@@ -90,6 +90,13 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 		stopDb = dbHandle.stop
 	}
 
+	// Payload's pushDevSchema caches the last-pushed schema in a module-level global and skips
+	// the push when the next boot's schema is identical. Every test boot uses a fresh database,
+	// so a second same-schema boot would otherwise receive no tables. Force the push each boot.
+	if (options.db === 'postgres') {
+		process.env.PAYLOAD_FORCE_DRIZZLE_PUSH = 'true'
+	}
+
 	const baseConfig: Config = {
 		secret: 'test-secret-not-for-prod',
 		db: adapter,
