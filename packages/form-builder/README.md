@@ -6,7 +6,7 @@ An end-to-end forms platform for Payload v3: author, validate, render, collect, 
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Status: alpha. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field with a native, Payload-style condition builder UI (field/operator/value, the same look as Payload's list filters), enforced server-side by a pure isomorphic engine. Phase 4 ships the headless `@10x-media/form-builder/react` renderer: the renderer contract, registry, accessible primitives, built-in field renderers, an optional container-query layout grid, and the orchestrating `<Form>` with progressive client-side validation, conditional visibility, submission, and lifecycle events. The post-submit action pipeline (email, webhooks) lands in a subsequent phase.
+> Status: beta. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field with a native, Payload-style condition builder UI (field/operator/value, the same look as Payload's list filters), enforced server-side by a pure isomorphic engine. Phase 4 ships the headless `@10x-media/form-builder/react` renderer: the renderer contract, registry, accessible primitives, built-in field renderers, an optional container-query layout grid, and the orchestrating `<Form>` with progressive client-side validation, conditional visibility, submission, and lifecycle events. The post-submit action pipeline (email, webhooks) lands in a subsequent phase. Phase 5 ships a shadcn registry block (styled field renderers + `<FormBuilderForm>`) plus bring-your-own-styling docs.
 
 ## What ships in Phase 1
 
@@ -240,6 +240,191 @@ When you pass `children`, `<Form>` renders them inside its context (instead of t
 `UseFieldResult<TValue>` carries: `value`, `errors`, `warnings`, `touched`, `setValue`, and `onBlur`.
 
 `FormState` carries: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, and `submitError`.
+
+## Styled components: shadcn registry (Phase 5)
+
+Phase 5 ships a [shadcn registry](https://ui.shadcn.com/docs/registry) block that installs styled field renderers and a `<FormBuilderForm>` preconfigured with them into your own codebase. You own the copied files and can restyle them however you like.
+
+### Install
+
+The registry JSON is built to `registry/r/form.json` in the package source; hosting it on the docs site is a follow-up. Until then, point the shadcn CLI at the raw path:
+
+```bash
+npx shadcn@latest add <registry-url>/r/form.json
+```
+
+Once the registry is hosted, register it as a namespace in your `components.json` and install by short name:
+
+```json
+{
+  "registries": {
+    "@formbuilder": "https://<registry-host>/r/{name}.json"
+  }
+}
+```
+
+```bash
+npx shadcn@latest add @formbuilder/form
+```
+
+### What gets installed
+
+| Item | Destination |
+|---|---|
+| `@10x-media/form-builder` | added to `dependencies` |
+| shadcn `input`, `textarea`, `label` primitives | `components/ui/` |
+| `<FormBuilderForm>` | `components/form-builder/form-builder-form.tsx` |
+| styled renderers map (`shadcnRenderers`) | `components/form-builder/renderers.tsx` |
+| six styled field renderers | `components/form-builder/fields/*.tsx` |
+
+### Usage
+
+```tsx
+import { FormBuilderForm } from '@/components/form-builder/form-builder-form'
+
+export function MyForm({ form }) {
+  return (
+    <FormBuilderForm
+      form={form}
+      onSuccess={(id) => console.log('submitted', id)}
+    />
+  )
+}
+```
+
+`<FormBuilderForm>` is `<Form>` preconfigured with the shadcn-styled renderers. Any `renderers` prop you pass merges on top, so you can override individual fields or add custom types without touching the rest.
+
+The copied files are yours: edit typography, spacing, colors, or swap in a different component library's primitives. The shipped styling is a shadcn-convention baseline, not an API.
+
+## Bring your own styling (BYO)
+
+### When to BYO vs. shadcn
+
+Use the shadcn registry when you want a working styled form in one command and your project already uses shadcn. BYO is for: projects that don't use shadcn; a design system that already has a component library; situations where you want to keep the control primitives and ship only CSS; or when you want full markup control from scratch.
+
+Three paths from lightest to heaviest:
+
+### Path 1: restyle with CSS on top of the unstyled primitives
+
+The built-in renderers (via `defaultRenderers`) render through the unstyled primitives. Every element carries a stable class hook. Write CSS that targets those classes and nothing else needs to change.
+
+| Class | Element |
+|---|---|
+| `fb-field` | wrapper `<div>` around the entire field |
+| `fb-field__label` | `<label>` |
+| `fb-field__required` | required asterisk `<span>` (aria-hidden) |
+| `fb-field__messages` | description + errors + warnings region |
+| `fb-field__description` | `<p>` description line |
+| `fb-field__errors` | error group `<div>` (role=alert, aria-atomic) |
+| `fb-field__error` | individual error `<p>` |
+| `fb-field__warning` | individual warning `<p>` |
+| `fb-input` | `<input type="text|email|number">` |
+| `fb-textarea` | `<textarea>` |
+| `fb-select` | `<select>` |
+| `fb-checkbox` | `<input type="checkbox">` |
+
+The wrapper `<div>` also receives a `data-invalid` attribute (present with empty string value) when the field has errors. Target it for error-state styling:
+
+```css
+.fb-field[data-invalid] .fb-input {
+  border-color: red;
+}
+```
+
+For the container-query layout grid, import the stylesheet and use `FormLayout` + `widthProps` as described in the Phase 4a section. The grid uses `fb-form--grid` on the container and `data-width` on each field slot (`full`, `half`, `third`, `twoThirds`).
+
+```ts
+import '@10x-media/form-builder/styles.css'
+```
+
+### Path 2: custom renderers with `defineFieldRenderer`
+
+Author a renderer per field type and register it through `resolveRenderers`. See the [renderer contract section](#renderer-contract) for the full `FieldRendererProps` shape.
+
+Use `resolveRenderers` to merge your overrides with the defaults:
+
+```ts
+import { defaultRenderers, resolveRenderers } from '@10x-media/form-builder/react'
+
+const registry = resolveRenderers(defaultRenderers, {
+  text: myText,    // replace the built-in text renderer
+  number: false,   // remove number entirely
+})
+```
+
+Pass `false` to remove a type, `true` to keep the default, or a renderer to replace it. The same convention applies throughout the plugin.
+
+A complete custom text renderer with full a11y wiring:
+
+```tsx
+import { defineFieldRenderer } from '@10x-media/form-builder/react'
+import { useId } from 'react'
+
+const myText = defineFieldRenderer<string>(
+  ({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+    const id = useId()
+    const describedById = `${id}-desc`
+    const label = typeof field.label === 'string' ? field.label : undefined
+    const invalid = errors.length > 0
+
+    return (
+      <div>
+        {label ? (
+          <label htmlFor={id}>
+            {label}
+            {required ? <span aria-hidden>{' *'}</span> : null}
+          </label>
+        ) : null}
+        <input
+          id={id}
+          name={name}
+          type="text"
+          value={value ?? ''}
+          required={required}
+          disabled={disabled}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedById}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+        />
+        <div id={describedById}>
+          {invalid ? (
+            <div role="alert" aria-atomic>
+              {errors.map((msg) => <p key={msg}>{msg}</p>)}
+            </div>
+          ) : null}
+          {warnings?.map((msg) => <p key={msg}>{msg}</p>)}
+        </div>
+      </div>
+    )
+  }
+)
+```
+
+Then pass the resolved registry to `<Form>`:
+
+```tsx
+import { Form, defaultRenderers, resolveRenderers } from '@10x-media/form-builder/react'
+
+const renderers = resolveRenderers(defaultRenderers, { text: myText })
+
+<Form form={form} renderers={renderers} />
+```
+
+### Path 3: drop to `useField` / `useFormState`
+
+For total markup control, pass children to `<Form>` and bind fields with the context hooks. See the [custom layouts section](#custom-layouts-with-useformstate-and-usefield).
+
+### A11y checklist for custom renderers
+
+Any renderer you write must satisfy these to match `FieldShell`'s baseline:
+
+- `<label htmlFor={id}>` where `id` matches the control's `id` prop.
+- `aria-invalid` set to `true` (or left absent) -- never set it to `false`; omit it when there are no errors.
+- `aria-describedby={describedById}` on the control, pointing at a region that contains errors and warnings.
+- The error region must have `role="alert"` and `aria-atomic` so screen readers announce it on change.
+- The required asterisk (or whatever indicator you use) must be `aria-hidden`; do not rely on it as the sole signal.
+- `required` on the native control so browser-native validation is consistent.
 
 > Multi-step forms and presentation-only steps are a later phase.
 
