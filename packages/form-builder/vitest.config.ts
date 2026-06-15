@@ -34,7 +34,7 @@ export default mergeConfig(
 					test: {
 						name: 'registry',
 						environment: 'jsdom',
-						include: ['registry/**/*.test.tsx'],
+						include: ['registry/**/*.test.tsx', 'registry/**/*.test.ts'],
 						setupFiles: ['./vitest.setup.ts'],
 						passWithNoTests: true,
 					},

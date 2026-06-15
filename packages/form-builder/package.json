@@ -63,7 +63,7 @@
 	],
 	"scripts": {
 		"build": "tsdown",
-		"registry:build": "shadcn build registry/registry.json --output registry/r",
+		"registry:build": "shadcn build registry.json --cwd registry --output r",
 		"lint": "biome check src tests dev registry",
 		"lint:fix": "biome check --write src tests dev registry",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
