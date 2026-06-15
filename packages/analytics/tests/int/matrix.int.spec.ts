@@ -4,8 +4,12 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { ROLLUPS_SLUG, rollupsCollection } from '../../src/native/collections/rollups'
 import { SEEN_SLUG, seenCollection } from '../../src/native/collections/seen'
+import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { native } from '../../src/native/nativeAdapter'
+import { applyDistinctDeltas } from '../../src/native/rollups/applyDistinctDeltas'
 import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
 import { bumpRollup } from '../../src/native/rollups/bumpRollup'
+import { computeRollupDeltas } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
@@ -144,5 +148,58 @@ describeForDb('native insertIfNew dedup', {}, (db) => {
 				period,
 			})
 		).toBe(false)
+	})
+})
+
+describeForDb('native distinct counting', {}, (db) => {
+	let booted: BootedPayload
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+	})
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const hit = async (visitorHash: string, country?: string): Promise<void> => {
+		const event: StoredEvent = {
+			timestamp: new Date('2026-02-01T10:00:00Z'),
+			type: 'pageview',
+			path: '/d',
+			hostname: 'h',
+			visitorHash,
+			sessionId: `sess-${visitorHash}`,
+			country,
+			durationMs: 100,
+		}
+		const deltas = computeRollupDeltas(event)
+		await applyRollupDeltas(booted.payload, deltas)
+		await applyDistinctDeltas(booted.payload, event, deltas)
+	}
+
+	it(`counts a repeat visitor once but pageviews twice on ${db}`, async () => {
+		await hit('vv1')
+		await hit('vv1')
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/d' }, dimension: { equals: '' } },
+			pagination: false,
+		})
+		const row = docs[0] as { pageviews: number; visitors: number; sessions: number } | undefined
+		expect(row?.pageviews).toBe(2)
+		expect(row?.visitors).toBe(1)
+		expect(row?.sessions).toBe(1)
+	})
+
+	it(`counts two distinct visitors as two on ${db}`, async () => {
+		await hit('vv2')
+		await hit('vv3')
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/d' }, dimension: { equals: '' } },
+			pagination: false,
+		})
+		const row = docs[0] as { visitors: number } | undefined
+		// vv1 (prior test) + vv2 + vv3 all share the '/d' path bucket: 3 distinct visitors.
+		expect(row?.visitors).toBe(3)
 	})
 })
