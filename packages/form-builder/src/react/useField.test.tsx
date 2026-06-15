@@ -9,7 +9,7 @@ afterEach(() => {
 	cleanup()
 })
 
-const Harness = ({ validateField }: { validateField: (name: string) => void }) => {
+const Harness = ({ validateField }: { validateField: (name: string, value: unknown) => void }) => {
 	const [state, dispatch] = useReducer(formReducer, initialFormState({ a: '' }))
 	return (
 		<FormContext.Provider value={{ state, dispatch, validateField, locale: 'en' }}>
@@ -41,7 +41,7 @@ describe('useField', () => {
 		fireEvent.change(input, { target: { value: 'x' } })
 		expect(input).toHaveValue('x')
 		fireEvent.blur(input)
-		expect(validateField).toHaveBeenCalledWith('a')
+		expect(validateField).toHaveBeenCalledWith('a', 'x')
 	})
 
 	it('does not surface errors until touched', () => {

@@ -7,7 +7,7 @@ export type FormEvent =
 	| (FormEventBase & { type: 'step.completed'; stepId: string })
 	| (FormEventBase & { type: 'field.errored'; field: string; message: string })
 	| (FormEventBase & { type: 'form.abandoned' })
-	| (FormEventBase & { type: 'submission.created'; submissionId: string })
+	| (FormEventBase & { type: 'submission.created'; submissionId?: string })
 
 export type FormEventSink = {
 	emit: (event: FormEvent) => Promise<void> | void

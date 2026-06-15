@@ -7,8 +7,8 @@ import type { FormAction, FormState } from './state'
 export type FormContextValue = {
 	state: FormState
 	dispatch: Dispatch<FormAction>
-	/** Validate one field now (client mode) and store its issues. Used on blur and post-touch change. */
-	validateField: (name: string) => void
+	/** Validate one field now (client mode) against the supplied value and store its issues. */
+	validateField: (name: string, value: unknown) => void
 	locale: string
 }
 

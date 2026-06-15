@@ -18,12 +18,13 @@ export const useField = <TValue = unknown>(name: string): UseFieldResult<TValue>
 	const { state, dispatch, validateField } = useFormContext()
 	const touched = state.touched[name] ?? false
 	const showIssues = touched || state.submitAttempted
+	const value = state.values[name] as TValue | undefined
 
 	const setValue = useCallback(
-		(value: TValue) => {
-			dispatch({ type: 'SET_VALUE', name, value })
+		(next: TValue) => {
+			dispatch({ type: 'SET_VALUE', name, value: next })
 			if (touched || state.submitAttempted) {
-				validateField(name)
+				validateField(name, next)
 			}
 		},
 		[dispatch, name, touched, state.submitAttempted, validateField]
@@ -31,11 +32,11 @@ export const useField = <TValue = unknown>(name: string): UseFieldResult<TValue>
 
 	const onBlur = useCallback(() => {
 		dispatch({ type: 'TOUCH', name })
-		validateField(name)
-	}, [dispatch, name, validateField])
+		validateField(name, value)
+	}, [dispatch, name, validateField, value])
 
 	return {
-		value: state.values[name] as TValue | undefined,
+		value,
 		errors: showIssues ? (state.errors[name] ?? []) : [],
 		warnings: showIssues ? (state.warnings[name] ?? []) : [],
 		touched,
