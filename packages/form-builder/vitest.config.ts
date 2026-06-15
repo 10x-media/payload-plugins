@@ -15,7 +15,7 @@ export default mergeConfig(
 						name: 'node',
 						environment: 'node',
 						include: ['tests/int/**/*.int.spec.ts', 'src/**/*.test.ts'],
-						exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**'],
+						exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**', 'registry/**'],
 						dangerouslyIgnoreUnhandledErrors: isMatrixRun,
 					},
 				},
@@ -25,8 +25,30 @@ export default mergeConfig(
 						name: 'jsdom',
 						environment: 'jsdom',
 						include: ['src/**/*.test.tsx'],
-						exclude: ['node_modules', 'dist', '.next'],
+						exclude: ['node_modules', 'dist', '.next', 'registry/**'],
 						setupFiles: ['./vitest.setup.ts'],
+					},
+				},
+				{
+					extends: true,
+					test: {
+						name: 'registry',
+						environment: 'jsdom',
+						include: ['registry/**/*.test.tsx'],
+						setupFiles: ['./vitest.setup.ts'],
+						passWithNoTests: true,
+					},
+					resolve: {
+						alias: {
+							'@/lib/utils': new URL('./registry/__shims__/utils.ts', import.meta.url).pathname,
+							'@/components/ui/input': new URL('./registry/__shims__/ui.tsx', import.meta.url)
+								.pathname,
+							'@/components/ui/textarea': new URL('./registry/__shims__/ui.tsx', import.meta.url)
+								.pathname,
+							'@/components/ui/label': new URL('./registry/__shims__/ui.tsx', import.meta.url)
+								.pathname,
+							'@/components/ui': new URL('./registry/__shims__/ui.tsx', import.meta.url).pathname,
+						},
 					},
 				},
 			],

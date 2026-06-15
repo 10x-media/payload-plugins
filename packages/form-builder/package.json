@@ -63,8 +63,9 @@
 	],
 	"scripts": {
 		"build": "tsdown",
-		"lint": "biome check src tests dev",
-		"lint:fix": "biome check --write src tests dev",
+		"registry:build": "shadcn build registry/registry.json --output registry/r",
+		"lint": "biome check src tests dev registry",
+		"lint:fix": "biome check --write src tests dev registry",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "vitest run",
 		"test:unit": "vitest run src",
@@ -94,6 +95,7 @@
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
+		"shadcn": "^2.4.0",
 		"@10x-media/tsconfig": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
