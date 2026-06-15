@@ -55,11 +55,11 @@ import { native } from '@10x-media/analytics/adapters/native'
 analytics({ adapters: [native()] })
 ```
 
-Registering the adapter adds two hidden collections (`analytics-events` and `analytics-rollups`) and a `POST /api/analytics/ingest` beacon endpoint. Events are written atomically via `$inc` (Mongo) or `ON CONFLICT DO UPDATE` (Postgres), so concurrent ingestion is safe.
+Registering the adapter adds three hidden collections (`analytics-events`, `analytics-rollups`, and `analytics-seen`) and a `POST /api/analytics/ingest` beacon endpoint. Events are written atomically via `$inc` (Mongo) or `ON CONFLICT DO UPDATE` (Postgres), so concurrent ingestion is safe.
 
 Supported metrics: `pageviews`, `events`, `avgDuration`, `visitors`, `sessions`.
 
-The native engine pre-aggregates unique visitors and sessions alongside pageviews. Distinct counts are computed exactly via a dedicated `analytics-seen` ledger and stored at every granularity they are queried (per page, site-wide, and site-wide per country), so they are always read directly and never summed across buckets. A site-wide country breakdown dimension is available out of the box; geoless events are simply omitted from it.
+The native engine pre-aggregates unique visitors and sessions alongside pageviews. Distinct counts are computed exactly via a dedicated `analytics-seen` ledger and stored at every granularity they are queried (per page, site-wide, and site-wide per country), so they are read directly and never summed across the page or country breakdowns. Within a single UTC day a unique count is exact; across a multi-day range the daily counts are summed, so longer-range uniques are approximate (the same tradeoff Plausible, Fathom, and Umami make). A site-wide country breakdown dimension is available out of the box; geoless events are simply omitted from it.
 
 **Production note (Mongo):** exact distinct counting relies on a unique index on the `analytics-seen` collection, which under concurrent ingestion must be live, so the Mongoose adapter should be configured with `ensureIndexes: true`:
 
