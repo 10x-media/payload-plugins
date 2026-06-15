@@ -57,9 +57,19 @@ analytics({ adapters: [native()] })
 
 Registering the adapter adds two hidden collections (`analytics-events` and `analytics-rollups`) and a `POST /api/analytics/ingest` beacon endpoint. Events are written atomically via `$inc` (Mongo) or `ON CONFLICT DO UPDATE` (Postgres), so concurrent ingestion is safe.
 
-Supported metrics: `pageviews`, `events`, `avgDuration`.
+Supported metrics: `pageviews`, `events`, `avgDuration`, `visitors`, `sessions`.
 
-Upcoming: unique visitors, sessions, retention, and dimension breakdowns (referrer, country, device).
+The native engine pre-aggregates unique visitors and sessions alongside pageviews. Distinct counts are computed exactly via a dedicated `analytics-seen` ledger and stored at every granularity they are queried (per page, site-wide, and site-wide per country), so they are always read directly and never summed across buckets. A site-wide country breakdown dimension is available out of the box; geoless events are simply omitted from it.
+
+**Production note (Mongo):** exact distinct counting relies on a unique index on the `analytics-seen` collection, which under concurrent ingestion must be live, so the Mongoose adapter should be configured with `ensureIndexes: true`:
+
+```ts
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+
+mongooseAdapter({ url: process.env.DATABASE_URI, ensureIndexes: true })
+```
+
+On Postgres the unique index is created by migrations, so no extra configuration is needed once migrations have run.
 
 ### Geo resolution
 
