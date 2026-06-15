@@ -1,1 +1,33 @@
 /* @10x-media/form-builder layout grid. Optional: import to enable container-query field widths. */
+
+.fb-form--grid {
+	container-type: inline-size;
+	display: grid;
+	grid-template-columns: repeat(6, 1fr);
+	gap: 1rem;
+}
+
+.fb-form--grid > [data-width='full'] {
+	grid-column: span 6;
+}
+.fb-form--grid > [data-width='half'] {
+	grid-column: span 6;
+}
+.fb-form--grid > [data-width='third'] {
+	grid-column: span 6;
+}
+.fb-form--grid > [data-width='twoThirds'] {
+	grid-column: span 6;
+}
+
+@container (min-width: 30rem) {
+	.fb-form--grid > [data-width='half'] {
+		grid-column: span 3;
+	}
+	.fb-form--grid > [data-width='third'] {
+		grid-column: span 2;
+	}
+	.fb-form--grid > [data-width='twoThirds'] {
+		grid-column: span 4;
+	}
+}
