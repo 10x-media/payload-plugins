@@ -15,6 +15,9 @@ import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
 import { maxmindResolver } from './geo/maxmindResolver'
 import { makeIngestHandler } from './ingest/endpoint'
+import { flushBatch } from './ingest/flushBatch'
+import type { StoredEvent } from './ingest/normalizeEvent'
+import { createWriteBuffer, type WriteBuffer } from './ingest/writeBuffer'
 import { pruneEventsTask } from './retention/pruneTask'
 
 export interface NativeOptions {
@@ -22,7 +25,11 @@ export interface NativeOptions {
 	geoDbPath?: string
 	ingestPath?: string
 	retentionDays?: number
+	/** Opt-in in-process write batching. `true` uses defaults (maxSize 50, maxAgeMs 2000). */
+	buffer?: boolean | { maxSize?: number; maxAgeMs?: number }
 }
+
+export type NativeAdapter = AnalyticsAdapter & { flush: () => Promise<void> }
 
 const metrics: ReadonlySet<MetricKey> = new Set([
 	'pageviews',
@@ -86,13 +93,14 @@ const selectMetrics = (acc: Acc, wanted: MetricKey[]): Partial<Record<MetricKey,
 	return out
 }
 
-export function native(options: NativeOptions = {}): AnalyticsAdapter {
+export function native(options: NativeOptions = {}): NativeAdapter {
 	const geoResolver =
 		options.geoResolver ??
 		(options.geoDbPath
 			? composeGeoResolvers(platformHeaderResolver, maxmindResolver({ dbPath: options.geoDbPath }))
 			: platformHeaderResolver)
 	let payloadRef: Payload | null = null
+	let buffer: WriteBuffer<StoredEvent> | null = null
 
 	const readRollups = async (
 		payload: Payload,
@@ -112,6 +120,7 @@ export function native(options: NativeOptions = {}): AnalyticsAdapter {
 		label: 'Native (Payload)',
 		capabilities,
 		isConfigured: () => true,
+		flush: () => buffer?.flush() ?? Promise.resolve(),
 		register(config: Config) {
 			config.collections = [
 				...(config.collections ?? []),
@@ -124,7 +133,7 @@ export function native(options: NativeOptions = {}): AnalyticsAdapter {
 				{
 					method: 'post',
 					path: options.ingestPath ?? '/analytics/ingest',
-					handler: makeIngestHandler(geoResolver),
+					handler: makeIngestHandler(geoResolver, () => buffer),
 				},
 			]
 			if (options.retentionDays && options.retentionDays > 0) {
@@ -137,6 +146,17 @@ export function native(options: NativeOptions = {}): AnalyticsAdapter {
 			config.onInit = async (p) => {
 				await prevOnInit?.(p)
 				payloadRef = p
+				if (options.buffer) {
+					const cfg = options.buffer === true ? {} : options.buffer
+					buffer = createWriteBuffer<StoredEvent>({
+						maxSize: cfg.maxSize ?? 50,
+						maxAgeMs: cfg.maxAgeMs ?? 2000,
+						onFlush: (batch) => flushBatch(p, batch),
+						onError: (error) => {
+							p.logger.error({ err: error, msg: 'analytics: write buffer flush failed' })
+						},
+					})
+				}
 			}
 		},
 		async query(q: AnalyticsQuery): Promise<AnalyticsResult> {

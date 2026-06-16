@@ -1,11 +1,15 @@
 import type { PayloadHandler } from 'payload'
 import type { GeoResolver } from '../geo/geoResolver'
 import { flushBatch } from './flushBatch'
-import { normalizeEvent, type RawEventInput } from './normalizeEvent'
+import { normalizeEvent, type RawEventInput, type StoredEvent } from './normalizeEvent'
 import { dailySalt } from './salt'
+import type { WriteBuffer } from './writeBuffer'
 
 export const makeIngestHandler =
-	(geoResolver: GeoResolver): PayloadHandler =>
+	(
+		geoResolver: GeoResolver,
+		getBuffer: () => WriteBuffer<StoredEvent> | null = () => null
+	): PayloadHandler =>
 	async (req) => {
 		const ct = req.headers.get('content-type') ?? ''
 		const raw = (
@@ -19,6 +23,11 @@ export const makeIngestHandler =
 		const now = new Date()
 		const salt = await dailySalt(req.payload, now)
 		const event = await normalizeEvent({ raw, headers: req.headers, geoResolver, salt, now })
-		await flushBatch(req.payload, [event])
+		const buffer = getBuffer()
+		if (buffer) {
+			buffer.add(event)
+		} else {
+			await flushBatch(req.payload, [event])
+		}
 		return Response.json({ ok: true }, { status: 202 })
 	}

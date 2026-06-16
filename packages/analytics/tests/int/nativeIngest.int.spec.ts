@@ -151,3 +151,54 @@ describeForDb('native retention', { dbs: ['mongo'] }, (db) => {
 		expect(seenAfter.totalDocs).toBe(0)
 	})
 })
+
+describeForDb('native write buffer', { dbs: ['mongo'] }, (db) => {
+	const adapter = native({ buffer: { maxSize: 10, maxAgeMs: 60_000 } })
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+	})
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const ingestBuffered = async (path: string): Promise<void> => {
+		const ep = booted.payload.config.endpoints?.find((e) => e.path === '/analytics/ingest')
+		if (!ep) {
+			throw new Error('ingest endpoint not registered')
+		}
+		await ep.handler({
+			payload: booted.payload,
+			headers: new Headers({
+				'content-type': 'application/json',
+				'user-agent': 'UA',
+				'x-vercel-ip-country': 'US',
+			}),
+			json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 100 }),
+		} as never)
+	}
+
+	it('holds ingests until flushed, then writes them in one batch', async () => {
+		await ingestBuffered('/buf')
+		await ingestBuffered('/buf')
+		const before = await booted.payload.find({
+			collection: ROLLUPS_SLUG as never,
+			where: { path: { equals: '/buf' } },
+			pagination: false,
+		})
+		expect(before.docs).toHaveLength(0)
+
+		await adapter.flush()
+
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG as never,
+			where: { path: { equals: '/buf' }, dimension: { equals: '' } },
+			pagination: false,
+		})
+		const row = docs[0] as { pageviews: number; visitors: number; sessions: number } | undefined
+		expect(row?.pageviews).toBe(2)
+		expect(row?.visitors).toBe(1)
+		expect(row?.sessions).toBe(1)
+	})
+})
