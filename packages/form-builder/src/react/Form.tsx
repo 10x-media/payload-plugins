@@ -17,12 +17,16 @@ import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
 import type { FormFlow } from '../flow/types'
+import { defaultPresentationDescriptors } from '../presentations/defaults'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import type { FieldRenderer, RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
 import { FormContext, type FormStepInfo } from './FormContext'
 import { type FieldWidth, FormLayout, widthProps } from './FormLayout'
+import { defaultPresentations } from './presentation/presentations'
+import { type PresentationsConfig, resolvePresentations } from './presentation/registry'
+import type { FormPresentation } from './presentation/types'
 import { type RenderersConfig, resolveRenderers } from './registry'
 import { defaultRenderers } from './renderers'
 import { buildFieldTypeRegistry, buildValidationRuleRegistry, visibleFields } from './resolveForm'
@@ -31,7 +35,13 @@ import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitF
 import { useField } from './useField'
 import { validateFieldValue } from './validateField'
 
-export type FormDocument = { id: number | string; fields: FormFieldInstance[]; flow?: FormFlow }
+export type FormDocument = {
+	id: number | string
+	fields: FormFieldInstance[]
+	flow?: FormFlow
+	/** Stored presentation name; overridden by the `presentation` prop. */
+	defaultPresentation?: string
+}
 
 export type FormProps = {
 	form: FormDocument
@@ -50,6 +60,14 @@ export type FormProps = {
 	nextLabel?: string
 	backLabel?: string
 	successMessage?: string
+	/** Active presentation: a name into the registry or an inline presentation. Overrides the form's stored default. */
+	presentation?: string | FormPresentation
+	/** Per-render presentation overrides merged onto the defaults (add, replace, or `false` to remove). */
+	presentations?: PresentationsConfig
+	/** Invoked when an overlay presentation dismisses (close button, Escape, outside click, or `dismissOnSuccess`). */
+	onClose?: () => void
+	/** Accessible name for an overlay surface. */
+	title?: string
 	/** Custom layout: render fields with `useField`/`useFormState` instead of the auto-rendered field loop. */
 	children?: ReactNode
 }
@@ -102,11 +120,25 @@ export const Form = ({
 	nextLabel = 'Next',
 	backLabel = 'Back',
 	successMessage = 'Thank you.',
+	presentation,
+	presentations,
+	onClose,
+	title,
 	children,
 }: FormProps) => {
 	const registry = useMemo(() => buildFieldTypeRegistry(fieldTypes), [fieldTypes])
 	const ruleRegistry = useMemo(() => buildValidationRuleRegistry(rules), [rules])
 	const rendererRegistry = useMemo(() => resolveRenderers(defaultRenderers, renderers), [renderers])
+	const presentationRegistry = useMemo(
+		() => resolvePresentations(defaultPresentations, presentations),
+		[presentations]
+	)
+	const activePresentation: FormPresentation =
+		typeof presentation === 'object'
+			? presentation
+			: (presentationRegistry.get(presentation ?? form.defaultPresentation ?? 'page') ??
+				presentationRegistry.get('page') ??
+				defaultPresentationDescriptors.page)
 	const fieldsByName = useMemo(
 		() => new Map(form.fields.map((field) => [field.name, field])),
 		[form.fields]
@@ -253,6 +285,10 @@ export const Form = ({
 		}
 	}, [])
 
+	const handleClose = useCallback(() => {
+		onClose?.()
+	}, [onClose])
+
 	const handleSubmit = async (event: ReactFormEvent<HTMLFormElement>) => {
 		event.preventDefault()
 		const visible = visibleFields(form.fields, state.values)
@@ -309,6 +345,9 @@ export const Form = ({
 				submissionId: result.submissionId,
 			})
 			onSuccess?.(result.submissionId)
+			if (activePresentation.dismissOnSuccess) {
+				handleClose()
+			}
 		} else {
 			if (result.fieldErrors) {
 				rawDispatch({ type: 'SET_ALL_ISSUES', errors: result.fieldErrors, warnings: {} })
@@ -343,21 +382,53 @@ export const Form = ({
 
 	const contextValue = { state, dispatch, validateField, locale, step }
 
+	const PresentationWrapper = activePresentation.Wrapper
+	const wrap = (content: ReactNode): ReactNode =>
+		PresentationWrapper ? (
+			<PresentationWrapper
+				presentation={activePresentation}
+				open
+				onClose={handleClose}
+				title={title}
+			>
+				{content}
+			</PresentationWrapper>
+		) : (
+			content
+		)
+
 	if (children !== undefined) {
 		return (
 			<FormContext.Provider value={contextValue}>
-				<form className="fb-form-root" noValidate onSubmit={handleSubmit}>
-					{children}
-				</form>
+				{wrap(
+					<form
+						className="fb-form-root"
+						noValidate
+						onSubmit={handleSubmit}
+						data-fb-presentation={activePresentation.name}
+						data-fb-density={activePresentation.density}
+					>
+						{children}
+					</form>
+				)}
 			</FormContext.Provider>
 		)
 	}
 
 	if (state.submitted) {
 		return (
-			<p role="status" className="fb-form__success">
-				{successMessage}
-			</p>
+			<FormContext.Provider value={contextValue}>
+				{wrap(
+					<p
+						role="status"
+						className="fb-form__success"
+						data-fb-presentation={activePresentation.name}
+						data-fb-density={activePresentation.density}
+					>
+						{successMessage}
+					</p>
+				)}
+			</FormContext.Provider>
 		)
 	}
 
@@ -365,58 +436,66 @@ export const Form = ({
 
 	return (
 		<FormContext.Provider value={contextValue}>
-			<form className="fb-form-root" noValidate onSubmit={handleSubmit}>
-				<FormLayout enabled={layout !== false}>
-					{rendered.map((field) => {
-						const renderer = rendererRegistry.get(field.blockType)
-						if (!renderer) {
-							return null
-						}
-						const width: FieldWidth | undefined =
-							typeof field.width === 'string' && FIELD_WIDTHS.has(field.width)
-								? (field.width as FieldWidth)
-								: undefined
-						return (
-							<div key={field.name} {...widthProps(width)}>
-								<FieldHost field={field} renderer={renderer} locale={locale} t={translate} />
-							</div>
-						)
-					})}
-				</FormLayout>
-				{state.submitError ? (
-					<p role="alert" className="fb-form__submit-error">
-						{state.submitError}
-					</p>
-				) : null}
-				{flow ? (
-					<div className="fb-form__controls">
-						{!step.isFirst ? (
-							<button type="button" onClick={goBack} disabled={state.submitting}>
-								{backLabel}
-							</button>
-						) : null}
-						{step.isTerminal ? (
-							<button type="submit" disabled={state.submitting}>
-								{submitLabel}
-							</button>
-						) : (
-							<button
-								type="button"
-								disabled={state.submitting}
-								onClick={() => {
-									void goNext()
-								}}
-							>
-								{nextLabel}
-							</button>
-						)}
-					</div>
-				) : (
-					<button type="submit" disabled={state.submitting}>
-						{submitLabel}
-					</button>
-				)}
-			</form>
+			{wrap(
+				<form
+					className="fb-form-root"
+					noValidate
+					onSubmit={handleSubmit}
+					data-fb-presentation={activePresentation.name}
+					data-fb-density={activePresentation.density}
+				>
+					<FormLayout enabled={layout !== false}>
+						{rendered.map((field) => {
+							const renderer = rendererRegistry.get(field.blockType)
+							if (!renderer) {
+								return null
+							}
+							const width: FieldWidth | undefined =
+								typeof field.width === 'string' && FIELD_WIDTHS.has(field.width)
+									? (field.width as FieldWidth)
+									: undefined
+							return (
+								<div key={field.name} {...widthProps(width)}>
+									<FieldHost field={field} renderer={renderer} locale={locale} t={translate} />
+								</div>
+							)
+						})}
+					</FormLayout>
+					{state.submitError ? (
+						<p role="alert" className="fb-form__submit-error">
+							{state.submitError}
+						</p>
+					) : null}
+					{flow ? (
+						<div className="fb-form__controls">
+							{!step.isFirst ? (
+								<button type="button" onClick={goBack} disabled={state.submitting}>
+									{backLabel}
+								</button>
+							) : null}
+							{step.isTerminal ? (
+								<button type="submit" disabled={state.submitting}>
+									{submitLabel}
+								</button>
+							) : (
+								<button
+									type="button"
+									disabled={state.submitting}
+									onClick={() => {
+										void goNext()
+									}}
+								>
+									{nextLabel}
+								</button>
+							)}
+						</div>
+					) : (
+						<button type="submit" disabled={state.submitting}>
+							{submitLabel}
+						</button>
+					)}
+				</form>
+			)}
 		</FormContext.Provider>
 	)
 }

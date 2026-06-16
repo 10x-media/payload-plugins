@@ -31,3 +31,43 @@
 		grid-column: span 4;
 	}
 }
+
+/* Presentations: density + overlay surfaces (page/inline carry no chrome). */
+
+.fb-form-root[data-fb-density='compact'] .fb-form--grid {
+	gap: 0.5rem;
+}
+.fb-form-root[data-fb-presentation='page'] {
+	max-width: 40rem;
+	margin-inline: auto;
+}
+
+[data-fb-backdrop] {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.5);
+}
+[data-fb-dialog] {
+	position: fixed;
+	background: var(--fb-surface, #fff);
+	overflow: auto;
+}
+[data-fb-dialog='modal'] {
+	inset: 50% auto auto 50%;
+	transform: translate(-50%, -50%);
+	width: min(32rem, calc(100vw - 2rem));
+	max-height: calc(100dvh - 2rem);
+	border-radius: 0.5rem;
+	padding: 1.5rem;
+}
+[data-fb-dialog='drawer'] {
+	inset: 0 0 0 auto;
+	width: min(28rem, 100vw);
+	max-height: 100dvh;
+	padding: 1.5rem;
+}
+[data-fb-dialog-close] {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+}
