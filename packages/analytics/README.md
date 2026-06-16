@@ -57,6 +57,16 @@ analytics({ adapters: [native()] })
 
 Registering the adapter adds three hidden collections (`analytics-events`, `analytics-rollups`, and `analytics-seen`) and a `POST /api/analytics/ingest` beacon endpoint. Events are written atomically via `$inc` (Mongo) or `ON CONFLICT DO UPDATE` (Postgres), so concurrent ingestion is safe.
 
+**Write batching (opt-in):** by default each ingest is written synchronously before the endpoint responds. Pass `buffer: true` (or `buffer: { maxSize, maxAgeMs }`) to batch writes in memory and flush on size (default 50) or age (default 2000 ms), coalescing per-bucket upserts to cut database round-trips under load.
+
+> Buffering trades durability for throughput: the endpoint responds before the batch is persisted, so a hard crash can lose up to `maxAgeMs` of unflushed events (the same best-effort model as Plausible and Umami). Call `native().flush()` on graceful shutdown to drain the buffer.
+
+```ts
+import { native } from '@10x-media/analytics/adapters/native'
+
+analytics({ adapters: [native({ buffer: true })] })
+```
+
 Supported metrics: `pageviews`, `events`, `avgDuration`, `visitors`, `sessions`.
 
 The native engine pre-aggregates unique visitors and sessions alongside pageviews. Distinct counts are computed exactly via a dedicated `analytics-seen` ledger and stored at every granularity they are queried (per page, site-wide, and site-wide per country), so they are read directly and never summed across the page or country breakdowns. Within a single UTC day a unique count is exact; across a multi-day range the daily counts are summed, so longer-range uniques are approximate (the same tradeoff Plausible, Fathom, and Umami make). A site-wide country breakdown dimension is available out of the box; geoless events are simply omitted from it.
