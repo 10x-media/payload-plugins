@@ -59,6 +59,8 @@ export type FormProps = {
 	submitLabel?: string
 	nextLabel?: string
 	backLabel?: string
+	/** Label for the overlay close control (modal/drawer). */
+	closeLabel?: string
 	successMessage?: string
 	/** Active presentation: a name into the registry or an inline presentation. Overrides the form's stored default. */
 	presentation?: string | FormPresentation
@@ -119,6 +121,7 @@ export const Form = ({
 	submitLabel = 'Submit',
 	nextLabel = 'Next',
 	backLabel = 'Back',
+	closeLabel = 'Close',
 	successMessage = 'Thank you.',
 	presentation,
 	presentations,
@@ -390,6 +393,7 @@ export const Form = ({
 				open
 				onClose={handleClose}
 				title={title}
+				closeLabel={closeLabel}
 			>
 				{content}
 			</PresentationWrapper>

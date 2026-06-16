@@ -7,6 +7,8 @@ export type PresentationWrapperProps = {
 	onClose: () => void
 	/** Accessible name for an overlay surface (e.g. the form title). */
 	title?: string
+	/** Label for the overlay close control. */
+	closeLabel?: string
 	children: ReactNode
 }
 

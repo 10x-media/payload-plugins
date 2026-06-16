@@ -6,8 +6,8 @@ import { DialogSurface } from './DialogSurface'
 import type { FormPresentation, PresentationWrapperProps } from './types'
 
 const overlayWrapper = (surface: 'modal' | 'drawer') => {
-	const Wrapper = ({ open, onClose, title, children }: PresentationWrapperProps) =>
-		createElement(DialogSurface, { open, onClose, label: title, surface }, children)
+	const Wrapper = ({ open, onClose, title, closeLabel, children }: PresentationWrapperProps) =>
+		createElement(DialogSurface, { open, onClose, label: title, surface, closeLabel }, children)
 	Wrapper.displayName = `${surface}Wrapper`
 	return Wrapper
 }

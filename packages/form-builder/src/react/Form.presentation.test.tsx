@@ -51,6 +51,18 @@ describe('Form presentations', () => {
 		expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
 	})
 
+	it('uses a custom closeLabel for the overlay close control', () => {
+		render(
+			<Form
+				form={doc([oneTextField], { defaultPresentation: 'modal' })}
+				closeLabel="Dismiss"
+				onSubmit={vi.fn().mockResolvedValue({ ok: true })}
+			/>
+		)
+		expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+	})
+
 	it('lets the presentation prop override the stored default', () => {
 		render(
 			<Form

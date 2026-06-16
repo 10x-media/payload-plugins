@@ -79,7 +79,6 @@ export const keys = {
 	presentationModal: 'formBuilder:presentation.modal',
 	presentationDrawer: 'formBuilder:presentation.drawer',
 	presentationInline: 'formBuilder:presentation.inline',
-	presentationClose: 'formBuilder:presentation.close',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
