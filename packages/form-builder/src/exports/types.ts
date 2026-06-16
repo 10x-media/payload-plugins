@@ -11,6 +11,16 @@ export type {
 export type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 export type { FormBuilderPluginOptions } from '../index'
 export type {
+	PresentationDescriptorOption,
+	PresentationDescriptorRegistry,
+	PresentationsDescriptorConfig,
+} from '../presentations/registry'
+export type {
+	PresentationDensity,
+	PresentationDescriptor,
+	PresentationSurface,
+} from '../presentations/types'
+export type {
 	SubmissionDescriptor,
 	SubmissionFieldError,
 	SubmissionValue,

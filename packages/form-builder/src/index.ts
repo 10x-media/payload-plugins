@@ -58,11 +58,13 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 } from './fields/types'
+export { DEFAULT_PRESENTATION_NAME, defaultPresentationDescriptors } from './presentations/defaults'
 export type {
 	PresentationDescriptorOption,
 	PresentationDescriptorRegistry,
 	PresentationsDescriptorConfig,
 } from './presentations/registry'
+export { resolvePresentationDescriptors } from './presentations/registry'
 export type {
 	PresentationDensity,
 	PresentationDescriptor,

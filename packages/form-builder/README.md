@@ -538,6 +538,128 @@ import {
 
 All four are pure and isomorphic (no React, no DOM).
 
+## Presentations (Phase 6b)
+
+A presentation is a named configuration bundle that controls how a form is surfaced to the visitor: where it appears in the page, how the overlay behaves, and whether it dismisses on success. Four presentations ship by default.
+
+| Name | Surface | Behavior |
+|---|---|---|
+| `page` | Full page (default) | Renders inline in the page flow; no overlay. |
+| `inline` | Embedded | Same as `page` but semantically scoped to an embedded slot. |
+| `modal` | Overlay | Centered dialog; dismisses on success. |
+| `drawer` | Overlay | Side-panel; dismisses on success. |
+
+### Editor-chosen default
+
+The Forms collection exposes a `defaultPresentation` select field in the admin UI. Editors choose a presentation when authoring the form; the renderer uses it automatically. When no presentation is chosen, `page` is the fallback.
+
+### Render-time override
+
+Pass the `presentation` prop to `<Form>` to override whatever the document carries. The value is either a registered name string or an inline `FormPresentation` object:
+
+```tsx
+import { Form } from '@10x-media/form-builder/react'
+
+<Form form={form} presentation="modal" onClose={() => setOpen(false)} />
+```
+
+The `onClose` prop is forwarded to the presentation's `Wrapper` component (used by `modal` and `drawer`) so the host controls when the overlay closes.
+
+### Presentation props on `<Form>`
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `presentation` | `string \| FormPresentation` | `undefined` | Override the document's `defaultPresentation`. |
+| `presentations` | `PresentationsConfig` | `undefined` | Registry override (`false/true/object` per name). |
+| `onClose` | `() => void` | `undefined` | Forwarded to overlay wrappers for close-trigger handling. |
+| `title` | `string` | `undefined` | Accessible name passed to overlay wrappers (e.g. `aria-label` on the dialog). |
+
+### Custom presentations
+
+Register a custom presentation through the `presentations` prop on `<Form>` (for a one-off) or via the plugin `presentations` option (to add it to the admin select and make it available everywhere). The same `false/true/object` convention used throughout the plugin applies here.
+
+Via the plugin option:
+
+```ts
+import { formBuilder } from '@10x-media/form-builder'
+
+formBuilder({
+  presentations: {
+    popover: false,         // remove a built-in
+    modal: true,            // keep the default modal
+    fullscreen: {           // add a new descriptor
+      name: 'fullscreen',
+      label: 'formBuilder:presentationFullscreen',
+      surface: 'overlay',
+      density: 'comfortable',
+      dismissOnSuccess: true,
+    },
+  },
+})
+```
+
+To provide a React `Wrapper` component for your custom presentation (required for overlays), pass a `FormPresentation` object directly to `<Form>`:
+
+```tsx
+import type { FormPresentation } from '@10x-media/form-builder/react'
+import { DialogSurface } from '@10x-media/form-builder/react'
+
+const fullscreen: FormPresentation = {
+  name: 'fullscreen',
+  label: 'formBuilder:presentationFullscreen',
+  surface: 'overlay',
+  density: 'comfortable',
+  dismissOnSuccess: true,
+  Wrapper: ({ open, onClose, title, children }) => (
+    <DialogSurface open={open} onClose={onClose} label={title} surface="fullscreen">
+      {children}
+    </DialogSurface>
+  ),
+}
+
+<Form form={form} presentations={{ fullscreen }} presentation="fullscreen" onClose={close} />
+```
+
+### Composable overlay primitives
+
+The built-in `modal` and `drawer` are a thin composition of individually-exported primitives. A headless consumer can reach for exactly the pieces they need, or none at all.
+
+```ts
+import {
+  DialogSurface,   // Backdrop + role=dialog/aria-modal + focus-trap + scroll-lock + dismiss
+  Backdrop,        // full-viewport backdrop with data-fb-backdrop hook
+  useFocusTrap,    // keeps Tab/Shift-Tab inside a container while active
+  useScrollLock,   // locks body scroll while an overlay is open
+  useDismiss,      // wires Escape and outside-click to an onDismiss callback
+} from '@10x-media/form-builder/react'
+```
+
+Options:
+
+- Use `inline` (or no presentation) for zero overlay DOM, then apply your own positioning.
+- Compose only `useFocusTrap` + `useScrollLock` + `useDismiss` inside your own wrapper component.
+- Use `Backdrop` standalone for a custom scrim behind your own surface markup.
+- Use `DialogSurface` directly to get the full accessible dialog behavior and swap CSS only.
+
+The built-in modal is `DialogSurface` plus a close button; the built-in drawer adds a `surface="drawer"` data hook for CSS positioning. Neither imposes a shadow DOM boundary or an opinionated style layer.
+
+### Accessibility baseline
+
+The built-in overlay (`DialogSurface`) ships a dependency-free, spec-compliant baseline:
+
+- Full-viewport `Backdrop` (`aria-hidden`; click to dismiss).
+- `role="dialog"` / `aria-modal` on the surface panel.
+- Focus-trap: Tab and Shift-Tab cycle inside the dialog while it is open.
+- Initial focus on the panel (`tabIndex=-1`) on open; focus restored to the trigger on close.
+- Scroll-lock: `overflow: hidden` on `<body>` while the overlay is open.
+- Escape key dismiss (configurable via `closeOnEscape`, default `true`).
+- Outside-click dismiss (configurable via `closeOnOutsideClick`, default `true`).
+- Accessible close button (`aria-label="Close"`, configurable via `closeLabel`).
+
+### Deferred
+
+Per-presentation style overrides, popover and exit-intent trigger modes, styled shadcn `Dialog` and `Sheet` wrappers (coming with the visual pass), and a React portal for the overlay DOM node (overlays currently use CSS `position: fixed`) are all planned for a later release.
+
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)

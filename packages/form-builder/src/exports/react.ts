@@ -9,6 +9,22 @@ export { Form } from '../react/Form'
 export type { FormStepInfo } from '../react/FormContext'
 export type { FieldWidth, FormLayoutProps } from '../react/FormLayout'
 export { FormLayout, widthProps } from '../react/FormLayout'
+export type { BackdropProps } from '../react/presentation/Backdrop'
+export { Backdrop } from '../react/presentation/Backdrop'
+export type { DialogSurfaceProps } from '../react/presentation/DialogSurface'
+export { DialogSurface } from '../react/presentation/DialogSurface'
+export { defaultPresentations } from '../react/presentation/presentations'
+export type {
+	PresentationOption,
+	PresentationRegistry,
+	PresentationsConfig,
+} from '../react/presentation/registry'
+export { resolvePresentations } from '../react/presentation/registry'
+export type { FormPresentation, PresentationWrapperProps } from '../react/presentation/types'
+export type { UseDismissOptions } from '../react/presentation/useDismiss'
+export { useDismiss } from '../react/presentation/useDismiss'
+export { useFocusTrap } from '../react/presentation/useFocusTrap'
+export { useScrollLock } from '../react/presentation/useScrollLock'
 export type { CheckboxProps } from '../react/primitives/Checkbox'
 export { Checkbox } from '../react/primitives/Checkbox'
 export type { FieldShellProps } from '../react/primitives/FieldShell'
