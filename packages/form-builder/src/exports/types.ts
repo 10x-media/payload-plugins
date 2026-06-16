@@ -8,6 +8,7 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 } from '../fields/types'
+export type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 export type { FormBuilderPluginOptions } from '../index'
 export type {
 	SubmissionDescriptor,

@@ -426,7 +426,115 @@ Any renderer you write must satisfy these to match `FieldShell`'s baseline:
 - The required asterisk (or whatever indicator you use) must be `aria-hidden`; do not rely on it as the sole signal.
 - `required` on the native control so browser-native validation is consistent.
 
-> Multi-step forms and presentation-only steps are a later phase.
+## Multi-step forms (Phase 6a)
+
+A form document can carry an optional `flow` property that layers a serializable step graph over its flat field list. When `flow` is absent or has fewer than two steps, `<Form>` behaves as a standard single-step form; no migration or schema change is needed to adopt the feature incrementally.
+
+### Flow data model
+
+```ts
+import type { FormFlow } from '@10x-media/form-builder/types'
+
+const flow: FormFlow = {
+  steps: [
+    {
+      id: 'contact',
+      title: 'Contact details',
+      fields: ['name', 'email'],
+      next: 'message',
+    },
+    {
+      id: 'message',
+      title: 'Your message',
+      fields: ['subject', 'body'],
+      transitions: [
+        { when: { subject: { equals: 'urgent' } }, to: 'urgent-confirm' },
+      ],
+      next: 'confirm',
+    },
+    {
+      id: 'urgent-confirm',
+      title: 'Confirm urgent request',
+      fields: ['confirmUrgent'],
+    },
+    { id: 'confirm', title: 'Review', fields: ['consent'] },
+  ],
+}
+```
+
+Each `FlowStep` groups a subset of the form's fields by machine name. The `transitions` array is evaluated in order: the first entry whose `when` condition matches the current answers (via the same `evaluateCondition` engine used by `visibleWhen`/`validateWhen`) wins. If no transition matches, `next` is the default next step. A step with neither a matching transition nor `next` is terminal.
+
+The `flow` is authored as data for now; a visual flow builder is a later release. Pass it alongside `fields` on the `FormDocument`:
+
+```ts
+import type { FormDocument } from '@10x-media/form-builder/react'
+
+const form: FormDocument = { id: 'contact-form', fields: [...], flow }
+```
+
+### Renderer behavior
+
+`<Form>` auto-drives the steps:
+
+- Renders only the current step's fields (hides the rest).
+- Back and Next buttons appear between the first and last steps.
+- Advancing validates the current step's visible fields; errors block progress.
+- Reaching a terminal step shows the Submit button instead of Next.
+- Submission sends all accumulated answers as a single form submission.
+
+No additional props are required; `<Form>` reads the `flow` from the form document.
+
+### `useFormStep` for custom UIs and progress indicators
+
+```tsx
+import { useFormStep } from '@10x-media/form-builder/react'
+
+function StepProgress() {
+  const { stepIndex, stepCount, isFirst, isTerminal, currentStepId } = useFormStep()
+
+  return (
+    <p>
+      Step {stepIndex + 1} of {stepCount}
+      {isTerminal ? ' (final)' : null}
+    </p>
+  )
+}
+```
+
+`useFormStep()` returns a `FormStepInfo`:
+
+| Field | Type | Description |
+|---|---|---|
+| `flow` | `FormFlow \| undefined` | The full flow, or `undefined` for a single-step form. |
+| `currentStepId` | `string \| undefined` | Machine id of the active step. |
+| `stepIndex` | `number` | Zero-based index within the ordered step list. `0` for single-step. |
+| `stepCount` | `number` | Total number of steps. `1` for single-step. |
+| `isFirst` | `boolean` | `true` when on the first step. |
+| `isTerminal` | `boolean` | `true` when no transition or `next` would advance further. |
+| `goNext` | `() => void` | Advance to the next step (validates current step first). |
+| `goBack` | `() => void` | Return to the previous step. |
+
+### Isomorphic flow engine
+
+The flow engine is exported from `@10x-media/form-builder/react` so you can drive custom step UIs without reimplementing the graph logic:
+
+```ts
+import {
+  firstStepId,
+  resolveNextStepId,
+  isTerminalStepId,
+  stepFieldNames,
+} from '@10x-media/form-builder/react'
+```
+
+| Export | Signature | Description |
+|---|---|---|
+| `firstStepId` | `(flow) => string \| undefined` | Id of the first step. |
+| `resolveNextStepId` | `(flow, currentId, answers) => string \| undefined` | Next step id given current answers. |
+| `isTerminalStepId` | `(flow, currentId, answers) => boolean` | Whether the current step is terminal. |
+| `stepFieldNames` | `(flow, id) => string[]` | Field machine names for a given step id. |
+
+All four are pure and isomorphic (no React, no DOM).
 
 ## Requirements
 
