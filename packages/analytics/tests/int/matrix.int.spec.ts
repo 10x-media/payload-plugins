@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { ROLLUPS_SLUG, rollupsCollection } from '../../src/native/collections/rollups'
 import { SEEN_SLUG, seenCollection } from '../../src/native/collections/seen'
+import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { native } from '../../src/native/nativeAdapter'
 import { applyDistinctDeltas } from '../../src/native/rollups/applyDistinctDeltas'
@@ -201,5 +202,51 @@ describeForDb('native distinct counting', {}, (db) => {
 		const row = docs[0] as { visitors: number } | undefined
 		// vv1 (prior test) + vv2 + vv3 all share the '/d' path bucket: 3 distinct visitors.
 		expect(row?.visitors).toBe(3)
+	})
+})
+
+describeForDb('native flushBatch coalescing', {}, (db) => {
+	let booted: BootedPayload
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+	})
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const event = (visitorHash: string, path: string): StoredEvent => ({
+		timestamp: new Date('2026-04-01T10:00:00Z'),
+		type: 'pageview',
+		path,
+		hostname: 'h',
+		visitorHash,
+		sessionId: `sess-${visitorHash}`,
+		durationMs: 100,
+	})
+
+	it(`coalesces a batch into correct per-page rollups on ${db}`, async () => {
+		await flushBatch(booted.payload, [event('v1', '/x'), event('v1', '/x'), event('v2', '/x')])
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/x' }, dimension: { equals: '' } },
+			pagination: false,
+		})
+		const row = docs[0] as { pageviews: number; visitors: number; sessions: number } | undefined
+		expect(row?.pageviews).toBe(3)
+		expect(row?.visitors).toBe(2)
+		expect(row?.sessions).toBe(2)
+	})
+
+	it(`matches the per-event path across flushes on ${db}`, async () => {
+		await flushBatch(booted.payload, [event('v3', '/y')])
+		await flushBatch(booted.payload, [event('v3', '/y')])
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/y' }, dimension: { equals: '' } },
+			pagination: false,
+		})
+		const row = docs[0] as { pageviews: number; visitors: number } | undefined
+		expect(row?.pageviews).toBe(2)
+		expect(row?.visitors).toBe(1)
 	})
 })

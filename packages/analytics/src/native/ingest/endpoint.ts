@@ -1,11 +1,8 @@
 import type { PayloadHandler } from 'payload'
 import type { GeoResolver } from '../geo/geoResolver'
-import { applyDistinctDeltas } from '../rollups/applyDistinctDeltas'
-import { applyRollupDeltas } from '../rollups/applyRollupDeltas'
-import { computeRollupDeltas } from '../rollups/deltas'
+import { flushBatch } from './flushBatch'
 import { normalizeEvent, type RawEventInput } from './normalizeEvent'
 import { dailySalt } from './salt'
-import { writeEvent } from './writeEvent'
 
 export const makeIngestHandler =
 	(geoResolver: GeoResolver): PayloadHandler =>
@@ -22,9 +19,6 @@ export const makeIngestHandler =
 		const now = new Date()
 		const salt = await dailySalt(req.payload, now)
 		const event = await normalizeEvent({ raw, headers: req.headers, geoResolver, salt, now })
-		await writeEvent(req.payload, event)
-		const deltas = computeRollupDeltas(event)
-		await applyRollupDeltas(req.payload, deltas)
-		await applyDistinctDeltas(req.payload, event, deltas)
+		await flushBatch(req.payload, [event])
 		return Response.json({ ok: true }, { status: 202 })
 	}
