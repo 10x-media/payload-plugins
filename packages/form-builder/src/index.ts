@@ -4,6 +4,9 @@ import { defaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
+import { defaultPresentationDescriptors } from './presentations/defaults'
+import type { PresentationsDescriptorConfig } from './presentations/registry'
+import { resolvePresentationDescriptors } from './presentations/registry'
 import { defaultValidationRules } from './validation/builtin'
 import { resolveValidationRules, type ValidationRulesConfig } from './validation/registry'
 
@@ -13,6 +16,8 @@ export type FormBuilderPluginOptions = {
 	events?: FormEventSink
 	/** Add, override, or remove field types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	fields?: FieldTypesConfig
+	/** Add, override, or remove presentations. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
+	presentations?: PresentationsDescriptorConfig
 	/** Add, override, or remove validation rule types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	rules?: ValidationRulesConfig
 }
@@ -32,8 +37,12 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
 		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
+		const presentationRegistry = resolvePresentationDescriptors(
+			defaultPresentationDescriptors,
+			options.presentations
+		)
 		registerTranslations(config)
-		registerCollections(config, registry, ruleRegistry)
+		registerCollections({ config, registry, ruleRegistry, presentationRegistry })
 		return config
 	},
 })
@@ -49,6 +58,16 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 } from './fields/types'
+export type {
+	PresentationDescriptorOption,
+	PresentationDescriptorRegistry,
+	PresentationsDescriptorConfig,
+} from './presentations/registry'
+export type {
+	PresentationDensity,
+	PresentationDescriptor,
+	PresentationSurface,
+} from './presentations/types'
 export { defineValidationRule } from './validation/defineValidationRule'
 export type {
 	ValidationRuleOption,
