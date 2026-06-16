@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useReducer } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { FormContext } from './FormContext'
+import { FormContext, type FormStepInfo } from './FormContext'
 import { formReducer, initialFormState } from './state'
 import { useField } from './useField'
 
@@ -9,10 +9,19 @@ afterEach(() => {
 	cleanup()
 })
 
+const step: FormStepInfo = {
+	stepIndex: 0,
+	stepCount: 1,
+	isFirst: true,
+	isTerminal: true,
+	goNext: () => {},
+	goBack: () => {},
+}
+
 const Harness = ({ validateField }: { validateField: (name: string, value: unknown) => void }) => {
 	const [state, dispatch] = useReducer(formReducer, initialFormState({ a: '' }))
 	return (
-		<FormContext.Provider value={{ state, dispatch, validateField, locale: 'en' }}>
+		<FormContext.Provider value={{ state, dispatch, validateField, locale: 'en', step }}>
 			<Field />
 		</FormContext.Provider>
 	)

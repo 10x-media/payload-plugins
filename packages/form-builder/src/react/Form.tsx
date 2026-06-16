@@ -10,15 +10,18 @@ import {
 	useMemo,
 	useReducer,
 	useRef,
+	useState,
 } from 'react'
 import { noopEventSink } from '../events/noopSink'
 import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
+import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
+import type { FormFlow } from '../flow/types'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import type { FieldRenderer, RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
-import { FormContext } from './FormContext'
+import { FormContext, type FormStepInfo } from './FormContext'
 import { type FieldWidth, FormLayout, widthProps } from './FormLayout'
 import { type RenderersConfig, resolveRenderers } from './registry'
 import { defaultRenderers } from './renderers'
@@ -28,7 +31,7 @@ import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitF
 import { useField } from './useField'
 import { validateFieldValue } from './validateField'
 
-export type FormDocument = { id: number | string; fields: FormFieldInstance[] }
+export type FormDocument = { id: number | string; fields: FormFieldInstance[]; flow?: FormFlow }
 
 export type FormProps = {
 	form: FormDocument
@@ -44,6 +47,8 @@ export type FormProps = {
 	locale?: string
 	layout?: boolean
 	submitLabel?: string
+	nextLabel?: string
+	backLabel?: string
 	successMessage?: string
 	/** Custom layout: render fields with `useField`/`useFormState` instead of the auto-rendered field loop. */
 	children?: ReactNode
@@ -94,6 +99,8 @@ export const Form = ({
 	locale = 'en',
 	layout,
 	submitLabel = 'Submit',
+	nextLabel = 'Next',
+	backLabel = 'Back',
 	successMessage = 'Thank you.',
 	children,
 }: FormProps) => {
@@ -116,9 +123,18 @@ export const Form = ({
 		initialFormState(Object.fromEntries(fields.map((field) => [field.name, undefined])))
 	)
 
+	// Multi-step is active only when a flow declares two or more steps; otherwise this is an ordinary single-step form.
+	const flow = form.flow && form.flow.steps.length >= 2 ? form.flow : undefined
+	const [currentStepId, setCurrentStepId] = useState<string | undefined>(() =>
+		flow ? firstStepId(flow) : undefined
+	)
+	const [history, setHistory] = useState<string[]>([])
+
 	const startedRef = useRef(false)
 	const submittedRef = useRef(false)
 	const submittingRef = useRef(false)
+	const flowRef = useRef(flow)
+	flowRef.current = flow
 
 	const dispatch = useCallback((action: FormAction) => {
 		if (action.type === 'SET_VALUE' && !startedRef.current) {
@@ -158,8 +174,78 @@ export const Form = ({
 		[fieldsByName, state.values, registry, ruleRegistry, locale, translate]
 	)
 
+	const visible = visibleFields(form.fields, state.values)
+	const stepNames = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
+	const stepVisible: FormFieldInstance[] = stepNames
+		.map((name) => visible.find((field) => field.name === name))
+		.filter((field): field is FormFieldInstance => Boolean(field))
+
+	const goNext = async () => {
+		if (!flow || !currentStepId) {
+			return
+		}
+		const results = await Promise.all(
+			stepVisible.map(async (field) => ({
+				field,
+				...(await validateFieldValue({
+					field,
+					value: state.values[field.name],
+					registry,
+					ruleRegistry,
+					answers: state.values,
+					locale,
+					t: translate,
+				})),
+			}))
+		)
+		let hasError = false
+		for (const result of results) {
+			rawDispatch({ type: 'TOUCH', name: result.field.name })
+			rawDispatch({
+				type: 'SET_FIELD_ISSUES',
+				name: result.field.name,
+				errors: result.errors,
+				warnings: result.warnings,
+			})
+			if (result.errors.length > 0) {
+				hasError = true
+			}
+		}
+		if (hasError) {
+			return
+		}
+		const next = resolveNextStepId(flow, currentStepId, state.values)
+		if (!next) {
+			return
+		}
+		emitFormEvent(sinkRef.current, formIdRef.current, {
+			type: 'step.completed',
+			stepId: currentStepId,
+		})
+		setHistory((prev) => [...prev, currentStepId])
+		setCurrentStepId(next)
+		emitFormEvent(sinkRef.current, formIdRef.current, { type: 'step.viewed', stepId: next })
+	}
+
+	const goBack = () => {
+		const prev = history[history.length - 1]
+		if (prev === undefined) {
+			return
+		}
+		setHistory((entries) => entries.slice(0, -1))
+		setCurrentStepId(prev)
+		emitFormEvent(sinkRef.current, formIdRef.current, { type: 'step.viewed', stepId: prev })
+	}
+
 	useEffect(() => {
 		emitFormEvent(sinkRef.current, formIdRef.current, { type: 'form.viewed' })
+		const mountFlow = flowRef.current
+		if (mountFlow) {
+			const first = firstStepId(mountFlow)
+			if (first) {
+				emitFormEvent(sinkRef.current, formIdRef.current, { type: 'step.viewed', stepId: first })
+			}
+		}
 		return () => {
 			if (!submittedRef.current && !submittingRef.current) {
 				emitFormEvent(sinkRef.current, formIdRef.current, { type: 'form.abandoned' })
@@ -233,7 +319,29 @@ export const Form = ({
 		}
 	}
 
-	const contextValue = { state, dispatch, validateField, locale }
+	const step: FormStepInfo = flow
+		? {
+				flow,
+				currentStepId,
+				stepIndex: flow.steps.findIndex((s) => s.id === currentStepId),
+				stepCount: flow.steps.length,
+				isFirst: history.length === 0,
+				isTerminal: currentStepId ? isTerminalStepId(flow, currentStepId, state.values) : true,
+				goNext: () => {
+					void goNext()
+				},
+				goBack,
+			}
+		: {
+				stepIndex: 0,
+				stepCount: 1,
+				isFirst: true,
+				isTerminal: true,
+				goNext: () => {},
+				goBack: () => {},
+			}
+
+	const contextValue = { state, dispatch, validateField, locale, step }
 
 	if (children !== undefined) {
 		return (
@@ -253,13 +361,13 @@ export const Form = ({
 		)
 	}
 
-	const visible = visibleFields(form.fields, state.values)
+	const rendered = flow ? stepVisible : visible
 
 	return (
 		<FormContext.Provider value={contextValue}>
 			<form className="fb-form-root" noValidate onSubmit={handleSubmit}>
 				<FormLayout enabled={layout !== false}>
-					{visible.map((field) => {
+					{rendered.map((field) => {
 						const renderer = rendererRegistry.get(field.blockType)
 						if (!renderer) {
 							return null
@@ -280,9 +388,33 @@ export const Form = ({
 						{state.submitError}
 					</p>
 				) : null}
-				<button type="submit" disabled={state.submitting}>
-					{submitLabel}
-				</button>
+				{flow ? (
+					<div className="fb-form__controls">
+						{!step.isFirst ? (
+							<button type="button" onClick={goBack}>
+								{backLabel}
+							</button>
+						) : null}
+						{step.isTerminal ? (
+							<button type="submit" disabled={state.submitting}>
+								{submitLabel}
+							</button>
+						) : (
+							<button
+								type="button"
+								onClick={() => {
+									void goNext()
+								}}
+							>
+								{nextLabel}
+							</button>
+						)}
+					</div>
+				) : (
+					<button type="submit" disabled={state.submitting}>
+						{submitLabel}
+					</button>
+				)}
 			</form>
 		</FormContext.Provider>
 	)
