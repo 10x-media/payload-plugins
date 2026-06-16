@@ -501,6 +501,8 @@ function StepProgress() {
 }
 ```
 
+`stepIndex` and `stepCount` reflect the declared step order, so this reads exactly for linear flows. For branching flows, where some steps are skipped, derive progress from `currentStepId` (or track the visited steps yourself) rather than the raw index.
+
 `useFormStep()` returns a `FormStepInfo`:
 
 | Field | Type | Description |

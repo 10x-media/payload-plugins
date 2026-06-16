@@ -391,7 +391,7 @@ export const Form = ({
 				{flow ? (
 					<div className="fb-form__controls">
 						{!step.isFirst ? (
-							<button type="button" onClick={goBack}>
+							<button type="button" onClick={goBack} disabled={state.submitting}>
 								{backLabel}
 							</button>
 						) : null}
@@ -402,6 +402,7 @@ export const Form = ({
 						) : (
 							<button
 								type="button"
+								disabled={state.submitting}
 								onClick={() => {
 									void goNext()
 								}}
