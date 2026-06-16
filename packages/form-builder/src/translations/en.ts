@@ -76,4 +76,10 @@ export const en: Record<TranslationKey, string> = {
 	[keys.conditionValuePlaceholder]: 'Value',
 	[keys.conditionTrue]: 'True',
 	[keys.conditionFalse]: 'False',
+	[keys.configDefaultPresentation]: 'Presentation',
+	[keys.presentationPage]: 'Page',
+	[keys.presentationModal]: 'Modal',
+	[keys.presentationDrawer]: 'Drawer',
+	[keys.presentationInline]: 'Inline',
+	[keys.presentationClose]: 'Close',
 }
