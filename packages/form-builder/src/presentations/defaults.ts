@@ -3,7 +3,7 @@ import type { PresentationDescriptor } from './types'
 
 export const DEFAULT_PRESENTATION_NAME = 'page'
 
-export const defaultPresentationDescriptors: Record<string, PresentationDescriptor> = {
+export const defaultPresentationDescriptors = {
 	page: { name: 'page', label: keys.presentationPage, surface: 'page', density: 'comfortable' },
 	inline: {
 		name: 'inline',
@@ -25,4 +25,4 @@ export const defaultPresentationDescriptors: Record<string, PresentationDescript
 		density: 'comfortable',
 		dismissOnSuccess: true,
 	},
-}
+} satisfies Record<string, PresentationDescriptor>
