@@ -68,13 +68,14 @@ export type RunSubmissionResult = {
 /**
  * Pure submission core, two-pass: first coerce every answered field to its typed kind (so cross-field
  * rules see coerced siblings), then validate each field through `runValidation` (required, intrinsic
- * facet, declarative rules), snapshotting a localized descriptor per answered field. Conditions gate
- * the second pass against the coerced answers: a field whose `visibleWhen` is false is skipped entirely
- * (never validated, never stored, so a client-sent value for it is ignored), and a visible field whose
- * `validateWhen` is false stores its value but skips validation. Calc fields are the trust boundary: a
- * visible calc field stores the value derived from its expression over the coerced answers, never the
- * client-sent value, and is never validated. Only `error` severity blocks; warnings are computed but not
- * surfaced server-side (the Phase 4 renderer shows them).
+ * facet, declarative rules), snapshotting a localized descriptor per answered field. Calc fields are
+ * the trust boundary: their client-sent values are never seeded, their values are derived from their
+ * expressions over the coerced answers, and those derived values are authoritative everywhere downstream
+ * (conditions, validation, storage). Conditions gate the second pass against these effective answers: a
+ * field whose `visibleWhen` is false is skipped entirely (never validated, never stored, so a client-sent
+ * value for it is ignored), and a visible field whose `validateWhen` is false stores its value but skips
+ * validation. A visible calc field stores its derived value and is never validated. Only `error` severity
+ * blocks; warnings are computed but not surfaced server-side (the Phase 4 renderer shows them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
 	const { fields, values, registry, ruleRegistry, locale, t, operation, req, payload, formId } =
@@ -86,7 +87,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 	for (const instance of fields) {
 		const definition = registry.get(instance.blockType)
 		const raw = incoming.get(instance.name)
-		if (!definition || isEmpty(raw)) {
+		// Never seed a calc field's client value: its value is derived below, so the client cannot influence it (even for a self-referencing expression).
+		if (!definition || calcExpressionOf(instance) || isEmpty(raw)) {
 			continue
 		}
 		const value = coerce(definition.value, raw)
@@ -94,6 +96,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		coercedByName.set(instance.name, value)
 	}
 
+	// Calc values are authoritative everywhere downstream (conditions, validation, storage), never the client-sent value.
 	const effective = computeCalcFields(fields, coercedAnswers)
 
 	const errors: SubmissionFieldError[] = []
@@ -108,7 +111,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		const raw = incoming.get(instance.name)
 		const value = coercedByName.has(instance.name) ? coercedByName.get(instance.name) : raw
 
-		if (!evaluateCondition(instance.visibleWhen, coercedAnswers)) {
+		if (!evaluateCondition(instance.visibleWhen, effective)) {
 			continue
 		}
 
@@ -123,14 +126,14 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 			continue
 		}
 
-		if (evaluateCondition(instance.validateWhen, coercedAnswers)) {
+		if (evaluateCondition(instance.validateWhen, effective)) {
 			const { errors: issues } = await runValidation({
 				field: instance,
 				fieldDefinition: definition,
 				value,
 				fieldType: instance.blockType,
 				ruleRegistry,
-				answers: coercedAnswers,
+				answers: effective,
 				locale,
 				t,
 				operation,

@@ -99,4 +99,39 @@ describeForDb('form-builder calculation field', { dbs: ['mongo'] }, (db) => {
 		expect(total?.value).toBe(42)
 		expect(total?.value).not.toBe(999)
 	})
+
+	it('gates conditions on the computed calc value, not the client-sent one', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Calc gates condition',
+				fields: [
+					{ blockType: 'number', name: 'a' },
+					{
+						blockType: 'calculation',
+						name: 'score',
+						expression: { type: 'ref', field: 'a' },
+					},
+					{ blockType: 'text', name: 'bonus', visibleWhen: { score: { equals: 5 } } },
+				],
+			},
+		})
+
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			data: {
+				form: form.id,
+				values: [
+					{ field: 'a', value: 5 },
+					{ field: 'score', value: 999 },
+					{ field: 'bonus', value: 'shown' },
+				],
+			},
+		})
+
+		const values = submission.values as { field: string; value: unknown }[]
+		// score computes to 5 (a), so bonus's `score equals 5` gate passes on the COMPUTED value; the bogus client score (999) would have hidden it.
+		expect(values.find((entry) => entry.field === 'score')?.value).toBe(5)
+		expect(values.find((entry) => entry.field === 'bonus')?.value).toBe('shown')
+	})
 })
