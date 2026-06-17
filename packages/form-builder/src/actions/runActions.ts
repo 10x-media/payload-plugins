@@ -2,7 +2,7 @@ import type { ActionRunArgs } from './defineAction'
 import type { ActionRegistry } from './registry'
 
 /** A stored action instance from the form's `actions` blocks array. */
-type ActionInstance = { blockType: string; [key: string]: unknown }
+export type ActionInstance = { blockType: string; [key: string]: unknown }
 
 export type ActionResult = { type: string; ok: boolean; error?: string }
 

@@ -48,7 +48,14 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		)
 		const actionRegistry = resolveActions(defaultActionDefinitions, options.actions)
 		registerTranslations(config)
-		registerCollections({ config, registry, ruleRegistry, presentationRegistry, actionRegistry })
+		registerCollections({
+			config,
+			registry,
+			ruleRegistry,
+			presentationRegistry,
+			actionRegistry,
+			events: options.events,
+		})
 		return config
 	},
 })
