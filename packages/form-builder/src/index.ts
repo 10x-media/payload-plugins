@@ -47,6 +47,10 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 	},
 })
 
+export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
+export { evaluateCalc } from './calc/evaluate'
+export { normalizeCalc } from './calc/normalizeCalc'
+export type { CalcExpression } from './calc/types'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { defineFormField } from './fields/defineFormField'

@@ -1,5 +1,8 @@
 'use client'
 
+export { computeCalcFields } from '../calc/computeCalcFields'
+export { evaluateCalc } from '../calc/evaluate'
+export type { CalcExpression } from '../calc/types'
 export { evaluateCondition } from '../conditions/evaluate'
 export { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
 export type { PrefillOptions } from '../prefill/valuesFromSearchParams'

@@ -741,6 +741,87 @@ valuesFromSearchParams(params, fields, registry, { allow: ['source'] })
 
 The `hidden` flag is render-only. The server stores and validates the field normally. A hidden field that is required and not prefilled will fail validation on submit, so hidden fields should be optional or reliably prefilled.
 
+## Calculations and scoring (Phase 6d)
+
+A `calculation` field is a read-only numeric field whose value is derived from a serializable expression tree over other answers. The value is computed live client-side for display, then re-computed authoritatively on the server at submit. The server value is never taken from the client; it is the authoritative value stored in the submission, used in conditions, and checked by validation rules.
+
+Set `calcDisplay: false` to compute without rendering anything visible (for example a hidden total or quiz score that conditions and validation reference but the visitor does not see).
+
+### The `CalcExpression` AST
+
+Expressions are plain JSON objects with a `type` discriminant. No `eval`, no `Function`, no untrusted code executes at any point.
+
+| Node type | Shape | Notes |
+|---|---|---|
+| `lit` | `{ type:'lit', value:number }` | Numeric literal |
+| `ref` | `{ type:'ref', field:string }` | Reference to another field's answer |
+| `op` | `{ type:'op', op:'+'\|'-'\|'*'\|'/'\|'%', left:CalcExpression, right:CalcExpression }` | Binary arithmetic |
+| `neg` | `{ type:'neg', expr:CalcExpression }` | Unary negation |
+| `fn` | `{ type:'fn', fn:'min'\|'max'\|'round'\|'abs'\|'ceil'\|'floor', args:CalcExpression[] }` | Math functions |
+| `weight` | `{ type:'weight', field:string, weights:Record<string,number> }` | Maps an option answer to a score |
+
+A price total multiplying two referenced answers:
+
+```ts
+import type { CalcExpression } from '@10x-media/form-builder'
+
+const total: CalcExpression = {
+  type: 'op',
+  op: '*',
+  left: { type: 'ref', field: 'qty' },
+  right: { type: 'ref', field: 'unitPrice' },
+}
+```
+
+A quiz score that maps a multiple-choice answer to a point value:
+
+```ts
+const scoreQ1: CalcExpression = {
+  type: 'weight',
+  field: 'q1',
+  weights: { a: 10, b: 0, c: 5 },
+}
+```
+
+### Safety and totality
+
+The evaluator is total: it always produces a finite number. Division or modulo by zero returns `0`; a missing `ref` returns `0`; unknown option keys in `weight` return `0`. Recursion is depth-guarded (max depth 64) so a pathologically nested expression cannot overflow the stack. The evaluator runs on the public submit path for every form submission.
+
+### Dual compute
+
+The `calculation` value is computed client-side each time its referenced answers change, so the running total or score is immediately visible to the visitor. On submit, the server re-computes from scratch using the same `evaluateCalc` engine. The client value is discarded; only the server result is stored.
+
+Because the value is authoritative at the server level, it can be referenced in `visibleWhen`/`validateWhen` conditions and in validation rules exactly like any other field value.
+
+### Scored results via recall
+
+Pipe a computed score into the post-submit success message using the recall token syntax:
+
+```
+Thanks, you scored {{score}} points!
+```
+
+`{{score}}` resolves to the `score` calculation field's formatted value at display time. This reuses the same recall feature described in the Answer recall section above; no additional setup is needed.
+
+### Authoring and programmatic use
+
+Calculation expressions are authored as data (JSON stored in the field config). A visual calc-builder UI is planned for a later release.
+
+`evaluateCalc`, `computeCalcFields`, `calcExpressionOf`, and `normalizeCalc` are exported from the root entry point and from `@10x-media/form-builder/react` so custom layouts can compute calc values with the exact same engine:
+
+```ts
+import { evaluateCalc, computeCalcFields, type CalcExpression } from '@10x-media/form-builder'
+
+const expr: CalcExpression = { type: 'ref', field: 'qty' }
+const result = evaluateCalc(expr, { qty: 3 })  // 3
+```
+
+```ts
+import { computeCalcFields } from '@10x-media/form-builder/react'
+
+const updatedValues = computeCalcFields(fields, currentValues)
+```
+
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)
