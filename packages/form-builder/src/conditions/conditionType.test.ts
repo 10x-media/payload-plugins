@@ -21,5 +21,6 @@ describe('conditionType resolution', () => {
 		expect(map.number).toBe('number')
 		expect(map.select).toBe('select')
 		expect(map.checkbox).toBe('checkbox')
+		expect(map.calculation).toBe('number')
 	})
 })

@@ -1,4 +1,5 @@
 import type { CollectionBeforeValidateHook, CollectionConfig } from 'payload'
+import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
@@ -37,6 +38,11 @@ export const buildFormsCollection = (
 				data.fields as FieldRow[],
 				conditionTypes
 			)
+			for (const field of normalized) {
+				if ('expression' in field) {
+					field.expression = normalizeCalc(field.expression)
+				}
+			}
 			data.fields = normalized
 			const fieldNames = normalized
 				.map((field: FieldRow) => (typeof field.name === 'string' ? field.name : undefined))

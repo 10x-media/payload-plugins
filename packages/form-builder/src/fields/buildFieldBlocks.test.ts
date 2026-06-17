@@ -22,6 +22,7 @@ describe('buildFieldBlocks', () => {
 			'number',
 			'select',
 			'checkbox',
+			'calculation',
 		])
 	})
 

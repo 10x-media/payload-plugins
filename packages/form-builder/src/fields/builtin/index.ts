@@ -1,4 +1,5 @@
 import type { AnyFormFieldDefinition } from '../types'
+import { calculationField } from './calculation'
 import { checkboxField } from './checkbox'
 import { emailField } from './email'
 import { numberField } from './number'
@@ -15,4 +16,5 @@ export const defaultFieldDefinitions: AnyFormFieldDefinition[] = [
 	numberField as AnyFormFieldDefinition,
 	selectField as AnyFormFieldDefinition,
 	checkboxField as AnyFormFieldDefinition,
+	calculationField as AnyFormFieldDefinition,
 ]
