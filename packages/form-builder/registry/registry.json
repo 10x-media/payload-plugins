@@ -53,6 +53,21 @@
 					"target": "components/form-builder/fields/checkbox-field.tsx"
 				}
 			]
+		},
+		{
+			"name": "form-results",
+			"type": "registry:component",
+			"title": "Form Results (shadcn)",
+			"description": "shadcn-styled <FormResults> for polls and survey summaries from @10x-media/form-builder.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/form-builder"],
+			"files": [
+				{
+					"path": "form-builder/form-results.tsx",
+					"type": "registry:component",
+					"target": "components/form-builder/form-results.tsx"
+				}
+			]
 		}
 	]
 }

@@ -1,5 +1,6 @@
 'use client'
 
+export type { AggregationBucket, FieldAggregation } from '../aggregation/types'
 export { computeCalcFields } from '../calc/computeCalcFields'
 export { evaluateCalc } from '../calc/evaluate'
 export type { CalcExpression } from '../calc/types'
