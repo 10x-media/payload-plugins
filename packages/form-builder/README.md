@@ -756,7 +756,7 @@ Expressions are plain JSON objects with a `type` discriminant. No `eval`, no `Fu
 | `lit` | `{ type:'lit', value:number }` | Numeric literal |
 | `ref` | `{ type:'ref', field:string }` | Reference to another field's answer |
 | `op` | `{ type:'op', op:'+'\|'-'\|'*'\|'/'\|'%', left:CalcExpression, right:CalcExpression }` | Binary arithmetic |
-| `neg` | `{ type:'neg', expr:CalcExpression }` | Unary negation |
+| `neg` | `{ type:'neg', operand:CalcExpression }` | Unary negation |
 | `fn` | `{ type:'fn', fn:'min'\|'max'\|'round'\|'abs'\|'ceil'\|'floor', args:CalcExpression[] }` | Math functions |
 | `weight` | `{ type:'weight', field:string, weights:Record<string,number> }` | Maps an option answer to a score |
 

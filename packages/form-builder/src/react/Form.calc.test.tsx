@@ -157,4 +157,24 @@ describe('Form calculation fields', () => {
 			})
 		})
 	})
+
+	it('shows a field gated on a computed calc value once the calc makes the condition true', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'number', name: 'a', label: 'A' },
+			{
+				blockType: 'calculation',
+				name: 'score',
+				label: 'Score',
+				expression: { type: 'ref', field: 'a' },
+			},
+			{ blockType: 'text', name: 'bonus', label: 'Bonus', visibleWhen: { score: { equals: 5 } } },
+		]
+		render(<Form form={doc(fields)} onSubmit={vi.fn()} />)
+
+		expect(screen.queryByLabelText('Bonus')).toBeNull()
+
+		fireEvent.change(screen.getByLabelText('A'), { target: { value: '5' } })
+
+		expect(await screen.findByLabelText('Bonus')).toBeInTheDocument()
+	})
 })

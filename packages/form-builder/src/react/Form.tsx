@@ -259,7 +259,7 @@ export const Form = ({
 		[fieldsByName, state.values, registry, ruleRegistry, locale, translate]
 	)
 
-	const visible = visibleFields(form.fields, state.values)
+	const visible = visibleFields(form.fields, effectiveValues)
 	const stepNames = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
 	const stepVisible: FormFieldInstance[] = stepNames
 		.map((name) => visible.find((field) => field.name === name))
@@ -346,7 +346,7 @@ export const Form = ({
 
 	const handleSubmit = async (event: ReactFormEvent<HTMLFormElement>) => {
 		event.preventDefault()
-		const visible = visibleFields(form.fields, state.values)
+		const visible = visibleFields(form.fields, effectiveValues)
 		const results = await Promise.all(
 			// Calc fields carry no rules and have no input; they are always satisfied, so skip validating them.
 			visible
