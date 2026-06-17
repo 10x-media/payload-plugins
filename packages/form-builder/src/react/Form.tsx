@@ -457,7 +457,7 @@ export const Form = ({
 		)
 	}
 
-	const rendered = flow ? stepVisible : visible
+	const rendered = (flow ? stepVisible : visible).filter((field) => field.hidden !== true)
 
 	return (
 		<FormContext.Provider value={contextValue}>

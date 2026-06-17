@@ -35,16 +35,17 @@ describe('buildFieldBlocks', () => {
 
 	it('gives type-config-free blocks only the shared config', () => {
 		const text = blocks.find((block) => block.slug === 'text')
-		expect(text?.fields.map(fieldName)).toEqual([
+		const names = text?.fields.map(fieldName) ?? []
+		expect(names).toEqual([
 			'name',
 			'label',
 			'required',
 			'width',
 			'placeholder',
 			'description',
-			'visibleWhen',
-			'validateWhen',
+			undefined,
 			'validations',
 		])
+		expect(text?.fields[6]?.type).toBe('collapsible')
 	})
 })

@@ -44,6 +44,14 @@ export const sharedFieldConfig = (conditionTypes: Record<string, ConditionFieldT
 	},
 	{ name: 'placeholder', type: 'text', label: labelFor(keys.configPlaceholder) },
 	{ name: 'description', type: 'textarea', label: labelFor(keys.configDescription) },
-	conditionField('visibleWhen', keys.configVisibleWhen, conditionTypes),
-	conditionField('validateWhen', keys.configValidateWhen, conditionTypes),
+	{
+		type: 'collapsible',
+		label: labelFor(keys.configAdvanced),
+		admin: { initCollapsed: true },
+		fields: [
+			conditionField('visibleWhen', keys.configVisibleWhen, conditionTypes),
+			conditionField('validateWhen', keys.configValidateWhen, conditionTypes),
+			{ name: 'hidden', type: 'checkbox', label: labelFor(keys.configHidden) },
+		],
+	},
 ]

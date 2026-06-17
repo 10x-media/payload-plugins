@@ -74,6 +74,8 @@ export const keys = {
 	conditionValuePlaceholder: 'formBuilder:condition.value',
 	conditionTrue: 'formBuilder:condition.true',
 	conditionFalse: 'formBuilder:condition.false',
+	configAdvanced: 'formBuilder:config.advanced',
+	configHidden: 'formBuilder:config.hidden',
 	configDefaultPresentation: 'formBuilder:config.defaultPresentation',
 	presentationPage: 'formBuilder:presentation.page',
 	presentationModal: 'formBuilder:presentation.modal',
