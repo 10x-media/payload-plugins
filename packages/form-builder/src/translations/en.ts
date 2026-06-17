@@ -110,4 +110,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.consentConfigSource]: 'Source',
 	[keys.consentConfigSourceConfig]: 'Source settings',
 	[keys.consentConfigOptional]: 'Optional (e.g. marketing)',
+	[keys.resultsTitle]: 'Results',
+	[keys.resultsResponses]: 'responses',
+	[keys.resultsNoResponses]: 'No responses yet',
+	[keys.resultsTruncated]: 'Showing a sample of responses',
 }
