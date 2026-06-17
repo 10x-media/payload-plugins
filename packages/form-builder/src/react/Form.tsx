@@ -18,6 +18,8 @@ import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
 import type { FormFlow } from '../flow/types'
 import { defaultPresentationDescriptors } from '../presentations/defaults'
+import { interpolate } from '../recall/interpolate'
+import { buildRecallResolver } from '../recall/resolver'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import type { FieldRenderer, RendererTranslate } from './contract'
@@ -27,6 +29,7 @@ import { type FieldWidth, FormLayout, widthProps } from './FormLayout'
 import { defaultPresentations } from './presentation/presentations'
 import { type PresentationsConfig, resolvePresentations } from './presentation/registry'
 import type { FormPresentation } from './presentation/types'
+import { applyRecall } from './recall'
 import { type RenderersConfig, resolveRenderers } from './registry'
 import { defaultRenderers } from './renderers'
 import { buildFieldTypeRegistry, buildValidationRuleRegistry, visibleFields } from './resolveForm'
@@ -156,6 +159,18 @@ export const Form = ({
 
 	const [state, rawDispatch] = useReducer(formReducer, form.fields, (fields) =>
 		initialFormState(Object.fromEntries(fields.map((field) => [field.name, undefined])))
+	)
+
+	const recall = useMemo(
+		() =>
+			buildRecallResolver({
+				fields: form.fields,
+				values: state.values,
+				registry,
+				locale,
+				t: translate,
+			}),
+		[form.fields, state.values, registry, locale, translate]
 	)
 
 	// Multi-step is active only when a flow declares two or more steps; otherwise this is an ordinary single-step form.
@@ -429,7 +444,7 @@ export const Form = ({
 						data-fb-presentation={activePresentation.name}
 						data-fb-density={activePresentation.density}
 					>
-						{successMessage}
+						{interpolate(successMessage, recall)}
 					</p>
 				)}
 			</FormContext.Provider>
@@ -458,9 +473,15 @@ export const Form = ({
 								typeof field.width === 'string' && FIELD_WIDTHS.has(field.width)
 									? (field.width as FieldWidth)
 									: undefined
+							const recalledField = applyRecall(field, recall)
 							return (
 								<div key={field.name} {...widthProps(width)}>
-									<FieldHost field={field} renderer={renderer} locale={locale} t={translate} />
+									<FieldHost
+										field={recalledField}
+										renderer={renderer}
+										locale={locale}
+										t={translate}
+									/>
 								</div>
 							)
 						})}
