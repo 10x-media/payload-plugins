@@ -79,7 +79,10 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
-			const plausibleMetrics = wanted.map((m) => METRIC_MAP[m] as string)
+			// Several contract metrics alias one Plausible metric (sessions and visits both
+			// map to "visits"), so dedupe before sending and read each contract metric back
+			// from its provider key's position rather than the request index.
+			const providerMetrics = [...new Set(wanted.map((m) => METRIC_MAP[m] as string))]
 			const dims = (q.dimensions ?? []).filter((d) => DIMENSION_MAP[d])
 			const filters: Array<[string, string, string[]]> = []
 			if (q.path) {
@@ -87,8 +90,11 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			}
 			const body = {
 				site_id: config.siteId,
-				metrics: plausibleMetrics,
-				date_range: [q.dateRange.start.toISOString(), q.dateRange.end.toISOString()],
+				metrics: providerMetrics,
+				date_range: [
+					q.dateRange.start.toISOString().slice(0, 10),
+					q.dateRange.end.toISOString().slice(0, 10),
+				],
 				...(dims.length ? { dimensions: dims.map((d) => DIMENSION_MAP[d] as string) } : {}),
 				...(filters.length ? { filters } : {}),
 			}
@@ -101,11 +107,9 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			})
 			const readRow = (row: { metrics: number[] }): Partial<Record<MetricKey, number>> => {
 				const out: Partial<Record<MetricKey, number>> = {}
-				for (let i = 0; i < wanted.length; i++) {
-					const m = wanted[i]
-					if (m !== undefined) {
-						out[m] = toContractValue(m, row.metrics[i] ?? 0)
-					}
+				for (const m of wanted) {
+					const idx = providerMetrics.indexOf(METRIC_MAP[m] as string)
+					out[m] = toContractValue(m, row.metrics[idx] ?? 0)
 				}
 				return out
 			}

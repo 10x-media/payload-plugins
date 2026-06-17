@@ -69,4 +69,16 @@ describe('umami adapter', () => {
 			{ dimensions: { page: '/b' }, metrics: { visitors: 8 } },
 		])
 	})
+
+	it('omits derived bounceRate and avgDuration when there are no visits', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/stats', () =>
+				HttpResponse.json({ pageviews: 0, visitors: 0, visits: 0, bounces: 0, totaltime: 0 })
+			)
+		)
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(q(), {})
+		expect(result.totals).toEqual({ pageviews: 0, visitors: 0, visits: 0 })
+		expect(result.totals?.bounceRate).toBeUndefined()
+		expect(result.totals?.avgDuration).toBeUndefined()
+	})
 })

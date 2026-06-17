@@ -22,7 +22,12 @@ describe('plausible adapter', () => {
 	})
 
 	it('sends a v2 query and normalizes totals, converting visit_duration seconds to ms', async () => {
-		let captured: { site_id?: string; metrics?: string[]; filters?: unknown } = {}
+		let captured: {
+			site_id?: string
+			metrics?: string[]
+			filters?: unknown
+			date_range?: string[]
+		} = {}
 		server.use(
 			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
 				expect(request.headers.get('authorization')).toBe('Bearer k')
@@ -39,6 +44,7 @@ describe('plausible adapter', () => {
 		expect(captured.site_id).toBe('example.com')
 		expect(captured.metrics).toEqual(['pageviews', 'visitors', 'visit_duration'])
 		expect(captured.filters).toEqual([['is', 'event:page', ['/pricing']]])
+		expect(captured.date_range).toEqual(['2026-01-01', '2026-01-31'])
 		expect(result.totals).toEqual({ pageviews: 120, visitors: 80, avgDuration: 42000 })
 		expect(result.meta.provider).toBe('plausible')
 	})

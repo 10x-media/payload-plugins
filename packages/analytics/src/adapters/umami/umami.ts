@@ -56,6 +56,9 @@ interface UmamiStats {
 export function umami(config: UmamiConfig): AnalyticsAdapter {
 	const base = config.host ?? CLOUD_BASE
 	// Cloud authenticates with x-umami-api-key; self-hosted with a bearer token.
+	// NOTE: the cloud header name and the per-URL `path` filter (set in params(), also
+	// sent to /metrics) match the documented v2 shape but are unvalidated against a live
+	// instance; confirm both before relying on per-URL provider data in production.
 	const authHeaders = (): Record<string, string> =>
 		config.apiKey
 			? { 'x-umami-api-key': config.apiKey }
@@ -108,8 +111,11 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 				visitors: stats.visitors,
 				visits: stats.visits,
 				sessions: stats.visits,
-				bounceRate: stats.visits > 0 ? Math.round((stats.bounces / stats.visits) * 100) : 0,
-				avgDuration: stats.visits > 0 ? Math.round((stats.totaltime / stats.visits) * 1000) : 0,
+				// Derived ratios are omitted (not zeroed) when there are no visits, so the
+				// display layer shows a "no data" state instead of a misleading 0.
+				bounceRate: stats.visits > 0 ? Math.round((stats.bounces / stats.visits) * 100) : undefined,
+				avgDuration:
+					stats.visits > 0 ? Math.round((stats.totaltime / stats.visits) * 1000) : undefined,
 			}
 			const totals: Partial<Record<MetricKey, number>> = {}
 			for (const m of q.metrics) {
