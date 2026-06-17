@@ -86,4 +86,13 @@ export const en: Record<TranslationKey, string> = {
 	[keys.presentationModal]: 'Modal',
 	[keys.presentationDrawer]: 'Drawer',
 	[keys.presentationInline]: 'Inline',
+	[keys.actionEmailTeam]: 'Email team',
+	[keys.actionConfirmation]: 'Confirmation email',
+	[keys.actionSignedWebhook]: 'Signed webhook',
+	[keys.actionConfigTo]: 'To',
+	[keys.actionConfigSubject]: 'Subject',
+	[keys.actionConfigBody]: 'Body',
+	[keys.actionConfigToField]: 'Email field name',
+	[keys.actionConfigUrl]: 'URL',
+	[keys.actionConfigSecret]: 'Secret',
 }

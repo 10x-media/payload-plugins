@@ -84,6 +84,15 @@ export const keys = {
 	presentationModal: 'formBuilder:presentation.modal',
 	presentationDrawer: 'formBuilder:presentation.drawer',
 	presentationInline: 'formBuilder:presentation.inline',
+	actionEmailTeam: 'formBuilder:action.emailTeam',
+	actionConfirmation: 'formBuilder:action.confirmation',
+	actionSignedWebhook: 'formBuilder:action.signedWebhook',
+	actionConfigTo: 'formBuilder:action.config.to',
+	actionConfigSubject: 'formBuilder:action.config.subject',
+	actionConfigBody: 'formBuilder:action.config.body',
+	actionConfigToField: 'formBuilder:action.config.toField',
+	actionConfigUrl: 'formBuilder:action.config.url',
+	actionConfigSecret: 'formBuilder:action.config.secret',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
