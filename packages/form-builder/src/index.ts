@@ -58,6 +58,8 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 } from './fields/types'
+export type { PrefillOptions } from './prefill/valuesFromSearchParams'
+export { valuesFromSearchParams } from './prefill/valuesFromSearchParams'
 export { DEFAULT_PRESENTATION_NAME, defaultPresentationDescriptors } from './presentations/defaults'
 export type {
 	PresentationDescriptorOption,
@@ -70,6 +72,9 @@ export type {
 	PresentationDescriptor,
 	PresentationSurface,
 } from './presentations/types'
+export { interpolate } from './recall/interpolate'
+export type { RecallResolver } from './recall/resolver'
+export { buildRecallResolver, optionLabelsFor } from './recall/resolver'
 export { defineValidationRule } from './validation/defineValidationRule'
 export type {
 	ValidationRuleOption,

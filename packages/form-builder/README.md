@@ -660,6 +660,87 @@ The built-in overlay (`DialogSurface`) ships a dependency-free, spec-compliant b
 
 Per-presentation style overrides, popover and exit-intent trigger modes, styled shadcn `Dialog` and `Sheet` wrappers (coming with the visual pass), and a React portal for the overlay DOM node (overlays currently use CSS `position: fixed`) are all planned for a later release.
 
+## Answer recall and prefill (Phase 6c)
+
+### Recall (piping)
+
+Recall pipes a previously captured answer into any displayed text using `{{ fieldName }}` and `{{ fieldName|fallback }}` tokens. Tokens resolve against the current form values at render time. They work in field labels, field descriptions, option labels, and the success message.
+
+Values are formatted through the field type's `format` function before substitution: a `select` field shows its option label, a `checkbox` shows Yes or No, a `date` shows a localized string. Token-free text is returned unchanged, so recall is a no-op when there are no tokens and can be applied unconditionally.
+
+A simple two-field example where a later field echoes back an earlier answer:
+
+```ts
+// field 1: name (text)
+// field 2: greeting (text, label uses recall)
+{
+  label: 'Hello {{name}}, what can we help with?',
+  successMessage: 'Thanks {{name}}, we will be in touch.',
+}
+```
+
+For custom layouts that manage their own rendering, `buildRecallResolver` and `interpolate` are exported from both `@10x-media/form-builder` and `@10x-media/form-builder/react`:
+
+```ts
+import { buildRecallResolver, interpolate } from '@10x-media/form-builder/react'
+
+const resolve = buildRecallResolver({ fields, values, registry, locale, t })
+
+const label = interpolate('Hello {{name}}', resolve)
+const success = interpolate('Thanks {{name}}, we will be in touch.', resolve)
+```
+
+`buildRecallResolver` is pure and isomorphic -- no React, no DOM -- so it can also run in server components or API routes.
+
+Deferred: recall inside email and action templates lands with the action pipeline. Calculations and scoring are their own phase.
+
+### URL prefill
+
+`valuesFromSearchParams` maps URL query parameters to typed initial field values. It maps KNOWN fields only, coerces each value to the field's value kind (number, boolean, multi-value, or text), and silently ignores unknown params, denied fields, and invalid values (for example a non-numeric string for a number field). Prefilled values are never trusted -- they still validate on submit.
+
+Pass the result to `<Form initialValues={...}>`:
+
+```tsx
+import { valuesFromSearchParams } from '@10x-media/form-builder/react'
+import { Form } from '@10x-media/form-builder/react'
+
+// Server component -- reads searchParams on the server, no window access, no hydration mismatch.
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>
+}) {
+  const form = await fetchForm('contact')
+  const params = new URLSearchParams(await searchParams)
+  const initialValues = valuesFromSearchParams(params, form.fields, registry)
+
+  return <Form form={form} initialValues={initialValues} />
+}
+```
+
+The optional `options` argument controls which params map to which fields:
+
+```ts
+valuesFromSearchParams(params, fields, registry, {
+  map: { utm_email: 'email' }, // rename: ?utm_email=... prefills the `email` field
+  allow: ['name', 'email'],    // only these field names may be prefilled
+  deny: ['internalRef'],       // these field names are never prefilled
+})
+```
+
+`map`, `allow`, and `deny` may be combined. `allow` is evaluated after `map`, so the mapped field name (not the param name) must appear in the allow list.
+
+### Hidden context fields
+
+Any field can be marked hidden in the admin UI via the Advanced section of its field settings. A hidden field is captured and included in the submission but not shown to the visitor. Pair it with URL prefill to capture tracking values like `utm_source` or referrer without displaying them in the form:
+
+```ts
+// The `source` field is hidden and prefilled from ?source=...
+valuesFromSearchParams(params, fields, registry, { allow: ['source'] })
+```
+
+The `hidden` flag is render-only. The server stores and validates the field normally. A hidden field that is required and not prefilled will fail validation on submit, so hidden fields should be optional or reliably prefilled.
+
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)

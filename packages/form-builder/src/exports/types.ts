@@ -10,6 +10,7 @@ export type {
 } from '../fields/types'
 export type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 export type { FormBuilderPluginOptions } from '../index'
+export type { PrefillOptions } from '../prefill/valuesFromSearchParams'
 export type {
 	PresentationDescriptorOption,
 	PresentationDescriptorRegistry,
@@ -20,6 +21,7 @@ export type {
 	PresentationDescriptor,
 	PresentationSurface,
 } from '../presentations/types'
+export type { RecallResolver } from '../recall/resolver'
 export type {
 	SubmissionDescriptor,
 	SubmissionFieldError,
