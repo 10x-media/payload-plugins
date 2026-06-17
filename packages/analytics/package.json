@@ -66,6 +66,11 @@
 			"development": "./src/exports/adapters/plausible.ts",
 			"types": "./src/exports/adapters/plausible.ts",
 			"default": "./dist/exports/adapters/plausible.js"
+		},
+		"./adapters/umami": {
+			"development": "./src/exports/adapters/umami.ts",
+			"types": "./src/exports/adapters/umami.ts",
+			"default": "./dist/exports/adapters/umami.js"
 		}
 	},
 	"files": [
@@ -174,6 +179,11 @@
 				"types": "./dist/exports/adapters/plausible.d.ts",
 				"import": "./dist/exports/adapters/plausible.js",
 				"default": "./dist/exports/adapters/plausible.js"
+			},
+			"./adapters/umami": {
+				"types": "./dist/exports/adapters/umami.d.ts",
+				"import": "./dist/exports/adapters/umami.js",
+				"default": "./dist/exports/adapters/umami.js"
 			}
 		}
 	}
