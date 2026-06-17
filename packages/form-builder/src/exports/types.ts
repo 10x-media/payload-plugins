@@ -3,6 +3,19 @@ export type { ActionOption, ActionRegistry, ActionsConfig } from '../actions/reg
 export type { ActionResult } from '../actions/runActions'
 export type { CalcExpression } from '../calc/types'
 export type { FieldCondition } from '../conditions/types'
+export type { ConsentProof } from '../consent/captureConsent'
+export type {
+	AnyConsentSource,
+	ConsentLink,
+	ConsentResolveArgs,
+	ConsentResolved,
+	ConsentSource,
+} from '../consent/defineConsentSource'
+export type {
+	ConsentSourceOption,
+	ConsentSourceRegistry,
+	ConsentSourcesConfig,
+} from '../consent/registry'
 export type { FormEvent, FormEventSink } from '../events/types'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from '../fields/registry'
 export type {

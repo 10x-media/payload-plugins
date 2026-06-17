@@ -81,6 +81,25 @@ export { normalizeCalc } from './calc/normalizeCalc'
 export type { CalcExpression } from './calc/types'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
+export { defaultConsentSources } from './consent/builtin'
+export type { ConsentProof } from './consent/captureConsent'
+export { captureConsent } from './consent/captureConsent'
+export type {
+	AnyConsentSource,
+	ConsentLink,
+	ConsentResolveArgs,
+	ConsentResolved,
+	ConsentSource,
+} from './consent/defineConsentSource'
+export { defineConsentSource } from './consent/defineConsentSource'
+export type {
+	ConsentSourceOption,
+	ConsentSourceRegistry,
+	ConsentSourcesConfig,
+} from './consent/registry'
+export { resolveConsentSources } from './consent/registry'
+export { resolveConsentLinks } from './consent/resolveConsentLinks'
+export { resolvePublishedVersionRef } from './consent/resolvePublishedVersionRef'
 export { defineFormField } from './fields/defineFormField'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from './fields/registry'
 export type {

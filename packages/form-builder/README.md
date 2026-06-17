@@ -934,6 +934,123 @@ import type { FormEvent, FormEventSink } from '@10x-media/form-builder/types'
 
 Conditional notifications (only send an action when a condition is met) are planned for v1.x.
 
+## Consent (Phase 8)
+
+The consent field captures affirmative, checkbox-based consent with a built-in compliance baseline: unchecked by default, required to submit unless `optional: true` is set, and proof stored by reference -- never by copying policy text.
+
+### Compliance defaults
+
+- The checkbox is unchecked by default. The form will not submit until every non-optional consent field is checked.
+- Set `optional: true` on a consent field for marketing opt-ins or similar non-required consent. Keep terms-of-service consent separate and required.
+- Proof is stored as a structured object on the submission's `consent` JSON array, containing the agreed boolean, a URL reference (`ref`), and an optional version reference (`versionRef`). Policy text is never stored.
+
+### Consent field
+
+The `consent` field type carries a `statement` (the text shown next to the checkbox), an optional `source` (which consent source type resolves the policy link), and a `sourceConfig` group for source-specific parameters:
+
+```ts
+// In a form's fields blocks:
+{
+  blockType: 'consent',
+  name: 'terms',
+  statement: 'I have read and agree to the Privacy Policy',
+  source: 'static',
+  sourceConfig: {
+    label: 'Privacy Policy',
+    url: 'https://example.com/privacy',
+  },
+  optional: false,
+}
+```
+
+### Consent sources
+
+Three built-in source types ship:
+
+- **static** (default): a fixed URL and label, authored directly in `sourceConfig`. No server step required; the renderer reads `sourceConfig` directly.
+- **pageReference**: resolves a policy URL at display time by looking up a Payload collection document. Set `relationTo`, `docId`, and optionally `urlField` in `sourceConfig`.
+- **custom** via `defineConsentSource`: implement a `resolve` function that returns `{ links, versionRef?, versionLabel? }` given the stored config and a Payload instance.
+
+```ts
+import { defineConsentSource } from '@10x-media/form-builder'
+
+const mySource = defineConsentSource({
+  type: 'mySource',
+  label: 'My policy source',
+  resolve: async ({ config, payload, locale }) => ({
+    links: [{ label: config.label as string, url: config.url as string }],
+  }),
+})
+
+formBuilder({ consentSources: { mySource } })
+```
+
+The `consentSources` option follows the same `false | true | object` convention used by `fields`, `rules`, and `actions`.
+
+### Version capture
+
+Set `captureVersion: true` in `sourceConfig` for sources that support it (currently `pageReference`). When enabled, `captureConsent` calls `resolvePublishedVersionRef` at submit time to record the version of the policy document the user agreed to. If Payload's draft/versions feature is off for that collection, `versionRef` is null and omitted from the proof.
+
+```ts
+import { resolvePublishedVersionRef } from '@10x-media/form-builder'
+
+const ref = await resolvePublishedVersionRef(payload, {
+  collection: 'pages',
+  id: docId,
+})
+```
+
+### Proof by reference
+
+On submit, `captureConsent` is called for each consent field. It returns a `ConsentProof` stored in the submission's `consent` array:
+
+```ts
+import type { ConsentProof } from '@10x-media/form-builder'
+
+// Stored per consent field:
+// { agreed: true, ref: 'https://...', versionRef?: '...', at: '<ISO-8601>' }
+```
+
+`ref` is the policy URL resolved at submit time, not at page load. `at` is the ISO-8601 timestamp of the submission. Policy text is never stored.
+
+### Display step: resolveConsentLinks
+
+For the `pageReference` source (and any custom source), call `resolveConsentLinks` server-side before rendering so the renderer receives the resolved policy links:
+
+```ts
+import { resolveConsentLinks } from '@10x-media/form-builder'
+
+const resolved = await resolveConsentLinks(field, {
+  registry: consentRegistry,
+  payload,
+  locale: 'en',
+})
+
+// Embed `resolved.links` into the field as `consentLinks` before passing to the renderer.
+```
+
+The `static` source needs no server step; the renderer falls back to `sourceConfig.url` and `sourceConfig.label` directly when `consentLinks` is absent.
+
+### Renderer
+
+The `consent` field is included in `defaultRenderers` (keyed `'consent'`). It renders:
+
+- the `statement` as the field label,
+- an unchecked checkbox (the field value) that the user must check,
+- one or more policy links derived from `field.consentLinks` (server-resolved) or, as a fallback, from `field.sourceConfig.url`.
+
+Policy links open in a new tab with `rel="noopener noreferrer"`.
+
+```tsx
+import { Form, defaultRenderers, resolveRenderers } from '@10x-media/form-builder/react'
+
+<Form form={form} renderers={resolveRenderers(defaultRenderers)} />
+```
+
+### Deferred
+
+Integration with c15t (consent management infrastructure) and retention-pruning of consent proofs are planned for a later release.
+
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)
