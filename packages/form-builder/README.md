@@ -1051,6 +1051,113 @@ import { Form, defaultRenderers, resolveRenderers } from '@10x-media/form-builde
 
 Integration with c15t (consent management infrastructure) and retention-pruning of consent proofs are planned for a later release.
 
+## Polls and response aggregation (Phase 9)
+
+Submissions are a collection, so aggregation is a query. This phase ships a submission-aggregation utility, a `<FormResults>` renderer (headless plus shadcn), a gated public results endpoint, and a turnkey `<Poll>` component. The same utility powers survey response summaries.
+
+### Aggregation utility
+
+`aggregateFieldResponses` (one field) and `aggregateFormResponses` (one or many fields, one pass) tally a form's submissions by answer value.
+
+```ts
+import { aggregateFieldResponses } from '@10x-media/form-builder'
+
+const results = await aggregateFieldResponses({ payload, formId, field: 'colour' })
+// {
+//   field: 'colour',
+//   label: 'Favourite colour',
+//   fieldType: 'select',
+//   total: 42,            // respondents who answered this field (the percentage denominator)
+//   truncated: false,
+//   buckets: [
+//     { value: 'red', label: 'Red', count: 28, percentage: 66.7 },
+//     { value: 'blue', label: 'Blue', count: 14, percentage: 33.3 },
+//   ],
+// }
+```
+
+- **Percentages are over respondents** (submissions with a non-empty answer for the field), not all submissions. Array answers (select-all) increment one bucket per element while counting one respondent, so percentages can sum past 100%.
+- **`complete` submissions only by default.** Pass `status: 'all'` to include partials, or `status: 'partial'`.
+- **Labels** come from the field's current options, falling back to the submitted snapshot label, then the raw value. Buckets follow the option order, then any retired values by count.
+- **Bounded.** It pages `payload.find` and reduces in JS (identical on Mongo and Postgres, no durable snapshot; long-term rollups are the analytics plugin's concern). The scan caps at `maxSubmissions` (default 10000); past it the result is flagged `truncated: true`.
+
+`aggregateFormResponses` with no `fields` aggregates every enumerable field (those with options), which is the survey-summary case:
+
+```ts
+const summary = await aggregateFormResponses({ payload, formId }) // FieldAggregation[]
+```
+
+### `<FormResults>`
+
+A headless, presentational renderer. It never fetches: resolve the data server-side and pass it in. The option label, count, and percentage are real text (the accessible content); the bar fill is decorative. Import the optional `./styles.css` for the `fb-results*` bar styling, or style it yourself. A shadcn-styled parity component is available from the registry (`shadcn add` the `form-results` item).
+
+```tsx
+import { FormResults } from '@10x-media/form-builder/react'
+
+<FormResults results={results} />          // one field, or
+<FormResults results={summary} />          // an array (survey summary)
+```
+
+### Results endpoint and opt-in
+
+Anonymous voters cannot read raw submissions (that access is gated, and submissions never reach the browser), so public poll results are served as aggregate counts through a gated endpoint:
+
+```
+GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
+```
+
+- **Authenticated callers** (admins) may aggregate any field, or all enumerable fields when `field` is omitted.
+- **Anonymous callers** are served only when the form's `showResults` is on, only for the configured `resultsField`, and only if that field is enumerable (a choice field).
+- **Security:** set `resultsField` to a choice field, never a free-text or PII field. The enumerable check refuses to expose a non-choice field publicly even if `resultsField` is misconfigured.
+
+`fetchFormResults` is the client helper:
+
+```ts
+import { fetchFormResults } from '@10x-media/form-builder/react'
+
+const res = await fetchFormResults({ formId, field: 'colour' })
+if (res.ok) {
+  // res.results: FieldAggregation[]
+}
+```
+
+### `<Poll>`
+
+A turnkey poll renders `<Form>` until the visitor votes, then fetches results and shows `<FormResults>`. A per-browser localStorage flag skips straight to results on revisit.
+
+```tsx
+import { Poll } from '@10x-media/form-builder/react'
+
+<Poll form={form} resultsField="colour" />
+```
+
+For an SSR poll, aggregate server-side and choose what to render:
+
+```tsx
+// app/poll/[id]/page.tsx (server component)
+import { aggregateFieldResponses } from '@10x-media/form-builder'
+import { FormResults, Form } from '@10x-media/form-builder/react'
+
+export default async function PollPage({ params }) {
+  const form = await payload.findByID({ collection: 'forms', id: params.id })
+  const voted = (await cookies()).has(`voted-${form.id}`)
+  if (voted) {
+    const results = await aggregateFieldResponses({ payload, formId: form.id, field: 'colour' })
+    return <FormResults results={results ? [results] : []} />
+  }
+  return <Form form={form} />
+}
+```
+
+### One response per identity (dedup)
+
+The `<Poll>` localStorage guard is per-browser UX: it stops the same browser re-seeing the form, but it is bypassable and is not integrity. Server-enforced one-per-identity dedup composes with what already ships:
+
+- **Authenticated forms:** gate on `req.user` in a submissions hook or access rule.
+- **By a field value (such as email):** the built-in `notAlreadySubmitted` validation rule.
+
+Cookie and IP identity dedup arrives with the spam phase.
+
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)

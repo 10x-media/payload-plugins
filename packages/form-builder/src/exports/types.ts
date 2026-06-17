@@ -1,6 +1,21 @@
 export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from '../actions/defineAction'
 export type { ActionOption, ActionRegistry, ActionsConfig } from '../actions/registry'
 export type { ActionResult } from '../actions/runActions'
+export type {
+	AggregateFieldResponsesArgs,
+	AggregateFormResponsesArgs,
+} from '../aggregation/aggregateResponses'
+export type {
+	ResolveResultsRequestArgs,
+	ResolveResultsRequestResult,
+} from '../aggregation/resolveResultsRequest'
+export type {
+	AggregationBucket,
+	AggregationRow,
+	FieldAggregation,
+	FieldMeta,
+	SubmissionStatusFilter,
+} from '../aggregation/types'
 export type { CalcExpression } from '../calc/types'
 export type { FieldCondition } from '../conditions/types'
 export type { ConsentProof } from '../consent/captureConsent'
