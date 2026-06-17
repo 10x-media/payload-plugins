@@ -1,6 +1,7 @@
-import type { CollectionBeforeValidateHook, CollectionConfig } from 'payload'
+import type { CollectionBeforeValidateHook, CollectionConfig, PayloadRequest } from 'payload'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { ActionRegistry } from '../actions/registry'
+import { resolveFormResultsRequest } from '../aggregation/resolveResultsRequest'
 import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
@@ -88,6 +89,41 @@ export const buildFormsCollection = ({
 				})),
 				label: labelForKey(keys.configDefaultPresentation),
 				admin: { position: 'sidebar' },
+			},
+			{
+				name: 'showResults',
+				type: 'checkbox',
+				defaultValue: false,
+				label: labelForKey(keys.configShowResults),
+				admin: { position: 'sidebar' },
+			},
+			{
+				name: 'resultsField',
+				type: 'text',
+				label: labelForKey(keys.configResultsField),
+				admin: {
+					position: 'sidebar',
+					description:
+						'Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.',
+					condition: (data) => Boolean(data?.showResults),
+				},
+			},
+		],
+		endpoints: [
+			{
+				path: '/:id/results',
+				method: 'get',
+				handler: async (req: PayloadRequest) => {
+					const field = typeof req.query?.field === 'string' ? req.query.field : undefined
+					const { status, body } = await resolveFormResultsRequest({
+						payload: req.payload,
+						formId: req.routeParams?.id as number | string | undefined,
+						field,
+						isAuthed: Boolean(req.user),
+						req,
+					})
+					return Response.json(body, { status })
+				},
 			},
 		],
 	}

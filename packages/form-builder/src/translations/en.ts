@@ -114,4 +114,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.resultsResponses]: 'responses',
 	[keys.resultsNoResponses]: 'No responses yet',
 	[keys.resultsTruncated]: 'Showing a sample of responses',
+	[keys.configShowResults]: 'Show results publicly',
+	[keys.configResultsField]: 'Results field (machine name)',
 }

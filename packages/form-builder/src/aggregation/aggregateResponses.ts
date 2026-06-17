@@ -29,6 +29,9 @@ const optionsOf = (field: FormFieldInstance): { value: string; label: string }[]
 	return options.length > 0 ? options : undefined
 }
 
+/** True when a field declares non-empty options (a choice field safe to aggregate publicly). */
+export const fieldHasOptions = (field: FormFieldInstance): boolean => optionsOf(field) !== undefined
+
 const metaFor = (field: FormFieldInstance): FieldMeta => ({
 	field: field.name,
 	label: field.label ?? field.name,

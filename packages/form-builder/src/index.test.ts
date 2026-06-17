@@ -36,4 +36,10 @@ describe('formBuilder factory', () => {
 		expect(typeof moduleExports.aggregateFormResponses).toBe('function')
 		expect(typeof moduleExports.aggregateFieldResponses).toBe('function')
 	})
+
+	it('exports the results-request gating helper', async () => {
+		const moduleExports = await import('./index')
+		expect(typeof moduleExports.resolveFormResultsRequest).toBe('function')
+		expect(typeof moduleExports.fieldHasOptions).toBe('function')
+	})
 })

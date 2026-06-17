@@ -112,6 +112,8 @@ export const keys = {
 	resultsResponses: 'formBuilder:results.responses',
 	resultsNoResponses: 'formBuilder:results.noResponses',
 	resultsTruncated: 'formBuilder:results.truncated',
+	configShowResults: 'formBuilder:config.showResults',
+	configResultsField: 'formBuilder:config.resultsField',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -82,8 +82,14 @@ export type {
 export {
 	aggregateFieldResponses,
 	aggregateFormResponses,
+	fieldHasOptions,
 } from './aggregation/aggregateResponses'
 export { aggregateRowForField, aggregateRowsForFields } from './aggregation/aggregateRows'
+export type {
+	ResolveResultsRequestArgs,
+	ResolveResultsRequestResult,
+} from './aggregation/resolveResultsRequest'
+export { resolveFormResultsRequest } from './aggregation/resolveResultsRequest'
 export type {
 	AggregationBucket,
 	AggregationRow,
