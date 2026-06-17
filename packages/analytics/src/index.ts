@@ -49,4 +49,16 @@ export type {
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
 } from './core/options'
+export type {
+	AnalyticsFieldsOptions,
+	AnalyticsStatOptions,
+	AnalyticsStatRowOptions,
+	AnalyticsTabOptions,
+} from './fields/factories'
+export {
+	analyticsFields,
+	analyticsStat,
+	analyticsStatRow,
+	analyticsTab,
+} from './fields/factories'
 export type { TimeframePreset } from './timeframe/presets'

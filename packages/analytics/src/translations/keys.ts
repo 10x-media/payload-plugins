@@ -5,6 +5,7 @@
  */
 export const keys = {
 	pluginName: 'analytics:pluginName',
+	tabAnalytics: 'analytics:tabAnalytics',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
