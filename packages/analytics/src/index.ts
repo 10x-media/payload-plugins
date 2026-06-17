@@ -44,7 +44,12 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 	},
 })
 
-export type { AnalyticsBinding, BindingContext, PathResolver } from './binding/types'
+export type {
+	AnalyticsBinding,
+	BindingContext,
+	HostnameResolver,
+	PathResolver,
+} from './binding/types'
 export type {
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,

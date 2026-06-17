@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 import { resolveHostname, resolvePath } from '../binding/resolvePath'
 import type { BindingDoc } from '../binding/types'
 import { satisfiesCapabilities } from '../core/capabilities'
-import type { DateRange, MetricKey } from '../core/contract'
+import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
 import { getRuntime } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 
@@ -42,7 +42,12 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 	if (!binding) {
 		return { status: 'not-bound', adapterId: adapterId ?? '', dateRange, metrics: {} }
 	}
-	const adapter = adapterId ? runtime.registry.get(adapterId) : runtime.registry.default()
+	let adapter: AnalyticsAdapter
+	try {
+		adapter = adapterId ? runtime.registry.get(adapterId) : runtime.registry.default()
+	} catch {
+		return { status: 'unavailable', adapterId: adapterId ?? '', dateRange, metrics: {} }
+	}
 	const path = resolvePath(binding, data, { req, locale: req.locale ?? undefined })
 	if (!path) {
 		return { status: 'no-path', adapterId: adapter.id, dateRange, metrics: {} }

@@ -56,7 +56,7 @@ export default buildConfig({
 	plugins: [
 		analytics({
 			adapters: [native()],
-			collections: { pages: { path: (doc) => (doc.slug as string) ?? null } },
+			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
 		}),
 	],
 	telemetry: false,

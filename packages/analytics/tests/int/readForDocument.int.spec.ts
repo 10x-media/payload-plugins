@@ -89,4 +89,17 @@ describeForDb('analytics readForField', { dbs: ['mongo'] }, (db) => {
 		})
 		expect(result.status).toBe('unavailable')
 	})
+
+	it('returns unavailable for an unknown adapter id', async () => {
+		const result = await readForField({
+			req: req(),
+			collectionSlug: 'pages',
+			data: { slug: '/p' },
+			metrics: ['pageviews'],
+			timeframe: 'last30days',
+			adapterId: 'does-not-exist',
+			now: new Date(),
+		})
+		expect(result.status).toBe('unavailable')
+	})
 })
