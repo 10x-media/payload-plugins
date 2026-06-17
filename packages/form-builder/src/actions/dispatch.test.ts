@@ -23,7 +23,7 @@ const makeRecorderRegistry = (): { registry: ActionRegistry; ran: string[] } => 
 }
 
 describe('dispatchActions', () => {
-	describe('hasRunner: true — queued path', () => {
+	describe('hasRunner true (queued path)', () => {
 		it('calls payload.jobs.queue with the correct shape and returns without running inline', async () => {
 			const queue = vi.fn().mockResolvedValue(undefined)
 			const payload = { jobs: { queue } } as never
@@ -66,7 +66,7 @@ describe('dispatchActions', () => {
 		})
 	})
 
-	describe('hasRunner: false — inline path', () => {
+	describe('hasRunner false (inline path)', () => {
 		it('runs actions inline and does not call queue', async () => {
 			const queue = vi.fn()
 			const { registry, ran } = makeRecorderRegistry()

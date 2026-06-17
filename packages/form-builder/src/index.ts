@@ -61,6 +61,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 	},
 })
 
+export { defaultActionDefinitions } from './actions/builtin'
+export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
+export { defineAction } from './actions/defineAction'
+export type { ActionOption, ActionRegistry, ActionsConfig } from './actions/registry'
+export { resolveActions } from './actions/registry'
+export type { ActionResult } from './actions/runActions'
+export { SIGNATURE_HEADER, signPayload } from './actions/sign'
 export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
 export { evaluateCalc } from './calc/evaluate'
 export { normalizeCalc } from './calc/normalizeCalc'

@@ -55,16 +55,18 @@ export const dispatchActions = async (args: DispatchActionsArgs): Promise<void> 
 	}
 
 	const ms = args.deadlineMs ?? INLINE_DISPATCH_DEADLINE_MS
-	try {
-		await Promise.race([
-			runActionsForSubmission({ input: { formId, submissionId }, registry, payload, req }),
-			deadline(ms),
-		])
-	} catch (error) {
+	// Guard the action arm itself (not just the race) so a rejection AFTER the deadline wins is never an unhandled rejection.
+	const work = runActionsForSubmission({
+		input: { formId, submissionId },
+		registry,
+		payload,
+		req,
+	}).catch((error) => {
 		payload.logger?.error(
 			`@10x-media/form-builder: inline action dispatch for submission ${String(submissionId)} threw: ${
 				error instanceof Error ? error.message : String(error)
 			}`
 		)
-	}
+	})
+	await Promise.race([work, deadline(ms)])
 }

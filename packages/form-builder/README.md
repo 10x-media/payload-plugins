@@ -822,6 +822,118 @@ import { computeCalcFields } from '@10x-media/form-builder/react'
 const updatedValues = computeCalcFields(fields, currentValues)
 ```
 
+## Post-submit actions and events
+
+### Action pipeline
+
+When a form submission is saved, the plugin runs the form's configured action blocks in order. Three built-in action types ship out of the box:
+
+- **emailTeam**: sends an email to one or more addresses via `payload.sendEmail`. Subject and body are recall templates (`{{field}}`); for example, `"New submission: {{name}}"` resolves against the submission values. The plugin calls `payload.sendEmail` directly -- configure a Payload email adapter to make it work; when no adapter is configured it no-ops gracefully.
+- **confirmation**: sends a confirmation email to the submitter. Same recall-template syntax.
+- **signedWebhook**: POSTs the submission as JSON to a URL with an HMAC-SHA256 signature header. See Signed webhook below.
+
+Custom action types are registered via `defineAction`:
+
+```ts
+import { defineAction } from '@10x-media/form-builder'
+import type { TextField } from 'payload'
+
+const slackNotify = defineAction({
+  type: 'slackNotify',
+  label: 'Notify Slack channel',
+  config: [
+    { name: 'webhookUrl', type: 'text', required: true } as TextField,
+    { name: 'message', type: 'text' } as TextField,
+  ],
+  run: async ({ values, config }) => {
+    const body = config.message ?? values.map((v) => `${v.label}: ${v.value}`).join('\n')
+    await fetch(config.webhookUrl as string, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: body }),
+    })
+  },
+})
+
+formBuilder({ actions: { slackNotify } })
+```
+
+The `config` fields become an authoring block inside the form editor. `run` receives the submission values, the stored config, `payload`, and a translate helper.
+
+### Plugin option and per-form blocks
+
+The plugin accepts an `actions` option following the same `false | true | object` convention as fields and validations:
+
+```ts
+formBuilder({
+  actions: {
+    emailTeam: true,      // keep built-in
+    confirmation: false,  // remove built-in
+    slackNotify,          // add custom
+  },
+})
+```
+
+Forms then expose an **Actions** blocks array in the admin. Editors add one or more action blocks per form and fill in each block's `config` fields. Actions run in the order they appear.
+
+### Run model
+
+Actions run as Payload jobs when a job runner is present (`config.jobs.autoRun: true` or the `@10x-media/jobs` plugin). When no job runner is detected, a bounded inline fallback runs them synchronously after the submission row is stored. Either way, an action error never fails the submission: each action is isolated, and a failure is captured as a failed `ActionResult` and logged rather than re-thrown.
+
+### Signed webhook
+
+The `signedWebhook` action POSTs the submission body as JSON and attaches an `X-Form-Signature` header:
+
+```
+X-Form-Signature: v1=<hex>
+```
+
+The signature is HMAC-SHA256 over the raw JSON body (the body alone, not a timestamp-prefixed string). To verify on the receiving end:
+
+```ts
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
+function verifyFormSignature(rawBody: string, secret: string, header: string): boolean {
+  const expected = `v1=${createHmac('sha256', secret).update(rawBody).digest('hex')}`
+  const a = Buffer.from(header)
+  const b = Buffer.from(expected)
+  // Constant-time compare (avoid a timing side-channel); length guard first since timingSafeEqual requires equal lengths.
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+```
+
+This header is intentionally distinct from `@10x-media/webhooks`' `X-Webhook-Signature` (which signs `timestamp.body`) so a receiver cannot mistake the two schemes.
+
+`signPayload` and `SIGNATURE_HEADER` are exported from the root entry point for consumers who need to verify manually.
+
+### Lifecycle events
+
+The plugin emits typed lifecycle events through the `events` sink (a `FormEventSink` passed to `formBuilder({ events })`). The sink is a no-op by default; analytics adapters and the future automations plugin subscribe here.
+
+The full event taxonomy:
+
+| Event | Emitter | When |
+|---|---|---|
+| `form.viewed` | renderer (client) | form mounts |
+| `form.started` | renderer (client) | first field interaction |
+| `step.viewed` | renderer (client) | multi-step: step becomes active |
+| `step.completed` | renderer (client) | multi-step: step passes validation |
+| `field.errored` | renderer (client) | a field receives a validation error |
+| `form.abandoned` | renderer (client) | component unmounts without a successful submission |
+| `submission.created` | server | submission row saved and actions dispatched |
+
+`form.viewed` through `form.abandoned` are emitted by the `<Form>` component. `submission.created` is emitted by the server `afterChange` hook.
+
+Types are exported from `@10x-media/form-builder/types`:
+
+```ts
+import type { FormEvent, FormEventSink } from '@10x-media/form-builder/types'
+```
+
+### Deferred
+
+Conditional notifications (only send an action when a condition is met) are planned for v1.x.
+
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)
