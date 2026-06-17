@@ -14,6 +14,7 @@ type RegisterCollectionsArgs = {
 	ruleRegistry: ValidationRuleRegistry
 	presentationRegistry: PresentationDescriptorRegistry
 	actionRegistry: ActionRegistry
+	hasJobsPlugin: boolean
 	events?: FormEventSink
 }
 
@@ -23,10 +24,11 @@ export const registerCollections = ({
 	ruleRegistry,
 	presentationRegistry,
 	actionRegistry,
+	hasJobsPlugin,
 	events,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry)
-	const hasRunner = Boolean(config.jobs?.autoRun)
+	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
 	config.collections = [
 		...(config.collections ?? []),
 		buildFormsCollection({ registry, ruleRegistry, presentationRegistry, actionRegistry }),

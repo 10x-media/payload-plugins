@@ -36,7 +36,7 @@ declare module 'payload' {
 export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 	slug: '@10x-media/form-builder',
 	order: 50,
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config, plugins, ...options }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -54,6 +54,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			ruleRegistry,
 			presentationRegistry,
 			actionRegistry,
+			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
 			events: options.events,
 		})
 		return config
