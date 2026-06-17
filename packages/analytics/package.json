@@ -105,15 +105,22 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@google-analytics/data": "^6.0.0",
 		"@payloadcms/ui": "^3.82.0",
 		"payload": "^3.82.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
+	"peerDependenciesMeta": {
+		"@google-analytics/data": {
+			"optional": true
+		}
+	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
+		"@google-analytics/data": "^6.1.0",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/ui": "catalog:",
