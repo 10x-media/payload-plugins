@@ -12,6 +12,7 @@ import {
 	useRef,
 	useState,
 } from 'react'
+import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { noopEventSink } from '../events/noopSink'
 import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
@@ -109,6 +110,27 @@ const FieldHost = ({ field, renderer, locale, t }: FieldHostProps) => {
 	})
 }
 
+type CalcFieldHostProps = FieldHostProps & { value: unknown }
+
+/** Hosts a derived (calc) field: read-only, value supplied from `effectiveValues`, never bound via `useField`. */
+const CalcFieldHost = ({ field, renderer, value, locale, t }: CalcFieldHostProps) => {
+	const id = useId()
+	return createElement(renderer, {
+		field,
+		id,
+		name: field.name,
+		value,
+		onChange: () => {},
+		onBlur: () => {},
+		errors: [],
+		warnings: [],
+		required: false,
+		disabled: true,
+		locale,
+		t,
+	})
+}
+
 /** The headless form controller: state, progressive client validation, conditional visibility, submission, events. */
 export const Form = ({
 	form,
@@ -167,16 +189,23 @@ export const Form = ({
 		})
 	)
 
+	// Authoritative values for derived (calc) fields, recomputed from user answers on every change. The
+	// server recomputes these too at submit; the client copy drives the live calc renderer, recall, and submit.
+	const effectiveValues = useMemo(
+		() => computeCalcFields(form.fields, state.values),
+		[form.fields, state.values]
+	)
+
 	const recall = useMemo(
 		() =>
 			buildRecallResolver({
 				fields: form.fields,
-				values: state.values,
+				values: effectiveValues,
 				registry,
 				locale,
 				t: translate,
 			}),
-		[form.fields, state.values, registry, locale, translate]
+		[form.fields, effectiveValues, registry, locale, translate]
 	)
 
 	// Multi-step is active only when a flow declares two or more steps; otherwise this is an ordinary single-step form.
@@ -241,18 +270,20 @@ export const Form = ({
 			return
 		}
 		const results = await Promise.all(
-			stepVisible.map(async (field) => ({
-				field,
-				...(await validateFieldValue({
+			stepVisible
+				.filter((field) => !calcExpressionOf(field))
+				.map(async (field) => ({
 					field,
-					value: state.values[field.name],
-					registry,
-					ruleRegistry,
-					answers: state.values,
-					locale,
-					t: translate,
-				})),
-			}))
+					...(await validateFieldValue({
+						field,
+						value: state.values[field.name],
+						registry,
+						ruleRegistry,
+						answers: state.values,
+						locale,
+						t: translate,
+					})),
+				}))
 		)
 		let hasError = false
 		for (const result of results) {
@@ -317,18 +348,21 @@ export const Form = ({
 		event.preventDefault()
 		const visible = visibleFields(form.fields, state.values)
 		const results = await Promise.all(
-			visible.map(async (field) => ({
-				field,
-				...(await validateFieldValue({
+			// Calc fields carry no rules and have no input; they are always satisfied, so skip validating them.
+			visible
+				.filter((field) => !calcExpressionOf(field))
+				.map(async (field) => ({
 					field,
-					value: state.values[field.name],
-					registry,
-					ruleRegistry,
-					answers: state.values,
-					locale,
-					t: translate,
-				})),
-			}))
+					...(await validateFieldValue({
+						field,
+						value: state.values[field.name],
+						registry,
+						ruleRegistry,
+						answers: state.values,
+						locale,
+						t: translate,
+					})),
+				}))
 		)
 		const errors: FieldErrors = {}
 		const warnings: FieldErrors = {}
@@ -355,8 +389,8 @@ export const Form = ({
 		submittingRef.current = true
 		rawDispatch({ type: 'SUBMIT_START' })
 		const values: SubmissionValue[] = visible
-			.filter((field) => !isEmpty(state.values[field.name]))
-			.map((field) => ({ field: field.name, value: state.values[field.name] }))
+			.filter((field) => !isEmpty(effectiveValues[field.name]))
+			.map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
 		const result: SubmitFormResult = onSubmit
 			? await onSubmit({ formId: form.id, values })
 			: await submitForm({ formId: form.id, values, apiRoute })
@@ -457,7 +491,9 @@ export const Form = ({
 		)
 	}
 
-	const rendered = (flow ? stepVisible : visible).filter((field) => field.hidden !== true)
+	const rendered = (flow ? stepVisible : visible).filter(
+		(field) => field.hidden !== true && field.calcDisplay !== false
+	)
 
 	return (
 		<FormContext.Provider value={contextValue}>
@@ -482,12 +518,22 @@ export const Form = ({
 							const recalledField = applyRecall(field, recall)
 							return (
 								<div key={field.name} {...widthProps(width)}>
-									<FieldHost
-										field={recalledField}
-										renderer={renderer}
-										locale={locale}
-										t={translate}
-									/>
+									{calcExpressionOf(field) ? (
+										<CalcFieldHost
+											field={recalledField}
+											renderer={renderer}
+											value={effectiveValues[field.name]}
+											locale={locale}
+											t={translate}
+										/>
+									) : (
+										<FieldHost
+											field={recalledField}
+											renderer={renderer}
+											locale={locale}
+											t={translate}
+										/>
+									)}
 								</div>
 							)
 						})}

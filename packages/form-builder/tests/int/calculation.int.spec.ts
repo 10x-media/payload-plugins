@@ -61,4 +61,42 @@ describeForDb('form-builder calculation field', { dbs: ['mongo'] }, (db) => {
 		)
 		expect(field?.expression).toBeUndefined()
 	})
+
+	it('stores the server-computed calc value, ignoring any client-sent value', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Calc trust boundary',
+				fields: [
+					{ blockType: 'number', name: 'a' },
+					{
+						blockType: 'calculation',
+						name: 'total',
+						expression: {
+							type: 'op',
+							op: '*',
+							left: { type: 'ref', field: 'a' },
+							right: { type: 'lit', value: 2 },
+						},
+					},
+				],
+			},
+		})
+
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			data: {
+				form: form.id,
+				values: [
+					{ field: 'a', value: 21 },
+					{ field: 'total', value: 999 },
+				],
+			},
+		})
+
+		const values = submission.values as { field: string; value: unknown }[]
+		const total = values.find((entry) => entry.field === 'total')
+		expect(total?.value).toBe(42)
+		expect(total?.value).not.toBe(999)
+	})
 })

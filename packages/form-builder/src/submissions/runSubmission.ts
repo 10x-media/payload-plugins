@@ -1,4 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
+import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { Translate } from '../fields/types'
@@ -70,8 +71,10 @@ export type RunSubmissionResult = {
  * facet, declarative rules), snapshotting a localized descriptor per answered field. Conditions gate
  * the second pass against the coerced answers: a field whose `visibleWhen` is false is skipped entirely
  * (never validated, never stored, so a client-sent value for it is ignored), and a visible field whose
- * `validateWhen` is false stores its value but skips validation. Only `error` severity blocks; warnings
- * are computed but not surfaced server-side (the Phase 4 renderer shows them).
+ * `validateWhen` is false stores its value but skips validation. Calc fields are the trust boundary: a
+ * visible calc field stores the value derived from its expression over the coerced answers, never the
+ * client-sent value, and is never validated. Only `error` severity blocks; warnings are computed but not
+ * surfaced server-side (the Phase 4 renderer shows them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
 	const { fields, values, registry, ruleRegistry, locale, t, operation, req, payload, formId } =
@@ -91,6 +94,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		coercedByName.set(instance.name, value)
 	}
 
+	const effective = computeCalcFields(fields, coercedAnswers)
+
 	const errors: SubmissionFieldError[] = []
 	const outValues: SubmissionValue[] = []
 	const descriptors: SubmissionDescriptor[] = []
@@ -104,6 +109,17 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		const value = coercedByName.has(instance.name) ? coercedByName.get(instance.name) : raw
 
 		if (!evaluateCondition(instance.visibleWhen, coercedAnswers)) {
+			continue
+		}
+
+		// A calc field's value is server-derived and always valid: skip validation and the client value entirely, storing the computed result.
+		if (calcExpressionOf(instance)) {
+			outValues.push({ field: instance.name, value: effective[instance.name] })
+			descriptors.push({
+				field: instance.name,
+				label: instance.label ?? instance.name,
+				fieldType: instance.blockType,
+			})
 			continue
 		}
 

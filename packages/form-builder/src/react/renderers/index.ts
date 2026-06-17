@@ -1,4 +1,5 @@
 import type { FieldRenderer } from '../contract'
+import { calculationRenderer } from './calculation'
 import { checkboxRenderer } from './checkbox'
 import { emailRenderer } from './email'
 import { numberRenderer } from './number'
@@ -14,4 +15,5 @@ export const defaultRenderers: Record<string, FieldRenderer> = {
 	number: numberRenderer as FieldRenderer,
 	select: selectRenderer as FieldRenderer,
 	checkbox: checkboxRenderer as FieldRenderer,
+	calculation: calculationRenderer as FieldRenderer,
 }
