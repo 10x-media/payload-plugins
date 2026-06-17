@@ -73,6 +73,8 @@ export type FormProps = {
 	onClose?: () => void
 	/** Accessible name for an overlay surface. */
 	title?: string
+	/** Seed initial field values (e.g. from `valuesFromSearchParams`). Still validated on submit. */
+	initialValues?: Record<string, unknown>
 	/** Custom layout: render fields with `useField`/`useFormState` instead of the auto-rendered field loop. */
 	children?: ReactNode
 }
@@ -130,6 +132,7 @@ export const Form = ({
 	presentations,
 	onClose,
 	title,
+	initialValues,
 	children,
 }: FormProps) => {
 	const registry = useMemo(() => buildFieldTypeRegistry(fieldTypes), [fieldTypes])
@@ -158,7 +161,10 @@ export const Form = ({
 	formIdRef.current = String(form.id)
 
 	const [state, rawDispatch] = useReducer(formReducer, form.fields, (fields) =>
-		initialFormState(Object.fromEntries(fields.map((field) => [field.name, undefined])))
+		initialFormState({
+			...Object.fromEntries(fields.map((field) => [field.name, undefined])),
+			...(initialValues ?? {}),
+		})
 	)
 
 	const recall = useMemo(
