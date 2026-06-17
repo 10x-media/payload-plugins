@@ -71,6 +71,16 @@
 			"development": "./src/exports/adapters/umami.ts",
 			"types": "./src/exports/adapters/umami.ts",
 			"default": "./dist/exports/adapters/umami.js"
+		},
+		"./adapters/ga4": {
+			"development": "./src/exports/adapters/ga4.ts",
+			"types": "./src/exports/adapters/ga4.ts",
+			"default": "./dist/exports/adapters/ga4.js"
+		},
+		"./adapters/posthog": {
+			"development": "./src/exports/adapters/posthog.ts",
+			"types": "./src/exports/adapters/posthog.ts",
+			"default": "./dist/exports/adapters/posthog.js"
 		}
 	},
 	"files": [
@@ -191,6 +201,16 @@
 				"types": "./dist/exports/adapters/umami.d.ts",
 				"import": "./dist/exports/adapters/umami.js",
 				"default": "./dist/exports/adapters/umami.js"
+			},
+			"./adapters/ga4": {
+				"types": "./dist/exports/adapters/ga4.d.ts",
+				"import": "./dist/exports/adapters/ga4.js",
+				"default": "./dist/exports/adapters/ga4.js"
+			},
+			"./adapters/posthog": {
+				"types": "./dist/exports/adapters/posthog.d.ts",
+				"import": "./dist/exports/adapters/posthog.js",
+				"default": "./dist/exports/adapters/posthog.js"
 			}
 		}
 	}

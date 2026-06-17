@@ -12,6 +12,8 @@ export default defineConfig({
 		'exports/adapters/native': 'src/exports/adapters/native.ts',
 		'exports/adapters/plausible': 'src/exports/adapters/plausible.ts',
 		'exports/adapters/umami': 'src/exports/adapters/umami.ts',
+		'exports/adapters/ga4': 'src/exports/adapters/ga4.ts',
+		'exports/adapters/posthog': 'src/exports/adapters/posthog.ts',
 	},
 	format: 'esm',
 	dts: true,

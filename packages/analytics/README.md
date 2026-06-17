@@ -191,4 +191,38 @@ analytics({ adapters: [umami({ websiteId: 'xxxx', token: process.env.UMAMI_TOKEN
 
 Supported metrics: pageviews, visitors, visits, sessions, bounceRate (derived), avgDuration (derived). A `page` dimension breakdown maps to Umami's `/metrics?type=url`.
 
-Both adapters auto-disable any surface whose required metric they do not provide, and degrade to an empty state when unconfigured (no network calls). GA4 and PostHog adapters land in a later release.
+### GA4
+
+```ts
+import { ga4 } from '@10x-media/analytics/adapters/ga4'
+
+analytics({
+  adapters: [
+    ga4({
+      propertyId: '123456789',
+      credentials: {
+        client_email: process.env.GA4_CLIENT_EMAIL!,
+        private_key: process.env.GA4_PRIVATE_KEY!,
+      },
+    }),
+  ],
+})
+```
+
+Uses the GA4 Data API (`runReport`) via the official `@google-analytics/data` SDK, declared as an **optional peer dependency** and loaded lazily, so only GA4 sites install it (`pnpm add @google-analytics/data`). Supported metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, conversions, revenue. Durations are normalized to milliseconds and bounce rate to a percentage. GA4 bills a token quota, so the adapter recommends a long cache TTL.
+
+### PostHog
+
+```ts
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+
+analytics({
+  adapters: [
+    posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY! }),
+  ],
+})
+```
+
+Derives web metrics with HogQL through the Query API. Pass `host` for EU Cloud (`https://eu.posthog.com`) or a self-hosted instance; US Cloud is the default. The API key is a personal API key with the "Query Read" scope. Supported metrics: pageviews, visitors, visits, sessions. A `page` dimension returns a top-pages breakdown.
+
+All provider adapters auto-disable any surface whose required metric they do not provide, and degrade to an empty state when unconfigured (no network calls).
