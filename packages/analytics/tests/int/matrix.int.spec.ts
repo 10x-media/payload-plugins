@@ -1,9 +1,12 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { Config } from 'payload'
+import type { Config, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import { readForField } from '../../src/fields/readForDocument'
 import { analytics } from '../../src/index'
 import { ROLLUPS_SLUG, rollupsCollection } from '../../src/native/collections/rollups'
 import { SEEN_SLUG, seenCollection } from '../../src/native/collections/seen'
+import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
+import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { native } from '../../src/native/nativeAdapter'
@@ -248,5 +251,50 @@ describeForDb('native flushBatch coalescing', {}, (db) => {
 		const row = docs[0] as { pageviews: number; visitors: number } | undefined
 		expect(row?.pageviews).toBe(2)
 		expect(row?.visitors).toBe(1)
+	})
+})
+
+describeForDb('analytics per-document read', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native()],
+				collections: { pages: { path: (doc) => (doc.slug as string) ?? null } },
+			}),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const ingest = (path: string) =>
+		makeIngestHandler(platformHeaderResolver)({
+			payload: booted.payload,
+			headers: new Headers({
+				'content-type': 'application/json',
+				'user-agent': 'UA',
+				'x-vercel-ip-country': 'US',
+			}),
+			json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 200 }),
+		} as never)
+
+	it(`reads per-document totals through the engine on ${db}`, async () => {
+		await ingest('/matrix-doc')
+		await ingest('/matrix-doc')
+		const result = await readForField({
+			req: { payload: booted.payload, locale: undefined } as unknown as PayloadRequest,
+			collectionSlug: 'pages',
+			data: { slug: '/matrix-doc' },
+			metrics: ['pageviews', 'visitors'],
+			timeframe: 'last30days',
+			now: new Date(),
+		})
+		expect(result.status).toBe('ok')
+		expect(result.metrics.pageviews).toBe(2)
+		expect(result.metrics.visitors).toBe(1)
 	})
 })
