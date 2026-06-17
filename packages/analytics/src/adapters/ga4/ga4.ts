@@ -110,6 +110,8 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 			Boolean(
 				config.propertyId && config.credentials?.client_email && config.credentials?.private_key
 			),
+		// The gRPC SDK's gax CallOptions has no AbortSignal field, so ctx.signal cannot be
+		// forwarded; gax cancellation uses the call's own handle, not our signal.
 		async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
