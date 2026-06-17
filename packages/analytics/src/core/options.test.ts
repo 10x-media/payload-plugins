@@ -12,3 +12,31 @@ describe('resolveOptions', () => {
 		expect(() => resolveOptions({ adapters: [] })).toThrow(/at least one adapter/i)
 	})
 })
+
+describe('resolveOptions bindings', () => {
+	const adapter = memoryAdapter()
+
+	it('defaults bindings to an empty object', () => {
+		expect(resolveOptions({ adapters: [adapter] }).bindings).toEqual({})
+	})
+
+	it('passes through a resolver binding', () => {
+		const path = (doc: Record<string, unknown>) => `/${doc.slug as string}`
+		const resolved = resolveOptions({ adapters: [adapter], collections: { pages: { path } } })
+		expect(resolved.bindings.pages?.path).toBe(path)
+	})
+
+	it('accepts a pathField-only binding', () => {
+		const resolved = resolveOptions({
+			adapters: [adapter],
+			collections: { posts: { pathField: 'permalink' } },
+		})
+		expect(resolved.bindings.posts?.pathField).toBe('permalink')
+	})
+
+	it('throws when a binding has neither path nor pathField', () => {
+		expect(() => resolveOptions({ adapters: [adapter], collections: { pages: {} } })).toThrow(
+			/pages.*path.*pathField/i
+		)
+	})
+})
