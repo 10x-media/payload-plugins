@@ -96,4 +96,13 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigSecret]: 'Secret',
 	[keys.configActions]: 'Actions',
+	[keys.consentSourceStatic]: 'Static text',
+	[keys.consentSourcePageReference]: 'Page reference',
+	[keys.consentConfigLabel]: 'Label',
+	[keys.consentConfigUrl]: 'URL',
+	[keys.consentConfigVersion]: 'Version',
+	[keys.consentConfigRelationTo]: 'Collection',
+	[keys.consentConfigDocId]: 'Document ID',
+	[keys.consentConfigUrlField]: 'URL field',
+	[keys.consentConfigCaptureVersion]: 'Capture published version',
 }

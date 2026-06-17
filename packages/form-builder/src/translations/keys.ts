@@ -94,6 +94,15 @@ export const keys = {
 	actionConfigUrl: 'formBuilder:action.config.url',
 	actionConfigSecret: 'formBuilder:action.config.secret',
 	configActions: 'formBuilder:config.actions',
+	consentSourceStatic: 'formBuilder:consentSource.static',
+	consentSourcePageReference: 'formBuilder:consentSource.pageReference',
+	consentConfigLabel: 'formBuilder:consent.config.label',
+	consentConfigUrl: 'formBuilder:consent.config.url',
+	consentConfigVersion: 'formBuilder:consent.config.version',
+	consentConfigRelationTo: 'formBuilder:consent.config.relationTo',
+	consentConfigDocId: 'formBuilder:consent.config.docId',
+	consentConfigUrlField: 'formBuilder:consent.config.urlField',
+	consentConfigCaptureVersion: 'formBuilder:consent.config.captureVersion',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
