@@ -2,6 +2,9 @@ import { type Config, definePlugin } from 'payload'
 import { defaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
+import { defaultConsentSources } from './consent/builtin'
+import type { ConsentSourcesConfig } from './consent/registry'
+import { resolveConsentSources } from './consent/registry'
 import type { FormEventSink } from './events/types'
 import { defaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
@@ -25,6 +28,8 @@ export type FormBuilderPluginOptions = {
 	rules?: ValidationRulesConfig
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	actions?: ActionsConfig
+	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
+	consentSources?: ConsentSourcesConfig
 }
 
 declare module 'payload' {
@@ -42,6 +47,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
 		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
+		const consentRegistry = resolveConsentSources(defaultConsentSources, options.consentSources)
 		const presentationRegistry = resolvePresentationDescriptors(
 			defaultPresentationDescriptors,
 			options.presentations
@@ -52,6 +58,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			config,
 			registry,
 			ruleRegistry,
+			consentRegistry,
 			presentationRegistry,
 			actionRegistry,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),

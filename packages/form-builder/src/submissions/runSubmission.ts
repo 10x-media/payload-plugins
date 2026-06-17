@@ -1,6 +1,9 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
+import type { ConsentProof } from '../consent/captureConsent'
+import { captureConsent } from '../consent/captureConsent'
+import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { Translate } from '../fields/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -46,11 +49,14 @@ const optionLabelsFor = (instance: FormFieldInstance): Record<string, string> | 
 	return Object.keys(map).length > 0 ? map : undefined
 }
 
+export type ConsentProofEntry = { field: string } & ConsentProof
+
 export type RunSubmissionInput = {
 	fields: FormFieldInstance[]
 	values: SubmissionValue[]
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	consentRegistry: ConsentSourceRegistry
 	locale: string
 	t: Translate
 	operation: 'create' | 'update'
@@ -63,6 +69,7 @@ export type RunSubmissionResult = {
 	errors: SubmissionFieldError[]
 	values: SubmissionValue[]
 	descriptors: SubmissionDescriptor[]
+	consent: ConsentProofEntry[]
 }
 
 /**
@@ -78,8 +85,19 @@ export type RunSubmissionResult = {
  * blocks; warnings are computed but not surfaced server-side (the Phase 4 renderer shows them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
-	const { fields, values, registry, ruleRegistry, locale, t, operation, req, payload, formId } =
-		input
+	const {
+		fields,
+		values,
+		registry,
+		ruleRegistry,
+		consentRegistry,
+		locale,
+		t,
+		operation,
+		req,
+		payload,
+		formId,
+	} = input
 	const incoming = new Map(values.map((entry) => [entry.field, entry.value]))
 
 	const coercedAnswers: Record<string, unknown> = {}
@@ -88,10 +106,16 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		const definition = registry.get(instance.blockType)
 		const raw = incoming.get(instance.name)
 		// Never seed a calc field's client value: its value is derived below, so the client cannot influence it (even for a self-referencing expression).
-		if (!definition || calcExpressionOf(instance) || isEmpty(raw)) {
+		if (!definition || calcExpressionOf(instance)) {
 			continue
 		}
-		const value = coerce(definition.value, raw)
+		// A consent field's "not agreed" state is semantically meaningful: treat a missing value as
+		// `false` so the intrinsic validate can enforce required-agreement (not optional = must be true).
+		const effectiveRaw = instance.blockType === 'consent' && isEmpty(raw) ? false : raw
+		if (isEmpty(effectiveRaw)) {
+			continue
+		}
+		const value = coerce(definition.value, effectiveRaw)
 		coercedAnswers[instance.name] = value
 		coercedByName.set(instance.name, value)
 	}
@@ -102,6 +126,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 	const errors: SubmissionFieldError[] = []
 	const outValues: SubmissionValue[] = []
 	const descriptors: SubmissionDescriptor[] = []
+	const consentProofs: ConsentProofEntry[] = []
+	const now = new Date().toISOString()
 
 	for (const instance of fields) {
 		const definition = registry.get(instance.blockType)
@@ -152,6 +178,20 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 			}
 		}
 
+		if (instance.blockType === 'consent' && payload) {
+			const proof = await captureConsent({
+				field: instance,
+				agreed: value === true,
+				registry: consentRegistry,
+				payload,
+				req,
+				locale,
+				now,
+			})
+			consentProofs.push({ field: instance.name, ...proof })
+			continue
+		}
+
 		if (isEmpty(raw)) {
 			continue
 		}
@@ -166,5 +206,5 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		})
 	}
 
-	return { errors, values: outValues, descriptors }
+	return { errors, values: outValues, descriptors, consent: consentProofs }
 }

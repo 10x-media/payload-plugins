@@ -8,8 +8,16 @@ import type { FormFieldInstance } from './types'
 
 const registry = buildRegistry(defaultFieldDefinitions)
 const ruleRegistry = buildRuleRegistry(defaultValidationRules)
+const consentRegistry = new Map()
 const t = (key: string) => key
-const base = { registry, ruleRegistry, locale: 'en', t, operation: 'create' as const }
+const base = {
+	registry,
+	ruleRegistry,
+	consentRegistry,
+	locale: 'en',
+	t,
+	operation: 'create' as const,
+}
 
 describe('runSubmission', () => {
 	it('validates required and email, snapshots descriptors, returns typed values', async () => {

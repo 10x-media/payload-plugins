@@ -1,6 +1,7 @@
 import { type CollectionBeforeValidateHook, ValidationError } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
+import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { asFieldTranslate } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -12,11 +13,13 @@ import type { FormFieldInstance, SubmissionValue } from './types'
  * field's required check, intrinsic validator, and declarative rules through `runSubmission`, threading
  * `req`/`payload` so server-only async rules can hit the DB, and throws a Payload `ValidationError` with
  * per-field paths on any error-severity failure. The client is never trusted.
+ * Consent fields are captured into `result.consent` (array of proofs, one per visible consent field).
  */
 export const validateSubmission =
 	(
 		registry: FieldTypeRegistry,
-		ruleRegistry: ValidationRuleRegistry
+		ruleRegistry: ValidationRuleRegistry,
+		consentRegistry: ConsentSourceRegistry
 	): CollectionBeforeValidateHook =>
 	async ({ data, operation, req }) => {
 		if (operation !== 'create' || !data) {
@@ -45,6 +48,7 @@ export const validateSubmission =
 			values: incoming,
 			registry,
 			ruleRegistry,
+			consentRegistry,
 			locale,
 			t,
 			operation: 'create',
@@ -59,6 +63,7 @@ export const validateSubmission =
 
 		data.values = result.values
 		data.descriptors = result.descriptors
+		data.consent = result.consent.length > 0 ? result.consent : undefined
 		data.locale = locale
 		return data
 	}

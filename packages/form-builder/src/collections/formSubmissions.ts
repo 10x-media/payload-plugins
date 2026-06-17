@@ -2,6 +2,7 @@ import type { CollectionAfterChangeHook, CollectionConfig } from 'payload'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
+import type { ConsentSourceRegistry } from '../consent/registry'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
@@ -14,6 +15,7 @@ export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 type BuildSubmissionsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	consentRegistry: ConsentSourceRegistry
 	actionRegistry?: ActionRegistry
 	events?: FormEventSink
 	/** Whether a job runner is likely present; gates the queued vs bounded-inline dispatch path. */
@@ -98,6 +100,7 @@ const makeAfterChange =
 export const buildSubmissionsCollection = ({
 	registry,
 	ruleRegistry,
+	consentRegistry,
 	actionRegistry = new Map(),
 	events,
 	hasRunner = false,
@@ -111,7 +114,7 @@ export const buildSubmissionsCollection = ({
 		update: () => false,
 	},
 	hooks: {
-		beforeValidate: [validateSubmission(registry, ruleRegistry)],
+		beforeValidate: [validateSubmission(registry, ruleRegistry, consentRegistry)],
 		afterChange: [makeAfterChange({ actionRegistry, events, hasRunner })],
 	},
 	fields: [
