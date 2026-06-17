@@ -103,6 +103,11 @@ export const keys = {
 	consentConfigDocId: 'formBuilder:consent.config.docId',
 	consentConfigUrlField: 'formBuilder:consent.config.urlField',
 	consentConfigCaptureVersion: 'formBuilder:consent.config.captureVersion',
+	fieldTypeConsent: 'formBuilder:fieldType.consent',
+	consentConfigStatement: 'formBuilder:consent.config.statement',
+	consentConfigSource: 'formBuilder:consent.config.source',
+	consentConfigSourceConfig: 'formBuilder:consent.config.sourceConfig',
+	consentConfigOptional: 'formBuilder:consent.config.optional',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

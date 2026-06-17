@@ -105,4 +105,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.consentConfigDocId]: 'Document ID',
 	[keys.consentConfigUrlField]: 'URL field',
 	[keys.consentConfigCaptureVersion]: 'Capture published version',
+	[keys.fieldTypeConsent]: 'Consent',
+	[keys.consentConfigStatement]: 'Statement',
+	[keys.consentConfigSource]: 'Source',
+	[keys.consentConfigSourceConfig]: 'Source settings',
+	[keys.consentConfigOptional]: 'Optional (e.g. marketing)',
 }
