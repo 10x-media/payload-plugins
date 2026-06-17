@@ -1,9 +1,10 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { Field } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
+import type { FileRef } from '../uploads/types'
 
 /** The stored value shapes a field type can declare. Drives `validate`/`format` typing and value coercion. */
-export type FormFieldValueKind = 'text' | 'number' | 'boolean' | 'date' | 'text[]'
+export type FormFieldValueKind = 'text' | 'number' | 'boolean' | 'date' | 'text[]' | 'file'
 
 export type ValueKindTypeMap = {
 	text: string
@@ -11,6 +12,7 @@ export type ValueKindTypeMap = {
 	boolean: boolean
 	date: string
 	'text[]': string[]
+	file: FileRef
 }
 
 export type ValueOfKind<K extends FormFieldValueKind> = ValueKindTypeMap[K]
