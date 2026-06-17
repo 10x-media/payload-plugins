@@ -162,3 +162,33 @@ fields: [
 Every factory accepts an optional `timeframe` (a relative preset: `today`, `last7days`, `last30days`, `last90days`, `thisMonth`, `thisYear`; default `last30days`) and `adapter` (an adapter id, when more than one is configured). The native engine backs `pageviews`, `visitors`, `sessions`, `events`, and `avgDuration`; fields requesting anything else render a muted "not available" state until a provider that supports it is configured.
 
 The display components are server components; add `@10x-media/analytics/rsc` to your Payload import map (run `payload generate:importmap`) so the admin can resolve them.
+
+## Provider adapters
+
+Third-party providers implement the same `AnalyticsAdapter` contract and ship as code-split subpaths, so a site installs only what it uses.
+
+### Plausible
+
+```ts
+import { plausible } from '@10x-media/analytics/adapters/plausible'
+
+analytics({ adapters: [plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY! })] })
+```
+
+Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance. Supported metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, scrollDepth, revenue. Durations are normalized to milliseconds.
+
+### Umami
+
+```ts
+import { umami } from '@10x-media/analytics/adapters/umami'
+
+// Umami Cloud
+analytics({ adapters: [umami({ websiteId: 'xxxx', apiKey: process.env.UMAMI_API_KEY! })] })
+
+// Self-hosted (token from POST /api/auth/login)
+analytics({ adapters: [umami({ websiteId: 'xxxx', token: process.env.UMAMI_TOKEN!, host: 'https://analytics.example.com/api' })] })
+```
+
+Supported metrics: pageviews, visitors, visits, sessions, bounceRate (derived), avgDuration (derived). A `page` dimension breakdown maps to Umami's `/metrics?type=url`.
+
+Both adapters auto-disable any surface whose required metric they do not provide, and degrade to an empty state when unconfigured (no network calls). GA4 and PostHog adapters land in a later release.
