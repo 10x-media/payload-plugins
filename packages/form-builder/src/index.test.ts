@@ -30,4 +30,10 @@ describe('formBuilder factory', () => {
 		const moduleExports = await import('./index')
 		expect(typeof moduleExports.evaluateCondition).toBe('function')
 	})
+
+	it('exports the response aggregation helpers', async () => {
+		const moduleExports = await import('./index')
+		expect(typeof moduleExports.aggregateFormResponses).toBe('function')
+		expect(typeof moduleExports.aggregateFieldResponses).toBe('function')
+	})
 })

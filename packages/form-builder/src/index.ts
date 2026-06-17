@@ -75,6 +75,22 @@ export type { ActionOption, ActionRegistry, ActionsConfig } from './actions/regi
 export { resolveActions } from './actions/registry'
 export type { ActionResult } from './actions/runActions'
 export { SIGNATURE_HEADER, signPayload } from './actions/sign'
+export type {
+	AggregateFieldResponsesArgs,
+	AggregateFormResponsesArgs,
+} from './aggregation/aggregateResponses'
+export {
+	aggregateFieldResponses,
+	aggregateFormResponses,
+} from './aggregation/aggregateResponses'
+export { aggregateRowForField, aggregateRowsForFields } from './aggregation/aggregateRows'
+export type {
+	AggregationBucket,
+	AggregationRow,
+	FieldAggregation,
+	FieldMeta,
+	SubmissionStatusFilter,
+} from './aggregation/types'
 export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
 export { evaluateCalc } from './calc/evaluate'
 export { normalizeCalc } from './calc/normalizeCalc'
