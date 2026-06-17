@@ -1,4 +1,5 @@
 import type { Config } from 'payload'
+import type { ActionRegistry } from '../actions/registry'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
 import type { FieldTypeRegistry } from '../fields/registry'
@@ -10,6 +11,7 @@ type RegisterCollectionsArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
 	presentationRegistry: PresentationDescriptorRegistry
+	actionRegistry: ActionRegistry
 }
 
 export const registerCollections = ({
@@ -17,10 +19,11 @@ export const registerCollections = ({
 	registry,
 	ruleRegistry,
 	presentationRegistry,
+	actionRegistry,
 }: RegisterCollectionsArgs): void => {
 	config.collections = [
 		...(config.collections ?? []),
-		buildFormsCollection(registry, ruleRegistry, presentationRegistry),
+		buildFormsCollection({ registry, ruleRegistry, presentationRegistry, actionRegistry }),
 		buildSubmissionsCollection(registry, ruleRegistry),
 	]
 }

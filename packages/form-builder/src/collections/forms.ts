@@ -1,4 +1,6 @@
 import type { CollectionBeforeValidateHook, CollectionConfig } from 'payload'
+import { buildActionBlocks } from '../actions/buildActionBlocks'
+import type { ActionRegistry } from '../actions/registry'
 import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
@@ -16,13 +18,19 @@ import type { ValidationRuleRegistry } from '../validation/registry'
 
 export const FORMS_SLUG = 'forms'
 
-export const buildFormsCollection = (
-	registry: FieldTypeRegistry,
-	ruleRegistry: ValidationRuleRegistry,
-	presentationRegistry: PresentationDescriptorRegistry = new Map(
-		Object.entries(defaultPresentationDescriptors)
-	)
-): CollectionConfig => {
+type BuildFormsCollectionArgs = {
+	registry: FieldTypeRegistry
+	ruleRegistry: ValidationRuleRegistry
+	presentationRegistry?: PresentationDescriptorRegistry
+	actionRegistry?: ActionRegistry
+}
+
+export const buildFormsCollection = ({
+	registry,
+	ruleRegistry,
+	presentationRegistry = new Map(Object.entries(defaultPresentationDescriptors)),
+	actionRegistry = new Map(),
+}: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data }) => {
@@ -64,6 +72,12 @@ export const buildFormsCollection = (
 			{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
 			{ name: 'fields', type: 'blocks', blocks: buildFieldBlocks(registry, ruleRegistry) },
 			{ name: 'flow', type: 'json' },
+			{
+				name: 'actions',
+				type: 'blocks',
+				blocks: buildActionBlocks(actionRegistry),
+				label: labelForKey(keys.configActions),
+			},
 			{
 				name: 'defaultPresentation',
 				type: 'select',

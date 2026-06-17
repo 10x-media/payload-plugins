@@ -93,6 +93,7 @@ export const keys = {
 	actionConfigToField: 'formBuilder:action.config.toField',
 	actionConfigUrl: 'formBuilder:action.config.url',
 	actionConfigSecret: 'formBuilder:action.config.secret',
+	configActions: 'formBuilder:config.actions',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

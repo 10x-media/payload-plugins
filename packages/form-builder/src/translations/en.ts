@@ -95,4 +95,5 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigToField]: 'Email field name',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigSecret]: 'Secret',
+	[keys.configActions]: 'Actions',
 }

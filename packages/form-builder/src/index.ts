@@ -1,4 +1,7 @@
 import { type Config, definePlugin } from 'payload'
+import { defaultActionDefinitions } from './actions/builtin'
+import type { ActionsConfig } from './actions/registry'
+import { resolveActions } from './actions/registry'
 import type { FormEventSink } from './events/types'
 import { defaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
@@ -20,6 +23,8 @@ export type FormBuilderPluginOptions = {
 	presentations?: PresentationsDescriptorConfig
 	/** Add, override, or remove validation rule types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	rules?: ValidationRulesConfig
+	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
+	actions?: ActionsConfig
 }
 
 declare module 'payload' {
@@ -41,8 +46,9 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			defaultPresentationDescriptors,
 			options.presentations
 		)
+		const actionRegistry = resolveActions(defaultActionDefinitions, options.actions)
 		registerTranslations(config)
-		registerCollections({ config, registry, ruleRegistry, presentationRegistry })
+		registerCollections({ config, registry, ruleRegistry, presentationRegistry, actionRegistry })
 		return config
 	},
 })
