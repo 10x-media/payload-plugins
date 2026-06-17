@@ -121,10 +121,17 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 		mode,
 		connectionString,
 		stop: async () => {
-			// Close Payload's DB client before stopping the server. Killing the
-			// server with the client still connected triggers a reconnect storm
-			// that surfaces as a stray rejection in a later test. When attached,
-			// only this Payload is destroyed; the owning boot stops the DB.
+			// Payload's drizzle destroy() never ends the pg pool (it holds a
+			// never-released health client, so pool.end() would hang), so idle
+			// connections stay open when stopDb() SIGKILLs the container. pg surfaces
+			// the backend's 57P01 on the pool 'error' event and needs a listener there
+			// or it throws uncaught; the termination is expected, so swallow it. Mongo
+			// has no pool, so this no-ops. When attached, only this Payload is
+			// destroyed; the owning boot stops the DB.
+			const pgPool = (
+				payload.db as { pool?: { on: (event: 'error', listener: (err: unknown) => void) => void } }
+			).pool
+			pgPool?.on('error', () => undefined)
 			await payload.destroy()
 			await stopDb()
 		},
