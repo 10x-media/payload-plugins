@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { analytics } from '../src/index'
+import { analytics, analyticsStat, analyticsStatRow, analyticsTab } from '../src/index'
 import { native } from '../src/native/nativeAdapter'
 import { seedDev } from './helpers/seed'
 
@@ -18,6 +18,18 @@ const users: CollectionConfig = {
 	auth: true,
 	admin: { useAsTitle: 'email' },
 	fields: [],
+}
+
+const pages: CollectionConfig = {
+	slug: 'pages',
+	admin: { useAsTitle: 'title' },
+	fields: [
+		{ name: 'title', type: 'text' },
+		{ name: 'slug', type: 'text', required: true },
+		analyticsStat({ metric: 'pageviews', position: 'sidebar' }),
+		analyticsTab(),
+		analyticsStatRow({ name: 'analytics_inline' }),
+	],
 }
 
 const db =
@@ -40,8 +52,13 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [analytics({ adapters: [native()] })],
+	collections: [users, pages],
+	plugins: [
+		analytics({
+			adapters: [native()],
+			collections: { pages: { path: (doc) => (doc.slug as string) ?? null } },
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

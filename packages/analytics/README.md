@@ -123,3 +123,42 @@ native({ retentionDays: 90 })
 ```
 
 The task runs at 03:00 UTC. If `retentionDays` is not set, no task is registered and raw events are kept indefinitely.
+
+## Document binding
+
+Bind any URL-bearing collection to its analytics with a per-collection path resolver. Binding a collection registers the resolver only; it renders no fields and injects nothing.
+
+```ts
+analytics({
+  adapters: [native()],
+  collections: {
+    pages: {
+      path: (doc) => (doc.slug ? `/${doc.slug}` : null), // primary resolver
+      // pathField: 'permalink',                          // optional explicit-field fallback
+      // hostname: 'example.com',                         // optional, for multi-domain
+    },
+  },
+})
+```
+
+The resolver returns the document's URL pathname (or `null` for an unsaved document). `pathField` is a fallback used only when the resolver is absent or returns `null`; a binding must define at least one of the two.
+
+## Portable display fields
+
+Read-only fields you place explicitly on your own collections. Nothing is auto-injected, and nothing lands in the sidebar unless you ask for it. Each field surfaces metrics for the document's bound path through the surfacing engine, and auto-disables when the active adapter cannot supply the requested metric.
+
+```ts
+import { analyticsStat, analyticsStatRow, analyticsFields, analyticsTab } from '@10x-media/analytics'
+
+fields: [
+  analyticsStat({ metric: 'pageviews' }),                 // a single stat
+  analyticsStat({ metric: 'visitors', position: 'sidebar' }), // opt in to the sidebar
+  analyticsStatRow({ metrics: ['pageviews', 'visitors', 'avgDuration'] }), // a row of stats
+  ...analyticsFields({ metrics: ['pageviews', 'sessions'] }), // several individual fields
+  analyticsTab(),                                         // a ready-made "Analytics" tab
+]
+```
+
+Every factory accepts an optional `timeframe` (a relative preset: `today`, `last7days`, `last30days`, `last90days`, `thisMonth`, `thisYear`; default `last30days`) and `adapter` (an adapter id, when more than one is configured). The native engine backs `pageviews`, `visitors`, `sessions`, `events`, and `avgDuration`; fields requesting anything else render a muted "not available" state until a provider that supports it is configured.
+
+The display components are server components; add `@10x-media/analytics/rsc` to your Payload import map (run `payload generate:importmap`) so the admin can resolve them.
