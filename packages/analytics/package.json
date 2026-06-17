@@ -61,6 +61,11 @@
 			"development": "./src/exports/adapters/native.ts",
 			"types": "./src/exports/adapters/native.ts",
 			"default": "./dist/exports/adapters/native.js"
+		},
+		"./adapters/plausible": {
+			"development": "./src/exports/adapters/plausible.ts",
+			"types": "./src/exports/adapters/plausible.ts",
+			"default": "./dist/exports/adapters/plausible.js"
 		}
 	},
 	"files": [
@@ -164,6 +169,11 @@
 				"types": "./dist/exports/adapters/native.d.ts",
 				"import": "./dist/exports/adapters/native.js",
 				"default": "./dist/exports/adapters/native.js"
+			},
+			"./adapters/plausible": {
+				"types": "./dist/exports/adapters/plausible.d.ts",
+				"import": "./dist/exports/adapters/plausible.js",
+				"default": "./dist/exports/adapters/plausible.js"
 			}
 		}
 	}

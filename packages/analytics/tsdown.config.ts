@@ -10,6 +10,7 @@ export default defineConfig({
 		'exports/geo': 'src/exports/geo.ts',
 		'exports/rsc': 'src/exports/rsc.ts',
 		'exports/adapters/native': 'src/exports/adapters/native.ts',
+		'exports/adapters/plausible': 'src/exports/adapters/plausible.ts',
 	},
 	format: 'esm',
 	dts: true,
