@@ -1,4 +1,4 @@
-import type { Config } from 'payload'
+import type { CollectionConfig, Config } from 'payload'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
@@ -18,6 +18,7 @@ type RegisterCollectionsArgs = {
 	actionRegistry: ActionRegistry
 	hasJobsPlugin: boolean
 	events?: FormEventSink
+	uploads: { enabled: boolean; slug: string; collection?: CollectionConfig }
 }
 
 export const registerCollections = ({
@@ -29,11 +30,13 @@ export const registerCollections = ({
 	actionRegistry,
 	hasJobsPlugin,
 	events,
+	uploads,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
 	config.collections = [
 		...(config.collections ?? []),
+		...(uploads.enabled && uploads.collection ? [uploads.collection] : []),
 		buildFormsCollection({ registry, ruleRegistry, presentationRegistry, actionRegistry }),
 		buildSubmissionsCollection({
 			registry,
@@ -42,6 +45,7 @@ export const registerCollections = ({
 			actionRegistry,
 			events,
 			hasRunner,
+			uploadSlug: uploads.slug,
 		}),
 	]
 }

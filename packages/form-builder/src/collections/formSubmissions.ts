@@ -20,6 +20,8 @@ type BuildSubmissionsCollectionArgs = {
 	events?: FormEventSink
 	/** Whether a job runner is likely present; gates the queued vs bounded-inline dispatch path. */
 	hasRunner?: boolean
+	/** Upload collection slug for file fields without an explicit `relationTo`. */
+	uploadSlug?: string
 }
 
 const formIdOf = (form: unknown): number | string | undefined => {
@@ -104,6 +106,7 @@ export const buildSubmissionsCollection = ({
 	actionRegistry = new Map(),
 	events,
 	hasRunner = false,
+	uploadSlug,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => ({
 	slug: FORM_SUBMISSIONS_SLUG,
 	labels: { singular: 'Submission', plural: 'Submissions' },
@@ -114,7 +117,7 @@ export const buildSubmissionsCollection = ({
 		update: () => false,
 	},
 	hooks: {
-		beforeValidate: [validateSubmission(registry, ruleRegistry, consentRegistry)],
+		beforeValidate: [validateSubmission({ registry, ruleRegistry, consentRegistry, uploadSlug })],
 		afterChange: [makeAfterChange({ actionRegistry, events, hasRunner })],
 	},
 	fields: [

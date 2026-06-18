@@ -116,4 +116,11 @@ export const en: Record<TranslationKey, string> = {
 	[keys.resultsTruncated]: 'Showing a sample of responses',
 	[keys.configShowResults]: 'Show results publicly',
 	[keys.configResultsField]: 'Results field (machine name)',
+	[keys.validationFileMissing]: 'Upload a file',
+	[keys.validationFileMimeType]: 'File type not allowed',
+	[keys.validationFileTooLarge]: 'File is too large',
+	[keys.fieldTypeFile]: 'File upload',
+	[keys.fileConfigRelationTo]: 'Upload collection',
+	[keys.fileConfigMimeTypes]: 'Allowed file types',
+	[keys.fileConfigMaxSize]: 'Maximum size (bytes)',
 }

@@ -3,6 +3,7 @@ import { calculationField } from './calculation'
 import { checkboxField } from './checkbox'
 import { consentField } from './consent'
 import { emailField } from './email'
+import { fileField } from './file'
 import { numberField } from './number'
 import { selectField } from './select'
 import { textField } from './text'
@@ -19,4 +20,5 @@ export const defaultFieldDefinitions: AnyFormFieldDefinition[] = [
 	checkboxField as AnyFormFieldDefinition,
 	calculationField as AnyFormFieldDefinition,
 	consentField as AnyFormFieldDefinition,
+	fileField as AnyFormFieldDefinition,
 ]

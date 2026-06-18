@@ -114,6 +114,13 @@ export const keys = {
 	resultsTruncated: 'formBuilder:results.truncated',
 	configShowResults: 'formBuilder:config.showResults',
 	configResultsField: 'formBuilder:config.resultsField',
+	validationFileMissing: 'formBuilder:validation.file.missing',
+	validationFileMimeType: 'formBuilder:validation.file.mimeType',
+	validationFileTooLarge: 'formBuilder:validation.file.tooLarge',
+	fieldTypeFile: 'formBuilder:fieldType.file',
+	fileConfigRelationTo: 'formBuilder:file.config.relationTo',
+	fileConfigMimeTypes: 'formBuilder:file.config.mimeTypes',
+	fileConfigMaxSize: 'formBuilder:file.config.maxSize',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

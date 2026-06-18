@@ -8,6 +8,14 @@ import type { ValidationRuleRegistry } from '../validation/registry'
 import { runSubmission } from './runSubmission'
 import type { FormFieldInstance, SubmissionValue } from './types'
 
+export type ValidateSubmissionArgs = {
+	registry: FieldTypeRegistry
+	ruleRegistry: ValidationRuleRegistry
+	consentRegistry: ConsentSourceRegistry
+	/** Upload collection slug for file fields without an explicit `relationTo`. */
+	uploadSlug?: string
+}
+
 /**
  * Server-authoritative submission validation. On create it loads the referenced form, re-runs every
  * field's required check, intrinsic validator, and declarative rules through `runSubmission`, threading
@@ -16,11 +24,12 @@ import type { FormFieldInstance, SubmissionValue } from './types'
  * Consent fields are captured into `result.consent` (array of proofs, one per visible consent field).
  */
 export const validateSubmission =
-	(
-		registry: FieldTypeRegistry,
-		ruleRegistry: ValidationRuleRegistry,
-		consentRegistry: ConsentSourceRegistry
-	): CollectionBeforeValidateHook =>
+	({
+		registry,
+		ruleRegistry,
+		consentRegistry,
+		uploadSlug,
+	}: ValidateSubmissionArgs): CollectionBeforeValidateHook =>
 	async ({ data, operation, req }) => {
 		if (operation !== 'create' || !data) {
 			return data
@@ -55,6 +64,7 @@ export const validateSubmission =
 			req,
 			payload: req.payload,
 			formId: formId as number | string,
+			uploadSlug,
 		})
 
 		if (result.errors.length > 0) {

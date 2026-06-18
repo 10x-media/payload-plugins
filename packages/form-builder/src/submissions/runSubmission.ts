@@ -6,6 +6,9 @@ import { captureConsent } from '../consent/captureConsent'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { Translate } from '../fields/types'
+import { keys } from '../translations/keys'
+import { captureFileRef } from '../uploads/captureFileRef'
+import type { FileFieldConfig, FileRefError } from '../uploads/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { runValidation } from '../validation/runValidation'
 import type {
@@ -14,6 +17,31 @@ import type {
 	SubmissionFieldError,
 	SubmissionValue,
 } from './types'
+
+const errorKeyFor = (code: FileRefError): string => {
+	if (code === 'mimeType') {
+		return keys.validationFileMimeType
+	}
+	if (code === 'tooLarge') {
+		return keys.validationFileTooLarge
+	}
+	return keys.validationFileMissing
+}
+
+/** Normalize the authored `mimeTypes` (a `hasMany` text field) to a `string[]`. */
+const mimeTypesOf = (raw: unknown): string[] | undefined => {
+	if (!Array.isArray(raw)) {
+		return undefined
+	}
+	const out = (raw as unknown[]).filter((entry): entry is string => typeof entry === 'string')
+	return out.length > 0 ? out : undefined
+}
+
+const fileFieldConfigOf = (instance: FormFieldInstance): FileFieldConfig => ({
+	relationTo: typeof instance.relationTo === 'string' ? instance.relationTo : undefined,
+	mimeTypes: mimeTypesOf(instance.mimeTypes),
+	maxSize: typeof instance.maxSize === 'number' ? instance.maxSize : undefined,
+})
 
 const isEmpty = (value: unknown): boolean =>
 	value == null || value === '' || (Array.isArray(value) && value.length === 0)
@@ -63,6 +91,8 @@ export type RunSubmissionInput = {
 	req?: PayloadRequest
 	payload?: Payload
 	formId?: number | string
+	/** Upload collection slug for file fields without an explicit `relationTo`. Defaults to `form-uploads`. */
+	uploadSlug?: string
 }
 
 export type RunSubmissionResult = {
@@ -97,6 +127,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		req,
 		payload,
 		formId,
+		uploadSlug,
 	} = input
 	const incoming = new Map(values.map((entry) => [entry.field, entry.value]))
 
@@ -176,6 +207,41 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				}
 				continue
 			}
+		}
+
+		if (instance.blockType === 'file') {
+			if (isEmpty(value)) {
+				continue
+			}
+			if (payload) {
+				const fileConfig = fileFieldConfigOf(instance)
+				const slug = fileConfig.relationTo ?? uploadSlug ?? 'form-uploads'
+				const captured = await captureFileRef({
+					payload,
+					collectionSlug: slug,
+					uploadId: value as string | number,
+					config: fileConfig,
+					req,
+				})
+				if (!captured.ok) {
+					errors.push({ path: instance.name, message: t(errorKeyFor(captured.code)) })
+					continue
+				}
+				outValues.push({ field: instance.name, value: captured.ref })
+				descriptors.push({
+					field: instance.name,
+					label: instance.label ?? instance.name,
+					fieldType: instance.blockType,
+				})
+				continue
+			}
+			outValues.push({ field: instance.name, value })
+			descriptors.push({
+				field: instance.name,
+				label: instance.label ?? instance.name,
+				fieldType: instance.blockType,
+			})
+			continue
 		}
 
 		if (instance.blockType === 'consent' && payload) {

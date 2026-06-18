@@ -2,6 +2,7 @@ import { type Config, definePlugin } from 'payload'
 import { defaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
+import { resolveUploads, type UploadsOption } from './collections/uploads'
 import { defaultConsentSources } from './consent/builtin'
 import type { ConsentSourcesConfig } from './consent/registry'
 import { resolveConsentSources } from './consent/registry'
@@ -30,6 +31,8 @@ export type FormBuilderPluginOptions = {
 	actions?: ActionsConfig
 	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	consentSources?: ConsentSourcesConfig
+	/** The built-in `form-uploads` collection backing file fields. `false` disables it (bring your own); an object overrides slug/upload/access/fields. */
+	uploads?: UploadsOption
 }
 
 declare module 'payload' {
@@ -53,6 +56,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			options.presentations
 		)
 		const actionRegistry = resolveActions(defaultActionDefinitions, options.actions)
+		const uploads = resolveUploads(options.uploads)
 		registerTranslations(config)
 		registerCollections({
 			config,
@@ -63,6 +67,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			actionRegistry,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
 			events: options.events,
+			uploads,
 		})
 		return config
 	},
@@ -101,6 +106,8 @@ export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
 export { evaluateCalc } from './calc/evaluate'
 export { normalizeCalc } from './calc/normalizeCalc'
 export type { CalcExpression } from './calc/types'
+export type { UploadsCollectionConfig, UploadsOption } from './collections/uploads'
+export { buildUploadsCollection, FORM_UPLOADS_SLUG, resolveUploads } from './collections/uploads'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { defaultConsentSources } from './consent/builtin'
