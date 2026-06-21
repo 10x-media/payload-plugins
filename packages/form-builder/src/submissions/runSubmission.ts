@@ -226,7 +226,6 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 					config: fileConfig,
 					req,
 					expectedOwner,
-					expectedForm: formId,
 				})
 				if (!captured.ok) {
 					errors.push({ path: instance.name, message: t(errorKeyFor(captured.code)) })

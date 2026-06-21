@@ -34,7 +34,6 @@ export const buildUploadsCollection = (config: UploadsCollectionConfig = {}): Co
 	upload: config.upload && config.upload !== true ? config.upload : true,
 	fields: [
 		{ name: 'owner', type: 'text', admin: { readOnly: true, hidden: true } },
-		{ name: 'form', type: 'text', admin: { readOnly: true, hidden: true } },
 		...(config.fields ?? []),
 	],
 })

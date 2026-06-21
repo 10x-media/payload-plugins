@@ -70,23 +70,29 @@ export const buildSpamGuard =
 			}
 		}
 
-		const meta: Record<string, unknown> = {
+		const serverMeta: Record<string, unknown> = {
 			at: new Date().toISOString(),
 			spam: { captcha: captchaChecked ? 'passed' : 'skipped' },
 		}
 		if (spam.metadata.ip) {
 			const ip = firstHop(req, spam.ipHeader)
 			if (ip) {
-				meta.ip = ip
+				serverMeta.ip = ip
 			}
 		}
 		if (spam.metadata.ua) {
 			const ua = req.headers?.get('user-agent')
 			if (ua) {
-				meta.ua = ua
+				serverMeta.ua = ua
 			}
 		}
-		data.meta = meta
+		// Preserve an authenticated (trusted) caller's own `meta` keys, with server fields winning. Anonymous
+		// `meta` is never trusted, so it is discarded.
+		const clientMeta =
+			authenticated && data.meta != null && typeof data.meta === 'object'
+				? (data.meta as Record<string, unknown>)
+				: {}
+		data.meta = { ...clientMeta, ...serverMeta }
 
 		return data
 	}

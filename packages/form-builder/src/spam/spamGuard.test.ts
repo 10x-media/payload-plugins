@@ -99,4 +99,25 @@ describe('buildSpamGuard', () => {
 		)) as { meta?: { spam?: { captcha?: string } } }
 		expect(out.meta?.spam?.captcha).toBe('skipped')
 	})
+
+	it('preserves an authenticated caller meta with server fields winning', async () => {
+		const req = baseReq()
+		;(req as { user: unknown }).user = { id: 1 }
+		const guard = buildSpamGuard(cfg())
+		const out = (await run(
+			guard,
+			{ form: 'f1', values: [], meta: { source: 'import', at: 'CLIENT' } },
+			req
+		)) as { meta?: Record<string, unknown> }
+		expect(out.meta?.source).toBe('import')
+		expect(out.meta?.at).not.toBe('CLIENT')
+	})
+
+	it('discards anonymous-supplied meta', async () => {
+		const guard = buildSpamGuard(cfg())
+		const out = (await run(guard, { form: 'f1', values: [], meta: { source: 'evil' } })) as {
+			meta?: Record<string, unknown>
+		}
+		expect(out.meta?.source).toBeUndefined()
+	})
 })

@@ -48,10 +48,14 @@ describeForDb('form-builder upload ownership', { dbs: ['mongo'] }, (db) => {
 		expect((await capture(await upload())).ok).toBe(true)
 	})
 
-	it('a stamped upload is capturable only by the matching identity', async () => {
+	it('a stamped upload is capturable by the matching identity, not by a different one', async () => {
 		const id = await upload('ip:1.1.1.1')
 		expect((await capture(id, 'ip:1.1.1.1')).ok).toBe(true)
 		expect((await capture(id, 'ip:2.2.2.2')).ok).toBe(false)
-		expect((await capture(id, undefined)).ok).toBe(false)
+	})
+
+	it('a stamped upload fails open when the submitter cannot be identified', async () => {
+		const id = await upload('ip:1.1.1.1')
+		expect((await capture(id, undefined)).ok).toBe(true)
 	})
 })

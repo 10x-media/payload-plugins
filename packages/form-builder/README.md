@@ -1278,7 +1278,7 @@ When a provider is configured, a submission without a valid token is rejected. P
 
 ### Upload ownership
 
-Each upload to the built-in `form-uploads` collection is stamped with the uploader's identity (`owner`). At submit, a file reference is only captured if the submitting identity matches the upload's owner, so an anonymous submitter cannot reference another identity's upload; a mismatch is treated as a missing file. Unstamped uploads (no identity at upload time, or a bring-your-own collection without the field) are unaffected. Ownership granularity is identity-level (IP for anonymous traffic), so clients sharing a NAT share scope; a per-session token is a v1.x option.
+Each upload to the built-in `form-uploads` collection is stamped with the uploader's identity (`owner`). At submit, a file reference is captured only if the submitting identity matches the upload's owner, so an anonymous submitter cannot reference another identity's upload; a mismatch is treated as a missing file. When the submitter cannot be identified (no resolvable identity), ownership is not enforced (fail-open) — a proxy-configured deployment identifies every request, so this only relaxes scoping where it could not apply fairly anyway. Unstamped uploads (no identity at upload time, or a bring-your-own collection without the field) are unaffected. Ownership granularity is identity-level (IP for anonymous traffic): clients sharing a NAT share scope, and an identity that changes between upload and submit (a rotating mobile IP) will not match its own earlier upload. A per-session token is a v1.x option.
 
 ### Capture metadata (privacy)
 
