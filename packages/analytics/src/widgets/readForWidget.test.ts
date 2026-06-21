@@ -111,4 +111,16 @@ describe('readForWidget', () => {
 		expect(result.adapterId).toBe('secondary')
 		expect(result.metrics.pageviews).toBe(2)
 	})
+
+	it('returns unavailable for an unknown adapterId', async () => {
+		const result = await readForWidget({
+			req: reqWith([memoryAdapter()]),
+			metrics: ['pageviews'],
+			timeframe: 'last30days',
+			adapterId: 'does-not-exist',
+			now: NOW,
+		})
+		expect(result.status).toBe('unavailable')
+		expect(result.adapterId).toBe('does-not-exist')
+	})
 })

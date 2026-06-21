@@ -185,7 +185,7 @@ export default buildConfig({
 })
 ```
 
-`analyticsDefaultWidgets()` returns two small metric widgets: pageviews and visitors, both over the last 30 days.
+`analyticsDefaultWidgets()` returns two small metric widgets: pageviews and visitors, both over the last 30 days. If you set `widgets: false`, do not spread it into your layout; its instances would then reference an unregistered widget.
 
 > The Modular Dashboard is an experimental Payload feature (PR #15700). After installing, run `payload generate:importmap` so the widget's server component resolves in the admin.
 
