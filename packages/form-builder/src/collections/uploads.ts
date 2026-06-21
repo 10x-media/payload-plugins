@@ -32,7 +32,11 @@ export const buildUploadsCollection = (config: UploadsCollectionConfig = {}): Co
 	},
 	admin: { group: 'Forms' },
 	upload: config.upload && config.upload !== true ? config.upload : true,
-	fields: [...(config.fields ?? [])],
+	fields: [
+		{ name: 'owner', type: 'text', admin: { readOnly: true, hidden: true } },
+		{ name: 'form', type: 'text', admin: { readOnly: true, hidden: true } },
+		...(config.fields ?? []),
+	],
 })
 
 /** Resolve the `uploads` plugin option: `false` disables, `true`/object enables the built-in collection. */

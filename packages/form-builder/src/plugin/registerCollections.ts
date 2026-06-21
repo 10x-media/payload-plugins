@@ -8,6 +8,7 @@ import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { PresentationDescriptorRegistry } from '../presentations/registry'
 import type { ResolvedSpamConfig } from '../spam/types'
+import { buildUploadOwnerStamp, buildUploadRateLimit } from '../spam/uploadHooks'
 import type { ValidationRuleRegistry } from '../validation/registry'
 
 type RegisterCollectionsArgs = {
@@ -37,6 +38,18 @@ export const registerCollections = ({
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
+	if (spam && uploads.enabled && uploads.collection) {
+		const collection = uploads.collection
+		collection.hooks = collection.hooks ?? {}
+		collection.hooks.beforeOperation = [
+			...(collection.hooks.beforeOperation ?? []),
+			buildUploadRateLimit(spam),
+		]
+		collection.hooks.beforeValidate = [
+			...(collection.hooks.beforeValidate ?? []),
+			buildUploadOwnerStamp(spam),
+		]
+	}
 	config.collections = [
 		...(config.collections ?? []),
 		...(uploads.enabled && uploads.collection ? [uploads.collection] : []),
