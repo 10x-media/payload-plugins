@@ -86,4 +86,17 @@ describe('buildSpamGuard', () => {
 		expect(out.meta?.ip).toBe('1.2.3.4')
 		expect(out.meta?.ua).toBe('jest')
 	})
+
+	it('skips honeypot + captcha for authenticated requests', async () => {
+		const req = baseReq()
+		;(req as { user: unknown }).user = { id: 1 }
+		const captcha = { type: 'stub', verify: async () => false }
+		const guard = buildSpamGuard(cfg({ captcha }))
+		const out = (await run(
+			guard,
+			{ form: 'f1', values: [{ field: 'confirm_email', value: 'x' }] },
+			req
+		)) as { meta?: { spam?: { captcha?: string } } }
+		expect(out.meta?.spam?.captcha).toBe('skipped')
+	})
 })

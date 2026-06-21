@@ -27,6 +27,10 @@ export const buildSpamGuard =
 			return data
 		}
 		const t = asTranslate(req.i18n.t)
+		// Honeypot + captcha are anti-bot measures for the anonymous public path; an authenticated request
+		// (admin panel, logged-in API client) is already gated by auth and never carries a decoy/token, so
+		// checking it would falsely reject legitimate authed creates. Rate-limit + ownership still apply.
+		const authenticated = Boolean(req.user)
 
 		const identity = await spam.identify(req)
 		if (identity != null) {
@@ -51,11 +55,12 @@ export const buildSpamGuard =
 		const { cleaned, honeypot, captchaToken } = extractReservedValues(values, honeypotField)
 		data.values = cleaned
 
-		if (honeypotField !== null && isHoneypotTripped(honeypot)) {
+		if (!authenticated && honeypotField !== null && isHoneypotTripped(honeypot)) {
 			throw new APIError(t(keys.spamRejected), 400)
 		}
 
-		if (spam.captcha) {
+		const captchaChecked = Boolean(spam.captcha) && !authenticated
+		if (spam.captcha && !authenticated) {
 			const passed =
 				typeof captchaToken === 'string' && captchaToken.length > 0
 					? await spam.captcha.verify({ token: captchaToken, req }).catch(() => false)
@@ -67,7 +72,7 @@ export const buildSpamGuard =
 
 		const meta: Record<string, unknown> = {
 			at: new Date().toISOString(),
-			spam: { captcha: spam.captcha ? 'passed' : 'skipped' },
+			spam: { captcha: captchaChecked ? 'passed' : 'skipped' },
 		}
 		if (spam.metadata.ip) {
 			const ip = firstHop(req, spam.ipHeader)
