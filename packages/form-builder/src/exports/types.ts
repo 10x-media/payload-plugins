@@ -56,6 +56,18 @@ export type {
 } from '../presentations/types'
 export type { RecallResolver } from '../recall/resolver'
 export type {
+	CaptchaProvider,
+	CaptchaVerifyArgs,
+	IdentifyFn,
+	RateLimitCheckArgs,
+	RateLimitConfig,
+	RateLimiter,
+	RateLimitResult,
+	SpamConfig,
+	SpamMetadataConfig,
+	SpamOption,
+} from '../spam/types'
+export type {
 	SubmissionDescriptor,
 	SubmissionFieldError,
 	SubmissionValue,

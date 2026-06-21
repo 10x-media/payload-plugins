@@ -1217,7 +1217,84 @@ The admin answers view renders a file answer as a download link when the `FileRe
 
 ### Deferred
 
-Multiple files per field, per-upload ownership scoping (binding an upload to its form/session), and rate-limiting on the public upload path are v1.x / spam-phase follow-ups.
+Multiple files per field is a v1.x follow-up. Per-upload ownership scoping and rate-limiting on the public upload path now ship with the spam controls below.
+
+## Spam and abuse prevention (spec 11.7)
+
+A honeypot decoy and per-identity rate limiting are **on by default** on the public submission and upload paths, with a captcha adapter seam and server-stamped upload ownership. Everything is opt-out, per control or with `spam: false`.
+
+```ts
+formBuilder({
+  spam: {
+    // honeypot: false,                 // disable the decoy
+    // rateLimit: false,                // disable submission rate limiting
+    // rateLimit: { window: 60_000, max: 5 },
+    // uploadRateLimit: { window: 60_000, max: 20 },
+    // captcha: turnstileProvider,       // a defineCaptchaProvider adapter
+    // identify: (req) => req.user ? `user:${req.user.id}` : null,
+    // ipHeader: 'cf-connecting-ip',     // trusted client-IP header
+    // metadata: { ip: true, ua: true }, // opt in to storing IP/UA (privacy)
+  },
+})
+```
+
+### Defense in depth, not DoS protection
+
+App-level rate limiting **complements** edge/CDN/WAF rate limiting; it does not replace it. Treat it as one layer: it cheaply turns away casual abuse and bots, but a determined flood should be stopped at the edge. The default limiter is a window counter over Payload's first-class `payload.kv` (durable + cross-instance). Because the KV interface has no atomic increment, the counter is a **soft limit** (a concurrent burst can slightly exceed the cap). Swap `spam.rateLimit.limiter` for a Redis-backed `RateLimiter` if you need a hard limit.
+
+### Best-effort identity
+
+Payload v3 has no `req.ip`. Identity resolves to the authenticated user id, else the first hop of a trusted IP header (default `x-forwarded-for`). This is **proxy-dependent**: set `spam.ipHeader` to whatever your proxy/CDN sets, or provide a custom `spam.identify(req)` (e.g. keyed on a signed cookie). When no identity can be resolved, rate limiting and upload-ownership scoping **fail open** rather than blocking legitimate traffic, so configure your proxy for these controls to bite.
+
+### Honeypot
+
+`<Form>` renders a visually hidden decoy field (off-screen, `aria-hidden`, `tabIndex={-1}`, `autoComplete="off"`). A real user never fills it; a bot that fills every input does, and the server rejects the submission with a generic error. The decoy field name defaults to `confirm_email` (shared constant `DEFAULT_HONEYPOT_FIELD`); if you customize `spam.honeypot.fieldName` on the server, pass the same name to `<Form honeypot={{ name }}>`, and make sure it does not collide with a real field's machine name.
+
+### Captcha
+
+v1 ships the **seam only**, no built-in provider. Supply one and pass the widget token to `<Form>`:
+
+```ts
+import { defineCaptchaProvider } from '@10x-media/form-builder'
+
+const turnstile = defineCaptchaProvider({
+  type: 'turnstile',
+  verify: async ({ token }) => {
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: process.env.TURNSTILE_SECRET, response: token }),
+    })
+    return ((await res.json()) as { success: boolean }).success
+  },
+})
+```
+
+```tsx
+<Form form={form} captchaToken={tokenFromYourWidget} />
+```
+
+When a provider is configured, a submission without a valid token is rejected. Prebuilt Turnstile/reCAPTCHA/hCaptcha adapters are a v1.x addition.
+
+### Upload ownership
+
+Each upload to the built-in `form-uploads` collection is stamped with the uploader's identity (`owner`). At submit, a file reference is only captured if the submitting identity matches the upload's owner, so an anonymous submitter cannot reference another identity's upload; a mismatch is treated as a missing file. Unstamped uploads (no identity at upload time, or a bring-your-own collection without the field) are unaffected. Ownership granularity is identity-level (IP for anonymous traffic), so clients sharing a NAT share scope; a per-session token is a v1.x option.
+
+### Capture metadata (privacy)
+
+The submission `meta` always records a timestamp and a spam signal. The client IP and user-agent are **not** stored unless you opt in via `spam.metadata.ip` / `spam.metadata.ua` (a GDPR consideration).
+
+### Spam options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `honeypot` | `false \| { fieldName? }` | on (`confirm_email`) | Hidden decoy field; a filled decoy is rejected. |
+| `rateLimit` | `false \| { window?, max?, limiter? }` | on (60s / 5) | Per-identity submission limit. |
+| `uploadRateLimit` | `false \| { window?, max?, limiter? }` | on (60s / 20) | Per-identity upload limit. |
+| `captcha` | `CaptchaProvider` | none | A `defineCaptchaProvider` adapter; token verified on submit. |
+| `identify` | `IdentifyFn` | user id / IP header | Identity resolver for limiting + ownership. |
+| `ipHeader` | `string` | `x-forwarded-for` | Trusted client-IP header. |
+| `metadata` | `{ ip?, ua? }` | `{}` (off) | Opt in to storing IP/UA on the submission `meta`. |
 
 ## Requirements
 
@@ -1295,6 +1372,7 @@ formBuilder({
 | `actions` | `ActionsConfig` | `{}` | Per-action registry override (email/confirmation/signed-webhook + custom). `false` removes, `true` keeps, an object adds or replaces one. |
 | `consentSources` | `ConsentSourcesConfig` | `{}` | Per-consent-source registry override (static/pageReference + custom). `false` removes, `true` keeps, an object adds or replaces one. |
 | `uploads` | `UploadsOption` | `true` | Built-in `form-uploads` collection backing file fields. `false` brings your own (set the file field's `relationTo`); an object overrides slug/upload/access/fields. |
+| `spam` | `SpamOption` | `{}` (on) | Honeypot + rate-limiting (on by default), a captcha adapter seam, and upload-ownership scoping. `false` disables the whole subsystem; see [Spam and abuse prevention](#spam-and-abuse-prevention-spec-117). |
 
 ## License
 

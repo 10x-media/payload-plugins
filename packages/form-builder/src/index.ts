@@ -161,6 +161,23 @@ export type {
 export { interpolate } from './recall/interpolate'
 export type { RecallResolver } from './recall/resolver'
 export { buildRecallResolver, optionLabelsFor } from './recall/resolver'
+export { defineCaptchaProvider } from './spam/captcha'
+export { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from './spam/constants'
+export { defaultIdentify } from './spam/identify'
+export { createKvRateLimiter } from './spam/rateLimiter'
+export { resolveSpamConfig } from './spam/resolveSpam'
+export type {
+	CaptchaProvider,
+	CaptchaVerifyArgs,
+	IdentifyFn,
+	RateLimitCheckArgs,
+	RateLimitConfig,
+	RateLimiter,
+	RateLimitResult,
+	SpamConfig,
+	SpamMetadataConfig,
+	SpamOption,
+} from './spam/types'
 export { captureFileRef } from './uploads/captureFileRef'
 export { resolveFileRef } from './uploads/resolveFileRef'
 export type { FileFieldConfig, FileRef, FileRefError } from './uploads/types'
