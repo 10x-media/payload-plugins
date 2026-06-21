@@ -1296,6 +1296,17 @@ The submission `meta` always records a timestamp and a spam signal. The client I
 | `ipHeader` | `string` | `x-forwarded-for` | Trusted client-IP header. |
 | `metadata` | `{ ip?, ua? }` | `{}` (off) | Opt in to storing IP/UA on the submission `meta`. |
 
+## Accessibility
+
+The headless renderer ships accessible defaults, verified by automated axe checks (`axe-core` over the rendered `<Form>` in the unit tier, plus a real-browser `@axe-core/playwright` sweep in e2e). The contract every built-in renderer upholds:
+
+- Every field control has a programmatically associated label (`<label for>` / accessible name); the consent control falls back to the field label so it is never unlabelled.
+- Validation errors are exposed via `role="alert"`, linked to the control with `aria-describedby`, and the control is marked `aria-invalid` when invalid.
+- Submit, Next, and Back are real `<button>`s; the multi-step flow validates per step on advance.
+- The honeypot decoy is `aria-hidden` and off the tab order, so assistive tech never encounters it.
+
+Caveat (by design): we ship accessible structure, but final compliance also depends on your theme. Color contrast in particular is a function of the colors you apply, so the jsdom axe pass skips `color-contrast` (no layout engine) and the e2e sweep checks it against the demo theme; validate contrast against your own palette. If you supply custom renderers (`defineFieldRenderer`) or restyle the primitives, preserve the label/error wiring above. See [A11y checklist for custom renderers](#a11y-checklist-for-custom-renderers).
+
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)
