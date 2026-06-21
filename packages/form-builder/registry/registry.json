@@ -51,6 +51,11 @@
 					"path": "form-builder/fields/checkbox-field.tsx",
 					"type": "registry:component",
 					"target": "components/form-builder/fields/checkbox-field.tsx"
+				},
+				{
+					"path": "form-builder/fields/file-field.tsx",
+					"type": "registry:component",
+					"target": "components/form-builder/fields/file-field.tsx"
 				}
 			]
 		},
