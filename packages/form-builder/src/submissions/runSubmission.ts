@@ -55,6 +55,18 @@ const coerce = (kind: string, value: unknown): unknown => {
 		return Number.isNaN(next) ? value : next
 	}
 	if (kind === 'boolean') {
+		// A genuine boolean from the renderer passes through; a raw client string is parsed strictly so that
+		// "false"/"0"/"off"/"no"/"" are not silently truthy (this matters for the required-consent check).
+		if (typeof value === 'string') {
+			const normalized = value.trim().toLowerCase()
+			return !(
+				normalized === '' ||
+				normalized === 'false' ||
+				normalized === '0' ||
+				normalized === 'off' ||
+				normalized === 'no'
+			)
+		}
 		return Boolean(value)
 	}
 	if (kind === 'text') {

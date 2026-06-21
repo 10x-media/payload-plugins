@@ -139,6 +139,27 @@ describe('runSubmission', () => {
 		expect(result.values).toEqual([])
 	})
 
+	it('coerces a checkbox string "false" to the boolean false, never a truthy string', async () => {
+		const fields: FormFieldInstance[] = [{ blockType: 'checkbox', name: 'agree', label: 'Agree' }]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'agree', value: 'false' }],
+		})
+		expect(result.values).toEqual([{ field: 'agree', value: false }])
+	})
+
+	it('rejects a required consent submitted as the string "false"', async () => {
+		const fields: FormFieldInstance[] = [{ blockType: 'consent', name: 'terms', label: 'I agree' }]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'terms', value: 'false' }],
+		})
+		expect(result.errors).toHaveLength(1)
+		expect(result.errors[0]?.path).toBe('terms')
+	})
+
 	it('enforces a declarative minLength rule with the coerced value', async () => {
 		const fields: FormFieldInstance[] = [
 			{

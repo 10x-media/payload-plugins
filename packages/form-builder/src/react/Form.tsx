@@ -13,6 +13,7 @@ import {
 	useState,
 } from 'react'
 import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
+import { evaluateCondition } from '../conditions/evaluate'
 import { noopEventSink } from '../events/noopSink'
 import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
@@ -245,7 +246,12 @@ export const Form = ({
 			if (!field) {
 				return
 			}
-			const answers = { ...state.values, [name]: value }
+			const answers = { ...effectiveValues, [name]: value }
+			// Mirror the server: a field whose `validateWhen` is unmet is not validated; clear any stale error.
+			if (!evaluateCondition(field.validateWhen, answers)) {
+				rawDispatch({ type: 'SET_FIELD_ISSUES', name, errors: [], warnings: [] })
+				return
+			}
 			void validateFieldValue({
 				field,
 				value,
@@ -266,7 +272,7 @@ export const Form = ({
 				}
 			})
 		},
-		[fieldsByName, state.values, registry, ruleRegistry, locale, translate]
+		[fieldsByName, effectiveValues, registry, ruleRegistry, locale, translate]
 	)
 
 	const visible = visibleFields(form.fields, effectiveValues)
@@ -282,14 +288,15 @@ export const Form = ({
 		const results = await Promise.all(
 			stepVisible
 				.filter((field) => !calcExpressionOf(field))
+				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
 				.map(async (field) => ({
 					field,
 					...(await validateFieldValue({
 						field,
-						value: state.values[field.name],
+						value: effectiveValues[field.name],
 						registry,
 						ruleRegistry,
-						answers: state.values,
+						answers: effectiveValues,
 						locale,
 						t: translate,
 					})),
@@ -356,19 +363,27 @@ export const Form = ({
 
 	const handleSubmit = async (event: ReactFormEvent<HTMLFormElement>) => {
 		event.preventDefault()
+		// Re-entrancy guard: claim the in-flight slot before the async validation window so a fast second
+		// activation (double-click, Enter + click) cannot reach the transport and POST the submission twice.
+		if (submittingRef.current) {
+			return
+		}
+		submittingRef.current = true
 		const visible = visibleFields(form.fields, effectiveValues)
 		const results = await Promise.all(
 			// Calc fields carry no rules and have no input; they are always satisfied, so skip validating them.
+			// A field whose `validateWhen` is unmet is skipped too, mirroring the server (no client/server divergence).
 			visible
 				.filter((field) => !calcExpressionOf(field))
+				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
 				.map(async (field) => ({
 					field,
 					...(await validateFieldValue({
 						field,
-						value: state.values[field.name],
+						value: effectiveValues[field.name],
 						registry,
 						ruleRegistry,
-						answers: state.values,
+						answers: effectiveValues,
 						locale,
 						t: translate,
 					})),
@@ -394,9 +409,9 @@ export const Form = ({
 		}
 		rawDispatch({ type: 'SET_ALL_ISSUES', errors, warnings })
 		if (Object.keys(errors).length > 0) {
+			submittingRef.current = false
 			return
 		}
-		submittingRef.current = true
 		rawDispatch({ type: 'SUBMIT_START' })
 		const values: SubmissionValue[] = visible
 			.filter((field) => !isEmpty(effectiveValues[field.name]))
