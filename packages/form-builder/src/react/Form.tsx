@@ -21,12 +21,14 @@ import type { FormFlow } from '../flow/types'
 import { defaultPresentationDescriptors } from '../presentations/defaults'
 import { interpolate } from '../recall/interpolate'
 import { buildRecallResolver } from '../recall/resolver'
+import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import type { FieldRenderer, RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
 import { FormContext, type FormStepInfo } from './FormContext'
 import { type FieldWidth, FormLayout, widthProps } from './FormLayout'
+import { Honeypot } from './Honeypot'
 import { defaultPresentations } from './presentation/presentations'
 import { type PresentationsConfig, resolvePresentations } from './presentation/registry'
 import type { FormPresentation } from './presentation/types'
@@ -76,6 +78,10 @@ export type FormProps = {
 	title?: string
 	/** Seed initial field values (e.g. from `valuesFromSearchParams`). Still validated on submit. */
 	initialValues?: Record<string, unknown>
+	/** Honeypot decoy (on by default). `false` removes it; `{ name }` matches a customized server `spam.honeypot.fieldName`. */
+	honeypot?: false | { name?: string }
+	/** A token from your captcha widget; verified server-side when a captcha provider is configured. */
+	captchaToken?: string
 	/** Custom layout: render fields with `useField`/`useFormState` instead of the auto-rendered field loop. */
 	children?: ReactNode
 }
@@ -155,8 +161,12 @@ export const Form = ({
 	onClose,
 	title,
 	initialValues,
+	honeypot,
+	captchaToken,
 	children,
 }: FormProps) => {
+	const honeypotName = honeypot === false ? null : (honeypot?.name ?? DEFAULT_HONEYPOT_FIELD)
+	const honeypotRef = useRef<HTMLInputElement>(null)
 	const registry = useMemo(() => buildFieldTypeRegistry(fieldTypes), [fieldTypes])
 	const ruleRegistry = useMemo(() => buildValidationRuleRegistry(rules), [rules])
 	const rendererRegistry = useMemo(() => resolveRenderers(defaultRenderers, renderers), [renderers])
@@ -391,6 +401,15 @@ export const Form = ({
 		const values: SubmissionValue[] = visible
 			.filter((field) => !isEmpty(effectiveValues[field.name]))
 			.map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
+		if (honeypotName) {
+			const decoy = honeypotRef.current?.value ?? ''
+			if (decoy !== '') {
+				values.push({ field: honeypotName, value: decoy })
+			}
+		}
+		if (captchaToken) {
+			values.push({ field: CAPTCHA_TOKEN_KEY, value: captchaToken })
+		}
 		const result: SubmitFormResult = onSubmit
 			? await onSubmit({ formId: form.id, values })
 			: await submitForm({ formId: form.id, values, apiRoute })
@@ -467,6 +486,7 @@ export const Form = ({
 						data-fb-presentation={activePresentation.name}
 						data-fb-density={activePresentation.density}
 					>
+						{honeypotName ? <Honeypot name={honeypotName} inputRef={honeypotRef} /> : null}
 						{children}
 					</form>
 				)}
@@ -505,6 +525,7 @@ export const Form = ({
 					data-fb-presentation={activePresentation.name}
 					data-fb-density={activePresentation.density}
 				>
+					{honeypotName ? <Honeypot name={honeypotName} inputRef={honeypotRef} /> : null}
 					<FormLayout enabled={layout !== false}>
 						{rendered.map((field) => {
 							const renderer = rendererRegistry.get(field.blockType)
