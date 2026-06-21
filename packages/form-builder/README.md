@@ -1158,6 +1158,67 @@ The `<Poll>` localStorage guard is per-browser UX: it stops the same browser re-
 
 Cookie and IP identity dedup arrives with the spam phase.
 
+## File uploads (spec 11.6)
+
+A `file` field backed by a configurable upload collection. The client uploads to the collection and submits only the upload id; the server re-reads the file metadata from the stored doc and enforces MIME/size, so the client is never trusted for it.
+
+### The `file` field
+
+```ts
+{
+  blockType: 'file',
+  name: 'resume',
+  label: 'Resume',
+  required: true,
+  relationTo: 'form-uploads',          // upload collection (default: form-uploads)
+  mimeTypes: ['application/pdf', 'image/*'],
+  maxSize: 5_000_000,                  // bytes
+}
+```
+
+The submitted value is a self-describing `FileRef` snapshot, captured server-side:
+
+```ts
+type FileRef = { id: string | number; filename: string; mimeType: string; filesize: number; url?: string }
+```
+
+### Upload collection (the `uploads` option)
+
+The plugin ships a built-in `form-uploads` collection, on by default. It allows anonymous create (public forms upload here) and gates read/update/delete to authenticated users.
+
+```ts
+formBuilder({
+  uploads: true,                       // default: ship form-uploads
+  // uploads: false,                   // bring your own; set the file field's relationTo to it
+  // uploads: { slug, upload: { staticDir, mimeTypes }, access, fields },  // configure the built-in
+})
+```
+
+Storage is the project's responsibility: configure `upload.staticDir` or a Payload storage adapter (S3, etc.). The collection has no `imageSizes`, so it needs no `sharp`.
+
+### Server enforcement (the trust boundary)
+
+On submit, `runSubmission` loads the referenced upload doc and re-validates it against the field's `mimeTypes`/`maxSize`, capturing the authoritative `FileRef`. A missing, disallowed, or oversize file blocks the submission with a per-field error; required presence rides the normal required rule. The client-sent filename/mimeType/filesize are never stored. Set `resultsField`-style PII care here too: only the upload id crosses the wire.
+
+### Renderer and client helper
+
+The headless `file` renderer (and its shadcn parity) is a file input that uploads on change and stores the returned id; `uploadFile` is the underlying client helper:
+
+```tsx
+import { uploadFile } from '@10x-media/form-builder/react'
+
+const result = await uploadFile({ file, collection: 'form-uploads' })
+if (result.ok) {
+  // result.id is the upload id to store as the field value
+}
+```
+
+The admin answers view renders a file answer as a download link when the `FileRef` carries a url.
+
+### Deferred
+
+Multiple files per field, per-upload ownership scoping (binding an upload to its form/session), and rate-limiting on the public upload path are v1.x / spam-phase follow-ups.
+
 ## Requirements
 
 - Payload v3 (peer: `payload@^3.82.0`)
@@ -1230,6 +1291,10 @@ formBuilder({
 | `fields` | `FieldTypesConfig` | `{}` | Per-type registry override. `false` removes a built-in, `true` keeps it, an object adds a new type or replaces one. |
 | `rules` | `ValidationRulesConfig` | `{}` | Per-rule registry override. `false` removes a built-in, `true` keeps it, an object adds a new rule or replaces one. |
 | `events` | `FormEventSink` | `undefined` | Pluggable sink for form lifecycle events; defaults to a no-op. Consumed by the submission pipeline in a later phase. |
+| `presentations` | `PresentationsDescriptorConfig` | `{}` | Per-presentation registry override (page/modal/drawer/inline + custom). `false` removes, `true` keeps, an object adds or replaces one. |
+| `actions` | `ActionsConfig` | `{}` | Per-action registry override (email/confirmation/signed-webhook + custom). `false` removes, `true` keeps, an object adds or replaces one. |
+| `consentSources` | `ConsentSourcesConfig` | `{}` | Per-consent-source registry override (static/pageReference + custom). `false` removes, `true` keeps, an object adds or replaces one. |
+| `uploads` | `UploadsOption` | `true` | Built-in `form-uploads` collection backing file fields. `false` brings your own (set the file field's `relationTo`); an object overrides slug/upload/access/fields. |
 
 ## License
 

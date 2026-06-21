@@ -17,6 +17,7 @@ export type {
 	SubmissionStatusFilter,
 } from '../aggregation/types'
 export type { CalcExpression } from '../calc/types'
+export type { UploadsCollectionConfig, UploadsOption } from '../collections/uploads'
 export type { FieldCondition } from '../conditions/types'
 export type { ConsentProof } from '../consent/captureConsent'
 export type {
@@ -59,6 +60,7 @@ export type {
 	SubmissionFieldError,
 	SubmissionValue,
 } from '../submissions/types'
+export type { FileFieldConfig, FileRef, FileRefError } from '../uploads/types'
 export type {
 	ValidationRuleOption,
 	ValidationRuleRegistry,

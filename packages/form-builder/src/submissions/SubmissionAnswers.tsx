@@ -13,6 +13,17 @@ type SubmissionDoc = {
 	locale?: string
 }
 
+/** A stored file answer's link, when the captured `FileRef` carries a url; null otherwise. */
+const fileHref = (raw: unknown): { url: string; filename: string } | null => {
+	if (raw && typeof raw === 'object' && 'url' in raw) {
+		const ref = raw as { url?: unknown; filename?: unknown }
+		if (typeof ref.url === 'string' && ref.url.length > 0) {
+			return { url: ref.url, filename: typeof ref.filename === 'string' ? ref.filename : ref.url }
+		}
+	}
+	return null
+}
+
 /**
  * Read-only, localized submission view (server component). Renders each answered field's snapshot
  * label next to its type-aware formatted value via the field type's `format`, using the request
@@ -50,10 +61,19 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 						: raw == null
 							? ''
 							: String(raw)
+					const href = descriptor.fieldType === 'file' ? fileHref(raw) : null
 					return (
 						<div key={descriptor.field}>
 							<dt>{descriptor.label}</dt>
-							<dd>{formatted}</dd>
+							<dd>
+								{href ? (
+									<a href={href.url} rel="noreferrer">
+										{href.filename}
+									</a>
+								) : (
+									formatted
+								)}
+							</dd>
 						</div>
 					)
 				})}
