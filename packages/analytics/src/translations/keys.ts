@@ -27,6 +27,11 @@ export const keys = {
 	timeframeLast90Days: 'analytics:timeframeLast90Days',
 	timeframeThisMonth: 'analytics:timeframeThisMonth',
 	timeframeThisYear: 'analytics:timeframeThisYear',
+	widgetMetricLabel: 'analytics:widgetMetricLabel',
+	widgetFieldTitle: 'analytics:widgetFieldTitle',
+	widgetFieldMetric: 'analytics:widgetFieldMetric',
+	widgetFieldTimeframe: 'analytics:widgetFieldTimeframe',
+	widgetFieldDataSource: 'analytics:widgetFieldDataSource',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -7,6 +7,7 @@ export type AnalyticsPluginOptions = {
 	defaultAdapter?: string
 	collections?: Record<string, AnalyticsBinding>
 	cache?: { ttl?: { aggregate?: number; realtime?: number } }
+	widgets?: boolean | { disabled?: string[] }
 }
 
 export interface ResolvedOptions {
@@ -14,6 +15,7 @@ export interface ResolvedOptions {
 	defaultAdapter?: string
 	bindings: Record<string, ResolvedBinding>
 	cache: { ttl: { aggregate: number; realtime: number } }
+	widgets: { enabled: boolean; disabled: string[] }
 }
 
 const resolveBindings = (
@@ -33,6 +35,12 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 	if (!options.adapters || options.adapters.length === 0) {
 		throw new Error('analytics: at least one adapter is required')
 	}
+	const widgets =
+		options.widgets === false
+			? { enabled: false, disabled: [] as string[] }
+			: options.widgets === undefined || options.widgets === true
+				? { enabled: true, disabled: [] as string[] }
+				: { enabled: true, disabled: options.widgets.disabled ?? [] }
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
@@ -43,5 +51,6 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 				realtime: options.cache?.ttl?.realtime ?? 300,
 			},
 		},
+		widgets,
 	}
 }

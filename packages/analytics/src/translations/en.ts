@@ -29,4 +29,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.timeframeLast90Days]: 'Last 90 days',
 	[keys.timeframeThisMonth]: 'This month',
 	[keys.timeframeThisYear]: 'This year',
+	[keys.widgetMetricLabel]: 'Metric',
+	[keys.widgetFieldTitle]: 'Title',
+	[keys.widgetFieldMetric]: 'Metric',
+	[keys.widgetFieldTimeframe]: 'Timeframe',
+	[keys.widgetFieldDataSource]: 'Data source',
 }

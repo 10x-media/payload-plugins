@@ -6,6 +6,7 @@ import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
 import { kvCacheStore } from './surfacing/cacheStore'
 import { createEngine } from './surfacing/engine'
+import { registerWidgets } from './widgets/registerWidgets'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -24,6 +25,13 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		const registry = createRegistry(resolved.adapters, resolved.defaultAdapter)
 		for (const adapter of resolved.adapters) {
 			adapter.register?.(config)
+		}
+		if (resolved.widgets.enabled) {
+			registerWidgets(config, {
+				adapters: resolved.adapters,
+				multiProvider: registry.isMultiProvider(),
+				disabled: resolved.widgets.disabled,
+			})
 		}
 		const prevOnInit = config.onInit
 		config.onInit = async (payload) => {
