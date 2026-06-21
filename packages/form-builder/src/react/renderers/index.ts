@@ -3,6 +3,7 @@ import { calculationRenderer } from './calculation'
 import { checkboxRenderer } from './checkbox'
 import { consentRenderer } from './consent'
 import { emailRenderer } from './email'
+import { fileRenderer } from './file'
 import { numberRenderer } from './number'
 import { selectRenderer } from './select'
 import { textRenderer } from './text'
@@ -14,6 +15,7 @@ export const defaultRenderers: Record<string, FieldRenderer> = {
 	checkbox: checkboxRenderer as FieldRenderer,
 	consent: consentRenderer as FieldRenderer,
 	email: emailRenderer as FieldRenderer,
+	file: fileRenderer as FieldRenderer,
 	number: numberRenderer as FieldRenderer,
 	select: selectRenderer as FieldRenderer,
 	text: textRenderer as FieldRenderer,
