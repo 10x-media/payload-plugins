@@ -6,7 +6,7 @@ export type RendererTranslate = (key: string) => string
 
 /**
  * The props every field renderer receives. The renderer turns one field instance plus its current value
- * into an accessible control. Supplied by `<Form>` (Phase 4b) or directly in tests. Generic over the
+ * into an accessible control. Supplied by `<Form>` or directly in tests. Generic over the
  * value type so custom renderers can narrow it.
  */
 export type FieldRendererProps<TValue = unknown> = {

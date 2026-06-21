@@ -57,7 +57,7 @@ export type FormFieldFormat<K extends FormFieldValueKind, TConfig extends FormFi
 
 /**
  * A field type, authored once. `value` drives typed `validate`/`format`; `config` is a Payload
- * `Field[]` for the add-field drawer; `Field` is the client renderer import-map ref (Phase 4);
+ * `Field[]` for the add-field drawer; `Field` is the client renderer import-map ref;
  * `label` is an i18n key or a literal.
  */
 export type FormFieldDefinition<
@@ -79,7 +79,7 @@ export type FormFieldDefinition<
 	conditionType?: ConditionFieldType
 }
 
-/** The erased shape stored in the heterogeneous registry. Value is `unknown`; config re-narrows per matched type at execution (spec 7.5). */
+/** The erased shape stored in the heterogeneous registry. Value is `unknown`; config re-narrows per matched type at execution. */
 export type AnyFormFieldValidate = (args: {
 	value: unknown
 	config: FormFieldConfigValues

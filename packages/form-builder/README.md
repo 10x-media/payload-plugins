@@ -50,9 +50,9 @@ export function ContactForm({ form }: { form: FormDocument }) {
 }
 ```
 
-`form` is a `forms` document loaded via Payload's Local or REST API. A complete working example (a multi-step form and a poll) lives in this package's `dev/app/(frontend)/`. For styled components, install the shadcn registry block (see [shadcn registry](#styled-components-shadcn-registry-phase-5)); to bring your own markup, supply renderers via `defineFieldRenderer` (see [BYO styling](#bring-your-own-styling-byo)).
+`form` is a `forms` document loaded via Payload's Local or REST API. A complete working example (a multi-step form and a poll) lives in this package's `dev/app/(frontend)/`. For styled components, install the shadcn registry block (see [shadcn registry](#styled-components-shadcn-registry)); to bring your own markup, supply renderers via `defineFieldRenderer` (see [BYO styling](#bring-your-own-styling-byo)).
 
-## What ships in Phase 1
+## Fields and submissions
 
 - **`defineFormField`** defines a field type once and yields four facets from a single object: a Payload `Field[]` for the add-field drawer, a typed isomorphic `validate`, a localized `format`, and a `value` kind that drives the typed value threaded into `validate`/`format`.
 - **Core field set**: `text`, `textarea`, `email`, `number`, `select`, and `checkbox`, each authored through the same primitive so custom field types are never second-class.
@@ -61,7 +61,7 @@ export function ContactForm({ form }: { form: FormDocument }) {
 - **Typed, self-describing, localized submissions**: each submission stores typed values plus a localized descriptor snapshot taken at submit time, validated server-side. The client is never trusted.
 - **Formatted admin answers view**: submissions render through a read-only answers view that formats each value with its field type's `format`.
 
-## Validation (Phase 2)
+## Validation
 
 - **Per-field validation rules in the admin**: each field carries a constraint list authored as native blocks. Built-in rules cover `minLength`, `maxLength`, `min`, `max`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`.
 - **Custom localized messages and severity**: every rule instance can override its message with `{var}` interpolation and run as an `error` (blocks submission) or a `warning` (advisory).
@@ -69,7 +69,7 @@ export function ContactForm({ form }: { form: FormDocument }) {
 - **Custom rule types** via `defineValidationRule`: define a rule type once and it yields its admin params and a typed `validate` for the engine, exactly like the built-ins. Override the registry through the `rules` option: `false` removes a built-in, `true` keeps it, an object adds a new rule or replaces one.
 - **Standard Schema escape hatch**: each field type can validate against any [Standard Schema](https://standardschema.dev) validator (zod, valibot, and others), bypassing the rule list when a schema is the better fit.
 
-## Conditional logic (Phase 3)
+## Conditional logic
 
 - **`visibleWhen` and `validateWhen` per field**: every field can declare two conditions in Payload's `Where` shape over its sibling answers, for example `{ or: [{ and: [{ country: { equals: 'US' } }] }] }`. The same query operators you already use elsewhere in Payload drive form logic.
 - **Hidden fields are skipped entirely**: when `visibleWhen` evaluates false, the field is not validated, its value is not stored, and any value the client sent for it is ignored. A hidden field cannot leak data into a submission.
@@ -77,7 +77,7 @@ export function ContactForm({ form }: { form: FormDocument }) {
 - **Server-authoritative, pure, and isomorphic**: conditions are enforced server-side by `evaluateCondition`, a pure engine that mirrors Payload's query-operator semantics (coerce then compare) with no `req` or database access. It is exported so the renderer and your own code can reuse the exact same logic client-side.
 - **Native condition builder UI**: conditions are authored with a Payload-style condition builder on each field (field, operator, value, the same look as Payload's list filters), stored as a canonical `Where`, normalized and validated server-side. The serializable format means the renderer reuses the exact same `evaluateCondition` client-side.
 
-## Headless renderer foundation (Phase 4a)
+## Headless renderer
 
 `@10x-media/form-builder/react` exports the headless renderer layer. It has no opinion on styling; bring your own CSS or opt into the included container-query grid.
 
@@ -164,9 +164,9 @@ import { FormLayout, widthProps } from '@10x-media/form-builder/react'
 
 `FieldWidth` values: `full`, `half`, `third`, `twoThirds`. Omit the import for your own layout; `FormLayout` still renders a plain container wrapper with no grid class when `enabled={false}`.
 
-## Headless renderer: Form controller (Phase 4b)
+## The Form controller
 
-Phase 4b ships the orchestrating `<Form>` component and the hooks that power fully custom layouts.
+The orchestrating `<Form>` component and the hooks that power fully custom layouts.
 
 ### Basic usage
 
@@ -285,9 +285,9 @@ When you pass `children`, `<Form>` renders them inside its context (instead of t
 
 `FormState` carries: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, and `submitError`.
 
-## Styled components: shadcn registry (Phase 5)
+## Styled components: shadcn registry
 
-Phase 5 ships a [shadcn registry](https://ui.shadcn.com/docs/registry) block that installs styled field renderers and a `<FormBuilderForm>` preconfigured with them into your own codebase. You own the copied files and can restyle them however you like.
+A [shadcn registry](https://ui.shadcn.com/docs/registry) block installs styled field renderers and a `<FormBuilderForm>` preconfigured with them into your own codebase. You own the copied files and can restyle them however you like.
 
 ### Install
 
@@ -375,7 +375,7 @@ The wrapper `<div>` also receives a `data-invalid` attribute (present with empty
 }
 ```
 
-For the container-query layout grid, import the stylesheet and use `FormLayout` + `widthProps` as described in the Phase 4a section. The grid uses `fb-form--grid` on the container and `data-width` on each field slot (`full`, `half`, `third`, `twoThirds`).
+For the container-query layout grid, import the stylesheet and use `FormLayout` + `widthProps` as described in the headless renderer section. The grid uses `fb-form--grid` on the container and `data-width` on each field slot (`full`, `half`, `third`, `twoThirds`).
 
 ```ts
 import '@10x-media/form-builder/styles.css'
@@ -470,7 +470,7 @@ Any renderer you write must satisfy these to match `FieldShell`'s baseline:
 - The required asterisk (or whatever indicator you use) must be `aria-hidden`; do not rely on it as the sole signal.
 - `required` on the native control so browser-native validation is consistent.
 
-## Multi-step forms (Phase 6a)
+## Multi-step forms
 
 A form document can carry an optional `flow` property that layers a serializable step graph over its flat field list. When `flow` is absent or has fewer than two steps, `<Form>` behaves as a standard single-step form; no migration or schema change is needed to adopt the feature incrementally.
 
@@ -582,7 +582,7 @@ import {
 
 All four are pure and isomorphic (no React, no DOM).
 
-## Presentations (Phase 6b)
+## Presentations
 
 A presentation is a named configuration bundle that controls how a form is surfaced to the visitor: where it appears in the page, how the overlay behaves, and whether it dismisses on success. Four presentations ship by default.
 
@@ -704,7 +704,7 @@ The built-in overlay (`DialogSurface`) ships a dependency-free, spec-compliant b
 
 Per-presentation style overrides, popover and exit-intent trigger modes, styled shadcn `Dialog` and `Sheet` wrappers (coming with the visual pass), and a React portal for the overlay DOM node (overlays currently use CSS `position: fixed`) are all planned for a later release.
 
-## Answer recall and prefill (Phase 6c)
+## Answer recall and prefill
 
 ### Recall (piping)
 
@@ -785,7 +785,7 @@ valuesFromSearchParams(params, fields, registry, { allow: ['source'] })
 
 The `hidden` flag is render-only. The server stores and validates the field normally. A hidden field that is required and not prefilled will fail validation on submit, so hidden fields should be optional or reliably prefilled.
 
-## Calculations and scoring (Phase 6d)
+## Calculations and scoring
 
 A `calculation` field is a read-only numeric field whose value is derived from a serializable expression tree over other answers. The value is computed live client-side for display, then re-computed authoritatively on the server at submit. The server value is never taken from the client; it is the authoritative value stored in the submission, used in conditions, and checked by validation rules.
 
@@ -978,7 +978,7 @@ import type { FormEvent, FormEventSink } from '@10x-media/form-builder/types'
 
 Conditional notifications (only send an action when a condition is met) are planned for v1.x.
 
-## Consent (Phase 8)
+## Consent
 
 The consent field captures affirmative, checkbox-based consent with a built-in compliance baseline: unchecked by default, required to submit unless `optional: true` is set, and proof stored by reference -- never by copying policy text.
 
@@ -1095,7 +1095,7 @@ import { Form, defaultRenderers, resolveRenderers } from '@10x-media/form-builde
 
 Integration with c15t (consent management infrastructure) and retention-pruning of consent proofs are planned for a later release.
 
-## Polls and response aggregation (Phase 9)
+## Polls and response aggregation
 
 Submissions are a collection, so aggregation is a query. This phase ships a submission-aggregation utility, a `<FormResults>` renderer (headless plus shadcn), a gated public results endpoint, and a turnkey `<Poll>` component. The same utility powers survey response summaries.
 
@@ -1202,7 +1202,7 @@ The `<Poll>` localStorage guard is per-browser UX: it stops the same browser re-
 
 Cookie and IP identity dedup arrives with the spam phase.
 
-## File uploads (spec 11.6)
+## File uploads
 
 A `file` field backed by a configurable upload collection. The client uploads to the collection and submits only the upload id; the server re-reads the file metadata from the stored doc and enforces MIME/size, so the client is never trusted for it.
 
@@ -1263,7 +1263,7 @@ The admin answers view renders a file answer as a download link when the `FileRe
 
 Multiple files per field is a v1.x follow-up. Per-upload ownership scoping and rate-limiting on the public upload path now ship with the spam controls below.
 
-## Spam and abuse prevention (spec 11.7)
+## Spam and abuse prevention
 
 A honeypot decoy and per-identity rate limiting are **on by default** on the public submission and upload paths, with a captcha adapter seam and server-stamped upload ownership. Everything is opt-out, per control or with `spam: false`.
 

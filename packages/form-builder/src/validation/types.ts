@@ -69,7 +69,7 @@ export type ValidationRuleDefinition<
 	validate: ValidationRuleValidate<TParams, TValue, TData>
 }
 
-/** Erased shape stored in the heterogeneous registry; params re-narrow per matched rule at execution (spec 7.5). */
+/** Erased shape stored in the heterogeneous registry; params re-narrow per matched rule at execution. */
 export type AnyValidationRuleValidate = (args: {
 	value: unknown
 	params: ValidationParams

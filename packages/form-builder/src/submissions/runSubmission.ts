@@ -114,7 +114,7 @@ export type RunSubmissionResult = {
  * field whose `visibleWhen` is false is skipped entirely (never validated, never stored, so a client-sent
  * value for it is ignored), and a visible field whose `validateWhen` is false stores its value but skips
  * validation. A visible calc field stores its derived value and is never validated. Only `error` severity
- * blocks; warnings are computed but not surfaced server-side (the Phase 4 renderer shows them).
+ * blocks; warnings are computed but not surfaced server-side (the renderer surfaces them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
 	const {

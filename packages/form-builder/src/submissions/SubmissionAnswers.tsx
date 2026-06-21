@@ -27,8 +27,8 @@ const fileHref = (raw: unknown): { url: string; filename: string } | null => {
 /**
  * Read-only, localized submission view (server component). Renders each answered field's snapshot
  * label next to its type-aware formatted value via the field type's `format`, using the request
- * locale and i18n, with no client bundle. Phase 1 formats the built-in field types; threading the
- * full resolved registry (custom types) to the view is a later phase.
+ * locale and i18n, with no client bundle. The built-in field types are formatted directly; threading
+ * the full resolved registry (custom types) to the view is a future enhancement.
  */
 export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 	const doc = (data ?? {}) as SubmissionDoc

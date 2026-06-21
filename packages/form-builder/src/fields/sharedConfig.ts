@@ -22,7 +22,7 @@ const conditionField = (
 
 /**
  * Config every field instance carries regardless of type. `name` is the machine key written into
- * submissions; `width` is stored now for the Phase 4 layout grid. `visibleWhen`/`validateWhen` store a
+ * submissions; `width` is stored for the layout grid. `visibleWhen`/`validateWhen` store a
  * canonical Payload `Where`, edited by the native condition builder. Field types add their own `config`
  * after these.
  */
