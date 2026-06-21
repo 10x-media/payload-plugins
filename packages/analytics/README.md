@@ -163,6 +163,32 @@ Every factory accepts an optional `timeframe` (a relative preset: `today`, `last
 
 The display components are server components; add `@10x-media/analytics/rsc` to your Payload import map (run `payload generate:importmap`) so the admin can resolve them.
 
+## Dashboard widgets
+
+The plugin registers capability-filtered widgets into `admin.dashboard.widgets`. A widget that requires a metric no configured adapter supports is not registered, so dead surfaces never appear.
+
+Widgets are enabled by default. Disable them entirely with `widgets: false`, or drop specific slugs with `widgets: { disabled: ['analytics-metric'] }`.
+
+The metric widget is configurable per instance: pick a metric, a relative timeframe, and (when more than one adapter is configured) a data source.
+
+A plugin must never set `admin.dashboard.defaultLayout` (Payload applies it with `??=`; a setter would clobber the app's own layout). Instead, the app places widgets by spreading the exported helper into its own config:
+
+```ts
+import { analytics, analyticsDefaultWidgets } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export default buildConfig({
+  admin: {
+    dashboard: { defaultLayout: [...analyticsDefaultWidgets()] },
+  },
+  plugins: [analytics({ adapters: [native()] })],
+})
+```
+
+`analyticsDefaultWidgets()` returns two small metric widgets: pageviews and visitors, both over the last 30 days.
+
+> The Modular Dashboard is an experimental Payload feature (PR #15700). After installing, run `payload generate:importmap` so the widget's server component resolves in the admin.
+
 ## Provider adapters
 
 Third-party providers implement the same `AnalyticsAdapter` contract and ship as code-split subpaths, so a site installs only what it uses.

@@ -75,3 +75,4 @@ export {
 	analyticsTab,
 } from './fields/factories'
 export type { TimeframePreset } from './timeframe/presets'
+export { analyticsDefaultWidgets } from './widgets/defaults'

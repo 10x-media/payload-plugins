@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { analytics, analyticsStat, analyticsStatRow, analyticsTab } from '../src/index'
+import {
+	analytics,
+	analyticsDefaultWidgets,
+	analyticsStat,
+	analyticsStatRow,
+	analyticsTab,
+} from '../src/index'
 import { native } from '../src/native/nativeAdapter'
 import { seedDev } from './helpers/seed'
 
@@ -65,9 +71,9 @@ export default buildConfig({
 	},
 	typescript: { autoGenerate },
 	admin: {
-		importMap: {
-			autoGenerate,
-			baseDir: path.resolve(dirname),
+		importMap: { autoGenerate, baseDir: path.resolve(dirname) },
+		dashboard: {
+			defaultLayout: [...analyticsDefaultWidgets()],
 		},
 	},
 })
