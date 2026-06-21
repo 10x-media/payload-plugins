@@ -10,21 +10,21 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 ## Features
 
-- **Field model** — `defineFormField` defines a field type once and yields its admin authoring, a typed isomorphic `validate`, a localized `format`, and a value kind. Core set: text, textarea, email, number, select, checkbox, date, file, consent, calculation. Every seam is `false | true | object` overridable.
-- **Validation subsystem** — declarative per-field rules (`defineValidationRule`), custom messages + severity, cross-field + async server-only rules, a Standard Schema escape hatch, one server-authoritative engine.
-- **Conditional logic** — serializable `visibleWhen`/`validateWhen` with a native Payload-style builder, evaluated by one isomorphic engine (client preview + server enforcement).
-- **Headless renderer** — `@10x-media/form-builder/react`: `<Form>` with progressive validation, conditional visibility, lifecycle events, accessible primitives + built-in renderers, an optional container-query layout grid; a shadcn registry block and bring-your-own renderers.
-- **Multi-step flow** — a serializable flow state machine with conditional branching/skipping.
-- **Presentations** — page, modal, drawer, inline (+ custom), with composable accessible overlay primitives.
-- **Recall + prefill** — pipe earlier answers into later labels and the thank-you screen; URL/query prefill; hidden context fields.
-- **Calculations + scoring** — a safe (no-eval) expression engine for pricing, quotes, and quizzes.
-- **Post-submit pipeline** — email, confirmation, signed webhook, and custom actions (queued via Payload jobs / `@10x-media/jobs`, with a bounded-inline fallback) + a typed lifecycle event taxonomy through a pluggable sink.
-- **Consent** — a compliant consent field with three sources + a published-version capture utility, proof by reference.
-- **Polls + aggregation** — a submission-aggregation utility, `<FormResults>` (headless + shadcn), and a `<Poll>` pattern.
-- **File uploads** — a file field backed by a configurable upload collection, server-enforced MIME/size/required, self-describing references.
-- **Spam basics** — honeypot + rate-limiting on by default, a captcha adapter seam, upload-ownership scoping, privacy-first capture metadata.
-- **Accessibility** — accessible defaults verified by automated axe checks (jsdom + real-browser e2e); a documented a11y contract.
-- **i18n** — typed keys, flat `en`, host-overridable, never depending on `@payloadcms/translations`.
+- **Field model** -- `defineFormField` defines a field type once and yields its admin authoring, a typed isomorphic `validate`, a localized `format`, and a value kind. Core set: text, textarea, email, number, select, checkbox, date, file, consent, calculation. Every seam is `false | true | object` overridable.
+- **Validation subsystem** -- declarative per-field rules (`defineValidationRule`), custom messages + severity, cross-field + async server-only rules, a Standard Schema escape hatch, one server-authoritative engine.
+- **Conditional logic** -- serializable `visibleWhen`/`validateWhen` with a native Payload-style builder, evaluated by one isomorphic engine (client preview + server enforcement).
+- **Headless renderer** -- `@10x-media/form-builder/react`: `<Form>` with progressive validation, conditional visibility, lifecycle events, accessible primitives + built-in renderers, an optional container-query layout grid; a shadcn registry block and bring-your-own renderers.
+- **Multi-step flow** -- a serializable flow state machine with conditional branching/skipping.
+- **Presentations** -- page, modal, drawer, inline (+ custom), with composable accessible overlay primitives.
+- **Recall + prefill** -- pipe earlier answers into later labels and the thank-you screen; URL/query prefill; hidden context fields.
+- **Calculations + scoring** -- a safe (no-eval) expression engine for pricing, quotes, and quizzes.
+- **Post-submit pipeline** -- email, confirmation, signed webhook, and custom actions (queued via Payload jobs / `@10x-media/jobs`, with a bounded-inline fallback) + a typed lifecycle event taxonomy through a pluggable sink.
+- **Consent** -- a compliant consent field with three sources + a published-version capture utility, proof by reference.
+- **Polls + aggregation** -- a submission-aggregation utility, `<FormResults>` (headless + shadcn), and a `<Poll>` pattern.
+- **File uploads** -- a file field backed by a configurable upload collection, server-enforced MIME/size/required, self-describing references.
+- **Spam basics** -- honeypot + rate-limiting on by default, a captcha adapter seam, upload-ownership scoping, privacy-first capture metadata.
+- **Accessibility** -- accessible defaults verified by automated axe checks (jsdom + real-browser e2e); a documented a11y contract.
+- **i18n** -- typed keys, flat `en`, host-overridable, never depending on `@payloadcms/translations`.
 
 ## Quickstart
 
@@ -1322,7 +1322,7 @@ When a provider is configured, a submission without a valid token is rejected. P
 
 ### Upload ownership
 
-Each upload to the built-in `form-uploads` collection is stamped with the uploader's identity (`owner`). At submit, a file reference is captured only if the submitting identity matches the upload's owner, so an anonymous submitter cannot reference another identity's upload; a mismatch is treated as a missing file. When the submitter cannot be identified (no resolvable identity), ownership is not enforced (fail-open) — a proxy-configured deployment identifies every request, so this only relaxes scoping where it could not apply fairly anyway. Unstamped uploads (no identity at upload time, or a bring-your-own collection without the field) are unaffected. Ownership granularity is identity-level (IP for anonymous traffic): clients sharing a NAT share scope, and an identity that changes between upload and submit (a rotating mobile IP) will not match its own earlier upload. A per-session token is a v1.x option.
+Each upload to the built-in `form-uploads` collection is stamped with the uploader's identity (`owner`). At submit, a file reference is captured only if the submitting identity matches the upload's owner, so an anonymous submitter cannot reference another identity's upload; a mismatch is treated as a missing file. When the submitter cannot be identified (no resolvable identity), ownership is not enforced (fail-open) -- a proxy-configured deployment identifies every request, so this only relaxes scoping where it could not apply fairly anyway. Unstamped uploads (no identity at upload time, or a bring-your-own collection without the field) are unaffected. Ownership granularity is identity-level (IP for anonymous traffic): clients sharing a NAT share scope, and an identity that changes between upload and submit (a rotating mobile IP) will not match its own earlier upload. A per-session token is a v1.x option.
 
 ### Capture metadata (privacy)
 

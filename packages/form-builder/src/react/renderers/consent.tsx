@@ -11,10 +11,11 @@ export const consentRenderer = defineFieldRenderer<boolean>(
 		const id = useId()
 		const describedById = `${id}-desc`
 		// The visible agreement text labels the checkbox. Prefer the explicit `statement`; fall back to the
-		// field `label` so a consent field authored with only a label is never an unlabelled control (a11y).
-		const statement =
-			(typeof field.statement === 'string' ? field.statement : undefined) ??
-			(typeof field.label === 'string' ? field.label : undefined)
+		// field `label` so a consent field authored with only a label (or a blank statement) is never an
+		// unlabelled control (a11y). A blank or whitespace-only value counts as absent.
+		const text = (raw: unknown): string | undefined =>
+			typeof raw === 'string' && raw.trim() !== '' ? raw : undefined
+		const statement = text(field.statement) ?? text(field.label)
 
 		const links: ConsentLink[] = Array.isArray(field.consentLinks)
 			? (field.consentLinks as ConsentLink[])

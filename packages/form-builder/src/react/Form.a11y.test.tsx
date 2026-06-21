@@ -71,4 +71,23 @@ describe('Form accessibility (axe)', () => {
 		)
 		expect(await axeViolations(container)).toEqual([])
 	})
+
+	it('a consent field with a blank statement falls back to the field label (still labelled)', async () => {
+		const { container } = render(
+			<Form
+				form={doc([
+					{
+						blockType: 'consent',
+						name: 'terms',
+						label: 'I agree to the terms',
+						statement: '',
+						source: 'static',
+						sourceConfig: { label: 'Terms of Service', url: 'https://example.com/terms' },
+					} as FormFieldInstance,
+				])}
+			/>
+		)
+		expect(await axeViolations(container)).toEqual([])
+		expect(screen.getByText('I agree to the terms')).toBeTruthy()
+	})
 })
