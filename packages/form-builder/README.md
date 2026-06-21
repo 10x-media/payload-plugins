@@ -6,7 +6,51 @@ An end-to-end forms platform for Payload v3: author, validate, render, collect, 
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Status: beta. Phase 1 ships the field spine: the `defineFormField` primitive, a core field set, native-block authoring, server-validated typed submissions, and a formatted admin answers view. Phase 2 adds the declarative validation subsystem. Phase 3 adds serializable conditional logic: `visibleWhen`/`validateWhen` per field with a native, Payload-style condition builder UI (field/operator/value, the same look as Payload's list filters), enforced server-side by a pure isomorphic engine. Phase 4 ships the headless `@10x-media/form-builder/react` renderer: the renderer contract, registry, accessible primitives, built-in field renderers, an optional container-query layout grid, and the orchestrating `<Form>` with progressive client-side validation, conditional visibility, submission, and lifecycle events. The post-submit action pipeline (email, webhooks) lands in a subsequent phase. Phase 5 ships a shadcn registry block (styled field renderers + `<FormBuilderForm>`) plus bring-your-own-styling docs.
+> Status: beta, feature-complete v1. Published under the `beta` dist-tag until a stable 1.0. The per-phase sections below double as the detailed feature reference; start with [Features](#features) and [Quickstart](#quickstart).
+
+## Features
+
+- **Field model** — `defineFormField` defines a field type once and yields its admin authoring, a typed isomorphic `validate`, a localized `format`, and a value kind. Core set: text, textarea, email, number, select, checkbox, date, file, consent, calculation. Every seam is `false | true | object` overridable.
+- **Validation subsystem** — declarative per-field rules (`defineValidationRule`), custom messages + severity, cross-field + async server-only rules, a Standard Schema escape hatch, one server-authoritative engine.
+- **Conditional logic** — serializable `visibleWhen`/`validateWhen` with a native Payload-style builder, evaluated by one isomorphic engine (client preview + server enforcement).
+- **Headless renderer** — `@10x-media/form-builder/react`: `<Form>` with progressive validation, conditional visibility, lifecycle events, accessible primitives + built-in renderers, an optional container-query layout grid; a shadcn registry block and bring-your-own renderers.
+- **Multi-step flow** — a serializable flow state machine with conditional branching/skipping.
+- **Presentations** — page, modal, drawer, inline (+ custom), with composable accessible overlay primitives.
+- **Recall + prefill** — pipe earlier answers into later labels and the thank-you screen; URL/query prefill; hidden context fields.
+- **Calculations + scoring** — a safe (no-eval) expression engine for pricing, quotes, and quizzes.
+- **Post-submit pipeline** — email, confirmation, signed webhook, and custom actions (queued via Payload jobs / `@10x-media/jobs`, with a bounded-inline fallback) + a typed lifecycle event taxonomy through a pluggable sink.
+- **Consent** — a compliant consent field with three sources + a published-version capture utility, proof by reference.
+- **Polls + aggregation** — a submission-aggregation utility, `<FormResults>` (headless + shadcn), and a `<Poll>` pattern.
+- **File uploads** — a file field backed by a configurable upload collection, server-enforced MIME/size/required, self-describing references.
+- **Spam basics** — honeypot + rate-limiting on by default, a captcha adapter seam, upload-ownership scoping, privacy-first capture metadata.
+- **Accessibility** — accessible defaults verified by automated axe checks (jsdom + real-browser e2e); a documented a11y contract.
+- **i18n** — typed keys, flat `en`, host-overridable, never depending on `@payloadcms/translations`.
+
+## Quickstart
+
+Add the plugin to your Payload config:
+
+```ts
+import { formBuilder } from '@10x-media/form-builder'
+
+export default buildConfig({
+  // ...
+  plugins: [formBuilder()],
+})
+```
+
+Author a form in the admin (the `forms` collection), fetch it, and render it with the headless renderer:
+
+```tsx
+import { Form } from '@10x-media/form-builder/react'
+import '@10x-media/form-builder/styles.css'
+
+export function ContactForm({ form }: { form: FormDocument }) {
+  return <Form form={form} />
+}
+```
+
+`form` is a `forms` document loaded via Payload's Local or REST API. A complete working example (a multi-step form and a poll) lives in this package's `dev/app/(frontend)/`. For styled components, install the shadcn registry block (see [shadcn registry](#styled-components-shadcn-registry-phase-5)); to bring your own markup, supply renderers via `defineFieldRenderer` (see [BYO styling](#bring-your-own-styling-byo)).
 
 ## What ships in Phase 1
 
