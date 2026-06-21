@@ -7,6 +7,7 @@ import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { PresentationDescriptorRegistry } from '../presentations/registry'
+import type { ResolvedSpamConfig } from '../spam/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
 
 type RegisterCollectionsArgs = {
@@ -19,6 +20,7 @@ type RegisterCollectionsArgs = {
 	hasJobsPlugin: boolean
 	events?: FormEventSink
 	uploads: { enabled: boolean; slug: string; collection?: CollectionConfig }
+	spam: ResolvedSpamConfig | false
 }
 
 export const registerCollections = ({
@@ -31,6 +33,7 @@ export const registerCollections = ({
 	hasJobsPlugin,
 	events,
 	uploads,
+	spam,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
@@ -46,6 +49,7 @@ export const registerCollections = ({
 			events,
 			hasRunner,
 			uploadSlug: uploads.slug,
+			spam,
 		}),
 	]
 }

@@ -121,6 +121,9 @@ export const keys = {
 	fileConfigRelationTo: 'formBuilder:file.config.relationTo',
 	fileConfigMimeTypes: 'formBuilder:file.config.mimeTypes',
 	fileConfigMaxSize: 'formBuilder:file.config.maxSize',
+	spamRateLimited: 'formBuilder:spam.rateLimited',
+	spamRejected: 'formBuilder:spam.rejected',
+	spamCaptchaFailed: 'formBuilder:spam.captchaFailed',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -93,6 +93,8 @@ export type RunSubmissionInput = {
 	formId?: number | string
 	/** Upload collection slug for file fields without an explicit `relationTo`. Defaults to `form-uploads`. */
 	uploadSlug?: string
+	/** Resolved request identity, verified against an upload's `owner` stamp when a file field is captured. */
+	expectedOwner?: string
 }
 
 export type RunSubmissionResult = {
@@ -128,6 +130,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		payload,
 		formId,
 		uploadSlug,
+		expectedOwner,
 	} = input
 	const incoming = new Map(values.map((entry) => [entry.field, entry.value]))
 
@@ -222,6 +225,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 					uploadId: value as string | number,
 					config: fileConfig,
 					req,
+					expectedOwner,
+					expectedForm: formId,
 				})
 				if (!captured.ok) {
 					errors.push({ path: instance.name, message: t(errorKeyFor(captured.code)) })

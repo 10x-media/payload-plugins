@@ -14,6 +14,8 @@ import { registerTranslations } from './plugin/registerTranslations'
 import { defaultPresentationDescriptors } from './presentations/defaults'
 import type { PresentationsDescriptorConfig } from './presentations/registry'
 import { resolvePresentationDescriptors } from './presentations/registry'
+import { resolveSpamConfig } from './spam/resolveSpam'
+import type { SpamOption } from './spam/types'
 import { defaultValidationRules } from './validation/builtin'
 import { resolveValidationRules, type ValidationRulesConfig } from './validation/registry'
 
@@ -33,6 +35,8 @@ export type FormBuilderPluginOptions = {
 	consentSources?: ConsentSourcesConfig
 	/** The built-in `form-uploads` collection backing file fields. `false` disables it (bring your own); an object overrides slug/upload/access/fields. */
 	uploads?: UploadsOption
+	/** Honeypot + rate-limiting (on by default) + a captcha adapter seam + upload-ownership scoping. `false` disables the whole subsystem. */
+	spam?: SpamOption
 }
 
 declare module 'payload' {
@@ -57,6 +61,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		)
 		const actionRegistry = resolveActions(defaultActionDefinitions, options.actions)
 		const uploads = resolveUploads(options.uploads)
+		const spam = resolveSpamConfig(options.spam)
 		registerTranslations(config)
 		registerCollections({
 			config,
@@ -68,6 +73,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
 			events: options.events,
 			uploads,
+			spam,
 		})
 		return config
 	},

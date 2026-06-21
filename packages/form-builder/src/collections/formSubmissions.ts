@@ -6,6 +6,8 @@ import type { ConsentSourceRegistry } from '../consent/registry'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { buildSpamGuard } from '../spam/spamGuard'
+import type { ResolvedSpamConfig } from '../spam/types'
 import { validateSubmission } from '../submissions/validateSubmission'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { FORMS_SLUG } from './forms'
@@ -22,6 +24,8 @@ type BuildSubmissionsCollectionArgs = {
 	hasRunner?: boolean
 	/** Upload collection slug for file fields without an explicit `relationTo`. */
 	uploadSlug?: string
+	/** Resolved spam config; when active, prepends the spam guard before validation. `false` disables it. */
+	spam?: ResolvedSpamConfig | false
 }
 
 const formIdOf = (form: unknown): number | string | undefined => {
@@ -107,6 +111,7 @@ export const buildSubmissionsCollection = ({
 	events,
 	hasRunner = false,
 	uploadSlug,
+	spam,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => ({
 	slug: FORM_SUBMISSIONS_SLUG,
 	labels: { singular: 'Submission', plural: 'Submissions' },
@@ -117,7 +122,10 @@ export const buildSubmissionsCollection = ({
 		update: () => false,
 	},
 	hooks: {
-		beforeValidate: [validateSubmission({ registry, ruleRegistry, consentRegistry, uploadSlug })],
+		beforeValidate: [
+			...(spam ? [buildSpamGuard(spam)] : []),
+			validateSubmission({ registry, ruleRegistry, consentRegistry, uploadSlug }),
+		],
 		afterChange: [makeAfterChange({ actionRegistry, events, hasRunner })],
 	},
 	fields: [

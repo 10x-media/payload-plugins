@@ -123,4 +123,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fileConfigRelationTo]: 'Upload collection',
 	[keys.fileConfigMimeTypes]: 'Allowed file types',
 	[keys.fileConfigMaxSize]: 'Maximum size (bytes)',
+	[keys.spamRateLimited]: 'You have sent too many requests. Please try again later.',
+	[keys.spamRejected]: 'Your submission could not be processed.',
+	[keys.spamCaptchaFailed]: 'Captcha verification failed. Please try again.',
 }

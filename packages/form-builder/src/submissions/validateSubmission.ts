@@ -3,6 +3,7 @@ import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { IDENTITY_CONTEXT_KEY } from '../spam/constants'
 import { asFieldTranslate } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { runSubmission } from './runSubmission'
@@ -51,6 +52,10 @@ export const validateSubmission =
 		const incoming = ((data.values as SubmissionValue[] | undefined) ?? []) as SubmissionValue[]
 		const locale = req.locale ?? 'en'
 		const t = asFieldTranslate(req.i18n.t)
+		const expectedOwner =
+			typeof req.context?.[IDENTITY_CONTEXT_KEY] === 'string'
+				? (req.context[IDENTITY_CONTEXT_KEY] as string)
+				: undefined
 
 		const result = await runSubmission({
 			fields,
@@ -65,6 +70,7 @@ export const validateSubmission =
 			payload: req.payload,
 			formId: formId as number | string,
 			uploadSlug,
+			expectedOwner,
 		})
 
 		if (result.errors.length > 0) {
