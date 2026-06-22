@@ -6,7 +6,10 @@ export type ReliabilityOptions = {
 	heartbeatIntervalMs?: number
 	/** How often the sweeper scans for orphaned jobs. Default 60000. */
 	sweepIntervalMs?: number
-	/** How many times the sweeper requeues a job before dead-lettering it. Default 3. */
+	/**
+	 * How many times the sweeper requeues a job before dead-lettering it. Default 3.
+	 * Number of sweeper requeues after the original attempt; total executions = maxRecoveries + 1.
+	 */
 	maxRecoveries?: number
 	/** How long a leadership lease (scheduler/sweeper) is valid. Default 30000. */
 	leaderLeaseTtlMs?: number
@@ -19,8 +22,8 @@ export type ReliabilityOptions = {
 	 */
 	serverless?: { maxDurationMs: number }
 	/**
-	 * Recommend (true) Payload's `enableConcurrencyControl` for app-level mutual
-	 * exclusion under multi-node. Documentation-facing; consumed in a later plan.
+	 * Throws at plugin registration when set without `jobs.enableConcurrencyControl: true`.
+	 * Requires Payload's `enableConcurrencyControl` for app-level mutual exclusion under multi-node.
 	 */
 	requireConcurrencyControl?: boolean
 }
