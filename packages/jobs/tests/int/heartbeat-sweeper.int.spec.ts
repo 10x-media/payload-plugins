@@ -134,6 +134,19 @@ describeForDb('job lease store semantics', {}, (db) => {
 		expect(job.hasError).toBe(true)
 		expect((await store.read(id))?.processing).toBe(false)
 	})
+
+	it('does not let a second owner claim a job already held by another node (item 24)', async () => {
+		clock = installTestClock(new Date('2026-05-01T06:00:00.000Z'))
+		const store = createJobLeaseStore(booted.payload)
+		const id = await claimedJob(booted)
+		const first = await store.stampClaim(id, 'node-A', 1000, clock.now())
+		expect(first.ok).toBe(true)
+		const second = await store.stampClaim(id, 'node-B', 1000, clock.now())
+		expect(second.ok).toBe(false)
+		const row = await store.read(id)
+		expect(row?.claimedBy).toBe('node-A')
+		expect(row?.fenceToken).toBe(first.fenceToken)
+	})
 })
 
 describeForDb('heartbeat wrapper', {}, (db) => {
