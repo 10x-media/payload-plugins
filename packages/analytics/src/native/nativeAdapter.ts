@@ -19,6 +19,14 @@ import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
 import { createWriteBuffer, type WriteBuffer } from './ingest/writeBuffer'
 import { pruneEventsTask } from './retention/pruneTask'
+import {
+	type Acc,
+	add,
+	emptyAcc,
+	type RollupDoc,
+	selectMetrics,
+	seriesFromRollups,
+} from './rollupAcc'
 
 export interface NativeOptions {
 	geoResolver?: GeoResolver
@@ -51,46 +59,6 @@ const capabilities: AnalyticsCapabilities = {
 	batchPageReport: true,
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },
-}
-
-type RollupDoc = {
-	path: string
-	dimvalue: string
-	pageviews: number
-	events: number
-	durationMs: number
-	visitors: number
-	sessions: number
-}
-
-interface Acc {
-	pageviews: number
-	events: number
-	durationMs: number
-	visitors: number
-	sessions: number
-}
-
-const emptyAcc = (): Acc => ({ pageviews: 0, events: 0, durationMs: 0, visitors: 0, sessions: 0 })
-
-const add = (acc: Acc, d: RollupDoc): void => {
-	acc.pageviews += d.pageviews
-	acc.events += d.events
-	acc.durationMs += d.durationMs
-	acc.visitors += d.visitors
-	acc.sessions += d.sessions
-}
-
-const selectMetrics = (acc: Acc, wanted: MetricKey[]): Partial<Record<MetricKey, number>> => {
-	const out: Partial<Record<MetricKey, number>> = {}
-	if (wanted.includes('pageviews')) out.pageviews = acc.pageviews
-	if (wanted.includes('events')) out.events = acc.events
-	if (wanted.includes('visitors')) out.visitors = acc.visitors
-	if (wanted.includes('sessions')) out.sessions = acc.sessions
-	if (wanted.includes('avgDuration')) {
-		out.avgDuration = acc.pageviews > 0 ? Math.round(acc.durationMs / acc.pageviews) : 0
-	}
-	return out
 }
 
 export function native(options: NativeOptions = {}): NativeAdapter {
@@ -174,18 +142,26 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			// Totals always come from the non-dimensioned aggregate row. A dimensioned query
 			// reports site-wide totals (path=''), a plain query uses the path-scoped row.
 			const totalsPath = dim ? '' : (q.path ?? '')
-			const totalsAcc = emptyAcc()
-			for (const d of await readRollups(payloadRef, {
+			const totalsDocs = await readRollups(payloadRef, {
 				granularity: { equals: 'day' },
 				dimension: { equals: '' },
 				path: { equals: totalsPath },
 				period: periodWhere,
-			})) {
+			})
+			const totalsAcc = emptyAcc()
+			for (const d of totalsDocs) {
 				add(totalsAcc, d)
 			}
 			const totals = selectMetrics(totalsAcc, q.metrics)
 
 			if (!dim) {
+				if (q.granularity === 'day') {
+					return {
+						rows: seriesFromRollups(totalsDocs, q.metrics),
+						totals,
+						meta: { provider: 'native', fetchedAt },
+					}
+				}
 				return { rows: [{ metrics: totals }], totals, meta: { provider: 'native', fetchedAt } }
 			}
 
