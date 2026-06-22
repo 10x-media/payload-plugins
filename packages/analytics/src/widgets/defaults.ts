@@ -7,6 +7,11 @@ import type { WidgetInstance } from 'payload'
  */
 export const analyticsDefaultWidgets = (): WidgetInstance[] => [
 	{
+		widgetSlug: 'analytics-trend',
+		width: 'large',
+		data: { metric: 'pageviews', timeframe: 'last30days' },
+	},
+	{
 		widgetSlug: 'analytics-metric',
 		width: 'small',
 		data: { metric: 'pageviews', timeframe: 'last30days' },
