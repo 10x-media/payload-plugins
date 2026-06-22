@@ -16,7 +16,7 @@ Fix a batch of functional and security issues found in the jobs plugin review:
 - `stop()` removed from the public `Worker` type; accessible via `WorkerTestHandle` cast for tests (item 14)
 - KV-stored pause state is validated on read; corrupt or missing values fall back to empty state (item 16)
 - `config.jobs.access.run` is composed with the plugin's built-in checker (both must pass) instead of replacing it; the same composed checker also guards the plugin's own `/queue-run` and `/queue-sweep` endpoints, so a stricter `jobs.access.run` cannot be bypassed through them (item 17)
-- `LeaseStore.release` returns `{ ok: boolean }`; `leaderController` only clears local leading state when the release was confirmed (item 18)
+- `LeaseStore.release` returns `{ ok: boolean }`; `leaderController` drops local leading state after any `release()`, since an unconfirmed release means the node no longer owns the lease (item 18)
 - `renew` filter includes `leaseExpiresAt >= now`; on failed renew while leading, the controller falls through to `acquireOrSteal` with a fence bump (item 19)
 - `createWorker` throws when signal handlers are already installed, enforcing the one-worker-per-process constraint (item 21)
 - `createWorker` defaults `pauseStore` to `createPauseStore(payload)`, eliminating the footgun where preset-enabled queue control was silently ignored (item 22)

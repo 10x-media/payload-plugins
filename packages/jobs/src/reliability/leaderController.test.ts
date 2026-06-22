@@ -81,31 +81,22 @@ describe('createLeaderController', () => {
 		expect(c.isLeader()).toBe(false)
 	})
 
-	it('keeps leading:true when release returns ok:false (row was already stolen)', async () => {
-		// A store where acquireOrSteal always succeeds but release always fails (simulates stolen row).
-		const failingReleaseStore: LeaseStore = {
-			// biome-ignore lint/complexity/useMaxParams: lease primitive signature (role, owner, ttlMs, now)
-			acquireOrSteal: async (_role, _owner, _ttlMs, _now) => ({
-				fenceToken: 1,
-				ok: true,
-			}),
+	it('clears leading state when release returns ok:false (node no longer owns the lease)', async () => {
+		// acquireOrSteal succeeds but release reports no matching row: the lease was stolen,
+		// expired, or already released, so this node is not the owner and must stop leading.
+		const store: LeaseStore = {
+			acquireOrSteal: async () => ({ fenceToken: 1, ok: true }),
 			read: async () => null,
 			release: async () => ({ ok: false }),
-			// biome-ignore lint/complexity/useMaxParams: lease primitive signature (role, owner, ttlMs, now)
-			renew: async (_role, _owner, _ttlMs, _now) => ({ fenceToken: 1, ok: true }),
+			renew: async () => ({ fenceToken: 1, ok: true }),
 		}
-		const c = createLeaderController({
-			ownerId: 'node-A',
-			role,
-			store: failingReleaseStore,
-			ttlMs: 30_000,
-		})
+		const c = createLeaderController({ ownerId: 'node-A', role, store, ttlMs: 30_000 })
 		await c.tick(new Date('2026-01-01T00:00:00.000Z'))
 		expect(c.isLeader()).toBe(true)
 
 		await c.release()
-		// With the fix: leading stays true because the DB did not confirm the release.
-		expect(c.isLeader()).toBe(true)
+		expect(c.isLeader()).toBe(false)
+		expect(c.fenceToken()).toBe(0)
 	})
 
 	it('re-acquires with a bumped fence token after release', async () => {
