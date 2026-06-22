@@ -96,4 +96,11 @@ describe('buildSubscriptionsCollection', () => {
 		hook({ doc: { id: '1' }, req: { context } } as never)
 		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(false)
 	})
+
+	it('rejects __none__ in the events array via beforeChange', async () => {
+		const hook = c.hooks?.beforeChange?.[1] as CollectionBeforeChangeHook
+		expect(() =>
+			hook({ data: { events: ['__none__'] }, operation: 'create', req: { context: {} } } as never)
+		).toThrow(/no valid events/)
+	})
 })

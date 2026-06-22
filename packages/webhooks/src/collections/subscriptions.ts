@@ -35,6 +35,16 @@ const clearRevealOnce: CollectionAfterChangeHook = ({ doc, req }) => {
 	return doc
 }
 
+const rejectNoneEvent: CollectionBeforeChangeHook = ({ data }) => {
+	const events = data?.events as unknown[] | undefined
+	if (Array.isArray(events) && events.includes('__none__')) {
+		throw new Error(
+			'@10x-media/webhooks: cannot save a subscription with no valid events; add at least one event to the catalog first.'
+		)
+	}
+	return data
+}
+
 const loggedIn = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
 
 /** Admin-managed subscriptions collection; `events` options come from the catalog. */
@@ -55,7 +65,7 @@ export const buildSubscriptionsCollection = (args: {
 		hidden: args.hidden,
 	},
 	access: { read: loggedIn, create: loggedIn, update: loggedIn, delete: loggedIn },
-	hooks: { beforeChange: [generateSecret], afterChange: [clearRevealOnce] },
+	hooks: { beforeChange: [generateSecret, rejectNoneEvent], afterChange: [clearRevealOnce] },
 	fields: [
 		{ name: 'name', type: 'text', required: true, label: labelForKey(keys.fieldName) },
 		{ name: 'url', type: 'text', required: true, label: labelForKey(keys.fieldUrl) },
