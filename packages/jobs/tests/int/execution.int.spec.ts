@@ -8,8 +8,10 @@ import {
 import type { TaskConfig } from 'payload'
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 
+import { resetHandlersInstalled } from '../../src/execution/signals'
 import { createWorker, type WorkerTestHandle } from '../../src/execution/worker'
 import { jobs } from '../../src/index'
+import { createPauseStore } from '../../src/queueControl/pauseStore'
 import { createJobLeaseStore } from '../../src/reliability/jobLeaseStore'
 import { createLeaseStore } from '../../src/reliability/leaseStore'
 import { resolveReliabilityOptions } from '../../src/reliability/options'
@@ -209,5 +211,64 @@ describeForDb('worker run loop', {}, (db) => {
 		}
 		;(worker as WorkerTestHandle).stop()
 		expect(ran).toBeGreaterThanOrEqual(1)
+	})
+
+	it('throws when signal handlers are already installed (item 21)', () => {
+		resetHandlersInstalled()
+		const first = createWorker({
+			installSignals: true,
+			payload: booted.payload,
+			reliability: resolved(),
+		}) as WorkerTestHandle
+		try {
+			expect(() =>
+				createWorker({ installSignals: true, payload: booted.payload, reliability: resolved() })
+			).toThrow(/already installed/)
+		} finally {
+			first.stop()
+			resetHandlersInstalled()
+		}
+	})
+
+	it('a worker created without an explicit pauseStore honors a cluster pause (item 22)', async () => {
+		const pauseStore = createPauseStore(booted.payload)
+		await pauseStore.resume({ all: true })
+		await booted.payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
+		ran = 0
+		const worker = createWorker({
+			installSignals: false,
+			payload: booted.payload,
+			reliability: resolved(),
+			runIntervalMs: 50,
+		}) as WorkerTestHandle
+		worker.start()
+		try {
+			// Liveness: with no pause the worker runs a queued job.
+			await booted.payload.jobs.queue({ input: {}, task: 'count' })
+			const live = Date.now() + 5000
+			while (ran < 1 && Date.now() < live) {
+				await new Promise((r) => setTimeout(r, 25))
+			}
+			expect(ran).toBeGreaterThanOrEqual(1)
+			const afterLive = ran
+
+			// A global pause must suppress the next job (the default store reads it from KV).
+			await pauseStore.pause()
+			await booted.payload.jobs.queue({ input: {}, task: 'count' })
+			await new Promise((r) => setTimeout(r, 500))
+			expect(ran).toBe(afterLive)
+
+			// Resume: the suppressed job now runs, proving the worker was live throughout.
+			await pauseStore.resume()
+			const resumed = Date.now() + 5000
+			while (ran <= afterLive && Date.now() < resumed) {
+				await new Promise((r) => setTimeout(r, 25))
+			}
+			expect(ran).toBeGreaterThan(afterLive)
+		} finally {
+			worker.stop()
+			await pauseStore.resume({ all: true })
+			await booted.payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
+		}
 	})
 })

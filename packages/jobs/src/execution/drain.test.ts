@@ -63,18 +63,15 @@ describe('drainWorker', () => {
 	})
 
 	it('does not overrun the budget by more than one poll interval (item 10)', async () => {
-		// Always returns 1 in-flight so the loop never exits early.
 		const deps = baseDeps({
 			countInFlight: vi.fn(() => Promise.resolve(1)),
 			requeueStragglers: vi.fn(() => Promise.resolve(1)),
 		})
 		const res = await drainWorker(deps, { drainTimeoutMs: 500, pollIntervalMs: 200 })
-		// After the fix, the loop breaks immediately after sleeping if time exceeded.
-		// Virtual clock: each sleep(200) advances 200ms. At t=0 in-flight=1, sleep 200.
-		// After sleep t=200 < 500, re-poll -> still 1, sleep 200. After sleep t=400 < 500,
-		// re-poll -> still 1, sleep 200. After sleep t=600 >= 500, break immediately.
-		// Without fix the loop would re-poll one extra time after the overrun sleep.
 		expect(res.timedOut).toBe(true)
+		// budget 500 / interval 200: an initial count, then re-counts after the 200ms and
+		// 400ms sleeps; the 600ms sleep trips the post-sleep deadline break before a 4th count.
+		expect(deps.countInFlight).toHaveBeenCalledTimes(3)
 	})
 
 	it('does not requeue on a clean drain, only on timeout (item 26)', async () => {
