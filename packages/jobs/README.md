@@ -132,6 +132,8 @@ console.log(JSON.stringify({ crons: vercelCrons() }, null, 2))
 - `/api/payload-jobs/queue-run` runs due jobs (pause-aware, mirrors the native run params). `?allQueues=true` runs every queue, `?queue=<name>` runs one, `?limit=<n>` caps jobs per invocation, `?disableScheduling=true` skips schedule handling.
 - `/api/payload-jobs/queue-sweep` runs one orphan sweep (a single cron invocation, so no leader election). Requires reliability to be enabled.
 
+**CSRF note.** Both `queue-run` and `queue-sweep` are state-mutating operations served over GET. A crafted `<img>` or link in a document opened by a logged-in admin can trigger them silently (CSRF). The serverless preset uses Vercel Cron, which sends GET requests only, so switching to POST is not feasible without breaking the Vercel cron flow. For deployments where browser sessions are involved, override `access` to require an `Authorization: Bearer` token (`cronSecretAccess`) rather than relying on the session cookie (`loggedInAccess`).
+
 **Vercel limits.** Match your plan to a cron cadence and a function duration:
 
 - **Hobby**: crons run at most **once per day** and functions cap at **300s**. That is unusable for real job processing. Use Hobby only for a toy or a demo.
