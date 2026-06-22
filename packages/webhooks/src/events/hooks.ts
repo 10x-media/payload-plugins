@@ -39,7 +39,11 @@ const resolveListening = async (args: {
 	try {
 		res = await args.req.payload.find({
 			collection: args.deps.subscriptionsSlug,
-			where: { enabled: { not_equals: false } },
+			where: {
+				enabled: { not_equals: false },
+				events: { contains: args.event },
+			},
+			sort: 'createdAt',
 			limit: SUBSCRIPTION_SCAN_LIMIT,
 			depth: 0,
 			overrideAccess: true,

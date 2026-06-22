@@ -48,3 +48,35 @@ describe('dispatch (inline mode)', () => {
 		expect(updateCall?.[0].data.status).toBe('failed')
 	})
 })
+
+describe('resolveListening', () => {
+	it('passes the triggering event to the DB query so the scan cap only applies to matching subscriptions', async () => {
+		const payload = makePayload()
+		payload.find.mockResolvedValue({ docs: [] })
+		const hook = makeAfterChange(makeDeps())
+		await hook({
+			doc: { id: '1' },
+			previousDoc: {},
+			operation: 'create',
+			req: makeReq(payload),
+			collection: {} as never,
+		})
+		const findCall = payload.find.mock.calls[0]?.[0]
+		expect(findCall?.where?.events).toBeDefined()
+	})
+
+	it('includes a sort in the DB query for deterministic scan ordering', async () => {
+		const payload = makePayload()
+		payload.find.mockResolvedValue({ docs: [] })
+		const hook = makeAfterChange(makeDeps())
+		await hook({
+			doc: { id: '1' },
+			previousDoc: {},
+			operation: 'create',
+			req: makeReq(payload),
+			collection: {} as never,
+		})
+		const findCall = payload.find.mock.calls[0]?.[0]
+		expect(findCall?.sort).toBeDefined()
+	})
+})

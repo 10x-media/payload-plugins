@@ -190,6 +190,8 @@ The plugin adds a **Webhooks** group with two collections.
 
 **Webhook Deliveries**: an append-only delivery log. Each row shows the event, subscription, status, HTTP response code, and a **Redeliver** button that replays the original payload to the original URL. Access requires a logged-in admin.
 
+**Subscription scan limit**: at most 1,000 admin-managed subscriptions matching the triggering event are dispatched per event. Subscriptions are scanned in `createdAt` ascending order; if you have more than 1,000 subscriptions registered for a single event, the oldest ones are dispatched and the rest are skipped with a warning logged. Code subscriptions (passed via `subscriptions: [...]` in plugin options) are not subject to this cap.
+
 ## Composing with `@10x-media/jobs`
 
 When `@10x-media/jobs` is installed, `delivery` mode auto-resolves to `'queue'` and the delivery task runs under the jobs worker. No extra config is needed -- the plugin detects the sibling plugin automatically.
