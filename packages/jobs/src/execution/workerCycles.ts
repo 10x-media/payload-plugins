@@ -37,12 +37,20 @@ export const maintenanceCycle = async (deps: MaintenanceCycleDeps): Promise<void
 
 export type SweepCycleDeps = {
 	isSweeperLeader: () => boolean
+	/** Advance the sweeper leadership lease before deciding whether to sweep. */
+	tickSweeperLeader: () => Promise<void>
 	sweep: () => Promise<void>
 	logger?: Logger
 }
 
-/** One sweep cycle: reclaim stuck jobs only if sweeper-leader. */
+/**
+ * One sweep cycle: tick sweeper leadership first so the decision reflects the current
+ * lease state (not the state from the previous maintenanceCycle), then sweep only if
+ * this node holds the lease. This prevents a split-brain window where a node whose
+ * lease was stolen continues sweeping until the next maintenanceCycle fires.
+ */
 export const sweepCycle = async (deps: SweepCycleDeps): Promise<void> => {
+	await guard(deps.logger, 'sweep-leadership', deps.tickSweeperLeader)
 	if (deps.isSweeperLeader()) {
 		await guard(deps.logger, 'sweep', deps.sweep)
 	}

@@ -214,7 +214,13 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 					maintenanceIntervalMs
 				),
 				guardedInterval(
-					() => sweepCycle({ isSweeperLeader: sweeper.isLeader, logger, sweep }),
+					() =>
+						sweepCycle({
+							isSweeperLeader: sweeper.isLeader,
+							logger,
+							sweep,
+							tickSweeperLeader: () => sweeper.tick(getCurrentDate()),
+						}),
 					sweepIntervalMs
 				),
 			]
