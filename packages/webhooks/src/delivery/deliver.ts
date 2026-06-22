@@ -27,6 +27,7 @@ export const deliver = async (args: DeliverArgs): Promise<DeliverResult> => {
 			headers: args.headers,
 			body: args.body,
 			signal: controller.signal,
+			redirect: 'error',
 		})
 		const text = await res.text()
 		return {

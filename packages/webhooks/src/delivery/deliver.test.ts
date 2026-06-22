@@ -17,6 +17,11 @@ beforeAll(async () => {
 			res.end('nope')
 			return
 		}
+		if (req.url === '/redirect') {
+			res.writeHead(302, { location: '/ok' })
+			res.end()
+			return
+		}
 		// /hang: never respond -> exercises the timeout
 	})
 	await new Promise<void>((resolve) => server.listen(0, resolve))
@@ -48,6 +53,12 @@ describe('deliver', () => {
 
 	it('returns an error on timeout', async () => {
 		const r = await deliver({ url: `${url}/hang`, body: '{}', headers: {}, timeoutMs: 50 })
+		expect(r.ok).toBe(false)
+		expect(r.error).toBeDefined()
+	})
+
+	it('returns an error on redirect (SSRF guard)', async () => {
+		const r = await deliver({ url: `${url}/redirect`, body: '{}', headers: {}, timeoutMs: 1000 })
 		expect(r.ok).toBe(false)
 		expect(r.error).toBeDefined()
 	})
