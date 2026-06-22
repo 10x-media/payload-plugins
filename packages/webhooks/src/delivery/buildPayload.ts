@@ -36,7 +36,9 @@ export const buildPayload = (args: {
 		data,
 	}
 	if (operation === 'update' && config?.includePreviousData && previousDoc) {
-		body.previousData = previousDoc
+		body.previousData = config?.transform
+			? config.transform({ doc: previousDoc, previousDoc: undefined, operation, req })
+			: previousDoc
 	}
 	return body
 }

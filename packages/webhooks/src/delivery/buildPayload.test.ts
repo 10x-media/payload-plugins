@@ -51,4 +51,19 @@ describe('buildPayload', () => {
 				.previousData
 		).toBeUndefined()
 	})
+
+	it('applies transform to previousData when includePreviousData is true', () => {
+		const prev = { id: 'p1', title: 'Old', secret: 'hidden' }
+		const body = buildPayload({
+			...base,
+			operation: 'update',
+			previousDoc: prev,
+			config: {
+				includePreviousData: true,
+				transform: ({ doc }) => ({ id: (doc as { id: string }).id }),
+			},
+		})
+		// transform must strip secret from previousData too
+		expect(body.previousData).toEqual({ id: 'p1' })
+	})
 })
