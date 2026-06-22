@@ -23,4 +23,4 @@ Fix a batch of functional and security issues found in the jobs plugin review:
 - `sweepCycle` re-ticks the sweeper leadership before acting so the check is always fresh (item 23)
 - `stampClaim` guards against double-claiming: a second owner cannot claim a job already held by a different node (item 24)
 - `/queue-status` reports the seven canonical job states (`queued`, `scheduled`, `retrying`, `processing`, `succeeded`, `failed`, `cancelled`) plus an orthogonal `recovered` count (`recoveryAttempts > 0`, when reliability is enabled) (item 25, breaking change)
-- In-flight job count is now process-local (incremented/decremented in `withHeartbeat`) instead of a DB query; `requeueStragglers` always runs on drain to release orphaned DB claims (item 26)
+- In-flight job count is now process-local (incremented/decremented in `withHeartbeat`) instead of a DB query; on drain, `requeueStragglers` runs only when the wall-clock budget is exceeded, so a just-completed job is never spuriously requeued (genuinely orphaned claims are recovered by the sweeper) (item 26)

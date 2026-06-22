@@ -127,14 +127,18 @@ describeForDb('worker graceful drain', {}, (db) => {
 		await booted.payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
 	})
 
-	it('times out, requeues this node stragglers, releases leadership, and destroys', async () => {
+	it('on a clean drain releases leadership and destroys without requeuing fresh claims (item 26)', async () => {
 		clock = installTestClock(new Date('2026-08-01T00:00:00.000Z'))
 		const leaseStore = createLeaseStore(booted.payload)
+		const jobLeaseStore = createJobLeaseStore(booted.payload)
 		// The worker's node id is resolveNodeId('worker-node') === 'worker-node'.
 		await leaseStore.acquireOrSteal('scheduler', 'worker-node', 30_000, clock.now())
 		await leaseStore.acquireOrSteal('sweeper', 'worker-node', 30_000, clock.now())
-		await claimedJob(booted, 'worker-node')
-		await claimedJob(booted, 'worker-node')
+		// Two jobs claimed-in-DB with a valid (future) lease, but NOT tracked by this
+		// process's in-flight counter: this is exactly the shape of a job that just
+		// completed but whose processing:false write has not yet landed.
+		const a1 = await claimedJob(booted, 'worker-node')
+		const a2 = await claimedJob(booted, 'worker-node')
 
 		const destroy = vi.fn(() => Promise.resolve())
 		const vc = virtualClock()
@@ -150,12 +154,17 @@ describeForDb('worker graceful drain', {}, (db) => {
 		})
 
 		const res = await worker.drain()
-		// inFlightAtStart reflects the process-local counter (no active handlers here,
-		// the 2 claimed-in-DB jobs are orphaned from a simulated previous run).
+		// Process-local counter is 0, so this is a clean drain (no timeout).
 		expect(res.inFlightAtStart).toBe(0)
 		expect(res.timedOut).toBe(false)
-		// requeueStragglers always runs; it clears the 2 DB-claimed orphaned claims.
-		expect(res.requeued).toBe(2)
+		// A clean drain must NOT force-release this node's claims: the two valid-lease
+		// rows are left untouched (their recoveryAttempts stay 0, they are not requeued).
+		// Genuinely orphaned claims carry expired leases and are recovered by the sweeper.
+		expect(res.requeued).toBe(0)
+		expect((await jobLeaseStore.read(a1))?.processing).toBe(true)
+		expect((await jobLeaseStore.read(a1))?.recoveryAttempts).toBe(0)
+		expect((await jobLeaseStore.read(a2))?.processing).toBe(true)
+		// Leadership is still released and the instance still destroyed on the clean path.
 		expect(destroy).toHaveBeenCalledTimes(1)
 		expect((await leaseStore.read('scheduler'))?.owner).toBeNull()
 		expect((await leaseStore.read('sweeper'))?.owner).toBeNull()

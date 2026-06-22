@@ -34,8 +34,8 @@ describe('drainWorker', () => {
 		const res = await drainWorker(deps, { drainTimeoutMs: 10_000, pollIntervalMs: 100 })
 		expect(res).toEqual({ inFlightAtStart: 2, remaining: 0, requeued: 0, timedOut: false })
 		expect(deps.stopLoops).toHaveBeenCalledTimes(1)
-		// requeueStragglers always runs to release orphaned DB claims (0 released here).
-		expect(deps.requeueStragglers).toHaveBeenCalledTimes(1)
+		// A clean drain does not requeue (item 26); leadership is still released and destroyed.
+		expect(deps.requeueStragglers).not.toHaveBeenCalled()
 		expect(deps.releaseLeadership).toHaveBeenCalledTimes(1)
 		expect(deps.destroy).toHaveBeenCalledTimes(1)
 	})
@@ -52,13 +52,14 @@ describe('drainWorker', () => {
 		expect(deps.destroy).toHaveBeenCalledTimes(1)
 	})
 
-	it('calls requeueStragglers even when there are no in-flight jobs', async () => {
+	it('does not requeue when there are no in-flight jobs to drain', async () => {
 		const deps = baseDeps()
 		const res = await drainWorker(deps, { drainTimeoutMs: 500, pollIntervalMs: 200 })
 		expect(res.inFlightAtStart).toBe(0)
 		expect(res.timedOut).toBe(false)
-		// Always called to release orphaned DB claims.
-		expect(deps.requeueStragglers).toHaveBeenCalledTimes(1)
+		expect(res.requeued).toBe(0)
+		// Nothing in flight and no timeout: requeueStragglers must not force-release claims.
+		expect(deps.requeueStragglers).not.toHaveBeenCalled()
 	})
 
 	it('does not overrun the budget by more than one poll interval (item 10)', async () => {
@@ -74,6 +75,18 @@ describe('drainWorker', () => {
 		// re-poll -> still 1, sleep 200. After sleep t=600 >= 500, break immediately.
 		// Without fix the loop would re-poll one extra time after the overrun sleep.
 		expect(res.timedOut).toBe(true)
+	})
+
+	it('does not requeue on a clean drain, only on timeout (item 26)', async () => {
+		const counts = [2, 1, 0]
+		const deps = baseDeps({ countInFlight: vi.fn(() => Promise.resolve(counts.shift() ?? 0)) })
+		const res = await drainWorker(deps, { drainTimeoutMs: 10_000, pollIntervalMs: 100 })
+		expect(res.timedOut).toBe(false)
+		expect(res.requeued).toBe(0)
+		expect(deps.requeueStragglers).not.toHaveBeenCalled()
+		// leadership is still released and the instance still destroyed on the clean path
+		expect(deps.releaseLeadership).toHaveBeenCalledTimes(1)
+		expect(deps.destroy).toHaveBeenCalledTimes(1)
 	})
 
 	it('releases leadership before the polling loop, not after (item 11)', async () => {
