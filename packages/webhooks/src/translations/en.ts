@@ -25,5 +25,5 @@ export const en: Record<TranslationKey, string> = {
 	[keys.statusFailed]: 'Failed',
 	[keys.statusDead]: 'Dead',
 	[keys.redeliver]: 'Redeliver',
-	[keys.redeliverDone]: 'Redelivery queued',
+	[keys.redeliverDone]: 'Redelivery initiated',
 }
