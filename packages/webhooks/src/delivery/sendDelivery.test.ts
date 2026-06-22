@@ -74,4 +74,23 @@ describe('sendDelivery', () => {
 		})
 		expect(received?.headers['x-webhook-signature']).toBeUndefined()
 	})
+
+	it('plugin identity headers override custom headers with the same name', async () => {
+		const sub = fromCodeSubscription({
+			id: 's',
+			url,
+			events: [],
+			headers: { 'X-Webhook-Id': 'attacker', 'X-Webhook-Event': 'fake.event' },
+		})
+		await sendDelivery({
+			subscription: sub,
+			deliveryId: 'd3',
+			event: 'posts.created',
+			body: '{}',
+			timeoutMs: 1000,
+			now: 1,
+		})
+		expect(received?.headers['x-webhook-id']).toBe('d3')
+		expect(received?.headers['x-webhook-event']).toBe('posts.created')
+	})
 })

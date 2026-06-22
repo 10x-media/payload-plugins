@@ -18,10 +18,10 @@ export const sendDelivery = (args: {
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 		'User-Agent': USER_AGENT,
+		...subscription.headers,
 		'X-Webhook-Id': deliveryId,
 		'X-Webhook-Event': event,
 		'X-Webhook-Timestamp': String(timestamp),
-		...subscription.headers,
 	}
 	if (subscription.secret) {
 		headers['X-Webhook-Signature'] = signatureHeader(
