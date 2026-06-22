@@ -202,6 +202,9 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		drain,
 		isLeader: (role) => (role === 'scheduler' ? scheduler.isLeader() : sweeper.isLeader()),
 		start: () => {
+			if (draining) {
+				return
+			}
 			stopLoops()
 			timers = [
 				guardedInterval(() => runCycle({ logger, runJobs }), runIntervalMs),
