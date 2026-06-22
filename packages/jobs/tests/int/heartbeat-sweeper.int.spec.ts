@@ -203,8 +203,15 @@ describeForDb('heartbeat wrapper', {}, (db) => {
 
 		const run = wrapped({ job: { id }, req: { payload: booted.payload } })
 		await new Promise((r) => setTimeout(r, 10))
-		// A thief re-stamps the still-processing job, bumping the fence token.
-		await store.stampClaim(id, 'thief', 1000, clock.now())
+		// Simulate a sweeper forcibly bumping the fence token (e.g. via releaseAllClaims +
+		// re-claim). With item 24's claimedBy guard, stampClaim from a different owner is
+		// correctly rejected, so we simulate the fence bump via a direct DB update.
+		await booted.payload.update({
+			collection: 'payload-jobs',
+			data: { claimedBy: 'sweeper', fenceToken: 9999 },
+			id,
+			overrideAccess: true,
+		})
 		// The next renew tick (held fence is now stale) must report the loss.
 		await new Promise((r) => setTimeout(r, 60))
 		expect(lost).toContain(id)

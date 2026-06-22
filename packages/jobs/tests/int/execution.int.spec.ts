@@ -150,8 +150,11 @@ describeForDb('worker graceful drain', {}, (db) => {
 		})
 
 		const res = await worker.drain()
-		expect(res.inFlightAtStart).toBe(2)
-		expect(res.timedOut).toBe(true)
+		// inFlightAtStart reflects the process-local counter (no active handlers here,
+		// the 2 claimed-in-DB jobs are orphaned from a simulated previous run).
+		expect(res.inFlightAtStart).toBe(0)
+		expect(res.timedOut).toBe(false)
+		// requeueStragglers always runs; it clears the 2 DB-claimed orphaned claims.
 		expect(res.requeued).toBe(2)
 		expect(destroy).toHaveBeenCalledTimes(1)
 		expect((await leaseStore.read('scheduler'))?.owner).toBeNull()

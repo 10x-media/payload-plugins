@@ -52,7 +52,10 @@ export const drainWorker = async (deps: DrainDeps, options: DrainOptions): Promi
 		remaining = await deps.countInFlight()
 	}
 	const timedOut = remaining > 0
-	const requeued = timedOut ? await deps.requeueStragglers() : 0
+	// Always release DB claims for this node regardless of whether the drain timed out.
+	// This handles both: (a) handlers that did not finish in time, and (b) orphaned DB
+	// claims from jobs claimed but not currently executing in this process.
+	const requeued = await deps.requeueStragglers()
 	await deps.destroy()
 	deps.logger?.info?.(
 		`@10x-media/jobs: drain complete (started ${inFlightAtStart}, requeued ${requeued}, timedOut ${timedOut})`

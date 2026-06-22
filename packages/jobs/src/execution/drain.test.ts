@@ -34,7 +34,8 @@ describe('drainWorker', () => {
 		const res = await drainWorker(deps, { drainTimeoutMs: 10_000, pollIntervalMs: 100 })
 		expect(res).toEqual({ inFlightAtStart: 2, remaining: 0, requeued: 0, timedOut: false })
 		expect(deps.stopLoops).toHaveBeenCalledTimes(1)
-		expect(deps.requeueStragglers).not.toHaveBeenCalled()
+		// requeueStragglers always runs to release orphaned DB claims (0 released here).
+		expect(deps.requeueStragglers).toHaveBeenCalledTimes(1)
 		expect(deps.releaseLeadership).toHaveBeenCalledTimes(1)
 		expect(deps.destroy).toHaveBeenCalledTimes(1)
 	})
@@ -51,12 +52,13 @@ describe('drainWorker', () => {
 		expect(deps.destroy).toHaveBeenCalledTimes(1)
 	})
 
-	it('does nothing to wait when there are no in-flight jobs', async () => {
+	it('calls requeueStragglers even when there are no in-flight jobs', async () => {
 		const deps = baseDeps()
 		const res = await drainWorker(deps, { drainTimeoutMs: 500, pollIntervalMs: 200 })
 		expect(res.inFlightAtStart).toBe(0)
 		expect(res.timedOut).toBe(false)
-		expect(deps.requeueStragglers).not.toHaveBeenCalled()
+		// Always called to release orphaned DB claims.
+		expect(deps.requeueStragglers).toHaveBeenCalledTimes(1)
 	})
 
 	it('does not overrun the budget by more than one poll interval (item 10)', async () => {
