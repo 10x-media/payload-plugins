@@ -40,6 +40,7 @@ type JobsFinder = (args: {
 	limit?: number
 	depth?: number
 	pagination?: boolean
+	sort?: string
 }) => Promise<{ docs: Array<{ id: JobId; recoveryAttempts?: number }> }>
 
 /**
@@ -78,7 +79,7 @@ export const runSweep = async (args: RunSweepArgs): Promise<SweepResult> => {
 	}
 
 	const find = payload.find as unknown as JobsFinder
-	const { docs } = await find({ collection: JOBS_SLUG, depth: 0, limit, where })
+	const { docs } = await find({ collection: JOBS_SLUG, depth: 0, limit, sort: 'updatedAt', where })
 	result.scanned = docs.length
 
 	for (const doc of docs) {

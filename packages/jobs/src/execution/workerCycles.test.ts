@@ -30,9 +30,43 @@ describe('maintenanceCycle', () => {
 describe('sweepCycle', () => {
 	it('sweeps only when sweeper-leader', async () => {
 		const sweep = vi.fn(() => Promise.resolve())
-		await sweepCycle({ isSweeperLeader: () => false, sweep })
+		await sweepCycle({
+			isSweeperLeader: () => false,
+			sweep,
+			tickSweeperLeader: vi.fn(() => Promise.resolve()),
+		})
 		expect(sweep).not.toHaveBeenCalled()
-		await sweepCycle({ isSweeperLeader: () => true, sweep })
+		await sweepCycle({
+			isSweeperLeader: () => true,
+			sweep,
+			tickSweeperLeader: vi.fn(() => Promise.resolve()),
+		})
+		expect(sweep).toHaveBeenCalledTimes(1)
+	})
+
+	it('ticks sweeper leadership before checking isSweeperLeader (item 23)', async () => {
+		const callOrder: string[] = []
+		const tickSweeperLeader = vi.fn(async () => {
+			callOrder.push('tick')
+		})
+		// isSweeperLeader returns true only after the tick (simulates freshly acquired leadership)
+		let ticked = false
+		const isSweeperLeader = vi.fn(() => {
+			const result = ticked
+			if (callOrder.includes('tick')) ticked = true
+			return result
+		})
+		const sweep = vi.fn(async () => {
+			callOrder.push('sweep')
+		})
+
+		// First call: tick fires, isSweeperLeader returns false (not yet leader before tick)
+		await sweepCycle({ isSweeperLeader, sweep, tickSweeperLeader })
+		expect(callOrder[0]).toBe('tick')
+
+		// Second call: now is leader after tick
+		ticked = true
+		await sweepCycle({ isSweeperLeader, sweep, tickSweeperLeader })
 		expect(sweep).toHaveBeenCalledTimes(1)
 	})
 })
