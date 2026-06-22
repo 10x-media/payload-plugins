@@ -30,6 +30,7 @@ export const keys = {
 	timeframeLastYear: 'analytics:timeframeLastYear',
 	timeframeAllTime: 'analytics:timeframeAllTime',
 	widgetMetricLabel: 'analytics:widgetMetricLabel',
+	widgetTrendLabel: 'analytics:widgetTrendLabel',
 	widgetFieldTitle: 'analytics:widgetFieldTitle',
 	widgetFieldMetric: 'analytics:widgetFieldMetric',
 	widgetFieldTimeframe: 'analytics:widgetFieldTimeframe',

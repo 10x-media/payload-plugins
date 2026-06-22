@@ -70,6 +70,15 @@ const WIDGET_DEFS: WidgetDef[] = [
 		maxWidth: 'medium',
 		fields: metricWidgetFields,
 	},
+	{
+		slug: 'analytics-trend',
+		component: '@10x-media/analytics/rsc#AnalyticsTrendWidget',
+		label: keys.widgetTrendLabel,
+		requires: { metrics: ['pageviews'] },
+		minWidth: 'small',
+		maxWidth: 'full',
+		fields: metricWidgetFields,
+	},
 ]
 
 export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void => {

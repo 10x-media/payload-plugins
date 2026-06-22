@@ -38,4 +38,15 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'timeframe']))
 	})
+
+	it('registers the trend widget into the sanitized admin.dashboard.widgets', () => {
+		const slugs = registeredWidgets(booted).map((w) => w.slug)
+		expect(slugs).toContain('analytics-trend')
+	})
+
+	it('keeps the trend widget configurable (title, metric, timeframe fields)', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-trend')
+		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'timeframe']))
+	})
 })

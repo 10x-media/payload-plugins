@@ -32,6 +32,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.timeframeLastYear]: 'Last year',
 	[keys.timeframeAllTime]: 'All time',
 	[keys.widgetMetricLabel]: 'Metric',
+	[keys.widgetTrendLabel]: 'Trend',
 	[keys.widgetFieldTitle]: 'Title',
 	[keys.widgetFieldMetric]: 'Metric',
 	[keys.widgetFieldTimeframe]: 'Timeframe',
