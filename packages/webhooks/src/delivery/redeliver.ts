@@ -47,7 +47,7 @@ export const redeliverDelivery = async (args: {
 	if (deps.mode === 'queue') {
 		await payload.jobs.queue({
 			task: WEBHOOK_DELIVER_TASK,
-			input: { deliveryId: newId },
+			input: { deliveryId: newId, endpoint: String(original.endpoint) },
 			queue: deps.queue,
 		})
 		return { id: newId }
@@ -81,7 +81,7 @@ export const redeliverDelivery = async (args: {
 		return { id: newId }
 	}
 	const result = await sendDelivery({
-		subscription,
+		subscription: { ...subscription, url: String(original.endpoint) },
 		deliveryId: newId,
 		event: String(original.event),
 		body: JSON.stringify(original.payload),

@@ -135,7 +135,7 @@ const dispatch = async (args: {
 		if (deps.mode === 'queue') {
 			await payload.jobs.queue({
 				task: WEBHOOK_DELIVER_TASK,
-				input: { deliveryId },
+				input: { deliveryId, endpoint: subscription.url },
 				queue: deps.queue,
 			})
 			continue

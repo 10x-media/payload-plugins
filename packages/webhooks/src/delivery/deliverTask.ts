@@ -20,10 +20,13 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 	({
 		slug: WEBHOOK_DELIVER_TASK,
 		retries: deps.retries,
-		inputSchema: [{ name: 'deliveryId', type: 'text', required: true }],
+		inputSchema: [
+			{ name: 'deliveryId', type: 'text', required: true },
+			{ name: 'endpoint', type: 'text', required: true },
+		],
 		handler: async ({ input, job, req }) => {
 			const { payload } = req
-			const deliveryId = (input as { deliveryId: string }).deliveryId
+			const { deliveryId, endpoint } = input as { deliveryId: string; endpoint: string }
 			const delivery = await payload.findByID({
 				collection: deps.deliveriesSlug,
 				id: deliveryId,
@@ -50,7 +53,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 
 			const attempt = Number(job.totalTried ?? 0) + 1
 			const result = await sendDelivery({
-				subscription,
+				subscription: { ...subscription, url: endpoint },
 				deliveryId,
 				event: String(delivery.event),
 				body: JSON.stringify(delivery.payload),
