@@ -1,5 +1,6 @@
 import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
+import type { AnalyticsAdapter, MetricKey } from '../core/contract'
 import { native } from '../native/nativeAdapter'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { registerWidgets, widgetIsSupported } from './registerWidgets'
@@ -58,6 +59,21 @@ describe('registerWidgets', () => {
 			{ value: 'native', label: native().label },
 			{ value: 'memory', label: memoryAdapter().label },
 		])
+	})
+
+	it('drops the trend widget when no adapter supports its required metric', () => {
+		const noPageviews: AnalyticsAdapter = {
+			id: 'limited',
+			label: 'Limited',
+			capabilities: { ...native().capabilities, metrics: new Set<MetricKey>(['visitors']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'limited', fetchedAt: '' } }),
+		}
+		const config = bareConfig()
+		registerWidgets(config, { adapters: [noPageviews], multiProvider: false, disabled: [] })
+		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugs).not.toContain('analytics-trend')
+		expect(slugs).toContain('analytics-metric')
 	})
 
 	it('preserves any widgets the host config already declared', () => {
