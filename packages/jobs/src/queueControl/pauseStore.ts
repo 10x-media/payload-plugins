@@ -30,7 +30,7 @@ const isValidPauseState = (raw: unknown): raw is PauseState =>
 
 export const createPauseStore = (payload: Payload): PauseStore => {
 	const getState = async (): Promise<PauseState> => {
-		const raw = await payload.kv.get<unknown>(PAUSE_KEY)
+		const raw = await payload.kv.get<Record<string, unknown>>(PAUSE_KEY)
 		return isValidPauseState(raw) ? raw : emptyPauseState()
 	}
 

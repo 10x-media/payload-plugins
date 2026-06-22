@@ -37,8 +37,8 @@ describe('runSweep', () => {
 			store: makeStore(),
 		})
 		expect(findSpy).toHaveBeenCalledTimes(1)
-		const callArgs = findSpy.mock.calls[0][0] as { sort?: string; where?: Where }
-		expect(callArgs.sort).toBe('updatedAt')
+		const callArgs = findSpy.mock.calls[0]?.[0] as { sort?: string; where?: Where } | undefined
+		expect(callArgs?.sort).toBe('updatedAt')
 	})
 
 	it('is a no-op when not leader', async () => {

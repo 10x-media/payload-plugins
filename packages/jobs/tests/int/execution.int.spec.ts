@@ -8,7 +8,7 @@ import {
 import type { TaskConfig } from 'payload'
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 
-import { createWorker } from '../../src/execution/worker'
+import { createWorker, type WorkerTestHandle } from '../../src/execution/worker'
 import { jobs } from '../../src/index'
 import { createJobLeaseStore } from '../../src/reliability/jobLeaseStore'
 import { createLeaseStore } from '../../src/reliability/leaseStore'
@@ -195,7 +195,7 @@ describeForDb('worker run loop', {}, (db) => {
 		while (ran < 1 && Date.now() < deadline) {
 			await new Promise((r) => setTimeout(r, 25))
 		}
-		worker.stop()
+		;(worker as WorkerTestHandle).stop()
 		expect(ran).toBeGreaterThanOrEqual(1)
 	})
 })

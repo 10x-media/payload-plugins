@@ -51,10 +51,17 @@ export type Worker = {
 	 * releases, destroys). Idempotent: repeated calls return the same in-flight drain.
 	 */
 	drain: () => Promise<DrainResult>
-	/** Stop the loops and remove signal handlers WITHOUT draining (test teardown). */
-	stop: () => void
 	/** Whether this node currently holds the given leadership role. */
 	isLeader: (role: LeaderRole) => boolean
+}
+
+/**
+ * A test-only handle for accessing `stop()`, which clears timers and signal handlers
+ * without releasing leadership leases. Do not use in production; drain() is the correct
+ * shutdown path. Cast a `Worker` to this type in tests to call stop().
+ */
+export type WorkerTestHandle = Worker & {
+	stop: () => void
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -183,6 +190,11 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		return draining
 	}
 
+	const stopWorker = (): void => {
+		stopLoops()
+		removeSignals()
+	}
+
 	const worker: Worker = {
 		drain,
 		isLeader: (role) => (role === 'scheduler' ? scheduler.isLeader() : sweeper.isLeader()),
@@ -207,11 +219,11 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 				),
 			]
 		},
-		stop: () => {
-			stopLoops()
-			removeSignals()
-		},
 	}
+
+	// Attach stop() as a non-enumerable property so tests can access it via WorkerTestHandle
+	// without it appearing on the public Worker type.
+	Object.defineProperty(worker, 'stop', { value: stopWorker, enumerable: false })
 
 	if (args.installSignals !== false) {
 		const exit = args.exit ?? ((code: number) => process.exit(code))

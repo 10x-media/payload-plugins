@@ -7,15 +7,16 @@ const fakeReq = (user: unknown = null): { req: PayloadRequest } => ({
 	req: { user, headers: new Headers() } as unknown as PayloadRequest,
 })
 
-const baseConfig = (existingRun?: (args: { req: PayloadRequest }) => boolean): Config => ({
-	collections: [],
-	jobs: existingRun
-		? {
-				access: { run: existingRun },
-			}
-		: {},
-	globals: [],
-})
+const baseConfig = (existingRun?: (args: { req: PayloadRequest }) => boolean): Config =>
+	({
+		collections: [],
+		jobs: existingRun
+			? {
+					access: { run: existingRun },
+				}
+			: {},
+		globals: [],
+	}) as unknown as Config
 
 const baseOptions = {
 	access: () => true,
