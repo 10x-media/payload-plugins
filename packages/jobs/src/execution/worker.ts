@@ -1,7 +1,6 @@
 import type { Payload } from 'payload'
 import { getCurrentDate } from 'payload'
-import { emptyPauseState } from '../queueControl/pauseState'
-import type { PauseStore } from '../queueControl/pauseStore'
+import { createPauseStore, type PauseStore } from '../queueControl/pauseStore'
 import { runTargetsForPause } from '../queueControl/runTargets'
 import { createJobLeaseStore } from '../reliability/jobLeaseStore'
 import { createLeaderController } from '../reliability/leaderController'
@@ -130,8 +129,12 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	let signalCleanup: SignalCleanup | undefined
 	let draining: Promise<DrainResult> | undefined
 
+	// Default to a KV-backed PauseStore so presets that enable queueControl automatically
+	// get the correct pause behavior without requiring an explicit pauseStore argument.
+	const pauseStore: PauseStore = args.pauseStore ?? createPauseStore(payload)
+
 	const runJobs = async (): Promise<void> => {
-		const state = args.pauseStore ? await args.pauseStore.getState() : emptyPauseState()
+		const state = await pauseStore.getState()
 		for (const target of runTargetsForPause(args.queues, state)) {
 			await payload.jobs.run({ ...target, limit: runLimit, silent: true })
 		}
