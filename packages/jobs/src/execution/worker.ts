@@ -10,7 +10,7 @@ import { resolveNodeId } from '../reliability/nodeId'
 import type { ResolvedReliabilityOptions } from '../reliability/options'
 import { runSweep } from '../reliability/sweeper'
 import { type DrainResult, drainWorker } from './drain'
-import { countInFlight } from './inFlight'
+import { getOrCreateCounter, releaseCounter } from './inFlight'
 import { areHandlersInstalled, installSignalHandlers, type SignalCleanup } from './signals'
 import { maintenanceCycle, runCycle, sweepCycle } from './workerCycles'
 
@@ -120,7 +120,12 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	const runLimit = args.runLimit ?? 10
 	const drainTimeoutMs = args.drainTimeoutMs ?? 30_000
 	const pollIntervalMs = args.pollIntervalMs ?? 500
-	const destroy = args.destroy ?? (() => payload.destroy())
+	const destroy =
+		args.destroy ??
+		(async () => {
+			releaseCounter(nodeId)
+			return payload.destroy()
+		})
 	const now = args.now ?? (() => Date.now())
 	const sleep = args.sleep ?? realSleep
 	const logger = payload.logger
@@ -174,9 +179,10 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 			return draining
 		}
 		removeSignals()
+		const counter = getOrCreateCounter(nodeId)
 		draining = drainWorker(
 			{
-				countInFlight: () => countInFlight(payload, nodeId),
+				countInFlight: () => Promise.resolve(counter.count()),
 				destroy,
 				logger,
 				now,
