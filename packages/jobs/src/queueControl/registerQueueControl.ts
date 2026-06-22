@@ -10,10 +10,10 @@ import {
 import type { ResolvedQueueControlOptions } from './options'
 
 /**
- * Register the queue-control layer: harden the native run endpoint by setting
- * `jobs.access.run` to the configured checker, and add the status, hardened-run, and
- * sweep endpoints to `payload-jobs` through the same `jobsCollectionOverrides` seam the
- * reliability and observability layers use (composing, never clobbering).
+ * Register the queue-control layer: harden the native run endpoint by composing the
+ * plugin's access checker with any existing `jobs.access.run` (both must pass), and
+ * add the status, hardened-run, and sweep endpoints to `payload-jobs` through the same
+ * `jobsCollectionOverrides` seam the reliability and observability layers use.
  */
 export const registerQueueControl = (
 	config: Config,
@@ -23,10 +23,16 @@ export const registerQueueControl = (
 	const deps: QueueEndpointDeps = { access: options.access, queues: options.queues, reliability }
 	const controlEndpoints = [statusEndpoint(deps), runControlEndpoint(deps), sweepEndpoint(deps)]
 
+	const existingRun = config.jobs?.access?.run
+	const composedRun = existingRun
+		? async (args: Parameters<typeof existingRun>[0]) =>
+				(await existingRun(args)) && options.access(args)
+		: options.access
+
 	const existingOverride = config.jobs?.jobsCollectionOverrides
 	config.jobs = {
 		...config.jobs,
-		access: { ...config.jobs?.access, run: options.access },
+		access: { ...config.jobs?.access, run: composedRun },
 		jobsCollectionOverrides: ({ defaultJobsCollection }) => {
 			const base = existingOverride
 				? existingOverride({ defaultJobsCollection })
