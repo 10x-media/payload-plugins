@@ -16,4 +16,3 @@
 - [ ] `pnpm typecheck <name>` passes with no new errors
 - [ ] Changeset added via `pnpm changeset`, or `no-release` label applied
 - [ ] Docs updated if commands, config, or behavior changed
-- [ ] No em-dashes; follows the comment and style policy (`.cursor/rules/comments.mdc`)
