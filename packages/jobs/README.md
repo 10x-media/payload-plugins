@@ -298,7 +298,8 @@ Notes:
 
 - `resolveReliabilityOptions` fully defaults your `ReliabilityOptions`. It returns `null` when reliability is off (passed `false` or `undefined`), which the worker cannot run with, hence the guard.
 - Pass the same reliability tuning you give the plugin (share a constant between `payload.config.ts` and `worker.ts`) so the lease TTLs match across the cluster.
-- `createWorker` registers SIGTERM and SIGINT handlers automatically (`installSignals` defaults to `true`). On signal it drains in-flight jobs (within `drainTimeoutMs`), requeues any straggler, releases leases, destroys the Payload instance, and exits 0 (or 1 if the drain timed out and jobs were requeued). Keep your orchestrator grace period at `drainTimeoutMs + pollIntervalMs + 5s` (see Multi-node above).
+- `createWorker` registers SIGTERM and SIGINT handlers automatically (`installSignals` defaults to `true`). On signal it drains in-flight jobs (within `drainTimeoutMs`), requeues any straggler, releases leases, destroys the Payload instance, and exits **0** on clean drain or **1** if the drain timed out (jobs were requeued). Keep your orchestrator grace period at `drainTimeoutMs + pollIntervalMs + 5s` (see Multi-node above).
+- Only one worker with `installSignals: true` may exist per process. Creating a second one throws. Use `installSignals: false` for additional workers in the same process (e.g. test helpers).
 - Run it with `node --import tsx worker.ts` in development, or compile it and run `node dist/worker.js` in production.
 
 ### CI-optional e2e recipes

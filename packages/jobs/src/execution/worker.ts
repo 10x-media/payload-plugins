@@ -12,7 +12,7 @@ import type { ResolvedReliabilityOptions } from '../reliability/options'
 import { runSweep } from '../reliability/sweeper'
 import { type DrainResult, drainWorker } from './drain'
 import { countInFlight } from './inFlight'
-import { installSignalHandlers, type SignalCleanup } from './signals'
+import { areHandlersInstalled, installSignalHandlers, type SignalCleanup } from './signals'
 import { maintenanceCycle, runCycle, sweepCycle } from './workerCycles'
 
 export type CreateWorkerArgs = {
@@ -232,10 +232,17 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	Object.defineProperty(worker, 'stop', { value: stopWorker, enumerable: false })
 
 	if (args.installSignals !== false) {
+		if (areHandlersInstalled()) {
+			throw new Error(
+				'@10x-media/jobs: signal handlers are already installed in this process. ' +
+					'Only one worker with installSignals:true may exist per process. ' +
+					'Create subsequent workers with installSignals:false.'
+			)
+		}
 		const exit = args.exit ?? ((code: number) => process.exit(code))
 		signalCleanup = installSignalHandlers(args.signals ?? ['SIGTERM', 'SIGINT'], () => {
 			void drain()
-				.then(() => exit(0))
+				.then((res) => exit(res.timedOut ? 1 : 0))
 				.catch(() => exit(1))
 		})
 	}
