@@ -12,8 +12,25 @@ export const applyPause = (state: PauseState, queue: string | undefined): PauseS
 	return state.queues.includes(queue) ? state : { ...state, queues: [...state.queues, queue] }
 }
 
-/** Resume everything (no queue, clears the global flag) or a single queue. */
-export const applyResume = (state: PauseState, queue: string | undefined): PauseState => {
+/**
+ * Resume a paused queue or clear the global pause flag.
+ *
+ * The pause model has two independent layers: a global flag and a per-queue set.
+ * `resume()` with no arguments (or `queue: undefined`) only clears the global flag;
+ * per-queue pauses set with `pause('emails')` remain active. Pass `all: true` to
+ * reset both layers at once to `emptyPauseState()`.
+ *
+ * Example: `pause('emails')` -> `pause()` -> `resume()` leaves emails paused.
+ * Use `resume(undefined, true)` or `resume({ all: true })` for a full reset.
+ */
+export const applyResume = (
+	state: PauseState,
+	queue: string | undefined,
+	all = false
+): PauseState => {
+	if (all) {
+		return emptyPauseState()
+	}
 	if (queue === undefined) {
 		return { ...state, global: false }
 	}
