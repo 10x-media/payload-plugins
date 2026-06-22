@@ -36,8 +36,20 @@ describe('resolveTimeframe', () => {
 		expect(start.toISOString()).toBe('2026-01-01T00:00:00.000Z')
 	})
 
+	it('lastYear spans 365 inclusive UTC days', () => {
+		const { start, end } = resolveTimeframe('lastYear', now)
+		expect(start.toISOString()).toBe('2025-06-18T00:00:00.000Z')
+		expect(end.toISOString()).toBe('2026-06-17T14:30:00.000Z')
+	})
+
+	it('allTime starts at the unix epoch and ends at now', () => {
+		const { start, end } = resolveTimeframe('allTime', now)
+		expect(start.toISOString()).toBe('1970-01-01T00:00:00.000Z')
+		expect(end.toISOString()).toBe('2026-06-17T14:30:00.000Z')
+	})
+
 	it('exposes the preset list', () => {
 		expect(TIMEFRAME_PRESETS).toContain('last30days')
-		expect(TIMEFRAME_PRESETS).toHaveLength(6)
+		expect(TIMEFRAME_PRESETS).toHaveLength(8)
 	})
 })

@@ -7,6 +7,8 @@ export const TIMEFRAME_PRESETS = [
 	'last90days',
 	'thisMonth',
 	'thisYear',
+	'lastYear',
+	'allTime',
 ] as const
 
 export type TimeframePreset = (typeof TIMEFRAME_PRESETS)[number]
@@ -40,5 +42,9 @@ export const resolveTimeframe = (preset: TimeframePreset, now: Date): DateRange 
 			return { start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)), end }
 		case 'thisYear':
 			return { start: new Date(Date.UTC(now.getUTCFullYear(), 0, 1)), end }
+		case 'lastYear':
+			return { start: daysBack(now, 364), end }
+		case 'allTime':
+			return { start: new Date(0), end }
 	}
 }

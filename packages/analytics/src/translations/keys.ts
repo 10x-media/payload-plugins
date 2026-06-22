@@ -27,6 +27,8 @@ export const keys = {
 	timeframeLast90Days: 'analytics:timeframeLast90Days',
 	timeframeThisMonth: 'analytics:timeframeThisMonth',
 	timeframeThisYear: 'analytics:timeframeThisYear',
+	timeframeLastYear: 'analytics:timeframeLastYear',
+	timeframeAllTime: 'analytics:timeframeAllTime',
 	widgetMetricLabel: 'analytics:widgetMetricLabel',
 	widgetFieldTitle: 'analytics:widgetFieldTitle',
 	widgetFieldMetric: 'analytics:widgetFieldMetric',

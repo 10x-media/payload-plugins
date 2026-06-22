@@ -25,4 +25,6 @@ export const TIMEFRAME_KEYS: Record<TimeframePreset, TranslationKey> = {
 	last90days: keys.timeframeLast90Days,
 	thisMonth: keys.timeframeThisMonth,
 	thisYear: keys.timeframeThisYear,
+	lastYear: keys.timeframeLastYear,
+	allTime: keys.timeframeAllTime,
 }
