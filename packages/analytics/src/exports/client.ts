@@ -1,3 +1,3 @@
 'use client'
 
-export {}
+export { TrendChart, type TrendChartProps } from '../charts/TrendChart'
