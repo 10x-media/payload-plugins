@@ -70,6 +70,16 @@ export const redeliverDelivery = async (args: {
 		})
 		return { id: newId }
 	}
+	if (!subscription.enabled) {
+		await payload.update({
+			collection: deps.deliveriesSlug,
+			id: newId,
+			data: { status: 'dead', error: 'subscription disabled' },
+			overrideAccess: true,
+			req,
+		})
+		return { id: newId }
+	}
 	const result = await sendDelivery({
 		subscription,
 		deliveryId: newId,
