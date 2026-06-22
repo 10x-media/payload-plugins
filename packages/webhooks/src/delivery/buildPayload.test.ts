@@ -30,7 +30,7 @@ describe('buildPayload', () => {
 			operation: 'create',
 			config: { transform: ({ doc }) => ({ id: doc.id }) },
 		})
-		expect(body.data).toEqual({ id: 'p1' })
+		expect(body?.data).toEqual({ id: 'p1' })
 	})
 
 	it('includes previousData only on update when enabled and present', () => {
@@ -41,14 +41,14 @@ describe('buildPayload', () => {
 				operation: 'update',
 				previousDoc: prev,
 				config: { includePreviousData: true },
-			}).previousData
+			})?.previousData
 		).toEqual(prev)
 		expect(
-			buildPayload({ ...base, operation: 'update', previousDoc: prev }).previousData
+			buildPayload({ ...base, operation: 'update', previousDoc: prev })?.previousData
 		).toBeUndefined()
 		expect(
 			buildPayload({ ...base, operation: 'create', config: { includePreviousData: true } })
-				.previousData
+				?.previousData
 		).toBeUndefined()
 	})
 
@@ -63,7 +63,15 @@ describe('buildPayload', () => {
 				transform: ({ doc }) => ({ id: (doc as { id: string }).id }),
 			},
 		})
-		// transform must strip secret from previousData too
-		expect(body.previousData).toEqual({ id: 'p1' })
+		expect(body?.previousData).toEqual({ id: 'p1' })
+	})
+
+	it('returns null when transform returns undefined (suppression signal)', () => {
+		const body = buildPayload({
+			...base,
+			operation: 'create',
+			config: { transform: () => undefined },
+		})
+		expect(body).toBeNull()
 	})
 })

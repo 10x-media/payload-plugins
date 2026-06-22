@@ -1,16 +1,18 @@
 import type { Config } from 'payload'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { registerWebhooks } from './registerWebhooks'
 
-const makeConfig = (): Config => ({
-	collections: [],
-	routes: { api: '/api' },
-	serverURL: 'http://localhost:3000',
-})
+const makeConfig = (): Config =>
+	({
+		collections: [],
+		routes: { api: '/api' },
+		serverURL: 'http://localhost:3000',
+	}) as unknown as Config
 
 const getRedeliverEndpoint = (config: Config) => {
 	const deliveries = config.collections?.find((c) => c.slug === 'webhook-deliveries')
-	return deliveries?.endpoints?.find((e) => e.path === '/:id/redeliver' && e.method === 'post')
+	const endpoints = Array.isArray(deliveries?.endpoints) ? deliveries.endpoints : []
+	return endpoints.find((e) => e.path === '/:id/redeliver' && e.method === 'post')
 }
 
 describe('redeliver endpoint access', () => {
@@ -20,8 +22,7 @@ describe('redeliver endpoint access', () => {
 		const endpoint = getRedeliverEndpoint(config)
 		const res = await endpoint?.handler?.({ user: undefined, routeParams: { id: '1' } } as never)
 		expect(res).toBeInstanceOf(Response)
-		const r = res as Response
-		expect(r.status).toBe(401)
+		expect((res as Response).status).toBe(401)
 	})
 
 	it('uses redeliverAccess when provided and returns 403 when it returns false', async () => {
@@ -32,13 +33,11 @@ describe('redeliver endpoint access', () => {
 			hasJobsPlugin: false,
 		})
 		const endpoint = getRedeliverEndpoint(config)
-		// Pass a logged-in user so the default loggedIn check would have passed
 		const res = await endpoint?.handler?.({
 			user: { id: '1' },
 			routeParams: { id: '1' },
 		} as never)
 		expect(res).toBeInstanceOf(Response)
-		const r = res as Response
-		expect(r.status).toBe(403)
+		expect((res as Response).status).toBe(403)
 	})
 })

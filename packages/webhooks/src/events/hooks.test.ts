@@ -26,6 +26,17 @@ const makeDeps = (overrides: Partial<WebhookDispatchDeps> = {}): WebhookDispatch
 const makeReq = (payload: ReturnType<typeof makePayload>) =>
 	({ payload, context: {} }) as unknown as Parameters<ReturnType<typeof makeAfterChange>>[0]['req']
 
+const makeHookArgs = (req: ReturnType<typeof makeReq>) =>
+	({
+		doc: { id: '1' },
+		previousDoc: {},
+		operation: 'create' as const,
+		req,
+		collection: {} as never,
+		data: {},
+		context: {},
+	}) as Parameters<ReturnType<typeof makeAfterChange>>[0]
+
 describe('dispatch (inline mode)', () => {
 	it('records status=failed (not dead) when inline delivery fails', async () => {
 		const payload = makePayload()
@@ -35,13 +46,7 @@ describe('dispatch (inline mode)', () => {
 				codeSubscriptions: [{ id: 'sub-1', url: 'http://127.0.0.1:1', events: ['posts.created'] }],
 			})
 		)
-		await hook({
-			doc: { id: '1' },
-			previousDoc: {},
-			operation: 'create',
-			req: makeReq(payload),
-			collection: {} as never,
-		})
+		await hook(makeHookArgs(makeReq(payload)))
 		const updateCall = payload.update.mock.calls.find(
 			(c) => c[0].data?.status !== undefined && c[0].data?.status !== 'pending'
 		)
@@ -57,19 +62,12 @@ describe('dispatch (inline mode)', () => {
 				codeSubscriptions: [{ id: 'sub-1', url: 'http://127.0.0.1:1', events: ['posts.created'] }],
 			})
 		)
-		await hook({
-			doc: { id: '1' },
-			previousDoc: {},
-			operation: 'create',
-			req: makeReq(payload),
-			collection: {} as never,
-		})
+		await hook(makeHookArgs(makeReq(payload)))
 		expect(payload.create).not.toHaveBeenCalled()
 	})
 
 	it('continues to the next subscription when DB create throws for one', async () => {
 		const payload = makePayload()
-		// First create throws, second succeeds
 		payload.create
 			.mockRejectedValueOnce(new Error('DB error'))
 			.mockResolvedValue({ id: 'delivery-2' })
@@ -82,16 +80,7 @@ describe('dispatch (inline mode)', () => {
 				],
 			})
 		)
-		await expect(
-			hook({
-				doc: { id: '1' },
-				previousDoc: {},
-				operation: 'create',
-				req: makeReq(payload),
-				collection: {} as never,
-			})
-		).resolves.not.toThrow()
-		// Second subscription should still have been attempted
+		await expect(hook(makeHookArgs(makeReq(payload)))).resolves.not.toThrow()
 		expect(payload.create).toHaveBeenCalledTimes(2)
 	})
 })
@@ -101,13 +90,7 @@ describe('resolveListening', () => {
 		const payload = makePayload()
 		payload.find.mockResolvedValue({ docs: [] })
 		const hook = makeAfterChange(makeDeps())
-		await hook({
-			doc: { id: '1' },
-			previousDoc: {},
-			operation: 'create',
-			req: makeReq(payload),
-			collection: {} as never,
-		})
+		await hook(makeHookArgs(makeReq(payload)))
 		const findCall = payload.find.mock.calls[0]?.[0]
 		expect(findCall?.where?.events).toBeDefined()
 	})
@@ -116,13 +99,7 @@ describe('resolveListening', () => {
 		const payload = makePayload()
 		payload.find.mockResolvedValue({ docs: [] })
 		const hook = makeAfterChange(makeDeps())
-		await hook({
-			doc: { id: '1' },
-			previousDoc: {},
-			operation: 'create',
-			req: makeReq(payload),
-			collection: {} as never,
-		})
+		await hook(makeHookArgs(makeReq(payload)))
 		const findCall = payload.find.mock.calls[0]?.[0]
 		expect(findCall?.sort).toBeDefined()
 	})
