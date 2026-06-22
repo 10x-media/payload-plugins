@@ -98,9 +98,9 @@ describeForDb('queue health', {}, (db) => {
 			includeRecovered: true,
 			queues: ['default', 'emails'],
 		})
-		expect(report.totals.pending).toBe(1)
+		expect(report.totals.queued).toBe(1)
 		expect(report.totals.processing).toBe(1)
-		expect(report.oldestPendingAgeMs).not.toBeNull()
+		expect(report.oldestQueuedAgeMs).not.toBeNull()
 		const emails = report.queues.find((q) => q.queue === 'emails')
 		expect(emails?.processing).toBe(1)
 		expect(emails?.lastScheduledRun).toBeNull() // no schedules: stats global absent, handled
@@ -131,8 +131,8 @@ describeForDb('queue-control endpoints', {}, (db) => {
 	it('status endpoint returns a health report', async () => {
 		const res = await statusEndpoint(deps(booted)).handler(fakeReq(booted))
 		expect(res.status).toBe(200)
-		const body = (await res.json()) as { totals: { pending: number } }
-		expect(typeof body.totals.pending).toBe('number')
+		const body = (await res.json()) as { totals: { queued: number } }
+		expect(typeof body.totals.queued).toBe('number')
 	})
 
 	it('denies access with 401 when the checker rejects', async () => {
