@@ -1,4 +1,5 @@
 import type { WidgetServerProps } from 'payload'
+import type { CSSProperties } from 'react'
 import type { MetricKey } from '../core/contract'
 import { formatMetricValue } from '../fields/format'
 import type { TimeframePreset } from '../timeframe/presets'
@@ -11,6 +12,25 @@ import type { MetricWidgetData } from './types'
 const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
 	unavailable: keys.stateUnavailable,
+}
+
+const cardStyle: CSSProperties = {
+	display: 'flex',
+	flexDirection: 'column',
+	gap: '0.375rem',
+	padding: 'var(--base, 1rem)',
+	background: 'var(--theme-elevation-50)',
+	border: '1px solid var(--theme-elevation-150)',
+	borderRadius: 'var(--style-radius-m, 6px)',
+	boxSizing: 'border-box',
+}
+
+const labelStyle: CSSProperties = {
+	fontSize: '0.6875rem',
+	fontWeight: 600,
+	letterSpacing: '0.04em',
+	textTransform: 'uppercase',
+	color: 'var(--theme-elevation-500)',
 }
 
 export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
@@ -31,29 +51,30 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 
 	if (result.status !== 'ok') {
 		return (
-			<div
-				className="analytics-metric-widget"
-				style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
-			>
-				<span style={{ fontSize: '0.75rem', opacity: 0.6, textTransform: 'uppercase' }}>
-					{title}
-				</span>
-				<span style={{ opacity: 0.6 }}>{t(STATE_KEY[result.status])}</span>
+			<div className="analytics-metric-widget" style={cardStyle}>
+				<span style={labelStyle}>{title}</span>
+				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
 			</div>
 		)
 	}
 
 	const value = result.metrics[metric]
 	return (
-		<div
-			className="analytics-metric-widget"
-			style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
-		>
-			<span style={{ fontSize: '0.75rem', opacity: 0.6, textTransform: 'uppercase' }}>{title}</span>
-			<span style={{ fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.1 }}>
+		<div className="analytics-metric-widget" style={cardStyle}>
+			<span style={labelStyle}>{title}</span>
+			<span
+				style={{
+					fontSize: '2rem',
+					fontWeight: 700,
+					lineHeight: 1.1,
+					color: 'var(--theme-elevation-800)',
+				}}
+			>
 				{value === undefined ? '–' : formatMetricValue(metric, value, locale)}
 			</span>
-			<span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t(TIMEFRAME_KEYS[timeframe])}</span>
+			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>
+				{t(TIMEFRAME_KEYS[timeframe])}
+			</span>
 		</div>
 	)
 }
