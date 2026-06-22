@@ -1,5 +1,4 @@
-import type { Payload } from 'payload'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { WebhookDispatchDeps } from './hooks'
 import { makeAfterChange } from './hooks'
 

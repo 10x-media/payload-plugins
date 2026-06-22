@@ -147,15 +147,38 @@ The signature is HMAC-SHA256 over `${timestamp}.${rawBody}`, where `timestamp` i
 Verify in your receiver:
 
 ```ts
-import { createHmac } from 'node:crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 
 function verify(secret: string, timestamp: string, rawBody: string, signature: string): boolean {
   const expected = createHmac('sha256', secret)
     .update(`${timestamp}.${rawBody}`)
     .digest('hex')
-  return signature === `v1=${expected}`
+  const expectedBuf = Buffer.from(`v1=${expected}`)
+  const actualBuf = Buffer.from(signature)
+  // timingSafeEqual requires equal lengths; unequal length means mismatch
+  if (expectedBuf.length !== actualBuf.length) {
+    return false
+  }
+  return timingSafeEqual(expectedBuf, actualBuf)
 }
 ```
+
+### Replay protection
+
+`X-Webhook-Timestamp` is included in the signed payload, so the signature covers when the request was sent. To prevent replay attacks, add a staleness check before accepting a delivery:
+
+```ts
+function isTimestampFresh(timestamp: string, toleranceSeconds = 300): boolean {
+  const sent = Number(timestamp)
+  if (!Number.isFinite(sent)) return false
+  const now = Math.floor(Date.now() / 1000)
+  const diff = now - sent
+  // Reject replays older than the tolerance window and future-dated requests
+  return diff >= 0 && diff <= toleranceSeconds
+}
+```
+
+Reject the request if `isTimestampFresh(req.headers['x-webhook-timestamp'])` returns `false`. A ±5 minute window (`toleranceSeconds: 300`) is the conventional default.
 
 Additional headers sent on every request: `X-Webhook-Id`, `X-Webhook-Event`, `X-Webhook-Timestamp`, `User-Agent: 10x-media-webhooks`. Subscriptions can inject extra headers via the admin panel's **Headers** array field.
 
