@@ -67,8 +67,10 @@ export const createMongoLeaseStore = (payload: Payload): LeaseStore => {
 		},
 		// biome-ignore lint/complexity/useMaxParams: lease primitive signature (role, owner, ttlMs, now)
 		renew: async (role, owner, ttlMs, now): Promise<LeaseResult> => {
+			// Guard on leaseExpiresAt >= now so a GC-paused node cannot silently re-extend
+			// an already-expired lease without going through acquireOrSteal (fence bump).
 			const doc = await m.findOneAndUpdate(
-				{ owner, role },
+				{ owner, role, leaseExpiresAt: { $gte: now } },
 				{ $set: { leaseExpiresAt: leaseExpiry(now, ttlMs) } },
 				{ new: true }
 			)

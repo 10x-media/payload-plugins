@@ -77,12 +77,14 @@ export const createPostgresLeaseStore = (payload: Payload): LeaseStore => {
 		},
 		// biome-ignore lint/complexity/useMaxParams: lease primitive signature (role, owner, ttlMs, now)
 		renew: async (role, owner, ttlMs, now): Promise<LeaseResult> => {
+			// Guard on lease_expires_at >= now so a GC-paused node cannot silently re-extend
+			// an already-expired lease without going through acquireOrSteal (fence bump).
 			const res = await db.query(
 				`UPDATE ${table}
 				 SET lease_expires_at = $1
-				 WHERE role = $2 AND owner = $3
+				 WHERE role = $2 AND owner = $3 AND lease_expires_at >= $4
 				 RETURNING fence_token`,
-				[leaseExpiry(now, ttlMs), role, owner]
+				[leaseExpiry(now, ttlMs), role, owner, now]
 			)
 			return {
 				fenceToken: res.rowCount === 1 ? Number(res.rows[0]?.fence_token) : 0,

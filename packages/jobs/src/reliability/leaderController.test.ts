@@ -34,7 +34,7 @@ const fakeStore = (): LeaseStore => {
 		},
 		// biome-ignore lint/complexity/useMaxParams: lease primitive signature (role, owner, ttlMs, now)
 		renew: async (_role, owner, ttlMs, now): Promise<LeaseResult> => {
-			if (rec.owner === owner) {
+			if (rec.owner === owner && !stale(now)) {
 				rec = { ...rec, leaseExpiresAt: new Date(now.getTime() + ttlMs) }
 				return { fenceToken: rec.fenceToken, ok: true }
 			}
@@ -117,6 +117,25 @@ describe('createLeaderController', () => {
 		await c.tick(new Date('2026-01-01T00:00:10.000Z'))
 		expect(c.isLeader()).toBe(true)
 		expect(c.fenceToken()).toBeGreaterThan(1)
+	})
+
+	it('falls through to acquireOrSteal with a fence bump when renew fails on an expired lease (item 19)', async () => {
+		// Node A holds the lease but its TTL elapses without a renew. Its next tick should
+		// go through acquireOrSteal (fence bump) rather than just dropping leadership.
+		const store = fakeStore()
+		const a = createLeaderController({ ownerId: 'node-A', role, store, ttlMs: 5_000 })
+		const t0 = new Date('2026-01-01T00:00:00.000Z')
+		await a.tick(t0) // acquires; fenceToken = 1, leaseExpiresAt = t0 + 5s
+		expect(a.isLeader()).toBe(true)
+		expect(a.fenceToken()).toBe(1)
+
+		// Tick after expiry: renew should return ok:false (lease expired, with item 19's fix),
+		// and the controller should fall through to acquireOrSteal, bumping the fence.
+		const t1 = new Date('2026-01-01T00:00:06.000Z') // t0 + 6s > ttl (5s)
+		await a.tick(t1)
+		// After the fix: acquireOrSteal was called, fence token bumped to 2.
+		expect(a.isLeader()).toBe(true)
+		expect(a.fenceToken()).toBeGreaterThan(1)
 	})
 
 	it('a losing acquire never flips leadership and never exposes the sentinel token', async () => {
