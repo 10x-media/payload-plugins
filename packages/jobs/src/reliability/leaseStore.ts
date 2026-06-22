@@ -36,8 +36,8 @@ export interface LeaseStore {
 	) => Promise<LeaseResult>
 	/** Renew `role` if `owner` still holds it at `now`. Does not bump the fence token. */
 	renew: (role: LeaderRole, owner: string, ttlMs: number, now: Date) => Promise<LeaseResult>
-	/** Release `role` if `owner` holds it (graceful handoff: clears owner and expiry). */
-	release: (role: LeaderRole, owner: string) => Promise<void>
+	/** Release `role` if `owner` holds it (graceful handoff: clears owner and expiry). Returns ok:false if the row did not match. */
+	release: (role: LeaderRole, owner: string) => Promise<{ ok: boolean }>
 	/** Read the current lease row (diagnostics and tests). */
 	read: (role: LeaderRole) => Promise<LeaseRecord | null>
 }

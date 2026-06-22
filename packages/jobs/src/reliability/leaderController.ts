@@ -34,9 +34,18 @@ export const createLeaderController = (args: LeaderControllerArgs): LeaderContro
 		fenceToken: () => (leading ? token : 0),
 		isLeader: () => leading,
 		release: async () => {
-			await store.release(role, ownerId)
-			leading = false
-			token = 0
+			const { ok } = await store.release(role, ownerId)
+			if (ok) {
+				leading = false
+				token = 0
+			} else if (leading) {
+				// The release did not match this node's row, meaning the lease was stolen before
+				// we could release it. Keep leading:true so callers get a confirmed handoff signal
+				// rather than a silent false negative. The TTL will self-heal.
+				console.warn(
+					`@10x-media/jobs: leaderController.release: row for role "${role}" did not match owner "${ownerId}"; lease may have been stolen`
+				)
+			}
 		},
 		tick: async (now) => {
 			if (leading) {

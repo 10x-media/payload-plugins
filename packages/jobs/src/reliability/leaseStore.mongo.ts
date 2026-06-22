@@ -57,8 +57,13 @@ export const createMongoLeaseStore = (payload: Payload): LeaseStore => {
 			return { fenceToken: doc?.fenceToken ?? 0, ok: doc !== null }
 		},
 		read: async (role): Promise<LeaseRecord | null> => toRecord(await m.findOne({ role }).lean()),
-		release: async (role, owner): Promise<void> => {
-			await m.findOneAndUpdate({ owner, role }, { $set: { leaseExpiresAt: null, owner: null } })
+		release: async (role, owner): Promise<{ ok: boolean }> => {
+			const doc = await m.findOneAndUpdate(
+				{ owner, role },
+				{ $set: { leaseExpiresAt: null, owner: null } },
+				{ new: true }
+			)
+			return { ok: doc !== null }
 		},
 		// biome-ignore lint/complexity/useMaxParams: lease primitive signature (role, owner, ttlMs, now)
 		renew: async (role, owner, ttlMs, now): Promise<LeaseResult> => {

@@ -68,11 +68,12 @@ export const createPostgresLeaseStore = (payload: Payload): LeaseStore => {
 			)
 			return toRecord(res.rows[0])
 		},
-		release: async (role, owner): Promise<void> => {
-			await db.query(
-				`UPDATE ${table} SET owner = NULL, lease_expires_at = NULL WHERE role = $1 AND owner = $2`,
+		release: async (role, owner): Promise<{ ok: boolean }> => {
+			const res = await db.query(
+				`UPDATE ${table} SET owner = NULL, lease_expires_at = NULL WHERE role = $1 AND owner = $2 RETURNING role`,
 				[role, owner]
 			)
+			return { ok: res.rowCount === 1 }
 		},
 		// biome-ignore lint/complexity/useMaxParams: lease primitive signature (role, owner, ttlMs, now)
 		renew: async (role, owner, ttlMs, now): Promise<LeaseResult> => {
