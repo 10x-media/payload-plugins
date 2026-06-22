@@ -129,8 +129,9 @@ export const createPostgresJobLeaseStore = (payload: Payload): JobLeaseStore => 
 				 SET started_at = $1, claimed_by = $2, lease_expires_at = $3,
 				     fence_token = COALESCE(fence_token, 0) + 1
 				 WHERE id = $4 AND processing = true
+				   AND (claimed_by IS NULL OR claimed_by = $5)
 				 RETURNING fence_token`,
-				[now, owner, leaseExpiry(now, ttlMs), jobId]
+				[now, owner, leaseExpiry(now, ttlMs), jobId, owner]
 			)
 			const ok = res.rowCount === 1
 			return { fenceToken: ok ? Number(res.rows[0]?.fence_token) : 0, ok }
