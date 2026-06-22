@@ -64,7 +64,7 @@ Three facts shape every topology below.
 
 2. **The worker is a separate process, not your web server.** The execution layer (`createWorker`) is meant to run as its own long-lived process (a worker container, a separate Vercel-incompatible service). Your Next.js / Payload web server handles HTTP. The worker boots its own Payload instance against the same database and owns the run/schedule/sweep loops. The only topology that does not run a worker process is serverless, which drives everything from cron-hit endpoints instead.
 
-3. **Completed jobs are deleted, not kept.** Payload's `jobs.deleteJobOnComplete` defaults to `true` in v3.85, so a job that finishes successfully is removed from the queue. The dashboard and the `/queue-status` counts therefore reflect pending, processing, failed, and scheduled jobs, never completed ones. Set `jobs.deleteJobOnComplete: false` in `buildConfig` if you want completed jobs to persist for auditing.
+3. **Completed jobs are deleted, not kept.** Payload's `jobs.deleteJobOnComplete` defaults to `true` in v3.85, so a job that finishes successfully is removed from the queue. With the default, the dashboard and `/queue-status` counts reflect the live states (`queued`, `scheduled`, `retrying`, `processing`, `failed`, `cancelled`), since succeeded jobs are gone. Set `jobs.deleteJobOnComplete: false` in `buildConfig` to keep completed jobs for auditing; the `succeeded` count then reflects them.
 
 Pick a preset:
 

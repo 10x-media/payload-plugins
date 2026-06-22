@@ -22,5 +22,5 @@ Fix a batch of functional and security issues found in the jobs plugin review:
 - `createWorker` defaults `pauseStore` to `createPauseStore(payload)`, eliminating the footgun where preset-enabled queue control was silently ignored (item 22)
 - `sweepCycle` re-ticks the sweeper leadership before acting so the check is always fresh (item 23)
 - `stampClaim` guards against double-claiming: a second owner cannot claim a job already held by a different node (item 24)
-- `/queue-status` response rewritten to the 7-state taxonomy: `queued`, `scheduled`, `retrying`, `processing`, `failed`, `cancelled`, `recovered` (item 25, breaking change)
+- `/queue-status` reports the seven canonical job states (`queued`, `scheduled`, `retrying`, `processing`, `succeeded`, `failed`, `cancelled`) plus an orthogonal `recovered` count (`recoveryAttempts > 0`, when reliability is enabled) (item 25, breaking change)
 - In-flight job count is now process-local (incremented/decremented in `withHeartbeat`) instead of a DB query; `requeueStragglers` always runs on drain to release orphaned DB claims (item 26)

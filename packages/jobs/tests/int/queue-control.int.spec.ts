@@ -105,6 +105,37 @@ describeForDb('queue health', {}, (db) => {
 		expect(emails?.processing).toBe(1)
 		expect(emails?.lastScheduledRun).toBeNull() // no schedules: stats global absent, handled
 	})
+
+	it('counts succeeded jobs and reports recovered from recoveryAttempts, not as a copy of retrying', async () => {
+		// A job that ultimately succeeded after one or more recovery attempts.
+		const done = await booted.payload.jobs.queue({ input: {}, queue: 'default', task: 'noop' })
+		await booted.payload.update({
+			collection: 'payload-jobs',
+			data: {
+				completedAt: new Date('2026-08-01T00:00:00.000Z').toISOString(),
+				hasError: false,
+				processing: false,
+				recoveryAttempts: 2,
+			},
+			id: done.id,
+			overrideAccess: true,
+		})
+
+		const report = await getQueueHealth(booted.payload, {
+			includeRecovered: true,
+			queues: ['default'],
+		})
+		// `succeeded` is one of the seven canonical states and must be counted.
+		expect(report.totals.succeeded).toBe(1)
+		// No retrying jobs exist; `recovered` is the orthogonal recoveryAttempts>0 count,
+		// so it must be 1 here. The old code aliased it to the retrying predicate (0).
+		expect(report.totals.retrying).toBe(0)
+		expect(report.totals.recovered).toBe(1)
+		const def = report.queues.find((q) => q.queue === 'default')
+		expect(def?.succeeded).toBe(1)
+		expect(def?.recovered).toBe(1)
+		expect(def?.retrying).toBe(0)
+	})
 })
 
 describeForDb('queue-control endpoints', {}, (db) => {

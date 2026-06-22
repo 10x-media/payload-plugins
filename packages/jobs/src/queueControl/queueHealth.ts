@@ -6,7 +6,7 @@ import { statusWhere } from '../jobs/deriveJobStatus'
 const JOBS_SLUG = 'payload-jobs'
 const STATS_SLUG = 'payload-jobs-stats'
 
-/** Per-queue health counts keyed by the 7 canonical job states. */
+/** Per-queue health: the seven canonical job states plus the orthogonal recovered count. */
 export type QueueHealth = {
 	queue: string
 	/** Jobs waiting to run (no prior attempts, no future schedule). */
@@ -17,11 +17,17 @@ export type QueueHealth = {
 	retrying: number
 	/** Jobs currently executing. */
 	processing: number
+	/** Jobs that completed successfully. */
+	succeeded: number
 	/** Jobs that completed with an unrecoverable error. */
 	failed: number
 	/** Jobs cancelled by the application. */
 	cancelled: number
-	/** Jobs that ultimately succeeded after one or more recovery attempts. */
+	/**
+	 * Jobs recovered at least once (`recoveryAttempts > 0`). Orthogonal to the seven states
+	 * above: a recovered job may currently be retrying, succeeded, or failed. 0 unless
+	 * reliability is enabled and `includeRecovered` is set.
+	 */
 	recovered: number
 	lastScheduledRun: string | null
 }
@@ -32,6 +38,7 @@ export type QueueHealthReport = {
 		scheduled: number
 		retrying: number
 		processing: number
+		succeeded: number
 		failed: number
 		cancelled: number
 		recovered: number
@@ -72,6 +79,17 @@ const stateWhere = (status: JobStatus, now: number, queue?: string): Where => {
 	return { and: [base, ...extra] }
 }
 
+/**
+ * Jobs recovered at least once. Orthogonal to the seven mutually-exclusive states (a
+ * recovered job may now be retrying, succeeded, or failed), so it is counted separately
+ * via the reliability `recoveryAttempts` field rather than slotted into the partition.
+ */
+const recoveredWhere = (queue?: string): Where => {
+	const base: Where = { recoveryAttempts: { greater_than: 0 } }
+	const extra = queueFilter(queue)
+	return extra.length === 0 ? base : { and: [base, ...extra] }
+}
+
 const readStats = async (payload: Payload): Promise<unknown> => {
 	const db = payload.db as unknown as { findGlobal: GlobalReader }
 	try {
@@ -107,8 +125,9 @@ const lastScheduledRunFor = (stats: unknown, queue: string): string | null => {
 }
 
 /**
- * Aggregate queue health via `payload.count` per the 7 canonical states
- * (queued, scheduled, retrying, processing, failed, cancelled, recovered).
+ * Aggregate queue health via `payload.count`: the seven canonical states
+ * (queued, scheduled, retrying, processing, succeeded, failed, cancelled) plus an
+ * orthogonal `recovered` count (recoveryAttempts > 0) when `includeRecovered` is set.
  * Reuses `statusWhere` from `deriveJobStatus` so the predicates are consistent
  * with what the UI and individual job reads report. The stats global is read
  * through `payload.db.findGlobal` inside a try/catch because that call throws
@@ -130,17 +149,17 @@ export const getQueueHealth = async (
 	const countState = (status: JobStatus, queue?: string): Promise<number> =>
 		countWhere(stateWhere(status, nowMs, queue))
 
-	const [queued, scheduled, retrying, processing, failed, cancelled, recovered] = await Promise.all(
-		[
+	const [queued, scheduled, retrying, processing, succeeded, failed, cancelled, recovered] =
+		await Promise.all([
 			countState('queued'),
 			countState('scheduled'),
 			countState('retrying'),
 			countState('running'),
+			countState('succeeded'),
 			countState('failed'),
 			countState('cancelled'),
-			includeRecovered ? countState('retrying') : Promise.resolve(0),
-		]
-	)
+			includeRecovered ? countWhere(recoveredWhere()) : Promise.resolve(0),
+		])
 
 	const oldest = await find({
 		collection: JOBS_SLUG,
@@ -160,6 +179,7 @@ export const getQueueHealth = async (
 			scheduledCount,
 			retryingCount,
 			processingCount,
+			succeededCount,
 			failedCount,
 			cancelledCount,
 			recoveredCount,
@@ -168,9 +188,10 @@ export const getQueueHealth = async (
 			countState('scheduled', queue),
 			countState('retrying', queue),
 			countState('running', queue),
+			countState('succeeded', queue),
 			countState('failed', queue),
 			countState('cancelled', queue),
-			includeRecovered ? countState('retrying', queue) : Promise.resolve(0),
+			includeRecovered ? countWhere(recoveredWhere(queue)) : Promise.resolve(0),
 		])
 		perQueue.push({
 			cancelled: cancelledCount,
@@ -182,6 +203,7 @@ export const getQueueHealth = async (
 			recovered: recoveredCount,
 			retrying: retryingCount,
 			scheduled: scheduledCount,
+			succeeded: succeededCount,
 		})
 	}
 
@@ -196,6 +218,7 @@ export const getQueueHealth = async (
 			recovered,
 			retrying,
 			scheduled,
+			succeeded,
 		},
 	}
 }
