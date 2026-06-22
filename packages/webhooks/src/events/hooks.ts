@@ -83,10 +83,39 @@ const dispatch = async (args: {
 
 	const occurredAt = new Date().toISOString()
 	for (const subscription of subscriptions) {
-		// Check for transform-based suppression before creating any DB rows
-		if (deps.config.transform) {
-			const probe = buildPayload({
-				deliveryId: '',
+		try {
+			// Check for transform-based suppression before creating any DB rows
+			if (deps.config.transform) {
+				const probe = buildPayload({
+					deliveryId: '',
+					collection: deps.collectionSlug,
+					operation,
+					doc,
+					previousDoc,
+					occurredAt,
+					config: deps.config,
+					req,
+				})
+				if (probe === null) {
+					continue
+				}
+			}
+
+			const created = await payload.create({
+				collection: deps.deliveriesSlug,
+				data: {
+					subscriptionId: subscription.id,
+					endpoint: subscription.url,
+					event,
+					status: 'pending',
+					attempt: 0,
+				},
+				overrideAccess: true,
+				req,
+			})
+			const deliveryId = String(created.id)
+			const body = buildPayload({
+				deliveryId,
 				collection: deps.collectionSlug,
 				operation,
 				doc,
@@ -95,54 +124,24 @@ const dispatch = async (args: {
 				config: deps.config,
 				req,
 			})
-			if (probe === null) {
+			// body cannot be null here: we already checked with the probe above
+			await payload.update({
+				collection: deps.deliveriesSlug,
+				id: deliveryId,
+				data: { payload: body },
+				overrideAccess: true,
+				req,
+			})
+
+			if (deps.mode === 'queue') {
+				await payload.jobs.queue({
+					task: WEBHOOK_DELIVER_TASK,
+					input: { deliveryId, endpoint: subscription.url },
+					queue: deps.queue,
+				})
 				continue
 			}
-		}
 
-		const created = await payload.create({
-			collection: deps.deliveriesSlug,
-			data: {
-				subscriptionId: subscription.id,
-				endpoint: subscription.url,
-				event,
-				status: 'pending',
-				attempt: 0,
-			},
-			overrideAccess: true,
-			req,
-		})
-		const deliveryId = String(created.id)
-		const body = buildPayload({
-			deliveryId,
-			collection: deps.collectionSlug,
-			operation,
-			doc,
-			previousDoc,
-			occurredAt,
-			config: deps.config,
-			req,
-		})
-		// body cannot be null here: we already checked with the probe above
-		await payload.update({
-			collection: deps.deliveriesSlug,
-			id: deliveryId,
-			data: { payload: body },
-			overrideAccess: true,
-			req,
-		})
-
-		if (deps.mode === 'queue') {
-			await payload.jobs.queue({
-				task: WEBHOOK_DELIVER_TASK,
-				input: { deliveryId, endpoint: subscription.url },
-				queue: deps.queue,
-			})
-			continue
-		}
-
-		// best-effort: a delivery failure must never abort the caller's write
-		try {
 			const result = await sendDelivery({
 				subscription,
 				deliveryId,
@@ -167,7 +166,7 @@ const dispatch = async (args: {
 			})
 		} catch (err) {
 			payload.logger.error(
-				`@10x-media/webhooks: inline delivery ${deliveryId} threw: ${err instanceof Error ? err.message : String(err)}`
+				`@10x-media/webhooks: dispatch for subscription ${subscription.id} threw: ${err instanceof Error ? err.message : String(err)}`
 			)
 		}
 	}

@@ -66,6 +66,34 @@ describe('dispatch (inline mode)', () => {
 		})
 		expect(payload.create).not.toHaveBeenCalled()
 	})
+
+	it('continues to the next subscription when DB create throws for one', async () => {
+		const payload = makePayload()
+		// First create throws, second succeeds
+		payload.create
+			.mockRejectedValueOnce(new Error('DB error'))
+			.mockResolvedValue({ id: 'delivery-2' })
+		const hook = makeAfterChange(
+			makeDeps({
+				mode: 'inline',
+				codeSubscriptions: [
+					{ id: 'sub-1', url: 'http://127.0.0.1:1', events: ['posts.created'] },
+					{ id: 'sub-2', url: 'http://127.0.0.1:1', events: ['posts.created'] },
+				],
+			})
+		)
+		await expect(
+			hook({
+				doc: { id: '1' },
+				previousDoc: {},
+				operation: 'create',
+				req: makeReq(payload),
+				collection: {} as never,
+			})
+		).resolves.not.toThrow()
+		// Second subscription should still have been attempted
+		expect(payload.create).toHaveBeenCalledTimes(2)
+	})
 })
 
 describe('resolveListening', () => {
