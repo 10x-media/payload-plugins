@@ -15,5 +15,5 @@
 		"@10x-media/plugin-template": "0.0.0",
 		"@10x-media/payload-test-harness": "0.0.0"
 	},
-	"changesets": ["jobs-initial-beta"]
+	"changesets": ["jobs-boolean-opt-in", "jobs-initial-beta", "webhooks-initial-beta"]
 }

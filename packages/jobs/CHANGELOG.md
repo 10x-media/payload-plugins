@@ -1,5 +1,11 @@
 # @10x-media/jobs
 
+## 0.1.0-beta.1
+
+### Minor Changes
+
+- Opt-in layers accept `true`: pass `reliability: true` or `queueControl: true` to enable a layer with its defaults, matching Payload's `false`/`true`/object option form. Empty objects and tuned objects still work.
+
 ## 0.1.0-beta.0
 
 ### Minor Changes
