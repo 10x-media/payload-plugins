@@ -1,0 +1,159 @@
+{
+	"name": "@10x-media/form-builder",
+	"version": "0.0.0",
+	"description": "End-to-end forms platform for Payload: author, validate, render, collect, aggregate, and act.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/10x-media/payload-plugins.git",
+		"directory": "packages/form-builder"
+	},
+	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/form-builder",
+	"bugs": "https://github.com/10x-media/payload-plugins/issues",
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin"
+	],
+	"author": "10x-media",
+	"engines": {
+		"node": ">=22.18.0"
+	},
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./types": {
+			"development": "./src/exports/types.ts",
+			"types": "./src/exports/types.ts",
+			"default": "./dist/exports/types.js"
+		},
+		"./client": {
+			"development": "./src/exports/client.ts",
+			"types": "./src/exports/client.ts",
+			"default": "./dist/exports/client.js"
+		},
+		"./react": {
+			"development": "./src/exports/react.ts",
+			"types": "./src/exports/react.ts",
+			"default": "./dist/exports/react.js"
+		},
+		"./styles.css": "./styles/form-builder.css",
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
+		},
+		"./i18n": {
+			"development": "./src/exports/i18n.ts",
+			"types": "./src/exports/i18n.ts",
+			"default": "./dist/exports/i18n.js"
+		}
+	},
+	"files": [
+		"dist",
+		"styles",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"registry:build": "shadcn build registry.json --cwd registry --output r",
+		"lint": "biome check src tests dev registry",
+		"lint:fix": "biome check --write src tests dev registry",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run",
+		"test:unit": "vitest run src",
+		"test:int": "vitest run tests/int",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:e2e": "bash scripts/e2e.sh",
+		"dev": "pnpm --filter @10x-media/form-builder-dev dev",
+		"start": "pnpm --filter @10x-media/form-builder-dev start",
+		"generate": "pnpm --filter @10x-media/form-builder-dev generate",
+		"generate:types": "pnpm --filter @10x-media/form-builder-dev generate:types",
+		"generate:importmap": "pnpm --filter @10x-media/form-builder-dev generate:importmap",
+		"migrate": "pnpm --filter @10x-media/form-builder-dev migrate",
+		"migrate:create": "pnpm --filter @10x-media/form-builder-dev migrate:create",
+		"migrate:down": "pnpm --filter @10x-media/form-builder-dev migrate:down",
+		"migrate:refresh": "pnpm --filter @10x-media/form-builder-dev migrate:refresh",
+		"migrate:reset": "pnpm --filter @10x-media/form-builder-dev migrate:reset",
+		"migrate:status": "pnpm --filter @10x-media/form-builder-dev migrate:status",
+		"migrate:fresh": "pnpm --filter @10x-media/form-builder-dev migrate:fresh",
+		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
+	},
+	"peerDependencies": {
+		"@payloadcms/ui": "^3.82.0",
+		"payload": "^3.82.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"devDependencies": {
+		"@10x-media/payload-test-harness": "workspace:*",
+		"shadcn": "^2.4.0",
+		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/vitest-config": "workspace:*",
+		"@axe-core/playwright": "catalog:",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"@playwright/test": "catalog:",
+		"@standard-schema/spec": "^1.0.0",
+		"@testing-library/jest-dom": "catalog:",
+		"@testing-library/react": "catalog:",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"axe-core": "catalog:",
+		"jsdom": "catalog:",
+		"payload": "catalog:",
+		"playwright": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true,
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js",
+				"default": "./dist/index.js"
+			},
+			"./types": {
+				"types": "./dist/exports/types.d.ts",
+				"import": "./dist/exports/types.js",
+				"default": "./dist/exports/types.js"
+			},
+			"./client": {
+				"types": "./dist/exports/client.d.ts",
+				"import": "./dist/exports/client.js",
+				"default": "./dist/exports/client.js"
+			},
+			"./react": {
+				"types": "./dist/exports/react.d.ts",
+				"import": "./dist/exports/react.js",
+				"default": "./dist/exports/react.js"
+			},
+			"./styles.css": "./styles/form-builder.css",
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
+			},
+			"./i18n": {
+				"types": "./dist/exports/i18n.d.ts",
+				"import": "./dist/exports/i18n.js",
+				"default": "./dist/exports/i18n.js"
+			}
+		}
+	}
+}
