@@ -45,7 +45,7 @@ export const createMongoLeaseStore = (payload: Payload): LeaseStore => {
 		acquireOrSteal: async (role, owner, ttlMs, now): Promise<LeaseResult> => {
 			const doc = await m.findOneAndUpdate(
 				{
-					$or: [{ owner: null }, { leaseExpiresAt: { $lt: now } }],
+					$or: [{ owner: null }, { leaseExpiresAt: null }, { leaseExpiresAt: { $lt: now } }],
 					role,
 				},
 				{

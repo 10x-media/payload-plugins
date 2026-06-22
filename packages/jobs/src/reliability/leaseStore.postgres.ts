@@ -52,7 +52,7 @@ export const createPostgresLeaseStore = (payload: Payload): LeaseStore => {
 			const res = await db.query(
 				`UPDATE ${table}
 				 SET owner = $1, lease_expires_at = $2, fence_token = fence_token + 1
-				 WHERE role = $3 AND (owner IS NULL OR lease_expires_at < $4)
+				 WHERE role = $3 AND (owner IS NULL OR lease_expires_at IS NULL OR lease_expires_at < $4)
 				 RETURNING fence_token`,
 				[owner, leaseExpiry(now, ttlMs), role, now]
 			)
