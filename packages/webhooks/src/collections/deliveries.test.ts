@@ -14,6 +14,8 @@ describe('buildDeliveriesCollection', () => {
 		expect(c.access?.read?.({ req: {} } as never)).toBe(false)
 		expect(c.access?.read?.({ req: { user: { id: '1' } } } as never)).toBe(true)
 		expect(c.access?.delete?.({ req: {} } as never)).toBe(false)
+		// logged-in users must not be able to delete delivery audit rows
+		expect(c.access?.delete?.({ req: { user: { id: '1' } } } as never)).toBe(false)
 	})
 
 	it('wires the status cell and stores the payload', () => {

@@ -24,7 +24,7 @@ export const buildDeliveriesCollection = (args: {
 		defaultColumns: ['event', 'endpoint', 'status', 'responseStatus', 'attempt', 'createdAt'],
 		hidden: args.hidden,
 	},
-	access: { read: loggedIn, create: () => false, update: () => false, delete: loggedIn },
+	access: { read: loggedIn, create: () => false, update: () => false, delete: () => false },
 	fields: [
 		{ name: 'subscriptionId', type: 'text', index: true },
 		{ name: 'endpoint', type: 'text' },
