@@ -36,4 +36,13 @@ describe('cronSecretAccess', () => {
 		expect(cronSecretAccess()({ req: reqWith({ authorization: 'Bearer s3cret' }) })).toBe(true)
 		expect(cronSecretAccess()({ req: reqWith({ authorization: 'Bearer nope' }) })).toBe(false)
 	})
+
+	it('rejects a secret that is a different byte length without timing leak', () => {
+		// biome-ignore lint/plugin/noProcessEnv: test arranges the secret it reads
+		process.env.CRON_SECRET = 'abc'
+		// 'abcd' is one byte longer than 'abc' — must be rejected, not throw
+		expect(cronSecretAccess()({ req: reqWith({ authorization: 'Bearer abcd' }) })).toBe(false)
+		// 'ab' is one byte shorter — must also be rejected
+		expect(cronSecretAccess()({ req: reqWith({ authorization: 'Bearer ab' }) })).toBe(false)
+	})
 })
