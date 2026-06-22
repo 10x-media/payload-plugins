@@ -40,6 +40,8 @@ export type WebhooksPluginOptions = {
 	delivery?: DeliveryMode | DeliveryOptions
 	subscriptionsCollection?: { slug?: string; hidden?: boolean }
 	deliveriesLog?: { slug?: string; hidden?: boolean }
+	/** Access guard for the redeliver endpoint. Defaults to any logged-in user. */
+	redeliverAccess?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 }
 
 export type ResolvedDeliveryOptions = {
