@@ -133,7 +133,7 @@ const dispatch = async (args: {
 				collection: deps.deliveriesSlug,
 				id: deliveryId,
 				data: {
-					status: result.ok ? 'success' : 'dead',
+					status: result.ok ? 'success' : 'failed',
 					attempt: 1,
 					responseStatus: result.responseStatus,
 					responseBody: result.responseBody,
