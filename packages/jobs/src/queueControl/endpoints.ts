@@ -52,6 +52,9 @@ export const runControlEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 			silent?: string
 		}
 		const limit = query.limit ? Number(query.limit) : undefined
+		if (limit !== undefined && !Number.isFinite(limit)) {
+			return Response.json({ message: 'Invalid limit parameter' }, { status: 400 })
+		}
 		const silent = query.silent === 'true'
 		const state = await createPauseStore(req.payload).getState()
 		// Mirror the native run scope: `allQueues` runs every queue, otherwise a single
