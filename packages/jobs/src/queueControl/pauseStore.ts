@@ -21,9 +21,18 @@ export type PauseStore = {
  * Pause and resume read-modify-write the single state value; this is last-writer-wins
  * (kv has no atomic compare-and-set), which is acceptable for rare admin actions.
  */
+const isValidPauseState = (raw: unknown): raw is PauseState =>
+	typeof raw === 'object' &&
+	raw !== null &&
+	'global' in raw &&
+	typeof (raw as PauseState).global === 'boolean' &&
+	Array.isArray((raw as PauseState).queues)
+
 export const createPauseStore = (payload: Payload): PauseStore => {
-	const getState = async (): Promise<PauseState> =>
-		(await payload.kv.get<PauseState>(PAUSE_KEY)) ?? emptyPauseState()
+	const getState = async (): Promise<PauseState> => {
+		const raw = await payload.kv.get<unknown>(PAUSE_KEY)
+		return isValidPauseState(raw) ? raw : emptyPauseState()
+	}
 
 	return {
 		getState,
