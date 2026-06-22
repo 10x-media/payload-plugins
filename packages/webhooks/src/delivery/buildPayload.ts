@@ -14,7 +14,10 @@ export type WebhookBody = {
 	previousData?: unknown
 }
 
-/** Build the outbound body, applying any per-collection transform/redaction. */
+/** Build the outbound body, applying any per-collection transform/redaction.
+ * Returns `null` when `config.transform` is defined and returns `undefined`,
+ * signaling that delivery should be suppressed for this subscription.
+ */
 export const buildPayload = (args: {
 	deliveryId: string
 	collection: string
@@ -24,9 +27,12 @@ export const buildPayload = (args: {
 	occurredAt: string
 	config?: CollectionWebhookConfig
 	req: PayloadRequest
-}): WebhookBody => {
+}): WebhookBody | null => {
 	const { deliveryId, collection, operation, doc, previousDoc, occurredAt, config, req } = args
 	const data = config?.transform ? config.transform({ doc, previousDoc, operation, req }) : doc
+	if (config?.transform && data === undefined) {
+		return null
+	}
 	const body: WebhookBody = {
 		id: deliveryId,
 		event: eventId(collection, operation),

@@ -83,6 +83,23 @@ const dispatch = async (args: {
 
 	const occurredAt = new Date().toISOString()
 	for (const subscription of subscriptions) {
+		// Check for transform-based suppression before creating any DB rows
+		if (deps.config.transform) {
+			const probe = buildPayload({
+				deliveryId: '',
+				collection: deps.collectionSlug,
+				operation,
+				doc,
+				previousDoc,
+				occurredAt,
+				config: deps.config,
+				req,
+			})
+			if (probe === null) {
+				continue
+			}
+		}
+
 		const created = await payload.create({
 			collection: deps.deliveriesSlug,
 			data: {
@@ -106,6 +123,7 @@ const dispatch = async (args: {
 			config: deps.config,
 			req,
 		})
+		// body cannot be null here: we already checked with the probe above
 		await payload.update({
 			collection: deps.deliveriesSlug,
 			id: deliveryId,

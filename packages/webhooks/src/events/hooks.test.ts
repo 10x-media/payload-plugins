@@ -47,6 +47,25 @@ describe('dispatch (inline mode)', () => {
 		)
 		expect(updateCall?.[0].data.status).toBe('failed')
 	})
+
+	it('skips delivery creation when transform returns undefined', async () => {
+		const payload = makePayload()
+		const hook = makeAfterChange(
+			makeDeps({
+				mode: 'inline',
+				config: { transform: () => undefined },
+				codeSubscriptions: [{ id: 'sub-1', url: 'http://127.0.0.1:1', events: ['posts.created'] }],
+			})
+		)
+		await hook({
+			doc: { id: '1' },
+			previousDoc: {},
+			operation: 'create',
+			req: makeReq(payload),
+			collection: {} as never,
+		})
+		expect(payload.create).not.toHaveBeenCalled()
+	})
 })
 
 describe('resolveListening', () => {
