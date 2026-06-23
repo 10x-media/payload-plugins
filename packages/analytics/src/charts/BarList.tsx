@@ -1,70 +1,65 @@
 'use client'
 
-import type { CSSProperties } from 'react'
+import { type PointerEvent, useState } from 'react'
 import { type BarDatum, toBarRows } from './bars'
+import { ChartStyles } from './styles'
 
 export interface BarListProps {
 	data: BarDatum[]
 	emptyLabel: string
 }
 
-const rowStyle: CSSProperties = {
-	position: 'relative',
-	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'space-between',
-	padding: '0.3rem 0.5rem',
-	borderRadius: 'var(--style-radius-s, 4px)',
-	overflow: 'hidden',
-}
-const barStyle = (fraction: number): CSSProperties => ({
-	position: 'absolute',
-	inset: 0,
-	transformOrigin: 'left',
-	transform: `scaleX(${fraction})`,
-	background: 'var(--theme-elevation-100)',
-	borderRadius: 'inherit',
-})
-const labelStyle: CSSProperties = {
-	position: 'relative',
-	overflow: 'hidden',
-	textOverflow: 'ellipsis',
-	whiteSpace: 'nowrap',
-	color: 'var(--theme-elevation-700)',
-}
-const valueStyle: CSSProperties = {
-	position: 'relative',
-	marginLeft: '0.75rem',
-	fontVariantNumeric: 'tabular-nums',
-	color: 'var(--theme-elevation-800)',
-	fontWeight: 600,
+interface Hover {
+	i: number
+	x: number
+	y: number
 }
 
 /**
- * Ranked horizontal bar list: each row shows a label over a proportional fill (scaled
- * to the largest value) with the value at the right. Colors are Payload theme tokens,
- * so it tracks light/dark. Dependency-free.
+ * Ranked horizontal bar list (shadcn "custom label" style): each row is a filled,
+ * proportional bar with the label inside and the value outside; hovering a row lifts
+ * it and shows a tooltip with the full label and value (useful when the label is
+ * truncated). Dependency-free; styling comes from the shared chart stylesheet.
  */
 export function BarList({ data, emptyLabel }: BarListProps) {
 	const rows = toBarRows(data)
+	const [hover, setHover] = useState<Hover | null>(null)
 	if (rows.length === 0) {
-		return (
-			<span style={{ color: 'var(--theme-elevation-400)', fontSize: '0.8125rem' }}>
-				{emptyLabel}
-			</span>
-		)
+		return <span className="analytics-bars__empty">{emptyLabel}</span>
 	}
+	const track = (i: number) => (e: PointerEvent<HTMLDivElement>) =>
+		setHover({ i, x: e.clientX, y: e.clientY })
+	const hovered = hover ? rows[hover.i] : undefined
 	return (
-		<div
-			style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', fontSize: '0.8125rem' }}
-		>
-			{rows.map((row) => (
-				<div key={row.label} style={rowStyle}>
-					<span aria-hidden style={barStyle(row.fraction)} />
-					<span style={labelStyle}>{row.label}</span>
-					<span style={valueStyle}>{row.display ?? row.value}</span>
+		<div className="analytics-chart">
+			<ChartStyles />
+			<div className="analytics-bars">
+				{rows.map((row, i) => (
+					// biome-ignore lint/a11y/noStaticElementInteractions: pointer tracking for the row tooltip, not a control
+					<div
+						key={row.label}
+						className="analytics-bars__row"
+						onPointerEnter={track(i)}
+						onPointerMove={track(i)}
+						onPointerLeave={() => setHover(null)}
+					>
+						<span className="analytics-bars__track">
+							<span className="analytics-bars__fill" style={{ width: `${row.fraction * 100}%` }} />
+							<span className="analytics-bars__label">{row.label}</span>
+						</span>
+						<span className="analytics-bars__value">{row.display ?? row.value}</span>
+					</div>
+				))}
+			</div>
+			{hover && hovered ? (
+				<div
+					className="analytics-chart__tooltip"
+					style={{ position: 'fixed', left: hover.x, top: hover.y }}
+				>
+					<div className="analytics-chart__tooltip-label">{hovered.label}</div>
+					<div className="analytics-chart__tooltip-value">{hovered.display ?? hovered.value}</div>
 				</div>
-			))}
+			) : null}
 		</div>
 	)
 }
