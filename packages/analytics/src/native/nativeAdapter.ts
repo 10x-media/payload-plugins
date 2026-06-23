@@ -46,7 +46,7 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'events',
 	'avgDuration',
 ])
-const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'country'])
+const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'country', 'source', 'device'])
 
 const capabilities: AnalyticsCapabilities = {
 	perPageQuery: true,

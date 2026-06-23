@@ -13,6 +13,8 @@ export const eventsCollection = (): CollectionConfig => ({
 		{ name: 'path', type: 'text', required: true, index: true },
 		{ name: 'hostname', type: 'text', required: true },
 		{ name: 'referrer', type: 'text' },
+		{ name: 'device', type: 'text' },
+		{ name: 'source', type: 'text' },
 		{ name: 'country', type: 'text' },
 		{ name: 'region', type: 'text' },
 		{ name: 'city', type: 'text' },

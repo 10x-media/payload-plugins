@@ -40,5 +40,11 @@ export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
 	if (event.country) {
 		deltas.push(make('', 'country', event.country))
 	}
+	if (event.device) {
+		deltas.push(make('', 'device', event.device))
+	}
+	if (event.source) {
+		deltas.push(make('', 'source', event.source))
+	}
 	return deltas
 }

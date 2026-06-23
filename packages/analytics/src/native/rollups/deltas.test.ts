@@ -55,4 +55,22 @@ describe('computeRollupDeltas', () => {
 		const deltas = computeRollupDeltas(ev({}))
 		expect(deltas.some((d) => d.key.dimension === 'country')).toBe(false)
 	})
+
+	it('emits device and source buckets when present', () => {
+		const deltas = computeRollupDeltas({
+			timestamp: new Date('2026-06-01T10:00:00.000Z'),
+			type: 'pageview',
+			path: '/p',
+			hostname: 'h',
+			visitorHash: 'v',
+			sessionId: 's',
+			country: 'US',
+			device: 'mobile',
+			source: 'google.com',
+		})
+		const dims = deltas.map((d) => `${d.key.dimension}:${d.key.dimvalue}`)
+		expect(dims).toEqual(
+			expect.arrayContaining(['country:US', 'device:mobile', 'source:google.com'])
+		)
+	})
 })

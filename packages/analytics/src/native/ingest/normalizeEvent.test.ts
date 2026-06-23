@@ -36,4 +36,23 @@ describe('normalizeEvent', () => {
 		})
 		expect(ev.country).toBeUndefined()
 	})
+
+	it('derives device from the user-agent header and source from the referrer', async () => {
+		const event = await normalizeEvent({
+			raw: {
+				type: 'pageview',
+				path: '/p',
+				hostname: 'example.com',
+				referrer: 'https://www.google.com/',
+			},
+			headers: new Headers({
+				'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile/15E148',
+			}),
+			geoResolver: async () => ({}),
+			salt: 'salt',
+			now: new Date('2026-06-01T00:00:00.000Z'),
+		})
+		expect(event.device).toBe('mobile')
+		expect(event.source).toBe('google.com')
+	})
 })

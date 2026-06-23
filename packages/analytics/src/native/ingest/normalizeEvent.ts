@@ -1,4 +1,6 @@
 import type { GeoResolver } from '../geo/geoResolver'
+import { classifyDevice, type DeviceType } from './device'
+import { deriveSource } from './source'
 import { dailyVisitorHash, deriveSessionId } from './visitorHash'
 
 export interface RawEventInput {
@@ -18,6 +20,8 @@ export interface StoredEvent {
 	path: string
 	hostname: string
 	referrer?: string
+	device?: DeviceType
+	source?: string
 	country?: string
 	region?: string
 	city?: string
@@ -58,6 +62,8 @@ export async function normalizeEvent({
 		path: raw.path,
 		hostname: raw.hostname,
 		referrer: raw.referrer,
+		device: classifyDevice(ua),
+		source: deriveSource(raw.referrer, raw.hostname),
 		country: geo.country,
 		region: geo.region,
 		city: geo.city,
