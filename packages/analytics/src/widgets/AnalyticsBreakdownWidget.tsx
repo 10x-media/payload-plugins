@@ -51,8 +51,11 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
 			) : (
 				<BarList
-					data={result.rows}
-					format={(value) => formatMetricValue(metric, value, locale)}
+					data={result.rows.map((row) => ({
+						label: row.label,
+						value: row.value,
+						display: formatMetricValue(metric, row.value, locale),
+					}))}
 					emptyLabel={t(keys.stateNoBreakdown)}
 				/>
 			)}

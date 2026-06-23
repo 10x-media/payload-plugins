@@ -5,7 +5,6 @@ import { type BarDatum, toBarRows } from './bars'
 
 export interface BarListProps {
 	data: BarDatum[]
-	format?: (value: number) => string
 	emptyLabel: string
 }
 
@@ -46,7 +45,7 @@ const valueStyle: CSSProperties = {
  * to the largest value) with the value at the right. Colors are Payload theme tokens,
  * so it tracks light/dark. Dependency-free.
  */
-export function BarList({ data, format, emptyLabel }: BarListProps) {
+export function BarList({ data, emptyLabel }: BarListProps) {
 	const rows = toBarRows(data)
 	if (rows.length === 0) {
 		return (
@@ -63,7 +62,7 @@ export function BarList({ data, format, emptyLabel }: BarListProps) {
 				<div key={row.label} style={rowStyle}>
 					<span aria-hidden style={barStyle(row.fraction)} />
 					<span style={labelStyle}>{row.label}</span>
-					<span style={valueStyle}>{format ? format(row.value) : row.value}</span>
+					<span style={valueStyle}>{row.display ?? row.value}</span>
 				</div>
 			))}
 		</div>

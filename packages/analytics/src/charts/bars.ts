@@ -1,12 +1,14 @@
 export interface BarDatum {
 	label: string
 	value: number
+	display?: string
 }
 
 export interface BarRow {
 	label: string
 	value: number
 	fraction: number
+	display?: string
 }
 
 /**
@@ -20,5 +22,6 @@ export const toBarRows = (data: BarDatum[]): BarRow[] => {
 		label: d.label,
 		value: d.value,
 		fraction: max > 0 ? d.value / max : 0,
+		display: d.display,
 	}))
 }
