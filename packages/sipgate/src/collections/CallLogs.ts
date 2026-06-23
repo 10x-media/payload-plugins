@@ -26,17 +26,18 @@ export const createCallLogsCollection = (
 				name: 'callType',
 				type: 'select',
 				required: true,
-				options: ['incoming', 'outgoing'],
+				options: ['in', 'out'],
 			},
 			{
 				name: 'callStatus',
 				type: 'select',
 				required: true,
-				options: ['ringing', 'connected', 'missed', 'voicemail', 'rejected'],
+				options: ['ringing', 'connected', 'completed', 'missed', 'voicemail', 'rejected'],
 			},
 			{
 				name: 'callDuration',
 				type: 'number',
+				defaultValue: 0,
 				required: true,
 			},
 			{
