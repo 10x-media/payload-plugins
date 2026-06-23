@@ -1,6 +1,6 @@
 import type { WidgetServerProps } from 'payload'
 
-export const CallActivityWidget = (props: WidgetServerProps) => {
+const CallActivityWidget = (props: WidgetServerProps) => {
 	console.log(props)
 	return (
 		<div>
@@ -8,3 +8,5 @@ export const CallActivityWidget = (props: WidgetServerProps) => {
 		</div>
 	)
 }
+
+export default CallActivityWidget
