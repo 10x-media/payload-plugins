@@ -32,4 +32,38 @@ describe('buildCacheKey', () => {
 		})
 		expect(asc).not.toBe(desc)
 	})
+	it('is stable for two reads on the same UTC day with different sub-day ends', () => {
+		const a = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			dateRange: {
+				start: new Date('2026-06-01T00:00:00.000Z'),
+				end: new Date('2026-06-23T08:00:00.000Z'),
+			},
+		})
+		const b = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			dateRange: {
+				start: new Date('2026-06-01T00:00:00.000Z'),
+				end: new Date('2026-06-23T19:45:12.913Z'),
+			},
+		})
+		expect(a).toBe(b)
+	})
+	it('differs once the end crosses into the next UTC day', () => {
+		const a = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			dateRange: {
+				start: new Date('2026-06-01T00:00:00.000Z'),
+				end: new Date('2026-06-23T23:00:00.000Z'),
+			},
+		})
+		const b = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			dateRange: {
+				start: new Date('2026-06-01T00:00:00.000Z'),
+				end: new Date('2026-06-24T01:00:00.000Z'),
+			},
+		})
+		expect(a).not.toBe(b)
+	})
 })
