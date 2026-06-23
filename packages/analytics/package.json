@@ -119,6 +119,7 @@
 		"@payloadcms/ui": "^3.82.0",
 		"payload": "^3.82.0",
 		"react": "^19.0.0",
+		"react-datepicker": "^7.6.0",
 		"react-dom": "^19.0.0"
 	},
 	"peerDependenciesMeta": {
@@ -143,6 +144,7 @@
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",
+		"react-datepicker": "^7.6.0",
 		"react-dom": "catalog:",
 		"tsdown": "catalog:",
 		"typescript": "catalog:",
