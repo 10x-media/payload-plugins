@@ -1,5 +1,5 @@
 import type { WidgetServerProps } from 'payload'
-import { bucketSeries } from '../charts/bucket'
+import { bucketByRange, bucketSeries } from '../charts/bucket'
 import { TrendChart } from '../charts/TrendChart'
 import type { MetricKey } from '../core/contract'
 import { formatMetricValue } from '../fields/format'
@@ -8,6 +8,7 @@ import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { cardStyle, labelStyle } from './cardChrome'
+import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
 import { readForWidgetSeries } from './readForWidgetSeries'
 import type { MetricWidgetData } from './types'
@@ -20,7 +21,9 @@ const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 	const data = (props.widgetData ?? {}) as MetricWidgetData
 	const metric: MetricKey = data.metric ?? 'pageviews'
-	const timeframe: TimeframePreset = data.timeframe ?? 'last30days'
+	const rawTimeframe = data.timeframe ?? 'last30days'
+	const customRange = resolveCustomRange(rawTimeframe, data.range)
+	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const t = asTranslate(props.req.i18n.t)
 	const locale = props.req.i18n.language ?? 'en-US'
 	const title = data.title?.trim() || t(METRIC_KEYS[metric])
@@ -31,6 +34,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 		timeframe,
 		adapterId: data.dataSource,
 		now: new Date(),
+		range: customRange,
 	})
 
 	if (result.status !== 'ok') {
@@ -42,8 +46,13 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 		)
 	}
 
-	const caption = t(TIMEFRAME_KEYS[timeframe])
-	const trendPoints = bucketSeries(result.points, timeframe, new Date()).map((b) => ({
+	const caption = customRange
+		? formatRangeCaption(customRange, locale)
+		: t(TIMEFRAME_KEYS[timeframe])
+	const buckets = customRange
+		? bucketByRange(result.points, customRange)
+		: bucketSeries(result.points, timeframe, new Date())
+	const trendPoints = buckets.map((b) => ({
 		...b,
 		display: formatMetricValue(metric, b.value, locale),
 	}))

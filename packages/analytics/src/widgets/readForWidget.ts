@@ -11,6 +11,7 @@ export interface WidgetReadResult {
 	adapterId: string
 	dateRange: DateRange
 	metrics: Partial<Record<MetricKey, number>>
+	clamped?: boolean
 }
 
 export interface ReadForWidgetArgs {
@@ -19,11 +20,12 @@ export interface ReadForWidgetArgs {
 	timeframe: TimeframePreset
 	adapterId?: string
 	now: Date
+	range?: DateRange
 }
 
 export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetReadResult> => {
-	const { req, metrics, timeframe, adapterId, now } = args
-	const dateRange = resolveTimeframe(timeframe, now)
+	const { req, metrics, timeframe, adapterId, now, range } = args
+	const dateRange = range ?? resolveTimeframe(timeframe, now)
 	const base = { dateRange, metrics: {} as Partial<Record<MetricKey, number>> }
 
 	const runtime = getRuntime(req.payload)
@@ -43,5 +45,11 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
 	const result = await runtime.engine.read(adapter, { metrics, dateRange })
-	return { status: 'ok', adapterId: adapter.id, dateRange, metrics: result.totals ?? {} }
+	return {
+		status: 'ok',
+		adapterId: adapter.id,
+		dateRange,
+		metrics: result.totals ?? {},
+		clamped: result.meta.clamped ?? false,
+	}
 }

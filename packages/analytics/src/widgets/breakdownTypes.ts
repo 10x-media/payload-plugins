@@ -1,11 +1,13 @@
 import type { DimensionKey, MetricKey } from '../core/contract'
 import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
+import type { WidgetRange } from './types'
 
 export interface BreakdownWidgetData {
 	title?: string
 	metric?: MetricKey
-	timeframe?: TimeframePreset
+	timeframe?: TimeframePreset | 'custom'
+	range?: WidgetRange
 	limit?: number
 	dataSource?: string
 }

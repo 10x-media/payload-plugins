@@ -17,6 +17,7 @@ export interface WidgetSeriesResult {
 	dateRange: DateRange
 	points: SeriesPoint[]
 	total: number
+	clamped?: boolean
 }
 
 export interface ReadForWidgetSeriesArgs {
@@ -25,6 +26,7 @@ export interface ReadForWidgetSeriesArgs {
 	timeframe: TimeframePreset
 	adapterId?: string
 	now: Date
+	range?: DateRange
 }
 
 const DAY_MS = 86_400_000
@@ -73,8 +75,8 @@ export const fillDailySeries = (
 export const readForWidgetSeries = async (
 	args: ReadForWidgetSeriesArgs
 ): Promise<WidgetSeriesResult> => {
-	const { req, metric, timeframe, adapterId, now } = args
-	const dateRange = resolveTimeframe(timeframe, now)
+	const { req, metric, timeframe, adapterId, now, range } = args
+	const dateRange = range ?? resolveTimeframe(timeframe, now)
 	const base = { dateRange, points: [] as SeriesPoint[], total: 0 }
 
 	const runtime = getRuntime(req.payload)
@@ -107,5 +109,6 @@ export const readForWidgetSeries = async (
 		dateRange,
 		points: fillDailySeries(result.rows, dateRange, metric),
 		total: result.totals?.[metric] ?? 0,
+		clamped: result.meta.clamped ?? false,
 	}
 }

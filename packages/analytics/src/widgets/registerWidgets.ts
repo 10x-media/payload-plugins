@@ -1,6 +1,7 @@
 import type { Config, Field, Widget, WidgetWidth } from 'payload'
 import { type CapabilityRequirement, satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter } from '../core/contract'
+import { dateRangeField } from '../fields/dateRange/field'
 import { TIMEFRAME_PRESETS } from '../timeframe/presets'
 import { en } from '../translations/en'
 import type { TranslationKey } from '../translations/keys'
@@ -53,8 +54,23 @@ const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 			required: true,
 			defaultValue: 'last30days',
 			label: labelForKey(keys.widgetFieldTimeframe),
-			options: TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
+			options: [
+				...TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
+				{ value: 'custom', label: labelForKey(keys.widgetTimeframeCustom) },
+			],
 		},
+		dateRangeField({
+			name: 'range',
+			label: labelForKey(keys.widgetFieldRange),
+			pickerAppearance: 'dayOnly',
+			overrides: (f) => ({
+				...f,
+				admin: {
+					...f.admin,
+					condition: (_data, siblingData) => siblingData?.timeframe === 'custom',
+				},
+			}),
+		}),
 	]
 	if (args.multiProvider) {
 		fields.push({
@@ -90,8 +106,23 @@ const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): 
 			required: true,
 			defaultValue: 'last30days',
 			label: labelForKey(keys.widgetFieldTimeframe),
-			options: TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
+			options: [
+				...TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
+				{ value: 'custom', label: labelForKey(keys.widgetTimeframeCustom) },
+			],
 		},
+		dateRangeField({
+			name: 'range',
+			label: labelForKey(keys.widgetFieldRange),
+			pickerAppearance: 'dayOnly',
+			overrides: (f) => ({
+				...f,
+				admin: {
+					...f.admin,
+					condition: (_data, siblingData) => siblingData?.timeframe === 'custom',
+				},
+			}),
+		}),
 		{
 			name: 'limit',
 			type: 'number',

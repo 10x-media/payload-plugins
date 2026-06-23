@@ -5,7 +5,7 @@ import { native } from '../../src/native/nativeAdapter'
 
 interface RegisteredWidget {
 	slug: string
-	fields?: Array<{ name?: string }>
+	fields?: Array<{ name?: string; type?: string; options?: Array<{ value?: string }> }>
 }
 
 // payload.config's widget types are deeply generic (TypedWidget); read them through a
@@ -66,5 +66,33 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-breakdown-pages')
 		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'timeframe', 'limit']))
+	})
+
+	it('exposes a range group field on the metric widget', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
+		const rangeField = (widget?.fields ?? []).find((f) => f.name === 'range')
+		expect(rangeField).toBeDefined()
+		expect(rangeField?.type).toBe('group')
+	})
+
+	it('exposes a range group field on the breakdown-pages widget', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-breakdown-pages')
+		const rangeField = (widget?.fields ?? []).find((f) => f.name === 'range')
+		expect(rangeField).toBeDefined()
+		expect(rangeField?.type).toBe('group')
+	})
+
+	it('includes a custom option in the metric widget timeframe select', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
+		const timeframeField = (widget?.fields ?? []).find((f) => f.name === 'timeframe')
+		const values = (timeframeField?.options ?? []).map((o) => o.value)
+		expect(values).toContain('custom')
+	})
+
+	it('includes a custom option in the breakdown-pages widget timeframe select', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-breakdown-pages')
+		const timeframeField = (widget?.fields ?? []).find((f) => f.name === 'timeframe')
+		const values = (timeframeField?.options ?? []).map((o) => o.value)
+		expect(values).toContain('custom')
 	})
 })

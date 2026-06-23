@@ -6,6 +6,7 @@ import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { cardStyle, labelStyle } from './cardChrome'
+import { formatRangeCaption, resolveCustomRange } from './range'
 import { readForWidget, type WidgetReadStatus } from './readForWidget'
 import type { MetricWidgetData } from './types'
 
@@ -17,10 +18,15 @@ const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 	const data = (props.widgetData ?? {}) as MetricWidgetData
 	const metric: MetricKey = data.metric ?? 'pageviews'
-	const timeframe: TimeframePreset = data.timeframe ?? 'last30days'
+	const rawTimeframe = data.timeframe ?? 'last30days'
+	const customRange = resolveCustomRange(rawTimeframe, data.range)
+	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const t = asTranslate(props.req.i18n.t)
 	const locale = props.req.i18n.language ?? 'en-US'
 	const title = data.title?.trim() || t(METRIC_KEYS[metric])
+	const caption = customRange
+		? formatRangeCaption(customRange, locale)
+		: t(TIMEFRAME_KEYS[timeframe])
 
 	const result = await readForWidget({
 		req: props.req,
@@ -28,6 +34,7 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 		timeframe,
 		adapterId: data.dataSource,
 		now: new Date(),
+		range: customRange,
 	})
 
 	if (result.status !== 'ok') {
@@ -53,9 +60,7 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 			>
 				{value === undefined ? '–' : formatMetricValue(metric, value, locale)}
 			</span>
-			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>
-				{t(TIMEFRAME_KEYS[timeframe])}
-			</span>
+			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
 		</div>
 	)
 }

@@ -1,4 +1,4 @@
-import type { GroupField } from 'payload'
+import type { GroupField, LabelFunction } from 'payload'
 
 export type DateRangePickerAppearance = 'default' | 'dayOnly' | 'monthOnly'
 
@@ -9,7 +9,7 @@ export interface DateRangeFieldOptions {
 
 export interface DateRangeFieldArgs {
 	name: string
-	label?: string | false
+	label?: string | LabelFunction | false
 	description?: string
 	required?: boolean
 	pickerAppearance?: DateRangePickerAppearance

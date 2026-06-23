@@ -8,6 +8,7 @@ import { TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { type BreakdownWidgetData, breakdownSpecBySlug } from './breakdownTypes'
 import { cardStyle, labelStyle } from './cardChrome'
+import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
 
@@ -21,7 +22,9 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 	const t = asTranslate(props.req.i18n.t)
 	const data = (props.widgetData ?? {}) as BreakdownWidgetData
 	const metric: MetricKey = data.metric ?? 'pageviews'
-	const timeframe: TimeframePreset = data.timeframe ?? 'last30days'
+	const rawTimeframe = data.timeframe ?? 'last30days'
+	const customRange = resolveCustomRange(rawTimeframe, data.range)
+	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const limit = data.limit ?? 5
 	const title = data.title?.trim() || (spec ? t(spec.label) : '')
 
@@ -41,9 +44,13 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 		limit,
 		adapterId: data.dataSource,
 		now: new Date(),
+		range: customRange,
 	})
 
 	const locale = props.req.i18n.language ?? 'en-US'
+	const caption = customRange
+		? formatRangeCaption(customRange, locale)
+		: t(TIMEFRAME_KEYS[timeframe])
 	return (
 		<div className="analytics-breakdown-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
@@ -59,9 +66,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 					emptyLabel={t(keys.stateNoBreakdown)}
 				/>
 			)}
-			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>
-				{t(TIMEFRAME_KEYS[timeframe])}
-			</span>
+			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
 		</div>
 	)
 }

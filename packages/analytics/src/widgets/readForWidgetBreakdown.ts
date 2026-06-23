@@ -15,6 +15,7 @@ export interface WidgetBreakdownResult {
 	adapterId: string
 	dateRange: DateRange
 	rows: BreakdownRow[]
+	clamped?: boolean
 }
 
 export interface ReadForWidgetBreakdownArgs {
@@ -25,6 +26,7 @@ export interface ReadForWidgetBreakdownArgs {
 	limit: number
 	adapterId?: string
 	now: Date
+	range?: DateRange
 }
 
 /**
@@ -35,8 +37,8 @@ export interface ReadForWidgetBreakdownArgs {
 export const readForWidgetBreakdown = async (
 	args: ReadForWidgetBreakdownArgs
 ): Promise<WidgetBreakdownResult> => {
-	const { req, metric, dimension, timeframe, limit, adapterId, now } = args
-	const dateRange = resolveTimeframe(timeframe, now)
+	const { req, metric, dimension, timeframe, limit, adapterId, now, range } = args
+	const dateRange = range ?? resolveTimeframe(timeframe, now)
 	const base = { dateRange, rows: [] as BreakdownRow[] }
 
 	const runtime = getRuntime(req.payload)
@@ -68,5 +70,11 @@ export const readForWidgetBreakdown = async (
 		label: row.dimensions?.[dimension] ?? '(none)',
 		value: row.metrics[metric] ?? 0,
 	}))
-	return { status: 'ok', adapterId: adapter.id, dateRange, rows }
+	return {
+		status: 'ok',
+		adapterId: adapter.id,
+		dateRange,
+		rows,
+		clamped: result.meta.clamped ?? false,
+	}
 }
