@@ -1,4 +1,5 @@
 import type { WidgetServerProps } from 'payload'
+import { bucketSeries } from '../charts/bucket'
 import { TrendChart } from '../charts/TrendChart'
 import type { MetricKey } from '../core/contract'
 import { formatMetricValue } from '../fields/format'
@@ -42,6 +43,10 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 	}
 
 	const caption = t(TIMEFRAME_KEYS[timeframe])
+	const trendPoints = bucketSeries(result.points, timeframe, new Date()).map((b) => ({
+		...b,
+		display: formatMetricValue(metric, b.value, locale),
+	}))
 	return (
 		<div className="analytics-trend-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
@@ -55,11 +60,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 			>
 				{formatMetricValue(metric, result.total, locale)}
 			</span>
-			<TrendChart
-				values={result.points.map((p) => p.value)}
-				ariaLabel={`${title} ${caption}`}
-				height={56}
-			/>
+			<TrendChart buckets={trendPoints} ariaLabel={`${title} ${caption}`} height={72} />
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
 		</div>
 	)
