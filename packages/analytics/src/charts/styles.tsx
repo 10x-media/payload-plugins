@@ -3,7 +3,6 @@
 const CHART_CSS = `
 :where(:root) {
 	--analytics-chart-1: var(--theme-success-500, #3b82f6);
-	--analytics-chart-2: var(--theme-elevation-400);
 }
 .analytics-chart { position: relative; width: 100%; }
 .analytics-chart__svg { display: block; width: 100%; height: 100%; overflow: visible; }
