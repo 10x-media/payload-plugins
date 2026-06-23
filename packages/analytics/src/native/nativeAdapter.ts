@@ -175,7 +175,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 						}
 					: {
 							granularity: { equals: 'day' },
-							dimension: { equals: 'country' },
+							dimension: { equals: dim },
 							path: { equals: '' },
 							period: periodWhere,
 						}
