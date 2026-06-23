@@ -104,12 +104,13 @@ Postgres-touching tiers (matrix, container, e2e) require Docker locally and on C
 
 ## Release flow
 
-The repo is in beta pre-mode. Every merge to `main` triggers:
+The repo is in beta pre-mode. The flow is currently split, because the npm account is `auth-and-writes` 2FA and pnpm 10 has no OIDC, so CI cannot publish:
 
-1. `release.yml` opens or updates a "Version Packages" PR aggregating queued changesets.
-2. Merging that PR runs `changeset publish` (via `pnpm release`) with npm provenance and creates per-package GitHub releases.
+1. `release.yml` opens or updates a "Version Packages" PR aggregating queued changesets. It no longer publishes.
+2. Merge that PR, then publish each bumped package from `main` with `pnpm publish:plugin <name>` (interactive passkey). The script publishes to npm and pushes the `@10x-media/<name>@<version>` tag.
+3. The tag push triggers `release-notes.yml`, which creates the per-package GitHub release from its `CHANGELOG.md`.
 
-To exit beta: `pnpm changeset pre exit` and add a major-bump changeset for each package going stable.
+Planned: move to pnpm 11 + npm OIDC trusted publishing so CI publishes and releases again (restore the `publish:` step in `release.yml`). To exit beta: `pnpm changeset pre exit` and add a major-bump changeset for each package going stable.
 
 ## Process hygiene
 
