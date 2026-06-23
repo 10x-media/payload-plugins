@@ -1,0 +1,58 @@
+name: Release Notes
+
+# Creates a GitHub release from a package's CHANGELOG when its version tag is pushed
+# (e.g. `@10x-media/jobs@0.1.0-beta.0`). npm publishing is currently manual: the npm
+# account is auth-and-writes 2FA and pnpm 10 has no OIDC, so scripts/bootstrap-publish.sh
+# publishes and then pushes the tag, which is what triggers this workflow. After the
+# pnpm 11 + OIDC trusted-publishing migration, changesets/action will create releases at
+# publish time and this workflow can be retired.
+
+on:
+  push:
+    tags:
+      - '@10x-media/**'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. @10x-media/jobs@0.1.0-beta.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-notes-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Create GitHub release from changelog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          name="${TAG##*/}"; name="${name%@*}"
+          version="${TAG##*@}"
+          changelog="packages/${name}/CHANGELOG.md"
+          if [ ! -f "$changelog" ]; then
+            echo "::error::no changelog at $changelog for tag $TAG"
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists; nothing to do"
+            exit 0
+          fi
+          node scripts/changelog-section.mjs "$changelog" "$version" > notes.md
+          prerelease=()
+          case "$version" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md "${prerelease[@]}"
+          echo "created release $TAG"
