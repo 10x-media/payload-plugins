@@ -3,6 +3,7 @@ import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
 
 export interface BreakdownWidgetData {
+	title?: string
 	metric?: MetricKey
 	timeframe?: TimeframePreset
 	limit?: number

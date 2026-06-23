@@ -61,4 +61,10 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 			])
 		)
 	})
+
+	it('gives breakdown widgets an editable title field', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-breakdown-pages')
+		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'timeframe', 'limit']))
+	})
 })

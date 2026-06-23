@@ -23,7 +23,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 	const metric: MetricKey = data.metric ?? 'pageviews'
 	const timeframe: TimeframePreset = data.timeframe ?? 'last30days'
 	const limit = data.limit ?? 5
-	const title = spec ? t(spec.label) : ''
+	const title = data.title?.trim() || (spec ? t(spec.label) : '')
 
 	if (!spec) {
 		return (

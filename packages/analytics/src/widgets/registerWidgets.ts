@@ -2,11 +2,12 @@ import type { Config, Field, Widget, WidgetWidth } from 'payload'
 import { type CapabilityRequirement, satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter } from '../core/contract'
 import { TIMEFRAME_PRESETS } from '../timeframe/presets'
+import { en } from '../translations/en'
 import type { TranslationKey } from '../translations/keys'
 import { keys } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { labelForKey } from '../translations/server'
-import { BREAKDOWN_SPECS } from './breakdownTypes'
+import { BREAKDOWN_SPECS, type BreakdownSpec } from './breakdownTypes'
 import { WIDGET_METRICS } from './types'
 
 export interface RegisterWidgetsArgs {
@@ -32,7 +33,12 @@ export const widgetIsSupported = (
 
 const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 	const fields: Field[] = [
-		{ name: 'title', type: 'text', label: labelForKey(keys.widgetFieldTitle) },
+		{
+			name: 'title',
+			type: 'text',
+			label: labelForKey(keys.widgetFieldTitle),
+			admin: { placeholder: en[keys.widgetFieldTitlePlaceholder] },
+		},
 		{
 			name: 'metric',
 			type: 'select',
@@ -62,8 +68,14 @@ const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 	return fields
 }
 
-const breakdownWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
+const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => {
 	const fields: Field[] = [
+		{
+			name: 'title',
+			type: 'text',
+			label: labelForKey(keys.widgetFieldTitle),
+			admin: { placeholder: en[spec.label] },
+		},
 		{
 			name: 'metric',
 			type: 'select',
@@ -127,7 +139,7 @@ const WIDGET_DEFS: WidgetDef[] = [
 			requires: { dimensions: [spec.dimension] },
 			minWidth: 'small' as WidgetWidth,
 			maxWidth: 'large' as WidgetWidth,
-			fields: breakdownWidgetFields,
+			fields: (args) => breakdownWidgetFields(args, spec),
 		})
 	),
 ]

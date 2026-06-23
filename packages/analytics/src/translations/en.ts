@@ -43,4 +43,5 @@ export const en: Record<TranslationKey, string> = {
 	[keys.widgetFieldMetric]: 'Metric',
 	[keys.widgetFieldTimeframe]: 'Timeframe',
 	[keys.widgetFieldDataSource]: 'Data source',
+	[keys.widgetFieldTitlePlaceholder]: 'e.g. Daily page views',
 }
