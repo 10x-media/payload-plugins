@@ -1,3 +1,4 @@
+import type { DateRange } from '../core/contract'
 import type { TimeframePreset } from '../timeframe/presets'
 import type { SeriesPoint } from '../widgets/readForWidgetSeries'
 
@@ -33,18 +34,7 @@ const bucketStart = (d: Date, unit: Unit): Date => {
 	return startOfUtcDay(d)
 }
 
-/**
- * Aggregate a daily series into display buckets sized to the timeframe (day for short
- * ranges, week for ~quarter, month for year+), each with a formatted label. Distinct
- * metrics are summed per bucket (a documented daily-uniques approximation).
- */
-export const bucketSeries = (
-	points: SeriesPoint[],
-	timeframe: TimeframePreset,
-	_now: Date
-): ChartBucket[] => {
-	const unit = UNIT_BY_TIMEFRAME[timeframe]
-	const weekday = timeframe === 'last7days' || timeframe === 'today'
+const bucketByUnit = (points: SeriesPoint[], unit: Unit, weekday: boolean): ChartBucket[] => {
 	const groups = new Map<string, { date: Date; value: number }>()
 	for (const p of points) {
 		const d = bucketStart(new Date(p.date), unit)
@@ -81,4 +71,35 @@ export const bucketSeries = (
 		}).format(d)
 	}
 	return sorted.map((g) => ({ label: format(g.date), value: g.value }))
+}
+
+/**
+ * Aggregate a daily series into display buckets sized to the timeframe (day for short
+ * ranges, week for ~quarter, month for year+), each with a formatted label. Distinct
+ * metrics are summed per bucket (a documented daily-uniques approximation).
+ */
+export const bucketSeries = (
+	points: SeriesPoint[],
+	timeframe: TimeframePreset,
+	_now: Date
+): ChartBucket[] =>
+	bucketByUnit(
+		points,
+		UNIT_BY_TIMEFRAME[timeframe],
+		timeframe === 'last7days' || timeframe === 'today'
+	)
+
+const DAY = 86_400_000
+
+const unitForSpan = (spanDays: number): Unit =>
+	spanDays <= 31 ? 'day' : spanDays <= 120 ? 'week' : 'month'
+
+/**
+ * Bucket a daily series for a custom (arbitrary) range, choosing the bucket unit from
+ * the span the way the presets do: short ranges by day, a quarter by week, longer by
+ * month. Weekday labels are only used for the fixed 7-day preset, never here.
+ */
+export const bucketByRange = (points: SeriesPoint[], range: DateRange): ChartBucket[] => {
+	const spanDays = Math.round((range.end.getTime() - range.start.getTime()) / DAY)
+	return bucketByUnit(points, unitForSpan(spanDays), false)
 }

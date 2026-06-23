@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bucketSeries } from './bucket'
+import { bucketByRange, bucketSeries } from './bucket'
 
 const day = (iso: string, value: number) => ({ date: `${iso}T00:00:00.000Z`, value })
 
@@ -26,5 +26,24 @@ describe('bucketSeries', () => {
 		)
 		expect(out[0]?.label).toBe('Jun 1')
 		expect(out[0]?.value).toBe(4)
+	})
+})
+
+describe('bucketByRange', () => {
+	const day = (iso: string, value: number) => ({ date: `${iso}T00:00:00.000Z`, value })
+	it('buckets a <=31 day span by day', () => {
+		const out = bucketByRange([day('2026-06-01', 4)], {
+			start: new Date('2026-06-01T00:00:00.000Z'),
+			end: new Date('2026-06-20T00:00:00.000Z'),
+		})
+		expect(out[0]?.label).toBe('Jun 1')
+		expect(out[0]?.value).toBe(4)
+	})
+	it('buckets a multi-month span by month', () => {
+		const out = bucketByRange([day('2026-01-10', 5), day('2026-02-05', 8)], {
+			start: new Date('2026-01-01T00:00:00.000Z'),
+			end: new Date('2026-06-01T00:00:00.000Z'),
+		})
+		expect(out.map((b) => b.label)).toEqual(['Jan', 'Feb'])
 	})
 })
