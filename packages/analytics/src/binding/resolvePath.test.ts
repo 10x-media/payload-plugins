@@ -35,4 +35,9 @@ describe('resolvePathCached', () => {
 		expect(await b).toBe('/cached')
 		expect(path).toHaveBeenCalledTimes(1)
 	})
+	it('resolves directly when the request has no context bag', async () => {
+		const binding: AnalyticsBinding = { path: (d) => `/${d.slug as string}` }
+		const noCtx = { req: {} as unknown as PayloadRequest, locale: undefined }
+		expect(await resolvePathCached(binding, { slug: 'x' }, noCtx)).toBe('/x')
+	})
 })
