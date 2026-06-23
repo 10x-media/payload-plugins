@@ -61,6 +61,11 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 				{value === undefined ? '–' : formatMetricValue(metric, value, locale)}
 			</span>
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
+			{result.clamped ? (
+				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
+					{t(keys.stateClamped)}
+				</span>
+			) : null}
 		</div>
 	)
 }

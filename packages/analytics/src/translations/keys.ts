@@ -37,6 +37,7 @@ export const keys = {
 	widgetBreakdownCountries: 'analytics:widgetBreakdownCountries',
 	widgetFieldLimit: 'analytics:widgetFieldLimit',
 	stateNoBreakdown: 'analytics:stateNoBreakdown',
+	stateClamped: 'analytics:stateClamped',
 	widgetFieldTitle: 'analytics:widgetFieldTitle',
 	widgetFieldMetric: 'analytics:widgetFieldMetric',
 	widgetFieldTimeframe: 'analytics:widgetFieldTimeframe',

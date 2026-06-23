@@ -143,6 +143,32 @@ analytics({
 
 The resolver returns the document's URL pathname (or `null` for an unsaved document). `pathField` is a fallback used only when the resolver is absent or returns `null`; a binding must define at least one of the two.
 
+### Computed page paths
+
+The `path` resolver is a plain function with the signature `(doc, ctx) => string | null | Promise<string | null>`. It receives `ctx.req` (a `PayloadRequest`), so it can look up related documents:
+
+```ts
+analytics({
+  adapters: [native()],
+  collections: {
+    posts: {
+      path: async (doc, ctx) => {
+        if (!doc.slug) return null
+        // look up a related category to build the path
+        const cat = await ctx.req.payload.findByID({
+          collection: 'categories',
+          id: doc.category as string,
+          req: ctx.req,
+        })
+        return `/${cat.slug}/${doc.slug}`
+      },
+    },
+  },
+})
+```
+
+Nothing is persisted - the path is computed at read time and memoized once per request. Keep resolvers cheap: they may be called for many documents in a single list request. If you must look up related docs, pass `req` so Payload dedupes calls through its request data loader. When the path is already stored on the document, `pathField` is the zero-cost alternative.
+
 ## Portable display fields
 
 Read-only fields you place explicitly on your own collections. Nothing is auto-injected, and nothing lands in the sidebar unless you ask for it. Each field surfaces metrics for the document's bound path through the surfacing engine, and auto-disables when the active adapter cannot supply the requested metric.
@@ -170,6 +196,8 @@ The plugin registers capability-filtered widgets into `admin.dashboard.widgets`.
 Widgets are enabled by default. Disable them entirely with `widgets: false`, or drop specific slugs with `widgets: { disabled: ['analytics-metric'] }`.
 
 The widgets that ship today: a **metric** widget (a single headline number), a **trend** widget (a gradient area chart of one metric over time, with timeframe-aware axis labels [weekdays for a 7-day range, months for a year] and a hover tooltip), and four **breakdown** widgets that rank one metric by a dimension as a filled bar list (**Top pages**, **Top sources**, **Devices**, **Countries**). Each is configurable per instance: an editable title (a sensible default shows as the field's placeholder), a metric, a relative timeframe (today, last 7 days, last 30 days, last 90 days, this month, this year, last year, or all time), and (when more than one adapter is configured) a data source. A widget whose dimension no configured adapter supports is not registered, so a provider that does not report devices simply has no Devices widget.
+
+The Timeframe selector also includes a **Custom range** option that reveals a native date-range picker, letting you query any arbitrary from/to window. For external providers that enforce a maximum lookback (for example GA4 or Plausible tiers), a range that exceeds the limit is automatically narrowed to the provider maximum and the widget shows a short note below the caption so the narrowing is visible.
 
 The charts are dependency-free SVG and CSS themed with Payload's design tokens. The series color comes from `--analytics-chart-1`, which a consuming app can override in its admin stylesheet.
 

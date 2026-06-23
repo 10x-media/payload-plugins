@@ -71,6 +71,11 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 			</span>
 			<TrendChart buckets={trendPoints} ariaLabel={`${title} ${caption}`} minHeight={180} />
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
+			{result.clamped ? (
+				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
+					{t(keys.stateClamped)}
+				</span>
+			) : null}
 		</div>
 	)
 }
