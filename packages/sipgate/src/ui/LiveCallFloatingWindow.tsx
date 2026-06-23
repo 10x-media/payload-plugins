@@ -1,5 +1,5 @@
-import type { UIFieldServerComponent } from 'payload'
-
-export const LiveCallFloatingWindow: UIFieldServerComponent = () => {
+const LiveCallFloatingWindow = () => {
 	return <div>LiveCallFloatingWindow</div>
 }
+
+export default LiveCallFloatingWindow

@@ -124,5 +124,8 @@
 				"default": "./dist/exports/i18n.js"
 			}
 		}
+	},
+	"dependencies": {
+		"query-string": "^9.4.0"
 	}
 }
