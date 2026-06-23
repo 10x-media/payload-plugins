@@ -35,7 +35,6 @@ export function BarList({ data, emptyLabel }: BarListProps) {
 			<ChartStyles />
 			<div className="analytics-bars">
 				{rows.map((row, i) => (
-					// biome-ignore lint/a11y/noStaticElementInteractions: pointer tracking for the row tooltip, not a control
 					<div
 						key={row.label}
 						className="analytics-bars__row"

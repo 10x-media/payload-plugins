@@ -77,7 +77,6 @@ export function TrendChart({ buckets, ariaLabel, height = 72 }: TrendChartProps)
 
 	const activeValue = active !== null ? (values[active] ?? 0) : 0
 	return (
-		// biome-ignore lint/a11y/noStaticElementInteractions: pointer tracking for the chart tooltip, not a control
 		<div
 			ref={ref}
 			className="analytics-chart"
