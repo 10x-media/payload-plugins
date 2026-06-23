@@ -25,9 +25,9 @@ describe('classifyDevice', () => {
 	})
 
 	it('classifies a desktop user-agent as desktop', () => {
-		expect(classifyDevice('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36')).toBe(
-			'desktop'
-		)
+		expect(
+			classifyDevice('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36')
+		).toBe('desktop')
 	})
 
 	it('defaults an empty user-agent to desktop', () => {
