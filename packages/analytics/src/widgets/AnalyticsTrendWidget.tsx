@@ -60,7 +60,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 			>
 				{formatMetricValue(metric, result.total, locale)}
 			</span>
-			<TrendChart buckets={trendPoints} ariaLabel={`${title} ${caption}`} height={72} />
+			<TrendChart buckets={trendPoints} ariaLabel={`${title} ${caption}`} minHeight={180} />
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
 		</div>
 	)

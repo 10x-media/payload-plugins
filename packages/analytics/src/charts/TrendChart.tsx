@@ -13,7 +13,7 @@ export interface TrendPoint {
 export interface TrendChartProps {
 	buckets: TrendPoint[]
 	ariaLabel: string
-	height?: number
+	minHeight?: number
 }
 
 const MARGIN = { top: 8, right: 8, bottom: 18, left: 8 }
@@ -35,9 +35,9 @@ const tickIndices = (n: number): number[] => {
  * tooltip. Dependency-free; sizes to its container via a ResizeObserver so dots and
  * labels stay crisp (no aspect-ratio distortion).
  */
-export function TrendChart({ buckets, ariaLabel, height = 72 }: TrendChartProps) {
+export function TrendChart({ buckets, ariaLabel, minHeight = 160 }: TrendChartProps) {
 	const ref = useRef<HTMLDivElement>(null)
-	const [width, setWidth] = useState(600)
+	const [size, setSize] = useState({ w: 600, h: minHeight })
 	const [active, setActive] = useState<number | null>(null)
 	const gradientId = useId()
 
@@ -46,13 +46,15 @@ export function TrendChart({ buckets, ariaLabel, height = 72 }: TrendChartProps)
 		if (!el) {
 			return
 		}
-		const update = () => setWidth(el.clientWidth || 600)
+		const update = () => setSize({ w: el.clientWidth || 600, h: el.clientHeight || minHeight })
 		update()
 		const ro = new ResizeObserver(update)
 		ro.observe(el)
 		return () => ro.disconnect()
-	}, [])
+	}, [minHeight])
 
+	const width = size.w
+	const height = size.h
 	const values = buckets.map((b) => b.value)
 	const n = values.length
 	const plotW = Math.max(1, width - MARGIN.left - MARGIN.right)
@@ -80,7 +82,7 @@ export function TrendChart({ buckets, ariaLabel, height = 72 }: TrendChartProps)
 		<div
 			ref={ref}
 			className="analytics-chart"
-			style={{ height }}
+			style={{ flex: '1 1 0', minHeight }}
 			onPointerMove={onMove}
 			onPointerLeave={() => setActive(null)}
 		>
