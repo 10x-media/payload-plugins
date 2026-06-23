@@ -1,6 +1,6 @@
 import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
-import type { AnalyticsAdapter, MetricKey } from '../core/contract'
+import type { AnalyticsAdapter, DimensionKey, MetricKey } from '../core/contract'
 import { native } from '../native/nativeAdapter'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { registerWidgets, widgetIsSupported } from './registerWidgets'
@@ -74,6 +74,23 @@ describe('registerWidgets', () => {
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).not.toContain('analytics-trend')
 		expect(slugs).toContain('analytics-metric')
+	})
+
+	it('registers only the page breakdown when an adapter supports only the page dimension', () => {
+		const pageOnly: AnalyticsAdapter = {
+			id: 'pageonly',
+			label: 'Page only',
+			capabilities: { ...native().capabilities, dimensions: new Set<DimensionKey>(['page']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'pageonly', fetchedAt: '' } }),
+		}
+		const config = bareConfig()
+		registerWidgets(config, { adapters: [pageOnly], multiProvider: false, disabled: [] })
+		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugs).toContain('analytics-breakdown-pages')
+		expect(slugs).not.toContain('analytics-breakdown-sources')
+		expect(slugs).not.toContain('analytics-breakdown-devices')
+		expect(slugs).not.toContain('analytics-breakdown-countries')
 	})
 
 	it('preserves any widgets the host config already declared', () => {

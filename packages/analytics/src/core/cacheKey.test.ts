@@ -24,4 +24,12 @@ describe('buildCacheKey', () => {
 		const { path: _path, ...siteWide } = base
 		expect(buildCacheKey('ga4', siteWide)).toContain('site')
 	})
+	it('differs by sort order', () => {
+		const asc = buildCacheKey('ga4', { ...base, order: { metric: 'pageviews', direction: 'asc' } })
+		const desc = buildCacheKey('ga4', {
+			...base,
+			order: { metric: 'pageviews', direction: 'desc' },
+		})
+		expect(asc).not.toBe(desc)
+	})
 })

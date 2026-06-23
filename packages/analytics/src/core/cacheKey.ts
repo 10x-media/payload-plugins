@@ -20,5 +20,6 @@ export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
 		q.granularity ?? '_',
 		filters,
 		String(q.limit ?? '_'),
+		q.order ? `${q.order.metric}:${q.order.direction}` : '_',
 	].join('|')
 }
