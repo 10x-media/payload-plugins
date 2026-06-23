@@ -6,6 +6,7 @@ import type { TranslationKey } from '../translations/keys'
 import { keys } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { labelForKey } from '../translations/server'
+import { BREAKDOWN_SPECS } from './breakdownTypes'
 import { WIDGET_METRICS } from './types'
 
 export interface RegisterWidgetsArgs {
@@ -61,6 +62,45 @@ const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 	return fields
 }
 
+const breakdownWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
+	const fields: Field[] = [
+		{
+			name: 'metric',
+			type: 'select',
+			required: true,
+			defaultValue: 'pageviews',
+			label: labelForKey(keys.widgetFieldMetric),
+			options: WIDGET_METRICS.map((m) => ({ value: m, label: labelForKey(METRIC_KEYS[m]) })),
+		},
+		{
+			name: 'timeframe',
+			type: 'select',
+			required: true,
+			defaultValue: 'last30days',
+			label: labelForKey(keys.widgetFieldTimeframe),
+			options: TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
+		},
+		{
+			name: 'limit',
+			type: 'number',
+			defaultValue: 5,
+			min: 1,
+			max: 20,
+			label: labelForKey(keys.widgetFieldLimit),
+		},
+	]
+	if (args.multiProvider) {
+		fields.push({
+			name: 'dataSource',
+			type: 'select',
+			label: labelForKey(keys.widgetFieldDataSource),
+			defaultValue: args.adapters[0]?.id,
+			options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
+		})
+	}
+	return fields
+}
+
 const WIDGET_DEFS: WidgetDef[] = [
 	{
 		slug: 'analytics-metric',
@@ -79,6 +119,17 @@ const WIDGET_DEFS: WidgetDef[] = [
 		maxWidth: 'full',
 		fields: metricWidgetFields,
 	},
+	...BREAKDOWN_SPECS.map(
+		(spec): WidgetDef => ({
+			slug: spec.slug,
+			component: '@10x-media/analytics/rsc#AnalyticsBreakdownWidget',
+			label: spec.label,
+			requires: { dimensions: [spec.dimension] },
+			minWidth: 'small' as WidgetWidth,
+			maxWidth: 'large' as WidgetWidth,
+			fields: breakdownWidgetFields,
+		})
+	),
 ]
 
 export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void => {

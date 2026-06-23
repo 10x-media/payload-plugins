@@ -49,4 +49,16 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'timeframe']))
 	})
+
+	it('registers all four breakdown widgets (native supports page/country/source/device)', () => {
+		const slugs = registeredWidgets(booted).map((w) => w.slug)
+		expect(slugs).toEqual(
+			expect.arrayContaining([
+				'analytics-breakdown-pages',
+				'analytics-breakdown-sources',
+				'analytics-breakdown-devices',
+				'analytics-breakdown-countries',
+			])
+		)
+	})
 })
