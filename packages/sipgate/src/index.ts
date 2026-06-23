@@ -2,15 +2,18 @@ import {
 	type CollectionConfig,
 	type CollectionSlug,
 	type Config,
+	type CustomComponent,
 	definePlugin,
 	type Endpoint,
 	type Widget,
 } from 'payload'
 import { createCallLogsCollection } from './collections/CallLogs'
+import { createSipgateActiveCall } from './endpoints/sipgate.activeCall'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
 import { registerTranslations } from './plugin/registerTranslations'
 import type { SipgateCredentials } from './types'
 import { createCallActivityWidget } from './widgets/callActivity.widget'
+import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.component'
 
 export type SipgatePluginOptions = {
 	/**
@@ -44,12 +47,19 @@ export type SipgatePluginOptions = {
 	enableCallActivityWidget: boolean // TODO: Implement the widget and inject. This needs payload v3.65.0 or higher. (TODO: confirm version, could also be 3.64.0)
 
 	/**
+	 * Whether to enable the live call floating window.
+	 */
+	enableLiveCallFloatingWindow: boolean
+
+	/**
 	 * The overrides to use for the plugin.
 	 */
 	overrides?: {
 		callLogs?: Partial<CollectionConfig>
 		allActivityWidget?: Partial<Widget> // TODO: See above.
 		sipgateWebhooks?: Partial<Endpoint>
+		sipgateActiveCall?: Partial<Endpoint>
+		liveCallFloatingWindow?: Partial<CustomComponent<Record<string, never>>>
 	}
 }
 
@@ -81,10 +91,16 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				options.contactCollections,
 				options.phoneNumberFields,
 				options.overrides?.sipgateWebhooks
-			)
+			),
+			createSipgateActiveCall(options.overrides?.sipgateActiveCall)
 		)
 
 		// 4. Inject global Admin UI components for call notifications
+		if (options.enableLiveCallFloatingWindow) {
+			config.admin?.components?.beforeNav?.push(
+				createLiveCallFloatingWindow(options.overrides?.liveCallFloatingWindow)
+			)
+		}
 
 		// 5. Inject custom dashboard widget for call activity
 		if (options.enableCallActivityWidget) {

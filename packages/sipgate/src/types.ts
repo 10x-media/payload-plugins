@@ -31,3 +31,38 @@ export type SipgateCredentials = {
 	 */
 	refreshToken?: string
 }
+
+export type SipgateNewCallWebhookData = {
+	event: 'newcall'
+	from: string
+	to: string
+	direction: 'in' | 'out'
+	callId: string
+	origCallId: string
+	'user[]': string[]
+	'userId[]': string[]
+	'fullUserId[]': string[]
+	xcid: string
+}
+
+export type SipgateAnswerWebhookData = {
+	event: 'answer'
+	from: string
+	to: string
+	direction: 'in' | 'out'
+	callId: string
+	user: string
+	userId: string
+	fullUserId: string
+	answeringNumber: string
+}
+
+export type SipgateHangupWebhookData = {
+	event: 'hangup'
+	cause: 'normalClearing' | 'busy' | 'cancel' | 'noAnswer' | 'congestion' | 'notFound' | 'forwarded'
+	callId: string
+	from: string
+	to: string
+	direction: 'in' | 'out'
+	answeringNumber: string
+}
