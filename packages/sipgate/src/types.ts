@@ -1,6 +1,6 @@
 export type SipgateAuthType = 'pat' | 'oauth2'
 
-export interface SipgateCredentials {
+export type SipgateCredentials = {
 	/**
 	 * The authentication method to use.
 	 */

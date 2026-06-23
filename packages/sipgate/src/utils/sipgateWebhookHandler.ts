@@ -1,7 +1,11 @@
-import type { PayloadHandler } from 'payload'
+import type { CollectionSlug, PayloadHandler } from 'payload'
 
-export const sipgateWebhookHandler: PayloadHandler = (req) => {
-	const body = req.body
-	console.log(body)
-	return Response.json({ received: true }, { status: 200 })
-}
+export const sipgateWebhookHandler =
+	(contactCollections: CollectionSlug[], phoneNumberFields: string[]): PayloadHandler =>
+	(req) => {
+		const body = req.body
+		console.log(body)
+		console.log(contactCollections)
+		console.log(phoneNumberFields)
+		return Response.json({ received: true }, { status: 200 })
+	}
