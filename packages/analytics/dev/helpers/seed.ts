@@ -7,6 +7,9 @@ const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
 
 const SEED_PATHS = ['/', '/about', '/pricing', '/blog', '/contact']
+const SEED_COUNTRIES = ['US', 'DE', 'GB', 'FR']
+const SEED_DEVICES = ['desktop', 'mobile', 'tablet'] as const
+const SEED_SOURCES = ['google.com', 'Direct', 't.co', 'news.ycombinator.com']
 const SEED_VISITOR_COUNT = 6
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -26,6 +29,9 @@ const buildSeedEvents = (now: Date): StoredEvent[] => {
 				visitorHash,
 				sessionId: `${visitorHash}-d${day}`,
 				durationMs: 30_000 + ((day + i) % 5) * 30_000,
+				country: SEED_COUNTRIES[(day + i) % SEED_COUNTRIES.length],
+				device: SEED_DEVICES[(day + i) % SEED_DEVICES.length],
+				source: SEED_SOURCES[(day + i) % SEED_SOURCES.length],
 			})
 		}
 	}
