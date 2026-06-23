@@ -9,7 +9,10 @@ export interface BindingContext {
 }
 
 /** Maps a document to its analytics path (URL pathname), or null when it has none yet. */
-export type PathResolver = (doc: BindingDoc, ctx: BindingContext) => string | null
+export type PathResolver = (
+	doc: BindingDoc,
+	ctx: BindingContext
+) => string | null | Promise<string | null>
 
 export type HostnameResolver = (doc: BindingDoc) => string
 

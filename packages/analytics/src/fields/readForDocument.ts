@@ -1,5 +1,5 @@
 import type { PayloadRequest } from 'payload'
-import { resolveHostname, resolvePath } from '../binding/resolvePath'
+import { resolveHostname, resolvePathCached } from '../binding/resolvePath'
 import type { BindingDoc } from '../binding/types'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
@@ -48,7 +48,12 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 	} catch {
 		return { status: 'unavailable', adapterId: adapterId ?? '', dateRange, metrics: {} }
 	}
-	const path = resolvePath(binding, data, { req, locale: req.locale ?? undefined })
+	let path: string | null
+	try {
+		path = await resolvePathCached(binding, data, { req, locale: req.locale ?? undefined })
+	} catch {
+		path = null
+	}
 	if (!path) {
 		return { status: 'no-path', adapterId: adapter.id, dateRange, metrics: {} }
 	}
