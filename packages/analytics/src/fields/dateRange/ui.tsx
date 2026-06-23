@@ -29,8 +29,6 @@ const getMonthNames = (locale: string): string[] =>
 		new Intl.DateTimeFormat(locale, { month: 'long' }).format(new Date(2000, i))
 	)
 
-// ── Appearance config ────────────────────────────────────────────────────────
-
 interface AppearanceConfig {
 	dateFormat: string
 	showMonthYearPicker?: boolean
@@ -45,17 +43,13 @@ const APPEARANCE_CONFIG: Record<DateRangePickerAppearance, AppearanceConfig> = {
 	},
 }
 
-// ── Normalize date (pin to noon to avoid TZ day shifts) ──────────────────────
-
+/** Pin a picked date to noon UTC so the stored ISO date does not shift a day across timezones. */
 const normalizeDate = (date: Date | null): Date | null => {
 	if (!date) return null
 	const normalized = new Date(date)
-	const tzOffset = normalized.getTimezoneOffset() / 60
-	normalized.setHours(12 - tzOffset, 0, 0, 0)
+	normalized.setUTCHours(12, 0, 0, 0)
 	return normalized
 }
-
-// ── Custom header ─────────────────────────────────────────────────────────────
 
 const makeDefaultHeader =
 	(months: string[]) =>
@@ -202,8 +196,6 @@ const renderMonthOnlyHeader = ({
 	)
 }
 
-// ── Custom input ──────────────────────────────────────────────────────────────
-
 interface RangeInputProps {
 	appearance: DateRangePickerAppearance
 	endDate: Date | null
@@ -248,8 +240,6 @@ const RangeInput = forwardRef<HTMLInputElement, RangeInputProps>(
 	}
 )
 RangeInput.displayName = 'RangeInput'
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 type DateRangeFieldComponentProps = GroupFieldClientProps & DateRangeFieldOptions
 

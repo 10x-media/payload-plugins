@@ -2,7 +2,7 @@ import type { GroupField } from 'payload'
 import type { DateRangeFieldArgs } from './types'
 
 /**
- * Utility to create a Date Range field — a group with `from` / `to` date subfields
+ * Utility to create a Date Range field: a group with `from` / `to` date subfields
  * rendered as a single range picker in the admin UI.
  *
  * @example
@@ -10,7 +10,7 @@ import type { DateRangeFieldArgs } from './types'
  * dateRangeField({
  *   name: 'eventDates',
  *   label: 'Event Dates',
- *   pickerAppearance: 'dayAndTime',
+ *   pickerAppearance: 'dayOnly',
  *   timezone: true,
  * })
  * ```
