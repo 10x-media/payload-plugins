@@ -1,6 +1,6 @@
 import { inMemoryKVAdapter } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import type { AnalyticsQuery } from '../core/contract'
+import type { AnalyticsAdapter, AnalyticsQuery } from '../core/contract'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { kvCacheStore } from './cacheStore'
 import { createEngine } from './engine'
@@ -42,5 +42,51 @@ describe('createEngine', () => {
 		expect(result.rows).toEqual([])
 		expect(result.meta.provider).toBe('memory')
 		expect(spy).not.toHaveBeenCalled()
+	})
+
+	it('clamps the query range to the adapter maxLookbackDays and flags it', async () => {
+		let received: { start: Date; end: Date } | undefined
+		const adapter: AnalyticsAdapter = {
+			id: 'limited',
+			label: 'Limited',
+			capabilities: { ...memoryAdapter().capabilities, maxLookbackDays: 30 },
+			isConfigured: () => true,
+			query: async (query) => {
+				received = query.dateRange
+				return { rows: [], totals: { pageviews: 1 }, meta: { provider: 'limited', fetchedAt: '' } }
+			},
+		}
+		const { engine } = setup()
+		const end = new Date('2026-06-30T00:00:00.000Z')
+		const res = await engine.read(adapter, {
+			metrics: ['pageviews'],
+			dateRange: { start: new Date('2025-06-30T00:00:00.000Z'), end },
+		})
+		expect(received?.start.toISOString()).toBe('2026-05-31T00:00:00.000Z')
+		expect(res.meta.clamped).toBe(true)
+	})
+
+	it('does not clamp when maxLookbackDays is null', async () => {
+		let received: { start: Date; end: Date } | undefined
+		const adapter: AnalyticsAdapter = {
+			id: 'unbounded',
+			label: 'Unbounded',
+			capabilities: { ...memoryAdapter().capabilities, maxLookbackDays: null },
+			isConfigured: () => true,
+			query: async (query) => {
+				received = query.dateRange
+				return {
+					rows: [],
+					totals: { pageviews: 5 },
+					meta: { provider: 'unbounded', fetchedAt: '' },
+				}
+			},
+		}
+		const { engine } = setup()
+		const start = new Date('2025-06-30T00:00:00.000Z')
+		const end = new Date('2026-06-30T00:00:00.000Z')
+		await engine.read(adapter, { metrics: ['pageviews'], dateRange: { start, end } })
+		expect(received?.start.toISOString()).toBe(start.toISOString())
+		expect(received?.end.toISOString()).toBe(end.toISOString())
 	})
 })

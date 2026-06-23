@@ -16,6 +16,14 @@ const q = (over: Partial<AnalyticsQuery> = {}): AnalyticsQuery => ({
 })
 
 describe('posthog adapter', () => {
+	it('defaults maxLookbackDays to 730 and allows overriding to null', () => {
+		expect(posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities.maxLookbackDays).toBe(730)
+		expect(
+			posthog({ projectId: '123', apiKey: 'phx_k', maxLookbackDays: null }).capabilities
+				.maxLookbackDays
+		).toBeNull()
+	})
+
 	it('is not configured without a projectId and apiKey', () => {
 		expect(posthog({ projectId: '', apiKey: '' }).isConfigured()).toBe(false)
 		expect(posthog({ projectId: '123', apiKey: 'phx_k' }).isConfigured()).toBe(true)

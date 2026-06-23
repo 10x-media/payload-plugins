@@ -16,6 +16,13 @@ const q = (over: Partial<AnalyticsQuery> = {}): AnalyticsQuery => ({
 })
 
 describe('plausible adapter', () => {
+	it('defaults maxLookbackDays to 730 and allows overriding to null', () => {
+		expect(plausible({ siteId: 's', apiKey: 'k' }).capabilities.maxLookbackDays).toBe(730)
+		expect(
+			plausible({ siteId: 's', apiKey: 'k', maxLookbackDays: null }).capabilities.maxLookbackDays
+		).toBeNull()
+	})
+
 	it('is not configured without a siteId and apiKey', () => {
 		expect(plausible({ siteId: '', apiKey: '' }).isConfigured()).toBe(false)
 		expect(plausible({ siteId: 's', apiKey: 'k' }).isConfigured()).toBe(true)

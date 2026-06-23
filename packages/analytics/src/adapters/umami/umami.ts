@@ -18,11 +18,13 @@ export interface UmamiConfig {
 	token?: string
 	/** API base URL. Defaults to Umami Cloud (https://api.umami.is/v1). Self-hosted is e.g. https://site/api. */
 	host?: string
+	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
+	maxLookbackDays?: number | null
 }
 
 const CLOUD_BASE = 'https://api.umami.is/v1'
 
-const metrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
+const umamiMetrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
 	'pageviews',
 	'visitors',
 	'visits',
@@ -30,20 +32,7 @@ const metrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
 	'bounceRate',
 	'avgDuration',
 ])
-const dimensions: ReadonlySet<DimensionKey> = new Set<DimensionKey>(['page'])
-
-const capabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
-	realtime: false,
-	comparison: false,
-	minGranularity: 'day',
-	maxLookbackDays: null,
-	metrics,
-	dimensions,
-	batchPageReport: true,
-	rateLimit: null,
-	recommendedTtl: { realtime: 300, aggregate: 3600 },
-}
+const umamiDimensions: ReadonlySet<DimensionKey> = new Set<DimensionKey>(['page'])
 
 interface UmamiStats {
 	pageviews: number
@@ -55,6 +44,20 @@ interface UmamiStats {
 
 export function umami(config: UmamiConfig): AnalyticsAdapter {
 	const base = config.host ?? CLOUD_BASE
+	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
+
+	const capabilities: AnalyticsCapabilities = {
+		perPageQuery: true,
+		realtime: false,
+		comparison: false,
+		minGranularity: 'day',
+		maxLookbackDays,
+		metrics: umamiMetrics,
+		dimensions: umamiDimensions,
+		batchPageReport: true,
+		rateLimit: null,
+		recommendedTtl: { realtime: 300, aggregate: 3600 },
+	}
 	// Cloud authenticates with x-umami-api-key; self-hosted with a bearer token.
 	// NOTE: the cloud header name and the per-URL `path` filter (set in params(), also
 	// sent to /metrics) match the documented v2 shape but are unvalidated against a live

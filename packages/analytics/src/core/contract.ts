@@ -68,7 +68,7 @@ export interface AnalyticsRow {
 export interface AnalyticsResult {
 	rows: AnalyticsRow[]
 	totals?: Partial<Record<MetricKey, number>>
-	meta: { provider: string; sampled?: boolean; fetchedAt: string }
+	meta: { provider: string; sampled?: boolean; clamped?: boolean; fetchedAt: string }
 }
 
 export interface RateLimitDescriptor {

@@ -17,6 +17,8 @@ export interface Ga4Config {
 	credentials: { client_email: string; private_key: string }
 	/** GCP project id; inferred from the credentials when omitted. */
 	projectId?: string
+	/** Maximum days of historical data. Defaults to 425 (GA4's rolling-window limit). Pass null to disable clamping. */
+	maxLookbackDays?: number | null
 }
 
 const METRIC_MAP: Partial<Record<MetricKey, string>> = {
@@ -50,22 +52,10 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	event: 'eventName',
 }
 
-const metrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
-const dimensions: ReadonlySet<DimensionKey> = new Set(Object.keys(DIMENSION_MAP) as DimensionKey[])
-
-const capabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
-	realtime: false,
-	comparison: false,
-	minGranularity: 'day',
-	maxLookbackDays: null,
-	metrics,
-	dimensions,
-	batchPageReport: true,
-	// GA4 bills a token quota (200k/day, 40k/hr), so bias hard to caching.
-	rateLimit: { maxConcurrent: 10, quotaModel: 'tokens', readsCountAsUsage: true },
-	recommendedTtl: { realtime: 300, aggregate: 21600 },
-}
+const ga4Metrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
+const ga4Dimensions: ReadonlySet<DimensionKey> = new Set(
+	Object.keys(DIMENSION_MAP) as DimensionKey[]
+)
 
 // GA4 returns bounceRate as a 0..1 ratio and averageSessionDuration in seconds; the
 // contract uses a 0..100 percentage and milliseconds.
@@ -80,6 +70,21 @@ const toContractValue = (metric: MetricKey, raw: number): number => {
 }
 
 export function ga4(config: Ga4Config): AnalyticsAdapter {
+	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 425
+
+	const capabilities: AnalyticsCapabilities = {
+		perPageQuery: true,
+		realtime: false,
+		comparison: false,
+		minGranularity: 'day',
+		maxLookbackDays,
+		metrics: ga4Metrics,
+		dimensions: ga4Dimensions,
+		batchPageReport: true,
+		rateLimit: { maxConcurrent: 10, quotaModel: 'tokens', readsCountAsUsage: true },
+		recommendedTtl: { realtime: 300, aggregate: 21600 },
+	}
+
 	let clientPromise: Promise<BetaAnalyticsDataClient> | undefined
 
 	const getClient = (): Promise<BetaAnalyticsDataClient> => {

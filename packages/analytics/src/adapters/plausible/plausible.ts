@@ -15,6 +15,8 @@ export interface PlausibleConfig {
 	apiKey: string
 	/** Base URL for self-hosted CE. Defaults to Plausible Cloud. */
 	host?: string
+	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
+	maxLookbackDays?: number | null
 }
 
 const METRIC_MAP: Partial<Record<MetricKey, string>> = {
@@ -44,21 +46,10 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	utmCampaign: 'visit:utm_campaign',
 }
 
-const metrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
-const dimensions: ReadonlySet<DimensionKey> = new Set(Object.keys(DIMENSION_MAP) as DimensionKey[])
-
-const capabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
-	realtime: false,
-	comparison: false,
-	minGranularity: 'day',
-	maxLookbackDays: null,
-	metrics,
-	dimensions,
-	batchPageReport: true,
-	rateLimit: { requestsPerHour: 600 },
-	recommendedTtl: { realtime: 300, aggregate: 3600 },
-}
+const plausibleMetrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
+const plausibleDimensions: ReadonlySet<DimensionKey> = new Set(
+	Object.keys(DIMENSION_MAP) as DimensionKey[]
+)
 
 interface PlausibleResponse {
 	results: Array<{ metrics: number[]; dimensions: string[] }>
@@ -70,6 +61,20 @@ const toContractValue = (metric: MetricKey, raw: number): number =>
 
 export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 	const host = config.host ?? 'https://plausible.io'
+	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
+
+	const capabilities: AnalyticsCapabilities = {
+		perPageQuery: true,
+		realtime: false,
+		comparison: false,
+		minGranularity: 'day',
+		maxLookbackDays,
+		metrics: plausibleMetrics,
+		dimensions: plausibleDimensions,
+		batchPageReport: true,
+		rateLimit: { requestsPerHour: 600 },
+		recommendedTtl: { realtime: 300, aggregate: 3600 },
+	}
 
 	return {
 		id: 'plausible',

@@ -17,6 +17,8 @@ export interface PosthogConfig {
 	apiKey: string
 	/** API host. Defaults to US Cloud; EU is https://eu.posthog.com, self-host is your instance URL. */
 	host?: string
+	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
+	maxLookbackDays?: number | null
 }
 
 const US_CLOUD = 'https://us.posthog.com'
@@ -30,21 +32,8 @@ const METRIC_SQL: Partial<Record<MetricKey, string>> = {
 	sessions: 'count(DISTINCT properties.$session_id)',
 }
 
-const metrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_SQL) as MetricKey[])
-const dimensions: ReadonlySet<DimensionKey> = new Set<DimensionKey>(['page'])
-
-const capabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
-	realtime: false,
-	comparison: false,
-	minGranularity: 'day',
-	maxLookbackDays: null,
-	metrics,
-	dimensions,
-	batchPageReport: true,
-	rateLimit: { requestsPerMinute: 240, requestsPerHour: 2400 },
-	recommendedTtl: { realtime: 300, aggregate: 3600 },
-}
+const posthogMetrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_SQL) as MetricKey[])
+const posthogDimensions: ReadonlySet<DimensionKey> = new Set<DimensionKey>(['page'])
 
 // The Query API has no parameter binding, so values are inlined as quoted literals.
 // Escape backslashes first, then single quotes, so a crafted path cannot break out.
@@ -62,6 +51,20 @@ interface PosthogQueryResponse {
 
 export function posthog(config: PosthogConfig): AnalyticsAdapter {
 	const host = config.host ?? US_CLOUD
+	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
+
+	const capabilities: AnalyticsCapabilities = {
+		perPageQuery: true,
+		realtime: false,
+		comparison: false,
+		minGranularity: 'day',
+		maxLookbackDays,
+		metrics: posthogMetrics,
+		dimensions: posthogDimensions,
+		batchPageReport: true,
+		rateLimit: { requestsPerMinute: 240, requestsPerHour: 2400 },
+		recommendedTtl: { realtime: 300, aggregate: 3600 },
+	}
 
 	return {
 		id: 'posthog',

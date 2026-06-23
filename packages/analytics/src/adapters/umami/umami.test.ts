@@ -16,6 +16,13 @@ const q = (over: Partial<AnalyticsQuery> = {}): AnalyticsQuery => ({
 })
 
 describe('umami adapter', () => {
+	it('defaults maxLookbackDays to 730 and allows overriding to null', () => {
+		expect(umami({ websiteId: 'w', apiKey: 'k' }).capabilities.maxLookbackDays).toBe(730)
+		expect(
+			umami({ websiteId: 'w', apiKey: 'k', maxLookbackDays: null }).capabilities.maxLookbackDays
+		).toBeNull()
+	})
+
 	it('requires a websiteId plus a cloud key or self-host token', () => {
 		expect(umami({ websiteId: '' }).isConfigured()).toBe(false)
 		expect(umami({ websiteId: 'w', apiKey: 'k' }).isConfigured()).toBe(true)

@@ -32,6 +32,11 @@ beforeEach(() => {
 })
 
 describe('ga4 adapter', () => {
+	it('defaults maxLookbackDays to 425 and allows overriding to null', () => {
+		expect(ga4(config).capabilities.maxLookbackDays).toBe(425)
+		expect(ga4({ ...config, maxLookbackDays: null }).capabilities.maxLookbackDays).toBeNull()
+	})
+
 	it('is not configured without a propertyId and credentials', () => {
 		expect(
 			ga4({ propertyId: '', credentials: { client_email: '', private_key: '' } }).isConfigured()
