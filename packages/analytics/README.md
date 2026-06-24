@@ -274,6 +274,30 @@ export default async function TopSourcesWidget(props: WidgetServerProps) {
 
 After registering, run `payload generate:importmap` so the admin can resolve the component. The widget only appears when a configured adapter satisfies its `requires` gate.
 
+## Scheduled cache warming
+
+Surfacing reads are cached in `payload.kv`, keyed per adapter + query and snapped to the UTC day. For a provider-backed dashboard (GA4, Plausible, Umami, PostHog), the first load after a cache entry expires pays a cold provider round-trip. Opt into a background job that pre-runs the dashboard's reads on a cron so that first load is a warm cache hit:
+
+```ts
+analytics({
+  adapters: [plausible({ /* ... */ })],
+  cache: { warm: true }, // default cron: every 30 minutes
+})
+```
+
+Pass a cron to change the cadence:
+
+```ts
+analytics({
+  adapters: [/* ... */],
+  cache: { warm: { cron: '0 * * * *' } }, // hourly
+})
+```
+
+The job registers a Payload task (`analytics-warm-cache`) whose work is derived from your `admin.dashboard.defaultLayout`: each metric, trend, and breakdown widget becomes one warm read for the same metric, timeframe, and (in multi-provider setups) data source it renders. The realtime widget is skipped (its short-lived count is kept warm by the live poller), as is any custom widget whose read shape the plugin does not know. One provider failure is logged and does not abort the rest.
+
+Warming is **off by default** because it spends provider API quota on a schedule. It pays off most when the dashboard is provider-backed; the native engine is fast enough that warming it is harmless but low value. The task runs through Payload's jobs runner, so your app must have that runner enabled (cron `autoRun`, or an external scheduler invoking the queue) for the schedule to fire.
+
 ## Provider adapters
 
 Third-party providers implement the same `AnalyticsAdapter` contract and ship as code-split subpaths, so a site installs only what it uses.
