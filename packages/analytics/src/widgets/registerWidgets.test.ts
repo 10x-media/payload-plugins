@@ -22,7 +22,12 @@ describe('widgetIsSupported', () => {
 describe('registerWidgets', () => {
 	it('pushes the metric widget into admin.dashboard.widgets', () => {
 		const config = bareConfig()
-		registerWidgets(config, { adapters: [native()], multiProvider: false, disabled: [] })
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).toContain('analytics-metric')
 	})
@@ -33,6 +38,7 @@ describe('registerWidgets', () => {
 			adapters: [native()],
 			multiProvider: false,
 			disabled: ['analytics-metric'],
+			register: [],
 		})
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).not.toContain('analytics-metric')
@@ -40,12 +46,18 @@ describe('registerWidgets', () => {
 
 	it('adds a data-source field (labelled by adapter label) only with more than one adapter', () => {
 		const single = bareConfig()
-		registerWidgets(single, { adapters: [native()], multiProvider: false, disabled: [] })
+		registerWidgets(single, {
+			adapters: [native()],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
 		const multi = bareConfig()
 		registerWidgets(multi, {
 			adapters: [native(), memoryAdapter()],
 			multiProvider: true,
 			disabled: [],
+			register: [],
 		})
 		const dataSourceField = (config: Config) =>
 			config.admin?.dashboard?.widgets
@@ -70,7 +82,12 @@ describe('registerWidgets', () => {
 			query: async () => ({ rows: [], meta: { provider: 'limited', fetchedAt: '' } }),
 		}
 		const config = bareConfig()
-		registerWidgets(config, { adapters: [noPageviews], multiProvider: false, disabled: [] })
+		registerWidgets(config, {
+			adapters: [noPageviews],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).not.toContain('analytics-trend')
 		expect(slugs).toContain('analytics-metric')
@@ -85,7 +102,12 @@ describe('registerWidgets', () => {
 			query: async () => ({ rows: [], meta: { provider: 'pageonly', fetchedAt: '' } }),
 		}
 		const config = bareConfig()
-		registerWidgets(config, { adapters: [pageOnly], multiProvider: false, disabled: [] })
+		registerWidgets(config, {
+			adapters: [pageOnly],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).toContain('analytics-breakdown-pages')
 		expect(slugs).not.toContain('analytics-breakdown-sources')
@@ -97,7 +119,12 @@ describe('registerWidgets', () => {
 		const config: Config = {
 			admin: { dashboard: { widgets: [{ slug: 'host-widget', Component: 'x#y' }] } },
 		} as Config
-		registerWidgets(config, { adapters: [native()], multiProvider: false, disabled: [] })
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).toEqual(expect.arrayContaining(['host-widget', 'analytics-metric']))
 	})

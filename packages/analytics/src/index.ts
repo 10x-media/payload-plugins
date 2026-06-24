@@ -40,6 +40,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				adapters: resolved.adapters,
 				multiProvider: registry.isMultiProvider(),
 				disabled: resolved.widgets.disabled,
+				register: resolved.widgets.register,
 			})
 		}
 		const prevOnInit = config.onInit
@@ -84,4 +85,5 @@ export {
 	analyticsTab,
 } from './fields/factories'
 export type { TimeframePreset } from './timeframe/presets'
+export type { CustomWidgetDef } from './widgets/customWidget'
 export { analyticsDefaultWidgets } from './widgets/defaults'

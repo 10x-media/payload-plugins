@@ -9,12 +9,14 @@ import { keys } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { labelForKey } from '../translations/server'
 import { BREAKDOWN_SPECS, type BreakdownSpec } from './breakdownTypes'
+import { buildCustomWidgets, type CustomWidgetDef } from './customWidget'
 import { WIDGET_METRICS } from './types'
 
 export interface RegisterWidgetsArgs {
 	adapters: AnalyticsAdapter[]
 	multiProvider: boolean
 	disabled: string[]
+	register: CustomWidgetDef[]
 }
 
 interface WidgetDef {
@@ -246,6 +248,7 @@ export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void
 			maxWidth: def.maxWidth,
 		})
 	}
+	built.push(...buildCustomWidgets(args.register, args.adapters, args.disabled))
 	if (!built.length) {
 		return
 	}
