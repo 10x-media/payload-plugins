@@ -1,5 +1,7 @@
+import { LiveCallFloatingWindowClient } from './LiveCallFloatingWindowClient'
+
 const LiveCallFloatingWindow = () => {
-	return <div>LiveCallFloatingWindow</div>
+	return <LiveCallFloatingWindowClient />
 }
 
 export default LiveCallFloatingWindow
