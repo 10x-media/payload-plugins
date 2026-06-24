@@ -2,6 +2,7 @@ import { type Config, definePlugin } from 'payload'
 
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry } from './core/registry'
+import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
 import { kvCacheStore } from './surfacing/cacheStore'
@@ -25,6 +26,12 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		const registry = createRegistry(resolved.adapters, resolved.defaultAdapter)
 		for (const adapter of resolved.adapters) {
 			adapter.register?.(config)
+		}
+		if (resolved.adapters.some((a) => a.capabilities.realtime)) {
+			config.endpoints = [
+				...(config.endpoints ?? []),
+				{ method: 'get', path: REALTIME_PATH, handler: makeRealtimeHandler() },
+			]
 		}
 		if (resolved.widgets.enabled) {
 			registerWidgets(config, {
