@@ -62,3 +62,12 @@ If neo: use /calls and create a new call in the channel that gets called.
 Flow for making a call:
 if classic: use /sessions/calls to create a new call. 
 If neo: use /calls and create a new call in the channel that gets called. 
+
+Update: v2 scrapped. Implementing webrtc and live calling in thsi plugin is exceptionally hard and complicated to set up. 
+It will have more value to actually implement the rest of the features that sipgate provides, to allow users to for example 
+play audio files hosted with their payload instance for custom IVR system messages. 
+
+Features to build: 
+Extensible Custom IVR system support. 
+Call Statistics dashboard (with possible real time call statistics).
+Slack integration.  
