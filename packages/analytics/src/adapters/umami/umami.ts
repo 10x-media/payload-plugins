@@ -9,6 +9,7 @@ import type {
 	MetricKey,
 } from '../../core/contract'
 import { fetchJson } from '../http/fetchJson'
+import { dayIso } from '../series'
 
 export interface UmamiConfig {
 	websiteId: string
@@ -105,27 +106,74 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 				return { rows, totals: undefined, meta: { provider: 'umami', fetchedAt } }
 			}
 
-			const stats = await fetchJson<UmamiStats>(
-				`${base}/websites/${config.websiteId}/stats?${params(q).toString()}`,
-				{ headers, signal: ctx.signal, provider: 'umami' }
-			)
-			const all: Partial<Record<MetricKey, number>> = {
-				pageviews: stats.pageviews,
-				visitors: stats.visitors,
-				visits: stats.visits,
-				sessions: stats.visits,
-				// Derived ratios are omitted (not zeroed) when there are no visits, so the
-				// display layer shows a "no data" state instead of a misleading 0.
-				bounceRate: stats.visits > 0 ? Math.round((stats.bounces / stats.visits) * 100) : undefined,
-				avgDuration:
-					stats.visits > 0 ? Math.round((stats.totaltime / stats.visits) * 1000) : undefined,
-			}
-			const totals: Partial<Record<MetricKey, number>> = {}
-			for (const m of q.metrics) {
-				if (all[m] !== undefined) {
-					totals[m] = all[m]
+			const fetchTotals = async (): Promise<Partial<Record<MetricKey, number>>> => {
+				const stats = await fetchJson<UmamiStats>(
+					`${base}/websites/${config.websiteId}/stats?${params(q).toString()}`,
+					{ headers, signal: ctx.signal, provider: 'umami' }
+				)
+				const all: Partial<Record<MetricKey, number>> = {
+					pageviews: stats.pageviews,
+					visitors: stats.visitors,
+					visits: stats.visits,
+					sessions: stats.visits,
+					// Derived ratios are omitted (not zeroed) when there are no visits, so the
+					// display layer shows a "no data" state instead of a misleading 0.
+					bounceRate:
+						stats.visits > 0 ? Math.round((stats.bounces / stats.visits) * 100) : undefined,
+					avgDuration:
+						stats.visits > 0 ? Math.round((stats.totaltime / stats.visits) * 1000) : undefined,
 				}
+				const totals: Partial<Record<MetricKey, number>> = {}
+				for (const m of q.metrics) {
+					if (all[m] !== undefined) {
+						totals[m] = all[m]
+					}
+				}
+				return totals
 			}
+
+			// Umami's only time-series endpoint reports pageviews and sessions per interval;
+			// visitors/bounceRate/avgDuration have no per-day source, so a trend on those
+			// metrics keeps a correct headline (from /stats) but an empty series.
+			if (q.granularity === 'day') {
+				const p = params(q)
+				p.set('unit', 'day')
+				p.set('timezone', 'UTC')
+				const fetchSeries = () =>
+					fetchJson<{
+						pageviews: Array<{ x: string; y: number }>
+						sessions: Array<{ x: string; y: number }>
+					}>(`${base}/websites/${config.websiteId}/pageviews?${p.toString()}`, {
+						headers,
+						signal: ctx.signal,
+						provider: 'umami',
+					})
+				const [series, totals] = await Promise.all([fetchSeries(), fetchTotals()])
+				const sessionsByX = new Map(series.sessions.map((s) => [s.x, s.y]))
+				const rows: AnalyticsRow[] = []
+				for (const pv of series.pageviews) {
+					const ts = dayIso(pv.x)
+					if (!ts) {
+						continue
+					}
+					const dayMetrics = sessionsByX.get(pv.x) ?? 0
+					const all: Partial<Record<MetricKey, number>> = {
+						pageviews: pv.y,
+						visits: dayMetrics,
+						sessions: dayMetrics,
+					}
+					const metrics: Partial<Record<MetricKey, number>> = {}
+					for (const m of q.metrics) {
+						if (all[m] !== undefined) {
+							metrics[m] = all[m]
+						}
+					}
+					rows.push({ timestamp: ts, metrics })
+				}
+				return { rows, totals, meta: { provider: 'umami', fetchedAt } }
+			}
+
+			const totals = await fetchTotals()
 			return { rows: [{ metrics: totals }], totals, meta: { provider: 'umami', fetchedAt } }
 		},
 	}

@@ -88,4 +88,39 @@ describe('umami adapter', () => {
 		expect(result.totals?.bounceRate).toBeUndefined()
 		expect(result.totals?.avgDuration).toBeUndefined()
 	})
+
+	it('returns a per-day pageviews/sessions series plus full totals when granularity is day', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/pageviews', ({ request }) => {
+				const url = new URL(request.url)
+				expect(url.searchParams.get('unit')).toBe('day')
+				expect(url.searchParams.get('timezone')).toBe('UTC')
+				return HttpResponse.json({
+					pageviews: [
+						{ x: '2026-01-01 00:00:00', y: 10 },
+						{ x: '2026-01-02 00:00:00', y: 25 },
+					],
+					sessions: [
+						{ x: '2026-01-01 00:00:00', y: 4 },
+						{ x: '2026-01-02 00:00:00', y: 9 },
+					],
+				})
+			}),
+			http.get('https://api.umami.is/v1/websites/w/stats', () =>
+				HttpResponse.json({ pageviews: 35, visitors: 20, visits: 13, bounces: 5, totaltime: 700 })
+			)
+		)
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews', 'sessions', 'visitors'], granularity: 'day' }),
+			{}
+		)
+		// pageviews + sessions have a per-day source; visitors does not, so rows omit it.
+		expect(result.rows).toEqual([
+			{ timestamp: '2026-01-01T00:00:00.000Z', metrics: { pageviews: 10, sessions: 4 } },
+			{ timestamp: '2026-01-02T00:00:00.000Z', metrics: { pageviews: 25, sessions: 9 } },
+		])
+		// the headline total stays correct for every metric, including visitors.
+		expect(result.totals?.pageviews).toBe(35)
+		expect(result.totals?.visitors).toBe(20)
+	})
 })
