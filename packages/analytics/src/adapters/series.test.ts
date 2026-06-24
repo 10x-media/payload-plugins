@@ -13,4 +13,8 @@ describe('dayIso', () => {
 		expect(dayIso('not-a-date')).toBeNull()
 		expect(dayIso('')).toBeNull()
 	})
+	it('returns null for a year-only or year-month value (not a full day)', () => {
+		expect(dayIso('2026')).toBeNull()
+		expect(dayIso('2026-01')).toBeNull()
+	})
 })

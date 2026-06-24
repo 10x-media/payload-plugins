@@ -6,6 +6,11 @@
  */
 export const dayIso = (value: string): string | null => {
 	const date = value.slice(0, 10)
+	// V8's Date.parse leniently accepts year-only and year-month strings, so require a
+	// full YYYY-MM-DD before parsing or a short value would resolve to Jan 1, not null.
+	if (date.length !== 10) {
+		return null
+	}
 	const t = Date.parse(`${date}T00:00:00.000Z`)
 	return Number.isNaN(t) ? null : new Date(t).toISOString()
 }
