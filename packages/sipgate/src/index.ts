@@ -141,6 +141,12 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				createCallActivityWidget(options.overrides?.allActivityWidget)
 			)
 		}
+
+		// 6. inject task
+		config.jobs ??= {}
+		config.jobs.tasks ??= []
+		config.jobs.tasks.push(buildSyncCallHistoryTask({ callLogsSlug }))
+
 		return config
 	},
 })
