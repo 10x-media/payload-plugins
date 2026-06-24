@@ -15,5 +15,21 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
+
+		// create some contacts
+		await payload.create({
+			collection: 'contacts',
+			data: {
+				name: 'John Doe',
+				phoneNumber: '+491234567890',
+			},
+		})
+		await payload.create({
+			collection: 'contacts',
+			data: {
+				name: 'Jane Doe',
+				phoneNumber: '+491234567891',
+			},
+		})
 	}
 }

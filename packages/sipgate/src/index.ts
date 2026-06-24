@@ -11,6 +11,7 @@ import { createCallLogsCollection } from './collections/CallLogs'
 import { createSipgateActiveCall } from './endpoints/sipgate.activeCall'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
 import { registerTranslations } from './plugin/registerTranslations'
+import { buildSyncCallHistoryTask } from './tasks/syncCallHistoryTask'
 import type { SipgateCredentials } from './types'
 import { createCallActivityWidget } from './widgets/callActivity.widget'
 import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.component'
@@ -79,9 +80,16 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		registerTranslations(config)
 
 		// 1. Inject custom Call Logs collection
+		const callLogsSlug = 'call-logs'
 		config.collections?.push(
 			createCallLogsCollection(options.contactCollections, options.overrides?.callLogs)
 		)
+
+		if (options.syncCallLogs) {
+			if (!config.jobs) config.jobs = {}
+			if (!config.jobs.tasks) config.jobs.tasks = []
+			config.jobs.tasks.push(buildSyncCallHistoryTask({ callLogsSlug }))
+		}
 
 		// 2. Extend target contact collections with custom UI components
 

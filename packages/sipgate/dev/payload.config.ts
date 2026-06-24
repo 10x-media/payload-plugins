@@ -19,6 +19,15 @@ const users: CollectionConfig = {
 	fields: [],
 }
 
+const contacts: CollectionConfig = {
+	slug: 'contacts',
+	admin: { useAsTitle: 'name' },
+	fields: [
+		{ name: 'name', type: 'text' },
+		{ name: 'phoneNumber', type: 'text' },
+	],
+}
+
 const db =
 	useDb === 'postgres'
 		? postgresAdapter({
@@ -33,14 +42,27 @@ const db =
 				migrationDir,
 				url:
 					process.env.DATABASE_URI_MONGO ??
-					'mongodb://localhost:37017/sipgate_e2e?replicaSet=rs0&directConnection=true',
+					'mongodb://localhost:27017/sipgate_e2e?replicaSet=rs0&directConnection=true',
 			})
 
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [sipgate({})],
+	collections: [users, contacts],
+	plugins: [
+		sipgate({
+			contactCollections: [contacts.slug],
+			phoneNumberFields: ['phoneNumber'],
+			syncCallLogs: true,
+			sipgateCredentials: {
+				authType: 'pat',
+				tokenId: process.env.SIPGATE_TOKEN_ID,
+				token: process.env.SIPGATE_TOKEN,
+			},
+			enableCallActivityWidget: true,
+			enableLiveCallFloatingWindow: true,
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
