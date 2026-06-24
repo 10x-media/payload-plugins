@@ -24,7 +24,7 @@ const contacts: CollectionConfig = {
 	admin: { useAsTitle: 'name' },
 	fields: [
 		{ name: 'name', type: 'text' },
-		{ name: 'phoneNumber', type: 'text' },
+		{ name: 'phoneNumber', type: 'text', admin: { width: '50%' } },
 	],
 }
 
