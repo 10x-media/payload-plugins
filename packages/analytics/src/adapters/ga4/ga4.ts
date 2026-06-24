@@ -9,6 +9,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../../core/contract'
+import { dayIso } from '../series'
 
 export interface Ga4Config {
 	/** GA4 property id (numeric), e.g. '123456789'. */
@@ -120,38 +121,9 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
-			// Several contract metrics alias one GA4 metric (visits and sessions both map to
-			// "sessions"); dedupe before sending and read each contract metric back from its
-			// provider key's position.
 			const providerMetrics = [...new Set(wanted.map((m) => METRIC_MAP[m] as string))]
 			const dims = (q.dimensions ?? []).filter((d) => DIMENSION_MAP[d])
 			const providerDims = [...new Set(dims.map((d) => DIMENSION_MAP[d] as string))]
-
-			const request: protos.google.analytics.data.v1beta.IRunReportRequest = {
-				property: `properties/${config.propertyId}`,
-				dateRanges: [
-					{
-						startDate: q.dateRange.start.toISOString().slice(0, 10),
-						endDate: q.dateRange.end.toISOString().slice(0, 10),
-					},
-				],
-				metrics: providerMetrics.map((name) => ({ name })),
-				...(providerDims.length ? { dimensions: providerDims.map((name) => ({ name })) } : {}),
-				...(q.path
-					? {
-							dimensionFilter: {
-								filter: {
-									fieldName: 'pagePath',
-									stringFilter: { matchType: 'EXACT', value: q.path },
-								},
-							},
-						}
-					: {}),
-				...(q.limit ? { limit: q.limit } : {}),
-			}
-
-			const client = await getClient()
-			const [response] = await client.runReport(request)
 
 			const readRow = (
 				row: protos.google.analytics.data.v1beta.IRow
@@ -163,6 +135,55 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				}
 				return out
 			}
+
+			const baseRequest: protos.google.analytics.data.v1beta.IRunReportRequest = {
+				property: `properties/${config.propertyId}`,
+				dateRanges: [
+					{
+						startDate: q.dateRange.start.toISOString().slice(0, 10),
+						endDate: q.dateRange.end.toISOString().slice(0, 10),
+					},
+				],
+				metrics: providerMetrics.map((name) => ({ name })),
+				...(q.path
+					? {
+							dimensionFilter: {
+								filter: {
+									fieldName: 'pagePath',
+									stringFilter: { matchType: 'EXACT', value: q.path },
+								},
+							},
+						}
+					: {}),
+			}
+
+			const client = await getClient()
+
+			if (q.granularity === 'day' && !dims.length) {
+				const [response] = await client.runReport({
+					...baseRequest,
+					dimensions: [{ name: 'date' }],
+					metricAggregations: (['TOTAL'] as unknown) as protos.google.analytics.data.v1beta.MetricAggregation[],
+					orderBys: [{ dimension: { dimensionName: 'date' } }],
+				})
+				const rows: AnalyticsRow[] = []
+				for (const row of response.rows ?? []) {
+					const ymd = row.dimensionValues?.[0]?.value ?? ''
+					const ts = dayIso(`${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`)
+					if (ts) {
+						rows.push({ timestamp: ts, metrics: readRow(row) })
+					}
+				}
+				const totalsRow = response.totals?.[0]
+				const totals = totalsRow ? readRow(totalsRow) : {}
+				return { rows, totals, meta: { provider: 'ga4', fetchedAt } }
+			}
+
+			const [response] = await client.runReport({
+				...baseRequest,
+				...(providerDims.length ? { dimensions: providerDims.map((name) => ({ name })) } : {}),
+				...(q.limit ? { limit: q.limit } : {}),
+			})
 
 			if (!dims.length) {
 				const row = response.rows?.[0]

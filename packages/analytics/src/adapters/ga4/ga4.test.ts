@@ -138,4 +138,31 @@ describe('ga4 adapter', () => {
 		expect(sentRequest().dimensions).toEqual([{ name: 'countryId' }])
 		expect(result.rows).toEqual([{ dimensions: { country: 'DE' }, metrics: { pageviews: 12 } }])
 	})
+
+	it('returns a per-day series with range totals when granularity is day', async () => {
+		runReport.mockResolvedValue([
+			{
+				dimensionHeaders: [{ name: 'date' }],
+				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
+				rows: [
+					{ dimensionValues: [{ value: '20260101' }], metricValues: [{ value: '10' }] },
+					{ dimensionValues: [{ value: '20260102' }], metricValues: [{ value: '25' }] },
+				],
+				totals: [
+					{ dimensionValues: [{ value: 'RESERVED_TOTAL' }], metricValues: [{ value: '35' }] },
+				],
+				rowCount: 2,
+			},
+		])
+		const result = await ga4(config).query(q({ metrics: ['pageviews'], granularity: 'day' }), {})
+		const req = sentRequest()
+		expect(req.dimensions).toEqual([{ name: 'date' }])
+		expect(req.metricAggregations).toEqual(['TOTAL'])
+		expect(result.rows).toEqual([
+			{ timestamp: '2026-01-01T00:00:00.000Z', metrics: { pageviews: 10 } },
+			{ timestamp: '2026-01-02T00:00:00.000Z', metrics: { pageviews: 25 } },
+		])
+		expect(result.totals).toEqual({ pageviews: 35 })
+		expect(runReport).toHaveBeenCalledTimes(1)
+	})
 })
