@@ -27,7 +27,9 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		for (const adapter of resolved.adapters) {
 			adapter.register?.(config)
 		}
-		if (resolved.adapters.some((a) => a.capabilities.realtime)) {
+		if (
+			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function')
+		) {
 			config.endpoints = [
 				...(config.endpoints ?? []),
 				{ method: 'get', path: REALTIME_PATH, handler: makeRealtimeHandler() },

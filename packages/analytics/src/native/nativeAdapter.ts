@@ -219,10 +219,13 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 						less_than_equal: q.dateRange.end.toISOString(),
 					},
 				} as never,
+				// Newest-first under a hard cap: if a very busy site has more events than the
+				// cap in the window, keep the most recent activity rather than the oldest.
+				// Unbounded accuracy via DB-side aggregation is deferred to the hardening spec.
 				limit: REALTIME_EVENT_LIMIT,
 				pagination: false,
 				depth: 0,
-				sort: 'timestamp',
+				sort: '-timestamp',
 			})
 			const events = docs as unknown as RealtimeEvent[]
 			const { rows, totals } = buildRealtime(events, q.dateRange, q.metrics)

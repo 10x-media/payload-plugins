@@ -10,8 +10,9 @@ export const REALTIME_PATH = '/analytics/realtime'
 
 /**
  * Authenticated GET handler for the realtime widget poller. Reads + clamps the query
- * params, then delegates to readForWidgetRealtime. Returns 401 when there is no
- * `req.user` (realtime analytics must not be public).
+ * params, then delegates to readForWidgetRealtime. Returns 401 for an anonymous request.
+ * The gate is any authenticated user (not admin-panel access specifically); the response
+ * is integer counts only. Tightening to admin-only is a post-v1 option.
  */
 export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
