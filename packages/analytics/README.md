@@ -221,6 +221,59 @@ export default buildConfig({
 
 > The Modular Dashboard is an experimental Payload feature (PR #15700). After installing, run `payload generate:importmap` so the widget's server component resolves in the admin.
 
+### Custom widgets
+
+An app can register its own widgets alongside the built-in ones. Each entry is capability-gated by `requires` and slug-validated; the `analytics-` prefix is reserved for built-ins.
+
+```ts
+analytics({
+  adapters: [native()],
+  widgets: {
+    register: [
+      {
+        slug: 'myapp-top-sources',
+        component: '/components/TopSourcesWidget#default',
+        label: 'Top sources',
+        requires: { dimensions: ['source'] },
+      },
+    ],
+  },
+})
+```
+
+Build the widget as a server component. Import reads from `@10x-media/analytics/rsc` and chart primitives from `@10x-media/analytics/client`:
+
+```tsx
+import { BarList } from '@10x-media/analytics/client'
+import { formatMetricValue, readForWidgetBreakdown } from '@10x-media/analytics/rsc'
+import type { WidgetServerProps } from 'payload'
+
+export default async function TopSourcesWidget(props: WidgetServerProps) {
+  const locale = props.req.i18n.language ?? 'en-US'
+  const result = await readForWidgetBreakdown({
+    req: props.req,
+    metric: 'pageviews',
+    dimension: 'source',
+    timeframe: 'last30days',
+    limit: 5,
+    now: new Date(),
+  })
+  if (result.status !== 'ok') return <span>No data</span>
+  return (
+    <BarList
+      data={result.rows.map((r) => ({
+        label: r.label,
+        value: r.value,
+        display: formatMetricValue('pageviews', r.value, locale),
+      }))}
+      emptyLabel="No data"
+    />
+  )
+}
+```
+
+After registering, run `payload generate:importmap` so the admin can resolve the component. The widget only appears when a configured adapter satisfies its `requires` gate.
+
 ## Provider adapters
 
 Third-party providers implement the same `AnalyticsAdapter` contract and ship as code-split subpaths, so a site installs only what it uses.

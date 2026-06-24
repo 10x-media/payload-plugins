@@ -57,6 +57,16 @@ export default buildConfig({
 		analytics({
 			adapters: [native()],
 			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
+			widgets: {
+				register: [
+					{
+						slug: 'dev-custom-sources',
+						component: '/components/DevCustomWidget#default',
+						label: 'Custom: Top sources',
+						requires: { dimensions: ['source'] },
+					},
+				],
+			},
 		}),
 	],
 	telemetry: false,
@@ -123,6 +133,7 @@ export default buildConfig({
 					width: 'medium',
 					data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
 				},
+				{ widgetSlug: 'dev-custom-sources', width: 'medium', data: {} },
 			],
 		},
 	},
