@@ -1,7 +1,7 @@
 import type { PayloadHandler } from 'payload'
 import type { SipgateCredentials } from '../types'
 import { createActiveCallStore } from './activeCall'
-import { hangupCall, holdCall, muteCall, recordingsCall } from './sipgate.rest'
+import { hangupCall, holdCall, muteCall, recordingsCall, transferCall } from './sipgate.rest'
 
 export const sipgateRtcmHandler =
 	(_credentials: SipgateCredentials): PayloadHandler =>
@@ -21,6 +21,18 @@ export const sipgateRtcmHandler =
 
 		switch (action) {
 			case 'answer':
+				try {
+					if (!_credentials.callerId) {
+						return Response.json({ error: 'callerId is required' }, { status: 500 })
+					}
+					await transferCall(callId, {
+						attended: true,
+						callerId: _credentials.callerId,
+						phoneNumber: callId,
+					})
+				} catch {
+					return Response.json({ error: 'Failed to answer call' }, { status: 500 })
+				}
 				break
 			case 'hold': {
 				const current = await req.payload.kv.get<{ held: boolean }>(
