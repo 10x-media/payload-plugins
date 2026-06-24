@@ -3,6 +3,9 @@ import type { CustomWidgetDef } from '../widgets/customWidget'
 import type { AnalyticsAdapter } from './contract'
 
 const DEFAULT_WARM_CRON = '*/30 * * * *'
+const DEFAULT_SYNC_CRON = '0 */6 * * *'
+const DEFAULT_SYNC_COLLECTION = 'analytics-daily'
+const DEFAULT_SYNC_LOOKBACK = 3
 
 export type AnalyticsPluginOptions = {
 	disabled?: boolean
@@ -11,6 +14,9 @@ export type AnalyticsPluginOptions = {
 	collections?: Record<string, AnalyticsBinding>
 	cache?: { ttl?: { aggregate?: number; realtime?: number }; warm?: boolean | { cron?: string } }
 	widgets?: boolean | { disabled?: string[]; register?: CustomWidgetDef[] }
+	sync?:
+		| boolean
+		| { collectionSlug?: string; cron?: string; lookbackDays?: number; adapters?: string[] }
 }
 
 export interface ResolvedOptions {
@@ -19,6 +25,13 @@ export interface ResolvedOptions {
 	bindings: Record<string, ResolvedBinding>
 	cache: { ttl: { aggregate: number; realtime: number }; warm: { enabled: boolean; cron: string } }
 	widgets: { enabled: boolean; disabled: string[]; register: CustomWidgetDef[] }
+	sync: {
+		enabled: boolean
+		collectionSlug: string
+		cron: string
+		lookbackDays: number
+		adapters?: string[]
+	}
 }
 
 const resolveBindings = (
@@ -55,6 +68,29 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 			: warmOpt && typeof warmOpt === 'object'
 				? { enabled: true, cron: warmOpt.cron ?? DEFAULT_WARM_CRON }
 				: { enabled: false, cron: DEFAULT_WARM_CRON }
+	const syncOpt = options.sync
+	const sync =
+		syncOpt === true
+			? {
+					enabled: true,
+					collectionSlug: DEFAULT_SYNC_COLLECTION,
+					cron: DEFAULT_SYNC_CRON,
+					lookbackDays: DEFAULT_SYNC_LOOKBACK,
+				}
+			: syncOpt && typeof syncOpt === 'object'
+				? {
+						enabled: true,
+						collectionSlug: syncOpt.collectionSlug ?? DEFAULT_SYNC_COLLECTION,
+						cron: syncOpt.cron ?? DEFAULT_SYNC_CRON,
+						lookbackDays: syncOpt.lookbackDays ?? DEFAULT_SYNC_LOOKBACK,
+						adapters: syncOpt.adapters,
+					}
+				: {
+						enabled: false,
+						collectionSlug: DEFAULT_SYNC_COLLECTION,
+						cron: DEFAULT_SYNC_CRON,
+						lookbackDays: DEFAULT_SYNC_LOOKBACK,
+					}
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
@@ -67,5 +103,6 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 			warm,
 		},
 		widgets,
+		sync,
 	}
 }

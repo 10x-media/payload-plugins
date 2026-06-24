@@ -58,6 +58,48 @@ describe('resolveOptions cache.warm', () => {
 	})
 })
 
+describe('resolveOptions sync', () => {
+	const adapters = [memoryAdapter()]
+	it('defaults sync to disabled with default slug/cron/lookback when unset', () => {
+		expect(resolveOptions({ adapters }).sync).toEqual({
+			enabled: false,
+			collectionSlug: 'analytics-daily',
+			cron: '0 */6 * * *',
+			lookbackDays: 3,
+		})
+	})
+	it('enables sync with defaults when sync is true', () => {
+		expect(resolveOptions({ adapters, sync: true }).sync).toEqual({
+			enabled: true,
+			collectionSlug: 'analytics-daily',
+			cron: '0 */6 * * *',
+			lookbackDays: 3,
+		})
+	})
+	it('keeps sync disabled when sync is false', () => {
+		expect(resolveOptions({ adapters, sync: false }).sync.enabled).toBe(false)
+	})
+	it('fills per-field defaults and carries adapters from an object option', () => {
+		expect(
+			resolveOptions({ adapters, sync: { cron: '0 0 * * *', adapters: ['plausible'] } }).sync
+		).toEqual({
+			enabled: true,
+			collectionSlug: 'analytics-daily',
+			cron: '0 0 * * *',
+			lookbackDays: 3,
+			adapters: ['plausible'],
+		})
+	})
+	it('overrides slug and lookbackDays from an object option', () => {
+		const sync = resolveOptions({
+			adapters,
+			sync: { collectionSlug: 'metrics', lookbackDays: 7 },
+		}).sync
+		expect(sync.collectionSlug).toBe('metrics')
+		expect(sync.lookbackDays).toBe(7)
+	})
+})
+
 describe('resolveOptions bindings', () => {
 	const adapter = memoryAdapter()
 
