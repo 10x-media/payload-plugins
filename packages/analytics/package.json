@@ -1,0 +1,219 @@
+{
+	"name": "@10x-media/analytics",
+	"version": "0.0.0",
+	"description": "Adapter-based analytics for Payload: providers, a native engine, dashboard widgets, and portable fields.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/10x-media/payload-plugins.git",
+		"directory": "packages/analytics"
+	},
+	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/analytics",
+	"bugs": "https://github.com/10x-media/payload-plugins/issues",
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin"
+	],
+	"author": "10x-media",
+	"engines": {
+		"node": ">=22.18.0"
+	},
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./types": {
+			"development": "./src/exports/types.ts",
+			"types": "./src/exports/types.ts",
+			"default": "./dist/exports/types.js"
+		},
+		"./client": {
+			"development": "./src/exports/client.ts",
+			"types": "./src/exports/client.ts",
+			"default": "./dist/exports/client.js"
+		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
+		},
+		"./i18n": {
+			"development": "./src/exports/i18n.ts",
+			"types": "./src/exports/i18n.ts",
+			"default": "./dist/exports/i18n.js"
+		},
+		"./geo": {
+			"development": "./src/exports/geo.ts",
+			"types": "./src/exports/geo.ts",
+			"default": "./dist/exports/geo.js"
+		},
+		"./testing": {
+			"development": "./src/testing/memoryAdapter.ts",
+			"types": "./src/testing/memoryAdapter.ts",
+			"default": "./dist/testing/memoryAdapter.js"
+		},
+		"./adapters/native": {
+			"development": "./src/exports/adapters/native.ts",
+			"types": "./src/exports/adapters/native.ts",
+			"default": "./dist/exports/adapters/native.js"
+		},
+		"./adapters/plausible": {
+			"development": "./src/exports/adapters/plausible.ts",
+			"types": "./src/exports/adapters/plausible.ts",
+			"default": "./dist/exports/adapters/plausible.js"
+		},
+		"./adapters/umami": {
+			"development": "./src/exports/adapters/umami.ts",
+			"types": "./src/exports/adapters/umami.ts",
+			"default": "./dist/exports/adapters/umami.js"
+		},
+		"./adapters/ga4": {
+			"development": "./src/exports/adapters/ga4.ts",
+			"types": "./src/exports/adapters/ga4.ts",
+			"default": "./dist/exports/adapters/ga4.js"
+		},
+		"./adapters/posthog": {
+			"development": "./src/exports/adapters/posthog.ts",
+			"types": "./src/exports/adapters/posthog.ts",
+			"default": "./dist/exports/adapters/posthog.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"lint": "biome check src tests dev",
+		"lint:fix": "biome check --write src tests dev",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run",
+		"test:unit": "vitest run src",
+		"test:int": "vitest run tests/int",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:e2e": "bash scripts/e2e.sh",
+		"dev": "pnpm --filter @10x-media/analytics-dev dev",
+		"start": "pnpm --filter @10x-media/analytics-dev start",
+		"generate": "pnpm --filter @10x-media/analytics-dev generate",
+		"generate:types": "pnpm --filter @10x-media/analytics-dev generate:types",
+		"generate:importmap": "pnpm --filter @10x-media/analytics-dev generate:importmap",
+		"migrate": "pnpm --filter @10x-media/analytics-dev migrate",
+		"migrate:create": "pnpm --filter @10x-media/analytics-dev migrate:create",
+		"migrate:down": "pnpm --filter @10x-media/analytics-dev migrate:down",
+		"migrate:refresh": "pnpm --filter @10x-media/analytics-dev migrate:refresh",
+		"migrate:reset": "pnpm --filter @10x-media/analytics-dev migrate:reset",
+		"migrate:status": "pnpm --filter @10x-media/analytics-dev migrate:status",
+		"migrate:fresh": "pnpm --filter @10x-media/analytics-dev migrate:fresh",
+		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
+	},
+	"peerDependencies": {
+		"@google-analytics/data": "^6.0.0",
+		"@payloadcms/ui": "^3.82.0",
+		"payload": "^3.82.0",
+		"react": "^19.0.0",
+		"react-datepicker": "^7.6.0",
+		"react-dom": "^19.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@google-analytics/data": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@10x-media/payload-test-harness": "workspace:*",
+		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/vitest-config": "workspace:*",
+		"@google-analytics/data": "^6.1.0",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"@playwright/test": "catalog:",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"maxmind": "^4.3.24",
+		"msw": "^2.14.6",
+		"payload": "catalog:",
+		"playwright": "catalog:",
+		"react": "catalog:",
+		"react-datepicker": "^7.6.0",
+		"react-dom": "catalog:",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true,
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js",
+				"default": "./dist/index.js"
+			},
+			"./types": {
+				"types": "./dist/exports/types.d.ts",
+				"import": "./dist/exports/types.js",
+				"default": "./dist/exports/types.js"
+			},
+			"./client": {
+				"types": "./dist/exports/client.d.ts",
+				"import": "./dist/exports/client.js",
+				"default": "./dist/exports/client.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
+			},
+			"./i18n": {
+				"types": "./dist/exports/i18n.d.ts",
+				"import": "./dist/exports/i18n.js",
+				"default": "./dist/exports/i18n.js"
+			},
+			"./geo": {
+				"types": "./dist/exports/geo.d.ts",
+				"import": "./dist/exports/geo.js",
+				"default": "./dist/exports/geo.js"
+			},
+			"./testing": {
+				"types": "./dist/testing/memoryAdapter.d.ts",
+				"import": "./dist/testing/memoryAdapter.js",
+				"default": "./dist/testing/memoryAdapter.js"
+			},
+			"./adapters/native": {
+				"types": "./dist/exports/adapters/native.d.ts",
+				"import": "./dist/exports/adapters/native.js",
+				"default": "./dist/exports/adapters/native.js"
+			},
+			"./adapters/plausible": {
+				"types": "./dist/exports/adapters/plausible.d.ts",
+				"import": "./dist/exports/adapters/plausible.js",
+				"default": "./dist/exports/adapters/plausible.js"
+			},
+			"./adapters/umami": {
+				"types": "./dist/exports/adapters/umami.d.ts",
+				"import": "./dist/exports/adapters/umami.js",
+				"default": "./dist/exports/adapters/umami.js"
+			},
+			"./adapters/ga4": {
+				"types": "./dist/exports/adapters/ga4.d.ts",
+				"import": "./dist/exports/adapters/ga4.js",
+				"default": "./dist/exports/adapters/ga4.js"
+			},
+			"./adapters/posthog": {
+				"types": "./dist/exports/adapters/posthog.d.ts",
+				"import": "./dist/exports/adapters/posthog.js",
+				"default": "./dist/exports/adapters/posthog.js"
+			}
+		}
+	}
+}
