@@ -274,6 +274,30 @@ export default async function TopSourcesWidget(props: WidgetServerProps) {
 
 After registering, run `payload generate:importmap` so the admin can resolve the component. The widget only appears when a configured adapter satisfies its `requires` gate.
 
+## Sync tier
+
+The cache and warm tiers keep `payload.kv` hot, but that store is ephemeral. The **sync tier** persists each configured **provider** adapter's daily metrics into a durable, queryable Payload collection, so you can query your third-party analytics with Payload's own APIs (`find`/`where`/REST/GraphQL, relationships, custom reports) without calling the provider live:
+
+```ts
+analytics({
+  adapters: [plausible({ /* ... */ })],
+  sync: true, // default: every 6h, last 3 days, into the `analytics-daily` collection
+})
+```
+
+Customize the schedule, window, collection, or which providers sync:
+
+```ts
+analytics({
+  adapters: [/* ... */],
+  sync: { cron: '0 4 * * *', lookbackDays: 7, collectionSlug: 'site-metrics', adapters: ['plausible'] },
+})
+```
+
+When enabled, the plugin registers a queryable collection (default `analytics-daily`) and a Payload task (`analytics-sync`). On its cron the task reads each provider's last `lookbackDays` of **daily** metrics through the surfacing engine and upserts one row per `(source, date)` (idempotent via a unique `source + date` index; re-running refreshes recent days as provider data finalizes). Rows are read-only in the admin (the job writes them); metrics a provider does not report are left null. The native engine is excluded, since its data already lives in `analytics-rollups`. One provider failure is logged and does not abort the rest. Run it on demand with `payload.jobs.queue({ task: 'analytics-sync' })`.
+
+Sync is **off by default** and, like warming, needs Payload's jobs runner enabled (cron `autoRun` or an external scheduler) for the schedule to fire. Daily breakdowns and serving widgets from the synced collection are planned follow-ups.
+
 ## Scheduled cache warming
 
 Surfacing reads are cached in `payload.kv`, keyed per adapter + query and snapped to the UTC day. For a provider-backed dashboard (GA4, Plausible, Umami, PostHog), the first load after a cache entry expires pays a cold provider round-trip. Opt into a background job that pre-runs the dashboard's reads on a cron so that first load is a warm cache hit:

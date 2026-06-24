@@ -57,6 +57,7 @@ export default buildConfig({
 		analytics({
 			adapters: [native()],
 			cache: { warm: true },
+			sync: true,
 			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
 			widgets: {
 				register: [
