@@ -77,3 +77,49 @@ export const Dial = async (props: SipgateDialProps) => {
 	}
 	return await ClassicDial(props)
 }
+
+type SipgateTransferCallProps = {
+	attended: boolean
+	callerId: string
+	phoneNumber: string
+}
+
+export const transferCall = async (callId: string, props: SipgateTransferCallProps) => {
+	return await sipgateRest(`/calls/${callId}/transfer`, {
+		method: 'POST',
+		body: JSON.stringify(props),
+	})
+}
+
+export const hangupCall = async (callId: string) => {
+	return await sipgateRest(`/calls/${callId}`, { method: 'DELETE' })
+}
+
+// endpoints for rtcm
+type SipgateHoldCallProps = {
+	value: boolean
+}
+
+export const holdCall = async (callId: string, props: SipgateHoldCallProps) => {
+	return await sipgateRest(`/calls/${callId}/hold`, { method: 'PUT', body: JSON.stringify(props) })
+}
+
+type SipgateMuteCallProps = {
+	value: boolean
+}
+
+export const muteCall = async (callId: string, props: SipgateMuteCallProps) => {
+	return await sipgateRest(`/calls/${callId}/muted`, { method: 'PUT', body: JSON.stringify(props) })
+}
+
+type SipgateRecordingsCallProps = {
+	announcement: boolean
+	value: boolean
+}
+
+export const recordingsCall = async (callId: string, props: SipgateRecordingsCallProps) => {
+	return await sipgateRest(`/calls/${callId}/recording`, {
+		method: 'PUT',
+		body: JSON.stringify(props),
+	})
+}

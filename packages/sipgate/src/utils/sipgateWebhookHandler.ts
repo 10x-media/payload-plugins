@@ -53,50 +53,15 @@ export const sipgateWebhookHandler =
 			| SipgateNewCallWebhookData
 			| SipgateAnswerWebhookData
 			| SipgateHangupWebhookData
-		console.log('Event:', data.event, 'From:', data.from, 'To:', data.to)
 
 		switch (data.event) {
 			case 'newcall':
-				console.log(
-					'New call:',
-					data.from,
-					'To:',
-					data.to,
-					'Direction:',
-					data.direction,
-					'CallId:',
-					data.callId,
-					'OrigCallId:',
-					data.origCallId,
-					'User:',
-					data['user[]'],
-					'UserId:',
-					data['userId[]'],
-					'FullUserId:',
-					data['fullUserId[]'],
-					'Xcid:',
-					data.xcid
-				)
-				await createActiveCallStore(req.payload, data.callId).set(data)
+				await createActiveCallStore(req.payload, data.callId).set({ ...data, status: 'ringing' })
 				break
 			case 'answer':
-				console.log(
-					'Answer:',
-					data.from,
-					'To:',
-					data.to,
-					'User:',
-					data.user,
-					'UserId:',
-					data.userId,
-					'FullUserId:',
-					data.fullUserId,
-					'AnsweringNumber:',
-					data.answeringNumber
-				)
+				await createActiveCallStore(req.payload, data.callId).update({ status: 'active' })
 				break
 			case 'hangup':
-				console.log('Hangup:', data.from, 'To:', data.to, 'Cause:', data.cause)
 				await createActiveCallStore(req.payload, data.callId).clear()
 				break
 			default:

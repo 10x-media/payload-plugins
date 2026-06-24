@@ -8,6 +8,7 @@ type ActiveCall = {
 	from: string
 	to: string
 	direction: 'in' | 'out'
+	status: 'ringing' | 'active'
 }
 
 export const LiveCallFloatingWindowClient = () => {
@@ -25,9 +26,6 @@ export const LiveCallFloatingWindowClient = () => {
 		const id = setInterval(fetch_, 3000)
 		return () => clearInterval(id)
 	}, [])
-
-	const handleAccept = (_call: ActiveCall) => {}
-	const handleDecline = (_call: ActiveCall) => {}
 
 	if (typeof document === 'undefined') return null
 	return createPortal(
@@ -53,14 +51,24 @@ export const LiveCallFloatingWindowClient = () => {
 						calls.map((call) => (
 							<div key={call.callId} style={{ marginBottom: 8 }}>
 								<div>
-									{call.from} → {call.to} ({call.direction})
+									{call.direction === 'in' ? `${call.from} → you` : `you → ${call.to}`}
+									{' · '}
+									{call.status === 'ringing'
+										? call.direction === 'in'
+											? 'Incoming'
+											: 'Ringing...'
+										: 'Active'}
 								</div>
-								<button type="button" onClick={() => handleAccept(call)}>
-									Accept
-								</button>
-								<button type="button" onClick={() => handleDecline(call)}>
-									Decline
-								</button>
+								{call.status === 'ringing' && call.direction === 'in' && (
+									<>
+										<button type="button">Accept</button>
+										<button type="button">Decline</button>
+									</>
+								)}
+								{call.status === 'ringing' && call.direction === 'out' && (
+									<button type="button">Cancel</button>
+								)}
+								{call.status === 'active' && <button type="button">Hang up</button>}
 							</div>
 						))
 					)}
