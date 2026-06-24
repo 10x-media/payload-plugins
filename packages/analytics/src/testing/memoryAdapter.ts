@@ -64,9 +64,36 @@ export function memoryAdapter(): MemoryAnalyticsAdapter {
 		},
 		async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
 			const matched = events.filter((e) => inRange(e, q))
+			const countVisitors = (list: MemoryEvent[]): number =>
+				new Set(list.map((e) => e.visitor ?? e.path + e.timestamp.toDateString())).size
+			if (q.granularity === 'day') {
+				const byDay = new Map<string, MemoryEvent[]>()
+				for (const e of matched) {
+					const day = new Date(
+						Date.UTC(
+							e.timestamp.getUTCFullYear(),
+							e.timestamp.getUTCMonth(),
+							e.timestamp.getUTCDate()
+						)
+					).toISOString()
+					const list = byDay.get(day) ?? []
+					list.push(e)
+					byDay.set(day, list)
+				}
+				const rows = [...byDay.entries()]
+					.sort(([a], [b]) => a.localeCompare(b))
+					.map(([day, list]) => ({
+						timestamp: day,
+						metrics: { pageviews: list.length, visitors: countVisitors(list) },
+					}))
+				return {
+					rows,
+					totals: { pageviews: matched.length, visitors: countVisitors(matched) },
+					meta: { provider: 'memory', fetchedAt: q.dateRange.end.toISOString() },
+				}
+			}
 			const pageviews = matched.length
-			const visitors = new Set(matched.map((e) => e.visitor ?? e.path + e.timestamp.toDateString()))
-				.size
+			const visitors = countVisitors(matched)
 			return {
 				rows: [{ metrics: { pageviews, visitors } }],
 				totals: { pageviews, visitors },

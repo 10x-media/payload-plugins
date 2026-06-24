@@ -15,6 +15,7 @@ import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
 import { bumpRollup } from '../../src/native/rollups/bumpRollup'
 import { computeRollupDeltas } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
+import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
 describeForDb('analytics cross-db', {}, (db) => {
@@ -296,5 +297,90 @@ describeForDb('analytics per-document read', {}, (db) => {
 		expect(result.status).toBe('ok')
 		expect(result.metrics.pageviews).toBe(2)
 		expect(result.metrics.visitors).toBe(1)
+	})
+})
+
+describeForDb('analytics sync tier', {}, (db) => {
+	const DAY = 86_400_000
+	const mem = memoryAdapter()
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [native(), mem], sync: true }), db })
+		for (let offset = 0; offset < 3; offset++) {
+			const t = new Date(Date.now() - offset * DAY)
+			mem.record({ path: '/p', timestamp: t, visitor: 'a' })
+			mem.record({ path: '/p', timestamp: t, visitor: 'b' })
+		}
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
+
+	const runSync = async (): Promise<{ synced: number; failed: number }> => {
+		const task = syncTask({
+			cron: '0 */6 * * *',
+			lookbackDays: 3,
+			collectionSlug: 'analytics-daily',
+		})
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('sync handler must be a function')
+		}
+		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
+		return (result as { output: { synced: number; failed: number } }).output
+	}
+
+	it('registers the analytics-daily collection and the sync task with its cron', () => {
+		const config = booted.payload.config as unknown as {
+			collections?: Array<{ slug?: string }>
+			jobs?: { tasks?: Array<{ slug?: string; schedule?: Array<{ cron?: string }> }> }
+		}
+		expect((config.collections ?? []).some((c) => c.slug === 'analytics-daily')).toBe(true)
+		const task = (config.jobs?.tasks ?? []).find((t) => t.slug === SYNC_TASK_SLUG)
+		expect(task?.schedule?.[0]?.cron).toBe('0 */6 * * *')
+	})
+
+	it('upserts one row per (provider source, day) and excludes native', async () => {
+		const out = await runSync()
+		expect(out.failed).toBe(0)
+		expect(out.synced).toBe(3)
+		const docs = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			limit: 100,
+			sort: 'date',
+			overrideAccess: true,
+		})
+		expect(docs.docs.length).toBe(3)
+		for (const doc of docs.docs as unknown as Array<{
+			source: string
+			pageviews: number
+			visitors: number
+			date: string
+		}>) {
+			expect(doc.source).toBe('memory')
+			expect(doc.pageviews).toBe(2)
+			expect(doc.visitors).toBe(2)
+			expect(doc.date).toBeTruthy()
+		}
+	})
+
+	it('is idempotent: a second run updates in place with no duplicates', async () => {
+		const before = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			limit: 0,
+			overrideAccess: true,
+		})
+		await runSync()
+		const after = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			limit: 0,
+			overrideAccess: true,
+		})
+		expect(after.totalDocs).toBe(before.totalDocs)
+		expect(after.totalDocs).toBe(3)
 	})
 })

@@ -8,6 +8,8 @@ import { setRuntime } from './plugin/runtime'
 import { warmTask } from './plugin/warmTask'
 import { kvCacheStore } from './surfacing/cacheStore'
 import { createEngine } from './surfacing/engine'
+import { syncCollection } from './sync/collection'
+import { syncTask } from './sync/syncTask'
 import { registerWidgets } from './widgets/registerWidgets'
 
 declare module 'payload' {
@@ -49,6 +51,24 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			config.jobs = {
 				...config.jobs,
 				tasks: [...(config.jobs?.tasks ?? []), warmTask(resolved.cache.warm.cron, defaultLayout)],
+			}
+		}
+		if (resolved.sync.enabled) {
+			config.collections = [
+				...(config.collections ?? []),
+				syncCollection(resolved.sync.collectionSlug),
+			]
+			config.jobs = {
+				...config.jobs,
+				tasks: [
+					...(config.jobs?.tasks ?? []),
+					syncTask({
+						cron: resolved.sync.cron,
+						lookbackDays: resolved.sync.lookbackDays,
+						collectionSlug: resolved.sync.collectionSlug,
+						adapterIds: resolved.sync.adapters,
+					}),
+				],
 			}
 		}
 		const prevOnInit = config.onInit
