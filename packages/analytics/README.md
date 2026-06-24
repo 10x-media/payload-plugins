@@ -201,6 +201,8 @@ The Timeframe selector also includes a **Custom range** option that reveals a na
 
 The charts are dependency-free SVG and CSS themed with Payload's design tokens. The series color comes from `--analytics-chart-1`, which a consuming app can override in its admin stylesheet.
 
+Trend widgets render a real daily series for every provider. GA4, Plausible, and PostHog cover all of their supported metrics; Umami's series covers pageviews and sessions (its API has no per-day source for visitors, bounce rate, or average duration, so a trend on those metrics shows a correct headline with an empty series). The headline total is always range-correct: distinct metrics like visitors are never summed across days.
+
 A plugin must never set `admin.dashboard.defaultLayout` (Payload applies it with `??=`; a setter would clobber the app's own layout). Instead, the app places widgets by spreading the exported helper into its own config:
 
 ```ts
