@@ -1,8 +1,8 @@
 import type { Payload } from 'payload'
-import type { SipgateNewCallWebhookData } from '../types'
+import type { SipgateNewCallWebhookData } from './sipgateWebhookHandler'
 
 const KEY = '@10x-media/sipgate:active-call'
-export const createActiveCallStore = (payload: Payload, callId: string) => ({
+export const createActiveCallStore = (payload: Payload, callId?: string) => ({
 	get: async (): Promise<SipgateNewCallWebhookData[]> => {
 		const allKeys = await payload.kv.keys()
 		const callKeys = allKeys.filter((k) => k.startsWith(KEY))

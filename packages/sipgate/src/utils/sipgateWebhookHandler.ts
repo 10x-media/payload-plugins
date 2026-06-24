@@ -2,7 +2,7 @@ import type { CollectionSlug, PayloadHandler } from 'payload'
 import queryString from 'query-string'
 import { createActiveCallStore } from './activeCall'
 
-type SipgateNewCallWebhookData = {
+export type SipgateNewCallWebhookData = {
 	event: 'newcall'
 	from: string
 	to: string
