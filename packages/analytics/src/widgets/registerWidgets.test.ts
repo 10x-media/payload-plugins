@@ -115,6 +115,29 @@ describe('registerWidgets', () => {
 		expect(slugs).not.toContain('analytics-breakdown-countries')
 	})
 
+	it('registers a custom widget even when every built-in is disabled', () => {
+		// All built-ins disabled leaves the built-in list empty; the custom widget must
+		// still register, which only holds if custom defs are pushed before the
+		// empty-list guard. Guards against a future reorder of those two steps.
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			disabled: [
+				'analytics-metric',
+				'analytics-trend',
+				'analytics-breakdown-pages',
+				'analytics-breakdown-sources',
+				'analytics-breakdown-devices',
+				'analytics-breakdown-countries',
+				'analytics-realtime',
+			],
+			register: [{ slug: 'myapp-only', component: 'x#y', label: 'Mine' }],
+		})
+		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugs).toEqual(['myapp-only'])
+	})
+
 	it('preserves any widgets the host config already declared', () => {
 		const config: Config = {
 			admin: { dashboard: { widgets: [{ slug: 'host-widget', Component: 'x#y' }] } },

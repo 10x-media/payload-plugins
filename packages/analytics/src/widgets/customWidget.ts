@@ -7,8 +7,8 @@ export interface CustomWidgetDef {
 	slug: string
 	/** The app's own RSC import path, e.g. `@/widgets/My#default`. */
 	component: string
-	/** A plain label or a locale->label map (Payload-native). */
-	label: string | Record<string, string>
+	/** A plain label, a locale->label map, or a Payload label function (`Widget['label']`). */
+	label: Exclude<Widget['label'], undefined>
 	fields?: Field[]
 	/** Capability gate; omit to always register. */
 	requires?: CapabilityRequirement
