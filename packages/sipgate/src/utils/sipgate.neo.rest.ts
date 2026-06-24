@@ -44,3 +44,22 @@ export const getChannelEvents = async (channelId: string, params?: SipgateChanne
 	}
 	return (await response.json()) as SipgateChannelEventsResponse
 }
+
+export type NeoDialProps = {
+	additionalDevices: Array<{
+		deviceId: string
+	}>
+	callerId: string
+	channelId: string
+	deviceId: string
+	targetNumber: string
+}
+
+export type SigpateNeoNewChannelResponse = {
+	callSid: string
+}
+
+export const NeoDial = async (props: NeoDialProps) => {
+	const response = await sipgateRest('/calls', { method: 'POST', body: JSON.stringify(props) })
+	return response
+}

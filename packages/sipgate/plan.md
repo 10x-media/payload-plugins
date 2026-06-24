@@ -18,3 +18,47 @@ For that we need:
 V2 Plugin: WebRTC live call in widget. 
 1. this is damn tricky. 
 2. WebRTC infrastructure. Probably Peer to Peer only option? As we would need a redistribution server to route it over custom infrastructure. 
+
+API Design:
+1. Dial: create a call. 
+CLASSIC: POST /sessions/calls
+{
+  "callee": "+4915799912345", The one who gets called
+  "caller": "e0", the one who calls (can be phone number or deviceId)
+  "callerId": "+4915799912345", to set a custom number that gets displayed to the callee
+  "deviceId": "e0" set if caller is phone number. 
+}
+
+NEO: POST /calls
+{
+  "additionalDevices": [ The devices to be connected to the call. 
+    {
+      "deviceId": "e1"
+    }
+  ],
+  "callerId": "4915790123456", to set a custom number that gets displayed to the callee
+  "channelId": "0982524d-1328-4830-89d8-a295f200e90e",
+  "deviceId": "e0",
+  "targetNumber": "4915790123456"
+}
+
+2. Hang Up Running Call:
+DELETE /calls/{callId}
+
+3. HOLD call:
+PUT /calls/{callId}/hold
+
+4. MUTE call:
+PUT /calls/{callId}/muted
+
+Flow for taking a call:
+1. webhooks fire and sets the call in kv index. 
+2. poll picks it up and displays it in the ui. 
+3. user accepts call. 
+4. gets the callId. 
+5. if classic: use /sessions/calls to create a new call and use callId as the caller
+If neo: use /calls and create a new call in the channel that gets called. 
+
+Flow for making a call:
+if classic: use /sessions/calls to create a new call. 
+If neo: use /calls and create a new call in the channel that gets called. 
