@@ -13,6 +13,7 @@ const ClickToDialField: TextFieldServerComponent = ({ field, path, readOnly }) =
 			placeholder={placeholder}
 			required={field.required}
 			readOnly={readOnly}
+			width={field.admin?.width}
 		/>
 	)
 }
