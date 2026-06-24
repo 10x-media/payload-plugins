@@ -30,6 +30,34 @@ describe('resolveOptions', () => {
 	})
 })
 
+describe('resolveOptions cache.warm', () => {
+	const adapters = [memoryAdapter()]
+	it('defaults warm to disabled with the default cron when cache.warm is unset', () => {
+		const warm = resolveOptions({ adapters }).cache.warm
+		expect(warm).toEqual({ enabled: false, cron: '*/30 * * * *' })
+	})
+	it('enables warm with the default cron when cache.warm is true', () => {
+		expect(resolveOptions({ adapters, cache: { warm: true } }).cache.warm).toEqual({
+			enabled: true,
+			cron: '*/30 * * * *',
+		})
+	})
+	it('keeps warm disabled when cache.warm is false', () => {
+		expect(resolveOptions({ adapters, cache: { warm: false } }).cache.warm.enabled).toBe(false)
+	})
+	it('enables warm with a custom cron from an object option', () => {
+		expect(resolveOptions({ adapters, cache: { warm: { cron: '0 * * * *' } } }).cache.warm).toEqual(
+			{
+				enabled: true,
+				cron: '0 * * * *',
+			}
+		)
+	})
+	it('enables warm with the default cron when the object omits cron', () => {
+		expect(resolveOptions({ adapters, cache: { warm: {} } }).cache.warm.cron).toBe('*/30 * * * *')
+	})
+})
+
 describe('resolveOptions bindings', () => {
 	const adapter = memoryAdapter()
 

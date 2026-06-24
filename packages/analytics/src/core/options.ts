@@ -2,12 +2,14 @@ import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import type { CustomWidgetDef } from '../widgets/customWidget'
 import type { AnalyticsAdapter } from './contract'
 
+const DEFAULT_WARM_CRON = '*/30 * * * *'
+
 export type AnalyticsPluginOptions = {
 	disabled?: boolean
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	collections?: Record<string, AnalyticsBinding>
-	cache?: { ttl?: { aggregate?: number; realtime?: number } }
+	cache?: { ttl?: { aggregate?: number; realtime?: number }; warm?: boolean | { cron?: string } }
 	widgets?: boolean | { disabled?: string[]; register?: CustomWidgetDef[] }
 }
 
@@ -15,7 +17,7 @@ export interface ResolvedOptions {
 	adapters: AnalyticsAdapter[]
 	defaultAdapter?: string
 	bindings: Record<string, ResolvedBinding>
-	cache: { ttl: { aggregate: number; realtime: number } }
+	cache: { ttl: { aggregate: number; realtime: number }; warm: { enabled: boolean; cron: string } }
 	widgets: { enabled: boolean; disabled: string[]; register: CustomWidgetDef[] }
 }
 
@@ -46,6 +48,13 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 						disabled: options.widgets.disabled ?? [],
 						register: options.widgets.register ?? [],
 					}
+	const warmOpt = options.cache?.warm
+	const warm =
+		warmOpt === true
+			? { enabled: true, cron: DEFAULT_WARM_CRON }
+			: warmOpt && typeof warmOpt === 'object'
+				? { enabled: true, cron: warmOpt.cron ?? DEFAULT_WARM_CRON }
+				: { enabled: false, cron: DEFAULT_WARM_CRON }
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
@@ -55,6 +64,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 				aggregate: options.cache?.ttl?.aggregate ?? 3600,
 				realtime: options.cache?.ttl?.realtime ?? 300,
 			},
+			warm,
 		},
 		widgets,
 	}
