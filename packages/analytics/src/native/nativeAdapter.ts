@@ -1,5 +1,6 @@
 import type { Config, Payload } from 'payload'
 import type {
+	AdapterContext,
 	AnalyticsAdapter,
 	AnalyticsCapabilities,
 	AnalyticsQuery,
@@ -8,7 +9,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../core/contract'
-import { eventsCollection } from './collections/events'
+import { EVENTS_SLUG, eventsCollection } from './collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from './collections/rollups'
 import { seenCollection } from './collections/seen'
 import { composeGeoResolvers } from './geo/composeGeoResolvers'
@@ -18,6 +19,7 @@ import { makeIngestHandler } from './ingest/endpoint'
 import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
 import { createWriteBuffer, type WriteBuffer } from './ingest/writeBuffer'
+import { buildRealtime, type RealtimeEvent } from './realtime/buildRealtime'
 import { pruneEventsTask } from './retention/pruneTask'
 import {
 	type Acc,
@@ -48,9 +50,12 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 ])
 const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'country', 'source', 'device'])
 
+const REALTIME_EVENT_LIMIT = 50_000
+
 const capabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
-	realtime: false,
+	realtime: true,
+	realtimeWindowMinutes: 60,
 	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
@@ -58,7 +63,7 @@ const capabilities: AnalyticsCapabilities = {
 	dimensions,
 	batchPageReport: true,
 	rateLimit: null,
-	recommendedTtl: { realtime: 60, aggregate: 300 },
+	recommendedTtl: { realtime: 10, aggregate: 300 },
 }
 
 export function native(options: NativeOptions = {}): NativeAdapter {
@@ -199,6 +204,28 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			if (q.limit) {
 				rows = rows.slice(0, q.limit)
 			}
+			return { rows, totals, meta: { provider: 'native', fetchedAt } }
+		},
+		async realtime(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+			if (!payloadRef) {
+				throw new Error('analytics: native adapter queried before init')
+			}
+			const fetchedAt = q.dateRange.end.toISOString()
+			const { docs } = await payloadRef.find({
+				collection: EVENTS_SLUG as never,
+				where: {
+					timestamp: {
+						greater_than_equal: q.dateRange.start.toISOString(),
+						less_than_equal: q.dateRange.end.toISOString(),
+					},
+				} as never,
+				limit: REALTIME_EVENT_LIMIT,
+				pagination: false,
+				depth: 0,
+				sort: 'timestamp',
+			})
+			const events = docs as unknown as RealtimeEvent[]
+			const { rows, totals } = buildRealtime(events, q.dateRange, q.metrics)
 			return { rows, totals, meta: { provider: 'native', fetchedAt } }
 		},
 	}
