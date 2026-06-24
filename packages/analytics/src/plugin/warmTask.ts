@@ -6,7 +6,7 @@ import { resolveCustomRange } from '../widgets/range'
 import { readForWidget } from '../widgets/readForWidget'
 import { readForWidgetBreakdown } from '../widgets/readForWidgetBreakdown'
 import { readForWidgetSeries } from '../widgets/readForWidgetSeries'
-import type { WidgetRange } from '../widgets/types'
+import { WIDGET_METRICS, type WidgetRange } from '../widgets/types'
 
 /** Minimal shape of a dashboard widget instance the warm job reads. */
 export interface WarmWidgetInstance {
@@ -41,7 +41,10 @@ export type WarmTarget =
 
 const asString = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
 
-const asMetric = (v: unknown): MetricKey => (typeof v === 'string' ? (v as MetricKey) : 'pageviews')
+const asMetric = (v: unknown): MetricKey =>
+	typeof v === 'string' && (WIDGET_METRICS as readonly string[]).includes(v)
+		? (v as MetricKey)
+		: 'pageviews'
 
 const asTimeframe = (v: unknown): TimeframePreset | 'custom' => {
 	if (v === 'custom') {
@@ -146,13 +149,21 @@ const resolveLayout = async (
 	layout: WarmLayout,
 	req: PayloadRequest
 ): Promise<WarmWidgetInstance[]> => {
-	const list = typeof layout === 'function' ? await layout({ req }) : (layout ?? [])
-	return list.map((w) => ({ widgetSlug: w.widgetSlug, data: w.data }))
+	try {
+		const list = typeof layout === 'function' ? await layout({ req }) : (layout ?? [])
+		return list.map((w) => ({ widgetSlug: w.widgetSlug, data: w.data }))
+	} catch (err) {
+		req.payload.logger.warn(
+			`analytics warm-cache: could not resolve the dashboard layout: ${String(err)}`
+		)
+		return []
+	}
 }
 
-const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Promise<void> => {
+/** Run one target's read; returns true when the read served data (status `ok`). */
+const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Promise<boolean> => {
 	if (target.kind === 'metric') {
-		await readForWidget({
+		const result = await readForWidget({
 			req,
 			metrics: [target.metric],
 			timeframe: target.timeframe,
@@ -160,10 +171,10 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 			now,
 			range: target.range,
 		})
-		return
+		return result.status === 'ok'
 	}
 	if (target.kind === 'series') {
-		await readForWidgetSeries({
+		const result = await readForWidgetSeries({
 			req,
 			metric: target.metric,
 			timeframe: target.timeframe,
@@ -171,9 +182,9 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 			now,
 			range: target.range,
 		})
-		return
+		return result.status === 'ok'
 	}
-	await readForWidgetBreakdown({
+	const result = await readForWidgetBreakdown({
 		req,
 		metric: target.metric,
 		dimension: target.dimension,
@@ -183,6 +194,7 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 		now,
 		range: target.range,
 	})
+	return result.status === 'ok'
 }
 
 /**
@@ -204,8 +216,9 @@ export const warmTask = (
 		let failed = 0
 		for (const target of targets) {
 			try {
-				await runTarget(target, req, now)
-				warmed++
+				if (await runTarget(target, req, now)) {
+					warmed++
+				}
 			} catch (err) {
 				failed++
 				req.payload.logger.warn(

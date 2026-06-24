@@ -135,4 +135,11 @@ describe('deriveWarmTargets', () => {
 		)
 		expect(targets).toEqual([])
 	})
+
+	it('defaults an unknown metric string to pageviews', () => {
+		const [target] = deriveWarmTargets(
+			layout([{ widgetSlug: 'analytics-metric', data: { metric: 'not-a-real-metric' } }])
+		)
+		expect(target?.metric).toBe('pageviews')
+	})
 })

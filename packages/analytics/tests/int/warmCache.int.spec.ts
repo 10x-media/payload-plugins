@@ -101,4 +101,19 @@ describeForDb('analytics scheduled warm-cache', { dbs: ['mongo'] }, (db) => {
 		expect(live.metrics.pageviews).toBe(1)
 		expect(spy).not.toHaveBeenCalled()
 	})
+
+	it('returns 0/0 without throwing when the layout function throws', async () => {
+		const task = warmTask('*/30 * * * *', () => {
+			throw new Error('boom')
+		})
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('warm task handler must be a function')
+		}
+		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
+		expect((result as { output: { warmed: number; failed: number } }).output).toEqual({
+			warmed: 0,
+			failed: 0,
+		})
+	})
 })
