@@ -69,6 +69,11 @@ export default buildConfig({
 		dashboard: {
 			defaultLayout: [
 				{
+					widgetSlug: 'analytics-realtime',
+					width: 'small',
+					data: { metric: 'visitors', windowMinutes: 30 },
+				},
+				{
 					widgetSlug: 'analytics-trend',
 					width: 'large',
 					data: { metric: 'pageviews', timeframe: 'last30days' },
