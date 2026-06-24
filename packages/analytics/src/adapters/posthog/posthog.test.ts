@@ -116,6 +116,45 @@ describe('posthog adapter', () => {
 		expect(body.query?.query).toContain("properties.$pathname = '/x\\'; DROP'")
 	})
 
+	it('returns a per-day series plus range totals when granularity is day', async () => {
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const body = (await request.json()) as { query?: { query?: string } }
+				const sql = body.query?.query ?? ''
+				if (sql.includes('GROUP BY day')) {
+					return HttpResponse.json({
+						columns: ['day', 'm0', 'm1', 'm2'],
+						types: [],
+						results: [
+							['2026-01-01 00:00:00', 10, 7, 5],
+							['2026-01-02 00:00:00', 25, 18, 12],
+						],
+					})
+				}
+				return HttpResponse.json({
+					columns: ['m0', 'm1', 'm2'],
+					types: [],
+					results: [[35, 20, 15]],
+				})
+			})
+		)
+		const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews', 'visitors', 'sessions'], granularity: 'day' }),
+			{}
+		)
+		expect(result.rows).toEqual([
+			{
+				timestamp: '2026-01-01T00:00:00.000Z',
+				metrics: { pageviews: 10, visitors: 7, sessions: 5 },
+			},
+			{
+				timestamp: '2026-01-02T00:00:00.000Z',
+				metrics: { pageviews: 25, visitors: 18, sessions: 12 },
+			},
+		])
+		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, sessions: 15 })
+	})
+
 	it('targets the configured host (EU / self-host)', async () => {
 		server.use(
 			http.post('https://eu.posthog.com/api/projects/9/query/', () =>

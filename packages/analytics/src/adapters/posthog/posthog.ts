@@ -9,6 +9,7 @@ import type {
 	MetricKey,
 } from '../../core/contract'
 import { fetchJson } from '../http/fetchJson'
+import { dayIso } from '../series'
 
 export interface PosthogConfig {
 	/** PostHog project id (numeric). */
@@ -85,22 +86,16 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			if (q.path) {
 				where.push(`properties.$pathname = ${sqlString(q.path)}`)
 			}
-
 			const selectMetrics = exprs.map((expr, i) => `${expr} AS m${i}`)
-			const sql = wantsPageBreakdown
-				? `SELECT properties.$pathname AS path, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY path ORDER BY m0 DESC LIMIT ${q.limit ?? 100}`
-				: `SELECT ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')}`
 
-			const data = await fetchJson<PosthogQueryResponse>(
-				`${host}/api/projects/${config.projectId}/query/`,
-				{
+			const runSql = (sql: string): Promise<PosthogQueryResponse> =>
+				fetchJson<PosthogQueryResponse>(`${host}/api/projects/${config.projectId}/query/`, {
 					method: 'POST',
 					headers: { authorization: `Bearer ${config.apiKey}` },
 					body: { query: { kind: 'HogQLQuery', query: sql } },
 					signal: ctx.signal,
 					provider: 'posthog',
-				}
-			)
+				})
 
 			const readRow = (row: unknown[], offset: number): Partial<Record<MetricKey, number>> => {
 				const out: Partial<Record<MetricKey, number>> = {}
@@ -111,17 +106,39 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				return out
 			}
 
-			if (!wantsPageBreakdown) {
+			const fetchTotals = async (): Promise<Partial<Record<MetricKey, number>>> => {
+				const data = await runSql(
+					`SELECT ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')}`
+				)
 				const row = data.results[0]
-				const totals = row ? readRow(row, 0) : {}
-				return { rows: [{ metrics: totals }], totals, meta: { provider: 'posthog', fetchedAt } }
+				return row ? readRow(row, 0) : {}
 			}
 
-			const rows: AnalyticsRow[] = data.results.map((row) => ({
-				dimensions: { page: String(row[0] ?? '') },
-				metrics: readRow(row, 1),
-			}))
-			return { rows, totals: undefined, meta: { provider: 'posthog', fetchedAt } }
+			if (q.granularity === 'day' && !wantsPageBreakdown) {
+				const seriesSql = `SELECT toStartOfDay(timestamp) AS day, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY day ORDER BY day`
+				const [seriesData, totals] = await Promise.all([runSql(seriesSql), fetchTotals()])
+				const rows: AnalyticsRow[] = []
+				for (const row of seriesData.results) {
+					const ts = dayIso(String(row[0] ?? ''))
+					if (ts) {
+						rows.push({ timestamp: ts, metrics: readRow(row, 1) })
+					}
+				}
+				return { rows, totals, meta: { provider: 'posthog', fetchedAt } }
+			}
+
+			if (wantsPageBreakdown) {
+				const sql = `SELECT properties.$pathname AS path, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY path ORDER BY m0 DESC LIMIT ${q.limit ?? 100}`
+				const data = await runSql(sql)
+				const rows: AnalyticsRow[] = data.results.map((row) => ({
+					dimensions: { page: String(row[0] ?? '') },
+					metrics: readRow(row, 1),
+				}))
+				return { rows, totals: undefined, meta: { provider: 'posthog', fetchedAt } }
+			}
+
+			const totals = await fetchTotals()
+			return { rows: [{ metrics: totals }], totals, meta: { provider: 'posthog', fetchedAt } }
 		},
 	}
 }
