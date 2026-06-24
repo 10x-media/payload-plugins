@@ -56,6 +56,10 @@ export const createCallLogsCollection = (
 				relationTo: contactCollections,
 				required: false,
 			},
+			{
+				name: 'startedAt',
+				type: 'date',
+			},
 		],
 	}
 
