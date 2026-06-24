@@ -19,7 +19,8 @@
 			"!.claude/skills/**/*.md",
 			"!.claude/settings.local.json",
 			"!.changeset/*.md",
-			"!packages/*/dev/app/(payload)/admin/importMap.js"
+			"!packages/*/dev/app/(payload)/admin/importMap.js",
+			"!packages/*/registry/r/**"
 		]
 	},
 	"formatter": {

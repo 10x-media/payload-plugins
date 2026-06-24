@@ -26,4 +26,18 @@ describe('pauseState', () => {
 		expect(isPaused({ global: false, queues: ['a'] }, 'a')).toBe(true)
 		expect(isPaused({ global: false, queues: ['a'] }, 'b')).toBe(false)
 	})
+
+	it('resume with all:true resets to empty state, clearing both global and per-queue pauses', () => {
+		const state = applyPause(applyPause(emptyPauseState(), undefined), 'emails')
+		// global=true, queues=['emails']
+		const reset = applyResume(state, undefined, true)
+		expect(reset).toEqual(emptyPauseState())
+	})
+
+	it('resume without all:true only clears global flag, leaving per-queue pauses intact', () => {
+		const state = applyPause(applyPause(emptyPauseState(), undefined), 'emails')
+		const partial = applyResume(state, undefined, false)
+		expect(partial.global).toBe(false)
+		expect(partial.queues).toContain('emails')
+	})
 })

@@ -121,7 +121,8 @@ export const createMongoJobLeaseStore = (payload: Payload): JobLeaseStore => {
 		// biome-ignore lint/complexity/useMaxParams: lease primitive signature (jobId, owner, ttlMs, now)
 		stampClaim: async (jobId, owner, ttlMs, now): Promise<StampResult> => {
 			const doc = await m.findOneAndUpdate(
-				{ _id: jobId, processing: true },
+				// Also guard on claimedBy to prevent two workers from both returning ok:true.
+				{ _id: jobId, processing: true, $or: [{ claimedBy: null }, { claimedBy: owner }] },
 				{
 					$inc: { fenceToken: 1 },
 					$set: { claimedBy: owner, leaseExpiresAt: leaseExpiry(now, ttlMs), startedAt: now },

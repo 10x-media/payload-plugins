@@ -165,6 +165,17 @@ describeForDb('lease store semantics', {}, (db) => {
 		expect(after?.owner).toBe('node-A')
 		expect(after?.leaseExpiresAt).not.toBeNull()
 	})
+
+	it('rejects an owner renewing its own expired lease (item 19)', async () => {
+		await reset(new Date('2026-02-01T06:00:00.000Z'))
+		const s = store()
+		await s.acquireOrSteal('scheduler', 'node-A', 30_000, clock.now())
+		const expiresAt = (await s.read('scheduler'))?.leaseExpiresAt?.toISOString()
+		clock.advance(30_001) // past expiry
+		const res = await s.renew('scheduler', 'node-A', 30_000, clock.now())
+		expect(res.ok).toBe(false)
+		expect((await s.read('scheduler'))?.leaseExpiresAt?.toISOString()).toBe(expiresAt)
+	})
 })
 
 describeForDb('lease store concurrency', {}, (db) => {

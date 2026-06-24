@@ -1,7 +1,6 @@
 import type { Payload } from 'payload'
 import { getCurrentDate } from 'payload'
-import { emptyPauseState } from '../queueControl/pauseState'
-import type { PauseStore } from '../queueControl/pauseStore'
+import { createPauseStore, type PauseStore } from '../queueControl/pauseStore'
 import { runTargetsForPause } from '../queueControl/runTargets'
 import { createJobLeaseStore } from '../reliability/jobLeaseStore'
 import { createLeaderController } from '../reliability/leaderController'
@@ -11,8 +10,8 @@ import { resolveNodeId } from '../reliability/nodeId'
 import type { ResolvedReliabilityOptions } from '../reliability/options'
 import { runSweep } from '../reliability/sweeper'
 import { type DrainResult, drainWorker } from './drain'
-import { countInFlight } from './inFlight'
-import { installSignalHandlers, type SignalCleanup } from './signals'
+import { getOrCreateCounter, releaseCounter } from './inFlight'
+import { areHandlersInstalled, installSignalHandlers, type SignalCleanup } from './signals'
 import { maintenanceCycle, runCycle, sweepCycle } from './workerCycles'
 
 export type CreateWorkerArgs = {
@@ -51,10 +50,17 @@ export type Worker = {
 	 * releases, destroys). Idempotent: repeated calls return the same in-flight drain.
 	 */
 	drain: () => Promise<DrainResult>
-	/** Stop the loops and remove signal handlers WITHOUT draining (test teardown). */
-	stop: () => void
 	/** Whether this node currently holds the given leadership role. */
 	isLeader: (role: LeaderRole) => boolean
+}
+
+/**
+ * A test-only handle for accessing `stop()`, which clears timers and signal handlers
+ * without releasing leadership leases. Do not use in production; drain() is the correct
+ * shutdown path. Cast a `Worker` to this type in tests to call stop().
+ */
+export type WorkerTestHandle = Worker & {
+	stop: () => void
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -114,7 +120,12 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	const runLimit = args.runLimit ?? 10
 	const drainTimeoutMs = args.drainTimeoutMs ?? 30_000
 	const pollIntervalMs = args.pollIntervalMs ?? 500
-	const destroy = args.destroy ?? (() => payload.destroy())
+	const destroy =
+		args.destroy ??
+		(async () => {
+			releaseCounter(nodeId)
+			return payload.destroy()
+		})
 	const now = args.now ?? (() => Date.now())
 	const sleep = args.sleep ?? realSleep
 	const logger = payload.logger
@@ -123,8 +134,12 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	let signalCleanup: SignalCleanup | undefined
 	let draining: Promise<DrainResult> | undefined
 
+	// Default to a KV-backed PauseStore so presets that enable queueControl automatically
+	// get the correct pause behavior without requiring an explicit pauseStore argument.
+	const pauseStore: PauseStore = args.pauseStore ?? createPauseStore(payload)
+
 	const runJobs = async (): Promise<void> => {
-		const state = args.pauseStore ? await args.pauseStore.getState() : emptyPauseState()
+		const state = await pauseStore.getState()
 		for (const target of runTargetsForPause(args.queues, state)) {
 			await payload.jobs.run({ ...target, limit: runLimit, silent: true })
 		}
@@ -164,9 +179,10 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 			return draining
 		}
 		removeSignals()
+		const counter = getOrCreateCounter(nodeId)
 		draining = drainWorker(
 			{
-				countInFlight: () => countInFlight(payload, nodeId),
+				countInFlight: () => Promise.resolve(counter.count()),
 				destroy,
 				logger,
 				now,
@@ -183,10 +199,18 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		return draining
 	}
 
+	const stopWorker = (): void => {
+		stopLoops()
+		removeSignals()
+	}
+
 	const worker: Worker = {
 		drain,
 		isLeader: (role) => (role === 'scheduler' ? scheduler.isLeader() : sweeper.isLeader()),
 		start: () => {
+			if (draining) {
+				return
+			}
 			stopLoops()
 			timers = [
 				guardedInterval(() => runCycle({ logger, runJobs }), runIntervalMs),
@@ -202,22 +226,35 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 					maintenanceIntervalMs
 				),
 				guardedInterval(
-					() => sweepCycle({ isSweeperLeader: sweeper.isLeader, logger, sweep }),
+					() =>
+						sweepCycle({
+							isSweeperLeader: sweeper.isLeader,
+							logger,
+							sweep,
+							tickSweeperLeader: () => sweeper.tick(getCurrentDate()),
+						}),
 					sweepIntervalMs
 				),
 			]
 		},
-		stop: () => {
-			stopLoops()
-			removeSignals()
-		},
 	}
 
+	// Attach stop() as a non-enumerable property so tests can access it via WorkerTestHandle
+	// without it appearing on the public Worker type.
+	Object.defineProperty(worker, 'stop', { value: stopWorker, enumerable: false })
+
 	if (args.installSignals !== false) {
+		if (areHandlersInstalled()) {
+			throw new Error(
+				'@10x-media/jobs: signal handlers are already installed in this process. ' +
+					'Only one worker with installSignals:true may exist per process. ' +
+					'Create subsequent workers with installSignals:false.'
+			)
+		}
 		const exit = args.exit ?? ((code: number) => process.exit(code))
 		signalCleanup = installSignalHandlers(args.signals ?? ['SIGTERM', 'SIGINT'], () => {
 			void drain()
-				.then(() => exit(0))
+				.then((res) => exit(res.timedOut ? 1 : 0))
 				.catch(() => exit(1))
 		})
 	}

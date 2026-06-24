@@ -1,5 +1,10 @@
 name: Snapshot Release
 
+# NOTE: blocked on publishing auth. Like release.yml, this cannot publish until the
+# pnpm 11 + OIDC trusted-publishing migration (the npm account is auth-and-writes 2FA
+# and pnpm 10 has no OIDC), so a `snapshot`-labeled PR currently fails at the publish
+# step with EOTP. Kept in place for when trusted publishing is configured.
+
 on:
   pull_request:
     types: [labeled]

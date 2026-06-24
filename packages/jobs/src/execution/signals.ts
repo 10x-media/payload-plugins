@@ -1,3 +1,13 @@
+let handlersInstalled = false
+
+/** Whether signal handlers have been installed in this process (module-level flag). */
+export const areHandlersInstalled = (): boolean => handlersInstalled
+
+/** Reset the installed-handlers flag. Only for use in tests between worker instantiations. */
+export const resetHandlersInstalled = (): void => {
+	handlersInstalled = false
+}
+
 /** The subset of `process` the signal installer needs (injectable for tests). */
 export type SignalTarget = {
 	on: (signal: NodeJS.Signals, listener: () => void) => unknown
@@ -17,6 +27,7 @@ export const installSignalHandlers = (
 	handler: (signal: NodeJS.Signals) => void,
 	target: SignalTarget = process
 ): SignalCleanup => {
+	handlersInstalled = true
 	let fired = false
 	const registered = signals.map((signal) => {
 		const listener = () => {
@@ -30,6 +41,7 @@ export const installSignalHandlers = (
 		return [signal, listener] as const
 	})
 	return () => {
+		handlersInstalled = false
 		for (const [signal, listener] of registered) {
 			target.removeListener(signal, listener)
 		}

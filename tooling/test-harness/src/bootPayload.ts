@@ -45,6 +45,12 @@ export interface BootedPayload {
 
 type AnyDbHandle = MongoTestDb | MongoContainerDb | PostgresContainerDb
 
+/**
+ * node-postgres `Pool`'s error-event surface. Drizzle's destroy() leaves the pool open and the
+ * container is SIGKILLed right after, so we handle the idle-connection errors (57P01) it emits.
+ */
+type TeardownPool = { on: (event: 'error', listener: (err: unknown) => void) => void }
+
 const resolveMode = (explicit?: TestDbMode): TestDbMode => {
 	if (explicit) return explicit
 	return process.env.TEST_DB === 'container' ? 'container' : 'memory'
@@ -121,18 +127,15 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 		mode,
 		connectionString,
 		stop: async () => {
-			// Payload's drizzle destroy() never ends the pg pool (it holds a
-			// never-released health client, so pool.end() would hang), so idle
-			// connections stay open when stopDb() SIGKILLs the container. pg surfaces
-			// the backend's 57P01 on the pool 'error' event and needs a listener there
-			// or it throws uncaught; the termination is expected, so swallow it. Mongo
-			// has no pool, so this no-ops. When attached, only this Payload is
-			// destroyed; the owning boot stops the DB.
-			const pgPool = (
-				payload.db as { pool?: { on: (event: 'error', listener: (err: unknown) => void) => void } }
-			).pool
-			pgPool?.on('error', () => undefined)
+			// When attached, only this Payload is destroyed; the owning boot stops the DB.
 			await payload.destroy()
+			// Drizzle's destroy() does not close the pg pool, and a Postgres container is
+			// SIGKILLed right after, terminating the pool's idle connections (57P01). Handle
+			// that expected teardown error so it is not surfaced as an unhandled rejection.
+			// Draining the pool here instead (pool.end) would hang on tests that hold a
+			// checked-out client at teardown.
+			const pool = (payload.db as unknown as { pool?: TeardownPool }).pool
+			pool?.on('error', () => undefined)
 			await stopDb()
 		},
 	}

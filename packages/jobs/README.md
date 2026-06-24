@@ -64,7 +64,7 @@ Three facts shape every topology below.
 
 2. **The worker is a separate process, not your web server.** The execution layer (`createWorker`) is meant to run as its own long-lived process (a worker container, a separate Vercel-incompatible service). Your Next.js / Payload web server handles HTTP. The worker boots its own Payload instance against the same database and owns the run/schedule/sweep loops. The only topology that does not run a worker process is serverless, which drives everything from cron-hit endpoints instead.
 
-3. **Completed jobs are deleted, not kept.** Payload's `jobs.deleteJobOnComplete` defaults to `true` in v3.85, so a job that finishes successfully is removed from the queue. The dashboard and the `/queue-status` counts therefore reflect pending, processing, failed, and scheduled jobs, never completed ones. Set `jobs.deleteJobOnComplete: false` in `buildConfig` if you want completed jobs to persist for auditing.
+3. **Completed jobs are deleted, not kept.** Payload's `jobs.deleteJobOnComplete` defaults to `true` in v3.85, so a job that finishes successfully is removed from the queue. With the default, the dashboard and `/queue-status` counts reflect the live states (`queued`, `scheduled`, `retrying`, `processing`, `failed`, `cancelled`), since succeeded jobs are gone. Set `jobs.deleteJobOnComplete: false` in `buildConfig` to keep completed jobs for auditing; the `succeeded` count then reflects them.
 
 Pick a preset:
 
@@ -131,6 +131,8 @@ console.log(JSON.stringify({ crons: vercelCrons() }, null, 2))
 
 - `/api/payload-jobs/queue-run` runs due jobs (pause-aware, mirrors the native run params). `?allQueues=true` runs every queue, `?queue=<name>` runs one, `?limit=<n>` caps jobs per invocation, `?disableScheduling=true` skips schedule handling.
 - `/api/payload-jobs/queue-sweep` runs one orphan sweep (a single cron invocation, so no leader election). Requires reliability to be enabled.
+
+**CSRF note.** Both `queue-run` and `queue-sweep` are state-mutating operations served over GET. A crafted `<img>` or link in a document opened by a logged-in admin can trigger them silently (CSRF). The serverless preset uses Vercel Cron, which sends GET requests only, so switching to POST is not feasible without breaking the Vercel cron flow. For deployments where browser sessions are involved, override `access` to require an `Authorization: Bearer` token (`cronSecretAccess`) rather than relying on the session cookie (`loggedInAccess`).
 
 **Vercel limits.** Match your plan to a cron cadence and a function duration:
 
@@ -234,7 +236,7 @@ Set `JOBS_SCHEDULER=1` on exactly one replica (or run a single dedicated schedul
 
 **Graceful shutdown is a hard requirement under multi-node.** When an orchestrator rolls or scales down a replica, it sends SIGTERM, then SIGKILLs after a grace period. The worker's drain requeues its in-flight job (so another replica picks it up) and releases its leases, but only if it is given time to finish.
 
-- The orchestrator grace period **must exceed** the worker's `drainTimeoutMs`. In Docker Compose set `stop_grace_period`; in Kubernetes set `terminationGracePeriodSeconds`. If the grace period is shorter, the orchestrator SIGKILLs a still-draining worker and you lose the clean requeue.
+- The orchestrator grace period must be set to `drainTimeoutMs + pollIntervalMs + 5s` to be safe. In Docker Compose set `stop_grace_period`; in Kubernetes set `terminationGracePeriodSeconds`. The actual shutdown time is `drainTimeoutMs` plus up to one `pollIntervalMs` (drain loop overrun) plus the `releaseLeadership` DB roundtrip plus `payload.destroy()` latency, which can be significant if the DB connection pool is busy. If the grace period is shorter, the orchestrator SIGKILLs a still-draining worker and you lose the clean requeue.
 - The container `CMD` must be **exec form** (`CMD ["node", "dist/worker.js"]`, not `CMD node dist/worker.js`). Shell form runs Node as a child of `/bin/sh`, which does not forward SIGTERM, so the worker never drains and is hard-killed every time.
 
 ```yaml
@@ -242,8 +244,8 @@ services:
   worker:
     build: .
     command: ['node', 'dist/worker.js'] # exec form: Node receives SIGTERM
-    # Must be greater than the worker's drainTimeoutMs (default 30s here, so 45s of headroom).
-    stop_grace_period: 45s
+    # drainTimeoutMs (30s) + pollIntervalMs (0.5s) + 5s buffer = 36s; round up to 40s.
+    stop_grace_period: 40s
     deploy:
       replicas: 3
     environment:
@@ -252,7 +254,7 @@ services:
     depends_on: [db]
 ```
 
-The Kubernetes equivalent: an exec-form `command` in the pod spec and `terminationGracePeriodSeconds: 45` (greater than `drainTimeoutMs`).
+The Kubernetes equivalent: an exec-form `command` in the pod spec and `terminationGracePeriodSeconds: 40` (`drainTimeoutMs + pollIntervalMs + 5s` buffer).
 
 ### The worker entrypoint
 
@@ -296,7 +298,8 @@ Notes:
 
 - `resolveReliabilityOptions` fully defaults your `ReliabilityOptions`. It returns `null` when reliability is off (passed `false` or `undefined`), which the worker cannot run with, hence the guard.
 - Pass the same reliability tuning you give the plugin (share a constant between `payload.config.ts` and `worker.ts`) so the lease TTLs match across the cluster.
-- `createWorker` registers SIGTERM and SIGINT handlers automatically (`installSignals` defaults to `true`). On signal it drains in-flight jobs (within `drainTimeoutMs`), requeues any straggler, releases leases, destroys the Payload instance, and exits 0. Keep your orchestrator grace period above `drainTimeoutMs` (see Multi-node above).
+- `createWorker` registers SIGTERM and SIGINT handlers automatically (`installSignals` defaults to `true`). On signal it drains in-flight jobs (within `drainTimeoutMs`), requeues any straggler, releases leases, destroys the Payload instance, and exits **0** on clean drain or **1** if the drain timed out (jobs were requeued). Keep your orchestrator grace period at `drainTimeoutMs + pollIntervalMs + 5s` (see Multi-node above).
+- Only one worker with `installSignals: true` may exist per process. Creating a second one throws. Use `installSignals: false` for additional workers in the same process (e.g. test helpers).
 - Run it with `node --import tsx worker.ts` in development, or compile it and run `node dist/worker.js` in production.
 
 ### CI-optional e2e recipes

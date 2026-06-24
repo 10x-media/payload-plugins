@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import type { PayloadRequest } from 'payload'
 
 /** A jobs access checker (matches Payload's `jobs.access.run` shape). */
@@ -27,6 +28,12 @@ export const cronSecretAccess = (options: CronSecretAccessOptions = {}): JobAcce
 		if (!secret) {
 			return false
 		}
-		return req.headers.get('authorization') === `Bearer ${secret}`
+		const expected = Buffer.from(`Bearer ${secret}`)
+		const incoming = Buffer.from(req.headers.get('authorization') ?? '')
+		// timingSafeEqual requires equal-length buffers; mismatched lengths are rejected first.
+		if (incoming.byteLength !== expected.byteLength) {
+			return false
+		}
+		return timingSafeEqual(incoming, expected)
 	}
 }

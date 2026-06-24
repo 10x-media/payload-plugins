@@ -1,8 +1,6 @@
 /**
  * A lease is stale (free to acquire/steal) when it has no expiry, or its expiry
  * is strictly before `now`. Strict `<` so a lease is still held exactly at expiry.
- *
- * Staleness primitive consumed by the heartbeat sweeper in the next reliability plan.
  */
 export const isLeaseStale = (leaseExpiresAt: Date | null, now: Date): boolean => {
 	if (leaseExpiresAt === null) {
@@ -13,8 +11,6 @@ export const isLeaseStale = (leaseExpiresAt: Date | null, now: Date): boolean =>
 
 /**
  * A privileged write is stale (must be rejected) when its fence token is below the current one.
- *
- * Fence-rejection primitive consumed by privileged-write fencing in the next reliability plan.
  */
 export const fenceIsStale = (incomingToken: number, currentToken: number): boolean =>
 	incomingToken < currentToken

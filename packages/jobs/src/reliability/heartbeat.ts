@@ -1,6 +1,7 @@
 import type { Config, Payload } from 'payload'
 import { getCurrentDate } from 'payload'
 
+import { getOrCreateCounter, type InFlightCounter } from '../execution/inFlight'
 import { createJobLeaseStore, type JobId, type JobLeaseStore } from './jobLeaseStore'
 import { initialLeaseTtlMs, isHeartbeatMode } from './leaseMode'
 import type { ResolvedReliabilityOptions } from './options'
@@ -19,6 +20,8 @@ export type WithHeartbeatArgs = {
 	options: ResolvedReliabilityOptions
 	ownerId: string
 	getStore: (payload: Payload) => JobLeaseStore
+	/** Process-local counter incremented while the handler is executing. */
+	counter?: InFlightCounter
 	/** Test/diagnostic seam: invoked once if a fenced renew finds the claim was lost. */
 	onLeaseLost?: (jobId: JobId) => void
 }
@@ -35,7 +38,7 @@ export type WithHeartbeatArgs = {
  * reclaimed) the handler still runs, just without a heartbeat.
  */
 export const withHeartbeat = (args: WithHeartbeatArgs): JobHandler => {
-	const { getStore, handler, onLeaseLost, options, ownerId } = args
+	const { counter, getStore, handler, onLeaseLost, options, ownerId } = args
 	const ttlMs = initialLeaseTtlMs(options)
 	const beats = isHeartbeatMode(options)
 	const intervalMs = options.heartbeatIntervalMs
@@ -48,6 +51,9 @@ export const withHeartbeat = (args: WithHeartbeatArgs): JobHandler => {
 		if (!stamp.ok) {
 			return handler(handlerArgs)
 		}
+
+		// Track this job as in-flight so the drain loop knows to wait for it.
+		counter?.increment()
 
 		const fence = stamp.fenceToken
 		let done = false
@@ -92,6 +98,7 @@ export const withHeartbeat = (args: WithHeartbeatArgs): JobHandler => {
 			return await handler(handlerArgs)
 		} finally {
 			done = true
+			counter?.decrement()
 			if (timer) {
 				clearTimeout(timer)
 			}
@@ -128,11 +135,16 @@ export const registerHeartbeat = (
 		return store
 	}
 
+	// Resolve the counter now so the same counter is shared with the worker's drain loop
+	// (worker reads via getOrCreateCounter(ownerId) as well).
+	const counter = getOrCreateCounter(ownerId)
+
 	const wrapEntry = <T extends WrappableEntry>(entry: T): T => {
 		if (typeof entry.handler !== 'function') {
 			return entry
 		}
 		const wrapped = withHeartbeat({
+			counter,
 			getStore,
 			handler: entry.handler as unknown as JobHandler,
 			options,

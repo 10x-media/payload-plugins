@@ -38,16 +38,24 @@ export type DrainResult = {
  */
 export const drainWorker = async (deps: DrainDeps, options: DrainOptions): Promise<DrainResult> => {
 	deps.stopLoops()
+	// Release leadership before the polling loop so other nodes can elect a new
+	// leader during the drain window rather than waiting for the full timeout.
+	await deps.releaseLeadership()
 	const start = deps.now()
 	const inFlightAtStart = await deps.countInFlight()
 	let remaining = inFlightAtStart
 	while (remaining > 0 && deps.now() - start < options.drainTimeoutMs) {
 		await deps.sleep(options.pollIntervalMs)
+		if (deps.now() - start >= options.drainTimeoutMs) {
+			break
+		}
 		remaining = await deps.countInFlight()
 	}
 	const timedOut = remaining > 0
+	// Only on timeout, to abandon still-running handlers. On a clean drain a just-finished
+	// job can still read processing:true before its completion write lands; requeuing it
+	// would bump recoveryAttempts and re-run it. The sweeper recovers genuine orphans.
 	const requeued = timedOut ? await deps.requeueStragglers() : 0
-	await deps.releaseLeadership()
 	await deps.destroy()
 	deps.logger?.info?.(
 		`@10x-media/jobs: drain complete (started ${inFlightAtStart}, requeued ${requeued}, timedOut ${timedOut})`

@@ -7,5 +7,15 @@
 		"./config/biome/plugins/requirePluginFactoryShape.grit",
 		"./config/biome/plugins/requireI18nKeysTyped.grit",
 		"./config/biome/plugins/noDirectClientImport.grit"
+	],
+	"overrides": [
+		{
+			"includes": ["**/registry/**"],
+			"linter": {
+				"rules": {
+					"a11y": { "noLabelWithoutControl": "off" }
+				}
+			}
+		}
 	]
 }

@@ -3,14 +3,15 @@ import { describe, expect, it } from 'vitest'
 
 import { {{pluginCamel}} } from './index'
 
-const fakeConfig = { collections: [] } as unknown as Config
+const fakeConfig = () => ({ collections: [] }) as unknown as Config
 
 describe('{{pluginCamel}} factory', () => {
 	it('returns a Payload plugin function', () => {
 		expect(typeof {{pluginCamel}}({})).toBe('function')
 	})
 
-	it('returns the incoming config untouched (passthrough scaffold)', () => {
-		expect({{pluginCamel}}({})(fakeConfig)).toBe(fakeConfig)
+	it('returns the incoming config when disabled', () => {
+		const cfg = fakeConfig()
+		expect({{pluginCamel}}({ disabled: true })(cfg)).toBe(cfg)
 	})
 })

@@ -32,7 +32,13 @@ export const statusEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 	path: '/queue-status',
 })
 
-/** GET a hardened, pause-aware run. Mirrors the native run params. */
+/**
+ * GET a hardened, pause-aware run. Mirrors the native run params.
+ *
+ * Security note: this is a state-mutating GET. A logged-in browser session can be
+ * exploited via CSRF (crafted img/link). For deployments where browser sessions are
+ * involved, set `access` to `cronSecretAccess` rather than the default `loggedInAccess`.
+ */
 export const runControlEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 	handler: async (req: PayloadRequest) => {
 		if (!(await deps.access({ req }))) {
@@ -46,6 +52,9 @@ export const runControlEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 			silent?: string
 		}
 		const limit = query.limit ? Number(query.limit) : undefined
+		if (limit !== undefined && !Number.isFinite(limit)) {
+			return Response.json({ message: 'Invalid limit parameter' }, { status: 400 })
+		}
 		const silent = query.silent === 'true'
 		const state = await createPauseStore(req.payload).getState()
 		// Mirror the native run scope: `allQueues` runs every queue, otherwise a single
@@ -73,7 +82,12 @@ export const runControlEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 	path: '/queue-run',
 })
 
-/** GET a one-shot sweep for serverless (one cron invocation, so no leader election). */
+/**
+ * GET a one-shot sweep for serverless (one cron invocation, so no leader election).
+ *
+ * Security note: same CSRF exposure as `runControlEndpoint`; override `access` with
+ * `cronSecretAccess` for cookie-session deployments.
+ */
 export const sweepEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 	handler: async (req: PayloadRequest) => {
 		if (!(await deps.access({ req }))) {

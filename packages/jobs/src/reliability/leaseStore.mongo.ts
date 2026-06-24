@@ -45,7 +45,7 @@ export const createMongoLeaseStore = (payload: Payload): LeaseStore => {
 		acquireOrSteal: async (role, owner, ttlMs, now): Promise<LeaseResult> => {
 			const doc = await m.findOneAndUpdate(
 				{
-					$or: [{ owner: null }, { leaseExpiresAt: { $lt: now } }],
+					$or: [{ owner: null }, { leaseExpiresAt: null }, { leaseExpiresAt: { $lt: now } }],
 					role,
 				},
 				{
@@ -57,13 +57,20 @@ export const createMongoLeaseStore = (payload: Payload): LeaseStore => {
 			return { fenceToken: doc?.fenceToken ?? 0, ok: doc !== null }
 		},
 		read: async (role): Promise<LeaseRecord | null> => toRecord(await m.findOne({ role }).lean()),
-		release: async (role, owner): Promise<void> => {
-			await m.findOneAndUpdate({ owner, role }, { $set: { leaseExpiresAt: null, owner: null } })
+		release: async (role, owner): Promise<{ ok: boolean }> => {
+			const doc = await m.findOneAndUpdate(
+				{ owner, role },
+				{ $set: { leaseExpiresAt: null, owner: null } },
+				{ new: true }
+			)
+			return { ok: doc !== null }
 		},
 		// biome-ignore lint/complexity/useMaxParams: lease primitive signature (role, owner, ttlMs, now)
 		renew: async (role, owner, ttlMs, now): Promise<LeaseResult> => {
+			// Guard on leaseExpiresAt >= now so a GC-paused node cannot silently re-extend
+			// an already-expired lease without going through acquireOrSteal (fence bump).
 			const doc = await m.findOneAndUpdate(
-				{ owner, role },
+				{ owner, role, leaseExpiresAt: { $gte: now } },
 				{ $set: { leaseExpiresAt: leaseExpiry(now, ttlMs) } },
 				{ new: true }
 			)

@@ -1,11 +1,10 @@
 import { type Config, definePlugin } from 'payload'
 
+import type { WebhooksPluginOptions } from './options'
 import { registerTranslations } from './plugin/registerTranslations'
+import { registerWebhooks } from './plugin/registerWebhooks'
 
-export type WebhooksPluginOptions = {
-	/** Disable the plugin entirely (incoming config returned untouched). */
-	disabled?: boolean
-}
+export type { WebhooksPluginOptions } from './options'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -18,11 +17,9 @@ export const WEBHOOK_TRIGGER_SLUG = 'webhook' as const
 
 /**
  * Webhooks plugin for Payload v3. Runs before automations (`order: 10`) so it can
- * push its `webhook` trigger into automations' options when that plugin is
- * present. The contribution is decoupled: webhooks references automations only by
- * slug and never imports it, so it composes when automations is installed and is
- * a no-op when it is not. For Phase 0 the contribution is all this does; delivery,
- * subscriptions, and incoming verification are built in a later phase.
+ * push its `webhook` trigger into automations when present, and builds outbound
+ * delivery: opt-in collections emit signed HTTP POSTs to subscribed endpoints,
+ * delivered via native Payload jobs or bounded-await inline.
  */
 export const webhooks = definePlugin<WebhooksPluginOptions>({
 	slug: '@10x-media/webhooks',
@@ -39,8 +36,10 @@ export const webhooks = definePlugin<WebhooksPluginOptions>({
 			opts.triggers = [...(opts.triggers ?? []), WEBHOOK_TRIGGER_SLUG]
 		}
 
+		registerWebhooks({ config, options, hasJobsPlugin: Boolean(plugins['@10x-media/jobs']) })
+
 		return config
 	},
 })
 
-export type { WebhooksPluginOptions as PluginOptions }
+export type { WebhooksPluginOptions as PluginOptions } from './options'

@@ -147,10 +147,10 @@ For questions, open a [GitHub Discussion](https://github.com/10x-media/payload-p
 Releases are automated with Changesets and GitHub Actions:
 
 1. When PRs carrying changesets land on `main`, `release.yml` opens or updates a **"Version Packages"** pull request that consumes the queued changesets, bumps each affected package, and updates its `CHANGELOG.md`.
-2. Merge the Version Packages PR when you want to cut a release. Merging runs `changeset publish` (via `pnpm release`), which builds the packages and publishes them to npm with provenance, then creates per-package GitHub releases.
-3. Versioning is independent per package: only packages with queued changesets are bumped and published.
+2. Merge the Version Packages PR to cut a release, then publish each bumped package from `main` with `pnpm publish:plugin <name>`. The npm account is `auth-and-writes` 2FA, so publishing uses an interactive browser passkey (CI cannot publish yet: pnpm 10 has no OIDC trusted publishing). The script publishes to npm, then creates and pushes the `@10x-media/<name>@<version>` git tag.
+3. Pushing that tag triggers `release-notes.yml`, which creates the per-package GitHub release from the package's `CHANGELOG.md`.
 
-Setup: the publish step needs an `NPM_TOKEN` repository secret (a granular npm token with publish rights to the `@10x-media` scope). Apply the `snapshot` label to a PR to publish a throwaway `pr-<number>` prerelease for testing. To leave beta, run `pnpm changeset pre exit`, add a major changeset per package going stable, and merge the resulting Version Packages PR.
+Versioning is independent per package: only packages with queued changesets are bumped, published, and released. **Planned:** after the monorepo moves to pnpm 11, switch to npm OIDC trusted publishing (a per-package Trusted Publisher on npmjs.com, no `NPM_TOKEN`) so CI publishes and creates releases directly again; the `snapshot` label (throwaway `pr-<number>` prereleases) is blocked on the same migration. To leave beta, run `pnpm changeset pre exit`, add a major changeset per package going stable, and merge the resulting Version Packages PR.
 
 ## Documentation
 
