@@ -1,5 +1,5 @@
 import type { PayloadRequest, TaskConfig } from 'payload'
-import type { AnalyticsRow } from '../core/contract'
+import type { AnalyticsResult, AnalyticsRow } from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
 import { getRuntime } from '../plugin/runtime'
 import { METRIC_FIELDS, type SyncMetric } from './collection'
@@ -113,22 +113,30 @@ export const syncTask = (
 			if (metrics.length === 0) {
 				continue
 			}
+			let result: AnalyticsResult
 			try {
-				const result = await runtime.engine.read(adapter, {
-					metrics,
-					dateRange,
-					granularity: 'day',
-				})
-				for (const row of result.rows) {
-					const doc = toSyncRow(adapter.id, row, now)
-					if (doc) {
-						await upsertDailyRow(req, opts.collectionSlug, doc)
-						synced++
-					}
-				}
+				result = await runtime.engine.read(adapter, { metrics, dateRange, granularity: 'day' })
 			} catch (err) {
 				failed++
-				req.payload.logger.warn(`analytics sync: adapter "${adapter.id}" failed: ${String(err)}`)
+				req.payload.logger.warn(
+					`analytics sync: adapter "${adapter.id}" read failed: ${String(err)}`
+				)
+				continue
+			}
+			for (const row of result.rows) {
+				const doc = toSyncRow(adapter.id, row, now)
+				if (!doc) {
+					continue
+				}
+				try {
+					await upsertDailyRow(req, opts.collectionSlug, doc)
+					synced++
+				} catch (err) {
+					failed++
+					req.payload.logger.warn(
+						`analytics sync: upsert for "${adapter.id}" on ${doc.date.toISOString()} failed: ${String(err)}`
+					)
+				}
 			}
 		}
 		return { output: { synced, failed } }

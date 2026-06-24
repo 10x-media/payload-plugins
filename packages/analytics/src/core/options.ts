@@ -14,6 +14,12 @@ export type AnalyticsPluginOptions = {
 	collections?: Record<string, AnalyticsBinding>
 	cache?: { ttl?: { aggregate?: number; realtime?: number }; warm?: boolean | { cron?: string } }
 	widgets?: boolean | { disabled?: string[]; register?: CustomWidgetDef[] }
+	/**
+	 * Opt-in sync tier: a cron job that persists each provider's daily metrics into a
+	 * queryable collection. Reads go through the surfacing cache, so persisted rows reflect
+	 * cached values up to `cache.ttl.aggregate` old; keep that TTL below the sync interval
+	 * for the freshest data.
+	 */
 	sync?:
 		| boolean
 		| { collectionSlug?: string; cron?: string; lookbackDays?: number; adapters?: string[] }
