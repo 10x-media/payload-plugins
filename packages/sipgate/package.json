@@ -41,6 +41,21 @@
 			"development": "./src/exports/i18n.ts",
 			"types": "./src/exports/i18n.ts",
 			"default": "./dist/exports/i18n.js"
+		},
+		"./ui/ClickToDialField": {
+			"development": "./src/ui/ClickToDialField.tsx",
+			"types": "./src/ui/ClickToDialField.tsx",
+			"default": "./dist/ui/ClickToDialField.js"
+		},
+		"./ui/CallActivityWidget": {
+			"development": "./src/ui/CallActivityWidget.tsx",
+			"types": "./src/ui/CallActivityWidget.tsx",
+			"default": "./dist/ui/CallActivityWidget.js"
+		},
+		"./ui/LiveCallFloatingWindow": {
+			"development": "./src/ui/LiveCallFloatingWindow.tsx",
+			"types": "./src/ui/LiveCallFloatingWindow.tsx",
+			"default": "./dist/ui/LiveCallFloatingWindow.js"
 		}
 	},
 	"files": [
@@ -122,6 +137,21 @@
 				"types": "./dist/exports/i18n.d.ts",
 				"import": "./dist/exports/i18n.js",
 				"default": "./dist/exports/i18n.js"
+			},
+			"./ui/ClickToDialField": {
+				"types": "./dist/ui/ClickToDialField.d.ts",
+				"import": "./dist/ui/ClickToDialField.js",
+				"default": "./dist/ui/ClickToDialField.js"
+			},
+			"./ui/CallActivityWidget": {
+				"types": "./dist/ui/CallActivityWidget.d.ts",
+				"import": "./dist/ui/CallActivityWidget.js",
+				"default": "./dist/ui/CallActivityWidget.js"
+			},
+			"./ui/LiveCallFloatingWindow": {
+				"types": "./dist/ui/LiveCallFloatingWindow.d.ts",
+				"import": "./dist/ui/LiveCallFloatingWindow.js",
+				"default": "./dist/ui/LiveCallFloatingWindow.js"
 			}
 		}
 	},

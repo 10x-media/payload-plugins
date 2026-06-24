@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { buildConfig, type CollectionConfig } from 'payload'
+import { buildConfig, type CollectionConfig, type CollectionSlug } from 'payload'
 import { sipgate } from '../src/index'
 import { seedDev } from './helpers/seed'
 
@@ -40,9 +40,7 @@ const db =
 		: mongooseAdapter({
 				ensureIndexes: true,
 				migrationDir,
-				url:
-					process.env.DATABASE_URI_MONGO ??
-					'mongodb://localhost:27017/sipgate_e2e?replicaSet=rs0&directConnection=true',
+				url: process.env.DATABASE_URI_MONGO ?? 'mongodb://localhost:27017/sipgate',
 			})
 
 export default buildConfig({
@@ -51,13 +49,16 @@ export default buildConfig({
 	collections: [users, contacts],
 	plugins: [
 		sipgate({
-			contactCollections: [contacts.slug],
+			contactCollections: [contacts.slug as CollectionSlug],
 			phoneNumberFields: ['phoneNumber'],
 			syncCallLogs: true,
 			sipgateCredentials: {
 				authType: 'pat',
 				tokenId: process.env.SIPGATE_TOKEN_ID,
 				token: process.env.SIPGATE_TOKEN,
+				deviceId: process.env.SIPGATE_DEVICE_ID,
+				channelId: process.env.SIPGATE_CHANNEL_ID,
+				callerId: process.env.SIPGATE_CALLER_ID,
 			},
 			enableCallActivityWidget: true,
 			enableLiveCallFloatingWindow: true,

@@ -30,41 +30,22 @@ export type SipgateCredentials = {
 	 * Sipgate OAuth2 Refresh Token. Required if authType is 'oauth2' for background syncing.
 	 */
 	refreshToken?: string
-}
 
-export type SipgateNewCallWebhookData = {
-	event: 'newcall'
-	from: string
-	to: string
-	direction: 'in' | 'out'
-	callId: string
-	origCallId: string
-	'user[]': string[]
-	'userId[]': string[]
-	'fullUserId[]': string[]
-	xcid: string
-}
+	/**
+	 * Device ID to use as the caller (e.g. `e0`). Sipgate rings this device first, then bridges
+	 * to the callee. Find yours at GET /v2/{sub}/devices.
+	 */
+	deviceId?: string
 
-export type SipgateAnswerWebhookData = {
-	event: 'answer'
-	from: string
-	to: string
-	direction: 'in' | 'out'
-	callId: string
-	user: string
-	userId: string
-	fullUserId: string
-	answeringNumber: string
-}
+	/**
+	 * Channel ID for sipgate Neo accounts. Required when using the Neo API.
+	 */
+	channelId?: string
 
-export type SipgateHangupWebhookData = {
-	event: 'hangup'
-	cause: 'normalClearing' | 'busy' | 'cancel' | 'noAnswer' | 'congestion' | 'notFound' | 'forwarded'
-	callId: string
-	from: string
-	to: string
-	direction: 'in' | 'out'
-	answeringNumber: string
+	/**
+	 * Outbound caller ID shown to the callee. Defaults to the device's assigned number if omitted.
+	 */
+	callerId?: string
 }
 
 export type SipgateContact = {
@@ -108,35 +89,6 @@ export type SipgateContact = {
 	}>
 	totalCount: number
 }
-
-export type SipgateNewSessionProps = {
-	callee: string
-	caller: string
-	callerId: string
-	deviceId?: string
-}
-
-export type SipgateNewSessionResponse = {
-	sessionId: string
-}
-
-export type SigpateNeoNewChannelProps = {
-	additionalDevices: Array<{
-		deviceId: string
-	}>
-	callerId: string
-	channelId: string
-	deviceId: string
-	targetNumber: string
-}
-
-export type SigpateNeoNewChannelResponse = {
-	callSid: string
-}
-
-export type AcceptCallAndBridgeProps =
-	| ({ mode: 'classic' } & SipgateNewSessionProps)
-	| ({ mode: 'neo' } & SigpateNeoNewChannelProps)
 
 export type SipgateHistoryParams = {
 	connectionIds?: string[]

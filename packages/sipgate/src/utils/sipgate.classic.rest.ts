@@ -19,10 +19,7 @@ export const getClassicCallHistory = async (params?: SipgateHistoryParams) => {
 		if (params.offset !== undefined) query.append('offset', params.offset.toString())
 		if (params.limit !== undefined) query.append('limit', params.limit.toString())
 		if (params.archived !== undefined) query.append('archived', params.archived.toString())
-		if (params.starred)
-			params.starred.forEach((star) => {
-				query.append('starred', star)
-			})
+		if (params.starred) query.append('starred', params.starred.toString())
 		if (params.from) query.append('from', params.from)
 		if (params.to) query.append('to', params.to)
 		if (params.phonenumber) query.append('phonenumber', params.phonenumber)
@@ -36,4 +33,35 @@ export const getClassicCallHistory = async (params?: SipgateHistoryParams) => {
 		throw new Error('Failed to get call history')
 	}
 	return (await response.json()) as SipgateHistoryResponse
+}
+
+export type SipgateNewSessionProps = {
+	/**
+	 * The number to call.
+	 */
+	callee: string
+	/**
+	 * The caller to use.
+	 */
+	caller: string
+	/**
+	 * The caller ID to use.
+	 */
+	callerId: string
+	/**
+	 * The device ID to use.
+	 */
+	deviceId?: string
+}
+
+export type SipgateNewSessionResponse = {
+	sessionId: string
+}
+
+export const ClassicDial = async (props: SipgateNewSessionProps) => {
+	const response = await sipgateRest('/sessions/calls', {
+		method: 'POST',
+		body: JSON.stringify(props),
+	})
+	return response
 }
