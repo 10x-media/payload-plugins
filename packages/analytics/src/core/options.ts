@@ -1,4 +1,5 @@
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
+import type { CustomWidgetDef } from '../widgets/customWidget'
 import type { AnalyticsAdapter } from './contract'
 
 export type AnalyticsPluginOptions = {
@@ -7,7 +8,7 @@ export type AnalyticsPluginOptions = {
 	defaultAdapter?: string
 	collections?: Record<string, AnalyticsBinding>
 	cache?: { ttl?: { aggregate?: number; realtime?: number } }
-	widgets?: boolean | { disabled?: string[] }
+	widgets?: boolean | { disabled?: string[]; register?: CustomWidgetDef[] }
 }
 
 export interface ResolvedOptions {
@@ -15,7 +16,7 @@ export interface ResolvedOptions {
 	defaultAdapter?: string
 	bindings: Record<string, ResolvedBinding>
 	cache: { ttl: { aggregate: number; realtime: number } }
-	widgets: { enabled: boolean; disabled: string[] }
+	widgets: { enabled: boolean; disabled: string[]; register: CustomWidgetDef[] }
 }
 
 const resolveBindings = (
@@ -37,10 +38,14 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 	}
 	const widgets =
 		options.widgets === false
-			? { enabled: false, disabled: [] as string[] }
+			? { enabled: false, disabled: [] as string[], register: [] as CustomWidgetDef[] }
 			: options.widgets === undefined || options.widgets === true
-				? { enabled: true, disabled: [] as string[] }
-				: { enabled: true, disabled: options.widgets.disabled ?? [] }
+				? { enabled: true, disabled: [] as string[], register: [] as CustomWidgetDef[] }
+				: {
+						enabled: true,
+						disabled: options.widgets.disabled ?? [],
+						register: options.widgets.register ?? [],
+					}
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,

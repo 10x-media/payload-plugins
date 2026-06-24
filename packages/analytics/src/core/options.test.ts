@@ -2,6 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { resolveOptions } from './options'
 
+describe('resolveOptions widgets.register', () => {
+	const adapters = [memoryAdapter()]
+	it('defaults register to [] when widgets is true/undefined', () => {
+		expect(resolveOptions({ adapters }).widgets.register).toEqual([])
+		expect(resolveOptions({ adapters, widgets: true }).widgets.register).toEqual([])
+	})
+	it('carries register through from an object option', () => {
+		const reg = [{ slug: 'myapp-x', component: '@/x#default', label: 'X' }]
+		expect(resolveOptions({ adapters, widgets: { register: reg } }).widgets.register).toEqual(reg)
+	})
+	it('keeps register [] and enabled false when widgets is false', () => {
+		const w = resolveOptions({ adapters, widgets: false }).widgets
+		expect(w.enabled).toBe(false)
+		expect(w.register).toEqual([])
+	})
+})
+
 describe('resolveOptions', () => {
 	it('fills cache TTL defaults', () => {
 		const r = resolveOptions({ adapters: [memoryAdapter()] })
