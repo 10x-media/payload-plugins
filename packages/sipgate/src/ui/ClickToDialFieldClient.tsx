@@ -10,9 +10,17 @@ type Props = {
 	placeholder?: string
 	required?: boolean
 	readOnly?: boolean
+	width?: string | number | undefined
 }
 
-export const ClickToDialFieldClient = ({ path, label, placeholder, required, readOnly }: Props) => {
+export const ClickToDialFieldClient = ({
+	path,
+	label,
+	placeholder,
+	required,
+	readOnly,
+	width,
+}: Props) => {
 	const { value, setValue, showError } = useField<string>({ path })
 	const [dialState, setDialState] = useState<'idle' | 'dialing' | 'success' | 'error'>('idle')
 
@@ -42,7 +50,7 @@ export const ClickToDialFieldClient = ({ path, label, placeholder, required, rea
 	}[dialState]
 
 	return (
-		<div className="field-type text">
+		<div className="field-type text" style={width ? { width } : undefined}>
 			<FieldLabel label={label} path={path} required={required} />
 			<div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
 				<TextInput
