@@ -9,6 +9,7 @@ import type {
 	MetricKey,
 } from '../../core/contract'
 import { fetchJson } from '../http/fetchJson'
+import { dayIso } from '../series'
 
 export interface PlausibleConfig {
 	siteId: string
@@ -93,23 +94,7 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			if (q.path) {
 				filters.push(['is', 'event:page', [q.path]])
 			}
-			const body = {
-				site_id: config.siteId,
-				metrics: providerMetrics,
-				date_range: [
-					q.dateRange.start.toISOString().slice(0, 10),
-					q.dateRange.end.toISOString().slice(0, 10),
-				],
-				...(dims.length ? { dimensions: dims.map((d) => DIMENSION_MAP[d] as string) } : {}),
-				...(filters.length ? { filters } : {}),
-			}
-			const data = await fetchJson<PlausibleResponse>(`${host}/api/v2/query`, {
-				method: 'POST',
-				headers: { authorization: `Bearer ${config.apiKey}` },
-				body,
-				signal: ctx.signal,
-				provider: 'plausible',
-			})
+
 			const readRow = (row: { metrics: number[] }): Partial<Record<MetricKey, number>> => {
 				const out: Partial<Record<MetricKey, number>> = {}
 				for (const m of wanted) {
@@ -118,10 +103,51 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 				}
 				return out
 			}
+
+			const postQuery = (extra: Record<string, unknown>): Promise<PlausibleResponse> =>
+				fetchJson<PlausibleResponse>(`${host}/api/v2/query`, {
+					method: 'POST',
+					headers: { authorization: `Bearer ${config.apiKey}` },
+					body: {
+						site_id: config.siteId,
+						metrics: providerMetrics,
+						date_range: [
+							q.dateRange.start.toISOString().slice(0, 10),
+							q.dateRange.end.toISOString().slice(0, 10),
+						],
+						...(filters.length ? { filters } : {}),
+						...extra,
+					},
+					signal: ctx.signal,
+					provider: 'plausible',
+				})
+
+			const fetchTotals = async (): Promise<Partial<Record<MetricKey, number>>> => {
+				const data = await postQuery({})
+				return data.results[0] ? readRow(data.results[0]) : {}
+			}
+
+			if (q.granularity === 'day' && !dims.length) {
+				const [seriesData, totals] = await Promise.all([
+					postQuery({ dimensions: ['time:day'] }),
+					fetchTotals(),
+				])
+				const rows: AnalyticsRow[] = []
+				for (const row of seriesData.results) {
+					const ts = dayIso(row.dimensions[0] ?? '')
+					if (ts) {
+						rows.push({ timestamp: ts, metrics: readRow(row) })
+					}
+				}
+				return { rows, totals, meta: { provider: 'plausible', fetchedAt } }
+			}
+
 			if (!dims.length) {
-				const totals = data.results[0] ? readRow(data.results[0]) : {}
+				const totals = await fetchTotals()
 				return { rows: [{ metrics: totals }], totals, meta: { provider: 'plausible', fetchedAt } }
 			}
+
+			const data = await postQuery({ dimensions: dims.map((d) => DIMENSION_MAP[d] as string) })
 			const rows: AnalyticsRow[] = data.results.map((row) => {
 				const dimValues: Partial<Record<DimensionKey, string>> = {}
 				for (let i = 0; i < dims.length; i++) {

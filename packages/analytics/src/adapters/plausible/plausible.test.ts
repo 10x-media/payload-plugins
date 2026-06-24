@@ -87,4 +87,42 @@ describe('plausible adapter', () => {
 		const result = await adapter.query(q({ metrics: ['pageviews'] }), {})
 		expect(result.totals?.pageviews).toBe(1)
 	})
+
+	it('returns a per-day series plus range totals when granularity is day', async () => {
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				const body = (await request.json()) as { dimensions?: string[] }
+				if (body.dimensions?.[0] === 'time:day') {
+					return HttpResponse.json({
+						results: [
+							{ metrics: [10, 7, 30], dimensions: ['2026-01-01'] },
+							{ metrics: [25, 18, 40], dimensions: ['2026-01-02'] },
+						],
+						meta: {},
+						query: {},
+					})
+				}
+				return HttpResponse.json({
+					results: [{ metrics: [35, 20, 35], dimensions: [] }],
+					meta: {},
+					query: {},
+				})
+			})
+		)
+		const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews', 'visitors', 'avgDuration'], granularity: 'day' }),
+			{}
+		)
+		expect(result.rows).toEqual([
+			{
+				timestamp: '2026-01-01T00:00:00.000Z',
+				metrics: { pageviews: 10, visitors: 7, avgDuration: 30000 },
+			},
+			{
+				timestamp: '2026-01-02T00:00:00.000Z',
+				metrics: { pageviews: 25, visitors: 18, avgDuration: 40000 },
+			},
+		])
+		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, avgDuration: 35000 })
+	})
 })
