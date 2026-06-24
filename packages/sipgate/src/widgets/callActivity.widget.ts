@@ -3,13 +3,6 @@ import { deepMerge, type Widget } from 'payload'
 const defaultWidget: Widget = {
 	slug: 'call-activity',
 	label: 'Call Activity',
-	fields: [
-		{
-			name: 'callActivity',
-			type: 'text',
-			label: 'Call Activity',
-		},
-	],
 	Component: '@10x-media/sipgate/ui/CallActivityWidget',
 }
 

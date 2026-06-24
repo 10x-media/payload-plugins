@@ -1,10 +1,19 @@
-import type { UIFieldServerComponent } from 'payload'
+import type { TextFieldServerComponent } from 'payload'
+import { ClickToDialFieldClient } from './ClickToDialFieldClient'
 
-const ClickToDialField: UIFieldServerComponent = () => {
+const ClickToDialField: TextFieldServerComponent = ({ field, path, readOnly }) => {
+	const label = typeof field.label === 'string' ? field.label : undefined
+	const placeholder =
+		typeof field.admin?.placeholder === 'string' ? field.admin.placeholder : undefined
+
 	return (
-		<div>
-			<h1>Click to Dial</h1>
-		</div>
+		<ClickToDialFieldClient
+			path={path ?? field.name}
+			label={label}
+			placeholder={placeholder}
+			required={field.required}
+			readOnly={readOnly}
+		/>
 	)
 }
 

@@ -11,6 +11,6 @@ export const createActiveCallStore = (payload: Payload, callId: string) => ({
 		)
 		return values.filter((v): v is SipgateNewCallWebhookData => v !== null)
 	},
-	set: (call: SipgateNewCallWebhookData) => payload.kv.set(`${KEY}${callId}`, call),
+	set: (call: SipgateNewCallWebhookData) => payload.kv.set(`${KEY}${callId}`, JSON.stringify(call)),
 	clear: () => payload.kv.delete(`${KEY}${callId}`),
 })

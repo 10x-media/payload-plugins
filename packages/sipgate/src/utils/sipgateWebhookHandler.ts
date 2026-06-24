@@ -1,11 +1,41 @@
 import type { CollectionSlug, PayloadHandler } from 'payload'
 import queryString from 'query-string'
-import type {
-	SipgateAnswerWebhookData,
-	SipgateHangupWebhookData,
-	SipgateNewCallWebhookData,
-} from '../types'
 import { createActiveCallStore } from './activeCall'
+
+type SipgateNewCallWebhookData = {
+	event: 'newcall'
+	from: string
+	to: string
+	direction: 'in' | 'out'
+	callId: string
+	origCallId: string
+	'user[]': string[]
+	'userId[]': string[]
+	'fullUserId[]': string[]
+	xcid: string
+}
+
+type SipgateAnswerWebhookData = {
+	event: 'answer'
+	from: string
+	to: string
+	direction: 'in' | 'out'
+	callId: string
+	user: string
+	userId: string
+	fullUserId: string
+	answeringNumber: string
+}
+
+type SipgateHangupWebhookData = {
+	event: 'hangup'
+	cause: 'normalClearing' | 'busy' | 'cancel' | 'noAnswer' | 'congestion' | 'notFound' | 'forwarded'
+	callId: string
+	from: string
+	to: string
+	direction: 'in' | 'out'
+	answeringNumber: string
+}
 
 export const sipgateWebhookHandler =
 	(_contactCollections: CollectionSlug[], _phoneNumberFields: string[]): PayloadHandler =>
@@ -47,7 +77,7 @@ export const sipgateWebhookHandler =
 					'Xcid:',
 					data.xcid
 				)
-				await createActiveCallStore(req.payload, data.callId).set(JSON.stringify(data))
+				await createActiveCallStore(req.payload, data.callId).set(data)
 				break
 			case 'answer':
 				console.log(
