@@ -163,7 +163,9 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				const [response] = await client.runReport({
 					...baseRequest,
 					dimensions: [{ name: 'date' }],
-					metricAggregations: (['TOTAL'] as unknown) as protos.google.analytics.data.v1beta.MetricAggregation[],
+					metricAggregations: [
+						'TOTAL',
+					] as unknown as protos.google.analytics.data.v1beta.MetricAggregation[],
 					orderBys: [{ dimension: { dimensionName: 'date' } }],
 				})
 				const rows: AnalyticsRow[] = []
