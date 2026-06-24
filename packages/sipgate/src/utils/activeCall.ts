@@ -1,7 +1,12 @@
 import type { Payload } from 'payload'
 import type { SipgateNewCallWebhookData } from './sipgateWebhookHandler'
 
-export type StoredCall = SipgateNewCallWebhookData & { status: 'ringing' | 'active' }
+export type StoredCall = SipgateNewCallWebhookData & {
+	status: 'ringing' | 'active'
+	held: boolean
+	muted: boolean
+	recording: boolean
+}
 
 const KEY = '@10x-media/sipgate:active-call'
 export const createActiveCallStore = (payload: Payload, callId?: string) => ({

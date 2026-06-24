@@ -56,7 +56,13 @@ export const sipgateWebhookHandler =
 
 		switch (data.event) {
 			case 'newcall':
-				await createActiveCallStore(req.payload, data.callId).set({ ...data, status: 'ringing' })
+				await createActiveCallStore(req.payload, data.callId).set({
+					...data,
+					status: 'ringing',
+					held: false,
+					muted: false,
+					recording: false,
+				})
 				break
 			case 'answer':
 				await createActiveCallStore(req.payload, data.callId).update({ status: 'active' })

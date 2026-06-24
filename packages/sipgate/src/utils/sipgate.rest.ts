@@ -6,7 +6,7 @@ import type {
 	SipgateHistoryResponse,
 } from '../types'
 import { ClassicDial, getClassicCallHistory } from './sipgate.classic.rest'
-import { getChannels, getNeoCallHistory, NeoDial, type NeoDialProps } from './sipgate.neo.rest'
+import { getNeoCallHistory, NeoDial, type NeoDialProps } from './sipgate.neo.rest'
 import { isNeo } from './sipgate.utils'
 
 const BASE_URL = 'https://api.sipgate.com/v2'
@@ -101,7 +101,14 @@ type SipgateHoldCallProps = {
 }
 
 export const holdCall = async (callId: string, props: SipgateHoldCallProps) => {
-	return await sipgateRest(`/calls/${callId}/hold`, { method: 'PUT', body: JSON.stringify(props) })
+	const response = await sipgateRest(`/calls/${callId}/hold`, {
+		method: 'PUT',
+		body: JSON.stringify(props),
+	})
+	if (!response.ok) {
+		throw new Error('Failed to hold call')
+	}
+	return response.json()
 }
 
 type SipgateMuteCallProps = {
@@ -109,7 +116,14 @@ type SipgateMuteCallProps = {
 }
 
 export const muteCall = async (callId: string, props: SipgateMuteCallProps) => {
-	return await sipgateRest(`/calls/${callId}/muted`, { method: 'PUT', body: JSON.stringify(props) })
+	const response = await sipgateRest(`/calls/${callId}/muted`, {
+		method: 'PUT',
+		body: JSON.stringify(props),
+	})
+	if (!response.ok) {
+		throw new Error('Failed to mute call')
+	}
+	return response.json()
 }
 
 type SipgateRecordingsCallProps = {
@@ -118,8 +132,12 @@ type SipgateRecordingsCallProps = {
 }
 
 export const recordingsCall = async (callId: string, props: SipgateRecordingsCallProps) => {
-	return await sipgateRest(`/calls/${callId}/recording`, {
+	const response = await sipgateRest(`/calls/${callId}/recording`, {
 		method: 'PUT',
 		body: JSON.stringify(props),
 	})
+	if (!response.ok) {
+		throw new Error('Failed to start recording')
+	}
+	return response.json()
 }
