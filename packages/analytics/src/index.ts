@@ -5,6 +5,7 @@ import { createRegistry } from './core/registry'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
+import { warmTask } from './plugin/warmTask'
 import { kvCacheStore } from './surfacing/cacheStore'
 import { createEngine } from './surfacing/engine'
 import { registerWidgets } from './widgets/registerWidgets'
@@ -22,6 +23,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			return config
 		}
 		const resolved = resolveOptions(options)
+		const defaultLayout = config.admin?.dashboard?.defaultLayout
 		registerTranslations(config)
 		const registry = createRegistry(resolved.adapters, resolved.defaultAdapter)
 		for (const adapter of resolved.adapters) {
@@ -42,6 +44,12 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				disabled: resolved.widgets.disabled,
 				register: resolved.widgets.register,
 			})
+		}
+		if (resolved.cache.warm.enabled) {
+			config.jobs = {
+				...config.jobs,
+				tasks: [...(config.jobs?.tasks ?? []), warmTask(resolved.cache.warm.cron, defaultLayout)],
+			}
 		}
 		const prevOnInit = config.onInit
 		config.onInit = async (payload) => {

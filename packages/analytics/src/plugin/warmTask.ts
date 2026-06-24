@@ -1,7 +1,11 @@
+import type { PayloadRequest, TaskConfig, WidgetInstance } from 'payload'
 import type { DateRange, DimensionKey, MetricKey } from '../core/contract'
 import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { breakdownSpecBySlug } from '../widgets/breakdownTypes'
 import { resolveCustomRange } from '../widgets/range'
+import { readForWidget } from '../widgets/readForWidget'
+import { readForWidgetBreakdown } from '../widgets/readForWidgetBreakdown'
+import { readForWidgetSeries } from '../widgets/readForWidgetSeries'
 import type { WidgetRange } from '../widgets/types'
 
 /** Minimal shape of a dashboard widget instance the warm job reads. */
@@ -129,3 +133,87 @@ export const deriveWarmTargets = (widgets: readonly WarmWidgetInstance[]): WarmT
 	}
 	return out
 }
+
+export const WARM_TASK_SLUG = 'analytics-warm-cache'
+
+/** A dashboard `defaultLayout`: an array, or a function resolving one per request. */
+export type WarmLayout =
+	| ((args: { req: PayloadRequest }) => WidgetInstance[] | Promise<WidgetInstance[]>)
+	| WidgetInstance[]
+	| undefined
+
+const resolveLayout = async (
+	layout: WarmLayout,
+	req: PayloadRequest
+): Promise<WarmWidgetInstance[]> => {
+	const list = typeof layout === 'function' ? await layout({ req }) : (layout ?? [])
+	return list.map((w) => ({ widgetSlug: w.widgetSlug, data: w.data }))
+}
+
+const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Promise<void> => {
+	if (target.kind === 'metric') {
+		await readForWidget({
+			req,
+			metrics: [target.metric],
+			timeframe: target.timeframe,
+			adapterId: target.adapterId,
+			now,
+			range: target.range,
+		})
+		return
+	}
+	if (target.kind === 'series') {
+		await readForWidgetSeries({
+			req,
+			metric: target.metric,
+			timeframe: target.timeframe,
+			adapterId: target.adapterId,
+			now,
+			range: target.range,
+		})
+		return
+	}
+	await readForWidgetBreakdown({
+		req,
+		metric: target.metric,
+		dimension: target.dimension,
+		timeframe: target.timeframe,
+		limit: target.limit,
+		adapterId: target.adapterId,
+		now,
+		range: target.range,
+	})
+}
+
+/**
+ * Opt-in Payload task that pre-runs the dashboard's widget reads through the surfacing
+ * engine so `payload.kv` is warm before a user opens the dashboard. Targets are derived
+ * from `layout` (the app's `defaultLayout`, captured at registration and resolved here);
+ * each read is isolated so one failing provider does not abort the rest. Most valuable
+ * for slow or rate-limited provider adapters; native reads are cheap and harmless to warm.
+ */
+export const warmTask = (
+	cron: string,
+	layout: WarmLayout
+): TaskConfig<{ input: Record<string, never>; output: { warmed: number; failed: number } }> => ({
+	slug: WARM_TASK_SLUG,
+	handler: async ({ req }) => {
+		const targets = deriveWarmTargets(await resolveLayout(layout, req))
+		const now = new Date()
+		let warmed = 0
+		let failed = 0
+		for (const target of targets) {
+			try {
+				await runTarget(target, req, now)
+				warmed++
+			} catch (err) {
+				failed++
+				req.payload.logger.warn(
+					`analytics warm-cache: ${target.kind} read for "${target.metric}" failed: ${String(err)}`
+				)
+			}
+		}
+		return { output: { warmed, failed } }
+	},
+	schedule: [{ cron, queue: 'default' }],
+})
