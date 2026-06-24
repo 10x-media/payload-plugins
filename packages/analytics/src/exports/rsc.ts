@@ -1,4 +1,5 @@
 export { AnalyticsStatField } from '../fields/AnalyticsStatField'
 export { default as AnalyticsBreakdownWidget } from '../widgets/AnalyticsBreakdownWidget'
 export { default as AnalyticsMetricWidget } from '../widgets/AnalyticsMetricWidget'
+export { default as AnalyticsRealtimeWidget } from '../widgets/AnalyticsRealtimeWidget'
 export { default as AnalyticsTrendWidget } from '../widgets/AnalyticsTrendWidget'

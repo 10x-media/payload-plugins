@@ -144,6 +144,50 @@ const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): 
 	return fields
 }
 
+const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
+	const fields: Field[] = [
+		{
+			name: 'title',
+			type: 'text',
+			label: labelForKey(keys.widgetFieldTitle),
+			admin: { placeholder: en[keys.widgetFieldTitlePlaceholder] },
+		},
+		{
+			name: 'metric',
+			type: 'select',
+			required: true,
+			defaultValue: 'visitors',
+			label: labelForKey(keys.widgetFieldMetric),
+			options: [
+				{ value: 'visitors', label: labelForKey(METRIC_KEYS.visitors) },
+				{ value: 'pageviews', label: labelForKey(METRIC_KEYS.pageviews) },
+			],
+		},
+		{
+			name: 'windowMinutes',
+			type: 'select',
+			defaultValue: '30',
+			label: labelForKey(keys.widgetFieldWindow),
+			options: [
+				{ value: '5', label: '5 min' },
+				{ value: '15', label: '15 min' },
+				{ value: '30', label: '30 min' },
+				{ value: '60', label: '60 min' },
+			],
+		},
+	]
+	if (args.multiProvider) {
+		fields.push({
+			name: 'dataSource',
+			type: 'select',
+			label: labelForKey(keys.widgetFieldDataSource),
+			defaultValue: args.adapters[0]?.id,
+			options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
+		})
+	}
+	return fields
+}
+
 const WIDGET_DEFS: WidgetDef[] = [
 	{
 		slug: 'analytics-metric',
@@ -161,6 +205,15 @@ const WIDGET_DEFS: WidgetDef[] = [
 		minWidth: 'small',
 		maxWidth: 'full',
 		fields: metricWidgetFields,
+	},
+	{
+		slug: 'analytics-realtime',
+		component: '@10x-media/analytics/rsc#AnalyticsRealtimeWidget',
+		label: keys.widgetRealtimeLabel,
+		requires: { realtime: true },
+		minWidth: 'small' as WidgetWidth,
+		maxWidth: 'medium' as WidgetWidth,
+		fields: realtimeWidgetFields,
 	},
 	...BREAKDOWN_SPECS.map(
 		(spec): WidgetDef => ({

@@ -95,4 +95,15 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 		const values = (timeframeField?.options ?? []).map((o) => o.value)
 		expect(values).toContain('custom')
 	})
+
+	it('registers the realtime widget when native adapter is configured (native has realtime: true)', () => {
+		const slugs = registeredWidgets(booted).map((w) => w.slug)
+		expect(slugs).toContain('analytics-realtime')
+	})
+
+	it('gives the realtime widget metric and windowMinutes fields', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-realtime')
+		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'windowMinutes']))
+	})
 })

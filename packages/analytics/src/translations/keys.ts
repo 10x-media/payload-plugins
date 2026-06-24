@@ -45,6 +45,10 @@ export const keys = {
 	widgetFieldTitlePlaceholder: 'analytics:widgetFieldTitlePlaceholder',
 	widgetTimeframeCustom: 'analytics:widgetTimeframeCustom',
 	widgetFieldRange: 'analytics:widgetFieldRange',
+	widgetFieldWindow: 'analytics:widgetFieldWindow',
+	widgetRealtimeLabel: 'analytics:widgetRealtimeLabel',
+	widgetRealtimeCaption: 'analytics:widgetRealtimeCaption',
+	widgetRealtimePaused: 'analytics:widgetRealtimePaused',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
