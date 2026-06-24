@@ -11,6 +11,7 @@ import { fieldAffectsData } from 'payload/shared'
 import { createCallLogsCollection } from './collections/CallLogs'
 import { createSipgateActiveCall } from './endpoints/sipgate.activeCall'
 import { createSipgateDial } from './endpoints/sipgate.dial'
+import { createSipgateRtcm } from './endpoints/sipgate.rtcm'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
 import { createPhoneNumberField } from './fields/phoneNumber.field'
 import { registerTranslations } from './plugin/registerTranslations'
@@ -64,6 +65,7 @@ export type SipgatePluginOptions = {
 		sipgateWebhooks?: Partial<Endpoint>
 		sipgateActiveCall?: Partial<Endpoint>
 		sipgateDial?: Partial<Endpoint>
+		sipgateRtcm?: Partial<Endpoint>
 		liveCallFloatingWindow?: Partial<CustomComponent<Record<string, never>>>
 	}
 }
@@ -119,7 +121,8 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				options.overrides?.sipgateWebhooks
 			),
 			createSipgateActiveCall(options.overrides?.sipgateActiveCall),
-			createSipgateDial(options.sipgateCredentials, options.overrides?.sipgateDial)
+			createSipgateDial(options.sipgateCredentials, options.overrides?.sipgateDial),
+			createSipgateRtcm(options.sipgateCredentials, options.overrides?.sipgateRtcm)
 		)
 
 		// 4. Inject global Admin UI components for call notifications
