@@ -66,8 +66,18 @@ If neo: use /calls and create a new call in the channel that gets called.
 Update: v2 scrapped. Implementing webrtc and live calling in thsi plugin is exceptionally hard and complicated to set up. 
 It will have more value to actually implement the rest of the features that sipgate provides, to allow users to for example 
 play audio files hosted with their payload instance for custom IVR system messages. 
+Falls web rtc live call gewünscht. mögliches beispiel: https://github.com/fnordian/sipgate-webrtc/blob/master/templates/webrtc.html
 
 Features to build: 
 Extensible Custom IVR system support. 
 Call Statistics dashboard (with possible real time call statistics).
 Slack integration.  
+
+ivr setup: https://en.sipgate.io/blog/create-complex-ivrs-for-your-crm
+collection für ivr-nodes. 
+payload.kv für current ivr status (aktuelles system erweiterbar)
+media collection für ivr voice files wäre cool. 
+routing über zielrufnummer: wenn eine rufnummer der des ivr access points entspricht, ivr starten. 
+bypass für direkte user-durchwahlen: webhook liefert leeres xml, sipgate übernimmt standard-routing ans endgerät.
+--> notwendig ist eine xml factory für simple responses. vermutlich ist nun sogar die sipgateio-node bibliothek nützlich. 
+--> umstieg vermutlich ziemlich simpel. client based, also eig nicht unbedingt für next mit payload gemacht. 
