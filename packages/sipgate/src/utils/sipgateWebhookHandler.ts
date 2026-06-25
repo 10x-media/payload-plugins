@@ -1,9 +1,11 @@
 import type { CollectionSlug, PayloadHandler } from 'payload'
 import queryString from 'query-string'
+import { env } from '../env'
 import { createActiveCallStore } from './activeCall'
+import { xmlResponse } from './xmlFactory'
 
 export type SipgateNewCallWebhookData = {
-	event: 'newcall'
+	event: 'newCall'
 	from: string
 	to: string
 	direction: 'in' | 'out'
@@ -37,6 +39,12 @@ type SipgateHangupWebhookData = {
 	answeringNumber: string
 }
 
+type SipgateDtmfWebhookData = {
+	event: 'dtmf'
+	callId: string
+	dtmf: string
+}
+
 export const sipgateWebhookHandler =
 	(_contactCollections: CollectionSlug[], _phoneNumberFields: string[]): PayloadHandler =>
 	async (req) => {
@@ -53,9 +61,10 @@ export const sipgateWebhookHandler =
 			| SipgateNewCallWebhookData
 			| SipgateAnswerWebhookData
 			| SipgateHangupWebhookData
+			| SipgateDtmfWebhookData
 
 		switch (data.event) {
-			case 'newcall':
+			case 'newCall': {
 				await createActiveCallStore(req.payload, data.callId).set({
 					...data,
 					status: 'ringing',
@@ -63,16 +72,21 @@ export const sipgateWebhookHandler =
 					muted: false,
 					recording: false,
 				})
-				break
+				if (!env.SIPGATE_WEBHOOK_URL) {
+					return new Response(null, { status: 204 })
+				}
+				return xmlResponse({ onAnswer: env.SIPGATE_WEBHOOK_URL, onHangup: env.SIPGATE_WEBHOOK_URL })
+			}
+			case 'dtmf':
+				await createActiveCallStore(req.payload, data.callId).update({ dtmf: data.dtmf })
+				return new Response(null, { status: 204 })
 			case 'answer':
 				await createActiveCallStore(req.payload, data.callId).update({ status: 'active' })
-				break
+				return new Response(null, { status: 204 })
 			case 'hangup':
 				await createActiveCallStore(req.payload, data.callId).clear()
-				break
+				return new Response(null, { status: 204 })
 			default:
 				return Response.json({ error: 'Invalid event' }, { status: 400 })
 		}
-
-		return Response.json({ received: true }, { status: 200 })
 	}

@@ -37,6 +37,7 @@ Notes:
 4. do we use sipgateio-node package? Rn all is custom with fetch. Simple and customizable. But as more features get used, package might be the best option for simple typing and interactions with the rest api. 
 5. API rate limits need to be researched. 
 6. webhooks could be spoofed. Is there any way to secure it with cryptographic headers?
+7. what happens when a webhook delivery fails? The call woul dbe stale. How do we remove it? We coul use the active calls rest api endpoint?
 
 
 1. What does the API support?

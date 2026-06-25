@@ -1,8 +1,19 @@
 'use client'
 
+import { Button, Drawer, useModal } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { transferCall } from '../utils/sipgate.rest'
+import type { SipgateRtcmAction } from '../utils/sipgateRtcmHandler'
+
+type SipgateDevice = {
+	id: string
+	alias: string
+	type: string
+	online: boolean
+	registered: { userAgent: string }[]
+}
+
+const ACCEPT_DRAWER_SLUG = 'sipgate-accept-device-picker'
 
 type ActiveCall = {
 	callId: string
@@ -19,6 +30,10 @@ export const LiveCallFloatingWindowClient = () => {
 	const [mounted, setMounted] = useState(false)
 	const [open, setOpen] = useState(false)
 	const [calls, setCalls] = useState<ActiveCall[]>([])
+	const [acceptingCall, setAcceptingCall] = useState<ActiveCall | null>(null)
+	const [devices, setDevices] = useState<SipgateDevice[]>([])
+	const [devicesLoading, setDevicesLoading] = useState(false)
+	const { openModal, closeModal } = useModal()
 
 	useEffect(() => {
 		setMounted(true)
@@ -36,11 +51,15 @@ export const LiveCallFloatingWindowClient = () => {
 		return () => clearInterval(id)
 	}, [])
 
-	const sendRtcm = async (call: ActiveCall, action: string) => {
+	const sendRtcm = async (
+		call: ActiveCall,
+		action: SipgateRtcmAction,
+		extra?: Record<string, unknown>
+	) => {
 		const res = await fetch('/api/sipgate/rtcm', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ callId: call.callId, action }),
+			body: JSON.stringify({ callId: call.callId, action, ...extra }),
 		})
 		if (res.ok) {
 			const updated = await res.json()
@@ -50,8 +69,24 @@ export const LiveCallFloatingWindowClient = () => {
 		}
 	}
 
-	const handleAccept = (call: ActiveCall) => sendRtcm(call, 'answer').catch(() => {})
-	const handleDecline = (call: ActiveCall) => sendRtcm(call, 'decline').catch(() => {})
+	const openAcceptDrawer = (call: ActiveCall) => {
+		setAcceptingCall(call)
+		setDevicesLoading(true)
+		fetch('/api/sipgate/devices')
+			.then((r) => (r.ok ? r.json() : []))
+			.then(setDevices)
+			.catch(() => {})
+			.finally(() => setDevicesLoading(false))
+		openModal(ACCEPT_DRAWER_SLUG)
+	}
+
+	const handleAcceptWithDevice = async (deviceId: string) => {
+		if (!acceptingCall) return
+		closeModal(ACCEPT_DRAWER_SLUG)
+		await sendRtcm(acceptingCall, 'answer', { deviceId }).catch(() => {})
+		setAcceptingCall(null)
+	}
+
 	const handleHangup = (call: ActiveCall) => {
 		sendRtcm(call, 'hangup')
 			.then(() => setCalls((prev) => prev.filter((c) => c.callId !== call.callId)))
@@ -95,10 +130,10 @@ export const LiveCallFloatingWindowClient = () => {
 								</div>
 								{call.status === 'ringing' && call.direction === 'in' && (
 									<>
-										<button type="button" onClick={() => handleAccept(call)}>
-											Accept
+										<button type="button" onClick={() => openAcceptDrawer(call)}>
+											Transfer
 										</button>
-										<button type="button" onClick={() => handleDecline(call)}>
+										<button type="button" onClick={() => handleHangup(call)}>
 											Decline
 										</button>
 									</>
@@ -144,6 +179,36 @@ export const LiveCallFloatingWindowClient = () => {
 					)}
 				</div>
 			)}
+
+			<Drawer
+				slug={ACCEPT_DRAWER_SLUG}
+				title={acceptingCall ? `Accept call from ${acceptingCall.from}` : 'Accept call'}
+			>
+				<div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+					{devicesLoading ? <p>Loading devices...</p> : null}
+					{!devicesLoading && devices.length === 0 && <p>No devices found.</p>}
+					{!devicesLoading &&
+						devices.map((device) => (
+							<Button
+								key={device.id}
+								type="button"
+								margin={false}
+								buttonStyle="secondary"
+								onClick={() => handleAcceptWithDevice(device.id)}
+							>
+								<span
+									style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+								>
+									<strong>{device.alias}</strong>
+									<small style={{ opacity: 0.6 }}>
+										{device.online ? '● Online' : '○ Offline'} · {device.id}
+										{device.registered[0] ? ` · ${device.registered[0].userAgent}` : ''}
+									</small>
+								</span>
+							</Button>
+						))}
+				</div>
+			</Drawer>
 		</div>,
 		document.body
 	)
