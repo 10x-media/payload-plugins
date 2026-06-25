@@ -5,6 +5,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig, type CollectionSlug } from 'payload'
 import { sipgate } from '../src/index'
+import { SYNC_CALL_HISTORY_TASK } from '../src/tasks/syncCallHistoryTask'
 import { seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -46,6 +47,9 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
+	jobs: {
+		autoRun: [{ cron: '* * * * *', limit: 10 }],
+	},
 	collections: [users, contacts],
 	plugins: [
 		sipgate({
@@ -67,6 +71,7 @@ export default buildConfig({
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
+		await payload.jobs.queue({ task: SYNC_CALL_HISTORY_TASK, input: { limit: 100 } })
 	},
 	typescript: { autoGenerate },
 	admin: {

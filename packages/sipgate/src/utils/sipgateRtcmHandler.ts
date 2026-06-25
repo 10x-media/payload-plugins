@@ -1,7 +1,9 @@
 import type { PayloadHandler } from 'payload'
 import type { SipgateCredentials } from '../types'
 import { createActiveCallStore } from './activeCall'
-import { hangupCall, holdCall, muteCall, recordingsCall, transferCall } from './sipgate.rest'
+import { answerCall, hangupCall, holdCall, muteCall, recordingsCall } from './sipgate.rest'
+
+export type SipgateRtcmAction = 'answer' | 'hold' | 'mute' | 'recordings' | 'hangup'
 
 export const sipgateRtcmHandler =
 	(_credentials: SipgateCredentials): PayloadHandler =>
@@ -9,7 +11,7 @@ export const sipgateRtcmHandler =
 		if (!req.json) {
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
-		const { callId, action } = await req.json()
+		const { callId, action, deviceId } = await req.json()
 		if (!callId) {
 			return Response.json({ error: 'callId is required' }, { status: 400 })
 		}
@@ -21,23 +23,18 @@ export const sipgateRtcmHandler =
 
 		switch (action) {
 			case 'answer':
+				if (!deviceId) {
+					return Response.json({ error: 'deviceId is required to answer a call' }, { status: 400 })
+				}
 				try {
-					if (!_credentials.callerId) {
-						return Response.json({ error: 'callerId is required' }, { status: 500 })
-					}
-					await transferCall(callId, {
-						attended: true,
-						callerId: _credentials.callerId,
-						phoneNumber: callId,
-					})
+					await answerCall(callId, deviceId)
 				} catch {
 					return Response.json({ error: 'Failed to answer call' }, { status: 500 })
 				}
+				await store.update({ status: 'active' })
 				break
 			case 'hold': {
-				const current = await req.payload.kv.get<{ held: boolean }>(
-					`@10x-media/sipgate:active-call${callId}`
-				)
+				const current = await store.getOne()
 				const newValue = !current?.held
 				try {
 					await holdCall(callId, { value: newValue })
@@ -48,9 +45,7 @@ export const sipgateRtcmHandler =
 				break
 			}
 			case 'mute': {
-				const current = await req.payload.kv.get<{ muted: boolean }>(
-					`@10x-media/sipgate:active-call${callId}`
-				)
+				const current = await store.getOne()
 				const newValue = !current?.muted
 				try {
 					await muteCall(callId, { value: newValue })
@@ -61,9 +56,7 @@ export const sipgateRtcmHandler =
 				break
 			}
 			case 'recordings': {
-				const current = await req.payload.kv.get<{ recording: boolean }>(
-					`@10x-media/sipgate:active-call${callId}`
-				)
+				const current = await store.getOne()
 				const newValue = !current?.recording
 				try {
 					await recordingsCall(callId, { announcement: false, value: newValue })
@@ -85,6 +78,6 @@ export const sipgateRtcmHandler =
 				return Response.json({ error: 'Invalid action' }, { status: 400 })
 		}
 
-		const updated = await req.payload.kv.get(`@10x-media/sipgate:active-call${callId}`)
+		const updated = await store.getOne()
 		return Response.json(updated ?? { success: true }, { status: 200 })
 	}

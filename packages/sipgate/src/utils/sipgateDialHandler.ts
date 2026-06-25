@@ -8,19 +8,20 @@ export const createSipgateDialHandler =
 		if (!req.json) {
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
-		const { callee } = await req.json()
+		const { callee, deviceId: bodyDeviceId } = await req.json()
 		if (!callee) {
 			return Response.json({ error: 'callee is required' }, { status: 400 })
 		}
-		if (!credentials.deviceId) {
+		const deviceId = bodyDeviceId ?? credentials.deviceId
+		if (!deviceId) {
 			return Response.json({ error: 'deviceId not configured' }, { status: 500 })
 		}
 
 		const response = await Dial({
 			callee,
-			caller: credentials.deviceId,
-			callerId: credentials.callerId ?? credentials.deviceId,
-			deviceId: credentials.deviceId,
+			caller: deviceId,
+			callerId: credentials.callerId ?? deviceId,
+			deviceId,
 			channelId: credentials.channelId,
 		})
 
