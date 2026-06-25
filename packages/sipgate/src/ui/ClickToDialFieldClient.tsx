@@ -89,22 +89,19 @@ export const ClickToDialFieldClient = ({
 					required={required}
 					style={{ flex: 1, margin: 0 }}
 				/>
-				<DrawerToggler slug={DRAWER_SLUG} disabled={!value || readOnly}>
-					<Button
-						type="button"
-						buttonStyle={dialState === 'error' ? 'error' : 'primary'}
-						size="medium"
-						disabled={!value || readOnly || dialState === 'dialing'}
-						margin={false}
-					>
-						{dialState === 'idle'
-							? 'Dial'
-							: dialState === 'dialing'
-								? 'Dialing...'
-								: dialState === 'success'
-									? 'Called!'
-									: 'Failed'}
-					</Button>
+				<DrawerToggler
+					slug={DRAWER_SLUG}
+					disabled={!value || readOnly || dialState === 'dialing'}
+					className={`btn btn--size-medium btn--style-${dialState === 'error' ? 'error' : 'primary'}`}
+					style={{ margin: 0 }}
+				>
+					{dialState === 'idle'
+						? 'Dial'
+						: dialState === 'dialing'
+							? 'Dialing...'
+							: dialState === 'success'
+								? 'Called!'
+								: 'Failed'}
 				</DrawerToggler>
 			</div>
 

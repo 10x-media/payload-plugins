@@ -56,6 +56,11 @@
 			"development": "./src/ui/LiveCallFloatingWindow.tsx",
 			"types": "./src/ui/LiveCallFloatingWindow.tsx",
 			"default": "./dist/ui/LiveCallFloatingWindow.js"
+		},
+		"./ui/ContactMatchUiField": {
+			"development": "./src/ui/ContactMatchUiField.tsx",
+			"types": "./src/ui/ContactMatchUiField.tsx",
+			"default": "./dist/ui/ContactMatchUiField.js"
 		}
 	},
 	"files": [
@@ -152,6 +157,11 @@
 				"types": "./dist/ui/LiveCallFloatingWindow.d.ts",
 				"import": "./dist/ui/LiveCallFloatingWindow.js",
 				"default": "./dist/ui/LiveCallFloatingWindow.js"
+			},
+			"./ui/ContactMatchUiField": {
+				"types": "./dist/ui/ContactMatchUiField.d.ts",
+				"import": "./dist/ui/ContactMatchUiField.js",
+				"default": "./dist/ui/ContactMatchUiField.js"
 			}
 		}
 	},
