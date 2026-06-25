@@ -9,6 +9,7 @@ export default defineConfig({
 		'ui/ClickToDialField': 'src/ui/ClickToDialField.tsx',
 		'ui/CallActivityWidget': 'src/ui/CallActivityWidget.tsx',
 		'ui/LiveCallFloatingWindow': 'src/ui/LiveCallFloatingWindow.tsx',
+		'ui/ContactMatchUiField': 'src/ui/ContactMatchUiField.tsx',
 	},
 	format: 'esm',
 	dts: true,

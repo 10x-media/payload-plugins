@@ -10,10 +10,12 @@ import {
 import { fieldAffectsData } from 'payload/shared'
 import { createCallLogsCollection } from './collections/CallLogs'
 import { createSipgateActiveCall } from './endpoints/sipgate.activeCall'
+import { createSipgateContacts } from './endpoints/sipgate.contacts'
 import { createSipgateDevices } from './endpoints/sipgate.devices'
 import { createSipgateDial } from './endpoints/sipgate.dial'
 import { createSipgateRtcm } from './endpoints/sipgate.rtcm'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
+import { createContactMatchUiField } from './fields/contactMatchUi.field'
 import { createPhoneNumberField } from './fields/phoneNumber.field'
 import { registerTranslations } from './plugin/registerTranslations'
 import { buildSyncCallHistoryTask } from './tasks/syncCallHistoryTask'
@@ -58,6 +60,11 @@ export type SipgatePluginOptions = {
 	enableLiveCallFloatingWindow: boolean
 
 	/**
+	 * Whether to enable the contact match UI.
+	 */
+	enableContactMatchUi?: boolean
+
+	/**
 	 * Maximum number of device IDs to probe when discovering sipgate devices.
 	 * Devices are probed as e0, e1, ... until a 404 is returned or this limit is reached.
 	 * @default 25
@@ -75,6 +82,7 @@ export type SipgatePluginOptions = {
 		sipgateDial?: Partial<Endpoint>
 		sipgateDevices?: Partial<Endpoint>
 		sipgateRtcm?: Partial<Endpoint>
+		sipgateContacts?: Partial<Endpoint>
 		liveCallFloatingWindow?: Partial<CustomComponent<Record<string, never>>>
 	}
 }
@@ -103,8 +111,12 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 
 		// 2. Extend target contact collections with click-to-dial UI on phone number fields
 		options.contactCollections.forEach((pluginCollectionSlug) => {
+			if (!config.collections) return
 			config.collections?.forEach((collection) => {
 				if (collection.slug === pluginCollectionSlug) {
+					if (!options.enableContactMatchUi) {
+						collection.fields.push(createContactMatchUiField(options.phoneNumberFields))
+					}
 					collection.fields = collection.fields?.map((field) => {
 						if (fieldAffectsData(field) && options.phoneNumberFields.includes(field.name)) {
 							return createPhoneNumberField(field)
@@ -126,7 +138,8 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			createSipgateActiveCall(options.overrides?.sipgateActiveCall),
 			createSipgateDial(options.sipgateCredentials, options.overrides?.sipgateDial),
 			createSipgateDevices(options.maxDeviceProbeCount ?? 25, options.overrides?.sipgateDevices),
-			createSipgateRtcm(options.sipgateCredentials, options.overrides?.sipgateRtcm)
+			createSipgateRtcm(options.sipgateCredentials, options.overrides?.sipgateRtcm),
+			createSipgateContacts(options.overrides?.sipgateContacts)
 		)
 
 		// 4. Inject global Admin UI components for call notifications

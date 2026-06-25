@@ -119,7 +119,7 @@ export const holdCall = async (callId: string, props: SipgateHoldCallProps) => {
 	if (!response.ok) {
 		throw new Error('Failed to hold call')
 	}
-	return response.json()
+	return response
 }
 
 type SipgateMuteCallProps = {
@@ -132,9 +132,10 @@ export const muteCall = async (callId: string, props: SipgateMuteCallProps) => {
 		body: JSON.stringify(props),
 	})
 	if (!response.ok) {
-		throw new Error('Failed to mute call')
+		const body = await response.text().catch(() => '')
+		throw new Error(`Failed to mute call: ${response.status} ${response.statusText} – ${body}`)
 	}
-	return response.json()
+	return response
 }
 
 type SipgateRecordingsCallProps = {
@@ -150,7 +151,7 @@ export const recordingsCall = async (callId: string, props: SipgateRecordingsCal
 	if (!response.ok) {
 		throw new Error('Failed to start recording')
 	}
-	return response.json()
+	return response
 }
 
 export type SipgateDevice = {
