@@ -32,6 +32,22 @@ const buildSecureFetch = (tokenId: string | undefined, token: string | undefined
 
 export const sipgateRest = buildSecureFetch(env.SIPGATE_TOKEN_ID, env.SIPGATE_TOKEN)
 
+// will work ONLY with OAuth2
+type SipgateUserInfo = {
+	domain: string
+	locale: string
+	masterSipId: string
+	sub: string // w0, w1, w2, etc.
+}
+
+export const getUserInfo = async () => {
+	const response = await sipgateRest('/authorization/user', { method: 'GET' })
+	if (!response.ok) {
+		throw new Error('Failed to get user info')
+	}
+	return (await response.json()) as SipgateUserInfo
+}
+
 export const getContacts = async () => {
 	const response = await sipgateRest('/contacts', { method: 'GET' })
 	if (!response.ok) {
@@ -178,4 +194,12 @@ export const probeDevices = async (maxCount = 25): Promise<SipgateDevice[]> => {
 		}
 	}
 	return devices
+}
+
+export const getDevices = async (userId: string) => {
+	const response = await sipgateRest(`/${userId}/devices`, { method: 'GET' })
+	if (!response.ok) {
+		throw new Error('Failed to get devices')
+	}
+	return (await response.json()) as SipgateDevice[]
 }
