@@ -132,6 +132,7 @@ Technical details:
 - api is messy. Do we even want to support classic accounts? all new accounts are neo either way. and there is a free migration for classic to neo accounts too. 
 - authentication is pretty good documented. No risk there. Only implementation work. 
 - default access control and localization missing from current implementation.  
+- Is the transfer feature currently implemented even neccesary? With the correct routing setup you can make all ur devices ring at the same time. No transfer needed. (which would be useful if u wanted to answer on a different device)(verdict: useful, because what if someone calls sandro but he wants joshua to answer the call. So he uses the transfer to route it to joshuas device) (this has issues with security tho, as every user can transfer to any other user, that would need to be restrictable)
 
 The current implementation:
 1. working calling from a phone number field. 

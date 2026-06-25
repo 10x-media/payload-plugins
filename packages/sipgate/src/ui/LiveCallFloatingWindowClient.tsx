@@ -156,7 +156,13 @@ export const LiveCallFloatingWindowClient = () => {
 										<button
 											type="button"
 											aria-pressed={call.muted}
-											style={{ fontWeight: call.muted ? 'bold' : undefined }}
+											disabled
+											title="Mute is not yet supported by sipgate Neo"
+											style={{
+												fontWeight: call.muted ? 'bold' : undefined,
+												opacity: 0.4,
+												cursor: 'not-allowed',
+											}}
 											onClick={() => handleMute(call)}
 										>
 											{call.muted ? 'Unmute' : 'Mute'}
