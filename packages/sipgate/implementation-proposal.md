@@ -38,6 +38,7 @@ Notes:
 5. API rate limits need to be researched. 
 6. webhooks could be spoofed. Is there any way to secure it with cryptographic headers?
 7. what happens when a webhook delivery fails? The call woul dbe stale. How do we remove it? We coul use the active calls rest api endpoint?
+8. It seems like Web Apps cant be the starting point for a call initiation via the rest api, hence why they are excluded from the /devices endpoint. 
 
 
 1. What does the API support?
@@ -111,6 +112,7 @@ More complete: more better channel management, device management and per payload
 3. Integrations with Third Party like Slack. 
 4. oauth2 integration. 
 5. device and chanel management (collections? as this data changes very infrequent with manual sync buttons) (how would it handel delete of a channel or device with a user still assigned? probbly jst remove from user before delete). 
+6. Number Pad to dial number directly in payload. 
 
 For the future:
 1. In App call via webrtx conection, guide for setting up infrastructure, straight forward plugin configuration. 
