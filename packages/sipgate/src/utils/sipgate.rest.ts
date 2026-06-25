@@ -95,6 +95,17 @@ export const hangupCall = async (callId: string) => {
 	return await sipgateRest(`/calls/${callId}`, { method: 'DELETE' })
 }
 
+export const answerCall = async (callId: string, deviceId: string) => {
+	const response = await sipgateRest(`/calls/${callId}/answer`, {
+		method: 'PUT',
+		body: JSON.stringify({ deviceId }),
+	})
+	if (!response.ok) {
+		throw new Error('Failed to answer call')
+	}
+	return response
+}
+
 // endpoints for rtcm
 type SipgateHoldCallProps = {
 	value: boolean
@@ -140,4 +151,30 @@ export const recordingsCall = async (callId: string, props: SipgateRecordingsCal
 		throw new Error('Failed to start recording')
 	}
 	return response.json()
+}
+
+export type SipgateDevice = {
+	id: string
+	alias: string
+	type: 'REGISTER' | 'MOBILE' | 'EXTERNAL'
+	online: boolean
+	dnd: boolean
+	registered: { userAgent: string; ip: string; port: string }[]
+}
+
+/**
+ * Probes /devices/e0, /devices/e1, ... until 404 or maxCount is reached.
+ * Sipgate does not expose CLINQ/web-app devices via /{userId}/devices,
+ * so sequential probing is the only reliable discovery mechanism.
+ */
+export const probeDevices = async (maxCount = 25): Promise<SipgateDevice[]> => {
+	const devices: SipgateDevice[] = []
+	for (let i = 0; i < maxCount; i++) {
+		const response = await sipgateRest(`/devices/e${i}`, { method: 'GET' })
+		if (response.status === 404) break
+		if (response.ok) {
+			devices.push((await response.json()) as SipgateDevice)
+		}
+	}
+	return devices
 }

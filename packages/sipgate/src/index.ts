@@ -10,6 +10,7 @@ import {
 import { fieldAffectsData } from 'payload/shared'
 import { createCallLogsCollection } from './collections/CallLogs'
 import { createSipgateActiveCall } from './endpoints/sipgate.activeCall'
+import { createSipgateDevices } from './endpoints/sipgate.devices'
 import { createSipgateDial } from './endpoints/sipgate.dial'
 import { createSipgateRtcm } from './endpoints/sipgate.rtcm'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
@@ -57,6 +58,13 @@ export type SipgatePluginOptions = {
 	enableLiveCallFloatingWindow: boolean
 
 	/**
+	 * Maximum number of device IDs to probe when discovering sipgate devices.
+	 * Devices are probed as e0, e1, ... until a 404 is returned or this limit is reached.
+	 * @default 25
+	 */
+	maxDeviceProbeCount?: number
+
+	/**
 	 * The overrides to use for the plugin.
 	 */
 	overrides?: {
@@ -65,6 +73,7 @@ export type SipgatePluginOptions = {
 		sipgateWebhooks?: Partial<Endpoint>
 		sipgateActiveCall?: Partial<Endpoint>
 		sipgateDial?: Partial<Endpoint>
+		sipgateDevices?: Partial<Endpoint>
 		sipgateRtcm?: Partial<Endpoint>
 		liveCallFloatingWindow?: Partial<CustomComponent<Record<string, never>>>
 	}
@@ -92,12 +101,6 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			createCallLogsCollection(options.contactCollections, options.overrides?.callLogs)
 		)
 
-		if (options.syncCallLogs) {
-			if (!config.jobs) config.jobs = {}
-			if (!config.jobs.tasks) config.jobs.tasks = []
-			config.jobs.tasks.push(buildSyncCallHistoryTask({ callLogsSlug }))
-		}
-
 		// 2. Extend target contact collections with click-to-dial UI on phone number fields
 		options.contactCollections.forEach((pluginCollectionSlug) => {
 			config.collections?.forEach((collection) => {
@@ -122,6 +125,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			),
 			createSipgateActiveCall(options.overrides?.sipgateActiveCall),
 			createSipgateDial(options.sipgateCredentials, options.overrides?.sipgateDial),
+			createSipgateDevices(options.maxDeviceProbeCount ?? 25, options.overrides?.sipgateDevices),
 			createSipgateRtcm(options.sipgateCredentials, options.overrides?.sipgateRtcm)
 		)
 
@@ -145,10 +149,12 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			)
 		}
 
-		// 6. inject task
-		config.jobs ??= {}
-		config.jobs.tasks ??= []
-		config.jobs.tasks.push(buildSyncCallHistoryTask({ callLogsSlug }))
+		// 6. Inject sync task when call log syncing is enabled
+		if (options.syncCallLogs) {
+			config.jobs ??= {}
+			config.jobs.tasks ??= []
+			config.jobs.tasks.push(buildSyncCallHistoryTask({ callLogsSlug }))
+		}
 
 		return config
 	},

@@ -10,8 +10,13 @@ export const getNeoCallHistory = async () => {
 
 	const allEvents = await Promise.all(
 		channelsResponse.items.map(async (channel) => {
-			const eventsResponse = await getChannelEvents(channel.id)
-			return eventsResponse.events.filter((event) => event.type === 'CALL')
+			try {
+				const eventsResponse = await getChannelEvents(channel.id)
+				return eventsResponse.events.filter((event) => event.type === 'CALL')
+			} catch (err) {
+				console.warn(`[sipgate] Skipping channel ${channel.id}:`, err)
+				return []
+			}
 		})
 	)
 
@@ -21,7 +26,8 @@ export const getNeoCallHistory = async () => {
 export const getChannels = async () => {
 	const response = await sipgateRest('/channels', { method: 'GET' })
 	if (!response.ok) {
-		throw new Error('Failed to get channels')
+		const body = await response.text().catch(() => '')
+		throw new Error(`Failed to get channels: ${response.status} ${response.statusText} - ${body}`)
 	}
 	return (await response.json()) as SipgateChannelResponse
 }
@@ -40,7 +46,10 @@ export const getChannelEvents = async (channelId: string, params?: SipgateChanne
 
 	const response = await sipgateRest(endpoint, { method: 'GET' })
 	if (!response.ok) {
-		throw new Error('Failed to get channel events')
+		const body = await response.text().catch(() => '')
+		throw new Error(
+			`Failed to get channel events: ${response.status} ${response.statusText} - ${body}`
+		)
 	}
 	return (await response.json()) as SipgateChannelEventsResponse
 }
