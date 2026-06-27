@@ -61,6 +61,11 @@
 			"development": "./src/ui/ContactMatchUiField.tsx",
 			"types": "./src/ui/ContactMatchUiField.tsx",
 			"default": "./dist/ui/ContactMatchUiField.js"
+		},
+		"./ui/SipgateSyncButton": {
+			"development": "./src/ui/SipgateSyncButton.tsx",
+			"types": "./src/ui/SipgateSyncButton.tsx",
+			"default": "./dist/ui/SipgateSyncButton.js"
 		}
 	},
 	"files": [

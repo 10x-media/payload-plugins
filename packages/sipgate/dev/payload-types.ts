@@ -70,6 +70,9 @@ export interface Config {
     users: User;
     contacts: Contact;
     'call-logs': CallLog;
+    'sipgate-users': SipgateUser;
+    'sipgate-devices': SipgateDevice;
+    'sipgate-channels': SipgateChannel;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -81,6 +84,9 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     contacts: ContactsSelect<false> | ContactsSelect<true>;
     'call-logs': CallLogsSelect<false> | CallLogsSelect<true>;
+    'sipgate-users': SipgateUsersSelect<false> | SipgateUsersSelect<true>;
+    'sipgate-devices': SipgateDevicesSelect<false> | SipgateDevicesSelect<true>;
+    'sipgate-channels': SipgateChannelsSelect<false> | SipgateChannelsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -183,6 +189,143 @@ export interface CallLog {
   startedAt?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sipgate-users".
+ */
+export interface SipgateUser {
+  /**
+   * Sipgate user ID (e.g. w0)
+   */
+  id: string;
+  firstname?: string | null;
+  lastname?: string | null;
+  email?: string | null;
+  /**
+   * Default device ID (e.g. e0)
+   */
+  defaultDevice?: string | null;
+  admin?: boolean | null;
+  /**
+   * Reject new incoming calls when already on a call
+   */
+  busyOnBusy?: boolean | null;
+  timezone?: string | null;
+  addressId?: string | null;
+  /**
+   * Link to the corresponding Payload user account
+   */
+  payloadUser?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sipgate-devices".
+ */
+export interface SipgateDevice {
+  /**
+   * Sipgate device ID (e.g. e0)
+   */
+  id: string;
+  alias?: string | null;
+  /**
+   * Sipgate user ID (e.g. w0)
+   */
+  sipgateUserId?: string | null;
+  /**
+   * Sipgate user
+   */
+  sipgateUser?: (string | null) | SipgateUser;
+  type?: ('REGISTER' | 'MOBILE' | 'EXTERNAL' | 'WEBRTC' | 'CLINQ') | null;
+  online?: boolean | null;
+  dnd?: boolean | null;
+  /**
+   * Channel groups this device is currently active in
+   */
+  activeGroups?:
+    | {
+        id?: string | null;
+        alias?: string | null;
+      }[]
+    | null;
+  /**
+   * Phonelines this device is currently active on
+   */
+  activePhonelines?:
+    | {
+        id?: string | null;
+        alias?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sipgate-channels".
+ */
+export interface SipgateChannel {
+  /**
+   * Sipgate channel ID
+   */
+  id: string;
+  name?: string | null;
+  /**
+   * Sipgate user ID of the channel owner (e.g. w0)
+   */
+  owner?: string | null;
+  locale?: string | null;
+  createdAt: string;
+  /**
+   * Users assigned to this channel and their active device IDs
+   */
+  assignedUsers?:
+    | {
+        /**
+         * Resolved sipgate user (populated on sync)
+         */
+        user?: (string | null) | SipgateUser;
+        /**
+         * Raw sipgate user ID (e.g. w0) - used to resolve the relationship on sync
+         */
+        sipgateUserId?: string | null;
+        deviceIds?:
+          | {
+              deviceId?: string | null;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  settings?: {
+    greetingAudioFileId?: string | null;
+    smsSim?: string | null;
+    voiceboxAccessNumber?: number | null;
+    queue?: {
+      respectWaitingTime?: boolean | null;
+      waitingAudioFileId?: string | null;
+    };
+    ringingOrder?: {
+      type?: string | null;
+      users?:
+        | {
+            userId?: string | null;
+            id?: string | null;
+          }[]
+        | null;
+    };
+    userDefaults?: {
+      followUpTime?: number | null;
+      ringTime?: number | null;
+    };
+  };
+  updatedAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -311,6 +454,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'call-logs';
         value: string | CallLog;
+      } | null)
+    | ({
+        relationTo: 'sipgate-users';
+        value: string | SipgateUser;
+      } | null)
+    | ({
+        relationTo: 'sipgate-devices';
+        value: string | SipgateDevice;
+      } | null)
+    | ({
+        relationTo: 'sipgate-channels';
+        value: string | SipgateChannel;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -401,6 +556,106 @@ export interface CallLogsSelect<T extends boolean = true> {
   startedAt?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sipgate-users_select".
+ */
+export interface SipgateUsersSelect<T extends boolean = true> {
+  id?: T;
+  firstname?: T;
+  lastname?: T;
+  email?: T;
+  defaultDevice?: T;
+  admin?: T;
+  busyOnBusy?: T;
+  timezone?: T;
+  addressId?: T;
+  payloadUser?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sipgate-devices_select".
+ */
+export interface SipgateDevicesSelect<T extends boolean = true> {
+  id?: T;
+  alias?: T;
+  sipgateUserId?: T;
+  sipgateUser?: T;
+  type?: T;
+  online?: T;
+  dnd?: T;
+  activeGroups?:
+    | T
+    | {
+        id?: T;
+        alias?: T;
+      };
+  activePhonelines?:
+    | T
+    | {
+        id?: T;
+        alias?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sipgate-channels_select".
+ */
+export interface SipgateChannelsSelect<T extends boolean = true> {
+  id?: T;
+  name?: T;
+  owner?: T;
+  locale?: T;
+  createdAt?: T;
+  assignedUsers?:
+    | T
+    | {
+        user?: T;
+        sipgateUserId?: T;
+        deviceIds?:
+          | T
+          | {
+              deviceId?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  settings?:
+    | T
+    | {
+        greetingAudioFileId?: T;
+        smsSim?: T;
+        voiceboxAccessNumber?: T;
+        queue?:
+          | T
+          | {
+              respectWaitingTime?: T;
+              waitingAudioFileId?: T;
+            };
+        ringingOrder?:
+          | T
+          | {
+              type?: T;
+              users?:
+                | T
+                | {
+                    userId?: T;
+                    id?: T;
+                  };
+            };
+        userDefaults?:
+          | T
+          | {
+              followUpTime?: T;
+              ringTime?: T;
+            };
+      };
+  updatedAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

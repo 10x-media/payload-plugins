@@ -9,19 +9,26 @@ import {
 } from 'payload'
 import { fieldAffectsData } from 'payload/shared'
 import { createCallLogsCollection } from './collections/CallLogs'
+import { createSipgateChannelsCollection } from './collections/Channels'
+import { createSipgateDevicesCollection } from './collections/Devices'
+import { createSipgateUsersCollection } from './collections/SipgateUsers'
 import { createSipgateActiveCall } from './endpoints/sipgate.activeCall'
 import { createSipgateContacts } from './endpoints/sipgate.contacts'
 import { createSipgateDevices } from './endpoints/sipgate.devices'
 import { createSipgateDial } from './endpoints/sipgate.dial'
 import { createSipgateRtcm } from './endpoints/sipgate.rtcm'
+import { createSipgateSync } from './endpoints/sipgate.sync'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
 import { createContactMatchUiField } from './fields/contactMatchUi.field'
 import { createPhoneNumberField } from './fields/phoneNumber.field'
 import { registerTranslations } from './plugin/registerTranslations'
 import { buildSyncCallHistoryTask } from './tasks/syncCallHistoryTask'
 import type { SipgateCredentials } from './types'
+import type { SipgateAccess } from './utils/access'
 import { createCallActivityWidget } from './widgets/callActivity.widget'
 import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.component'
+
+export type { SipgateAccess, SipgateAccessFn } from './utils/access'
 
 export type SipgatePluginOptions = {
 	/**
@@ -32,37 +39,45 @@ export type SipgatePluginOptions = {
 	/**
 	 * Your collections with phone number fields.
 	 */
-	contactCollections: CollectionSlug[]
+	contactCollections?: CollectionSlug[]
 
 	/**
 	 * These field slugs will be used to identify phoneNumber fields on your contact collections.
 	 */
-	phoneNumberFields: string[]
+	phoneNumberFields?: string[]
 
 	/**
 	 * Whether to sync call logs from the Sipgate API.
 	 */
-	syncCallLogs: boolean
+	syncCallLogs?: boolean
 
 	/**
 	 * The credentials to use for the Sipgate API.
 	 */
-	sipgateCredentials: SipgateCredentials
+	sipgateCredentials?: SipgateCredentials
 
 	/**
 	 * Whether to enable the call activity widget.
 	 */
-	enableCallActivityWidget: boolean // TODO: Implement the widget and inject. This needs payload v3.65.0 or higher. (TODO: confirm version, could also be 3.64.0)
+	enableCallActivityWidget?: boolean
 
 	/**
 	 * Whether to enable the live call floating window.
 	 */
-	enableLiveCallFloatingWindow: boolean
+	enableLiveCallFloatingWindow?: boolean
 
 	/**
 	 * Whether to enable the contact match UI.
 	 */
 	enableContactMatchUi?: boolean
+
+	/**
+	 * When true (default), the device list is filtered to devices belonging to the logged-in
+	 * Payload user's linked sipgate account. Set to false to show all devices to all users.
+	 * Has no effect when `singleUser` is set.
+	 * @default true
+	 */
+	filterDevicesByUser?: boolean
 
 	/**
 	 * Maximum number of device IDs to probe when discovering sipgate devices.
@@ -72,15 +87,37 @@ export type SipgatePluginOptions = {
 	maxDeviceProbeCount?: number
 
 	/**
+	 * Access control for sipgate endpoints. Each key maps to a specific endpoint.
+	 * The `default` key is used as a fallback when no endpoint-specific function is set.
+	 * Defaults to requiring an authenticated Payload user (`req.user != null`).
+	 * The webhooks endpoint is always public (sipgate servers call it without a user session).
+	 */
+	access?: SipgateAccess
+
+	payloadUsersSlug?: CollectionSlug | CollectionSlug[]
+
+	/**
+	 * When set, all dial and device operations are scoped to this Sipgate user.
+	 * Useful for single-account setups where all Payload users share one Sipgate identity.
+	 * The email is matched against the `sipgate-users` collection (populated by sync).
+	 */
+	singleUser?: {
+		/** Sipgate account email address. */
+		email: string
+	}
+
+	/**
 	 * The overrides to use for the plugin.
 	 */
 	overrides?: {
 		callLogs?: Partial<CollectionConfig>
-		allActivityWidget?: Partial<Widget> // TODO: See above.
+		sipgateUsers?: Partial<CollectionConfig>
+		sipgateDevices?: Partial<CollectionConfig>
+		sipgateChannels?: Partial<CollectionConfig>
+		allActivityWidget?: Partial<Widget>
 		sipgateWebhooks?: Partial<Endpoint>
 		sipgateActiveCall?: Partial<Endpoint>
 		sipgateDial?: Partial<Endpoint>
-		sipgateDevices?: Partial<Endpoint>
 		sipgateRtcm?: Partial<Endpoint>
 		sipgateContacts?: Partial<Endpoint>
 		liveCallFloatingWindow?: Partial<CustomComponent<Record<string, never>>>
@@ -102,24 +139,48 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		}
 		registerTranslations(config)
 
-		// 1. Inject custom Call Logs collection
 		const callLogsSlug = 'call-logs'
+		const sipgateUsersSlug = 'sipgate-users'
+		const sipgateDevicesSlug = 'sipgate-devices'
+		const sipgateChannelsSlug = 'sipgate-channels'
+		const contactCollections = options.contactCollections ?? []
+		const phoneNumberFields = options.phoneNumberFields ?? []
+		const maxDeviceProbeCount = options.maxDeviceProbeCount ?? 25
+
 		if (!config.collections) config.collections = []
 		config.collections.push(
-			createCallLogsCollection(options.contactCollections, options.overrides?.callLogs)
+			createCallLogsCollection(contactCollections, phoneNumberFields, options.overrides?.callLogs),
+			createSipgateUsersCollection({
+				slug: sipgateUsersSlug,
+				payloadUsersSlug: options.payloadUsersSlug ?? 'users',
+				overrides: options.overrides?.sipgateUsers,
+			}),
+			createSipgateDevicesCollection({
+				slug: sipgateDevicesSlug,
+				sipgateUsersSlug,
+				overrides: options.overrides?.sipgateDevices,
+			}),
+			createSipgateChannelsCollection({
+				slug: sipgateChannelsSlug,
+				sipgateUsersSlug,
+				overrides: options.overrides?.sipgateChannels,
+			})
 		)
 
-		// 2. Extend target contact collections with click-to-dial UI on phone number fields
-		options.contactCollections.forEach((pluginCollectionSlug) => {
+		contactCollections.forEach((pluginCollectionSlug) => {
 			if (!config.collections) return
 			config.collections?.forEach((collection) => {
 				if (collection.slug === pluginCollectionSlug) {
 					if (!options.enableContactMatchUi) {
-						collection.fields.push(createContactMatchUiField(options.phoneNumberFields))
+						collection.fields.push(createContactMatchUiField(phoneNumberFields))
 					}
 					collection.fields = collection.fields?.map((field) => {
-						if (fieldAffectsData(field) && options.phoneNumberFields.includes(field.name)) {
-							return createPhoneNumberField(field)
+						if (fieldAffectsData(field) && phoneNumberFields.includes(field.name)) {
+							return createPhoneNumberField(field, {
+								sipgateDevicesSlug,
+								sipgateUsersSlug,
+								filterDevicesByUser: options.filterDevicesByUser,
+							})
 						}
 						return field
 					})
@@ -127,22 +188,53 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			})
 		})
 
-		// 3. Inject API endpoints
 		if (!config.endpoints) config.endpoints = []
 		config.endpoints.push(
-			createSipgateWebhooks(
-				options.contactCollections,
-				options.phoneNumberFields,
-				options.overrides?.sipgateWebhooks
-			),
-			createSipgateActiveCall(options.overrides?.sipgateActiveCall),
-			createSipgateDial(options.sipgateCredentials, options.overrides?.sipgateDial),
-			createSipgateDevices(options.maxDeviceProbeCount ?? 25, options.overrides?.sipgateDevices),
-			createSipgateRtcm(options.sipgateCredentials, options.overrides?.sipgateRtcm),
-			createSipgateContacts(options.overrides?.sipgateContacts)
+			createSipgateWebhooks({
+				contactCollections,
+				phoneNumberFields,
+				callLogsSlug,
+				overrides: options.overrides?.sipgateWebhooks,
+			}),
+			createSipgateActiveCall(options.access, options.overrides?.sipgateActiveCall),
+			createSipgateDevices({
+				sipgateDevicesSlug,
+				sipgateUsersSlug,
+				access: options.access,
+				singleUserEmail: options.singleUser?.email,
+				filterDevicesByUser: options.filterDevicesByUser,
+			})
 		)
 
-		// 4. Inject global Admin UI components for call notifications
+		if (options.sipgateCredentials) {
+			config.endpoints.push(
+				createSipgateDial({
+					credentials: options.sipgateCredentials,
+					access: options.access,
+					singleUserEmail: options.singleUser?.email,
+					sipgateUsersSlug,
+					overrides: options.overrides?.sipgateDial,
+				}),
+				createSipgateRtcm(
+					options.sipgateCredentials,
+					options.access,
+					options.overrides?.sipgateRtcm
+				),
+				createSipgateContacts(
+					options.sipgateCredentials,
+					options.access,
+					options.overrides?.sipgateContacts
+				),
+				createSipgateSync({
+					credentials: options.sipgateCredentials,
+					sipgateUsersSlug,
+					sipgateDevicesSlug,
+					sipgateChannelsSlug,
+					access: options.access,
+				})
+			)
+		}
+
 		if (options.enableLiveCallFloatingWindow) {
 			if (!config.admin) config.admin = {}
 			if (!config.admin.components) config.admin.components = {}
@@ -152,7 +244,6 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			)
 		}
 
-		// 5. Inject custom dashboard widget for call activity
 		if (options.enableCallActivityWidget) {
 			if (!config.admin) config.admin = {}
 			if (!config.admin?.dashboard) config.admin.dashboard = { widgets: [] }
@@ -162,11 +253,15 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			)
 		}
 
-		// 6. Inject sync task when call log syncing is enabled
-		if (options.syncCallLogs) {
+		if (options.syncCallLogs && options.sipgateCredentials) {
 			config.jobs ??= {}
 			config.jobs.tasks ??= []
-			config.jobs.tasks.push(buildSyncCallHistoryTask({ callLogsSlug }))
+			config.jobs.tasks.push(
+				buildSyncCallHistoryTask({
+					callLogsSlug,
+					credentials: options.sipgateCredentials,
+				})
+			)
 		}
 
 		return config
