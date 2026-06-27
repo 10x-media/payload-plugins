@@ -10,6 +10,7 @@ export default defineConfig({
 		'ui/CallActivityWidget': 'src/ui/CallActivityWidget.tsx',
 		'ui/LiveCallFloatingWindow': 'src/ui/LiveCallFloatingWindow.tsx',
 		'ui/ContactMatchUiField': 'src/ui/ContactMatchUiField.tsx',
+		'ui/SipgateSyncButton': 'src/ui/SipgateSyncButton.tsx',
 	},
 	format: 'esm',
 	dts: true,

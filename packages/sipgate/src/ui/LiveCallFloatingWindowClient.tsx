@@ -10,7 +10,7 @@ type SipgateDevice = {
 	alias: string
 	type: string
 	online: boolean
-	registered: { userAgent: string }[]
+	dnd: boolean
 }
 
 const ACCEPT_DRAWER_SLUG = 'sipgate-accept-device-picker'
@@ -26,12 +26,16 @@ type ActiveCall = {
 	recording: boolean
 }
 
-export const LiveCallFloatingWindowClient = () => {
+export const LiveCallFloatingWindowClient = ({
+	initialDevices,
+}: {
+	initialDevices: SipgateDevice[]
+}) => {
 	const [mounted, setMounted] = useState(false)
 	const [open, setOpen] = useState(false)
 	const [calls, setCalls] = useState<ActiveCall[]>([])
 	const [acceptingCall, setAcceptingCall] = useState<ActiveCall | null>(null)
-	const [devices, setDevices] = useState<SipgateDevice[]>([])
+	const [devices] = useState<SipgateDevice[]>(initialDevices)
 	const [devicesLoading, setDevicesLoading] = useState(false)
 	const { openModal, closeModal } = useModal()
 
@@ -72,11 +76,6 @@ export const LiveCallFloatingWindowClient = () => {
 	const openAcceptDrawer = (call: ActiveCall) => {
 		setAcceptingCall(call)
 		setDevicesLoading(true)
-		fetch('/api/sipgate/devices')
-			.then((r) => (r.ok ? r.json() : []))
-			.then(setDevices)
-			.catch(() => {})
-			.finally(() => setDevicesLoading(false))
 		openModal(ACCEPT_DRAWER_SLUG)
 	}
 
@@ -208,7 +207,6 @@ export const LiveCallFloatingWindowClient = () => {
 									<strong>{device.alias}</strong>
 									<small style={{ opacity: 0.6 }}>
 										{device.online ? '● Online' : '○ Offline'} · {device.id}
-										{device.registered[0] ? ` · ${device.registered[0].userAgent}` : ''}
 									</small>
 								</span>
 							</Button>

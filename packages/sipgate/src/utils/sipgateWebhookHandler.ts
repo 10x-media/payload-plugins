@@ -2,6 +2,7 @@ import type { CollectionSlug, PayloadHandler } from 'payload'
 import queryString from 'query-string'
 import { env } from '../env'
 import { createActiveCallStore } from './activeCall'
+import { createOrUpdateCallLog } from './callLog'
 import { xmlResponse } from './xmlFactory'
 
 export type SipgateNewCallWebhookData = {
@@ -45,8 +46,22 @@ type SipgateDtmfWebhookData = {
 	dtmf: string
 }
 
+const HANGUP_CAUSE_STATUS: Record<string, 'completed' | 'missed' | 'rejected'> = {
+	normalClearing: 'completed',
+	busy: 'missed',
+	cancel: 'missed',
+	noAnswer: 'missed',
+	congestion: 'missed',
+	notFound: 'missed',
+	forwarded: 'completed',
+}
+
 export const sipgateWebhookHandler =
-	(_contactCollections: CollectionSlug[], _phoneNumberFields: string[]): PayloadHandler =>
+	(
+		_contactCollections: CollectionSlug[],
+		_phoneNumberFields: string[],
+		callLogsSlug: string
+	): PayloadHandler =>
 	async (req) => {
 		if (!req.text) {
 			return Response.json({ error: 'No body' }, { status: 400 })
@@ -71,6 +86,7 @@ export const sipgateWebhookHandler =
 					held: false,
 					muted: false,
 					recording: false,
+					startedAt: Date.now(),
 				})
 				if (!env.SIPGATE_WEBHOOK_URL) {
 					return new Response(null, { status: 204 })
@@ -81,11 +97,36 @@ export const sipgateWebhookHandler =
 				await createActiveCallStore(req.payload, data.callId).update({ dtmf: data.dtmf })
 				return new Response(null, { status: 204 })
 			case 'answer':
-				await createActiveCallStore(req.payload, data.callId).update({ status: 'active' })
+				await createActiveCallStore(req.payload, data.callId).update({
+					status: 'active',
+					answeredAt: Date.now(),
+				})
 				return new Response(null, { status: 204 })
-			case 'hangup':
-				await createActiveCallStore(req.payload, data.callId).clear()
+			case 'hangup': {
+				const store = createActiveCallStore(req.payload, data.callId)
+				const stored = await store.getOne()
+
+				const callStatus = HANGUP_CAUSE_STATUS[data.cause] ?? 'completed'
+				const callDuration =
+					stored?.answeredAt != null
+						? Math.max(0, Math.round((Date.now() - stored.answeredAt) / 1000))
+						: 0
+
+				await createOrUpdateCallLog(req.payload, callLogsSlug, {
+					callId: data.callId,
+					callType: data.direction,
+					callStatus,
+					callDuration,
+					fromNumber: data.from,
+					toNumber: data.to,
+					startedAt: stored?.startedAt != null ? new Date(stored.startedAt) : undefined,
+				}).catch((err) => {
+					console.error('[sipgate] Failed to write call log on hangup:', err)
+				})
+
+				await store.clear()
 				return new Response(null, { status: 204 })
+			}
 			default:
 				return Response.json({ error: 'Invalid event' }, { status: 400 })
 		}

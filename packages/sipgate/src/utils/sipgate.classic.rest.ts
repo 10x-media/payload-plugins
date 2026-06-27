@@ -1,7 +1,10 @@
 import type { SipgateHistoryParams, SipgateHistoryResponse } from '../types'
-import { sipgateRest } from './sipgate.rest'
+import type { SipgateRestFetch } from './sipgate.rest'
 
-export const getClassicCallHistory = async (params?: SipgateHistoryParams) => {
+export const getClassicCallHistory = async (
+	rest: SipgateRestFetch,
+	params?: SipgateHistoryParams
+) => {
 	const query = new URLSearchParams()
 	if (params) {
 		if (params.connectionIds)
@@ -28,7 +31,7 @@ export const getClassicCallHistory = async (params?: SipgateHistoryParams) => {
 	const queryString = query.toString()
 	const endpoint = queryString ? `/history?${queryString}` : '/history'
 
-	const response = await sipgateRest(endpoint, { method: 'GET' })
+	const response = await rest(endpoint, { method: 'GET' })
 	if (!response.ok) {
 		throw new Error('Failed to get call history')
 	}
@@ -36,21 +39,9 @@ export const getClassicCallHistory = async (params?: SipgateHistoryParams) => {
 }
 
 export type SipgateNewSessionProps = {
-	/**
-	 * The number to call.
-	 */
 	callee: string
-	/**
-	 * The caller to use.
-	 */
 	caller: string
-	/**
-	 * The caller ID to use.
-	 */
 	callerId: string
-	/**
-	 * The device ID to use.
-	 */
 	deviceId?: string
 }
 
@@ -58,10 +49,9 @@ export type SipgateNewSessionResponse = {
 	sessionId: string
 }
 
-export const ClassicDial = async (props: SipgateNewSessionProps) => {
-	const response = await sipgateRest('/sessions/calls', {
+export const ClassicDial = async (rest: SipgateRestFetch, props: SipgateNewSessionProps) => {
+	return rest('/sessions/calls', {
 		method: 'POST',
 		body: JSON.stringify(props),
 	})
-	return response
 }

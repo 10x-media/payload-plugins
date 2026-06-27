@@ -2,15 +2,18 @@ import type { TaskConfig } from 'payload'
 import type {
 	CallStatus,
 	NeoCallEvent,
+	SipgateCredentials,
 	SipgateHistoryParams,
 	SipgateHistoryResponse,
 } from '../types'
-import { getCallHistory } from '../utils/sipgate.rest'
+import { createOrUpdateCallLog } from '../utils/callLog'
+import { buildSipgateRest, getCallHistory } from '../utils/sipgate.rest'
 
 export const SYNC_CALL_HISTORY_TASK = 'sipgateSyncCallHistory'
 
 export type SyncCallHistoryTaskDeps = {
 	callLogsSlug: string
+	credentials: SipgateCredentials
 }
 
 type NormalizedCallLog = {
@@ -148,35 +151,22 @@ export const buildSyncCallHistoryTask = (deps: SyncCallHistoryTaskDeps): TaskCon
 				...(to ? { to } : {}),
 			}
 
-			const history = await getCallHistory(params)
+			const rest = buildSipgateRest(deps.credentials)
+			const history = await getCallHistory(rest, params)
 			const entries = normalizeHistory(history)
 
 			let created = 0
-			let skipped = 0
+			let updated = 0
 
 			for (const entry of entries) {
-				const existing = await payload.find({
-					collection: deps.callLogsSlug,
-					where: { callId: { equals: entry.callId } },
-					limit: 1,
-					overrideAccess: true,
-					req,
-				})
-
-				if (existing.totalDocs > 0) {
-					skipped++
-					continue
+				const result = await createOrUpdateCallLog(payload, deps.callLogsSlug, entry)
+				if ('createdAt' in result && result.createdAt === result.updatedAt) {
+					created++
+				} else {
+					updated++
 				}
-
-				await payload.create({
-					collection: deps.callLogsSlug,
-					data: entry,
-					overrideAccess: true,
-					req,
-				})
-				created++
 			}
 
-			return { output: { created, skipped, total: entries.length } }
+			return { output: { created, updated, total: entries.length } }
 		},
 	}) as TaskConfig

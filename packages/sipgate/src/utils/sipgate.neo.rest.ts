@@ -3,15 +3,15 @@ import type {
 	SipgateChannelEventsResponse,
 	SipgateChannelResponse,
 } from '../types'
-import { sipgateRest } from './sipgate.rest'
+import type { SipgateRestFetch } from './sipgate.rest'
 
-export const getNeoCallHistory = async () => {
-	const channelsResponse = await getChannels()
+export const getNeoCallHistory = async (rest: SipgateRestFetch) => {
+	const channelsResponse = await getChannels(rest)
 
 	const allEvents = await Promise.all(
 		channelsResponse.items.map(async (channel) => {
 			try {
-				const eventsResponse = await getChannelEvents(channel.id)
+				const eventsResponse = await getChannelEvents(rest, channel.id)
 				return eventsResponse.events.filter((event) => event.type === 'CALL')
 			} catch (err) {
 				console.warn(`[sipgate] Skipping channel ${channel.id}:`, err)
@@ -23,8 +23,8 @@ export const getNeoCallHistory = async () => {
 	return allEvents.flat()
 }
 
-export const getChannels = async () => {
-	const response = await sipgateRest('/channels', { method: 'GET' })
+export const getChannels = async (rest: SipgateRestFetch) => {
+	const response = await rest('/channels', { method: 'GET' })
 	if (!response.ok) {
 		const body = await response.text().catch(() => '')
 		throw new Error(`Failed to get channels: ${response.status} ${response.statusText} - ${body}`)
@@ -32,7 +32,11 @@ export const getChannels = async () => {
 	return (await response.json()) as SipgateChannelResponse
 }
 
-export const getChannelEvents = async (channelId: string, params?: SipgateChannelEventsParams) => {
+export const getChannelEvents = async (
+	rest: SipgateRestFetch,
+	channelId: string,
+	params?: SipgateChannelEventsParams
+) => {
 	const query = new URLSearchParams()
 	if (params) {
 		if (params.position) query.append('position', params.position)
@@ -44,7 +48,7 @@ export const getChannelEvents = async (channelId: string, params?: SipgateChanne
 		? `/channels/${channelId}/events?${queryString}`
 		: `/channels/${channelId}/events`
 
-	const response = await sipgateRest(endpoint, { method: 'GET' })
+	const response = await rest(endpoint, { method: 'GET' })
 	if (!response.ok) {
 		const body = await response.text().catch(() => '')
 		throw new Error(
@@ -68,7 +72,6 @@ export type SigpateNeoNewChannelResponse = {
 	callSid: string
 }
 
-export const NeoDial = async (props: NeoDialProps) => {
-	const response = await sipgateRest('/calls', { method: 'POST', body: JSON.stringify(props) })
-	return response
+export const NeoDial = async (rest: SipgateRestFetch, props: NeoDialProps) => {
+	return rest('/calls', { method: 'POST', body: JSON.stringify(props) })
 }

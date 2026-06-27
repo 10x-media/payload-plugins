@@ -10,14 +10,14 @@ import {
 	useModal,
 } from '@payloadcms/ui'
 import type { ChangeEvent } from 'react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 type SipgateDevice = {
 	id: string
 	alias: string
 	type: string
 	online: boolean
-	registered: { userAgent: string }[]
+	dnd: boolean
 }
 
 type Props = {
@@ -27,6 +27,7 @@ type Props = {
 	required?: boolean
 	readOnly?: boolean
 	width?: string | number | undefined
+	initialDevices?: SipgateDevice[]
 }
 
 const DRAWER_SLUG = 'sipgate-device-picker'
@@ -38,23 +39,12 @@ export const ClickToDialFieldClient = ({
 	required,
 	readOnly,
 	width,
+	initialDevices,
 }: Props) => {
 	const { value, setValue, showError } = useField<string>({ path })
 	const [dialState, setDialState] = useState<'idle' | 'dialing' | 'success' | 'error'>('idle')
-	const [devices, setDevices] = useState<SipgateDevice[]>([])
+	const [devices] = useState<SipgateDevice[]>(initialDevices ?? [])
 	const { closeModal } = useModal()
-
-	// states
-	const [isLoading, setIsLoading] = useState(false)
-
-	useEffect(() => {
-		setIsLoading(true)
-		fetch('/api/sipgate/devices')
-			.then((r) => r.json())
-			.then(setDevices)
-			.catch(() => {})
-			.finally(() => setIsLoading(false))
-	}, [])
 
 	const dial = async (deviceId: string) => {
 		if (!value) return
@@ -107,10 +97,8 @@ export const ClickToDialFieldClient = ({
 
 			<Drawer slug={DRAWER_SLUG} title={`Call ${value}`}>
 				<div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-					{isLoading ? <p>Loading devices...</p> : null}
-					{!isLoading && devices.length === 0 && <p>No devices found.</p>}
-					{!isLoading &&
-						devices.length > 0 &&
+					{devices.length === 0 && <p>No devices found.</p>}
+					{devices.length > 0 &&
 						devices.map((device) => (
 							<Button
 								key={device.id}
@@ -125,7 +113,6 @@ export const ClickToDialFieldClient = ({
 									<strong>{device.alias}</strong>
 									<small style={{ opacity: 0.6 }}>
 										{device.online ? '● Online' : '○ Offline'} · {device.id}
-										{device.registered[0] ? ` · ${device.registered[0].userAgent}` : ''}
 									</small>
 								</span>
 							</Button>
