@@ -55,6 +55,7 @@ export default buildConfig({
 		sipgate({
 			contactCollections: [contacts.slug as CollectionSlug],
 			phoneNumberFields: ['phoneNumber'],
+			payloadUsersSlug: 'users',
 			syncCallLogs: true,
 			sipgateCredentials: {
 				authType: 'pat',

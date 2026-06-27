@@ -1,9 +1,10 @@
-// collections/CallLogs.ts
 import type { CollectionConfig, CollectionSlug } from 'payload'
 import { deepMerge } from 'payload'
+import { resolveRelatedContact } from '../utils/resolveRelatedContact'
 
 export const createCallLogsCollection = (
 	contactCollections: CollectionSlug[],
+	phoneNumberFields: string[],
 	overrides?: Partial<CollectionConfig>
 ): CollectionConfig => {
 	const defaultCallLogs: CollectionConfig = {
@@ -14,6 +15,25 @@ export const createCallLogsCollection = (
 		},
 		admin: {
 			useAsTitle: 'callId',
+		},
+		hooks: {
+			beforeChange: [
+				async ({ data, req }) => {
+					if (data.relatedContact) return data
+					const phoneNumber = data.fromNumber ?? data.toNumber
+					if (!phoneNumber) return data
+					const match = await resolveRelatedContact({
+						payload: req.payload,
+						contactCollections,
+						phoneNumberFields,
+						phoneNumber,
+					})
+					if (match) {
+						data.relatedContact = match
+					}
+					return data
+				},
+			],
 		},
 		fields: [
 			{

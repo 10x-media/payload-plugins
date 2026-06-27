@@ -7,6 +7,8 @@ export type StoredCall = SipgateNewCallWebhookData & {
 	muted: boolean
 	recording: boolean
 	dtmf?: string
+	answeredAt?: number
+	startedAt?: number
 }
 
 const KEY = '@10x-media/sipgate:active-call:'

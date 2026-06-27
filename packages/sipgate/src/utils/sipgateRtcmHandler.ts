@@ -1,13 +1,25 @@
 import type { PayloadHandler } from 'payload'
 import type { SipgateCredentials } from '../types'
+import type { SipgateAccess } from './access'
+import { checkAccess } from './access'
 import { createActiveCallStore } from './activeCall'
-import { hangupCall, holdCall, muteCall, recordingsCall, transferCall } from './sipgate.rest'
+import {
+	buildSipgateRest,
+	hangupCall,
+	holdCall,
+	muteCall,
+	recordingsCall,
+	transferCall,
+} from './sipgate.rest'
 
 export type SipgateRtcmAction = 'answer' | 'hold' | 'mute' | 'recordings' | 'hangup'
 
 export const sipgateRtcmHandler =
-	(_credentials: SipgateCredentials): PayloadHandler =>
+	(credentials: SipgateCredentials, access?: SipgateAccess): PayloadHandler =>
 	async (req) => {
+		const denied = await checkAccess(req, access, 'rtcm')
+		if (denied) return denied
+
 		if (!req.json) {
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
@@ -19,6 +31,7 @@ export const sipgateRtcmHandler =
 			return Response.json({ error: 'action is required' }, { status: 400 })
 		}
 
+		const rest = buildSipgateRest(credentials)
 		const store = createActiveCallStore(req.payload, callId)
 
 		switch (action) {
@@ -30,7 +43,7 @@ export const sipgateRtcmHandler =
 					)
 				}
 				try {
-					await transferCall(callId, deviceId)
+					await transferCall(rest, callId, deviceId)
 				} catch {
 					return Response.json({ error: 'Failed to transfer call' }, { status: 500 })
 				}
@@ -39,7 +52,7 @@ export const sipgateRtcmHandler =
 				const current = await store.getOne()
 				const newValue = !current?.held
 				try {
-					await holdCall(callId, { value: newValue })
+					await holdCall(rest, callId, { value: newValue })
 				} catch {
 					return Response.json({ error: 'Failed to hold call' }, { status: 500 })
 				}
@@ -50,7 +63,7 @@ export const sipgateRtcmHandler =
 				const current = await store.getOne()
 				const newValue = !current?.muted
 				try {
-					await muteCall(callId, { value: newValue })
+					await muteCall(rest, callId, { value: newValue })
 				} catch (err) {
 					const msg = err instanceof Error ? err.message : 'Failed to mute call'
 					const status = msg.includes('501') ? 501 : 500
@@ -63,7 +76,7 @@ export const sipgateRtcmHandler =
 				const current = await store.getOne()
 				const newValue = !current?.recording
 				try {
-					await recordingsCall(callId, { announcement: false, value: newValue })
+					await recordingsCall(rest, callId, { announcement: false, value: newValue })
 				} catch {
 					return Response.json({ error: 'Failed to toggle recording' }, { status: 500 })
 				}
@@ -72,7 +85,7 @@ export const sipgateRtcmHandler =
 			}
 			case 'hangup':
 				try {
-					await hangupCall(callId)
+					await hangupCall(rest, callId)
 				} catch {
 					return Response.json({ error: 'Failed to hang up call' }, { status: 500 })
 				}

@@ -2,6 +2,7 @@ import { env } from '../env'
 import type {
 	NeoCallEvent,
 	SipgateContact,
+	SipgateCredentials,
 	SipgateHistoryParams,
 	SipgateHistoryResponse,
 } from '../types'
@@ -11,14 +12,19 @@ import { isNeo } from './sipgate.utils'
 
 const BASE_URL = 'https://api.sipgate.com/v2'
 
-const buildSecureFetch = (tokenId: string | undefined, token: string | undefined) => {
+export type SipgateRestFetch = (url: string, options: RequestInit) => Promise<Response>
+
+export const buildSipgateRest = (credentials: SipgateCredentials): SipgateRestFetch => {
+	const tokenId = credentials.tokenId ?? env.SIPGATE_TOKEN_ID
+	const token = credentials.token ?? env.SIPGATE_TOKEN
 	if (!tokenId || !token) {
-		throw new Error('SIPGATE_TOKEN_ID and SIPGATE_TOKEN must be set')
+		throw new Error(
+			'Sipgate credentials: tokenId and token are required (or set SIPGATE_TOKEN_ID / SIPGATE_TOKEN)'
+		)
 	}
 	const auth = Buffer.from(`${tokenId}:${token}`).toString('base64')
-
-	return async (url: string, options: RequestInit) => {
-		const response = await fetch(BASE_URL + url, {
+	return (url, options) =>
+		fetch(BASE_URL + url, {
 			...options,
 			headers: {
 				'Content-Type': 'application/json',
@@ -26,30 +32,26 @@ const buildSecureFetch = (tokenId: string | undefined, token: string | undefined
 				Authorization: `Basic ${auth}`,
 			},
 		})
-		return response
-	}
 }
 
-export const sipgateRest = buildSecureFetch(env.SIPGATE_TOKEN_ID, env.SIPGATE_TOKEN)
-
-// will work ONLY with OAuth2
+/** @note Works only with OAuth2 tokens that include the userinfo scope. */
 type SipgateUserInfo = {
 	domain: string
 	locale: string
 	masterSipId: string
-	sub: string // w0, w1, w2, etc.
+	sub: string
 }
 
-export const getUserInfo = async () => {
-	const response = await sipgateRest('/authorization/user', { method: 'GET' })
+export const getUserInfo = async (rest: SipgateRestFetch) => {
+	const response = await rest('/authorization/user', { method: 'GET' })
 	if (!response.ok) {
 		throw new Error('Failed to get user info')
 	}
 	return (await response.json()) as SipgateUserInfo
 }
 
-export const getContacts = async () => {
-	const response = await sipgateRest('/contacts', { method: 'GET' })
+export const getContacts = async (rest: SipgateRestFetch) => {
+	const response = await rest('/contacts', { method: 'GET' })
 	if (!response.ok) {
 		throw new Error('Failed to get contacts')
 	}
@@ -57,12 +59,13 @@ export const getContacts = async () => {
 }
 
 export const getCallHistory = async (
+	rest: SipgateRestFetch,
 	params?: SipgateHistoryParams
 ): Promise<SipgateHistoryResponse | NeoCallEvent[]> => {
 	if (isNeo()) {
-		return await getNeoCallHistory()
+		return getNeoCallHistory(rest)
 	}
-	return await getClassicCallHistory(params)
+	return getClassicCallHistory(rest, params)
 }
 
 export type SipgateDialProps = {
@@ -73,7 +76,7 @@ export type SipgateDialProps = {
 	channelId?: string
 }
 
-export const Dial = async (props: SipgateDialProps) => {
+export const Dial = async (rest: SipgateRestFetch, props: SipgateDialProps) => {
 	const mode = isNeo() ? 'neo' : 'classic'
 	if (mode === 'neo') {
 		if (!props.deviceId) {
@@ -89,9 +92,9 @@ export const Dial = async (props: SipgateDialProps) => {
 			deviceId: props.deviceId,
 			targetNumber: props.callee,
 		}
-		return await NeoDial(neoProps)
+		return NeoDial(rest, neoProps)
 	}
-	return await ClassicDial(props)
+	return ClassicDial(rest, props)
 }
 
 type SipgateTransferCallProps = {
@@ -100,19 +103,23 @@ type SipgateTransferCallProps = {
 	phoneNumber: string
 }
 
-export const transferCall = async (callId: string, props: SipgateTransferCallProps) => {
-	return await sipgateRest(`/calls/${callId}/transfer`, {
+export const transferCall = async (
+	rest: SipgateRestFetch,
+	callId: string,
+	props: SipgateTransferCallProps
+) => {
+	return rest(`/calls/${callId}/transfer`, {
 		method: 'POST',
 		body: JSON.stringify(props),
 	})
 }
 
-export const hangupCall = async (callId: string) => {
-	return await sipgateRest(`/calls/${callId}`, { method: 'DELETE' })
+export const hangupCall = async (rest: SipgateRestFetch, callId: string) => {
+	return rest(`/calls/${callId}`, { method: 'DELETE' })
 }
 
-export const answerCall = async (callId: string, deviceId: string) => {
-	const response = await sipgateRest(`/calls/${callId}/answer`, {
+export const answerCall = async (rest: SipgateRestFetch, callId: string, deviceId: string) => {
+	const response = await rest(`/calls/${callId}/answer`, {
 		method: 'PUT',
 		body: JSON.stringify({ deviceId }),
 	})
@@ -122,13 +129,16 @@ export const answerCall = async (callId: string, deviceId: string) => {
 	return response
 }
 
-// endpoints for rtcm
 type SipgateHoldCallProps = {
 	value: boolean
 }
 
-export const holdCall = async (callId: string, props: SipgateHoldCallProps) => {
-	const response = await sipgateRest(`/calls/${callId}/hold`, {
+export const holdCall = async (
+	rest: SipgateRestFetch,
+	callId: string,
+	props: SipgateHoldCallProps
+) => {
+	const response = await rest(`/calls/${callId}/hold`, {
 		method: 'PUT',
 		body: JSON.stringify(props),
 	})
@@ -142,14 +152,18 @@ type SipgateMuteCallProps = {
 	value: boolean
 }
 
-export const muteCall = async (callId: string, props: SipgateMuteCallProps) => {
-	const response = await sipgateRest(`/calls/${callId}/muted`, {
+export const muteCall = async (
+	rest: SipgateRestFetch,
+	callId: string,
+	props: SipgateMuteCallProps
+) => {
+	const response = await rest(`/calls/${callId}/muted`, {
 		method: 'PUT',
 		body: JSON.stringify(props),
 	})
 	if (!response.ok) {
 		const body = await response.text().catch(() => '')
-		throw new Error(`Failed to mute call: ${response.status} ${response.statusText} – ${body}`)
+		throw new Error(`Failed to mute call: ${response.status} ${response.statusText} - ${body}`)
 	}
 	return response
 }
@@ -159,8 +173,12 @@ type SipgateRecordingsCallProps = {
 	value: boolean
 }
 
-export const recordingsCall = async (callId: string, props: SipgateRecordingsCallProps) => {
-	const response = await sipgateRest(`/calls/${callId}/recording`, {
+export const recordingsCall = async (
+	rest: SipgateRestFetch,
+	callId: string,
+	props: SipgateRecordingsCallProps
+) => {
+	const response = await rest(`/calls/${callId}/recording`, {
 		method: 'PUT',
 		body: JSON.stringify(props),
 	})
@@ -173,10 +191,59 @@ export const recordingsCall = async (callId: string, props: SipgateRecordingsCal
 export type SipgateDevice = {
 	id: string
 	alias: string
-	type: 'REGISTER' | 'MOBILE' | 'EXTERNAL'
+	sipgateUserId: string
+	sipgateUser: string
+	type: 'REGISTER' | 'MOBILE' | 'EXTERNAL' | 'WEBRTC' | 'CLINQ' | string
 	online: boolean
 	dnd: boolean
-	registered: { userAgent: string; ip: string; port: string }[]
+	activeGroups: { id: string; alias: string }[]
+	activePhonelines: { id: string; alias: string }[]
+	registered?: { userAgent: string; ip: string; port: string }[]
+}
+
+export type SipgateUserApiItem = {
+	id: string
+	firstname: string
+	lastname: string
+	email: string
+	defaultDevice: string
+	admin: boolean
+	busyOnBusy: boolean
+	timezone: string
+	addressId: string
+}
+
+export type SipgateGroupSettings = {
+	greetingAudioFileId?: string
+	queue?: { respectWaitingTime: boolean; waitingAudioFileId?: string }
+	ringingOrder?: { type: string; users: string[] }
+	smsSim?: string
+	users?: { followUpTime: number; ringTime: number }
+	voiceboxAccessNumber?: number
+}
+
+export type SipgateGroupApiItem = {
+	id: string
+	name: string
+	owner: string
+	createdAt: string
+	locale: string
+	settings: SipgateGroupSettings
+	users: { id: string; deviceIds: string[] }[]
+}
+
+export const getUsers = async (rest: SipgateRestFetch): Promise<SipgateUserApiItem[]> => {
+	const response = await rest('/users', { method: 'GET' })
+	if (!response.ok) throw new Error('Failed to get users')
+	const data = (await response.json()) as { items: SipgateUserApiItem[] }
+	return data.items
+}
+
+export const getGroups = async (rest: SipgateRestFetch): Promise<SipgateGroupApiItem[]> => {
+	const response = await rest('/channels', { method: 'GET' })
+	if (!response.ok) throw new Error('Failed to get channels')
+	const data = (await response.json()) as { items: SipgateGroupApiItem[] }
+	return data.items
 }
 
 /**
@@ -184,10 +251,13 @@ export type SipgateDevice = {
  * Sipgate does not expose CLINQ/web-app devices via /{userId}/devices,
  * so sequential probing is the only reliable discovery mechanism.
  */
-export const probeDevices = async (maxCount = 25): Promise<SipgateDevice[]> => {
+export const probeDevices = async (
+	rest: SipgateRestFetch,
+	maxCount = 25
+): Promise<SipgateDevice[]> => {
 	const devices: SipgateDevice[] = []
 	for (let i = 0; i < maxCount; i++) {
-		const response = await sipgateRest(`/devices/e${i}`, { method: 'GET' })
+		const response = await rest(`/devices/e${i}`, { method: 'GET' })
 		if (response.status === 404) break
 		if (response.ok) {
 			devices.push((await response.json()) as SipgateDevice)
@@ -196,10 +266,14 @@ export const probeDevices = async (maxCount = 25): Promise<SipgateDevice[]> => {
 	return devices
 }
 
-export const getDevices = async (userId: string) => {
-	const response = await sipgateRest(`/${userId}/devices`, { method: 'GET' })
+export const getDevices = async (
+	rest: SipgateRestFetch,
+	userId: string
+): Promise<SipgateDevice[]> => {
+	const response = await rest(`/${userId}/devices`, { method: 'GET' })
 	if (!response.ok) {
 		throw new Error('Failed to get devices')
 	}
-	return (await response.json()) as SipgateDevice[]
+	const data = (await response.json()) as { items: SipgateDevice[] }
+	return data.items ?? []
 }
