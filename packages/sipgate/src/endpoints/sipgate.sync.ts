@@ -40,7 +40,7 @@ export const createSipgateSync = ({
 			const results: Record<string, { synced: number; errors: number }> = {}
 
 			if (type === 'users' || type === 'all') {
-				results.users = await syncUsers({ payload, rest, sipgateUsersSlug })
+				results.users = await syncUsers({ payload, rest, sipgateUsersSlug, prune: true })
 			}
 			if (type === 'devices' || type === 'all') {
 				results.devices = await syncDevices({
@@ -48,6 +48,7 @@ export const createSipgateSync = ({
 					rest,
 					sipgateDevicesSlug,
 					sipgateUsersSlug,
+					prune: true,
 				})
 			}
 			if (type === 'channels' || type === 'all') {
@@ -56,6 +57,7 @@ export const createSipgateSync = ({
 					rest,
 					sipgateChannelsSlug,
 					sipgateUsersSlug,
+					prune: true,
 				})
 			}
 
