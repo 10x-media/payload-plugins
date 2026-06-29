@@ -145,7 +145,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		const sipgateChannelsSlug = 'sipgate-channels'
 		const contactCollections = options.contactCollections ?? []
 		const phoneNumberFields = options.phoneNumberFields ?? []
-		const maxDeviceProbeCount = options.maxDeviceProbeCount ?? 25
+		const _maxDeviceProbeCount = options.maxDeviceProbeCount ?? 25
 
 		if (!config.collections) config.collections = []
 		config.collections.push(
@@ -176,11 +176,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 					}
 					collection.fields = collection.fields?.map((field) => {
 						if (fieldAffectsData(field) && phoneNumberFields.includes(field.name)) {
-							return createPhoneNumberField(field, {
-								sipgateDevicesSlug,
-								sipgateUsersSlug,
-								filterDevicesByUser: options.filterDevicesByUser,
-							})
+							return createPhoneNumberField(field)
 						}
 						return field
 					})

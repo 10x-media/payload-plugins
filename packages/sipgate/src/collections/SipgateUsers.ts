@@ -57,6 +57,14 @@ export const createSipgateUsersCollection = ({
 				admin: { description: 'Default device ID (e.g. e0)' },
 			},
 			{
+				name: 'defaultChannel',
+				type: 'text',
+				admin: {
+					description: 'Personal channel UUID (set automatically by channel sync)',
+					readOnly: true,
+				},
+			},
+			{
 				name: 'admin',
 				type: 'checkbox',
 				defaultValue: false,

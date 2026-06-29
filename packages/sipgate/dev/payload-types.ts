@@ -206,6 +206,10 @@ export interface SipgateUser {
    * Default device ID (e.g. e0)
    */
   defaultDevice?: string | null;
+  /**
+   * Personal channel UUID (set automatically by channel sync)
+   */
+  defaultChannel?: string | null;
   admin?: boolean | null;
   /**
    * Reject new incoming calls when already on a call
@@ -567,6 +571,7 @@ export interface SipgateUsersSelect<T extends boolean = true> {
   lastname?: T;
   email?: T;
   defaultDevice?: T;
+  defaultChannel?: T;
   admin?: T;
   busyOnBusy?: T;
   timezone?: T;

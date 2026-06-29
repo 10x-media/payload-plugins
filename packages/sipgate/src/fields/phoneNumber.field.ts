@@ -11,29 +11,5 @@ const defaultField: Field = {
 	},
 }
 
-type PhoneNumberFieldOptions = {
-	sipgateDevicesSlug?: string
-	sipgateUsersSlug?: string
-	filterDevicesByUser?: boolean
-}
-
-export const createPhoneNumberField = (
-	overrides?: Partial<Field>,
-	options: PhoneNumberFieldOptions = {}
-) => {
-	const {
-		sipgateDevicesSlug = 'sipgate-devices',
-		sipgateUsersSlug = 'sipgate-users',
-		filterDevicesByUser = true,
-	} = options
-	return deepMerge<Field>(
-		{
-			...defaultField,
-			admin: {
-				...defaultField.admin,
-				custom: { sipgateDevicesSlug, sipgateUsersSlug, filterDevicesByUser },
-			},
-		},
-		overrides ?? {}
-	)
-}
+export const createPhoneNumberField = (overrides?: Partial<Field>) =>
+	deepMerge<Field>(defaultField, overrides ?? {})

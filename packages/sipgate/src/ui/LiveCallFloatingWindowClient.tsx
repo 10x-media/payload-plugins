@@ -36,7 +36,6 @@ export const LiveCallFloatingWindowClient = ({
 	const [calls, setCalls] = useState<ActiveCall[]>([])
 	const [acceptingCall, setAcceptingCall] = useState<ActiveCall | null>(null)
 	const [devices] = useState<SipgateDevice[]>(initialDevices)
-	const [devicesLoading, setDevicesLoading] = useState(false)
 	const { openModal, closeModal } = useModal()
 
 	useEffect(() => {
@@ -75,7 +74,6 @@ export const LiveCallFloatingWindowClient = ({
 
 	const openAcceptDrawer = (call: ActiveCall) => {
 		setAcceptingCall(call)
-		setDevicesLoading(true)
 		openModal(ACCEPT_DRAWER_SLUG)
 	}
 
@@ -190,27 +188,23 @@ export const LiveCallFloatingWindowClient = ({
 				title={acceptingCall ? `Accept call from ${acceptingCall.from}` : 'Accept call'}
 			>
 				<div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-					{devicesLoading ? <p>Loading devices...</p> : null}
-					{!devicesLoading && devices.length === 0 && <p>No devices found.</p>}
-					{!devicesLoading &&
-						devices.map((device) => (
-							<Button
-								key={device.id}
-								type="button"
-								margin={false}
-								buttonStyle="secondary"
-								onClick={() => handleAcceptWithDevice(device.id)}
-							>
-								<span
-									style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
-								>
-									<strong>{device.alias}</strong>
-									<small style={{ opacity: 0.6 }}>
-										{device.online ? '● Online' : '○ Offline'} · {device.id}
-									</small>
-								</span>
-							</Button>
-						))}
+					{devices.length === 0 && <p>No devices found.</p>}
+					{devices.map((device) => (
+						<Button
+							key={device.id}
+							type="button"
+							margin={false}
+							buttonStyle="secondary"
+							onClick={() => handleAcceptWithDevice(device.id)}
+						>
+							<span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+								<strong>{device.alias}</strong>
+								<small style={{ opacity: 0.6 }}>
+									{device.online ? '● Online' : '○ Offline'} · {device.id}
+								</small>
+							</span>
+						</Button>
+					))}
 				</div>
 			</Drawer>
 		</div>,

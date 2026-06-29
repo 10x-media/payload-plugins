@@ -179,7 +179,7 @@ export const syncChannels = async ({
 						ringingOrder: group.settings.ringingOrder
 							? {
 									type: group.settings.ringingOrder.type,
-									users: group.settings.ringingOrder.users.map((userId) => ({ userId })),
+									users: (group.settings.ringingOrder.users ?? []).map((userId) => ({ userId })),
 								}
 							: undefined,
 						userDefaults: group.settings.users
@@ -191,6 +191,18 @@ export const syncChannels = async ({
 					},
 				},
 			})
+
+			const isPersonalChannel = group.users.length === 1 && group.users[0]?.id === group.owner
+			if (isPersonalChannel) {
+				await upsertByField({
+					payload,
+					collection: sipgateUsersSlug,
+					uniqueField: 'id',
+					uniqueValue: group.owner,
+					data: { defaultChannel: group.id },
+				})
+			}
+
 			synced++
 		} catch {
 			errors++
