@@ -20,6 +20,11 @@ type SipgateDevice = {
 	dnd: boolean
 }
 
+type SipgateChannel = {
+	id: string
+	name: string
+}
+
 type Props = {
 	path: string
 	label?: string
@@ -28,6 +33,8 @@ type Props = {
 	readOnly?: boolean
 	width?: string | number | undefined
 	initialDevices?: SipgateDevice[]
+	initialChannels?: SipgateChannel[]
+	defaultChannelId?: string
 }
 
 const DRAWER_SLUG = 'sipgate-device-picker'
@@ -40,10 +47,18 @@ export const ClickToDialFieldClient = ({
 	readOnly,
 	width,
 	initialDevices,
+	initialChannels,
+	defaultChannelId,
 }: Props) => {
 	const { value, setValue, showError } = useField<string>({ path })
 	const [dialState, setDialState] = useState<'idle' | 'dialing' | 'success' | 'error'>('idle')
 	const [devices] = useState<SipgateDevice[]>(initialDevices ?? [])
+	const [channels] = useState<SipgateChannel[]>(initialChannels ?? [])
+	const [selectedChannelId, setSelectedChannelId] = useState<string | undefined>(
+		initialChannels && initialChannels.length > 0
+			? (initialChannels[0]?.id ?? defaultChannelId)
+			: defaultChannelId
+	)
 	const { closeModal } = useModal()
 
 	const dial = async (deviceId: string) => {
@@ -54,7 +69,7 @@ export const ClickToDialFieldClient = ({
 			const res = await fetch('/api/sipgate/dial', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ callee: value, deviceId }),
+				body: JSON.stringify({ callee: value, deviceId, channelId: selectedChannelId }),
 			})
 			if (!res.ok) throw new Error()
 			setDialState('success')
@@ -96,27 +111,61 @@ export const ClickToDialFieldClient = ({
 			</div>
 
 			<Drawer slug={DRAWER_SLUG} title={`Call ${value}`}>
-				<div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-					{devices.length === 0 && <p>No devices found.</p>}
-					{devices.length > 0 &&
-						devices.map((device) => (
-							<Button
-								key={device.id}
-								type="button"
-								margin={false}
-								buttonStyle="secondary"
-								onClick={() => dial(device.id)}
-							>
-								<span
-									style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
-								>
-									<strong>{device.alias}</strong>
-									<small style={{ opacity: 0.6 }}>
-										{device.online ? '● Online' : '○ Offline'} · {device.id}
-									</small>
-								</span>
-							</Button>
-						))}
+				<div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+					{channels.length > 1 && (
+						<div>
+							<p style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Call from</p>
+							<div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+								{channels.map((channel) => (
+									<label
+										key={channel.id}
+										style={{
+											display: 'flex',
+											alignItems: 'center',
+											gap: '0.5rem',
+											cursor: 'pointer',
+										}}
+									>
+										<input
+											type="radio"
+											name="sipgate-channel"
+											value={channel.id}
+											checked={selectedChannelId === channel.id}
+											onChange={() => setSelectedChannelId(channel.id)}
+										/>
+										{channel.name}
+									</label>
+								))}
+							</div>
+						</div>
+					)}
+
+					<div>
+						<p style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Select device</p>
+						{devices.length === 0 && <p style={{ opacity: 0.6 }}>No devices found.</p>}
+						{devices.length > 0 && (
+							<div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+								{devices.map((device) => (
+									<Button
+										key={device.id}
+										type="button"
+										margin={false}
+										buttonStyle="secondary"
+										onClick={() => dial(device.id)}
+									>
+										<span
+											style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+										>
+											<strong>{device.alias}</strong>
+											<small style={{ opacity: 0.6 }}>
+												{device.online ? '● Online' : '○ Offline'} · {device.id}
+											</small>
+										</span>
+									</Button>
+								))}
+							</div>
+						)}
+					</div>
 				</div>
 			</Drawer>
 		</div>
