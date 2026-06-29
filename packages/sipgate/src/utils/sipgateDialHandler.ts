@@ -1,4 +1,4 @@
-import type { PayloadHandler } from 'payload'
+import type { PayloadHandler, Where } from 'payload'
 import type { SipgateCredentials } from '../types'
 import type { SipgateAccess } from './access'
 import { checkAccess } from './access'
@@ -25,22 +25,34 @@ export const createSipgateDialHandler =
 		if (!req.json) {
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
-		const { callee, deviceId: bodyDeviceId } = await req.json()
+		const { callee, deviceId: bodyDeviceId, channelId: bodyChannelId } = await req.json()
 		if (!callee) {
 			return Response.json({ error: 'callee is required' }, { status: 400 })
 		}
 
 		let deviceId: string | undefined = bodyDeviceId ?? credentials.deviceId
+		let channelId: string | undefined = bodyChannelId ?? credentials.channelId
 
-		if (!deviceId && singleUserEmail && sipgateUsersSlug) {
-			const result = await req.payload.find({
-				collection: sipgateUsersSlug,
-				where: { email: { equals: singleUserEmail } },
-				limit: 1,
-				overrideAccess: true,
-			})
-			const user = result.docs[0]
-			deviceId = user?.defaultDevice as string | undefined
+		if (sipgateUsersSlug && (!deviceId || !channelId)) {
+			const lookupWhere: Where | null = singleUserEmail
+				? { email: { equals: singleUserEmail } }
+				: req.user
+					? { 'payloadUser.value': { equals: req.user.id } }
+					: null
+
+			if (lookupWhere) {
+				const result = await req.payload.find({
+					collection: sipgateUsersSlug,
+					where: lookupWhere,
+					limit: 1,
+					overrideAccess: true,
+				})
+				const sipgateUser = result.docs[0]
+				if (sipgateUser) {
+					deviceId ??= sipgateUser.defaultDevice as string | undefined
+					channelId ??= sipgateUser.defaultChannel as string | undefined
+				}
+			}
 		}
 
 		if (!deviceId) {
@@ -53,7 +65,7 @@ export const createSipgateDialHandler =
 			caller: deviceId,
 			callerId: credentials.callerId ?? deviceId,
 			deviceId,
-			channelId: credentials.channelId,
+			channelId,
 		})
 
 		if (!response.ok) {

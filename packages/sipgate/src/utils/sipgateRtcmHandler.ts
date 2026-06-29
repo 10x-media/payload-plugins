@@ -4,6 +4,7 @@ import type { SipgateAccess } from './access'
 import { checkAccess } from './access'
 import { createActiveCallStore } from './activeCall'
 import {
+	answerCall,
 	buildSipgateRest,
 	hangupCall,
 	holdCall,
@@ -35,6 +36,17 @@ export const sipgateRtcmHandler =
 		const store = createActiveCallStore(req.payload, callId)
 
 		switch (action) {
+			case 'answer':
+				if (!deviceId) {
+					return Response.json({ error: 'deviceId is required to answer a call' }, { status: 400 })
+				}
+				try {
+					await answerCall(rest, callId, deviceId)
+				} catch {
+					return Response.json({ error: 'Failed to answer call' }, { status: 500 })
+				}
+				await store.update({ status: 'active' })
+				break
 			case 'transfer':
 				if (!deviceId) {
 					return Response.json(

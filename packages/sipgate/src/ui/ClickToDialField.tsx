@@ -1,5 +1,9 @@
-import type { TextFieldServerComponent, Where } from 'payload'
+import type { TextFieldServerComponent } from 'payload'
 import { ClickToDialFieldClient } from './ClickToDialFieldClient'
+
+const USERS_SLUG = 'sipgate-users'
+const DEVICES_SLUG = 'sipgate-devices'
+const CHANNELS_SLUG = 'sipgate-channels'
 
 type SipgateDevice = {
 	id: string
@@ -9,10 +13,9 @@ type SipgateDevice = {
 	dnd: boolean
 }
 
-type FieldCustom = {
-	sipgateDevicesSlug?: string
-	sipgateUsersSlug?: string
-	filterDevicesByUser?: boolean
+type SipgateChannel = {
+	id: string
+	name: string
 }
 
 const ClickToDialField: TextFieldServerComponent = async ({ field, path, readOnly, req }) => {
@@ -20,26 +23,22 @@ const ClickToDialField: TextFieldServerComponent = async ({ field, path, readOnl
 	const placeholder =
 		typeof field.admin?.placeholder === 'string' ? field.admin.placeholder : undefined
 
-	const custom = (field.admin?.custom ?? {}) as FieldCustom
-	const devicesSlug = custom.sipgateDevicesSlug ?? 'sipgate-devices'
-	const usersSlug = custom.sipgateUsersSlug ?? 'sipgate-users'
-	const filterByUser = custom.filterDevicesByUser ?? true
+	let sipgateUserId: string | undefined
+	let defaultChannelId: string | undefined
 
-	// biome-ignore lint/suspicious/noExplicitAny: dynamic slugs from plugin config
-	let userWhere: Where | undefined
-
-	if (filterByUser && req.user) {
+	if (req.user) {
 		try {
-			const sipgateUserResult = await req.payload.find({
-				// biome-ignore lint/suspicious/noExplicitAny: dynamic slugs from plugin config
-				collection: usersSlug as any,
+			const result = await req.payload.find({
+				// biome-ignore lint/suspicious/noExplicitAny: fixed slug maps to dynamic collection
+				collection: USERS_SLUG as any,
 				where: { 'payloadUser.value': { equals: req.user.id } },
 				limit: 1,
 				overrideAccess: true,
 			})
-			const sipgateUserId = sipgateUserResult.docs[0]?.id as string | undefined
-			if (sipgateUserId) {
-				userWhere = { sipgateUserId: { equals: sipgateUserId } }
+			const sipgateUser = result.docs[0]
+			if (sipgateUser) {
+				sipgateUserId = sipgateUser.id as string
+				defaultChannelId = sipgateUser.defaultChannel as string | undefined
 			}
 		} catch {}
 	}
@@ -47,15 +46,33 @@ const ClickToDialField: TextFieldServerComponent = async ({ field, path, readOnl
 	let initialDevices: SipgateDevice[] = []
 	try {
 		const result = await req.payload.find({
-			// biome-ignore lint/suspicious/noExplicitAny: dynamic slugs from plugin config
-			collection: devicesSlug as any,
-			where: userWhere,
+			// biome-ignore lint/suspicious/noExplicitAny: fixed slug maps to dynamic collection
+			collection: DEVICES_SLUG as any,
+			where: sipgateUserId ? { sipgateUserId: { equals: sipgateUserId } } : undefined,
 			limit: 100,
 			depth: 0,
 			overrideAccess: true,
 		})
 		initialDevices = result.docs as SipgateDevice[]
 	} catch {}
+
+	let initialChannels: SipgateChannel[] = []
+	if (sipgateUserId) {
+		try {
+			const result = await req.payload.find({
+				// biome-ignore lint/suspicious/noExplicitAny: fixed slug maps to dynamic collection
+				collection: CHANNELS_SLUG as any,
+				where: { 'assignedUsers.sipgateUserId': { equals: sipgateUserId } },
+				limit: 100,
+				depth: 0,
+				overrideAccess: true,
+			})
+			initialChannels = result.docs.map((doc) => ({
+				id: doc.id as string,
+				name: (doc.name as string | undefined) ?? (doc.id as string),
+			}))
+		} catch {}
+	}
 
 	return (
 		<ClickToDialFieldClient
@@ -66,6 +83,8 @@ const ClickToDialField: TextFieldServerComponent = async ({ field, path, readOnl
 			readOnly={readOnly}
 			width={field.admin?.width}
 			initialDevices={initialDevices}
+			initialChannels={initialChannels}
+			defaultChannelId={defaultChannelId}
 		/>
 	)
 }
