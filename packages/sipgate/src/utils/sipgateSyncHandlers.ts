@@ -59,8 +59,7 @@ export const syncUsers = async ({
 
 	if (prune) {
 		try {
-			// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-			const orphans = await (payload.find as any)({
+			const orphans = await payload.find({
 				collection: sipgateUsersSlug,
 				where: { id: { not_in: [...seenIds] } },
 				limit: 1000,
@@ -69,10 +68,9 @@ export const syncUsers = async ({
 			})
 			for (const doc of orphans.docs) {
 				try {
-					// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-					await (payload.delete as any)({
+					await payload.delete({
 						collection: sipgateUsersSlug,
-						id: doc.id as string,
+						id: doc.id,
 						overrideAccess: true,
 					})
 					deleted++
@@ -103,8 +101,7 @@ export const syncDevices = async ({
 	sipgateUsersSlug,
 	prune,
 }: SyncDevicesOptions): Promise<SyncResult> => {
-	// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-	const usersResult = await (payload.find as any)({
+	const usersResult = await payload.find({
 		collection: sipgateUsersSlug,
 		limit: 1000,
 		depth: 0,
@@ -156,8 +153,7 @@ export const syncDevices = async ({
 
 	if (prune) {
 		try {
-			// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-			const orphans = await (payload.find as any)({
+			const orphans = await payload.find({
 				collection: sipgateDevicesSlug,
 				where: { id: { not_in: [...seen] } },
 				limit: 1000,
@@ -166,10 +162,9 @@ export const syncDevices = async ({
 			})
 			for (const doc of orphans.docs) {
 				try {
-					// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-					await (payload.delete as any)({
+					await payload.delete({
 						collection: sipgateDevicesSlug,
-						id: doc.id as string,
+						id: doc.id,
 						overrideAccess: true,
 					})
 					deleted++
@@ -211,8 +206,7 @@ export const syncChannels = async ({
 		try {
 			const assignedUsers = await Promise.all(
 				group.users.map(async (u) => {
-					// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-					const result = await (payload.find as any)({
+					const result = await payload.find({
 						collection: sipgateUsersSlug,
 						where: { id: { equals: u.id } },
 						limit: 1,
@@ -286,8 +280,7 @@ export const syncChannels = async ({
 
 	if (prune) {
 		try {
-			// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-			const orphans = await (payload.find as any)({
+			const orphans = await payload.find({
 				collection: sipgateChannelsSlug,
 				where: { id: { not_in: [...seenIds] } },
 				limit: 1000,
@@ -296,8 +289,7 @@ export const syncChannels = async ({
 			})
 			for (const doc of orphans.docs) {
 				try {
-					// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-					await (payload.delete as any)({
+					await payload.delete({
 						collection: sipgateChannelsSlug,
 						id: doc.id as string,
 						overrideAccess: true,
