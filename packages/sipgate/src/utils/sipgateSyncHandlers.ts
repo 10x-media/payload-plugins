@@ -1,5 +1,7 @@
 import type { Payload } from 'payload'
+import type { SipgateCredentials } from '../types'
 import {
+	buildSipgateRest,
 	getDevices,
 	getGroups,
 	getUsers,
@@ -8,24 +10,29 @@ import {
 } from './sipgate.rest'
 import { upsertByField } from './upsertByField'
 
-export type SyncResult = { synced: number; errors: number }
+export type SyncResult = { synced: number; errors: number; deleted: number }
 
 type SyncUsersOptions = {
 	payload: Payload
 	rest: SipgateRestFetch
 	sipgateUsersSlug: string
+	prune?: boolean
 }
 
 export const syncUsers = async ({
 	payload,
 	rest,
 	sipgateUsersSlug,
+	prune,
 }: SyncUsersOptions): Promise<SyncResult> => {
 	const users = await getUsers(rest)
+	const seenIds = new Set<string>()
 	let synced = 0
 	let errors = 0
+	let deleted = 0
 
 	for (const user of users) {
+		seenIds.add(user.id)
 		try {
 			await upsertByField({
 				payload,
@@ -50,7 +57,35 @@ export const syncUsers = async ({
 		}
 	}
 
-	return { synced, errors }
+	if (prune) {
+		try {
+			// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
+			const orphans = await (payload.find as any)({
+				collection: sipgateUsersSlug,
+				where: { id: { not_in: [...seenIds] } },
+				limit: 1000,
+				depth: 0,
+				overrideAccess: true,
+			})
+			for (const doc of orphans.docs) {
+				try {
+					// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
+					await (payload.delete as any)({
+						collection: sipgateUsersSlug,
+						id: doc.id as string,
+						overrideAccess: true,
+					})
+					deleted++
+				} catch {
+					errors++
+				}
+			}
+		} catch {
+			errors++
+		}
+	}
+
+	return { synced, errors, deleted }
 }
 
 type SyncDevicesOptions = {
@@ -58,6 +93,7 @@ type SyncDevicesOptions = {
 	rest: SipgateRestFetch
 	sipgateDevicesSlug: string
 	sipgateUsersSlug: string
+	prune?: boolean
 }
 
 export const syncDevices = async ({
@@ -65,8 +101,10 @@ export const syncDevices = async ({
 	rest,
 	sipgateDevicesSlug,
 	sipgateUsersSlug,
+	prune,
 }: SyncDevicesOptions): Promise<SyncResult> => {
-	const usersResult = await payload.find({
+	// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
+	const usersResult = await (payload.find as any)({
 		collection: sipgateUsersSlug,
 		limit: 1000,
 		depth: 0,
@@ -76,6 +114,7 @@ export const syncDevices = async ({
 	const seen = new Set<string>()
 	let synced = 0
 	let errors = 0
+	let deleted = 0
 
 	for (const user of usersResult.docs) {
 		const userId = user.id as string
@@ -115,7 +154,35 @@ export const syncDevices = async ({
 		}
 	}
 
-	return { synced, errors }
+	if (prune) {
+		try {
+			// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
+			const orphans = await (payload.find as any)({
+				collection: sipgateDevicesSlug,
+				where: { id: { not_in: [...seen] } },
+				limit: 1000,
+				depth: 0,
+				overrideAccess: true,
+			})
+			for (const doc of orphans.docs) {
+				try {
+					// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
+					await (payload.delete as any)({
+						collection: sipgateDevicesSlug,
+						id: doc.id as string,
+						overrideAccess: true,
+					})
+					deleted++
+				} catch {
+					errors++
+				}
+			}
+		} catch {
+			errors++
+		}
+	}
+
+	return { synced, errors, deleted }
 }
 
 type SyncChannelsOptions = {
@@ -123,6 +190,7 @@ type SyncChannelsOptions = {
 	rest: SipgateRestFetch
 	sipgateChannelsSlug: string
 	sipgateUsersSlug: string
+	prune?: boolean
 }
 
 export const syncChannels = async ({
@@ -130,16 +198,21 @@ export const syncChannels = async ({
 	rest,
 	sipgateChannelsSlug,
 	sipgateUsersSlug,
+	prune,
 }: SyncChannelsOptions): Promise<SyncResult> => {
 	const groups = await getGroups(rest)
+	const seenIds = new Set<string>()
 	let synced = 0
 	let errors = 0
+	let deleted = 0
 
 	for (const group of groups) {
+		seenIds.add(group.id)
 		try {
 			const assignedUsers = await Promise.all(
 				group.users.map(async (u) => {
-					const result = await payload.find({
+					// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
+					const result = await (payload.find as any)({
 						collection: sipgateUsersSlug,
 						where: { id: { equals: u.id } },
 						limit: 1,
@@ -149,7 +222,7 @@ export const syncChannels = async ({
 					return {
 						sipgateUserId: u.id,
 						user: payloadDoc ? payloadDoc.id : undefined,
-						deviceIds: u.deviceIds.map((deviceId) => ({ deviceId })),
+						deviceIds: u.deviceIds.map((deviceId: string) => ({ deviceId })),
 					}
 				})
 			)
@@ -179,7 +252,9 @@ export const syncChannels = async ({
 						ringingOrder: group.settings.ringingOrder
 							? {
 									type: group.settings.ringingOrder.type,
-									users: (group.settings.ringingOrder.users ?? []).map((userId) => ({ userId })),
+									users: (group.settings.ringingOrder.users ?? []).map((userId: string) => ({
+										userId,
+									})),
 								}
 							: undefined,
 						userDefaults: group.settings.users
@@ -209,5 +284,65 @@ export const syncChannels = async ({
 		}
 	}
 
-	return { synced, errors }
+	if (prune) {
+		try {
+			// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
+			const orphans = await (payload.find as any)({
+				collection: sipgateChannelsSlug,
+				where: { id: { not_in: [...seenIds] } },
+				limit: 1000,
+				depth: 0,
+				overrideAccess: true,
+			})
+			for (const doc of orphans.docs) {
+				try {
+					// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
+					await (payload.delete as any)({
+						collection: sipgateChannelsSlug,
+						id: doc.id as string,
+						overrideAccess: true,
+					})
+					deleted++
+				} catch {
+					errors++
+				}
+			}
+		} catch {
+			errors++
+		}
+	}
+
+	return { synced, errors, deleted }
 }
+
+/**
+ * Returns an `onInit` handler that performs a full sync (users → devices → channels)
+ * with pruning, removing any Payload records that no longer exist in sipgate.
+ *
+ * Usage in payload.config.ts:
+ * ```ts
+ * onInit: async (payload) => {
+ *   await createSipgateOnInit(credentials)(payload)
+ * }
+ * ```
+ */
+export const createSipgateOnInit =
+	(credentials: SipgateCredentials) =>
+	async (payload: Payload): Promise<void> => {
+		const rest = buildSipgateRest(credentials)
+		await syncUsers({ payload, rest, sipgateUsersSlug: 'sipgate-users', prune: true })
+		await syncDevices({
+			payload,
+			rest,
+			sipgateDevicesSlug: 'sipgate-devices',
+			sipgateUsersSlug: 'sipgate-users',
+			prune: true,
+		})
+		await syncChannels({
+			payload,
+			rest,
+			sipgateChannelsSlug: 'sipgate-channels',
+			sipgateUsersSlug: 'sipgate-users',
+			prune: true,
+		})
+	}
