@@ -1,22 +1,18 @@
-import type { PayloadRequest } from 'payload'
+import type { PayloadComponent, PayloadServerReactComponent } from 'payload'
 import type { SipgateDevice } from '../utils/sipgate.rest'
 import { LiveCallFloatingWindowClient } from './LiveCallFloatingWindowClient'
 
 const USERS_SLUG = 'sipgate-users'
 const DEVICES_SLUG = 'sipgate-devices'
 
-const LiveCallFloatingWindow = async (props: Record<string, unknown>) => {
-	console.log('[LiveCallFloatingWindow] props keys:', Object.keys(props))
-	console.log('[LiveCallFloatingWindow] req:', props.req)
-
-	const req = props.req as PayloadRequest | undefined
+const LiveCallFloatingWindow: PayloadServerReactComponent<PayloadComponent> = async (props) => {
 	let sipgateUserId: string | undefined
 
-	if (req?.user) {
+	if (props.user) {
 		try {
-			const result = await req.payload.find({
+			const result = await props.payload.find({
 				collection: USERS_SLUG,
-				where: { 'payloadUser.value': { equals: req.user.id } },
+				where: { 'payloadUser.value': { equals: props.user.id } },
 				limit: 1,
 				overrideAccess: true,
 			})
@@ -26,7 +22,7 @@ const LiveCallFloatingWindow = async (props: Record<string, unknown>) => {
 
 	let initialDevices: SipgateDevice[] = []
 	try {
-		const result = await req?.payload.find({
+		const result = await props.payload.find({
 			collection: DEVICES_SLUG,
 			where: sipgateUserId ? { sipgateUserId: { equals: sipgateUserId } } : undefined,
 			limit: 100,

@@ -29,6 +29,7 @@ import { createCallActivityWidget } from './widgets/callActivity.widget'
 import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.component'
 
 export type { SipgateAccess, SipgateAccessFn } from './utils/access'
+export { createSipgateOnInit } from './utils/sipgateSyncHandlers'
 
 export type SipgatePluginOptions = {
 	/**
