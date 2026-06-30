@@ -195,31 +195,16 @@ export interface CallLog {
  * via the `definition` "sipgate-users".
  */
 export interface SipgateUser {
-  /**
-   * Sipgate user ID (e.g. w0)
-   */
   id: string;
   firstname?: string | null;
   lastname?: string | null;
   email?: string | null;
-  /**
-   * Default device ID (e.g. e0)
-   */
   defaultDevice?: string | null;
-  /**
-   * Personal channel UUID (set automatically by channel sync)
-   */
   defaultChannel?: string | null;
   admin?: boolean | null;
-  /**
-   * Reject new incoming calls when already on a call
-   */
   busyOnBusy?: boolean | null;
   timezone?: string | null;
   addressId?: string | null;
-  /**
-   * Link to the corresponding Payload user account
-   */
   payloadUser?: {
     relationTo: 'users';
     value: string | User;
@@ -232,34 +217,19 @@ export interface SipgateUser {
  * via the `definition` "sipgate-devices".
  */
 export interface SipgateDevice {
-  /**
-   * Sipgate device ID (e.g. e0)
-   */
   id: string;
   alias?: string | null;
-  /**
-   * Sipgate user ID (e.g. w0)
-   */
   sipgateUserId?: string | null;
-  /**
-   * Sipgate user
-   */
   sipgateUser?: (string | null) | SipgateUser;
   type?: ('REGISTER' | 'MOBILE' | 'EXTERNAL' | 'WEBRTC' | 'CLINQ') | null;
   online?: boolean | null;
   dnd?: boolean | null;
-  /**
-   * Channel groups this device is currently active in
-   */
   activeGroups?:
     | {
         id?: string | null;
         alias?: string | null;
       }[]
     | null;
-  /**
-   * Phonelines this device is currently active on
-   */
   activePhonelines?:
     | {
         id?: string | null;
@@ -274,29 +244,14 @@ export interface SipgateDevice {
  * via the `definition` "sipgate-channels".
  */
 export interface SipgateChannel {
-  /**
-   * Sipgate channel ID
-   */
   id: string;
   name?: string | null;
-  /**
-   * Sipgate user ID of the channel owner (e.g. w0)
-   */
   owner?: string | null;
   locale?: string | null;
   createdAt: string;
-  /**
-   * Users assigned to this channel and their active device IDs
-   */
   assignedUsers?:
     | {
-        /**
-         * Resolved sipgate user (populated on sync)
-         */
         user?: (string | null) | SipgateUser;
-        /**
-         * Raw sipgate user ID (e.g. w0) - used to resolve the relationship on sync
-         */
         sipgateUserId?: string | null;
         deviceIds?:
           | {
