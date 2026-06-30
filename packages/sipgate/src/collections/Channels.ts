@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { deepMerge } from 'payload'
+import { keys } from '../translations/keys'
+import { labelForKey } from '../translations/server'
 
 type CreateSipgateChannelsCollectionOptions = {
 	slug: string
@@ -15,8 +17,8 @@ export const createSipgateChannelsCollection = ({
 	const defaults: CollectionConfig = {
 		slug,
 		labels: {
-			singular: 'Sipgate Channel',
-			plural: 'Sipgate Channels',
+			singular: labelForKey(keys.sipgateChannelsSingular),
+			plural: labelForKey(keys.sipgateChannelsPlural),
 		},
 		admin: {
 			useAsTitle: 'name',
@@ -31,7 +33,7 @@ export const createSipgateChannelsCollection = ({
 				type: 'text',
 				required: true,
 				unique: true,
-				admin: { description: 'Sipgate channel ID' },
+				admin: { description: labelForKey(keys.sipgateChannelsDescChannelId) },
 			},
 			{
 				name: 'name',
@@ -40,7 +42,7 @@ export const createSipgateChannelsCollection = ({
 			{
 				name: 'owner',
 				type: 'text',
-				admin: { description: 'Sipgate user ID of the channel owner (e.g. w0)' },
+				admin: { description: labelForKey(keys.sipgateChannelsDescOwner) },
 			},
 			{
 				name: 'locale',
@@ -54,7 +56,7 @@ export const createSipgateChannelsCollection = ({
 				name: 'assignedUsers',
 				type: 'array',
 				admin: {
-					description: 'Users assigned to this channel and their active device IDs',
+					description: labelForKey(keys.sipgateChannelsDescAssignedUsers),
 				},
 				fields: [
 					{
@@ -62,14 +64,13 @@ export const createSipgateChannelsCollection = ({
 						type: 'relationship',
 						relationTo: sipgateUsersSlug as 'users',
 						required: false,
-						admin: { description: 'Resolved sipgate user (populated on sync)' },
+						admin: { description: labelForKey(keys.sipgateChannelsDescAssignedUsersUser) },
 					},
 					{
 						name: 'sipgateUserId',
 						type: 'text',
 						admin: {
-							description:
-								'Raw sipgate user ID (e.g. w0) - used to resolve the relationship on sync',
+							description: labelForKey(keys.sipgateChannelsDescAssignedUsersSipgateUserId),
 						},
 					},
 					{
@@ -137,7 +138,7 @@ export const createSipgateChannelsCollection = ({
 					},
 					{
 						name: 'userDefaults',
-						label: 'User Defaults',
+						label: labelForKey(keys.sipgateChannelsLabelUserDefaults),
 						type: 'group',
 						fields: [
 							{
