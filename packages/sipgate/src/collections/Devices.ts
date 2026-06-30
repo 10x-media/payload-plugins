@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { deepMerge } from 'payload'
+import { keys } from '../translations/keys'
+import { labelForKey } from '../translations/server'
 
 type CreateSipgateDevicesCollectionOptions = {
 	slug: string
@@ -15,8 +17,8 @@ export const createSipgateDevicesCollection = ({
 	const defaults: CollectionConfig = {
 		slug,
 		labels: {
-			singular: 'Sipgate Device',
-			plural: 'Sipgate Devices',
+			singular: labelForKey(keys.sipgateDevicesSingular),
+			plural: labelForKey(keys.sipgateDevicesPlural),
 		},
 		admin: {
 			useAsTitle: 'alias',
@@ -31,7 +33,7 @@ export const createSipgateDevicesCollection = ({
 				type: 'text',
 				required: true,
 				unique: true,
-				admin: { description: 'Sipgate device ID (e.g. e0)' },
+				admin: { description: labelForKey(keys.sipgateDevicesDescDeviceId) },
 			},
 			{
 				name: 'alias',
@@ -44,7 +46,7 @@ export const createSipgateDevicesCollection = ({
 						name: 'sipgateUserId',
 						type: 'text',
 						admin: {
-							description: 'Sipgate user ID (e.g. w0)',
+							description: labelForKey(keys.sipgateDevicesDescSipgateUserId),
 							readOnly: true,
 						},
 					},
@@ -53,7 +55,7 @@ export const createSipgateDevicesCollection = ({
 						type: 'relationship',
 						relationTo: sipgateUsersSlug as 'users',
 						admin: {
-							description: 'Sipgate user',
+							description: labelForKey(keys.sipgateDevicesDescSipgateUser),
 							readOnly: true,
 						},
 					},
@@ -80,7 +82,7 @@ export const createSipgateDevicesCollection = ({
 					},
 					{
 						name: 'dnd',
-						label: 'Do Not Disturb',
+						label: labelForKey(keys.sipgateDevicesLabelDnd),
 						type: 'checkbox',
 						defaultValue: false,
 					},
@@ -89,7 +91,7 @@ export const createSipgateDevicesCollection = ({
 			{
 				name: 'activeGroups',
 				type: 'array',
-				admin: { description: 'Channel groups this device is currently active in' },
+				admin: { description: labelForKey(keys.sipgateDevicesDescActiveGroups) },
 				fields: [
 					{ name: 'id', type: 'text' },
 					{ name: 'alias', type: 'text' },
@@ -98,7 +100,7 @@ export const createSipgateDevicesCollection = ({
 			{
 				name: 'activePhonelines',
 				type: 'array',
-				admin: { description: 'Phonelines this device is currently active on' },
+				admin: { description: labelForKey(keys.sipgateDevicesDescActivePhonelines) },
 				fields: [
 					{ name: 'id', type: 'text' },
 					{ name: 'alias', type: 'text' },

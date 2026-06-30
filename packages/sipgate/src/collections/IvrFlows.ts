@@ -1,4 +1,6 @@
 import type { CollectionConfig } from 'payload'
+import { keys } from '../translations/keys'
+import { labelForKey } from '../translations/server'
 
 export const createIvrFlowsCollection = (
 	slug: string,
@@ -6,8 +8,8 @@ export const createIvrFlowsCollection = (
 ): CollectionConfig => ({
 	slug,
 	labels: {
-		singular: 'IVR Flow',
-		plural: 'IVR Flows',
+		singular: labelForKey(keys.ivrFlowsSingular),
+		plural: labelForKey(keys.ivrFlowsPlural),
 	},
 	admin: {
 		useAsTitle: 'name',
@@ -18,25 +20,29 @@ export const createIvrFlowsCollection = (
 			name: 'name',
 			type: 'text',
 			required: true,
+			label: labelForKey(keys.ivrFlowsFieldName),
 		},
 		{
 			name: 'phoneNumber',
 			type: 'text',
+			label: labelForKey(keys.ivrFlowsFieldPhoneNumber),
 			admin: {
-				description: 'The DID that triggers this flow. Leave blank to use as a catch-all.',
+				description: labelForKey(keys.ivrFlowsFieldPhoneNumberDesc),
 			},
 		},
 		{
 			name: 'isActive',
 			type: 'checkbox',
 			defaultValue: true,
+			label: labelForKey(keys.ivrFlowsFieldIsActive),
 		},
 		{
 			name: 'entryStepId',
 			type: 'text',
 			required: true,
+			label: labelForKey(keys.ivrFlowsFieldEntryStepId),
 			admin: {
-				description: 'The stepId of the first step to execute when the call is answered.',
+				description: labelForKey(keys.ivrFlowsFieldEntryStepIdDesc),
 			},
 		},
 		{
@@ -44,19 +50,22 @@ export const createIvrFlowsCollection = (
 			type: 'array',
 			required: true,
 			minRows: 1,
+			label: labelForKey(keys.ivrFlowsFieldSteps),
 			fields: [
 				{
 					name: 'stepId',
 					type: 'text',
 					required: true,
+					label: labelForKey(keys.ivrFlowsFieldStepsStepId),
 					admin: {
-						description: 'Unique identifier for this step within the flow.',
+						description: labelForKey(keys.ivrFlowsFieldStepsStepIdDesc),
 					},
 				},
 				{
 					name: 'type',
 					type: 'select',
 					required: true,
+					label: labelForKey(keys.ivrFlowsFieldStepsType),
 					options: [
 						{ label: 'Play (announce and optionally hang up)', value: 'play' },
 						{ label: 'Gather (play prompt and collect DTMF input)', value: 'gather' },
@@ -67,56 +76,63 @@ export const createIvrFlowsCollection = (
 					type: 'relationship',
 					relationTo: voiceLinesSlug as 'ivr-voice-lines',
 					required: true,
+					label: labelForKey(keys.ivrFlowsFieldStepsVoiceLine),
 				},
 				{
 					name: 'hangupAfterPlay',
 					type: 'checkbox',
 					defaultValue: true,
+					label: labelForKey(keys.ivrFlowsFieldStepsHangupAfterPlay),
 					admin: {
 						condition: (_, siblingData) => siblingData?.type === 'play',
-						description: 'Hang up the call after the audio finishes playing.',
+						description: labelForKey(keys.ivrFlowsFieldStepsHangupAfterPlayDesc),
 					},
 				},
 				{
 					name: 'maxDigits',
 					type: 'number',
 					defaultValue: 1,
+					label: labelForKey(keys.ivrFlowsFieldStepsMaxDigits),
 					admin: {
 						condition: (_, siblingData) => siblingData?.type === 'gather',
-						description: 'Maximum number of DTMF digits to collect.',
+						description: labelForKey(keys.ivrFlowsFieldStepsMaxDigitsDesc),
 					},
 				},
 				{
 					name: 'timeout',
 					type: 'number',
 					defaultValue: 5000,
+					label: labelForKey(keys.ivrFlowsFieldStepsTimeout),
 					admin: {
 						condition: (_, siblingData) => siblingData?.type === 'gather',
-						description: 'Milliseconds to wait for DTMF input after the announcement.',
+						description: labelForKey(keys.ivrFlowsFieldStepsTimeoutDesc),
 					},
 				},
 				{
 					name: 'branches',
 					type: 'array',
+					label: labelForKey(keys.ivrFlowsFieldStepsBranches),
 					admin: {
 						condition: (_, siblingData) => siblingData?.type === 'gather',
-						description: 'Map DTMF input values to the next step.',
+						description: labelForKey(keys.ivrFlowsFieldStepsBranchesDesc),
 					},
 					fields: [
 						{
 							name: 'dtmf',
 							type: 'text',
 							required: true,
+							label: labelForKey(keys.ivrFlowsFieldStepsBranchesDtmf),
 							admin: {
-								description: 'DTMF input that triggers this branch (e.g. "1", "2", "123").',
+								description: labelForKey(keys.ivrFlowsFieldStepsBranchesDtmfDesc),
 							},
 						},
 						{
 							name: 'nextStepId',
 							type: 'text',
 							required: true,
+							label: labelForKey(keys.ivrFlowsFieldStepsBranchesNextStepId),
 							admin: {
-								description: 'The stepId to advance to when this branch is matched.',
+								description: labelForKey(keys.ivrFlowsFieldStepsBranchesNextStepIdDesc),
 							},
 						},
 					],
@@ -124,9 +140,10 @@ export const createIvrFlowsCollection = (
 				{
 					name: 'fallbackStepId',
 					type: 'text',
+					label: labelForKey(keys.ivrFlowsFieldStepsFallbackStepId),
 					admin: {
 						condition: (_, siblingData) => siblingData?.type === 'gather',
-						description: 'Step to use when no branch matches the input. Hangs up if omitted.',
+						description: labelForKey(keys.ivrFlowsFieldStepsFallbackStepIdDesc),
 					},
 				},
 			],
