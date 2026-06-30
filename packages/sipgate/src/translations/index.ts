@@ -1,3 +1,4 @@
+import { de } from './de'
 import { en } from './en'
 
 export type { TranslationKey } from './keys'
@@ -19,7 +20,8 @@ const toNested = (flat: Record<string, string>): Record<string, Record<string, s
 	return out
 }
 
-/** Per-locale messages merged into `config.i18n.translations`. English only for now. */
+/** Per-locale messages merged into `config.i18n.translations`. */
 export const translations = {
 	en: toNested(en),
+	de: toNested(de),
 }
