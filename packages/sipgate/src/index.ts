@@ -11,11 +11,14 @@ import { fieldAffectsData } from 'payload/shared'
 import { createCallLogsCollection } from './collections/CallLogs'
 import { createSipgateChannelsCollection } from './collections/Channels'
 import { createSipgateDevicesCollection } from './collections/Devices'
+import { createIvrFlowsCollection } from './collections/IvrFlows'
+import { createIvrVoiceLinesCollection } from './collections/IvrVoiceLines'
 import { createSipgateUsersCollection } from './collections/SipgateUsers'
 import { createSipgateActiveCall } from './endpoints/sipgate.activeCall'
 import { createSipgateContacts } from './endpoints/sipgate.contacts'
 import { createSipgateDevices } from './endpoints/sipgate.devices'
 import { createSipgateDial } from './endpoints/sipgate.dial'
+import { createSipgateIvr } from './endpoints/sipgate.ivr'
 import { createSipgateRtcm } from './endpoints/sipgate.rtcm'
 import { createSipgateSync } from './endpoints/sipgate.sync'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
@@ -108,6 +111,30 @@ export type SipgatePluginOptions = {
 	}
 
 	/**
+	 * Enable the IVR (Interactive Voice Response) system.
+	 * When enabled, two Payload collections are registered: one for uploaded voice line audio
+	 * files and one for IVR flow definitions. Incoming calls are routed through the configured
+	 * flow when answered.
+	 *
+	 * Set to `false` or omit to disable. Set to `true` or an object to enable.
+	 */
+	ivr?:
+		| {
+				/**
+				 * Slug for the voice lines upload collection.
+				 * @default 'ivr-voice-lines'
+				 */
+				voiceLinesSlug?: string
+				/**
+				 * Slug for the IVR flows collection.
+				 * @default 'ivr-flows'
+				 */
+				flowsSlug?: string
+		  }
+		| true
+		| false
+
+	/**
 	 * The overrides to use for the plugin.
 	 */
 	overrides?: {
@@ -148,7 +175,20 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		const phoneNumberFields = options.phoneNumberFields ?? []
 		const _maxDeviceProbeCount = options.maxDeviceProbeCount ?? 25
 
+		const ivrOptions = options.ivr === true ? {} : (options.ivr ?? false)
+		const ivrEnabled = ivrOptions !== false
+		const ivrVoiceLinesSlug = ivrEnabled ? (ivrOptions.voiceLinesSlug ?? 'ivr-voice-lines') : ''
+		const ivrFlowsSlug = ivrEnabled ? (ivrOptions.flowsSlug ?? 'ivr-flows') : ''
+
 		if (!config.collections) config.collections = []
+
+		if (ivrEnabled) {
+			config.collections.push(
+				createIvrVoiceLinesCollection(ivrVoiceLinesSlug),
+				createIvrFlowsCollection(ivrFlowsSlug, ivrVoiceLinesSlug)
+			)
+		}
+
 		config.collections.push(
 			createCallLogsCollection(contactCollections, phoneNumberFields, options.overrides?.callLogs),
 			createSipgateUsersCollection({
@@ -186,11 +226,19 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		})
 
 		if (!config.endpoints) config.endpoints = []
+
+		const serverURL = config.serverURL ?? ''
 		config.endpoints.push(
 			createSipgateWebhooks({
 				contactCollections,
 				phoneNumberFields,
 				callLogsSlug,
+				ivr: ivrEnabled
+					? {
+							flowsSlug: ivrFlowsSlug,
+							ivrEndpointUrl: `${serverURL}/api/sipgate/ivr`,
+						}
+					: undefined,
 				overrides: options.overrides?.sipgateWebhooks,
 			}),
 			createSipgateActiveCall(options.access, options.overrides?.sipgateActiveCall),
@@ -202,6 +250,16 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				filterDevicesByUser: options.filterDevicesByUser,
 			})
 		)
+
+		if (ivrEnabled) {
+			config.endpoints.push(
+				createSipgateIvr({
+					flowsSlug: ivrFlowsSlug,
+					voiceLinesSlug: ivrVoiceLinesSlug,
+					ivrEndpointUrl: `${serverURL}/api/sipgate/ivr`,
+				})
+			)
+		}
 
 		if (options.sipgateCredentials) {
 			config.endpoints.push(
