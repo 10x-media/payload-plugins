@@ -1,5 +1,7 @@
 import type { CollectionConfig, CollectionSlug } from 'payload'
 import { deepMerge } from 'payload'
+import { keys } from '../translations/keys'
+import { labelForKey } from '../translations/server'
 
 type CreateSipgateUsersCollectionOptions = {
 	slug: string
@@ -16,8 +18,8 @@ export const createSipgateUsersCollection = ({
 	const defaults: CollectionConfig = {
 		slug,
 		labels: {
-			singular: 'Sipgate User',
-			plural: 'Sipgate Users',
+			singular: labelForKey(keys.sipgateUsersSingular),
+			plural: labelForKey(keys.sipgateUsersPlural),
 		},
 		admin: {
 			useAsTitle: 'email',
@@ -32,7 +34,7 @@ export const createSipgateUsersCollection = ({
 				type: 'text',
 				required: true,
 				unique: true,
-				admin: { description: 'Sipgate user ID (e.g. w0)' },
+				admin: { description: labelForKey(keys.sipgateUsersDescUserId) },
 			},
 			{
 				type: 'row',
@@ -54,13 +56,13 @@ export const createSipgateUsersCollection = ({
 			{
 				name: 'defaultDevice',
 				type: 'text',
-				admin: { description: 'Default device ID (e.g. e0)' },
+				admin: { description: labelForKey(keys.sipgateUsersDescDefaultDevice) },
 			},
 			{
 				name: 'defaultChannel',
 				type: 'text',
 				admin: {
-					description: 'Personal channel UUID (set automatically by channel sync)',
+					description: labelForKey(keys.sipgateUsersDescDefaultChannel),
 					readOnly: true,
 				},
 			},
@@ -74,7 +76,7 @@ export const createSipgateUsersCollection = ({
 				type: 'checkbox',
 				defaultValue: false,
 				admin: {
-					description: 'Reject new incoming calls when already on a call',
+					description: labelForKey(keys.sipgateUsersDescBusyOnBusy),
 				},
 			},
 			{
@@ -93,7 +95,7 @@ export const createSipgateUsersCollection = ({
 				hasMany: false,
 				required: false,
 				admin: {
-					description: 'Link to the corresponding Payload user account',
+					description: labelForKey(keys.sipgateUsersDescPayloadUser),
 				},
 			},
 		],
