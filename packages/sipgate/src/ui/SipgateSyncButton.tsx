@@ -1,6 +1,5 @@
 'use client'
 
-import { Button } from '@payloadcms/ui'
 import { useState } from 'react'
 import type { SyncEntityType } from '../endpoints/sipgate.sync'
 
@@ -16,6 +15,7 @@ const SipgateSyncButton = ({ entity, label }: SyncButtonProps) => {
 	const [result, setResult] = useState<string | null>(null)
 
 	const run = async () => {
+		if (state === 'syncing') return
 		setState('syncing')
 		setResult(null)
 		try {
@@ -27,13 +27,14 @@ const SipgateSyncButton = ({ entity, label }: SyncButtonProps) => {
 			if (!res.ok) throw new Error(`HTTP ${res.status}`)
 			const data = (await res.json()) as {
 				ok: boolean
-				results: Record<string, { synced: number; errors: number }>
+				results: Record<string, { synced: number; errors: number; deleted: number }>
 			}
-			const entityResult = data.results[entity]
-			if (entityResult) {
-				setResult(
-					`${entityResult.synced} synced${entityResult.errors > 0 ? `, ${entityResult.errors} errors` : ''}`
-				)
+			const r = data.results[entity]
+			if (r) {
+				const parts = [`${r.synced} synced`]
+				if (r.deleted > 0) parts.push(`${r.deleted} deleted`)
+				if (r.errors > 0) parts.push(`${r.errors} errors`)
+				setResult(parts.join(', '))
 			} else {
 				setResult('Done')
 			}
@@ -49,7 +50,7 @@ const SipgateSyncButton = ({ entity, label }: SyncButtonProps) => {
 		}
 	}
 
-	const buttonLabel =
+	const text =
 		state === 'syncing'
 			? 'Syncing...'
 			: state === 'success'
@@ -59,28 +60,40 @@ const SipgateSyncButton = ({ entity, label }: SyncButtonProps) => {
 					: (label ?? `Sync ${entity}`)
 
 	return (
-		<div style={{ marginTop: '1rem' }}>
-			<Button
-				type="button"
-				buttonStyle={state === 'error' ? 'error' : 'secondary'}
-				disabled={state === 'syncing'}
-				onClick={run}
-				size="medium"
-			>
-				{buttonLabel}
-			</Button>
-		</div>
+		<button
+			type="button"
+			onClick={run}
+			disabled={state === 'syncing'}
+			style={{
+				display: 'block',
+				width: '100%',
+				padding: '8px 16px',
+				background: 'transparent',
+				border: 'none',
+				textAlign: 'left',
+				cursor: state === 'syncing' ? 'default' : 'pointer',
+				color:
+					state === 'error'
+						? 'var(--theme-error-500)'
+						: state === 'success'
+							? 'var(--theme-success-500)'
+							: 'var(--theme-text)',
+				fontSize: 'inherit',
+				opacity: state === 'syncing' ? 0.6 : 1,
+				whiteSpace: 'nowrap',
+			}}
+		>
+			{text}
+		</button>
 	)
 }
 
-export const SipgateUsersSyncButton = () => (
-	<SipgateSyncButton entity="users" label="Sync Sipgate Users" />
-)
+export const SipgateUsersSyncButton = () => <SipgateSyncButton entity="users" label="Sync Users" />
 
 export const SipgateDevicesSyncButton = () => (
-	<SipgateSyncButton entity="devices" label="Sync Sipgate Devices" />
+	<SipgateSyncButton entity="devices" label="Sync Devices" />
 )
 
 export const SipgateChannelsSyncButton = () => (
-	<SipgateSyncButton entity="channels" label="Sync Sipgate Channels" />
+	<SipgateSyncButton entity="channels" label="Sync Channels" />
 )
