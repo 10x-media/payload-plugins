@@ -30,8 +30,5 @@ export const sipgateActiveCallHandler =
 			}
 		}
 
-		if (!calls.length) {
-			return Response.json({ error: 'Call not found' }, { status: 404 })
-		}
 		return Response.json(calls, { status: 200 })
 	}
