@@ -29,7 +29,7 @@ export const createSipgateDevicesCollection = ({
 		},
 		fields: [
 			{
-				name: 'id',
+				name: 'sipgateId',
 				type: 'text',
 				required: true,
 				unique: true,

@@ -37,10 +37,10 @@ export const syncUsers = async ({
 			await upsertByField({
 				payload,
 				collection: sipgateUsersSlug,
-				uniqueField: 'id',
+				uniqueField: 'sipgateId',
 				uniqueValue: user.id,
 				data: {
-					id: user.id,
+					sipgateId: user.id,
 					firstname: user.firstname,
 					lastname: user.lastname,
 					email: user.email,
@@ -110,7 +110,7 @@ export const syncDevices = async ({
 }: SyncDevicesOptions): Promise<SyncResult> => {
 	const usersResult = await payload.find({
 		collection: sipgateUsersSlug,
-		where: scopeToUserId ? { id: { equals: scopeToUserId } } : undefined,
+		where: scopeToUserId ? { sipgateId: { equals: scopeToUserId } } : undefined,
 		limit: 1000,
 		depth: 0,
 		overrideAccess: true,
@@ -122,7 +122,12 @@ export const syncDevices = async ({
 	let deleted = 0
 
 	for (const user of usersResult.docs) {
-		const userId = user.id as string
+		const userId = user.sipgateId as string | undefined
+		const payloadDocId = user.id as string
+		if (!userId) {
+			errors++
+			continue
+		}
 		let userDevices: SipgateDevice[]
 		try {
 			userDevices = await getDevices(rest, userId)
@@ -138,10 +143,10 @@ export const syncDevices = async ({
 				await upsertByField({
 					payload,
 					collection: sipgateDevicesSlug,
-					uniqueField: 'id',
+					uniqueField: 'sipgateId',
 					uniqueValue: device.id,
 					data: {
-						id: device.id,
+						sipgateId: device.id,
 						alias: device.alias,
 						type: device.type,
 						online: device.online,
@@ -149,7 +154,7 @@ export const syncDevices = async ({
 						activeGroups: device.activeGroups ?? [],
 						activePhonelines: device.activePhonelines ?? [],
 						sipgateUserId: userId,
-						sipgateUser: userId,
+						sipgateUser: payloadDocId,
 					},
 				})
 				synced++
@@ -227,7 +232,7 @@ export const syncChannels = async ({
 				group.users.map(async (u) => {
 					const result = await payload.find({
 						collection: sipgateUsersSlug,
-						where: { id: { equals: u.id } },
+						where: { sipgateId: { equals: u.id } },
 						limit: 1,
 						overrideAccess: true,
 					})
@@ -243,10 +248,10 @@ export const syncChannels = async ({
 			await upsertByField({
 				payload,
 				collection: sipgateChannelsSlug,
-				uniqueField: 'id',
+				uniqueField: 'sipgateId',
 				uniqueValue: group.id,
 				data: {
-					id: group.id,
+					sipgateId: group.id,
 					name: group.name,
 					owner: group.owner,
 					createdAt: group.createdAt ? new Date(group.createdAt) : undefined,
@@ -285,7 +290,7 @@ export const syncChannels = async ({
 				await upsertByField({
 					payload,
 					collection: sipgateUsersSlug,
-					uniqueField: 'id',
+					uniqueField: 'sipgateId',
 					uniqueValue: group.owner,
 					data: { defaultChannel: group.id },
 				})

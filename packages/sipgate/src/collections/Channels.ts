@@ -22,14 +22,14 @@ export const createSipgateChannelsCollection = ({
 		},
 		admin: {
 			useAsTitle: 'name',
-			defaultColumns: ['name', 'id', 'owner', 'createdAt'],
+			defaultColumns: ['name', 'sipgateId', 'owner', 'createdAt'],
 			components: {
 				listMenuItems: ['@10x-media/sipgate/ui/SipgateSyncButton#SipgateChannelsSyncButton'],
 			},
 		},
 		fields: [
 			{
-				name: 'id',
+				name: 'sipgateId',
 				type: 'text',
 				required: true,
 				unique: true,

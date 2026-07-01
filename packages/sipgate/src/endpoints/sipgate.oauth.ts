@@ -17,6 +17,8 @@ type CreateSipgateOAuthOptions = {
 	sipgateDevicesSlug: string
 	sipgateChannelsSlug: string
 	payloadUsersSlug: string | string[]
+	/** When true, multiple Payload users may link to the same Sipgate account. */
+	allowSharedSipgateAccount?: boolean
 }
 
 const noop: (tokens: OAuthTokens) => Promise<void> = async () => {}
@@ -59,6 +61,7 @@ export const createSipgateOAuthCallback = ({
 	sipgateDevicesSlug,
 	sipgateChannelsSlug,
 	payloadUsersSlug,
+	allowSharedSipgateAccount = false,
 }: CreateSipgateOAuthOptions): Endpoint => ({
 	path: '/sipgate/oauth/callback',
 	method: 'get',
@@ -174,6 +177,30 @@ export const createSipgateOAuthCallback = ({
 
 		const tokenExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
+		// Check whether this Sipgate account is already claimed by a different Payload user.
+		if (!allowSharedSipgateAccount) {
+			const claimedBy = await req.payload.find({
+				collection: sipgateUsersSlug,
+				where: {
+					and: [
+						{ sipgateId: { equals: sipgateUser.id } },
+						{ 'payloadUser.value': { not_equals: payloadUserId } },
+					],
+				},
+				limit: 1,
+				overrideAccess: true,
+			})
+			if (claimedBy.totalDocs > 0) {
+				const claimer = claimedBy.docs[0] as Record<string, unknown>
+				const claimerEmail =
+					typeof claimer?.email === 'string' ? encodeURIComponent(claimer.email) : ''
+				return Response.redirect(
+					`${adminUrl}?sipgate_error=account_already_claimed&sipgate_claimed_by=${claimerEmail}`,
+					302
+				)
+			}
+		}
+
 		try {
 			const existing = await req.payload.find({
 				collection: sipgateUsersSlug,
@@ -187,7 +214,7 @@ export const createSipgateOAuthCallback = ({
 					collection: sipgateUsersSlug,
 					id: existing.docs[0].id as string,
 					data: {
-						id: sipgateUser.id,
+						sipgateId: sipgateUser.id,
 						firstname: sipgateUser.firstname,
 						lastname: sipgateUser.lastname,
 						email: sipgateUser.email,
@@ -201,7 +228,7 @@ export const createSipgateOAuthCallback = ({
 				await req.payload.create({
 					collection: sipgateUsersSlug,
 					data: {
-						id: sipgateUser.id,
+						sipgateId: sipgateUser.id,
 						firstname: sipgateUser.firstname,
 						lastname: sipgateUser.lastname,
 						email: sipgateUser.email,

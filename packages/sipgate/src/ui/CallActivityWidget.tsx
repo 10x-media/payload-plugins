@@ -34,7 +34,7 @@ const CallActivityWidget = async (props: WidgetServerProps) => {
 			overrideAccess: true,
 		})
 		const doc = linked.docs[0]
-		if (doc) sipgateUserIdFilter = doc.id as string
+		if (doc) sipgateUserIdFilter = doc.sipgateId as string
 	}
 
 	const where: Where = sipgateUserIdFilter

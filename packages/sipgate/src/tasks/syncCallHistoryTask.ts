@@ -230,6 +230,7 @@ export const buildSyncCallHistoryTaskOAuth = (deps: SyncCallHistoryTaskOAuthDeps
 				if (!accessToken || !refreshToken) continue
 
 				const docId = sipgateUserDoc.id as string
+				const sipgateId = sipgateUserDoc.sipgateId as string
 				const rest = buildSipgateRestOAuth({
 					accessToken,
 					refreshToken,
@@ -258,7 +259,7 @@ export const buildSyncCallHistoryTaskOAuth = (deps: SyncCallHistoryTaskOAuthDeps
 					for (const entry of entries) {
 						const result = await createOrUpdateCallLog(payload, deps.callLogsSlug, {
 							...entry,
-							sipgateUserId: docId,
+							sipgateUserId: sipgateId,
 						})
 						if ('createdAt' in result && result.createdAt === result.updatedAt) {
 							created++
