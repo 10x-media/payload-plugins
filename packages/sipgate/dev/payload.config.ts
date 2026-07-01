@@ -12,6 +12,8 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
+const siteUrl = process.env.SITE_URL ?? 'http://localhost:3000'
+const authType = process.env.SIPGATE_AUTH_TYPE === 'oauth2' ? 'oauth2' : 'pat'
 
 const users: CollectionConfig = {
 	slug: 'users',
@@ -46,6 +48,7 @@ const db =
 
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
+	serverURL: siteUrl,
 	db,
 	jobs: {
 		autoRun: [{ cron: '* * * * *', limit: 10 }],
@@ -56,15 +59,25 @@ export default buildConfig({
 			contactCollections: [contacts.slug as CollectionSlug],
 			phoneNumberFields: ['phoneNumber'],
 			payloadUsersSlug: 'users',
-			syncCallLogs: true,
-			sipgateCredentials: {
-				authType: 'pat',
-				tokenId: process.env.SIPGATE_TOKEN_ID,
-				token: process.env.SIPGATE_TOKEN,
-				deviceId: process.env.SIPGATE_DEVICE_ID,
-				channelId: process.env.SIPGATE_CHANNEL_ID,
-				callerId: process.env.SIPGATE_CALLER_ID,
-			},
+			syncCallLogs: authType === 'pat',
+			sipgateCredentials:
+				authType === 'oauth2'
+					? {
+							authType: 'oauth2',
+							clientId: process.env.SIPGATE_CLIENT_ID,
+							clientSecret: process.env.SIPGATE_CLIENT_SECRET,
+							realm: (process.env.SIPGATE_REALM as 'third-party' | 'sipgate-apps') ?? 'third-party',
+							deviceId: process.env.SIPGATE_DEVICE_ID,
+							callerId: process.env.SIPGATE_CALLER_ID,
+						}
+					: {
+							authType: 'pat',
+							tokenId: process.env.SIPGATE_TOKEN_ID,
+							token: process.env.SIPGATE_TOKEN,
+							deviceId: process.env.SIPGATE_DEVICE_ID,
+							channelId: process.env.SIPGATE_CHANNEL_ID,
+							callerId: process.env.SIPGATE_CALLER_ID,
+						},
 			enableCallActivityWidget: true,
 			enableLiveCallFloatingWindow: true,
 		}),
@@ -72,7 +85,9 @@ export default buildConfig({
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
-		await payload.jobs.queue({ task: SYNC_CALL_HISTORY_TASK, input: { limit: 100 } })
+		if (authType === 'pat') {
+			await payload.jobs.queue({ task: SYNC_CALL_HISTORY_TASK, input: { limit: 100 } })
+		}
 	},
 	typescript: { autoGenerate },
 	admin: {

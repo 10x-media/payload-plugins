@@ -66,6 +66,11 @@
 			"development": "./src/ui/SipgateSyncButton.tsx",
 			"types": "./src/ui/SipgateSyncButton.tsx",
 			"default": "./dist/ui/SipgateSyncButton.js"
+		},
+		"./ui/SipgateOAuthButton": {
+			"development": "./src/ui/SipgateOAuthButton.tsx",
+			"types": "./src/ui/SipgateOAuthButton.tsx",
+			"default": "./dist/ui/SipgateOAuthButton.js"
 		}
 	},
 	"files": [
@@ -167,6 +172,11 @@
 				"types": "./dist/ui/ContactMatchUiField.d.ts",
 				"import": "./dist/ui/ContactMatchUiField.js",
 				"default": "./dist/ui/ContactMatchUiField.js"
+			},
+			"./ui/SipgateOAuthButton": {
+				"types": "./dist/ui/SipgateOAuthButton.d.ts",
+				"import": "./dist/ui/SipgateOAuthButton.js",
+				"default": "./dist/ui/SipgateOAuthButton.js"
 			}
 		}
 	},

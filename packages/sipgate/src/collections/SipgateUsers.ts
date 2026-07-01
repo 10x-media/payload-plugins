@@ -7,12 +7,15 @@ type CreateSipgateUsersCollectionOptions = {
 	slug: string
 	/** One or more Payload auth collection slugs to link against. */
 	payloadUsersSlug: CollectionSlug | CollectionSlug[]
+	/** When true, adds hidden OAuth2 token fields (accessToken, refreshToken, tokenExpiresAt). */
+	includeOAuthFields?: boolean
 	overrides?: Partial<CollectionConfig>
 }
 
 export const createSipgateUsersCollection = ({
 	slug,
 	payloadUsersSlug,
+	includeOAuthFields,
 	overrides,
 }: CreateSipgateUsersCollectionOptions): CollectionConfig => {
 	const defaults: CollectionConfig = {
@@ -98,6 +101,37 @@ export const createSipgateUsersCollection = ({
 					description: labelForKey(keys.sipgateUsersDescPayloadUser),
 				},
 			},
+			...(includeOAuthFields
+				? [
+						{
+							name: 'accessToken',
+							type: 'text' as const,
+							saveToJWT: false,
+							admin: {
+								hidden: true,
+								description: labelForKey(keys.sipgateUsersDescAccessToken),
+							},
+						},
+						{
+							name: 'refreshToken',
+							type: 'text' as const,
+							saveToJWT: false,
+							admin: {
+								hidden: true,
+								description: labelForKey(keys.sipgateUsersDescRefreshToken),
+							},
+						},
+						{
+							name: 'tokenExpiresAt',
+							type: 'date' as const,
+							saveToJWT: false,
+							admin: {
+								readOnly: true,
+								description: labelForKey(keys.sipgateUsersDescTokenExpiresAt),
+							},
+						},
+					]
+				: []),
 		],
 	}
 

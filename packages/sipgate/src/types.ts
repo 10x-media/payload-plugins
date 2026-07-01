@@ -32,6 +32,18 @@ export type SipgateCredentials = {
 	refreshToken?: string
 
 	/**
+	 * Keycloak realm for the OAuth2 client. Defaults to 'third-party'. Older clients may use
+	 * 'sipgate-apps'. Check the sipgate console to find your client's realm.
+	 */
+	realm?: 'third-party' | 'sipgate-apps'
+
+	/**
+	 * OAuth2 scopes to request. Defaults to `['all']`. Must match the scopes enabled
+	 * for your client in the sipgate console (console.sipgate.com).
+	 */
+	scopes?: string[]
+
+	/**
 	 * Device ID to use as the caller (e.g. `e0`). Sipgate rings this device first, then bridges
 	 * to the callee. Find yours at GET /v2/{sub}/devices.
 	 */
