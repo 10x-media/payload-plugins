@@ -39,6 +39,7 @@ const SipgateSyncButton = ({ entity, label }: SyncButtonProps) => {
 				setResult('Done')
 			}
 			setState('success')
+			window.location.reload()
 		} catch (err) {
 			setResult(err instanceof Error ? err.message : 'Unknown error')
 			setState('error')

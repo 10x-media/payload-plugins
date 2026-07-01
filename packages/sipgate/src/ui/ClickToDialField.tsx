@@ -37,7 +37,7 @@ const ClickToDialField: TextFieldServerComponent = async ({ field, path, readOnl
 			})
 			const sipgateUser = result.docs[0]
 			if (sipgateUser) {
-				sipgateUserId = sipgateUser.id as string
+				sipgateUserId = sipgateUser.sipgateId as string
 				defaultChannelId = sipgateUser.defaultChannel as string | undefined
 			}
 		} catch {}

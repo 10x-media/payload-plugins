@@ -9,6 +9,12 @@ type CreateSipgateUsersCollectionOptions = {
 	payloadUsersSlug: CollectionSlug | CollectionSlug[]
 	/** When true, adds hidden OAuth2 token fields (accessToken, refreshToken, tokenExpiresAt). */
 	includeOAuthFields?: boolean
+	/**
+	 * When true, multiple Payload users may link to the same Sipgate account.
+	 * Removes the unique constraint on the sipgate user ID field so that the same
+	 * account can be claimed by more than one Payload user.
+	 */
+	allowSharedSipgateAccount?: boolean
 	overrides?: Partial<CollectionConfig>
 }
 
@@ -16,6 +22,7 @@ export const createSipgateUsersCollection = ({
 	slug,
 	payloadUsersSlug,
 	includeOAuthFields,
+	allowSharedSipgateAccount = false,
 	overrides,
 }: CreateSipgateUsersCollectionOptions): CollectionConfig => {
 	const defaults: CollectionConfig = {
@@ -26,17 +33,17 @@ export const createSipgateUsersCollection = ({
 		},
 		admin: {
 			useAsTitle: 'email',
-			defaultColumns: ['firstname', 'lastname', 'email', 'id', 'payloadUser'],
+			defaultColumns: ['firstname', 'lastname', 'email', 'sipgateId', 'payloadUser'],
 			components: {
 				listMenuItems: ['@10x-media/sipgate/ui/SipgateSyncButton#SipgateUsersSyncButton'],
 			},
 		},
 		fields: [
 			{
-				name: 'id',
+				name: 'sipgateId',
 				type: 'text',
 				required: true,
-				unique: true,
+				unique: !allowSharedSipgateAccount,
 				admin: { description: labelForKey(keys.sipgateUsersDescUserId) },
 			},
 			{
