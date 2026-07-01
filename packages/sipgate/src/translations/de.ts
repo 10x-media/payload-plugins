@@ -33,6 +33,13 @@ export const de: Record<TranslationKey, string> = {
 	[keys.sipgateUsersDescBusyOnBusy]:
 		'Neue eingehende Anrufe ablehnen, wenn bereits telefoniert wird',
 	[keys.sipgateUsersDescPayloadUser]: 'Verknüpfung mit dem entsprechenden Payload-Benutzerkonto',
+	[keys.sipgateUsersDescAccessToken]: 'OAuth2-Zugriffstoken (automatisch verwaltet)',
+	[keys.sipgateUsersDescRefreshToken]: 'OAuth2-Aktualisierungstoken (automatisch verwaltet)',
+	[keys.sipgateUsersDescTokenExpiresAt]: 'Ablaufdatum des aktuellen Zugriffstokens',
+
+	// OAuth-Schaltfläche
+	[keys.oauthButtonConnect]: 'Sipgate verbinden',
+	[keys.oauthButtonReconnect]: 'Sipgate erneut verbinden',
 
 	// SipgateDevices field labels and descriptions
 	[keys.sipgateDevicesLabelDnd]: 'Nicht stören',

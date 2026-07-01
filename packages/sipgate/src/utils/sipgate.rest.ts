@@ -15,6 +15,11 @@ const BASE_URL = 'https://api.sipgate.com/v2'
 export type SipgateRestFetch = (url: string, options: RequestInit) => Promise<Response>
 
 export const buildSipgateRest = (credentials: SipgateCredentials): SipgateRestFetch => {
+	if (credentials.authType === 'oauth2') {
+		throw new Error(
+			'buildSipgateRest does not support OAuth2. Use buildSipgateRestOAuth from sipgateOAuthRest.ts for per-user OAuth2 requests.'
+		)
+	}
 	const tokenId = credentials.tokenId ?? env.SIPGATE_TOKEN_ID
 	const token = credentials.token ?? env.SIPGATE_TOKEN
 	if (!tokenId || !token) {
