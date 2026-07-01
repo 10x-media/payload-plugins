@@ -37,6 +37,13 @@ export const en: Record<TranslationKey, string> = {
 		'Personal channel UUID (set automatically by channel sync)',
 	[keys.sipgateUsersDescBusyOnBusy]: 'Reject new incoming calls when already on a call',
 	[keys.sipgateUsersDescPayloadUser]: 'Link to the corresponding Payload user account',
+	[keys.sipgateUsersDescAccessToken]: 'OAuth2 access token (managed automatically)',
+	[keys.sipgateUsersDescRefreshToken]: 'OAuth2 refresh token (managed automatically)',
+	[keys.sipgateUsersDescTokenExpiresAt]: 'When the current access token expires',
+
+	// OAuth button
+	[keys.oauthButtonConnect]: 'Connect Sipgate',
+	[keys.oauthButtonReconnect]: 'Reconnect Sipgate',
 
 	// SipgateDevices field labels and descriptions
 	[keys.sipgateDevicesLabelDnd]: 'Do Not Disturb',

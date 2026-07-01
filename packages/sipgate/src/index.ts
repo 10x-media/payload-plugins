@@ -19,6 +19,7 @@ import { createSipgateContacts } from './endpoints/sipgate.contacts'
 import { createSipgateDevices } from './endpoints/sipgate.devices'
 import { createSipgateDial } from './endpoints/sipgate.dial'
 import { createSipgateIvr } from './endpoints/sipgate.ivr'
+import { createSipgateOAuthCallback, createSipgateOAuthConnect } from './endpoints/sipgate.oauth'
 import { createSipgateRtcm } from './endpoints/sipgate.rtcm'
 import { createSipgateSync } from './endpoints/sipgate.sync'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
@@ -30,6 +31,7 @@ import type { SipgateCredentials } from './types'
 import type { SipgateAccess } from './utils/access'
 import { createCallActivityWidget } from './widgets/callActivity.widget'
 import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.component'
+import { createSipgateOAuthButton } from './widgets/sipgateOAuthButton.component'
 
 export type { SipgateAccess, SipgateAccessFn } from './utils/access'
 export { createSipgateOnInit } from './utils/sipgateSyncHandlers'
@@ -189,11 +191,14 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			)
 		}
 
+		const isOAuth2 = options.sipgateCredentials?.authType === 'oauth2'
+
 		config.collections.push(
 			createCallLogsCollection(contactCollections, phoneNumberFields, options.overrides?.callLogs),
 			createSipgateUsersCollection({
 				slug: sipgateUsersSlug,
 				payloadUsersSlug: options.payloadUsersSlug ?? 'users',
+				includeOAuthFields: isOAuth2,
 				overrides: options.overrides?.sipgateUsers,
 			}),
 			createSipgateDevicesCollection({
@@ -269,25 +274,49 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 					singleUserEmail: options.singleUser?.email,
 					sipgateUsersSlug,
 					overrides: options.overrides?.sipgateDial,
-				}),
-				createSipgateRtcm(
-					options.sipgateCredentials,
-					options.access,
-					options.overrides?.sipgateRtcm
-				),
-				createSipgateContacts(
-					options.sipgateCredentials,
-					options.access,
-					options.overrides?.sipgateContacts
-				),
-				createSipgateSync({
-					credentials: options.sipgateCredentials,
-					sipgateUsersSlug,
-					sipgateDevicesSlug,
-					sipgateChannelsSlug,
-					access: options.access,
 				})
 			)
+
+			if (isOAuth2) {
+				const rawPayloadUsersSlug = options.payloadUsersSlug ?? 'users'
+				const singlePayloadUsersSlug = Array.isArray(rawPayloadUsersSlug)
+					? (rawPayloadUsersSlug[0] ?? 'users')
+					: rawPayloadUsersSlug
+				config.endpoints.push(
+					createSipgateOAuthConnect({
+						credentials: options.sipgateCredentials,
+						serverURL,
+						sipgateUsersSlug,
+						payloadUsersSlug: singlePayloadUsersSlug,
+					}),
+					createSipgateOAuthCallback({
+						credentials: options.sipgateCredentials,
+						serverURL,
+						sipgateUsersSlug,
+						payloadUsersSlug: singlePayloadUsersSlug,
+					})
+				)
+			} else {
+				config.endpoints.push(
+					createSipgateRtcm(
+						options.sipgateCredentials,
+						options.access,
+						options.overrides?.sipgateRtcm
+					),
+					createSipgateContacts(
+						options.sipgateCredentials,
+						options.access,
+						options.overrides?.sipgateContacts
+					),
+					createSipgateSync({
+						credentials: options.sipgateCredentials,
+						sipgateUsersSlug,
+						sipgateDevicesSlug,
+						sipgateChannelsSlug,
+						access: options.access,
+					})
+				)
+			}
 		}
 
 		if (options.enableLiveCallFloatingWindow) {
@@ -297,6 +326,13 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			config.admin.components.beforeNav.push(
 				createLiveCallFloatingWindow(options.overrides?.liveCallFloatingWindow)
 			)
+		}
+
+		if (isOAuth2) {
+			if (!config.admin) config.admin = {}
+			if (!config.admin.components) config.admin.components = {}
+			if (!config.admin.components.afterNavLinks) config.admin.components.afterNavLinks = []
+			config.admin.components.afterNavLinks.push(createSipgateOAuthButton())
 		}
 
 		if (options.enableCallActivityWidget) {

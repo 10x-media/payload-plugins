@@ -53,6 +53,15 @@ export const keys = {
 	sipgateChannelsDescAssignedUsersSipgateUserId:
 		'sipgate:sipgateChannels.desc.assignedUsers.sipgateUserId',
 
+	// SipgateUsers OAuth token field descriptions
+	sipgateUsersDescAccessToken: 'sipgate:sipgateUsers.desc.accessToken',
+	sipgateUsersDescRefreshToken: 'sipgate:sipgateUsers.desc.refreshToken',
+	sipgateUsersDescTokenExpiresAt: 'sipgate:sipgateUsers.desc.tokenExpiresAt',
+
+	// OAuth button
+	oauthButtonConnect: 'sipgate:oauth.button.connect',
+	oauthButtonReconnect: 'sipgate:oauth.button.reconnect',
+
 	// IVR Voice Lines collection
 	ivrVoiceLinesSingular: 'sipgate:ivrVoiceLines.singular',
 	ivrVoiceLinesPlural: 'sipgate:ivrVoiceLines.plural',
