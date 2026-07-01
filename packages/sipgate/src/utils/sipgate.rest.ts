@@ -40,7 +40,7 @@ export const buildSipgateRest = (credentials: SipgateCredentials): SipgateRestFe
 }
 
 /** @note Works only with OAuth2 tokens that include the userinfo scope. */
-type SipgateUserInfo = {
+type SipgateAuthUser = {
 	domain: string
 	locale: string
 	masterSipId: string
@@ -52,7 +52,25 @@ export const getUserInfo = async (rest: SipgateRestFetch) => {
 	if (!response.ok) {
 		throw new Error('Failed to get user info')
 	}
-	return (await response.json()) as SipgateUserInfo
+	return (await response.json()) as SipgateAuthUser
+}
+
+type SipgateAuthorizationUserinfo = {
+	/** Sipgate user ID, e.g. "w2". Use this to identify the authenticated user. */
+	sub?: string
+	domain?: string
+	isAdmin?: boolean
+	masterSipId?: string
+	userId?: string
+}
+
+/** Returns the authenticated user's profile from the sipgate REST API. */
+export const getAuthorizationUserinfo = async (rest: SipgateRestFetch) => {
+	const response = await rest('/authorization/userinfo', { method: 'GET' })
+	if (!response.ok) {
+		throw new Error(`GET /authorization/userinfo failed: ${response.status}`)
+	}
+	return (await response.json()) as SipgateAuthorizationUserinfo
 }
 
 export const getContacts = async (rest: SipgateRestFetch) => {

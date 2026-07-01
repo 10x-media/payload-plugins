@@ -3,6 +3,7 @@ import type { SipgateCredentials } from '../types'
 import type { SipgateAccess } from './access'
 import { checkAccess } from './access'
 import { createActiveCallStore } from './activeCall'
+import type { SipgateRestFetch } from './sipgate.rest'
 import {
 	answerCall,
 	buildSipgateRest,
@@ -12,11 +13,77 @@ import {
 	recordingsCall,
 	transferCall,
 } from './sipgate.rest'
+import { buildSipgateRestOAuth } from './sipgateOAuthRest'
 
 export type SipgateRtcmAction = 'answer' | 'hold' | 'mute' | 'recordings' | 'hangup'
 
+type SipgateRtcmHandlerOptions = {
+	credentials: SipgateCredentials
+	access?: SipgateAccess
+	sipgateUsersSlug?: string
+}
+
+const resolveRest = async ({
+	credentials,
+	sipgateUsersSlug,
+	req,
+}: Pick<SipgateRtcmHandlerOptions, 'credentials' | 'sipgateUsersSlug'> & {
+	req: Parameters<PayloadHandler>[0]
+}): Promise<{ rest: SipgateRestFetch } | { error: Response }> => {
+	if (credentials.authType !== 'oauth2') {
+		return { rest: buildSipgateRest(credentials) }
+	}
+
+	if (!sipgateUsersSlug || !req.user?.id) {
+		return {
+			error: Response.json({ error: 'No sipgate account connected' }, { status: 403 }),
+		}
+	}
+
+	const linked = await req.payload.find({
+		collection: sipgateUsersSlug,
+		where: { 'payloadUser.value': { equals: req.user.id } },
+		limit: 1,
+		depth: 0,
+		overrideAccess: true,
+	})
+
+	const doc = linked.docs[0]
+	const accessToken = doc?.accessToken as string | undefined
+	const refreshToken = doc?.refreshToken as string | undefined
+
+	if (!doc || !accessToken || !refreshToken) {
+		return {
+			error: Response.json({ error: 'No sipgate account connected' }, { status: 403 }),
+		}
+	}
+
+	const docId = doc.id as string
+	const rest = buildSipgateRestOAuth({
+		accessToken,
+		refreshToken,
+		clientId: credentials.clientId ?? '',
+		clientSecret: credentials.clientSecret ?? '',
+		realm: credentials.realm ?? 'third-party',
+		onRefresh: async (tokens) => {
+			await req.payload.update({
+				collection: sipgateUsersSlug,
+				id: docId,
+				data: {
+					accessToken: tokens.access_token,
+					refreshToken: tokens.refresh_token,
+					tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+				},
+				overrideAccess: true,
+			})
+		},
+	})
+
+	return { rest }
+}
+
 export const sipgateRtcmHandler =
-	(credentials: SipgateCredentials, access?: SipgateAccess): PayloadHandler =>
+	({ credentials, access, sipgateUsersSlug }: SipgateRtcmHandlerOptions): PayloadHandler =>
 	async (req) => {
 		const denied = await checkAccess(req, access, 'rtcm')
 		if (denied) return denied
@@ -32,7 +99,10 @@ export const sipgateRtcmHandler =
 			return Response.json({ error: 'action is required' }, { status: 400 })
 		}
 
-		const rest = buildSipgateRest(credentials)
+		const resolved = await resolveRest({ credentials, sipgateUsersSlug, req })
+		if ('error' in resolved) return resolved.error
+		const { rest } = resolved
+
 		const store = createActiveCallStore(req.payload, callId)
 
 		switch (action) {

@@ -20,13 +20,17 @@ import { createSipgateDevices } from './endpoints/sipgate.devices'
 import { createSipgateDial } from './endpoints/sipgate.dial'
 import { createSipgateIvr } from './endpoints/sipgate.ivr'
 import { createSipgateOAuthCallback, createSipgateOAuthConnect } from './endpoints/sipgate.oauth'
+import { createSipgateOAuthSync } from './endpoints/sipgate.oauthSync'
 import { createSipgateRtcm } from './endpoints/sipgate.rtcm'
 import { createSipgateSync } from './endpoints/sipgate.sync'
 import { createSipgateWebhooks } from './endpoints/sipgate.webhooks'
 import { createContactMatchUiField } from './fields/contactMatchUi.field'
 import { createPhoneNumberField } from './fields/phoneNumber.field'
 import { registerTranslations } from './plugin/registerTranslations'
-import { buildSyncCallHistoryTask } from './tasks/syncCallHistoryTask'
+import {
+	buildSyncCallHistoryTask,
+	buildSyncCallHistoryTaskOAuth,
+} from './tasks/syncCallHistoryTask'
 import type { SipgateCredentials } from './types'
 import type { SipgateAccess } from './utils/access'
 import { createCallActivityWidget } from './widgets/callActivity.widget'
@@ -246,7 +250,11 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 					: undefined,
 				overrides: options.overrides?.sipgateWebhooks,
 			}),
-			createSipgateActiveCall(options.access, options.overrides?.sipgateActiveCall),
+			createSipgateActiveCall(
+				options.access,
+				options.overrides?.sipgateActiveCall,
+				sipgateUsersSlug
+			),
 			createSipgateDevices({
 				sipgateDevicesSlug,
 				sipgateUsersSlug,
@@ -277,6 +285,22 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				})
 			)
 
+			// RTCM and contacts work in both PAT and OAuth2 modes.
+			config.endpoints.push(
+				createSipgateRtcm({
+					credentials: options.sipgateCredentials,
+					access: options.access,
+					sipgateUsersSlug,
+					overrides: options.overrides?.sipgateRtcm,
+				}),
+				createSipgateContacts({
+					credentials: options.sipgateCredentials,
+					access: options.access,
+					sipgateUsersSlug,
+					overrides: options.overrides?.sipgateContacts,
+				})
+			)
+
 			if (isOAuth2) {
 				const rawPayloadUsersSlug = options.payloadUsersSlug ?? 'users'
 				const singlePayloadUsersSlug = Array.isArray(rawPayloadUsersSlug)
@@ -287,27 +311,28 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 						credentials: options.sipgateCredentials,
 						serverURL,
 						sipgateUsersSlug,
+						sipgateDevicesSlug,
+						sipgateChannelsSlug,
 						payloadUsersSlug: singlePayloadUsersSlug,
 					}),
 					createSipgateOAuthCallback({
 						credentials: options.sipgateCredentials,
 						serverURL,
 						sipgateUsersSlug,
+						sipgateDevicesSlug,
+						sipgateChannelsSlug,
 						payloadUsersSlug: singlePayloadUsersSlug,
+					}),
+					createSipgateOAuthSync({
+						credentials: options.sipgateCredentials,
+						sipgateUsersSlug,
+						sipgateDevicesSlug,
+						sipgateChannelsSlug,
+						access: options.access,
 					})
 				)
 			} else {
 				config.endpoints.push(
-					createSipgateRtcm(
-						options.sipgateCredentials,
-						options.access,
-						options.overrides?.sipgateRtcm
-					),
-					createSipgateContacts(
-						options.sipgateCredentials,
-						options.access,
-						options.overrides?.sipgateContacts
-					),
 					createSipgateSync({
 						credentials: options.sipgateCredentials,
 						sipgateUsersSlug,
@@ -347,12 +372,22 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		if (options.syncCallLogs && options.sipgateCredentials) {
 			config.jobs ??= {}
 			config.jobs.tasks ??= []
-			config.jobs.tasks.push(
-				buildSyncCallHistoryTask({
-					callLogsSlug,
-					credentials: options.sipgateCredentials,
-				})
-			)
+			if (isOAuth2) {
+				config.jobs.tasks.push(
+					buildSyncCallHistoryTaskOAuth({
+						callLogsSlug,
+						sipgateUsersSlug,
+						credentials: options.sipgateCredentials,
+					})
+				)
+			} else {
+				config.jobs.tasks.push(
+					buildSyncCallHistoryTask({
+						callLogsSlug,
+						credentials: options.sipgateCredentials,
+					})
+				)
+			}
 		}
 
 		return config
