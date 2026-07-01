@@ -1,11 +1,16 @@
 import type { CustomComponent } from 'payload'
 import { deepMerge } from 'payload'
+import type { LiveCallPosition } from '../types'
+
+type LiveCallWindowClientProps = { position: LiveCallPosition }
 
 export const createLiveCallFloatingWindow = (
-	overrides?: Partial<CustomComponent<Record<string, never>>>
+	position: LiveCallPosition = 'bottom-right',
+	overrides?: Partial<CustomComponent<LiveCallWindowClientProps>>
 ) => {
-	const defaultComponent: CustomComponent<Record<string, never>> = {
+	const defaultComponent: CustomComponent<LiveCallWindowClientProps> = {
 		path: '@10x-media/sipgate/ui/LiveCallFloatingWindow',
+		clientProps: { position },
 	}
-	return deepMerge<CustomComponent<Record<string, never>>>(defaultComponent, overrides ?? {})
+	return deepMerge<CustomComponent<LiveCallWindowClientProps>>(defaultComponent, overrides ?? {})
 }

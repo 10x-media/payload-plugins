@@ -31,7 +31,7 @@ import {
 	buildSyncCallHistoryTask,
 	buildSyncCallHistoryTaskOAuth,
 } from './tasks/syncCallHistoryTask'
-import type { SipgateCredentials } from './types'
+import type { LiveCallPosition, SipgateCredentials } from './types'
 import type { SipgateAccess } from './utils/access'
 import { createCallActivityWidget } from './widgets/callActivity.widget'
 import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.component'
@@ -75,6 +75,12 @@ export type SipgatePluginOptions = {
 	 * Whether to enable the live call floating window.
 	 */
 	enableLiveCallFloatingWindow?: boolean
+
+	/**
+	 * Corner where the live call floating window is anchored.
+	 * @default 'bottom-right'
+	 */
+	liveCallPosition?: LiveCallPosition
 
 	/**
 	 * Whether to enable the contact match UI.
@@ -349,7 +355,10 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			if (!config.admin.components) config.admin.components = {}
 			if (!config.admin.components.beforeNav) config.admin.components.beforeNav = []
 			config.admin.components.beforeNav.push(
-				createLiveCallFloatingWindow(options.overrides?.liveCallFloatingWindow)
+				createLiveCallFloatingWindow(
+					options.liveCallPosition ?? 'bottom-right',
+					options.overrides?.liveCallFloatingWindow
+				)
 			)
 		}
 

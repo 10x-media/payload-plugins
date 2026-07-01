@@ -79,8 +79,10 @@ const CallActivityWidget = async (props: WidgetServerProps) => {
 	const chartData: CallActivityChartData = { labels, inbound, outbound, statusCounts }
 
 	return (
-		<div style={{ padding: '1rem' }}>
-			<h2 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Call Activity (last {DAYS} days)</h2>
+		<div style={{ padding: 'var(--base)' }}>
+			<h2 style={{ marginBottom: 'var(--base)', fontSize: '1rem' }}>
+				Call Activity (last {DAYS} days)
+			</h2>
 			<CallActivityWidgetClient data={chartData} />
 		</div>
 	)
