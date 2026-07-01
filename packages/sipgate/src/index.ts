@@ -375,10 +375,24 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		}
 
 		if (isOAuth2) {
-			if (!config.admin) config.admin = {}
-			if (!config.admin.components) config.admin.components = {}
-			if (!config.admin.components.afterNavLinks) config.admin.components.afterNavLinks = []
-			config.admin.components.afterNavLinks.push(createSipgateOAuthButton())
+			// Also inject the Connect button into the edit view of every configured payload users collection.
+			const payloadUsersSlugsArr = Array.isArray(options.payloadUsersSlug)
+				? options.payloadUsersSlug
+				: [options.payloadUsersSlug ?? 'users']
+			for (const collection of config.collections ?? []) {
+				if ((payloadUsersSlugsArr as string[]).includes(collection.slug)) {
+					if (!collection.fields) collection.fields = []
+					collection.fields.push({
+						name: 'sipgateConnection',
+						type: 'ui',
+						admin: {
+							components: {
+								Field: '@10x-media/sipgate/ui/SipgateOAuthButton',
+							},
+						},
+					})
+				}
+			}
 		}
 
 		if (options.enableCallActivityWidget) {
