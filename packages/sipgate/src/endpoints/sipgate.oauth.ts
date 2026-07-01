@@ -1,6 +1,6 @@
 import type { Endpoint } from 'payload'
 import type { SipgateCredentials } from '../types'
-import { getUsers } from '../utils/sipgate.rest'
+import { getAuthorizationUserinfo, getUsers } from '../utils/sipgate.rest'
 import {
 	buildAuthorizeUrl,
 	DEFAULT_OAUTH_SCOPES,
@@ -8,11 +8,14 @@ import {
 	type OAuthTokens,
 } from '../utils/sipgateOAuth'
 import { buildSipgateRestOAuth } from '../utils/sipgateOAuthRest'
+import { syncChannels, syncDevices } from '../utils/sipgateSyncHandlers'
 
 type CreateSipgateOAuthOptions = {
 	credentials: SipgateCredentials
 	serverURL: string
 	sipgateUsersSlug: string
+	sipgateDevicesSlug: string
+	sipgateChannelsSlug: string
 	payloadUsersSlug: string | string[]
 }
 
@@ -22,6 +25,8 @@ export const createSipgateOAuthConnect = ({
 	credentials,
 	serverURL,
 	sipgateUsersSlug: _sipgateUsersSlug,
+	sipgateDevicesSlug: _sipgateDevicesSlug,
+	sipgateChannelsSlug: _sipgateChannelsSlug,
 	payloadUsersSlug: _payloadUsersSlug,
 }: CreateSipgateOAuthOptions): Endpoint => ({
 	path: '/sipgate/oauth/connect',
@@ -51,6 +56,8 @@ export const createSipgateOAuthCallback = ({
 	credentials,
 	serverURL,
 	sipgateUsersSlug,
+	sipgateDevicesSlug,
+	sipgateChannelsSlug,
 	payloadUsersSlug,
 }: CreateSipgateOAuthOptions): Endpoint => ({
 	path: '/sipgate/oauth/callback',
@@ -113,6 +120,11 @@ export const createSipgateOAuthCallback = ({
 			return Response.redirect(`${adminUrl}?sipgate_error=token_exchange_failed`, 302)
 		}
 
+		req.payload.logger.info({
+			msg: '[sipgate oauth] token exchange ok',
+			expires_in: tokens.expires_in,
+		})
+
 		const tempRest = buildSipgateRestOAuth({
 			accessToken: tokens.access_token,
 			refreshToken: tokens.refresh_token,
@@ -122,14 +134,40 @@ export const createSipgateOAuthCallback = ({
 			onRefresh: noop,
 		})
 
+		// GET /authorization/userinfo returns sub = the sipgate user ID (e.g. "w2").
+		// Use that to find the exact user rather than falling back to getUsers()[0],
+		// which is the first user in the org (typically the account owner).
+		let authenticatedSub: string | undefined
+		try {
+			const userinfo = await getAuthorizationUserinfo(tempRest)
+			req.payload.logger.info({ msg: '[sipgate oauth] /authorization/userinfo', userinfo })
+			authenticatedSub = userinfo.sub
+		} catch (err) {
+			req.payload.logger.warn({ msg: '[sipgate oauth] /authorization/userinfo failed', err })
+		}
+
 		let sipgateUsers: Awaited<ReturnType<typeof getUsers>>
 		try {
 			sipgateUsers = await getUsers(tempRest)
+			req.payload.logger.info({
+				msg: '[sipgate oauth] getUsers',
+				count: sipgateUsers.length,
+				users: sipgateUsers.map((u) => ({ id: u.id, email: u.email })),
+			})
 		} catch {
 			return Response.redirect(`${adminUrl}?sipgate_error=user_fetch_failed`, 302)
 		}
 
-		const sipgateUser = sipgateUsers[0]
+		const sipgateUser = authenticatedSub
+			? (sipgateUsers.find((u) => u.id === authenticatedSub) ?? sipgateUsers[0])
+			: sipgateUsers[0]
+
+		req.payload.logger.info({
+			msg: '[sipgate oauth] resolved sipgate user',
+			authenticatedSub,
+			resolved: sipgateUser ? { id: sipgateUser.id, email: sipgateUser.email } : null,
+		})
+
 		if (!sipgateUser) {
 			return Response.redirect(`${adminUrl}?sipgate_error=no_sipgate_user`, 302)
 		}
@@ -186,6 +224,28 @@ export const createSipgateOAuthCallback = ({
 		} catch {
 			return Response.redirect(`${adminUrl}?sipgate_error=upsert_failed`, 302)
 		}
+
+		// Immediately sync this user's devices and channels after connecting.
+		// Errors are non-fatal — the user is already connected even if sync fails.
+		try {
+			await syncDevices({
+				payload: req.payload,
+				rest: tempRest,
+				sipgateDevicesSlug,
+				sipgateUsersSlug,
+				scopeToUserId: sipgateUser.id,
+			})
+		} catch {}
+
+		try {
+			await syncChannels({
+				payload: req.payload,
+				rest: tempRest,
+				sipgateChannelsSlug,
+				sipgateUsersSlug,
+				scopeToUserId: sipgateUser.id,
+			})
+		} catch {}
 
 		return Response.redirect(adminUrl, 302)
 	},

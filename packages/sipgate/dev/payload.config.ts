@@ -5,7 +5,10 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig, type CollectionSlug } from 'payload'
 import { sipgate } from '../src/index'
-import { SYNC_CALL_HISTORY_TASK } from '../src/tasks/syncCallHistoryTask'
+import {
+	SYNC_CALL_HISTORY_TASK,
+	SYNC_CALL_HISTORY_TASK_OAUTH,
+} from '../src/tasks/syncCallHistoryTask'
 import { seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -59,7 +62,7 @@ export default buildConfig({
 			contactCollections: [contacts.slug as CollectionSlug],
 			phoneNumberFields: ['phoneNumber'],
 			payloadUsersSlug: 'users',
-			syncCallLogs: authType === 'pat',
+			syncCallLogs: true,
 			sipgateCredentials:
 				authType === 'oauth2'
 					? {
@@ -85,9 +88,9 @@ export default buildConfig({
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
-		if (authType === 'pat') {
-			await payload.jobs.queue({ task: SYNC_CALL_HISTORY_TASK, input: { limit: 100 } })
-		}
+		const callHistoryTask =
+			authType === 'oauth2' ? SYNC_CALL_HISTORY_TASK_OAUTH : SYNC_CALL_HISTORY_TASK
+		await payload.jobs.queue({ task: callHistoryTask, input: { limit: 100 } })
 	},
 	typescript: { autoGenerate },
 	admin: {

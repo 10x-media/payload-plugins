@@ -45,6 +45,14 @@ export const createCallLogsCollection = (
 				unique: true,
 			},
 			{
+				name: 'sipgateUserId',
+				type: 'text',
+				admin: {
+					description: 'Sipgate user ID (e.g. w2) that owns this call log. Set in OAuth2 mode.',
+					position: 'sidebar',
+				},
+			},
+			{
 				name: 'callType',
 				type: 'select',
 				required: true,

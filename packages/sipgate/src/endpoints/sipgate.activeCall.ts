@@ -4,12 +4,13 @@ import { sipgateActiveCallHandler } from '../utils/sipgateActiveCallHandler'
 
 export const createSipgateActiveCall = (
 	access?: SipgateAccess,
-	overrides?: Partial<Endpoint>
+	overrides?: Partial<Endpoint>,
+	sipgateUsersSlug?: string
 ): Endpoint => {
 	const defaultEndpoint: Endpoint = {
 		path: '/sipgate/active-call',
 		method: 'get',
-		handler: sipgateActiveCallHandler(access),
+		handler: sipgateActiveCallHandler(access, sipgateUsersSlug),
 	}
 	return deepMerge<Endpoint>(defaultEndpoint, overrides ?? {})
 }

@@ -92,6 +92,12 @@ type SyncDevicesOptions = {
 	sipgateDevicesSlug: string
 	sipgateUsersSlug: string
 	prune?: boolean
+	/**
+	 * When set, only syncs devices for this specific sipgate user ID (the Payload
+	 * document ID / sipgate user ID like "w0"). Prune is automatically disabled
+	 * when scoping to a single user.
+	 */
+	scopeToUserId?: string
 }
 
 export const syncDevices = async ({
@@ -100,9 +106,11 @@ export const syncDevices = async ({
 	sipgateDevicesSlug,
 	sipgateUsersSlug,
 	prune,
+	scopeToUserId,
 }: SyncDevicesOptions): Promise<SyncResult> => {
 	const usersResult = await payload.find({
 		collection: sipgateUsersSlug,
+		where: scopeToUserId ? { id: { equals: scopeToUserId } } : undefined,
 		limit: 1000,
 		depth: 0,
 		overrideAccess: true,
@@ -151,7 +159,7 @@ export const syncDevices = async ({
 		}
 	}
 
-	if (prune) {
+	if (prune && !scopeToUserId) {
 		try {
 			const orphans = await payload.find({
 				collection: sipgateDevicesSlug,
@@ -186,6 +194,12 @@ type SyncChannelsOptions = {
 	sipgateChannelsSlug: string
 	sipgateUsersSlug: string
 	prune?: boolean
+	/**
+	 * When set, disables the global prune step so other users' channels are not
+	 * deleted. The API already scopes channels by the OAuth token, so no
+	 * application-level filtering is needed.
+	 */
+	scopeToUserId?: string
 }
 
 export const syncChannels = async ({
@@ -194,8 +208,13 @@ export const syncChannels = async ({
 	sipgateChannelsSlug,
 	sipgateUsersSlug,
 	prune,
+	scopeToUserId,
 }: SyncChannelsOptions): Promise<SyncResult> => {
-	const groups = await getGroups(rest)
+	const allGroups = await getGroups(rest)
+	// When scoped, only sync channels this user is actually a member of.
+	const groups = scopeToUserId
+		? allGroups.filter((g) => g.users.some((u: { id: string }) => u.id === scopeToUserId))
+		: allGroups
 	const seenIds = new Set<string>()
 	let synced = 0
 	let errors = 0
@@ -278,7 +297,7 @@ export const syncChannels = async ({
 		}
 	}
 
-	if (prune) {
+	if (prune && !scopeToUserId) {
 		try {
 			const orphans = await payload.find({
 				collection: sipgateChannelsSlug,
