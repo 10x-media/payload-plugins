@@ -41,7 +41,7 @@ export const createSipgateDevices = ({
 					limit: 1,
 					overrideAccess: true,
 				})
-				sipgateUserId = result.docs[0]?.id as string | undefined
+				sipgateUserId = result.docs[0]?.sipgateId as string | undefined
 			} else if (filterDevicesByUser && req.user) {
 				const result = await req.payload.find({
 					collection: usersCol,
@@ -49,7 +49,7 @@ export const createSipgateDevices = ({
 					limit: 1,
 					overrideAccess: true,
 				})
-				sipgateUserId = result.docs[0]?.id as string | undefined
+				sipgateUserId = result.docs[0]?.sipgateId as string | undefined
 			}
 
 			const devices = await req.payload.find({

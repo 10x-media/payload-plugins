@@ -113,6 +113,16 @@ export type SipgatePluginOptions = {
 	payloadUsersSlug?: CollectionSlug | CollectionSlug[]
 
 	/**
+	 * When true, multiple Payload users may link to the same Sipgate account via OAuth2.
+	 * By default each Sipgate account can only be claimed by one Payload user; a second
+	 * attempt returns a clear error. Enabling this removes that restriction and also drops
+	 * the unique-index on the sipgate user ID field in the `sipgate-users` collection
+	 * (requires a DB migration when toggled on existing data).
+	 * @default false
+	 */
+	allowSharedSipgateAccount?: boolean
+
+	/**
 	 * When set, all dial and device operations are scoped to this Sipgate user.
 	 * Useful for single-account setups where all Payload users share one Sipgate identity.
 	 * The email is matched against the `sipgate-users` collection (populated by sync).
@@ -209,6 +219,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				slug: sipgateUsersSlug,
 				payloadUsersSlug: options.payloadUsersSlug ?? 'users',
 				includeOAuthFields: isOAuth2,
+				allowSharedSipgateAccount: options.allowSharedSipgateAccount ?? false,
 				overrides: options.overrides?.sipgateUsers,
 			}),
 			createSipgateDevicesCollection({
@@ -328,6 +339,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 						sipgateDevicesSlug,
 						sipgateChannelsSlug,
 						payloadUsersSlug: singlePayloadUsersSlug,
+						allowSharedSipgateAccount: options.allowSharedSipgateAccount ?? false,
 					}),
 					createSipgateOAuthSync({
 						credentials: options.sipgateCredentials,

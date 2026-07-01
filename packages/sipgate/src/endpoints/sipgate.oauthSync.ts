@@ -58,6 +58,7 @@ export const createSipgateOAuthSync = ({
 			if (!accessToken || !refreshToken) continue
 
 			const docId = sipgateUserDoc.id as string
+			const sipgateId = sipgateUserDoc.sipgateId as string
 			const rest = buildSipgateRestOAuth({
 				accessToken,
 				refreshToken,
@@ -85,7 +86,7 @@ export const createSipgateOAuthSync = ({
 						rest,
 						sipgateDevicesSlug,
 						sipgateUsersSlug,
-						scopeToUserId: docId,
+						scopeToUserId: sipgateId,
 					})
 					totals.devices.synced += result.synced
 					totals.devices.errors += result.errors
@@ -101,7 +102,7 @@ export const createSipgateOAuthSync = ({
 						rest,
 						sipgateChannelsSlug,
 						sipgateUsersSlug,
-						scopeToUserId: docId,
+						scopeToUserId: sipgateId,
 					})
 					totals.channels.synced += result.synced
 					totals.channels.errors += result.errors

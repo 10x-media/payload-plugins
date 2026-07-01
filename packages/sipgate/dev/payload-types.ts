@@ -200,6 +200,7 @@ export interface CallLog {
  */
 export interface SipgateUser {
   id: string;
+  sipgateId: string;
   firstname?: string | null;
   lastname?: string | null;
   email?: string | null;
@@ -225,6 +226,7 @@ export interface SipgateUser {
  */
 export interface SipgateDevice {
   id: string;
+  sipgateId: string;
   alias?: string | null;
   sipgateUserId?: string | null;
   sipgateUser?: (string | null) | SipgateUser;
@@ -252,6 +254,7 @@ export interface SipgateDevice {
  */
 export interface SipgateChannel {
   id: string;
+  sipgateId: string;
   name?: string | null;
   owner?: string | null;
   locale?: string | null;
@@ -529,7 +532,7 @@ export interface CallLogsSelect<T extends boolean = true> {
  * via the `definition` "sipgate-users_select".
  */
 export interface SipgateUsersSelect<T extends boolean = true> {
-  id?: T;
+  sipgateId?: T;
   firstname?: T;
   lastname?: T;
   email?: T;
@@ -551,7 +554,7 @@ export interface SipgateUsersSelect<T extends boolean = true> {
  * via the `definition` "sipgate-devices_select".
  */
 export interface SipgateDevicesSelect<T extends boolean = true> {
-  id?: T;
+  sipgateId?: T;
   alias?: T;
   sipgateUserId?: T;
   sipgateUser?: T;
@@ -578,7 +581,7 @@ export interface SipgateDevicesSelect<T extends boolean = true> {
  * via the `definition` "sipgate-channels_select".
  */
 export interface SipgateChannelsSelect<T extends boolean = true> {
-  id?: T;
+  sipgateId?: T;
   name?: T;
   owner?: T;
   locale?: T;

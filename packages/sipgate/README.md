@@ -128,6 +128,24 @@ sipgateCredentials: {
 
 Make sure the scopes you request are enabled for your OAuth2 client in the sipgate console.
 
+**Shared Sipgate accounts (multiple Payload users, one Sipgate account):**
+
+By default each Sipgate account can only be linked to one Payload user. A second user trying to connect the same account receives a clear error message. To allow multiple Payload users to share a single Sipgate account, set `allowSharedSipgateAccount: true`:
+
+```ts
+sipgate({
+  sipgateCredentials: { authType: 'oauth2', ... },
+  allowSharedSipgateAccount: true,
+})
+```
+
+When this option is enabled, the plugin removes the unique constraint from the sipgate user ID field in the `sipgate-users` collection. **If you are enabling this on an existing database, you must also drop the old unique index manually:**
+
+- **MongoDB:** Open MongoDB Compass, navigate to the `sipgate-users` collection, go to the Indexes tab, and **drop** the index on the `id` field (MongoDB does not allow editing index properties in-place; you must drop and let Payload recreate it without the unique constraint on the next startup).
+- **PostgreSQL:** Create a Payload migration (`pnpm migrate:create <plugin> drop-sipgate-users-id-unique`) and drop the unique constraint in the migration file.
+
+If you skip this step, the database will still enforce uniqueness even though the application no longer expects it, and the second user's connection attempt will fail with a generic database error.
+
 ## Startup sync (onInit)
 
 Use `createSipgateOnInit` to perform a full sync every time the Payload server starts. The function syncs users, devices, and channels in the correct order and **prunes any Payload records that no longer exist in sipgate** — so deleted users, devices, or channels are automatically removed.

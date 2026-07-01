@@ -21,7 +21,7 @@ const LiveCallFloatingWindow: PayloadServerReactComponent<PayloadComponent> = as
 				limit: 1,
 				overrideAccess: true,
 			})
-			sipgateUserId = result.docs[0]?.id as string
+			sipgateUserId = result.docs[0]?.sipgateId as string
 		} catch {}
 	}
 

@@ -23,7 +23,7 @@ export const sipgateActiveCallHandler =
 				depth: 0,
 				overrideAccess: true,
 			})
-			const sipgateUserId = linked.docs[0]?.id as string | undefined
+			const sipgateUserId = linked.docs[0]?.sipgateId as string | undefined
 			if (sipgateUserId) {
 				calls = allCalls.filter((c) => {
 					const userIds: string[] = (c['userId[]'] as string[] | undefined) ?? []

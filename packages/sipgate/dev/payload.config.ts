@@ -83,6 +83,7 @@ export default buildConfig({
 						},
 			enableCallActivityWidget: true,
 			enableLiveCallFloatingWindow: true,
+			allowSharedSipgateAccount: true,
 		}),
 	],
 	telemetry: false,
