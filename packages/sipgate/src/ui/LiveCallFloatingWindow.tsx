@@ -1,4 +1,5 @@
 import type { PayloadComponent, PayloadServerReactComponent } from 'payload'
+import type { LiveCallPosition } from '../types'
 import type { SipgateDevice } from '../utils/sipgate.rest'
 import { LiveCallFloatingWindowClient } from './LiveCallFloatingWindowClient'
 
@@ -6,6 +7,10 @@ const USERS_SLUG = 'sipgate-users'
 const DEVICES_SLUG = 'sipgate-devices'
 
 const LiveCallFloatingWindow: PayloadServerReactComponent<PayloadComponent> = async (props) => {
+	const position: LiveCallPosition =
+		(props as unknown as { clientProps?: { position?: LiveCallPosition } }).clientProps?.position ??
+		'bottom-right'
+
 	let sipgateUserId: string | undefined
 
 	if (props.user) {
@@ -32,7 +37,7 @@ const LiveCallFloatingWindow: PayloadServerReactComponent<PayloadComponent> = as
 		initialDevices = (result?.docs ?? []) as SipgateDevice[]
 	} catch {}
 
-	return <LiveCallFloatingWindowClient initialDevices={initialDevices} />
+	return <LiveCallFloatingWindowClient initialDevices={initialDevices} position={position} />
 }
 
 export default LiveCallFloatingWindow

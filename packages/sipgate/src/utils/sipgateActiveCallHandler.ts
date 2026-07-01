@@ -11,7 +11,9 @@ export const sipgateActiveCallHandler =
 
 		const allCalls = await createActiveCallStore(req.payload).get()
 
-		// Filter to calls involving the current user's sipgate account when linked.
+		// When user-scoping is active, filter to calls involving the current user's
+		// sipgate account. If no account is linked the user gets an empty list —
+		// they should not see other users' calls just because they haven't connected.
 		let calls = allCalls
 		if (sipgateUsersSlug && req.user?.id) {
 			const linked = await req.payload.find({
@@ -27,6 +29,8 @@ export const sipgateActiveCallHandler =
 					const userIds: string[] = (c['userId[]'] as string[] | undefined) ?? []
 					return userIds.includes(sipgateUserId)
 				})
+			} else {
+				calls = []
 			}
 		}
 
