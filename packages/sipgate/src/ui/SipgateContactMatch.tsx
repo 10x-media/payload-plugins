@@ -13,6 +13,7 @@ const normalizeNumber = (num: string) => num.replace(/\D/g, '')
 const SipgateContactMatch = ({ phoneNumberFields = [] }: Props) => {
 	const [contacts, setContacts] = useState<SipgateContact>()
 	const [loading, setLoading] = useState(true)
+	const [notConnected, setNotConnected] = useState(false)
 
 	const formPhoneValues = useFormFields(([fields]) =>
 		phoneNumberFields
@@ -22,11 +23,18 @@ const SipgateContactMatch = ({ phoneNumberFields = [] }: Props) => {
 
 	useEffect(() => {
 		fetch('/api/sipgate/contacts')
-			.then((res) => res.json())
-			.then((data) => {
-				setContacts(data)
-				setLoading(false)
+			.then((res) => {
+				if (res.status === 403) {
+					setNotConnected(true)
+					setLoading(false)
+					return
+				}
+				return res.json().then((data: SipgateContact) => {
+					setContacts(data)
+					setLoading(false)
+				})
 			})
+			.catch(() => setLoading(false))
 	}, [])
 
 	const normalizedFormNumbers = useMemo(
@@ -42,6 +50,8 @@ const SipgateContactMatch = ({ phoneNumberFields = [] }: Props) => {
 	}, [contacts, normalizedFormNumbers])
 
 	if (loading) return <div>Loading contacts...</div>
+
+	if (notConnected) return null
 
 	if (matchedContacts.length === 0) return null
 

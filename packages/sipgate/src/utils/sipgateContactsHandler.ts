@@ -61,7 +61,9 @@ export const sipgateContactsHandler =
 			rest = buildSipgateRest(credentials)
 		}
 
-		const contactsStore = createSipgateContactsStore(req.payload, rest)
+		const userId =
+			credentials.authType === 'oauth2' ? (req.user?.id as string | undefined) : undefined
+		const contactsStore = createSipgateContactsStore(req.payload, rest, userId)
 		const contacts = await contactsStore.get()
 		return Response.json(contacts)
 	}

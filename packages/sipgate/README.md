@@ -105,12 +105,17 @@ SIPGATE_CLIENT_ID=your-oauth2-client-id
 SIPGATE_CLIENT_SECRET=your-oauth2-client-secret
 ```
 
+**Prerequisites:**
+
+- `serverURL` must be set in your Payload config (the plugin uses it to build the OAuth2 `redirect_uri`).
+- `payloadUsersSlug` must be set to the slug(s) of your Payload auth collection(s). The plugin injects the **Connect Sipgate** button into those collections' document edit views, so users can link their Sipgate account directly from their own profile page.
+
 **Setup steps:**
 
 1. Create an OAuth2 client in the [sipgate console](https://console.sipgate.com). Set the redirect URI to `{SITE_URL}/api/sipgate/oauth/callback`.
-2. Configure the plugin with `authType: 'oauth2'` and the client credentials above.
+2. Configure the plugin with `authType: 'oauth2'`, the client credentials, and `payloadUsersSlug` matching your auth collection.
 3. Set `serverURL` to your app's public URL.
-4. Each Payload user clicks the **Connect Sipgate** button that appears in the admin navigation and follows the sipgate login flow.
+4. Each Payload user opens their own profile in the admin and clicks the **Connect Sipgate** button (also visible in the admin navigation). They follow the Sipgate login flow.
 5. After connecting, devices and channels are synced automatically for that user.
 
 **OAuth2 scopes:**
