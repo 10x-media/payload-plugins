@@ -1,4 +1,4 @@
-import type { WidgetServerProps } from 'payload'
+import type { Where, WidgetServerProps } from 'payload'
 import type { CallActivityChartData } from './CallActivityWidgetClient'
 import { CallActivityWidgetClient } from './CallActivityWidgetClient'
 
@@ -22,10 +22,34 @@ const CallActivityWidget = async (props: WidgetServerProps) => {
 	const since = new Date()
 	since.setDate(since.getDate() - DAYS)
 
+	// If the current user has a linked sipgate account, scope the widget to
+	// their calls only. Falls back to all calls in PAT mode or when unlinked.
+	let sipgateUserIdFilter: string | undefined
+	if (req.user?.id) {
+		const linked = await req.payload.find({
+			collection: 'sipgate-users',
+			where: { 'payloadUser.value': { equals: req.user.id } },
+			limit: 1,
+			depth: 0,
+			overrideAccess: true,
+		})
+		const doc = linked.docs[0]
+		if (doc) sipgateUserIdFilter = doc.id as string
+	}
+
+	const where: Where = sipgateUserIdFilter
+		? {
+				and: [
+					{ startedAt: { greater_than: since.toISOString() } },
+					{ sipgateUserId: { equals: sipgateUserIdFilter } },
+				],
+			}
+		: { startedAt: { greater_than: since.toISOString() } }
+
 	const result = await req.payload.find({
 		collection: 'call-logs',
 		limit: 1000,
-		where: { startedAt: { greater_than: since.toISOString() } },
+		where,
 		sort: 'startedAt',
 		overrideAccess: true,
 	})

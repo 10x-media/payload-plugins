@@ -33,24 +33,29 @@ export default buildConfig({
   plugins: [
     sipgate({
       sipgateCredentials: {
-        username: process.env.SIPGATE_USERNAME,
-        password: process.env.SIPGATE_PASSWORD,
+        authType: 'pat',
+        tokenId: process.env.SIPGATE_TOKEN_ID!,
+        token: process.env.SIPGATE_TOKEN!,
       },
     }),
   ],
 })
 ```
 
-This registers the four sync collections (`sipgate-users`, `sipgate-devices`, `sipgate-channels`, `call-logs`) and all API endpoints. Use the **Sync** buttons inside each collection's list view to populate them from sipgate.
+This registers four collections (`sipgate-users`, `sipgate-devices`, `sipgate-channels`, `call-logs`) and all API endpoints. Use the **Sync** buttons inside each collection's list view to populate them from sipgate.
 
-## Environment variables
+## Authentication modes
 
-Store credentials and any sensitive config in environment variables, never in source code.
+The plugin supports two authentication modes: Personal Access Token (PAT) and OAuth2.
+
+### Personal Access Token (PAT)
+
+PAT is the default mode. All API calls are made on behalf of one sipgate account using a token ID and token generated in the sipgate console.
 
 ```bash
 # .env
-SIPGATE_USERNAME=your@email.de
-SIPGATE_PASSWORD=your-sipgate-password
+SIPGATE_TOKEN_ID=your-token-id
+SIPGATE_TOKEN=your-token
 
 # Optional: for single-user setups
 SIPGATE_USER_EMAIL=your@email.de
@@ -59,14 +64,69 @@ SIPGATE_USER_EMAIL=your@email.de
 ```ts
 sipgate({
   sipgateCredentials: {
-    username: process.env.SIPGATE_USERNAME!,
-    password: process.env.SIPGATE_PASSWORD!,
+    authType: 'pat',
+    tokenId: process.env.SIPGATE_TOKEN_ID!,
+    token: process.env.SIPGATE_TOKEN!,
   },
   singleUser: process.env.SIPGATE_USER_EMAIL
     ? { email: process.env.SIPGATE_USER_EMAIL }
     : undefined,
 })
 ```
+
+### OAuth2 (per-user authentication)
+
+OAuth2 lets each Payload user connect their own sipgate account. Tokens are stored per user in the `sipgate-users` collection. Dialing, call logs, device lists, and sync are all scoped to the individual user.
+
+**`serverURL` is required** when using OAuth2. Sipgate redirects the browser back to your Payload server after authentication, and the plugin constructs the `redirect_uri` from `serverURL`. Without it, the OAuth2 flow cannot complete.
+
+```ts
+// payload.config.ts
+export default buildConfig({
+  serverURL: process.env.SITE_URL!, // required for OAuth2
+  plugins: [
+    sipgate({
+      sipgateCredentials: {
+        authType: 'oauth2',
+        clientId: process.env.SIPGATE_CLIENT_ID!,
+        clientSecret: process.env.SIPGATE_CLIENT_SECRET!,
+        realm: 'third-party', // or 'sipgate-apps' — check your sipgate console
+      },
+      syncCallLogs: true,
+    }),
+  ],
+})
+```
+
+```bash
+# .env
+SITE_URL=https://your-app.example.com
+SIPGATE_CLIENT_ID=your-oauth2-client-id
+SIPGATE_CLIENT_SECRET=your-oauth2-client-secret
+```
+
+**Setup steps:**
+
+1. Create an OAuth2 client in the [sipgate console](https://console.sipgate.com). Set the redirect URI to `{SITE_URL}/api/sipgate/oauth/callback`.
+2. Configure the plugin with `authType: 'oauth2'` and the client credentials above.
+3. Set `serverURL` to your app's public URL.
+4. Each Payload user clicks the **Connect Sipgate** button that appears in the admin navigation and follows the sipgate login flow.
+5. After connecting, devices and channels are synced automatically for that user.
+
+**OAuth2 scopes:**
+
+By default the plugin requests `['all']`, which grants full access. You can restrict this via `scopes`:
+
+```ts
+sipgateCredentials: {
+  authType: 'oauth2',
+  clientId: '...',
+  clientSecret: '...',
+  scopes: ['balance:read', 'history:read', 'calls:write'],
+}
+```
+
+Make sure the scopes you request are enabled for your OAuth2 client in the sipgate console.
 
 ## Startup sync (onInit)
 
@@ -77,8 +137,9 @@ import { buildConfig } from 'payload'
 import { sipgate, createSipgateOnInit } from '@10x-media/sipgate'
 
 const credentials = {
-  username: process.env.SIPGATE_USERNAME!,
-  password: process.env.SIPGATE_PASSWORD!,
+  authType: 'pat' as const,
+  tokenId: process.env.SIPGATE_TOKEN_ID!,
+  token: process.env.SIPGATE_TOKEN!,
 }
 
 export default buildConfig({
@@ -115,11 +176,11 @@ The plugin registers three Payload collections that mirror sipgate's user, devic
 
 | Collection | Slug | Populated by |
 |---|---|---|
-| Sipgate Users | `sipgate-users` | Sync Users button |
-| Sipgate Devices | `sipgate-devices` | Sync Devices button (requires Users synced first) |
-| Sipgate Channels | `sipgate-channels` | Sync Channels button |
+| Sipgate Users | `sipgate-users` | Sync Users button (PAT) / OAuth connect flow (OAuth2) |
+| Sipgate Devices | `sipgate-devices` | Sync Devices button (PAT) / OAuth connect or sync (OAuth2) |
+| Sipgate Channels | `sipgate-channels` | Sync Channels button (PAT) / OAuth connect or sync (OAuth2) |
 
-Sync buttons appear in each collection's list view toolbar. You can also trigger sync programmatically via the API:
+**PAT mode** — Sync buttons appear in each collection's list view toolbar. Trigger programmatically:
 
 ```bash
 # Sync all
@@ -133,16 +194,54 @@ curl -X POST /api/sipgate/sync \
   -d '{"type": "users"}' # or "devices" | "channels"
 ```
 
+**OAuth2 mode** — Devices and channels are synced automatically the moment a user completes the OAuth connect flow. You can also trigger a sync across all connected users:
+
+```bash
+curl -X POST /api/sipgate/sync \
+  -H "Content-Type: application/json" \
+  -d '{"type": "all"}' # or "devices" | "channels"
+```
+
+This iterates every `sipgate-users` record that has a stored access token and syncs that user's devices/channels using their own OAuth credentials.
+
 Devices must be synced after users because device records are fetched per-user from the sipgate API (`GET /{userId}/devices`).
 
 Personal channels are detected automatically during channel sync (a channel owned by and assigned to only one user) and stored as `defaultChannel` on the corresponding `sipgate-users` record. This is used as the fallback caller ID when dialing.
 
+## Collection field reference
+
+### `sipgate-users`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | text | Sipgate user ID (e.g. `w0`). Used as the Payload document ID. |
+| `firstname` / `lastname` | text | |
+| `email` | text | |
+| `defaultDevice` | text | Sipgate device ID used for outbound calls |
+| `defaultChannel` | text | Sipgate channel ID for caller ID. Set automatically during channel sync when a personal channel is detected. |
+| `payloadUser` | relationship | Links to the Payload `users` collection. Set manually in PAT mode; set automatically in OAuth2 mode. |
+| `accessToken` | text (hidden) | OAuth2 access token. Only present in OAuth2 mode. |
+| `refreshToken` | text (hidden) | OAuth2 refresh token. Auto-refreshed on expiry. Only present in OAuth2 mode. |
+| `tokenExpiresAt` | date | Access token expiry. Only present in OAuth2 mode. |
+
+### `call-logs`
+
+| Field | Type | Notes |
+|---|---|---|
+| `callId` | text (unique) | Sipgate call identifier |
+| `callType` | select | `in` or `out` |
+| `callStatus` | select | `ringing`, `connected`, `completed`, `missed`, `voicemail`, `rejected` |
+| `callDuration` | number | Duration in seconds |
+| `fromNumber` / `toNumber` | text | |
+| `relatedContact` | relationship | Auto-resolved from `contactCollections` by phone number match |
+| `sipgateUserId` | text | Sipgate user ID of the call owner. Populated in OAuth2 sync; empty in PAT mode. Used to scope the call activity widget and live call window to the current user. |
+| `startedAt` | date | |
+
 ## Linking Payload users to sipgate users
 
-Each `sipgate-users` record has a `payloadUser` relationship field. After syncing, manually link each sipgate user to their Payload account. This enables:
+**PAT mode:** Each `sipgate-users` record has a `payloadUser` relationship field. After syncing, manually link each sipgate user to their Payload account in the admin. This enables per-user device/channel filtering in the dial UI.
 
-- Device and channel filtering per logged-in user in the dial UI
-- Automatic fallback `deviceId` and `channelId` resolution when dialing
+**OAuth2 mode:** The link is created automatically when the user completes the OAuth connect flow. No manual linking is required.
 
 ## Single-user mode
 
@@ -168,7 +267,9 @@ sipgate({
 })
 ```
 
-The window polls active calls every 3 seconds and lets users answer incoming calls on a specific device, hold, record, and hang up.
+The window polls `GET /api/sipgate/active-call` every 3 seconds and lets users answer incoming calls on a specific device, hold, record, and hang up.
+
+**User scoping:** When a Payload user has a linked sipgate account (via OAuth2 connect or manual `payloadUser` link in PAT mode), the endpoint filters active calls to only those involving their sipgate user ID. Users without a linked account see all active calls.
 
 Incoming calls are received via sipgate webhooks. Configure your sipgate account to POST to `/api/sipgate/webhooks`.
 
@@ -185,6 +286,10 @@ sipgate({
 ```
 
 `syncCallLogs: true` registers a Payload job that periodically pulls call history from sipgate into the `call-logs` collection. Use Payload's jobs runner to execute it.
+
+**User scoping:** When a Payload user has a linked sipgate account, the widget shows only their calls. In PAT mode (or when no link exists), all call logs are shown.
+
+**OAuth2 mode:** Call logs are fetched per user using each user's own access token. The `call-logs` collection stores a `sipgateUserId` field on each record to enable this filtering. In PAT mode, `sipgateUserId` is left empty and the widget shows everything.
 
 ## Access control
 
@@ -253,23 +358,68 @@ Available override keys: `callLogs`, `sipgateUsers`, `sipgateDevices`, `sipgateC
 
 ## API endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/sipgate/webhooks` | Receives sipgate events (`newCall`, `answer`, `hangup`, `dtmf`) |
-| `POST` | `/api/sipgate/dial` | Initiates an outbound call |
-| `GET` | `/api/sipgate/active-call` | Returns currently active calls from the KV store |
-| `POST` | `/api/sipgate/rtcm` | Call control: `answer`, `hold`, `mute`, `recordings`, `hangup`, `transfer` |
-| `GET` | `/api/sipgate/devices` | Returns devices for the current user |
-| `GET` | `/api/sipgate/contacts` | Searches sipgate contacts |
-| `POST` | `/api/sipgate/sync` | Triggers data sync (`users`, `devices`, `channels`, or `all`) |
+| Method | Path | Mode | Description |
+|---|---|---|---|
+| `POST` | `/api/sipgate/webhooks` | both | Receives sipgate events (`newCall`, `answer`, `hangup`, `dtmf`) |
+| `POST` | `/api/sipgate/dial` | both | Initiates an outbound call |
+| `GET` | `/api/sipgate/active-call` | both | Returns active calls from the KV store, filtered to the current user's calls when a sipgate account is linked |
+| `POST` | `/api/sipgate/rtcm` | both | Call control: `answer`, `hold`, `mute`, `recordings`, `hangup`, `transfer`. In OAuth2 mode, uses the current user's token. |
+| `GET` | `/api/sipgate/devices` | both | Returns devices for the current user |
+| `GET` | `/api/sipgate/contacts` | both | Searches sipgate contacts. In OAuth2 mode, uses the current user's token. |
+| `POST` | `/api/sipgate/sync` | both | Triggers data sync. PAT: `users`, `devices`, `channels`, or `all`. OAuth2: `devices`, `channels`, or `all` (per connected user). |
+| `GET` | `/api/sipgate/oauth/connect` | OAuth2 | Redirects the logged-in Payload user to sipgate's authorization screen |
+| `GET` | `/api/sipgate/oauth/callback` | OAuth2 | Receives the authorization code from sipgate, exchanges it for tokens, and immediately syncs devices and channels |
 
-## Full example
+## Full examples
+
+### PAT mode
+
+```ts
+import { buildConfig } from 'payload'
+import { sipgate, createSipgateOnInit } from '@10x-media/sipgate'
+
+const credentials = {
+  authType: 'pat' as const,
+  tokenId: process.env.SIPGATE_TOKEN_ID!,
+  token: process.env.SIPGATE_TOKEN!,
+}
+
+export default buildConfig({
+  onInit: async (payload) => {
+    await createSipgateOnInit(credentials)(payload)
+  },
+  collections: [
+    {
+      slug: 'contacts',
+      fields: [
+        { name: 'name', type: 'text' },
+        { name: 'phone', type: 'text' },
+      ],
+    },
+  ],
+  plugins: [
+    sipgate({
+      sipgateCredentials: credentials,
+      contactCollections: ['contacts'],
+      phoneNumberFields: ['phone'],
+      payloadUsersSlug: 'users',
+      filterDevicesByUser: true,
+      enableLiveCallFloatingWindow: true,
+      enableCallActivityWidget: true,
+      syncCallLogs: true,
+    }),
+  ],
+})
+```
+
+### OAuth2 mode
 
 ```ts
 import { buildConfig } from 'payload'
 import { sipgate } from '@10x-media/sipgate'
 
 export default buildConfig({
+  serverURL: process.env.SITE_URL!, // required — used to build the OAuth redirect URI
   collections: [
     {
       slug: 'contacts',
@@ -282,16 +432,16 @@ export default buildConfig({
   plugins: [
     sipgate({
       sipgateCredentials: {
-        username: process.env.SIPGATE_USERNAME!,
-        password: process.env.SIPGATE_PASSWORD!,
+        authType: 'oauth2',
+        clientId: process.env.SIPGATE_CLIENT_ID!,
+        clientSecret: process.env.SIPGATE_CLIENT_SECRET!,
+        realm: 'third-party',
       },
       contactCollections: ['contacts'],
       phoneNumberFields: ['phone'],
       payloadUsersSlug: 'users',
-      filterDevicesByUser: true,
-      enableLiveCallFloatingWindow: true,
       enableCallActivityWidget: true,
-      syncCallLogs: true,
+      syncCallLogs: true, // uses per-user tokens
     }),
   ],
 })

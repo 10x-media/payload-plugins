@@ -10,6 +10,8 @@ export type CallLogData = {
 	toNumber: string
 	startedAt?: Date
 	relatedContact?: { relationTo: string; value: string }
+	/** Sipgate user ID (e.g. "w2") owning this log. Populated in OAuth2 sync. */
+	sipgateUserId?: string
 }
 
 export const createOrUpdateCallLog = async (

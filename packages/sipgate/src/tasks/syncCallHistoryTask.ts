@@ -8,11 +8,19 @@ import type {
 } from '../types'
 import { createOrUpdateCallLog } from '../utils/callLog'
 import { buildSipgateRest, getCallHistory } from '../utils/sipgate.rest'
+import { buildSipgateRestOAuth } from '../utils/sipgateOAuthRest'
 
 export const SYNC_CALL_HISTORY_TASK = 'sipgateSyncCallHistory'
+export const SYNC_CALL_HISTORY_TASK_OAUTH = 'sipgateSyncCallHistoryOAuth'
 
 export type SyncCallHistoryTaskDeps = {
 	callLogsSlug: string
+	credentials: SipgateCredentials
+}
+
+export type SyncCallHistoryTaskOAuthDeps = {
+	callLogsSlug: string
+	sipgateUsersSlug: string
 	credentials: SipgateCredentials
 }
 
@@ -168,5 +176,101 @@ export const buildSyncCallHistoryTask = (deps: SyncCallHistoryTaskDeps): TaskCon
 			}
 
 			return { output: { created, updated, total: entries.length } }
+		},
+	}) as TaskConfig
+
+/**
+ * Per-user OAuth2 variant. Iterates all connected sipgate users, fetches call
+ * history with each user's own access token, and upserts into the call-logs
+ * collection. Duplicate calls (e.g. group lines) are deduplicated by callId.
+ */
+export const buildSyncCallHistoryTaskOAuth = (deps: SyncCallHistoryTaskOAuthDeps): TaskConfig =>
+	({
+		slug: SYNC_CALL_HISTORY_TASK_OAUTH,
+		retries: 2,
+		inputSchema: [
+			{ name: 'limit', type: 'number' },
+			{ name: 'from', type: 'text' },
+			{ name: 'to', type: 'text' },
+		],
+		handler: async ({ input, req }) => {
+			const { payload } = req
+			const { limit, from, to } = input as { limit?: number; from?: string; to?: string }
+
+			const params: SipgateHistoryParams = {
+				types: ['CALL'],
+				limit: limit ?? 100,
+				...(from ? { from } : {}),
+				...(to ? { to } : {}),
+			}
+
+			const clientId = deps.credentials.clientId
+			const clientSecret = deps.credentials.clientSecret
+			const realm = deps.credentials.realm ?? 'third-party'
+
+			if (!clientId || !clientSecret) {
+				throw new Error('OAuth2 client credentials not configured for call log sync')
+			}
+
+			const connectedUsers = await payload.find({
+				collection: deps.sipgateUsersSlug,
+				where: { accessToken: { exists: true } },
+				limit: 1000,
+				depth: 0,
+				overrideAccess: true,
+			})
+
+			let created = 0
+			let updated = 0
+			let total = 0
+
+			for (const sipgateUserDoc of connectedUsers.docs) {
+				const accessToken = sipgateUserDoc.accessToken as string | undefined
+				const refreshToken = sipgateUserDoc.refreshToken as string | undefined
+				if (!accessToken || !refreshToken) continue
+
+				const docId = sipgateUserDoc.id as string
+				const rest = buildSipgateRestOAuth({
+					accessToken,
+					refreshToken,
+					clientId,
+					clientSecret,
+					realm,
+					onRefresh: async (tokens) => {
+						await payload.update({
+							collection: deps.sipgateUsersSlug,
+							id: docId,
+							data: {
+								accessToken: tokens.access_token,
+								refreshToken: tokens.refresh_token,
+								tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+							},
+							overrideAccess: true,
+						})
+					},
+				})
+
+				try {
+					const history = await getCallHistory(rest, params)
+					const entries = normalizeHistory(history)
+					total += entries.length
+
+					for (const entry of entries) {
+						const result = await createOrUpdateCallLog(payload, deps.callLogsSlug, {
+							...entry,
+							sipgateUserId: docId,
+						})
+						if ('createdAt' in result && result.createdAt === result.updatedAt) {
+							created++
+						} else {
+							updated++
+						}
+					}
+				} catch {
+					// Non-fatal — other users can still sync even if one fails
+				}
+			}
+
+			return { output: { created, updated, total } }
 		},
 	}) as TaskConfig
