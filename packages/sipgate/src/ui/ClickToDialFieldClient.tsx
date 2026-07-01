@@ -83,7 +83,7 @@ export const ClickToDialFieldClient = ({
 	return (
 		<div className="field-type text" style={width ? { width } : undefined}>
 			<FieldLabel label={label} path={path} required={required} />
-			<div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+			<div style={{ display: 'flex', gap: 'calc(var(--base) * 0.5)', alignItems: 'stretch' }}>
 				<TextInput
 					path={path}
 					value={value ?? ''}
@@ -111,18 +111,31 @@ export const ClickToDialFieldClient = ({
 			</div>
 
 			<Drawer slug={DRAWER_SLUG} title={`Call ${value}`}>
-				<div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+				<div
+					style={{
+						padding: 'var(--base)',
+						display: 'flex',
+						flexDirection: 'column',
+						gap: 'var(--base)',
+					}}
+				>
 					{channels.length > 1 && (
 						<div>
-							<p style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Call from</p>
-							<div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+							<p style={{ marginBottom: 'calc(var(--base) * 0.5)', fontWeight: 600 }}>Call from</p>
+							<div
+								style={{
+									display: 'flex',
+									flexDirection: 'column',
+									gap: 'calc(var(--base) * 0.25)',
+								}}
+							>
 								{channels.map((channel) => (
 									<label
 										key={channel.id}
 										style={{
 											display: 'flex',
 											alignItems: 'center',
-											gap: '0.5rem',
+											gap: 'calc(var(--base) * 0.5)',
 											cursor: 'pointer',
 										}}
 									>
@@ -141,10 +154,16 @@ export const ClickToDialFieldClient = ({
 					)}
 
 					<div>
-						<p style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Select device</p>
-						{devices.length === 0 && <p style={{ opacity: 0.6 }}>No devices found.</p>}
+						<p style={{ marginBottom: 'calc(var(--base) * 0.5)', fontWeight: 600 }}>
+							Select device
+						</p>
+						{devices.length === 0 && (
+							<p style={{ color: 'var(--theme-elevation-500)' }}>No devices found.</p>
+						)}
 						{devices.length > 0 && (
-							<div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+							<div
+								style={{ display: 'flex', flexDirection: 'column', gap: 'calc(var(--base) * 0.5)' }}
+							>
 								{devices.map((device) => (
 									<Button
 										key={device.id}
@@ -154,10 +173,15 @@ export const ClickToDialFieldClient = ({
 										onClick={() => dial(device.id)}
 									>
 										<span
-											style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+											style={{
+												display: 'flex',
+												flexDirection: 'column',
+												alignItems: 'flex-start',
+												gap: 2,
+											}}
 										>
 											<strong>{device.alias}</strong>
-											<small style={{ opacity: 0.6 }}>
+											<small style={{ color: 'var(--theme-elevation-500)' }}>
 												{device.online ? '● Online' : '○ Offline'} · {device.id}
 											</small>
 										</span>

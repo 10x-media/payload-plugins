@@ -1,5 +1,8 @@
 export type SipgateAuthType = 'pat' | 'oauth2'
 
+/** Corner of the admin UI where the live call floating window is anchored. */
+export type LiveCallPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+
 export type SipgateCredentials = {
 	/**
 	 * The authentication method to use.
