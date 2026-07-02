@@ -216,7 +216,9 @@ describeForDb('heartbeat wrapper', {}, (db) => {
 		})
 
 		const run = wrapped({ job: { id }, req: { payload: booted.payload } })
-		await new Promise((r) => setTimeout(r, 10))
+		// Wait long enough for the initial stampClaim write and first heartbeat tick to
+		// complete before we issue a conflicting update, avoiding a MongoDB write conflict.
+		await new Promise((r) => setTimeout(r, 150))
 		// Simulate a sweeper forcibly bumping the fence token (e.g. via releaseAllClaims +
 		// re-claim). With item 24's claimedBy guard, stampClaim from a different owner is
 		// correctly rejected, so we simulate the fence bump via a direct DB update.
@@ -227,7 +229,7 @@ describeForDb('heartbeat wrapper', {}, (db) => {
 			overrideAccess: true,
 		})
 		// The next renew tick (held fence is now stale) must report the loss.
-		await new Promise((r) => setTimeout(r, 60))
+		await new Promise((r) => setTimeout(r, 100))
 		expect(lost).toContain(id)
 
 		release()
