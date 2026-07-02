@@ -183,13 +183,14 @@ describeForDb('heartbeat wrapper', {}, (db) => {
 		})
 
 		const run = wrapped({ job: { id }, req: { payload: booted.payload } })
-		// Let the entry stamp settle, then assert the lease is held.
-		await new Promise((r) => setTimeout(r, 10))
+		// stampClaim is the first async op in withHeartbeat; allow enough wall time for the
+		// MongoDB round-trip to complete before asserting (10ms was too tight in CI).
+		await new Promise((r) => setTimeout(r, 300))
 		expect((await store.read(id))?.claimedBy).toBe('node-A')
 
 		// Advance the clock and let a real renew tick fire; the stored lease must move.
 		clock.advance(500)
-		await new Promise((r) => setTimeout(r, 60))
+		await new Promise((r) => setTimeout(r, 300))
 		expect((await store.read(id))?.leaseExpiresAt?.toISOString()).toBe('2026-06-01T00:00:01.500Z')
 
 		release()
@@ -346,7 +347,11 @@ describeForDb('sweeper', {}, (db) => {
 	})
 
 	it('recovers a null-lease job via the updatedAt fallback', async () => {
-		clock = installTestClock(new Date('2026-07-01T03:00:00.000Z'))
+		// Start the fake clock far in the future so that clock.now() - fallbackMs (the
+		// updatedAt cutoff) always exceeds any real timestamp written by the DB adapter.
+		// Using a past date fails once wall time overtakes it: real updatedAt would be
+		// newer than the fake cutoff, so the sweeper WHERE never matches.
+		clock = installTestClock(new Date('2035-07-01T03:00:00.000Z'))
 		const id = await booted.payload.jobs.queue({ input: {}, task: 'noop' }).then((j) => j.id)
 		// Claimed, but no lease ever stamped; make updatedAt old relative to now.
 		await booted.payload.update({
