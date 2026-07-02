@@ -1,7 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { ActionRegistry } from './registry'
 import type { ActionInstance } from './runActions'
-import { ACTIONS_TASK_SLUG, type ActionsTaskInput, runActionsForSubmission } from './task'
+import { ACTIONS_TASK_SLUG, runActionsForSubmission } from './task'
 
 /** Default cap on inline action work so a missing worker never hangs the submission response. */
 export const INLINE_DISPATCH_DEADLINE_MS = 5_000
@@ -42,8 +42,11 @@ export const dispatchActions = async (args: DispatchActionsArgs): Promise<void> 
 
 	if (args.hasRunner && canQueue(payload)) {
 		try {
-			const input: ActionsTaskInput = { formId, submissionId }
-			await payload.jobs.queue({ task: ACTIONS_TASK_SLUG, input, req })
+			await payload.jobs.queue({
+				task: ACTIONS_TASK_SLUG,
+				input: { formId: String(formId), submissionId: String(submissionId) },
+				req,
+			})
 		} catch (error) {
 			payload.logger?.error(
 				`@10x-media/form-builder: failed to enqueue actions for submission ${String(submissionId)}: ${
