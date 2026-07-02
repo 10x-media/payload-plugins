@@ -1,4 +1,3 @@
-import type { Plugin } from 'rolldown'
 import { defineConfig } from 'tsdown'
 
 /**
@@ -8,7 +7,7 @@ import { defineConfig } from 'tsdown'
  * module in the chunk originally had one. Without this, Next.js cannot see
  * the RSC/client boundary when it imports a shared chunk from the rsc bundle.
  */
-const preserveDirectives = (): Plugin => {
+const preserveDirectives = () => {
 	const directiveModules = new Map<string, string>()
 	return {
 		name: 'preserve-directives',
