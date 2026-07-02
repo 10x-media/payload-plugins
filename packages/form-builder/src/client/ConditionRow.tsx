@@ -40,6 +40,14 @@ const singleOption = (
 	selected: ReactSelectOption | ReactSelectOption[]
 ): ReactSelectOption | undefined => (Array.isArray(selected) ? selected[0] : selected)
 
+const S = {
+	row: { display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'nowrap' } as const,
+	field: { flex: '1 1 9rem', minWidth: 0 } as const,
+	operator: { flex: '0 1 9rem', minWidth: 0 } as const,
+	value: { flex: '1 1 9rem', minWidth: 0 } as const,
+	remove: { flexShrink: 0, alignSelf: 'center' } as const,
+}
+
 export const ConditionRow = ({ condition, operands, onChange, onRemove }: ConditionRowProps) => {
 	const { t, i18n } = useTranslation()
 	const operand = operands.find((entry) => entry.name === condition.field)
@@ -79,8 +87,8 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 	}
 
 	return (
-		<div className="form-builder-condition-row">
-			<div className="form-builder-condition-row__field">
+		<div style={S.row}>
+			<div style={S.field}>
 				<ReactSelect
 					options={fieldOptions}
 					value={fieldOptions.find((option) => option.value === condition.field)}
@@ -89,7 +97,7 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={handleFieldChange}
 				/>
 			</div>
-			<div className="form-builder-condition-row__operator">
+			<div style={S.operator}>
 				<ReactSelect
 					options={operatorOptions}
 					value={operatorOptions.find((option) => option.value === condition.operator)}
@@ -98,7 +106,7 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={handleOperatorChange}
 				/>
 			</div>
-			<div className="form-builder-condition-row__value">
+			<div style={S.value}>
 				<ConditionValue
 					conditionType={conditionType}
 					operand={operand}
@@ -107,15 +115,16 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={(value) => onChange({ ...condition, value })}
 				/>
 			</div>
-			<Button
-				buttonStyle="error"
-				size="small"
-				onClick={onRemove}
-				aria-label={t(keys.conditionRemove)}
-				className="form-builder-condition-row__remove"
-			>
-				&#x2715;
-			</Button>
+			<div style={S.remove}>
+				<Button
+					buttonStyle="error"
+					size="small"
+					onClick={onRemove}
+					aria-label={t(keys.conditionRemove)}
+				>
+					&#x2715;
+				</Button>
+			</div>
 		</div>
 	)
 }

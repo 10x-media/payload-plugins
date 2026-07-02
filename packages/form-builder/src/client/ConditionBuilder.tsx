@@ -62,6 +62,45 @@ const operandsFromData = (
 		.filter((operand): operand is ConditionOperand => operand !== null && operand.name !== selfName)
 }
 
+const S = {
+	root: { display: 'flex', flexDirection: 'column', gap: '0.5rem' } as const,
+	hint: { color: 'var(--theme-elevation-400)', fontSize: '0.875rem', margin: 0 } as const,
+	group: {
+		display: 'flex',
+		flexDirection: 'column',
+		gap: '0.375rem',
+		padding: '0.75rem',
+		border: '1px solid var(--theme-elevation-150)',
+		borderRadius: 'var(--style-radius-m)',
+	} as const,
+	orBadge: {
+		display: 'flex',
+		alignItems: 'center',
+		gap: '0.5rem',
+		marginBlock: '0.125rem',
+	} as const,
+	orLine: { flex: 1, height: '1px', background: 'var(--theme-elevation-150)' } as const,
+	orText: {
+		fontSize: '0.6875rem',
+		fontWeight: 700,
+		textTransform: 'uppercase',
+		letterSpacing: '0.06em',
+		color: 'var(--theme-elevation-400)',
+		whiteSpace: 'nowrap',
+	} as const,
+	andRow: { display: 'flex', flexDirection: 'column', gap: '0.25rem' } as const,
+	andBadge: {
+		fontSize: '0.6875rem',
+		fontWeight: 700,
+		textTransform: 'uppercase',
+		letterSpacing: '0.06em',
+		color: 'var(--theme-elevation-400)',
+		paddingInlineStart: '0.125rem',
+	} as const,
+	addCondition: { alignSelf: 'flex-start', marginBlockStart: '0.25rem' } as const,
+	actions: { display: 'flex', gap: '0.5rem' } as const,
+}
+
 export const ConditionBuilder = ({
 	value,
 	onChange,
@@ -126,28 +165,28 @@ export const ConditionBuilder = ({
 		)
 
 	if (operands.length === 0) {
-		return <p className="form-builder-condition__hint">{t(keys.conditionNoFields)}</p>
+		return <p style={S.hint}>{t(keys.conditionNoFields)}</p>
 	}
 
 	return (
-		<div className="form-builder-condition">
+		<div style={S.root}>
 			{groups.length === 0 ? (
-				<p className="form-builder-condition__hint">{t(keys.conditionEmpty)}</p>
+				<p style={S.hint}>{t(keys.conditionEmpty)}</p>
 			) : (
 				groups.map((group, groupIndex) => (
 					// biome-ignore lint/suspicious/noArrayIndexKey: groups are positional and never reordered
-					<div key={groupIndex} className="form-builder-condition__group">
+					<div key={groupIndex} style={S.group}>
 						{groupIndex > 0 ? (
-							<div className="form-builder-condition__or-badge">
-								<span>{t(keys.conditionOr)}</span>
+							<div style={S.orBadge}>
+								<span style={S.orLine} />
+								<span style={S.orText}>{t(keys.conditionOr)}</span>
+								<span style={S.orLine} />
 							</div>
 						) : null}
 						{group.map((row, rowIndex) => (
 							// biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and never reordered
-							<div key={rowIndex} className="form-builder-condition__and-row">
-								{rowIndex > 0 ? (
-									<span className="form-builder-condition__and-badge">{t(keys.conditionAnd)}</span>
-								) : null}
+							<div key={rowIndex} style={S.andRow}>
+								{rowIndex > 0 ? <span style={S.andBadge}>{t(keys.conditionAnd)}</span> : null}
 								<ConditionRow
 									condition={row}
 									operands={operands}
@@ -156,18 +195,15 @@ export const ConditionBuilder = ({
 								/>
 							</div>
 						))}
-						<Button
-							buttonStyle="secondary"
-							size="small"
-							onClick={() => addCondition(groupIndex)}
-							className="form-builder-condition__add-condition"
-						>
-							+ {t(keys.conditionAddCondition)}
-						</Button>
+						<div style={S.addCondition}>
+							<Button buttonStyle="secondary" size="small" onClick={() => addCondition(groupIndex)}>
+								+ {t(keys.conditionAddCondition)}
+							</Button>
+						</div>
 					</div>
 				))
 			)}
-			<div className="form-builder-condition__actions">
+			<div style={S.actions}>
 				<Button
 					buttonStyle="secondary"
 					size="small"

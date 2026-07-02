@@ -1,7 +1,6 @@
 'use client'
 
 import { FieldLabel, useField } from '@payloadcms/ui'
-import './condition.css'
 import type { StaticLabel, Where } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import { ConditionBuilder } from './ConditionBuilder'
@@ -32,7 +31,7 @@ export const FormConditionField = (props: FormConditionFieldProps) => {
 	const { path, setValue, value } = useField<Where>()
 	const label = toStaticLabel(props.field?.label ?? props.label)
 	return (
-		<div className="field-type form-builder-condition-field">
+		<div className="field-type" style={{ marginBlockEnd: '1rem' }}>
 			<FieldLabel label={label} path={path} />
 			<ConditionBuilder
 				value={value ?? undefined}
