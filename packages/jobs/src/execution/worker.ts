@@ -254,7 +254,7 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		const exit = args.exit ?? ((code: number) => process.exit(code))
 		signalCleanup = installSignalHandlers(args.signals ?? ['SIGTERM', 'SIGINT'], () => {
 			void drain()
-				.then((res) => exit(res.timedOut ? 1 : 0))
+				.then(() => exit(0))
 				.catch(() => exit(1))
 		})
 	}
