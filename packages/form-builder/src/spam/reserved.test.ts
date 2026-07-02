@@ -8,8 +8,8 @@ const v = (field: string, value: unknown): SubmissionValue => ({ field, value })
 describe('extractReservedValues', () => {
 	it('pulls out honeypot + captcha and leaves real fields', () => {
 		const { cleaned, honeypot, captchaToken } = extractReservedValues(
-			[v('name', 'Jo'), v('confirm_email', 'bot@x.com'), v(CAPTCHA_TOKEN_KEY, 'tok')],
-			'confirm_email'
+			[v('name', 'Jo'), v('website', 'bot@x.com'), v(CAPTCHA_TOKEN_KEY, 'tok')],
+			'website'
 		)
 		expect(cleaned).toEqual([v('name', 'Jo')])
 		expect(honeypot).toBe('bot@x.com')
@@ -17,13 +17,13 @@ describe('extractReservedValues', () => {
 	})
 
 	it('keeps the honeypot-named entry when honeypot is disabled (null field)', () => {
-		const { cleaned, honeypot } = extractReservedValues([v('confirm_email', 'x')], null)
-		expect(cleaned).toEqual([v('confirm_email', 'x')])
+		const { cleaned, honeypot } = extractReservedValues([v('website', 'x')], null)
+		expect(cleaned).toEqual([v('website', 'x')])
 		expect(honeypot).toBeUndefined()
 	})
 
 	it('ignores a non-string captcha token', () => {
-		const { captchaToken } = extractReservedValues([v(CAPTCHA_TOKEN_KEY, 123)], 'confirm_email')
+		const { captchaToken } = extractReservedValues([v(CAPTCHA_TOKEN_KEY, 123)], 'website')
 		expect(captchaToken).toBeUndefined()
 	})
 })
