@@ -139,6 +139,9 @@ export const buildSubmissionsCollection = ({
 				{ label: 'Complete', value: 'complete' },
 				{ label: 'Partial', value: 'partial' },
 			],
+			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
+			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
+			access: { create: isLoggedIn, update: isLoggedIn },
 		},
 		{ name: 'locale', type: 'text' },
 		{ name: 'values', type: 'json' },

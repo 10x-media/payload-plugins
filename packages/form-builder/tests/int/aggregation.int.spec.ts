@@ -81,6 +81,9 @@ describeForDb('form-builder response aggregation', { dbs: ['mongo'] }, (db) => {
 		await booted.payload.create({
 			collection: 'form-submissions',
 			depth: 0,
+			// Authenticated (admin) creates can set partial; an unauthenticated create would be
+			// forced to 'complete' by validateSubmission. Simulate an admin-created partial.
+			req: { user: { id: 'admin', collection: 'users' } } as never,
 			data: { form: form.id, status: 'partial', values: [{ field: 'colour', value: 'blue' }] },
 		})
 		const completeOnly = await aggregateFieldResponses({
