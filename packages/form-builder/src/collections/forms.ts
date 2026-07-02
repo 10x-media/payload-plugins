@@ -8,6 +8,7 @@ import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeC
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
+import { isLoggedIn } from '../plugin/access'
 import {
 	DEFAULT_PRESENTATION_NAME,
 	defaultPresentationDescriptors,
@@ -78,6 +79,10 @@ export const buildFormsCollection = ({
 				type: 'blocks',
 				blocks: buildActionBlocks(actionRegistry),
 				label: labelForKey(keys.configActions),
+				// Action config can contain secrets (e.g. signedWebhook.secret). The collection
+				// itself is publicly readable so forms can be rendered by anonymous clients, but
+				// action config must never be exposed to anonymous callers.
+				access: { read: isLoggedIn },
 			},
 			{
 				name: 'defaultPresentation',
