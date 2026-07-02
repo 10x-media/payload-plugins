@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormFields } from '@payloadcms/ui'
+import { Button, useFormFields } from '@payloadcms/ui'
 import type { Operator, Where } from 'payload'
 import { reduceFieldsToValues, transformWhereQuery } from 'payload/shared'
 import { useMemo } from 'react'
@@ -138,12 +138,16 @@ export const ConditionBuilder = ({
 					// biome-ignore lint/suspicious/noArrayIndexKey: groups are positional and never reordered
 					<div key={groupIndex} className="form-builder-condition__group">
 						{groupIndex > 0 ? (
-							<div className="form-builder-condition__or">{t(keys.conditionOr)}</div>
+							<div className="form-builder-condition__or-badge">
+								<span>{t(keys.conditionOr)}</span>
+							</div>
 						) : null}
 						{group.map((row, rowIndex) => (
 							// biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and never reordered
-							<div key={rowIndex} className="form-builder-condition__and">
-								{rowIndex > 0 ? <span>{t(keys.conditionAnd)}</span> : null}
+							<div key={rowIndex} className="form-builder-condition__and-row">
+								{rowIndex > 0 ? (
+									<span className="form-builder-condition__and-badge">{t(keys.conditionAnd)}</span>
+								) : null}
 								<ConditionRow
 									condition={row}
 									operands={operands}
@@ -152,19 +156,25 @@ export const ConditionBuilder = ({
 								/>
 							</div>
 						))}
-						<button type="button" onClick={() => addCondition(groupIndex)}>
-							{t(keys.conditionAddCondition)}
-						</button>
+						<Button
+							buttonStyle="secondary"
+							size="small"
+							onClick={() => addCondition(groupIndex)}
+							className="form-builder-condition__add-condition"
+						>
+							+ {t(keys.conditionAddCondition)}
+						</Button>
 					</div>
 				))
 			)}
 			<div className="form-builder-condition__actions">
-				<button
-					type="button"
+				<Button
+					buttonStyle="secondary"
+					size="small"
 					onClick={() => (groups.length === 0 ? addCondition(0) : addOrGroup())}
 				>
-					{groups.length === 0 ? t(keys.conditionAddCondition) : t(keys.conditionAddOr)}
-				</button>
+					{groups.length === 0 ? `+ ${t(keys.conditionAddCondition)}` : t(keys.conditionAddOr)}
+				</Button>
 			</div>
 		</div>
 	)
