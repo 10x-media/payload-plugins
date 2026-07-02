@@ -80,12 +80,16 @@ export const createCallLogsCollection = (
 				type: 'text',
 				required: true,
 			},
-			{
-				name: 'relatedContact',
-				type: 'relationship',
-				relationTo: contactCollections,
-				required: false,
-			},
+			...(contactCollections.length > 0
+				? [
+						{
+							name: 'relatedContact',
+							type: 'relationship' as const,
+							relationTo: contactCollections,
+							required: false,
+						},
+					]
+				: []),
 			{
 				name: 'startedAt',
 				type: 'date',
