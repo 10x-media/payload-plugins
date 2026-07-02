@@ -1,0 +1,106 @@
+/* Condition builder admin UI layout.
+ * Uses Payload CSS variables so the styles respond to light/dark theme automatically.
+ */
+
+.form-builder-condition-field {
+	margin-block-end: 1rem;
+}
+
+.form-builder-condition {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.form-builder-condition__hint {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+}
+
+.form-builder-condition__group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+	padding: 0.75rem;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-m);
+}
+
+.form-builder-condition__or-badge {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-block: 0.125rem;
+}
+
+.form-builder-condition__or-badge::before,
+.form-builder-condition__or-badge::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--theme-elevation-150);
+}
+
+.form-builder-condition__or-badge span {
+	font-size: 0.6875rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--theme-elevation-400);
+	white-space: nowrap;
+}
+
+.form-builder-condition__and-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.form-builder-condition__and-badge {
+	font-size: 0.6875rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--theme-elevation-400);
+	padding-inline-start: 0.125rem;
+}
+
+.form-builder-condition__add-condition {
+	align-self: flex-start;
+	margin-block-start: 0.25rem;
+}
+
+.form-builder-condition__actions {
+	display: flex;
+	gap: 0.5rem;
+}
+
+/* Condition row: [field] [operator] [value] [remove] laid out as a flex row */
+
+.form-builder-condition-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+	flex-wrap: nowrap;
+}
+
+.form-builder-condition-row__field {
+	flex: 1 1 9rem;
+	min-width: 0;
+}
+
+.form-builder-condition-row__operator {
+	flex: 0 1 9rem;
+	min-width: 0;
+}
+
+.form-builder-condition-row__value {
+	flex: 1 1 9rem;
+	min-width: 0;
+}
+
+.form-builder-condition-row__remove {
+	flex-shrink: 0;
+	align-self: center;
+}
