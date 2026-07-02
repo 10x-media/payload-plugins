@@ -207,11 +207,13 @@ describeForDb('heartbeat wrapper', {}, (db) => {
 		const barrier = new Promise<void>((r) => {
 			release = r
 		})
+		// Use a wider interval so the gap between ticks is large enough that the
+		// payload.update() below rarely races with an in-flight renew on MongoMemoryReplSet.
 		const wrapped = withHeartbeat({
 			getStore: () => store,
 			handler: () => barrier.then(() => ({ output: {} })),
 			onLeaseLost: (jobId) => lost.push(jobId),
-			options: resolved({ heartbeatIntervalMs: 25, jobLeaseTtlMs: 1000 }),
+			options: resolved({ heartbeatIntervalMs: 200, jobLeaseTtlMs: 1000 }),
 			ownerId: 'node-A',
 		})
 
@@ -222,14 +224,25 @@ describeForDb('heartbeat wrapper', {}, (db) => {
 		// Simulate a sweeper forcibly bumping the fence token (e.g. via releaseAllClaims +
 		// re-claim). With item 24's claimedBy guard, stampClaim from a different owner is
 		// correctly rejected, so we simulate the fence bump via a direct DB update.
-		await booted.payload.update({
-			collection: 'payload-jobs',
-			data: { claimedBy: 'sweeper', fenceToken: 9999 },
-			id,
-			overrideAccess: true,
-		})
+		// Retry on write conflict: MongoMemoryReplSet can still collide with an in-flight
+		// renew tick even with the wider interval; a short retry eliminates the flake.
+		let retries = 5
+		while (retries--) {
+			try {
+				await booted.payload.update({
+					collection: 'payload-jobs',
+					data: { claimedBy: 'sweeper', fenceToken: 9999 },
+					id,
+					overrideAccess: true,
+				})
+				break
+			} catch (err: unknown) {
+				if (retries === 0 || (err as { code?: number }).code !== 112) throw err
+				await new Promise((r) => setTimeout(r, 30))
+			}
+		}
 		// The next renew tick (held fence is now stale) must report the loss.
-		await new Promise((r) => setTimeout(r, 100))
+		await new Promise((r) => setTimeout(r, 300))
 		expect(lost).toContain(id)
 
 		release()
