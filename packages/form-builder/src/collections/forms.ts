@@ -5,6 +5,7 @@ import { resolveFormResultsRequest } from '../aggregation/resolveResultsRequest'
 import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
+import type { ConsentSourceRegistry } from '../consent/registry'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
@@ -22,6 +23,7 @@ export const FORMS_SLUG = 'forms'
 type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	consentRegistry?: ConsentSourceRegistry
 	presentationRegistry?: PresentationDescriptorRegistry
 	actionRegistry?: ActionRegistry
 }
@@ -29,6 +31,7 @@ type BuildFormsCollectionArgs = {
 export const buildFormsCollection = ({
 	registry,
 	ruleRegistry,
+	consentRegistry,
 	presentationRegistry = new Map(Object.entries(defaultPresentationDescriptors)),
 	actionRegistry = new Map(),
 }: BuildFormsCollectionArgs): CollectionConfig => {
@@ -71,7 +74,11 @@ export const buildFormsCollection = ({
 		},
 		fields: [
 			{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
-			{ name: 'fields', type: 'blocks', blocks: buildFieldBlocks(registry, ruleRegistry) },
+			{
+				name: 'fields',
+				type: 'blocks',
+				blocks: buildFieldBlocks(registry, ruleRegistry, consentRegistry),
+			},
 			{ name: 'flow', type: 'json' },
 			{
 				name: 'actions',
