@@ -1,6 +1,7 @@
 'use client'
 
 import { FieldLabel, useField } from '@payloadcms/ui'
+import './condition.css'
 import type { StaticLabel, Where } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import { ConditionBuilder } from './ConditionBuilder'
