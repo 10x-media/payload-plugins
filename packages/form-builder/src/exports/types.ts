@@ -68,6 +68,7 @@ export type {
 	SpamOption,
 } from '../spam/types'
 export type {
+	FormFieldInstance,
 	SubmissionDescriptor,
 	SubmissionFieldError,
 	SubmissionValue,

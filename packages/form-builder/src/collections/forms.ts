@@ -73,7 +73,47 @@ export const buildFormsCollection = ({
 		fields: [
 			{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
 			{ name: 'fields', type: 'blocks', blocks: buildFieldBlocks(registry, ruleRegistry) },
-			{ name: 'flow', type: 'json' },
+			{
+				name: 'flow',
+				type: 'json',
+				// Narrows the generated TypeScript type from opaque JSON to FormFlow so callers
+				// don't need a cast. Keep this in sync with src/flow/types.ts.
+				typescriptSchema: [
+					() => ({
+						type: 'object' as const,
+						required: ['steps'],
+						additionalProperties: false,
+						properties: {
+							steps: {
+								type: 'array' as const,
+								items: {
+									type: 'object' as const,
+									required: ['id'],
+									additionalProperties: true,
+									properties: {
+										id: { type: 'string' as const },
+										title: { type: 'string' as const },
+										fields: { type: 'array' as const, items: { type: 'string' as const } },
+										next: { type: 'string' as const },
+										transitions: {
+											type: 'array' as const,
+											items: {
+												type: 'object' as const,
+												required: ['to'],
+												additionalProperties: true,
+												properties: {
+													to: { type: 'string' as const },
+													when: { type: 'object' as const, additionalProperties: true },
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					}),
+				],
+			},
 			{
 				name: 'actions',
 				type: 'blocks',
