@@ -161,6 +161,7 @@ export const ConditionBuilder = ({
 							size="small"
 							onClick={() => addCondition(groupIndex)}
 							className="form-builder-condition__add-condition"
+							margin={false}
 						>
 							+ {t(keys.conditionAddCondition)}
 						</Button>
@@ -171,6 +172,7 @@ export const ConditionBuilder = ({
 				<Button
 					buttonStyle="secondary"
 					size="small"
+					margin={false}
 					onClick={() => (groups.length === 0 ? addCondition(0) : addOrGroup())}
 				>
 					{groups.length === 0 ? `+ ${t(keys.conditionAddCondition)}` : t(keys.conditionAddOr)}
