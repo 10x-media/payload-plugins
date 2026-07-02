@@ -94,7 +94,7 @@ describe('Form multi-step flow', () => {
 		]
 		render(<Form form={doc(requiredFields, linearFlow)} onSubmit={onSubmit} />)
 		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-		expect(await screen.findByRole('alert')).toHaveTextContent('formBuilder:validation.required')
+		expect(await screen.findByRole('alert')).toHaveTextContent('This field is required')
 		expect(screen.queryByLabelText('Last')).not.toBeInTheDocument()
 		expect(onSubmit).not.toHaveBeenCalled()
 	})

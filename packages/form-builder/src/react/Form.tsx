@@ -24,6 +24,8 @@ import { interpolate } from '../recall/interpolate'
 import { buildRecallResolver } from '../recall/resolver'
 import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
+import { en } from '../translations/en'
+import { makeTranslate } from '../translations/makeTranslate'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import type { FieldRenderer, RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
@@ -185,7 +187,7 @@ export const Form = ({
 		() => new Map(form.fields.map((field) => [field.name, field])),
 		[form.fields]
 	)
-	const translate = useMemo<RendererTranslate>(() => t ?? ((key) => key), [t])
+	const translate = useMemo<RendererTranslate>(() => t ?? makeTranslate(en), [t])
 
 	// Latest-value refs so event emission and the mount/unmount effect tolerate an inline `events` prop or a changing form id.
 	const sinkRef = useRef<FormEventSink>(noopEventSink)
