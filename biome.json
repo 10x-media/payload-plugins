@@ -16,14 +16,6 @@
 					"a11y": { "noLabelWithoutControl": "off" }
 				}
 			}
-		},
-		{
-			"includes": ["**/client/FlowBuilder.tsx"],
-			"linter": {
-				"rules": {
-					"suspicious": { "noArrayIndexKey": "off" }
-				}
-			}
 		}
 	]
 }

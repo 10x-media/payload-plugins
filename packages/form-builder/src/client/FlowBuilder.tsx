@@ -15,7 +15,7 @@ import { Popup, PopupList } from '@payloadcms/ui/elements/Popup'
 import { MoreIcon } from '@payloadcms/ui/icons/More'
 import { reduceFieldsToValues } from 'payload/shared'
 import type { ChangeEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 import { ConditionBuilder } from './ConditionBuilder'
@@ -126,6 +126,7 @@ const TransitionRow = ({
 
 type StepCardProps = {
 	step: FlowStep
+	stepKey: string
 	stepIndex: number
 	stepCount: number
 	otherStepIds: string[]
@@ -143,6 +144,7 @@ type StepCardProps = {
 
 const StepCard = ({
 	step,
+	stepKey,
 	stepIndex,
 	stepCount,
 	otherStepIds,
@@ -164,9 +166,18 @@ const StepCard = ({
 
 	const transitions = step.transitions ?? []
 
+	// Stable per-transition keys, mirroring the step-level scheme so transition reorder/remove
+	// reconciles by identity rather than array position.
+	const tKeysRef = useRef<string[]>([])
+	if (tKeysRef.current.length !== transitions.length) {
+		tKeysRef.current = transitions.map((_, i) => tKeysRef.current[i] ?? crypto.randomUUID())
+	}
+	const tKeys = tKeysRef.current
+
 	const addTransition = () => {
 		const firstOtherStep = otherStepIds[0]
 		if (!firstOtherStep) return
+		tKeysRef.current = [...tKeys, crypto.randomUUID()]
 		onChange({
 			...step,
 			transitions: [...transitions, { when: {}, to: firstOtherStep }],
@@ -180,6 +191,7 @@ const StepCard = ({
 	}
 
 	const removeTransition = (index: number) => {
+		tKeysRef.current = tKeys.filter((_, i) => i !== index)
 		const updated = transitions.filter((_, i) => i !== index)
 		onChange({ ...step, transitions: updated.length > 0 ? updated : undefined })
 	}
@@ -188,6 +200,10 @@ const StepCard = ({
 		const updated = [...transitions]
 		const [item] = updated.splice(from, 1)
 		if (item !== undefined) updated.splice(to, 0, item)
+		const nextKeys = [...tKeys]
+		const [movedKey] = nextKeys.splice(from, 1)
+		if (movedKey !== undefined) nextKeys.splice(to, 0, movedKey)
+		tKeysRef.current = nextKeys
 		onChange({ ...step, transitions: updated })
 	}
 
@@ -236,7 +252,7 @@ const StepCard = ({
 		>
 			<div className="fb-flow-step__body">
 				<TextInput
-					path={`fb-flow-step-${stepIndex}-id`}
+					path={`fb-flow-step-${stepKey}-id`}
 					label="Step ID"
 					value={step.id}
 					placeholder="e.g. intro"
@@ -244,7 +260,7 @@ const StepCard = ({
 				/>
 
 				<TextInput
-					path={`fb-flow-step-${stepIndex}-title`}
+					path={`fb-flow-step-${stepKey}-title`}
 					label="Title"
 					value={step.title ?? ''}
 					placeholder="Optional display title"
@@ -295,20 +311,24 @@ const StepCard = ({
 						<FieldLabel label="Conditional transitions" />
 						<span className="fb-flow-step__hint">(first match wins)</span>
 					</div>
-					{transitions.map((transition, tIndex) => (
-						<TransitionRow
-							key={tIndex}
-							transition={transition}
-							stepIds={otherStepIds}
-							conditionTypes={conditionTypes}
-							isFirst={tIndex === 0}
-							isLast={tIndex === transitions.length - 1}
-							onChange={(next) => updateTransition(tIndex, next)}
-							onRemove={() => removeTransition(tIndex)}
-							onMoveUp={() => moveTransition(tIndex, tIndex - 1)}
-							onMoveDown={() => moveTransition(tIndex, tIndex + 1)}
-						/>
-					))}
+					{transitions.map((transition, tIndex) => {
+						const tKey = tKeys[tIndex]
+						if (tKey === undefined) return null
+						return (
+							<TransitionRow
+								key={tKey}
+								transition={transition}
+								stepIds={otherStepIds}
+								conditionTypes={conditionTypes}
+								isFirst={tIndex === 0}
+								isLast={tIndex === transitions.length - 1}
+								onChange={(next) => updateTransition(tIndex, next)}
+								onRemove={() => removeTransition(tIndex)}
+								onMoveUp={() => moveTransition(tIndex, tIndex - 1)}
+								onMoveDown={() => moveTransition(tIndex, tIndex + 1)}
+							/>
+						)
+					})}
 					<Button
 						buttonStyle="icon-label"
 						icon="plus"
@@ -328,7 +348,7 @@ const StepCard = ({
 export const FlowBuilder = (props: FlowBuilderProps) => {
 	const { setValue, value } = useField<FormFlow | undefined>()
 	const label = toStaticLabel(props.field?.label ?? props.label)
-	const [expandedIndices, setExpandedIndices] = useState<Set<number>>(new Set())
+	const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
 	const fieldNamesJson = useFormFields(([fields]) =>
 		JSON.stringify(extractFieldNames(reduceFieldsToValues(fields, true) as Record<string, unknown>))
@@ -338,64 +358,72 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 	const steps = value?.steps ?? []
 	const allStepIds = steps.map((s) => s.id).filter((id) => id.length > 0)
 
-	const toggleExpanded = (index: number) => {
-		setExpandedIndices((prev) => {
+	// Stable per-step keys, decoupled from the user-editable step.id. Reorder/insert/remove
+	// reconcile by identity so the focused Step ID input and each step's expand state stay with
+	// their step instead of jumping to whichever step now sits at that array position.
+	const keysRef = useRef<string[]>([])
+	if (keysRef.current.length !== steps.length) {
+		keysRef.current = steps.map((_, i) => keysRef.current[i] ?? crypto.randomUUID())
+	}
+	const keys = keysRef.current
+
+	const toggleExpanded = (key: string) => {
+		setExpandedKeys((prev) => {
 			const next = new Set(prev)
-			if (next.has(index)) next.delete(index)
-			else next.add(index)
+			if (next.has(key)) next.delete(key)
+			else next.add(key)
 			return next
 		})
 	}
 
-	const emit = (nextSteps: FlowStep[]) => {
+	const emit = (nextSteps: FlowStep[], nextKeys: string[]) => {
+		keysRef.current = nextKeys
 		setValue({ steps: nextSteps } as FormFlow)
 	}
 
 	const insertStep = (at: number) => {
-		const next = [...steps]
-		next.splice(at, 0, { id: crypto.randomUUID(), fields: [] })
-		emit(next)
-		setExpandedIndices((prev) => {
-			const shifted = new Set<number>()
-			for (const idx of prev) shifted.add(idx < at ? idx : idx + 1)
-			shifted.add(at)
-			return shifted
-		})
+		const key = crypto.randomUUID()
+		const nextSteps = [...steps]
+		nextSteps.splice(at, 0, { id: crypto.randomUUID(), fields: [] })
+		const nextKeys = [...keys]
+		nextKeys.splice(at, 0, key)
+		emit(nextSteps, nextKeys)
+		setExpandedKeys((prev) => new Set(prev).add(key))
 	}
 
 	const addStep = () => insertStep(steps.length)
 
 	const updateStep = (index: number, next: FlowStep) => {
-		emit(steps.map((s, i) => (i === index ? next : s)))
+		emit(
+			steps.map((s, i) => (i === index ? next : s)),
+			keys
+		)
 	}
 
 	const removeStep = (index: number) => {
-		emit(steps.filter((_, i) => i !== index))
-		setExpandedIndices((prev) => {
-			const next = new Set<number>()
-			for (const idx of prev) {
-				if (idx < index) next.add(idx)
-				else if (idx > index) next.add(idx - 1)
-			}
-			return next
-		})
+		const removedKey = keys[index]
+		emit(
+			steps.filter((_, i) => i !== index),
+			keys.filter((_, i) => i !== index)
+		)
+		if (removedKey !== undefined) {
+			setExpandedKeys((prev) => {
+				const next = new Set(prev)
+				next.delete(removedKey)
+				return next
+			})
+		}
 	}
 
 	const moveStep = (from: number, to: number) => {
-		const next = [...steps]
-		const [item] = next.splice(from, 1)
-		if (item !== undefined) next.splice(to, 0, item)
-		emit(next)
-		setExpandedIndices((prev) => {
-			const updated = new Set<number>()
-			for (const idx of prev) {
-				if (idx === from) updated.add(to)
-				else if (from < to && idx > from && idx <= to) updated.add(idx - 1)
-				else if (from > to && idx < from && idx >= to) updated.add(idx + 1)
-				else updated.add(idx)
-			}
-			return updated
-		})
+		const nextSteps = [...steps]
+		const [movedStep] = nextSteps.splice(from, 1)
+		if (movedStep === undefined) return
+		nextSteps.splice(to, 0, movedStep)
+		const nextKeys = [...keys]
+		const [movedKey] = nextKeys.splice(from, 1)
+		if (movedKey !== undefined) nextKeys.splice(to, 0, movedKey)
+		emit(nextSteps, nextKeys)
 	}
 
 	return (
@@ -412,18 +440,21 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 			) : (
 				<div className="fb-flow-builder__steps">
 					{steps.map((step, index) => {
+						const key = keys[index]
+						if (key === undefined) return null
 						const otherStepIds = allStepIds.filter((id) => id !== step.id)
 						return (
 							<StepCard
-								key={index}
+								key={key}
+								stepKey={key}
 								step={step}
 								stepIndex={index}
 								stepCount={steps.length}
 								otherStepIds={otherStepIds}
 								fieldNames={fieldNames}
 								conditionTypes={props.conditionTypes}
-								isExpanded={expandedIndices.has(index)}
-								onToggle={() => toggleExpanded(index)}
+								isExpanded={expandedKeys.has(key)}
+								onToggle={() => toggleExpanded(key)}
 								onChange={(next) => updateStep(index, next)}
 								onRemove={() => removeStep(index)}
 								onMoveUp={() => moveStep(index, index - 1)}

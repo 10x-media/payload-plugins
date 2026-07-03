@@ -1,4 +1,9 @@
-import type { CollectionBeforeValidateHook, CollectionConfig, PayloadRequest } from 'payload'
+import {
+	type CollectionBeforeValidateHook,
+	type CollectionConfig,
+	type PayloadRequest,
+	ValidationError,
+} from 'payload'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { ActionRegistry } from '../actions/registry'
 import { resolveFormResultsRequest } from '../aggregation/resolveResultsRequest'
@@ -49,6 +54,13 @@ const validateFlow = (raw: unknown): string | true => {
 	return true
 }
 
+/** How many steps the caller actually submitted, before normalization strips/collapses the flow. */
+const providedFlowStepCount = (raw: unknown): number => {
+	if (raw === null || typeof raw !== 'object') return 0
+	const steps = (raw as { steps?: unknown }).steps
+	return Array.isArray(steps) ? steps.length : 0
+}
+
 type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
@@ -67,7 +79,7 @@ export const buildFormsCollection = ({
 	const conditionTypes = buildConditionTypeMap(registry)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 
-	const beforeValidate: CollectionBeforeValidateHook = ({ data }) => {
+	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
 		if (
 			data &&
 			typeof data.defaultPresentation === 'string' &&
@@ -89,7 +101,25 @@ export const buildFormsCollection = ({
 			const fieldNames = normalized
 				.map((field: FieldRow) => (typeof field.name === 'string' ? field.name : undefined))
 				.filter((name): name is string => name !== undefined)
-			data.flow = normalizeFlow(data.flow, fieldNames)
+			const normalizedFlow = normalizeFlow(data.flow, fieldNames)
+			// A flow the author built but that collapses to fewer than two valid steps would
+			// otherwise vanish silently. Surface it instead of discarding their work.
+			if (providedFlowStepCount(data.flow) > 0 && normalizedFlow === undefined) {
+				throw new ValidationError(
+					{
+						collection: FORMS_SLUG,
+						errors: [
+							{
+								path: 'flow',
+								message:
+									'A flow needs at least two steps with unique, non-empty IDs. Add another step or remove the flow.',
+							},
+						],
+					},
+					req.t
+				)
+			}
+			data.flow = normalizedFlow
 		}
 		return data
 	}
