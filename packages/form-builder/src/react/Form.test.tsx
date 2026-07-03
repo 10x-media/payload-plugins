@@ -36,7 +36,7 @@ describe('Form', () => {
 
 		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
-		expect(await screen.findByRole('alert')).toHaveTextContent('formBuilder:validation.required')
+		expect(await screen.findByRole('alert')).toHaveTextContent('This field is required')
 		expect(onSubmit).not.toHaveBeenCalled()
 	})
 

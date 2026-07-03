@@ -20,8 +20,12 @@ export type HoneypotProps = {
 }
 
 /**
- * A visually hidden honeypot decoy. Real users never see or tab to it; bots that fill every input trip it,
- * and the server rejects the submission. Off-screen + aria-hidden + tabIndex -1 + autoComplete off.
+ * A visually hidden honeypot decoy. Real users never see or tab to it; bots that fill every input
+ * trip it, and the server rejects the submission.
+ *
+ * `autoComplete="new-password"` is used instead of `"off"` because Chrome frequently ignores `"off"`
+ * but reliably respects `"new-password"` to prevent autofill. The field name is intentionally generic
+ * (no "email" token) to avoid Chrome's email-address heuristic.
  */
 export const Honeypot = ({ name, inputRef }: HoneypotProps) => (
 	<div aria-hidden="true" style={HIDDEN}>
@@ -32,7 +36,7 @@ export const Honeypot = ({ name, inputRef }: HoneypotProps) => (
 				type="text"
 				name={name}
 				tabIndex={-1}
-				autoComplete="off"
+				autoComplete="new-password"
 				defaultValue=""
 			/>
 		</label>

@@ -6,6 +6,7 @@ import type { ConsentSourceRegistry } from '../consent/registry'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { isLoggedIn } from '../plugin/access'
 import { buildSpamGuard } from '../spam/spamGuard'
 import type { ResolvedSpamConfig } from '../spam/types'
 import { validateSubmission } from '../submissions/validateSubmission'
@@ -118,7 +119,7 @@ export const buildSubmissionsCollection = ({
 	admin: { group: 'Forms' },
 	access: {
 		create: () => true,
-		read: ({ req }) => Boolean(req.user),
+		read: isLoggedIn,
 		update: () => false,
 	},
 	hooks: {
@@ -138,6 +139,9 @@ export const buildSubmissionsCollection = ({
 				{ label: 'Complete', value: 'complete' },
 				{ label: 'Partial', value: 'partial' },
 			],
+			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
+			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
+			access: { create: isLoggedIn, update: isLoggedIn },
 		},
 		{ name: 'locale', type: 'text' },
 		{ name: 'values', type: 'json' },

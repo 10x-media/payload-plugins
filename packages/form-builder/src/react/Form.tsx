@@ -24,7 +24,10 @@ import { interpolate } from '../recall/interpolate'
 import { buildRecallResolver } from '../recall/resolver'
 import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
+import { en } from '../translations/en'
+import { makeTranslate } from '../translations/makeTranslate'
 import type { AnyValidationRuleDefinition } from '../validation/types'
+import { cn } from './cn'
 import type { FieldRenderer, RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
 import { FormContext, type FormStepInfo } from './FormContext'
@@ -85,6 +88,8 @@ export type FormProps = {
 	captchaToken?: string
 	/** Custom layout: render fields with `useField`/`useFormState` instead of the auto-rendered field loop. */
 	children?: ReactNode
+	/** Additional CSS class names applied to the root `<form>` element (and the success node). */
+	className?: string
 }
 
 const isEmpty = (value: unknown): boolean =>
@@ -165,6 +170,7 @@ export const Form = ({
 	honeypot,
 	captchaToken,
 	children,
+	className,
 }: FormProps) => {
 	const honeypotName = honeypot === false ? null : (honeypot?.name ?? DEFAULT_HONEYPOT_FIELD)
 	const honeypotRef = useRef<HTMLInputElement>(null)
@@ -185,7 +191,7 @@ export const Form = ({
 		() => new Map(form.fields.map((field) => [field.name, field])),
 		[form.fields]
 	)
-	const translate = useMemo<RendererTranslate>(() => t ?? ((key) => key), [t])
+	const translate = useMemo<RendererTranslate>(() => t ?? makeTranslate(en), [t])
 
 	// Latest-value refs so event emission and the mount/unmount effect tolerate an inline `events` prop or a changing form id.
 	const sinkRef = useRef<FormEventSink>(noopEventSink)
@@ -495,7 +501,7 @@ export const Form = ({
 			<FormContext.Provider value={contextValue}>
 				{wrap(
 					<form
-						className="fb-form-root"
+						className={cn('fb-form-root', className)}
 						noValidate
 						onSubmit={handleSubmit}
 						data-fb-presentation={activePresentation.name}
@@ -515,7 +521,7 @@ export const Form = ({
 				{wrap(
 					<p
 						role="status"
-						className="fb-form__success"
+						className={cn('fb-form__success', className)}
 						data-fb-presentation={activePresentation.name}
 						data-fb-density={activePresentation.density}
 					>
@@ -534,7 +540,7 @@ export const Form = ({
 		<FormContext.Provider value={contextValue}>
 			{wrap(
 				<form
-					className="fb-form-root"
+					className={cn('fb-form-root', className)}
 					noValidate
 					onSubmit={handleSubmit}
 					data-fb-presentation={activePresentation.name}

@@ -53,7 +53,13 @@ export const registerCollections = ({
 	config.collections = [
 		...(config.collections ?? []),
 		...(uploads.enabled && uploads.collection ? [uploads.collection] : []),
-		buildFormsCollection({ registry, ruleRegistry, presentationRegistry, actionRegistry }),
+		buildFormsCollection({
+			registry,
+			ruleRegistry,
+			consentRegistry,
+			presentationRegistry,
+			actionRegistry,
+		}),
 		buildSubmissionsCollection({
 			registry,
 			ruleRegistry,

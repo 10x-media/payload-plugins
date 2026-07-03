@@ -81,5 +81,11 @@ export const validateSubmission =
 		data.descriptors = result.descriptors
 		data.consent = result.consent.length > 0 ? result.consent : undefined
 		data.locale = locale
+		// Unauthenticated submits are always 'complete'. A client-supplied 'partial' would
+		// silently skip all post-submit actions and events. Authenticated callers (e.g. an
+		// admin draft-save flow) may set status themselves.
+		if (!req.user) {
+			data.status = 'complete'
+		}
 		return data
 	}

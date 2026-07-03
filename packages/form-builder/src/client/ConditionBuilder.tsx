@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormFields } from '@payloadcms/ui'
+import { Button, useFormFields } from '@payloadcms/ui'
 import type { Operator, Where } from 'payload'
 import { reduceFieldsToValues, transformWhereQuery } from 'payload/shared'
 import { useMemo } from 'react'
@@ -126,24 +126,26 @@ export const ConditionBuilder = ({
 		)
 
 	if (operands.length === 0) {
-		return <p className="form-builder-condition__hint">{t(keys.conditionNoFields)}</p>
+		return <p className="fb-condition-builder__hint">{t(keys.conditionNoFields)}</p>
 	}
 
 	return (
-		<div className="form-builder-condition">
+		<div className="fb-condition-builder">
 			{groups.length === 0 ? (
-				<p className="form-builder-condition__hint">{t(keys.conditionEmpty)}</p>
+				<p className="fb-condition-builder__hint">{t(keys.conditionEmpty)}</p>
 			) : (
 				groups.map((group, groupIndex) => (
 					// biome-ignore lint/suspicious/noArrayIndexKey: groups are positional and never reordered
-					<div key={groupIndex} className="form-builder-condition__group">
+					<div key={groupIndex} className="fb-condition-builder__group">
 						{groupIndex > 0 ? (
-							<div className="form-builder-condition__or">{t(keys.conditionOr)}</div>
+							<div className="fb-condition-builder__or-label">{t(keys.conditionOr)}</div>
 						) : null}
 						{group.map((row, rowIndex) => (
 							// biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and never reordered
-							<div key={rowIndex} className="form-builder-condition__and">
-								{rowIndex > 0 ? <span>{t(keys.conditionAnd)}</span> : null}
+							<div key={rowIndex} className="fb-condition-builder__and-row">
+								{rowIndex > 0 ? (
+									<span className="fb-condition-builder__and-label">{t(keys.conditionAnd)}</span>
+								) : null}
 								<ConditionRow
 									condition={row}
 									operands={operands}
@@ -152,19 +154,32 @@ export const ConditionBuilder = ({
 								/>
 							</div>
 						))}
-						<button type="button" onClick={() => addCondition(groupIndex)}>
-							{t(keys.conditionAddCondition)}
-						</button>
+						<div className="fb-condition-builder__add-condition">
+							<Button
+								buttonStyle="icon-label"
+								icon="plus"
+								iconStyle="with-border"
+								iconPosition="left"
+								onClick={() => addCondition(groupIndex)}
+								margin={false}
+							>
+								{t(keys.conditionAddCondition)}
+							</Button>
+						</div>
 					</div>
 				))
 			)}
-			<div className="form-builder-condition__actions">
-				<button
-					type="button"
+			<div className="fb-condition-builder__actions">
+				<Button
+					buttonStyle="icon-label"
+					icon="plus"
+					iconStyle="with-border"
+					iconPosition="left"
 					onClick={() => (groups.length === 0 ? addCondition(0) : addOrGroup())}
+					margin={false}
 				>
 					{groups.length === 0 ? t(keys.conditionAddCondition) : t(keys.conditionAddOr)}
-				</button>
+				</Button>
 			</div>
 		</div>
 	)
