@@ -34,7 +34,7 @@ const db =
 				migrationDir,
 				url:
 					process.env.DATABASE_URI_MONGO ??
-					'mongodb://localhost:37017/form-builder_e2e?replicaSet=rs0&directConnection=true',
+					'mongodb://localhost:27017/form-builder_e2e?directConnection=true',
 			})
 
 export default buildConfig({

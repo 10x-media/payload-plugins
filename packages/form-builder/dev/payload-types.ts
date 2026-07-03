@@ -822,15 +822,22 @@ export interface Form {
           }
       )[]
     | null;
-  flow?:
-    | {
+  flow?: {
+    steps: {
+      id: string;
+      title?: string;
+      fields?: string[];
+      next?: string;
+      transitions?: {
+        to: string;
+        when?: {
+          [k: string]: unknown;
+        };
         [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
+      }[];
+      [k: string]: unknown;
+    }[];
+  };
   actions?:
     | (
         | {

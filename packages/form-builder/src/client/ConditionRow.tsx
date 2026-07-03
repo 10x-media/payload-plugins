@@ -40,14 +40,6 @@ const singleOption = (
 	selected: ReactSelectOption | ReactSelectOption[]
 ): ReactSelectOption | undefined => (Array.isArray(selected) ? selected[0] : selected)
 
-const S = {
-	row: { display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'nowrap' } as const,
-	field: { flex: '1 1 9rem', minWidth: 0 } as const,
-	operator: { flex: '0 1 9rem', minWidth: 0 } as const,
-	value: { flex: '1 1 9rem', minWidth: 0 } as const,
-	remove: { flexShrink: 0, alignSelf: 'center' } as const,
-}
-
 export const ConditionRow = ({ condition, operands, onChange, onRemove }: ConditionRowProps) => {
 	const { t, i18n } = useTranslation()
 	const operand = operands.find((entry) => entry.name === condition.field)
@@ -87,8 +79,8 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 	}
 
 	return (
-		<div style={S.row}>
-			<div style={S.field}>
+		<div className="fb-condition-row">
+			<div className="fb-condition-row__field">
 				<ReactSelect
 					options={fieldOptions}
 					value={fieldOptions.find((option) => option.value === condition.field)}
@@ -97,7 +89,7 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={handleFieldChange}
 				/>
 			</div>
-			<div style={S.operator}>
+			<div className="fb-condition-row__operator">
 				<ReactSelect
 					options={operatorOptions}
 					value={operatorOptions.find((option) => option.value === condition.operator)}
@@ -106,7 +98,7 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={handleOperatorChange}
 				/>
 			</div>
-			<div style={S.value}>
+			<div className="fb-condition-row__value">
 				<ConditionValue
 					conditionType={conditionType}
 					operand={operand}
@@ -115,15 +107,14 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={(value) => onChange({ ...condition, value })}
 				/>
 			</div>
-			<div style={S.remove}>
+			<div className="fb-condition-row__remove">
 				<Button
-					buttonStyle="error"
-					size="small"
+					buttonStyle="icon-label"
+					icon="x"
 					onClick={onRemove}
 					aria-label={t(keys.conditionRemove)}
-				>
-					&#x2715;
-				</Button>
+					margin={false}
+				/>
 			</div>
 		</div>
 	)

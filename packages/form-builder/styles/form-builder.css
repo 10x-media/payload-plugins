@@ -7,37 +7,37 @@
 	gap: 1rem;
 }
 
-.fb-form--grid > [data-width='full'] {
+.fb-form--grid > [data-width="full"] {
 	grid-column: span 6;
 }
-.fb-form--grid > [data-width='half'] {
+.fb-form--grid > [data-width="half"] {
 	grid-column: span 6;
 }
-.fb-form--grid > [data-width='third'] {
+.fb-form--grid > [data-width="third"] {
 	grid-column: span 6;
 }
-.fb-form--grid > [data-width='twoThirds'] {
+.fb-form--grid > [data-width="twoThirds"] {
 	grid-column: span 6;
 }
 
 @container (min-width: 30rem) {
-	.fb-form--grid > [data-width='half'] {
+	.fb-form--grid > [data-width="half"] {
 		grid-column: span 3;
 	}
-	.fb-form--grid > [data-width='third'] {
+	.fb-form--grid > [data-width="third"] {
 		grid-column: span 2;
 	}
-	.fb-form--grid > [data-width='twoThirds'] {
+	.fb-form--grid > [data-width="twoThirds"] {
 		grid-column: span 4;
 	}
 }
 
 /* Presentations: density + overlay surfaces (page/inline carry no chrome). */
 
-.fb-form-root[data-fb-density='compact'] .fb-form--grid {
+.fb-form-root[data-fb-density="compact"] .fb-form--grid {
 	gap: 0.5rem;
 }
-.fb-form-root[data-fb-presentation='page'] {
+.fb-form-root[data-fb-presentation="page"] {
 	max-width: 40rem;
 	margin-inline: auto;
 }
@@ -52,7 +52,7 @@
 	background: var(--fb-surface, #fff);
 	overflow: auto;
 }
-[data-fb-dialog='modal'] {
+[data-fb-dialog="modal"] {
 	inset: 50% auto auto 50%;
 	transform: translate(-50%, -50%);
 	width: min(32rem, calc(100vw - 2rem));
@@ -60,7 +60,7 @@
 	border-radius: 0.5rem;
 	padding: 1.5rem;
 }
-[data-fb-dialog='drawer'] {
+[data-fb-dialog="drawer"] {
 	inset: 0 0 0 auto;
 	width: min(28rem, 100vw);
 	max-height: 100dvh;
@@ -105,4 +105,73 @@
 	margin-block-start: 0.5rem;
 	opacity: 0.7;
 	font-size: 0.875em;
+}
+
+/* Condition builder (admin UI only, requires Payload theme variables). */
+.fb-condition-builder {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.fb-condition-builder__hint {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+}
+.fb-condition-builder__group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+	padding: 0.75rem;
+	border: 1px solid var(--theme-border-color);
+	border-radius: var(--style-radius-m);
+}
+.fb-condition-builder__or-label {
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 500;
+	text-transform: uppercase;
+	margin-block: 0.125rem;
+}
+.fb-condition-builder__and-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+.fb-condition-builder__and-label {
+	font-size: 10px;
+	font-weight: 500;
+	text-transform: uppercase;
+	padding-inline-start: 0.125rem;
+}
+.fb-condition-builder__add-condition {
+	align-self: flex-start;
+	margin-block-start: 0.25rem;
+}
+.fb-condition-builder__actions {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
+}
+.fb-condition-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+	flex-wrap: nowrap;
+}
+.fb-condition-row__field {
+	flex: 1 1 9rem;
+	min-width: 0;
+}
+.fb-condition-row__operator {
+	flex: 0 1 9rem;
+	min-width: 0;
+}
+.fb-condition-row__value {
+	flex: 1 1 9rem;
+	min-width: 0;
+}
+.fb-condition-row__remove {
+	flex-shrink: 0;
+	align-self: center;
 }
