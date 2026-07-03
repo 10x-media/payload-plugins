@@ -22,7 +22,17 @@
 		},
 		"typecheck": {
 			"dependsOn": ["^typecheck"],
-			"inputs": ["src/**", "tests/**", "dev/**", "tsconfig.json", "**/*.ts", "**/*.tsx"],
+			"inputs": [
+				"src/**",
+				"tests/**",
+				"dev/**",
+				"tsconfig.json",
+				"**/*.ts",
+				"**/*.tsx",
+				"!**/.next/**",
+				"!**/.source/**",
+				"!**/dist/**"
+			],
 			"outputs": []
 		},
 		"test": {
