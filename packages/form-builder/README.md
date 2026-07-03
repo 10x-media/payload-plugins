@@ -39,6 +39,12 @@ export default buildConfig({
 })
 ```
 
+The `forms` collection's condition and flow builders ship their layout in the bundled stylesheet. Import it once in your admin layout (for example `app/(payload)/layout.tsx`) so the in-admin builders pick up their styling:
+
+```ts
+import '@10x-media/form-builder/styles.css'
+```
+
 Author a form in the admin (the `forms` collection), fetch it, and render it with the headless renderer:
 
 ```tsx

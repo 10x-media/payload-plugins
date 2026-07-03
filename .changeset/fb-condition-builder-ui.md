@@ -2,4 +2,4 @@
 '@10x-media/form-builder': patch
 ---
 
-Polish the condition builder admin UI: replace bare `<button>` elements with Payload's `Button` component (`buttonStyle="secondary"` for add actions, `buttonStyle="error"` for remove), replace the text "Remove" label with a compact `×` symbol, remove inline styles in favour of CSS class selectors, and rename the OR/AND labels to `form-builder-condition__or-badge` / `form-builder-condition__and-badge` to make them styleable as distinct visual affordances.
+Polish the condition builder admin UI: bare `<button>` elements are replaced with Payload's `Button` component, the OR/AND separators render as themed labels (`fb-condition-builder__or-label` / `fb-condition-builder__and-label`), and the row layout ships as class-based styles in the bundled `@10x-media/form-builder/styles.css` (using Payload CSS variables for light/dark theming). Import that stylesheet in your admin layout to pick up the builder styling.
