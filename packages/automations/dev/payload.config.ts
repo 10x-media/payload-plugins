@@ -5,6 +5,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { automations } from '../src/index'
+import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -32,9 +33,7 @@ const db =
 		: mongooseAdapter({
 				ensureIndexes: true,
 				migrationDir,
-				url:
-					process.env.DATABASE_URI_MONGO ??
-					'mongodb://localhost:37017/automations_e2e?replicaSet=rs0&directConnection=true',
+				url: process.env.DATABASE_URI_MONGO ?? (await startMemoryMongo()),
 			})
 
 export default buildConfig({
