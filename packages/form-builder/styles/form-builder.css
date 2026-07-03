@@ -107,6 +107,127 @@
 	font-size: 0.875em;
 }
 
+/* Flow builder (admin UI only, requires Payload theme variables). */
+.fb-flow-builder {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-block-end: 1rem;
+}
+.fb-flow-builder__hint {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+}
+.fb-flow-builder__steps {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.fb-flow-builder__actions {
+	margin-block-start: 0.25rem;
+}
+
+.fb-flow-step__header-content {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	overflow: hidden;
+}
+.fb-flow-step__index {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--theme-elevation-400);
+	flex-shrink: 0;
+}
+.fb-flow-step__id-preview {
+	font-size: 0.875rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fb-flow-step__id-preview em {
+	color: var(--theme-elevation-400);
+	font-style: italic;
+}
+.fb-flow-step__body {
+	padding: 0.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+.fb-flow-step__row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+.fb-flow-step__hint {
+	font-size: 0.75rem;
+	color: var(--theme-elevation-400);
+	margin: 0;
+}
+.fb-flow-step__field-picker {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 1.25rem;
+	padding-block: 0.25rem;
+}
+.fb-flow-step__transitions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding-block-start: 0.5rem;
+}
+.fb-flow-step__transitions-header {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+}
+
+.fb-flow-transition {
+	border: 1px solid var(--theme-border-color);
+	border-radius: var(--style-radius-s);
+	padding: 0.5rem 0.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.fb-flow-transition__header {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fb-flow-transition__label {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--theme-elevation-400);
+	flex-shrink: 0;
+}
+.fb-flow-transition__goto {
+	flex: 1;
+	min-width: 0;
+}
+.fb-flow-transition__actions {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	flex-shrink: 0;
+}
+.fb-flow-transition__when-label {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--theme-elevation-400);
+}
+.fb-flow-transition__condition {
+	padding-inline-start: 0.25rem;
+}
+
 /* Condition builder (admin UI only, requires Payload theme variables). */
 .fb-condition-builder {
 	display: flex;

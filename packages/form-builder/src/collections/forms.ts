@@ -21,6 +21,34 @@ import type { ValidationRuleRegistry } from '../validation/registry'
 
 export const FORMS_SLUG = 'forms'
 
+const validateFlow = (raw: unknown): string | true => {
+	if (raw === null || raw === undefined) return true
+	const r = raw as Record<string, unknown>
+	if (!Array.isArray(r.steps)) return true
+	const steps = r.steps as Array<Record<string, unknown>>
+	const emptyIdStep = steps.find((s) => typeof s?.id !== 'string' || s.id.length === 0)
+	if (emptyIdStep) return 'Flow: every step must have a non-empty ID'
+	const ids = steps.map((s) => s.id as string)
+	if (new Set(ids).size !== ids.length) {
+		return 'Flow: duplicate step IDs found'
+	}
+	const idSet = new Set(ids)
+	for (const step of steps) {
+		const id = step.id as string
+		if (typeof step.next === 'string' && step.next.length > 0 && !idSet.has(step.next)) {
+			return `Flow: step "${id}" references unknown next step "${step.next}"`
+		}
+		if (Array.isArray(step.transitions)) {
+			for (const t of step.transitions as Array<Record<string, unknown>>) {
+				if (typeof t?.to === 'string' && t.to.length > 0 && !idSet.has(t.to)) {
+					return `Flow: step "${id}" has a transition to unknown step "${t.to}"`
+				}
+			}
+		}
+	}
+	return true
+}
+
 type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
@@ -37,6 +65,7 @@ export const buildFormsCollection = ({
 	actionRegistry = new Map(),
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
+	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data }) => {
 		if (
@@ -83,6 +112,12 @@ export const buildFormsCollection = ({
 			{
 				name: 'flow',
 				type: 'json',
+				validate: validateFlow,
+				admin: {
+					components: {
+						Field: { path: FLOW_BUILDER_REF, clientProps: { conditionTypes } },
+					},
+				},
 				// Narrows the generated TypeScript type from opaque JSON to FormFlow so callers
 				// don't need a cast. Keep this in sync with src/flow/types.ts.
 				typescriptSchema: [
