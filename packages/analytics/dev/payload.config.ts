@@ -79,6 +79,7 @@ export default buildConfig({
 	admin: {
 		importMap: { autoGenerate, baseDir: path.resolve(dirname) },
 		dashboard: {
+			widgets: [],
 			defaultLayout: [
 				{
 					widgetSlug: 'analytics-realtime',

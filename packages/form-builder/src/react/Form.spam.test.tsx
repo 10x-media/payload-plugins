@@ -21,13 +21,13 @@ describe('Form spam wiring', () => {
 	it('renders a hidden honeypot decoy by default and submits its value when filled', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true })
 		const { container } = render(<Form form={doc()} onSubmit={onSubmit} />)
-		const decoy = container.querySelector('input[name="confirm_email"]') as HTMLInputElement | null
+		const decoy = container.querySelector('input[name="website"]') as HTMLInputElement | null
 		expect(decoy).not.toBeNull()
 		fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Jo' } })
 		fireEvent.change(decoy as HTMLInputElement, { target: { value: 'bot' } })
 		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 		await waitFor(() => expect(onSubmit).toHaveBeenCalled())
-		expect(submittedValues(onSubmit)).toContainEqual({ field: 'confirm_email', value: 'bot' })
+		expect(submittedValues(onSubmit)).toContainEqual({ field: 'website', value: 'bot' })
 	})
 
 	it('does not append the decoy when it is left empty (a real user)', async () => {
@@ -51,7 +51,7 @@ describe('Form spam wiring', () => {
 	it('renders no decoy when honeypot is false', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true })
 		const { container } = render(<Form form={doc()} onSubmit={onSubmit} honeypot={false} />)
-		expect(container.querySelector('input[name="confirm_email"]')).toBeNull()
+		expect(container.querySelector('input[name="website"]')).toBeNull()
 		fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Jo' } })
 		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 		await waitFor(() => expect(onSubmit).toHaveBeenCalled())

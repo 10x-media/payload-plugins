@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { isLoggedIn } from '../plugin/access'
 
 export const FORM_UPLOADS_SLUG = 'form-uploads'
 
@@ -26,9 +27,9 @@ export const buildUploadsCollection = (config: UploadsCollectionConfig = {}): Co
 	slug: config.slug ?? FORM_UPLOADS_SLUG,
 	access: config.access ?? {
 		create: () => true,
-		read: ({ req }) => Boolean(req.user),
-		update: ({ req }) => Boolean(req.user),
-		delete: ({ req }) => Boolean(req.user),
+		read: isLoggedIn,
+		update: isLoggedIn,
+		delete: isLoggedIn,
 	},
 	admin: { group: 'Forms' },
 	upload: config.upload && config.upload !== true ? config.upload : true,

@@ -2,7 +2,9 @@
 
 import type { ReactNode } from 'react'
 import type { FieldAggregation } from '../aggregation/types'
+import { en } from '../translations/en'
 import { keys } from '../translations/keys'
+import { makeTranslate } from '../translations/makeTranslate'
 import type { RendererTranslate } from './contract'
 
 export type FormResultsProps = {
@@ -66,7 +68,7 @@ const OneResult = ({
  * is `aria-hidden` visual sugar sized by inline width.
  */
 export const FormResults = ({ results, t, showCounts = true }: FormResultsProps): ReactNode => {
-	const translate: RendererTranslate = t ?? ((key) => key)
+	const translate: RendererTranslate = t ?? makeTranslate(en)
 	const list = Array.isArray(results) ? results : [results]
 	return (
 		<div className="fb-results">

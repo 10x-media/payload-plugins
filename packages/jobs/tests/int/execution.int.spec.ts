@@ -267,6 +267,9 @@ describeForDb('worker run loop', {}, (db) => {
 			expect(ran).toBeGreaterThan(afterLive)
 		} finally {
 			worker.stop()
+			// Allow any in-flight job transaction to commit before the bulk delete,
+			// otherwise MongoDB aborts the running transaction.
+			await new Promise((r) => setTimeout(r, 300))
 			await pauseStore.resume({ all: true })
 			await booted.payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
 		}

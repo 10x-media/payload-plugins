@@ -53,7 +53,7 @@ describe('Form submit hardening', () => {
 		render(<Form form={doc(fields)} onSubmit={onSubmit} />)
 		fireEvent.change(screen.getByLabelText('Plan'), { target: { value: 'pro' } })
 		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
-		expect(await screen.findByRole('alert')).toHaveTextContent('formBuilder:validation.required')
+		expect(await screen.findByRole('alert')).toHaveTextContent('This field is required')
 		expect(onSubmit).not.toHaveBeenCalled()
 	})
 })
