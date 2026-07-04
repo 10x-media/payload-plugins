@@ -1,0 +1,149 @@
+---
+title: Rendering
+description: The headless Form controller, renderers, primitives, hooks, and the layout grid.
+---
+
+`@10x-media/form-builder/react` renders forms on your frontend. It is headless: accessible markup with stable class hooks, no imposed styles. Bring CSS, swap renderers, or drop to hooks for full markup control; see [Styling](/docs/form-builder/styling) for the three paths.
+
+## `<Form>`
+
+```tsx
+import { Form } from '@10x-media/form-builder/react'
+
+<Form
+  form={form}
+  onSuccess={(submissionId) => router.push('/thanks')}
+  onError={(message) => console.error(message)}
+/>
+```
+
+`form` is a `FormDocument` (`{ id, fields, flow?, defaultPresentation? }`): pass the `forms` document from Payload's Local or REST API directly.
+
+### Progressive validation
+
+Validation runs on blur, re-validates on change once a field is touched, then validates all visible fields on submit. Hidden fields ([`visibleWhen`](/docs/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.
+
+### Transport
+
+By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Override the prefix with `apiRoute`, or replace the transport entirely:
+
+```tsx
+<Form
+  form={form}
+  onSubmit={async ({ formId, values }) => {
+    const res = await myClient.submitForm(formId, values)
+    return res.ok ? { ok: true } : { ok: false, message: res.error }
+  }}
+/>
+```
+
+### Props
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `form` | `FormDocument` | required | The form document. |
+| `renderers` | `RenderersConfig` | built-ins | Renderer overrides (`false`/`true`/component per type). |
+| `fieldTypes` | `AnyFormFieldDefinition[]` | none | Extra field-type definitions, for custom types. |
+| `rules` | `AnyValidationRuleDefinition[]` | none | Extra validation rule definitions. |
+| `apiRoute` | `string` | `'/api'` | API prefix for the built-in transport. |
+| `onSubmit` | `SubmitHandler` | none | Custom transport. |
+| `onSuccess` / `onError` | callbacks | none | Submission outcome hooks. |
+| `events` | `FormEventSink` | none | Lifecycle event sink; see [Actions and events](/docs/form-builder/actions#lifecycle-events). |
+| `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
+| `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
+| `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. |
+| `successMessage` | `string` | `'Thank you.'` | Post-submit message (supports [recall tokens](/docs/form-builder/recall-prefill)). |
+| `presentation`, `presentations`, `onClose`, `title` | | | Overlay control; see [Presentations](/docs/form-builder/presentations). |
+| `initialValues` | `Record<string, unknown>` | none | Seed values; see [Prefill](/docs/form-builder/recall-prefill#url-prefill). |
+| `honeypot`, `captchaToken` | | defaults on / none | See [Spam](/docs/form-builder/spam). |
+| `children` | `ReactNode` | none | Custom layout mode; see below. |
+
+## Renderers
+
+A renderer maps `FieldRendererProps` to markup for one field type. `defineFieldRenderer` pins the value type:
+
+```tsx
+import { defineFieldRenderer } from '@10x-media/form-builder/react'
+
+const myText = defineFieldRenderer<string>(
+  ({ id, name, value, onChange, onBlur, errors, required, disabled }) => (
+    <input
+      id={id}
+      name={name}
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      required={required}
+      disabled={disabled}
+      aria-invalid={errors.length > 0 || undefined}
+    />
+  )
+)
+```
+
+`FieldRendererProps<TValue>` carries the field instance, a stable `id`, the machine `name`, `value`, `onChange`/`onBlur`, `errors`/`warnings`, `required`, `disabled`, `locale`, and a `t` translator.
+
+`resolveRenderers` merges the defaults with overrides using the [opt-in convention](/docs/concepts#the-opt-in-convention):
+
+```ts
+import { defaultRenderers, resolveRenderers } from '@10x-media/form-builder/react'
+
+const registry = resolveRenderers(defaultRenderers, {
+  text: myText,           // replace a built-in
+  number: false,          // remove one
+  rating: ratingRenderer, // add a custom type
+})
+```
+
+Pass the result (or just the overrides object) to `<Form renderers={...}>`.
+
+## Primitives
+
+Unstyled, accessible control primitives for building custom renderers: `Input`, `Textarea`, `Select`, `Checkbox`, and `FieldShell`. `FieldShell` renders the label, the control slot, and the description/error/warning region with correct `aria-describedby`, `role="alert"`, and `aria-invalid` wiring; the built-in renderers are exactly these primitives composed.
+
+If you write renderers from scratch instead, uphold the a11y contract: a programmatically associated label, `aria-invalid` only when invalid, `aria-describedby` pointing at an error region with `role="alert"` and `aria-atomic`, an `aria-hidden` required indicator, and native `required` on the control.
+
+## Layout grid
+
+An optional container-query grid ships in the stylesheet:
+
+```tsx
+import '@10x-media/form-builder/styles.css'
+import { FormLayout, widthProps } from '@10x-media/form-builder/react'
+
+<FormLayout>
+  <div {...widthProps('half')}>{/* first name */}</div>
+  <div {...widthProps('half')}>{/* last name */}</div>
+  <div {...widthProps('full')}>{/* message */}</div>
+</FormLayout>
+```
+
+Widths: `full`, `half`, `third`, `twoThirds`. Skip the stylesheet (or pass `layout={false}`) for your own layout system.
+
+## Custom layouts with hooks
+
+Pass `children` to `<Form>` and it renders them inside its context instead of the auto-rendered field loop, so you own the entire layout while `<Form>` keeps owning state and submission:
+
+```tsx
+import { Form, useField } from '@10x-media/form-builder/react'
+
+function NameField() {
+  const { value, errors, setValue, onBlur } = useField<string>('name')
+  return (
+    <label>
+      Name
+      <input value={value ?? ''} onChange={(e) => setValue(e.target.value)} onBlur={onBlur} />
+      {errors.map((e) => <span key={e}>{e}</span>)}
+    </label>
+  )
+}
+
+<Form form={form}>
+  <NameField />
+  <button type="submit">Send</button>
+</Form>
+```
+
+- `useField(name)` returns `value`, `errors`, `warnings`, `touched`, `setValue`, `onBlur`.
+- `useFormState()` returns the whole `FormState`: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, `submitError`.
+- `useFormStep()` drives [multi-step UIs](/docs/form-builder/multi-step#useformstep-for-custom-step-uis).

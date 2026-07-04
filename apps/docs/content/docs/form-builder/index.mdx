@@ -1,0 +1,43 @@
+---
+title: Form Builder
+description: An end-to-end forms platform for Payload v3. Author, validate, render, collect, aggregate, and act on forms.
+---
+
+`@10x-media/form-builder` is a complete forms stack, 100% native to Payload. Editors author forms as documents in the admin; your frontend renders them with a headless React layer; the server validates every submission from scratch; a post-submit pipeline emails, webhooks, and aggregates. Simple by default for editors, with a definition seam (`defineFormField`, `defineValidationRule`, `defineAction`, and friends) wherever developers need depth.
+
+```tsx title="app/contact/page.tsx"
+import { Form } from '@10x-media/form-builder/react'
+
+export default async function ContactPage() {
+  const form = await fetchForm('contact') // a `forms` document via Payload's API
+  return <Form form={form} />
+}
+```
+
+## Features
+
+- **[Fields](/docs/form-builder/fields)**: a core set (text, textarea, email, number, select, checkbox, file, consent, calculation) authored as Payload blocks; custom types via `defineFormField` are never second-class.
+- **[Validation](/docs/form-builder/validation)**: declarative per-field rules, custom messages and severities, cross-field and async server-only rules, a [Standard Schema](https://standardschema.dev) escape hatch, one server-authoritative engine.
+- **[Conditional logic](/docs/form-builder/conditions)**: serializable `visibleWhen` / `validateWhen` in Payload's `Where` shape, evaluated by one isomorphic engine on client and server.
+- **[Multi-step flows](/docs/form-builder/multi-step)** with conditional branching, driven by a serializable step graph.
+- **[Headless rendering](/docs/form-builder/rendering)**: `<Form>` with progressive validation and lifecycle events, accessible primitives, built-in renderers, an optional layout grid; [style it](/docs/form-builder/styling) via CSS hooks, a shadcn registry, or your own renderers.
+- **[Presentations](/docs/form-builder/presentations)**: page, inline, modal, and drawer, built from composable accessible overlay primitives.
+- **[Recall and prefill](/docs/form-builder/recall-prefill)**: pipe earlier answers into labels and messages; prefill from URL parameters; hidden context fields.
+- **[Calculations](/docs/form-builder/calculations)**: a safe, no-eval expression engine for totals, quotes, and quiz scores, recomputed authoritatively on the server.
+- **[Post-submit actions](/docs/form-builder/actions)**: email, confirmation, signed webhook, and custom actions, queued through Payload jobs with a bounded inline fallback, plus a typed lifecycle event sink.
+- **[Consent](/docs/form-builder/consent)**: compliant consent capture with proof by reference and policy-version capture.
+- **[Uploads](/docs/form-builder/uploads)**: a file field backed by a configurable upload collection, server-enforced MIME and size.
+- **[Polls and aggregation](/docs/form-builder/polls)**: submission aggregation, a gated public results endpoint, `<FormResults>`, and a turnkey `<Poll>`.
+- **[Spam protection](/docs/form-builder/spam)**: honeypot and rate limiting on by default, a captcha seam, upload-ownership scoping, privacy-first metadata.
+- **Accessibility**: accessible defaults verified by automated axe checks (jsdom and real-browser e2e), with a documented contract for custom renderers.
+- **[Typed translations](/docs/form-builder/i18n)** following the shared plugin pattern.
+
+## The trust model
+
+The client is never trusted. Conditions, validation rules, calculations, consent capture, and file constraints are all re-evaluated server-side on every submission; client-side evaluation exists for UX only and uses the same exported engines, so the two cannot drift.
+
+## When to use it
+
+Any Payload project that needs forms beyond a hardcoded contact form: marketing sites where editors ship new forms without deploys, quizzes and calculators, gated downloads, surveys and polls. Everything is a Payload collection underneath (`forms`, `form-submissions`, `form-uploads`), so your existing access control, hooks, and APIs apply.
+
+Start with the [quick start](/docs/form-builder/quick-start).

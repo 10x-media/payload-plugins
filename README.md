@@ -1,12 +1,16 @@
 # @10x-media/payload-plugins
 
-Open-source plugins for [Payload v3](https://payloadcms.com) maintained by [10x-media](https://github.com/10x-media).
+Open-source plugins for [Payload v3](https://payloadcms.com) maintained by [10x-media](https://github.com/10x-media). Documentation: [docs.10xmedia.de](https://docs.10xmedia.de).
 
 ## Packages
 
 | Package | Description | Version |
 |---|---|---|
-| [@10x-media/automations](./packages/automations) | No-code automations and a jobs ops dashboard for Payload | [![npm](https://img.shields.io/npm/v/@10x-media/automations)](https://www.npmjs.com/package/@10x-media/automations) |
+| [@10x-media/form-builder](./packages/form-builder) | End-to-end forms platform: author, validate, render, collect, aggregate, act | [![npm](https://img.shields.io/npm/v/@10x-media/form-builder)](https://www.npmjs.com/package/@10x-media/form-builder) |
+| [@10x-media/analytics](./packages/analytics) | Adapter-based analytics: native engine or GA4/Plausible/Umami/PostHog, widgets, per-doc stats | [![npm](https://img.shields.io/npm/v/@10x-media/analytics)](https://www.npmjs.com/package/@10x-media/analytics) |
+| [@10x-media/jobs](./packages/jobs) | Ops dashboard plus reliability, worker, and queue-control layers for Payload jobs | [![npm](https://img.shields.io/npm/v/@10x-media/jobs)](https://www.npmjs.com/package/@10x-media/jobs) |
+| [@10x-media/webhooks](./packages/webhooks) | Outbound webhook subscriptions with signing, retries, and a delivery log | [![npm](https://img.shields.io/npm/v/@10x-media/webhooks)](https://www.npmjs.com/package/@10x-media/webhooks) |
+| [@10x-media/automations](./packages/automations) | No-code automation engine (beta scaffold) | [![npm](https://img.shields.io/npm/v/@10x-media/automations)](https://www.npmjs.com/package/@10x-media/automations) |
 
 ## Status
 

@@ -1,0 +1,87 @@
+---
+title: Polls and aggregation
+description: Aggregate submissions, expose results safely, and render them with FormResults and Poll.
+---
+
+Submissions are a collection, so aggregation is a query. The plugin ships the aggregation utility, a gated public results endpoint, a presentational `<FormResults>`, and a turnkey `<Poll>`.
+
+## Aggregating
+
+`aggregateFieldResponses` (one field) and `aggregateFormResponses` (many fields in one pass) tally submissions by answer:
+
+```ts
+import { aggregateFieldResponses } from '@10x-media/form-builder'
+
+const results = await aggregateFieldResponses({ payload, formId, field: 'colour' })
+// {
+//   field: 'colour', label: 'Favourite colour', fieldType: 'select',
+//   total: 42, truncated: false,
+//   buckets: [
+//     { value: 'red', label: 'Red', count: 28, percentage: 66.7 },
+//     { value: 'blue', label: 'Blue', count: 14, percentage: 33.3 },
+//   ],
+// }
+```
+
+Semantics worth knowing:
+
+- **Percentages are over respondents** (submissions that answered the field), not all submissions. Multi-select answers increment one bucket per element while counting one respondent, so percentages can exceed 100% summed.
+- **`complete` submissions only by default**; pass `status: 'all'` or `'partial'` to change.
+- **Labels** come from the field's current options, then the submitted snapshot, then the raw value. Buckets follow option order, retired values after, by count.
+- **Bounded**: pages `payload.find` and reduces in JS (identical on Mongo and Postgres). The scan caps at `maxSubmissions` (default 10000) and flags `truncated: true` past it. Long-term durable rollups are the [analytics plugin's](/docs/analytics) territory.
+
+`aggregateFormResponses` with no `fields` aggregates every enumerable field (those with options): the survey-summary case.
+
+## The results endpoint
+
+Anonymous voters cannot read raw submissions, so public results are served as aggregate counts through a gated endpoint:
+
+```
+GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
+```
+
+- **Authenticated callers** may aggregate any field, or all enumerable fields with `field` omitted.
+- **Anonymous callers** are served only when the form's `showResults` toggle is on, only for its configured `resultsField`, and only if that field is enumerable. The enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
+
+Set `resultsField` to a choice field, never free text or PII.
+
+## Rendering results
+
+`<FormResults>` is presentational and never fetches; resolve data and pass it in. Labels, counts, and percentages are real text; the bar fill is decorative. Import `./styles.css` for the `fb-results*` styling or style it yourself (a shadcn parity component is in the registry):
+
+```tsx
+import { FormResults } from '@10x-media/form-builder/react'
+
+<FormResults results={results} />   // one field or an array
+```
+
+`fetchFormResults({ formId, field })` is the client helper for the endpoint.
+
+## `<Poll>`
+
+Renders `<Form>` until the visitor votes, then fetches and shows results. A per-browser localStorage flag skips straight to results on revisit:
+
+```tsx
+import { Poll } from '@10x-media/form-builder/react'
+
+<Poll form={form} resultsField="colour" />
+```
+
+The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/docs/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/docs/form-builder/spam) caps anonymous repeat voting per identity.
+
+For an SSR poll, aggregate server-side and choose what to render:
+
+```tsx title="app/poll/[id]/page.tsx"
+import { aggregateFieldResponses } from '@10x-media/form-builder'
+import { Form, FormResults } from '@10x-media/form-builder/react'
+
+export default async function PollPage({ params }) {
+  const form = await payload.findByID({ collection: 'forms', id: params.id })
+  const voted = (await cookies()).has(`voted-${form.id}`)
+  if (voted) {
+    const results = await aggregateFieldResponses({ payload, formId: form.id, field: 'colour' })
+    return <FormResults results={results ? [results] : []} />
+  }
+  return <Form form={form} />
+}
+```

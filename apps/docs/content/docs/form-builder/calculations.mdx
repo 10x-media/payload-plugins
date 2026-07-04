@@ -1,0 +1,65 @@
+---
+title: Calculations and scoring
+description: Derived numeric fields from a safe expression engine for totals, quotes, and quiz scores.
+---
+
+A `calculation` field derives its value from a serializable expression over other answers. The client computes it live for display; the server recomputes it from scratch at submit and stores only its own result. The client's number is discarded.
+
+Set `calcDisplay: false` on the field to compute without rendering (a hidden total or quiz score that [conditions](/docs/form-builder/conditions) and validation can still reference).
+
+## The expression AST
+
+Expressions are plain JSON with a `type` discriminant. No `eval`, no `Function`, no untrusted code:
+
+| Node | Shape | Notes |
+|---|---|---|
+| `lit` | `{ type: 'lit', value: number }` | Literal |
+| `ref` | `{ type: 'ref', field: string }` | Another field's answer |
+| `op` | `{ type: 'op', op: '+' \| '-' \| '*' \| '/' \| '%', left, right }` | Arithmetic |
+| `neg` | `{ type: 'neg', operand }` | Negation |
+| `fn` | `{ type: 'fn', fn: 'min' \| 'max' \| 'round' \| 'abs' \| 'ceil' \| 'floor', args }` | Math functions |
+| `weight` | `{ type: 'weight', field: string, weights: Record<string, number> }` | Maps an option answer to a score |
+
+A price total:
+
+```ts
+import type { CalcExpression } from '@10x-media/form-builder'
+
+const total: CalcExpression = {
+  type: 'op',
+  op: '*',
+  left: { type: 'ref', field: 'qty' },
+  right: { type: 'ref', field: 'unitPrice' },
+}
+```
+
+A quiz score:
+
+```ts
+const scoreQ1: CalcExpression = {
+  type: 'weight',
+  field: 'q1',
+  weights: { a: 10, b: 0, c: 5 },
+}
+```
+
+Expressions are authored as data in the field config today; a visual builder is planned.
+
+## Totality and safety
+
+The evaluator always produces a finite number: division or modulo by zero yields `0`, a missing `ref` yields `0`, an unknown `weight` key yields `0`, and recursion is depth-guarded (max 64). It runs on the public submit path for every submission, so these properties are load-bearing, not niceties.
+
+## Using the engine directly
+
+`evaluateCalc`, `computeCalcFields`, `calcExpressionOf`, and `normalizeCalc` are exported from the root and from `./react`, so custom layouts compute with the identical engine:
+
+```ts
+import { evaluateCalc, computeCalcFields } from '@10x-media/form-builder/react'
+
+evaluateCalc({ type: 'ref', field: 'qty' }, { qty: 3 }) // 3
+const updatedValues = computeCalcFields(fields, currentValues)
+```
+
+## Downstream
+
+Because the stored value is server-authoritative, calculation fields participate everywhere ordinary fields do: `visibleWhen`/`validateWhen` conditions, validation rules, and [recall](/docs/form-builder/recall-prefill) (`You scored {{score}} points!`).

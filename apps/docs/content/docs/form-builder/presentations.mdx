@@ -1,0 +1,79 @@
+---
+title: Presentations
+description: Page, inline, modal, and drawer surfaces, and the overlay primitives behind them.
+---
+
+A presentation is a named bundle controlling how a form surfaces: in the page flow, or as an overlay, and whether it dismisses on success. Four ship by default:
+
+| Name | Surface | Behavior |
+|---|---|---|
+| `page` | In flow (default) | Renders inline in the page. |
+| `inline` | Embedded | Same as `page`, semantically scoped to an embedded slot. |
+| `modal` | Overlay | Centered dialog; dismisses on success. |
+| `drawer` | Overlay | Side panel; dismisses on success. |
+
+## Choosing a presentation
+
+Editors pick a `defaultPresentation` on the form document; the renderer uses it automatically (`page` is the fallback). Override at render time with the `presentation` prop, as a registered name or an inline object:
+
+```tsx
+<Form form={form} presentation="modal" onClose={() => setOpen(false)} title="Contact us" />
+```
+
+`onClose` is forwarded to the presentation's `Wrapper` so the host controls closing; `title` becomes the overlay's accessible name.
+
+## Custom presentations
+
+Register through the plugin option to add a presentation to the admin select everywhere, following the [opt-in convention](/docs/concepts#the-opt-in-convention):
+
+```ts title="payload.config.ts"
+formBuilder({
+  presentations: {
+    drawer: false, // remove a built-in
+    fullscreen: {
+      name: 'fullscreen',
+      label: 'Fullscreen',
+      surface: 'overlay',
+      density: 'comfortable',
+      dismissOnSuccess: true,
+    },
+  },
+})
+```
+
+The plugin option takes descriptors (serializable). To supply the React `Wrapper` an overlay needs, pass a full `FormPresentation` to `<Form>` via its `presentations` prop:
+
+```tsx
+import { DialogSurface, type FormPresentation } from '@10x-media/form-builder/react'
+
+const fullscreen: FormPresentation = {
+  name: 'fullscreen',
+  label: 'Fullscreen',
+  surface: 'overlay',
+  density: 'comfortable',
+  dismissOnSuccess: true,
+  Wrapper: ({ open, onClose, title, children }) => (
+    <DialogSurface open={open} onClose={onClose} label={title} surface="fullscreen">
+      {children}
+    </DialogSurface>
+  ),
+}
+
+<Form form={form} presentations={{ fullscreen }} presentation="fullscreen" onClose={close} />
+```
+
+## Overlay primitives
+
+The built-in `modal` and `drawer` are thin compositions of exported primitives; take exactly the pieces you need:
+
+```ts
+import {
+  DialogSurface, // backdrop + role=dialog/aria-modal + focus trap + scroll lock + dismiss
+  Backdrop,      // full-viewport scrim with a data-fb-backdrop hook
+  useFocusTrap,  // keep Tab/Shift-Tab inside a container
+  useScrollLock, // lock body scroll while open
+  useDismiss,    // wire Escape and outside-click to a callback
+} from '@10x-media/form-builder/react'
+```
+
+`DialogSurface` ships the accessible baseline: `role="dialog"` with `aria-modal`, initial focus on open and focus restore on close, scroll lock, Escape and outside-click dismiss (both configurable), and a labelled close button. The drawer variant adds a `surface="drawer"` data hook for CSS positioning. Overlays use `position: fixed` (no portal yet); a portal, popover and exit-intent triggers, and styled shadcn wrappers are planned.

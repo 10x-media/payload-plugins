@@ -1,0 +1,73 @@
+---
+title: Quick start
+description: Install the Jobs plugin, configure a task, and see the dashboard.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/jobs
+```
+
+## Configure
+
+The plugin needs at least one Payload task configured; the `payload-jobs` collection does not exist without one.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { jobs } from '@10x-media/jobs'
+
+export default buildConfig({
+  // ...
+  jobs: {
+    tasks: [
+      {
+        slug: 'send-welcome-email',
+        inputSchema: [{ name: 'userId', type: 'text', required: true }],
+        handler: async ({ input, req }) => {
+          // do the work
+          return { output: {} }
+        },
+      },
+    ],
+  },
+  plugins: [jobs({})],
+})
+```
+
+`jobs({})` alone gives you the [dashboard layer](/docs/jobs/dashboard): a Status column, a queue-health bar, and error/log panels on the `payload-jobs` collection in the admin.
+
+## Verify
+
+Queue a job and watch it in the admin:
+
+```ts
+await payload.jobs.queue({
+  task: 'send-welcome-email',
+  input: { userId: '123' },
+})
+```
+
+Open **Jobs** in the admin panel. The new job appears as `Queued` in the health bar and the list. Run it:
+
+```ts
+await payload.jobs.run()
+```
+
+With `deleteJobOnComplete` at its default (`true`), a successful job disappears from the list; a failed one shows `Failed` with an error panel on its detail view.
+
+## Enable the production layers
+
+Pick a [topology preset](/docs/jobs/topologies) to turn on [reliability](/docs/jobs/reliability) and [queue control](/docs/jobs/queue-control) together:
+
+```ts title="payload.config.ts"
+import { jobs, singleNodePreset } from '@10x-media/jobs'
+
+plugins: [jobs({ ...singleNodePreset() })]
+```
+
+<Callout>
+Enabling reliability adds fields to `payload-jobs` and a `payload-jobs-locks` collection. On Postgres, generate and run a migration afterwards (`payload migrate:create`, then `payload migrate`).
+</Callout>
+
+Then run a [worker](/docs/jobs/workers) as its own process, or drive the queue from cron on [serverless](/docs/jobs/topologies#serverless-vercel).

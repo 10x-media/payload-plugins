@@ -1,0 +1,55 @@
+---
+title: Jobs family interop
+description: How Jobs, Webhooks, Form Builder, and Automations detect and compose with each other.
+---
+
+Several plugins produce background work; one plugin, [Jobs](/docs/jobs), is about running it. They compose automatically through Payload's plugin registry, with zero shared configuration.
+
+## Jobs is the runtime
+
+Payload's built-in jobs system (`payload-jobs`) executes tasks. `@10x-media/jobs` layers operations on top of it: a dashboard, reliability (leases, sweeper, leader election), a standalone worker, and queue control. It does not define its own task types.
+
+The producer plugins enqueue plain Payload tasks:
+
+- **Webhooks** registers a `webhooksDeliver` task and queues one job per delivery when running in queue mode.
+- **Form Builder** registers a `form-builder-actions` task and queues post-submit action runs when a runner is present.
+- **Analytics** registers `analytics-warm-cache`, `analytics-sync`, and `analytics-prune-events` tasks for its opt-in scheduled work.
+
+Because they are ordinary Payload jobs, they all inherit whatever you set up with the Jobs plugin: they show up in the dashboard, get swept when orphaned, and run under the worker.
+
+## Automatic runner detection
+
+Webhooks and Form Builder decide between queueing and inline execution by asking two questions at config time:
+
+1. Is `config.jobs.autoRun` set?
+2. Is `@10x-media/jobs` registered as a plugin?
+
+If either is true, a runner is assumed and work is queued. Otherwise it runs inline (webhooks) or through a bounded inline fallback (form-builder), so a project without a worker still functions. Installing the Jobs plugin is therefore enough to move both onto the queue; there is no mode flag to coordinate.
+
+Detection uses Payload's `definePlugin` slug registry: each plugin registers under its package name, and siblings look it up by slug. See [Plugin conventions](/docs/concepts).
+
+## Contributions run before consumers
+
+Plugin `order` makes cross-plugin contributions deterministic. Webhooks runs early (`order: 10`) and, when Automations is registered, pushes its `webhook` trigger slug into the Automations options. Automations runs last (`order: 100`) and resolves its trigger catalog after every contributor has run.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { jobs, singleNodePreset } from '@10x-media/jobs'
+import { webhooks } from '@10x-media/webhooks'
+import { automations } from '@10x-media/automations'
+
+export default buildConfig({
+  jobs: { tasks: [/* your tasks */] },
+  plugins: [
+    jobs({ ...singleNodePreset() }), // runtime + ops
+    webhooks({ collections: { posts: true } }), // producer; auto-queues via jobs
+    automations({}), // consumer; receives the `webhook` trigger slug
+  ],
+})
+```
+
+The order of the `plugins` array does not matter; `order` does.
+
+## One queue, one worker
+
+Run one worker (or one `autoRun` schedule) and every plugin's jobs flow through it. Deliveries, form actions, and analytics warming do not need separate infrastructure. If you route work to named queues (for example webhooks' `delivery.queue` option), make sure the worker or run endpoint covers those queues; see [Workers](/docs/jobs/workers).

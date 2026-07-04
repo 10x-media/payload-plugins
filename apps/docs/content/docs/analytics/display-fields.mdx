@@ -1,0 +1,119 @@
+---
+title: Display fields
+description: Bind collections to their URLs and place per-document stats on your own collections.
+---
+
+Display fields surface a document's analytics inside its edit view. Two pieces cooperate: a **binding** tells the plugin which URL path a document's analytics live under, and **field factories** place read-only stat fields wherever you want them. Nothing is auto-injected; nothing lands in the sidebar unless you ask.
+
+## Bindings
+
+Bind each URL-bearing collection with a path resolver:
+
+```ts title="payload.config.ts"
+analytics({
+  adapters: [native()],
+  collections: {
+    pages: {
+      path: (doc) => (doc.slug ? `/${doc.slug}` : null),
+      // pathField: 'permalink',   // explicit-field fallback
+      // hostname: 'example.com',  // multi-domain filter
+    },
+  },
+})
+```
+
+- **`path`** maps a document to the pathname its analytics were recorded under. Return `null` when the document has no URL yet (unsaved, unpublished); fields then render an empty state instead of querying.
+- **`pathField`** names a document field whose stored value is the path. It is a fallback, used only when `path` is absent or returns `null`. A binding must define at least one of the two (validated at startup).
+- **`hostname`** filters adapter queries to one site in multi-domain setups: a static string, or a resolver with the same signature as `path`. Omit it (or return `null`) to query across every domain the data source records.
+
+The `collections` keys are typed against your generated `CollectionSlug` union, and with generated types present each binding's resolvers receive that collection's document type. Without generated types, `doc` degrades to `Record<string, unknown>`.
+
+### Async and computed paths
+
+Resolvers can be async and receive `(doc, ctx)` where `ctx.req` is the current `PayloadRequest`, so related documents can be looked up:
+
+```ts
+collections: {
+  posts: {
+    path: async (doc, ctx) => {
+      if (!doc.slug) return null
+      const cat = await ctx.req.payload.findByID({
+        collection: 'categories',
+        id: doc.category as string,
+        req: ctx.req,
+      })
+      return `/${cat.slug}/${doc.slug}`
+    },
+  },
+},
+```
+
+Nothing is persisted: paths are computed at read time and memoized once per document per request. Keep resolvers cheap (they can run for many documents in one list view); pass `req` into nested Payload calls so the request data loader dedupes them. When the path is already stored on the document, `pathField` is the zero-cost choice. `hostname` resolvers may be async too and run right before each per-document read.
+
+## Field factories
+
+```ts title="collections/pages.ts"
+import {
+  analyticsStat,
+  analyticsStatRow,
+  analyticsFields,
+  analyticsTab,
+  analyticsTabsField,
+} from '@10x-media/analytics'
+
+fields: [
+  analyticsStat({ metric: 'pageviews' }),                     // one stat card
+  analyticsStat({ metric: 'visitors', position: 'sidebar' }), // opt in to the sidebar
+  analyticsStatRow({ metrics: ['pageviews', 'visitors', 'avgDuration'] }),
+  ...analyticsFields({ metrics: ['pageviews', 'sessions'] }), // separate fields, spread in
+  analyticsTabsField(),                                       // a standalone "Analytics" tab
+]
+```
+
+| Factory | Returns | Use |
+|---|---|---|
+| `analyticsStat` | `UIField` | A single metric card. |
+| `analyticsStatRow` | `UIField` | A row of cards. Default metrics: pageviews, visitors, sessions, avgDuration. |
+| `analyticsFields` | `UIField[]` | One field per metric; spread into `fields`. |
+| `analyticsTab` | `Tab` | An unnamed tab to push into your own tabs field's `tabs` array. |
+| `analyticsTabsField` | `TabsField` | A ready-made tabs field wrapping a single `analyticsTab`. |
+
+Every factory accepts `timeframe` (`today`, `last7days`, `last30days` (default), `last90days`, `thisMonth`, `thisYear`, `lastYear`, `allTime`) and `adapter` (an adapter id, when several are configured).
+
+Composing the tab into an existing tabs field:
+
+```ts
+{
+  type: 'tabs',
+  tabs: [
+    { label: 'Content', fields: [/* ... */] },
+    analyticsTab({ metrics: ['pageviews', 'visitors'] }),
+  ],
+}
+```
+
+### Labels
+
+Every hardcoded label is overridable with a string, a locale map, or a Payload label function:
+
+```ts
+analyticsStat({ metric: 'pageviews', label: 'Views' })
+analyticsStatRow({ labels: { pageviews: { en: 'Views', de: 'Aufrufe' } } })
+analyticsTab({ label: 'Traffic', description: 'Last 30 days', labels: { visitors: 'People' } })
+```
+
+Defaults come from the plugin's [translations](/docs/analytics/i18n), so overriding strings globally works there too.
+
+## The import map
+
+The stat components are server components. After adding fields, regenerate the import map so the admin resolves `@10x-media/analytics/rsc`:
+
+```bash
+payload generate:importmap
+```
+
+## Unsupported metrics and empty states
+
+Requested metrics the active adapter does not support are dropped from the read, with one server-side warning per field render naming the dropped metrics and the adapter. The supported remainder renders normally. Only when nothing survives does the field show its muted "not available" state.
+
+The other empty states are equally specific: no binding for the collection, no resolvable path for this document, and adapter not configured each render their own message rather than an error.
