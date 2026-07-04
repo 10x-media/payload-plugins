@@ -1,7 +1,20 @@
-import type { PayloadRequest } from 'payload'
+import type {
+	CollectionSlug,
+	DataFromCollectionSlug,
+	GeneratedTypes,
+	PayloadRequest,
+} from 'payload'
 
-/** Document data as seen by a binding resolver: a plain record, field-shape agnostic. */
-export type BindingDoc = Record<string, unknown>
+/**
+ * Document data as seen by a binding resolver. With generated types augmented
+ * (a consumer project after `payload generate:types`) this is the collection's
+ * generated document type, so a resolver written inline under `collections.<slug>`
+ * receives that collection's typed doc. Without augmentation (this repo, or before
+ * first generation) it degrades to a plain `Record<string, unknown>` rather than
+ * the `any`-indexed fallback Payload would otherwise supply.
+ */
+export type BindingDoc<TSlug extends CollectionSlug = CollectionSlug> =
+	keyof GeneratedTypes extends never ? Record<string, unknown> : DataFromCollectionSlug<TSlug>
 
 export type BindingContext = {
 	req: PayloadRequest
@@ -19,8 +32,8 @@ export type BindingContext = {
  * (for example unsaved or unpublished); the field then renders its empty state
  * instead of querying.
  */
-export type PathResolver = (
-	doc: BindingDoc,
+export type PathResolver<TSlug extends CollectionSlug = CollectionSlug> = (
+	doc: BindingDoc<TSlug>,
 	ctx: BindingContext
 ) => string | null | Promise<string | null>
 
@@ -35,8 +48,8 @@ export type PathResolver = (
  * for single-domain-per-collection setups; sync one-argument functions remain
  * supported.
  */
-export type HostnameResolver = (
-	doc: BindingDoc,
+export type HostnameResolver<TSlug extends CollectionSlug = CollectionSlug> = (
+	doc: BindingDoc<TSlug>,
 	ctx: BindingContext
 ) => string | null | Promise<string | null>
 
@@ -45,10 +58,10 @@ export type HostnameResolver = (
  * field fallback used only when `path` is absent or returns null. At least one of the
  * two must be provided (validated at config resolve time).
  */
-export type AnalyticsBinding = {
-	path?: PathResolver
+export type AnalyticsBinding<TSlug extends CollectionSlug = CollectionSlug> = {
+	path?: PathResolver<TSlug>
 	pathField?: string
-	hostname?: string | HostnameResolver
+	hostname?: string | HostnameResolver<TSlug>
 }
 
 /** A binding after option resolution; identical shape, kept distinct for intent. */

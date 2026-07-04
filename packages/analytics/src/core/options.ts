@@ -1,3 +1,4 @@
+import type { CollectionSlug } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import type { CustomWidgetDef } from '../widgets/customWidget'
 import type { AnalyticsAdapter } from './contract'
@@ -11,7 +12,11 @@ export type AnalyticsPluginOptions = {
 	disabled?: boolean
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
-	collections?: Record<string, AnalyticsBinding>
+	/**
+	 * Per-collection bindings, keyed by collection slug. With generated types
+	 * augmented, each slug's resolvers receive that collection's typed document.
+	 */
+	collections?: { [TSlug in CollectionSlug]?: AnalyticsBinding<TSlug> }
 	cache?: { ttl?: { aggregate?: number; realtime?: number }; warm?: boolean | { cron?: string } }
 	widgets?: boolean | { disabled?: string[]; register?: CustomWidgetDef[] }
 	/**
@@ -22,7 +27,7 @@ export type AnalyticsPluginOptions = {
 	 */
 	sync?:
 		| boolean
-		| { collectionSlug?: string; cron?: string; lookbackDays?: number; adapters?: string[] }
+		| { collectionSlug?: CollectionSlug; cron?: string; lookbackDays?: number; adapters?: string[] }
 }
 
 export interface ResolvedOptions {
@@ -45,10 +50,13 @@ const resolveBindings = (
 ): Record<string, ResolvedBinding> => {
 	const out: Record<string, ResolvedBinding> = {}
 	for (const [slug, binding] of Object.entries(collections ?? {})) {
+		if (!binding) continue
 		if (!binding.path && !binding.pathField) {
 			throw new Error(`analytics: binding for "${slug}" needs a path resolver or a pathField`)
 		}
-		out[slug] = binding
+		// Erases the per-slug doc generic; safe because the runtime only ever hands
+		// a binding documents from its own collection.
+		out[slug] = binding as ResolvedBinding
 	}
 	return out
 }

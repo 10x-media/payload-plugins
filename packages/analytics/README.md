@@ -143,6 +143,8 @@ analytics({
 
 The resolver returns the document's URL pathname (or `null` for an unsaved document). `pathField` is a fallback used only when the resolver is absent or returns `null`; a binding must define at least one of the two.
 
+Bindings are typed over your project's `CollectionSlug`: once `payload generate:types` has run, the `collections` keys are checked against your real slugs and a resolver written inline under `collections.posts` receives the generated `Post` document type. Before generation (or in a project without generated types) `doc` degrades to `Record<string, unknown>`.
+
 `hostname` narrows adapter queries to one site's traffic in multi-domain setups. It takes a static string or a resolver with the same `(doc, ctx) => string | null | Promise<string | null>` signature as `path`; returning `null` (or omitting `hostname`) applies no hostname filter.
 
 ### Computed page paths
