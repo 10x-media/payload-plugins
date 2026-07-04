@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { DEFAULT_DELIVERY_QUEUE, DEFAULT_RETRIES, DEFAULT_TIMEOUT_MS } from './constants'
+import type { TranslationsOption } from './translations'
 
 export type WebhookOperation = 'create' | 'update' | 'delete'
 
@@ -35,6 +36,13 @@ export type DeliveryOptions = {
 
 export type WebhooksPluginOptions = {
 	disabled?: boolean
+	/**
+	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
+	 * translation keys exported from `@10x-media/webhooks/i18n`. Values win over
+	 * the built-in locales key-by-key; locales the plugin does not ship are added
+	 * whole. App-level `i18n.translations` still wins over both.
+	 */
+	translations?: TranslationsOption
 	collections?: Record<string, true | CollectionWebhookConfig>
 	subscriptions?: CodeSubscription[]
 	delivery?: DeliveryMode | DeliveryOptions

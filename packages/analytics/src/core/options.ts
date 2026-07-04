@@ -1,6 +1,7 @@
 import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import { PROVIDERS_SLUG } from '../providers/collection'
+import type { TranslationsOption } from '../translations'
 import type { CustomWidgetDef } from '../widgets/customWidget'
 import type { AnalyticsAdapter } from './contract'
 
@@ -63,6 +64,13 @@ export type AnalyticsAccessOptions = {
 
 export type AnalyticsPluginOptions = {
 	disabled?: boolean
+	/**
+	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
+	 * translation keys exported from `@10x-media/analytics/i18n`. Values win over
+	 * the built-in locales key-by-key; locales the plugin does not ship are added
+	 * whole. App-level `i18n.translations` still wins over both.
+	 */
+	translations?: TranslationsOption
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver?: ScopeResolver

@@ -32,7 +32,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		}
 		const resolved = resolveOptions(options)
 		const defaultLayout = config.admin?.dashboard?.defaultLayout
-		registerTranslations(config)
+		registerTranslations(config, options.translations)
 		const registry = createRegistry(resolved.adapters, resolved.defaultAdapter)
 		const registryBase = { adapters: resolved.adapters, defaultId: resolved.defaultAdapter }
 		let resolveRegistry = staticRegistryResolver(registry)

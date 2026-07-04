@@ -16,11 +16,19 @@ import type { PresentationsDescriptorConfig } from './presentations/registry'
 import { resolvePresentationDescriptors } from './presentations/registry'
 import { resolveSpamConfig } from './spam/resolveSpam'
 import type { SpamOption } from './spam/types'
+import type { TranslationsOption } from './translations'
 import { defaultValidationRules } from './validation/builtin'
 import { resolveValidationRules, type ValidationRulesConfig } from './validation/registry'
 
 export type FormBuilderPluginOptions = {
 	disabled?: boolean
+	/**
+	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
+	 * translation keys exported from `@10x-media/form-builder/i18n`. Values win
+	 * over the built-in locales key-by-key; locales the plugin does not ship are
+	 * added whole. App-level `i18n.translations` still wins over both.
+	 */
+	translations?: TranslationsOption
 	/** Pluggable sink for form lifecycle events. Defaults to a no-op; analytics adapters or a future analytics plugin subscribe here. */
 	events?: FormEventSink
 	/** Add, override, or remove field types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
@@ -62,7 +70,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		const actionRegistry = resolveActions(defaultActionDefinitions, options.actions)
 		const uploads = resolveUploads(options.uploads)
 		const spam = resolveSpamConfig(options.spam)
-		registerTranslations(config)
+		registerTranslations(config, options.translations)
 		registerCollections({
 			config,
 			registry,

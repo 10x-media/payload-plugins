@@ -121,7 +121,9 @@
 	},
 	"peerDependencies": {
 		"@google-analytics/data": "^6.0.0",
+		"@payloadcms/db-postgres": "^3.82.0",
 		"@payloadcms/ui": "^3.82.0",
+		"maxmind": "^4.3.24",
 		"payload": "^3.82.0",
 		"react": "^19.0.0",
 		"react-datepicker": "^7.6.0",
@@ -130,11 +132,18 @@
 	"peerDependenciesMeta": {
 		"@google-analytics/data": {
 			"optional": true
+		},
+		"@payloadcms/db-postgres": {
+			"optional": true
+		},
+		"maxmind": {
+			"optional": true
 		}
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
 		"@google-analytics/data": "^6.1.0",
 		"@payloadcms/db-mongodb": "catalog:",

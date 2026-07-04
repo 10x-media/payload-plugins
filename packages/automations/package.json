@@ -85,6 +85,7 @@
 		"@10x-media/jobs": "workspace:*",
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
 		"@10x-media/webhooks": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",

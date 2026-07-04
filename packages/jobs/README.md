@@ -40,6 +40,7 @@ export default buildConfig({
 | `disabled` | `boolean` | `false` | When `true`, returns the incoming config unchanged. Useful for toggling the plugin per environment. |
 | `reliability` | `ReliabilityOptions \| boolean` | off | Job leases, the orphan sweeper, leader election, and serverless staleness. Opt in with `true` (defaults) or a tuned object. |
 | `queueControl` | `QueueControlOptions \| boolean` | off | Cluster-wide pause/resume, hardened run/sweep/status endpoints, and access guards. Opt in with `true` (defaults) or a tuned object. |
+| `translations` | `TranslationsOption` | -- | Per-locale string overrides keyed by the typed keys from `@10x-media/jobs/i18n`. Values win over the built-ins key-by-key; unshipped locales are added whole. |
 
 <!-- Add new options to this table as you build them. -->
 

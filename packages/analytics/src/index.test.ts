@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { analytics } from './index'
 import { memoryAdapter } from './testing/memoryAdapter'
+import { keys } from './translations'
 
 const fakeConfig = () => ({ collections: [] }) as unknown as Config
 
@@ -17,6 +18,15 @@ describe('analytics factory', () => {
 	it('registers translations when enabled', () => {
 		const out = analytics({ adapters: [memoryAdapter()] })(fakeConfig()) as Config
 		expect(out.i18n?.translations).toBeDefined()
+	})
+	it('applies the translations option', () => {
+		const out = analytics({
+			adapters: [memoryAdapter()],
+			translations: { de: { [keys.pluginName]: 'Analytik' } },
+		})(fakeConfig()) as Config
+		const i18n = out.i18n?.translations as Record<string, Record<string, Record<string, string>>>
+		expect(i18n.de?.analytics?.pluginName).toBe('Analytik')
+		expect(i18n.en?.analytics?.pluginName).toBe('Analytics')
 	})
 	it('throws when no adapters are supplied', () => {
 		expect(() => analytics({ adapters: [] })(fakeConfig())).toThrow(/at least one adapter/i)
