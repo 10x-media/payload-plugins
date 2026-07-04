@@ -100,13 +100,42 @@ describe('resolveOptions scopeResolver', () => {
 	it('defaults to resolving null for every request', async () => {
 		const resolved = resolveOptions({ adapters })
 		expect(await resolved.scopeResolver({ req })).toBeNull()
+		expect(resolved.scoped).toBe(false)
 	})
 
-	it('carries a custom resolver through, sync or async', async () => {
+	it('carries a custom resolver through, sync or async, and marks the install scoped', async () => {
 		const sync = resolveOptions({ adapters, scopeResolver: () => 'tenant-a' })
 		expect(await sync.scopeResolver({ req })).toBe('tenant-a')
+		expect(sync.scoped).toBe(true)
 		const async = resolveOptions({ adapters, scopeResolver: async () => 'tenant-b' })
 		expect(await async.scopeResolver({ req })).toBe('tenant-b')
+	})
+})
+
+describe('resolveOptions platformAdapter and access', () => {
+	const adapters = [memoryAdapter()]
+
+	it('accepts a platformAdapter naming a config adapter', () => {
+		expect(resolveOptions({ adapters, platformAdapter: 'memory' }).platformAdapter).toBe('memory')
+	})
+
+	it('throws for a platformAdapter naming no config adapter', () => {
+		expect(() => resolveOptions({ adapters, platformAdapter: 'posthog' })).toThrow(
+			/unknown platform adapter/i
+		)
+	})
+
+	it('defaults platformRead to any authenticated user', async () => {
+		const { platformRead } = resolveOptions({ adapters }).access
+		expect(await platformRead({ req: { user: { id: 1 } } as never })).toBe(true)
+		expect(await platformRead({ req: { user: null } as never })).toBe(false)
+	})
+
+	it('carries a custom platformRead through', async () => {
+		const platformRead = () => false
+		expect(resolveOptions({ adapters, access: { platformRead } }).access.platformRead).toBe(
+			platformRead
+		)
 	})
 })
 

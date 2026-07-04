@@ -1,8 +1,13 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Field } from 'payload'
 
 export const EVENTS_SLUG = 'analytics-events'
 
-export const eventsCollection = (): CollectionConfig => ({
+/**
+ * The scope column exists only for scoped installs (a configured scopeResolver);
+ * enabling scope on an existing native install therefore needs a migration adding
+ * the column to events and rollups.
+ */
+export const eventsCollection = (scoped = false): CollectionConfig => ({
 	slug: EVENTS_SLUG,
 	admin: { hidden: true },
 	access: { read: () => false, create: () => true, update: () => false, delete: () => false },
@@ -22,6 +27,7 @@ export const eventsCollection = (): CollectionConfig => ({
 		{ name: 'sessionId', type: 'text', required: true, index: true },
 		{ name: 'durationMs', type: 'number' },
 		{ name: 'props', type: 'json' },
+		...(scoped ? [{ name: 'scope', type: 'text', index: true } satisfies Field] : []),
 	],
 	indexes: [{ fields: ['path', 'timestamp'] }, { fields: ['type', 'timestamp'] }],
 })

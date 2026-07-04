@@ -70,3 +70,72 @@ describe('resolveReadContext', () => {
 		expect(ctx.ok).toBe(false)
 	})
 })
+
+describe('resolveReadContext platform gating', () => {
+	const userReq = { payload: {}, user: { id: 1 } } as unknown as PayloadRequest
+	const anonReq = { payload: {}, user: null } as unknown as PayloadRequest
+
+	const scopedAdapter = () => {
+		const adapter = memoryAdapter()
+		return { ...adapter, capabilities: { ...adapter.capabilities, scopedQueries: true } }
+	}
+
+	it("gates an explicit '*' read behind platformRead and strips the query scope", async () => {
+		const runtime = runtimeWith()
+		const allowed = await resolveReadContext({ runtime, req: userReq, scope: '*' })
+		expect(allowed.ok).toBe(true)
+		if (allowed.ok) {
+			expect(allowed.scope).toBeNull()
+			expect(allowed.queryScope).toBeUndefined()
+		}
+		const denied = await resolveReadContext({ runtime, req: anonReq, scope: '*' })
+		expect(denied.ok).toBe(false)
+	})
+
+	it('honors a custom platformRead for cross-scope reads', async () => {
+		const runtime = runtimeWith({ platformRead: () => false })
+		const ctx = await resolveReadContext({ runtime, req: userReq, scope: '*' })
+		expect(ctx.ok).toBe(false)
+	})
+
+	it('gates a scoped read through a platform adapter that cannot filter by scope', async () => {
+		const runtime = runtimeWith({ platformAdapterId: 'memory' })
+		const denied = await resolveReadContext({ runtime, req: anonReq, scope: 't1' })
+		expect(denied.ok).toBe(false)
+		const allowed = await resolveReadContext({ runtime, req: userReq, scope: 't1' })
+		expect(allowed.ok).toBe(true)
+		if (allowed.ok) {
+			expect(allowed.queryScope).toBeUndefined()
+		}
+	})
+
+	it('lets a scope-filtering platform adapter serve scoped reads ungated', async () => {
+		const runtime = runtimeWith({
+			registry: createRegistry([scopedAdapter()]),
+			platformAdapterId: 'memory',
+		})
+		const ctx = await resolveReadContext({ runtime, req: anonReq, scope: 't1' })
+		expect(ctx.ok).toBe(true)
+		if (ctx.ok) {
+			expect(ctx.queryScope).toBe('t1')
+		}
+	})
+
+	it('leaves scoped reads through non-platform adapters ungated', async () => {
+		const runtime = runtimeWith({ platformAdapterId: 'other' })
+		const ctx = await resolveReadContext({ runtime, req: anonReq, scope: 't1' })
+		expect(ctx.ok).toBe(true)
+		if (ctx.ok) {
+			expect(ctx.queryScope).toBe('t1')
+		}
+	})
+
+	it('leaves null-scope reads through the platform adapter ungated', async () => {
+		const runtime = runtimeWith({ platformAdapterId: 'memory' })
+		const ctx = await resolveReadContext({ runtime, req: anonReq })
+		expect(ctx.ok).toBe(true)
+		if (ctx.ok) {
+			expect(ctx.queryScope).toBeUndefined()
+		}
+	})
+})

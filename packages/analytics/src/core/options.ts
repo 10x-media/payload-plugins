@@ -49,12 +49,33 @@ export type ProvidersOptions = {
 	resolve?: ProvidersResolve
 }
 
+/** Access checker for cross-scope (platform) analytics reads. */
+export type PlatformReadAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+
+export type AnalyticsAccessOptions = {
+	/**
+	 * Gates cross-scope reads: explicit `scope: '*'` reads, and scoped reads through
+	 * a platform adapter that cannot filter by scope. Defaults to any authenticated
+	 * admin-panel user.
+	 */
+	platformRead?: PlatformReadAccess
+}
+
 export type AnalyticsPluginOptions = {
 	disabled?: boolean
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver?: ScopeResolver
 	providers?: ProvidersOptions
+	/**
+	 * Id of one config adapter shared by every scope (the platform's own analytics,
+	 * e.g. a PostHog project capturing all tenants). Included in each scope's
+	 * registry like any config adapter; reads through it are scope-filtered only
+	 * when the adapter supports scoped queries, otherwise they are cross-scope and
+	 * require `access.platformRead`.
+	 */
+	platformAdapter?: string
+	access?: AnalyticsAccessOptions
 	/**
 	 * Per-collection bindings, keyed by collection slug. With generated types
 	 * augmented, each slug's resolvers receive that collection's typed document.
@@ -88,6 +109,10 @@ export interface ResolvedOptions {
 	adapters: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver: ScopeResolver
+	/** True when the app configured a scopeResolver (scoped install). */
+	scoped: boolean
+	platformAdapter?: string
+	access: { platformRead: PlatformReadAccess }
 	providers: {
 		collection: {
 			enabled: boolean
@@ -134,6 +159,12 @@ const resolveBindings = (
 export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions {
 	if (!options.adapters || options.adapters.length === 0) {
 		throw new Error('analytics: at least one adapter is required')
+	}
+	if (
+		options.platformAdapter !== undefined &&
+		!options.adapters.some((a) => a.id === options.platformAdapter)
+	) {
+		throw new Error(`analytics: unknown platform adapter "${options.platformAdapter}"`)
 	}
 	const widgets =
 		options.widgets === false
@@ -206,6 +237,9 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
 		scopeResolver: options.scopeResolver ?? (() => null),
+		scoped: options.scopeResolver !== undefined,
+		platformAdapter: options.platformAdapter,
+		access: { platformRead: options.access?.platformRead ?? (({ req }) => Boolean(req.user)) },
 		providers,
 		bindings: resolveBindings(options.collections),
 		cache: {

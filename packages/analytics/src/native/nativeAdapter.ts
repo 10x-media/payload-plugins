@@ -52,7 +52,7 @@ const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'country', 'sourc
 
 const REALTIME_EVENT_LIMIT = 50_000
 
-const capabilities: AnalyticsCapabilities = {
+const baseCapabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
 	realtime: true,
 	realtimeWindowMinutes: 60,
@@ -72,8 +72,14 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		(options.geoDbPath
 			? composeGeoResolvers(platformHeaderResolver, maxmindResolver({ dbPath: options.geoDbPath }))
 			: platformHeaderResolver)
+	// Per-instance copy: register() flips scopedQueries when the install is scoped.
+	const capabilities: AnalyticsCapabilities = { ...baseCapabilities }
 	let payloadRef: Payload | null = null
 	let buffer: WriteBuffer<StoredEvent> | null = null
+	let scoped = false
+
+	const scopeWhere = (q: AnalyticsQuery): Record<string, unknown> =>
+		scoped && q.scope !== undefined ? { scope: { equals: q.scope } } : {}
 
 	const readRollups = async (
 		payload: Payload,
@@ -94,11 +100,15 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		capabilities,
 		isConfigured: () => true,
 		flush: () => buffer?.flush() ?? Promise.resolve(),
-		register(config: Config) {
+		register(config: Config, context) {
+			scoped = context?.scoped ?? false
+			if (scoped) {
+				capabilities.scopedQueries = true
+			}
 			config.collections = [
 				...(config.collections ?? []),
-				eventsCollection(),
-				rollupsCollection(),
+				eventsCollection(scoped),
+				rollupsCollection(scoped),
 				seenCollection(),
 			]
 			config.endpoints = [
@@ -106,7 +116,11 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				{
 					method: 'post',
 					path: options.ingestPath ?? '/analytics/ingest',
-					handler: makeIngestHandler(geoResolver, () => buffer),
+					handler: makeIngestHandler(
+						geoResolver,
+						() => buffer,
+						scoped ? context?.resolveScope : undefined
+					),
 				},
 			]
 			if (options.retentionDays && options.retentionDays > 0) {
@@ -152,6 +166,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				dimension: { equals: '' },
 				path: { equals: totalsPath },
 				period: periodWhere,
+				...scopeWhere(q),
 			})
 			const totalsAcc = emptyAcc()
 			for (const d of totalsDocs) {
@@ -177,12 +192,14 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 							dimension: { equals: '' },
 							path: { not_equals: '' },
 							period: periodWhere,
+							...scopeWhere(q),
 						}
 					: {
 							granularity: { equals: 'day' },
 							dimension: { equals: dim },
 							path: { equals: '' },
 							period: periodWhere,
+							...scopeWhere(q),
 						}
 			const groups = new Map<string, Acc>()
 			for (const d of await readRollups(payloadRef, breakdownWhere)) {
@@ -218,6 +235,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 						greater_than_equal: q.dateRange.start.toISOString(),
 						less_than_equal: q.dateRange.end.toISOString(),
 					},
+					...scopeWhere(q),
 				} as never,
 				// Newest-first under a hard cap: if a very busy site has more events than the
 				// cap in the window, keep the most recent activity rather than the oldest.

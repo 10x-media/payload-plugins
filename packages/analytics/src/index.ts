@@ -1,4 +1,4 @@
-import { type Config, definePlugin } from 'payload'
+import { type Config, definePlugin, type PayloadRequest } from 'payload'
 
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
@@ -66,8 +66,9 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				}),
 			]
 		}
+		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
 		for (const adapter of resolved.adapters) {
-			adapter.register?.(config)
+			adapter.register?.(config, { scoped: resolved.scoped, resolveScope })
 		}
 		if (
 			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function')
@@ -121,7 +122,9 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			setRuntime(payload, {
 				registry,
 				resolveRegistry,
-				resolveScope: async (req) => resolved.scopeResolver({ req }),
+				resolveScope,
+				platformAdapterId: resolved.platformAdapter,
+				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,
@@ -137,9 +140,12 @@ export type {
 	HostnameResolver,
 	PathResolver,
 } from './binding/types'
+export { PLATFORM_SCOPE } from './core/contract'
 export type {
+	AnalyticsAccessOptions,
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
+	PlatformReadAccess,
 	ProvidersCollectionOptions,
 	ProvidersOptions,
 	ProvidersResolve,

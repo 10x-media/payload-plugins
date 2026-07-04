@@ -1,4 +1,10 @@
-import type { Config } from 'payload'
+import type { Config, PayloadRequest } from 'payload'
+
+/**
+ * Explicit cross-scope read marker: pass as a read's `scope` to aggregate over every
+ * scope. Gated by `access.platformRead`; the query reaches the adapter unscoped.
+ */
+export const PLATFORM_SCOPE = '*'
 
 export type MetricKey =
 	| 'pageviews'
@@ -98,10 +104,25 @@ export interface AnalyticsCapabilities {
 	batchPageReport: boolean
 	rateLimit: RateLimitDescriptor | null
 	recommendedTtl: { realtime: number; aggregate: number }
+	/**
+	 * The adapter applies `AnalyticsQuery.scope` as a provider-native filter (native
+	 * scope column, PostHog `scopeProperty`, ...). Without it, a scoped read through
+	 * a shared platform adapter would expose cross-scope data, so such reads are
+	 * gated by `access.platformRead`.
+	 */
+	scopedQueries?: boolean
 }
 
 export interface AdapterContext {
 	signal?: AbortSignal
+}
+
+/** Extra context the plugin hands adapters when they register config surface. */
+export interface AdapterRegisterContext {
+	/** True when the plugin has a scopeResolver configured. */
+	scoped: boolean
+	/** The plugin's scopeResolver bound for adapter use (e.g. ingest stamping). */
+	resolveScope: (req: PayloadRequest) => Promise<string | null>
 }
 
 export interface AnalyticsAdapter {
@@ -111,7 +132,7 @@ export interface AnalyticsAdapter {
 	isConfigured(): boolean
 	query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
 	realtime?(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
-	register?(config: Config): void
+	register?(config: Config, context?: AdapterRegisterContext): void
 }
 
 export type AnalyticsAdapterFactory<Config> = (config: Config) => AnalyticsAdapter

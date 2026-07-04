@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { Config, PayloadRequest } from 'payload'
+import type { Config, Endpoint, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readForField } from '../../src/fields/readForDocument'
 import { analytics } from '../../src/index'
@@ -17,6 +17,7 @@ import { computeRollupDeltas } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { readForWidget } from '../../src/widgets/readForWidget'
 
 describeForDb('analytics cross-db', {}, (db) => {
 	let booted: BootedPayload
@@ -297,6 +298,134 @@ describeForDb('analytics per-document read', {}, (db) => {
 		expect(result.status).toBe('ok')
 		expect(result.metrics.pageviews).toBe(2)
 		expect(result.metrics.visitors).toBe(1)
+	})
+})
+
+describeForDb('native scoped ingest and reads', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native()],
+				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+			}),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const ingest = async (tenant: string | null, path: string, ua = 'UA'): Promise<void> => {
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		const headers = new Headers({ 'content-type': 'application/json', 'user-agent': ua })
+		if (tenant) {
+			headers.set('x-tenant', tenant)
+		}
+		const res = await endpoint.handler({
+			payload: booted.payload,
+			headers,
+			json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 100 }),
+		} as never)
+		expect(res.status).toBe(202)
+	}
+
+	const widgetReq = (tenant?: string, user?: object): PayloadRequest =>
+		({
+			payload: booted.payload,
+			headers: new Headers(tenant ? { 'x-tenant': tenant } : {}),
+			user: user ?? null,
+		}) as unknown as PayloadRequest
+
+	it(`stamps ingested events and rollups with the resolved scope on ${db}`, async () => {
+		await ingest('t1', '/scoped')
+		await ingest('t1', '/scoped', 'UA-second-visitor')
+		await ingest('t2', '/scoped')
+		await ingest(null, '/scoped')
+
+		const rollups = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/scoped' }, dimension: { equals: '' } },
+			pagination: false,
+			overrideAccess: true,
+		})
+		const byScope = new Map(
+			(
+				rollups.docs as unknown as Array<{ scope: string; pageviews: number; visitors: number }>
+			).map((d) => [d.scope, d])
+		)
+		expect(byScope.get('t1')?.pageviews).toBe(2)
+		expect(byScope.get('t1')?.visitors).toBe(2)
+		expect(byScope.get('t2')?.pageviews).toBe(1)
+		expect(byScope.get('')?.pageviews).toBe(1)
+	})
+
+	it(`keeps the same visitor distinct per scope on ${db}`, async () => {
+		await ingest('t1', '/dedupe', 'UA-shared')
+		await ingest('t1', '/dedupe', 'UA-shared')
+		await ingest('t2', '/dedupe', 'UA-shared')
+		const rollups = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/dedupe' } },
+			pagination: false,
+			overrideAccess: true,
+		})
+		const byScope = new Map(
+			(
+				rollups.docs as unknown as Array<{ scope: string; pageviews: number; visitors: number }>
+			).map((d) => [d.scope, d])
+		)
+		expect(byScope.get('t1')?.pageviews).toBe(2)
+		expect(byScope.get('t1')?.visitors).toBe(1)
+		expect(byScope.get('t2')?.pageviews).toBe(1)
+		expect(byScope.get('t2')?.visitors).toBe(1)
+	})
+
+	it(`filters widget reads by the request's scope on ${db}`, async () => {
+		const t1 = await readForWidget({
+			req: widgetReq('t1'),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: new Date(),
+		})
+		expect(t1.status).toBe('ok')
+		expect(t1.metrics.pageviews).toBe(4)
+
+		const t2 = await readForWidget({
+			req: widgetReq('t2'),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: new Date(),
+		})
+		expect(t2.metrics.pageviews).toBe(2)
+	})
+
+	it(`aggregates across scopes only for permitted platform reads on ${db}`, async () => {
+		const denied = await readForWidget({
+			req: widgetReq('t1'),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: new Date(),
+			scope: '*',
+		})
+		expect(denied.status).toBe('unavailable')
+
+		const allowed = await readForWidget({
+			req: widgetReq('t1', { id: 'admin' }),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: new Date(),
+			scope: '*',
+		})
+		expect(allowed.status).toBe('ok')
+		expect(allowed.metrics.pageviews).toBe(7)
 	})
 })
 
