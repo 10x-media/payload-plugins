@@ -93,6 +93,9 @@
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
+	"dependencies": {
+		"@standard-schema/spec": "^1.0.0"
+	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
@@ -103,7 +106,6 @@
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
-		"@standard-schema/spec": "^1.0.0",
 		"@testing-library/jest-dom": "catalog:",
 		"@testing-library/react": "catalog:",
 		"@types/node": "catalog:",
