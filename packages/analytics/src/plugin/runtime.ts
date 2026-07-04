@@ -1,10 +1,18 @@
-import type { Payload } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
 import type { ResolvedBinding } from '../binding/types'
-import type { AdapterRegistry } from '../core/registry'
+import type { AdapterRegistry, RegistryResolver, ResolveRegistryArgs } from '../core/registry'
 import type { Engine } from '../surfacing/engine'
 
 export interface AnalyticsRuntime {
 	registry: AdapterRegistry
+	/** Per-scope adapter resolution; absent runtimes fall back to the static registry. */
+	resolveRegistry?: RegistryResolver
+	/** The plugin's scopeResolver bound at init; absent runtimes resolve null. */
+	resolveScope?: (req: PayloadRequest) => Promise<string | null>
+	/** Id of the config adapter shared by every scope, when one is designated. */
+	platformAdapterId?: string
+	/** Gate for cross-scope reads; absent runtimes require an authenticated user. */
+	platformRead?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 	bindings: Record<string, ResolvedBinding>
 	engine: Engine
 	ttl: { aggregate: number; realtime: number }
@@ -27,3 +35,19 @@ export const setRuntime = (payload: Payload, runtime: AnalyticsRuntime): void =>
 
 export const getRuntime = (payload: Payload): AnalyticsRuntime | undefined =>
 	(payload as unknown as RuntimeHost)[RUNTIME_KEY]
+
+export const resolveScopeFor = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): Promise<string | null> => runtime.resolveScope?.(req) ?? Promise.resolve(null)
+
+export const resolveRegistryFor = (
+	runtime: AnalyticsRuntime,
+	args: ResolveRegistryArgs
+): Promise<AdapterRegistry> => runtime.resolveRegistry?.(args) ?? Promise.resolve(runtime.registry)
+
+export const platformReadFor = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): Promise<boolean> =>
+	runtime.platformRead ? await runtime.platformRead({ req }) : Boolean(req.user)

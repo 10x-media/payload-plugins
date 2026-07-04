@@ -44,6 +44,101 @@ describe('resolveOptions', () => {
 	})
 })
 
+describe('resolveOptions providers', () => {
+	const adapters = [memoryAdapter()]
+
+	it('defaults to a disabled collection with the default slug and scope field', () => {
+		const p = resolveOptions({ adapters }).providers
+		expect(p.collection).toEqual({
+			enabled: false,
+			slug: 'analytics-providers',
+			scopeField: 'scope',
+		})
+		expect(p.resolve).toBeUndefined()
+	})
+
+	it('enables the collection with defaults when collection is true', () => {
+		const p = resolveOptions({ adapters, providers: { collection: true } }).providers
+		expect(p.collection.enabled).toBe(true)
+		expect(p.collection.slug).toBe('analytics-providers')
+		expect(p.collection.scopeField).toBe('scope')
+	})
+
+	it('keeps the collection disabled when collection is false', () => {
+		const p = resolveOptions({ adapters, providers: { collection: false } }).providers
+		expect(p.collection.enabled).toBe(false)
+	})
+
+	it('carries slug, scopeField, access, and overrides through from an object option', () => {
+		const overrides = (c: import('payload').CollectionConfig) => c
+		const access = { read: () => true }
+		const p = resolveOptions({
+			adapters,
+			providers: {
+				collection: { slug: 'tenant-analytics', scopeField: 'tenant', overrides, access },
+			},
+		}).providers
+		expect(p.collection).toEqual({
+			enabled: true,
+			slug: 'tenant-analytics',
+			scopeField: 'tenant',
+			overrides,
+			access,
+		})
+	})
+
+	it('carries the resolve escape hatch through', () => {
+		const resolve = async () => []
+		expect(resolveOptions({ adapters, providers: { resolve } }).providers.resolve).toBe(resolve)
+	})
+})
+
+describe('resolveOptions scopeResolver', () => {
+	const adapters = [memoryAdapter()]
+	const req = {} as import('payload').PayloadRequest
+
+	it('defaults to resolving null for every request', async () => {
+		const resolved = resolveOptions({ adapters })
+		expect(await resolved.scopeResolver({ req })).toBeNull()
+		expect(resolved.scoped).toBe(false)
+	})
+
+	it('carries a custom resolver through, sync or async, and marks the install scoped', async () => {
+		const sync = resolveOptions({ adapters, scopeResolver: () => 'tenant-a' })
+		expect(await sync.scopeResolver({ req })).toBe('tenant-a')
+		expect(sync.scoped).toBe(true)
+		const async = resolveOptions({ adapters, scopeResolver: async () => 'tenant-b' })
+		expect(await async.scopeResolver({ req })).toBe('tenant-b')
+	})
+})
+
+describe('resolveOptions platformAdapter and access', () => {
+	const adapters = [memoryAdapter()]
+
+	it('accepts a platformAdapter naming a config adapter', () => {
+		expect(resolveOptions({ adapters, platformAdapter: 'memory' }).platformAdapter).toBe('memory')
+	})
+
+	it('throws for a platformAdapter naming no config adapter', () => {
+		expect(() => resolveOptions({ adapters, platformAdapter: 'posthog' })).toThrow(
+			/unknown platform adapter/i
+		)
+	})
+
+	it('defaults platformRead to any authenticated user', async () => {
+		const { platformRead } = resolveOptions({ adapters }).access
+		expect(await platformRead({ req: { user: { id: 1 } } as never })).toBe(true)
+		expect(await platformRead({ req: { user: null } as never })).toBe(false)
+	})
+
+	it('carries a custom platformRead through', async () => {
+		const platformRead = () => false
+		expect(resolveOptions({ adapters, access: { platformRead } }).access.platformRead).toBe(
+			platformRead
+		)
+	})
+})
+
 describe('resolveOptions cache.warm', () => {
 	const adapters = [memoryAdapter()]
 	it('defaults warm to disabled with the default cron when cache.warm is unset', () => {

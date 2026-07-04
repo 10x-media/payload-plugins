@@ -1,6 +1,7 @@
+import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { memoryAdapter } from '../testing/memoryAdapter'
-import { createRegistry } from './registry'
+import { createRegistry, staticRegistryResolver } from './registry'
 
 describe('createRegistry', () => {
 	it('resolves an adapter by id and exposes the default', () => {
@@ -22,5 +23,16 @@ describe('createRegistry', () => {
 	})
 	it('throws on an unknown default adapter id', () => {
 		expect(() => createRegistry([memoryAdapter()], 'nope')).toThrow(/unknown default adapter/i)
+	})
+})
+
+describe('staticRegistryResolver', () => {
+	it('returns the same registry for every scope', async () => {
+		const registry = createRegistry([memoryAdapter()])
+		const resolve = staticRegistryResolver(registry)
+		const payload = {} as Payload
+		expect(await resolve({ payload, scope: null })).toBe(registry)
+		expect(await resolve({ payload, scope: 'tenant-a' })).toBe(registry)
+		expect(await resolve({ payload, scope: 'tenant-b' })).toBe(registry)
 	})
 })

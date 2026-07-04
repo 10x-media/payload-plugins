@@ -1,11 +1,17 @@
-import { type Config, definePlugin } from 'payload'
+import { type Config, definePlugin, type PayloadRequest } from 'payload'
 
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
-import { createRegistry } from './core/registry'
+import { createRegistry, staticRegistryResolver } from './core/registry'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
 import { warmTask } from './plugin/warmTask'
+import { buildProvidersCollection } from './providers/collection'
+import {
+	collectionProvidersSource,
+	combineRegistries,
+	createScopedRegistryResolver,
+} from './providers/resolver'
 import { kvCacheStore } from './surfacing/cacheStore'
 import { createEngine } from './surfacing/engine'
 import { syncCollection } from './sync/collection'
@@ -28,8 +34,41 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		const defaultLayout = config.admin?.dashboard?.defaultLayout
 		registerTranslations(config, options.translations)
 		const registry = createRegistry(resolved.adapters, resolved.defaultAdapter)
+		const registryBase = { adapters: resolved.adapters, defaultId: resolved.defaultAdapter }
+		let resolveRegistry = staticRegistryResolver(registry)
+		let invalidateProviders = () => {}
+		const providersResolve = resolved.providers.resolve
+		if (providersResolve) {
+			resolveRegistry = async (args) =>
+				combineRegistries(
+					registryBase,
+					await providersResolve({ payload: args.payload, req: args.req, scope: args.scope })
+				)
+		} else if (resolved.providers.collection.enabled) {
+			const scoped = createScopedRegistryResolver({
+				base: registryBase,
+				source: collectionProvidersSource(
+					resolved.providers.collection.slug,
+					resolved.providers.collection.scopeField
+				),
+			})
+			resolveRegistry = scoped.resolver
+			invalidateProviders = scoped.invalidate
+		}
+		if (resolved.providers.collection.enabled) {
+			config.collections = [
+				...(config.collections ?? []),
+				buildProvidersCollection({
+					slug: resolved.providers.collection.slug,
+					access: resolved.providers.collection.access,
+					overrides: resolved.providers.collection.overrides,
+					onChange: () => invalidateProviders(),
+				}),
+			]
+		}
+		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
 		for (const adapter of resolved.adapters) {
-			adapter.register?.(config)
+			adapter.register?.(config, { scoped: resolved.scoped, resolveScope })
 		}
 		if (
 			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function')
@@ -82,6 +121,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			})
 			setRuntime(payload, {
 				registry,
+				resolveRegistry,
+				resolveScope,
+				platformAdapterId: resolved.platformAdapter,
+				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,
@@ -97,9 +140,16 @@ export type {
 	HostnameResolver,
 	PathResolver,
 } from './binding/types'
+export { PLATFORM_SCOPE } from './core/contract'
 export type {
+	AnalyticsAccessOptions,
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
+	PlatformReadAccess,
+	ProvidersCollectionOptions,
+	ProvidersOptions,
+	ProvidersResolve,
+	ScopeResolver,
 } from './core/options'
 export type {
 	AnalyticsFieldsOptions,

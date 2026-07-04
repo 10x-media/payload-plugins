@@ -20,6 +20,12 @@ export interface PosthogConfig {
 	host?: string
 	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
 	maxLookbackDays?: number | null
+	/**
+	 * Event property holding a query's scope (e.g. 'tenant'). Enables scoped queries:
+	 * one platform project captures every scope with this property set, and a scoped
+	 * read filters on it. Both the property name and value are escaped literals.
+	 */
+	scopeProperty?: string
 }
 
 const US_CLOUD = 'https://us.posthog.com'
@@ -65,6 +71,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		batchPageReport: true,
 		rateLimit: { requestsPerMinute: 240, requestsPerHour: 2400 },
 		recommendedTtl: { realtime: 300, aggregate: 3600 },
+		...(config.scopeProperty ? { scopedQueries: true } : {}),
 	}
 
 	return {
@@ -85,6 +92,11 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			]
 			if (q.path) {
 				where.push(`properties.$pathname = ${sqlString(q.path)}`)
+			}
+			if (config.scopeProperty && q.scope !== undefined) {
+				// Bracket property access with escaped literals: neither the configured
+				// property name nor the scope value can break out of the HogQL string.
+				where.push(`properties[${sqlString(config.scopeProperty)}] = ${sqlString(q.scope)}`)
 			}
 			const selectMetrics = exprs.map((expr, i) => `${expr} AS m${i}`)
 

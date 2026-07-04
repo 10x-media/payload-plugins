@@ -12,7 +12,7 @@ const startOfNextUtcDay = (d: Date): Date => {
 }
 
 export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
-	const scope = q.path ?? 'site'
+	const pathKey = q.path ?? 'site'
 	const range = `${startOfUtcDay(q.dateRange.start).toISOString()}_${startOfNextUtcDay(q.dateRange.end).toISOString()}`
 	const filters = (q.filters ?? [])
 		.map((f) => `${f.dimension}${f.operator}${f.value}`)
@@ -22,7 +22,7 @@ export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
 		'analytics',
 		provider,
 		q.hostname ?? '_',
-		scope,
+		pathKey,
 		stable(q.metrics),
 		stable(q.dimensions),
 		range,
@@ -30,5 +30,7 @@ export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
 		filters,
 		String(q.limit ?? '_'),
 		q.order ? `${q.order.metric}:${q.order.direction}` : '_',
+		// Appended only for scoped reads so unscoped keys keep their historical format.
+		...(q.scope !== undefined ? [encodeURIComponent(q.scope)] : []),
 	].join('|')
 }

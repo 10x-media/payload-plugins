@@ -3,6 +3,7 @@ import { resolveHostname, resolvePathCached } from '../binding/resolvePath'
 import type { BindingDoc } from '../binding/types'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
+import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 
@@ -27,6 +28,8 @@ export interface ReadForFieldArgs {
 	timeframe: TimeframePreset
 	adapterId?: string
 	now: Date
+	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
+	scope?: string | null
 }
 
 /**
@@ -51,12 +54,11 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 	if (!binding) {
 		return { status: 'not-bound', adapterId: adapterId ?? '', dateRange, ...empty }
 	}
-	let adapter: AnalyticsAdapter
-	try {
-		adapter = adapterId ? runtime.registry.get(adapterId) : runtime.registry.default()
-	} catch {
+	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
+	if (!ctx.ok) {
 		return { status: 'unavailable', adapterId: adapterId ?? '', dateRange, ...empty }
 	}
+	const adapter: AnalyticsAdapter = ctx.adapter
 	const bindingCtx = { req, locale: req.locale ?? undefined }
 	let path: string | null
 	try {
@@ -95,6 +97,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 		hostname: await resolveHostname(binding, data, bindingCtx),
 		metrics: supportedMetrics,
 		dateRange,
+		scope: ctx.queryScope,
 	})
 	return {
 		status: 'ok',

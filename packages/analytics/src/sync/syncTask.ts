@@ -1,7 +1,7 @@
 import type { PayloadRequest, TaskConfig } from 'payload'
 import type { AnalyticsResult, AnalyticsRow } from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
-import { getRuntime } from '../plugin/runtime'
+import { getRuntime, resolveRegistryFor, resolveScopeFor } from '../plugin/runtime'
 import { METRIC_FIELDS, type SyncMetric } from './collection'
 
 export const SYNC_TASK_SLUG = 'analytics-sync'
@@ -99,7 +99,11 @@ export const syncTask = (
 		}
 		let synced = 0
 		let failed = 0
-		for (const adapter of runtime.registry.all()) {
+		// A job req may lack the request shape an app's scopeResolver expects;
+		// degrade to the install scope rather than failing the whole run.
+		const scope = await resolveScopeFor(runtime, req).catch(() => null)
+		const registry = await resolveRegistryFor(runtime, { payload: req.payload, req, scope })
+		for (const adapter of registry.all()) {
 			if (adapter.id === 'native') {
 				continue
 			}
@@ -115,7 +119,12 @@ export const syncTask = (
 			}
 			let result: AnalyticsResult
 			try {
-				result = await runtime.engine.read(adapter, { metrics, dateRange, granularity: 'day' })
+				result = await runtime.engine.read(adapter, {
+					metrics,
+					dateRange,
+					granularity: 'day',
+					scope: scope ?? undefined,
+				})
 			} catch (err) {
 				failed++
 				req.payload.logger.warn(

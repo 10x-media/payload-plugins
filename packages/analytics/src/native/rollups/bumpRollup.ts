@@ -65,11 +65,14 @@ export async function bumpRollup(
 	for (const [metric, amount] of Object.entries(inc)) {
 		set[metric] = sql`${table[metric]} + ${amount}`
 	}
+	// The conflict target must match the unique index exactly, which includes the
+	// scope column only in scoped installs (mirrored by a scope key on RollupKey).
+	const target = [table.granularity, table.period, table.path, table.dimension, table.dimvalue]
+	if (key.scope !== undefined) {
+		target.push(table.scope)
+	}
 	await db.drizzle
 		.insert(table)
 		.values({ ...key, ...ZERO, ...inc })
-		.onConflictDoUpdate({
-			target: [table.granularity, table.period, table.path, table.dimension, table.dimvalue],
-			set,
-		})
+		.onConflictDoUpdate({ target, set })
 }

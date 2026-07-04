@@ -66,4 +66,20 @@ describe('buildCacheKey', () => {
 		})
 		expect(a).not.toBe(b)
 	})
+	it('keeps the unscoped key format unchanged', () => {
+		expect(buildCacheKey('ga4', base)).toBe(
+			'analytics|ga4|_|/pricing|pageviews,visitors||2026-01-01T00:00:00.000Z_2026-02-01T00:00:00.000Z|_||_|_'
+		)
+	})
+	it('partitions the key by scope', () => {
+		const unscoped = buildCacheKey('ga4', base)
+		const a = buildCacheKey('ga4', { ...base, scope: 'tenant-a' })
+		const b = buildCacheKey('ga4', { ...base, scope: 'tenant-b' })
+		expect(a).not.toBe(unscoped)
+		expect(a).not.toBe(b)
+		expect(a).toBe(buildCacheKey('ga4', { ...base, scope: 'tenant-a' }))
+	})
+	it('encodes scope values so a delimiter cannot forge another key segment', () => {
+		expect(buildCacheKey('ga4', { ...base, scope: 'a|b' }).endsWith('|a%7Cb')).toBe(true)
+	})
 })

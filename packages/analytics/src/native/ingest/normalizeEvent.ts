@@ -29,6 +29,8 @@ export interface StoredEvent {
 	sessionId: string
 	durationMs?: number
 	props?: Record<string, unknown>
+	/** Set only in scoped installs; '' is the null scope. */
+	scope?: string
 }
 
 export interface NormalizeArgs {
@@ -37,6 +39,7 @@ export interface NormalizeArgs {
 	geoResolver: GeoResolver
 	salt: string
 	now: Date
+	scope?: string
 }
 
 export async function normalizeEvent({
@@ -45,6 +48,7 @@ export async function normalizeEvent({
 	geoResolver,
 	salt,
 	now,
+	scope,
 }: NormalizeArgs): Promise<StoredEvent> {
 	const geo = await geoResolver(headers)
 	const ip = (
@@ -71,5 +75,6 @@ export async function normalizeEvent({
 		sessionId: deriveSessionId(visitorHash, hourBucket),
 		durationMs: raw.durationMs,
 		props: raw.props,
+		...(scope !== undefined ? { scope } : {}),
 	}
 }
