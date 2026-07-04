@@ -111,6 +111,7 @@ export {
 	analyticsStat,
 	analyticsStatRow,
 	analyticsTab,
+	analyticsTabsField,
 } from './fields/factories'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'

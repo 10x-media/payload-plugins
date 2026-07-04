@@ -1,4 +1,4 @@
-import type { TabsField, UIField } from 'payload'
+import type { Tab, TabsField, UIField } from 'payload'
 import type { MetricKey } from '../core/contract'
 import type { TimeframePreset } from '../timeframe/presets'
 import { keys } from '../translations/keys'
@@ -15,28 +15,28 @@ interface StatServerProps {
 	adapterId?: string
 }
 
-interface BaseFieldOptions {
+type BaseFieldOptions = {
 	timeframe?: TimeframePreset
 	adapter?: string
 	position?: 'sidebar'
 	name?: string
 }
 
-export interface AnalyticsStatOptions extends BaseFieldOptions {
+export type AnalyticsStatOptions = BaseFieldOptions & {
 	metric: MetricKey
 }
 
-export interface AnalyticsStatRowOptions extends BaseFieldOptions {
+export type AnalyticsStatRowOptions = BaseFieldOptions & {
 	metrics?: MetricKey[]
 }
 
-export interface AnalyticsFieldsOptions {
+export type AnalyticsFieldsOptions = {
 	metrics?: MetricKey[]
 	timeframe?: TimeframePreset
 	adapter?: string
 }
 
-export interface AnalyticsTabOptions {
+export type AnalyticsTabOptions = {
 	metrics?: MetricKey[]
 	timeframe?: TimeframePreset
 	adapter?: string
@@ -87,18 +87,23 @@ export const analyticsFields = (options: AnalyticsFieldsOptions = {}): UIField[]
 		})
 	)
 
-export const analyticsTab = (options: AnalyticsTabOptions = {}): TabsField => ({
-	type: 'tabs',
-	tabs: [
-		{
-			label: labelForKey(keys.tabAnalytics),
-			fields: [
-				analyticsStatRow({
-					metrics: options.metrics,
-					timeframe: options.timeframe,
-					adapter: options.adapter,
-				}),
-			],
-		},
+/**
+ * An unnamed "Analytics" `Tab` to push into your own tabs field's `tabs` array.
+ * Use {@link analyticsTabsField} for a standalone tabs field wrapping this tab.
+ */
+export const analyticsTab = (options: AnalyticsTabOptions = {}): Tab => ({
+	label: labelForKey(keys.tabAnalytics),
+	fields: [
+		analyticsStatRow({
+			metrics: options.metrics,
+			timeframe: options.timeframe,
+			adapter: options.adapter,
+		}),
 	],
+})
+
+/** A ready-made tabs field containing a single {@link analyticsTab}. */
+export const analyticsTabsField = (options: AnalyticsTabOptions = {}): TabsField => ({
+	type: 'tabs',
+	tabs: [analyticsTab(options)],
 })

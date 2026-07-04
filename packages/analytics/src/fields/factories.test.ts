@@ -1,6 +1,12 @@
 import type { TabsField, UIField } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { analyticsFields, analyticsStat, analyticsStatRow, analyticsTab } from './factories'
+import {
+	analyticsFields,
+	analyticsStat,
+	analyticsStatRow,
+	analyticsTab,
+	analyticsTabsField,
+} from './factories'
 
 const fieldComponent = (field: UIField) => {
 	const component = field.admin?.components?.Field
@@ -61,8 +67,27 @@ describe('analyticsFields', () => {
 })
 
 describe('analyticsTab', () => {
-	it('builds a tabs field with one Analytics tab containing a stat row', () => {
-		const field = analyticsTab() as TabsField
+	it('builds a plain tab containing a stat row, usable inside a host tabs field', () => {
+		const tab = analyticsTab()
+		expect('type' in tab).toBe(false)
+		expect(tab.fields).toHaveLength(1)
+		expect((tab.fields[0] as UIField).type).toBe('ui')
+		const host: TabsField = { type: 'tabs', tabs: [tab] }
+		expect(host.tabs).toHaveLength(1)
+	})
+
+	it('forwards metrics, timeframe, and adapter to the stat row', () => {
+		const tab = analyticsTab({ metrics: ['visitors'], timeframe: 'last7days', adapter: 'ga4' })
+		const component = fieldComponent(tab.fields[0] as UIField)
+		expect(component.serverProps?.metrics).toEqual(['visitors'])
+		expect(component.serverProps?.timeframe).toBe('last7days')
+		expect(component.serverProps?.adapterId).toBe('ga4')
+	})
+})
+
+describe('analyticsTabsField', () => {
+	it('builds a tabs field wrapping a single analytics tab', () => {
+		const field = analyticsTabsField()
 		expect(field.type).toBe('tabs')
 		expect(field.tabs).toHaveLength(1)
 		const [tab] = field.tabs

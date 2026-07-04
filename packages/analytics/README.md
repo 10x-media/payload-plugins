@@ -174,14 +174,21 @@ Nothing is persisted - the path is computed at read time and memoized once per r
 Read-only fields you place explicitly on your own collections. Nothing is auto-injected, and nothing lands in the sidebar unless you ask for it. Each field surfaces metrics for the document's bound path through the surfacing engine, and auto-disables when the active adapter cannot supply the requested metric.
 
 ```ts
-import { analyticsStat, analyticsStatRow, analyticsFields, analyticsTab } from '@10x-media/analytics'
+import { analyticsStat, analyticsStatRow, analyticsFields, analyticsTab, analyticsTabsField } from '@10x-media/analytics'
 
 fields: [
   analyticsStat({ metric: 'pageviews' }),                 // a single stat
   analyticsStat({ metric: 'visitors', position: 'sidebar' }), // opt in to the sidebar
   analyticsStatRow({ metrics: ['pageviews', 'visitors', 'avgDuration'] }), // a row of stats
   ...analyticsFields({ metrics: ['pageviews', 'sessions'] }), // several individual fields
-  analyticsTab(),                                         // a ready-made "Analytics" tab
+  analyticsTabsField(),                                   // a standalone tabs field with one "Analytics" tab
+  {
+    type: 'tabs',
+    tabs: [
+      { label: 'Content', fields: [/* your fields */] },
+      analyticsTab(),                                     // an "Analytics" tab inside your own tabs field
+    ],
+  },
 ]
 ```
 
