@@ -88,10 +88,11 @@
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
-		"@payloadcms/ui": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",

@@ -95,8 +95,8 @@
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
-		"shadcn": "^2.4.0",
 		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
 		"@axe-core/playwright": "catalog:",
 		"@payloadcms/db-mongodb": "catalog:",
@@ -115,6 +115,7 @@
 		"playwright": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
+		"shadcn": "^2.4.0",
 		"tsdown": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
