@@ -44,6 +44,55 @@ describe('resolveOptions', () => {
 	})
 })
 
+describe('resolveOptions providers', () => {
+	const adapters = [memoryAdapter()]
+
+	it('defaults to a disabled collection with the default slug and scope field', () => {
+		const p = resolveOptions({ adapters }).providers
+		expect(p.collection).toEqual({
+			enabled: false,
+			slug: 'analytics-providers',
+			scopeField: 'scope',
+		})
+		expect(p.resolve).toBeUndefined()
+	})
+
+	it('enables the collection with defaults when collection is true', () => {
+		const p = resolveOptions({ adapters, providers: { collection: true } }).providers
+		expect(p.collection.enabled).toBe(true)
+		expect(p.collection.slug).toBe('analytics-providers')
+		expect(p.collection.scopeField).toBe('scope')
+	})
+
+	it('keeps the collection disabled when collection is false', () => {
+		const p = resolveOptions({ adapters, providers: { collection: false } }).providers
+		expect(p.collection.enabled).toBe(false)
+	})
+
+	it('carries slug, scopeField, access, and overrides through from an object option', () => {
+		const overrides = (c: import('payload').CollectionConfig) => c
+		const access = { read: () => true }
+		const p = resolveOptions({
+			adapters,
+			providers: {
+				collection: { slug: 'tenant-analytics', scopeField: 'tenant', overrides, access },
+			},
+		}).providers
+		expect(p.collection).toEqual({
+			enabled: true,
+			slug: 'tenant-analytics',
+			scopeField: 'tenant',
+			overrides,
+			access,
+		})
+	})
+
+	it('carries the resolve escape hatch through', () => {
+		const resolve = async () => []
+		expect(resolveOptions({ adapters, providers: { resolve } }).providers.resolve).toBe(resolve)
+	})
+})
+
 describe('resolveOptions scopeResolver', () => {
 	const adapters = [memoryAdapter()]
 	const req = {} as import('payload').PayloadRequest

@@ -1,5 +1,6 @@
-import type { CollectionSlug, PayloadRequest } from 'payload'
+import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
+import { PROVIDERS_SLUG } from '../providers/collection'
 import type { CustomWidgetDef } from '../widgets/customWidget'
 import type { AnalyticsAdapter } from './contract'
 
@@ -7,6 +8,7 @@ const DEFAULT_WARM_CRON = '*/30 * * * *'
 const DEFAULT_SYNC_CRON = '0 */6 * * *'
 const DEFAULT_SYNC_COLLECTION = 'analytics-daily'
 const DEFAULT_SYNC_LOOKBACK = 3
+const DEFAULT_SCOPE_FIELD = 'scope'
 
 /**
  * Maps a request to its analytics boundary (tenant id, site key). Null means the
@@ -17,11 +19,42 @@ export type ScopeResolver = (args: {
 	req: PayloadRequest
 }) => string | null | Promise<string | null>
 
+/**
+ * Escape hatch replacing the provider-collection lookup: return the runtime
+ * adapters for a scope yourself (any store, any shape). Results are layered onto
+ * the static config adapters exactly like collection-resolved ones, but are not
+ * cached; memoize inside the function if lookups are expensive.
+ */
+export type ProvidersResolve = (args: {
+	payload: Payload
+	req?: PayloadRequest
+	scope: string | null
+}) => AnalyticsAdapter[] | Promise<AnalyticsAdapter[]>
+
+export type ProvidersCollectionOptions = {
+	slug?: string
+	/**
+	 * Field matched against the resolved scope when looking up a scope's providers.
+	 * Point it at a tenant plugin's field (e.g. 'tenant') when that plugin manages
+	 * scoping for the collection.
+	 */
+	scopeField?: string
+	overrides?: (collection: CollectionConfig) => CollectionConfig
+	access?: Partial<CollectionConfig['access']>
+}
+
+export type ProvidersOptions = {
+	/** Opt-in admin collection storing runtime provider configurations. */
+	collection?: boolean | ProvidersCollectionOptions
+	resolve?: ProvidersResolve
+}
+
 export type AnalyticsPluginOptions = {
 	disabled?: boolean
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver?: ScopeResolver
+	providers?: ProvidersOptions
 	/**
 	 * Per-collection bindings, keyed by collection slug. With generated types
 	 * augmented, each slug's resolvers receive that collection's typed document.
@@ -55,6 +88,16 @@ export interface ResolvedOptions {
 	adapters: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver: ScopeResolver
+	providers: {
+		collection: {
+			enabled: boolean
+			slug: string
+			scopeField: string
+			overrides?: (collection: CollectionConfig) => CollectionConfig
+			access?: Partial<CollectionConfig['access']>
+		}
+		resolve?: ProvidersResolve
+	}
 	bindings: Record<string, ResolvedBinding>
 	cache: { ttl: { aggregate: number; realtime: number }; warm: { enabled: boolean; cron: string } }
 	widgets: {
@@ -120,6 +163,22 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 			: warmOpt && typeof warmOpt === 'object'
 				? { enabled: true, cron: warmOpt.cron ?? DEFAULT_WARM_CRON }
 				: { enabled: false, cron: DEFAULT_WARM_CRON }
+	const collectionOpt = options.providers?.collection
+	const providers = {
+		collection:
+			collectionOpt === true
+				? { enabled: true, slug: PROVIDERS_SLUG, scopeField: DEFAULT_SCOPE_FIELD }
+				: collectionOpt && typeof collectionOpt === 'object'
+					? {
+							enabled: true,
+							slug: collectionOpt.slug ?? PROVIDERS_SLUG,
+							scopeField: collectionOpt.scopeField ?? DEFAULT_SCOPE_FIELD,
+							overrides: collectionOpt.overrides,
+							access: collectionOpt.access,
+						}
+					: { enabled: false, slug: PROVIDERS_SLUG, scopeField: DEFAULT_SCOPE_FIELD },
+		resolve: options.providers?.resolve,
+	}
 	const syncOpt = options.sync
 	const sync =
 		syncOpt === true
@@ -147,6 +206,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
 		scopeResolver: options.scopeResolver ?? (() => null),
+		providers,
 		bindings: resolveBindings(options.collections),
 		cache: {
 			ttl: {
