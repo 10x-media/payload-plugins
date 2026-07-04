@@ -47,6 +47,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitlePlaceholder]: 'e.g. Daily page views',
 	[keys.widgetTimeframeCustom]: 'Custom range',
 	[keys.widgetFieldRange]: 'Date range',
+	[keys.dateRangePlaceholder]: 'Select date range...',
 	[keys.widgetFieldWindow]: 'Window',
 	[keys.widgetRealtimeLabel]: 'Active now',
 	[keys.widgetRealtimeCaption]: 'active right now',

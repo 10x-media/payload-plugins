@@ -8,7 +8,6 @@ import {
 	useConfig,
 	useForm,
 	useFormFields,
-	useTranslation,
 	withCondition,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
@@ -16,6 +15,8 @@ import type { GroupFieldClientProps } from 'payload'
 import { forwardRef, useCallback, useMemo, useState } from 'react'
 import type { ReactDatePickerCustomHeaderProps } from 'react-datepicker'
 import ReactDatePicker from 'react-datepicker'
+import { keys } from '../../translations/keys'
+import { useTranslation } from '../../translations/useTranslation'
 import { DateRangeStyles } from './styles'
 import type { DateRangeFieldOptions, DateRangePickerAppearance } from './types'
 
@@ -201,6 +202,7 @@ interface RangeInputProps {
 	endDate: Date | null
 	locale: string
 	onClick?: () => void
+	placeholder: string
 	startDate: Date | null
 }
 
@@ -221,7 +223,7 @@ const formatByAppearance = (
 }
 
 const RangeInput = forwardRef<HTMLInputElement, RangeInputProps>(
-	({ appearance, endDate, locale, onClick, startDate }, ref) => {
+	({ appearance, endDate, locale, onClick, placeholder, startDate }, ref) => {
 		const value =
 			startDate || endDate
 				? `${formatByAppearance(startDate, appearance, locale)} → ${formatByAppearance(endDate, appearance, locale) || '...'}`
@@ -231,7 +233,7 @@ const RangeInput = forwardRef<HTMLInputElement, RangeInputProps>(
 			<input
 				onChange={() => {}}
 				onClick={onClick}
-				placeholder="Select date range..."
+				placeholder={placeholder}
 				readOnly
 				ref={ref}
 				value={value}
@@ -253,7 +255,7 @@ const DateRangeFieldComponent = (props: DateRangeFieldComponentProps) => {
 	} = props
 
 	const { config } = useConfig()
-	const { i18n } = useTranslation()
+	const { i18n, t } = useTranslation()
 	const { dispatchFields, setModified } = useForm()
 
 	const locale = i18n.language
@@ -373,6 +375,7 @@ const DateRangeFieldComponent = (props: DateRangeFieldComponentProps) => {
 									appearance={pickerAppearance}
 									endDate={endDate}
 									locale={locale}
+									placeholder={t(keys.dateRangePlaceholder)}
 									startDate={startDate}
 								/>
 							}
