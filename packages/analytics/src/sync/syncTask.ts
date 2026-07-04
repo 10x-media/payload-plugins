@@ -99,7 +99,9 @@ export const syncTask = (
 		}
 		let synced = 0
 		let failed = 0
-		const scope = await resolveScopeFor(runtime, req)
+		// A job req may lack the request shape an app's scopeResolver expects;
+		// degrade to the install scope rather than failing the whole run.
+		const scope = await resolveScopeFor(runtime, req).catch(() => null)
 		const registry = await resolveRegistryFor(runtime, { payload: req.payload, req, scope })
 		for (const adapter of registry.all()) {
 			if (adapter.id === 'native') {
