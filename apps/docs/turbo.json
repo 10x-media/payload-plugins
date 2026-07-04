@@ -1,0 +1,21 @@
+{
+	"$schema": "https://turbo.build/schema.json",
+	"extends": ["//"],
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"inputs": [
+				"app/**",
+				"components/**",
+				"content/**",
+				"lib/**",
+				"next.config.ts",
+				"source.config.ts",
+				"postcss.config.mjs",
+				"package.json",
+				"tsconfig.json"
+			],
+			"outputs": ["out/**", ".next/**", "!.next/cache/**"]
+		}
+	}
+}
