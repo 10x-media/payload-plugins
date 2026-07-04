@@ -1,2 +1,6 @@
+export type {
+	TranslationKey,
+	TranslationKey as JobsTranslationKeys,
+	TranslationsOption,
+} from '../translations'
 export { keys, translations } from '../translations'
-export type { TranslationKey as JobsTranslationKeys } from '../translations/keys'
