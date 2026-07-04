@@ -24,8 +24,8 @@ Each adapter declares an `AnalyticsCapabilities` object: which `metrics` and `di
 
 Every surface is gated by it:
 
-- A [dashboard widget](/docs/analytics/widgets) whose metric or dimension no configured adapter supports is not registered at all.
-- A [display field](/docs/analytics/display-fields) drops unsupported metrics from its request and renders the rest.
+- A [dashboard widget](/analytics/widgets) whose metric or dimension no configured adapter supports is not registered at all.
+- A [display field](/analytics/display-fields) drops unsupported metrics from its request and renders the rest.
 - A custom range that exceeds a provider's `maxLookbackDays` is narrowed to the provider maximum, visibly.
 
 Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `entries`, `exits`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
@@ -76,7 +76,7 @@ Uses the GA4 Data API (`runReport`) through the official SDK, declared as an opt
 pnpm add @google-analytics/data
 ```
 
-Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, conversions, revenue. Durations normalize to milliseconds, bounce rate to a percentage. GA4 bills a token quota, so the adapter recommends a long aggregate TTL (6 hours); [cache warming](/docs/analytics/cache) pairs well with it. Default `maxLookbackDays: 425` (GA4's rolling window).
+Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, conversions, revenue. Durations normalize to milliseconds, bounce rate to a percentage. GA4 bills a token quota, so the adapter recommends a long aggregate TTL (6 hours); [cache warming](/analytics/cache) pairs well with it. Default `maxLookbackDays: 425` (GA4's rolling window).
 
 ## PostHog
 

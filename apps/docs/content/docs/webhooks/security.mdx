@@ -11,7 +11,7 @@ Deliveries POST to whatever URL a subscription specifies, including private and 
 
 - restrict outbound egress from the Payload host at the network layer, or
 - front receivers with an allowlist, or
-- drop admin-managed subscriptions entirely and use only [code subscriptions](/docs/webhooks/subscriptions#code-subscriptions), whose URLs live in your repository and environment.
+- drop admin-managed subscriptions entirely and use only [code subscriptions](/webhooks/subscriptions#code-subscriptions), whose URLs live in your repository and environment.
 
 ## Access defaults
 
@@ -22,10 +22,10 @@ Tighten either with your own access control by overriding the collections throug
 
 ## Secrets
 
-Signing secrets are reveal-once and masked on every read, but stored unencrypted at rest for now. See [Signing](/docs/webhooks/signing). Keep code-subscription secrets in your secret manager, not in the config file.
+Signing secrets are reveal-once and masked on every read, but stored unencrypted at rest for now. See [Signing](/webhooks/signing). Keep code-subscription secrets in your secret manager, not in the config file.
 
 ## Receiver-side checklist
 
-- Verify the signature and enforce a timestamp tolerance ([example](/docs/webhooks/signing#verifying-in-your-receiver)).
+- Verify the signature and enforce a timestamp tolerance ([example](/webhooks/signing#verifying-in-your-receiver)).
 - Treat `data` as untrusted input; it is whatever the document (or your `transform`) contained.
 - Respond quickly and process async. The sender aborts at `timeoutMs` (default 10s) and a slow receiver burns retry attempts.

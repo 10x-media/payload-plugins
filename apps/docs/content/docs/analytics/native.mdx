@@ -30,7 +30,7 @@ interface RawEventInput {
 }
 ```
 
-`type`, `path`, and `hostname` are required; anything else is optional. The server derives the rest at ingest time: device class from the user agent, traffic source from the referrer, geo from [resolvers](/docs/analytics/geo), and a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days). The endpoint responds `202` on success and `400` on an invalid body.
+`type`, `path`, and `hostname` are required; anything else is optional. The server derives the rest at ingest time: device class from the user agent, traffic source from the referrer, geo from [resolvers](/analytics/geo), and a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days). The endpoint responds `202` on success and `400` on an invalid body.
 
 Events are written atomically, via `$inc` on Mongo and `ON CONFLICT DO UPDATE` on Postgres, so concurrent ingestion is safe.
 
@@ -63,7 +63,7 @@ On Postgres the unique index comes from migrations; nothing extra is needed once
 
 ## Geo resolution
 
-The engine resolves country, region, and city per event: platform headers first (Vercel, Cloudflare), MaxMind only when headers do not supply a country. Pass `geoDbPath` for MaxMind or `geoResolver` for a custom pipeline. Details on [Geo](/docs/analytics/geo).
+The engine resolves country, region, and city per event: platform headers first (Vercel, Cloudflare), MaxMind only when headers do not supply a country. Pass `geoDbPath` for MaxMind or `geoResolver` for a custom pipeline. Details on [Geo](/analytics/geo).
 
 ## Retention pruning
 
@@ -73,7 +73,7 @@ Raw events are kept indefinitely unless you opt in to pruning:
 native({ retentionDays: 90 })
 ```
 
-This registers a Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) that deletes raw `analytics-events` and `analytics-seen` rows older than the window. Rollups are untouched, so long-range aggregates survive pruning. Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/docs/jobs/workers), or an external scheduler).
+This registers a Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) that deletes raw `analytics-events` and `analytics-seen` rows older than the window. Rollups are untouched, so long-range aggregates survive pruning. Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler).
 
 ## Options
 

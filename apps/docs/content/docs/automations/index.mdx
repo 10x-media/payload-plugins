@@ -12,8 +12,8 @@ Beta scaffold. The engine is not built yet. Installing the plugin today register
 ## What exists today
 
 - The `automations(options)` factory with `disabled`, `translations`, and `triggers` options.
-- A trigger catalog seam: the plugin runs last (`order: 100`) and resolves `triggers` after sibling plugins have contributed. [Webhooks](/docs/webhooks) pushes a `webhook` trigger slug when both are installed. The resolved list is recorded on `config.custom` under the exported `AUTOMATIONS_CUSTOM_KEY`.
-- The standard subpath exports: `./types`, `./client`, `./i18n`. Translations follow the [shared pattern](/docs/concepts/translations) (namespace `automations:`).
+- A trigger catalog seam: the plugin runs last (`order: 100`) and resolves `triggers` after sibling plugins have contributed. [Webhooks](/webhooks) pushes a `webhook` trigger slug when both are installed. The resolved list is recorded on `config.custom` under the exported `AUTOMATIONS_CUSTOM_KEY`.
+- The standard subpath exports: `./types`, `./client`, `./i18n`. Translations follow the [shared pattern](/concepts/translations) (namespace `automations:`).
 
 ## Install
 
@@ -35,9 +35,9 @@ export default buildConfig({
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `disabled` | `boolean` | `false` | Return the incoming config unchanged. |
-| `translations` | `TranslationsOption` | none | Per-locale string overrides. See [Translations](/docs/concepts/translations). |
+| `translations` | `TranslationsOption` | none | Per-locale string overrides. See [Translations](/concepts/translations). |
 | `triggers` | `string[]` | `[]` | Trigger slugs available to author automations. Sibling plugins append to this before the plugin runs. |
 
 ## Where it is headed
 
-Automations is the consumer end of the [jobs family](/docs/concepts/jobs-family): [Jobs](/docs/jobs) is the runtime and ops layer, [Webhooks](/docs/webhooks) and others contribute triggers, and this plugin turns them into editor-composable automations. Until the engine ships, use those plugins directly.
+Automations is the consumer end of the [jobs family](/concepts/jobs-family): [Jobs](/jobs) is the runtime and ops layer, [Webhooks](/webhooks) and others contribute triggers, and this plugin turns them into editor-composable automations. Until the engine ships, use those plugins directly.

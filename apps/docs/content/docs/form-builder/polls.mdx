@@ -28,7 +28,7 @@ Semantics worth knowing:
 - **Percentages are over respondents** (submissions that answered the field), not all submissions. Multi-select answers increment one bucket per element while counting one respondent, so percentages can exceed 100% summed.
 - **`complete` submissions only by default**; pass `status: 'all'` or `'partial'` to change.
 - **Labels** come from the field's current options, then the submitted snapshot, then the raw value. Buckets follow option order, retired values after, by count.
-- **Bounded**: pages `payload.find` and reduces in JS (identical on Mongo and Postgres). The scan caps at `maxSubmissions` (default 10000) and flags `truncated: true` past it. Long-term durable rollups are the [analytics plugin's](/docs/analytics) territory.
+- **Bounded**: pages `payload.find` and reduces in JS (identical on Mongo and Postgres). The scan caps at `maxSubmissions` (default 10000) and flags `truncated: true` past it. Long-term durable rollups are the [analytics plugin's](/analytics) territory.
 
 `aggregateFormResponses` with no `fields` aggregates every enumerable field (those with options): the survey-summary case.
 
@@ -67,7 +67,7 @@ import { Poll } from '@10x-media/form-builder/react'
 <Poll form={form} resultsField="colour" />
 ```
 
-The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/docs/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/docs/form-builder/spam) caps anonymous repeat voting per identity.
+The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/form-builder/spam) caps anonymous repeat voting per identity.
 
 For an SSR poll, aggregate server-side and choose what to render:
 

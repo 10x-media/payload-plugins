@@ -3,7 +3,7 @@ title: Workers
 description: Run jobs in a standalone process with createWorker and a graceful drain.
 ---
 
-The execution layer is a separate process, not your web server. Your Next.js / Payload server handles HTTP; the worker boots its own Payload instance against the same database and owns the run, schedule, and sweep loops. The one topology without a worker process is [serverless](/docs/jobs/topologies#serverless-vercel).
+The execution layer is a separate process, not your web server. Your Next.js / Payload server handles HTTP; the worker boots its own Payload instance against the same database and owns the run, schedule, and sweep loops. The one topology without a worker process is [serverless](/jobs/topologies#serverless-vercel).
 
 ## The worker entrypoint
 
@@ -48,11 +48,11 @@ Run it with `node --import tsx worker.ts` in development, or compile it and run 
 
 `start()` runs three guarded loops:
 
-1. **Run** (every `runIntervalMs`): claims and runs due jobs, up to `runLimit` per tick, honoring cluster [pause state](/docs/jobs/queue-control) when a `pauseStore` is passed.
+1. **Run** (every `runIntervalMs`): claims and runs due jobs, up to `runLimit` per tick, honoring cluster [pause state](/jobs/queue-control) when a `pauseStore` is passed.
 2. **Maintenance** (every `maintenanceIntervalMs`): renews or acquires the `scheduler` and `sweeper` leases and handles schedules while holding `scheduler`.
 3. **Sweep** (every `sweepIntervalMs`): recovers orphaned jobs while holding `sweeper`.
 
-Every node runs jobs; only lease holders schedule and sweep. See [Reliability](/docs/jobs/reliability).
+Every node runs jobs; only lease holders schedule and sweep. See [Reliability](/jobs/reliability).
 
 ## Graceful drain
 

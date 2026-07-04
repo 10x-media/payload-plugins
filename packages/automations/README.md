@@ -32,10 +32,10 @@ export default buildConfig({
 
 ## Documentation
 
-Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/docs/automations):
+Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/automations):
 
-- [Overview and status](https://docs.10xmedia.de/docs/automations)
-- [Jobs family interop](https://docs.10xmedia.de/docs/concepts/jobs-family)
+- [Overview and status](https://docs.10xmedia.de/automations)
+- [Jobs family interop](https://docs.10xmedia.de/concepts/jobs-family)
 
 ## License
 

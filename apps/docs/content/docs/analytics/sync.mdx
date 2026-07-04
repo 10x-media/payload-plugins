@@ -36,11 +36,11 @@ When enabled, the plugin registers the collection (default slug `analytics-daily
 - **The native engine is excluded**: its data already lives durably in `analytics-rollups`.
 - **Failures are isolated**: one provider failing is logged and does not abort the others.
 
-Reads go through the [surfacing cache](/docs/analytics/cache), so persisted rows can reflect cached values up to the aggregate TTL old. Keep `cache.ttl.aggregate` below your sync interval for the freshest rows.
+Reads go through the [surfacing cache](/analytics/cache), so persisted rows can reflect cached values up to the aggregate TTL old. Keep `cache.ttl.aggregate` below your sync interval for the freshest rows.
 
 ## Running it
 
-Sync is off by default and needs Payload's jobs runner (cron `autoRun`, a [worker](/docs/jobs/workers), or an external scheduler) for the cron to fire. Run it on demand at any time:
+Sync is off by default and needs Payload's jobs runner (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler) for the cron to fire. Run it on demand at any time:
 
 ```ts
 await payload.jobs.queue({ task: 'analytics-sync' })

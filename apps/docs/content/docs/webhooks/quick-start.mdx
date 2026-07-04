@@ -33,7 +33,7 @@ The plugin adds a **Webhooks** group to the admin with two collections: **Subscr
 
 ## Create a subscription
 
-In the admin, create a Subscription: a name, the receiver URL, and which events it listens to (`posts.created`, `posts.updated`, `posts.deleted`). Saving generates a 48-character signing secret and shows it once, on that create response only. Copy it to your receiver now; it is masked forever after. See [Signing](/docs/webhooks/signing).
+In the admin, create a Subscription: a name, the receiver URL, and which events it listens to (`posts.created`, `posts.updated`, `posts.deleted`). Saving generates a 48-character signing secret and shows it once, on that create response only. Copy it to your receiver now; it is masked forever after. See [Signing](/webhooks/signing).
 
 ## Verify
 
@@ -54,4 +54,4 @@ Open **Webhook Deliveries** in the admin: the row shows the event, status (`succ
 
 ## If nothing is delivered
 
-With no job runner configured, `delivery: 'auto'` runs deliveries inline inside the hook, so they should fire immediately. If you set `delivery: 'queue'` (or installed [Jobs](/docs/jobs), which switches auto to queue), deliveries wait as `pending` until a worker or `payload.jobs.run()` processes them. See [Deliveries](/docs/webhooks/deliveries).
+With no job runner configured, `delivery: 'auto'` runs deliveries inline inside the hook, so they should fire immediately. If you set `delivery: 'queue'` (or installed [Jobs](/jobs), which switches auto to queue), deliveries wait as `pending` until a worker or `payload.jobs.run()` processes them. See [Deliveries](/webhooks/deliveries).

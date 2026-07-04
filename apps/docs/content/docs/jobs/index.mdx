@@ -19,16 +19,16 @@ export default buildConfig({
 
 | Layer | What it adds | How to enable |
 |---|---|---|
-| [Dashboard](/docs/jobs/dashboard) | A derived Status column, a queue-health bar, error and log panels on the `payload-jobs` collection. | Always on with `jobs()`. |
-| [Reliability](/docs/jobs/reliability) | Job leases, an orphan sweeper with dead-lettering, leader election, serverless staleness. | `reliability: true` or a tuned object. |
-| [Workers](/docs/jobs/workers) | `createWorker`: a standalone worker process with graceful SIGTERM drain. | Run the worker entrypoint as its own process. |
-| [Queue control](/docs/jobs/queue-control) | Cluster-wide pause/resume plus hardened `queue-run`, `queue-sweep`, and `queue-status` endpoints with access guards. | `queueControl: true` or a tuned object. |
+| [Dashboard](/jobs/dashboard) | A derived Status column, a queue-health bar, error and log panels on the `payload-jobs` collection. | Always on with `jobs()`. |
+| [Reliability](/jobs/reliability) | Job leases, an orphan sweeper with dead-lettering, leader election, serverless staleness. | `reliability: true` or a tuned object. |
+| [Workers](/jobs/workers) | `createWorker`: a standalone worker process with graceful SIGTERM drain. | Run the worker entrypoint as its own process. |
+| [Queue control](/jobs/queue-control) | Cluster-wide pause/resume plus hardened `queue-run`, `queue-sweep`, and `queue-status` endpoints with access guards. | `queueControl: true` or a tuned object. |
 
-[Topology presets](/docs/jobs/topologies) wire reliability and queue control consistently for serverless, single-node, and multi-node deployments.
+[Topology presets](/jobs/topologies) wire reliability and queue control consistently for serverless, single-node, and multi-node deployments.
 
 ## When to use it
 
-Use this plugin when Payload jobs move from "nice to have" to "must not silently break": queued emails, webhook deliveries, imports, scheduled work. It is also the runtime half of the [jobs family](/docs/concepts/jobs-family): [Webhooks](/docs/webhooks) and [Form Builder](/docs/form-builder) detect it and queue their work through it automatically.
+Use this plugin when Payload jobs move from "nice to have" to "must not silently break": queued emails, webhook deliveries, imports, scheduled work. It is also the runtime half of the [jobs family](/concepts/jobs-family): [Webhooks](/webhooks) and [Form Builder](/form-builder) detect it and queue their work through it automatically.
 
 ## Two facts to know up front
 
@@ -37,4 +37,4 @@ Use this plugin when Payload jobs move from "nice to have" to "must not silently
 
 ## Next
 
-Start with the [quick start](/docs/jobs/quick-start), then pick the [topology](/docs/jobs/topologies) that matches your deployment.
+Start with the [quick start](/jobs/quick-start), then pick the [topology](/jobs/topologies) that matches your deployment.

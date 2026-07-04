@@ -38,17 +38,17 @@ export default buildConfig({
 
 ## Documentation
 
-Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/docs/jobs):
+Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/jobs):
 
-- [Overview](https://docs.10xmedia.de/docs/jobs)
-- [Quick start](https://docs.10xmedia.de/docs/jobs/quick-start)
-- [Dashboard](https://docs.10xmedia.de/docs/jobs/dashboard)
-- [Reliability](https://docs.10xmedia.de/docs/jobs/reliability)
-- [Workers](https://docs.10xmedia.de/docs/jobs/workers)
-- [Topologies](https://docs.10xmedia.de/docs/jobs/topologies)
-- [Queue control](https://docs.10xmedia.de/docs/jobs/queue-control)
-- [Testing and local dev](https://docs.10xmedia.de/docs/jobs/testing)
-- [i18n](https://docs.10xmedia.de/docs/jobs/i18n)
+- [Overview](https://docs.10xmedia.de/jobs)
+- [Quick start](https://docs.10xmedia.de/jobs/quick-start)
+- [Dashboard](https://docs.10xmedia.de/jobs/dashboard)
+- [Reliability](https://docs.10xmedia.de/jobs/reliability)
+- [Workers](https://docs.10xmedia.de/jobs/workers)
+- [Topologies](https://docs.10xmedia.de/jobs/topologies)
+- [Queue control](https://docs.10xmedia.de/jobs/queue-control)
+- [Testing and local dev](https://docs.10xmedia.de/jobs/testing)
+- [i18n](https://docs.10xmedia.de/jobs/i18n)
 
 ## License
 

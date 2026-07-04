@@ -34,7 +34,7 @@ formBuilder({
 })
 ```
 
-The `rules` option follows the [opt-in convention](/docs/concepts#the-opt-in-convention): `false` removes a built-in, `true` keeps it, an object adds or replaces one. Cast entries to `ValidationRuleOption` at the registry boundary (the same erased-generics pattern as field types).
+The `rules` option follows the [opt-in convention](/concepts#the-opt-in-convention): `false` removes a built-in, `true` keeps it, an object adds or replaces one. Cast entries to `ValidationRuleOption` at the registry boundary (the same erased-generics pattern as field types).
 
 Useful definition fields:
 
@@ -63,8 +63,8 @@ The schema runs through the same engine, on the server always and isomorphically
 
 ## What gets validated when
 
-- **On blur and change** (client): visible fields, client-safe rules, for feedback. See [Rendering](/docs/form-builder/rendering#progressive-validation).
+- **On blur and change** (client): visible fields, client-safe rules, for feedback. See [Rendering](/form-builder/rendering#progressive-validation).
 - **On step advance** (client, multi-step): the current step's visible fields.
-- **On submit** (server): every visible field, every rule, including cross-field, async, schema, [calculation](/docs/form-builder/calculations) re-compute, [consent](/docs/form-builder/consent), and [file constraints](/docs/form-builder/uploads). Fields hidden by [conditions](/docs/form-builder/conditions) are skipped entirely.
+- **On submit** (server): every visible field, every rule, including cross-field, async, schema, [calculation](/form-builder/calculations) re-compute, [consent](/form-builder/consent), and [file constraints](/form-builder/uploads). Fields hidden by [conditions](/form-builder/conditions) are skipped entirely.
 
 Server-returned field errors are mapped back onto the right fields by the renderer.

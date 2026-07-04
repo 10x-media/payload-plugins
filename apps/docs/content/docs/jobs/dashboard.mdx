@@ -8,7 +8,7 @@ Adding `jobs()` decorates Payload's `payload-jobs` collection in the admin. Ther
 ## What you get
 
 - **A derived Status column.** Payload stores execution state as raw fields (`processing`, `hasError`, `completedAt`, `waitUntil`, `totalTried`). The plugin derives one readable status from them: `queued`, `scheduled`, `retrying`, `running`, `succeeded`, `failed`, or `cancelled`. The same derivation is exported as `deriveJobStatus` for your own code.
-- **A queue-health bar** above the list: per-status counts at a glance, plus a `recovered` count when [reliability](/docs/jobs/reliability) is on. Counts above the cap render as `100+` (configurable via `healthBarCap`).
+- **A queue-health bar** above the list: per-status counts at a glance, plus a `recovered` count when [reliability](/jobs/reliability) is on. Counts above the cap render as `100+` (configurable via `healthBarCap`).
 - **Error and log panels** on the job detail view: the stored `error` rendered readably, and the job `log` as a timeline.
 - **Read-only records.** Execution-state fields are locked and surfaced in the header; inputs are editable only on Create. Jobs remain creatable from the admin, but a finished run cannot be edited into inconsistency. Set `readOnlyRecord: false` to opt out.
 - **Sensible list defaults**: columns `workflowSlug`, `status`, `queue`, `totalTried`, `updatedAt`, and relative-time cells for dates.

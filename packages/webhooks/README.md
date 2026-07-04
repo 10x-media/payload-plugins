@@ -43,15 +43,15 @@ Then create a subscription in the admin (**Webhooks** group), copy its reveal-on
 
 ## Documentation
 
-Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/docs/webhooks):
+Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/webhooks):
 
-- [Overview](https://docs.10xmedia.de/docs/webhooks)
-- [Quick start](https://docs.10xmedia.de/docs/webhooks/quick-start)
-- [Subscriptions](https://docs.10xmedia.de/docs/webhooks/subscriptions)
-- [Deliveries](https://docs.10xmedia.de/docs/webhooks/deliveries)
-- [Signing and secrets](https://docs.10xmedia.de/docs/webhooks/signing)
-- [Security model](https://docs.10xmedia.de/docs/webhooks/security)
-- [i18n](https://docs.10xmedia.de/docs/webhooks/i18n)
+- [Overview](https://docs.10xmedia.de/webhooks)
+- [Quick start](https://docs.10xmedia.de/webhooks/quick-start)
+- [Subscriptions](https://docs.10xmedia.de/webhooks/subscriptions)
+- [Deliveries](https://docs.10xmedia.de/webhooks/deliveries)
+- [Signing and secrets](https://docs.10xmedia.de/webhooks/signing)
+- [Security model](https://docs.10xmedia.de/webhooks/security)
+- [i18n](https://docs.10xmedia.de/webhooks/i18n)
 
 ## License
 
