@@ -33,3 +33,4 @@ export default buildConfig({
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `disabled` | `boolean` | `false` | When `true`, returns the incoming config unchanged. Useful for toggling the plugin per environment. |
+| `translations` | `TranslationsOption` | -- | Per-locale string overrides keyed by the typed keys from `@10x-media/automations/i18n`. Values win over the built-ins key-by-key; unshipped locales are added whole. |
