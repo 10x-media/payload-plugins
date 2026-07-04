@@ -3,6 +3,7 @@ import type { CollectionConfig, Field, PayloadComponent } from 'payload'
 import type { Override } from './plugin/resolve'
 import type { QueueControlOptions } from './queueControl/options'
 import type { ReliabilityOptions } from './reliability/options'
+import type { TranslationsOption } from './translations'
 
 /** Replace the default fields, or transform them (the idiomatic Payload form). */
 export type FieldsOverride = (args: { defaultFields: Field[] }) => Field[]
@@ -54,6 +55,13 @@ export type JobsOptions = {
 export type JobsPluginOptions = JobsOptions & {
 	/** Disable the plugin entirely (incoming config returned untouched). */
 	disabled?: boolean
+	/**
+	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
+	 * translation keys exported from `@10x-media/jobs/i18n`. Values win over the
+	 * built-in locales key-by-key; locales the plugin does not ship are added
+	 * whole. App-level `i18n.translations` still wins over both.
+	 */
+	translations?: TranslationsOption
 	/**
 	 * Reliability layer: stuck-job recovery, a heartbeat lease, and multi-node
 	 * leader election. Off by default; pass `true` for defaults or an object to

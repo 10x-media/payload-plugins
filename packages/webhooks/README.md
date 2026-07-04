@@ -51,6 +51,7 @@ That is the minimum config. The plugin adds two collections to your admin panel:
 | `delivery` | `DeliveryMode \| DeliveryOptions` | `'auto'` | How deliveries are executed. |
 | `subscriptionsCollection` | `{ slug?: string; hidden?: boolean }` | -- | Override the subscriptions collection slug or hide it from the admin panel. |
 | `deliveriesLog` | `{ slug?: string; hidden?: boolean }` | -- | Override the deliveries collection slug or hide it from the admin panel. |
+| `translations` | `TranslationsOption` | -- | Per-locale string overrides keyed by the typed keys from `@10x-media/webhooks/i18n`. Values win over the built-ins key-by-key; unshipped locales are added whole. |
 
 ### `CollectionWebhookConfig`
 

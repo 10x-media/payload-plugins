@@ -1,2 +1,6 @@
+export type {
+	TranslationKey,
+	TranslationKey as FormBuilderTranslationKeys,
+	TranslationsOption,
+} from '../translations'
 export { keys, translations } from '../translations'
-export type { TranslationKey as FormBuilderTranslationKeys } from '../translations/keys'
