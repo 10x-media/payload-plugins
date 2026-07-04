@@ -1,0 +1,91 @@
+---
+title: Actions and events
+description: The post-submit pipeline (email, webhook, custom actions) and the lifecycle event sink.
+---
+
+When a submission is stored, the form's configured action blocks run in order. Actions never fail a submission: each is isolated, and a failure is captured as a failed result and logged, not re-thrown.
+
+## Built-in actions
+
+- **`emailTeam`**: emails one or more addresses via `payload.sendEmail`. Subject and body are [recall templates](/docs/form-builder/recall-prefill) (`New submission from {{name}}`). Configure a Payload email adapter; with none configured it no-ops gracefully.
+- **`confirmation`**: emails the submitter, same templating.
+- **`signedWebhook`**: POSTs the submission as JSON with an HMAC signature header (below).
+
+Editors add action blocks per form in the admin and fill in each block's config fields.
+
+## Custom actions
+
+```ts title="payload.config.ts"
+import { defineAction } from '@10x-media/form-builder'
+import type { TextField } from 'payload'
+
+const slackNotify = defineAction({
+  type: 'slackNotify',
+  label: 'Notify Slack channel',
+  config: [
+    { name: 'webhookUrl', type: 'text', required: true } as TextField,
+    { name: 'message', type: 'text' } as TextField,
+  ],
+  run: async ({ values, config }) => {
+    const body = config.message ?? values.map((v) => `${v.label}: ${v.value}`).join('\n')
+    await fetch(config.webhookUrl as string, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: body }),
+    })
+  },
+})
+
+formBuilder({ actions: { slackNotify, confirmation: false } })
+```
+
+`config` becomes the block's authoring fields in the form editor. `run` receives the form, submission id, `values`, `descriptors`, the stored `config`, `payload`, `req`, `locale`, and a translate helper. The `actions` option follows the [opt-in convention](/docs/concepts#the-opt-in-convention).
+
+## Run model
+
+Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/docs/jobs) installed (see [Jobs family interop](/docs/concepts/jobs-family)). Without a runner, a bounded inline fallback runs them synchronously after the submission row is stored. Either way an action error never fails the submission.
+
+## Signed webhook verification
+
+The `signedWebhook` action attaches:
+
+```
+X-Form-Signature: v1=<hex>
+```
+
+HMAC-SHA256 over the raw JSON body alone (no timestamp prefix; intentionally distinct from the [Webhooks plugin's scheme](/docs/webhooks/signing) so receivers cannot confuse the two). Verify with a constant-time compare:
+
+```ts title="receiver.ts"
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
+function verifyFormSignature(rawBody: string, secret: string, header: string): boolean {
+  const expected = `v1=${createHmac('sha256', secret).update(rawBody).digest('hex')}`
+  const a = Buffer.from(header)
+  const b = Buffer.from(expected)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+```
+
+`signPayload` and `SIGNATURE_HEADER` are exported from the root for manual signing and verification.
+
+## Lifecycle events
+
+The plugin emits typed events through a pluggable sink, a no-op by default. Pass one to the plugin (server events) and to `<Form>` (client events):
+
+```ts
+import type { FormEvent, FormEventSink } from '@10x-media/form-builder/types'
+
+const sink: FormEventSink = { emit: (event) => analytics.track(event.type, event) }
+
+formBuilder({ events: sink })          // server side
+<Form form={form} events={sink} />     {/* client side */}
+```
+
+| Event | Emitter | When |
+|---|---|---|
+| `form.viewed` | client | The form mounts. |
+| `form.started` | client | First field interaction. |
+| `step.viewed` / `step.completed` | client | Multi-step: a step activates / passes validation. |
+| `field.errored` | client | A field receives a validation error. |
+| `form.abandoned` | client | Unmount without a successful submission. |
+| `submission.created` | server | Submission stored and actions dispatched. |

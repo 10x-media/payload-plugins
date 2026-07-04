@@ -1,0 +1,77 @@
+---
+title: Quick start
+description: Install the plugin, author a form in the admin, and render it on your frontend.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/form-builder
+```
+
+## Configure
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { formBuilder } from '@10x-media/form-builder'
+
+export default buildConfig({
+  // ...
+  plugins: [formBuilder()],
+})
+```
+
+This registers three collections under a **Forms** admin group: `forms` (the documents editors author), `form-submissions` (typed, validated responses), and `form-uploads` (backing the file field).
+
+The in-admin condition and flow builders ship their layout in the bundled stylesheet. Import it once in your admin layout:
+
+```ts title="app/(payload)/layout.tsx"
+import '@10x-media/form-builder/styles.css'
+```
+
+## Author a form
+
+In the admin, create a `forms` document: give it a title, then add fields as blocks (a text field `name`, an email field `email`, a textarea `message`). Each field carries its own validation rules, conditions, and advanced settings.
+
+## Render it
+
+Fetch the form document and hand it to the headless renderer:
+
+```tsx title="app/contact/page.tsx"
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { ContactForm } from './ContactForm'
+
+export default async function ContactPage() {
+  const payload = await getPayload({ config })
+  const { docs } = await payload.find({
+    collection: 'forms',
+    where: { title: { equals: 'Contact' } },
+    limit: 1,
+  })
+  return <ContactForm form={docs[0]} />
+}
+```
+
+```tsx title="app/contact/ContactForm.tsx"
+'use client'
+import { Form, type FormDocument } from '@10x-media/form-builder/react'
+import '@10x-media/form-builder/styles.css'
+
+export function ContactForm({ form }: { form: FormDocument }) {
+  return <Form form={form} onSuccess={(id) => console.log('submitted', id)} />
+}
+```
+
+`<Form>` renders the fields with its built-in unstyled renderers, validates progressively, and POSTs to `/api/form-submissions`.
+
+## Verify
+
+Submit the form. The submission appears in **Form Submissions** with a formatted answers view; the server re-validated every value before storing it. Leave a required field empty and submit: the server rejects it and the error lands on the right field.
+
+## Next
+
+- Make it look right: [Styling](/docs/form-builder/styling) (CSS hooks, the shadcn registry, or custom renderers).
+- Add rules and logic: [Validation](/docs/form-builder/validation) and [Conditions](/docs/form-builder/conditions).
+- Do something with submissions: [Actions](/docs/form-builder/actions).
+- A complete working example (multi-step form and poll) lives in the package's `dev/app/(frontend)/` directory in the [repository](https://github.com/10x-media/payload-plugins).

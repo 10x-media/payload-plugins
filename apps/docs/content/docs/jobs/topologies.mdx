@@ -1,0 +1,119 @@
+---
+title: Topologies
+description: Presets and recipes for serverless, single-node, and multi-node deployments.
+---
+
+Three presets wire [reliability](/docs/jobs/reliability) and [queue control](/docs/jobs/queue-control) consistently for the common deployment shapes. Each returns `{ reliability, queueControl }`, so spread it into the plugin options:
+
+```ts title="payload.config.ts"
+import { jobs, serverlessPreset, singleNodePreset, multiNodePreset } from '@10x-media/jobs'
+
+jobs({ ...serverlessPreset({ maxDurationMs: 800_000 }) }) // Vercel
+jobs({ ...singleNodePreset() })                           // one worker container
+jobs({ ...multiNodePreset({ leaderId: process.env.HOSTNAME }) }) // many replicas
+```
+
+An override after the spread replaces the whole group (no deep merge). To tweak one field, spread the group too:
+
+```ts
+jobs({
+  ...multiNodePreset(),
+  reliability: { ...multiNodePreset().reliability, leaderId: 'node-7' },
+})
+```
+
+## Serverless (Vercel)
+
+No long-running worker exists; functions are killed at `maxDuration` with no SIGTERM. `serverlessPreset({ maxDurationMs })` sets `reliability.jobLeaseTtlMs` and `reliability.serverless.maxDurationMs` to that value, and guards the control endpoints with `cronSecretAccess()` (pass `cronSecretEnvVar` if your secret is not in `CRON_SECRET`). You drive runs and sweeps from Vercel Cron.
+
+Generate the cron entries with `vercelCrons()`:
+
+```json title="vercel.json"
+{
+  "crons": [
+    { "path": "/api/payload-jobs/queue-run?allQueues=true", "schedule": "* * * * *" },
+    { "path": "/api/payload-jobs/queue-sweep", "schedule": "* * * * *" }
+  ]
+}
+```
+
+Set `CRON_SECRET` in the Vercel project. Vercel sends it as `Authorization: Bearer ...` on each invocation and `cronSecretAccess` checks exactly that (a logged-in admin also passes, so you can trigger runs from the panel).
+
+Plan limits matter: Hobby crons fire once per day with 300s functions, which is unusable for real processing. Pro gives per-minute crons and 800s functions; that is the practical floor and the preset default. Cap batch size with `?limit=<n>` on the run path so one invocation finishes inside `maxDuration`; the next minute's cron picks up the rest.
+
+## Single-node Docker
+
+One worker container claims and runs every job, so claim races are moot and leader election trivially resolves to the single node. `singleNodePreset()` is reliability and queue control with all defaults.
+
+```yaml title="docker-compose.yml"
+services:
+  web:
+    build: .
+    command: ['node', 'server.js']
+    environment:
+      DATABASE_URI: postgres://postgres:postgres@db:5432/app
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+    depends_on: [db]
+
+  worker:
+    build: .
+    command: ['node', 'dist/worker.js'] # exec form: Node receives SIGTERM
+    environment:
+      DATABASE_URI: postgres://postgres:postgres@db:5432/app
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+    depends_on: [db]
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: postgres
+```
+
+`dist/worker.js` is the compiled [worker entrypoint](/docs/jobs/workers).
+
+## Multi-node Docker / Kubernetes
+
+Many replicas share one database. Every replica runs jobs; only the `scheduler` lease holder handles schedules and only the `sweeper` lease holder sweeps. `multiNodePreset({ leaderId })` is the default wiring; pass a stable per-replica id such as `process.env.HOSTNAME`.
+
+Graceful shutdown is a hard requirement here. The drain requeues in-flight jobs and releases leases, but only if the orchestrator gives it time:
+
+```yaml title="docker-compose.yml"
+services:
+  worker:
+    build: .
+    command: ['node', 'dist/worker.js']
+    # drainTimeoutMs (30s) + pollIntervalMs (0.5s) + 5s buffer, rounded up.
+    stop_grace_period: 40s
+    deploy:
+      replicas: 3
+```
+
+Kubernetes equivalent: exec-form `command` plus `terminationGracePeriodSeconds: 40`.
+
+### Env-designated leader (no election)
+
+To skip leader election entirely, designate one replica as the scheduler by environment and disable scheduling on the rest:
+
+```ts title="payload.config.ts"
+import { autoRunConfig, jobs, multiNodePreset } from '@10x-media/jobs'
+
+const isScheduler = process.env.JOBS_SCHEDULER === '1'
+
+export default buildConfig({
+  jobs: {
+    tasks: [/* ... */],
+    autoRun: autoRunConfig({ disableScheduling: !isScheduler }),
+  },
+  plugins: [jobs({ ...multiNodePreset() })],
+})
+```
+
+This trades automatic failover for zero coordination state. Prefer election (the default) when a replica loss should recover on its own.
+
+## Verifying a deployment
+
+Two checks worth running by hand against a real database:
+
+1. **One elected scheduler.** Start two workers with distinct `leaderId`s, then query `payload-jobs-locks` for `role: scheduler`: exactly one row, whose `owner` is one of the two ids.
+2. **Orphan recovery.** Queue a slow job, `kill -9` the worker that claimed it, and watch the survivor's sweeper requeue it after `jobLeaseTtlMs` (the job reappears with `recoveryAttempts >= 1`). Allow `jobLeaseTtlMs + sweepIntervalMs` before asserting.

@@ -1,0 +1,29 @@
+---
+title: i18n
+description: Override or localize the Analytics admin strings.
+---
+
+Metric names, widget labels, timeframe names, and empty-state messages are typed translations under the `analytics:` namespace. Override or extend them through the `translations` option:
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { keys } from '@10x-media/analytics/i18n'
+
+analytics({
+  adapters: [/* ... */],
+  translations: {
+    en: { [keys.metricPageviews]: 'Views' },
+    de: {
+      [keys.pluginName]: 'Statistiken',
+      [keys.metricPageviews]: 'Seitenaufrufe',
+      [keys.timeframeLast30Days]: 'Letzte 30 Tage',
+    },
+  },
+})
+```
+
+`@10x-media/analytics/i18n` exports `keys` (constants covering metrics, widget labels, breakdowns, timeframes, and field states), the built-in English `translations`, and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile.
+
+Because [display-field labels](/docs/analytics/display-fields#labels) default to these translations, overriding a metric's key here renames it everywhere at once; per-field `label`/`labels` options are the targeted alternative. Widget titles are editor-entered content, not translations; localize those with the [`widgets.localizeText` option](/docs/analytics/widgets#options).
+
+Merge semantics, adding locales, and app-level overrides are shared across plugins: see [Translations](/docs/concepts/translations).

@@ -1,15 +1,19 @@
 ---
-title: automations
-description: No-code automations and a jobs ops dashboard for Payload v3.
+title: Automations
+description: A no-code automation engine for Payload v3. Beta scaffold.
 ---
 
-`@10x-media/automations` adds two things to Payload v3 that the core jobs system leaves to you: an operations dashboard for the jobs queue, and a no-code automation engine that lets non-developers wire up triggers and actions from the admin panel.
+`@10x-media/automations` will let editors compose automations from the admin panel: pick a trigger, set conditions, order a list of actions. Developers register the trigger and action catalog in code; each action runs as a Payload task, so retries, queues, and the audit trail come from the jobs system rather than a parallel runtime.
 
-Developers register a catalog of triggers and actions in code. Editors compose them into automations through Payload-native forms: pick a trigger, set field conditions, order a list of actions. Each action runs as a Payload task, so retries, queues, and the per-step audit trail come from the jobs system rather than a parallel runtime.
+<Callout type="warn">
+Beta scaffold. The engine is not built yet. Installing the plugin today registers translations and records the resolved trigger catalog on the config; it adds no collections, no UI, and runs nothing.
+</Callout>
 
-## Status
+## What exists today
 
-Beta scaffold. The plugin currently returns the Payload config unchanged while the engine is built out in phases (collection schema, trigger families, default catalog, dashboard). The public surface is the `automations(options)` factory plus the `./types`, `./client`, and `./i18n` sub-path exports.
+- The `automations(options)` factory with `disabled`, `translations`, and `triggers` options.
+- A trigger catalog seam: the plugin runs last (`order: 100`) and resolves `triggers` after sibling plugins have contributed. [Webhooks](/docs/webhooks) pushes a `webhook` trigger slug when both are installed. The resolved list is recorded on `config.custom` under the exported `AUTOMATIONS_CUSTOM_KEY`.
+- The standard subpath exports: `./types`, `./client`, `./i18n`. Translations follow the [shared pattern](/docs/concepts/translations) (namespace `automations:`).
 
 ## Install
 
@@ -17,9 +21,7 @@ Beta scaffold. The plugin currently returns the Payload config unchanged while t
 pnpm add @10x-media/automations
 ```
 
-## Usage
-
-```ts
+```ts title="payload.config.ts"
 import { buildConfig } from 'payload'
 import { automations } from '@10x-media/automations'
 
@@ -32,4 +34,10 @@ export default buildConfig({
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `disabled` | `boolean` | `false` | When `true`, returns the incoming config unchanged. Useful for toggling the plugin per environment. |
+| `disabled` | `boolean` | `false` | Return the incoming config unchanged. |
+| `translations` | `TranslationsOption` | none | Per-locale string overrides. See [Translations](/docs/concepts/translations). |
+| `triggers` | `string[]` | `[]` | Trigger slugs available to author automations. Sibling plugins append to this before the plugin runs. |
+
+## Where it is headed
+
+Automations is the consumer end of the [jobs family](/docs/concepts/jobs-family): [Jobs](/docs/jobs) is the runtime and ops layer, [Webhooks](/docs/webhooks) and others contribute triggers, and this plugin turns them into editor-composable automations. Until the engine ships, use those plugins directly.

@@ -1,0 +1,76 @@
+---
+title: Consent
+description: Checkbox consent with compliance defaults and proof stored by reference.
+---
+
+The `consent` field captures affirmative, checkbox-based consent with a compliance baseline built in: unchecked by default, required to submit unless marked optional, and proof stored as a reference to the policy, never as copied policy text.
+
+```ts
+// In a form's fields blocks:
+{
+  blockType: 'consent',
+  name: 'terms',
+  statement: 'I have read and agree to the Privacy Policy',
+  source: 'static',
+  sourceConfig: {
+    label: 'Privacy Policy',
+    url: 'https://example.com/privacy',
+  },
+  optional: false,
+}
+```
+
+Set `optional: true` for marketing opt-ins and similar non-required consent. Keep terms-of-service consent separate and required.
+
+## Sources
+
+The `source` decides how the policy link resolves:
+
+- **`static`** (default): a fixed URL and label from `sourceConfig`. No server step; the renderer reads it directly.
+- **`pageReference`**: resolves the policy URL at display time from a Payload document. Set `relationTo`, `docId`, and optionally `urlField` in `sourceConfig`.
+- **Custom** via `defineConsentSource`:
+
+```ts
+import { defineConsentSource } from '@10x-media/form-builder'
+
+const mySource = defineConsentSource({
+  type: 'mySource',
+  label: 'My policy source',
+  resolve: async ({ config, payload, locale }) => ({
+    links: [{ label: config.label as string, url: config.url as string }],
+  }),
+})
+
+formBuilder({ consentSources: { mySource } })
+```
+
+The `consentSources` option follows the [opt-in convention](/docs/concepts#the-opt-in-convention).
+
+## Proof by reference
+
+At submit, each consent field produces a `ConsentProof` stored on the submission's `consent` array:
+
+```ts
+// { agreed: true, ref: 'https://example.com/privacy', versionRef?: '...', at: '<ISO-8601>' }
+```
+
+`ref` is the policy URL resolved at submit time (not page load), `at` is the submission timestamp. Policy text is never stored, so a policy edit does not silently rewrite past proofs.
+
+### Version capture
+
+Set `captureVersion: true` in `sourceConfig` for sources that support it (`pageReference` today). The proof then records which published version of the policy document the user agreed to, via `resolvePublishedVersionRef`. If drafts/versions are off for that collection, `versionRef` is omitted.
+
+## Rendering
+
+The `consent` renderer ships in `defaultRenderers`: the statement as the label, the unchecked checkbox, and the policy links (opening in a new tab with `rel="noopener noreferrer"`).
+
+For the `pageReference` and custom sources, resolve links server-side before rendering so the visitor sees them without a client round trip:
+
+```ts
+import { resolveConsentLinks } from '@10x-media/form-builder'
+
+const resolved = await resolveConsentLinks(field, { registry, payload, locale: 'en' })
+// Embed resolved.links on the field as `consentLinks` before passing the form to <Form>.
+```
+
+The `static` source needs none of this; the renderer falls back to `sourceConfig` directly.

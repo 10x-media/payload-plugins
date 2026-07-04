@@ -1,0 +1,93 @@
+---
+title: Translations
+description: The typed translations pattern shared by every @10x-media plugin.
+---
+
+Every plugin ships its admin UI strings as typed translations and lets you override or extend them at three levels. The pattern is identical across plugins; only the package name changes.
+
+## Override strings with the `translations` option
+
+Each plugin factory accepts a `translations` option: per-locale string overrides, keyed by the typed keys exported from that plugin's `./i18n` subpath.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { jobs } from '@10x-media/jobs'
+import { keys } from '@10x-media/jobs/i18n'
+
+export default buildConfig({
+  plugins: [
+    jobs({
+      translations: {
+        en: { [keys.pluginName]: 'Background work' },
+        de: { [keys.pluginName]: 'Aufgaben', [keys.statusQueued]: 'Wartend' },
+      },
+    }),
+  ],
+})
+```
+
+The merge is key-by-key:
+
+- A value you provide wins over the plugin's built-in value for that key and locale.
+- Keys you do not touch keep their built-in values.
+- A locale the plugin does not ship (the plugins ship `en`) is added whole.
+- App-level `i18n.translations` in your Payload config still wins over everything, so a project can override any plugin string without touching the plugin call.
+
+A typo'd key is a compile error: `translations` is typed as `Partial<Record<TranslationKey, string>>` per locale, where `TranslationKey` is that plugin's exact key union.
+
+## The `./i18n` subpath
+
+Each plugin's `./i18n` export is a stable public API with the same shape:
+
+```ts
+import {
+  keys,          // typed key constants, e.g. keys.pluginName === 'jobs:pluginName'
+  translations,  // the built-in locales, nested for Payload
+  type TranslationKey,    // union of all key strings
+  type TranslationsOption // the shape of the factory's `translations` option
+} from '@10x-media/jobs/i18n'
+```
+
+Keys are namespaced strings in Payload's `namespace:key` format (`jobs:pluginName`, `analytics:metricPageviews`, `formBuilder:pluginName`, `webhooks:redeliver`, `automations:pluginName`). Always reference them through the `keys` object rather than string literals; the constants are the contract, the literal values are an implementation detail.
+
+Each plugin also aliases its key union under a plugin-specific name (`JobsTranslationKeys`, `AnalyticsTranslationKeys`, and so on) for imports that mix several plugins.
+
+## Adding a locale
+
+To ship a locale a plugin does not include, translate the keys you care about and pass them for that locale. Untranslated keys fall back to Payload's `fallbackLanguage` (default `en`):
+
+```ts
+import { analytics } from '@10x-media/analytics'
+import { keys } from '@10x-media/analytics/i18n'
+
+analytics({
+  adapters: [/* ... */],
+  translations: {
+    fr: {
+      [keys.pluginName]: 'Statistiques',
+      [keys.metricPageviews]: 'Pages vues',
+    },
+  },
+})
+```
+
+## App-level overrides
+
+`i18n.translations` in `buildConfig` is merged last and wins. Plugin translations are nested objects, so target the plugin's namespace:
+
+```ts title="payload.config.ts"
+export default buildConfig({
+  i18n: {
+    translations: {
+      en: { jobs: { pluginName: 'Task queue' } },
+    },
+  },
+  plugins: [jobs({})],
+})
+```
+
+Prefer the plugin's `translations` option for plugin strings; it is typed, while app-level `i18n.translations` is not checked against the plugin's keys.
+
+## Never a dependency on @payloadcms/translations
+
+Plugin translations register through `config.i18n.translations` only. The plugins do not depend on `@payloadcms/translations`, so they cannot conflict with the translation packages your app installs.

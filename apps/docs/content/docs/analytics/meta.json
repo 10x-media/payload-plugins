@@ -1,0 +1,15 @@
+{
+	"title": "Analytics",
+	"pages": [
+		"index",
+		"quick-start",
+		"adapters",
+		"native",
+		"geo",
+		"display-fields",
+		"widgets",
+		"cache",
+		"sync",
+		"i18n"
+	]
+}
