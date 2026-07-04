@@ -143,6 +143,8 @@ analytics({
 
 The resolver returns the document's URL pathname (or `null` for an unsaved document). `pathField` is a fallback used only when the resolver is absent or returns `null`; a binding must define at least one of the two.
 
+`hostname` narrows adapter queries to one site's traffic in multi-domain setups. It takes a static string or a resolver with the same `(doc, ctx) => string | null | Promise<string | null>` signature as `path`; returning `null` (or omitting `hostname`) applies no hostname filter.
+
 ### Computed page paths
 
 The `path` resolver is a plain function with the signature `(doc, ctx) => string | null | Promise<string | null>`. It receives `ctx.req` (a `PayloadRequest`), so it can look up related documents:

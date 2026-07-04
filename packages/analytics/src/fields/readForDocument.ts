@@ -57,9 +57,10 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 	} catch {
 		return { status: 'unavailable', adapterId: adapterId ?? '', dateRange, ...empty }
 	}
+	const bindingCtx = { req, locale: req.locale ?? undefined }
 	let path: string | null
 	try {
-		path = await resolvePathCached(binding, data, { req, locale: req.locale ?? undefined })
+		path = await resolvePathCached(binding, data, bindingCtx)
 	} catch {
 		path = null
 	}
@@ -91,7 +92,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 	}
 	const result = await runtime.engine.read(adapter, {
 		path,
-		hostname: resolveHostname(binding, data),
+		hostname: await resolveHostname(binding, data, bindingCtx),
 		metrics: supportedMetrics,
 		dateRange,
 	})
