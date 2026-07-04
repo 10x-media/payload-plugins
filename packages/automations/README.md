@@ -1,48 +1,41 @@
 # @10x-media/automations
 
-No-code automations engine for Payload.
+A no-code automation engine for Payload v3: editors will compose automations from triggers and actions in the admin panel, with each action running as a Payload task. Beta scaffold; the engine is being built on top of [@10x-media/jobs](https://www.npmjs.com/package/@10x-media/jobs).
 
 [![npm](https://img.shields.io/npm/v/@10x-media/automations?style=flat-square)](https://www.npmjs.com/package/@10x-media/automations)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Beta scaffold: this plugin currently returns the Payload config unchanged. Replace this note and fill in the sections below as you add behavior.
+> Beta scaffold: installing the plugin today registers translations and records the resolved trigger catalog on the config. It adds no collections, no UI, and runs nothing yet.
 
-## Requirements
+## What exists today
 
-- Payload v3 (peer: `payload@^3.82.0`)
-- React 19 (peer)
+- The `automations(options)` factory with `disabled`, `translations`, and `triggers` options.
+- A trigger catalog seam: sibling plugins contribute trigger slugs before the plugin resolves them (`@10x-media/webhooks` pushes `webhook`).
+- Standard subpath exports: `./types`, `./client`, `./i18n`.
 
-## Installation
+## Quick start
 
 ```bash
 pnpm add @10x-media/automations
 ```
 
-## Usage
-
 ```ts
+// payload.config.ts
 import { buildConfig } from 'payload'
 import { automations } from '@10x-media/automations'
 
 export default buildConfig({
-  // ...
-  plugins: [
-    automations({
-      // options
-    }),
-  ],
+  plugins: [automations({})],
 })
 ```
 
-## Options
+## Documentation
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `disabled` | `boolean` | `false` | When `true`, returns the incoming config unchanged. Useful for toggling the plugin per environment. |
-| `translations` | `TranslationsOption` | -- | Per-locale string overrides keyed by the typed keys from `@10x-media/automations/i18n`. Values win over the built-ins key-by-key; unshipped locales are added whole. |
+Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/docs/automations):
 
-<!-- Add new options to this table as you build them. -->
+- [Overview and status](https://docs.10xmedia.de/docs/automations)
+- [Jobs family interop](https://docs.10xmedia.de/docs/concepts/jobs-family)
 
 ## License
 

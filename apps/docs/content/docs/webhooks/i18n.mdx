@@ -1,0 +1,23 @@
+---
+title: i18n
+description: Override or localize the Webhooks admin strings.
+---
+
+Every admin-facing string (collection labels, field labels, delivery statuses, the redeliver button) is a typed translation under the `webhooks:` namespace. Override or extend through the `translations` option:
+
+```ts title="payload.config.ts"
+import { webhooks } from '@10x-media/webhooks'
+import { keys } from '@10x-media/webhooks/i18n'
+
+webhooks({
+  collections: { posts: true },
+  translations: {
+    en: { [keys.fieldSecret]: 'Signing key' },
+    de: { [keys.pluginName]: 'Webhooks', [keys.redeliver]: 'Erneut zustellen' },
+  },
+})
+```
+
+`@10x-media/webhooks/i18n` exports `keys` (constants like `keys.statusPending`, `keys.fieldUrl`), the built-in English `translations`, and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile.
+
+Merge semantics, adding locales, and app-level overrides are shared across plugins: see [Translations](/docs/concepts/translations).

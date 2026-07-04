@@ -1,0 +1,58 @@
+---
+title: Plugin conventions
+description: The factory shape, opt-in convention, and export layout every @10x-media plugin follows.
+---
+
+Every `@10x-media` plugin follows the same shape. Learn it once and each plugin's options read the same way.
+
+## The factory
+
+Each plugin exports one factory, authored with Payload's experimental `definePlugin` helper. The factory takes a typed options object and returns a standard Payload `Plugin`:
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { jobs } from '@10x-media/jobs'
+
+export default buildConfig({
+  plugins: [jobs({})],
+})
+```
+
+`definePlugin` attaches two pieces of metadata to the returned plugin:
+
+- **`slug`**: the package name, for example `@10x-media/jobs`. Payload builds a slug-keyed map of registered plugins, so plugins can detect each other. Webhooks uses this to switch its delivery mode when Jobs is installed, and to push a trigger into Automations. See [Jobs family interop](/docs/concepts/jobs-family).
+- **`order`**: controls when the plugin runs relative to others. Contributors run early (webhooks at `order: 10`), consumers run late (automations at `order: 100`), so contributions are already in place when the consumer reads them.
+
+Every factory accepts `disabled: true`, which returns the incoming config untouched. Use it to switch a plugin off per environment without removing the call.
+
+## The opt-in convention
+
+Optional features follow Payload's own form: `false` or omitted disables, `true` enables with defaults, an object enables and customizes.
+
+```ts
+jobs({
+  reliability: true,                      // defaults
+  queueControl: { queues: ['default', 'emails'] }, // customized
+  // reliability: false,                  // off (same as omitting)
+})
+```
+
+The same convention nests one level down where it fits, for example form-builder's per-type registries: `fields: { number: false, rating: myFieldType }` removes a built-in and adds a custom type in one object.
+
+## Subpath exports
+
+Each package splits its surface into subpath exports so server code, client components, and metadata stay separate:
+
+| Subpath | Contents |
+|---|---|
+| `.` | The plugin factory, options types, and server-side helpers. |
+| `./types` | Types only. Import from here in code that must not pull in runtime. |
+| `./client` | Client components (`'use client'`). Referenced by the admin import map. |
+| `./rsc` | Server components for the admin, where the plugin has them. |
+| `./i18n` | Translation `keys`, the built-in `translations`, and the `TranslationsOption` type. See [Translations](/docs/concepts/translations). |
+
+Some plugins add more: analytics ships `./adapters/*`, `./geo`, and `./testing`; form-builder ships `./react` (the frontend renderer) and `./styles.css`.
+
+## Requirements
+
+All plugins declare the same peers: `payload@^3.82.0`, `react@^19.0.0`, `react-dom@^19.0.0`, and `@payloadcms/ui@^3.82.0`. Node 22.18 or newer. Optional integrations are optional peer dependencies (for example `@google-analytics/data` and `maxmind` in analytics), so you install only what you use.

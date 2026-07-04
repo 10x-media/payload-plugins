@@ -1,4 +1,16 @@
 {
-	"title": "analytics",
-	"pages": ["multi-tenancy"]
+	"title": "Analytics",
+	"pages": [
+		"index",
+		"quick-start",
+		"adapters",
+		"native",
+		"geo",
+		"display-fields",
+		"widgets",
+		"cache",
+		"sync",
+		"multi-tenancy",
+		"i18n"
+	]
 }

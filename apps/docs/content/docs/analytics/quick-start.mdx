@@ -1,0 +1,83 @@
+---
+title: Quick start
+description: Install the plugin, track pageviews with the native engine, and see numbers in the admin.
+---
+
+This walkthrough uses the [native engine](/docs/analytics/native) so nothing external is required. Swap in a [provider adapter](/docs/analytics/adapters) at any point; everything else stays the same.
+
+## Install
+
+```bash
+pnpm add @10x-media/analytics
+```
+
+## Configure
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { analytics, analyticsDefaultWidgets, analyticsStatRow } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export default buildConfig({
+  admin: {
+    // Widgets render on Payload's Modular Dashboard. The app owns the layout;
+    // spread the plugin's defaults into it (or compose your own).
+    dashboard: { defaultLayout: [...analyticsDefaultWidgets()] },
+  },
+  collections: [
+    {
+      slug: 'pages',
+      fields: [
+        { name: 'slug', type: 'text' },
+        analyticsStatRow(), // pageviews, visitors, sessions, avg duration
+      ],
+    },
+  ],
+  plugins: [
+    analytics({
+      adapters: [native()],
+      collections: {
+        // Bind documents to the URL path their analytics were recorded under.
+        pages: { path: (doc) => (doc.slug ? `/${doc.slug}` : null) },
+      },
+    }),
+  ],
+})
+```
+
+Then regenerate the import map so the admin resolves the plugin's server components:
+
+```bash
+payload generate:importmap
+```
+
+## Send events
+
+The native engine registers a public beacon endpoint at `POST /api/analytics/ingest`. Call it from your frontend on navigation:
+
+```ts title="track.ts"
+navigator.sendBeacon(
+  '/api/analytics/ingest',
+  JSON.stringify({
+    type: 'pageview',
+    path: location.pathname,
+    hostname: location.hostname,
+    referrer: document.referrer || undefined,
+  })
+)
+```
+
+`type`, `path`, and `hostname` are required; see [Native engine](/docs/analytics/native#the-ingest-endpoint) for the full event shape.
+
+## Verify
+
+1. Hit a few frontend pages (or POST to the ingest endpoint by hand).
+2. Open the admin dashboard: the trend, metric, and breakdown widgets show the traffic.
+3. Open a `pages` document whose slug matches a tracked path: the stat row shows that document's numbers.
+
+## Where to go next
+
+- Point the plugin at an existing provider instead: [Adapters](/docs/analytics/adapters).
+- Bind more collections and tune the fields: [Display fields](/docs/analytics/display-fields).
+- Configure the dashboard: [Widgets](/docs/analytics/widgets).
+- Production concerns: [geo resolution](/docs/analytics/geo), [caching and warming](/docs/analytics/cache), [retention](/docs/analytics/native#retention-pruning), and the Mongo `ensureIndexes` note in [Native engine](/docs/analytics/native#production-note-mongo).

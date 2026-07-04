@@ -1,0 +1,62 @@
+---
+title: Fields
+description: The core field types, the registry, and defining your own with defineFormField.
+---
+
+Form fields are authored as Payload blocks: one block type per registered field type. A field type is defined once and yields four facets: its admin authoring fields, a typed isomorphic `validate`, a localized `format`, and a value kind that types the value flowing through validation and formatting.
+
+## Core field types
+
+`text`, `textarea`, `email`, `number`, `select`, `checkbox`, `file`, `consent`, and `calculation`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/docs/form-builder/uploads), [Consent](/docs/form-builder/consent), [Calculations](/docs/form-builder/calculations).
+
+## The registry
+
+The `fields` option follows the plugin-wide [opt-in convention](/docs/concepts#the-opt-in-convention): `false` removes a built-in, `true` keeps it, an object adds or replaces a type.
+
+```ts title="payload.config.ts"
+formBuilder({
+  fields: {
+    textarea: false,     // remove a built-in
+    text: true,          // keep (explicitly)
+    rating: myRating,    // add a custom type
+  },
+})
+```
+
+## Defining a field type
+
+```ts title="payload.config.ts"
+import { formBuilder, defineFormField, type FieldTypeOption } from '@10x-media/form-builder'
+
+export default buildConfig({
+  plugins: [
+    formBuilder({
+      fields: {
+        rating: defineFormField<'number'>({
+          type: 'rating',
+          label: 'Star rating',
+          value: 'number',
+          validate: ({ value }) => (value == null || value <= 5 ? true : 'Too high'),
+          format: ({ value }) => `${value ?? 0} / 5`,
+        }) as FieldTypeOption,
+      },
+    }),
+  ],
+})
+```
+
+- **`value`** is the value kind (`'text'`, `'number'`, `'boolean'`, and so on). It drives the `TValue` that `validate` and `format` receive.
+- **`config`** (optional) is a Payload `Field[]` rendered in the add-field drawer, so your type gets admin-authorable settings.
+- **`validate`** runs on the server for every submission, and on the client for UX when the renderer knows the type.
+- **`format`** turns a stored value into display text: the admin answers view, [recall tokens](/docs/form-builder/recall-prefill), and results all use it.
+- **`schema`** (optional) attaches a [Standard Schema](https://standardschema.dev) validator; see [Validation](/docs/form-builder/validation#standard-schema).
+
+Field definitions use precise generics, so cast each registry entry to `FieldTypeOption` at the registry boundary (the erased type the registry stores), exactly as the built-ins do.
+
+To render a custom type on the frontend, register a matching renderer under the same slug: see [Rendering](/docs/form-builder/rendering#renderers).
+
+## Submissions are typed and self-describing
+
+Each submission stores typed values plus a localized descriptor snapshot taken at submit time, all validated server-side. The snapshot means a submission stays readable even after the form's fields change: the admin answers view formats each value with the field type's `format`, falling back to the snapshot when a field has been removed or renamed.
+
+Submissions live in the `form-submissions` collection: anonymous create (public forms must submit), read for logged-in users, update closed.

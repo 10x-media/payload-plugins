@@ -1,0 +1,22 @@
+{
+	"title": "Form Builder",
+	"pages": [
+		"index",
+		"quick-start",
+		"fields",
+		"validation",
+		"conditions",
+		"multi-step",
+		"rendering",
+		"styling",
+		"presentations",
+		"recall-prefill",
+		"calculations",
+		"actions",
+		"consent",
+		"uploads",
+		"polls",
+		"spam",
+		"i18n"
+	]
+}

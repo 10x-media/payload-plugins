@@ -1,0 +1,65 @@
+---
+title: Reliability
+description: Job leases, the orphan sweeper, dead-lettering, and leader election.
+---
+
+A worker that dies mid-job leaves the job marked `processing` forever; Payload core does not recover it. The reliability layer fixes that class of failure. It is off by default:
+
+```ts title="payload.config.ts"
+jobs({ reliability: true }) // defaults
+// or tuned:
+jobs({
+  reliability: {
+    jobLeaseTtlMs: 300_000,
+    sweepIntervalMs: 60_000,
+    maxRecoveries: 3,
+    leaderLeaseTtlMs: 30_000,
+    leaderId: process.env.HOSTNAME,
+  },
+})
+```
+
+<Callout>
+Reliability adds fields to `payload-jobs` and a `payload-jobs-locks` collection. On Postgres, create and run a migration after enabling it.
+</Callout>
+
+## Job leases and the sweeper
+
+Every claimed job carries a lease. The worker heartbeats it while running; if the worker dies, the lease expires after `jobLeaseTtlMs` and the sweeper requeues the job. After `maxRecoveries` requeues the job is dead-lettered instead: marked failed with a recovery note, never retried again, visible in the dashboard.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `jobLeaseTtlMs` | `300000` (5 min) | How long a claim is valid before the sweeper may reclaim it. |
+| `heartbeatIntervalMs` | `jobLeaseTtlMs / 3` | How often a running worker renews its lease. |
+| `sweepIntervalMs` | `60000` | How often the sweeper scans for orphans. |
+| `maxRecoveries` | `3` | Requeues before dead-lettering. Total executions = `maxRecoveries + 1`. |
+
+Size `jobLeaseTtlMs` above your slowest legitimate job, or long-running jobs get "recovered" while still alive.
+
+## Leader election
+
+Under multiple replicas, every node runs jobs, but exactly one should handle schedules and exactly one should sweep. The plugin elects leaders per role (`scheduler`, `sweeper`) through leases in the `payload-jobs-locks` collection. No extra infrastructure: the coordination state lives in your database.
+
+- **Failover is automatic.** If the leader dies, another replica acquires the lease once it expires (`leaderLeaseTtlMs`, default 30s).
+- **Fence tokens prevent zombies.** Each acquisition increments a monotonic token; a revived former leader cannot renew with a stale token, so it cannot act on old authority.
+- **`leaderId`** is the stable identity a node uses when acquiring leases. Pass a per-replica value like `process.env.HOSTNAME`; omit it and the worker generates `hostname:pid` at runtime.
+
+Inspect leadership at runtime with `worker.isLeader('scheduler')`, or query `payload-jobs-locks` directly (one row per role; `owner` names the holder).
+
+## Serverless staleness
+
+Serverless functions are killed at `maxDuration` with no signal, so heartbeats cannot mean anything. Set `serverless.maxDurationMs` and job staleness derives from the platform's hard-kill duration instead of a heartbeat:
+
+```ts
+jobs({ reliability: { jobLeaseTtlMs: 800_000, serverless: { maxDurationMs: 800_000 } } })
+```
+
+The [serverless preset](/docs/jobs/topologies#serverless-vercel) sets both from one value.
+
+## Concurrency control
+
+Set `requireConcurrencyControl: true` to make the plugin throw at startup unless Payload's `jobs.enableConcurrencyControl` is on. Use it as a guardrail in multi-node deployments where app-level mutual exclusion matters. The related helper `withIdempotencyKey` is exported for task code that needs at-most-once semantics over retries.
+
+## Lower-level access
+
+The building blocks are exported for advanced setups and tests: `resolveReliabilityOptions` (normalizes `boolean | ReliabilityOptions` to a fully-defaulted object or `null`), `runSweep` (one sweep pass), `createLeaseStore`, `createJobLeaseStore`, `createLeaderController`, `decideRecovery`, and the constants `JOBS_LOCKS_SLUG` and `LEADER_ROLES`.
