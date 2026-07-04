@@ -48,6 +48,7 @@ export default defineConfig({
 		'exports/i18n': 'src/exports/i18n.ts',
 		'testing/memoryAdapter': 'src/testing/memoryAdapter.ts',
 		'exports/geo': 'src/exports/geo.ts',
+		'exports/next': 'src/exports/next.ts',
 		'exports/rsc': 'src/exports/rsc.ts',
 		'exports/adapters/native': 'src/exports/adapters/native.ts',
 		'exports/adapters/plausible': 'src/exports/adapters/plausible.ts',

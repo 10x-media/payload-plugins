@@ -1,0 +1,128 @@
+---
+title: Multi-tenancy
+description: Per-tenant analytics providers, a shared platform provider, and scoped reads with @10x-media/analytics.
+---
+
+`@10x-media/analytics` is tenancy-agnostic: it has no dependency on any tenant plugin. The integration point is a single concept called **scope**, a string identifying an analytics boundary (a tenant id, a site key). `null` means the whole install, which is the default single-site behavior. This page walks through the full multi-tenant recipe with `@payloadcms/plugin-multi-tenant`, but the same options work for any multi-site setup.
+
+## The moving parts
+
+| Option | What it does |
+|---|---|
+| `scopeResolver` | Maps each request to its scope (e.g. the tenant id). Reads, widget data, and native ingest all resolve through it. |
+| `providers.collection` | Opt-in admin collection where providers are configured at runtime (per scope). |
+| `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
+| `access.platformRead` | Gates cross-scope reads. Defaults to any authenticated admin user. |
+| `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
+| `posthogProxyRewrites` | Next.js rewrites for a first-party PostHog reverse proxy. |
+
+## 1. Resolve the tenant as the scope
+
+Tell the plugin how to find the current tenant. With `plugin-multi-tenant`, its cookie utility is the simplest source:
+
+```ts
+import { getTenantFromCookie } from '@payloadcms/plugin-multi-tenant/utilities'
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+
+analytics({
+  adapters: [
+    native(),
+    posthog({
+      projectId: process.env.POSTHOG_PROJECT_ID ?? '',
+      apiKey: process.env.POSTHOG_API_KEY ?? '',
+      host: 'https://eu.posthog.com',
+      scopeProperty: 'tenant',
+    }),
+  ],
+  platformAdapter: 'posthog',
+  scopeResolver: ({ req }) => {
+    const tenant = getTenantFromCookie(req.headers, req.payload.db.defaultIDType)
+    return tenant === null ? null : String(tenant)
+  },
+  providers: { collection: { scopeField: 'tenant' } },
+})
+```
+
+With a `scopeResolver` configured, the native engine adds an indexed `scope` column to its events and rollups: ingest stamps every event with the resolved scope, and every read filters by the request's scope. Enabling this on an **existing** native install requires a migration for the new column (`pnpm payload migrate:create` in your app).
+
+## 2. Register the provider collection per tenant
+
+`providers.collection` scaffolds an `analytics-providers` collection where providers (Plausible, Umami, GA4, PostHog) are configured from the admin UI. Register it with `plugin-multi-tenant` as a per-tenant global:
+
+```ts
+multiTenantPlugin({
+  collections: {
+    'analytics-providers': { isGlobal: true },
+  },
+})
+```
+
+`isGlobal: true` turns the collection into a per-tenant "global": one document per tenant, and the list view goes straight to the tenant's own document. The tenant plugin adds its `tenant` field and scoped access automatically; `scopeField: 'tenant'` (from step 1) points the plugin's provider lookup at that field, so each tenant's enabled providers resolve for exactly that tenant's scope.
+
+A tenant configuring their own Plausible there gets it layered onto the static config adapters for their scope only. When a runtime provider shares an id with a config adapter (a tenant brings their own PostHog), the tenant's configuration wins for that scope. API keys are stored server-side and always come back masked; the internal adapter factory is the only reader that sees them.
+
+Without a tenant plugin, the same collection works standalone: the hidden `scope` text field binds a document to a scope (empty scope = the whole install), and `access` / `overrides` on `providers.collection` reshape anything.
+
+## 3. Platform analytics through a first-party proxy
+
+The platform (host) project captures events from **all** tenant pages through the app's own domain, which also survives ad blockers. Wire PostHog's recommended reverse proxy with the exported helper:
+
+```ts
+// next.config.ts
+import { posthogProxyRewrites } from '@10x-media/analytics/next'
+
+const nextConfig = {
+  skipTrailingSlashRedirect: true, // PostHog capture endpoints use trailing slashes
+  async rewrites() {
+    return posthogProxyRewrites({ path: '/ph', region: 'eu' })
+  },
+}
+```
+
+Point the snippet at the proxied path and stamp every event with the tenant:
+
+```ts
+posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+  api_host: '/ph',
+  ui_host: 'https://eu.posthog.com',
+})
+posthog.register({ tenant: currentTenantId })
+```
+
+The `scopeProperty: 'tenant'` on the platform adapter (step 1) closes the loop: a tenant admin's dashboard reads through the shared PostHog project, and the adapter filters `properties['tenant']` to their scope. Tenants see their slice; nobody needs per-tenant PostHog credentials.
+
+## 4. Who sees what
+
+- A tenant request resolves its scope, so widgets, document stat fields, and the realtime endpoint read that tenant's data: native reads filter on the scope column, the platform PostHog filters on `scopeProperty`, and the tenant's own collection-configured providers are already tenant-specific.
+- Cross-scope reads are explicit: pass `scope: '*'` to a read (e.g. from a custom platform dashboard widget). They are gated by `access.platformRead`, which defaults to any authenticated admin user; tighten it to your host role:
+
+```ts
+analytics({
+  // ...
+  access: {
+    platformRead: ({ req }) => req.user?.roles?.includes('platform-admin') ?? false,
+  },
+})
+```
+
+- A scoped read through a platform adapter that cannot filter by scope would expose cross-scope data, so it fails closed behind the same `platformRead` gate. Give the platform adapter a `scopeProperty` (or use native) to serve tenants without the gate.
+
+## Custom provider stores
+
+If providers live somewhere other than the collection (an external control plane, a tenants table), replace the lookup entirely:
+
+```ts
+analytics({
+  // ...
+  providers: {
+    resolve: async ({ payload, scope }) => {
+      const config = await loadTenantAnalyticsConfig(payload, scope)
+      return config ? [plausible(config)] : []
+    },
+  },
+})
+```
+
+The result is layered onto the static config adapters exactly like collection documents.

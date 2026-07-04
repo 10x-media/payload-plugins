@@ -52,6 +52,11 @@
 			"types": "./src/exports/geo.ts",
 			"default": "./dist/exports/geo.js"
 		},
+		"./next": {
+			"development": "./src/exports/next.ts",
+			"types": "./src/exports/next.ts",
+			"default": "./dist/exports/next.js"
+		},
 		"./testing": {
 			"development": "./src/testing/memoryAdapter.ts",
 			"types": "./src/testing/memoryAdapter.ts",
@@ -183,6 +188,11 @@
 				"types": "./dist/exports/geo.d.ts",
 				"import": "./dist/exports/geo.js",
 				"default": "./dist/exports/geo.js"
+			},
+			"./next": {
+				"types": "./dist/exports/next.d.ts",
+				"import": "./dist/exports/next.js",
+				"default": "./dist/exports/next.js"
 			},
 			"./testing": {
 				"types": "./dist/testing/memoryAdapter.d.ts",
