@@ -1,7 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
-import { createRegistry } from './core/registry'
+import { createRegistry, staticRegistryResolver } from './core/registry'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
@@ -82,6 +82,8 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			})
 			setRuntime(payload, {
 				registry,
+				resolveRegistry: staticRegistryResolver(registry),
+				resolveScope: async (req) => resolved.scopeResolver({ req }),
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,

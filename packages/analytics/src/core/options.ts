@@ -1,4 +1,4 @@
-import type { CollectionSlug } from 'payload'
+import type { CollectionSlug, PayloadRequest } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import type { CustomWidgetDef } from '../widgets/customWidget'
 import type { AnalyticsAdapter } from './contract'
@@ -8,10 +8,20 @@ const DEFAULT_SYNC_CRON = '0 */6 * * *'
 const DEFAULT_SYNC_COLLECTION = 'analytics-daily'
 const DEFAULT_SYNC_LOOKBACK = 3
 
+/**
+ * Maps a request to its analytics boundary (tenant id, site key). Null means the
+ * whole install, which is the default single-site behavior. With a multi-tenant
+ * plugin, return the request's tenant id here.
+ */
+export type ScopeResolver = (args: {
+	req: PayloadRequest
+}) => string | null | Promise<string | null>
+
 export type AnalyticsPluginOptions = {
 	disabled?: boolean
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
+	scopeResolver?: ScopeResolver
 	/**
 	 * Per-collection bindings, keyed by collection slug. With generated types
 	 * augmented, each slug's resolvers receive that collection's typed document.
@@ -44,6 +54,7 @@ export type AnalyticsPluginOptions = {
 export interface ResolvedOptions {
 	adapters: AnalyticsAdapter[]
 	defaultAdapter?: string
+	scopeResolver: ScopeResolver
 	bindings: Record<string, ResolvedBinding>
 	cache: { ttl: { aggregate: number; realtime: number }; warm: { enabled: boolean; cron: string } }
 	widgets: {
@@ -135,6 +146,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
+		scopeResolver: options.scopeResolver ?? (() => null),
 		bindings: resolveBindings(options.collections),
 		cache: {
 			ttl: {

@@ -57,6 +57,13 @@ export interface AnalyticsQuery {
 	filters?: AnalyticsFilter[]
 	limit?: number
 	order?: { metric: MetricKey; direction: 'asc' | 'desc' }
+	/**
+	 * Analytics boundary this read belongs to (tenant id, site key). Undefined means
+	 * install-wide (the default). Adapters that can filter by scope apply it; others
+	 * ignore it. Always part of the surfacing cache key, so per-scope adapter
+	 * instances sharing an id never share cached results.
+	 */
+	scope?: string
 }
 
 export interface AnalyticsRow {

@@ -44,6 +44,23 @@ describe('resolveOptions', () => {
 	})
 })
 
+describe('resolveOptions scopeResolver', () => {
+	const adapters = [memoryAdapter()]
+	const req = {} as import('payload').PayloadRequest
+
+	it('defaults to resolving null for every request', async () => {
+		const resolved = resolveOptions({ adapters })
+		expect(await resolved.scopeResolver({ req })).toBeNull()
+	})
+
+	it('carries a custom resolver through, sync or async', async () => {
+		const sync = resolveOptions({ adapters, scopeResolver: () => 'tenant-a' })
+		expect(await sync.scopeResolver({ req })).toBe('tenant-a')
+		const async = resolveOptions({ adapters, scopeResolver: async () => 'tenant-b' })
+		expect(await async.scopeResolver({ req })).toBe('tenant-b')
+	})
+})
+
 describe('resolveOptions cache.warm', () => {
 	const adapters = [memoryAdapter()]
 	it('defaults warm to disabled with the default cron when cache.warm is unset', () => {

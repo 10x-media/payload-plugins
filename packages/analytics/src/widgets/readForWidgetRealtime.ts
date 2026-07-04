@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, MetricKey } from '../core/contract'
+import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime } from '../plugin/runtime'
 import { kvCacheStore } from '../surfacing/cacheStore'
 
@@ -24,6 +25,8 @@ export interface ReadForWidgetRealtimeArgs {
 	windowMinutes: number
 	adapterId?: string
 	now: Date
+	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
+	scope?: string | null
 }
 
 const empty = (status: WidgetRealtimeStatus, adapterId: string): WidgetRealtimeResult => ({
@@ -47,12 +50,11 @@ export const readForWidgetRealtime = async (
 	if (!runtime) {
 		return empty('unavailable', adapterId ?? '')
 	}
-	let adapter: AnalyticsAdapter
-	try {
-		adapter = adapterId ? runtime.registry.get(adapterId) : runtime.registry.default()
-	} catch {
+	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
+	if (!ctx.ok) {
 		return empty('unavailable', adapterId ?? '')
 	}
+	const adapter: AnalyticsAdapter = ctx.adapter
 	if (!adapter.isConfigured()) {
 		return empty('not-configured', adapter.id)
 	}
@@ -62,7 +64,8 @@ export const readForWidgetRealtime = async (
 
 	const ttlSeconds = adapter.capabilities.recommendedTtl.realtime || runtime.ttl.realtime
 	const bucket = Math.floor(now.getTime() / 1000 / Math.max(1, ttlSeconds))
-	const key = `rt:${adapter.id}:${metric}:${windowMinutes}:${bucket}`
+	const scopeKey = ctx.queryScope === undefined ? '' : `:${encodeURIComponent(ctx.queryScope)}`
+	const key = `rt:${adapter.id}:${metric}:${windowMinutes}:${bucket}${scopeKey}`
 	const store = kvCacheStore(req.payload.kv)
 	const cached = await store.get<WidgetRealtimeResult>(key)
 	if (cached) {
@@ -70,7 +73,7 @@ export const readForWidgetRealtime = async (
 	}
 
 	const dateRange = { start: new Date(now.getTime() - windowMinutes * 60_000), end: now }
-	const result = await adapter.realtime({ metrics: [metric], dateRange }, {})
+	const result = await adapter.realtime({ metrics: [metric], dateRange, scope: ctx.queryScope }, {})
 	const out: WidgetRealtimeResult = {
 		status: 'ok',
 		adapterId: adapter.id,
