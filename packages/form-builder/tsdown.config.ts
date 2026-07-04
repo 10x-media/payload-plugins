@@ -1,6 +1,6 @@
-import { defineConfig } from 'tsdown'
+import { definePluginBuild } from '@10x-media/tsdown-config/tsdown.shared'
 
-export default defineConfig({
+export default definePluginBuild({
 	entry: {
 		index: 'src/index.ts',
 		'exports/types': 'src/exports/types.ts',
@@ -9,10 +9,4 @@ export default defineConfig({
 		'exports/rsc': 'src/exports/rsc.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 	},
-	format: 'esm',
-	dts: true,
-	clean: true,
-	treeshake: true,
-	sourcemap: true,
-	fixedExtension: false,
 })
