@@ -99,6 +99,28 @@ describeForDb('analytics stat field render', { dbs: ['mongo'] }, (db) => {
 		warn.mockRestore()
 	})
 
+	it('renders label overrides in place of translated metric names', async () => {
+		await ingest(booted, '/labelled')
+		const element = await AnalyticsStatField({
+			req: { payload: booted.payload, locale: undefined } as unknown as PayloadRequest,
+			data: { slug: '/labelled' },
+			collectionSlug: 'pages',
+			i18n: i18nStub,
+			metrics: ['pageviews', 'visitors'],
+			timeframe: 'last30days',
+			variant: 'row',
+			labels: {
+				pageviews: 'Views',
+				visitors: ({ t }) =>
+					`${(t as unknown as (key: string) => string)('analytics:metricVisitors')}!`,
+			},
+		})
+		const text = flatten(element)
+		expect(text).toContain('Views')
+		expect(text).not.toContain('analytics:metricPageviews')
+		expect(text).toContain('analytics:metricVisitors!')
+	})
+
 	it('renders the unavailable state only when no metric is supported', async () => {
 		const element = await AnalyticsStatField({
 			req: { payload: booted.payload, locale: undefined } as unknown as PayloadRequest,

@@ -107,9 +107,7 @@ describeForDb('analytics readForField', { dbs: ['mongo'] }, (db) => {
 		expect(result.droppedMetrics).toEqual(['bounceRate', 'scrollDepth'])
 		expect(result.metrics.pageviews).toBe(2)
 		expect(warn).toHaveBeenCalledTimes(1)
-		expect(warn).toHaveBeenCalledWith(
-			expect.stringMatching(/native.*bounceRate, scrollDepth/s)
-		)
+		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/native.*bounceRate, scrollDepth/s))
 		warn.mockRestore()
 	})
 

@@ -1,4 +1,4 @@
-import type { PayloadRequest } from 'payload'
+import type { LabelFunction, PayloadRequest } from 'payload'
 import type { CSSProperties } from 'react'
 import type { BindingDoc } from '../binding/types'
 import type { MetricKey } from '../core/contract'
@@ -6,18 +6,38 @@ import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
+import type { AnalyticsMetricLabel, AnalyticsMetricLabels } from './factories'
 import { formatMetricValue } from './format'
 import { type FieldReadStatus, readForField } from './readForDocument'
+
+type StatFieldI18n = { t: unknown; language?: string }
 
 interface AnalyticsStatFieldProps {
 	req: PayloadRequest
 	data: BindingDoc
 	collectionSlug: string
-	i18n: { t: unknown; language?: string }
+	i18n: StatFieldI18n
 	metrics: MetricKey[]
 	timeframe: TimeframePreset
 	variant: 'stat' | 'row'
 	adapterId?: string
+	labels?: AnalyticsMetricLabels
+}
+
+const resolveMetricLabel = (
+	override: AnalyticsMetricLabel | undefined,
+	i18n: StatFieldI18n,
+	fallback: () => string
+): string => {
+	if (typeof override === 'function') {
+		return override({ i18n, t: i18n.t } as Parameters<LabelFunction>[0])
+	}
+	if (typeof override === 'string') return override
+	if (override) {
+		const language = i18n.language ?? 'en'
+		return override[language] ?? override.en ?? fallback()
+	}
+	return fallback()
 }
 
 const STATE_KEYS: Record<Exclude<FieldReadStatus, 'ok'>, TranslationKey> = {
@@ -44,7 +64,7 @@ const captionStyle: CSSProperties = { fontSize: '0.75rem', opacity: 0.5, width: 
  * static markup. Interactivity (timeframe picker, refresh) is intentionally deferred.
  */
 export const AnalyticsStatField = async (props: AnalyticsStatFieldProps) => {
-	const { req, data, collectionSlug, i18n, metrics, timeframe, adapterId } = props
+	const { req, data, collectionSlug, i18n, metrics, timeframe, adapterId, labels } = props
 	const t = asTranslate(i18n.t)
 	const locale = i18n.language ?? 'en-US'
 
@@ -70,7 +90,9 @@ export const AnalyticsStatField = async (props: AnalyticsStatFieldProps) => {
 		<div className="field-type" style={wrapStyle}>
 			{result.supportedMetrics.map((metric) => (
 				<div key={metric} style={cardStyle}>
-					<span style={labelStyle}>{t(METRIC_KEYS[metric])}</span>
+					<span style={labelStyle}>
+						{resolveMetricLabel(labels?.[metric], i18n, () => t(METRIC_KEYS[metric]))}
+					</span>
 					<span style={valueStyle}>
 						{formatMetricValue(metric, result.metrics[metric] ?? 0, locale)}
 					</span>

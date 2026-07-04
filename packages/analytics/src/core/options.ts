@@ -18,7 +18,18 @@ export type AnalyticsPluginOptions = {
 	 */
 	collections?: { [TSlug in CollectionSlug]?: AnalyticsBinding<TSlug> }
 	cache?: { ttl?: { aggregate?: number; realtime?: number }; warm?: boolean | { cron?: string } }
-	widgets?: boolean | { disabled?: string[]; register?: CustomWidgetDef[] }
+	widgets?:
+		| boolean
+		| {
+				disabled?: string[]
+				register?: CustomWidgetDef[]
+				/**
+				 * Marks the free-text widget config fields (each widget's Title) as
+				 * `localized`. Off by default; takes effect only when the Payload config
+				 * enables localization (Payload strips the flag otherwise).
+				 */
+				localizeText?: boolean
+		  }
 	/**
 	 * Opt-in sync tier: a cron job that persists each provider's daily metrics into a
 	 * queryable collection. Reads go through the surfacing cache, so persisted rows reflect
@@ -35,7 +46,12 @@ export interface ResolvedOptions {
 	defaultAdapter?: string
 	bindings: Record<string, ResolvedBinding>
 	cache: { ttl: { aggregate: number; realtime: number }; warm: { enabled: boolean; cron: string } }
-	widgets: { enabled: boolean; disabled: string[]; register: CustomWidgetDef[] }
+	widgets: {
+		enabled: boolean
+		disabled: string[]
+		register: CustomWidgetDef[]
+		localizeText: boolean
+	}
 	sync: {
 		enabled: boolean
 		collectionSlug: string
@@ -67,13 +83,24 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 	}
 	const widgets =
 		options.widgets === false
-			? { enabled: false, disabled: [] as string[], register: [] as CustomWidgetDef[] }
+			? {
+					enabled: false,
+					disabled: [] as string[],
+					register: [] as CustomWidgetDef[],
+					localizeText: false,
+				}
 			: options.widgets === undefined || options.widgets === true
-				? { enabled: true, disabled: [] as string[], register: [] as CustomWidgetDef[] }
+				? {
+						enabled: true,
+						disabled: [] as string[],
+						register: [] as CustomWidgetDef[],
+						localizeText: false,
+					}
 				: {
 						enabled: true,
 						disabled: options.widgets.disabled ?? [],
 						register: options.widgets.register ?? [],
+						localizeText: options.widgets.localizeText ?? false,
 					}
 	const warmOpt = options.cache?.warm
 	const warm =
