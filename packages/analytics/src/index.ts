@@ -45,6 +45,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				multiProvider: registry.isMultiProvider(),
 				disabled: resolved.widgets.disabled,
 				register: resolved.widgets.register,
+				localizeText: resolved.widgets.localizeText,
 			})
 		}
 		if (resolved.cache.warm.enabled) {
@@ -102,6 +103,8 @@ export type {
 } from './core/options'
 export type {
 	AnalyticsFieldsOptions,
+	AnalyticsMetricLabel,
+	AnalyticsMetricLabels,
 	AnalyticsStatOptions,
 	AnalyticsStatRowOptions,
 	AnalyticsTabOptions,
@@ -111,6 +114,7 @@ export {
 	analyticsStat,
 	analyticsStatRow,
 	analyticsTab,
+	analyticsTabsField,
 } from './fields/factories'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'

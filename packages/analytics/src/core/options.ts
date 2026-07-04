@@ -1,3 +1,4 @@
+import type { CollectionSlug } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import type { TranslationsOption } from '../translations'
 import type { CustomWidgetDef } from '../widgets/customWidget'
@@ -19,9 +20,24 @@ export type AnalyticsPluginOptions = {
 	translations?: TranslationsOption
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
-	collections?: Record<string, AnalyticsBinding>
+	/**
+	 * Per-collection bindings, keyed by collection slug. With generated types
+	 * augmented, each slug's resolvers receive that collection's typed document.
+	 */
+	collections?: { [TSlug in CollectionSlug]?: AnalyticsBinding<TSlug> }
 	cache?: { ttl?: { aggregate?: number; realtime?: number }; warm?: boolean | { cron?: string } }
-	widgets?: boolean | { disabled?: string[]; register?: CustomWidgetDef[] }
+	widgets?:
+		| boolean
+		| {
+				disabled?: string[]
+				register?: CustomWidgetDef[]
+				/**
+				 * Marks the free-text widget config fields (each widget's Title) as
+				 * `localized`. Off by default; takes effect only when the Payload config
+				 * enables localization (Payload strips the flag otherwise).
+				 */
+				localizeText?: boolean
+		  }
 	/**
 	 * Opt-in sync tier: a cron job that persists each provider's daily metrics into a
 	 * queryable collection. Reads go through the surfacing cache, so persisted rows reflect
@@ -30,7 +46,7 @@ export type AnalyticsPluginOptions = {
 	 */
 	sync?:
 		| boolean
-		| { collectionSlug?: string; cron?: string; lookbackDays?: number; adapters?: string[] }
+		| { collectionSlug?: CollectionSlug; cron?: string; lookbackDays?: number; adapters?: string[] }
 }
 
 export interface ResolvedOptions {
@@ -38,7 +54,12 @@ export interface ResolvedOptions {
 	defaultAdapter?: string
 	bindings: Record<string, ResolvedBinding>
 	cache: { ttl: { aggregate: number; realtime: number }; warm: { enabled: boolean; cron: string } }
-	widgets: { enabled: boolean; disabled: string[]; register: CustomWidgetDef[] }
+	widgets: {
+		enabled: boolean
+		disabled: string[]
+		register: CustomWidgetDef[]
+		localizeText: boolean
+	}
 	sync: {
 		enabled: boolean
 		collectionSlug: string
@@ -53,10 +74,13 @@ const resolveBindings = (
 ): Record<string, ResolvedBinding> => {
 	const out: Record<string, ResolvedBinding> = {}
 	for (const [slug, binding] of Object.entries(collections ?? {})) {
+		if (!binding) continue
 		if (!binding.path && !binding.pathField) {
 			throw new Error(`analytics: binding for "${slug}" needs a path resolver or a pathField`)
 		}
-		out[slug] = binding
+		// Erases the per-slug doc generic; safe because the runtime only ever hands
+		// a binding documents from its own collection.
+		out[slug] = binding as ResolvedBinding
 	}
 	return out
 }
@@ -67,13 +91,24 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 	}
 	const widgets =
 		options.widgets === false
-			? { enabled: false, disabled: [] as string[], register: [] as CustomWidgetDef[] }
+			? {
+					enabled: false,
+					disabled: [] as string[],
+					register: [] as CustomWidgetDef[],
+					localizeText: false,
+				}
 			: options.widgets === undefined || options.widgets === true
-				? { enabled: true, disabled: [] as string[], register: [] as CustomWidgetDef[] }
+				? {
+						enabled: true,
+						disabled: [] as string[],
+						register: [] as CustomWidgetDef[],
+						localizeText: false,
+					}
 				: {
 						enabled: true,
 						disabled: options.widgets.disabled ?? [],
 						register: options.widgets.register ?? [],
+						localizeText: options.widgets.localizeText ?? false,
 					}
 	const warmOpt = options.cache?.warm
 	const warm =

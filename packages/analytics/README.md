@@ -143,6 +143,10 @@ analytics({
 
 The resolver returns the document's URL pathname (or `null` for an unsaved document). `pathField` is a fallback used only when the resolver is absent or returns `null`; a binding must define at least one of the two.
 
+Bindings are typed over your project's `CollectionSlug`: once `payload generate:types` has run, the `collections` keys are checked against your real slugs and a resolver written inline under `collections.posts` receives the generated `Post` document type. Before generation (or in a project without generated types) `doc` degrades to `Record<string, unknown>`.
+
+`hostname` narrows adapter queries to one site's traffic in multi-domain setups. It takes a static string or a resolver with the same `(doc, ctx) => string | null | Promise<string | null>` signature as `path`; returning `null` (or omitting `hostname`) applies no hostname filter.
+
 ### Computed page paths
 
 The `path` resolver is a plain function with the signature `(doc, ctx) => string | null | Promise<string | null>`. It receives `ctx.req` (a `PayloadRequest`), so it can look up related documents:
@@ -171,21 +175,28 @@ Nothing is persisted - the path is computed at read time and memoized once per r
 
 ## Portable display fields
 
-Read-only fields you place explicitly on your own collections. Nothing is auto-injected, and nothing lands in the sidebar unless you ask for it. Each field surfaces metrics for the document's bound path through the surfacing engine, and auto-disables when the active adapter cannot supply the requested metric.
+Read-only fields you place explicitly on your own collections. Nothing is auto-injected, and nothing lands in the sidebar unless you ask for it. Each field surfaces metrics for the document's bound path through the surfacing engine; a requested metric the active adapter cannot supply is dropped from the render (with a server-side warning naming it), and the field disables only when no requested metric survives.
 
 ```ts
-import { analyticsStat, analyticsStatRow, analyticsFields, analyticsTab } from '@10x-media/analytics'
+import { analyticsStat, analyticsStatRow, analyticsFields, analyticsTab, analyticsTabsField } from '@10x-media/analytics'
 
 fields: [
   analyticsStat({ metric: 'pageviews' }),                 // a single stat
   analyticsStat({ metric: 'visitors', position: 'sidebar' }), // opt in to the sidebar
   analyticsStatRow({ metrics: ['pageviews', 'visitors', 'avgDuration'] }), // a row of stats
   ...analyticsFields({ metrics: ['pageviews', 'sessions'] }), // several individual fields
-  analyticsTab(),                                         // a ready-made "Analytics" tab
+  analyticsTabsField(),                                   // a standalone tabs field with one "Analytics" tab
+  {
+    type: 'tabs',
+    tabs: [
+      { label: 'Content', fields: [/* your fields */] },
+      analyticsTab(),                                     // an "Analytics" tab inside your own tabs field
+    ],
+  },
 ]
 ```
 
-Every factory accepts an optional `timeframe` (a relative preset: `today`, `last7days`, `last30days`, `last90days`, `thisMonth`, `thisYear`; default `last30days`) and `adapter` (an adapter id, when more than one is configured). The native engine backs `pageviews`, `visitors`, `sessions`, `events`, and `avgDuration`; fields requesting anything else render a muted "not available" state until a provider that supports it is configured.
+Every factory accepts an optional `timeframe` (a relative preset: `today`, `last7days`, `last30days`, `last90days`, `thisMonth`, `thisYear`; default `last30days`) and `adapter` (an adapter id, when more than one is configured). Labels are overridable everywhere they default to a translation: `analyticsStat` takes `label`, the row/fields/tab factories take per-metric `labels`, and `analyticsTab` / `analyticsTabsField` take `label` and `description` for the tab itself. Each override accepts a plain string, a locale-to-label map, or a Payload label function. The native engine backs `pageviews`, `visitors`, `sessions`, `events`, and `avgDuration`; a metric outside the active adapter's capabilities is dropped from the render and logged, and a field whose every metric is unsupported renders a muted "not available" state until a provider that supports one is configured.
 
 The display components are server components; add `@10x-media/analytics/rsc` to your Payload import map (run `payload generate:importmap`) so the admin can resolve them.
 
@@ -193,7 +204,7 @@ The display components are server components; add `@10x-media/analytics/rsc` to 
 
 The plugin registers capability-filtered widgets into `admin.dashboard.widgets`. A widget that requires a metric no configured adapter supports is not registered, so dead surfaces never appear.
 
-Widgets are enabled by default. Disable them entirely with `widgets: false`, or drop specific slugs with `widgets: { disabled: ['analytics-metric'] }`.
+Widgets are enabled by default. Disable them entirely with `widgets: false`, or drop specific slugs with `widgets: { disabled: ['analytics-metric'] }`. In a project with admin localization enabled, `widgets: { localizeText: true }` marks the free-text widget config fields (each widget's Title) as `localized`, so a title can be entered per locale; the flag is off by default and is a no-op without localization configured.
 
 The widgets that ship today: a **metric** widget (a single headline number), a **trend** widget (a gradient area chart of one metric over time, with timeframe-aware axis labels [weekdays for a 7-day range, months for a year] and a hover tooltip), four **breakdown** widgets that rank one metric by a dimension as a filled bar list (**Top pages**, **Top sources**, **Devices**, **Countries**), and a **realtime** widget that shows a live "active now" count (active visitors or pageviews in the last few minutes) with a per-minute sparkline. The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoint every 15 seconds, so the number updates without reloading the dashboard. It is native-backed and registers only when a realtime-capable adapter is configured; external providers can implement realtime later through the same capability gate. Each widget is configurable per instance: an editable title (a sensible default shows as the field's placeholder), a metric, a relative timeframe (today, last 7 days, last 30 days, last 90 days, this month, this year, last year, or all time), and (when more than one adapter is configured) a data source. A widget whose dimension no configured adapter supports is not registered, so a provider that does not report devices simply has no Devices widget.
 

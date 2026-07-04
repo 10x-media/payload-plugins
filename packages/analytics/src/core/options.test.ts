@@ -19,6 +19,20 @@ describe('resolveOptions widgets.register', () => {
 	})
 })
 
+describe('resolveOptions widgets.localizeText', () => {
+	const adapters = [memoryAdapter()]
+	it('defaults localizeText to false for boolean and object forms', () => {
+		expect(resolveOptions({ adapters }).widgets.localizeText).toBe(false)
+		expect(resolveOptions({ adapters, widgets: true }).widgets.localizeText).toBe(false)
+		expect(resolveOptions({ adapters, widgets: {} }).widgets.localizeText).toBe(false)
+	})
+	it('carries localizeText through from an object option', () => {
+		expect(resolveOptions({ adapters, widgets: { localizeText: true } }).widgets.localizeText).toBe(
+			true
+		)
+	})
+})
+
 describe('resolveOptions', () => {
 	it('fills cache TTL defaults', () => {
 		const r = resolveOptions({ adapters: [memoryAdapter()] })
