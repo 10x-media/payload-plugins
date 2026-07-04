@@ -171,7 +171,7 @@ Nothing is persisted - the path is computed at read time and memoized once per r
 
 ## Portable display fields
 
-Read-only fields you place explicitly on your own collections. Nothing is auto-injected, and nothing lands in the sidebar unless you ask for it. Each field surfaces metrics for the document's bound path through the surfacing engine, and auto-disables when the active adapter cannot supply the requested metric.
+Read-only fields you place explicitly on your own collections. Nothing is auto-injected, and nothing lands in the sidebar unless you ask for it. Each field surfaces metrics for the document's bound path through the surfacing engine; a requested metric the active adapter cannot supply is dropped from the render (with a server-side warning naming it), and the field disables only when no requested metric survives.
 
 ```ts
 import { analyticsStat, analyticsStatRow, analyticsFields, analyticsTab, analyticsTabsField } from '@10x-media/analytics'
@@ -192,7 +192,7 @@ fields: [
 ]
 ```
 
-Every factory accepts an optional `timeframe` (a relative preset: `today`, `last7days`, `last30days`, `last90days`, `thisMonth`, `thisYear`; default `last30days`) and `adapter` (an adapter id, when more than one is configured). The native engine backs `pageviews`, `visitors`, `sessions`, `events`, and `avgDuration`; fields requesting anything else render a muted "not available" state until a provider that supports it is configured.
+Every factory accepts an optional `timeframe` (a relative preset: `today`, `last7days`, `last30days`, `last90days`, `thisMonth`, `thisYear`; default `last30days`) and `adapter` (an adapter id, when more than one is configured). The native engine backs `pageviews`, `visitors`, `sessions`, `events`, and `avgDuration`; a metric outside the active adapter's capabilities is dropped from the render and logged, and a field whose every metric is unsupported renders a muted "not available" state until a provider that supports one is configured.
 
 The display components are server components; add `@10x-media/analytics/rsc` to your Payload import map (run `payload generate:importmap`) so the admin can resolve them.
 

@@ -68,7 +68,7 @@ export const AnalyticsStatField = async (props: AnalyticsStatFieldProps) => {
 
 	return (
 		<div className="field-type" style={wrapStyle}>
-			{metrics.map((metric) => (
+			{result.supportedMetrics.map((metric) => (
 				<div key={metric} style={cardStyle}>
 					<span style={labelStyle}>{t(METRIC_KEYS[metric])}</span>
 					<span style={valueStyle}>

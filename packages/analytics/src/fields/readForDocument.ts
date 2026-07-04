@@ -13,6 +13,10 @@ export interface FieldReadResult {
 	adapterId: string
 	dateRange: DateRange
 	metrics: Partial<Record<MetricKey, number>>
+	/** Requested metrics the adapter supports, in request order; the set actually read. */
+	supportedMetrics: MetricKey[]
+	/** Requested metrics the adapter cannot serve, dropped from the read. */
+	droppedMetrics: MetricKey[]
 }
 
 export interface ReadForFieldArgs {
@@ -30,23 +34,28 @@ export interface ReadForFieldArgs {
  * the bound path, capability-gate the requested metrics against the active adapter,
  * then read through the surfacing engine. Returns a discriminated status so the
  * rendering component can show the right empty state without throwing.
+ *
+ * A metric the adapter does not support is dropped (with one warning per field
+ * render), not fatal; `unavailable` is returned only when no requested metric
+ * survives or the adapter cannot query per page at all.
  */
 export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadResult> => {
 	const { req, collectionSlug, data, metrics, timeframe, adapterId, now } = args
 	const dateRange = resolveTimeframe(timeframe, now)
+	const empty = { metrics: {}, supportedMetrics: [], droppedMetrics: [] }
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return { status: 'not-bound', adapterId: adapterId ?? '', dateRange, metrics: {} }
+		return { status: 'not-bound', adapterId: adapterId ?? '', dateRange, ...empty }
 	}
 	const binding = runtime.bindings[collectionSlug]
 	if (!binding) {
-		return { status: 'not-bound', adapterId: adapterId ?? '', dateRange, metrics: {} }
+		return { status: 'not-bound', adapterId: adapterId ?? '', dateRange, ...empty }
 	}
 	let adapter: AnalyticsAdapter
 	try {
 		adapter = adapterId ? runtime.registry.get(adapterId) : runtime.registry.default()
 	} catch {
-		return { status: 'unavailable', adapterId: adapterId ?? '', dateRange, metrics: {} }
+		return { status: 'unavailable', adapterId: adapterId ?? '', dateRange, ...empty }
 	}
 	let path: string | null
 	try {
@@ -55,19 +64,43 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 		path = null
 	}
 	if (!path) {
-		return { status: 'no-path', adapterId: adapter.id, dateRange, metrics: {} }
+		return { status: 'no-path', adapterId: adapter.id, dateRange, ...empty }
 	}
 	if (!adapter.isConfigured()) {
-		return { status: 'not-configured', adapterId: adapter.id, dateRange, metrics: {} }
+		return { status: 'not-configured', adapterId: adapter.id, dateRange, ...empty }
 	}
-	if (!satisfiesCapabilities(adapter.capabilities, { metrics, perPageQuery: true })) {
-		return { status: 'unavailable', adapterId: adapter.id, dateRange, metrics: {} }
+	const supportedMetrics = metrics.filter((m) => adapter.capabilities.metrics.has(m))
+	const droppedMetrics = metrics.filter((m) => !adapter.capabilities.metrics.has(m))
+	if (droppedMetrics.length > 0) {
+		req.payload.logger.warn(
+			`analytics: adapter "${adapter.id}" does not support metric(s) ${droppedMetrics.join(', ')}; dropped from the "${collectionSlug}" display field`
+		)
+	}
+	if (
+		supportedMetrics.length === 0 ||
+		!satisfiesCapabilities(adapter.capabilities, { metrics: supportedMetrics, perPageQuery: true })
+	) {
+		return {
+			status: 'unavailable',
+			adapterId: adapter.id,
+			dateRange,
+			metrics: {},
+			supportedMetrics: [],
+			droppedMetrics: metrics,
+		}
 	}
 	const result = await runtime.engine.read(adapter, {
 		path,
 		hostname: resolveHostname(binding, data),
-		metrics,
+		metrics: supportedMetrics,
 		dateRange,
 	})
-	return { status: 'ok', adapterId: adapter.id, dateRange, metrics: result.totals ?? {} }
+	return {
+		status: 'ok',
+		adapterId: adapter.id,
+		dateRange,
+		metrics: result.totals ?? {},
+		supportedMetrics,
+		droppedMetrics,
+	}
 }
