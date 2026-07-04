@@ -1,10 +1,18 @@
 import { type Config, definePlugin } from 'payload'
 
 import { registerTranslations } from './plugin/registerTranslations'
+import type { TranslationsOption } from './translations'
 
 export type AutomationsPluginOptions = {
 	/** Disable the plugin entirely (incoming config returned untouched). */
 	disabled?: boolean
+	/**
+	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
+	 * translation keys exported from `@10x-media/automations/i18n`. Values win
+	 * over the built-in locales key-by-key; locales the plugin does not ship are
+	 * added whole. App-level `i18n.translations` still wins over both.
+	 */
+	translations?: TranslationsOption
 	/**
 	 * Trigger slugs available to author automations. Seeded with built-in defaults
 	 * and appended to by sibling/third-party plugins (e.g. webhooks pushes
@@ -35,7 +43,7 @@ export const automations = definePlugin<AutomationsPluginOptions>({
 		if (options.disabled === true) {
 			return config
 		}
-		registerTranslations(config)
+		registerTranslations(config, options.translations)
 		const triggers = [...new Set(options.triggers ?? [])]
 		config.custom = {
 			...config.custom,

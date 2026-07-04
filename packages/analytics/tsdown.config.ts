@@ -1,46 +1,6 @@
-import { defineConfig } from 'tsdown'
+import { definePluginBuild } from '@10x-media/tsdown-config/tsdown.shared'
 
-/**
- * Rolldown strips 'use client' / 'use server' directives from auto-generated
- * shared chunks (non-entry files). This plugin restores them: the transform
- * hook records which modules carried a directive, and renderChunk re-injects
- * it when any module in the chunk originally had one.
- *
- * Without this, Next.js cannot see the RSC boundary when it imports a shared
- * chunk (e.g. TrendChart, BarList) from both the rsc and client entry points.
- */
-const preserveDirectives = () => {
-	const directiveModules = new Map<string, string>()
-	return {
-		name: 'preserve-directives',
-		transform(code: string, id: string) {
-			const trimmed = code.trimStart()
-			const match = /^(['"])use (client|server)\1/.exec(trimmed)
-			if (match) {
-				directiveModules.set(id, `${match[1]}use ${match[2]}${match[1]}`)
-			}
-			return null
-		},
-		renderChunk(code: string, chunk: { modules?: Record<string, unknown> }) {
-			const directive = Object.keys(chunk.modules ?? {})
-				.map((id) => directiveModules.get(id))
-				.find(Boolean)
-			if (!directive) return null
-			const trimmed = code.trimStart()
-			if (
-				trimmed.startsWith("'use client'") ||
-				trimmed.startsWith('"use client"') ||
-				trimmed.startsWith("'use server'") ||
-				trimmed.startsWith('"use server"')
-			) {
-				return null
-			}
-			return { code: `${directive};\n${code}` }
-		},
-	}
-}
-
-export default defineConfig({
+export default definePluginBuild({
 	entry: {
 		index: 'src/index.ts',
 		'exports/types': 'src/exports/types.ts',
@@ -55,11 +15,4 @@ export default defineConfig({
 		'exports/adapters/ga4': 'src/exports/adapters/ga4.ts',
 		'exports/adapters/posthog': 'src/exports/adapters/posthog.ts',
 	},
-	format: 'esm',
-	dts: true,
-	clean: true,
-	treeshake: true,
-	sourcemap: true,
-	fixedExtension: false,
-	plugins: [preserveDirectives()],
 })

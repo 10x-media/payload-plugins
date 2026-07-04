@@ -1,6 +1,12 @@
 import type { TabsField, UIField } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { analyticsFields, analyticsStat, analyticsStatRow, analyticsTab } from './factories'
+import {
+	analyticsFields,
+	analyticsStat,
+	analyticsStatRow,
+	analyticsTab,
+	analyticsTabsField,
+} from './factories'
 
 const fieldComponent = (field: UIField) => {
 	const component = field.admin?.components?.Field
@@ -61,12 +67,70 @@ describe('analyticsFields', () => {
 })
 
 describe('analyticsTab', () => {
-	it('builds a tabs field with one Analytics tab containing a stat row', () => {
-		const field = analyticsTab() as TabsField
+	it('builds a plain tab containing a stat row, usable inside a host tabs field', () => {
+		const tab = analyticsTab()
+		expect('type' in tab).toBe(false)
+		expect(tab.fields).toHaveLength(1)
+		expect((tab.fields[0] as UIField).type).toBe('ui')
+		const host: TabsField = { type: 'tabs', tabs: [tab] }
+		expect(host.tabs).toHaveLength(1)
+	})
+
+	it('forwards metrics, timeframe, and adapter to the stat row', () => {
+		const tab = analyticsTab({ metrics: ['visitors'], timeframe: 'last7days', adapter: 'ga4' })
+		const component = fieldComponent(tab.fields[0] as UIField)
+		expect(component.serverProps?.metrics).toEqual(['visitors'])
+		expect(component.serverProps?.timeframe).toBe('last7days')
+		expect(component.serverProps?.adapterId).toBe('ga4')
+	})
+})
+
+describe('analyticsTabsField', () => {
+	it('builds a tabs field wrapping a single analytics tab', () => {
+		const field = analyticsTabsField()
 		expect(field.type).toBe('tabs')
 		expect(field.tabs).toHaveLength(1)
 		const [tab] = field.tabs
 		expect(tab?.fields).toHaveLength(1)
 		expect((tab?.fields[0] as UIField).type).toBe('ui')
+	})
+})
+
+describe('label overrides', () => {
+	it('passes a stat label override into serverProps keyed by metric', () => {
+		const field = analyticsStat({ metric: 'pageviews', label: 'Views' }) as UIField
+		expect(fieldComponent(field).serverProps?.labels).toEqual({ pageviews: 'Views' })
+	})
+
+	it('passes per-metric row labels through, including function labels', () => {
+		const visitors = () => 'Unique folks'
+		const field = analyticsStatRow({
+			metrics: ['pageviews', 'visitors'],
+			labels: { visitors },
+		}) as UIField
+		expect(fieldComponent(field).serverProps?.labels).toEqual({ visitors })
+	})
+
+	it('spreads labels across analyticsFields stats', () => {
+		const fields = analyticsFields({
+			metrics: ['pageviews', 'visitors'],
+			labels: { pageviews: 'Views' },
+		})
+		expect(fieldComponent(fields[0] as UIField).serverProps?.labels).toEqual({
+			pageviews: 'Views',
+		})
+		expect(fieldComponent(fields[1] as UIField).serverProps?.labels).toBeUndefined()
+	})
+
+	it('overrides the tab label and description', () => {
+		const tab = analyticsTab({ label: 'Traffic', description: 'Last 30 days' })
+		expect(tab.label).toBe('Traffic')
+		expect(tab.description).toBe('Last 30 days')
+	})
+
+	it('keeps the translated default tab label when no override is given', () => {
+		const tab = analyticsTab()
+		expect(typeof tab.label).toBe('function')
+		expect('description' in tab).toBe(false)
 	})
 })

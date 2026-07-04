@@ -1,7 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { PayloadRequest } from 'payload'
 import { isValidElement, type ReactNode } from 'react'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { AnalyticsStatField } from '../../src/fields/AnalyticsStatField'
 import { analytics } from '../../src/index'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
@@ -76,5 +76,61 @@ describeForDb('analytics stat field render', { dbs: ['mongo'] }, (db) => {
 			variant: 'stat',
 		})
 		expect(flatten(element)).toContain('analytics:stateNoData')
+	})
+
+	it('renders the supported subset when some metrics are unsupported', async () => {
+		await ingest(booted, '/mixed')
+		const warn = vi.spyOn(booted.payload.logger, 'warn')
+		const element = await AnalyticsStatField({
+			req: { payload: booted.payload, locale: undefined } as unknown as PayloadRequest,
+			data: { slug: '/mixed' },
+			collectionSlug: 'pages',
+			i18n: i18nStub,
+			metrics: ['pageviews', 'bounceRate'],
+			timeframe: 'last30days',
+			variant: 'row',
+		})
+		const text = flatten(element)
+		expect(text).toContain('analytics:metricPageviews')
+		expect(text).not.toContain('analytics:metricBounceRate')
+		expect(text).not.toContain('analytics:stateUnavailable')
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('bounceRate'))
+		warn.mockRestore()
+	})
+
+	it('renders label overrides in place of translated metric names', async () => {
+		await ingest(booted, '/labelled')
+		const element = await AnalyticsStatField({
+			req: { payload: booted.payload, locale: undefined } as unknown as PayloadRequest,
+			data: { slug: '/labelled' },
+			collectionSlug: 'pages',
+			i18n: i18nStub,
+			metrics: ['pageviews', 'visitors'],
+			timeframe: 'last30days',
+			variant: 'row',
+			labels: {
+				pageviews: 'Views',
+				visitors: ({ t }) =>
+					`${(t as unknown as (key: string) => string)('analytics:metricVisitors')}!`,
+			},
+		})
+		const text = flatten(element)
+		expect(text).toContain('Views')
+		expect(text).not.toContain('analytics:metricPageviews')
+		expect(text).toContain('analytics:metricVisitors!')
+	})
+
+	it('renders the unavailable state only when no metric is supported', async () => {
+		const element = await AnalyticsStatField({
+			req: { payload: booted.payload, locale: undefined } as unknown as PayloadRequest,
+			data: { slug: '/mixed' },
+			collectionSlug: 'pages',
+			i18n: i18nStub,
+			metrics: ['bounceRate', 'scrollDepth'],
+			timeframe: 'last30days',
+			variant: 'row',
+		})
+		expect(flatten(element)).toContain('analytics:stateUnavailable')
 	})
 })

@@ -26,7 +26,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		}
 		const resolved = resolveOptions(options)
 		const defaultLayout = config.admin?.dashboard?.defaultLayout
-		registerTranslations(config)
+		registerTranslations(config, options.translations)
 		const registry = createRegistry(resolved.adapters, resolved.defaultAdapter)
 		for (const adapter of resolved.adapters) {
 			adapter.register?.(config)
@@ -45,6 +45,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				multiProvider: registry.isMultiProvider(),
 				disabled: resolved.widgets.disabled,
 				register: resolved.widgets.register,
+				localizeText: resolved.widgets.localizeText,
 			})
 		}
 		if (resolved.cache.warm.enabled) {
@@ -102,6 +103,8 @@ export type {
 } from './core/options'
 export type {
 	AnalyticsFieldsOptions,
+	AnalyticsMetricLabel,
+	AnalyticsMetricLabels,
 	AnalyticsStatOptions,
 	AnalyticsStatRowOptions,
 	AnalyticsTabOptions,
@@ -111,6 +114,7 @@ export {
 	analyticsStat,
 	analyticsStatRow,
 	analyticsTab,
+	analyticsTabsField,
 } from './fields/factories'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'

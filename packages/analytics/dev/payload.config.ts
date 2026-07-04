@@ -25,10 +25,20 @@ const pages: CollectionConfig = {
 	slug: 'pages',
 	admin: { useAsTitle: 'title' },
 	fields: [
-		{ name: 'title', type: 'text' },
-		{ name: 'slug', type: 'text', required: true },
+		{
+			type: 'tabs',
+			tabs: [
+				{
+					label: 'Content',
+					fields: [
+						{ name: 'title', type: 'text' },
+						{ name: 'slug', type: 'text', required: true },
+					],
+				},
+				analyticsTab(),
+			],
+		},
 		analyticsStat({ metric: 'pageviews', position: 'sidebar' }),
-		analyticsTab(),
 		analyticsStatRow({ name: 'analytics_inline' }),
 	],
 }

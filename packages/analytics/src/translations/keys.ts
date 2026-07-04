@@ -45,6 +45,7 @@ export const keys = {
 	widgetFieldTitlePlaceholder: 'analytics:widgetFieldTitlePlaceholder',
 	widgetTimeframeCustom: 'analytics:widgetTimeframeCustom',
 	widgetFieldRange: 'analytics:widgetFieldRange',
+	dateRangePlaceholder: 'analytics:dateRangePlaceholder',
 	widgetFieldWindow: 'analytics:widgetFieldWindow',
 	widgetRealtimeLabel: 'analytics:widgetRealtimeLabel',
 	widgetRealtimeCaption: 'analytics:widgetRealtimeCaption',

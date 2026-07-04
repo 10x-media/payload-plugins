@@ -27,7 +27,7 @@ export const jobs = definePlugin<JobsPluginOptions>({
 		if (options.disabled === true) {
 			return config
 		}
-		registerTranslations(config)
+		registerTranslations(config, options.translations)
 		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
 		registerJobsEnhancements(config, options)
 		const reliability = resolveReliabilityOptions(options.reliability)

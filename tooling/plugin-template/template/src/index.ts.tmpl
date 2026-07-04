@@ -1,6 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 
 import { registerTranslations } from './plugin/registerTranslations'
+import type { TranslationsOption } from './translations'
 
 export type {{pluginPascal}}PluginOptions = {
 	/**
@@ -8,6 +9,13 @@ export type {{pluginPascal}}PluginOptions = {
 	 * Useful for opting out per environment without removing the plugin call.
 	 */
 	disabled?: boolean
+	/**
+	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
+	 * translation keys exported from `@10x-media/{{pluginSlug}}/i18n`. Values win
+	 * over the built-in locales key-by-key; locales the plugin does not ship are
+	 * added whole. App-level `i18n.translations` still wins over both.
+	 */
+	translations?: TranslationsOption
 }
 
 declare module 'payload' {
@@ -27,7 +35,7 @@ export const {{pluginCamel}} = definePlugin<{{pluginPascal}}PluginOptions>({
 		if (options.disabled === true) {
 			return config
 		}
-		registerTranslations(config)
+		registerTranslations(config, options.translations)
 		return config
 	},
 })
