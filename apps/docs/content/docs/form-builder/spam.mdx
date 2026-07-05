@@ -30,7 +30,7 @@ Payload v3 has no `req.ip`. Identity resolves to the authenticated user id, else
 
 ## Honeypot
 
-`<Form>` renders a visually hidden decoy input (off-screen, `aria-hidden`, out of the tab order, `autoComplete="off"`). Humans never fill it; bots that fill everything do, and the server rejects with a generic error. The decoy field name defaults to `website` (the exported `DEFAULT_HONEYPOT_FIELD`). If you change `spam.honeypot.fieldName` on the server, pass the same name to `<Form honeypot={{ name }}>`, and keep it from colliding with a real field.
+`<Form>` renders a visually hidden decoy input: off-screen, `aria-hidden`, out of the tab order, and marked `autoComplete="new-password"` rather than `"off"`, because Chrome routinely ignores `"off"` and an autofilled honeypot would flag a real visitor as a bot. Humans never see it; bots that fill every field do, and the server rejects with a generic error. The decoy name defaults to `website` (the exported `DEFAULT_HONEYPOT_FIELD`), chosen to look like a real field to bots while avoiding the name patterns browsers autofill for humans, such as anything containing `email`. If you change `spam.honeypot.fieldName` on the server, pass the same name to `<Form honeypot={{ name }}>`, and keep it from colliding with a real field.
 
 ## Captcha
 

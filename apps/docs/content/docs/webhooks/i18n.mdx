@@ -18,6 +18,6 @@ webhooks({
 })
 ```
 
-`@10x-media/webhooks/i18n` exports `keys` (constants like `keys.statusPending`, `keys.fieldUrl`), the built-in English `translations`, and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile.
+`@10x-media/webhooks/i18n` exports `keys` (constants like `keys.statusPending`, `keys.fieldUrl`), the built-in English `translations`, and the `TranslationKey` / `TranslationsOption` types. Misspell a key and the build fails.
 
-Merge semantics, adding locales, and app-level overrides are shared across plugins: see [Translations](/concepts/translations).
+For merge order, adding locales, and app-level overrides, see [Translations](/concepts/translations); the pattern is identical in every plugin.

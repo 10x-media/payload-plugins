@@ -46,11 +46,7 @@ Run it with `node --import tsx worker.ts` in development, or compile it and run 
 
 ## What the worker does
 
-`start()` runs three guarded loops:
-
-1. **Run** (every `runIntervalMs`): claims and runs due jobs, up to `runLimit` per tick, honoring cluster [pause state](/jobs/queue-control) when a `pauseStore` is passed.
-2. **Maintenance** (every `maintenanceIntervalMs`): renews or acquires the `scheduler` and `sweeper` leases and handles schedules while holding `scheduler`.
-3. **Sweep** (every `sweepIntervalMs`): recovers orphaned jobs while holding `sweeper`.
+`start()` runs three guarded loops. The run loop claims and runs due jobs every `runIntervalMs`, up to `runLimit` per tick, honoring cluster [pause state](/jobs/queue-control) when a `pauseStore` is passed. The maintenance loop (every `maintenanceIntervalMs`) renews or acquires the `scheduler` and `sweeper` leases and handles schedules while holding `scheduler`. The sweep loop (every `sweepIntervalMs`) recovers orphaned jobs while holding `sweeper`.
 
 Every node runs jobs; only lease holders schedule and sweep. See [Reliability](/jobs/reliability).
 
@@ -58,10 +54,7 @@ Every node runs jobs; only lease holders schedule and sweep. See [Reliability](/
 
 `createWorker` installs SIGTERM/SIGINT handlers by default. On signal it stops the loops, waits up to `drainTimeoutMs` for in-flight jobs, requeues any straggler, releases its leases, destroys the Payload instance, and exits `0` on a clean drain or `1` if the drain timed out (jobs were requeued for another node).
 
-Two deployment rules follow:
-
-- **Exec-form CMD.** `CMD ["node", "dist/worker.js"]`, never `CMD node dist/worker.js`. Shell form runs Node under `/bin/sh`, which does not forward SIGTERM, so the worker is hard-killed every time.
-- **Grace period.** Set the orchestrator's stop grace to at least `drainTimeoutMs + pollIntervalMs + 5s` (Docker Compose `stop_grace_period`, Kubernetes `terminationGracePeriodSeconds`). Shorter, and the orchestrator SIGKILLs a still-draining worker and you lose the clean requeue.
+Two deployment rules follow. Use exec-form CMD (`CMD ["node", "dist/worker.js"]`, never `CMD node dist/worker.js`): shell form runs Node under `/bin/sh`, which does not forward SIGTERM, so the worker is hard-killed every time. And set the orchestrator's stop grace to at least `drainTimeoutMs + pollIntervalMs + 5s` (Docker Compose `stop_grace_period`, Kubernetes `terminationGracePeriodSeconds`); anything shorter SIGKILLs a still-draining worker and you lose the clean requeue.
 
 ## CreateWorkerArgs
 

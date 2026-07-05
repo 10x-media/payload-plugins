@@ -7,9 +7,7 @@ When a submission is stored, the form's configured action blocks run in order. A
 
 ## Built-in actions
 
-- **`emailTeam`**: emails one or more addresses via `payload.sendEmail`. Subject and body are [recall templates](/form-builder/recall-prefill) (`New submission from {{name}}`). Configure a Payload email adapter; with none configured it no-ops gracefully.
-- **`confirmation`**: emails the submitter, same templating.
-- **`signedWebhook`**: POSTs the submission as JSON with an HMAC signature header (below).
+Three ship. `emailTeam` emails one or more addresses via `payload.sendEmail`; subject and body are [recall templates](/form-builder/recall-prefill) (`New submission from {{name}}`), and with no email adapter configured it no-ops gracefully. `confirmation` sends to the submitter with the same templating. `signedWebhook` POSTs the submission as JSON with an HMAC signature header (below).
 
 Editors add action blocks per form in the admin and fill in each block's config fields.
 
@@ -43,7 +41,7 @@ formBuilder({ actions: { slackNotify, confirmation: false } })
 
 ## Run model
 
-Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, a bounded inline fallback runs them synchronously after the submission row is stored. Either way an action error never fails the submission.
+Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most five seconds for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission.
 
 ## Signed webhook verification
 

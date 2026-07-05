@@ -41,7 +41,7 @@ formBuilder({
 })
 ```
 
-The plugin option takes descriptors (serializable). To supply the React `Wrapper` an overlay needs, pass a full `FormPresentation` to `<Form>` via its `presentations` prop:
+The plugin option lives in server config, so it takes serializable descriptors only. The React `Wrapper` an overlay needs is supplied at render time instead: pass a full `FormPresentation` to `<Form>` via its `presentations` prop:
 
 ```tsx
 import { DialogSurface, type FormPresentation } from '@10x-media/form-builder/react'

@@ -25,10 +25,10 @@ const results = await aggregateFieldResponses({ payload, formId, field: 'colour'
 
 Semantics worth knowing:
 
-- **Percentages are over respondents** (submissions that answered the field), not all submissions. Multi-select answers increment one bucket per element while counting one respondent, so percentages can exceed 100% summed.
-- **`complete` submissions only by default**; pass `status: 'all'` or `'partial'` to change.
-- **Labels** come from the field's current options, then the submitted snapshot, then the raw value. Buckets follow option order, retired values after, by count.
-- **Bounded**: pages `payload.find` and reduces in JS (identical on Mongo and Postgres). The scan caps at `maxSubmissions` (default 10000) and flags `truncated: true` past it. Long-term durable rollups are the [analytics plugin's](/analytics) territory.
+- Percentages are over respondents (submissions that answered the field), not all submissions. Multi-select answers increment one bucket per element while counting one respondent, so summed percentages can exceed 100%.
+- Only `complete` submissions count by default; pass `status: 'all'` or `'partial'` to change that.
+- Labels come from the field's current options, then the submitted snapshot, then the raw value. Buckets follow option order, retired values after, by count.
+- The scan is bounded. It pages `payload.find` and reduces in JS, so results are identical on Mongo and Postgres, and it stops at `maxSubmissions` (default 10000), setting `truncated: true` only when matching rows exist beyond the cap. Long-term durable rollups are the [analytics plugin's](/analytics) territory.
 
 `aggregateFormResponses` with no `fields` aggregates every enumerable field (those with options): the survey-summary case.
 
@@ -40,8 +40,7 @@ Anonymous voters cannot read raw submissions, so public results are served as ag
 GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
 ```
 
-- **Authenticated callers** may aggregate any field, or all enumerable fields with `field` omitted.
-- **Anonymous callers** are served only when the form's `showResults` toggle is on, only for its configured `resultsField`, and only if that field is enumerable. The enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
+Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `showResults` toggle is on, only for its configured `resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
 
 Set `resultsField` to a choice field, never free text or PII.
 

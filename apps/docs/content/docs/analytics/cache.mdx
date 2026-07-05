@@ -3,7 +3,7 @@ title: Caching and warming
 description: How reads are cached in payload.kv, and the opt-in warm job for provider-backed dashboards.
 ---
 
-Every read (widgets, display fields, sync) goes through a surfacing engine that caches in `payload.kv`, coalesces concurrent identical requests into one in-flight read, bounds concurrency, and backs off exponentially on provider errors. Unconfigured adapters and provider outages degrade to empty states, never crashes.
+Every read (widgets, display fields, sync) goes through a surfacing engine that caches in `payload.kv`, coalesces concurrent identical requests into one in-flight read, bounds concurrency, and backs off exponentially on provider errors. The engine is built for the dashboard's worst case: one page load fires many widget reads at once, and several providers bill per query. Caching absorbs repeat reads across requests; coalescing absorbs them within one, so a burst of identical queries costs a single provider call. Unconfigured adapters and provider outages degrade to empty states, never crashes.
 
 ## TTLs
 

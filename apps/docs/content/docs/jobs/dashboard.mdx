@@ -7,11 +7,11 @@ Adding `jobs()` decorates Payload's `payload-jobs` collection in the admin. Ther
 
 ## What you get
 
-- **A derived Status column.** Payload stores execution state as raw fields (`processing`, `hasError`, `completedAt`, `waitUntil`, `totalTried`). The plugin derives one readable status from them: `queued`, `scheduled`, `retrying`, `running`, `succeeded`, `failed`, or `cancelled`. The same derivation is exported as `deriveJobStatus` for your own code.
-- **A queue-health bar** above the list: per-status counts at a glance, plus a `recovered` count when [reliability](/jobs/reliability) is on. Counts above the cap render as `100+` (configurable via `healthBarCap`).
-- **Error and log panels** on the job detail view: the stored `error` rendered readably, and the job `log` as a timeline.
-- **Read-only records.** Execution-state fields are locked and surfaced in the header; inputs are editable only on Create. Jobs remain creatable from the admin, but a finished run cannot be edited into inconsistency. Set `readOnlyRecord: false` to opt out.
-- **Sensible list defaults**: columns `workflowSlug`, `status`, `queue`, `totalTried`, `updatedAt`, and relative-time cells for dates.
+Payload stores execution state as raw fields (`processing`, `hasError`, `completedAt`, `waitUntil`, `totalTried`), which take practice to read at a glance. The plugin derives one readable status per job from them (`queued`, `scheduled`, `retrying`, `running`, `succeeded`, `failed`, or `cancelled`) and shows it as a list column. The same derivation is exported as `deriveJobStatus` for your own code.
+
+Above the list sits a queue-health bar: per-status counts at a glance, plus a `recovered` count when [reliability](/jobs/reliability) is on. Counts above the cap render as `100+` (configurable via `healthBarCap`). The job detail view gains an error panel that renders the stored `error` readably and a timeline view of the job `log`.
+
+Records are locked down by default: execution-state fields are read-only and surfaced in the header, and inputs are editable only on Create. Jobs remain creatable from the admin, but a finished run cannot be edited into inconsistency. Set `readOnlyRecord: false` to opt out. The list itself defaults to the columns `workflowSlug`, `status`, `queue`, `totalTried`, `updatedAt`, with relative-time cells for dates.
 
 ## Options
 

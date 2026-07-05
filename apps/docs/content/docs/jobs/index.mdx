@@ -32,8 +32,7 @@ Use this plugin when Payload jobs move from "nice to have" to "must not silently
 
 ## Two facts to know up front
 
-1. **At least one task must be configured.** Payload only materializes the `payload-jobs` collection when `jobs.tasks` or `jobs.workflows` is non-empty. `createWorker` throws a clear error otherwise.
-2. **Completed jobs are deleted by default.** Payload's `jobs.deleteJobOnComplete` defaults to `true`, so dashboard and status counts reflect the live states. Set it to `false` in `buildConfig` to keep succeeded jobs for auditing.
+Payload only materializes the `payload-jobs` collection when `jobs.tasks` or `jobs.workflows` is non-empty, so the plugin needs at least one task configured; `createWorker` throws a clear error otherwise. And Payload deletes completed jobs by default (`jobs.deleteJobOnComplete: true`), so the dashboard and status counts reflect live states only. Set it to `false` in `buildConfig` to keep succeeded jobs around for auditing.
 
 ## Next
 

@@ -25,15 +25,13 @@ export default buildConfig({
 })
 ```
 
-## Features
+## How it fits together
 
-- **[Adapters](/analytics/adapters)**: one `AnalyticsAdapter` contract with a capabilities model. Ship with the [native engine](/analytics/native), a provider, or several at once; every surface auto-hides what the active adapter cannot answer.
-- **[Native engine](/analytics/native)**: self-hosted, cookieless analytics stored in Payload collections, with atomic rollups, exact daily uniques, [geo resolution](/analytics/geo), retention pruning, and optional write batching.
-- **[Dashboard widgets](/analytics/widgets)**: metric, trend, breakdown, and realtime widgets for Payload's Modular Dashboard, plus a public API for your own.
-- **[Display fields](/analytics/display-fields)**: `analyticsStat`, `analyticsStatRow`, `analyticsFields`, `analyticsTab`, and `analyticsTabsField` place per-document stats on your own collections. Nothing is auto-injected.
-- **[Caching](/analytics/cache)** through `payload.kv` with request coalescing and optional scheduled warming.
-- **[Sync tier](/analytics/sync)**: an opt-in job that persists provider daily metrics into a queryable Payload collection.
-- **[Typed translations](/analytics/i18n)** following the shared plugin pattern.
+Everything reads through one [adapter contract](/analytics/adapters) with a capabilities model: run the [native engine](/analytics/native), a provider, or several at once, and every surface hides what the active adapter cannot answer. The native engine gives you self-hosted, cookieless analytics stored in Payload collections, with atomic rollups, exact daily uniques, [geo resolution](/analytics/geo), retention pruning, and optional write batching.
+
+The numbers surface in two places. [Dashboard widgets](/analytics/widgets) (metric, trend, breakdown, and realtime, plus a public API for your own) render on Payload's Modular Dashboard. [Display fields](/analytics/display-fields) put per-document stats on your own collections through factories such as `analyticsStat` and `analyticsTab`; nothing is auto-injected into your schema.
+
+Underneath, reads are [cached](/analytics/cache) in `payload.kv` with request coalescing and optional scheduled warming, and an opt-in [sync tier](/analytics/sync) persists provider daily metrics into a queryable Payload collection. Admin strings are [typed translations](/analytics/i18n) following the shared plugin pattern.
 
 ## When to use it
 

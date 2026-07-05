@@ -7,7 +7,7 @@ When a subscription has a secret, every delivery is signed so your receiver can 
 
 ## Secrets are reveal-once
 
-Creating a subscription in the admin auto-generates a 48-character hex secret (24 random bytes). The create response shows it in full, exactly once. Every later read, through the admin, REST, or GraphQL, returns `__redacted__`. The raw value is still used server-side to sign deliveries, but it never leaves the server again.
+Creating a subscription in the admin auto-generates a 48-character hex secret (24 random bytes). The create response shows it in full, exactly once. Every later read, through the admin, REST, or GraphQL, returns `__redacted__`, so the secret cannot leak through a screen share, an API response, or an export after that first look. The raw value is still used server-side to sign deliveries, but it never leaves the server again.
 
 To rotate a secret, delete the subscription and create a new one. [Code subscriptions](/webhooks/subscriptions#code-subscriptions) supply their secret from your environment instead.
 

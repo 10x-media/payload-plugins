@@ -7,10 +7,7 @@ Validation is declarative and server-authoritative. Editors attach rules to fiel
 
 ## Built-in rules
 
-`minLength`, `maxLength`, `min`, `max`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`.
-
-- **`matchesField`** is cross-field: it validates one answer against another (confirm-email style).
-- **`notAlreadySubmitted`** is async and server-only: it queries existing submissions, so it never runs client-side.
+`minLength`, `maxLength`, `min`, `max`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`. Two are special: `matchesField` is cross-field, validating one answer against another (confirm-email style), and `notAlreadySubmitted` is async and server-only, because it queries existing submissions.
 
 Every rule instance can override its message (with `{var}` interpolation for rule parameters) and its severity: an `error` blocks submission, a `warning` is advisory and does not.
 
@@ -34,14 +31,9 @@ formBuilder({
 })
 ```
 
-The `rules` option follows the [opt-in convention](/concepts#the-opt-in-convention): `false` removes a built-in, `true` keeps it, an object adds or replaces one. Cast entries to `ValidationRuleOption` at the registry boundary (the same erased-generics pattern as field types).
+The `rules` option follows the same [opt-in convention](/concepts#the-opt-in-convention) as field types, and entries are cast to `ValidationRuleOption` at the registry boundary for the same erased-generics reason.
 
-Useful definition fields:
-
-- **`appliesTo`**: field type slugs the rule can attach to; omit for all.
-- **`params`**: a Payload `Field[]` for the rule's per-instance configuration in the admin.
-- **`client: false`**: mark a rule server-only (anything async, or touching `payload`/`req`). The renderer skips it; the server still runs it.
-- **`severity`**: default severity, overridable per instance.
+Beyond the required pieces, a definition can set `appliesTo` (field type slugs the rule can attach to; omit for all), `params` (a Payload `Field[]` for the rule's per-instance configuration in the admin), and a default `severity`. Mark anything async or touching `payload`/`req` with `client: false`: the renderer skips it, the server still runs it.
 
 ## Standard Schema
 
@@ -63,8 +55,8 @@ The schema runs through the same engine, on the server always and isomorphically
 
 ## What gets validated when
 
-- **On blur and change** (client): visible fields, client-safe rules, for feedback. See [Rendering](/form-builder/rendering#progressive-validation).
-- **On step advance** (client, multi-step): the current step's visible fields.
-- **On submit** (server): every visible field, every rule, including cross-field, async, schema, [calculation](/form-builder/calculations) re-compute, [consent](/form-builder/consent), and [file constraints](/form-builder/uploads). Fields hidden by [conditions](/form-builder/conditions) are skipped entirely.
+- On blur and change (client): visible fields, client-safe rules, for feedback. See [Rendering](/form-builder/rendering#progressive-validation).
+- On step advance (client, multi-step): the current step's visible fields.
+- On submit (server): every visible field, every rule, including cross-field, async, schema, [calculation](/form-builder/calculations) re-compute, [consent](/form-builder/consent), and [file constraints](/form-builder/uploads). Fields hidden by [conditions](/form-builder/conditions) are skipped entirely.
 
 Server-returned field errors are mapped back onto the right fields by the renderer.

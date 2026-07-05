@@ -48,10 +48,7 @@ The same health data is available programmatically via `getQueueHealth(payload, 
 
 ## Access guards
 
-Two guards ship; `access` accepts any `JobAccess` function:
-
-- **`loggedInAccess`** (default): any authenticated user.
-- **`cronSecretAccess({ envVar? })`**: an `Authorization: Bearer <secret>` header matching the env var (default `CRON_SECRET`), or a logged-in user. This is what Vercel Cron sends.
+Two guards ship, and `access` accepts any `JobAccess` function. `loggedInAccess` (the default) admits any authenticated user. `cronSecretAccess({ envVar? })` admits an `Authorization: Bearer <secret>` header matching the env var (default `CRON_SECRET`), or a logged-in user; the bearer form is what Vercel Cron sends.
 
 <Callout type="warn">
 `queue-run` and `queue-sweep` mutate state over GET, so they are CSRF-exposed to logged-in admin sessions: a crafted image tag can trigger them silently. They are GET because Vercel Cron only sends GET. If browser sessions can reach your deployment, prefer `cronSecretAccess` (bearer token) over relying on the session cookie.

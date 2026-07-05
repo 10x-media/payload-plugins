@@ -115,5 +115,5 @@ This trades automatic failover for zero coordination state. Prefer election (the
 
 Two checks worth running by hand against a real database:
 
-1. **One elected scheduler.** Start two workers with distinct `leaderId`s, then query `payload-jobs-locks` for `role: scheduler`: exactly one row, whose `owner` is one of the two ids.
-2. **Orphan recovery.** Queue a slow job, `kill -9` the worker that claimed it, and watch the survivor's sweeper requeue it after `jobLeaseTtlMs` (the job reappears with `recoveryAttempts >= 1`). Allow `jobLeaseTtlMs + sweepIntervalMs` before asserting.
+1. One elected scheduler: start two workers with distinct `leaderId`s, then query `payload-jobs-locks` for `role: scheduler`. Exactly one row, whose `owner` is one of the two ids.
+2. Orphan recovery: queue a slow job, `kill -9` the worker that claimed it, and watch the survivor's sweeper requeue it after `jobLeaseTtlMs` (the job reappears with `recoveryAttempts >= 1`). Allow `jobLeaseTtlMs + sweepIntervalMs` before asserting.

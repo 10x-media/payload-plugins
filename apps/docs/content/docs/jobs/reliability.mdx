@@ -40,9 +40,7 @@ Size `jobLeaseTtlMs` above your slowest legitimate job, or long-running jobs get
 
 Under multiple replicas, every node runs jobs, but exactly one should handle schedules and exactly one should sweep. The plugin elects leaders per role (`scheduler`, `sweeper`) through leases in the `payload-jobs-locks` collection. No extra infrastructure: the coordination state lives in your database.
 
-- **Failover is automatic.** If the leader dies, another replica acquires the lease once it expires (`leaderLeaseTtlMs`, default 30s).
-- **Fence tokens prevent zombies.** Each acquisition increments a monotonic token; a revived former leader cannot renew with a stale token, so it cannot act on old authority.
-- **`leaderId`** is the stable identity a node uses when acquiring leases. Pass a per-replica value like `process.env.HOSTNAME`; omit it and the worker generates `hostname:pid` at runtime.
+Failover is automatic: if the leader dies, another replica acquires the lease once it expires (`leaderLeaseTtlMs`, default 30s). Fence tokens guard against zombies. Each acquisition increments a monotonic token, so a revived former leader cannot renew with a stale one and act on old authority. `leaderId` is the stable identity a node uses when acquiring leases; pass a per-replica value like `process.env.HOSTNAME`, or omit it and the worker generates `hostname:pid` at runtime.
 
 Inspect leadership at runtime with `worker.isLeader('scheduler')`, or query `payload-jobs-locks` directly (one row per role; `owner` names the holder).
 
