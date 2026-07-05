@@ -3,7 +3,7 @@ title: Rendering
 description: The headless Form controller, renderers, primitives, hooks, and the layout grid.
 ---
 
-`@10x-media/form-builder/react` renders forms on your frontend. It is headless: accessible markup with stable class hooks, no imposed styles. Bring CSS, swap renderers, or drop to hooks for full markup control; see [Styling](/docs/form-builder/styling) for the three paths.
+`@10x-media/form-builder/react` renders forms on your frontend. It is headless: accessible markup with stable class hooks, no imposed styles. Bring CSS, swap renderers, or drop to hooks for full markup control; see [Styling](/form-builder/styling) for the three paths.
 
 ## `<Form>`
 
@@ -21,7 +21,9 @@ import { Form } from '@10x-media/form-builder/react'
 
 ### Progressive validation
 
-Validation runs on blur, re-validates on change once a field is touched, then validates all visible fields on submit. Hidden fields ([`visibleWhen`](/docs/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.
+Validation runs on blur, re-validates on change once a field is touched, then validates all visible fields on submit. Hidden fields ([`visibleWhen`](/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.
+
+Submission is also guarded against double activation: while a submit is in flight, a second click or an Enter-plus-click cannot reach the transport and POST twice. The disabled button is feedback on top of that guard, not the guard itself.
 
 ### Transport
 
@@ -48,14 +50,14 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `apiRoute` | `string` | `'/api'` | API prefix for the built-in transport. |
 | `onSubmit` | `SubmitHandler` | none | Custom transport. |
 | `onSuccess` / `onError` | callbacks | none | Submission outcome hooks. |
-| `events` | `FormEventSink` | none | Lifecycle event sink; see [Actions and events](/docs/form-builder/actions#lifecycle-events). |
+| `events` | `FormEventSink` | none | Lifecycle event sink; see [Actions and events](/form-builder/actions#lifecycle-events). |
 | `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
 | `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
 | `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. |
-| `successMessage` | `string` | `'Thank you.'` | Post-submit message (supports [recall tokens](/docs/form-builder/recall-prefill)). |
-| `presentation`, `presentations`, `onClose`, `title` | | | Overlay control; see [Presentations](/docs/form-builder/presentations). |
-| `initialValues` | `Record<string, unknown>` | none | Seed values; see [Prefill](/docs/form-builder/recall-prefill#url-prefill). |
-| `honeypot`, `captchaToken` | | defaults on / none | See [Spam](/docs/form-builder/spam). |
+| `successMessage` | `string` | `'Thank you.'` | Post-submit message (supports [recall tokens](/form-builder/recall-prefill)). |
+| `presentation`, `presentations`, `onClose`, `title` | | | Overlay control; see [Presentations](/form-builder/presentations). |
+| `initialValues` | `Record<string, unknown>` | none | Seed values; see [Prefill](/form-builder/recall-prefill#url-prefill). |
+| `honeypot`, `captchaToken` | | defaults on / none | See [Spam](/form-builder/spam). |
 | `children` | `ReactNode` | none | Custom layout mode; see below. |
 
 ## Renderers
@@ -83,7 +85,7 @@ const myText = defineFieldRenderer<string>(
 
 `FieldRendererProps<TValue>` carries the field instance, a stable `id`, the machine `name`, `value`, `onChange`/`onBlur`, `errors`/`warnings`, `required`, `disabled`, `locale`, and a `t` translator.
 
-`resolveRenderers` merges the defaults with overrides using the [opt-in convention](/docs/concepts#the-opt-in-convention):
+`resolveRenderers` merges the defaults with overrides using the [opt-in convention](/concepts#the-opt-in-convention):
 
 ```ts
 import { defaultRenderers, resolveRenderers } from '@10x-media/form-builder/react'
@@ -146,4 +148,4 @@ function NameField() {
 
 - `useField(name)` returns `value`, `errors`, `warnings`, `touched`, `setValue`, `onBlur`.
 - `useFormState()` returns the whole `FormState`: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, `submitError`.
-- `useFormStep()` drives [multi-step UIs](/docs/form-builder/multi-step#useformstep-for-custom-step-uis).
+- `useFormStep()` drives [multi-step UIs](/form-builder/multi-step#useformstep-for-custom-step-uis).

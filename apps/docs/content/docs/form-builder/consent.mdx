@@ -24,11 +24,7 @@ Set `optional: true` for marketing opt-ins and similar non-required consent. Kee
 
 ## Sources
 
-The `source` decides how the policy link resolves:
-
-- **`static`** (default): a fixed URL and label from `sourceConfig`. No server step; the renderer reads it directly.
-- **`pageReference`**: resolves the policy URL at display time from a Payload document. Set `relationTo`, `docId`, and optionally `urlField` in `sourceConfig`.
-- **Custom** via `defineConsentSource`:
+The `source` decides how the policy link resolves. `static` (the default) is a fixed URL and label from `sourceConfig`; no server step, the renderer reads it directly. `pageReference` resolves the policy URL at display time from a Payload document (`relationTo`, `docId`, and optionally `urlField` in `sourceConfig`), the right choice when the policy is content whose URL can change. Anything else is a custom source via `defineConsentSource`:
 
 ```ts
 import { defineConsentSource } from '@10x-media/form-builder'
@@ -44,7 +40,7 @@ const mySource = defineConsentSource({
 formBuilder({ consentSources: { mySource } })
 ```
 
-The `consentSources` option follows the [opt-in convention](/docs/concepts#the-opt-in-convention).
+The `consentSources` option follows the [opt-in convention](/concepts#the-opt-in-convention).
 
 ## Proof by reference
 

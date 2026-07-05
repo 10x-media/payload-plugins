@@ -21,14 +21,11 @@ export default buildConfig({
 })
 ```
 
-## Features
+## The pieces
 
-- **Opt-in collections**: `true` for all three operations, or pick operations and add a `transform` to reshape or redact the payload.
-- **Two subscription sources**: admin-managed records and hard-coded [code subscriptions](/docs/webhooks/subscriptions#code-subscriptions), merged at delivery time.
-- **[Delivery modes](/docs/webhooks/deliveries)**: queued through Payload jobs (with retries and timeouts) or inline in the hook; `auto` picks based on whether a job runner exists.
-- **[HMAC signing](/docs/webhooks/signing)** with reveal-once secrets, plus id, event, and timestamp headers on every request.
-- **A delivery log** collection: status, response code, duration, the exact body sent, and one-click redelivery.
-- **Composes with the [jobs family](/docs/concepts/jobs-family)**: installing [Jobs](/docs/jobs) switches delivery to the queue automatically; installing [Automations](/docs/automations) registers a `webhook` trigger slug for the future inbound phase.
+Collections opt in per operation: `true` covers create, update, and delete, or pick operations and add a `transform` to reshape or redact the body. Receivers come from two [subscription sources](/webhooks/subscriptions), merged at delivery time: records operators manage in the admin, and code subscriptions for endpoints that belong in your repository. [Deliveries](/webhooks/deliveries) run queued through Payload jobs (retries, timeouts) or inline in the hook, with the default `auto` mode picking based on whether a job runner exists. When a subscription has a secret, every request is [HMAC-signed](/webhooks/signing); secrets are revealed once at creation, and each request carries id, event, and timestamp headers. Every attempt lands in a delivery log collection with status, response code, duration, the exact body sent, and one-click redelivery.
+
+The plugin composes with the [jobs family](/concepts/jobs-family): installing [Jobs](/jobs) switches delivery to the queue automatically, and installing [Automations](/automations) registers a `webhook` trigger slug for the future inbound phase.
 
 ## When to use it
 
@@ -36,4 +33,4 @@ Use it to push Payload changes into external systems (CRMs, search indexes, Slac
 
 ## Next
 
-[Quick start](/docs/webhooks/quick-start), then [subscriptions](/docs/webhooks/subscriptions) and [deliveries](/docs/webhooks/deliveries).
+[Quick start](/webhooks/quick-start), then [subscriptions](/webhooks/subscriptions) and [deliveries](/webhooks/deliveries).

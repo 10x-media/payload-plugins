@@ -3,7 +3,7 @@ title: Display fields
 description: Bind collections to their URLs and place per-document stats on your own collections.
 ---
 
-Display fields surface a document's analytics inside its edit view. Two pieces cooperate: a **binding** tells the plugin which URL path a document's analytics live under, and **field factories** place read-only stat fields wherever you want them. Nothing is auto-injected; nothing lands in the sidebar unless you ask.
+Display fields surface a document's analytics inside its edit view; they are the per-document counterpart to the site-wide [dashboard widgets](/analytics/widgets), reading through the same [cached engine](/analytics/cache). Two pieces cooperate: a **binding** tells the plugin which URL path a document's analytics live under, and **field factories** place read-only stat fields wherever you want them. Nothing is auto-injected; nothing lands in the sidebar unless you ask.
 
 ## Bindings
 
@@ -22,9 +22,9 @@ analytics({
 })
 ```
 
-- **`path`** maps a document to the pathname its analytics were recorded under. Return `null` when the document has no URL yet (unsaved, unpublished); fields then render an empty state instead of querying.
-- **`pathField`** names a document field whose stored value is the path. It is a fallback, used only when `path` is absent or returns `null`. A binding must define at least one of the two (validated at startup).
-- **`hostname`** filters adapter queries to one site in multi-domain setups: a static string, or a resolver with the same signature as `path`. Omit it (or return `null`) to query across every domain the data source records.
+- `path` maps a document to the pathname its analytics were recorded under. Return `null` when the document has no URL yet (unsaved, unpublished); fields then render an empty state instead of querying.
+- `pathField` names a document field whose stored value is the path. It is a fallback, used only when `path` is absent or returns `null`. A binding must define at least one of the two (validated at startup).
+- `hostname` filters adapter queries to one site in multi-domain setups: a static string, or a resolver with the same signature as `path`. Omit it (or return `null`) to query across every domain the data source records.
 
 The `collections` keys are typed against your generated `CollectionSlug` union, and with generated types present each binding's resolvers receive that collection's document type. Without generated types, `doc` degrades to `Record<string, unknown>`.
 
@@ -102,7 +102,7 @@ analyticsStatRow({ labels: { pageviews: { en: 'Views', de: 'Aufrufe' } } })
 analyticsTab({ label: 'Traffic', description: 'Last 30 days', labels: { visitors: 'People' } })
 ```
 
-Defaults come from the plugin's [translations](/docs/analytics/i18n), so overriding strings globally works there too.
+Defaults come from the plugin's [translations](/analytics/i18n), so overriding strings globally works there too.
 
 ## The import map
 

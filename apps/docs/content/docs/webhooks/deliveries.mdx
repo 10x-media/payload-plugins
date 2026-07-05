@@ -16,9 +16,11 @@ webhooks({
 
 | Mode | Behavior |
 |---|---|
-| `'auto'` (default) | Queue when a job runner is likely (`config.jobs.autoRun` set, or [`@10x-media/jobs`](/docs/jobs) installed); inline otherwise. |
+| `'auto'` (default) | Queue when a job runner is likely (`config.jobs.autoRun` set, or [`@10x-media/jobs`](/jobs) installed); inline otherwise. |
 | `'queue'` | Always enqueue a Payload job (task `webhooksDeliver`). Something must run the queue, or deliveries stay `pending`; the plugin logs a warning when it cannot detect a runner. |
 | `'inline'` | Send inside the `afterChange`/`afterDelete` hook. Zero moving parts, but adds outbound-HTTP latency to every matching write, and a failure is final (no retries). |
+
+Inline mode exists so the plugin is useful with no queue infrastructure at all: no worker, no cron, just the hook. The cost sits on the write path, where matching subscriptions are delivered sequentially and each attempt waits up to `timeoutMs`. Queue mode moves that latency out of the request and buys retries and crash recovery, which is why `auto` switches to it as soon as a runner is detectable.
 
 Pass an object to tune the rest:
 
@@ -34,7 +36,7 @@ webhooks({
 })
 ```
 
-Queued deliveries inherit everything the jobs system provides: retries with backoff, visibility in the [Jobs dashboard](/docs/jobs/dashboard), and recovery under the [reliability layer](/docs/jobs/reliability). See [Jobs family interop](/docs/concepts/jobs-family).
+Queued deliveries inherit everything the jobs system provides: retries with backoff, visibility in the [Jobs dashboard](/jobs/dashboard), and recovery under the [reliability layer](/jobs/reliability). See [Jobs family interop](/concepts/jobs-family).
 
 ## Timeouts and retries
 

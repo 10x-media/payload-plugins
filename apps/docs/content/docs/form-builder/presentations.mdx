@@ -24,7 +24,7 @@ Editors pick a `defaultPresentation` on the form document; the renderer uses it 
 
 ## Custom presentations
 
-Register through the plugin option to add a presentation to the admin select everywhere, following the [opt-in convention](/docs/concepts#the-opt-in-convention):
+Register through the plugin option to add a presentation to the admin select everywhere, following the [opt-in convention](/concepts#the-opt-in-convention):
 
 ```ts title="payload.config.ts"
 formBuilder({
@@ -41,7 +41,7 @@ formBuilder({
 })
 ```
 
-The plugin option takes descriptors (serializable). To supply the React `Wrapper` an overlay needs, pass a full `FormPresentation` to `<Form>` via its `presentations` prop:
+The plugin option lives in server config, so it takes serializable descriptors only. The React `Wrapper` an overlay needs is supplied at render time instead: pass a full `FormPresentation` to `<Form>` via its `presentations` prop:
 
 ```tsx
 import { DialogSurface, type FormPresentation } from '@10x-media/form-builder/react'

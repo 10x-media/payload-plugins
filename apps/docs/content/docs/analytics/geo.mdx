@@ -3,7 +3,7 @@ title: Geo resolution
 description: Resolve visitor country, region, and city at ingest, with headers, MaxMind, or your own resolver.
 ---
 
-The [native engine](/docs/analytics/native) resolves geo per ingested event, server-side. Resolution never blocks ingestion: on any failure the geo fields stay empty and the event is stored anyway.
+The [native engine](/analytics/native) resolves geo per ingested event, server-side. Resolution never blocks ingestion: on any failure the geo fields stay empty and the event is stored anyway.
 
 ## Default: platform headers
 
@@ -61,4 +61,4 @@ Use `noopResolver` to disable geo entirely (`geoResolver: noopResolver`).
 
 ## Where geo shows up
 
-Geo lands on each raw event and in the site-wide country rollup, which powers the Countries [dashboard widget](/docs/analytics/widgets) and the `country` dimension. Events without a resolved country are simply omitted from country breakdowns; totals are unaffected.
+Geo lands on each raw event and in the site-wide country rollup, which powers the Countries [dashboard widget](/analytics/widgets) and the `country` dimension. Events without a resolved country are simply omitted from country breakdowns; totals are unaffected.

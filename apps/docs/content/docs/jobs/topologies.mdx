@@ -3,7 +3,7 @@ title: Topologies
 description: Presets and recipes for serverless, single-node, and multi-node deployments.
 ---
 
-Three presets wire [reliability](/docs/jobs/reliability) and [queue control](/docs/jobs/queue-control) consistently for the common deployment shapes. Each returns `{ reliability, queueControl }`, so spread it into the plugin options:
+Three presets wire [reliability](/jobs/reliability) and [queue control](/jobs/queue-control) consistently for the common deployment shapes. Each returns `{ reliability, queueControl }`, so spread it into the plugin options:
 
 ```ts title="payload.config.ts"
 import { jobs, serverlessPreset, singleNodePreset, multiNodePreset } from '@10x-media/jobs'
@@ -70,7 +70,7 @@ services:
       POSTGRES_PASSWORD: postgres
 ```
 
-`dist/worker.js` is the compiled [worker entrypoint](/docs/jobs/workers).
+`dist/worker.js` is the compiled [worker entrypoint](/jobs/workers).
 
 ## Multi-node Docker / Kubernetes
 
@@ -115,5 +115,5 @@ This trades automatic failover for zero coordination state. Prefer election (the
 
 Two checks worth running by hand against a real database:
 
-1. **One elected scheduler.** Start two workers with distinct `leaderId`s, then query `payload-jobs-locks` for `role: scheduler`: exactly one row, whose `owner` is one of the two ids.
-2. **Orphan recovery.** Queue a slow job, `kill -9` the worker that claimed it, and watch the survivor's sweeper requeue it after `jobLeaseTtlMs` (the job reappears with `recoveryAttempts >= 1`). Allow `jobLeaseTtlMs + sweepIntervalMs` before asserting.
+1. One elected scheduler: start two workers with distinct `leaderId`s, then query `payload-jobs-locks` for `role: scheduler`. Exactly one row, whose `owner` is one of the two ids.
+2. Orphan recovery: queue a slow job, `kill -9` the worker that claimed it, and watch the survivor's sweeper requeue it after `jobLeaseTtlMs` (the job reappears with `recoveryAttempts >= 1`). Allow `jobLeaseTtlMs + sweepIntervalMs` before asserting.

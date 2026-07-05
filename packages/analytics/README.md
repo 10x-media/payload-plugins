@@ -49,18 +49,18 @@ Run `payload generate:importmap`, send pageviews to `POST /api/analytics/ingest`
 
 ## Documentation
 
-Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/docs/analytics):
+Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/analytics):
 
-- [Overview](https://docs.10xmedia.de/docs/analytics)
-- [Quick start](https://docs.10xmedia.de/docs/analytics/quick-start)
-- [Adapters](https://docs.10xmedia.de/docs/analytics/adapters)
-- [Native engine](https://docs.10xmedia.de/docs/analytics/native)
-- [Geo resolution](https://docs.10xmedia.de/docs/analytics/geo)
-- [Display fields](https://docs.10xmedia.de/docs/analytics/display-fields)
-- [Dashboard widgets](https://docs.10xmedia.de/docs/analytics/widgets)
-- [Caching and warming](https://docs.10xmedia.de/docs/analytics/cache)
-- [Sync tier](https://docs.10xmedia.de/docs/analytics/sync)
-- [i18n](https://docs.10xmedia.de/docs/analytics/i18n)
+- [Overview](https://docs.10xmedia.de/analytics)
+- [Quick start](https://docs.10xmedia.de/analytics/quick-start)
+- [Adapters](https://docs.10xmedia.de/analytics/adapters)
+- [Native engine](https://docs.10xmedia.de/analytics/native)
+- [Geo resolution](https://docs.10xmedia.de/analytics/geo)
+- [Display fields](https://docs.10xmedia.de/analytics/display-fields)
+- [Dashboard widgets](https://docs.10xmedia.de/analytics/widgets)
+- [Caching and warming](https://docs.10xmedia.de/analytics/cache)
+- [Sync tier](https://docs.10xmedia.de/analytics/sync)
+- [i18n](https://docs.10xmedia.de/analytics/i18n)
 
 ## License
 

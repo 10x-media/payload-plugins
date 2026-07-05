@@ -29,7 +29,7 @@ The admin answers view renders it as a download link when a `url` is present.
 
 ## The uploads collection
 
-A built-in `form-uploads` collection ships on by default: anonymous create (public forms must upload), read/update/delete for authenticated users, and an `owner` stamp for [ownership scoping](/docs/form-builder/spam#upload-ownership).
+A built-in `form-uploads` collection ships on by default: anonymous create (public forms must upload), read/update/delete for authenticated users, and an `owner` stamp for [ownership scoping](/form-builder/spam#upload-ownership).
 
 ```ts title="payload.config.ts"
 formBuilder({
@@ -45,7 +45,7 @@ Storage is your project's concern: set `upload.staticDir` or configure a Payload
 
 On submit, the server loads the referenced upload and re-validates it against the field's `mimeTypes` and `maxSize`, then captures the authoritative `FileRef`. A missing, disallowed, or oversize file blocks the submission with a per-field error. Required presence rides the normal required rule.
 
-Uploads on the public path are also rate limited and ownership-scoped by default; see [Spam protection](/docs/form-builder/spam).
+Uploads on the public path are also rate limited and ownership-scoped by default; see [Spam protection](/form-builder/spam).
 
 ## Renderer
 

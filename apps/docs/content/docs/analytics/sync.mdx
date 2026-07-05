@@ -28,19 +28,15 @@ analytics({
 
 ## How it works
 
-When enabled, the plugin registers the collection (default slug `analytics-daily`) and a Payload task (`analytics-sync`). On its cron, the task reads each provider's last `lookbackDays` of daily metrics through the surfacing engine and upserts one row per `(source, date)`:
+When enabled, the plugin registers the collection (default slug `analytics-daily`) and a Payload task (`analytics-sync`). On its cron, the task reads each provider's last `lookbackDays` of daily metrics through the surfacing engine and upserts one row per `(source, date)`.
 
-- **Idempotent**: a unique `source + date` index makes re-runs refresh recent days as provider data finalizes, instead of duplicating rows.
-- **Row shape**: `source`, `date`, `pageviews`, `visitors`, `sessions`, `avgDuration`, `bounceRate`, `events`, `syncedAt`. Metrics a provider does not report stay null.
-- **Read-only in the admin**: the job writes the rows; users read them.
-- **The native engine is excluded**: its data already lives durably in `analytics-rollups`.
-- **Failures are isolated**: one provider failing is logged and does not abort the others.
+A unique `source + date` index makes re-runs idempotent: recent days are refreshed as provider data finalizes rather than duplicated, which is also why the default looks back three days instead of one. Each row carries `source`, `date`, `pageviews`, `visitors`, `sessions`, `avgDuration`, `bounceRate`, `events`, and `syncedAt`; metrics a provider does not report stay null. The collection is read-only in the admin (the job writes, users read). The native engine is excluded, since its data already lives durably in `analytics-rollups`, and one provider failing is logged without aborting the others.
 
-Reads go through the [surfacing cache](/docs/analytics/cache), so persisted rows can reflect cached values up to the aggregate TTL old. Keep `cache.ttl.aggregate` below your sync interval for the freshest rows.
+Reads go through the [surfacing cache](/analytics/cache), so persisted rows can reflect cached values up to the aggregate TTL old. Keep `cache.ttl.aggregate` below your sync interval for the freshest rows.
 
 ## Running it
 
-Sync is off by default and needs Payload's jobs runner (cron `autoRun`, a [worker](/docs/jobs/workers), or an external scheduler) for the cron to fire. Run it on demand at any time:
+Sync is off by default and needs Payload's jobs runner (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler) for the cron to fire. Run it on demand at any time:
 
 ```ts
 await payload.jobs.queue({ task: 'analytics-sync' })

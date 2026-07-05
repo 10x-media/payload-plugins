@@ -35,7 +35,7 @@ export default buildConfig({
 })
 ```
 
-`jobs({})` alone gives you the [dashboard layer](/docs/jobs/dashboard): a Status column, a queue-health bar, and error/log panels on the `payload-jobs` collection in the admin.
+`jobs({})` alone gives you the [dashboard layer](/jobs/dashboard): a Status column, a queue-health bar, and error/log panels on the `payload-jobs` collection in the admin.
 
 ## Verify
 
@@ -58,7 +58,7 @@ With `deleteJobOnComplete` at its default (`true`), a successful job disappears 
 
 ## Enable the production layers
 
-Pick a [topology preset](/docs/jobs/topologies) to turn on [reliability](/docs/jobs/reliability) and [queue control](/docs/jobs/queue-control) together:
+Pick a [topology preset](/jobs/topologies) to turn on [reliability](/jobs/reliability) and [queue control](/jobs/queue-control) together:
 
 ```ts title="payload.config.ts"
 import { jobs, singleNodePreset } from '@10x-media/jobs'
@@ -70,4 +70,4 @@ plugins: [jobs({ ...singleNodePreset() })]
 Enabling reliability adds fields to `payload-jobs` and a `payload-jobs-locks` collection. On Postgres, generate and run a migration afterwards (`payload migrate:create`, then `payload migrate`).
 </Callout>
 
-Then run a [worker](/docs/jobs/workers) as its own process, or drive the queue from cron on [serverless](/docs/jobs/topologies#serverless-vercel).
+Then run a [worker](/jobs/workers) as its own process, or drive the queue from cron on [serverless](/jobs/topologies#serverless-vercel).

@@ -50,25 +50,25 @@ export function ContactForm({ form }) {
 
 ## Documentation
 
-Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/docs/form-builder):
+Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/form-builder):
 
-- [Overview](https://docs.10xmedia.de/docs/form-builder)
-- [Quick start](https://docs.10xmedia.de/docs/form-builder/quick-start)
-- [Fields](https://docs.10xmedia.de/docs/form-builder/fields)
-- [Validation](https://docs.10xmedia.de/docs/form-builder/validation)
-- [Conditional logic](https://docs.10xmedia.de/docs/form-builder/conditions)
-- [Multi-step forms](https://docs.10xmedia.de/docs/form-builder/multi-step)
-- [Rendering](https://docs.10xmedia.de/docs/form-builder/rendering)
-- [Styling](https://docs.10xmedia.de/docs/form-builder/styling)
-- [Presentations](https://docs.10xmedia.de/docs/form-builder/presentations)
-- [Recall and prefill](https://docs.10xmedia.de/docs/form-builder/recall-prefill)
-- [Calculations](https://docs.10xmedia.de/docs/form-builder/calculations)
-- [Actions and events](https://docs.10xmedia.de/docs/form-builder/actions)
-- [Consent](https://docs.10xmedia.de/docs/form-builder/consent)
-- [File uploads](https://docs.10xmedia.de/docs/form-builder/uploads)
-- [Polls and aggregation](https://docs.10xmedia.de/docs/form-builder/polls)
-- [Spam protection](https://docs.10xmedia.de/docs/form-builder/spam)
-- [i18n](https://docs.10xmedia.de/docs/form-builder/i18n)
+- [Overview](https://docs.10xmedia.de/form-builder)
+- [Quick start](https://docs.10xmedia.de/form-builder/quick-start)
+- [Fields](https://docs.10xmedia.de/form-builder/fields)
+- [Validation](https://docs.10xmedia.de/form-builder/validation)
+- [Conditional logic](https://docs.10xmedia.de/form-builder/conditions)
+- [Multi-step forms](https://docs.10xmedia.de/form-builder/multi-step)
+- [Rendering](https://docs.10xmedia.de/form-builder/rendering)
+- [Styling](https://docs.10xmedia.de/form-builder/styling)
+- [Presentations](https://docs.10xmedia.de/form-builder/presentations)
+- [Recall and prefill](https://docs.10xmedia.de/form-builder/recall-prefill)
+- [Calculations](https://docs.10xmedia.de/form-builder/calculations)
+- [Actions and events](https://docs.10xmedia.de/form-builder/actions)
+- [Consent](https://docs.10xmedia.de/form-builder/consent)
+- [File uploads](https://docs.10xmedia.de/form-builder/uploads)
+- [Polls and aggregation](https://docs.10xmedia.de/form-builder/polls)
+- [Spam protection](https://docs.10xmedia.de/form-builder/spam)
+- [i18n](https://docs.10xmedia.de/form-builder/i18n)
 
 ## License
 

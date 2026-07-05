@@ -32,7 +32,7 @@ await pause.resume({ all: true }) // clear both layers
 await pause.isPaused('default') // check
 ```
 
-Pass the store to [`createWorker`](/docs/jobs/workers) as `pauseStore` so workers respect it. Pause writes are read-modify-write over kv (last writer wins), which is fine for rare admin actions.
+Pass the store to [`createWorker`](/jobs/workers) as `pauseStore` so workers respect it. Pause writes are read-modify-write over kv (last writer wins), which is fine for rare admin actions.
 
 ## Endpoints
 
@@ -42,16 +42,13 @@ All three are GET endpoints registered on the `payload-jobs` collection and gate
 |---|---|
 | `GET /api/payload-jobs/queue-status` | Returns a `QueueHealthReport`: totals and per-queue counts (`queued`, `scheduled`, `retrying`, `processing`, `succeeded`, `failed`, `cancelled`, `recovered`), oldest queued age, last scheduled run. |
 | `GET /api/payload-jobs/queue-run` | Runs due jobs, pause-aware. Params: `allQueues=true`, `queue=<name>`, `limit=<n>`, `disableScheduling=true`, `silent=true`. |
-| `GET /api/payload-jobs/queue-sweep` | One orphan sweep pass (no leader election; safe from cron). Requires [reliability](/docs/jobs/reliability). |
+| `GET /api/payload-jobs/queue-sweep` | One orphan sweep pass (no leader election; safe from cron). Requires [reliability](/jobs/reliability). |
 
 The same health data is available programmatically via `getQueueHealth(payload, options)`.
 
 ## Access guards
 
-Two guards ship; `access` accepts any `JobAccess` function:
-
-- **`loggedInAccess`** (default): any authenticated user.
-- **`cronSecretAccess({ envVar? })`**: an `Authorization: Bearer <secret>` header matching the env var (default `CRON_SECRET`), or a logged-in user. This is what Vercel Cron sends.
+Two guards ship, and `access` accepts any `JobAccess` function. `loggedInAccess` (the default) admits any authenticated user. `cronSecretAccess({ envVar? })` admits an `Authorization: Bearer <secret>` header matching the env var (default `CRON_SECRET`), or a logged-in user; the bearer form is what Vercel Cron sends.
 
 <Callout type="warn">
 `queue-run` and `queue-sweep` mutate state over GET, so they are CSRF-exposed to logged-in admin sessions: a crafted image tag can trigger them silently. They are GET because Vercel Cron only sends GET. If browser sessions can reach your deployment, prefer `cronSecretAccess` (bearer token) over relying on the session cookie.

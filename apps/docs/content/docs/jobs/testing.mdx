@@ -43,10 +43,7 @@ export default buildConfig({
 })
 ```
 
-Two details matter:
-
-- **A replica set, not a standalone.** Payload's mongoose adapter enables transactions only when the connection URL carries a `replicaSet` parameter, which `MongoMemoryReplSet.getUri()` includes. A standalone memory server would silently run without transactions and behave differently from production.
-- **Stop it on exit.** The `process.once` handlers keep test runs and dev servers from leaking `mongod` processes.
+Two details matter. It must be a replica set, not a standalone: Payload's mongoose adapter enables transactions only when the connection URL carries a `replicaSet` parameter, which `MongoMemoryReplSet.getUri()` includes, so a standalone memory server would silently run without transactions and behave differently from production. And stop it on exit: the `process.once` handlers keep test runs and dev servers from leaking `mongod` processes.
 
 ## Exercising the reliability layer in tests
 

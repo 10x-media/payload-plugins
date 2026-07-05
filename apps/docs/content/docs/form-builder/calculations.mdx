@@ -5,7 +5,7 @@ description: Derived numeric fields from a safe expression engine for totals, qu
 
 A `calculation` field derives its value from a serializable expression over other answers. The client computes it live for display; the server recomputes it from scratch at submit and stores only its own result. The client's number is discarded.
 
-Set `calcDisplay: false` on the field to compute without rendering (a hidden total or quiz score that [conditions](/docs/form-builder/conditions) and validation can still reference).
+Set `calcDisplay: false` on the field to compute without rendering (a hidden total or quiz score that [conditions](/form-builder/conditions) and validation can still reference).
 
 ## The expression AST
 
@@ -62,4 +62,4 @@ const updatedValues = computeCalcFields(fields, currentValues)
 
 ## Downstream
 
-Because the stored value is server-authoritative, calculation fields participate everywhere ordinary fields do: `visibleWhen`/`validateWhen` conditions, validation rules, and [recall](/docs/form-builder/recall-prefill) (`You scored {{score}} points!`).
+Because the stored value is server-authoritative, calculation fields participate everywhere ordinary fields do: `visibleWhen`/`validateWhen` conditions, validation rules, and [recall](/form-builder/recall-prefill) (`You scored {{score}} points!`).

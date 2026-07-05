@@ -3,7 +3,7 @@ title: Dashboard widgets
 description: Analytics widgets for Payload's Modular Dashboard, plus a public API for custom ones.
 ---
 
-The plugin registers widgets into Payload's Modular Dashboard (`admin.dashboard.widgets`). Each widget is capability-gated: if no configured adapter can answer its metric or dimension, it is not registered, so dead tiles never appear.
+The plugin registers widgets into Payload's Modular Dashboard (`admin.dashboard.widgets`); they are the site-wide view, with [display fields](/analytics/display-fields) as the per-document counterpart. Each widget is capability-gated: if no configured adapter can answer its metric or dimension, it is not registered at all, so dead tiles never appear and nobody can configure a widget no data source could answer.
 
 <Callout>
 The Modular Dashboard is an experimental Payload feature. After configuring widgets, run `payload generate:importmap` so their server components resolve in the admin.

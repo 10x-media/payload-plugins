@@ -3,7 +3,7 @@ title: Jobs family interop
 description: How Jobs, Webhooks, Form Builder, and Automations detect and compose with each other.
 ---
 
-Several plugins produce background work; one plugin, [Jobs](/docs/jobs), is about running it. They compose automatically through Payload's plugin registry, with zero shared configuration.
+Several plugins produce background work; one plugin, [Jobs](/jobs), is about running it. They compose automatically through Payload's plugin registry, with zero shared configuration.
 
 ## Jobs is the runtime
 
@@ -11,9 +11,9 @@ Payload's built-in jobs system (`payload-jobs`) executes tasks. `@10x-media/jobs
 
 The producer plugins enqueue plain Payload tasks:
 
-- **Webhooks** registers a `webhooksDeliver` task and queues one job per delivery when running in queue mode.
-- **Form Builder** registers a `form-builder-actions` task and queues post-submit action runs when a runner is present.
-- **Analytics** registers `analytics-warm-cache`, `analytics-sync`, and `analytics-prune-events` tasks for its opt-in scheduled work.
+- Webhooks registers a `webhooksDeliver` task and queues one job per delivery when running in queue mode.
+- Form Builder registers a `form-builder-actions` task and queues post-submit action runs when a runner is present.
+- Analytics registers `analytics-warm-cache`, `analytics-sync`, and `analytics-prune-events` for its opt-in scheduled work.
 
 Because they are ordinary Payload jobs, they all inherit whatever you set up with the Jobs plugin: they show up in the dashboard, get swept when orphaned, and run under the worker.
 
@@ -26,7 +26,7 @@ Webhooks and Form Builder decide between queueing and inline execution by asking
 
 If either is true, a runner is assumed and work is queued. Otherwise it runs inline (webhooks) or through a bounded inline fallback (form-builder), so a project without a worker still functions. Installing the Jobs plugin is therefore enough to move both onto the queue; there is no mode flag to coordinate.
 
-Detection uses Payload's `definePlugin` slug registry: each plugin registers under its package name, and siblings look it up by slug. See [Plugin conventions](/docs/concepts).
+Detection uses Payload's `definePlugin` slug registry: each plugin registers under its package name, and siblings look it up by slug. See [Plugin conventions](/concepts).
 
 ## Contributions run before consumers
 
@@ -52,4 +52,4 @@ The order of the `plugins` array does not matter; `order` does.
 
 ## One queue, one worker
 
-Run one worker (or one `autoRun` schedule) and every plugin's jobs flow through it. Deliveries, form actions, and analytics warming do not need separate infrastructure. If you route work to named queues (for example webhooks' `delivery.queue` option), make sure the worker or run endpoint covers those queues; see [Workers](/docs/jobs/workers).
+Run one worker (or one `autoRun` schedule) and every plugin's jobs flow through it. Deliveries, form actions, and analytics warming do not need separate infrastructure. If you route work to named queues (for example webhooks' `delivery.queue` option), make sure the worker or run endpoint covers those queues; see [Workers](/jobs/workers).

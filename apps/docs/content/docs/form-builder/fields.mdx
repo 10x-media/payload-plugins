@@ -7,11 +7,11 @@ Form fields are authored as Payload blocks: one block type per registered field 
 
 ## Core field types
 
-`text`, `textarea`, `email`, `number`, `select`, `checkbox`, `file`, `consent`, and `calculation`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/docs/form-builder/uploads), [Consent](/docs/form-builder/consent), [Calculations](/docs/form-builder/calculations).
+`text`, `textarea`, `email`, `number`, `select`, `checkbox`, `file`, `consent`, and `calculation`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads), [Consent](/form-builder/consent), [Calculations](/form-builder/calculations).
 
 ## The registry
 
-The `fields` option follows the plugin-wide [opt-in convention](/docs/concepts#the-opt-in-convention): `false` removes a built-in, `true` keeps it, an object adds or replaces a type.
+The `fields` option follows the plugin-wide [opt-in convention](/concepts#the-opt-in-convention): `false` removes a built-in, `true` keeps it, an object adds or replaces a type.
 
 ```ts title="payload.config.ts"
 formBuilder({
@@ -45,15 +45,11 @@ export default buildConfig({
 })
 ```
 
-- **`value`** is the value kind (`'text'`, `'number'`, `'boolean'`, and so on). It drives the `TValue` that `validate` and `format` receive.
-- **`config`** (optional) is a Payload `Field[]` rendered in the add-field drawer, so your type gets admin-authorable settings.
-- **`validate`** runs on the server for every submission, and on the client for UX when the renderer knows the type.
-- **`format`** turns a stored value into display text: the admin answers view, [recall tokens](/docs/form-builder/recall-prefill), and results all use it.
-- **`schema`** (optional) attaches a [Standard Schema](https://standardschema.dev) validator; see [Validation](/docs/form-builder/validation#standard-schema).
+`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Two optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings, and `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)).
 
 Field definitions use precise generics, so cast each registry entry to `FieldTypeOption` at the registry boundary (the erased type the registry stores), exactly as the built-ins do.
 
-To render a custom type on the frontend, register a matching renderer under the same slug: see [Rendering](/docs/form-builder/rendering#renderers).
+To render a custom type on the frontend, register a matching renderer under the same slug: see [Rendering](/form-builder/rendering#renderers).
 
 ## Submissions are typed and self-describing
 

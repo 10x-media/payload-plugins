@@ -18,10 +18,7 @@ export default buildConfig({
 })
 ```
 
-`definePlugin` attaches two pieces of metadata to the returned plugin:
-
-- **`slug`**: the package name, for example `@10x-media/jobs`. Payload builds a slug-keyed map of registered plugins, so plugins can detect each other. Webhooks uses this to switch its delivery mode when Jobs is installed, and to push a trigger into Automations. See [Jobs family interop](/docs/concepts/jobs-family).
-- **`order`**: controls when the plugin runs relative to others. Contributors run early (webhooks at `order: 10`), consumers run late (automations at `order: 100`), so contributions are already in place when the consumer reads them.
+`definePlugin` attaches two pieces of metadata to the returned plugin. The `slug` is the package name (`@10x-media/jobs`); Payload builds a slug-keyed map of registered plugins from it, which is how the plugins detect each other. Webhooks, for example, switches its delivery mode when it finds Jobs in that map. `order` controls when a plugin runs relative to its siblings: contributors run early (webhooks at `order: 10`), consumers late (automations at `order: 100`), so contributions are already in place when the consumer reads them. Both mechanisms are shown in action in [Jobs family interop](/concepts/jobs-family).
 
 Every factory accepts `disabled: true`, which returns the incoming config untouched. Use it to switch a plugin off per environment without removing the call.
 
@@ -49,7 +46,7 @@ Each package splits its surface into subpath exports so server code, client comp
 | `./types` | Types only. Import from here in code that must not pull in runtime. |
 | `./client` | Client components (`'use client'`). Referenced by the admin import map. |
 | `./rsc` | Server components for the admin, where the plugin has them. |
-| `./i18n` | Translation `keys`, the built-in `translations`, and the `TranslationsOption` type. See [Translations](/docs/concepts/translations). |
+| `./i18n` | Translation `keys`, the built-in `translations`, and the `TranslationsOption` type. See [Translations](/concepts/translations). |
 
 Some plugins add more: analytics ships `./adapters/*`, `./geo`, and `./testing`; form-builder ships `./react` (the frontend renderer) and `./styles.css`.
 
