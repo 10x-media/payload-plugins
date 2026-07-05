@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/automations",
-	"version": "0.0.0",
+	"version": "0.1.0-beta.0",
 	"private": true,
 	"description": "No-code automations engine for Payload",
 	"license": "MIT",
