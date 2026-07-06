@@ -124,6 +124,17 @@ export const keys = {
 	spamRateLimited: 'formBuilder:spam.rateLimited',
 	spamRejected: 'formBuilder:spam.rejected',
 	spamCaptchaFailed: 'formBuilder:spam.captchaFailed',
+	fieldTypeRepeater: 'formBuilder:fieldType.repeater',
+	configMinRows: 'formBuilder:config.minRows',
+	configMaxRows: 'formBuilder:config.maxRows',
+	configAddLabel: 'formBuilder:config.addLabel',
+	configSubFields: 'formBuilder:config.subFields',
+	validationRepeaterMin: 'formBuilder:validation.repeaterMin',
+	validationRepeaterMax: 'formBuilder:validation.repeaterMax',
+	repeaterAddRow: 'formBuilder:repeater.addRow',
+	repeaterRemoveRow: 'formBuilder:repeater.removeRow',
+	repeaterRow: 'formBuilder:repeater.row',
+	repeaterRowCount: 'formBuilder:repeater.rowCount',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

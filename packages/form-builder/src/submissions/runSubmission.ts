@@ -157,7 +157,14 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		}
 		// A consent field's "not agreed" state is semantically meaningful: treat a missing value as
 		// `false` so the intrinsic validate can enforce required-agreement (not optional = must be true).
-		const effectiveRaw = instance.blockType === 'consent' && isEmpty(raw) ? false : raw
+		// A repeater with no rows is a valid empty submission; treat null/undefined as [] so it
+		// reaches row-count validation (e.g. minRows > 0 must still reject).
+		const effectiveRaw =
+			instance.blockType === 'consent' && isEmpty(raw)
+				? false
+				: instance.blockType === 'repeater' && isEmpty(raw)
+					? []
+					: raw
 		if (isEmpty(effectiveRaw)) {
 			continue
 		}
@@ -271,6 +278,69 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				now,
 			})
 			consentProofs.push({ field: instance.name, ...proof })
+			continue
+		}
+
+		if (instance.blockType === 'repeater') {
+			const rows = Array.isArray(value) ? (value as Array<Record<string, unknown>>) : []
+			const subFields = Array.isArray(instance.subFields)
+				? (instance.subFields as FormFieldInstance[])
+				: []
+
+			// Per-row sub-field validation: evaluate each sub-field's visibleWhen against the
+			// row's own values, then run its validation rules. Errors are reported with path
+			// fieldName[rowIndex].subFieldName so the client can map them to the right input.
+			for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+				const row = rows[rowIndex] ?? {}
+				for (const subField of subFields) {
+					const subDef = registry.get(subField.blockType)
+					if (!subDef) continue
+					if (!evaluateCondition(subField.visibleWhen, row)) continue
+					if (!evaluateCondition(subField.validateWhen, row)) continue
+					const subValue = row[subField.name]
+					const { errors: subErrors } = await runValidation({
+						field: subField,
+						fieldDefinition: subDef,
+						value: subValue,
+						fieldType: subField.blockType,
+						ruleRegistry,
+						answers: row,
+						locale,
+						t,
+						operation,
+						event: 'submit',
+						mode: 'server',
+						req,
+						payload,
+						formId,
+					})
+					for (const issue of subErrors.filter((e) => e.severity === 'error')) {
+						errors.push({
+							path: `${instance.name}[${rowIndex}].${subField.name}`,
+							message: issue.message,
+						})
+					}
+				}
+			}
+
+			if (errors.length > 0) {
+				continue
+			}
+
+			const subFieldDescriptors: SubmissionDescriptor[] = subFields.map((sf) => ({
+				field: sf.name,
+				label: sf.label ?? sf.name,
+				fieldType: sf.blockType,
+				...((sf.options as unknown) ? { optionLabels: optionLabelsFor(sf) ?? undefined } : {}),
+			}))
+
+			outValues.push({ field: instance.name, value: rows })
+			descriptors.push({
+				field: instance.name,
+				label: instance.label ?? instance.name,
+				fieldType: instance.blockType,
+				...(subFieldDescriptors.length > 0 ? { subFieldDescriptors } : {}),
+			})
 			continue
 		}
 

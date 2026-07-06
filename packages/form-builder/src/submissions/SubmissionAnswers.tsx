@@ -50,6 +50,69 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 				{descriptors.map((descriptor) => {
 					const definition = registry.get(descriptor.fieldType)
 					const raw = valueByField.get(descriptor.field)
+
+					if (descriptor.fieldType === 'repeater') {
+						const rows = Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : []
+						const subFieldDescriptors = descriptor.subFieldDescriptors ?? []
+						return (
+							<div key={descriptor.field}>
+								<dt>{descriptor.label}</dt>
+								<dd>
+									{rows.length === 0 ? (
+										<span>—</span>
+									) : (
+										<ol className="form-builder-submission-answers__repeater">
+											{rows.map((row, rowIndex) => {
+												// biome-ignore lint/suspicious/noArrayIndexKey: submission rows have no stable ID; index is stable for read-only display
+												const rowKey = rowIndex
+												return (
+													<li
+														key={rowKey}
+														className="form-builder-submission-answers__repeater-row"
+													>
+														<dl>
+															{subFieldDescriptors.map((subDesc) => {
+																const subDef = registry.get(subDesc.fieldType)
+																const subRaw = row[subDesc.field]
+																const subFormatted = subDef?.format
+																	? subDef.format({
+																			value: subRaw,
+																			config: {},
+																			optionLabels: subDesc.optionLabels,
+																			locale,
+																			t,
+																		})
+																	: subRaw == null
+																		? ''
+																		: String(subRaw)
+																const subHref =
+																	subDesc.fieldType === 'file' ? fileHref(subRaw) : null
+																return (
+																	<div key={subDesc.field}>
+																		<dt>{subDesc.label}</dt>
+																		<dd>
+																			{subHref ? (
+																				<a href={subHref.url} rel="noreferrer">
+																					{subHref.filename}
+																				</a>
+																			) : (
+																				subFormatted
+																			)}
+																		</dd>
+																	</div>
+																)
+															})}
+														</dl>
+													</li>
+												)
+											})}
+										</ol>
+									)}
+								</dd>
+							</div>
+						)
+					}
+
 					const formatted = definition?.format
 						? definition.format({
 								value: raw,

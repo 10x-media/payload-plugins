@@ -5,6 +5,7 @@ import { consentField } from './consent'
 import { emailField } from './email'
 import { fileField } from './file'
 import { numberField } from './number'
+import { repeaterField } from './repeater'
 import { selectField } from './select'
 import { textField } from './text'
 import { textareaField } from './textarea'
@@ -21,4 +22,5 @@ export const defaultFieldDefinitions: AnyFormFieldDefinition[] = [
 	calculationField as AnyFormFieldDefinition,
 	consentField as AnyFormFieldDefinition,
 	fileField as AnyFormFieldDefinition,
+	repeaterField as AnyFormFieldDefinition,
 ]

@@ -3,6 +3,7 @@
 import type { Dispatch } from 'react'
 import { createContext, useContext } from 'react'
 import type { FormFlow } from '../flow/types'
+import type { RendererRegistry } from './registry'
 import type { FormAction, FormState } from './state'
 
 /** Multi-step navigation state. Defaults to a single terminal step when the form has no flow. */
@@ -24,6 +25,8 @@ export type FormContextValue = {
 	validateField: (name: string, value: unknown) => void
 	locale: string
 	step: FormStepInfo
+	/** The active renderer registry, exposed so nested renderers (e.g. repeater) can look up sub-renderers. */
+	rendererRegistry: RendererRegistry
 }
 
 export const FormContext = createContext<FormContextValue | null>(null)

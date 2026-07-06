@@ -478,7 +478,7 @@ export const Form = ({
 				goBack: () => {},
 			}
 
-	const contextValue = { state, dispatch, validateField, locale, step }
+	const contextValue = { state, dispatch, validateField, locale, step, rendererRegistry }
 
 	const PresentationWrapper = activePresentation.Wrapper
 	const wrap = (content: ReactNode): ReactNode =>

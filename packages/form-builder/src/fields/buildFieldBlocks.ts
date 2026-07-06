@@ -49,5 +49,29 @@ export const buildFieldBlocks = (
 			],
 		})
 	}
+
+	// Second pass: inject subFields into the repeater block using all non-repeater blocks.
+	// Done after the main loop so every sibling block is already built.
+	// Repeater-in-repeater is not supported in v1; the repeater block is excluded from subFields.
+	const repeaterBlock = blocks.find((b) => b.slug === 'repeater')
+	if (repeaterBlock) {
+		const subFieldBlocks = blocks.filter((b) => b.slug !== 'repeater')
+		const fieldsArr = repeaterBlock.fields as Field[]
+		const validationsIdx = fieldsArr.findIndex(
+			(f) => (f as { name?: string }).name === 'validations'
+		)
+		const subFieldsField: Field = {
+			name: 'subFields',
+			type: 'blocks',
+			label: labelFor(keys.configSubFields),
+			blocks: subFieldBlocks,
+		}
+		if (validationsIdx >= 0) {
+			fieldsArr.splice(validationsIdx, 0, subFieldsField)
+		} else {
+			fieldsArr.push(subFieldsField)
+		}
+	}
+
 	return blocks
 }

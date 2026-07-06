@@ -9,6 +9,8 @@ export type SubmissionDescriptor = {
 	label: string
 	fieldType: string
 	optionLabels?: Record<string, string>
+	/** For repeater fields: one descriptor per sub-field, shared across all rows. */
+	subFieldDescriptors?: SubmissionDescriptor[]
 }
 
 /** A per-field validation failure (`path` is the field name, for renderer error mapping). */
