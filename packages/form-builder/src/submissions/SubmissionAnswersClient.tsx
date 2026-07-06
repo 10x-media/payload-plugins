@@ -55,13 +55,11 @@ const pillStyle = (agreed: boolean): React.CSSProperties => ({
 	color: '#fff',
 })
 
-const sectionDivider: React.CSSProperties = {
+const rowHeading: React.CSSProperties = {
 	fontSize: '0.75rem',
 	fontWeight: 600,
 	color: 'var(--theme-elevation-500)',
-	margin: '8px 0 4px',
-	paddingBottom: '4px',
-	borderBottom: '1px solid var(--theme-elevation-100)',
+	margin: '0 0 4px',
 }
 
 export const SubmissionAnswersClient = ({
@@ -79,76 +77,79 @@ export const SubmissionAnswersClient = ({
 	}
 
 	return (
-		<div className="field-type">
-			{answers.map(({ field, label, value, href }) =>
-				href ? (
-					<div key={field} className="field-type">
-						<FieldLabel label={label} />
-						<a
-							href={href}
-							target="_blank"
-							rel="noreferrer"
-							style={{
-								display: 'block',
-								padding: '8px 0',
-								color: 'var(--theme-text)',
-								textDecoration: 'underline',
-							}}
-						>
-							{value}
-						</a>
-					</div>
-				) : (
-					<TextInput
-						key={field}
-						path={`sa-${field}`}
-						label={label}
-						value={value}
-						readOnly
-						onChange={noop}
-					/>
-				)
-			)}
-
-			{repeaters.map(({ field, label, rows }) => (
-				<div key={field} className="field-type">
-					<FieldLabel label={label} />
-					{rows.length === 0 ? (
-						<TextInput path={`sa-${field}-empty`} label="" value="—" readOnly onChange={noop} />
-					) : (
-						<div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-							{rows.map((row) => (
-								<div
-									key={row.id}
+		<div className="field-type" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+			{(answers.length > 0 || repeaters.length > 0) && (
+				<section>
+					{answers.map(({ field, label, value, href }) =>
+						href ? (
+							<div key={field} className="field-type">
+								<FieldLabel label={label} />
+								<a
+									href={href}
+									target="_blank"
+									rel="noreferrer"
 									style={{
-										border: '1px solid var(--theme-elevation-150)',
-										borderRadius: '4px',
-										padding: '4px 12px 0',
+										display: 'block',
+										padding: '8px 0',
+										color: 'var(--theme-text)',
+										textDecoration: 'underline',
 									}}
 								>
-									<p style={{ ...sectionDivider, borderBottom: 'none', marginBottom: 0 }}>
-										Row {Number(row.id) + 1}
-									</p>
-									{row.subFields.map((subField) => (
-										<TextInput
-											key={subField.label}
-											path={`sa-${field}-${row.id}-${subField.label}`}
-											label={subField.label}
-											value={subField.value}
-											readOnly
-											onChange={noop}
-										/>
+									{value}
+								</a>
+							</div>
+						) : (
+							<TextInput
+								key={field}
+								path={`sa-${field}`}
+								label={label}
+								value={value}
+								readOnly
+								onChange={noop}
+							/>
+						)
+					)}
+
+					{repeaters.map(({ field, label, rows }) => (
+						<div key={field} className="field-type">
+							<FieldLabel label={label} />
+							{rows.length === 0 ? (
+								<TextInput path={`sa-${field}-empty`} label="" value="—" readOnly onChange={noop} />
+							) : (
+								<div
+									style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}
+								>
+									{rows.map((row) => (
+										<div
+											key={row.id}
+											style={{
+												border: '1px solid var(--theme-elevation-150)',
+												borderRadius: '4px',
+												padding: '4px 12px 0',
+											}}
+										>
+											<p style={rowHeading}>Row {Number(row.id) + 1}</p>
+											{row.subFields.map((subField) => (
+												<TextInput
+													key={subField.label}
+													path={`sa-${field}-${row.id}-${subField.label}`}
+													label={subField.label}
+													value={subField.value}
+													readOnly
+													onChange={noop}
+												/>
+											))}
+										</div>
 									))}
 								</div>
-							))}
+							)}
 						</div>
-					)}
-				</div>
-			))}
+					))}
+				</section>
+			)}
 
 			{consent.length > 0 && (
-				<div className="field-type">
-					<p style={sectionDivider}>Consent</p>
+				<section>
 					{consent.map((entry) => (
 						<div key={entry.field} className="field-type">
 							<FieldLabel label={entry.field} />
@@ -171,12 +172,11 @@ export const SubmissionAnswersClient = ({
 							</div>
 						</div>
 					))}
-				</div>
+				</section>
 			)}
 
 			{meta.length > 0 && (
-				<div className="field-type">
-					<p style={sectionDivider}>Submission details</p>
+				<section>
 					{meta.map((item) => (
 						<TextInput
 							key={item.label}
@@ -187,7 +187,7 @@ export const SubmissionAnswersClient = ({
 							onChange={noop}
 						/>
 					))}
-				</div>
+				</section>
 			)}
 		</div>
 	)
