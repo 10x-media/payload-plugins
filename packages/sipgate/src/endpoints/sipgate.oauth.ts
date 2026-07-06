@@ -1,4 +1,4 @@
-import type { Endpoint } from 'payload'
+import type { CollectionSlug, Endpoint } from 'payload'
 import type { SipgateCredentials } from '../types'
 import { getAuthorizationUserinfo, getUsers } from '../utils/sipgate.rest'
 import {
@@ -180,7 +180,7 @@ export const createSipgateOAuthCallback = ({
 		// Check whether this Sipgate account is already claimed by a different Payload user.
 		if (!allowSharedSipgateAccount) {
 			const claimedBy = await req.payload.find({
-				collection: sipgateUsersSlug,
+				collection: sipgateUsersSlug as CollectionSlug,
 				where: {
 					and: [
 						{ sipgateId: { equals: sipgateUser.id } },
@@ -191,7 +191,7 @@ export const createSipgateOAuthCallback = ({
 				overrideAccess: true,
 			})
 			if (claimedBy.totalDocs > 0) {
-				const claimer = claimedBy.docs[0] as Record<string, unknown>
+				const claimer = claimedBy.docs[0] as unknown as Record<string, unknown>
 				const claimerEmail =
 					typeof claimer?.email === 'string' ? encodeURIComponent(claimer.email) : ''
 				return Response.redirect(
@@ -203,7 +203,7 @@ export const createSipgateOAuthCallback = ({
 
 		try {
 			const existing = await req.payload.find({
-				collection: sipgateUsersSlug,
+				collection: sipgateUsersSlug as CollectionSlug,
 				where: { 'payloadUser.value': { equals: payloadUserId } },
 				limit: 1,
 				overrideAccess: true,
@@ -211,7 +211,7 @@ export const createSipgateOAuthCallback = ({
 
 			if (existing.totalDocs > 0 && existing.docs[0]) {
 				await req.payload.update({
-					collection: sipgateUsersSlug,
+					collection: sipgateUsersSlug as CollectionSlug,
 					id: existing.docs[0].id as string,
 					data: {
 						sipgateId: sipgateUser.id,
@@ -226,7 +226,7 @@ export const createSipgateOAuthCallback = ({
 				})
 			} else {
 				await req.payload.create({
-					collection: sipgateUsersSlug,
+					collection: sipgateUsersSlug as CollectionSlug,
 					data: {
 						sipgateId: sipgateUser.id,
 						firstname: sipgateUser.firstname,

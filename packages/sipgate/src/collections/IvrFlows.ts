@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, CollectionSlug } from 'payload'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 
@@ -74,7 +74,7 @@ export const createIvrFlowsCollection = (
 				{
 					name: 'voiceLine',
 					type: 'relationship',
-					relationTo: voiceLinesSlug as 'ivr-voice-lines',
+					relationTo: voiceLinesSlug as CollectionSlug,
 					required: true,
 					label: labelForKey(keys.ivrFlowsFieldStepsVoiceLine),
 				},

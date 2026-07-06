@@ -1,4 +1,4 @@
-import type { Payload } from 'payload'
+import type { CollectionSlug, Payload } from 'payload'
 import type { SipgateCredentials } from '../types'
 import {
 	buildSipgateRest,
@@ -36,7 +36,7 @@ export const syncUsers = async ({
 		try {
 			await upsertByField({
 				payload,
-				collection: sipgateUsersSlug,
+				collection: sipgateUsersSlug as CollectionSlug,
 				uniqueField: 'sipgateId',
 				uniqueValue: user.id,
 				data: {
@@ -60,7 +60,7 @@ export const syncUsers = async ({
 	if (prune) {
 		try {
 			const orphans = await payload.find({
-				collection: sipgateUsersSlug,
+				collection: sipgateUsersSlug as CollectionSlug,
 				where: { id: { not_in: [...seenIds] } },
 				limit: 1000,
 				depth: 0,
@@ -69,7 +69,7 @@ export const syncUsers = async ({
 			for (const doc of orphans.docs) {
 				try {
 					await payload.delete({
-						collection: sipgateUsersSlug,
+						collection: sipgateUsersSlug as CollectionSlug,
 						id: doc.id,
 						overrideAccess: true,
 					})
@@ -109,7 +109,7 @@ export const syncDevices = async ({
 	scopeToUserId,
 }: SyncDevicesOptions): Promise<SyncResult> => {
 	const usersResult = await payload.find({
-		collection: sipgateUsersSlug,
+		collection: sipgateUsersSlug as CollectionSlug,
 		where: scopeToUserId ? { sipgateId: { equals: scopeToUserId } } : undefined,
 		limit: 1000,
 		depth: 0,
@@ -121,7 +121,8 @@ export const syncDevices = async ({
 	let errors = 0
 	let deleted = 0
 
-	for (const user of usersResult.docs) {
+	for (const _user of usersResult.docs) {
+		const user = _user as unknown as Record<string, unknown>
 		const userId = user.sipgateId as string | undefined
 		const payloadDocId = user.id as string
 		if (!userId) {
@@ -142,7 +143,7 @@ export const syncDevices = async ({
 			try {
 				await upsertByField({
 					payload,
-					collection: sipgateDevicesSlug,
+					collection: sipgateDevicesSlug as CollectionSlug,
 					uniqueField: 'sipgateId',
 					uniqueValue: device.id,
 					data: {
@@ -167,7 +168,7 @@ export const syncDevices = async ({
 	if (prune && !scopeToUserId) {
 		try {
 			const orphans = await payload.find({
-				collection: sipgateDevicesSlug,
+				collection: sipgateDevicesSlug as CollectionSlug,
 				where: { id: { not_in: [...seen] } },
 				limit: 1000,
 				depth: 0,
@@ -176,7 +177,7 @@ export const syncDevices = async ({
 			for (const doc of orphans.docs) {
 				try {
 					await payload.delete({
-						collection: sipgateDevicesSlug,
+						collection: sipgateDevicesSlug as CollectionSlug,
 						id: doc.id,
 						overrideAccess: true,
 					})
@@ -231,7 +232,7 @@ export const syncChannels = async ({
 			const assignedUsers = await Promise.all(
 				group.users.map(async (u) => {
 					const result = await payload.find({
-						collection: sipgateUsersSlug,
+						collection: sipgateUsersSlug as CollectionSlug,
 						where: { sipgateId: { equals: u.id } },
 						limit: 1,
 						overrideAccess: true,
@@ -247,7 +248,7 @@ export const syncChannels = async ({
 
 			await upsertByField({
 				payload,
-				collection: sipgateChannelsSlug,
+				collection: sipgateChannelsSlug as CollectionSlug,
 				uniqueField: 'sipgateId',
 				uniqueValue: group.id,
 				data: {
@@ -289,7 +290,7 @@ export const syncChannels = async ({
 			if (isPersonalChannel) {
 				await upsertByField({
 					payload,
-					collection: sipgateUsersSlug,
+					collection: sipgateUsersSlug as CollectionSlug,
 					uniqueField: 'sipgateId',
 					uniqueValue: group.owner,
 					data: { defaultChannel: group.id },
@@ -305,7 +306,7 @@ export const syncChannels = async ({
 	if (prune && !scopeToUserId) {
 		try {
 			const orphans = await payload.find({
-				collection: sipgateChannelsSlug,
+				collection: sipgateChannelsSlug as CollectionSlug,
 				where: { id: { not_in: [...seenIds] } },
 				limit: 1000,
 				depth: 0,
@@ -314,7 +315,7 @@ export const syncChannels = async ({
 			for (const doc of orphans.docs) {
 				try {
 					await payload.delete({
-						collection: sipgateChannelsSlug,
+						collection: sipgateChannelsSlug as CollectionSlug,
 						id: doc.id as string,
 						overrideAccess: true,
 					})

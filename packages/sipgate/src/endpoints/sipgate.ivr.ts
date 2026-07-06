@@ -1,4 +1,4 @@
-import type { Endpoint } from 'payload'
+import type { CollectionSlug, Endpoint } from 'payload'
 import queryString from 'query-string'
 import { createIvrStore } from '../utils/ivrStore'
 import { buildStepAction, resolveNextStepId, resolveVoiceLineUrl } from '../utils/sipgateIvrHandler'
@@ -36,7 +36,7 @@ const createSipgateIvrHandler =
 		}
 
 		const flowResult = await req.payload.findByID({
-			collection: flowsSlug as 'ivr-flows',
+			collection: flowsSlug as CollectionSlug,
 			id: session.flowId,
 			depth: 1,
 		})
