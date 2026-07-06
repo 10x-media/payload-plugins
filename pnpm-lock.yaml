@@ -718,7 +718,7 @@ importers:
         version: 19.2.6(react@19.2.6)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -14174,7 +14174,7 @@ snapshots:
       rolldown: 1.0.3
       rolldown-plugin-dts: 0.25.1(rolldown@1.0.3)(typescript@5.9.3)
       semver: 7.8.1
-      tinyexec: 1.2.2
+      tinyexec: 1.2.4
       tinyglobby: 0.2.16
       tree-kill: 1.2.2
       unconfig-core: 7.5.0
