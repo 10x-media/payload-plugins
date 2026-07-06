@@ -156,18 +156,24 @@ export const SubmissionAnswersClient = ({
 						<div key={entry.field} className="field-type">
 							<FieldLabel label={entry.field} />
 							<div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-								<span style={pillStyle(entry.agreed)}>{entry.agreed ? 'Agreed' : 'Declined'}</span>
-								{entry.ref ? (
-									<a
-										href={entry.ref}
-										target="_blank"
-										rel="noreferrer"
-										style={{ fontSize: '0.8rem', color: 'var(--theme-text)' }}
-									>
-										{entry.ref}
-										{entry.versionRef ? ` (v${entry.versionRef})` : ''}
-									</a>
-								) : null}
+								<div
+									style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}
+								>
+									<span style={pillStyle(entry.agreed)}>
+										{entry.agreed ? 'Agreed' : 'Declined'}
+									</span>
+									{entry.ref ? (
+										<a
+											href={entry.ref}
+											target="_blank"
+											rel="noreferrer"
+											style={{ fontSize: '0.8rem', color: 'var(--theme-text)' }}
+										>
+											{entry.ref}
+											{entry.versionRef ? ` (v${entry.versionRef})` : ''}
+										</a>
+									) : null}
+								</div>
 								<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-500)' }}>
 									{entry.at}
 								</span>
