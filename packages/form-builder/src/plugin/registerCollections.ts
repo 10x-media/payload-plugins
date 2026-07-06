@@ -22,6 +22,7 @@ type RegisterCollectionsArgs = {
 	events?: FormEventSink
 	uploads: { enabled: boolean; slug: string; collection?: CollectionConfig }
 	spam: ResolvedSpamConfig | false
+	showSubmissionRawFields: boolean
 }
 
 export const registerCollections = ({
@@ -35,6 +36,7 @@ export const registerCollections = ({
 	events,
 	uploads,
 	spam,
+	showSubmissionRawFields,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
@@ -69,6 +71,7 @@ export const registerCollections = ({
 			hasRunner,
 			uploadSlug: uploads.slug,
 			spam,
+			showRawFields: showSubmissionRawFields,
 		}),
 	]
 }

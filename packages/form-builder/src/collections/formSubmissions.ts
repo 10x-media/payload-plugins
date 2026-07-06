@@ -27,6 +27,11 @@ type BuildSubmissionsCollectionArgs = {
 	uploadSlug?: string
 	/** Resolved spam config; when active, prepends the spam guard before validation. `false` disables it. */
 	spam?: ResolvedSpamConfig | false
+	/**
+	 * When `true`, shows the raw `values`, `descriptors`, and `consent` JSON fields in the admin UI.
+	 * Default `false` — they are fully represented by the `SubmissionAnswers` UI component.
+	 */
+	showRawFields?: boolean
 }
 
 const formIdOf = (form: unknown): number | string | undefined => {
@@ -113,6 +118,7 @@ export const buildSubmissionsCollection = ({
 	hasRunner = false,
 	uploadSlug,
 	spam,
+	showRawFields = false,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => ({
 	slug: FORM_SUBMISSIONS_SLUG,
 	labels: { singular: 'Submission', plural: 'Submissions' },
@@ -143,11 +149,7 @@ export const buildSubmissionsCollection = ({
 			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
 			access: { create: isLoggedIn, update: isLoggedIn },
 		},
-		{ name: 'locale', type: 'text' },
-		{ name: 'values', type: 'json' },
-		{ name: 'descriptors', type: 'json' },
-		{ name: 'consent', type: 'json' },
-		{ name: 'meta', type: 'json' },
+		// answers UI appears first so it is the dominant view when opening a submission document.
 		{
 			name: 'answers',
 			type: 'ui',
@@ -155,5 +157,10 @@ export const buildSubmissionsCollection = ({
 				components: { Field: '@10x-media/form-builder/rsc#SubmissionAnswers' },
 			},
 		},
+		{ name: 'locale', type: 'text' },
+		{ name: 'values', type: 'json', admin: { hidden: !showRawFields } },
+		{ name: 'descriptors', type: 'json', admin: { hidden: !showRawFields } },
+		{ name: 'consent', type: 'json', admin: { hidden: !showRawFields } },
+		{ name: 'meta', type: 'json' },
 	],
 })

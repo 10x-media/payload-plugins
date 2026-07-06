@@ -45,6 +45,12 @@ export type FormBuilderPluginOptions = {
 	uploads?: UploadsOption
 	/** Honeypot + rate-limiting (on by default) + a captcha adapter seam + upload-ownership scoping. `false` disables the whole subsystem. */
 	spam?: SpamOption
+	/**
+	 * When `true`, the raw `values`, `descriptors`, and `consent` JSON fields are visible in the
+	 * submission admin view. Default `false` — those fields are fully represented by the
+	 * `SubmissionAnswers` UI component and are noisy when shown alongside it.
+	 */
+	showSubmissionRawFields?: boolean
 }
 
 declare module 'payload' {
@@ -82,6 +88,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			events: options.events,
 			uploads,
 			spam,
+			showSubmissionRawFields: options.showSubmissionRawFields ?? false,
 		})
 		return config
 	},
