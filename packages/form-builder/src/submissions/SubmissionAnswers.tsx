@@ -59,15 +59,15 @@ const formatDate = (iso: string, locale: string): string => {
 const sectionStyle: React.CSSProperties = {
 	display: 'flex',
 	flexDirection: 'column',
-	gap: '0.5rem',
+	gap: '0.125rem',
 }
 
 const headingStyle: React.CSSProperties = {
-	fontSize: '0.75rem',
+	fontSize: '0.6875rem',
 	fontWeight: 600,
-	letterSpacing: '0.06em',
+	letterSpacing: '0.08em',
 	textTransform: 'uppercase',
-	color: 'var(--theme-elevation-500)',
+	color: 'var(--theme-elevation-400)',
 	margin: '0 0 0.25rem',
 }
 
@@ -75,30 +75,33 @@ const rowStyle: React.CSSProperties = {
 	display: 'flex',
 	flexDirection: 'column',
 	gap: '0.125rem',
-	padding: '0.625rem 0',
+	padding: '0.375rem 0',
 	borderBottom: '1px solid var(--theme-elevation-100)',
 }
 
 const labelStyle: React.CSSProperties = {
-	fontSize: '0.75rem',
-	color: 'var(--theme-elevation-500)',
+	fontSize: '0.6875rem',
+	fontWeight: 600,
+	letterSpacing: '0.04em',
+	textTransform: 'uppercase',
+	color: 'var(--theme-elevation-400)',
 	margin: 0,
 }
 
 const valueStyle: React.CSSProperties = {
-	fontSize: '0.875rem',
+	fontSize: 'inherit',
 	color: 'var(--theme-text)',
 	margin: 0,
 	wordBreak: 'break-word',
 }
 
 const repeaterRowStyle: React.CSSProperties = {
-	padding: '0.5rem 0.75rem',
+	padding: '0.375rem 0.625rem',
 	border: '1px solid var(--theme-elevation-150)',
-	borderRadius: '4px',
+	borderRadius: '3px',
 	display: 'flex',
 	flexDirection: 'column',
-	gap: '0.5rem',
+	gap: '0.25rem',
 }
 
 const pillStyle = (agreed: boolean): React.CSSProperties => ({
@@ -239,7 +242,7 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 
 	if (!hasAnswers && !hasConsent && !hasMeta) {
 		return (
-			<p style={{ color: 'var(--theme-elevation-500)', fontSize: '0.875rem' }}>
+			<p style={{ color: 'var(--theme-elevation-400)', fontSize: 'inherit' }}>
 				{t(keys.submissionNoAnswers)}
 			</p>
 		)
@@ -248,7 +251,15 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 	const valueByField = new Map(values.map((entry) => [entry.field, entry.value]))
 
 	return (
-		<div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '0.5rem 0' }}>
+		<div
+			style={{
+				display: 'flex',
+				flexDirection: 'column',
+				gap: '1.25rem',
+				padding: '0.25rem 0',
+				fontFamily: 'var(--font-body, inherit)',
+			}}
+		>
 			{hasAnswers && (
 				<section style={sectionStyle}>
 					<h3 style={headingStyle}>{t(keys.submissionAnswers)}</h3>
@@ -280,7 +291,7 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 							>
 								<span style={pillStyle(entry.agreed)}>{entry.agreed ? 'Agreed' : 'Declined'}</span>
 								{entry.ref ? (
-									<p style={{ ...valueStyle, fontSize: '0.8rem' }}>
+									<p style={valueStyle}>
 										<a
 											href={entry.ref}
 											rel="noreferrer"
@@ -292,7 +303,7 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 										{entry.versionRef ? ` (v${entry.versionRef})` : ''}
 									</p>
 								) : null}
-								<p style={{ ...labelStyle, fontSize: '0.7rem' }}>{formatDate(entry.at, locale)}</p>
+								<p style={labelStyle}>{formatDate(entry.at, locale)}</p>
 							</div>
 						</div>
 					))}
@@ -317,7 +328,7 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 					{meta.ua ? (
 						<div style={rowStyle}>
 							<p style={labelStyle}>User agent</p>
-							<p style={{ ...valueStyle, fontSize: '0.8rem', color: 'var(--theme-elevation-500)' }}>
+							<p style={{ ...valueStyle, color: 'var(--theme-elevation-500)' }}>
 								{String(meta.ua)}
 							</p>
 						</div>
