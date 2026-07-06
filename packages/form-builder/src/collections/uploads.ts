@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { deepMerge } from 'payload'
 import { isLoggedIn } from '../plugin/access'
 
 export const FORM_UPLOADS_SLUG = 'form-uploads'
@@ -23,21 +24,27 @@ export type UploadsOption = boolean | UploadsCollectionConfig
  * `imageSizes`, so it needs no `sharp`. Projects with their own upload collection set `uploads: false` and
  * point the file field's `relationTo` at theirs.
  */
-export const buildUploadsCollection = (config: UploadsCollectionConfig = {}): CollectionConfig => ({
-	slug: config.slug ?? FORM_UPLOADS_SLUG,
-	access: config.access ?? {
-		create: () => true,
-		read: isLoggedIn,
-		update: isLoggedIn,
-		delete: isLoggedIn,
-	},
-	admin: { group: 'Forms' },
-	upload: config.upload && config.upload !== true ? config.upload : true,
-	fields: [
-		{ name: 'owner', type: 'text', admin: { readOnly: true, hidden: true } },
-		...(config.fields ?? []),
-	],
-})
+export const buildUploadsCollection = (
+	config: UploadsCollectionConfig = {},
+	overrides?: Partial<CollectionConfig>
+): CollectionConfig => {
+	const defaults: CollectionConfig = {
+		slug: config.slug ?? FORM_UPLOADS_SLUG,
+		access: config.access ?? {
+			create: () => true,
+			read: isLoggedIn,
+			update: isLoggedIn,
+			delete: isLoggedIn,
+		},
+		admin: { group: 'Forms' },
+		upload: config.upload && config.upload !== true ? config.upload : true,
+		fields: [
+			{ name: 'owner', type: 'text', admin: { readOnly: true, hidden: true } },
+			...(config.fields ?? []),
+		],
+	}
+	return overrides ? deepMerge(defaults, overrides) : defaults
+}
 
 /** Resolve the `uploads` plugin option: `false` disables, `true`/object enables the built-in collection. */
 export const resolveUploads = (
@@ -48,5 +55,5 @@ export const resolveUploads = (
 	}
 	const config = option && option !== true ? option : {}
 	const collection = buildUploadsCollection(config)
-	return { enabled: true, slug: collection.slug, collection }
+	return { enabled: true, slug: collection.slug as string, collection }
 }

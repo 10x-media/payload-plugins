@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook, CollectionConfig } from 'payload'
+import { deepMerge } from 'payload'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
@@ -32,6 +33,7 @@ type BuildSubmissionsCollectionArgs = {
 	 * Default `false` — they are fully represented by the `SubmissionAnswers` UI component.
 	 */
 	showRawFields?: boolean
+	overrides?: Partial<CollectionConfig>
 }
 
 const formIdOf = (form: unknown): number | string | undefined => {
@@ -119,48 +121,53 @@ export const buildSubmissionsCollection = ({
 	uploadSlug,
 	spam,
 	showRawFields = false,
-}: BuildSubmissionsCollectionArgs): CollectionConfig => ({
-	slug: FORM_SUBMISSIONS_SLUG,
-	labels: { singular: 'Submission', plural: 'Submissions' },
-	admin: { group: 'Forms' },
-	access: {
-		create: () => true,
-		read: isLoggedIn,
-		update: () => false,
-	},
-	hooks: {
-		beforeValidate: [
-			...(spam ? [buildSpamGuard(spam)] : []),
-			validateSubmission({ registry, ruleRegistry, consentRegistry, uploadSlug }),
-		],
-		afterChange: [makeAfterChange({ actionRegistry, events, hasRunner })],
-	},
-	fields: [
-		{ name: 'form', type: 'relationship', relationTo: FORMS_SLUG, required: true },
-		{
-			name: 'status',
-			type: 'select',
-			defaultValue: 'complete',
-			options: [
-				{ label: 'Complete', value: 'complete' },
-				{ label: 'Partial', value: 'partial' },
+	overrides,
+}: BuildSubmissionsCollectionArgs): CollectionConfig => {
+	const merge = (defaults: CollectionConfig): CollectionConfig =>
+		overrides ? deepMerge(defaults, overrides) : defaults
+	return merge({
+		slug: FORM_SUBMISSIONS_SLUG,
+		labels: { singular: 'Submission', plural: 'Submissions' },
+		admin: { group: 'Forms' },
+		access: {
+			create: () => true,
+			read: isLoggedIn,
+			update: () => false,
+		},
+		hooks: {
+			beforeValidate: [
+				...(spam ? [buildSpamGuard(spam)] : []),
+				validateSubmission({ registry, ruleRegistry, consentRegistry, uploadSlug }),
 			],
-			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
-			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
-			access: { create: isLoggedIn, update: isLoggedIn },
+			afterChange: [makeAfterChange({ actionRegistry, events, hasRunner })],
 		},
-		// answers UI appears first so it is the dominant view when opening a submission document.
-		{
-			name: 'answers',
-			type: 'ui',
-			admin: {
-				components: { Field: '@10x-media/form-builder/rsc#SubmissionAnswers' },
+		fields: [
+			{ name: 'form', type: 'relationship', relationTo: FORMS_SLUG, required: true },
+			{
+				name: 'status',
+				type: 'select',
+				defaultValue: 'complete',
+				options: [
+					{ label: 'Complete', value: 'complete' },
+					{ label: 'Partial', value: 'partial' },
+				],
+				// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
+				// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
+				access: { create: isLoggedIn, update: isLoggedIn },
 			},
-		},
-		{ name: 'locale', type: 'text' },
-		{ name: 'values', type: 'json', admin: { hidden: !showRawFields } },
-		{ name: 'descriptors', type: 'json', admin: { hidden: !showRawFields } },
-		{ name: 'consent', type: 'json', admin: { hidden: !showRawFields } },
-		{ name: 'meta', type: 'json' },
-	],
-})
+			// answers UI appears first so it is the dominant view when opening a submission document.
+			{
+				name: 'answers',
+				type: 'ui',
+				admin: {
+					components: { Field: '@10x-media/form-builder/rsc#SubmissionAnswers' },
+				},
+			},
+			{ name: 'locale', type: 'text' },
+			{ name: 'values', type: 'json', admin: { hidden: !showRawFields } },
+			{ name: 'descriptors', type: 'json', admin: { hidden: !showRawFields } },
+			{ name: 'consent', type: 'json', admin: { hidden: !showRawFields } },
+			{ name: 'meta', type: 'json' },
+		],
+	})
+}

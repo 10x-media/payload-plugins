@@ -1,4 +1,4 @@
-import { type Config, definePlugin } from 'payload'
+import { type CollectionConfig, type Config, definePlugin } from 'payload'
 import { defaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
@@ -51,6 +51,16 @@ export type FormBuilderPluginOptions = {
 	 * `SubmissionAnswers` UI component and are noisy when shown alongside it.
 	 */
 	showSubmissionRawFields?: boolean
+	/**
+	 * Deep-merge overrides applied to individual plugin-managed collections after they are built.
+	 * Use this to add fields, hooks, admin settings, or access control without replacing the
+	 * entire collection config.
+	 */
+	overrides?: {
+		forms?: Partial<CollectionConfig>
+		formSubmissions?: Partial<CollectionConfig>
+		uploads?: Partial<CollectionConfig>
+	}
 }
 
 declare module 'payload' {
@@ -89,6 +99,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			uploads,
 			spam,
 			showSubmissionRawFields: options.showSubmissionRawFields ?? false,
+			overrides: options.overrides,
 		})
 		return config
 	},

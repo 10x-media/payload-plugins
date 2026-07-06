@@ -1,6 +1,7 @@
 import {
 	type CollectionBeforeValidateHook,
 	type CollectionConfig,
+	deepMerge,
 	type PayloadRequest,
 	ValidationError,
 } from 'payload'
@@ -67,9 +68,11 @@ type BuildFormsCollectionArgs = {
 	consentRegistry?: ConsentSourceRegistry
 	presentationRegistry?: PresentationDescriptorRegistry
 	actionRegistry?: ActionRegistry
+	overrides?: Partial<CollectionConfig>
 }
 
 export const buildFormsCollection = ({
+	overrides,
 	registry,
 	ruleRegistry,
 	consentRegistry,
@@ -77,6 +80,8 @@ export const buildFormsCollection = ({
 	actionRegistry = new Map(),
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
+	const merge = (defaults: CollectionConfig): CollectionConfig =>
+		overrides ? deepMerge(defaults, overrides) : defaults
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
@@ -124,7 +129,7 @@ export const buildFormsCollection = ({
 		return data
 	}
 
-	return {
+	return merge({
 		slug: FORMS_SLUG,
 		labels: { singular: 'Form', plural: 'Forms' },
 		admin: { group: 'Forms', useAsTitle: 'title' },
@@ -243,5 +248,5 @@ export const buildFormsCollection = ({
 				},
 			},
 		],
-	}
+	})
 }

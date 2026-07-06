@@ -1,4 +1,5 @@
 import type { CollectionConfig, Config } from 'payload'
+import { deepMerge } from 'payload'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
@@ -23,6 +24,11 @@ type RegisterCollectionsArgs = {
 	uploads: { enabled: boolean; slug: string; collection?: CollectionConfig }
 	spam: ResolvedSpamConfig | false
 	showSubmissionRawFields: boolean
+	overrides?: {
+		forms?: Partial<CollectionConfig>
+		formSubmissions?: Partial<CollectionConfig>
+		uploads?: Partial<CollectionConfig>
+	}
 }
 
 export const registerCollections = ({
@@ -37,6 +43,7 @@ export const registerCollections = ({
 	uploads,
 	spam,
 	showSubmissionRawFields,
+	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
@@ -52,15 +59,23 @@ export const registerCollections = ({
 			buildUploadOwnerStamp(spam),
 		]
 	}
+	const uploadsCollection =
+		uploads.enabled && uploads.collection
+			? overrides?.uploads
+				? deepMerge(uploads.collection, overrides.uploads)
+				: uploads.collection
+			: null
+
 	config.collections = [
 		...(config.collections ?? []),
-		...(uploads.enabled && uploads.collection ? [uploads.collection] : []),
+		...(uploadsCollection ? [uploadsCollection] : []),
 		buildFormsCollection({
 			registry,
 			ruleRegistry,
 			consentRegistry,
 			presentationRegistry,
 			actionRegistry,
+			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({
 			registry,
@@ -72,6 +87,7 @@ export const registerCollections = ({
 			uploadSlug: uploads.slug,
 			spam,
 			showRawFields: showSubmissionRawFields,
+			overrides: overrides?.formSubmissions,
 		}),
 	]
 }
