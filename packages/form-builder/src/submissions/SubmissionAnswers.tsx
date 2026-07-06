@@ -135,7 +135,7 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 	if (meta) {
 		if (meta.at) metaItems.push({ label: 'Received at', value: formatDate(meta.at, locale) })
 		if (meta.ip) metaItems.push({ label: 'IP address', value: meta.ip })
-		if (meta.ua) metaItems.push({ label: 'User agent', value: String(meta.ua), muted: true })
+		if (meta.ua) metaItems.push({ label: 'User agent', value: String(meta.ua) })
 		if (meta.spam) {
 			const captcha =
 				typeof meta.spam === 'object' && 'captcha' in meta.spam

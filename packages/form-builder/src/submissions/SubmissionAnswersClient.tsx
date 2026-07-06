@@ -1,6 +1,7 @@
 'use client'
 
-import { FieldLabel } from '@payloadcms/ui'
+import { FieldLabel, TextInput } from '@payloadcms/ui'
+import type { ChangeEvent } from 'react'
 
 export type AnswerItem = {
 	field: string
@@ -32,7 +33,6 @@ export type ConsentItem = {
 export type MetaItem = {
 	label: string
 	value: string
-	muted?: boolean
 }
 
 type Props = {
@@ -43,30 +43,7 @@ type Props = {
 	emptyLabel: string
 }
 
-const inputStyle: React.CSSProperties = {
-	width: '100%',
-	background: 'var(--theme-input-bg, var(--theme-elevation-50))',
-	border: '1px solid var(--theme-elevation-200)',
-	borderRadius: '4px',
-	padding: '8px 12px',
-	fontFamily: 'inherit',
-	fontSize: 'inherit',
-	color: 'var(--theme-text)',
-	cursor: 'default',
-	opacity: 0.8,
-	boxSizing: 'border-box',
-}
-
-const fieldWrap: React.CSSProperties = { paddingBottom: '12px' }
-
-const sectionHeading: React.CSSProperties = {
-	fontSize: '0.75rem',
-	fontWeight: 600,
-	color: 'var(--theme-elevation-500)',
-	margin: '16px 0 8px',
-	paddingBottom: '4px',
-	borderBottom: '1px solid var(--theme-elevation-100)',
-}
+const noop = (_e: ChangeEvent<HTMLInputElement>) => {}
 
 const pillStyle = (agreed: boolean): React.CSSProperties => ({
 	display: 'inline-block',
@@ -76,15 +53,16 @@ const pillStyle = (agreed: boolean): React.CSSProperties => ({
 	fontWeight: 600,
 	background: agreed ? 'var(--theme-success-500)' : 'var(--theme-error-500)',
 	color: '#fff',
-	marginBottom: '4px',
 })
 
-const ReadOnlyInput = ({ value, multiline }: { value: string; multiline?: boolean }) =>
-	multiline ? (
-		<textarea readOnly value={value} rows={3} style={inputStyle} />
-	) : (
-		<input type="text" readOnly value={value} style={inputStyle} />
-	)
+const sectionDivider: React.CSSProperties = {
+	fontSize: '0.75rem',
+	fontWeight: 600,
+	color: 'var(--theme-elevation-500)',
+	margin: '8px 0 4px',
+	paddingBottom: '4px',
+	borderBottom: '1px solid var(--theme-elevation-100)',
+}
 
 export const SubmissionAnswersClient = ({
 	answers,
@@ -97,88 +75,84 @@ export const SubmissionAnswersClient = ({
 		answers.length > 0 || repeaters.length > 0 || consent.length > 0 || meta.length > 0
 
 	if (!hasContent) {
-		return <p style={{ color: 'var(--theme-elevation-500)', fontSize: 'inherit' }}>{emptyLabel}</p>
+		return <p style={{ color: 'var(--theme-elevation-500)' }}>{emptyLabel}</p>
 	}
 
 	return (
-		<div>
-			{(answers.length > 0 || repeaters.length > 0) && (
-				<section>
-					{answers.map(({ field, label, value, href, multiline }) => (
-						<div key={field} style={fieldWrap}>
-							<FieldLabel label={label} />
-							{href ? (
-								<a
-									href={href}
-									target="_blank"
-									rel="noreferrer"
-									style={{
-										display: 'block',
-										padding: '8px 0',
-										color: 'var(--theme-text)',
-										textDecoration: 'underline',
-									}}
-								>
-									{value}
-								</a>
-							) : (
-								<ReadOnlyInput value={value} multiline={multiline} />
-							)}
-						</div>
-					))}
-
-					{repeaters.map(({ field, label, rows }) => (
-						<div key={field} style={fieldWrap}>
-							<FieldLabel label={label} />
-							{rows.length === 0 ? (
-								<input type="text" readOnly value="—" style={inputStyle} />
-							) : (
-								<div
-									style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}
-								>
-									{rows.map((row) => (
-										<div
-											key={row.id}
-											style={{
-												border: '1px solid var(--theme-elevation-150)',
-												borderRadius: '4px',
-												padding: '8px 12px',
-											}}
-										>
-											<p
-												style={{
-													fontSize: '0.75rem',
-													fontWeight: 600,
-													color: 'var(--theme-elevation-500)',
-													margin: '0 0 8px',
-												}}
-											>
-												Row {Number(row.id) + 1}
-											</p>
-											{row.subFields.map((subField) => (
-												<div key={subField.label} style={{ paddingBottom: '8px' }}>
-													<FieldLabel label={subField.label} />
-													<ReadOnlyInput value={subField.value} />
-												</div>
-											))}
-										</div>
-									))}
-								</div>
-							)}
-						</div>
-					))}
-				</section>
+		<div className="field-type">
+			{answers.map(({ field, label, value, href }) =>
+				href ? (
+					<div key={field} className="field-type">
+						<FieldLabel label={label} />
+						<a
+							href={href}
+							target="_blank"
+							rel="noreferrer"
+							style={{
+								display: 'block',
+								padding: '8px 0',
+								color: 'var(--theme-text)',
+								textDecoration: 'underline',
+							}}
+						>
+							{value}
+						</a>
+					</div>
+				) : (
+					<TextInput
+						key={field}
+						path={`sa-${field}`}
+						label={label}
+						value={value}
+						readOnly
+						onChange={noop}
+					/>
+				)
 			)}
 
+			{repeaters.map(({ field, label, rows }) => (
+				<div key={field} className="field-type">
+					<FieldLabel label={label} />
+					{rows.length === 0 ? (
+						<TextInput path={`sa-${field}-empty`} label="" value="—" readOnly onChange={noop} />
+					) : (
+						<div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+							{rows.map((row) => (
+								<div
+									key={row.id}
+									style={{
+										border: '1px solid var(--theme-elevation-150)',
+										borderRadius: '4px',
+										padding: '4px 12px 0',
+									}}
+								>
+									<p style={{ ...sectionDivider, borderBottom: 'none', marginBottom: 0 }}>
+										Row {Number(row.id) + 1}
+									</p>
+									{row.subFields.map((subField) => (
+										<TextInput
+											key={subField.label}
+											path={`sa-${field}-${row.id}-${subField.label}`}
+											label={subField.label}
+											value={subField.value}
+											readOnly
+											onChange={noop}
+										/>
+									))}
+								</div>
+							))}
+						</div>
+					)}
+				</div>
+			))}
+
 			{consent.length > 0 && (
-				<section>
-					<p style={sectionHeading}>Consent</p>
+				<div className="field-type">
+					<p style={sectionDivider}>Consent</p>
 					{consent.map((entry) => (
-						<div key={entry.field} style={fieldWrap}>
+						<div key={entry.field} className="field-type">
 							<FieldLabel label={entry.field} />
-							<div
-								style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}
-							>
+							<div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
 								<span style={pillStyle(entry.agreed)}>{entry.agreed ? 'Agreed' : 'Declined'}</span>
 								{entry.ref ? (
 									<a
@@ -197,24 +171,23 @@ export const SubmissionAnswersClient = ({
 							</div>
 						</div>
 					))}
-				</section>
+				</div>
 			)}
 
 			{meta.length > 0 && (
-				<section>
-					<p style={sectionHeading}>Submission details</p>
+				<div className="field-type">
+					<p style={sectionDivider}>Submission details</p>
 					{meta.map((item) => (
-						<div key={item.label} style={fieldWrap}>
-							<FieldLabel label={item.label} />
-							<input
-								type="text"
-								readOnly
-								value={item.value}
-								style={{ ...inputStyle, ...(item.muted ? { opacity: 0.5 } : {}) }}
-							/>
-						</div>
+						<TextInput
+							key={item.label}
+							path={`sa-meta-${item.label}`}
+							label={item.label}
+							value={item.value}
+							readOnly
+							onChange={noop}
+						/>
 					))}
-				</section>
+				</div>
 			)}
 		</div>
 	)
