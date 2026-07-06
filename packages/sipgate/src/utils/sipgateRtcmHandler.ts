@@ -1,4 +1,4 @@
-import type { PayloadHandler } from 'payload'
+import type { CollectionSlug, PayloadHandler } from 'payload'
 import type { SipgateCredentials } from '../types'
 import type { SipgateAccess } from './access'
 import { checkAccess } from './access'
@@ -41,14 +41,14 @@ const resolveRest = async ({
 	}
 
 	const linked = await req.payload.find({
-		collection: sipgateUsersSlug,
+		collection: sipgateUsersSlug as CollectionSlug,
 		where: { 'payloadUser.value': { equals: req.user.id } },
 		limit: 1,
 		depth: 0,
 		overrideAccess: true,
 	})
 
-	const doc = linked.docs[0]
+	const doc = linked.docs[0] as Record<string, unknown> | undefined
 	const accessToken = doc?.accessToken as string | undefined
 	const refreshToken = doc?.refreshToken as string | undefined
 
@@ -67,7 +67,7 @@ const resolveRest = async ({
 		realm: credentials.realm ?? 'third-party',
 		onRefresh: async (tokens) => {
 			await req.payload.update({
-				collection: sipgateUsersSlug,
+				collection: sipgateUsersSlug as CollectionSlug,
 				id: docId,
 				data: {
 					accessToken: tokens.access_token,

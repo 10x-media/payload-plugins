@@ -1,4 +1,4 @@
-import type { PayloadHandler } from 'payload'
+import type { CollectionSlug, PayloadHandler } from 'payload'
 import type { SipgateAccess } from './access'
 import { checkAccess } from './access'
 import { createActiveCallStore } from './activeCall'
@@ -17,13 +17,15 @@ export const sipgateActiveCallHandler =
 		let calls = allCalls
 		if (sipgateUsersSlug && req.user?.id) {
 			const linked = await req.payload.find({
-				collection: sipgateUsersSlug,
+				collection: sipgateUsersSlug as CollectionSlug,
 				where: { 'payloadUser.value': { equals: req.user.id } },
 				limit: 1,
 				depth: 0,
 				overrideAccess: true,
 			})
-			const sipgateUserId = linked.docs[0]?.sipgateId as string | undefined
+			const sipgateUserId = (linked.docs[0] as Record<string, unknown> | undefined)?.sipgateId as
+				| string
+				| undefined
 			if (sipgateUserId) {
 				calls = allCalls.filter((c) => {
 					const userIds: string[] = (c['userId[]'] as string[] | undefined) ?? []

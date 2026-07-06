@@ -1,4 +1,4 @@
-import type { Payload } from 'payload'
+import type { CollectionSlug, Payload } from 'payload'
 
 type UpsertByFieldOptions = {
 	payload: Payload
@@ -18,7 +18,7 @@ export const upsertByField = async ({
 }: UpsertByFieldOptions): // biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
 Promise<any> => {
 	const existing = await payload.find({
-		collection,
+		collection: collection as CollectionSlug,
 		where: { [uniqueField]: { equals: uniqueValue } },
 		limit: 1,
 		overrideAccess: true,
@@ -26,7 +26,7 @@ Promise<any> => {
 
 	if (existing.totalDocs > 0 && existing.docs[0]) {
 		return payload.update({
-			collection,
+			collection: collection as CollectionSlug,
 			id: existing.docs[0].id,
 			data,
 			overrideAccess: true,
@@ -34,7 +34,7 @@ Promise<any> => {
 	}
 
 	return payload.create({
-		collection,
+		collection: collection as CollectionSlug,
 		data,
 		overrideAccess: true,
 	})

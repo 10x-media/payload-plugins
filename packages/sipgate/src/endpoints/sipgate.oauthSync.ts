@@ -1,4 +1,4 @@
-import type { Endpoint } from 'payload'
+import type { CollectionSlug, Endpoint } from 'payload'
 import type { SipgateCredentials } from '../types'
 import type { SipgateAccess } from '../utils/access'
 import { checkAccess } from '../utils/access'
@@ -40,7 +40,7 @@ export const createSipgateOAuthSync = ({
 		}
 
 		const connectedUsers = await req.payload.find({
-			collection: sipgateUsersSlug,
+			collection: sipgateUsersSlug as CollectionSlug,
 			where: { accessToken: { exists: true } },
 			limit: 1000,
 			depth: 0,
@@ -52,7 +52,8 @@ export const createSipgateOAuthSync = ({
 			channels: { synced: 0, errors: 0 },
 		}
 
-		for (const sipgateUserDoc of connectedUsers.docs) {
+		for (const _doc of connectedUsers.docs) {
+			const sipgateUserDoc = _doc as unknown as Record<string, unknown>
 			const accessToken = sipgateUserDoc.accessToken as string | undefined
 			const refreshToken = sipgateUserDoc.refreshToken as string | undefined
 			if (!accessToken || !refreshToken) continue
@@ -67,7 +68,7 @@ export const createSipgateOAuthSync = ({
 				realm,
 				onRefresh: async (tokens) => {
 					await req.payload.update({
-						collection: sipgateUsersSlug,
+						collection: sipgateUsersSlug as CollectionSlug,
 						id: docId,
 						data: {
 							accessToken: tokens.access_token,
