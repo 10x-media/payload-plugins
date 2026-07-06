@@ -35,7 +35,6 @@ import type { LiveCallPosition, SipgateCredentials } from './types'
 import type { SipgateAccess } from './utils/access'
 import { createCallActivityWidget } from './widgets/callActivity.widget'
 import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.component'
-import { createSipgateOAuthButton } from './widgets/sipgateOAuthButton.component'
 
 export type { SipgateAccess, SipgateAccessFn } from './utils/access'
 export { createSipgateOnInit } from './utils/sipgateSyncHandlers'
