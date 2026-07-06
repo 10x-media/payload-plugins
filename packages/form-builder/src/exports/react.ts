@@ -11,7 +11,13 @@ export { valuesFromSearchParams } from '../prefill/valuesFromSearchParams'
 export { cn } from '../react/cn'
 export type { FieldRenderer, FieldRendererProps, RendererTranslate } from '../react/contract'
 export { defineFieldRenderer } from '../react/contract'
-export type { FormDocument, FormProps } from '../react/Form'
+export type {
+	BackButtonRenderProps,
+	FormDocument,
+	FormProps,
+	NextButtonRenderProps,
+	SubmitButtonRenderProps,
+} from '../react/Form'
 export { Form } from '../react/Form'
 export type { FormStepInfo } from '../react/FormContext'
 export type { FieldWidth, FormLayoutProps } from '../react/FormLayout'
