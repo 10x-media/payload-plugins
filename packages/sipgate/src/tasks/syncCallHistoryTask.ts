@@ -1,4 +1,4 @@
-import type { TaskConfig } from 'payload'
+import type { CollectionSlug, TaskConfig } from 'payload'
 import type {
 	CallStatus,
 	NeoCallEvent,
@@ -141,7 +141,8 @@ function normalizeHistory(
 
 export const buildSyncCallHistoryTask = (deps: SyncCallHistoryTaskDeps): TaskConfig =>
 	({
-		slug: SYNC_CALL_HISTORY_TASK,
+		// biome-ignore lint/suspicious/noExplicitAny: task slug is plugin-defined, not in the generated TaskType union
+		slug: SYNC_CALL_HISTORY_TASK as any,
 		retries: 2,
 		inputSchema: [
 			{ name: 'limit', type: 'number' },
@@ -213,7 +214,7 @@ export const buildSyncCallHistoryTaskOAuth = (deps: SyncCallHistoryTaskOAuthDeps
 			}
 
 			const connectedUsers = await payload.find({
-				collection: deps.sipgateUsersSlug,
+				collection: deps.sipgateUsersSlug as CollectionSlug,
 				where: { accessToken: { exists: true } },
 				limit: 1000,
 				depth: 0,
@@ -224,7 +225,8 @@ export const buildSyncCallHistoryTaskOAuth = (deps: SyncCallHistoryTaskOAuthDeps
 			let updated = 0
 			let total = 0
 
-			for (const sipgateUserDoc of connectedUsers.docs) {
+			for (const _doc of connectedUsers.docs) {
+				const sipgateUserDoc = _doc as unknown as Record<string, unknown>
 				const accessToken = sipgateUserDoc.accessToken as string | undefined
 				const refreshToken = sipgateUserDoc.refreshToken as string | undefined
 				if (!accessToken || !refreshToken) continue
@@ -239,7 +241,7 @@ export const buildSyncCallHistoryTaskOAuth = (deps: SyncCallHistoryTaskOAuthDeps
 					realm,
 					onRefresh: async (tokens) => {
 						await payload.update({
-							collection: deps.sipgateUsersSlug,
+							collection: deps.sipgateUsersSlug as CollectionSlug,
 							id: docId,
 							data: {
 								accessToken: tokens.access_token,

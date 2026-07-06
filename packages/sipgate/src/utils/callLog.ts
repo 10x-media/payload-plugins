@@ -1,4 +1,4 @@
-import type { Payload } from 'payload'
+import type { CollectionSlug, Payload } from 'payload'
 import type { CallStatus } from '../types'
 
 export type CallLogData = {
@@ -20,26 +20,29 @@ export const createOrUpdateCallLog = async (
 	data: CallLogData
 ) => {
 	const existing = await payload.find({
-		collection: callLogsSlug,
+		collection: callLogsSlug as CollectionSlug,
 		where: { callId: { equals: data.callId } },
 		limit: 1,
 		overrideAccess: true,
 	})
 	if (existing.totalDocs > 0) {
-		const existingDoc = existing.docs[0]
+		const existingDoc = existing.docs[0] as { id: string } | undefined
 		if (!existingDoc)
-			return payload.create({ collection: callLogsSlug, data, overrideAccess: true })
+			return payload.create({
+				collection: callLogsSlug as CollectionSlug,
+				data: data as never,
+				overrideAccess: true,
+			})
 		return payload.update({
-			collection: callLogsSlug,
-			id: existingDoc.id as string,
-			data,
+			collection: callLogsSlug as CollectionSlug,
+			id: existingDoc.id,
+			data: data as never,
 			overrideAccess: true,
 		})
 	}
 	return payload.create({
-		// biome-ignore lint/suspicious/noExplicitAny: dynamic collection slug from plugin config
-		collection: callLogsSlug as any,
-		data,
+		collection: callLogsSlug as CollectionSlug,
+		data: data as never,
 		overrideAccess: true,
 	})
 }

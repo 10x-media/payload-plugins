@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { buildConfig, type CollectionConfig, type CollectionSlug } from 'payload'
+import { buildConfig, type CollectionConfig, type CollectionSlug, type TypedJobs } from 'payload'
 import { sipgate } from '../src/index'
 import {
 	SYNC_CALL_HISTORY_TASK,
@@ -91,7 +91,10 @@ export default buildConfig({
 		await seedDev(payload)
 		const callHistoryTask =
 			authType === 'oauth2' ? SYNC_CALL_HISTORY_TASK_OAUTH : SYNC_CALL_HISTORY_TASK
-		await payload.jobs.queue({ task: callHistoryTask, input: { limit: 100 } })
+		await payload.jobs.queue({
+			task: callHistoryTask as keyof TypedJobs['tasks'],
+			input: { limit: 100 },
+		})
 	},
 	typescript: { autoGenerate },
 	admin: {

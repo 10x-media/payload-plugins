@@ -1,4 +1,4 @@
-import type { Payload } from 'payload'
+import type { CollectionSlug, Payload } from 'payload'
 import type { SipgateAction } from './xmlFactory'
 
 export type IvrBranch = {
@@ -32,7 +32,7 @@ export const findFlowForNumber = async (
 	toNumber: string
 ): Promise<IvrFlow | null> => {
 	const result = await payload.find({
-		collection: flowsSlug as 'ivr-flows',
+		collection: flowsSlug as CollectionSlug,
 		where: {
 			and: [{ isActive: { equals: true } }, { phoneNumber: { equals: toNumber } }],
 		},
@@ -46,7 +46,7 @@ export const findFlowForNumber = async (
 
 	// Fall back to catch-all flows (no phoneNumber set)
 	const catchAll = await payload.find({
-		collection: flowsSlug as 'ivr-flows',
+		collection: flowsSlug as CollectionSlug,
 		where: {
 			and: [{ isActive: { equals: true } }, { phoneNumber: { exists: false } }],
 		},
