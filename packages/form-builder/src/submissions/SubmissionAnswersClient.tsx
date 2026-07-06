@@ -80,6 +80,7 @@ export const SubmissionAnswersClient = ({
 		<div className="field-type" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 			{(answers.length > 0 || repeaters.length > 0) && (
 				<section>
+					<FieldLabel label="Answers" />
 					{answers.map(({ field, label, value, href }) =>
 						href ? (
 							<div key={field} className="field-type">
@@ -150,6 +151,7 @@ export const SubmissionAnswersClient = ({
 
 			{consent.length > 0 && (
 				<section>
+					<FieldLabel label="Consent" />
 					{consent.map((entry) => (
 						<div key={entry.field} className="field-type">
 							<FieldLabel label={entry.field} />
@@ -177,6 +179,7 @@ export const SubmissionAnswersClient = ({
 
 			{meta.length > 0 && (
 				<section>
+					<FieldLabel label="Submission details" />
 					{meta.map((item) => (
 						<TextInput
 							key={item.label}
