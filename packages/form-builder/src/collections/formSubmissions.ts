@@ -11,6 +11,8 @@ import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import { buildSpamGuard } from '../spam/spamGuard'
 import type { ResolvedSpamConfig } from '../spam/types'
 import { validateSubmission } from '../submissions/validateSubmission'
+import { keys } from '../translations/keys'
+import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { FORMS_SLUG } from './forms'
 
@@ -130,8 +132,8 @@ export const buildSubmissionsCollection = ({
 			type: 'select',
 			defaultValue: 'complete',
 			options: [
-				{ label: 'Complete', value: 'complete' },
-				{ label: 'Partial', value: 'partial' },
+				{ label: labelForKey(keys.statusComplete), value: 'complete' },
+				{ label: labelForKey(keys.statusPartial), value: 'partial' },
 			],
 			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
 			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
@@ -155,7 +157,11 @@ export const buildSubmissionsCollection = ({
 	return {
 		...(overrides ?? {}),
 		slug: FORM_SUBMISSIONS_SLUG,
-		labels: { singular: 'Submission', plural: 'Submissions', ...(overrides?.labels ?? {}) },
+		labels: {
+			singular: labelForKey(keys.collectionSubmissionSingular),
+			plural: labelForKey(keys.collectionSubmissionPlural),
+			...(overrides?.labels ?? {}),
+		},
 		admin: { group: 'Forms', ...(overrides?.admin ?? {}) },
 		access: {
 			create: () => true,

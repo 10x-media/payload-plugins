@@ -59,13 +59,16 @@ export const registerCollections = ({
 			col.hooks.beforeValidate = [...(col.hooks.beforeValidate ?? []), buildUploadOwnerStamp(spam)]
 		}
 
-		// Apply CollectionOverrides using explicit spreads after spam hooks are in place
+		// Apply CollectionOverrides using explicit spreads after spam hooks are in place.
+		// ...col first so the plugin defaults are the base, ...(ov ?? {}) second so the consumer
+		// wins for any top-level key not explicitly re-set below (consistent with forms/formSubmissions).
+		// The locked keys (hooks array ordering, fields function) are spread last.
 		const ov = overrides?.uploads
 		if (ov) {
 			const defaultFields = (col.fields ?? []) as Field[]
 			uploadsCollection = {
-				...(ov ?? {}),
 				...col,
+				...(ov ?? {}),
 				access: { ...(col.access ?? {}), ...(ov.access ?? {}) },
 				admin: { ...(col.admin ?? {}), ...(ov.admin ?? {}) },
 				hooks: {

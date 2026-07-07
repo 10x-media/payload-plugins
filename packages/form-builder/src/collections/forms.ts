@@ -244,7 +244,11 @@ export const buildFormsCollection = ({
 	return {
 		...(overrides ?? {}),
 		slug: FORMS_SLUG,
-		labels: { singular: 'Form', plural: 'Forms', ...(overrides?.labels ?? {}) },
+		labels: {
+			singular: labelForKey(keys.collectionFormSingular),
+			plural: labelForKey(keys.collectionFormPlural),
+			...(overrides?.labels ?? {}),
+		},
 		admin: { group: 'Forms', useAsTitle: 'title', ...(overrides?.admin ?? {}) },
 		access: { read: () => true, ...(overrides?.access ?? {}) },
 		hooks: {
