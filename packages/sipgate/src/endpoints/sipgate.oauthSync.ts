@@ -3,23 +3,25 @@ import type { SipgateCredentials } from '../types'
 import type { SipgateAccess } from '../utils/access'
 import { checkAccess } from '../utils/access'
 import { buildSipgateRestOAuth } from '../utils/sipgateOAuthRest'
-import { syncChannels, syncDevices } from '../utils/sipgateSyncHandlers'
+import { syncCallHistoryOAuth, syncChannels, syncDevices } from '../utils/sipgateSyncHandlers'
 
 type CreateSipgateOAuthSyncOptions = {
 	credentials: SipgateCredentials
 	sipgateUsersSlug: string
 	sipgateDevicesSlug: string
 	sipgateChannelsSlug: string
+	callLogsSlug: string
 	access?: SipgateAccess
 }
 
-export type OAuthSyncEntityType = 'devices' | 'channels' | 'all'
+export type OAuthSyncEntityType = 'devices' | 'channels' | 'call-logs' | 'all'
 
 export const createSipgateOAuthSync = ({
 	credentials,
 	sipgateUsersSlug,
 	sipgateDevicesSlug,
 	sipgateChannelsSlug,
+	callLogsSlug,
 	access,
 }: CreateSipgateOAuthSyncOptions): Endpoint => ({
 	path: '/sipgate/sync',
@@ -47,9 +49,13 @@ export const createSipgateOAuthSync = ({
 			overrideAccess: true,
 		})
 
-		const totals = {
-			devices: { synced: 0, errors: 0 },
-			channels: { synced: 0, errors: 0 },
+		const totals: {
+			devices: { synced: number; errors: number; deleted: number }
+			channels: { synced: number; errors: number; deleted: number }
+			'call-logs'?: { synced: number; errors: number; deleted: number }
+		} = {
+			devices: { synced: 0, errors: 0, deleted: 0 },
+			channels: { synced: 0, errors: 0, deleted: 0 },
 		}
 
 		for (const _doc of connectedUsers.docs) {
@@ -109,6 +115,24 @@ export const createSipgateOAuthSync = ({
 					totals.channels.errors += result.errors
 				} catch {
 					totals.channels.errors++
+				}
+			}
+		}
+
+		if (type === 'call-logs') {
+			try {
+				const result = await syncCallHistoryOAuth({
+					payload: req.payload,
+					credentials,
+					sipgateUsersSlug,
+					callLogsSlug,
+				})
+				totals['call-logs'] = result
+			} catch {
+				totals['call-logs'] = {
+					synced: 0,
+					errors: 1,
+					deleted: 0,
 				}
 			}
 		}

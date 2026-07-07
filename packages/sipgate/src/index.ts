@@ -213,7 +213,12 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		const isOAuth2 = options.sipgateCredentials?.authType === 'oauth2'
 
 		config.collections.push(
-			createCallLogsCollection(contactCollections, phoneNumberFields, options.overrides?.callLogs),
+			createCallLogsCollection({
+				contactCollections,
+				phoneNumberFields,
+				overrides: options.overrides?.callLogs,
+				enableSyncButton: !!options.sipgateCredentials,
+			}),
 			createSipgateUsersCollection({
 				slug: sipgateUsersSlug,
 				payloadUsersSlug: options.payloadUsersSlug ?? 'users',
@@ -345,6 +350,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 						sipgateUsersSlug,
 						sipgateDevicesSlug,
 						sipgateChannelsSlug,
+						callLogsSlug,
 						access: options.access,
 					})
 				)
@@ -355,6 +361,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 						sipgateUsersSlug,
 						sipgateDevicesSlug,
 						sipgateChannelsSlug,
+						callLogsSlug,
 						access: options.access,
 					})
 				)

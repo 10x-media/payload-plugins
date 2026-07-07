@@ -1,13 +1,22 @@
 import type { CollectionSlug, Payload } from 'payload'
-import type { SipgateCredentials } from '../types'
+import type {
+	CallStatus,
+	NeoCallEvent,
+	SipgateCredentials,
+	SipgateHistoryParams,
+	SipgateHistoryResponse,
+} from '../types'
+import { createOrUpdateCallLog } from './callLog'
 import {
 	buildSipgateRest,
+	getCallHistory,
 	getDevices,
 	getGroups,
 	getUsers,
 	type SipgateDevice,
 	type SipgateRestFetch,
 } from './sipgate.rest'
+import { buildSipgateRestOAuth } from './sipgateOAuthRest'
 import { upsertByField } from './upsertByField'
 
 export type SyncResult = { synced: number; errors: number; deleted: number }
@@ -330,6 +339,236 @@ export const syncChannels = async ({
 	}
 
 	return { synced, errors, deleted }
+}
+
+const CLASSIC_DIRECTION_MAP: Record<string, 'in' | 'out'> = {
+	INCOMING: 'in',
+	OUTGOING: 'out',
+	MISSED_INCOMING: 'in',
+	MISSED_OUTGOING: 'out',
+}
+
+const CLASSIC_DIRECTION_MISSED = new Set(['MISSED_INCOMING', 'MISSED_OUTGOING'])
+
+const CLASSIC_STATUS_MAP: Record<string, CallStatus> = {
+	PICKUP: 'completed',
+	NOPICKUP: 'missed',
+	VOICEMAIL: 'voicemail',
+	MISSED: 'missed',
+	BUSY: 'missed',
+	REJECTED: 'rejected',
+	FAILED: 'missed',
+}
+
+const NEO_DIRECTION_MAP: Record<string, 'in' | 'out'> = {
+	INCOMING: 'in',
+	OUTGOING: 'out',
+}
+
+const NEO_STATE_MAP: Record<string, CallStatus> = {
+	RINGING: 'ringing',
+	ESTABLISHED: 'connected',
+	FINISHED: 'completed',
+	MISSED: 'missed',
+	REJECTED: 'rejected',
+	TRANSFERRING: 'connected',
+	TRANSFERRED: 'completed',
+	TRANSFER_FAILED: 'missed',
+	BUSY: 'missed',
+	CLIENT_ERROR: 'missed',
+	UNKNOWN: 'completed',
+}
+
+type NormalizedCallLog = {
+	callId: string
+	callType: 'in' | 'out'
+	callStatus: CallStatus
+	callDuration: number
+	fromNumber: string
+	toNumber: string
+	startedAt: Date
+}
+
+function normalizeClassicItem(item: SipgateHistoryResponse['items'][0]): NormalizedCallLog | null {
+	const direction = item.direction?.toUpperCase()
+	const callType = CLASSIC_DIRECTION_MAP[direction]
+	if (!callType) return null
+	const callStatus = CLASSIC_DIRECTION_MISSED.has(direction)
+		? 'missed'
+		: (CLASSIC_STATUS_MAP[item.status?.toUpperCase()] ?? 'completed')
+	return {
+		callId: item.id,
+		callType,
+		callStatus,
+		callDuration: 0,
+		fromNumber: item.source,
+		toNumber: item.target,
+		startedAt: new Date(item.created),
+	}
+}
+
+function normalizeNeoEvent(event: NeoCallEvent): NormalizedCallLog | null {
+	const callType = NEO_DIRECTION_MAP[event.call.direction]
+	if (!callType) return null
+	const callStatus =
+		event.call.terminatedReason === 'CANCELLED'
+			? 'missed'
+			: (NEO_STATE_MAP[event.call.state] ?? 'completed')
+	let callDuration = 0
+	if (event.call.establishedAt && event.call.terminatedAt) {
+		callDuration = Math.max(
+			0,
+			Math.round(
+				(new Date(event.call.terminatedAt).getTime() -
+					new Date(event.call.establishedAt).getTime()) /
+					1000
+			)
+		)
+	}
+	return {
+		callId: event.call.callSid,
+		callType,
+		callStatus,
+		callDuration,
+		fromNumber: event.call.from,
+		toNumber: event.call.to,
+		startedAt: new Date(event.call.startedAt),
+	}
+}
+
+export function normalizeCallHistory(
+	history: SipgateHistoryResponse | NeoCallEvent[]
+): NormalizedCallLog[] {
+	if (Array.isArray(history)) {
+		return history.flatMap((event) => {
+			const normalized = normalizeNeoEvent(event as NeoCallEvent)
+			return normalized ? [normalized] : []
+		})
+	}
+	return (history as SipgateHistoryResponse).items.flatMap((item) => {
+		const normalized = normalizeClassicItem(item)
+		return normalized ? [normalized] : []
+	})
+}
+
+type SyncCallHistoryOptions = {
+	payload: Payload
+	rest: SipgateRestFetch
+	callLogsSlug: string
+	params?: Partial<SipgateHistoryParams>
+	/** Sipgate user ID to tag each log with. Used in OAuth2 mode. */
+	sipgateUserId?: string
+}
+
+export const syncCallHistory = async ({
+	payload,
+	rest,
+	callLogsSlug,
+	params,
+	sipgateUserId,
+}: SyncCallHistoryOptions): Promise<SyncResult> => {
+	const history = await getCallHistory(rest, {
+		types: ['CALL'],
+		limit: 100,
+		...params,
+	})
+	const entries = normalizeCallHistory(history)
+	let synced = 0
+	let errors = 0
+
+	for (const entry of entries) {
+		try {
+			await createOrUpdateCallLog(payload, callLogsSlug, {
+				...entry,
+				...(sipgateUserId ? { sipgateUserId } : {}),
+			})
+			synced++
+		} catch {
+			errors++
+		}
+	}
+
+	return { synced, errors, deleted: 0 }
+}
+
+type SyncCallHistoryOAuthOptions = {
+	payload: Payload
+	credentials: SipgateCredentials
+	sipgateUsersSlug: string
+	callLogsSlug: string
+	params?: Partial<SipgateHistoryParams>
+}
+
+export const syncCallHistoryOAuth = async ({
+	payload,
+	credentials,
+	sipgateUsersSlug,
+	callLogsSlug,
+	params,
+}: SyncCallHistoryOAuthOptions): Promise<SyncResult> => {
+	const clientId = credentials.clientId
+	const clientSecret = credentials.clientSecret
+	const realm = credentials.realm ?? 'third-party'
+
+	if (!clientId || !clientSecret) {
+		throw new Error('OAuth2 client credentials not configured for call log sync')
+	}
+
+	const connectedUsers = await payload.find({
+		collection: sipgateUsersSlug as CollectionSlug,
+		where: { accessToken: { exists: true } },
+		limit: 1000,
+		depth: 0,
+		overrideAccess: true,
+	})
+
+	let synced = 0
+	let errors = 0
+
+	for (const _doc of connectedUsers.docs) {
+		const doc = _doc as unknown as Record<string, unknown>
+		const accessToken = doc.accessToken as string | undefined
+		const refreshToken = doc.refreshToken as string | undefined
+		if (!accessToken || !refreshToken) continue
+
+		const docId = doc.id as string
+		const sipgateId = doc.sipgateId as string
+		const rest = buildSipgateRestOAuth({
+			accessToken,
+			refreshToken,
+			clientId,
+			clientSecret,
+			realm,
+			onRefresh: async (tokens) => {
+				await payload.update({
+					collection: sipgateUsersSlug as CollectionSlug,
+					id: docId,
+					data: {
+						accessToken: tokens.access_token,
+						refreshToken: tokens.refresh_token,
+						tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+					},
+					overrideAccess: true,
+				})
+			},
+		})
+
+		try {
+			const result = await syncCallHistory({
+				payload,
+				rest,
+				callLogsSlug,
+				params,
+				sipgateUserId: sipgateId,
+			})
+			synced += result.synced
+			errors += result.errors
+		} catch {
+			errors++
+		}
+	}
+
+	return { synced, errors, deleted: 0 }
 }
 
 /**
