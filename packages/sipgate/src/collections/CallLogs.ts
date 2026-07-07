@@ -4,11 +4,19 @@ import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import { resolveRelatedContact } from '../utils/resolveRelatedContact'
 
-export const createCallLogsCollection = (
-	contactCollections: CollectionSlug[],
-	phoneNumberFields: string[],
+type CreateCallLogsCollectionOptions = {
+	contactCollections: CollectionSlug[]
+	phoneNumberFields: string[]
 	overrides?: Partial<CollectionConfig>
-): CollectionConfig => {
+	enableSyncButton?: boolean
+}
+
+export const createCallLogsCollection = ({
+	contactCollections,
+	phoneNumberFields,
+	overrides,
+	enableSyncButton,
+}: CreateCallLogsCollectionOptions): CollectionConfig => {
 	const defaultCallLogs: CollectionConfig = {
 		slug: 'call-logs',
 		labels: {
@@ -17,6 +25,13 @@ export const createCallLogsCollection = (
 		},
 		admin: {
 			useAsTitle: 'callId',
+			...(enableSyncButton
+				? {
+						components: {
+							listMenuItems: ['@10x-media/sipgate/ui/SipgateSyncButton#SipgateCallLogsSyncButton'],
+						},
+					}
+				: {}),
 		},
 		hooks: {
 			beforeChange: [
