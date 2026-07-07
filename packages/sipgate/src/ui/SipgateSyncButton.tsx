@@ -98,3 +98,7 @@ export const SipgateDevicesSyncButton = () => (
 export const SipgateChannelsSyncButton = () => (
 	<SipgateSyncButton entity="channels" label="Sync Channels" />
 )
+
+export const SipgateCallLogsSyncButton = () => (
+	<SipgateSyncButton entity="call-logs" label="Sync Call History" />
+)

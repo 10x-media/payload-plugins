@@ -3,15 +3,16 @@ import type { SipgateCredentials } from '../types'
 import type { SipgateAccess } from '../utils/access'
 import { checkAccess } from '../utils/access'
 import { buildSipgateRest } from '../utils/sipgate.rest'
-import { syncChannels, syncDevices, syncUsers } from '../utils/sipgateSyncHandlers'
+import { syncCallHistory, syncChannels, syncDevices, syncUsers } from '../utils/sipgateSyncHandlers'
 
-export type SyncEntityType = 'users' | 'devices' | 'channels' | 'all'
+export type SyncEntityType = 'users' | 'devices' | 'channels' | 'call-logs' | 'all'
 
 type CreateSipgateSyncOptions = {
 	credentials: SipgateCredentials
 	sipgateUsersSlug: string
 	sipgateDevicesSlug: string
 	sipgateChannelsSlug: string
+	callLogsSlug: string
 	access?: SipgateAccess
 	overrides?: Partial<Endpoint>
 }
@@ -21,6 +22,7 @@ export const createSipgateSync = ({
 	sipgateUsersSlug,
 	sipgateDevicesSlug,
 	sipgateChannelsSlug,
+	callLogsSlug,
 	access,
 	overrides,
 }: CreateSipgateSyncOptions): Endpoint => {
@@ -37,7 +39,7 @@ export const createSipgateSync = ({
 			const rest = buildSipgateRest(credentials)
 			const payload = req.payload
 
-			const results: Record<string, { synced: number; errors: number }> = {}
+			const results: Record<string, { synced: number; errors: number; deleted: number }> = {}
 
 			if (type === 'users' || type === 'all') {
 				results.users = await syncUsers({ payload, rest, sipgateUsersSlug, prune: true })
@@ -59,6 +61,9 @@ export const createSipgateSync = ({
 					sipgateUsersSlug,
 					prune: true,
 				})
+			}
+			if (type === 'call-logs') {
+				results['call-logs'] = await syncCallHistory({ payload, rest, callLogsSlug })
 			}
 
 			return Response.json({ ok: true, results })
