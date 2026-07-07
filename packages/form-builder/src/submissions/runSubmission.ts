@@ -157,15 +157,16 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		}
 		// A consent field's "not agreed" state is semantically meaningful: treat a missing value as
 		// `false` so the intrinsic validate can enforce required-agreement (not optional = must be true).
-		// A repeater with no rows is a valid empty submission; treat null/undefined as [] so it
-		// reaches row-count validation (e.g. minRows > 0 must still reject).
+		// A repeater with no rows is coerced to [] so validate() can check minRows. The empty-guard
+		// below must not skip repeaters: isEmpty([]) is true, but [] still needs to reach validate()
+		// so a minRows > 0 constraint correctly rejects a zero-row submission.
 		const effectiveRaw =
 			instance.blockType === 'consent' && isEmpty(raw)
 				? false
 				: instance.blockType === 'repeater' && isEmpty(raw)
 					? []
 					: raw
-		if (isEmpty(effectiveRaw)) {
+		if (isEmpty(effectiveRaw) && instance.blockType !== 'repeater') {
 			continue
 		}
 		const value = coerce(definition.value, effectiveRaw)

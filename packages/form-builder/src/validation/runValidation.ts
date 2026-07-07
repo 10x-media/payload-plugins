@@ -97,7 +97,9 @@ export const runValidation = async (input: RunValidationInput): Promise<RunValid
 	if (field.required && isEmpty(value)) {
 		return { errors: [{ message: t(keys.validationRequired), severity: 'error' }] }
 	}
-	if (isEmpty(value)) {
+	// Repeaters coerced to [] must reach fieldDefinition.validate so minRows is enforced;
+	// all other empty fields have no intrinsic rules to run.
+	if (isEmpty(value) && field.blockType !== 'repeater') {
 		return { errors: [] }
 	}
 

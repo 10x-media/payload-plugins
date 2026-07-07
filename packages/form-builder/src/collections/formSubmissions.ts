@@ -1,5 +1,4 @@
-import type { CollectionAfterChangeHook, CollectionConfig } from 'payload'
-import { deepMerge } from 'payload'
+import type { CollectionAfterChangeHook, CollectionConfig, Field } from 'payload'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
@@ -8,6 +7,7 @@ import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { isLoggedIn } from '../plugin/access'
+import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import { buildSpamGuard } from '../spam/spamGuard'
 import type { ResolvedSpamConfig } from '../spam/types'
 import { validateSubmission } from '../submissions/validateSubmission'
@@ -33,7 +33,7 @@ type BuildSubmissionsCollectionArgs = {
 	 * Default `false` — they are fully represented by the `SubmissionAnswers` UI component.
 	 */
 	showRawFields?: boolean
-	overrides?: Partial<CollectionConfig>
+	overrides?: CollectionOverrides
 }
 
 const formIdOf = (form: unknown): number | string | undefined => {
@@ -123,51 +123,61 @@ export const buildSubmissionsCollection = ({
 	showRawFields = false,
 	overrides,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => {
-	const merge = (defaults: CollectionConfig): CollectionConfig =>
-		overrides ? deepMerge(defaults, overrides) : defaults
-	return merge({
+	const defaultFields: Field[] = [
+		{ name: 'form', type: 'relationship', relationTo: FORMS_SLUG, required: true },
+		{
+			name: 'status',
+			type: 'select',
+			defaultValue: 'complete',
+			options: [
+				{ label: 'Complete', value: 'complete' },
+				{ label: 'Partial', value: 'partial' },
+			],
+			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
+			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
+			access: { create: isLoggedIn, update: isLoggedIn },
+		},
+		// answers UI appears first so it is the dominant view when opening a submission document.
+		{
+			name: 'answers',
+			type: 'ui',
+			admin: {
+				components: { Field: '@10x-media/form-builder/rsc#SubmissionAnswers' },
+			},
+		},
+		{ name: 'locale', type: 'text' },
+		{ name: 'values', type: 'json', admin: { hidden: !showRawFields } },
+		{ name: 'descriptors', type: 'json', admin: { hidden: !showRawFields } },
+		{ name: 'consent', type: 'json', admin: { hidden: !showRawFields } },
+		{ name: 'meta', type: 'json' },
+	]
+
+	return {
+		...(overrides ?? {}),
 		slug: FORM_SUBMISSIONS_SLUG,
-		labels: { singular: 'Submission', plural: 'Submissions' },
-		admin: { group: 'Forms' },
+		labels: { singular: 'Submission', plural: 'Submissions', ...(overrides?.labels ?? {}) },
+		admin: { group: 'Forms', ...(overrides?.admin ?? {}) },
 		access: {
 			create: () => true,
 			read: isLoggedIn,
 			update: () => false,
+			...(overrides?.access ?? {}),
 		},
 		hooks: {
+			...(overrides?.hooks ?? {}),
+			// Spam guard + validateSubmission must remain first: they enforce the security invariant
+			// that anonymous callers cannot bypass post-submit actions or supply a forged status.
+			// Consumer beforeValidate hooks are appended after so they run on already-validated data.
 			beforeValidate: [
 				...(spam ? [buildSpamGuard(spam)] : []),
 				validateSubmission({ registry, ruleRegistry, consentRegistry, uploadSlug }),
+				...(overrides?.hooks?.beforeValidate ?? []),
 			],
-			afterChange: [makeAfterChange({ actionRegistry, events, hasRunner })],
+			afterChange: [
+				makeAfterChange({ actionRegistry, events, hasRunner }),
+				...(overrides?.hooks?.afterChange ?? []),
+			],
 		},
-		fields: [
-			{ name: 'form', type: 'relationship', relationTo: FORMS_SLUG, required: true },
-			{
-				name: 'status',
-				type: 'select',
-				defaultValue: 'complete',
-				options: [
-					{ label: 'Complete', value: 'complete' },
-					{ label: 'Partial', value: 'partial' },
-				],
-				// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
-				// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
-				access: { create: isLoggedIn, update: isLoggedIn },
-			},
-			// answers UI appears first so it is the dominant view when opening a submission document.
-			{
-				name: 'answers',
-				type: 'ui',
-				admin: {
-					components: { Field: '@10x-media/form-builder/rsc#SubmissionAnswers' },
-				},
-			},
-			{ name: 'locale', type: 'text' },
-			{ name: 'values', type: 'json', admin: { hidden: !showRawFields } },
-			{ name: 'descriptors', type: 'json', admin: { hidden: !showRawFields } },
-			{ name: 'consent', type: 'json', admin: { hidden: !showRawFields } },
-			{ name: 'meta', type: 'json' },
-		],
-	})
+		fields: overrides?.fields ? overrides.fields({ defaultFields }) : defaultFields,
+	}
 }

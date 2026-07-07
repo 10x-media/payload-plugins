@@ -1,6 +1,6 @@
-import type { CollectionConfig } from 'payload'
-import { deepMerge } from 'payload'
+import type { CollectionConfig, Field } from 'payload'
 import { isLoggedIn } from '../plugin/access'
+import type { CollectionOverrides } from '../plugin/collectionOverrides'
 
 export const FORM_UPLOADS_SLUG = 'form-uploads'
 
@@ -26,24 +26,28 @@ export type UploadsOption = boolean | UploadsCollectionConfig
  */
 export const buildUploadsCollection = (
 	config: UploadsCollectionConfig = {},
-	overrides?: Partial<CollectionConfig>
+	overrides?: CollectionOverrides
 ): CollectionConfig => {
-	const defaults: CollectionConfig = {
+	const defaultFields: Field[] = [
+		{ name: 'owner', type: 'text', admin: { readOnly: true, hidden: true } },
+		...(config.fields ?? []),
+	]
+
+	return {
+		...(overrides ?? {}),
 		slug: config.slug ?? FORM_UPLOADS_SLUG,
-		access: config.access ?? {
+		access: {
 			create: () => true,
 			read: isLoggedIn,
 			update: isLoggedIn,
 			delete: isLoggedIn,
+			...(config.access ?? {}),
+			...(overrides?.access ?? {}),
 		},
-		admin: { group: 'Forms' },
+		admin: { group: 'Forms', ...(overrides?.admin ?? {}) },
 		upload: config.upload && config.upload !== true ? config.upload : true,
-		fields: [
-			{ name: 'owner', type: 'text', admin: { readOnly: true, hidden: true } },
-			...(config.fields ?? []),
-		],
+		fields: overrides?.fields ? overrides.fields({ defaultFields }) : defaultFields,
 	}
-	return overrides ? deepMerge(defaults, overrides) : defaults
 }
 
 /** Resolve the `uploads` plugin option: `false` disables, `true`/object enables the built-in collection. */

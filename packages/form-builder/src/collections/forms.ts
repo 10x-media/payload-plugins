@@ -1,7 +1,7 @@
 import {
 	type CollectionBeforeValidateHook,
 	type CollectionConfig,
-	deepMerge,
+	type Field,
 	type PayloadRequest,
 	ValidationError,
 } from 'payload'
@@ -16,6 +16,7 @@ import { buildFieldBlocks } from '../fields/buildFieldBlocks'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
 import { isLoggedIn } from '../plugin/access'
+import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import {
 	DEFAULT_PRESENTATION_NAME,
 	defaultPresentationDescriptors,
@@ -68,7 +69,7 @@ type BuildFormsCollectionArgs = {
 	consentRegistry?: ConsentSourceRegistry
 	presentationRegistry?: PresentationDescriptorRegistry
 	actionRegistry?: ActionRegistry
-	overrides?: Partial<CollectionConfig>
+	overrides?: CollectionOverrides
 }
 
 export const buildFormsCollection = ({
@@ -80,8 +81,6 @@ export const buildFormsCollection = ({
 	actionRegistry = new Map(),
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
-	const merge = (defaults: CollectionConfig): CollectionConfig =>
-		overrides ? deepMerge(defaults, overrides) : defaults
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
@@ -129,124 +128,134 @@ export const buildFormsCollection = ({
 		return data
 	}
 
-	return merge({
-		slug: FORMS_SLUG,
-		labels: { singular: 'Form', plural: 'Forms' },
-		admin: { group: 'Forms', useAsTitle: 'title' },
-		access: { read: () => true },
-		hooks: {
-			beforeValidate: [beforeValidate],
+	const defaultFields: Field[] = [
+		{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
+		{
+			name: 'fields',
+			type: 'blocks',
+			blocks: buildFieldBlocks(registry, ruleRegistry, consentRegistry),
 		},
-		fields: [
-			{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
-			{
-				name: 'fields',
-				type: 'blocks',
-				blocks: buildFieldBlocks(registry, ruleRegistry, consentRegistry),
-			},
-			{
-				name: 'flow',
-				type: 'json',
-				validate: validateFlow,
-				admin: {
-					components: {
-						Field: { path: FLOW_BUILDER_REF, clientProps: { conditionTypes } },
-					},
+		{
+			name: 'flow',
+			type: 'json',
+			validate: validateFlow,
+			admin: {
+				components: {
+					Field: { path: FLOW_BUILDER_REF, clientProps: { conditionTypes } },
 				},
-				// Narrows the generated TypeScript type from opaque JSON to FormFlow so callers
-				// don't need a cast. Keep this in sync with src/flow/types.ts.
-				typescriptSchema: [
-					() => ({
-						type: 'object' as const,
-						required: ['steps'],
-						additionalProperties: false,
-						properties: {
-							steps: {
-								type: 'array' as const,
-								items: {
-									type: 'object' as const,
-									required: ['id'],
-									additionalProperties: true,
-									properties: {
-										id: { type: 'string' as const },
-										title: { type: 'string' as const },
-										fields: { type: 'array' as const, items: { type: 'string' as const } },
-										next: { type: 'string' as const },
-										transitions: {
-											type: 'array' as const,
-											items: {
-												type: 'object' as const,
-												required: ['to'],
-												additionalProperties: true,
-												properties: {
-													to: { type: 'string' as const },
-													when: { type: 'object' as const, additionalProperties: true },
-												},
+			},
+			// Narrows the generated TypeScript type from opaque JSON to FormFlow so callers
+			// don't need a cast. Keep this in sync with src/flow/types.ts.
+			typescriptSchema: [
+				() => ({
+					type: 'object' as const,
+					required: ['steps'],
+					additionalProperties: false,
+					properties: {
+						steps: {
+							type: 'array' as const,
+							items: {
+								type: 'object' as const,
+								required: ['id'],
+								additionalProperties: true,
+								properties: {
+									id: { type: 'string' as const },
+									title: { type: 'string' as const },
+									fields: { type: 'array' as const, items: { type: 'string' as const } },
+									next: { type: 'string' as const },
+									transitions: {
+										type: 'array' as const,
+										items: {
+											type: 'object' as const,
+											required: ['to'],
+											additionalProperties: true,
+											properties: {
+												to: { type: 'string' as const },
+												when: { type: 'object' as const, additionalProperties: true },
 											},
 										},
 									},
 								},
 							},
 						},
-					}),
-				],
+					},
+				}),
+			],
+		},
+		{
+			name: 'actions',
+			type: 'blocks',
+			blocks: buildActionBlocks(actionRegistry),
+			label: labelForKey(keys.configActions),
+			// Action config can contain secrets (e.g. signedWebhook.secret). The collection
+			// itself is publicly readable so forms can be rendered by anonymous clients, but
+			// action config must never be exposed to anonymous callers.
+			access: { read: isLoggedIn },
+		},
+		{
+			name: 'defaultPresentation',
+			type: 'select',
+			defaultValue: DEFAULT_PRESENTATION_NAME,
+			options: [...presentationRegistry.values()].map((descriptor) => ({
+				label: labelFor(descriptor.label),
+				value: descriptor.name,
+			})),
+			label: labelForKey(keys.configDefaultPresentation),
+			admin: { position: 'sidebar' },
+		},
+		{
+			name: 'showResults',
+			type: 'checkbox',
+			defaultValue: false,
+			label: labelForKey(keys.configShowResults),
+			admin: { position: 'sidebar' },
+		},
+		{
+			name: 'resultsField',
+			type: 'text',
+			label: labelForKey(keys.configResultsField),
+			admin: {
+				position: 'sidebar',
+				description:
+					'Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.',
+				condition: (data) => Boolean(data?.showResults),
 			},
-			{
-				name: 'actions',
-				type: 'blocks',
-				blocks: buildActionBlocks(actionRegistry),
-				label: labelForKey(keys.configActions),
-				// Action config can contain secrets (e.g. signedWebhook.secret). The collection
-				// itself is publicly readable so forms can be rendered by anonymous clients, but
-				// action config must never be exposed to anonymous callers.
-				access: { read: isLoggedIn },
+		},
+	]
+
+	const defaultEndpoints: CollectionConfig['endpoints'] = [
+		{
+			path: '/:id/results',
+			method: 'get',
+			handler: async (req: PayloadRequest) => {
+				const field = typeof req.query?.field === 'string' ? req.query.field : undefined
+				const { status, body } = await resolveFormResultsRequest({
+					payload: req.payload,
+					formId: req.routeParams?.id as number | string | undefined,
+					field,
+					isAuthed: Boolean(req.user),
+					req,
+				})
+				return Response.json(body, { status })
 			},
-			{
-				name: 'defaultPresentation',
-				type: 'select',
-				defaultValue: DEFAULT_PRESENTATION_NAME,
-				options: [...presentationRegistry.values()].map((descriptor) => ({
-					label: labelFor(descriptor.label),
-					value: descriptor.name,
-				})),
-				label: labelForKey(keys.configDefaultPresentation),
-				admin: { position: 'sidebar' },
-			},
-			{
-				name: 'showResults',
-				type: 'checkbox',
-				defaultValue: false,
-				label: labelForKey(keys.configShowResults),
-				admin: { position: 'sidebar' },
-			},
-			{
-				name: 'resultsField',
-				type: 'text',
-				label: labelForKey(keys.configResultsField),
-				admin: {
-					position: 'sidebar',
-					description:
-						'Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.',
-					condition: (data) => Boolean(data?.showResults),
-				},
-			},
-		],
+		},
+	]
+
+	return {
+		...(overrides ?? {}),
+		slug: FORMS_SLUG,
+		labels: { singular: 'Form', plural: 'Forms', ...(overrides?.labels ?? {}) },
+		admin: { group: 'Forms', useAsTitle: 'title', ...(overrides?.admin ?? {}) },
+		access: { read: () => true, ...(overrides?.access ?? {}) },
+		hooks: {
+			...(overrides?.hooks ?? {}),
+			// beforeValidate normalizes conditions and flow; consumer hooks run after
+			beforeValidate: [beforeValidate, ...(overrides?.hooks?.beforeValidate ?? [])],
+		},
 		endpoints: [
-			{
-				path: '/:id/results',
-				method: 'get',
-				handler: async (req: PayloadRequest) => {
-					const field = typeof req.query?.field === 'string' ? req.query.field : undefined
-					const { status, body } = await resolveFormResultsRequest({
-						payload: req.payload,
-						formId: req.routeParams?.id as number | string | undefined,
-						field,
-						isAuthed: Boolean(req.user),
-						req,
-					})
-					return Response.json(body, { status })
-				},
-			},
+			...defaultEndpoints,
+			...(Array.isArray(overrides?.endpoints) ? overrides.endpoints : []),
 		],
-	})
+		fields: overrides?.fields ? overrides.fields({ defaultFields }) : defaultFields,
+	}
 }

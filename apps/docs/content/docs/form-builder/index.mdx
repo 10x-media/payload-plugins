@@ -16,7 +16,7 @@ export default async function ContactPage() {
 
 ## What is in the box
 
-Editors compose forms from [fields](/form-builder/fields) authored as Payload blocks. Nine types ship (text, textarea, email, number, select, checkbox, file, consent, calculation), all built through the same `defineFormField` primitive your custom types use, so nothing about the built-ins is privileged. Fields carry declarative [validation rules](/form-builder/validation) with custom messages, warning-versus-error severities, cross-field and async server-only rules, and a [Standard Schema](https://standardschema.dev) escape hatch. [Conditional logic](/form-builder/conditions) is expressed in Payload's own `Where` shape and evaluated by one isomorphic engine on client and server, and a serializable step graph turns any form into a [multi-step flow](/form-builder/multi-step) with conditional branching.
+Editors compose forms from [fields](/form-builder/fields) authored as Payload blocks. Ten types ship (text, textarea, email, number, select, checkbox, file, consent, calculation, repeater), all built through the same `defineFormField` primitive your custom types use, so nothing about the built-ins is privileged. Fields carry declarative [validation rules](/form-builder/validation) with custom messages, warning-versus-error severities, cross-field and async server-only rules, and a [Standard Schema](https://standardschema.dev) escape hatch. [Conditional logic](/form-builder/conditions) is expressed in Payload's own `Where` shape and evaluated by one isomorphic engine on client and server, and a serializable step graph turns any form into a [multi-step flow](/form-builder/multi-step) with conditional branching.
 
 On the frontend, [`<Form>`](/form-builder/rendering) renders headless: progressive validation, lifecycle events, accessible primitives, swappable renderers, an optional layout grid. [Style it](/form-builder/styling) with CSS on stable class hooks, the shadcn registry, or your own components, and surface it as a page, inline block, modal, or drawer through [presentations](/form-builder/presentations). Accessibility is not left to the integrator: the defaults are verified by automated axe checks (jsdom and real-browser e2e), and custom renderers get a documented contract to uphold.
 
@@ -27,6 +27,10 @@ Around the submission itself: [recall and prefill](/form-builder/recall-prefill)
 ## The trust model
 
 The client is never trusted. Conditions, validation rules, calculations, consent capture, and file constraints are all re-evaluated server-side on every submission; client-side evaluation exists for UX only and uses the same exported engines, so the two cannot drift.
+
+## Extending the plugin's collections
+
+All three plugin-managed collections (`forms`, `form-submissions`, `form-uploads`) accept an `overrides` option that uses explicit spreads instead of deep-merge. This means you always know which values you control and which are locked by the plugin for correctness or security. See [Collection overrides](/form-builder/customization) for the full API.
 
 ## When to use it
 

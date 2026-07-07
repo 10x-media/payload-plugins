@@ -11,11 +11,22 @@ import { useField } from '../useField'
 
 type RepeaterRow = Record<string, unknown>
 
-// Thin wrapper so each sub-field renderer is a proper React component (has stable hook identity per row/field).
+/**
+ * Thin wrapper so each sub-field renderer is a proper React component (has stable hook identity
+ * per row/field). Reads errors and warnings for the composite path `field[row].subField` from
+ * form state so server-side validation errors are surfaced inline next to the sub-field input,
+ * overriding any static values passed by the parent.
+ */
 const SubFieldWrapper = ({
 	renderer,
+	name,
 	...props
-}: { renderer: FieldRenderer } & Parameters<FieldRenderer>[0]) => renderer(props)
+}: { renderer: FieldRenderer } & Parameters<FieldRenderer>[0]) => {
+	const { state } = useFormContext()
+	const errors = (state.errors as Record<string, string[]>)?.[name] ?? []
+	const warnings = (state.warnings as Record<string, string[]>)?.[name] ?? []
+	return renderer({ ...props, name, errors, warnings })
+}
 
 export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 	({ field, id: rootId, errors, warnings, required, t, locale }) => {
@@ -81,16 +92,18 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 										const renderer = rendererRegistry.get(subField.blockType)
 										if (!renderer) return null
 										const subId = `${rootId}-${rowIndex}-${subField.name}`
+										const compositeName = `${field.name}[${rowIndex}].${subField.name}`
 										return (
 											<div key={subField.name} className="fb-repeater__sub-field">
 												{createElement(SubFieldWrapper, {
 													renderer,
 													field: subField,
 													id: subId,
-													name: `${field.name}[${rowIndex}].${subField.name}`,
+													name: compositeName,
 													value: row[subField.name],
 													onChange: (v) => updateRow(rowIndex, subField.name, v),
 													onBlur,
+													// SubFieldWrapper overrides these from form state; passed here to satisfy the type
 													errors: [],
 													warnings: [],
 													required: subField.required ?? false,

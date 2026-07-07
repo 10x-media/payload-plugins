@@ -451,6 +451,38 @@ export const Form = ({
 				warnings[result.field.name] = result.warnings
 			}
 		}
+
+		// Validate sub-fields within each visible repeater, mirroring the server's per-row pass.
+		// Errors are stored under the composite key `fieldName[rowIndex].subFieldName` so the
+		// repeater renderer can look them up from form state and display them inline.
+		for (const field of visible.filter((f) => f.blockType === 'repeater')) {
+			const rows = Array.isArray(effectiveValues[field.name])
+				? (effectiveValues[field.name] as Array<Record<string, unknown>>)
+				: []
+			const subFields = Array.isArray(field.subFields)
+				? (field.subFields as FormFieldInstance[])
+				: []
+			for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+				const row = rows[rowIndex] ?? {}
+				for (const subField of subFields) {
+					if (!evaluateCondition(subField.visibleWhen, row)) continue
+					if (!evaluateCondition(subField.validateWhen, row)) continue
+					const subResult = await validateFieldValue({
+						field: subField,
+						value: row[subField.name],
+						registry,
+						ruleRegistry,
+						answers: row,
+						locale,
+						t: translate,
+					})
+					const compositeKey = `${field.name}[${rowIndex}].${subField.name}`
+					if (subResult.errors.length > 0) errors[compositeKey] = subResult.errors
+					if (subResult.warnings.length > 0) warnings[compositeKey] = subResult.warnings
+				}
+			}
+		}
+
 		rawDispatch({ type: 'SET_ALL_ISSUES', errors, warnings })
 		if (Object.keys(errors).length > 0) {
 			submittingRef.current = false

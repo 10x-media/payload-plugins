@@ -1,4 +1,4 @@
-import { type CollectionConfig, type Config, definePlugin } from 'payload'
+import { type Config, definePlugin } from 'payload'
 import { defaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
@@ -9,6 +9,7 @@ import { resolveConsentSources } from './consent/registry'
 import type { FormEventSink } from './events/types'
 import { defaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
+import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 import { defaultPresentationDescriptors } from './presentations/defaults'
@@ -52,14 +53,16 @@ export type FormBuilderPluginOptions = {
 	 */
 	showSubmissionRawFields?: boolean
 	/**
-	 * Deep-merge overrides applied to individual plugin-managed collections after they are built.
-	 * Use this to add fields, hooks, admin settings, or access control without replacing the
-	 * entire collection config.
+	 * Override individual plugin-managed collections using explicit spreads. Each key accepts a
+	 * `CollectionOverrides` object: top-level keys are spread with the plugin's defaults (spread
+	 * order per key determines who wins), hooks are appended after the plugin's own hooks, and
+	 * `fields` is a function that receives the default fields and returns the final array so
+	 * additions/removals are always intentional.
 	 */
 	overrides?: {
-		forms?: Partial<CollectionConfig>
-		formSubmissions?: Partial<CollectionConfig>
-		uploads?: Partial<CollectionConfig>
+		forms?: CollectionOverrides
+		formSubmissions?: CollectionOverrides
+		uploads?: CollectionOverrides
 	}
 }
 
