@@ -37,7 +37,11 @@ export const createCallLogsCollection = ({
 			beforeChange: [
 				async ({ data, req }) => {
 					if (data.relatedContact) return data
-					const phoneNumber = data.fromNumber ?? data.toNumber
+					// For incoming calls the caller is fromNumber; for outgoing the
+					// callee is toNumber. Matching the own sipgate line would never
+					// find a contact, so pick the external party's number.
+					const phoneNumber =
+						data.callType === 'out' ? data.toNumber : (data.fromNumber ?? data.toNumber)
 					if (!phoneNumber) return data
 					const match = await resolveRelatedContact({
 						payload: req.payload,
