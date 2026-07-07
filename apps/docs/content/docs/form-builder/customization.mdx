@@ -1,7 +1,25 @@
 ---
-title: Collection overrides
-description: Add fields, hooks, and access rules to the plugin's built-in collections without replacing them.
+title: Customization
+description: Collection overrides, submission admin UI options, and other plugin-level configuration.
 ---
+
+## Submission answers UI
+
+When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component that formats each value using its field type's `format` function, shows repeater rows with numbered headings, displays consent proofs with agreed/declined indicators and a timestamp, and includes submission metadata. This replaces the raw JSON fields as the primary view.
+
+The raw `values`, `descriptors`, and `consent` JSON fields are hidden by default. They contain the same data as the formatted UI and are noisy alongside it. To show them (useful for debugging), set `showSubmissionRawFields`:
+
+```ts title="payload.config.ts"
+formBuilder({
+  showSubmissionRawFields: true,
+})
+```
+
+With this option off (the default), the `answers` UI field is the only visible representation of a submission's content in the admin. The raw JSON fields still exist in the database and are returned by the API; only the admin display is affected.
+
+---
+
+## Collection overrides
 
 The plugin manages three Payload collections: `forms`, `form-submissions`, and `form-uploads`. All three accept an `overrides` option that lets you extend them in a way that is explicit and predictable, without using a deep-merge utility that can silently drop plugin-critical config.
 

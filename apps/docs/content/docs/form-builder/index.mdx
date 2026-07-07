@@ -28,9 +28,9 @@ Around the submission itself: [recall and prefill](/form-builder/recall-prefill)
 
 The client is never trusted. Conditions, validation rules, calculations, consent capture, and file constraints are all re-evaluated server-side on every submission; client-side evaluation exists for UX only and uses the same exported engines, so the two cannot drift.
 
-## Extending the plugin's collections
+## Extending and configuring the plugin
 
-All three plugin-managed collections (`forms`, `form-submissions`, `form-uploads`) accept an `overrides` option that uses explicit spreads instead of deep-merge. This means you always know which values you control and which are locked by the plugin for correctness or security. See [Collection overrides](/form-builder/customization) for the full API.
+All three plugin-managed collections (`forms`, `form-submissions`, `form-uploads`) accept an `overrides` option that uses explicit spreads. The submission admin view renders a formatted `SubmissionAnswers` component by default; raw JSON fields are hidden unless you set `showSubmissionRawFields: true`. See [Customization](/form-builder/customization) for the full API.
 
 ## When to use it
 
