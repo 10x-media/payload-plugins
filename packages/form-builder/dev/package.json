@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/form-builder-dev",
-	"version": "0.0.1-beta.1",
+	"version": "0.0.1-beta.2",
 	"private": true,
 	"type": "module",
 	"scripts": {

@@ -51,6 +51,7 @@
 		"fb-form-document-types",
 		"fb-forms-secret-access",
 		"fb-honeypot-autofill",
+		"fb-repeater-field",
 		"fb-submission-status",
 		"form-builder-standard-schema-dep",
 		"form-builder-v1",
