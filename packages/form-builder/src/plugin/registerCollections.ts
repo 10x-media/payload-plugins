@@ -1,4 +1,4 @@
-import type { CollectionConfig, Config } from 'payload'
+import type { CollectionConfig, Config, Field } from 'payload'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
@@ -10,6 +10,7 @@ import type { PresentationDescriptorRegistry } from '../presentations/registry'
 import type { ResolvedSpamConfig } from '../spam/types'
 import { buildUploadOwnerStamp, buildUploadRateLimit } from '../spam/uploadHooks'
 import type { ValidationRuleRegistry } from '../validation/registry'
+import type { CollectionOverrides } from './collectionOverrides'
 
 type RegisterCollectionsArgs = {
 	config: Config
@@ -22,6 +23,12 @@ type RegisterCollectionsArgs = {
 	events?: FormEventSink
 	uploads: { enabled: boolean; slug: string; collection?: CollectionConfig }
 	spam: ResolvedSpamConfig | false
+	showSubmissionRawFields: boolean
+	overrides?: {
+		forms?: CollectionOverrides
+		formSubmissions?: CollectionOverrides
+		uploads?: CollectionOverrides
+	}
 }
 
 export const registerCollections = ({
@@ -35,30 +42,64 @@ export const registerCollections = ({
 	events,
 	uploads,
 	spam,
+	showSubmissionRawFields,
+	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
-	if (spam && uploads.enabled && uploads.collection) {
-		const collection = uploads.collection
-		collection.hooks = collection.hooks ?? {}
-		collection.hooks.beforeOperation = [
-			...(collection.hooks.beforeOperation ?? []),
-			buildUploadRateLimit(spam),
-		]
-		collection.hooks.beforeValidate = [
-			...(collection.hooks.beforeValidate ?? []),
-			buildUploadOwnerStamp(spam),
-		]
+
+	let uploadsCollection: CollectionConfig | null = null
+	if (uploads.enabled && uploads.collection) {
+		const col = uploads.collection
+
+		// Spam hooks are added first (plugin-owned invariant)
+		if (spam) {
+			col.hooks = col.hooks ?? {}
+			col.hooks.beforeOperation = [...(col.hooks.beforeOperation ?? []), buildUploadRateLimit(spam)]
+			col.hooks.beforeValidate = [...(col.hooks.beforeValidate ?? []), buildUploadOwnerStamp(spam)]
+		}
+
+		// Apply CollectionOverrides using explicit spreads after spam hooks are in place.
+		// ...col first so the plugin defaults are the base, ...(ov ?? {}) second so the consumer
+		// wins for any top-level key not explicitly re-set below (consistent with forms/formSubmissions).
+		// The locked keys (hooks array ordering, fields function) are spread last.
+		const ov = overrides?.uploads
+		if (ov) {
+			const defaultFields = (col.fields ?? []) as Field[]
+			uploadsCollection = {
+				...col,
+				...(ov ?? {}),
+				access: { ...(col.access ?? {}), ...(ov.access ?? {}) },
+				admin: { ...(col.admin ?? {}), ...(ov.admin ?? {}) },
+				hooks: {
+					...(ov.hooks ?? {}),
+					// Spam hooks stay first in each array; consumer hooks appended
+					beforeOperation: [
+						...(col.hooks?.beforeOperation ?? []),
+						...(ov.hooks?.beforeOperation ?? []),
+					],
+					beforeValidate: [
+						...(col.hooks?.beforeValidate ?? []),
+						...(ov.hooks?.beforeValidate ?? []),
+					],
+				},
+				fields: ov.fields ? ov.fields({ defaultFields }) : defaultFields,
+			}
+		} else {
+			uploadsCollection = col
+		}
 	}
+
 	config.collections = [
 		...(config.collections ?? []),
-		...(uploads.enabled && uploads.collection ? [uploads.collection] : []),
+		...(uploadsCollection ? [uploadsCollection] : []),
 		buildFormsCollection({
 			registry,
 			ruleRegistry,
 			consentRegistry,
 			presentationRegistry,
 			actionRegistry,
+			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({
 			registry,
@@ -69,6 +110,8 @@ export const registerCollections = ({
 			hasRunner,
 			uploadSlug: uploads.slug,
 			spam,
+			showRawFields: showSubmissionRawFields,
+			overrides: overrides?.formSubmissions,
 		}),
 	]
 }

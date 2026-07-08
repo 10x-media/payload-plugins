@@ -3,32 +3,57 @@ import { defaultFieldDefinitions } from '../fields/builtin'
 import { buildRegistry } from '../fields/registry'
 import { keys } from '../translations/keys'
 import { asFieldTranslate } from '../translations/server'
+import type {
+	AnswerItem,
+	ConsentItem,
+	MetaItem,
+	RepeaterItem,
+	SubmissionAnswersLabels,
+} from './SubmissionAnswersClient'
+import { SubmissionAnswersClient } from './SubmissionAnswersClient'
 import type { SubmissionDescriptor, SubmissionValue } from './types'
 
 const registry = buildRegistry(defaultFieldDefinitions)
+
+type ConsentEntry = {
+	field: string
+	agreed: boolean
+	ref?: string
+	versionRef?: string
+	at: string
+}
+
+type MetaSpam = { captcha?: string }
+
+type SubmissionMeta = {
+	at?: string
+	ip?: string
+	ua?: string
+	spam?: MetaSpam
+	[key: string]: unknown
+}
 
 type SubmissionDoc = {
 	values?: SubmissionValue[]
 	descriptors?: SubmissionDescriptor[]
 	locale?: string
+	consent?: ConsentEntry[]
+	meta?: SubmissionMeta
 }
 
-/** A stored file answer's link, when the captured `FileRef` carries a url; null otherwise. */
-const fileHref = (raw: unknown): { url: string; filename: string } | null => {
-	if (raw && typeof raw === 'object' && 'url' in raw) {
-		const ref = raw as { url?: unknown; filename?: unknown }
-		if (typeof ref.url === 'string' && ref.url.length > 0) {
-			return { url: ref.url, filename: typeof ref.filename === 'string' ? ref.filename : ref.url }
-		}
+const formatDate = (iso: string, locale: string): string => {
+	try {
+		return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
+			new Date(iso)
+		)
+	} catch {
+		return iso
 	}
-	return null
 }
 
 /**
- * Read-only, localized submission view (server component). Renders each answered field's snapshot
- * label next to its type-aware formatted value via the field type's `format`, using the request
- * locale and i18n, with no client bundle. The built-in field types are formatted directly; threading
- * the full resolved registry (custom types) to the view is a future enhancement.
+ * Server component. Formats submission data into serializable props and delegates
+ * rendering to the client component which uses Payload's UI components.
  */
 export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 	const doc = (data ?? {}) as SubmissionDoc
@@ -36,48 +61,111 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 	const values = doc.values ?? []
 	const locale = doc.locale ?? req.locale ?? 'en'
 	const t = asFieldTranslate(req.i18n.t)
-
-	if (descriptors.length === 0) {
-		return <p>{t(keys.submissionNoAnswers)}</p>
-	}
+	const rawConsent = doc.consent ?? []
+	const meta = doc.meta
 
 	const valueByField = new Map(values.map((entry) => [entry.field, entry.value]))
 
+	const answers: AnswerItem[] = []
+	const repeaters: RepeaterItem[] = []
+
+	for (const descriptor of descriptors) {
+		const raw = valueByField.get(descriptor.field)
+
+		if (descriptor.fieldType === 'repeater') {
+			const rows = Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : []
+			const subDescs = descriptor.subFieldDescriptors ?? []
+			repeaters.push({
+				field: descriptor.field,
+				label: descriptor.label,
+				rows: rows.map((row, rowIndex) => ({
+					id: String(rowIndex),
+					subFields: subDescs.map((sub) => {
+						const subDef = registry.get(sub.fieldType)
+						const subRaw = row[sub.field]
+						const formatted = subDef?.format
+							? subDef.format({
+									value: subRaw,
+									config: {},
+									optionLabels: sub.optionLabels,
+									locale,
+									t,
+								})
+							: subRaw == null
+								? ''
+								: String(subRaw)
+						return { label: sub.label, value: formatted || '—' }
+					}),
+				})),
+			})
+			continue
+		}
+
+		const def = registry.get(descriptor.fieldType)
+		const formatted = def?.format
+			? def.format({ value: raw, config: {}, optionLabels: descriptor.optionLabels, locale, t })
+			: raw == null
+				? ''
+				: String(raw)
+
+		if (descriptor.fieldType === 'file') {
+			const ref =
+				raw && typeof raw === 'object' && 'url' in raw
+					? (raw as { url?: string; filename?: string })
+					: null
+			const url = typeof ref?.url === 'string' ? ref.url : undefined
+			const filename = typeof ref?.filename === 'string' ? ref.filename : (url ?? '')
+			answers.push({ field: descriptor.field, label: descriptor.label, value: filename, href: url })
+		} else {
+			answers.push({
+				field: descriptor.field,
+				label: descriptor.label,
+				value: formatted || '—',
+				multiline: descriptor.fieldType === 'textarea',
+			})
+		}
+	}
+
+	const consent: ConsentItem[] = rawConsent.map((entry) => ({
+		...entry,
+		at: formatDate(entry.at, locale),
+	}))
+
+	const metaItems: MetaItem[] = []
+	if (meta) {
+		if (meta.at)
+			metaItems.push({
+				label: t(keys.submissionMetaReceivedAt),
+				value: formatDate(meta.at, locale),
+			})
+		if (meta.ip) metaItems.push({ label: t(keys.submissionMetaIp), value: meta.ip })
+		if (meta.ua) metaItems.push({ label: t(keys.submissionMetaUserAgent), value: String(meta.ua) })
+		if (meta.spam) {
+			const captcha =
+				typeof meta.spam === 'object' && 'captcha' in meta.spam
+					? String((meta.spam as MetaSpam).captcha)
+					: '—'
+			metaItems.push({ label: t(keys.submissionMetaCaptcha), value: captcha })
+		}
+	}
+
+	const labels: SubmissionAnswersLabels = {
+		answers: t(keys.submissionAnswers),
+		consent: t(keys.submissionConsent),
+		submissionDetails: t(keys.submissionDetails),
+		agreed: t(keys.submissionConsentAgreed),
+		declined: t(keys.submissionConsentDeclined),
+		row: t(keys.repeaterRow),
+		empty: t(keys.submissionNoAnswers),
+	}
+
 	return (
-		<div className="form-builder-submission-answers">
-			<h4>{t(keys.submissionAnswers)}</h4>
-			<dl>
-				{descriptors.map((descriptor) => {
-					const definition = registry.get(descriptor.fieldType)
-					const raw = valueByField.get(descriptor.field)
-					const formatted = definition?.format
-						? definition.format({
-								value: raw,
-								config: {},
-								optionLabels: descriptor.optionLabels,
-								locale,
-								t,
-							})
-						: raw == null
-							? ''
-							: String(raw)
-					const href = descriptor.fieldType === 'file' ? fileHref(raw) : null
-					return (
-						<div key={descriptor.field}>
-							<dt>{descriptor.label}</dt>
-							<dd>
-								{href ? (
-									<a href={href.url} rel="noreferrer">
-										{href.filename}
-									</a>
-								) : (
-									formatted
-								)}
-							</dd>
-						</div>
-					)
-				})}
-			</dl>
-		</div>
+		<SubmissionAnswersClient
+			answers={answers}
+			repeaters={repeaters}
+			consent={consent}
+			meta={metaItems}
+			labels={labels}
+		/>
 	)
 }

@@ -53,12 +53,50 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `events` | `FormEventSink` | none | Lifecycle event sink; see [Actions and events](/form-builder/actions#lifecycle-events). |
 | `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
 | `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
+| `className` | `string` | none | Extra CSS classes on the root `<form>` element (and the post-submit success node). |
 | `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. |
+| `submitButtonClassName` | `string` | none | CSS class on the default submit button. Ignored when `renderSubmit` is provided. |
+| `nextButtonClassName` | `string` | none | CSS class on the default Next button (multi-step). Ignored when `renderNext` is provided. |
+| `backButtonClassName` | `string` | none | CSS class on the default Back button (multi-step). Ignored when `renderBack` is provided. |
+| `renderSubmit` | `(props: SubmitButtonRenderProps) => ReactNode` | none | Replace the default submit button entirely. |
+| `renderNext` | `(props: NextButtonRenderProps) => ReactNode` | none | Replace the default Next button in multi-step forms. |
+| `renderBack` | `(props: BackButtonRenderProps) => ReactNode` | none | Replace the default Back button in multi-step forms. |
 | `successMessage` | `string` | `'Thank you.'` | Post-submit message (supports [recall tokens](/form-builder/recall-prefill)). |
 | `presentation`, `presentations`, `onClose`, `title` | | | Overlay control; see [Presentations](/form-builder/presentations). |
 | `initialValues` | `Record<string, unknown>` | none | Seed values; see [Prefill](/form-builder/recall-prefill#url-prefill). |
 | `honeypot`, `captchaToken` | | defaults on / none | See [Spam](/form-builder/spam). |
 | `children` | `ReactNode` | none | Custom layout mode; see below. |
+
+### Custom buttons
+
+Use render props to replace a button with your own component while keeping the built-in label, state, and click wiring:
+
+```tsx
+<Form
+  form={form}
+  renderSubmit={({ label, submitting }) => (
+    <button type="submit" className="btn btn-primary" disabled={submitting}>
+      {submitting ? 'Sending…' : label}
+    </button>
+  )}
+  renderBack={({ label, onClick }) => (
+    <button type="button" className="btn btn-ghost" onClick={onClick}>{label}</button>
+  )}
+/>
+```
+
+For simple styling without replacing markup, pass `submitButtonClassName`, `nextButtonClassName`, or `backButtonClassName` instead:
+
+```tsx
+<Form
+  form={form}
+  submitButtonClassName="btn btn-primary"
+  nextButtonClassName="btn btn-secondary"
+  backButtonClassName="btn btn-ghost"
+/>
+```
+
+The render prop types (`SubmitButtonRenderProps`, `NextButtonRenderProps`, `BackButtonRenderProps`) are exported from `@10x-media/form-builder/react`.
 
 ## Renderers
 

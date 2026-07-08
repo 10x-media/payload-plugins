@@ -7,7 +7,35 @@ Form fields are authored as Payload blocks: one block type per registered field 
 
 ## Core field types
 
-`text`, `textarea`, `email`, `number`, `select`, `checkbox`, `file`, `consent`, and `calculation`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads), [Consent](/form-builder/consent), [Calculations](/form-builder/calculations).
+`text`, `textarea`, `email`, `number`, `select`, `checkbox`, `file`, `consent`, `calculation`, and `repeater`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads), [Consent](/form-builder/consent), [Calculations](/form-builder/calculations).
+
+## Repeater
+
+The `repeater` type captures a dynamic list of rows, each containing the same set of sub-fields defined once in the admin UI. It is the right choice for anything list-shaped: team members, product variants, line items, references.
+
+**Admin config**
+
+| Option | Type | Description |
+|---|---|---|
+| `minRows` | `number` | Minimum rows required. A zero-row submission is rejected when `minRows > 0`. |
+| `maxRows` | `number` | Maximum rows allowed. |
+| `addLabel` | `string` | Label for the add-row button. Defaults to the built-in translation key. |
+| `subFields` | blocks | The fields inside each row. Authored in the admin add-field drawer; supports all non-repeater field types. |
+
+**Validation**
+
+Row-count validation runs on the server for every submission. An empty repeater (no rows submitted) is still validated against `minRows`, so `minRows: 2` correctly rejects a form submitted with zero rows. `maxRows` rejects arrays that are too long. Per-row sub-field validation (required checks, custom rules) runs after row-count validation; errors are reported with path `fieldName[rowIndex].subFieldName`.
+
+**Renderer**
+
+The built-in renderer renders each row in a `<fieldset>` with an add-row button and per-row remove buttons. It reads server-side sub-field errors from form state by composite key and displays them inline next to the offending input. Client-side sub-field validation also runs on submit, before the request is sent. To use a custom renderer, register one under the `'repeater'` slug via the `renderers` prop on `<Form>`.
+
+```ts title="payload.config.ts"
+formBuilder({
+  // Repeater is on by default; disable it like any other built-in
+  fields: { repeater: false },
+})
+```
 
 ## The registry
 

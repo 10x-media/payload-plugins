@@ -9,6 +9,7 @@ import { resolveConsentSources } from './consent/registry'
 import type { FormEventSink } from './events/types'
 import { defaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
+import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 import { defaultPresentationDescriptors } from './presentations/defaults'
@@ -45,6 +46,24 @@ export type FormBuilderPluginOptions = {
 	uploads?: UploadsOption
 	/** Honeypot + rate-limiting (on by default) + a captcha adapter seam + upload-ownership scoping. `false` disables the whole subsystem. */
 	spam?: SpamOption
+	/**
+	 * When `true`, the raw `values`, `descriptors`, and `consent` JSON fields are visible in the
+	 * submission admin view. Default `false` — those fields are fully represented by the
+	 * `SubmissionAnswers` UI component and are noisy when shown alongside it.
+	 */
+	showSubmissionRawFields?: boolean
+	/**
+	 * Override individual plugin-managed collections using explicit spreads. Each key accepts a
+	 * `CollectionOverrides` object: top-level keys are spread with the plugin's defaults (spread
+	 * order per key determines who wins), hooks are appended after the plugin's own hooks, and
+	 * `fields` is a function that receives the default fields and returns the final array so
+	 * additions/removals are always intentional.
+	 */
+	overrides?: {
+		forms?: CollectionOverrides
+		formSubmissions?: CollectionOverrides
+		uploads?: CollectionOverrides
+	}
 }
 
 declare module 'payload' {
@@ -82,6 +101,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			events: options.events,
 			uploads,
 			spam,
+			showSubmissionRawFields: options.showSubmissionRawFields ?? false,
+			overrides: options.overrides,
 		})
 		return config
 	},

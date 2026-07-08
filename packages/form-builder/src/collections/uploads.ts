@@ -1,5 +1,6 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Field } from 'payload'
 import { isLoggedIn } from '../plugin/access'
+import type { CollectionOverrides } from '../plugin/collectionOverrides'
 
 export const FORM_UPLOADS_SLUG = 'form-uploads'
 
@@ -23,21 +24,31 @@ export type UploadsOption = boolean | UploadsCollectionConfig
  * `imageSizes`, so it needs no `sharp`. Projects with their own upload collection set `uploads: false` and
  * point the file field's `relationTo` at theirs.
  */
-export const buildUploadsCollection = (config: UploadsCollectionConfig = {}): CollectionConfig => ({
-	slug: config.slug ?? FORM_UPLOADS_SLUG,
-	access: config.access ?? {
-		create: () => true,
-		read: isLoggedIn,
-		update: isLoggedIn,
-		delete: isLoggedIn,
-	},
-	admin: { group: 'Forms' },
-	upload: config.upload && config.upload !== true ? config.upload : true,
-	fields: [
+export const buildUploadsCollection = (
+	config: UploadsCollectionConfig = {},
+	overrides?: CollectionOverrides
+): CollectionConfig => {
+	const defaultFields: Field[] = [
 		{ name: 'owner', type: 'text', admin: { readOnly: true, hidden: true } },
 		...(config.fields ?? []),
-	],
-})
+	]
+
+	return {
+		...(overrides ?? {}),
+		slug: config.slug ?? FORM_UPLOADS_SLUG,
+		access: {
+			create: () => true,
+			read: isLoggedIn,
+			update: isLoggedIn,
+			delete: isLoggedIn,
+			...(config.access ?? {}),
+			...(overrides?.access ?? {}),
+		},
+		admin: { group: 'Forms', ...(overrides?.admin ?? {}) },
+		upload: config.upload && config.upload !== true ? config.upload : true,
+		fields: overrides?.fields ? overrides.fields({ defaultFields }) : defaultFields,
+	}
+}
 
 /** Resolve the `uploads` plugin option: `false` disables, `true`/object enables the built-in collection. */
 export const resolveUploads = (
@@ -48,5 +59,5 @@ export const resolveUploads = (
 	}
 	const config = option && option !== true ? option : {}
 	const collection = buildUploadsCollection(config)
-	return { enabled: true, slug: collection.slug, collection }
+	return { enabled: true, slug: collection.slug as string, collection }
 }

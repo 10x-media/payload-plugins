@@ -53,6 +53,26 @@ export type FormDocument = {
 	defaultPresentation?: string
 }
 
+/** Props passed to `renderSubmit`. */
+export type SubmitButtonRenderProps = {
+	label: string
+	submitting: boolean
+}
+
+/** Props passed to `renderNext`. */
+export type NextButtonRenderProps = {
+	label: string
+	submitting: boolean
+	onClick: () => void
+}
+
+/** Props passed to `renderBack`. */
+export type BackButtonRenderProps = {
+	label: string
+	submitting: boolean
+	onClick: () => void
+}
+
 export type FormProps = {
 	form: FormDocument
 	fieldTypes?: AnyFormFieldDefinition[]
@@ -90,6 +110,18 @@ export type FormProps = {
 	children?: ReactNode
 	/** Additional CSS class names applied to the root `<form>` element (and the success node). */
 	className?: string
+	/** Replace the default submit button entirely. Receives the resolved label and submitting state. */
+	renderSubmit?: (props: SubmitButtonRenderProps) => ReactNode
+	/** Replace the default "Next" button in multi-step forms. */
+	renderNext?: (props: NextButtonRenderProps) => ReactNode
+	/** Replace the default "Back" button in multi-step forms. */
+	renderBack?: (props: BackButtonRenderProps) => ReactNode
+	/** CSS class forwarded to the default submit `<button>`. Ignored when `renderSubmit` is provided. */
+	submitButtonClassName?: string
+	/** CSS class forwarded to the default "Next" `<button>`. Ignored when `renderNext` is provided. */
+	nextButtonClassName?: string
+	/** CSS class forwarded to the default "Back" `<button>`. Ignored when `renderBack` is provided. */
+	backButtonClassName?: string
 }
 
 const isEmpty = (value: unknown): boolean =>
@@ -171,6 +203,12 @@ export const Form = ({
 	captchaToken,
 	children,
 	className,
+	renderSubmit,
+	renderNext,
+	renderBack,
+	submitButtonClassName,
+	nextButtonClassName,
+	backButtonClassName,
 }: FormProps) => {
 	const honeypotName = honeypot === false ? null : (honeypot?.name ?? DEFAULT_HONEYPOT_FIELD)
 	const honeypotRef = useRef<HTMLInputElement>(null)
@@ -413,6 +451,38 @@ export const Form = ({
 				warnings[result.field.name] = result.warnings
 			}
 		}
+
+		// Validate sub-fields within each visible repeater, mirroring the server's per-row pass.
+		// Errors are stored under the composite key `fieldName[rowIndex].subFieldName` so the
+		// repeater renderer can look them up from form state and display them inline.
+		for (const field of visible.filter((f) => f.blockType === 'repeater')) {
+			const rows = Array.isArray(effectiveValues[field.name])
+				? (effectiveValues[field.name] as Array<Record<string, unknown>>)
+				: []
+			const subFields = Array.isArray(field.subFields)
+				? (field.subFields as FormFieldInstance[])
+				: []
+			for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+				const row = rows[rowIndex] ?? {}
+				for (const subField of subFields) {
+					if (!evaluateCondition(subField.visibleWhen, row)) continue
+					if (!evaluateCondition(subField.validateWhen, row)) continue
+					const subResult = await validateFieldValue({
+						field: subField,
+						value: row[subField.name],
+						registry,
+						ruleRegistry,
+						answers: row,
+						locale,
+						t: translate,
+					})
+					const compositeKey = `${field.name}[${rowIndex}].${subField.name}`
+					if (subResult.errors.length > 0) errors[compositeKey] = subResult.errors
+					if (subResult.warnings.length > 0) warnings[compositeKey] = subResult.warnings
+				}
+			}
+		}
+
 		rawDispatch({ type: 'SET_ALL_ISSUES', errors, warnings })
 		if (Object.keys(errors).length > 0) {
 			submittingRef.current = false
@@ -478,7 +548,7 @@ export const Form = ({
 				goBack: () => {},
 			}
 
-	const contextValue = { state, dispatch, validateField, locale, step }
+	const contextValue = { state, dispatch, validateField, locale, step, rendererRegistry }
 
 	const PresentationWrapper = activePresentation.Wrapper
 	const wrap = (content: ReactNode): ReactNode =>
@@ -588,17 +658,41 @@ export const Form = ({
 					{flow ? (
 						<div className="fb-form__controls">
 							{!step.isFirst ? (
-								<button type="button" onClick={goBack} disabled={state.submitting}>
-									{backLabel}
-								</button>
+								renderBack ? (
+									renderBack({ label: backLabel, submitting: state.submitting, onClick: goBack })
+								) : (
+									<button
+										type="button"
+										className={backButtonClassName}
+										onClick={goBack}
+										disabled={state.submitting}
+									>
+										{backLabel}
+									</button>
+								)
 							) : null}
 							{step.isTerminal ? (
-								<button type="submit" disabled={state.submitting}>
-									{submitLabel}
-								</button>
+								renderSubmit ? (
+									renderSubmit({ label: submitLabel, submitting: state.submitting })
+								) : (
+									<button
+										type="submit"
+										className={submitButtonClassName}
+										disabled={state.submitting}
+									>
+										{submitLabel}
+									</button>
+								)
+							) : renderNext ? (
+								renderNext({
+									label: nextLabel,
+									submitting: state.submitting,
+									onClick: () => void goNext(),
+								})
 							) : (
 								<button
 									type="button"
+									className={nextButtonClassName}
 									disabled={state.submitting}
 									onClick={() => {
 										void goNext()
@@ -608,8 +702,10 @@ export const Form = ({
 								</button>
 							)}
 						</div>
+					) : renderSubmit ? (
+						renderSubmit({ label: submitLabel, submitting: state.submitting })
 					) : (
-						<button type="submit" disabled={state.submitting}>
+						<button type="submit" className={submitButtonClassName} disabled={state.submitting}>
 							{submitLabel}
 						</button>
 					)}

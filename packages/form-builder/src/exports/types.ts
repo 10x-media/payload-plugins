@@ -43,6 +43,7 @@ export type {
 } from '../fields/types'
 export type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 export type { FormBuilderPluginOptions } from '../index'
+export type { CollectionOverrides, FieldsOverride } from '../plugin/collectionOverrides'
 export type { PrefillOptions } from '../prefill/valuesFromSearchParams'
 export type {
 	PresentationDescriptorOption,
