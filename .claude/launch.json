@@ -12,6 +12,12 @@
 			"runtimeExecutable": "bash",
 			"runtimeArgs": ["-c", "PAYLOAD_SKIP_AUTOGEN=1 PORT=3101 pnpm dev analytics"],
 			"port": 3101
+		},
+		{
+			"name": "jobs",
+			"runtimeExecutable": "bash",
+			"runtimeArgs": ["-c", "PAYLOAD_SKIP_AUTOGEN=1 PORT=3102 pnpm dev jobs"],
+			"port": 3102
 		}
 	]
 }
