@@ -1,16 +1,25 @@
-import type {
-	CollectionBeforeChangeHook,
-	CollectionConfig,
-	Config,
-	Field,
-	LabelFunction,
-	PayloadComponent,
+import {
+	APIError,
+	type CollectionBeforeChangeHook,
+	type CollectionBeforeValidateHook,
+	type CollectionConfig,
+	type Config,
+	type Field,
+	type LabelFunction,
+	type PayloadComponent,
 } from 'payload'
 
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
-import { labelForKey } from '../translations/server'
+import { asTranslate, labelForKey } from '../translations/server'
 import { resolve } from './resolve'
+import {
+	collectJobSelectSlugs,
+	jobSelectField,
+	taskCondition,
+	unionSelectValues,
+	workflowCondition,
+} from './selectFields'
 
 const STATUS_CELL = '@10x-media/jobs/client#JobStatusCell'
 const STATUS_HEADER = '@10x-media/jobs/client#JobStatusHeader'
@@ -45,6 +54,23 @@ const setJobTitle: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
 	const task = typeof source.taskSlug === 'string' ? source.taskSlug : undefined
 	const title = workflow || task
 	return title ? { ...data, jobTitle: title } : data
+}
+
+/** A job runs a workflow or a task; reject documents claiming both. */
+const rejectWorkflowAndTask: CollectionBeforeValidateHook = ({
+	data,
+	operation,
+	originalDoc,
+	req,
+}) => {
+	if (operation !== 'create') {
+		return data
+	}
+	const merged = { ...(originalDoc ?? {}), ...(data ?? {}) } as Record<string, unknown>
+	if (merged.workflowSlug && merged.taskSlug) {
+		throw new APIError(asTranslate(req.t)(keys.errorWorkflowTaskExclusive), 400)
+	}
+	return data
 }
 
 /** Our default document Field component for specific job fields. */
@@ -197,7 +223,11 @@ const buildStatusField = (status: JobsOptions['status']): Field | null => {
  * (ours layer on top of theirs) so neither clobbers the other, and every piece
  * is replaceable through `options` (`status`, `cells`, `beforeListTable`).
  */
-export const registerJobsEnhancements = (config: Config, options: JobsOptions): void => {
+export const registerJobsEnhancements = (
+	config: Config,
+	options: JobsOptions,
+	queueControlQueues: string[] = []
+): void => {
 	const existing = config.jobs?.jobsCollectionOverrides
 
 	const enhance = ({
@@ -217,6 +247,29 @@ export const registerJobsEnhancements = (config: Config, options: JobsOptions): 
 			const name = fieldName(field)
 			return name ? !existingNames.has(name) : false
 		}).map((field) => resolveCell(field, options.cells))
+
+		// Top-level swap only: the log array nests its own required taskSlug field.
+		// Existing option values are kept (core seeds runtime-only slugs like `inline`
+		// that the db-level select enum must keep accepting). The queue field stays
+		// text: both db adapters turn select options into a hard enum, which would
+		// reject the arbitrary queue names `payload.jobs.queue()` may target.
+		const slugs = collectJobSelectSlugs(config, queueControlQueues)
+		const withSelects = base.fields.map((field): Field => {
+			const name = fieldName(field)
+			if (name === 'workflowSlug') {
+				return {
+					...jobSelectField(field, unionSelectValues(field, slugs.workflows)),
+					admin: { ...field.admin, condition: workflowCondition(slugs.workflows.length) },
+				} as Field
+			}
+			if (name === 'taskSlug') {
+				return {
+					...jobSelectField(field, unionSelectValues(field, slugs.tasks)),
+					admin: { ...field.admin, condition: taskCondition(slugs.tasks.length) },
+				} as Field
+			}
+			return field
+		})
 
 		const statusField = buildStatusField(options.status)
 		const lockRecord = options.readOnlyRecord !== false
@@ -244,11 +297,12 @@ export const registerJobsEnhancements = (config: Config, options: JobsOptions): 
 			hooks: {
 				...base.hooks,
 				beforeChange: [...(base.hooks?.beforeChange ?? []), setJobTitle],
+				beforeValidate: [...(base.hooks?.beforeValidate ?? []), rejectWorkflowAndTask],
 			},
 			fields: [
 				...(statusField ? [statusField] : []),
 				TITLE_FIELD,
-				...enhanceFields(base.fields, options.cells, lockRecord),
+				...enhanceFields(withSelects, options.cells, lockRecord),
 				...timestamps,
 			],
 		} as CollectionConfig

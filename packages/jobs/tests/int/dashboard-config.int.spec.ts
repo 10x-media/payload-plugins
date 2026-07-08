@@ -69,4 +69,38 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 		expect(waitUntil?.admin?.condition).toBeUndefined()
 		expect(waitUntil?.admin?.components?.Field).toBeDefined()
 	})
+
+	it('keeps workflow and task selects over every configured slug, and queue as permissive text', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		const optionValues = (field: Field | undefined) =>
+			field?.type === 'select'
+				? field.options.map((o) => (typeof o === 'object' ? o.value : o))
+				: undefined
+		const workflow = cfg && fieldByName(cfg.fields, 'workflowSlug')
+		expect(workflow?.type).toBe('select')
+		expect(optionValues(workflow)).toEqual(['onboarding'])
+		expect(workflow?.admin?.condition).toBeTypeOf('function')
+		const task = cfg && fieldByName(cfg.fields, 'taskSlug')
+		expect(task?.type).toBe('select')
+		expect(optionValues(task)).toEqual(['inline', 'sendEmail', 'syncCrm'])
+		expect(task?.admin?.condition).toBeTypeOf('function')
+		expect(cfg && fieldByName(cfg.fields, 'queue')?.type).toBe('text')
+	})
+
+	it('rejects creating a job with both a workflow and a task', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'payload-jobs',
+				data: { taskSlug: 'sendEmail', workflowSlug: 'onboarding' } as never,
+			})
+		).rejects.toThrow(/workflow or a task/)
+	})
+
+	it('still accepts programmatic queue names outside any configured list', async () => {
+		const job = await booted.payload.create({
+			collection: 'payload-jobs',
+			data: { queue: 'not-in-options', taskSlug: 'sendEmail' } as never,
+		})
+		expect(job.queue).toBe('not-in-options')
+	})
 })

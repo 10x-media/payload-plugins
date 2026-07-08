@@ -28,13 +28,13 @@ export const jobs = definePlugin<JobsPluginOptions>({
 			return config
 		}
 		registerTranslations(config, options.translations)
-		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
-		registerJobsEnhancements(config, options)
 		const reliability = resolveReliabilityOptions(options.reliability)
+		const queueControl = resolveQueueControlOptions(options.queueControl)
+		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
+		registerJobsEnhancements(config, options, queueControl?.queues ?? [])
 		if (reliability) {
 			registerReliability(config, reliability)
 		}
-		const queueControl = resolveQueueControlOptions(options.queueControl)
 		if (queueControl) {
 			registerQueueControl(config, queueControl, reliability)
 		}
