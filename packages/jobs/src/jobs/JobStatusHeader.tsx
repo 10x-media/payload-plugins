@@ -104,6 +104,7 @@ export const JobStatusHeader: UIFieldClientComponent = () => {
 	const pattern = config.admin?.dateFormat ?? DEFAULT_DATE_FORMAT
 	const createdAt = get('createdAt') as null | string
 	const completedAt = get('completedAt') as null | string
+	const waitUntil = get('waitUntil') as null | string
 	const absolute = (date: null | string): string | undefined =>
 		date ? formatDate({ date, i18n, pattern }) : undefined
 
@@ -126,6 +127,13 @@ export const JobStatusHeader: UIFieldClientComponent = () => {
 			<Fact label={runsLabel} value={runsValue} />
 			<Fact label={t(keys.fieldQueue)} value={String(get('queue') || 'default')} />
 			<Fact label={t(keys.fieldAttempts)} value={String((get('totalTried') as number) ?? 0)} />
+			{status === 'scheduled' && waitUntil ? (
+				<Fact
+					label={t(keys.fieldScheduledFor)}
+					tooltip={absolute(waitUntil)}
+					value={formatRelativeTime(waitUntil, Date.now(), i18n.language) || '—'}
+				/>
+			) : null}
 			<Fact
 				label={t(keys.fieldCreated)}
 				tooltip={absolute(createdAt)}

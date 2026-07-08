@@ -19,6 +19,7 @@ const ERROR_PANEL = '@10x-media/jobs/client#JobErrorPanel'
 const LOG_TIMELINE = '@10x-media/jobs/client#JobLogTimeline'
 const DOC_DESCRIPTION = '@10x-media/jobs/client#JobDocDescription'
 const HEALTH_BAR = '@10x-media/jobs/rsc#JobsHealthBar'
+const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
@@ -43,6 +44,7 @@ const setJobTitle: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
 const FIELD_COMPONENTS: Record<string, string> = {
 	error: ERROR_PANEL,
 	log: LOG_TIMELINE,
+	waitUntil: WAIT_UNTIL_FIELD,
 }
 
 const DEFAULT_JOBS_COLUMNS = ['workflowSlug', 'status', 'queue', 'totalTried', 'updatedAt']
@@ -50,6 +52,7 @@ const DEFAULT_JOBS_COLUMNS = ['workflowSlug', 'status', 'queue', 'totalTried', '
 /** Friendlier labels for a few of Payload's default job fields. */
 const FIELD_LABELS: Record<string, LabelFunction> = {
 	totalTried: labelForKey(keys.fieldAttempts),
+	waitUntil: labelForKey(keys.fieldScheduledFor),
 	workflowSlug: labelForKey(keys.fieldWorkflow),
 }
 
@@ -104,12 +107,10 @@ const resolveCell = (field: Field, cells: JobsOptions['cells']): Field => {
 
 /** Execution-state fields surfaced in the header; hidden from the form, kept as data/columns. */
 const HIDE_ALWAYS = new Set(['completedAt', 'totalTried', 'hasError', 'processing', 'taskStatus'])
-/** Inputs shown only when creating a job; hidden once it exists. */
-const HIDE_ON_EDIT = new Set(['waitUntil'])
 /** Execution output: read-only in the admin (admin-only, so the runner can still write it). */
 const READONLY_OUTPUTS = new Set(['error', 'log'])
 /** Config inputs: editable on Create, read-only on edit; kept in the sidebar. */
-const READONLY_INPUTS = new Set(['input', 'workflowSlug', 'taskSlug', 'queue'])
+const READONLY_INPUTS = new Set(['input', 'workflowSlug', 'taskSlug', 'queue', 'waitUntil'])
 
 /**
  * Lock a field for the read-only-record model. Runner-written fields use
@@ -120,15 +121,6 @@ const READONLY_INPUTS = new Set(['input', 'workflowSlug', 'taskSlug', 'queue'])
 const lockField = (field: Field, name: string): Field => {
 	if (HIDE_ALWAYS.has(name)) {
 		return { ...field, admin: { ...field.admin, hidden: true } } as Field
-	}
-	if (HIDE_ON_EDIT.has(name)) {
-		return {
-			...field,
-			admin: {
-				...field.admin,
-				condition: (_data, _siblingData, { operation }) => operation === 'create',
-			},
-		} as Field
 	}
 	if (READONLY_OUTPUTS.has(name)) {
 		return { ...field, admin: { ...field.admin, readOnly: true } } as Field
