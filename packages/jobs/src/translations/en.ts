@@ -31,6 +31,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldOutput]: 'Output',
 	[keys.fieldError]: 'Error',
 	[keys.fieldId]: 'ID',
+	[keys.fieldStarted]: 'Started',
+	[keys.fieldLeaseExpires]: 'Lease expires',
+	[keys.fieldScheduledFor]: 'Scheduled for',
 
 	[keys.outcome]: 'Outcome',
 	[keys.noAttempts]: 'No attempts recorded yet.',
@@ -38,4 +41,5 @@ export const en: Record<TranslationKey, string> = {
 	[keys.copied]: 'Copied',
 	[keys.jobSingular]: 'job',
 	[keys.jobPlural]: 'jobs',
+	[keys.errorWorkflowTaskExclusive]: 'A job runs a workflow or a task, not both.',
 }

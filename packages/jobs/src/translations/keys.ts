@@ -29,6 +29,9 @@ export const keys = {
 	fieldOutput: 'jobs:fieldOutput',
 	fieldError: 'jobs:fieldError',
 	fieldId: 'jobs:fieldId',
+	fieldStarted: 'jobs:fieldStarted',
+	fieldLeaseExpires: 'jobs:fieldLeaseExpires',
+	fieldScheduledFor: 'jobs:fieldScheduledFor',
 
 	outcome: 'jobs:outcome',
 	noAttempts: 'jobs:noAttempts',
@@ -36,6 +39,7 @@ export const keys = {
 	copied: 'jobs:copied',
 	jobSingular: 'jobs:jobSingular',
 	jobPlural: 'jobs:jobPlural',
+	errorWorkflowTaskExclusive: 'jobs:errorWorkflowTaskExclusive',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
