@@ -17,7 +17,7 @@ export const RelativeTimeCell = ({ cellData }: DefaultCellComponentProps) => {
 	if (cellData === null || cellData === undefined) {
 		return null
 	}
-	const relative = formatRelativeTime(cellData)
+	const relative = formatRelativeTime(cellData, Date.now(), i18n.language)
 	if (!relative) {
 		return null
 	}

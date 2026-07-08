@@ -1,4 +1,4 @@
-import type { TaskConfig } from 'payload'
+import type { TaskConfig, WorkflowConfig } from 'payload'
 
 import type { ReliabilityOptions } from '../src/index'
 
@@ -35,3 +35,18 @@ const noopTask: E2ETask = { slug: 'noop', handler: () => ({ output: {} }) }
 
 /** A sleep task (drain e2e) and a noop task. Sleep duration comes from `input.ms`. */
 export const e2eTasks: E2ETask[] = [sleepTask, noopTask]
+
+/**
+ * Matches the seeded `workflowSlug: 'runAutomation'` jobs (see dev/helpers/seed.ts) so the
+ * workflow select has a real option in dev. Uses `inlineTask` rather than `tasks.noop`
+ * because dev's generated `TypedJobs['tasks']` is stale (`unknown`), which would make
+ * `noop` resolve to a non-existent property.
+ */
+export const e2eWorkflows: WorkflowConfig[] = [
+	{
+		slug: 'runAutomation',
+		handler: async ({ inlineTask }) => {
+			await inlineTask('1', { task: () => ({ output: {} }) })
+		},
+	},
+]

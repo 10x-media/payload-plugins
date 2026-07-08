@@ -22,7 +22,7 @@ const baseDeps = (over = {}) => {
 		releaseLeadership: vi.fn(() => Promise.resolve()),
 		requeueStragglers: vi.fn(() => Promise.resolve(0)),
 		sleep: clock.sleep,
-		stopLoops: vi.fn(),
+		stopLoops: vi.fn(() => Promise.resolve()),
 		...over,
 	}
 }

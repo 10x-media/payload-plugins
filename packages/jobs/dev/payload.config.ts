@@ -7,7 +7,7 @@ import { buildConfig, type CollectionConfig } from 'payload'
 import { jobs } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
-import { e2eTasks, RELIABILITY_OPTIONS } from './jobsOptions'
+import { e2eTasks, e2eWorkflows, RELIABILITY_OPTIONS } from './jobsOptions'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
@@ -40,8 +40,13 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	collections: [users],
-	jobs: { tasks: e2eTasks },
-	plugins: [jobs({ queueControl: {}, reliability: RELIABILITY_OPTIONS })],
+	jobs: { tasks: e2eTasks, workflows: e2eWorkflows },
+	plugins: [
+		jobs({
+			queueControl: { queues: ['default', 'emails', 'webhooks'] },
+			reliability: RELIABILITY_OPTIONS,
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		if (process.env.JOBS_SKIP_SEED !== '1') {

@@ -32,4 +32,10 @@ describe('formatRelativeTime', () => {
 		expect(formatRelativeTime(new Date(NOW - HOUR), NOW)).toBe('1 hour ago')
 		expect(formatRelativeTime(NOW - DAY, NOW)).toBe('yesterday')
 	})
+
+	it('formats in the given locale', () => {
+		const now = Date.parse('2026-07-08T12:00:00Z')
+		expect(formatRelativeTime('2026-07-08T11:58:00Z', now, 'de')).toBe('vor 2 Minuten')
+		expect(formatRelativeTime('2026-07-08T15:00:00Z', now, 'de')).toBe('in 3 Stunden')
+	})
 })

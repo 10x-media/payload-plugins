@@ -21,4 +21,11 @@ export const definePluginBuild = (options: PluginBuildOptions) =>
 		unbundle: true,
 		sourcemap: true,
 		fixedExtension: false,
+		// Rolldown's default sanitizer rewrites '+' to '_' in preserved-module
+		// names, so a checkout path containing '+' no longer matches
+		// preserveModulesRoot and [name] becomes a rejected ../.. traversal.
+		// Names here are src-relative file paths, already URL-safe.
+		outputOptions: {
+			sanitizeFileName: false,
+		},
 	})

@@ -1,6 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 
 import type { JobsPluginOptions } from './options'
+import { applyCollectionOverride } from './plugin/applyCollectionOverride'
 import { registerJobsEnhancements } from './plugin/registerJobsEnhancements'
 import { registerTranslations } from './plugin/registerTranslations'
 import { resolveQueueControlOptions } from './queueControl/options'
@@ -28,15 +29,27 @@ export const jobs = definePlugin<JobsPluginOptions>({
 			return config
 		}
 		registerTranslations(config, options.translations)
-		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
-		registerJobsEnhancements(config, options)
 		const reliability = resolveReliabilityOptions(options.reliability)
+		const queueControl = resolveQueueControlOptions(options.queueControl)
+		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
+		registerJobsEnhancements(config, options, queueControl?.queues ?? [])
 		if (reliability) {
 			registerReliability(config, reliability)
 		}
-		const queueControl = resolveQueueControlOptions(options.queueControl)
 		if (queueControl) {
 			registerQueueControl(config, queueControl, reliability)
+		}
+		if (options.overrides?.jobs) {
+			const previous = config.jobs?.jobsCollectionOverrides
+			const override = options.overrides.jobs
+			config.jobs = {
+				...config.jobs,
+				jobsCollectionOverrides: ({ defaultJobsCollection }) =>
+					applyCollectionOverride(
+						previous ? previous({ defaultJobsCollection }) : defaultJobsCollection,
+						override
+					),
+			}
 		}
 		return config
 	},
@@ -51,7 +64,13 @@ export { type DrainDeps, type DrainOptions, type DrainResult, drainWorker } from
 export { type CreateWorkerArgs, createWorker, type Worker } from './execution/worker'
 export type { JobStatus, JobStatusInput } from './jobs/deriveJobStatus'
 export { deriveJobStatus } from './jobs/deriveJobStatus'
-export type { JobsOptions, JobsPluginOptions, JobsPluginOptions as PluginOptions } from './options'
+export type {
+	CollectionOverride,
+	FieldsOverride,
+	JobsOptions,
+	JobsPluginOptions,
+	JobsPluginOptions as PluginOptions,
+} from './options'
 export {
 	multiNodePreset,
 	serverlessPreset,

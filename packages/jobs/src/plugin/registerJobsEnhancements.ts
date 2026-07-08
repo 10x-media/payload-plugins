@@ -1,16 +1,25 @@
-import type {
-	CollectionBeforeChangeHook,
-	CollectionConfig,
-	Config,
-	Field,
-	LabelFunction,
-	PayloadComponent,
+import {
+	APIError,
+	type CollectionBeforeChangeHook,
+	type CollectionBeforeValidateHook,
+	type CollectionConfig,
+	type Config,
+	type Field,
+	type LabelFunction,
+	type PayloadComponent,
 } from 'payload'
 
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
-import { labelForKey } from '../translations/server'
+import { asTranslate, labelForKey } from '../translations/server'
 import { resolve } from './resolve'
+import {
+	collectJobSelectSlugs,
+	jobSelectField,
+	taskCondition,
+	unionSelectValues,
+	workflowCondition,
+} from './selectFields'
 
 const STATUS_CELL = '@10x-media/jobs/client#JobStatusCell'
 const STATUS_HEADER = '@10x-media/jobs/client#JobStatusHeader'
@@ -19,12 +28,21 @@ const ERROR_PANEL = '@10x-media/jobs/client#JobErrorPanel'
 const LOG_TIMELINE = '@10x-media/jobs/client#JobLogTimeline'
 const DOC_DESCRIPTION = '@10x-media/jobs/client#JobDocDescription'
 const HEALTH_BAR = '@10x-media/jobs/rsc#JobsHealthBar'
+const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
+const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
+const QUEUE_SELECT_FIELD = '@10x-media/jobs/client#QueueSelectField'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
 	name: 'jobTitle',
 	type: 'text',
-	admin: { disableListColumn: true, hidden: true },
+	label: labelForKey(keys.fieldJob),
+	admin: {
+		// Form-only hide: admin.hidden would also strip it from list columns.
+		condition: () => false,
+		components: { Cell: JOB_TITLE_CELL },
+		disableBulkEdit: true,
+	},
 }
 
 /**
@@ -39,17 +57,36 @@ const setJobTitle: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
 	return title ? { ...data, jobTitle: title } : data
 }
 
+/** A job runs a workflow or a task; reject documents claiming both. */
+const rejectWorkflowAndTask: CollectionBeforeValidateHook = ({
+	data,
+	operation,
+	originalDoc,
+	req,
+}) => {
+	if (operation !== 'create') {
+		return data
+	}
+	const merged = { ...(originalDoc ?? {}), ...(data ?? {}) } as Record<string, unknown>
+	if (merged.workflowSlug && merged.taskSlug) {
+		throw new APIError(asTranslate(req.t)(keys.errorWorkflowTaskExclusive), 400)
+	}
+	return data
+}
+
 /** Our default document Field component for specific job fields. */
 const FIELD_COMPONENTS: Record<string, string> = {
 	error: ERROR_PANEL,
 	log: LOG_TIMELINE,
+	waitUntil: WAIT_UNTIL_FIELD,
 }
 
-const DEFAULT_JOBS_COLUMNS = ['workflowSlug', 'status', 'queue', 'totalTried', 'updatedAt']
+const DEFAULT_JOBS_COLUMNS = ['jobTitle', 'status', 'queue', 'totalTried', 'updatedAt']
 
 /** Friendlier labels for a few of Payload's default job fields. */
 const FIELD_LABELS: Record<string, LabelFunction> = {
 	totalTried: labelForKey(keys.fieldAttempts),
+	waitUntil: labelForKey(keys.fieldScheduledFor),
 	workflowSlug: labelForKey(keys.fieldWorkflow),
 }
 
@@ -104,12 +141,10 @@ const resolveCell = (field: Field, cells: JobsOptions['cells']): Field => {
 
 /** Execution-state fields surfaced in the header; hidden from the form, kept as data/columns. */
 const HIDE_ALWAYS = new Set(['completedAt', 'totalTried', 'hasError', 'processing', 'taskStatus'])
-/** Inputs shown only when creating a job; hidden once it exists. */
-const HIDE_ON_EDIT = new Set(['waitUntil'])
 /** Execution output: read-only in the admin (admin-only, so the runner can still write it). */
 const READONLY_OUTPUTS = new Set(['error', 'log'])
 /** Config inputs: editable on Create, read-only on edit; kept in the sidebar. */
-const READONLY_INPUTS = new Set(['input', 'workflowSlug', 'taskSlug', 'queue'])
+const READONLY_INPUTS = new Set(['input', 'workflowSlug', 'taskSlug', 'queue', 'waitUntil'])
 
 /**
  * Lock a field for the read-only-record model. Runner-written fields use
@@ -120,15 +155,6 @@ const READONLY_INPUTS = new Set(['input', 'workflowSlug', 'taskSlug', 'queue'])
 const lockField = (field: Field, name: string): Field => {
 	if (HIDE_ALWAYS.has(name)) {
 		return { ...field, admin: { ...field.admin, hidden: true } } as Field
-	}
-	if (HIDE_ON_EDIT.has(name)) {
-		return {
-			...field,
-			admin: {
-				...field.admin,
-				condition: (_data, _siblingData, { operation }) => operation === 'create',
-			},
-		} as Field
 	}
 	if (READONLY_OUTPUTS.has(name)) {
 		return { ...field, admin: { ...field.admin, readOnly: true } } as Field
@@ -198,7 +224,11 @@ const buildStatusField = (status: JobsOptions['status']): Field | null => {
  * (ours layer on top of theirs) so neither clobbers the other, and every piece
  * is replaceable through `options` (`status`, `cells`, `beforeListTable`).
  */
-export const registerJobsEnhancements = (config: Config, options: JobsOptions): void => {
+export const registerJobsEnhancements = (
+	config: Config,
+	options: JobsOptions,
+	queueControlQueues: string[] = []
+): void => {
 	const existing = config.jobs?.jobsCollectionOverrides
 
 	const enhance = ({
@@ -218,6 +248,42 @@ export const registerJobsEnhancements = (config: Config, options: JobsOptions): 
 			const name = fieldName(field)
 			return name ? !existingNames.has(name) : false
 		}).map((field) => resolveCell(field, options.cells))
+
+		// Top-level swap only: the log array nests its own required taskSlug field.
+		// Existing option values are kept (core seeds runtime-only slugs like `inline`
+		// that the db-level select enum must keep accepting). The queue field keeps
+		// its text type under a select component: a real select would harden the
+		// options into a db enum and reject the arbitrary queue names
+		// `payload.jobs.queue()` may target.
+		const slugs = collectJobSelectSlugs(config, queueControlQueues)
+		const withSelects = base.fields.map((field): Field => {
+			const name = fieldName(field)
+			if (name === 'workflowSlug') {
+				return {
+					...jobSelectField(field, unionSelectValues(field, slugs.workflows)),
+					admin: { ...field.admin, condition: workflowCondition(slugs.workflows.length) },
+				} as Field
+			}
+			if (name === 'taskSlug') {
+				return {
+					...jobSelectField(field, unionSelectValues(field, slugs.tasks)),
+					admin: { ...field.admin, condition: taskCondition(slugs.tasks.length) },
+				} as Field
+			}
+			if (name === 'queue') {
+				return {
+					...field,
+					admin: {
+						...field.admin,
+						components: {
+							...field.admin?.components,
+							Field: { clientProps: { options: slugs.queues }, path: QUEUE_SELECT_FIELD },
+						},
+					},
+				} as Field
+			}
+			return field
+		})
 
 		const statusField = buildStatusField(options.status)
 		const lockRecord = options.readOnlyRecord !== false
@@ -245,11 +311,12 @@ export const registerJobsEnhancements = (config: Config, options: JobsOptions): 
 			hooks: {
 				...base.hooks,
 				beforeChange: [...(base.hooks?.beforeChange ?? []), setJobTitle],
+				beforeValidate: [...(base.hooks?.beforeValidate ?? []), rejectWorkflowAndTask],
 			},
 			fields: [
 				...(statusField ? [statusField] : []),
 				TITLE_FIELD,
-				...enhanceFields(base.fields, options.cells, lockRecord),
+				...enhanceFields(withSelects, options.cells, lockRecord),
 				...timestamps,
 			],
 		} as CollectionConfig

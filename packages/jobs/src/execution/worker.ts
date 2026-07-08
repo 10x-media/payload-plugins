@@ -56,11 +56,13 @@ export type Worker = {
 
 /**
  * A test-only handle for accessing `stop()`, which clears timers and signal handlers
- * without releasing leadership leases. Do not use in production; drain() is the correct
- * shutdown path. Cast a `Worker` to this type in tests to call stop().
+ * without releasing leadership leases, then resolves once any in-flight tick has
+ * settled (so no worker write can race the test's subsequent DB operations). Do not
+ * use in production; drain() is the correct shutdown path. Cast a `Worker` to this
+ * type in tests to call stop().
  */
 export type WorkerTestHandle = Worker & {
-	stop: () => void
+	stop: () => Promise<void>
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -68,18 +70,24 @@ const realSleep = (ms: number): Promise<void> =>
 		setTimeout(resolve, ms)
 	})
 
+type LoopHandle = {
+	timer: ReturnType<typeof setInterval>
+	/** Resolves once the currently running tick (if any) has settled. */
+	settle: () => Promise<void>
+}
+
 /** A self-skipping interval: a slow tick never overlaps the next (like Croner's `protect`). */
-const guardedInterval = (fn: () => Promise<void>, ms: number): ReturnType<typeof setInterval> => {
-	let busy = false
-	return setInterval(() => {
-		if (busy) {
+const guardedInterval = (fn: () => Promise<void>, ms: number): LoopHandle => {
+	let current: Promise<void> | undefined
+	const timer = setInterval(() => {
+		if (current) {
 			return
 		}
-		busy = true
-		void fn().finally(() => {
-			busy = false
+		current = fn().finally(() => {
+			current = undefined
 		})
 	}, ms)
+	return { settle: () => current ?? Promise.resolve(), timer }
 }
 
 /**
@@ -130,7 +138,7 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	const sleep = args.sleep ?? realSleep
 	const logger = payload.logger
 
-	let timers: ReturnType<typeof setInterval>[] = []
+	let timers: LoopHandle[] = []
 	let signalCleanup: SignalCleanup | undefined
 	let draining: Promise<DrainResult> | undefined
 
@@ -161,11 +169,19 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		await sweeper.tick(at)
 	}
 
-	const stopLoops = (): void => {
-		for (const timer of timers) {
-			clearInterval(timer)
-		}
+	/**
+	 * Clears the interval timers synchronously, then awaits any tick still running.
+	 * Callers that touch the DB after stopping (drain destroys it; tests bulk-delete
+	 * jobs) must await this, otherwise an in-flight `payload.jobs.run` write can land
+	 * concurrently and abort their Mongo transaction (or hit a destroyed connection).
+	 */
+	const stopLoops = async (): Promise<void> => {
+		const stopped = timers
 		timers = []
+		for (const loop of stopped) {
+			clearInterval(loop.timer)
+		}
+		await Promise.all(stopped.map((loop) => loop.settle()))
 	}
 	const removeSignals = (): void => {
 		signalCleanup?.()
@@ -199,9 +215,9 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		return draining
 	}
 
-	const stopWorker = (): void => {
-		stopLoops()
+	const stopWorker = async (): Promise<void> => {
 		removeSignals()
+		await stopLoops()
 	}
 
 	const worker: Worker = {
@@ -211,7 +227,7 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 			if (draining) {
 				return
 			}
-			stopLoops()
+			void stopLoops()
 			timers = [
 				guardedInterval(() => runCycle({ logger, runJobs }), runIntervalMs),
 				guardedInterval(

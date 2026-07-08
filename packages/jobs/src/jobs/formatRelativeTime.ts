@@ -14,11 +14,13 @@ const toMillis = (value: Date | number | string): number =>
 /**
  * Format a timestamp relative to `now`, for example `2 minutes ago` or
  * `in 1 hour`. Returns an empty string for missing or unparseable input. Pure,
- * so it can be unit-tested and reused outside the cell.
+ * so it can be unit-tested and reused outside the cell. `locale` defaults to
+ * `en` and is passed straight through to `Intl.RelativeTimeFormat`.
  */
 export const formatRelativeTime = (
 	value: Date | null | number | string | undefined,
-	now: number = Date.now()
+	now: number = Date.now(),
+	locale = 'en'
 ): string => {
 	if (value === null || value === undefined) {
 		return ''
@@ -28,7 +30,7 @@ export const formatRelativeTime = (
 		return ''
 	}
 
-	const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+	const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
 	let duration = (time - now) / 1000
 
 	for (const division of DIVISIONS) {
