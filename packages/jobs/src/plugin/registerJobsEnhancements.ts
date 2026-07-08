@@ -30,6 +30,7 @@ const DOC_DESCRIPTION = '@10x-media/jobs/client#JobDocDescription'
 const HEALTH_BAR = '@10x-media/jobs/rsc#JobsHealthBar'
 const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
 const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
+const QUEUE_SELECT_FIELD = '@10x-media/jobs/client#QueueSelectField'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
@@ -250,9 +251,10 @@ export const registerJobsEnhancements = (
 
 		// Top-level swap only: the log array nests its own required taskSlug field.
 		// Existing option values are kept (core seeds runtime-only slugs like `inline`
-		// that the db-level select enum must keep accepting). The queue field stays
-		// text: both db adapters turn select options into a hard enum, which would
-		// reject the arbitrary queue names `payload.jobs.queue()` may target.
+		// that the db-level select enum must keep accepting). The queue field keeps
+		// its text type under a select component: a real select would harden the
+		// options into a db enum and reject the arbitrary queue names
+		// `payload.jobs.queue()` may target.
 		const slugs = collectJobSelectSlugs(config, queueControlQueues)
 		const withSelects = base.fields.map((field): Field => {
 			const name = fieldName(field)
@@ -266,6 +268,18 @@ export const registerJobsEnhancements = (
 				return {
 					...jobSelectField(field, unionSelectValues(field, slugs.tasks)),
 					admin: { ...field.admin, condition: taskCondition(slugs.tasks.length) },
+				} as Field
+			}
+			if (name === 'queue') {
+				return {
+					...field,
+					admin: {
+						...field.admin,
+						components: {
+							...field.admin?.components,
+							Field: { clientProps: { options: slugs.queues }, path: QUEUE_SELECT_FIELD },
+						},
+					},
 				} as Field
 			}
 			return field

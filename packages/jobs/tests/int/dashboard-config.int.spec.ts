@@ -70,7 +70,7 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 		expect(waitUntil?.admin?.components?.Field).toBeDefined()
 	})
 
-	it('keeps workflow and task selects over every configured slug, and queue as permissive text', () => {
+	it('keeps workflow and task selects over every configured slug, and queue as text with a select component', () => {
 		const cfg = booted.payload.collections['payload-jobs']?.config
 		const optionValues = (field: Field | undefined) =>
 			field?.type === 'select'
@@ -84,7 +84,9 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 		expect(task?.type).toBe('select')
 		expect(optionValues(task)).toEqual(['inline', 'sendEmail', 'syncCrm'])
 		expect(task?.admin?.condition).toBeTypeOf('function')
-		expect(cfg && fieldByName(cfg.fields, 'queue')?.type).toBe('text')
+		const queue = cfg && fieldByName(cfg.fields, 'queue')
+		expect(queue?.type).toBe('text')
+		expect(queue?.admin?.components?.Field).toBeDefined()
 	})
 
 	it('rejects creating a job with both a workflow and a task', async () => {
