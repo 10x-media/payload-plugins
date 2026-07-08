@@ -35,12 +35,23 @@ export type MetaItem = {
 	value: string
 }
 
+export type SubmissionAnswersLabels = {
+	answers: string
+	consent: string
+	submissionDetails: string
+	agreed: string
+	declined: string
+	/** Row heading template containing `{n}`, the 1-based row number. */
+	row: string
+	empty: string
+}
+
 type Props = {
 	answers: AnswerItem[]
 	repeaters: RepeaterItem[]
 	consent: ConsentItem[]
 	meta: MetaItem[]
-	emptyLabel: string
+	labels: SubmissionAnswersLabels
 }
 
 const noop = (_e: ChangeEvent<HTMLInputElement>) => {}
@@ -62,25 +73,19 @@ const rowHeading: React.CSSProperties = {
 	margin: '0 0 4px',
 }
 
-export const SubmissionAnswersClient = ({
-	answers,
-	repeaters,
-	consent,
-	meta,
-	emptyLabel,
-}: Props) => {
+export const SubmissionAnswersClient = ({ answers, repeaters, consent, meta, labels }: Props) => {
 	const hasContent =
 		answers.length > 0 || repeaters.length > 0 || consent.length > 0 || meta.length > 0
 
 	if (!hasContent) {
-		return <p style={{ color: 'var(--theme-elevation-500)' }}>{emptyLabel}</p>
+		return <p style={{ color: 'var(--theme-elevation-500)' }}>{labels.empty}</p>
 	}
 
 	return (
 		<div className="field-type" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 			{(answers.length > 0 || repeaters.length > 0) && (
 				<section>
-					<FieldLabel label="Answers" />
+					<FieldLabel label={labels.answers} />
 					{answers.map(({ field, label, value, href }) =>
 						href ? (
 							<div key={field} className="field-type">
@@ -129,7 +134,9 @@ export const SubmissionAnswersClient = ({
 												padding: '4px 12px 0',
 											}}
 										>
-											<p style={rowHeading}>Row {Number(row.id) + 1}</p>
+											<p style={rowHeading}>
+												{labels.row.replace('{n}', String(Number(row.id) + 1))}
+											</p>
 											{row.subFields.map((subField) => (
 												<TextInput
 													key={subField.label}
@@ -151,7 +158,7 @@ export const SubmissionAnswersClient = ({
 
 			{consent.length > 0 && (
 				<section>
-					<FieldLabel label="Consent" />
+					<FieldLabel label={labels.consent} />
 					{consent.map((entry) => (
 						<div key={entry.field} className="field-type">
 							<FieldLabel label={entry.field} />
@@ -160,7 +167,7 @@ export const SubmissionAnswersClient = ({
 									style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}
 								>
 									<span style={pillStyle(entry.agreed)}>
-										{entry.agreed ? 'Agreed' : 'Declined'}
+										{entry.agreed ? labels.agreed : labels.declined}
 									</span>
 									{entry.ref ? (
 										<a
@@ -185,7 +192,7 @@ export const SubmissionAnswersClient = ({
 
 			{meta.length > 0 && (
 				<section>
-					<FieldLabel label="Submission details" />
+					<FieldLabel label={labels.submissionDetails} />
 					{meta.map((item) => (
 						<TextInput
 							key={item.label}

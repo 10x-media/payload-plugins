@@ -8,7 +8,7 @@ import type {
 	ConsentItem,
 	MetaItem,
 	RepeaterItem,
-	RepeaterRow,
+	SubmissionAnswersLabels,
 } from './SubmissionAnswersClient'
 import { SubmissionAnswersClient } from './SubmissionAnswersClient'
 import type { SubmissionDescriptor, SubmissionValue } from './types'
@@ -133,16 +133,30 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 
 	const metaItems: MetaItem[] = []
 	if (meta) {
-		if (meta.at) metaItems.push({ label: 'Received at', value: formatDate(meta.at, locale) })
-		if (meta.ip) metaItems.push({ label: 'IP address', value: meta.ip })
-		if (meta.ua) metaItems.push({ label: 'User agent', value: String(meta.ua) })
+		if (meta.at)
+			metaItems.push({
+				label: t(keys.submissionMetaReceivedAt),
+				value: formatDate(meta.at, locale),
+			})
+		if (meta.ip) metaItems.push({ label: t(keys.submissionMetaIp), value: meta.ip })
+		if (meta.ua) metaItems.push({ label: t(keys.submissionMetaUserAgent), value: String(meta.ua) })
 		if (meta.spam) {
 			const captcha =
 				typeof meta.spam === 'object' && 'captcha' in meta.spam
 					? String((meta.spam as MetaSpam).captcha)
 					: '—'
-			metaItems.push({ label: 'Captcha', value: captcha })
+			metaItems.push({ label: t(keys.submissionMetaCaptcha), value: captcha })
 		}
+	}
+
+	const labels: SubmissionAnswersLabels = {
+		answers: t(keys.submissionAnswers),
+		consent: t(keys.submissionConsent),
+		submissionDetails: t(keys.submissionDetails),
+		agreed: t(keys.submissionConsentAgreed),
+		declined: t(keys.submissionConsentDeclined),
+		row: t(keys.repeaterRow),
+		empty: t(keys.submissionNoAnswers),
 	}
 
 	return (
@@ -151,7 +165,7 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 			repeaters={repeaters}
 			consent={consent}
 			meta={metaItems}
-			emptyLabel={t(keys.submissionNoAnswers)}
+			labels={labels}
 		/>
 	)
 }

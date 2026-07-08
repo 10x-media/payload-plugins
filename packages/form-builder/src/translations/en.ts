@@ -143,4 +143,12 @@ export const en: Record<TranslationKey, string> = {
 	[keys.repeaterRemoveRow]: 'Remove',
 	[keys.repeaterRow]: 'Row {n}',
 	[keys.repeaterRowCount]: '{count} row(s)',
+	[keys.submissionConsent]: 'Consent',
+	[keys.submissionDetails]: 'Submission details',
+	[keys.submissionConsentAgreed]: 'Agreed',
+	[keys.submissionConsentDeclined]: 'Declined',
+	[keys.submissionMetaReceivedAt]: 'Received at',
+	[keys.submissionMetaIp]: 'IP address',
+	[keys.submissionMetaUserAgent]: 'User agent',
+	[keys.submissionMetaCaptcha]: 'Captcha',
 }

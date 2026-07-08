@@ -141,6 +141,14 @@ export const keys = {
 	repeaterRemoveRow: 'formBuilder:repeater.removeRow',
 	repeaterRow: 'formBuilder:repeater.row',
 	repeaterRowCount: 'formBuilder:repeater.rowCount',
+	submissionConsent: 'formBuilder:submission.consent',
+	submissionDetails: 'formBuilder:submission.details',
+	submissionConsentAgreed: 'formBuilder:submission.consentAgreed',
+	submissionConsentDeclined: 'formBuilder:submission.consentDeclined',
+	submissionMetaReceivedAt: 'formBuilder:submission.meta.receivedAt',
+	submissionMetaIp: 'formBuilder:submission.meta.ip',
+	submissionMetaUserAgent: 'formBuilder:submission.meta.userAgent',
+	submissionMetaCaptcha: 'formBuilder:submission.meta.captcha',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
