@@ -105,7 +105,8 @@ describe('repeaterRenderer', () => {
 			name: /formBuilder:repeater\.removeRow/i,
 		})
 		expect(removeButtons).toHaveLength(2)
-		fireEvent.click(removeButtons[0]!)
+		const [firstRemove] = removeButtons
+		if (firstRemove) fireEvent.click(firstRemove)
 		expect(
 			screen.getAllByRole('button', { name: /formBuilder:repeater\.removeRow/i })
 		).toHaveLength(1)
