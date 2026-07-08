@@ -56,7 +56,7 @@ jobs({
 
 ## Collection overrides
 
-`overrides.jobs` extends the enhanced `payload-jobs` collection: the outermost layer, applied after the dashboard fields above and after [reliability](/jobs/reliability) fields if that's on. `fields` is a function that receives the fully-enhanced defaults, so you compose with them rather than replace them; hooks are appended after the plugin's own hooks, not in place of them; `admin` and `access` are merged key-by-key; `slug` is locked and any value you pass is ignored.
+`overrides.jobs` extends the enhanced `payload-jobs` collection: the outermost layer, applied after the dashboard fields above and after [reliability](/jobs/reliability) fields if that's on. `fields` is a function that receives the fully-enhanced defaults, so you compose with them rather than replace them; hooks are appended after the plugin's own hooks, not in place of them; `admin` and `access` are merged key-by-key; `slug` is locked and any value you pass is ignored. The `CollectionOverride` and `FieldsOverride` types are exported from `@10x-media/jobs` for typing an override you define separately.
 
 ```ts title="payload.config.ts"
 import { jobs } from '@10x-media/jobs'

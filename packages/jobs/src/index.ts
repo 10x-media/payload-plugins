@@ -64,7 +64,13 @@ export { type DrainDeps, type DrainOptions, type DrainResult, drainWorker } from
 export { type CreateWorkerArgs, createWorker, type Worker } from './execution/worker'
 export type { JobStatus, JobStatusInput } from './jobs/deriveJobStatus'
 export { deriveJobStatus } from './jobs/deriveJobStatus'
-export type { JobsOptions, JobsPluginOptions, JobsPluginOptions as PluginOptions } from './options'
+export type {
+	CollectionOverride,
+	FieldsOverride,
+	JobsOptions,
+	JobsPluginOptions,
+	JobsPluginOptions as PluginOptions,
+} from './options'
 export {
 	multiNodePreset,
 	serverlessPreset,
