@@ -20,12 +20,19 @@ const LOG_TIMELINE = '@10x-media/jobs/client#JobLogTimeline'
 const DOC_DESCRIPTION = '@10x-media/jobs/client#JobDocDescription'
 const HEALTH_BAR = '@10x-media/jobs/rsc#JobsHealthBar'
 const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
+const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
 	name: 'jobTitle',
 	type: 'text',
-	admin: { disableListColumn: true, hidden: true },
+	label: labelForKey(keys.fieldJob),
+	admin: {
+		// Form-only hide: admin.hidden would also strip it from list columns.
+		condition: () => false,
+		components: { Cell: JOB_TITLE_CELL },
+		disableBulkEdit: true,
+	},
 }
 
 /**
@@ -47,7 +54,7 @@ const FIELD_COMPONENTS: Record<string, string> = {
 	waitUntil: WAIT_UNTIL_FIELD,
 }
 
-const DEFAULT_JOBS_COLUMNS = ['workflowSlug', 'status', 'queue', 'totalTried', 'updatedAt']
+const DEFAULT_JOBS_COLUMNS = ['jobTitle', 'status', 'queue', 'totalTried', 'updatedAt']
 
 /** Friendlier labels for a few of Payload's default job fields. */
 const FIELD_LABELS: Record<string, LabelFunction> = {
