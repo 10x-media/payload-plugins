@@ -129,12 +129,12 @@ export const JobStatusHeader: UIFieldClientComponent = () => {
 			<Fact
 				label={t(keys.fieldCreated)}
 				tooltip={absolute(createdAt)}
-				value={formatRelativeTime(createdAt) || '—'}
+				value={formatRelativeTime(createdAt, Date.now(), i18n.language) || '—'}
 			/>
 			<Fact
 				label={t(keys.fieldCompleted)}
 				tooltip={absolute(completedAt)}
-				value={completedAt ? formatRelativeTime(completedAt) : '—'}
+				value={completedAt ? formatRelativeTime(completedAt, Date.now(), i18n.language) : '—'}
 			/>
 		</div>
 	)
