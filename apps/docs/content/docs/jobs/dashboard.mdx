@@ -9,9 +9,29 @@ Adding `jobs()` decorates Payload's `payload-jobs` collection in the admin. Ther
 
 Payload stores execution state as raw fields (`processing`, `hasError`, `completedAt`, `waitUntil`, `totalTried`), which take practice to read at a glance. The plugin derives one readable status per job from them (`queued`, `scheduled`, `retrying`, `running`, `succeeded`, `failed`, or `cancelled`) and shows it as a list column. The same derivation is exported as `deriveJobStatus` for your own code.
 
-Above the list sits a queue-health bar: per-status counts at a glance, plus a `recovered` count when [reliability](/jobs/reliability) is on. Counts above the cap render as `100+` (configurable via `healthBarCap`). The job detail view gains an error panel that renders the stored `error` readably and a timeline view of the job `log`.
+Above the list sits a queue-health bar: per-status counts at a glance, plus a `recovered` count when [reliability](/jobs/reliability) is on. Counts above the cap render as `100+` (configurable via `healthBarCap`). Each pill is a link to the list view pre-filtered to that exact status, using the same where-clause the count was computed with; the total links to the unfiltered list. The job detail view gains an error panel that renders the stored `error` readably and a timeline view of the job `log`.
 
-Records are locked down by default: execution-state fields are read-only and surfaced in the header, and inputs are editable only on Create. Jobs remain creatable from the admin, but a finished run cannot be edited into inconsistency. Set `readOnlyRecord: false` to opt out. The list itself defaults to the columns `workflowSlug`, `status`, `queue`, `totalTried`, `updatedAt`, with relative-time cells for dates.
+Records are locked down by default: execution-state fields are read-only and surfaced in the header, and inputs are editable only on Create. Jobs remain creatable from the admin, but a finished run cannot be edited into inconsistency. Set `readOnlyRecord: false` to opt out. The list itself defaults to the columns `jobTitle`, `status`, `queue`, `totalTried`, `updatedAt`, with relative-time cells for dates.
+
+## The Job column
+
+The first column, `jobTitle`, is a stored field kept in sync with `workflowSlug` or `taskSlug` on every write, and doubles as the collection's `useAsTitle`. It renders as a link to the document, matching Payload's default linked-first-column behavior. `workflowSlug` is no longer a default column on its own; the derived title covers both workflow and task jobs in one place.
+
+## Readable timestamps
+
+`startedAt` ("Started") and `leaseExpiresAt` ("Lease expires", only present with [reliability](/jobs/reliability) on) render as relative time ("2 minutes ago", "in 3 hours") with the exact timestamp available on hover. They are read-only, runner-owned fields, so unlike Payload's native date picker they render without a clear button.
+
+`waitUntil` ("Scheduled for") keeps Payload's native date picker while creating a job, then switches to the same read-only relative display once the document exists, since the runner owns that value from then on. A scheduled job also shows a "Scheduled for" fact alongside status, queue, and attempts in the document header.
+
+Relative phrasing is produced with `Intl.RelativeTimeFormat` against the admin's active locale, so it localizes along with the rest of the admin UI.
+
+## Create form: workflow and task selects
+
+`workflowSlug` and `taskSlug` render as selects on the create form, with options merged from Payload's own configured slugs (`config.jobs.workflows` / `config.jobs.tasks`). A job runs a workflow or a task, never both: picking one hides the other, and a select with no configured options hides entirely. Submitting both on create is rejected server-side with a translated error (`errorWorkflowTaskExclusive`).
+
+## Create form: queue select
+
+`queue` stays a `text` field at the schema level, but renders as a native-looking select in the admin, populated from `'default'`, any `queueControl.queues` you've configured, and queues named in static `autoRun` entries. It is not a real Payload `select` field on purpose: select options become a hard enum in both the Mongo and Postgres adapters, so adding a queue name later would need a migration on Postgres. `queue` stays free-form underneath, so `payload.jobs.queue({ queue: 'anything' })` keeps working for queue names that were never declared in config; an existing job with an undeclared queue value still displays correctly, since the field injects it as an extra option instead of showing blank.
 
 ## Options
 
@@ -34,9 +54,36 @@ jobs({
 })
 ```
 
+## Collection overrides
+
+`overrides.jobs` extends the enhanced `payload-jobs` collection: the outermost layer, applied after the dashboard fields above and after [reliability](/jobs/reliability) fields if that's on. `fields` is a function that receives the fully-enhanced defaults, so you compose with them rather than replace them; hooks are appended after the plugin's own hooks, not in place of them; `admin` and `access` are merged key-by-key; `slug` is locked and any value you pass is ignored.
+
+```ts title="payload.config.ts"
+import { jobs } from '@10x-media/jobs'
+
+jobs({
+  overrides: {
+    jobs: {
+      fields: ({ defaultFields }) => [
+        ...defaultFields,
+        { name: 'source', type: 'text' },
+      ],
+      hooks: {
+        afterChange: [
+          async ({ doc }) => {
+            // Runs after the plugin's own afterChange
+            await notifySlack(doc)
+          },
+        ],
+      },
+    },
+  },
+})
+```
+
 ## Components
 
-The pieces are exported for reuse in your own admin customizations: `JobStatusCell`, `JobStatusHeader`, `JobErrorPanel`, `JobLogTimeline`, `JobDocDescription`, and `RelativeTimeCell` from `@10x-media/jobs/client`, and the server-rendered `JobsHealthBar` from `@10x-media/jobs/rsc`.
+The pieces are exported for reuse in your own admin customizations: `JobStatusCell`, `JobStatusHeader`, `JobTitleCell`, `JobErrorPanel`, `JobLogTimeline`, `JobDocDescription`, `RelativeTimeCell`, `ReadOnlyDateField`, `WaitUntilField`, and `QueueSelectField` from `@10x-media/jobs/client`, and the server-rendered `JobsHealthBar` from `@10x-media/jobs/rsc`.
 
 ## Counting caveat
 
