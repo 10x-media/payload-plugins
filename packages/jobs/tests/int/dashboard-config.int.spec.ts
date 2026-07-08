@@ -106,3 +106,35 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 		expect(job.queue).toBe('not-in-options')
 	})
 })
+
+describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: jobs({
+				overrides: {
+					jobs: {
+						admin: { group: 'Ops' },
+						fields: ({ defaultFields }) => [...defaultFields, { name: 'costCenter', type: 'text' }],
+					},
+				},
+				reliability: true,
+			}),
+			db,
+			configOverrides: { jobs: { tasks: [sendEmailTask] } },
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('applies consumer fields over the fully-enhanced defaults', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		expect(cfg?.admin?.group).toBe('Ops')
+		expect(cfg && fieldByName(cfg.fields, 'costCenter')).toBeDefined()
+		expect(cfg && fieldByName(cfg.fields, 'leaseExpiresAt')).toBeDefined()
+		expect(cfg && fieldByName(cfg.fields, 'jobTitle')).toBeDefined()
+	})
+})

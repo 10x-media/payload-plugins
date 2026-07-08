@@ -74,4 +74,10 @@ export type JobsPluginOptions = JobsOptions & {
 	 * Off by default; pass `true` for defaults or an object to tune it.
 	 */
 	queueControl?: boolean | QueueControlOptions
+	/**
+	 * Collection-level override for the enhanced `payload-jobs` collection,
+	 * applied as the outermost layer (after reliability fields). `fields`
+	 * receives the fully-enhanced defaults; hooks append after the plugin's.
+	 */
+	overrides?: { jobs?: CollectionOverride }
 }

@@ -1,6 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 
 import type { JobsPluginOptions } from './options'
+import { applyCollectionOverride } from './plugin/applyCollectionOverride'
 import { registerJobsEnhancements } from './plugin/registerJobsEnhancements'
 import { registerTranslations } from './plugin/registerTranslations'
 import { resolveQueueControlOptions } from './queueControl/options'
@@ -37,6 +38,18 @@ export const jobs = definePlugin<JobsPluginOptions>({
 		}
 		if (queueControl) {
 			registerQueueControl(config, queueControl, reliability)
+		}
+		if (options.overrides?.jobs) {
+			const previous = config.jobs?.jobsCollectionOverrides
+			const override = options.overrides.jobs
+			config.jobs = {
+				...config.jobs,
+				jobsCollectionOverrides: ({ defaultJobsCollection }) =>
+					applyCollectionOverride(
+						previous ? previous({ defaultJobsCollection }) : defaultJobsCollection,
+						override
+					),
+			}
 		}
 		return config
 	},
