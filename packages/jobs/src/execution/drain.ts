@@ -1,6 +1,9 @@
 export type DrainDeps = {
-	/** Stop the worker's interval loops (stop claiming new jobs). */
-	stopLoops: () => void
+	/**
+	 * Stop the worker's interval loops (stop claiming new jobs). Resolves once any
+	 * in-flight tick has settled, so no run-loop write can outlive the drain.
+	 */
+	stopLoops: () => Promise<void>
 	/** Count this node's in-flight jobs (processing and claimed by it). */
 	countInFlight: () => Promise<number>
 	/** Requeue this node's remaining in-flight jobs. Returns how many were released. */
@@ -37,7 +40,8 @@ export type DrainResult = {
  * waiting. Always releases leadership and destroys, even when nothing was in flight.
  */
 export const drainWorker = async (deps: DrainDeps, options: DrainOptions): Promise<DrainResult> => {
-	deps.stopLoops()
+	// Awaited so a tick that is mid payload.jobs.run cannot hit the DB after destroy().
+	await deps.stopLoops()
 	// Release leadership before the polling loop so other nodes can elect a new
 	// leader during the drain window rather than waiting for the full timeout.
 	await deps.releaseLeadership()

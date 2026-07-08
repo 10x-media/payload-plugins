@@ -209,11 +209,11 @@ describeForDb('worker run loop', {}, (db) => {
 		while (ran < 1 && Date.now() < deadline) {
 			await new Promise((r) => setTimeout(r, 25))
 		}
-		;(worker as WorkerTestHandle).stop()
+		await (worker as WorkerTestHandle).stop()
 		expect(ran).toBeGreaterThanOrEqual(1)
 	})
 
-	it('throws when signal handlers are already installed (item 21)', () => {
+	it('throws when signal handlers are already installed (item 21)', async () => {
 		resetHandlersInstalled()
 		const first = createWorker({
 			installSignals: true,
@@ -225,7 +225,7 @@ describeForDb('worker run loop', {}, (db) => {
 				createWorker({ installSignals: true, payload: booted.payload, reliability: resolved() })
 			).toThrow(/already installed/)
 		} finally {
-			first.stop()
+			await first.stop()
 			resetHandlersInstalled()
 		}
 	})
@@ -266,10 +266,9 @@ describeForDb('worker run loop', {}, (db) => {
 			}
 			expect(ran).toBeGreaterThan(afterLive)
 		} finally {
-			worker.stop()
-			// Allow any in-flight job transaction to commit before the bulk delete,
-			// otherwise MongoDB aborts the running transaction.
-			await new Promise((r) => setTimeout(r, 300))
+			// stop() resolves only after the in-flight run tick settles; without that, a
+			// late payload.jobs.run write to a job doc aborts the bulk delete's transaction.
+			await worker.stop()
 			await pauseStore.resume({ all: true })
 			await booted.payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
 		}
