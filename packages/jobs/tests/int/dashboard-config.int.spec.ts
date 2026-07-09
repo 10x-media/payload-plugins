@@ -193,6 +193,8 @@ describeForDb('jobs run-access default', { dbs: ['mongo'] }, (db) => {
 			const run = booted.payload.config.jobs.access?.run
 			expect(run).toBeDefined()
 			expect(await run?.({ req: {} as never })).toBe(false)
+			// Core's defaultAccess allows any logged-in user; only the plugin's deny yields false here.
+			expect(await run?.({ req: { user: { id: 1 } } as never })).toBe(false)
 		} finally {
 			await booted.stop()
 		}
