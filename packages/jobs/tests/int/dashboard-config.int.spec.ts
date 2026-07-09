@@ -181,3 +181,33 @@ describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
 		expect(cfg?.admin.listSearchableFields).toEqual(['queue'])
 	})
 })
+
+describeForDb('jobs run-access default', { dbs: ['mongo'] }, (db) => {
+	it('denies the native run endpoint when queueControl is off and access.run is unset', async () => {
+		const booted = await bootPayload({
+			plugin: jobs({}),
+			db,
+			configOverrides: { jobs: { tasks: [syncCrmTask] } },
+		})
+		try {
+			const run = booted.payload.config.jobs.access?.run
+			expect(run).toBeDefined()
+			expect(await run?.({ req: {} as never })).toBe(false)
+		} finally {
+			await booted.stop()
+		}
+	})
+
+	it('respects a host-set access.run', async () => {
+		const booted = await bootPayload({
+			plugin: jobs({}),
+			db,
+			configOverrides: { jobs: { access: { run: () => true }, tasks: [syncCrmTask] } },
+		})
+		try {
+			expect(await booted.payload.config.jobs.access?.run?.({ req: {} as never })).toBe(true)
+		} finally {
+			await booted.stop()
+		}
+	})
+})
