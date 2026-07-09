@@ -1,4 +1,4 @@
-import type { TaskConfig, WorkflowConfig } from 'payload'
+import type { ScheduleConfig, TaskConfig, WorkflowConfig } from 'payload'
 
 import type { ReliabilityOptions } from '../src/index'
 
@@ -22,6 +22,7 @@ type E2ETask = TaskConfig<{ input: object; output: object }>
 
 const sleepTask: E2ETask = {
 	slug: 'sleep',
+	label: 'Sleep',
 	handler: async ({ job }) => {
 		const ms = Number((job.input as { ms?: number })?.ms ?? 100)
 		await new Promise((resolve) => {
@@ -31,7 +32,15 @@ const sleepTask: E2ETask = {
 	},
 }
 
-const noopTask: E2ETask = { slug: 'noop', handler: () => ({ output: {} }) }
+/** Nightly schedule demos the queue-select auto-discovery: 'maintenance' isn't in queueControl.queues. */
+const noopSchedule: ScheduleConfig[] = [{ cron: '0 3 * * *', queue: 'maintenance' }]
+
+const noopTask: E2ETask = {
+	slug: 'noop',
+	label: 'No-op',
+	schedule: noopSchedule,
+	handler: () => ({ output: {} }),
+}
 
 /** A sleep task (drain e2e) and a noop task. Sleep duration comes from `input.ms`. */
 export const e2eTasks: E2ETask[] = [sleepTask, noopTask]
@@ -45,6 +54,7 @@ export const e2eTasks: E2ETask[] = [sleepTask, noopTask]
 export const e2eWorkflows: WorkflowConfig[] = [
 	{
 		slug: 'runAutomation',
+		label: 'Run automation',
 		handler: async ({ inlineTask }) => {
 			await inlineTask('1', { task: () => ({ output: {} }) })
 		},
