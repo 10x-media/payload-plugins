@@ -40,6 +40,9 @@ export const keys = {
 	jobSingular: 'jobs:jobSingular',
 	jobPlural: 'jobs:jobPlural',
 	errorWorkflowTaskExclusive: 'jobs:errorWorkflowTaskExclusive',
+	cronBadge: 'jobs:cronBadge',
+	attemptsTooltip: 'jobs:attemptsTooltip',
+	inlineStep: 'jobs:inlineStep',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -42,4 +42,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.jobSingular]: 'job',
 	[keys.jobPlural]: 'jobs',
 	[keys.errorWorkflowTaskExclusive]: 'A job runs a workflow or a task, not both.',
+	[keys.cronBadge]: 'Cron',
+	[keys.attemptsTooltip]: 'Execution attempts for this job, including retries',
+	[keys.inlineStep]: 'inline: {{id}}',
 }
