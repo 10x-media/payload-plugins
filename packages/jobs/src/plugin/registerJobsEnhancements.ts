@@ -12,6 +12,7 @@ import {
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { collectJobLabels, type JobLabelMaps } from './labelMaps'
 import { resolve } from './resolve'
 import {
 	collectJobSelectSlugs,
@@ -40,7 +41,6 @@ const TITLE_FIELD: Field = {
 	admin: {
 		// Form-only hide: admin.hidden would also strip it from list columns.
 		condition: () => false,
-		components: { Cell: JOB_TITLE_CELL },
 		disableBulkEdit: true,
 	},
 }
@@ -75,9 +75,8 @@ const rejectWorkflowAndTask: CollectionBeforeValidateHook = ({
 }
 
 /** Our default document Field component for specific job fields. */
-const FIELD_COMPONENTS: Record<string, string> = {
+const FIELD_COMPONENTS: Record<string, PayloadComponent> = {
 	error: ERROR_PANEL,
-	log: LOG_TIMELINE,
 	waitUntil: WAIT_UNTIL_FIELD,
 }
 
@@ -166,28 +165,30 @@ const lockField = (field: Field, name: string): Field => {
 	return field
 }
 
-/** Recursively relabel fields, apply cell overrides, and lock the record, descending into tabs. */
-const enhanceFields = (
-	fields: Field[],
-	cells: JobsOptions['cells'],
+type EnhanceContext = {
+	cells: JobsOptions['cells']
+	fieldComponents: Record<string, PayloadComponent>
 	lockRecord: boolean
-): Field[] =>
+}
+
+/** Recursively relabel fields, apply cell overrides, and lock the record, descending into tabs. */
+const enhanceFields = (fields: Field[], ctx: EnhanceContext): Field[] =>
 	fields.map((field): Field => {
 		let next = field
 		const name = fieldName(field)
 		if (name && FIELD_LABELS[name]) {
 			next = { ...field, label: FIELD_LABELS[name] } as Field
 		}
-		next = resolveCell(next, cells)
-		if (lockRecord && name) {
+		next = resolveCell(next, ctx.cells)
+		if (ctx.lockRecord && name) {
 			next = lockField(next, name)
 		}
-		if (name && FIELD_COMPONENTS[name]) {
+		if (name && ctx.fieldComponents[name]) {
 			next = {
 				...next,
 				admin: {
 					...next.admin,
-					components: { ...next.admin?.components, Field: FIELD_COMPONENTS[name] },
+					components: { ...next.admin?.components, Field: ctx.fieldComponents[name] },
 				},
 			} as Field
 		}
@@ -196,17 +197,17 @@ const enhanceFields = (
 				...next,
 				tabs: next.tabs.map((tab) => ({
 					...tab,
-					fields: enhanceFields(tab.fields, cells, lockRecord),
+					fields: enhanceFields(tab.fields, ctx),
 				})),
 			} as Field
 		} else if ('fields' in next) {
-			next = { ...next, fields: enhanceFields(next.fields, cells, lockRecord) } as Field
+			next = { ...next, fields: enhanceFields(next.fields, ctx) } as Field
 		}
 		return next
 	})
 
 /** Build the derived Status column, honoring the `status` override (`false` removes it). */
-const buildStatusField = (status: JobsOptions['status']): Field | null => {
+const buildStatusField = (status: JobsOptions['status'], labels: JobLabelMaps): Field | null => {
 	if (status === false) {
 		return null
 	}
@@ -214,7 +215,18 @@ const buildStatusField = (status: JobsOptions['status']): Field | null => {
 		name: 'status',
 		type: 'ui',
 		label: labelForKey(keys.fieldStatus),
-		admin: { components: { Cell: status ?? STATUS_CELL, Field: STATUS_HEADER } },
+		admin: {
+			components: {
+				Cell: status ?? STATUS_CELL,
+				Field: {
+					clientProps: {
+						taskLabels: labels.taskLabels,
+						workflowLabels: labels.workflowLabels,
+					},
+					path: STATUS_HEADER,
+				},
+			},
+		},
 	} as Field
 }
 
@@ -256,6 +268,11 @@ export const registerJobsEnhancements = (
 		// options into a db enum and reject the arbitrary queue names
 		// `payload.jobs.queue()` may target.
 		const slugs = collectJobSelectSlugs(config, extraQueues)
+		const labels = collectJobLabels(config)
+		const fieldComponents: Record<string, PayloadComponent> = {
+			...FIELD_COMPONENTS,
+			log: { clientProps: { taskLabels: labels.taskLabels }, path: LOG_TIMELINE },
+		}
 		const withSelects = base.fields.map((field): Field => {
 			const name = fieldName(field)
 			if (name === 'workflowSlug') {
@@ -285,7 +302,22 @@ export const registerJobsEnhancements = (
 			return field
 		})
 
-		const statusField = buildStatusField(options.status)
+		const statusField = buildStatusField(options.status, labels)
+		const titleField: Field = {
+			...TITLE_FIELD,
+			admin: {
+				...TITLE_FIELD.admin,
+				components: {
+					Cell: {
+						clientProps: {
+							taskLabels: labels.taskLabels,
+							workflowLabels: labels.workflowLabels,
+						},
+						path: JOB_TITLE_CELL,
+					},
+				},
+			},
+		}
 		const lockRecord = options.readOnlyRecord !== false
 		const hostBeforeTable = base.admin?.components?.beforeListTable ?? []
 		const ourBeforeTable: PayloadComponent[] =
@@ -315,8 +347,8 @@ export const registerJobsEnhancements = (
 			},
 			fields: [
 				...(statusField ? [statusField] : []),
-				TITLE_FIELD,
-				...enhanceFields(withSelects, options.cells, lockRecord),
+				titleField,
+				...enhanceFields(withSelects, { cells: options.cells, fieldComponents, lockRecord }),
 				...timestamps,
 			],
 		} as CollectionConfig

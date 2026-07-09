@@ -14,12 +14,23 @@ export const JobTitleCell = ({
 	link,
 	linkURL,
 	rowData,
-}: DefaultCellComponentProps) => {
+	taskLabels,
+	workflowLabels,
+}: DefaultCellComponentProps & {
+	taskLabels?: Record<string, string>
+	workflowLabels?: Record<string, string>
+}) => {
 	const { config } = useConfig()
 	const title =
 		(typeof cellData === 'string' && cellData) ||
 		String(rowData?.workflowSlug || rowData?.taskSlug || '') ||
 		'—'
+	const workflowSlug = typeof rowData?.workflowSlug === 'string' ? rowData.workflowSlug : undefined
+	const taskSlug = typeof rowData?.taskSlug === 'string' ? rowData.taskSlug : undefined
+	const label =
+		(workflowSlug && workflowLabels?.[workflowSlug]) ||
+		(taskSlug && taskLabels?.[taskSlug]) ||
+		undefined
 
 	if (link && collectionSlug && rowData?.id != null) {
 		const adminRoute = config.routes?.admin ?? '/admin'
@@ -28,10 +39,10 @@ export const JobTitleCell = ({
 			`${adminRoute}/collections/${collectionSlug}/${encodeURIComponent(String(rowData.id))}`
 		return (
 			<Link href={href} prefetch={false}>
-				{title}
+				<span title={label ? title : undefined}>{label ?? title}</span>
 			</Link>
 		)
 	}
 
-	return <span>{title}</span>
+	return <span title={label ? title : undefined}>{label ?? title}</span>
 }
