@@ -334,6 +334,14 @@ export const registerJobsEnhancements = (
 				hidden: options.hidden ?? false,
 				useAsTitle: 'jobTitle',
 				defaultColumns: resolve(options.defaultColumns, DEFAULT_JOBS_COLUMNS),
+				// jobTitle is only synced by a beforeChange hook; runtime-queued docs
+				// bypass hooks by default, so list search must cover the raw slugs too.
+				listSearchableFields: base.admin?.listSearchableFields ?? [
+					'jobTitle',
+					'workflowSlug',
+					'taskSlug',
+					'queue',
+				],
 				components: {
 					...base.admin?.components,
 					Description: DOC_DESCRIPTION,

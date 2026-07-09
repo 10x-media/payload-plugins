@@ -119,6 +119,30 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 		})
 		expect(job.queue).toBe('not-in-options')
 	})
+
+	it('sets list search fields covering slugs unless the host already did', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		expect(cfg?.admin.listSearchableFields).toEqual([
+			'jobTitle',
+			'workflowSlug',
+			'taskSlug',
+			'queue',
+		])
+	})
+
+	it('finds runtime-queued jobs via the search fields without runHooks', async () => {
+		await booted.payload.jobs.queue({
+			input: {},
+			task: 'sendEmail',
+			waitUntil: new Date(Date.now() + 3_600_000),
+		} as never)
+		const fields = ['jobTitle', 'workflowSlug', 'taskSlug', 'queue']
+		const found = await booted.payload.find({
+			collection: 'payload-jobs',
+			where: { or: fields.map((field) => ({ [field]: { like: 'send' } })) },
+		})
+		expect(found.totalDocs).toBeGreaterThanOrEqual(1)
+	})
 })
 
 describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
@@ -129,7 +153,7 @@ describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
 			plugin: jobs({
 				overrides: {
 					jobs: {
-						admin: { group: 'Ops' },
+						admin: { group: 'Ops', listSearchableFields: ['queue'] },
 						fields: ({ defaultFields }) => [...defaultFields, { name: 'costCenter', type: 'text' }],
 					},
 				},
@@ -150,5 +174,10 @@ describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
 		expect(cfg && fieldByName(cfg.fields, 'costCenter')).toBeDefined()
 		expect(cfg && fieldByName(cfg.fields, 'leaseExpiresAt')).toBeDefined()
 		expect(cfg && fieldByName(cfg.fields, 'jobTitle')).toBeDefined()
+	})
+
+	it('host listSearchableFields wins over the plugin default', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		expect(cfg?.admin.listSearchableFields).toEqual(['queue'])
 	})
 })
