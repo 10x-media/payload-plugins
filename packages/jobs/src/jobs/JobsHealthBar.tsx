@@ -4,6 +4,7 @@ import type { ServerProps } from 'payload'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { type JobStatus, statusWhere } from './deriveJobStatus'
+import { JobsTotalChip } from './JobsTotalChip'
 import { jobStatusMeta } from './jobStatusMeta'
 import { jobsListURL } from './jobsListURL'
 
@@ -58,15 +59,11 @@ export const JobsHealthBar = async ({ cap = DEFAULT_CAP, i18n, payload }: Props)
 				marginBottom: 'var(--base)',
 			}}
 		>
-			<Link
-				href={jobsListURL(adminRoute)}
-				prefetch={false}
-				style={{ color: 'inherit', textDecoration: 'none' }}
-			>
+			<JobsTotalChip fallbackHref={jobsListURL(adminRoute)}>
 				<strong>
 					{show(total)} {t(total === 1 ? keys.jobSingular : keys.jobPlural)}
 				</strong>
-			</Link>
+			</JobsTotalChip>
 			{results.map(({ count, status }) =>
 				count === 0 ? null : (
 					<Link
