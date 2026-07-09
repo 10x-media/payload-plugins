@@ -39,6 +39,20 @@ test('health-bar failed badge filters the jobs list', async ({ page }) => {
 	await expect(page.locator('td.cell-jobTitle a').first()).toHaveText('Run automation')
 })
 
+test('total chip clears applied filters', async ({ page }) => {
+	await login(page)
+	await page.goto('/admin/collections/payload-jobs')
+
+	await page.getByRole('link', { name: /^\d+\+? Failed$/ }).click()
+	await page.waitForURL(/where/)
+	await expect(page.locator('table tbody tr')).toHaveCount(1)
+
+	// The total chip is a button (JobsTotalChip) that clears search + filters in
+	// place via refineListData; the seed creates exactly 7 jobs.
+	await page.getByRole('button', { name: /^\d+\+? jobs$/ }).click()
+	await expect(page.locator('table tbody tr')).toHaveCount(7)
+})
+
 test('job title column links to the document', async ({ page }) => {
 	await login(page)
 	await page.goto('/admin/collections/payload-jobs')
