@@ -2,6 +2,7 @@ import { JobStatusCell as JobStatusCell_6d572934460331fb7409e85e4294174e } from 
 import { JobStatusHeader as JobStatusHeader_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { JobTitleCell as JobTitleCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { RelativeTimeCell as RelativeTimeCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { AttemptsCell as AttemptsCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { JobErrorPanel as JobErrorPanel_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { JobLogTimeline as JobLogTimeline_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { QueueSelectField as QueueSelectField_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
@@ -17,6 +18,7 @@ export const importMap = {
   "@10x-media/jobs/client#JobStatusHeader": JobStatusHeader_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#JobTitleCell": JobTitleCell_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#RelativeTimeCell": RelativeTimeCell_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/client#AttemptsCell": AttemptsCell_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#JobErrorPanel": JobErrorPanel_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#JobLogTimeline": JobLogTimeline_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#QueueSelectField": QueueSelectField_6d572934460331fb7409e85e4294174e,

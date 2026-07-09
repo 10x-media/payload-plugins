@@ -1,4 +1,4 @@
-import type { ScheduleConfig, TaskConfig, WorkflowConfig } from 'payload'
+import type { TaskConfig, WorkflowConfig } from 'payload'
 
 import type { ReliabilityOptions } from '../src/index'
 
@@ -32,8 +32,12 @@ const sleepTask: E2ETask = {
 	},
 }
 
-/** Nightly schedule demos the queue-select auto-discovery: 'maintenance' isn't in queueControl.queues. */
-const noopSchedule: ScheduleConfig[] = [{ cron: '0 3 * * *', queue: 'maintenance' }]
+/**
+ * Nightly schedule demos the queue-select auto-discovery: 'maintenance' isn't in
+ * queueControl.queues. Payload 3.85 does not re-export ScheduleConfig from its root,
+ * so the type is derived from TaskConfig's schedule field.
+ */
+const noopSchedule: NonNullable<E2ETask['schedule']> = [{ cron: '0 3 * * *', queue: 'maintenance' }]
 
 const noopTask: E2ETask = {
 	slug: 'noop',
