@@ -32,6 +32,23 @@ describe('collectJobSelectSlugs', () => {
 		expect(slugs.queues).toEqual(['default'])
 		expect(slugs.workflows).toEqual([])
 	})
+
+	it('collects queues from schedules, workflow queue, and extra queues, deduped', () => {
+		const cfg = {
+			jobs: {
+				autoRun: [{ cron: '* * * * *', queue: 'nightly' }],
+				tasks: [
+					{ slug: 'sendEmail', schedule: [{ cron: '0 3 * * *', queue: 'emails' }] },
+					{ slug: 'syncCrm' },
+				],
+				workflows: [
+					{ queue: 'atos', schedule: [{ cron: '0 0 * * *', queue: 'atos' }], slug: 'atosSync' },
+				],
+			},
+		} as unknown as Config
+		const slugs = collectJobSelectSlugs(cfg, ['emails', 'ops'])
+		expect(slugs.queues).toEqual(['default', 'emails', 'ops', 'nightly', 'atos'])
+	})
 })
 
 describe('jobSelectField', () => {

@@ -46,6 +46,12 @@ export type JobsOptions = {
 	 * Defaults to 100; `false` shows the exact count.
 	 */
 	healthBarCap?: false | number
+	/**
+	 * Extra queue names offered by the admin queue select, independent of
+	 * queueControl. Queues named in task/workflow schedules, workflow `queue`,
+	 * and static autoRun entries are discovered automatically.
+	 */
+	queues?: string[]
 }
 
 /**

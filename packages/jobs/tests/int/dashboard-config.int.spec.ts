@@ -10,6 +10,7 @@ const fieldByName = (fields: Field[], name: string): Field | undefined =>
 const sendEmailTask: TaskConfig<'sendEmail'> = {
 	slug: 'sendEmail',
 	handler: () => ({ output: {} }),
+	schedule: [{ cron: '0 3 * * *', queue: 'sched' }],
 }
 
 const syncCrmTask: TaskConfig<'syncCrm'> = {
@@ -27,7 +28,11 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: jobs({ queueControl: { queues: ['default', 'emails'] }, reliability: true }),
+			plugin: jobs({
+				queueControl: { queues: ['default', 'emails'] },
+				queues: ['ops'],
+				reliability: true,
+			}),
 			db,
 			configOverrides: {
 				jobs: {
@@ -89,6 +94,15 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 		expect(queue?.admin?.components?.Field).toBeDefined()
 	})
 
+	it('offers queues from the option and schedule entries in the queue select', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		const queue = cfg && fieldByName(cfg.fields, 'queue')
+		const field = queue?.admin?.components?.Field as { clientProps?: { options?: string[] } }
+		expect(field?.clientProps?.options).toEqual(
+			expect.arrayContaining(['default', 'emails', 'ops', 'sched'])
+		)
+	})
+
 	it('rejects creating a job with both a workflow and a task', async () => {
 		await expect(
 			booted.payload.create({
@@ -105,6 +119,30 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 		})
 		expect(job.queue).toBe('not-in-options')
 	})
+
+	it('sets list search fields covering slugs unless the host already did', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		expect(cfg?.admin.listSearchableFields).toEqual([
+			'jobTitle',
+			'workflowSlug',
+			'taskSlug',
+			'queue',
+		])
+	})
+
+	it('finds runtime-queued jobs via the search fields without runHooks', async () => {
+		await booted.payload.jobs.queue({
+			input: {},
+			task: 'sendEmail',
+			waitUntil: new Date(Date.now() + 3_600_000),
+		} as never)
+		const fields = ['jobTitle', 'workflowSlug', 'taskSlug', 'queue']
+		const found = await booted.payload.find({
+			collection: 'payload-jobs',
+			where: { or: fields.map((field) => ({ [field]: { like: 'send' } })) },
+		})
+		expect(found.totalDocs).toBeGreaterThanOrEqual(1)
+	})
 })
 
 describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
@@ -115,7 +153,7 @@ describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
 			plugin: jobs({
 				overrides: {
 					jobs: {
-						admin: { group: 'Ops' },
+						admin: { group: 'Ops', listSearchableFields: ['queue'] },
 						fields: ({ defaultFields }) => [...defaultFields, { name: 'costCenter', type: 'text' }],
 					},
 				},
@@ -136,5 +174,42 @@ describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
 		expect(cfg && fieldByName(cfg.fields, 'costCenter')).toBeDefined()
 		expect(cfg && fieldByName(cfg.fields, 'leaseExpiresAt')).toBeDefined()
 		expect(cfg && fieldByName(cfg.fields, 'jobTitle')).toBeDefined()
+	})
+
+	it('host listSearchableFields wins over the plugin default', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		expect(cfg?.admin.listSearchableFields).toEqual(['queue'])
+	})
+})
+
+describeForDb('jobs run-access default', { dbs: ['mongo'] }, (db) => {
+	it('denies the native run endpoint when queueControl is off and access.run is unset', async () => {
+		const booted = await bootPayload({
+			plugin: jobs({}),
+			db,
+			configOverrides: { jobs: { tasks: [syncCrmTask] } },
+		})
+		try {
+			const run = booted.payload.config.jobs.access?.run
+			expect(run).toBeDefined()
+			expect(await run?.({ req: {} as never })).toBe(false)
+			// Core's defaultAccess allows any logged-in user; only the plugin's deny yields false here.
+			expect(await run?.({ req: { user: { id: 1 } } as never })).toBe(false)
+		} finally {
+			await booted.stop()
+		}
+	})
+
+	it('respects a host-set access.run', async () => {
+		const booted = await bootPayload({
+			plugin: jobs({}),
+			db,
+			configOverrides: { jobs: { access: { run: () => true }, tasks: [syncCrmTask] } },
+		})
+		try {
+			expect(await booted.payload.config.jobs.access?.run?.({ req: {} as never })).toBe(true)
+		} finally {
+			await booted.stop()
+		}
 	})
 })

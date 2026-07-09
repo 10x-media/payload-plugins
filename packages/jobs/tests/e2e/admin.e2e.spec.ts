@@ -36,7 +36,21 @@ test('health-bar failed badge filters the jobs list', async ({ page }) => {
 	// The seed has exactly one failed job (hasError without error.cancelled) and the
 	// e2e app runs no worker, so derived statuses cannot drift during the test.
 	await expect(page.locator('table tbody tr')).toHaveCount(1)
-	await expect(page.locator('td.cell-jobTitle a').first()).toHaveText('runAutomation')
+	await expect(page.locator('td.cell-jobTitle a').first()).toHaveText('Run automation')
+})
+
+test('total chip clears applied filters', async ({ page }) => {
+	await login(page)
+	await page.goto('/admin/collections/payload-jobs')
+
+	await page.getByRole('link', { name: /^\d+\+? Failed$/ }).click()
+	await page.waitForURL(/where/)
+	await expect(page.locator('table tbody tr')).toHaveCount(1)
+
+	// The total chip is a button (JobsTotalChip) that clears search + filters in
+	// place via refineListData; the seed creates exactly 7 jobs.
+	await page.getByRole('button', { name: /^\d+\+? jobs$/ }).click()
+	await expect(page.locator('table tbody tr')).toHaveCount(7)
 })
 
 test('job title column links to the document', async ({ page }) => {
@@ -44,7 +58,7 @@ test('job title column links to the document', async ({ page }) => {
 	await page.goto('/admin/collections/payload-jobs')
 
 	const titleLink = page.locator('td.cell-jobTitle a').first()
-	await expect(titleLink).toHaveText('runAutomation')
+	await expect(titleLink).toHaveText('Run automation')
 	await titleLink.click()
 
 	await page.waitForURL(DOC_URL)

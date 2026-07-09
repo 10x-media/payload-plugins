@@ -9,13 +9,21 @@ Adding `jobs()` decorates Payload's `payload-jobs` collection in the admin. Ther
 
 Payload stores execution state as raw fields (`processing`, `hasError`, `completedAt`, `waitUntil`, `totalTried`), which take practice to read at a glance. The plugin derives one readable status per job from them (`queued`, `scheduled`, `retrying`, `running`, `succeeded`, `failed`, or `cancelled`) and shows it as a list column. The same derivation is exported as `deriveJobStatus` for your own code.
 
-Above the list sits a queue-health bar: per-status counts at a glance (the [queue-control health endpoint](/jobs/queue-control) additionally reports a `recovered` count when reliability is on). Counts above the cap render as `100+` (configurable via `healthBarCap`). Each pill is a link to the list view pre-filtered to that exact status, using the same where-clause the count was computed with; the total links to the unfiltered list. The job detail view gains an error panel that renders the stored `error` readably and a timeline view of the job `log`.
+Above the list sits a queue-health bar: per-status counts at a glance (the [queue-control health endpoint](/jobs/queue-control) additionally reports a `recovered` count when reliability is on). Counts above the cap render as `100+` (configurable via `healthBarCap`). Each pill is a link to the list view pre-filtered to that exact status, using the same where-clause the count was computed with. The total chip resets search and filters instead of linking away: inside the list view it clears them in place through Payload's list-query context, so you land back on the full unfiltered table without a navigation; outside a list view (for example a custom dashboard embedding `JobsHealthBar`) it falls back to a plain link to the unfiltered list. The job detail view gains an error panel that renders the stored `error` readably and a timeline view of the job `log`.
 
 Records are locked down by default: execution-state fields are read-only and surfaced in the header, and inputs are editable only on Create. Jobs remain creatable from the admin, but a finished run cannot be edited into inconsistency. Set `readOnlyRecord: false` to opt out. The list itself defaults to the columns `jobTitle`, `status`, `queue`, `totalTried`, `updatedAt`, with relative-time cells for dates.
 
 ## The Job column
 
 The first column, `jobTitle`, is a stored field kept in sync with `workflowSlug` or `taskSlug` on every write, and doubles as the collection's `useAsTitle`. It renders as a link to the document, matching Payload's default linked-first-column behavior. `workflowSlug` is no longer a default column on its own; the derived title covers both workflow and task jobs in one place.
+
+When a task or workflow is configured with Payload's own `label`, that label displays in place of the slug, with the slug available on hover. The same label maps drive the document header's Job/Workflow/Task fact and the log timeline (below). Jobs whose task or workflow has no configured `label` keep showing the raw slug, so nothing regresses for existing configs.
+
+## List search
+
+The list search box matches `jobTitle`, `workflowSlug`, `taskSlug`, and `queue` (`admin.listSearchableFields`; a host-set value on the collection wins over this default). `jobTitle` alone isn't enough: it's populated by a `beforeChange` hook, and jobs created through `payload.jobs.queue()` or a schedule bypass collection hooks by default (Payload writes them with `db.create` unless `jobs.runHooks` or `depth` is set), so `jobTitle` is empty on those documents. Matching the slug fields directly means runtime-queued and schedule-created jobs are still found by workflow, task, or queue name.
+
+Set `jobs: { runHooks: true }` in `buildConfig` if you also want document titles and breadcrumbs to populate for runtime-created jobs; the dashboard's search works either way.
 
 ## Readable timestamps
 
@@ -25,13 +33,25 @@ The first column, `jobTitle`, is a stored field kept in sync with `workflowSlug`
 
 Relative phrasing is produced with `Intl.RelativeTimeFormat` against the admin's active locale, so it localizes along with the rest of the admin UI.
 
+## Scheduled-row cues
+
+The Status column carries two extra cues for scheduled and cron-driven jobs. A `scheduled` row shows its next run as relative time next to the status pill, with the exact timestamp on hover. A document created by Payload's `handleSchedules` (its `meta.scheduled` flag) additionally gets a light-gray "Cron" pill, so schedule-spawned jobs are visually distinct from ones queued directly through `payload.jobs.queue()`.
+
+The Attempts column, and the equivalent Attempts fact in the document header, show a tooltip on hover explaining what the count includes (execution attempts for the job, including retries), since `totalTried` alone doesn't say that.
+
 ## Create form: workflow and task selects
 
 `workflowSlug` and `taskSlug` render as selects on the create form, with options merged from Payload's own configured slugs (`config.jobs.workflows` / `config.jobs.tasks`). A job runs a workflow or a task, never both: picking one hides the other, and a select with no configured options hides entirely. Submitting both on create is rejected server-side with a translated error (`errorWorkflowTaskExclusive`).
 
 ## Create form: queue select
 
-`queue` stays a `text` field at the schema level, but renders as a native-looking select in the admin, populated from `'default'`, any `queueControl.queues` you've configured, and queues named in static `autoRun` entries. It is not a real Payload `select` field on purpose: select options become a hard enum in both the Mongo and Postgres adapters, so adding a queue name later would need a migration on Postgres. `queue` stays free-form underneath, so `payload.jobs.queue({ queue: 'anything' })` keeps working for queue names that were never declared in config; an existing job with an undeclared queue value still displays correctly, since the field injects it as an extra option instead of showing blank.
+`queue` stays a `text` field at the schema level, but renders as a native-looking select in the admin. It is not a real Payload `select` field on purpose: select options become a hard enum in both the Mongo and Postgres adapters, so adding a queue name later would need a migration on Postgres. `queue` stays free-form underneath, so `payload.jobs.queue({ queue: 'anything' })` keeps working for queue names that were never declared in config; an existing job with an undeclared queue value still displays correctly, since the field injects it as an extra option instead of showing blank.
+
+The select's options come from automatic queue discovery, so you rarely need to name a queue twice. The union covers, in order: `'default'`, the plugin's own `queues` option, `queueControl.queues` (if queue control is on), queues named in static `autoRun` entries, every `schedule[].queue` on a configured task or workflow, and workflow-level `queue`. `autoRun` as a function is skipped, since it can't be inspected statically. Use the `queues` option for a queue that exists only at runtime and isn't otherwise declared anywhere in config:
+
+```ts title="payload.config.ts"
+jobs({ queues: ['emails', 'exports'] })
+```
 
 ## Options
 
@@ -46,6 +66,7 @@ All dashboard options live at the top level of the plugin options:
 | `status` | `PayloadComponent \| false` | built-in | Replace or remove the derived Status column. |
 | `beforeListTable` | `PayloadComponent[] \| false` | health bar | Replace or remove the components above the list. |
 | `healthBarCap` | `number \| false` | `100` | Per-status count cap; `false` shows exact counts. |
+| `queues` | `string[]` | `[]` | Extra queue names for the admin queue select, on top of the sources auto-discovered from config. |
 
 ```ts title="payload.config.ts"
 jobs({
@@ -81,9 +102,15 @@ jobs({
 })
 ```
 
+## Task and workflow labels
+
+Payload's own `TaskConfig`/`WorkflowConfig` accept a `label`, and the dashboard now renders it everywhere a job shows its workflow or task: the Job column, the document header's Job/Workflow/Task fact, and each row of the log timeline (as "Label (slug / taskID)"). The slug stays available on hover wherever the label replaces it, so nothing is lost, just deprioritized.
+
+The one place a label can't apply is an inline step: a workflow handler that calls `runTask('inline', ...)` instead of running a registered task. Payload's own runner writes that log entry with the reserved `taskSlug: 'inline'`, not a real task config, so there is no label to look up. Those rows render as `inline: <taskID>` instead of bare `inline`, so at least the identifying ID is visible. A registered task or workflow slug always gets its full label treatment.
+
 ## Components
 
-The pieces are exported for reuse in your own admin customizations: `JobStatusCell`, `JobStatusHeader`, `JobTitleCell`, `JobErrorPanel`, `JobLogTimeline`, `JobDocDescription`, `RelativeTimeCell`, `ReadOnlyDateField`, `WaitUntilField`, and `QueueSelectField` from `@10x-media/jobs/client`, and the server-rendered `JobsHealthBar` from `@10x-media/jobs/rsc`.
+The pieces are exported for reuse in your own admin customizations: `JobStatusCell`, `JobStatusHeader`, `JobTitleCell`, `JobErrorPanel`, `JobLogTimeline`, `JobDocDescription`, `RelativeTimeCell`, `ReadOnlyDateField`, `WaitUntilField`, `QueueSelectField`, `AttemptsCell`, and `JobsTotalChip` from `@10x-media/jobs/client`, and the server-rendered `JobsHealthBar` from `@10x-media/jobs/rsc`.
 
 ## Counting caveat
 

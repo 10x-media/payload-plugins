@@ -32,12 +32,24 @@ export const jobs = definePlugin<JobsPluginOptions>({
 		const reliability = resolveReliabilityOptions(options.reliability)
 		const queueControl = resolveQueueControlOptions(options.queueControl)
 		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
-		registerJobsEnhancements(config, options, queueControl?.queues ?? [])
+		registerJobsEnhancements(config, options, [
+			...(options.queues ?? []),
+			...(queueControl?.queues ?? []),
+		])
 		if (reliability) {
 			registerReliability(config, reliability)
 		}
 		if (queueControl) {
 			registerQueueControl(config, queueControl, reliability)
+		}
+		// Core defaults jobs.access.run to any logged-in user (`defaultAccess`), gating both
+		// /payload-jobs/run and /handle-schedules. With queue control off nothing else hardens
+		// them, so deny unless the host made an explicit choice.
+		if (!queueControl && config.jobs && config.jobs.access?.run === undefined) {
+			config.jobs = {
+				...config.jobs,
+				access: { ...config.jobs.access, run: () => false },
+			}
 		}
 		if (options.overrides?.jobs) {
 			const previous = config.jobs?.jobsCollectionOverrides

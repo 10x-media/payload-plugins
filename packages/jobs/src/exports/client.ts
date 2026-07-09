@@ -1,10 +1,12 @@
 'use client'
 
+export { AttemptsCell } from '../jobs/AttemptsCell'
 export { JobDocDescription } from '../jobs/JobDocDescription'
 export { JobErrorPanel } from '../jobs/JobErrorPanel'
 export { JobLogTimeline } from '../jobs/JobLogTimeline'
 export { JobStatusCell } from '../jobs/JobStatusCell'
 export { JobStatusHeader } from '../jobs/JobStatusHeader'
+export { JobsTotalChip } from '../jobs/JobsTotalChip'
 export { JobTitleCell } from '../jobs/JobTitleCell'
 export { QueueSelectField } from '../jobs/QueueSelectField'
 export { ReadOnlyDateField } from '../jobs/ReadOnlyDateField'
