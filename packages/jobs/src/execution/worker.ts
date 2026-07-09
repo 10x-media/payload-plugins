@@ -31,6 +31,12 @@ export type CreateWorkerArgs = {
 	drainTimeoutMs?: number
 	/** How often the drain re-counts in-flight jobs. Default 500. */
 	pollIntervalMs?: number
+	/**
+	 * Register schedules and contend for the scheduler leadership lease. Set false
+	 * for workers that must never create cron jobs (e.g. per-PR preview fleets);
+	 * the run loop and sweeper are unaffected.
+	 */
+	scheduling?: boolean
 	/** Register SIGTERM/SIGINT handlers that drain then exit. Default true. */
 	installSignals?: boolean
 	/** Which signals to drain on. Default ['SIGTERM', 'SIGINT']. */
@@ -121,6 +127,7 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		ttlMs: reliability.leaderLeaseTtlMs,
 	})
 
+	const scheduling = args.scheduling !== false
 	const runIntervalMs = args.runIntervalMs ?? 2000
 	const maintenanceIntervalMs =
 		args.maintenanceIntervalMs ?? Math.max(1000, Math.floor(reliability.leaderLeaseTtlMs / 3))
@@ -165,7 +172,9 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		})
 	}
 	const tickLeaders = async (at: Date): Promise<void> => {
-		await scheduler.tick(at)
+		if (scheduling) {
+			await scheduler.tick(at)
+		}
 		await sweeper.tick(at)
 	}
 
@@ -222,7 +231,8 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 
 	const worker: Worker = {
 		drain,
-		isLeader: (role) => (role === 'scheduler' ? scheduler.isLeader() : sweeper.isLeader()),
+		isLeader: (role) =>
+			role === 'scheduler' ? scheduling && scheduler.isLeader() : sweeper.isLeader(),
 		start: () => {
 			if (draining) {
 				return
@@ -234,7 +244,7 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 					() =>
 						maintenanceCycle({
 							handleSchedules,
-							isSchedulerLeader: scheduler.isLeader,
+							isSchedulerLeader: scheduling ? scheduler.isLeader : () => false,
 							logger,
 							now: getCurrentDate,
 							tickLeaders,

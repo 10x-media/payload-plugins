@@ -178,6 +178,43 @@ describeForDb('worker graceful drain', {}, (db) => {
 	})
 })
 
+describeForDb('worker scheduling flag', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: jobs({ reliability: {} }),
+			db,
+			configOverrides: { jobs: { tasks: [countingTask] } },
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('a worker with scheduling disabled never contends for the scheduler lease', async () => {
+		const worker = createWorker({
+			installSignals: false,
+			maintenanceIntervalMs: 50,
+			payload: booted.payload,
+			reliability: resolved(),
+			scheduling: false,
+		}) as WorkerTestHandle
+		worker.start()
+		try {
+			// Sweeper leadership proves the flag is scoped: the same maintenance tick that
+			// acquired the sweeper lease would have acquired the scheduler lease first.
+			await expect.poll(() => worker.isLeader('sweeper'), { timeout: 5000 }).toBe(true)
+			expect(worker.isLeader('scheduler')).toBe(false)
+			const lease = await createLeaseStore(booted.payload).read('scheduler')
+			expect(lease?.owner ?? null).toBeNull()
+		} finally {
+			await worker.stop()
+		}
+	})
+})
+
 describeForDb('worker run loop', {}, (db) => {
 	let booted: BootedPayload
 
