@@ -69,12 +69,29 @@ Two deployment rules follow. Use exec-form CMD (`CMD ["node", "dist/worker.js"]`
 | `runLimit` | `10` | Max jobs per run tick. |
 | `drainTimeoutMs` | `30000` | Wall-clock budget for in-flight jobs on drain. |
 | `pollIntervalMs` | `500` | How often the drain re-counts in-flight jobs. |
+| `scheduling` | `true` | Contend for the scheduler lease and run schedules. `false` opts a worker out entirely. |
 | `installSignals` | `true` | Register SIGTERM/SIGINT drain handlers. |
 | `signals` | `['SIGTERM', 'SIGINT']` | Which signals drain. |
 
 The returned `Worker` exposes `start()`, `drain()` (idempotent; returns the same in-flight promise on repeat calls), and `isLeader(role)`.
 
 Only one worker per process may install signal handlers; creating a second with `installSignals: true` throws. Pass `installSignals: false` for extra in-process workers (test helpers).
+
+## Opting out of scheduling
+
+Pass `scheduling: false` for a worker that must never register crons or contend for the scheduler leadership lease:
+
+```ts title="worker.ts"
+createWorker({
+  payload,
+  reliability,
+  scheduling: false,
+}).start()
+```
+
+The run loop and sweeper are unaffected: the worker still claims and runs due jobs, and still contends for the sweeper lease to recover orphaned jobs. `isLeader('scheduler')` also reports `false` unconditionally, so code branching on leadership doesn't need its own check.
+
+This is for fleets that shouldn't own scheduling at all, most commonly per-PR or per-branch preview workers: every ephemeral deployment booting against a shared database would otherwise contend for the same scheduler lease and, if it won, start running crons meant for the long-lived environment. Pin scheduling to whichever worker is meant to hold it and set `scheduling: false` on the rest.
 
 ## No worker at all
 
