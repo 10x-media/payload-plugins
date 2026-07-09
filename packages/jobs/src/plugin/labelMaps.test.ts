@@ -6,7 +6,12 @@ describe('collectJobLabels', () => {
 	it('maps slugs to labels, skipping unlabeled entries', () => {
 		const config = {
 			jobs: {
-				tasks: [{ label: 'Send email', slug: 'sendEmail' }, { slug: 'syncCrm' }],
+				tasks: [
+					{ label: 'Send email', slug: 'sendEmail' },
+					{ slug: 'syncCrm' },
+					{ label: '', slug: 'blank' },
+					{ label: 42, slug: 'numeric' },
+				],
 				workflows: [{ label: 'Atos sync', slug: 'atosSync' }],
 			},
 		} as unknown as Config
