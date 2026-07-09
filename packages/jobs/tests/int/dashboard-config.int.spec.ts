@@ -10,6 +10,7 @@ const fieldByName = (fields: Field[], name: string): Field | undefined =>
 const sendEmailTask: TaskConfig<'sendEmail'> = {
 	slug: 'sendEmail',
 	handler: () => ({ output: {} }),
+	schedule: [{ cron: '0 3 * * *', queue: 'sched' }],
 }
 
 const syncCrmTask: TaskConfig<'syncCrm'> = {
@@ -27,7 +28,11 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: jobs({ queueControl: { queues: ['default', 'emails'] }, reliability: true }),
+			plugin: jobs({
+				queueControl: { queues: ['default', 'emails'] },
+				queues: ['ops'],
+				reliability: true,
+			}),
 			db,
 			configOverrides: {
 				jobs: {
@@ -87,6 +92,15 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 		const queue = cfg && fieldByName(cfg.fields, 'queue')
 		expect(queue?.type).toBe('text')
 		expect(queue?.admin?.components?.Field).toBeDefined()
+	})
+
+	it('offers queues from the option and schedule entries in the queue select', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		const queue = cfg && fieldByName(cfg.fields, 'queue')
+		const field = queue?.admin?.components?.Field as { clientProps?: { options?: string[] } }
+		expect(field?.clientProps?.options).toEqual(
+			expect.arrayContaining(['default', 'emails', 'ops', 'sched'])
+		)
 	})
 
 	it('rejects creating a job with both a workflow and a task', async () => {

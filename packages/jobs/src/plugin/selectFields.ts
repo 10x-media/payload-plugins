@@ -4,19 +4,38 @@ export type JobSelectSlugs = { queues: string[]; tasks: string[]; workflows: str
 
 /**
  * Slugs available for the create-form selects, read from the assembled config.
- * `autoRun` may be a function (resolved at runtime), in which case its queues
- * cannot be known here and are skipped.
+ * Queues union every statically declarable source: the plugin's `queues` option
+ * and queue-control queues (passed in as `extraQueues`), static `autoRun`
+ * entries, task and workflow `schedule[].queue`, and workflow-level `queue`.
+ * `autoRun` may be a function (resolved at runtime); those queues are skipped.
  */
 export const collectJobSelectSlugs = (
 	config: Config,
-	queueControlQueues: string[] = []
+	extraQueues: string[] = []
 ): JobSelectSlugs => {
-	const tasks = (config.jobs?.tasks ?? []).map((task) => task.slug)
-	const workflows = (config.jobs?.workflows ?? []).map((workflow) => workflow.slug)
+	const taskConfigs = config.jobs?.tasks ?? []
+	const workflowConfigs = config.jobs?.workflows ?? []
 	const autoRun = Array.isArray(config.jobs?.autoRun) ? config.jobs.autoRun : []
-	const autoRunQueues = autoRun.flatMap((cron) => (cron.queue ? [cron.queue] : []))
-	const queues = [...new Set(['default', ...queueControlQueues, ...autoRunQueues])]
-	return { queues, tasks, workflows }
+	const scheduleQueues = [...taskConfigs, ...workflowConfigs].flatMap((entry) =>
+		(entry.schedule ?? []).map((schedule) => schedule.queue)
+	)
+	const workflowQueues = workflowConfigs.flatMap((workflow) =>
+		workflow.queue ? [workflow.queue] : []
+	)
+	const queues = [
+		...new Set([
+			'default',
+			...extraQueues,
+			...autoRun.flatMap((cron) => (cron.queue ? [cron.queue] : [])),
+			...scheduleQueues,
+			...workflowQueues,
+		]),
+	]
+	return {
+		queues,
+		tasks: taskConfigs.map((task) => task.slug),
+		workflows: workflowConfigs.map((workflow) => workflow.slug),
+	}
 }
 
 /**

@@ -227,7 +227,7 @@ const buildStatusField = (status: JobsOptions['status']): Field | null => {
 export const registerJobsEnhancements = (
 	config: Config,
 	options: JobsOptions,
-	queueControlQueues: string[] = []
+	extraQueues: string[] = []
 ): void => {
 	const existing = config.jobs?.jobsCollectionOverrides
 
@@ -255,7 +255,7 @@ export const registerJobsEnhancements = (
 		// its text type under a select component: a real select would harden the
 		// options into a db enum and reject the arbitrary queue names
 		// `payload.jobs.queue()` may target.
-		const slugs = collectJobSelectSlugs(config, queueControlQueues)
+		const slugs = collectJobSelectSlugs(config, extraQueues)
 		const withSelects = base.fields.map((field): Field => {
 			const name = fieldName(field)
 			if (name === 'workflowSlug') {
