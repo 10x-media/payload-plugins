@@ -32,6 +32,7 @@ const HEALTH_BAR = '@10x-media/jobs/rsc#JobsHealthBar'
 const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
 const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
 const QUEUE_SELECT_FIELD = '@10x-media/jobs/client#QueueSelectField'
+const ATTEMPTS_CELL = '@10x-media/jobs/client#AttemptsCell'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
@@ -119,9 +120,15 @@ const setCell = (field: Field, cell: PayloadComponent): Field =>
 		admin: { ...field.admin, components: { ...field.admin?.components, Cell: cell } },
 	}) as Field
 
+/** Plugin-default list cells for specific fields; explicit `cells` overrides still win. */
+const DEFAULT_FIELD_CELLS: Record<string, PayloadComponent> = {
+	totalTried: ATTEMPTS_CELL,
+}
+
 /**
  * Resolve a field's list cell: an explicit `cells` override wins (`false` keeps
- * Payload's default), otherwise date fields get the relative-time cell.
+ * Payload's default), then plugin defaults for specific fields, otherwise date
+ * fields get the relative-time cell.
  */
 const resolveCell = (field: Field, cells: JobsOptions['cells']): Field => {
 	const name = fieldName(field)
@@ -131,6 +138,9 @@ const resolveCell = (field: Field, cells: JobsOptions['cells']): Field => {
 	}
 	if (override) {
 		return setCell(field, override)
+	}
+	if (name && DEFAULT_FIELD_CELLS[name]) {
+		return setCell(field, DEFAULT_FIELD_CELLS[name])
 	}
 	if (field.type === 'date') {
 		return setCell(field, RELATIVE_CELL)

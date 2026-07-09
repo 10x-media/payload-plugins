@@ -1,5 +1,6 @@
 'use client'
 
+export { AttemptsCell } from '../jobs/AttemptsCell'
 export { JobDocDescription } from '../jobs/JobDocDescription'
 export { JobErrorPanel } from '../jobs/JobErrorPanel'
 export { JobLogTimeline } from '../jobs/JobLogTimeline'
