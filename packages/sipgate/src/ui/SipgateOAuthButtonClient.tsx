@@ -1,9 +1,11 @@
 'use client'
 
-import { Button } from '@payloadcms/ui'
+import { Button, useTranslation as usePayloadTranslation } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
+import type { TranslationKey } from '../translations/keys'
 import { keys } from '../translations/keys'
-import { useTranslation } from '../translations/useTranslation'
+
+const useTranslation = () => usePayloadTranslation<Record<string, never>, TranslationKey>()
 
 type Props = {
 	connected: boolean
