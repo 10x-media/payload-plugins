@@ -242,7 +242,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 			if (!config.collections) return
 			config.collections?.forEach((collection) => {
 				if (collection.slug === pluginCollectionSlug) {
-					if (!options.enableContactMatchUi) {
+					if (options.enableContactMatchUi) {
 						collection.fields.push(createContactMatchUiField(phoneNumberFields))
 					}
 					collection.fields = collection.fields?.map((field) => {
@@ -306,7 +306,6 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				})
 			)
 
-			// RTCM and contacts work in both PAT and OAuth2 modes.
 			config.endpoints.push(
 				createSipgateRtcm({
 					credentials: options.sipgateCredentials,
@@ -381,7 +380,6 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		}
 
 		if (isOAuth2) {
-			// Also inject the Connect button into the edit view of every configured payload users collection.
 			const payloadUsersSlugsArr = Array.isArray(options.payloadUsersSlug)
 				? options.payloadUsersSlug
 				: [options.payloadUsersSlug ?? 'users']

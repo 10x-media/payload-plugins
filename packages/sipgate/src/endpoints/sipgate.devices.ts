@@ -12,6 +12,11 @@ type CreateSipgateDevicesOptions = {
 	overrides?: Partial<Endpoint>
 }
 
+/**
+ * `GET /sipgate/devices` — returns the device list scoped to the authenticated user's linked
+ * sipgate account. Returns an empty array when the user has no linked account rather than
+ * leaking all org devices.
+ */
 export const createSipgateDevices = ({
 	sipgateDevicesSlug,
 	sipgateUsersSlug,
@@ -50,6 +55,9 @@ export const createSipgateDevices = ({
 					overrideAccess: true,
 				})
 				sipgateUserId = result.docs[0]?.sipgateId as string | undefined
+				if (!sipgateUserId) {
+					return Response.json([])
+				}
 			}
 
 			const devices = await req.payload.find({

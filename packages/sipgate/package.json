@@ -17,7 +17,7 @@
 	],
 	"author": "10x-media",
 	"engines": {
-		"node": "^18.20.2 || >=20.9.0"
+		"node": ">=22.18.0"
 	},
 	"type": "module",
 	"sideEffects": false,
@@ -177,6 +177,11 @@
 				"types": "./dist/ui/SipgateOAuthButton.d.ts",
 				"import": "./dist/ui/SipgateOAuthButton.js",
 				"default": "./dist/ui/SipgateOAuthButton.js"
+			},
+			"./ui/SipgateSyncButton": {
+				"types": "./dist/ui/SipgateSyncButton.d.ts",
+				"import": "./dist/ui/SipgateSyncButton.js",
+				"default": "./dist/ui/SipgateSyncButton.js"
 			}
 		}
 	},
