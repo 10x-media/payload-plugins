@@ -11,7 +11,16 @@ import {
 } from '@payloadcms/ui'
 import type { ChangeEvent } from 'react'
 import { useState } from 'react'
-import { resolveInitialChannel } from '../utils/resolveInitialChannel'
+
+function resolveInitialChannel(
+	channels: { id: string }[] | undefined,
+	defaultChannelId: string | undefined
+): string | undefined {
+	if (!channels || channels.length === 0) return defaultChannelId
+	const explicit = channels.find((c) => c.id === defaultChannelId)
+	if (explicit) return explicit.id
+	return channels[0]?.id ?? defaultChannelId
+}
 
 type SipgateDevice = {
 	id: string

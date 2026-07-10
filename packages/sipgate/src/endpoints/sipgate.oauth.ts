@@ -242,7 +242,7 @@ export const createSipgateOAuthCallback = ({
 						timezone: sipgateUser.timezone,
 						addressId: sipgateUser.addressId,
 						payloadUser: {
-							relationTo: usersCollection as CollectionSlug,
+							relationTo: usersCollection as unknown as 'users',
 							value: payloadUserId,
 						},
 						accessToken: tokens.access_token,
