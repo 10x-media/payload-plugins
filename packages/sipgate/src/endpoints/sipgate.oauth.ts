@@ -23,6 +23,7 @@ type CreateSipgateOAuthOptions = {
 
 const noop: (tokens: OAuthTokens) => Promise<void> = async () => {}
 
+/** Redirects the authenticated Payload user to the sipgate OAuth2 authorization page. */
 export const createSipgateOAuthConnect = ({
 	credentials,
 	serverURL,
@@ -46,14 +47,20 @@ export const createSipgateOAuthConnect = ({
 			return Response.json({ error: 'OAuth2 clientId not configured' }, { status: 500 })
 		}
 
+		const nonce = crypto.randomUUID()
+		await req.payload.kv.set(`sipgate:oauth:nonce:${nonce}`, req.user.id as string)
+
 		const redirectUri = `${serverURL}/api/sipgate/oauth/callback`
-		const state = req.user.id as string
-		const authorizeUrl = buildAuthorizeUrl({ clientId, realm, redirectUri, scopes, state })
+		const authorizeUrl = buildAuthorizeUrl({ clientId, realm, redirectUri, scopes, state: nonce })
 
 		return Response.redirect(authorizeUrl, 302)
 	},
 })
 
+/**
+ * Handles the sipgate OAuth2 callback. Validates the state nonce from `payload.kv`,
+ * exchanges the authorization code for tokens, and upserts the linked sipgate-users record.
+ */
 export const createSipgateOAuthCallback = ({
 	credentials,
 	serverURL,
@@ -90,22 +97,23 @@ export const createSipgateOAuthCallback = ({
 			return Response.redirect(`${adminUrl}?sipgate_error=missing_params`, 302)
 		}
 
-		// Verify state is a valid Payload user ID. We can't rely on req.user here
-		// because the browser session cookie may not be sent when sipgate redirects
-		// back via a different hostname (e.g. ngrok in dev).
 		const usersCollection = Array.isArray(payloadUsersSlug) ? payloadUsersSlug[0] : payloadUsersSlug
+		const payloadUserId = await req.payload.kv.get<string>(`sipgate:oauth:nonce:${state}`)
+		await req.payload.kv.delete(`sipgate:oauth:nonce:${state}`)
+		if (!payloadUserId) {
+			return Response.redirect(`${adminUrl}?sipgate_error=invalid_state`, 302)
+		}
+
 		try {
 			const user = await req.payload.findByID({
 				collection: usersCollection as Parameters<typeof req.payload.findByID>[0]['collection'],
-				id: state,
+				id: payloadUserId,
 				overrideAccess: true,
 			})
 			if (!user) throw new Error()
 		} catch {
 			return Response.redirect(`${adminUrl}?sipgate_error=invalid_state`, 302)
 		}
-
-		const payloadUserId = state
 
 		const clientId = credentials.clientId
 		const clientSecret = credentials.clientSecret
@@ -137,9 +145,6 @@ export const createSipgateOAuthCallback = ({
 			onRefresh: noop,
 		})
 
-		// GET /authorization/userinfo returns sub = the sipgate user ID (e.g. "w2").
-		// Use that to find the exact user rather than falling back to getUsers()[0],
-		// which is the first user in the org (typically the account owner).
 		let authenticatedSub: string | undefined
 		try {
 			const userinfo = await getAuthorizationUserinfo(tempRest)
@@ -177,7 +182,6 @@ export const createSipgateOAuthCallback = ({
 
 		const tokenExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
-		// Check whether this Sipgate account is already claimed by a different Payload user.
 		if (!allowSharedSipgateAccount) {
 			const claimedBy = await req.payload.find({
 				collection: sipgateUsersSlug as CollectionSlug,
@@ -238,7 +242,7 @@ export const createSipgateOAuthCallback = ({
 						timezone: sipgateUser.timezone,
 						addressId: sipgateUser.addressId,
 						payloadUser: {
-							relationTo: 'users',
+							relationTo: usersCollection as CollectionSlug,
 							value: payloadUserId,
 						},
 						accessToken: tokens.access_token,
@@ -252,8 +256,6 @@ export const createSipgateOAuthCallback = ({
 			return Response.redirect(`${adminUrl}?sipgate_error=upsert_failed`, 302)
 		}
 
-		// Immediately sync this user's devices and channels after connecting.
-		// Errors are non-fatal — the user is already connected even if sync fails.
 		try {
 			await syncDevices({
 				payload: req.payload,

@@ -11,6 +11,7 @@ import {
 } from '@payloadcms/ui'
 import type { ChangeEvent } from 'react'
 import { useState } from 'react'
+import { resolveInitialChannel } from '../utils/resolveInitialChannel'
 
 type SipgateDevice = {
 	id: string
@@ -55,9 +56,7 @@ export const ClickToDialFieldClient = ({
 	const [devices] = useState<SipgateDevice[]>(initialDevices ?? [])
 	const [channels] = useState<SipgateChannel[]>(initialChannels ?? [])
 	const [selectedChannelId, setSelectedChannelId] = useState<string | undefined>(
-		initialChannels && initialChannels.length > 0
-			? (initialChannels[0]?.id ?? defaultChannelId)
-			: defaultChannelId
+		resolveInitialChannel(initialChannels, defaultChannelId)
 	)
 	const { closeModal } = useModal()
 

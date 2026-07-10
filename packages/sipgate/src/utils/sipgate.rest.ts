@@ -6,9 +6,7 @@ import type {
 	SipgateHistoryParams,
 	SipgateHistoryResponse,
 } from '../types'
-import { ClassicDial, getClassicCallHistory } from './sipgate.classic.rest'
 import { getNeoCallHistory, NeoDial, type NeoDialProps } from './sipgate.neo.rest'
-import { isNeo } from './sipgate.utils'
 
 const BASE_URL = 'https://api.sipgate.com/v2'
 
@@ -83,12 +81,9 @@ export const getContacts = async (rest: SipgateRestFetch) => {
 
 export const getCallHistory = async (
 	rest: SipgateRestFetch,
-	params?: SipgateHistoryParams
+	_params?: SipgateHistoryParams
 ): Promise<SipgateHistoryResponse | NeoCallEvent[]> => {
-	if (isNeo()) {
-		return getNeoCallHistory(rest)
-	}
-	return getClassicCallHistory(rest, params)
+	return getNeoCallHistory(rest)
 }
 
 export type SipgateDialProps = {
@@ -100,24 +95,20 @@ export type SipgateDialProps = {
 }
 
 export const Dial = async (rest: SipgateRestFetch, props: SipgateDialProps) => {
-	const mode = isNeo() ? 'neo' : 'classic'
-	if (mode === 'neo') {
-		if (!props.deviceId) {
-			throw new Error('Device ID is required for neo calls')
-		}
-		if (!props.channelId) {
-			throw new Error('Channel ID is required for neo calls')
-		}
-		const neoProps: NeoDialProps = {
-			additionalDevices: [],
-			callerId: props.callerId,
-			channelId: props.channelId,
-			deviceId: props.deviceId,
-			targetNumber: props.callee,
-		}
-		return NeoDial(rest, neoProps)
+	if (!props.deviceId) {
+		throw new Error('Device ID is required for neo calls')
 	}
-	return ClassicDial(rest, props)
+	if (!props.channelId) {
+		throw new Error('Channel ID is required for neo calls')
+	}
+	const neoProps: NeoDialProps = {
+		additionalDevices: [],
+		callerId: props.callerId,
+		channelId: props.channelId,
+		deviceId: props.deviceId,
+		targetNumber: props.callee,
+	}
+	return NeoDial(rest, neoProps)
 }
 
 type SipgateTransferCallProps = {
@@ -126,19 +117,29 @@ type SipgateTransferCallProps = {
 	phoneNumber: string
 }
 
+/** Throws on non-2xx responses so callers can detect transfer failures. */
 export const transferCall = async (
 	rest: SipgateRestFetch,
 	callId: string,
 	props: SipgateTransferCallProps
 ) => {
-	return rest(`/calls/${callId}/transfer`, {
+	const response = await rest(`/calls/${callId}/transfer`, {
 		method: 'POST',
 		body: JSON.stringify(props),
 	})
+	if (!response.ok) {
+		throw new Error(`transferCall failed: ${response.status}`)
+	}
+	return response
 }
 
+/** Throws on non-2xx responses so callers can detect hangup failures. */
 export const hangupCall = async (rest: SipgateRestFetch, callId: string) => {
-	return rest(`/calls/${callId}`, { method: 'DELETE' })
+	const response = await rest(`/calls/${callId}`, { method: 'DELETE' })
+	if (!response.ok) {
+		throw new Error(`hangupCall failed: ${response.status}`)
+	}
+	return response
 }
 
 export const answerCall = async (rest: SipgateRestFetch, callId: string, deviceId: string) => {

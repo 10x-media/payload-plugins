@@ -27,11 +27,18 @@ export const buildSipgateRestOAuth = ({
 	onRefresh,
 }: BuildSipgateRestOAuthOptions): SipgateRestFetch => {
 	let currentAccessToken = initialAccessToken
+	let currentRefreshToken = refreshToken
 	let inflight: Promise<void> | null = null
 
 	const doRefresh = async () => {
-		const tokens = await refreshAccessToken({ clientId, clientSecret, realm, refreshToken })
+		const tokens = await refreshAccessToken({
+			clientId,
+			clientSecret,
+			realm,
+			refreshToken: currentRefreshToken,
+		})
 		currentAccessToken = tokens.access_token
+		currentRefreshToken = tokens.refresh_token
 		await onRefresh(tokens)
 	}
 

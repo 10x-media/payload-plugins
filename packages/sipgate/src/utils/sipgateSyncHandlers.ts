@@ -28,6 +28,7 @@ type SyncUsersOptions = {
 	prune?: boolean
 }
 
+/** Upserts sipgate users into the local collection and, when `prune` is true, deletes docs whose `sipgateId` is no longer returned by the API. */
 export const syncUsers = async ({
 	payload,
 	rest,
@@ -70,7 +71,7 @@ export const syncUsers = async ({
 		try {
 			const orphans = await payload.find({
 				collection: sipgateUsersSlug as CollectionSlug,
-				where: { id: { not_in: [...seenIds] } },
+				where: { sipgateId: { not_in: [...seenIds] } },
 				limit: 1000,
 				depth: 0,
 				overrideAccess: true,
@@ -109,6 +110,7 @@ type SyncDevicesOptions = {
 	scopeToUserId?: string
 }
 
+/** Upserts devices for all (or a single scoped) sipgate user and, when `prune` is true, deletes docs whose `sipgateId` is no longer returned by the API. */
 export const syncDevices = async ({
 	payload,
 	rest,
@@ -178,7 +180,7 @@ export const syncDevices = async ({
 		try {
 			const orphans = await payload.find({
 				collection: sipgateDevicesSlug as CollectionSlug,
-				where: { id: { not_in: [...seen] } },
+				where: { sipgateId: { not_in: [...seen] } },
 				limit: 1000,
 				depth: 0,
 				overrideAccess: true,
@@ -217,6 +219,7 @@ type SyncChannelsOptions = {
 	scopeToUserId?: string
 }
 
+/** Upserts sipgate channels (groups) and, when `prune` is true, deletes docs whose `sipgateId` is no longer returned by the API. */
 export const syncChannels = async ({
 	payload,
 	rest,
@@ -226,7 +229,6 @@ export const syncChannels = async ({
 	scopeToUserId,
 }: SyncChannelsOptions): Promise<SyncResult> => {
 	const allGroups = await getGroups(rest)
-	// When scoped, only sync channels this user is actually a member of.
 	const groups = scopeToUserId
 		? allGroups.filter((g) => g.users.some((u: { id: string }) => u.id === scopeToUserId))
 		: allGroups
@@ -316,7 +318,7 @@ export const syncChannels = async ({
 		try {
 			const orphans = await payload.find({
 				collection: sipgateChannelsSlug as CollectionSlug,
-				where: { id: { not_in: [...seenIds] } },
+				where: { sipgateId: { not_in: [...seenIds] } },
 				limit: 1000,
 				depth: 0,
 				overrideAccess: true,

@@ -114,6 +114,7 @@ export const createSipgateUsersCollection = ({
 							name: 'accessToken',
 							type: 'text' as const,
 							saveToJWT: false,
+							access: { read: () => false as const },
 							admin: {
 								hidden: true,
 								description: labelForKey(keys.sipgateUsersDescAccessToken),
@@ -123,6 +124,7 @@ export const createSipgateUsersCollection = ({
 							name: 'refreshToken',
 							type: 'text' as const,
 							saveToJWT: false,
+							access: { read: () => false as const },
 							admin: {
 								hidden: true,
 								description: labelForKey(keys.sipgateUsersDescRefreshToken),
@@ -132,6 +134,7 @@ export const createSipgateUsersCollection = ({
 							name: 'tokenExpiresAt',
 							type: 'date' as const,
 							saveToJWT: false,
+							access: { read: () => false as const },
 							admin: {
 								readOnly: true,
 								description: labelForKey(keys.sipgateUsersDescTokenExpiresAt),
