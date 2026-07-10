@@ -5,6 +5,7 @@ const USERS_SLUG = 'sipgate-users'
 
 const SipgateOAuthButton: PayloadServerReactComponent<PayloadComponent> = async (props) => {
 	let connected = false
+	let needsReconnect = false
 
 	if (props.user) {
 		try {
@@ -17,11 +18,13 @@ const SipgateOAuthButton: PayloadServerReactComponent<PayloadComponent> = async 
 				limit: 1,
 				overrideAccess: true,
 			})
-			connected = result.totalDocs > 0
+			const doc = result.docs[0] as { needsReconnect?: boolean } | undefined
+			connected = !!doc
+			needsReconnect = doc?.needsReconnect ?? false
 		} catch {}
 	}
 
-	return <SipgateOAuthButtonClient connected={connected} />
+	return <SipgateOAuthButtonClient connected={connected} needsReconnect={needsReconnect} />
 }
 
 export default SipgateOAuthButton

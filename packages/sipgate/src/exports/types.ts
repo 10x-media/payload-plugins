@@ -1,5 +1,5 @@
 export type { SipgateAccess, SipgateAccessFn, SipgatePluginOptions } from '../index'
-export type { LiveCallPosition } from '../types'
+export type { LiveCallPosition, SipgateAuthType, SipgateCredentials } from '../types'
 export type { SyncResult } from '../utils/sipgateSyncHandlers'
 
 export type CallLog = {

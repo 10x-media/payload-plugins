@@ -44,6 +44,8 @@ export const en: Record<TranslationKey, string> = {
 	// OAuth button
 	[keys.oauthButtonConnect]: 'Connect Sipgate',
 	[keys.oauthButtonReconnect]: 'Reconnect Sipgate',
+	[keys.oauthTokenExpired]:
+		'Your Sipgate session has expired. Please reconnect to restore calling, syncing, and other features.',
 
 	// SipgateDevices field labels and descriptions
 	[keys.sipgateDevicesLabelDnd]: 'Do Not Disturb',

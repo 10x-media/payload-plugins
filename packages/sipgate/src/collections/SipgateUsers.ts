@@ -111,6 +111,14 @@ export const createSipgateUsersCollection = ({
 			...(includeOAuthFields
 				? [
 						{
+							name: 'needsReconnect',
+							type: 'checkbox' as const,
+							defaultValue: false,
+							saveToJWT: false,
+							access: { read: () => false as const },
+							admin: { hidden: true },
+						},
+						{
 							name: 'accessToken',
 							type: 'text' as const,
 							saveToJWT: false,
