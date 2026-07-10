@@ -4,6 +4,7 @@ import { type OAuthTokens, refreshAccessToken } from './sipgateOAuth'
 const BASE_URL = 'https://api.sipgate.com/v2'
 
 export type OAuthRefreshCallback = (tokens: OAuthTokens) => Promise<void>
+export type OAuthRefreshFailedCallback = (error: Error) => Promise<void>
 
 type BuildSipgateRestOAuthOptions = {
 	accessToken: string
@@ -12,6 +13,7 @@ type BuildSipgateRestOAuthOptions = {
 	clientSecret: string
 	realm: string
 	onRefresh: OAuthRefreshCallback
+	onRefreshFailed?: OAuthRefreshFailedCallback
 }
 
 /**
@@ -25,21 +27,27 @@ export const buildSipgateRestOAuth = ({
 	clientSecret,
 	realm,
 	onRefresh,
+	onRefreshFailed,
 }: BuildSipgateRestOAuthOptions): SipgateRestFetch => {
 	let currentAccessToken = initialAccessToken
 	let currentRefreshToken = refreshToken
 	let inflight: Promise<void> | null = null
 
 	const doRefresh = async () => {
-		const tokens = await refreshAccessToken({
-			clientId,
-			clientSecret,
-			realm,
-			refreshToken: currentRefreshToken,
-		})
-		currentAccessToken = tokens.access_token
-		currentRefreshToken = tokens.refresh_token
-		await onRefresh(tokens)
+		try {
+			const tokens = await refreshAccessToken({
+				clientId,
+				clientSecret,
+				realm,
+				refreshToken: currentRefreshToken,
+			})
+			currentAccessToken = tokens.access_token
+			currentRefreshToken = tokens.refresh_token
+			await onRefresh(tokens)
+		} catch (err) {
+			await onRefreshFailed?.(err instanceof Error ? err : new Error(String(err)))
+			throw err
+		}
 	}
 
 	return async (url, options) => {

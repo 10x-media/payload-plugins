@@ -164,6 +164,14 @@ const handleOAuth2Dial = async ({
 				overrideAccess: true,
 			})
 		},
+		onRefreshFailed: async () => {
+			await req.payload.update({
+				collection: sipgateUsersSlug as CollectionSlug,
+				id: docId,
+				data: { needsReconnect: true } as Record<string, unknown>,
+				overrideAccess: true,
+			})
+		},
 	})
 
 	const deviceId = bodyDeviceId ?? (sipgateUser.defaultDevice as string | undefined)

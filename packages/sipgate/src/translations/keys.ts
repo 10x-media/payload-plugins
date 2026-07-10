@@ -61,6 +61,7 @@ export const keys = {
 	// OAuth button
 	oauthButtonConnect: 'sipgate:oauth.button.connect',
 	oauthButtonReconnect: 'sipgate:oauth.button.reconnect',
+	oauthTokenExpired: 'sipgate:oauth.token.expired',
 
 	// IVR Voice Lines collection
 	ivrVoiceLinesSingular: 'sipgate:ivrVoiceLines.singular',

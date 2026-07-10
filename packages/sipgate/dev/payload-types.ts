@@ -214,6 +214,7 @@ export interface SipgateUser {
     relationTo: 'users';
     value: string | User;
   } | null;
+  needsReconnect?: boolean | null;
   accessToken?: string | null;
   refreshToken?: string | null;
   tokenExpiresAt?: string | null;
@@ -543,6 +544,7 @@ export interface SipgateUsersSelect<T extends boolean = true> {
   timezone?: T;
   addressId?: T;
   payloadUser?: T;
+  needsReconnect?: T;
   accessToken?: T;
   refreshToken?: T;
   tokenExpiresAt?: T;

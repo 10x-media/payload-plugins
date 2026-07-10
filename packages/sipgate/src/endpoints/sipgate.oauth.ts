@@ -12,7 +12,10 @@ import { syncChannels, syncDevices } from '../utils/sipgateSyncHandlers'
 
 type CreateSipgateOAuthOptions = {
 	credentials: SipgateCredentials
-	serverURL: string
+	/** Public base URL for OAuth redirect URIs — must be reachable by Sipgate's auth server. */
+	webhookUrl: string
+	/** Base URL for /admin browser redirects — typically config.serverURL. */
+	adminBaseUrl: string
 	sipgateUsersSlug: string
 	sipgateDevicesSlug: string
 	sipgateChannelsSlug: string
@@ -26,7 +29,7 @@ const noop: (tokens: OAuthTokens) => Promise<void> = async () => {}
 /** Redirects the authenticated Payload user to the sipgate OAuth2 authorization page. */
 export const createSipgateOAuthConnect = ({
 	credentials,
-	serverURL,
+	webhookUrl,
 	sipgateUsersSlug: _sipgateUsersSlug,
 	sipgateDevicesSlug: _sipgateDevicesSlug,
 	sipgateChannelsSlug: _sipgateChannelsSlug,
@@ -50,7 +53,7 @@ export const createSipgateOAuthConnect = ({
 		const nonce = crypto.randomUUID()
 		await req.payload.kv.set(`sipgate:oauth:nonce:${nonce}`, req.user.id as string)
 
-		const redirectUri = `${serverURL}/api/sipgate/oauth/callback`
+		const redirectUri = `${webhookUrl}/api/sipgate/oauth/callback`
 		const authorizeUrl = buildAuthorizeUrl({ clientId, realm, redirectUri, scopes, state: nonce })
 
 		return Response.redirect(authorizeUrl, 302)
@@ -63,7 +66,8 @@ export const createSipgateOAuthConnect = ({
  */
 export const createSipgateOAuthCallback = ({
 	credentials,
-	serverURL,
+	webhookUrl,
+	adminBaseUrl,
 	sipgateUsersSlug,
 	sipgateDevicesSlug,
 	sipgateChannelsSlug,
@@ -73,7 +77,7 @@ export const createSipgateOAuthCallback = ({
 	path: '/sipgate/oauth/callback',
 	method: 'get',
 	handler: async (req) => {
-		const adminUrl = `${serverURL}/admin`
+		const adminUrl = `${adminBaseUrl}/admin`
 
 		if (!req.url) {
 			return Response.redirect(`${adminUrl}?sipgate_error=missing_params`, 302)
@@ -125,7 +129,7 @@ export const createSipgateOAuthCallback = ({
 
 		let tokens: OAuthTokens
 		try {
-			const redirectUri = `${serverURL}/api/sipgate/oauth/callback`
+			const redirectUri = `${webhookUrl}/api/sipgate/oauth/callback`
 			tokens = await exchangeCode({ clientId, clientSecret, realm, code, redirectUri })
 		} catch {
 			return Response.redirect(`${adminUrl}?sipgate_error=token_exchange_failed`, 302)
@@ -225,7 +229,8 @@ export const createSipgateOAuthCallback = ({
 						accessToken: tokens.access_token,
 						refreshToken: tokens.refresh_token,
 						tokenExpiresAt,
-					},
+						needsReconnect: false,
+					} as Record<string, unknown>,
 					overrideAccess: true,
 				})
 			} else {
@@ -248,7 +253,8 @@ export const createSipgateOAuthCallback = ({
 						accessToken: tokens.access_token,
 						refreshToken: tokens.refresh_token,
 						tokenExpiresAt,
-					},
+						needsReconnect: false,
+					} as Record<string, unknown>,
 					overrideAccess: true,
 				})
 			}

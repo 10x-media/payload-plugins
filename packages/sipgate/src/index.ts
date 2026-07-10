@@ -36,6 +36,7 @@ import type { SipgateAccess } from './utils/access'
 import { createCallActivityWidget } from './widgets/callActivity.widget'
 import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.component'
 
+export type { SipgateAuthType, SipgateCredentials } from './types'
 export type { SipgateAccess, SipgateAccessFn } from './utils/access'
 export { createSipgateOnInit } from './utils/sipgateSyncHandlers'
 
@@ -156,6 +157,14 @@ export type SipgatePluginOptions = {
 		| false
 
 	/**
+	 * Public base URL for OAuth redirect URIs and IVR webhook callbacks
+	 * (e.g. `https://your-app.com` or `https://abc.ngrok.io`).
+	 * Required when `authType` is `'oauth2'` or the `ivr` option is enabled.
+	 * Must be reachable by Sipgate's servers — not `localhost`.
+	 */
+	webhookUrl?: string
+
+	/**
 	 * The overrides to use for the plugin.
 	 */
 	overrides?: {
@@ -257,7 +266,16 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 
 		if (!config.endpoints) config.endpoints = []
 
-		const serverURL = config.serverURL ?? ''
+		const needsWebhookUrl = isOAuth2 || ivrEnabled
+		if (needsWebhookUrl && !options.webhookUrl) {
+			throw new Error(
+				'[@10x-media/sipgate] webhookUrl is required when using OAuth2 or IVR. ' +
+					'Set it to the public base URL of your Payload instance (e.g. https://your-app.com).'
+			)
+		}
+		const webhookUrl = options.webhookUrl ?? ''
+		const adminBaseUrl = config.serverURL ?? ''
+
 		config.endpoints.push(
 			createSipgateWebhooks({
 				contactCollections,
@@ -266,7 +284,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				ivr: ivrEnabled
 					? {
 							flowsSlug: ivrFlowsSlug,
-							ivrEndpointUrl: `${serverURL}/api/sipgate/ivr`,
+							ivrEndpointUrl: `${webhookUrl}/api/sipgate/ivr`,
 						}
 					: undefined,
 				overrides: options.overrides?.sipgateWebhooks,
@@ -290,7 +308,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				createSipgateIvr({
 					flowsSlug: ivrFlowsSlug,
 					voiceLinesSlug: ivrVoiceLinesSlug,
-					ivrEndpointUrl: `${serverURL}/api/sipgate/ivr`,
+					ivrEndpointUrl: `${webhookUrl}/api/sipgate/ivr`,
 				})
 			)
 		}
@@ -329,7 +347,8 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 				config.endpoints.push(
 					createSipgateOAuthConnect({
 						credentials: options.sipgateCredentials,
-						serverURL,
+						webhookUrl,
+						adminBaseUrl,
 						sipgateUsersSlug,
 						sipgateDevicesSlug,
 						sipgateChannelsSlug,
@@ -337,7 +356,8 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 					}),
 					createSipgateOAuthCallback({
 						credentials: options.sipgateCredentials,
-						serverURL,
+						webhookUrl,
+						adminBaseUrl,
 						sipgateUsersSlug,
 						sipgateDevicesSlug,
 						sipgateChannelsSlug,
