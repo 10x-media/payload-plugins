@@ -5,6 +5,7 @@ import {
 	type CustomComponent,
 	definePlugin,
 	type Endpoint,
+	type Field,
 	type Widget,
 } from 'payload'
 import { fieldAffectsData } from 'payload/shared'
@@ -188,6 +189,26 @@ declare module 'payload' {
 	}
 }
 
+const mapPhoneNumberFields = (fields: Field[], phoneNumberFields: string[]): Field[] =>
+	fields.map((field) => {
+		if (fieldAffectsData(field) && phoneNumberFields.includes(field.name)) {
+			return createPhoneNumberField(field)
+		}
+		if ('fields' in field && Array.isArray(field.fields)) {
+			return { ...field, fields: mapPhoneNumberFields(field.fields, phoneNumberFields) }
+		}
+		if ('tabs' in field && Array.isArray(field.tabs)) {
+			return {
+				...field,
+				tabs: field.tabs.map((tab) => ({
+					...tab,
+					fields: mapPhoneNumberFields(tab.fields ?? [], phoneNumberFields),
+				})),
+			}
+		}
+		return field
+	})
+
 export const sipgate = definePlugin<SipgatePluginOptions>({
 	slug: '@10x-media/sipgate',
 	order: 10,
@@ -254,12 +275,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 					if (options.enableContactMatchUi) {
 						collection.fields.push(createContactMatchUiField(phoneNumberFields))
 					}
-					collection.fields = collection.fields?.map((field) => {
-						if (fieldAffectsData(field) && phoneNumberFields.includes(field.name)) {
-							return createPhoneNumberField(field)
-						}
-						return field
-					})
+					collection.fields = mapPhoneNumberFields(collection.fields, phoneNumberFields)
 				}
 			})
 		})
