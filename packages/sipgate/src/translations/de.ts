@@ -40,6 +40,8 @@ export const de: Record<TranslationKey, string> = {
 	// OAuth-Schaltfläche
 	[keys.oauthButtonConnect]: 'Sipgate verbinden',
 	[keys.oauthButtonReconnect]: 'Sipgate erneut verbinden',
+	[keys.oauthTokenExpired]:
+		'Ihre Sipgate-Sitzung ist abgelaufen. Bitte erneut verbinden, um Anrufe, Synchronisierung und andere Funktionen wiederherzustellen.',
 
 	// SipgateDevices field labels and descriptions
 	[keys.sipgateDevicesLabelDnd]: 'Nicht stören',

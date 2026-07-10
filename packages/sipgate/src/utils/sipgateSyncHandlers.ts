@@ -553,6 +553,14 @@ export const syncCallHistoryOAuth = async ({
 					overrideAccess: true,
 				})
 			},
+			onRefreshFailed: async () => {
+				await payload.update({
+					collection: sipgateUsersSlug as CollectionSlug,
+					id: docId,
+					data: { needsReconnect: true } as Record<string, unknown>,
+					overrideAccess: true,
+				})
+			},
 		})
 
 		try {

@@ -16,6 +16,7 @@ const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
 const siteUrl = process.env.SITE_URL ?? 'http://localhost:3000'
+const webhookUrl = process.env.WEBHOOK_URL ?? siteUrl
 const authType = process.env.SIPGATE_AUTH_TYPE === 'oauth2' ? 'oauth2' : 'pat'
 
 const users: CollectionConfig = {
@@ -63,6 +64,7 @@ export default buildConfig({
 			phoneNumberFields: ['phoneNumber'],
 			payloadUsersSlug: 'users',
 			syncCallLogs: true,
+			webhookUrl: authType === 'oauth2' ? webhookUrl : undefined,
 			sipgateCredentials:
 				authType === 'oauth2'
 					? {
@@ -83,6 +85,7 @@ export default buildConfig({
 						},
 			enableCallActivityWidget: true,
 			enableLiveCallFloatingWindow: true,
+			enableContactMatchUi: true,
 			allowSharedSipgateAccount: true,
 		}),
 	],

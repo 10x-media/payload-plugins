@@ -84,6 +84,14 @@ export const createSipgateOAuthSync = ({
 						overrideAccess: true,
 					})
 				},
+				onRefreshFailed: async () => {
+					await req.payload.update({
+						collection: sipgateUsersSlug as CollectionSlug,
+						id: docId,
+						data: { needsReconnect: true } as Record<string, unknown>,
+						overrideAccess: true,
+					})
+				},
 			})
 
 			if (type === 'devices' || type === 'all') {
