@@ -1,10 +1,12 @@
 // biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { formBuilder } from '../src/index'
+import { defineFormField, type FieldTypeOption, formBuilder } from '../src/index'
+import { customRules } from './helpers/rules'
 import { seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -41,7 +43,40 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	collections: [users],
-	plugins: [formBuilder({})],
+	plugins: [
+		formBuilder({
+			fields: {
+				date: defineFormField<'date'>({
+					type: 'date',
+					label: 'Date',
+					value: 'date',
+					validate: ({ value }) =>
+						value != null && isNaN(Date.parse(String(value))) ? 'Invalid date' : true,
+					format: ({ value }) => (value ? new Date(String(value)).toLocaleDateString() : ''),
+				}) as FieldTypeOption,
+			},
+			rules: {
+				dateMin: customRules[0]!,
+				dateMax: customRules[1]!,
+			},
+			spam: {
+				// captcha: defineCaptchaProvider({
+				// 	type: 'turnstile',
+				// 	verify: async ({ token }) => {
+				// 		const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+				// 			method: 'POST',
+				// 			headers: { 'Content-Type': 'application/json' },
+				// 			body: JSON.stringify({
+				// 				secret: '0x4AAAAAADzK49qKscc6GTFsbwTMvjNAjtY',
+				// 				response: token,
+				// 			}),
+				// 		})
+				// 		return ((await res.json()) as { success: boolean }).success
+				// 	},
+				// }),
+			},
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

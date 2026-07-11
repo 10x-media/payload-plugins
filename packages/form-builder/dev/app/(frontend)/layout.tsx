@@ -1,4 +1,5 @@
 import '@10x-media/form-builder/styles.css'
+import './demo.css'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 
