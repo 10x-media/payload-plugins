@@ -3,7 +3,8 @@ import { defineFormField } from '../defineFormField'
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
-const isValidCalendarDate = (value: string): boolean => {
+/** True calendar-date check for `YYYY-MM-DD` strings (rejects e.g. `2024-02-30`). */
+export const isValidCalendarDate = (value: string): boolean => {
 	const match = DATE_PATTERN.exec(value)
 	if (!match) {
 		return false
