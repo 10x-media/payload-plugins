@@ -186,6 +186,7 @@ export type {
 export { resolveConsentSources } from './consent/registry'
 export { resolveConsentLinks } from './consent/resolveConsentLinks'
 export { resolvePublishedVersionRef } from './consent/resolvePublishedVersionRef'
+export { fileMimeTypeOptions } from './fields/builtin/file'
 export { defineFormField } from './fields/defineFormField'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from './fields/registry'
 export type {
@@ -230,6 +231,7 @@ export type {
 	SpamOption,
 } from './spam/types'
 export { captureFileRef } from './uploads/captureFileRef'
+export { formatBytes } from './uploads/formatBytes'
 export { resolveFileRef } from './uploads/resolveFileRef'
 export type { FileFieldConfig, FileRef, FileRefError } from './uploads/types'
 export { defineValidationRule } from './validation/defineValidationRule'
