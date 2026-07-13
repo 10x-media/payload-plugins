@@ -13,13 +13,17 @@ pnpm add @10x-media/form-builder
 
 ```ts title="payload.config.ts"
 import { buildConfig } from 'payload'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { formBuilder } from '@10x-media/form-builder'
 
 export default buildConfig({
   // ...
+  editor: lexicalEditor(),
   plugins: [formBuilder()],
 })
 ```
+
+The plugin's notification bodies are rich text fields that inherit your project's `editor`, so the config must set one (any editor works; Payload throws `MissingEditorProp` at startup otherwise). See [rich text bodies](/form-builder/actions#rich-text-bodies).
 
 This registers three collections under a **Forms** admin group: `forms` (the documents editors author), `form-submissions` (typed, validated responses), and `form-uploads` (backing the file field).
 
