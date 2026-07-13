@@ -26,7 +26,9 @@ export const buildPayload = (args: {
 	req: PayloadRequest
 }): WebhookBody => {
 	const { deliveryId, collection, operation, doc, previousDoc, occurredAt, config, req } = args
-	const data = config?.transform ? config.transform({ doc, previousDoc, operation, req }) : doc
+	const data = config?.transform
+		? config.transform({ doc, previousDoc, operation, req, target: 'data' })
+		: doc
 	const body: WebhookBody = {
 		id: deliveryId,
 		event: eventId(collection, operation),
@@ -36,7 +38,9 @@ export const buildPayload = (args: {
 		data,
 	}
 	if (operation === 'update' && config?.includePreviousData && previousDoc) {
-		body.previousData = previousDoc
+		body.previousData = config?.transform
+			? config.transform({ doc: previousDoc, operation, req, target: 'previousData' })
+			: previousDoc
 	}
 	return body
 }

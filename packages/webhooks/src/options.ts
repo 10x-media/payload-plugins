@@ -8,11 +8,18 @@ export type WebhookOperation = 'create' | 'update' | 'delete'
 export type CollectionWebhookConfig = {
 	operations?: WebhookOperation[]
 	includePreviousData?: boolean
+	/**
+	 * Reshape or redact a document before it is sent. Applied to the body's `data` and,
+	 * when `includePreviousData` is set, to `previousData` as well, so redaction cannot
+	 * be bypassed through the prior document. `target` names the slot being built; on
+	 * the `previousData` call `doc` is the prior document and `previousDoc` is undefined.
+	 */
 	transform?: (args: {
 		doc: Record<string, unknown>
 		previousDoc?: Record<string, unknown>
 		operation: WebhookOperation
 		req: PayloadRequest
+		target: 'data' | 'previousData'
 	}) => unknown
 }
 

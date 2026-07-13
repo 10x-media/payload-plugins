@@ -60,11 +60,14 @@ export const redeliverDelivery = async (args: {
 		payload,
 		req,
 	})
-	if (!subscription) {
+	if (!subscription?.enabled) {
 		await payload.update({
 			collection: deps.deliveriesSlug,
 			id: newId,
-			data: { status: 'dead', error: 'subscription not found' },
+			data: {
+				status: 'dead',
+				error: subscription ? 'subscription disabled' : 'subscription not found',
+			},
 			overrideAccess: true,
 			req,
 		})
