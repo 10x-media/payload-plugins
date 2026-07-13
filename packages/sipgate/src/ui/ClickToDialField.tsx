@@ -53,7 +53,13 @@ const ClickToDialField: TextFieldServerComponent = async ({ field, path, readOnl
 			depth: 0,
 			overrideAccess: true,
 		})
-		initialDevices = result.docs as SipgateDevice[]
+		initialDevices = result.docs.map((doc) => ({
+			id: doc.sipgateId as string,
+			alias: (doc.alias as string | undefined) ?? (doc.sipgateId as string),
+			type: doc.type as string,
+			online: Boolean(doc.online),
+			dnd: Boolean(doc.dnd),
+		}))
 	} catch {}
 
 	let initialChannels: SipgateChannel[] = []
@@ -68,8 +74,8 @@ const ClickToDialField: TextFieldServerComponent = async ({ field, path, readOnl
 				overrideAccess: true,
 			})
 			initialChannels = result.docs.map((doc) => ({
-				id: doc.id as string,
-				name: (doc.name as string | undefined) ?? (doc.id as string),
+				id: doc.sipgateId as string,
+				name: (doc.name as string | undefined) ?? (doc.sipgateId as string),
 			}))
 		} catch {}
 	}
