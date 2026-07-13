@@ -1,5 +1,15 @@
 # @10x-media/webhooks
 
+## 0.1.0-beta.2
+
+### Patch Changes
+
+- `transform` now also applies to `previousData` on update deliveries, closing a gap where the prior document shipped unredacted when `includePreviousData` and a redacting `transform` were combined. The transform args gain a `target` field (`'data'` or `'previousData'`) naming the slot being built; on the `previousData` call `doc` is the prior document. Existing transforms need no change and now redact both slots.
+
+  Redelivery (and queued delivery attempts) short-circuit to a `dead` row when the subscription has been disabled, matching the dispatch path. Docs now state that redelivery targets the subscription's current URL.
+
+- Redelivered delivery rows now store the subscription's current URL as `endpoint` instead of the stale URL captured on the original delivery. The subscription is resolved before the new row is created (in both queue and inline modes), so `endpoint` reflects where the retry actually targets. Missing and disabled subscriptions still dead-row without sending; a missing subscription falls back to the original endpoint, while a disabled one stores its live URL.
+
 ## 0.1.0-beta.1
 
 ### Minor Changes
