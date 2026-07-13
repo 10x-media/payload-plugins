@@ -22,7 +22,7 @@ On the frontend, [`<Form>`](/form-builder/rendering) renders headless: progressi
 
 Around the submission itself: [recall and prefill](/form-builder/recall-prefill) pipe earlier answers into labels and seed values from URL parameters, [calculations](/form-builder/calculations) derive totals and quiz scores through a no-eval expression engine recomputed on the server, [consent](/form-builder/consent) is captured with proof by reference and policy-version capture, and [file uploads](/form-builder/uploads) ride a dedicated collection with server-enforced MIME and size limits. Stored submissions trigger [post-submit actions](/form-builder/actions) (email, confirmation, signed webhook, custom) through Payload jobs with a bounded inline fallback, and [polls and aggregation](/form-builder/polls) turn them into publishable results via a gated endpoint, `<FormResults>`, and a turnkey `<Poll>`.
 
-[Spam protection](/form-builder/spam) is on by default: a honeypot decoy and per-identity rate limiting, a captcha seam, upload-ownership scoping, and privacy-first metadata capture. Every admin string is a [typed translation](/form-builder/i18n) following the shared plugin pattern.
+[Spam protection](/form-builder/spam) is on by default: a honeypot decoy and per-identity rate limiting, bundled captcha adapters (Turnstile, reCAPTCHA, hCaptcha), upload-ownership scoping, and privacy-first metadata capture. Every admin string is a [typed translation](/form-builder/i18n) following the shared plugin pattern.
 
 ## The trust model
 
