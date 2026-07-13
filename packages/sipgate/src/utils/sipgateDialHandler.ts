@@ -24,10 +24,16 @@ export const createSipgateDialHandler =
 		if (denied) return denied
 
 		if (!req.json) {
+			req.payload.logger.warn('[sipgate:dial] request has no JSON body')
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
 		const { callee, deviceId: bodyDeviceId, channelId: bodyChannelId } = await req.json()
+		req.payload.logger.info(
+			{ callee, bodyDeviceId, bodyChannelId, authType: credentials.authType, userId: req.user?.id },
+			'[sipgate:dial] incoming dial request'
+		)
 		if (!callee) {
+			req.payload.logger.warn('[sipgate:dial] callee missing')
 			return Response.json({ error: 'callee is required' }, { status: 400 })
 		}
 
@@ -121,6 +127,10 @@ const handleOAuth2Dial = async ({
 
 	const sipgateUser = result.docs[0] as Record<string, unknown> | undefined
 	if (!sipgateUser) {
+		req.payload.logger.warn(
+			{ userId: req.user.id, sipgateUsersSlug },
+			'[sipgate:dial] no sipgate user doc linked to payload user'
+		)
 		return Response.json(
 			{ error: 'No Sipgate account connected. Authenticate via OAuth first.' },
 			{ status: 400 }
@@ -131,6 +141,15 @@ const handleOAuth2Dial = async ({
 	const refreshToken = sipgateUser.refreshToken as string | undefined
 
 	if (!accessToken || !refreshToken) {
+		req.payload.logger.warn(
+			{
+				docId: sipgateUser.id,
+				hasAccessToken: Boolean(accessToken),
+				hasRefreshToken: Boolean(refreshToken),
+				needsReconnect: sipgateUser.needsReconnect,
+			},
+			'[sipgate:dial] oauth tokens missing on sipgate user doc'
+		)
 		return Response.json(
 			{ error: 'Sipgate OAuth tokens missing. Please reconnect.' },
 			{ status: 400 }
@@ -178,8 +197,24 @@ const handleOAuth2Dial = async ({
 	const channelId = bodyChannelId ?? (sipgateUser.defaultChannel as string | undefined)
 
 	if (!deviceId) {
+		req.payload.logger.warn(
+			{ docId: sipgateUser.id, defaultDevice: sipgateUser.defaultDevice },
+			'[sipgate:dial] no deviceId (body + defaultDevice both empty)'
+		)
 		return Response.json({ error: 'deviceId not configured' }, { status: 500 })
 	}
+
+	if (!channelId) {
+		req.payload.logger.warn(
+			{ docId: sipgateUser.id, defaultChannel: sipgateUser.defaultChannel },
+			'[sipgate:dial] no channelId (body + defaultChannel both empty); Dial will throw'
+		)
+	}
+
+	req.payload.logger.info(
+		{ callee, deviceId, channelId, callerId: credentials.callerId ?? deviceId, realm },
+		'[sipgate:dial] posting to sipgate /calls (oauth2)'
+	)
 
 	const response = await Dial(rest, {
 		callee,
@@ -191,7 +226,19 @@ const handleOAuth2Dial = async ({
 
 	if (!response.ok) {
 		const text = await response.text()
+		req.payload.logger.error(
+			{
+				status: response.status,
+				statusText: response.statusText,
+				detail: text,
+				callee,
+				deviceId,
+				channelId,
+			},
+			'[sipgate:dial] sipgate /calls returned non-2xx'
+		)
 		return Response.json({ error: 'Failed to dial', detail: text }, { status: response.status })
 	}
+	req.payload.logger.info({ callee, deviceId, channelId }, '[sipgate:dial] dial succeeded')
 	return Response.json({ success: true }, { status: 200 })
 }
