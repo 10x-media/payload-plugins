@@ -46,6 +46,7 @@ describe('validateExpression', () => {
 type FieldWithJSONShape = {
 	name: string
 	jsonSchema?: { fileMatch: string[]; schema: unknown; uri: string }
+	typescriptSchema?: Array<(args: { jsonSchema: unknown }) => unknown>
 	admin?: {
 		description?: (args: { t: (key: string, vars?: Record<string, unknown>) => string }) => string
 	}
@@ -60,6 +61,14 @@ describe('calculationField expression config', () => {
 		expect(expressionField?.jsonSchema).toBeDefined()
 		expect(expressionField?.jsonSchema?.uri).toContain('calc-expression.json')
 		expect(expressionField?.jsonSchema?.fileMatch).toEqual([expressionField?.jsonSchema?.uri])
+	})
+
+	it('gives type generation a flat, $ref-free schema via typescriptSchema', () => {
+		const overrides = expressionField?.typescriptSchema
+		expect(overrides).toHaveLength(1)
+		const generated = overrides?.[0]?.({ jsonSchema: expressionField?.jsonSchema?.schema })
+		expect(generated).toEqual({ type: 'object' })
+		expect(JSON.stringify(generated)).not.toContain('$ref')
 	})
 
 	it('renders a description that keeps JSON braces intact through Payload-style t()', () => {

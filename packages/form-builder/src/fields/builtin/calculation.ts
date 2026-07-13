@@ -108,6 +108,9 @@ export const calculationField = defineFormField<'number'>({
 			label: labelFor(keys.configExpression),
 			admin: { description: labelFor(keys.configExpressionDescription) },
 			jsonSchema: calcExpressionSchema,
+			// generate:types embeds jsonSchema.schema into the config-level schema, where its
+			// document-root-relative $refs cannot resolve; hand type generation a flat shape instead.
+			typescriptSchema: [() => ({ type: 'object' })],
 			validate: validateExpression,
 		},
 		{
