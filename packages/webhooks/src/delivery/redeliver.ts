@@ -29,11 +29,20 @@ export const redeliverDelivery = async (args: {
 		overrideAccess: true,
 		req,
 	})
+	// Resolved up front (cheap) so the new row's endpoint reflects the subscription's current URL
+	// rather than whatever was stored at the time of the original delivery.
+	const subscription = await resolveSubscriptionById({
+		id: String(original.subscriptionId),
+		codeSubscriptions: deps.codeSubscriptions,
+		subscriptionsSlug: deps.subscriptionsSlug,
+		payload,
+		req,
+	})
 	const created = await payload.create({
 		collection: deps.deliveriesSlug,
 		data: {
 			subscriptionId: original.subscriptionId,
-			endpoint: original.endpoint,
+			endpoint: subscription?.url ?? original.endpoint,
 			event: original.event,
 			payload: original.payload,
 			status: 'pending',
@@ -45,6 +54,8 @@ export const redeliverDelivery = async (args: {
 	const newId = String(created.id)
 
 	if (deps.mode === 'queue') {
+		// deliverTask re-resolves the subscription (and re-checks enabled) when it runs, so no
+		// missing/disabled gate is needed here.
 		await payload.jobs.queue({
 			task: WEBHOOK_DELIVER_TASK,
 			input: { deliveryId: newId },
@@ -53,13 +64,6 @@ export const redeliverDelivery = async (args: {
 		return { id: newId }
 	}
 
-	const subscription = await resolveSubscriptionById({
-		id: String(original.subscriptionId),
-		codeSubscriptions: deps.codeSubscriptions,
-		subscriptionsSlug: deps.subscriptionsSlug,
-		payload,
-		req,
-	})
 	if (!subscription?.enabled) {
 		await payload.update({
 			collection: deps.deliveriesSlug,
