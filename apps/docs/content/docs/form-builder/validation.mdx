@@ -7,7 +7,7 @@ Validation is declarative and server-authoritative. Editors attach rules to fiel
 
 ## Built-in rules
 
-`minLength`, `maxLength`, `min`, `max`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`. Two are special: `matchesField` is cross-field, validating one answer against another (confirm-email style), and `notAlreadySubmitted` is async and server-only, because it queries existing submissions.
+`minLength`, `maxLength`, `min`, `max`, `minDate`, `maxDate`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`. `minDate` / `maxDate` apply to [date fields](/form-builder/fields#date) and compare ISO `YYYY-MM-DD` strings against the configured bound. Two are special: `matchesField` is cross-field, validating one answer against another (confirm-email style), and `notAlreadySubmitted` is async and server-only, because it queries existing submissions.
 
 Every rule instance can override its message (with `{var}` interpolation for rule parameters) and its severity: an `error` blocks submission, a `warning` is advisory and does not.
 
