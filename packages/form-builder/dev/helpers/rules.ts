@@ -1,4 +1,8 @@
-import { defineValidationRule, type ValidationRuleOption } from '../../src/index'
+import {
+	type AnyValidationRuleDefinition,
+	defineValidationRule,
+	type ValidationRuleOption,
+} from '../../src/index'
 
 export const dateMinRule = defineValidationRule<{ min: string }, string>({
 	type: 'dateMin',
@@ -24,4 +28,4 @@ export const dateMaxRule = defineValidationRule<{ max: string }, string>({
 	},
 }) as ValidationRuleOption
 
-export const customRules = [dateMinRule, dateMaxRule]
+export const customRules = [dateMinRule, dateMaxRule] as AnyValidationRuleDefinition[]

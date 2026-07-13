@@ -1,6 +1,6 @@
 'use client'
 
-import { defineFieldRenderer } from '@10x-media/form-builder/react'
+import { defineFieldRenderer, type RendererOption } from '@10x-media/form-builder/react'
 import { useId } from 'react'
 
 export const dateRenderer = defineFieldRenderer<string>(
@@ -57,4 +57,4 @@ export const dateRenderer = defineFieldRenderer<string>(
 			</div>
 		)
 	}
-)
+) as RendererOption

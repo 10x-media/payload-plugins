@@ -6,7 +6,7 @@ import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { defineFormField, type FieldTypeOption, formBuilder } from '../src/index'
+import { defineCaptchaProvider, defineFormField, type FieldTypeOption, formBuilder } from '../src/index'
 import { forwardAction } from './helpers/actions'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { customRules } from './helpers/rules'
@@ -64,20 +64,20 @@ export default buildConfig({
 				forward: forwardAction,
 			},
 			spam: {
-				// captcha: defineCaptchaProvider({
-				// 	type: 'turnstile',
-				// 	verify: async ({ token }) => {
-				// 		const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-				// 			method: 'POST',
-				// 			headers: { 'Content-Type': 'application/json' },
-				// 			body: JSON.stringify({
-				// 				secret: '0x4AAAAAADzK49qKscc6GTFsbwTMvjNAjtY',
-				// 				response: token,
-				// 			}),
-				// 		})
-				// 		return ((await res.json()) as { success: boolean }).success
-				// 	},
-				// }),
+				captcha: defineCaptchaProvider({
+					type: 'turnstile',
+					verify: async ({ token }) => {
+						const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								secret: process.env.TURNSTILE_SECRET ?? '',
+								response: token,
+							}),
+						})
+						return ((await res.json()) as { success: boolean }).success
+					},
+				}),
 			},
 		}),
 	],
