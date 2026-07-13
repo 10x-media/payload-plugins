@@ -186,6 +186,7 @@ export type {
 export { resolveConsentSources } from './consent/registry'
 export { resolveConsentLinks } from './consent/resolveConsentLinks'
 export { resolvePublishedVersionRef } from './consent/resolvePublishedVersionRef'
+export { defaultFieldDefinitions, defaultFieldDefinitionsByType } from './fields/builtin'
 export { fileMimeTypeOptions } from './fields/builtin/file'
 export { defineFormField } from './fields/defineFormField'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from './fields/registry'
@@ -234,6 +235,7 @@ export { captureFileRef } from './uploads/captureFileRef'
 export { formatBytes } from './uploads/formatBytes'
 export { resolveFileRef } from './uploads/resolveFileRef'
 export type { FileFieldConfig, FileRef, FileRefError } from './uploads/types'
+export { defaultValidationRules, defaultValidationRulesByType } from './validation/builtin'
 export { defineValidationRule } from './validation/defineValidationRule'
 export type {
 	ValidationRuleOption,

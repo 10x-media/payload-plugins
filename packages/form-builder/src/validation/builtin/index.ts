@@ -28,3 +28,12 @@ export const defaultValidationRules: AnyValidationRuleDefinition[] = [
 	matchesFieldRule as AnyValidationRuleDefinition,
 	notAlreadySubmittedRule as AnyValidationRuleDefinition,
 ]
+
+/**
+ * `defaultValidationRules` indexed by `type`, so a single built-in can be spread and tweaked
+ * without hand-rolling a `.find()`, e.g.
+ * `rules: { minLength: { ...defaultValidationRulesByType.minLength, message: myMessage } }`. The
+ * `rules` plugin option replaces a built-in of the same `type`; `false` removes it, `true` keeps it.
+ */
+export const defaultValidationRulesByType: Record<string, AnyValidationRuleDefinition> =
+	Object.fromEntries(defaultValidationRules.map((rule) => [rule.type, rule]))

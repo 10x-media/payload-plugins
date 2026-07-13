@@ -11,12 +11,12 @@ describe('formBuilder factory', () => {
 	})
 
 	it('applies the translations option', async () => {
-		const plugin = formBuilder({ translations: { de: { [keys.pluginName]: 'Formulare' } } })
+		const plugin = formBuilder({ translations: { de: { [keys.fieldTitle]: 'Titel' } } })
 		const config = { collections: [] } as unknown as Config
 		const out = await Promise.resolve(plugin(config))
 		const i18n = out.i18n?.translations as Record<string, Record<string, Record<string, string>>>
-		expect(i18n.de?.formBuilder?.pluginName).toBe('Formulare')
-		expect(i18n.en?.formBuilder?.pluginName).toBe('Form Builder')
+		expect(i18n.de?.formBuilder?.fieldTitle).toBe('Titel')
+		expect(i18n.en?.formBuilder?.fieldTitle).toBe('Title')
 	})
 
 	it('returns the config untouched when disabled', async () => {

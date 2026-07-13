@@ -48,7 +48,7 @@ import {
 } from '@10x-media/jobs/i18n'
 ```
 
-Keys are namespaced strings in Payload's `namespace:key` format (`jobs:pluginName`, `analytics:metricPageviews`, `formBuilder:pluginName`, `webhooks:redeliver`, `automations:pluginName`). Always reference them through the `keys` object rather than string literals; the constants are the contract, the literal values are an implementation detail.
+Keys are namespaced strings in Payload's `namespace:key` format (`jobs:pluginName`, `analytics:metricPageviews`, `formBuilder:fieldTitle`, `webhooks:redeliver`, `automations:pluginName`). Always reference them through the `keys` object rather than string literals; the constants are the contract, the literal values are an implementation detail.
 
 Each plugin also aliases its key union under a plugin-specific name (`JobsTranslationKeys`, `AnalyticsTranslationKeys`, and so on) for imports that mix several plugins.
 

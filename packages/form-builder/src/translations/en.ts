@@ -6,7 +6,6 @@ import { keys, type TranslationKey } from './keys'
  * unknown key a type error. `translations/index.ts` nests these for Payload.
  */
 export const en: Record<TranslationKey, string> = {
-	[keys.pluginName]: 'Form Builder',
 	[keys.fieldTitle]: 'Title',
 	[keys.fieldTypeText]: 'Text',
 	[keys.fieldTypeTextarea]: 'Long text',
@@ -82,7 +81,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.conditionNoFields]: 'Add named fields to this form to build a condition.',
 	[keys.conditionEmpty]: 'No conditions. This field is always shown.',
 	[keys.conditionSelectField]: 'Select a field',
-	[keys.conditionValuePlaceholder]: 'Value',
 	[keys.conditionTrue]: 'True',
 	[keys.conditionFalse]: 'False',
 	[keys.configHidden]: 'Hidden (capture without showing)',
@@ -136,7 +134,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.consentConfigSource]: 'Source',
 	[keys.consentConfigSourceConfig]: 'Source settings',
 	[keys.consentConfigOptional]: 'Optional (e.g. marketing)',
-	[keys.resultsTitle]: 'Results',
 	[keys.resultsResponses]: 'responses',
 	[keys.resultsNoResponses]: 'No responses yet',
 	[keys.resultsTruncated]: 'Showing a sample of responses',

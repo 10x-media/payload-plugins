@@ -4,7 +4,6 @@
  * value in every locale (`en.ts`), or it is a type error.
  */
 export const keys = {
-	pluginName: 'formBuilder:pluginName',
 	fieldTitle: 'formBuilder:fieldTitle',
 	fieldTypeText: 'formBuilder:fieldType.text',
 	fieldTypeTextarea: 'formBuilder:fieldType.textarea',
@@ -80,7 +79,6 @@ export const keys = {
 	conditionNoFields: 'formBuilder:condition.noFields',
 	conditionEmpty: 'formBuilder:condition.empty',
 	conditionSelectField: 'formBuilder:condition.selectField',
-	conditionValuePlaceholder: 'formBuilder:condition.value',
 	conditionTrue: 'formBuilder:condition.true',
 	conditionFalse: 'formBuilder:condition.false',
 	configHidden: 'formBuilder:config.hidden',
@@ -129,7 +127,6 @@ export const keys = {
 	consentConfigSource: 'formBuilder:consent.config.source',
 	consentConfigSourceConfig: 'formBuilder:consent.config.sourceConfig',
 	consentConfigOptional: 'formBuilder:consent.config.optional',
-	resultsTitle: 'formBuilder:results.title',
 	resultsResponses: 'formBuilder:results.responses',
 	resultsNoResponses: 'formBuilder:results.noResponses',
 	resultsTruncated: 'formBuilder:results.truncated',

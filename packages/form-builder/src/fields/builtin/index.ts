@@ -26,3 +26,12 @@ export const defaultFieldDefinitions: AnyFormFieldDefinition[] = [
 	repeaterField as AnyFormFieldDefinition,
 	dateField as AnyFormFieldDefinition,
 ]
+
+/**
+ * `defaultFieldDefinitions` indexed by `type`, so a single built-in can be spread and tweaked
+ * without hand-rolling a `.find()`, e.g.
+ * `fields: { text: { ...defaultFieldDefinitionsByType.text, validate: myValidate } }`. The
+ * `fields` plugin option replaces a built-in of the same `type`; `false` removes it, `true` keeps it.
+ */
+export const defaultFieldDefinitionsByType: Record<string, AnyFormFieldDefinition> =
+	Object.fromEntries(defaultFieldDefinitions.map((definition) => [definition.type, definition]))
