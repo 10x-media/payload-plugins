@@ -93,14 +93,14 @@ export default buildConfig({
 		},
 	},
 	email: nodemailerAdapter({
-		defaultFromAddress: 'test@test.com',
-		defaultFromName: 'Tester',
+		defaultFromAddress: process.env.SMTP_FROM_ADDRESS ?? 'test@test.com',
+		defaultFromName: process.env.SMTP_FROM_NAME ?? 'Tester',
 		transportOptions: {
-			host: 'smtp.gmail.com',
-			port: 465,
+			host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
+			port: Number(process.env.SMTP_PORT) || 465,
 			auth: {
-				user: 'hassine427@gmail.com',
-				pass: 'ctzw wlzw vdna mhsn',
+				user: process.env.SMTP_USER ?? 'test@gmail.com',
+				pass: process.env.SMTP_PASS ?? '',
 			},
 		},
 	}),
