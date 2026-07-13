@@ -1,3 +1,5 @@
+import type { RichTextBodyOption } from './body/serializeBody'
+import { makeRenderBody } from './body/serializeBody'
 import type { ActionRunArgs } from './defineAction'
 import type { ActionRegistry } from './registry'
 
@@ -6,9 +8,10 @@ export type ActionInstance = { blockType: string; [key: string]: unknown }
 
 export type ActionResult = { type: string; ok: boolean; error?: string }
 
-export type RunActionsArgs = Omit<ActionRunArgs, 'config'> & {
+export type RunActionsArgs = Omit<ActionRunArgs, 'config' | 'renderBody'> & {
 	actions: ActionInstance[]
 	registry: ActionRegistry
+	richText?: RichTextBodyOption
 }
 
 /**
@@ -16,7 +19,8 @@ export type RunActionsArgs = Omit<ActionRunArgs, 'config'> & {
  * and never breaks the others or the caller.
  */
 export const runActions = async (args: RunActionsArgs): Promise<ActionResult[]> => {
-	const { actions, registry, ...ctx } = args
+	const { actions, registry, richText, ...ctx } = args
+	const renderBody = makeRenderBody({ values: ctx.values, descriptors: ctx.descriptors, richText })
 	const results: ActionResult[] = []
 	for (const instance of actions) {
 		const definition = registry.get(instance.blockType)
@@ -24,7 +28,7 @@ export const runActions = async (args: RunActionsArgs): Promise<ActionResult[]> 
 			continue
 		}
 		try {
-			await definition.run({ ...ctx, config: instance })
+			await definition.run({ ...ctx, renderBody, config: instance })
 			results.push({ type: instance.blockType, ok: true })
 		} catch (error) {
 			results.push({

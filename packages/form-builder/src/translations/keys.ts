@@ -98,6 +98,7 @@ export const keys = {
 	actionConfigTo: 'formBuilder:action.config.to',
 	actionConfigSubject: 'formBuilder:action.config.subject',
 	actionConfigBody: 'formBuilder:action.config.body',
+	actionConfigBodyDescription: 'formBuilder:action.config.bodyDescription',
 	actionConfigToField: 'formBuilder:action.config.toField',
 	actionConfigUrl: 'formBuilder:action.config.url',
 	actionConfigSecret: 'formBuilder:action.config.secret',

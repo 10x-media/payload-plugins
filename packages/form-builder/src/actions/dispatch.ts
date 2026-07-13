@@ -1,4 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
+import type { RichTextBodyOption } from './body/serializeBody'
 import type { ActionRegistry } from './registry'
 import type { ActionInstance } from './runActions'
 import { ACTIONS_TASK_SLUG, runActionsForSubmission } from './task'
@@ -16,6 +17,7 @@ export type DispatchActionsArgs = {
 	/** Whether a job runner is likely present (queued path); otherwise the bounded-inline fallback runs. */
 	hasRunner: boolean
 	deadlineMs?: number
+	richText?: RichTextBodyOption
 }
 
 const canQueue = (payload: Payload): boolean => typeof payload.jobs?.queue === 'function'
@@ -64,6 +66,7 @@ export const dispatchActions = async (args: DispatchActionsArgs): Promise<void> 
 		registry,
 		payload,
 		req,
+		richText: args.richText,
 	}).catch((error) => {
 		payload.logger?.error(
 			`@10x-media/form-builder: inline action dispatch for submission ${String(submissionId)} threw: ${

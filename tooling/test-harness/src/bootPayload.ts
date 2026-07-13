@@ -1,6 +1,7 @@
 // biome-ignore-all lint/plugin/noProcessEnv: test harness env boundary (TEST_DB)
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type Config, getPayload, type Payload, type Plugin } from 'payload'
 import { type MongoTestDb, startMongo } from './db/mongo'
 import { type MongoContainerDb, startMongoContainer } from './db/mongo-container'
@@ -107,6 +108,8 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 		secret: 'test-secret-not-for-prod',
 		db: adapter,
 		collections: options.collections ?? [],
+		// Plugins registering richText fields need a config editor or sanitize throws MissingEditorProp
+		editor: lexicalEditor(),
 		typescript: { autoGenerate: false, outputFile: '/dev/null' },
 		admin: { importMap: { autoGenerate: false } },
 		telemetry: false,

@@ -13,6 +13,8 @@ export type ActionRunArgs<TConfig extends Record<string, unknown> = Record<strin
 	req?: PayloadRequest
 	locale: string
 	t: Translate
+	/** Serialize a rich text (or legacy string) body config into channel-ready HTML. */
+	renderBody: (body: unknown) => Promise<string>
 }
 
 /**

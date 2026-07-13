@@ -100,6 +100,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigTo]: 'To',
 	[keys.actionConfigSubject]: 'Subject',
 	[keys.actionConfigBody]: 'Body',
+	[keys.actionConfigBodyDescription]:
+		'Supports {{ fieldName|fallback }} tokens, {{*}} for all answers as lines, and {{*:table}} for all answers as a table.',
 	[keys.actionConfigToField]: 'Email field name',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigSecret]: 'Secret',

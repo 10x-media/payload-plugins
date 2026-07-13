@@ -1,9 +1,10 @@
 import { interpolate } from '../../recall/interpolate'
 import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
+import { resolverFor } from '../body/serializeBody'
 import { defineAction } from '../defineAction'
 
-type ConfirmationConfig = { toField?: string; subject?: string; body?: string }
+type ConfirmationConfig = { toField?: string; subject?: string; body?: unknown }
 
 export const confirmation = defineAction<ConfirmationConfig>({
 	type: 'confirmation',
@@ -11,17 +12,22 @@ export const confirmation = defineAction<ConfirmationConfig>({
 	config: [
 		{ name: 'toField', type: 'text', label: labelFor(keys.actionConfigToField) },
 		{ name: 'subject', type: 'text', label: labelFor(keys.actionConfigSubject) },
-		{ name: 'body', type: 'textarea', label: labelFor(keys.actionConfigBody) },
+		{
+			name: 'body',
+			type: 'richText',
+			label: labelFor(keys.actionConfigBody),
+			admin: { description: labelFor(keys.actionConfigBodyDescription) },
+		},
 	],
 	run: async (args) => {
-		const { config, values, payload } = args
+		const { config, values, payload, renderBody } = args
 
 		if (!config.toField) {
 			return
 		}
 
-		const entry = values.find((v) => v.field === config.toField)
-		const to = entry == null ? '' : String(entry.value ?? '')
+		const resolve = resolverFor(values)
+		const to = resolve(config.toField)
 
 		if (!to) {
 			return
@@ -31,13 +37,8 @@ export const confirmation = defineAction<ConfirmationConfig>({
 			throw new Error('confirmation: no email adapter configured')
 		}
 
-		const resolve = (name: string) => {
-			const found = values.find((v) => v.field === name)
-			return found == null ? '' : String(found.value ?? '')
-		}
-
 		const subject = interpolate(config.subject ?? '', resolve)
-		const html = interpolate(config.body ?? '', resolve)
+		const html = await renderBody(config.body)
 
 		await payload.sendEmail({ to, subject, html })
 	},
