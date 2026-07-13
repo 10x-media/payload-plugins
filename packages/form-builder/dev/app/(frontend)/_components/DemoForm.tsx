@@ -1,7 +1,14 @@
 'use client'
 
-import { Form, type FormDocument } from '@10x-media/form-builder/react'
-import { useEffect, useRef, useState } from 'react'
+import {
+	Form,
+	type FormDocument,
+	type FormFieldInstance,
+	buildFieldTypeRegistry,
+	valuesFromSearchParams,
+} from '@10x-media/form-builder/react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { customRules } from '../../../helpers/rules'
 import { dateRenderer } from './fields/date'
 
@@ -24,6 +31,13 @@ const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
 export function DemoForm({ form }: { form: unknown }) {
 	const [captchaToken, setCaptchaToken] = useState<string | undefined>()
 	const widgetIdRef = useRef<string>('')
+	const searchParams = useSearchParams()
+	const doc = form as FormDocument
+
+	const initialValues = useMemo(
+		() => valuesFromSearchParams(searchParams, doc.fields as FormFieldInstance[], buildFieldTypeRegistry()),
+		[searchParams, doc.fields],
+	)
 
 	useEffect(() => {
 		const script = document.createElement('script')
@@ -55,10 +69,11 @@ export function DemoForm({ form }: { form: unknown }) {
 			<h1>Demo form</h1>
 			<div id="turnstile-widget" style={{ marginBottom: '1rem' }} />
 			<Form
-				form={form as FormDocument}
+				form={doc}
 				renderers={{ date: dateRenderer }}
 				rules={customRules}
 				captchaToken={captchaToken}
+				initialValues={initialValues}
 			/>
 		</main>
 	)
