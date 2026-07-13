@@ -8,6 +8,16 @@ export { evaluateCondition } from '../conditions/evaluate'
 export { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
 export type { PrefillOptions } from '../prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from '../prefill/valuesFromSearchParams'
+export type { HcaptchaCaptchaProps } from '../react/captcha/HcaptchaCaptcha'
+export { HCAPTCHA_SCRIPT_URL, HcaptchaCaptcha } from '../react/captcha/HcaptchaCaptcha'
+export type {
+	RecaptchaCaptchaHandle,
+	RecaptchaCaptchaProps,
+} from '../react/captcha/RecaptchaCaptcha'
+export { RECAPTCHA_SCRIPT_URL, RecaptchaCaptcha } from '../react/captcha/RecaptchaCaptcha'
+export type { TurnstileCaptchaProps } from '../react/captcha/TurnstileCaptcha'
+export { TURNSTILE_SCRIPT_URL, TurnstileCaptcha } from '../react/captcha/TurnstileCaptcha'
+export type { CaptchaWidgetHandle } from '../react/captcha/types'
 export { cn } from '../react/cn'
 export type { FieldRenderer, FieldRendererProps, RendererTranslate } from '../react/contract'
 export { defineFieldRenderer } from '../react/contract'

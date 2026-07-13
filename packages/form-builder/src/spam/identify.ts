@@ -1,3 +1,4 @@
+import { firstHop } from './clientIp'
 import type { IdentifyFn } from './types'
 
 /**
@@ -12,12 +13,6 @@ export const defaultIdentify =
 		if (userId != null) {
 			return `user:${String(userId)}`
 		}
-		const header = req.headers?.get(ipHeader)
-		if (header) {
-			const first = header.split(',')[0]?.trim()
-			if (first) {
-				return `ip:${first}`
-			}
-		}
-		return null
+		const ip = firstHop(req.headers, ipHeader)
+		return ip ? `ip:${ip}` : null
 	}
