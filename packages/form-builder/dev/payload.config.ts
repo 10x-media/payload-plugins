@@ -64,6 +64,7 @@ export default buildConfig({
 				forward: forwardAction,
 			},
 			spam: {
+				metadata: { ip: true, ua: true },
 				captcha: defineCaptchaProvider({
 					type: 'turnstile',
 					verify: async ({ token }) => {
