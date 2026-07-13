@@ -189,25 +189,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             validations?:
               | (
                   | {
@@ -279,6 +260,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'text';
@@ -290,25 +290,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             validations?:
               | (
                   | {
@@ -380,6 +361,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'textarea';
@@ -391,25 +391,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             validations?:
               | (
                   | {
@@ -461,6 +442,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'email';
@@ -472,25 +472,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             validations?:
               | (
                   | {
@@ -526,6 +507,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'number';
@@ -537,25 +537,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             options?:
               | {
                   label: string;
@@ -595,6 +576,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'select';
@@ -606,25 +606,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             validations?:
               | (
                   | {
@@ -644,6 +625,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'checkbox';
@@ -655,25 +655,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             expression?: {
               [k: string]: unknown;
             };
@@ -697,6 +678,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'calculation';
@@ -708,25 +708,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             statement?: string | null;
             source?: ('static' | 'pageReference') | null;
             sourceConfig?: {
@@ -758,6 +739,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'consent';
@@ -769,25 +769,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             relationTo?: string | null;
             mimeTypes?:
               | (
@@ -829,6 +810,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'file';
@@ -840,25 +840,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             minRows?: number | null;
             maxRows?: number | null;
             addLabel?: string | null;
@@ -871,25 +852,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -961,6 +923,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'text';
@@ -972,25 +953,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1062,6 +1024,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'textarea';
@@ -1073,25 +1054,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1143,6 +1105,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'email';
@@ -1154,25 +1135,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1208,6 +1170,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'number';
@@ -1219,25 +1200,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       options?:
                         | {
                             label: string;
@@ -1277,6 +1239,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'select';
@@ -1288,25 +1269,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1326,6 +1288,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'checkbox';
@@ -1337,25 +1318,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       expression?: {
                         [k: string]: unknown;
                       };
@@ -1379,6 +1341,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'calculation';
@@ -1390,25 +1371,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       statement?: string | null;
                       source?: ('static' | 'pageReference') | null;
                       sourceConfig?: {
@@ -1440,6 +1402,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'consent';
@@ -1451,25 +1432,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       relationTo?: string | null;
                       mimeTypes?:
                         | (
@@ -1511,6 +1473,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'file';
@@ -1522,25 +1503,6 @@ export interface Form {
                       width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1576,6 +1538,25 @@ export interface Form {
                               }
                           )[]
                         | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'date';
@@ -1601,6 +1582,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'repeater';
@@ -1612,25 +1612,6 @@ export interface Form {
             width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             validations?:
               | (
                   | {
@@ -1666,6 +1647,25 @@ export interface Form {
                     }
                 )[]
               | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'date';
@@ -2032,9 +2032,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               validations?:
                 | T
                 | {
@@ -2114,6 +2111,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2126,9 +2126,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               validations?:
                 | T
                 | {
@@ -2208,6 +2205,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2220,9 +2220,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               validations?:
                 | T
                 | {
@@ -2280,6 +2277,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2292,9 +2292,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               validations?:
                 | T
                 | {
@@ -2334,6 +2331,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2346,9 +2346,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               options?:
                 | T
                 | {
@@ -2391,6 +2388,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2403,9 +2403,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               validations?:
                 | T
                 | {
@@ -2427,6 +2424,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2439,9 +2439,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               expression?: T;
               calcDisplay?: T;
               validations?:
@@ -2465,6 +2462,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2477,9 +2477,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               statement?: T;
               source?: T;
               sourceConfig?:
@@ -2515,6 +2512,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2527,9 +2527,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               relationTo?: T;
               mimeTypes?: T;
               maxSize?: T;
@@ -2554,6 +2551,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -2566,9 +2566,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               minRows?: T;
               maxRows?: T;
               addLabel?: T;
@@ -2584,9 +2581,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           validations?:
                             | T
                             | {
@@ -2666,6 +2660,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2678,9 +2675,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           validations?:
                             | T
                             | {
@@ -2760,6 +2754,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2772,9 +2769,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           validations?:
                             | T
                             | {
@@ -2832,6 +2826,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2844,9 +2841,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           validations?:
                             | T
                             | {
@@ -2886,6 +2880,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2898,9 +2895,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           options?:
                             | T
                             | {
@@ -2943,6 +2937,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2955,9 +2952,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           validations?:
                             | T
                             | {
@@ -2979,6 +2973,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2991,9 +2988,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           expression?: T;
                           calcDisplay?: T;
                           validations?:
@@ -3017,6 +3011,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3029,9 +3026,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           statement?: T;
                           source?: T;
                           sourceConfig?:
@@ -3067,6 +3061,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3079,9 +3076,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           relationTo?: T;
                           mimeTypes?: T;
                           maxSize?: T;
@@ -3106,6 +3100,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3118,9 +3115,6 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          visibleWhen?: T;
-                          validateWhen?: T;
-                          hidden?: T;
                           validations?:
                             | T
                             | {
@@ -3160,6 +3154,9 @@ export interface FormsSelect<T extends boolean = true> {
                                       blockName?: T;
                                     };
                               };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3185,6 +3182,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };
@@ -3197,9 +3197,6 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               placeholder?: T;
               description?: T;
-              visibleWhen?: T;
-              validateWhen?: T;
-              hidden?: T;
               validations?:
                 | T
                 | {
@@ -3239,6 +3236,9 @@ export interface FormsSelect<T extends boolean = true> {
                           blockName?: T;
                         };
                   };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
               id?: T;
               blockName?: T;
             };

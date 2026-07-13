@@ -9,4 +9,5 @@ export default definePluginBuild({
 		'exports/rsc': 'src/exports/rsc.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 	},
+	copy: [{ from: 'src/client/admin.css', to: 'dist/client' }],
 })

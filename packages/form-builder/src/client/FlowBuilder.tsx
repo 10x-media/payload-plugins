@@ -21,6 +21,7 @@ import type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 import { ConditionBuilder } from './ConditionBuilder'
 import type { FieldRow } from './synthesizeClientField'
 import { toStaticLabel } from './toStaticLabel'
+import './admin.css'
 
 export type FlowBuilderProps = {
 	path?: string

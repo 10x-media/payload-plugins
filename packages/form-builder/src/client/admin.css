@@ -1,0 +1,192 @@
+/* Admin panel styles, imported by the client components themselves so consumers
+ * get styled admin UI without touching their layout. Relies on Payload theme variables. */
+
+/* Flow builder */
+.fb-flow-builder {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-block-end: 1rem;
+}
+.fb-flow-builder__hint {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+}
+.fb-flow-builder__steps {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.fb-flow-builder__actions {
+	margin-block-start: 0.25rem;
+}
+
+.fb-flow-step__header-content {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	overflow: hidden;
+}
+.fb-flow-step__index {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--theme-elevation-400);
+	flex-shrink: 0;
+}
+.fb-flow-step__id-preview {
+	font-size: 0.875rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fb-flow-step__id-preview em {
+	color: var(--theme-elevation-400);
+	font-style: italic;
+}
+.fb-flow-step__body {
+	padding: 0.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+.fb-flow-step__row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+.fb-flow-step__hint {
+	font-size: 0.75rem;
+	color: var(--theme-elevation-400);
+	margin: 0;
+}
+.fb-flow-step__field-picker {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 1.25rem;
+	padding-block: 0.25rem;
+}
+.fb-flow-step__transitions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding-block-start: 0.5rem;
+}
+.fb-flow-step__transitions-header {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+}
+
+.fb-flow-transition {
+	border: 1px solid var(--theme-border-color);
+	border-radius: var(--style-radius-s);
+	padding: 0.5rem 0.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.fb-flow-transition__header {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fb-flow-transition__label {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--theme-elevation-400);
+	flex-shrink: 0;
+}
+.fb-flow-transition__goto {
+	flex: 1;
+	min-width: 0;
+}
+.fb-flow-transition__actions {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	flex-shrink: 0;
+}
+.fb-flow-transition__when-label {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--theme-elevation-400);
+}
+.fb-flow-transition__condition {
+	padding-inline-start: 0.25rem;
+}
+
+/* Condition builder */
+.fb-condition-builder {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.fb-condition-builder__hint {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+}
+.fb-condition-builder__group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+	padding: 0.75rem;
+	border: 1px solid var(--theme-border-color);
+	border-radius: var(--style-radius-m);
+}
+.fb-condition-builder__or-label {
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 500;
+	text-transform: uppercase;
+	margin-block: 0.125rem;
+}
+.fb-condition-builder__and-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+.fb-condition-builder__and-label {
+	font-size: 10px;
+	font-weight: 500;
+	text-transform: uppercase;
+	padding-inline-start: 0.125rem;
+}
+.fb-condition-builder__add-condition {
+	align-self: flex-start;
+	margin-block-start: 0.25rem;
+}
+.fb-condition-builder__actions {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
+}
+.fb-condition-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+	flex-wrap: nowrap;
+}
+.fb-condition-row__field {
+	flex: 1 1 9rem;
+	min-width: 0;
+}
+.fb-condition-row__operator {
+	flex: 0 1 9rem;
+	min-width: 0;
+}
+.fb-condition-row__value {
+	flex: 1 1 9rem;
+	min-width: 0;
+}
+.fb-condition-row__remove {
+	flex-shrink: 0;
+	align-self: center;
+}

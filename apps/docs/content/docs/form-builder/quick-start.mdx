@@ -23,11 +23,7 @@ export default buildConfig({
 
 This registers three collections under a **Forms** admin group: `forms` (the documents editors author), `form-submissions` (typed, validated responses), and `form-uploads` (backing the file field).
 
-The in-admin condition and flow builders ship their layout in the bundled stylesheet. Import it once in your admin layout:
-
-```ts title="app/(payload)/layout.tsx"
-import '@10x-media/form-builder/styles.css'
-```
+The in-admin condition and flow builders ship their own styles; no admin setup is needed.
 
 ## Author a form
 
