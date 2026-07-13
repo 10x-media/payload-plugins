@@ -107,7 +107,12 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigToFieldDescription]:
 		'The email field on this form the confirmation is sent to.',
 	[keys.actionConfigUrl]: 'URL',
+	[keys.actionConfigUrlDescription]:
+		'The endpoint that receives a signed JSON POST for each submission.',
 	[keys.actionConfigSecret]: 'Secret',
+	[keys.actionConfigSecretDescription]:
+		'HMAC key used for the X-Form-Signature header, shared with the receiver.',
+	[keys.validationUrlInvalid]: 'Enter a valid http or https URL',
 	[keys.configActions]: 'Actions',
 	[keys.consentSourceStatic]: 'Static text',
 	[keys.consentSourcePageReference]: 'Page reference',

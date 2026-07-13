@@ -101,6 +101,33 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		expect(action.toField).toBe('email')
 	})
 
+	it('rejects a signedWebhook url that is not a valid http(s) URL', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Invalid webhook url',
+					fields: [],
+					actions: [{ blockType: 'signedWebhook', url: 'not-a-url', secret: 'shh' }],
+				},
+			})
+		).rejects.toThrow()
+	})
+
+	it('accepts a signedWebhook url that is a valid https URL', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Valid webhook url',
+				fields: [],
+				actions: [{ blockType: 'signedWebhook', url: 'https://example.com/hook', secret: 'shh' }],
+			},
+		})
+
+		const action = form.actions?.[0] as Record<string, unknown>
+		expect(action.url).toBe('https://example.com/hook')
+	})
+
 	it('stores a form with no actions', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',
