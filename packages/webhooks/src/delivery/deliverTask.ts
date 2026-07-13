@@ -37,11 +37,14 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 				payload,
 				req,
 			})
-			if (!subscription) {
+			if (!subscription?.enabled) {
 				await payload.update({
 					collection: deps.deliveriesSlug,
 					id: deliveryId,
-					data: { status: 'dead', error: 'subscription not found' },
+					data: {
+						status: 'dead',
+						error: subscription ? 'subscription disabled' : 'subscription not found',
+					},
 					overrideAccess: true,
 					req,
 				})

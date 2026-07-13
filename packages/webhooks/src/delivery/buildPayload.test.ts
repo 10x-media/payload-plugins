@@ -33,6 +33,58 @@ describe('buildPayload', () => {
 		expect(body.data).toEqual({ id: 'p1' })
 	})
 
+	it('applies the transform to previousData so redaction covers both slots', () => {
+		const prev = { id: 'p1', title: 'Old', secret: 'y' }
+		const body = buildPayload({
+			...base,
+			operation: 'update',
+			previousDoc: prev,
+			config: {
+				includePreviousData: true,
+				transform: ({ doc }) => ({ id: doc.id, title: doc.title }),
+			},
+		})
+		expect(body.data).toEqual({ id: 'p1', title: 'Hi' })
+		expect(body.previousData).toEqual({ id: 'p1', title: 'Old' })
+	})
+
+	it('tells the transform which slot it is building via target', () => {
+		const targets: string[] = []
+		buildPayload({
+			...base,
+			operation: 'update',
+			previousDoc: { id: 'p1', title: 'Old' },
+			config: {
+				includePreviousData: true,
+				transform: ({ target, doc }) => {
+					targets.push(target)
+					return doc
+				},
+			},
+		})
+		expect(targets).toEqual(['data', 'previousData'])
+	})
+
+	it('passes no previousDoc to the previousData transform call', () => {
+		const seen: Array<Record<string, unknown> | undefined> = []
+		buildPayload({
+			...base,
+			operation: 'update',
+			previousDoc: { id: 'p1', title: 'Old' },
+			config: {
+				includePreviousData: true,
+				transform: ({ doc, previousDoc, target }) => {
+					if (target === 'previousData') {
+						seen.push(previousDoc)
+						return doc
+					}
+					return doc
+				},
+			},
+		})
+		expect(seen).toEqual([undefined])
+	})
+
 	it('includes previousData only on update when enabled and present', () => {
 		const prev = { id: 'p1', title: 'Old' }
 		expect(
