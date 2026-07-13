@@ -142,6 +142,29 @@ describe('file renderer', () => {
 		expect(onChange).not.toHaveBeenCalled()
 	})
 
+	it('treats a zero max size as a real limit, matching the server', async () => {
+		const fetchMock = vi.fn()
+		vi.stubGlobal('fetch', fetchMock)
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				fileRenderer,
+				props({
+					field: { blockType: 'file', name: 'resume', maxSize: 0 },
+					onChange,
+					t: makeTranslate(en),
+				})
+			)
+		)
+		expect(within(container).getByText('Max size: 0 B')).toBeInTheDocument()
+		const input = container.querySelector('input[type="file"]') as HTMLInputElement
+		fireEvent.change(input, { target: { files: [pdf()] } })
+		await waitFor(() => expect(within(container).getByRole('alert')).toBeInTheDocument())
+		expect(within(container).getByText('File is too large (max 0 B)')).toBeInTheDocument()
+		expect(fetchMock).not.toHaveBeenCalled()
+		expect(onChange).not.toHaveBeenCalled()
+	})
+
 	it('uploads a file within the max size and clears a previous size error', async () => {
 		stubUpload({ ok: true, json: async () => ({ doc: { id: 'up3' } }) })
 		const onChange = vi.fn()

@@ -32,13 +32,16 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 		const collection = typeof field.relationTo === 'string' ? field.relationTo : 'form-uploads'
 		const types = typesOf(field.mimeTypes)
 		const accept = types.length > 0 ? types.join(',') : undefined
+		// Zero is a real limit, matching resolveFileRef server-side (filesize > maxSize rejects any non-empty file).
 		const maxSize =
-			typeof field.maxSize === 'number' && field.maxSize > 0 ? field.maxSize : undefined
+			typeof field.maxSize === 'number' && field.maxSize >= 0 ? field.maxSize : undefined
 		const hints = [
 			types.length > 0
 				? resolveMessage(t(keys.fileHintAccepted), { types: types.join(', ') })
 				: undefined,
-			maxSize ? resolveMessage(t(keys.fileHintMaxSize), { max: formatBytes(maxSize) }) : undefined,
+			maxSize !== undefined
+				? resolveMessage(t(keys.fileHintMaxSize), { max: formatBytes(maxSize) })
+				: undefined,
 		].filter((hint): hint is string => typeof hint === 'string')
 		const allErrors = localError ? [...errors, localError] : errors
 		// Show the just-uploaded filename, or a generic indicator when the field already holds an id (recall/prefill): the filename is not part of the client value.
@@ -50,7 +53,7 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 			if (!selected) {
 				return
 			}
-			if (maxSize && selected.size > maxSize) {
+			if (maxSize !== undefined && selected.size > maxSize) {
 				setLocalError(resolveMessage(t(keys.fileTooLarge), { max: formatBytes(maxSize) }))
 				return
 			}
