@@ -63,7 +63,29 @@ export default buildConfig({
 			actions: {
 				forward: forwardAction,
 			},
+			translations: {
+				en: {
+					'formBuilder:pluginName': 'Custom Forms',
+					'formBuilder:validation.required': 'Gotta fill this in!',
+					'formBuilder:config.required': 'Is required?',
+					'formBuilder:results.title': 'Poll Results',
+					'formBuilder:results.responses': '{count} votes',
+					'formBuilder:results.noResponses': 'No votes yet — be the first!',
+					'formBuilder:submission.meta.receivedAt': 'Submitted',
+					'formBuilder:submission.meta.ip': 'IP Address',
+					'formBuilder:submission.meta.userAgent': 'Browser',
+				},
+			},
 			spam: {
+				identify: (req) => {
+					const userId = req.user?.id
+					if (userId != null) return `user:${String(userId)}`
+					const ip =
+						req.headers?.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+						req.headers?.get('x-real-ip')?.trim() ||
+						req.headers?.get('cf-connecting-ip')?.trim()
+					return ip ? `ip:${ip}` : null
+				},
 				metadata: { ip: true, ua: true },
 				captcha: defineCaptchaProvider({
 					type: 'turnstile',
