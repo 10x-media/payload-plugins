@@ -64,6 +64,23 @@ describe('redeliverDelivery', () => {
 		expect(creates[0]?.endpoint).toBe('https://receiver.test/hook')
 	})
 
+	it('stores the live url on the dead row when a disabled subscription url differs from the original endpoint', async () => {
+		const { payload, updates, creates } = makePayload({
+			id: 'sub-1',
+			url: 'https://receiver.test/new-hook',
+			events: ['posts.updated'],
+			enabled: false,
+		})
+		const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+		await redeliverDelivery({ deps, deliveryId: 'del-1', payload, req })
+
+		expect(fetchSpy).not.toHaveBeenCalled()
+		expect(updates).toEqual([{ status: 'dead', error: 'subscription disabled' }])
+		expect(creates[0]?.endpoint).toBe('https://receiver.test/new-hook')
+		expect(creates[0]?.endpoint).not.toBe(original.endpoint)
+	})
+
 	it('marks the new delivery dead when the subscription is missing, falling back to the stored endpoint', async () => {
 		const { payload, updates, creates } = makePayload(null)
 		const fetchSpy = vi.spyOn(globalThis, 'fetch')
