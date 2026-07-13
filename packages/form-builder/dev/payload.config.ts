@@ -86,6 +86,7 @@ export default buildConfig({
 				},
 			},
 			spam: {
+				honeypot: { fieldName: 'url' },
 				identify: (req) => {
 					const userId = req.user?.id
 					if (userId != null) return `user:${String(userId)}`
