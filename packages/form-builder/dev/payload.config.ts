@@ -46,6 +46,7 @@ export default buildConfig({
 	collections: [users],
 	plugins: [
 		formBuilder({
+			events: { emit: () => Promise.resolve() },
 			fields: {
 				date: defineFormField<'date'>({
 					type: 'date',
