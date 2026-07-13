@@ -96,12 +96,10 @@ const usage = (task: string, targets: string[]): never => {
 }
 
 const run = (command: string, args: string[]): void => {
-	const [cmd, cmdArgs] =
-		process.platform === 'win32'
-			? //biome-ignore lint/plugin/noProcessEnv: process.env is allowed in this context
-				([process.env.ComSpec ?? 'cmd.exe', ['/c', command, ...args]] as const)
-			: ([command, args] as const)
-	const child = spawn(cmd, cmdArgs, { stdio: 'inherit' })
+	const child = spawn(command, args, {
+		stdio: 'inherit',
+		shell: process.platform === 'win32',
+	})
 	child.on('error', (err) => {
 		console.error(`Failed to run "${command}": ${err.message}`)
 		process.exit(1)
