@@ -1,16 +1,16 @@
 'use client'
 
 import {
-	Form,
+	buildFieldTypeRegistry,
 	type FormDocument,
 	type FormFieldInstance,
-	buildFieldTypeRegistry,
 	valuesFromSearchParams,
 } from '@10x-media/form-builder/react'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { customRules } from '../../../helpers/rules'
 import { dateRenderer } from './fields/date'
+import { WizardForm } from './WizardForm'
 
 declare global {
 	interface Window {
@@ -35,7 +35,12 @@ export function DemoForm({ form }: { form: unknown }) {
 	const doc = form as FormDocument
 
 	const initialValues = useMemo(
-		() => valuesFromSearchParams(searchParams, doc.fields as FormFieldInstance[], buildFieldTypeRegistry()),
+		() =>
+			valuesFromSearchParams(
+				searchParams,
+				doc.fields as FormFieldInstance[],
+				buildFieldTypeRegistry(),
+			),
 		[searchParams, doc.fields],
 	)
 
@@ -68,12 +73,13 @@ export function DemoForm({ form }: { form: unknown }) {
 		<main style={{ maxWidth: 640, margin: '2rem auto', padding: '0 1rem' }}>
 			<h1>Demo form</h1>
 			<div id="turnstile-widget" style={{ marginBottom: '1rem' }} />
-			<Form
+			<WizardForm
 				form={doc}
 				renderers={{ date: dateRenderer }}
 				rules={customRules}
 				captchaToken={captchaToken}
 				initialValues={initialValues}
+				presentation="wizard"
 			/>
 		</main>
 	)

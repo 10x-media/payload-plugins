@@ -1696,7 +1696,7 @@ export interface Form {
           }
       )[]
     | null;
-  defaultPresentation?: ('page' | 'inline' | 'modal' | 'drawer') | null;
+  defaultPresentation?: ('page' | 'inline' | 'modal' | 'drawer' | 'wizard') | null;
   showResults?: boolean | null;
   /**
    * Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.

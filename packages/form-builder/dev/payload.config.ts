@@ -56,6 +56,14 @@ export default buildConfig({
 					format: ({ value }) => (value ? new Date(String(value)).toLocaleDateString() : ''),
 				}) as FieldTypeOption,
 			},
+			presentations: {
+				wizard: {
+					name: 'wizard',
+					label: 'Wizard',
+					surface: 'page',
+					density: 'compact',
+				},
+			},
 			rules: {
 				dateMin: customRules[0]!,
 				dateMax: customRules[1]!,
