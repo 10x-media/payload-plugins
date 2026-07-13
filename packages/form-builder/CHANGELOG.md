@@ -1,5 +1,23 @@
 # @10x-media/form-builder
 
+## 0.1.0-beta.3
+
+### Minor Changes
+
+- Bundled captcha adapters and widget components. `turnstileProvider`, `recaptchaProvider` (v2 + v3 with `minScore`), and `hcaptchaProvider` verify tokens server-side with fail-closed semantics (network errors, timeouts, and non-2xx responses reject the submission). Matching headless `TurnstileCaptcha`, `RecaptchaCaptcha`, and `HcaptchaCaptcha` components on the `/react` export load each vendor script once, report tokens through `onToken` for `<Form captchaToken>`, clear on expiry or error, and expose `reset` (plus on-demand `execute` refresh for reCAPTCHA v3) via a ref handle.
+
+- Feedback round: `date` field type (native date input, real-calendar validation) with `minDate`/`maxDate` rules; rich text notification bodies for `emailTeam`/`confirmation` using the project's configured editor, serialized with escaping, sanitized links, `{{ name|fallback }}`/`{{*}}`/`{{*:table}}` tokens, a plugin `richText { converters, serialize }` option for custom nodes and non-HTML channels, and `renderBody` on action run args; the confirmation recipient is a select over the form's email fields, validated server-side on save; `signedWebhook` validates its URL as absolute http(s) and describes its config fields; calculation expressions get an admin description, Monaco JSON-schema autocomplete, and save-time validation of the expression tree; the file field's `mimeTypes` is a curated select and `maxSize` live-previews as a human-readable size, with a client-side size pre-check and hint line on the renderer; flow transitions resolve against effective values so calculation fields can drive branching; the forms document (Fields/Flow/Actions) and every field block (Field/Validation/Advanced) use tabbed admin layouts, and admin components ship their own CSS (no `styles.css` import needed for the admin). New exports: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, `renderAllValuesTable`, `fileMimeTypeOptions`, `formatBytes`, `defaultFieldDefinitionsByType`, `defaultValidationRulesByType`, and the `ByteSizeField`/`FieldNameSelect` client components.
+
+  **Soft compat:** existing plain-string action bodies keep working through the send path (interpolated exactly as before), though the admin editor shows them as empty rich text until re-entered. File fields keep enforcing stored free-text MIME values, but values outside the curated list need re-selecting the next time that field is edited; submitted data is untouched.
+
+  **Postgres migration note:** on `@payloadcms/db-postgres`, two `forms` column types change: action `body` goes `varchar` to `jsonb` (pre-existing string bodies are not valid JSON, so cast with `USING to_jsonb(body)` when writing the migration), and `mimeTypes` moves from a text array to an enum-backed select. Mongo needs no migration. The project config must also set an `editor` (rich text bodies inherit it; Payload throws `MissingEditorProp` without one).
+
+### Patch Changes
+
+- The registry (shadcn-style) file field now matches the built-in file renderer: a client-side max-size pre-check rejects oversized files before uploading, and an accepted-types/max-size hint line renders under the input.
+
+  `minDate`/`maxDate` rule bounds are now validated as real `YYYY-MM-DD` calendar dates in the admin UI, so a malformed bound (e.g. `abc` or `2024-02-30`) is rejected at config time instead of silently breaking the rule's comparisons.
+
 ## 0.1.0-beta.2
 
 ### Minor Changes

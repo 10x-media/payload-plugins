@@ -43,9 +43,11 @@
 		"analytics-uniques-breakdowns",
 		"analytics-widget-foundation",
 		"analytics-write-buffer",
+		"fb-captcha-adapters",
 		"fb-client-i18n-fallback",
 		"fb-condition-builder-ui",
 		"fb-consent-source-ux",
+		"fb-file-field-date-bound-polish",
 		"fb-flow-builder",
 		"fb-form-classname",
 		"fb-form-document-types",
@@ -53,6 +55,7 @@
 		"fb-honeypot-autofill",
 		"fb-repeater-field",
 		"fb-submission-status",
+		"form-builder-feedback",
 		"form-builder-standard-schema-dep",
 		"form-builder-v1",
 		"jobs-admin-ux",
@@ -64,6 +67,8 @@
 		"readme-restructure",
 		"readme-root-docs-urls",
 		"unbundled-plugin-builds",
-		"webhooks-initial-beta"
+		"webhooks-initial-beta",
+		"webhooks-previous-data-transform",
+		"webhooks-redeliver-endpoint"
 	]
 }
