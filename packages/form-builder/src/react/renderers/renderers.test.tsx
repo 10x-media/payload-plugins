@@ -3,6 +3,7 @@ import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FieldRendererProps } from '../contract'
 import { checkboxRenderer } from './checkbox'
+import { dateRenderer } from './date'
 import { emailRenderer } from './email'
 import { numberRenderer } from './number'
 import { selectRenderer } from './select'
@@ -106,6 +107,24 @@ describe('built-in field renderers', () => {
 		const select = within(container).getByRole('combobox')
 		fireEvent.change(select, { target: { value: 'b' } })
 		expect(onChange).toHaveBeenCalledWith('b')
+	})
+
+	it('date: renders a date-typed input and fires onChange', () => {
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				dateRenderer,
+				baseProps<string>({
+					field: { blockType: 'date', name: 'd', label: 'D' },
+					value: '2024-01-15',
+					onChange,
+				})
+			)
+		)
+		const input = container.querySelector('input[type="date"]')
+		expect(input).toHaveValue('2024-01-15')
+		fireEvent.change(input as HTMLInputElement, { target: { value: '2024-02-01' } })
+		expect(onChange).toHaveBeenCalledWith('2024-02-01')
 	})
 
 	it('checkbox: emits a boolean', () => {

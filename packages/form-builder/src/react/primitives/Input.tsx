@@ -3,7 +3,7 @@
 export type InputProps = {
 	id: string
 	name: string
-	type?: 'text' | 'email' | 'number'
+	type?: 'text' | 'email' | 'number' | 'date'
 	value: string
 	onChange: (value: string) => void
 	onBlur?: () => void

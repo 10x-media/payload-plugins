@@ -26,6 +26,7 @@ describe('buildFieldBlocks', () => {
 			'consent',
 			'file',
 			'repeater',
+			'date',
 		])
 	})
 

@@ -92,6 +92,19 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 		).rejects.toThrow()
 	})
 
+	it('stores a form with a date field block', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Contact',
+				fields: [{ blockType: 'date', name: 'startDate', label: 'Start date', required: true }],
+			},
+		})
+		expect(Array.isArray(form.fields)).toBe(true)
+		expect(form.fields).toHaveLength(1)
+		expect((form.fields as { blockType: string }[])[0]?.blockType).toBe('date')
+	})
+
 	it('rejects a submission missing a required field', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',
