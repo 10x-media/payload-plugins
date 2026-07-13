@@ -1,7 +1,9 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import { HttpResponse, http } from 'msw'
+import { setupServer } from 'msw/node'
 import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { formBuilder } from '../../src/index'
+import { formBuilder, turnstileProvider } from '../../src/index'
 import { createKvRateLimiter } from '../../src/spam/rateLimiter'
 
 describeForDb('form-builder spam guard', { dbs: ['mongo'] }, (db) => {
@@ -84,6 +86,58 @@ describeForDb('form-builder spam captcha', { dbs: ['mongo'] }, (db) => {
 			booted.payload.create({
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'name', value: 'A' }] },
+			})
+		).rejects.toThrow()
+		const ok = await booted.payload.create({
+			collection: 'form-submissions',
+			data: {
+				form: form.id,
+				values: [
+					{ field: 'name', value: 'A' },
+					{ field: '__fb_captcha', value: 'good' },
+				],
+			},
+		})
+		expect(ok.id).toBeDefined()
+	})
+})
+
+describeForDb('form-builder spam bundled turnstile adapter', { dbs: ['mongo'] }, (db) => {
+	const msw = setupServer(
+		http.post('https://challenges.cloudflare.com/turnstile/v0/siteverify', async ({ request }) => {
+			const body = new URLSearchParams(await request.text())
+			return HttpResponse.json({ success: body.get('response') === 'good' })
+		})
+	)
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		msw.listen({ onUnhandledRequest: 'bypass' })
+		booted = await bootPayload({
+			plugin: formBuilder({ spam: { captcha: turnstileProvider({ secretKey: 'sec' }) } }),
+			db,
+		})
+	})
+	afterAll(async () => {
+		await booted.stop()
+		msw.close()
+	})
+
+	it('verifies the token against the siteverify endpoint', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: { title: 'Gated', fields: [{ blockType: 'text', name: 'name', label: 'Name' }] },
+		})
+		await expect(
+			booted.payload.create({
+				collection: 'form-submissions',
+				data: {
+					form: form.id,
+					values: [
+						{ field: 'name', value: 'A' },
+						{ field: '__fb_captcha', value: 'bad' },
+					],
+				},
 			})
 		).rejects.toThrow()
 		const ok = await booted.payload.create({

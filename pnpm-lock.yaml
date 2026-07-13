@@ -48,6 +48,9 @@ catalogs:
     jsdom:
       specifier: ^25.0.1
       version: 25.0.1
+    msw:
+      specifier: ^2.14.6
+      version: 2.14.6
     next:
       specifier: 16.2.6
       version: 16.2.6
@@ -218,7 +221,7 @@ importers:
         specifier: ^4.3.24
         version: 4.3.29
       msw:
-        specifier: ^2.14.6
+        specifier: 'catalog:'
         version: 2.14.6(@types/node@22.19.19)(typescript@5.9.3)
       payload:
         specifier: 'catalog:'
@@ -460,6 +463,9 @@ importers:
       jsdom:
         specifier: 'catalog:'
         version: 25.0.1
+      msw:
+        specifier: 'catalog:'
+        version: 2.14.6(@types/node@22.19.19)(typescript@5.9.3)
       payload:
         specifier: 'catalog:'
         version: 3.85.0(graphql@16.14.0)(typescript@5.9.3)
