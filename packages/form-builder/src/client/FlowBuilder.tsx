@@ -20,18 +20,13 @@ import type { ConditionFieldType } from '../conditions/fieldTypes'
 import type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 import { ConditionBuilder } from './ConditionBuilder'
 import type { FieldRow } from './synthesizeClientField'
+import { toStaticLabel } from './toStaticLabel'
 
 export type FlowBuilderProps = {
 	path?: string
 	field?: { label?: unknown }
 	label?: unknown
 	conditionTypes: Record<string, ConditionFieldType>
-}
-
-const toStaticLabel = (label: unknown): string | Record<string, string> | undefined => {
-	if (typeof label === 'string') return label
-	if (label && typeof label === 'object') return label as Record<string, string>
-	return undefined
 }
 
 const extractFieldNames = (data: Record<string, unknown>): string[] => {

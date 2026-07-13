@@ -42,7 +42,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 			collection: 'forms',
 			data: {
 				title: 'Multi-action',
-				fields: [],
+				fields: [{ blockType: 'email', name: 'email', label: 'Email' }],
 				actions: [
 					{ blockType: 'emailTeam', to: 'ops@x.com', subject: 'Alert', body: '' },
 					{ blockType: 'confirmation', toField: 'email', subject: 'Thanks', body: 'Got it.' },
@@ -53,6 +53,52 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		expect(form.actions).toHaveLength(2)
 		const types = (form.actions as Array<Record<string, unknown>>).map((a) => a.blockType)
 		expect(types).toEqual(['emailTeam', 'confirmation'])
+	})
+
+	it('rejects a confirmation toField that names no field on the form', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Unknown toField',
+					fields: [],
+					actions: [
+						{ blockType: 'confirmation', toField: 'nope', subject: 'Thanks', body: 'Got it.' },
+					],
+				},
+			})
+		).rejects.toThrow()
+	})
+
+	it('rejects a confirmation toField that names a non-email field', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Non-email toField',
+					fields: [{ blockType: 'text', name: 'name', label: 'Name' }],
+					actions: [
+						{ blockType: 'confirmation', toField: 'name', subject: 'Thanks', body: 'Got it.' },
+					],
+				},
+			})
+		).rejects.toThrow()
+	})
+
+	it('accepts a confirmation toField that names a real email field', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Valid toField',
+				fields: [{ blockType: 'email', name: 'email', label: 'Email' }],
+				actions: [
+					{ blockType: 'confirmation', toField: 'email', subject: 'Thanks', body: 'Got it.' },
+				],
+			},
+		})
+
+		const action = form.actions?.[0] as Record<string, unknown>
+		expect(action.toField).toBe('email')
 	})
 
 	it('stores a form with no actions', async () => {

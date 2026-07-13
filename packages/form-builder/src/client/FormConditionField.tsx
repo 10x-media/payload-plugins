@@ -1,9 +1,10 @@
 'use client'
 
 import { FieldLabel, useField } from '@payloadcms/ui'
-import type { StaticLabel, Where } from 'payload'
+import type { Where } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import { ConditionBuilder } from './ConditionBuilder'
+import { toStaticLabel } from './toStaticLabel'
 
 /** Props: standard JSON field client props plus the `conditionTypes` map we pass via clientProps. */
 export type FormConditionFieldProps = {
@@ -11,16 +12,6 @@ export type FormConditionFieldProps = {
 	field?: { label?: unknown; name?: string }
 	label?: unknown
 	conditionTypes: Record<string, ConditionFieldType>
-}
-
-const toStaticLabel = (label: unknown): StaticLabel | undefined => {
-	if (typeof label === 'string') {
-		return label
-	}
-	if (label && typeof label === 'object') {
-		return label as Record<string, string>
-	}
-	return undefined
 }
 
 /**

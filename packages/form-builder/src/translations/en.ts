@@ -24,6 +24,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.validationNumber]: 'Enter a valid number',
 	[keys.validationDate]: 'Enter a valid date',
 	[keys.validationSelect]: 'Choose a valid option',
+	[keys.validationEmailFieldUnknown]: 'Choose an existing email field on this form',
 	[keys.formatYes]: 'Yes',
 	[keys.formatNo]: 'No',
 	[keys.configName]: 'Name',
@@ -103,6 +104,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigBodyDescription]:
 		'Supports {{ fieldName|fallback }} tokens, {{*}} for all answers as lines, and {{*:table}} for all answers as a table.',
 	[keys.actionConfigToField]: 'Email field name',
+	[keys.actionConfigToFieldDescription]:
+		'The email field on this form the confirmation is sent to.',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigSecret]: 'Secret',
 	[keys.configActions]: 'Actions',

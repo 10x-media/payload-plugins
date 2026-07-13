@@ -1,8 +1,9 @@
+import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { SubmissionValue } from '../../submissions/types'
 import { makeRenderBody } from '../body/serializeBody'
 import type { ActionRunArgs } from '../defineAction'
-import { confirmation } from './confirmation'
+import { confirmation, validateToField } from './confirmation'
 
 const form = { id: 'form-1' }
 const submissionId = 'sub-1'
@@ -160,5 +161,60 @@ describe('confirmation', () => {
 				})
 			)
 		).rejects.toThrow()
+	})
+})
+
+describe('validateToField', () => {
+	const req = { t: (key: string) => key } as unknown as PayloadRequest
+	const fields = [
+		{ blockType: 'email', name: 'email' },
+		{ blockType: 'text', name: 'name' },
+	]
+
+	it('passes when unset', () => {
+		expect(validateToField(undefined, { data: { fields }, req })).toBe(true)
+		expect(validateToField('', { data: { fields }, req })).toBe(true)
+	})
+
+	it('passes when the value names an existing email field', () => {
+		expect(validateToField('email', { data: { fields }, req })).toBe(true)
+	})
+
+	it('fails when the value names a field that is not email-type', () => {
+		expect(validateToField('name', { data: { fields }, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+	})
+
+	it('fails when the value names a field that does not exist', () => {
+		expect(validateToField('missing', { data: { fields }, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+	})
+
+	it('rejects an email field whose name is empty or whitespace', () => {
+		const blankNamed = [
+			{ blockType: 'email', name: '' },
+			{ blockType: 'email', name: '   ' },
+		]
+		expect(validateToField('', { data: { fields: blankNamed }, req })).toBe(true)
+		expect(validateToField('   ', { data: { fields: blankNamed }, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+	})
+
+	it('does not crash when data.fields is missing or garbled', () => {
+		expect(validateToField('email', { data: {}, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+		expect(validateToField('email', { data: { fields: 'not-an-array' }, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+		expect(
+			validateToField('email', { data: { fields: [null, 'garbage', { blockType: 'email' }] }, req })
+		).toBe('formBuilder:validation.emailFieldUnknown')
+		expect(validateToField('email', { data: undefined, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
 	})
 })
