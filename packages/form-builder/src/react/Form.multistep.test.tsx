@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { CalcExpression } from '../calc/types'
 import type { FormEventSink } from '../events/types'
 import type { FormFlow } from '../flow/types'
 import type { FormFieldInstance } from '../submissions/types'
@@ -134,6 +135,39 @@ describe('Form multi-step flow', () => {
 				expect.objectContaining({ type: 'step.viewed', stepId: 's2' })
 			)
 		})
+	})
+
+	const doubled: CalcExpression = {
+		type: 'op',
+		op: '*',
+		left: { type: 'ref', field: 'score' },
+		right: { type: 'lit', value: 2 },
+	}
+	const calcRoutedFields: FormFieldInstance[] = [
+		{ blockType: 'number', name: 'score', label: 'Score' },
+		{ blockType: 'calculation', name: 'doubled', expression: doubled },
+		{ blockType: 'text', name: 'highInfo', label: 'High info' },
+		{ blockType: 'text', name: 'lowInfo', label: 'Low info' },
+	]
+	const calcRoutedFlow: FormFlow = {
+		steps: [
+			{
+				id: 'entry',
+				fields: ['score', 'doubled'],
+				transitions: [{ when: { doubled: { equals: 20 } }, to: 'high' }],
+				next: 'low',
+			},
+			{ id: 'high', fields: ['highInfo'] },
+			{ id: 'low', fields: ['lowInfo'] },
+		],
+	}
+
+	it('routes a transition on a calculation field against the computed value, not the raw input', async () => {
+		render(<Form form={doc(calcRoutedFields, calcRoutedFlow)} onSubmit={vi.fn()} />)
+		fireEvent.change(screen.getByLabelText('Score'), { target: { value: '10' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		expect(await screen.findByLabelText('High info')).toBeInTheDocument()
+		expect(screen.queryByLabelText('Low info')).not.toBeInTheDocument()
 	})
 
 	it('a form with no flow renders all fields with a single submit button', () => {

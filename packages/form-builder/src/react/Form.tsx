@@ -362,7 +362,7 @@ export const Form = ({
 		if (hasError) {
 			return
 		}
-		const next = resolveNextStepId(flow, currentStepId, state.values)
+		const next = resolveNextStepId(flow, currentStepId, effectiveValues)
 		if (!next) {
 			return
 		}
@@ -533,7 +533,7 @@ export const Form = ({
 				stepIndex: flow.steps.findIndex((s) => s.id === currentStepId),
 				stepCount: flow.steps.length,
 				isFirst: history.length === 0,
-				isTerminal: currentStepId ? isTerminalStepId(flow, currentStepId, state.values) : true,
+				isTerminal: currentStepId ? isTerminalStepId(flow, currentStepId, effectiveValues) : true,
 				goNext: () => {
 					void goNext()
 				},
