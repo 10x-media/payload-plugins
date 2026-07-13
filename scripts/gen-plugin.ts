@@ -64,6 +64,7 @@ const formatGenerated = (slug: string): void => {
 		execFileSync('pnpm', ['exec', 'biome', 'check', '--write', ...targets], {
 			cwd: REPO_ROOT,
 			stdio: 'inherit',
+			shell: process.platform === 'win32',
 		})
 	} catch (err) {
 		throw new Error(
