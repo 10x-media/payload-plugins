@@ -16,8 +16,10 @@ const MAX_SIZE_REF = '@10x-media/form-builder/client#ByteSizeField'
 
 /**
  * Curated MIME type choices for the file field's `mimeTypes` select. Values are raw MIME strings or
- * `type/*` wildcards, exactly the patterns `resolveFileRef` matches server-side and the file input's
- * `accept` attribute understands client-side.
+ * trailing-`*` prefix wildcards, exactly the patterns `resolveFileRef` matches server-side; `type/*`
+ * values double as the file input's `accept` attribute (browsers ignore other prefix patterns, which
+ * is fine since the server stays authoritative). Every value must be 63 bytes or less: Payload's
+ * db-postgres adapter stores select options as a pg enum, and pg enum labels cap at 63 bytes.
  */
 export const fileMimeTypeOptions = [
 	{ label: 'Any image', value: 'image/*' },
@@ -31,14 +33,10 @@ export const fileMimeTypeOptions = [
 	{ label: 'CSV', value: 'text/csv' },
 	{ label: 'ZIP archive', value: 'application/zip' },
 	{ label: 'Word document (.doc)', value: 'application/msword' },
-	{
-		label: 'Word document (.docx)',
-		value: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-	},
 	{ label: 'Excel spreadsheet (.xls)', value: 'application/vnd.ms-excel' },
 	{
-		label: 'Excel spreadsheet (.xlsx)',
-		value: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		label: 'Office documents (docx, xlsx, pptx)',
+		value: 'application/vnd.openxmlformats-officedocument.*',
 	},
 	{ label: 'Any audio', value: 'audio/*' },
 	{ label: 'Any video', value: 'video/*' },

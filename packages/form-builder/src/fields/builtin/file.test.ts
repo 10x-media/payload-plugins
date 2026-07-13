@@ -40,6 +40,12 @@ describe('file field', () => {
 		expect(new Set(values).size).toBe(values.length)
 	})
 
+	it('keeps every mimeTypes option value within the 63-byte postgres enum label limit', () => {
+		for (const option of fileMimeTypeOptions) {
+			expect(Buffer.byteLength(option.value, 'utf8')).toBeLessThanOrEqual(63)
+		}
+	})
+
 	it('mounts the ByteSizeField component on maxSize', () => {
 		const maxSize = fileField.config?.find(
 			(entry) => 'name' in entry && entry.name === 'maxSize'
