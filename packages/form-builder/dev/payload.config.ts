@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { formBuilder } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
@@ -39,6 +40,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
+	editor: lexicalEditor(),
 	collections: [users],
 	plugins: [formBuilder({})],
 	telemetry: false,

@@ -12,6 +12,36 @@ type FileConfig = {
 const isFileRef = (value: unknown): value is FileRef =>
 	typeof value === 'object' && value !== null && 'filename' in value
 
+const MAX_SIZE_REF = '@10x-media/form-builder/client#ByteSizeField'
+
+/**
+ * Curated MIME type choices for the file field's `mimeTypes` select. Values are raw MIME strings or
+ * trailing-`*` prefix wildcards, exactly the patterns `resolveFileRef` matches server-side; `type/*`
+ * values double as the file input's `accept` attribute (browsers ignore other prefix patterns, which
+ * is fine since the server stays authoritative). Every value must be 63 bytes or less: Payload's
+ * db-postgres adapter stores select options as a pg enum, and pg enum labels cap at 63 bytes.
+ */
+export const fileMimeTypeOptions = [
+	{ label: 'Any image', value: 'image/*' },
+	{ label: 'PNG image', value: 'image/png' },
+	{ label: 'JPEG image', value: 'image/jpeg' },
+	{ label: 'WebP image', value: 'image/webp' },
+	{ label: 'GIF image', value: 'image/gif' },
+	{ label: 'SVG image', value: 'image/svg+xml' },
+	{ label: 'PDF', value: 'application/pdf' },
+	{ label: 'Plain text', value: 'text/plain' },
+	{ label: 'CSV', value: 'text/csv' },
+	{ label: 'ZIP archive', value: 'application/zip' },
+	{ label: 'Word document (.doc)', value: 'application/msword' },
+	{ label: 'Excel spreadsheet (.xls)', value: 'application/vnd.ms-excel' },
+	{
+		label: 'Office documents (docx, xlsx, pptx)',
+		value: 'application/vnd.openxmlformats-officedocument.*',
+	},
+	{ label: 'Any audio', value: 'audio/*' },
+	{ label: 'Any video', value: 'video/*' },
+]
+
 /**
  * The `file` field type. Its stored value is a server-captured {@link FileRef}; the client only ever submits
  * the upload id, and `runSubmission` re-reads filename/mimeType/filesize from the upload doc at the trust
@@ -25,8 +55,23 @@ export const fileField = defineFormField<'file', FileConfig>({
 	value: 'file',
 	config: [
 		{ name: 'relationTo', type: 'text', label: labelFor(keys.fileConfigRelationTo) },
-		{ name: 'mimeTypes', type: 'text', hasMany: true, label: labelFor(keys.fileConfigMimeTypes) },
-		{ name: 'maxSize', type: 'number', label: labelFor(keys.fileConfigMaxSize) },
+		{
+			name: 'mimeTypes',
+			type: 'select',
+			hasMany: true,
+			options: fileMimeTypeOptions,
+			label: labelFor(keys.fileConfigMimeTypes),
+		},
+		{
+			name: 'maxSize',
+			type: 'number',
+			min: 0,
+			label: labelFor(keys.fileConfigMaxSize),
+			admin: {
+				description: labelFor(keys.fileConfigMaxSizeDescription),
+				components: { Field: MAX_SIZE_REF },
+			},
+		},
 	],
 	format: ({ value }) => (isFileRef(value) ? value.filename : ''),
 })

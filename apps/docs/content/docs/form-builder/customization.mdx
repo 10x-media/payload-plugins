@@ -3,6 +3,30 @@ title: Customization
 description: Collection overrides, submission admin UI options, and other plugin-level configuration.
 ---
 
+## Tweaking one built-in
+
+The registries behind [field types](/form-builder/fields#the-registry) and [validation rules](/form-builder/validation#custom-rules) replace a built-in wholesale when you pass an object under its type. To change one property of a built-in and keep the rest, spread it from the exported defaults: `defaultFieldDefinitionsByType` and `defaultValidationRulesByType` index the built-ins by `type` (the arrays `defaultFieldDefinitions` and `defaultValidationRules` are exported too).
+
+```ts title="payload.config.ts"
+import {
+  defaultFieldDefinitionsByType,
+  formBuilder,
+  type FieldTypeOption,
+} from '@10x-media/form-builder'
+
+formBuilder({
+  fields: {
+    text: {
+      ...defaultFieldDefinitionsByType.text,
+      validate: ({ value }) =>
+        typeof value === 'string' && value.includes('@') ? 'No emails here' : true,
+    } as FieldTypeOption,
+  },
+})
+```
+
+The same pattern works for rules via `defaultValidationRulesByType` under the `rules` option.
+
 ## Submission answers UI
 
 When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component that formats each value using its field type's `format` function, shows repeater rows with numbered headings, displays consent proofs with agreed/declined indicators and a timestamp, and includes submission metadata. This replaces the raw JSON fields as the primary view.
@@ -27,9 +51,9 @@ The plugin manages three Payload collections: `forms`, `form-submissions`, and `
 
 Each key in `overrides` is a `CollectionOverrides` object. The plugin builds the defaults, then merges them with your overrides using explicit spreads. The spread order encodes who wins:
 
-- Keys where the consumer wins: `{ ...pluginDefault, ...(overrides?.key ?? {}) }` — your value is last.
-- Keys the plugin locks: `{ ...(overrides?.key ?? {}), pluginLockedValue }` — the plugin value is last and cannot be overwritten.
-- Hooks: `[...pluginHooks, ...(overrides?.hooks?.X ?? [])]` — the plugin's hooks always run first, your hooks are appended.
+- Keys where the consumer wins: `{ ...pluginDefault, ...(overrides?.key ?? {}) }`, your value is last.
+- Keys the plugin locks: `{ ...(overrides?.key ?? {}), pluginLockedValue }`, the plugin value is last and cannot be overwritten.
+- Hooks: `[...pluginHooks, ...(overrides?.hooks?.X ?? [])]`, the plugin's hooks always run first, your hooks are appended.
 
 This means you can always add a `beforeValidate` hook to `form-submissions` and it will run after the spam guard and submission validator, not instead of them.
 

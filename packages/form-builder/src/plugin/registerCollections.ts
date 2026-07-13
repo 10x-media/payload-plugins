@@ -1,4 +1,5 @@
 import type { CollectionConfig, Config, Field } from 'payload'
+import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
@@ -19,6 +20,7 @@ type RegisterCollectionsArgs = {
 	consentRegistry: ConsentSourceRegistry
 	presentationRegistry: PresentationDescriptorRegistry
 	actionRegistry: ActionRegistry
+	richText?: RichTextBodyOption
 	hasJobsPlugin: boolean
 	events?: FormEventSink
 	uploads: { enabled: boolean; slug: string; collection?: CollectionConfig }
@@ -38,6 +40,7 @@ export const registerCollections = ({
 	consentRegistry,
 	presentationRegistry,
 	actionRegistry,
+	richText,
 	hasJobsPlugin,
 	events,
 	uploads,
@@ -45,7 +48,7 @@ export const registerCollections = ({
 	showSubmissionRawFields,
 	overrides,
 }: RegisterCollectionsArgs): void => {
-	registerActionsTask(config, actionRegistry)
+	registerActionsTask(config, actionRegistry, richText)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
 
 	let uploadsCollection: CollectionConfig | null = null
@@ -106,6 +109,7 @@ export const registerCollections = ({
 			ruleRegistry,
 			consentRegistry,
 			actionRegistry,
+			richText,
 			events,
 			hasRunner,
 			uploadSlug: uploads.slug,

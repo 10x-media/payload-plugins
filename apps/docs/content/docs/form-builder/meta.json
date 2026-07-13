@@ -17,7 +17,7 @@
 		"uploads",
 		"polls",
 		"spam",
-		"i18n",
-		"customization"
+		"customization",
+		"i18n"
 	]
 }

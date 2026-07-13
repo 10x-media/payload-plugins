@@ -22,11 +22,10 @@ const conditionField = (
 
 /**
  * Config every field instance carries regardless of type. `name` is the machine key written into
- * submissions; `width` is stored for the layout grid. `visibleWhen`/`validateWhen` store a
- * canonical Payload `Where`, edited by the native condition builder. Field types add their own `config`
- * after these.
+ * submissions; `width` is stored for the layout grid. Field types add their own `config` after
+ * these inside the Field tab (see `fieldBlockTabs`).
  */
-export const sharedFieldConfig = (conditionTypes: Record<string, ConditionFieldType>): Field[] => [
+export const sharedFieldConfig = (): Field[] => [
 	{ name: 'name', type: 'text', required: true, label: labelFor(keys.configName) },
 	{ name: 'label', type: 'text', label: labelFor(keys.configLabel) },
 	{ name: 'required', type: 'checkbox', label: labelFor(keys.configRequired) },
@@ -44,14 +43,38 @@ export const sharedFieldConfig = (conditionTypes: Record<string, ConditionFieldT
 	},
 	{ name: 'placeholder', type: 'text', label: labelFor(keys.configPlaceholder) },
 	{ name: 'description', type: 'textarea', label: labelFor(keys.configDescription) },
-	{
-		type: 'collapsible',
-		label: labelFor(keys.configAdvanced),
-		admin: { initCollapsed: true },
-		fields: [
-			conditionField('visibleWhen', keys.configVisibleWhen, conditionTypes),
-			conditionField('validateWhen', keys.configValidateWhen, conditionTypes),
-			{ name: 'hidden', type: 'checkbox', label: labelFor(keys.configHidden) },
-		],
-	},
 ]
+
+/**
+ * The single field of every field block: unnamed tabs (presentational only, data paths stay flat).
+ * Field tab holds the shared basics plus the type's own config; Validation holds the rule blocks and
+ * `validateWhen`; Advanced holds `visibleWhen` and `hidden`. `visibleWhen`/`validateWhen` store a
+ * canonical Payload `Where`, edited by the native condition builder.
+ */
+export const fieldBlockTabs = (
+	conditionTypes: Record<string, ConditionFieldType>,
+	typeConfig: Field[],
+	validations: Field
+): Field => ({
+	type: 'tabs',
+	tabs: [
+		{
+			label: labelFor(keys.tabField),
+			fields: [...sharedFieldConfig(), ...typeConfig],
+		},
+		{
+			label: labelFor(keys.tabValidation),
+			fields: [
+				validations,
+				conditionField('validateWhen', keys.configValidateWhen, conditionTypes),
+			],
+		},
+		{
+			label: labelFor(keys.tabAdvanced),
+			fields: [
+				conditionField('visibleWhen', keys.configVisibleWhen, conditionTypes),
+				{ name: 'hidden', type: 'checkbox', label: labelFor(keys.configHidden) },
+			],
+		},
+	],
+})

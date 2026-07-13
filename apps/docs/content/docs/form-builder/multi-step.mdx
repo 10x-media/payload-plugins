@@ -26,7 +26,7 @@ const flow: FormFlow = {
 }
 ```
 
-Each step groups fields by machine name. `transitions` are evaluated in order against the current answers using the same [condition engine](/form-builder/conditions) as `visibleWhen`; the first match wins. No match falls through to `next`. A step with neither is terminal.
+Each step groups fields by machine name. `transitions` are evaluated in order against the current answers using the same [condition engine](/form-builder/conditions) as `visibleWhen`; the first match wins. No match falls through to `next`. A step with neither is terminal. Transitions see effective values, including computed [calculation fields](/form-builder/calculations), so a flow can branch on a quiz score or a running total.
 
 Flows are authored with the flow builder in the admin and stored as this serializable structure, so the client and server reason about the identical graph.
 

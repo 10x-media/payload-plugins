@@ -8,7 +8,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 ## Features
 
-- **Fields**: text, textarea, email, number, select, checkbox, file, consent, calculation, and repeater (dynamic row lists with per-row sub-field validation), authored as Payload blocks; custom types via `defineFormField` are never second-class.
+- **Fields**: text, textarea, email, number, date, select, checkbox, file, consent, calculation, and repeater (dynamic row lists with per-row sub-field validation), authored as Payload blocks; custom types via `defineFormField` are never second-class.
 - **Validation**: declarative per-field rules, custom messages and severities, cross-field and async server-only rules, a Standard Schema escape hatch (zod, valibot, ...), one server-authoritative engine.
 - **Conditional logic**: `visibleWhen` / `validateWhen` in Payload's `Where` shape, one isomorphic engine on client and server.
 - **Multi-step flows** with conditional branching, authored in the admin flow builder.

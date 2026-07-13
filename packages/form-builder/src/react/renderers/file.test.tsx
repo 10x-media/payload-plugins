@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { en } from '../../translations/en'
+import { makeTranslate } from '../../translations/makeTranslate'
 import type { FieldRendererProps } from '../contract'
 import { fileRenderer } from './file'
 
@@ -95,6 +97,94 @@ describe('file renderer', () => {
 		const { container } = render(createElement(fileRenderer, props({ value: 'existing-id' })))
 		expect(within(container).getByText('Uploaded file')).toBeInTheDocument()
 		expect(within(container).getByRole('button', { name: /remove/i })).toBeInTheDocument()
+	})
+
+	it('shows a hint with accepted types and the max size when configured', () => {
+		const { container } = render(
+			createElement(
+				fileRenderer,
+				props({
+					field: {
+						blockType: 'file',
+						name: 'resume',
+						mimeTypes: ['application/pdf'],
+						maxSize: 2621440,
+					},
+					t: makeTranslate(en),
+				})
+			)
+		)
+		expect(
+			within(container).getByText('Accepted: application/pdf · Max size: 2.5 MB')
+		).toBeInTheDocument()
+	})
+
+	it('rejects an oversized file before uploading', async () => {
+		const fetchMock = vi.fn()
+		vi.stubGlobal('fetch', fetchMock)
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				fileRenderer,
+				props({
+					field: { blockType: 'file', name: 'resume', maxSize: 1024 },
+					onChange,
+					t: makeTranslate(en),
+				})
+			)
+		)
+		const input = container.querySelector('input[type="file"]') as HTMLInputElement
+		const big = new File([new Uint8Array(2048)], 'big.pdf', { type: 'application/pdf' })
+		fireEvent.change(input, { target: { files: [big] } })
+		await waitFor(() => expect(within(container).getByRole('alert')).toBeInTheDocument())
+		expect(within(container).getByText('File is too large (max 1 KB)')).toBeInTheDocument()
+		expect(fetchMock).not.toHaveBeenCalled()
+		expect(onChange).not.toHaveBeenCalled()
+	})
+
+	it('treats a zero max size as a real limit, matching the server', async () => {
+		const fetchMock = vi.fn()
+		vi.stubGlobal('fetch', fetchMock)
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				fileRenderer,
+				props({
+					field: { blockType: 'file', name: 'resume', maxSize: 0 },
+					onChange,
+					t: makeTranslate(en),
+				})
+			)
+		)
+		expect(within(container).getByText('Max size: 0 B')).toBeInTheDocument()
+		const input = container.querySelector('input[type="file"]') as HTMLInputElement
+		fireEvent.change(input, { target: { files: [pdf()] } })
+		await waitFor(() => expect(within(container).getByRole('alert')).toBeInTheDocument())
+		expect(within(container).getByText('File is too large (max 0 B)')).toBeInTheDocument()
+		expect(fetchMock).not.toHaveBeenCalled()
+		expect(onChange).not.toHaveBeenCalled()
+	})
+
+	it('uploads a file within the max size and clears a previous size error', async () => {
+		stubUpload({ ok: true, json: async () => ({ doc: { id: 'up3' } }) })
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(
+				fileRenderer,
+				props({
+					field: { blockType: 'file', name: 'resume', maxSize: 1024 },
+					onChange,
+					t: makeTranslate(en),
+				})
+			)
+		)
+		const input = container.querySelector('input[type="file"]') as HTMLInputElement
+		const big = new File([new Uint8Array(2048)], 'big.pdf', { type: 'application/pdf' })
+		fireEvent.change(input, { target: { files: [big] } })
+		await waitFor(() => expect(within(container).getByRole('alert')).toBeInTheDocument())
+		fireEvent.change(input, { target: { files: [pdf()] } })
+		await waitFor(() => expect(onChange).toHaveBeenCalledWith('up3'))
+		expect(within(container).queryByRole('alert')).toBeNull()
 	})
 
 	it('re-attempts cleanly after a failed upload', async () => {

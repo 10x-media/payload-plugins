@@ -13,7 +13,7 @@ describeForDb('form-builder hidden fields', { dbs: ['mongo'] }, (db) => {
 		await booted.stop()
 	})
 
-	it('stores hidden: true at the top level on a field instance (unnamed collapsible does not nest)', async () => {
+	it('stores hidden: true at the top level on a field instance (unnamed tabs do not nest)', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',
 			data: {

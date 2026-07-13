@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { SubmissionValue } from '../../submissions/types'
+import { makeRenderBody } from '../body/serializeBody'
 import type { ActionRunArgs } from '../defineAction'
 import { emailTeam } from './emailTeam'
 
@@ -7,19 +9,22 @@ const submissionId = 'sub-1'
 const locale = 'en'
 const t = (key: string) => key
 
-const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {}) =>
-	({
+const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {}) => {
+	const values = (overrides.values ?? []) as SubmissionValue[]
+	return {
 		form,
 		submissionId,
 		locale,
 		t,
 		descriptors: [],
+		renderBody: makeRenderBody({ values, descriptors: [] }),
 		req: undefined,
 		...overrides,
-	}) as ActionRunArgs<Record<string, unknown>>
+	} as ActionRunArgs<Record<string, unknown>>
+}
 
 describe('emailTeam', () => {
-	it('calls sendEmail with interpolated subject and body', async () => {
+	it('calls sendEmail with interpolated subject and legacy string body', async () => {
 		const sendEmail = vi.fn().mockResolvedValue(undefined)
 		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
 
@@ -41,6 +46,34 @@ describe('emailTeam', () => {
 			to: 'team@example.com',
 			subject: 'New from Alice',
 			html: 'Hello there',
+		})
+	})
+
+	it('serializes a lexical body to interpolated HTML', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+
+		const body = {
+			root: {
+				type: 'root',
+				children: [
+					{ type: 'paragraph', children: [{ type: 'text', text: 'From {{name}}', format: 1 }] },
+				],
+			},
+		}
+
+		await emailTeam.run(
+			baseArgs({
+				config: { to: 'team@example.com', subject: 'Alert', body },
+				values: [{ field: 'name', value: 'A & B' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'team@example.com',
+			subject: 'Alert',
+			html: '<p><strong>From A &amp; B</strong></p>',
 		})
 	})
 

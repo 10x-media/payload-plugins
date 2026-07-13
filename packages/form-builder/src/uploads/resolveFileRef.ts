@@ -15,7 +15,7 @@ const mimeAllowed = (mimeType: string, allow: string[] | undefined): boolean => 
 		return true
 	}
 	return allow.some((pattern) => {
-		if (pattern.endsWith('/*')) {
+		if (pattern.endsWith('*')) {
 			return mimeType.startsWith(pattern.slice(0, -1))
 		}
 		return mimeType === pattern

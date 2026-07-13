@@ -1,9 +1,10 @@
 import { interpolate } from '../../recall/interpolate'
 import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
+import { resolverFor } from '../body/serializeBody'
 import { defineAction } from '../defineAction'
 
-type EmailTeamConfig = { to?: string; subject?: string; body?: string }
+type EmailTeamConfig = { to?: string; subject?: string; body?: unknown }
 
 export const emailTeam = defineAction<EmailTeamConfig>({
 	type: 'emailTeam',
@@ -11,10 +12,15 @@ export const emailTeam = defineAction<EmailTeamConfig>({
 	config: [
 		{ name: 'to', type: 'text', label: labelFor(keys.actionConfigTo) },
 		{ name: 'subject', type: 'text', label: labelFor(keys.actionConfigSubject) },
-		{ name: 'body', type: 'textarea', label: labelFor(keys.actionConfigBody) },
+		{
+			name: 'body',
+			type: 'richText',
+			label: labelFor(keys.actionConfigBody),
+			admin: { description: labelFor(keys.actionConfigBodyDescription) },
+		},
 	],
 	run: async (args) => {
-		const { config, values, payload } = args
+		const { config, values, payload, renderBody } = args
 
 		if (!config.to) {
 			throw new Error('emailTeam: missing "to" address')
@@ -24,13 +30,8 @@ export const emailTeam = defineAction<EmailTeamConfig>({
 			throw new Error('emailTeam: no email adapter configured')
 		}
 
-		const resolve = (name: string) => {
-			const entry = values.find((v) => v.field === name)
-			return entry == null ? '' : String(entry.value ?? '')
-		}
-
-		const subject = interpolate(config.subject ?? '', resolve)
-		const html = interpolate(config.body ?? '', resolve)
+		const subject = interpolate(config.subject ?? '', resolverFor(values))
+		const html = await renderBody(config.body)
 
 		await payload.sendEmail({ to: config.to, subject, html })
 	},

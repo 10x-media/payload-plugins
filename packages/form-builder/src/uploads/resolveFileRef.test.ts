@@ -38,6 +38,21 @@ describe('resolveFileRef', () => {
 		expect(resolveFileRef(doc({ mimeType: 'image/png' }), { mimeTypes: ['image/*'] }).ok).toBe(true)
 	})
 
+	it('allows a prefix wildcard mime match (curated Office documents pattern)', () => {
+		const pattern = 'application/vnd.openxmlformats-officedocument.*'
+		expect(
+			resolveFileRef(
+				doc({
+					mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+				}),
+				{ mimeTypes: [pattern] }
+			).ok
+		).toBe(true)
+		expect(
+			resolveFileRef(doc({ mimeType: 'application/vnd.ms-excel' }), { mimeTypes: [pattern] })
+		).toEqual({ ok: false, code: 'mimeType' })
+	})
+
 	it('rejects a mime not in the allowlist', () => {
 		expect(
 			resolveFileRef(doc({ mimeType: 'application/x-msdownload' }), {

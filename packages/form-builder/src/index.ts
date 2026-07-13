@@ -1,4 +1,5 @@
 import { type Config, definePlugin } from 'payload'
+import type { RichTextBodyOption } from './actions/body/serializeBody'
 import { defaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
@@ -40,6 +41,12 @@ export type FormBuilderPluginOptions = {
 	rules?: ValidationRulesConfig
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	actions?: ActionsConfig
+	/**
+	 * Customize how rich text action bodies are rendered. `converters` spread over the default
+	 * Lexical node converters; `serialize` replaces the whole pipeline (e.g. to target chat or
+	 * plain-text channels instead of email HTML).
+	 */
+	richText?: RichTextBodyOption
 	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	consentSources?: ConsentSourcesConfig
 	/** The built-in `form-uploads` collection backing file fields. `false` disables it (bring your own); an object overrides slug/upload/access/fields. */
@@ -97,6 +104,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			consentRegistry,
 			presentationRegistry,
 			actionRegistry,
+			richText: options.richText,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
 			events: options.events,
 			uploads,
@@ -108,6 +116,20 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 	},
 })
 
+export type {
+	BodyConverter,
+	BodyConverterArgs,
+	BodyRender,
+} from './actions/body/converters'
+export { defaultBodyConverters, sanitizeUrl } from './actions/body/converters'
+export { escapeHtml } from './actions/body/escapeHtml'
+export type {
+	BodyContext,
+	RichTextBodyOption,
+	SerializeBodyArgs,
+} from './actions/body/serializeBody'
+export { serializeBody } from './actions/body/serializeBody'
+export { renderAllValues, renderAllValuesTable } from './actions/body/wildcards'
 export { defaultActionDefinitions } from './actions/builtin'
 export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
 export { defineAction } from './actions/defineAction'
@@ -164,6 +186,8 @@ export type {
 export { resolveConsentSources } from './consent/registry'
 export { resolveConsentLinks } from './consent/resolveConsentLinks'
 export { resolvePublishedVersionRef } from './consent/resolvePublishedVersionRef'
+export { defaultFieldDefinitions, defaultFieldDefinitionsByType } from './fields/builtin'
+export { fileMimeTypeOptions } from './fields/builtin/file'
 export { defineFormField } from './fields/defineFormField'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from './fields/registry'
 export type {
@@ -208,8 +232,10 @@ export type {
 	SpamOption,
 } from './spam/types'
 export { captureFileRef } from './uploads/captureFileRef'
+export { formatBytes } from './uploads/formatBytes'
 export { resolveFileRef } from './uploads/resolveFileRef'
 export type { FileFieldConfig, FileRef, FileRefError } from './uploads/types'
+export { defaultValidationRules, defaultValidationRulesByType } from './validation/builtin'
 export { defineValidationRule } from './validation/defineValidationRule'
 export type {
 	ValidationRuleOption,

@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook, CollectionConfig, Field } from 'payload'
+import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
@@ -26,6 +27,8 @@ type BuildSubmissionsCollectionArgs = {
 	events?: FormEventSink
 	/** Whether a job runner is likely present; gates the queued vs bounded-inline dispatch path. */
 	hasRunner?: boolean
+	/** Body serialization customization forwarded to the inline action dispatch path. */
+	richText?: RichTextBodyOption
 	/** Upload collection slug for file fields without an explicit `relationTo`. */
 	uploadSlug?: string
 	/** Resolved spam config; when active, prepends the spam guard before validation. `false` disables it. */
@@ -64,6 +67,7 @@ const makeAfterChange =
 		actionRegistry: ActionRegistry
 		events?: FormEventSink
 		hasRunner: boolean
+		richText?: RichTextBodyOption
 	}): CollectionAfterChangeHook =>
 	async ({ doc, operation, req }) => {
 		if (operation !== 'create' || (doc.status != null && doc.status !== 'complete')) {
@@ -87,6 +91,7 @@ const makeAfterChange =
 				payload,
 				req,
 				hasRunner: args.hasRunner,
+				richText: args.richText,
 			})
 
 			try {
@@ -120,6 +125,7 @@ export const buildSubmissionsCollection = ({
 	actionRegistry = new Map(),
 	events,
 	hasRunner = false,
+	richText,
 	uploadSlug,
 	spam,
 	showRawFields = false,
@@ -180,7 +186,7 @@ export const buildSubmissionsCollection = ({
 				...(overrides?.hooks?.beforeValidate ?? []),
 			],
 			afterChange: [
-				makeAfterChange({ actionRegistry, events, hasRunner }),
+				makeAfterChange({ actionRegistry, events, hasRunner, richText }),
 				...(overrides?.hooks?.afterChange ?? []),
 			],
 		},

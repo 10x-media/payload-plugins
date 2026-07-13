@@ -1,25 +1,31 @@
+import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
+import type { SubmissionValue } from '../../submissions/types'
+import { makeRenderBody } from '../body/serializeBody'
 import type { ActionRunArgs } from '../defineAction'
-import { confirmation } from './confirmation'
+import { confirmation, validateToField } from './confirmation'
 
 const form = { id: 'form-1' }
 const submissionId = 'sub-1'
 const locale = 'en'
 const t = (key: string) => key
 
-const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {}) =>
-	({
+const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {}) => {
+	const values = (overrides.values ?? []) as SubmissionValue[]
+	return {
 		form,
 		submissionId,
 		locale,
 		t,
 		descriptors: [],
+		renderBody: makeRenderBody({ values, descriptors: [] }),
 		req: undefined,
 		...overrides,
-	}) as ActionRunArgs<Record<string, unknown>>
+	} as ActionRunArgs<Record<string, unknown>>
+}
 
 describe('confirmation', () => {
-	it('sends email to the resolved recipient', async () => {
+	it('sends email to the resolved recipient with a legacy string body', async () => {
 		const sendEmail = vi.fn().mockResolvedValue(undefined)
 		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
 
@@ -45,6 +51,54 @@ describe('confirmation', () => {
 			to: 'user@example.com',
 			subject: 'Thanks Bob',
 			html: 'Your submission is received.',
+		})
+	})
+
+	it('serializes a lexical body to interpolated HTML', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		const body = {
+			root: {
+				type: 'root',
+				children: [{ type: 'paragraph', children: [{ type: 'text', text: 'Thanks {{name}}!' }] }],
+			},
+		}
+
+		await confirmation.run(
+			baseArgs({
+				config: { toField: 'email', subject: 'Thanks', body },
+				values: [
+					{ field: 'email', value: 'user@example.com' },
+					{ field: 'name', value: 'Bob' },
+				],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Thanks',
+			html: '<p>Thanks Bob!</p>',
+		})
+	})
+
+	it('sends an empty html body when body is unset', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: { toField: 'email', subject: 'Hi' },
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: '',
 		})
 	})
 
@@ -107,5 +161,60 @@ describe('confirmation', () => {
 				})
 			)
 		).rejects.toThrow()
+	})
+})
+
+describe('validateToField', () => {
+	const req = { t: (key: string) => key } as unknown as PayloadRequest
+	const fields = [
+		{ blockType: 'email', name: 'email' },
+		{ blockType: 'text', name: 'name' },
+	]
+
+	it('passes when unset', () => {
+		expect(validateToField(undefined, { data: { fields }, req })).toBe(true)
+		expect(validateToField('', { data: { fields }, req })).toBe(true)
+	})
+
+	it('passes when the value names an existing email field', () => {
+		expect(validateToField('email', { data: { fields }, req })).toBe(true)
+	})
+
+	it('fails when the value names a field that is not email-type', () => {
+		expect(validateToField('name', { data: { fields }, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+	})
+
+	it('fails when the value names a field that does not exist', () => {
+		expect(validateToField('missing', { data: { fields }, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+	})
+
+	it('rejects an email field whose name is empty or whitespace', () => {
+		const blankNamed = [
+			{ blockType: 'email', name: '' },
+			{ blockType: 'email', name: '   ' },
+		]
+		expect(validateToField('', { data: { fields: blankNamed }, req })).toBe(true)
+		expect(validateToField('   ', { data: { fields: blankNamed }, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+	})
+
+	it('does not crash when data.fields is missing or garbled', () => {
+		expect(validateToField('email', { data: {}, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+		expect(validateToField('email', { data: { fields: 'not-an-array' }, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
+		expect(
+			validateToField('email', { data: { fields: [null, 'garbage', { blockType: 'email' }] }, req })
+		).toBe('formBuilder:validation.emailFieldUnknown')
+		expect(validateToField('email', { data: undefined, req })).toBe(
+			'formBuilder:validation.emailFieldUnknown'
+		)
 	})
 })

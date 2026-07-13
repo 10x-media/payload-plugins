@@ -1,9 +1,9 @@
-import type { CalcExpression } from './types'
+import { CALC_FNS, CALC_OPS, type CalcExpression, type CalcFn, type CalcOp } from './types'
 
 const MAX_DEPTH = 64
 
-const OP_SET = new Set(['+', '-', '*', '/', '%'])
-const FN_SET = new Set(['min', 'max', 'round', 'abs', 'ceil', 'floor'])
+const isOp = (v: unknown): v is CalcOp => (CALC_OPS as readonly unknown[]).includes(v)
+const isFn = (v: unknown): v is CalcFn => (CALC_FNS as readonly unknown[]).includes(v)
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
 	v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -25,12 +25,12 @@ const normalizeNode = (value: unknown, depth: number): CalcExpression | undefine
 		}
 		case 'op': {
 			const { op, left, right } = value
-			if (typeof op !== 'string' || !OP_SET.has(op)) return undefined
+			if (!isOp(op)) return undefined
 			const l = normalizeNode(left, depth + 1)
 			if (!l) return undefined
 			const r = normalizeNode(right, depth + 1)
 			if (!r) return undefined
-			return { type: 'op', op: op as '+' | '-' | '*' | '/' | '%', left: l, right: r }
+			return { type: 'op', op, left: l, right: r }
 		}
 		case 'neg': {
 			const operand = normalizeNode(value.operand, depth + 1)
@@ -39,7 +39,7 @@ const normalizeNode = (value: unknown, depth: number): CalcExpression | undefine
 		}
 		case 'fn': {
 			const { fn, args } = value
-			if (typeof fn !== 'string' || !FN_SET.has(fn)) return undefined
+			if (!isFn(fn)) return undefined
 			if (!Array.isArray(args)) return undefined
 			const normalizedArgs: CalcExpression[] = []
 			for (const arg of args) {
@@ -47,11 +47,7 @@ const normalizeNode = (value: unknown, depth: number): CalcExpression | undefine
 				if (!a) return undefined
 				normalizedArgs.push(a)
 			}
-			return {
-				type: 'fn',
-				fn: fn as 'min' | 'max' | 'round' | 'abs' | 'ceil' | 'floor',
-				args: normalizedArgs,
-			}
+			return { type: 'fn', fn, args: normalizedArgs }
 		}
 		case 'weight': {
 			const { field, weights } = value

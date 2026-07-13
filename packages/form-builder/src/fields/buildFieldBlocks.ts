@@ -1,4 +1,4 @@
-import type { Block, Field } from 'payload'
+import type { Block, Field, TabsField } from 'payload'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { buildConsentSourceConfig } from '../consent/buildConsentSourceConfig'
 import type { ConsentSourceRegistry } from '../consent/registry'
@@ -7,9 +7,16 @@ import { labelFor } from '../translations/server'
 import { buildRuleBlocks } from '../validation/buildRuleBlocks'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import type { FieldTypeRegistry } from './registry'
-import { sharedFieldConfig } from './sharedConfig'
+import { fieldBlockTabs } from './sharedConfig'
 
-/** One add-field block per registered type: shared config, the type's own config, then its validations. */
+/** The tab whose fields hold the shared basics and type config, found by the `name` field it carries. */
+const fieldTabOf = (block: Block): Field[] | undefined => {
+	const tabsField = block.fields.find((f): f is TabsField => f.type === 'tabs')
+	return tabsField?.tabs.find((tab) => tab.fields.some((f) => 'name' in f && f.name === 'name'))
+		?.fields
+}
+
+/** One add-field block per registered type: tabs holding shared config, type config, and validations. */
 export const buildFieldBlocks = (
 	registry: FieldTypeRegistry,
 	ruleRegistry: ValidationRuleRegistry,
@@ -38,14 +45,12 @@ export const buildFieldBlocks = (
 			slug: definition.type,
 			labels: { singular: labelFor(definition.label), plural: labelFor(definition.label) },
 			fields: [
-				...sharedFieldConfig(conditionTypes),
-				...typeConfig,
-				{
+				fieldBlockTabs(conditionTypes, typeConfig, {
 					name: 'validations',
 					type: 'blocks',
 					label: labelFor(keys.validationsLabel),
 					blocks: buildRuleBlocks(ruleRegistry, definition.type),
-				},
+				}),
 			],
 		})
 	}
@@ -55,22 +60,14 @@ export const buildFieldBlocks = (
 	// Repeater-in-repeater is not supported in v1; the repeater block is excluded from subFields.
 	const repeaterBlock = blocks.find((b) => b.slug === 'repeater')
 	if (repeaterBlock) {
-		const subFieldBlocks = blocks.filter((b) => b.slug !== 'repeater')
-		const fieldsArr = repeaterBlock.fields as Field[]
-		const validationsIdx = fieldsArr.findIndex(
-			(f) => (f as { name?: string }).name === 'validations'
-		)
 		const subFieldsField: Field = {
 			name: 'subFields',
 			type: 'blocks',
 			label: labelFor(keys.configSubFields),
-			blocks: subFieldBlocks,
+			blocks: blocks.filter((b) => b.slug !== 'repeater'),
 		}
-		if (validationsIdx >= 0) {
-			fieldsArr.splice(validationsIdx, 0, subFieldsField)
-		} else {
-			fieldsArr.push(subFieldsField)
-		}
+		const fieldTabFields = fieldTabOf(repeaterBlock)
+		;(fieldTabFields ?? (repeaterBlock.fields as Field[])).push(subFieldsField)
 	}
 
 	return blocks

@@ -9,6 +9,7 @@ import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { ConditionRow, type RowCondition } from './ConditionRow'
 import { type ConditionOperand, type FieldRow, operandFromRow } from './synthesizeClientField'
+import './admin.css'
 
 export type ConditionBuilderProps = {
 	value?: Where
