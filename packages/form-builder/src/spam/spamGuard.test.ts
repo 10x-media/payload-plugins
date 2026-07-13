@@ -17,7 +17,7 @@ const okLimiter = { check: async () => ({ ok: true, remaining: 9, resetAt: 0 }) 
 const blockLimiter = { check: async () => ({ ok: false, remaining: 0, resetAt: 0 }) }
 
 const cfg = (over: Partial<ResolvedSpamConfig> = {}): ResolvedSpamConfig => ({
-	honeypot: { fieldName: 'confirm_email' },
+	honeypot: { fieldName: 'website' },
 	rateLimit: { window: 60_000, max: 5, limiter: okLimiter },
 	uploadRateLimit: false,
 	captcha: undefined,
@@ -47,7 +47,7 @@ describe('buildSpamGuard', () => {
 	it('rejects when the honeypot is filled (generic message, no distinguishing detail)', async () => {
 		const guard = buildSpamGuard(cfg())
 		await expect(
-			run(guard, { form: 'f1', values: [{ field: 'confirm_email', value: 'bot' }] })
+			run(guard, { form: 'f1', values: [{ field: 'website', value: 'bot' }] })
 		).rejects.toBeInstanceOf(APIError)
 	})
 
@@ -94,7 +94,7 @@ describe('buildSpamGuard', () => {
 		const guard = buildSpamGuard(cfg({ captcha }))
 		const out = (await run(
 			guard,
-			{ form: 'f1', values: [{ field: 'confirm_email', value: 'x' }] },
+			{ form: 'f1', values: [{ field: 'website', value: 'x' }] },
 			req
 		)) as { meta?: { spam?: { captcha?: string } } }
 		expect(out.meta?.spam?.captcha).toBe('skipped')

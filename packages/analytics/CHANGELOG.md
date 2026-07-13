@@ -1,5 +1,76 @@
 # @10x-media/analytics
 
+## 0.1.0-beta.1
+
+### Minor Changes
+
+- Field, type, and resolver API fixes from user feedback.
+
+  **Breaking:** `analyticsTab()` now returns a Payload `Tab` (as its name promises) instead of a whole tabs field, so it can be pushed into your own tabs field's `tabs` array. If you used it standalone in a `fields` array, switch to the new `analyticsTabsField()`:
+
+  ```ts
+  fields: [analyticsTab()]; // before
+  fields: [analyticsTabsField()]; // after (same rendered result)
+  ```
+
+  Display fields no longer blank entirely when one requested metric is unsupported by the active adapter: unsupported metrics are dropped (logged once per field render with the dropped names and adapter id), the supported remainder renders, and the "not available" state shows only when nothing survives.
+
+  Bindings are typed over `CollectionSlug`: the `collections` option keys are checked against your generated slugs and inline resolvers receive that collection's generated document type (degrading to `Record<string, unknown>` without generated types); `sync.collectionSlug` is checked the same way. `HostnameResolver` gains the same `(doc, ctx)` signature as `PathResolver` and may return `string | null | Promise<string | null>`; sync one-argument resolvers keep working.
+
+  Widget config Titles can opt into localization via `widgets: { localizeText: true }`. Field factories accept label overrides wherever they hardcoded translation keys: `analyticsStat` takes `label`, the row/fields/tab factories take per-metric `labels`, and `analyticsTab` / `analyticsTabsField` take tab `label` and `description`, each as a string, locale map, or Payload label function. The date range picker placeholder is now translatable.
+
+- Runtime provider configuration and multi-tenant scoping. New options: `scopeResolver` maps each request to an analytics boundary (tenant id, site key; null = whole install), `providers.collection` (false | true | object) scaffolds an admin collection where providers are configured at runtime per scope (masked secrets, overridable slug/fields/access, `scopeField` for tenant-plugin fields), `providers.resolve` replaces the collection lookup with a custom store, `platformAdapter` designates one config adapter shared by every scope, and `access.platformRead` gates cross-scope reads (default: any authenticated user). Scoped installs add an indexed scope column to native events and rollups (existing native installs need a migration), the posthog adapter gains `scopeProperty` for per-scope reads against one shared project, and `posthogProxyRewrites` (new `./next` subpath) returns Next.js rewrites for a first-party PostHog proxy.
+
+  ```ts
+  import { getTenantFromCookie } from "@payloadcms/plugin-multi-tenant/utilities";
+
+  analytics({
+    adapters: [
+      native(),
+      posthog({ projectId, apiKey, scopeProperty: "tenant" }),
+    ],
+    platformAdapter: "posthog",
+    scopeResolver: ({ req }) => {
+      const tenant = getTenantFromCookie(
+        req.headers,
+        req.payload.db.defaultIDType
+      );
+      return tenant === null ? null : String(tenant);
+    },
+    providers: { collection: { scopeField: "tenant" } },
+  });
+  ```
+
+  Static `adapters` config and default behavior without the new options are unchanged.
+
+- Add a typed `translations` option to every plugin factory and make translation keys a stable public API. Each plugin's `./i18n` subpath now exports the `keys` object, the `TranslationKey` union, and the `TranslationsOption` shape. Overrides are flat and per-locale: values win over the built-in locales key-by-key, locales a plugin does not ship are added whole, and app-level `i18n.translations` still wins over everything.
+
+  ```ts
+  import { analytics } from "@10x-media/analytics";
+  import { keys } from "@10x-media/analytics/i18n";
+
+  analytics({
+    adapters: [nativeAdapter()],
+    translations: {
+      de: { [keys.pluginName]: "Analytik" },
+    },
+  });
+  ```
+
+  A typo'd key inside `translations` is a compile error.
+
+### Patch Changes
+
+- Declare `maxmind` and `@payloadcms/db-postgres` as optional peer dependencies. Both are loaded lazily (maxmind by the MaxMind geo resolver, `@payloadcms/db-postgres` by the atomic rollup path on Postgres), but they were previously bundled into the published package, which inlined the entire Postgres driver stack and the MaxMind reader into dist. Consumers on Postgres already have `@payloadcms/db-postgres` installed; Mongo-only consumers never load it. Install `maxmind` only if you use the MaxMind geo resolver.
+
+- Preserve `'use client'` directives in shared build chunks so the `/client` and `/rsc` entries expose correct React Server Component boundaries. Client widgets (`RealtimeCounter`, `TrendChart`, `BarList`) that get hoisted into a shared chunk now keep their directive, preventing "use client" boundary errors in Next.js consumers.
+
+- Restructure README: features, quick start, and links into the documentation site at https://docs.10xmedia.de. Long-form documentation moved out of the package README.
+
+- Update README documentation links: the docs site now serves from the domain root, so `docs.10xmedia.de/docs/<plugin>` links became `docs.10xmedia.de/<plugin>`.
+
+- Ship per-file dist output instead of bundled chunks. Bundling merged client components into shared chunks and dropped their 'use client' directives, so Next.js lost the RSC boundary and the admin panel crashed with "useRef only works in Client Components" when rendering components imported through such a chunk (for analytics: every chart-based dashboard widget). Dist now mirrors src one file at a time, directives stay exactly where they were authored, and file names are stable across releases. A repo-level `check:dist` verification (directive parity, no inlined dependencies, exports resolution, publint) now runs in CI so this class of regression cannot ship again.
+
 ## 0.1.0-beta.0
 
 ### Minor Changes

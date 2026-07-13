@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/form-builder",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.2",
 	"description": "End-to-end forms platform for Payload: author, validate, render, collect, aggregate, and act.",
 	"license": "MIT",
 	"repository": {
@@ -93,17 +93,21 @@
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
+	"dependencies": {
+		"@payloadcms/email-nodemailer": "^3.86.0",
+		"@standard-schema/spec": "^1.0.0",
+		"nodemailer": "^9.0.3"
+	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
-		"shadcn": "^2.4.0",
 		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
 		"@axe-core/playwright": "catalog:",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
-		"@standard-schema/spec": "^1.0.0",
 		"@testing-library/jest-dom": "catalog:",
 		"@testing-library/react": "catalog:",
 		"@types/node": "catalog:",
@@ -115,6 +119,7 @@
 		"playwright": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
+		"shadcn": "^2.4.0",
 		"tsdown": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"

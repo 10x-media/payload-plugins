@@ -1,0 +1,65 @@
+---
+title: Queue control
+description: Cluster-wide pause/resume and the hardened queue endpoints.
+---
+
+Queue control adds an operations surface to the queue: pause and resume across every node, plus three endpoints for driving and observing it from outside. Off by default:
+
+```ts title="payload.config.ts"
+jobs({ queueControl: true })
+// or tuned:
+jobs({
+  queueControl: {
+    access: cronSecretAccess(),          // default: loggedInAccess
+    queues: ['default', 'emails'],       // queues to report health for; default ['default']
+  },
+})
+```
+
+## Pause and resume
+
+Pause state is durable and cluster-wide, stored in `payload.kv`. Both the worker's run loop and the `queue-run` endpoint honor it.
+
+```ts
+import { createPauseStore } from '@10x-media/jobs'
+
+const pause = createPauseStore(payload)
+
+await pause.pause()             // pause everything
+await pause.pause('emails')     // pause one queue
+await pause.resume('emails')    // resume one queue
+await pause.resume({ all: true }) // clear both layers
+await pause.isPaused('default') // check
+```
+
+Pass the store to [`createWorker`](/jobs/workers) as `pauseStore` so workers respect it. Pause writes are read-modify-write over kv (last writer wins), which is fine for rare admin actions.
+
+## Endpoints
+
+All three are GET endpoints registered on the `payload-jobs` collection and gated by the `access` option:
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/payload-jobs/queue-status` | Returns a `QueueHealthReport`: totals and per-queue counts (`queued`, `scheduled`, `retrying`, `processing`, `succeeded`, `failed`, `cancelled`, `recovered`), oldest queued age, last scheduled run. |
+| `GET /api/payload-jobs/queue-run` | Runs due jobs, pause-aware. Params: `allQueues=true`, `queue=<name>`, `limit=<n>`, `disableScheduling=true`, `silent=true`. |
+| `GET /api/payload-jobs/queue-sweep` | One orphan sweep pass (no leader election; safe from cron). Requires [reliability](/jobs/reliability). |
+
+The same health data is available programmatically via `getQueueHealth(payload, options)`.
+
+## Access guards
+
+Two guards ship, and `access` accepts any `JobAccess` function. `loggedInAccess` (the default) admits any authenticated user. `cronSecretAccess({ envVar? })` admits an `Authorization: Bearer <secret>` header matching the env var (default `CRON_SECRET`), or a logged-in user; the bearer form is what Vercel Cron sends.
+
+<Callout type="warn">
+`queue-run` and `queue-sweep` mutate state over GET, so they are CSRF-exposed to logged-in admin sessions: a crafted image tag can trigger them silently. They are GET because Vercel Cron only sends GET. If browser sessions can reach your deployment, prefer `cronSecretAccess` (bearer token) over relying on the session cookie.
+</Callout>
+
+## Default access when queue control is off
+
+Payload's own jobs system exposes two endpoints of its own, independent of this plugin: `/api/payload-jobs/run` and `/api/payload-jobs/handle-schedules`. Both are state-mutating, since they execute jobs (or fire due schedules) in the serving process. When `jobs.access.run` is left unset, Payload defaults it to `defaultAccess`, which admits **any logged-in user**, not just admins with access to the jobs collection.
+
+<Callout type="warn">
+With `queueControl` off and `jobs.access.run` unset, the plugin now denies both endpoints outright rather than inheriting Payload's any-logged-in-user default. A `jobs.access.run` you set yourself always wins, whether `queueControl` is on or off. Turning `queueControl` on keeps its own hardened composition (the `access` option above, defaulting to `loggedInAccess`) and is unaffected by this change.
+
+If you relied on the unauthenticated-but-logged-in default (for example, hitting `/api/payload-jobs/run` from your own backend with a user session and no `queueControl`), set `jobs.access.run` explicitly in `buildConfig` to opt back in.
+</Callout>

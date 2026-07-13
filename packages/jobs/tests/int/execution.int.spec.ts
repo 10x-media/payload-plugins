@@ -178,6 +178,43 @@ describeForDb('worker graceful drain', {}, (db) => {
 	})
 })
 
+describeForDb('worker scheduling flag', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: jobs({ reliability: {} }),
+			db,
+			configOverrides: { jobs: { tasks: [countingTask] } },
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('a worker with scheduling disabled never contends for the scheduler lease', async () => {
+		const worker = createWorker({
+			installSignals: false,
+			maintenanceIntervalMs: 50,
+			payload: booted.payload,
+			reliability: resolved(),
+			scheduling: false,
+		}) as WorkerTestHandle
+		worker.start()
+		try {
+			// Sweeper leadership proves the flag is scoped: the same maintenance tick that
+			// acquired the sweeper lease would have acquired the scheduler lease first.
+			await expect.poll(() => worker.isLeader('sweeper'), { timeout: 5000 }).toBe(true)
+			expect(worker.isLeader('scheduler')).toBe(false)
+			const lease = await createLeaseStore(booted.payload).read('scheduler')
+			expect(lease?.owner ?? null).toBeNull()
+		} finally {
+			await worker.stop()
+		}
+	})
+})
+
 describeForDb('worker run loop', {}, (db) => {
 	let booted: BootedPayload
 
@@ -209,11 +246,11 @@ describeForDb('worker run loop', {}, (db) => {
 		while (ran < 1 && Date.now() < deadline) {
 			await new Promise((r) => setTimeout(r, 25))
 		}
-		;(worker as WorkerTestHandle).stop()
+		await (worker as WorkerTestHandle).stop()
 		expect(ran).toBeGreaterThanOrEqual(1)
 	})
 
-	it('throws when signal handlers are already installed (item 21)', () => {
+	it('throws when signal handlers are already installed (item 21)', async () => {
 		resetHandlersInstalled()
 		const first = createWorker({
 			installSignals: true,
@@ -225,7 +262,7 @@ describeForDb('worker run loop', {}, (db) => {
 				createWorker({ installSignals: true, payload: booted.payload, reliability: resolved() })
 			).toThrow(/already installed/)
 		} finally {
-			first.stop()
+			await first.stop()
 			resetHandlersInstalled()
 		}
 	})
@@ -266,7 +303,9 @@ describeForDb('worker run loop', {}, (db) => {
 			}
 			expect(ran).toBeGreaterThan(afterLive)
 		} finally {
-			worker.stop()
+			// stop() resolves only after the in-flight run tick settles; without that, a
+			// late payload.jobs.run write to a job doc aborts the bulk delete's transaction.
+			await worker.stop()
 			await pauseStore.resume({ all: true })
 			await booted.payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
 		}

@@ -1,0 +1,44 @@
+---
+title: Caching and warming
+description: How reads are cached in payload.kv, and the opt-in warm job for provider-backed dashboards.
+---
+
+Every read (widgets, display fields, sync) goes through a surfacing engine that caches in `payload.kv`, coalesces concurrent identical requests into one in-flight read, bounds concurrency, and backs off exponentially on provider errors. The engine is built for the dashboard's worst case: one page load fires many widget reads at once, and several providers bill per query. Caching absorbs repeat reads across requests; coalescing absorbs them within one, so a burst of identical queries costs a single provider call. Unconfigured adapters and provider outages degrade to empty states, never crashes.
+
+## TTLs
+
+Cache entries are keyed per adapter and query and snapped to the UTC day. Two TTLs apply:
+
+```ts
+analytics({
+  adapters: [/* ... */],
+  cache: {
+    ttl: {
+      aggregate: 3600, // seconds; historical reads. Default 3600.
+      realtime: 300,   // seconds; realtime reads. Default 300.
+    },
+  },
+})
+```
+
+Adapters recommend TTLs through their capabilities (GA4 suggests 6 hours because its quota is token-billed); the configured values apply across adapters.
+
+## Scheduled warming (opt-in)
+
+For provider-backed dashboards, the first load after an entry expires pays a cold provider round trip. The warm job pre-runs the dashboard's reads on a cron so that first load hits a warm cache:
+
+```ts
+analytics({
+  adapters: [plausible({ /* ... */ })],
+  cache: { warm: true },                       // default cron: every 30 minutes
+  // cache: { warm: { cron: '0 * * * *' } },   // hourly
+})
+```
+
+The job registers a Payload task (`analytics-warm-cache`) whose work list derives from your `admin.dashboard.defaultLayout`: each metric, trend, and breakdown widget becomes one warm read with the same metric, timeframe, and data source it renders. The realtime widget is skipped (the live poller keeps it warm), as is any custom widget whose read shape the plugin cannot know. One provider failure is logged and does not abort the rest.
+
+Warming is off by default because it spends provider API quota on a schedule. It pays off most for provider-backed dashboards; the native engine is fast enough that warming it is harmless but low value.
+
+<Callout>
+The warm task runs through Payload's jobs runner. Enable cron `autoRun`, run a [worker](/jobs/workers), or invoke the queue from an external scheduler, or the schedule never fires. The same applies to [sync](/analytics/sync) and retention pruning.
+</Callout>

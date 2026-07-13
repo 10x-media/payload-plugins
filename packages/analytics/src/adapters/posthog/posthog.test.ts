@@ -169,3 +169,60 @@ describe('posthog adapter', () => {
 		expect(result.totals?.pageviews).toBe(1)
 	})
 })
+
+describe('posthog scopeProperty', () => {
+	const captureSql = (): { get: () => string } => {
+		let sql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const body = (await request.json()) as { query?: { query?: string } }
+				sql = body.query?.query ?? ''
+				return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[1]] })
+			})
+		)
+		return { get: () => sql }
+	}
+
+	it('declares scopedQueries only when a scopeProperty is configured', () => {
+		expect(posthog({ projectId: '123', apiKey: 'k' }).capabilities.scopedQueries).toBeUndefined()
+		expect(
+			posthog({ projectId: '123', apiKey: 'k', scopeProperty: 'tenant' }).capabilities.scopedQueries
+		).toBe(true)
+	})
+
+	it('filters by the scope property with escaped literals', async () => {
+		const sql = captureSql()
+		await posthog({ projectId: '123', apiKey: 'k', scopeProperty: 'tenant' }).query(
+			q({ metrics: ['pageviews'], scope: 'acme' }),
+			{}
+		)
+		expect(sql.get()).toContain("properties['tenant'] = 'acme'")
+	})
+
+	it('escapes injection attempts in both the property name and the scope value', async () => {
+		const sql = captureSql()
+		await posthog({
+			projectId: '123',
+			apiKey: 'k',
+			scopeProperty: "t' OR 1=1 --",
+		}).query(q({ metrics: ['pageviews'], scope: "a'; DROP TABLE events --" }), {})
+		expect(sql.get()).toContain("properties['t\\' OR 1=1 --'] = 'a\\'; DROP TABLE events --'")
+		expect(sql.get()).not.toContain("= 'a'; DROP")
+	})
+
+	it('adds no scope filter when the query has no scope or no property is configured', async () => {
+		const noScope = captureSql()
+		await posthog({ projectId: '123', apiKey: 'k', scopeProperty: 'tenant' }).query(
+			q({ metrics: ['pageviews'] }),
+			{}
+		)
+		expect(noScope.get()).not.toContain("properties['tenant']")
+
+		const noProperty = captureSql()
+		await posthog({ projectId: '123', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews'], scope: 'acme' }),
+			{}
+		)
+		expect(noProperty.get()).not.toContain('acme')
+	})
+})

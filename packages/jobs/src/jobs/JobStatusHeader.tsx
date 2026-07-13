@@ -2,7 +2,8 @@
 
 import { Pill, useConfig, useFormFields } from '@payloadcms/ui'
 import { formatDate } from '@payloadcms/ui/shared'
-import type { UIFieldClientComponent } from 'payload'
+import type { UIFieldClientProps } from 'payload'
+import type { FC } from 'react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -76,7 +77,12 @@ const Fact = ({ label, tooltip, value }: { label: string; tooltip?: string; valu
  * Document header for a job: the derived status as a Pill plus the key facts,
  * read from the form so it stays in sync. Rendered at the top of the edit view.
  */
-export const JobStatusHeader: UIFieldClientComponent = () => {
+export const JobStatusHeader: FC<
+	UIFieldClientProps & {
+		taskLabels?: Record<string, string>
+		workflowLabels?: Record<string, string>
+	}
+> = ({ taskLabels, workflowLabels }) => {
 	const fields = useFormFields(([formFields]) => formFields)
 	const { config } = useConfig()
 	const { i18n, t } = useTranslation()
@@ -99,11 +105,17 @@ export const JobStatusHeader: UIFieldClientComponent = () => {
 		: taskSlug
 			? t(keys.fieldTask)
 			: t(keys.fieldJob)
-	const runsValue = String(workflowSlug || taskSlug || '—')
+	const runsSlug = String(workflowSlug || taskSlug || '—')
+	const runsFriendly =
+		(typeof workflowSlug === 'string' && workflowLabels?.[workflowSlug]) ||
+		(typeof taskSlug === 'string' && taskLabels?.[taskSlug]) ||
+		undefined
+	const runsValue = runsFriendly ?? runsSlug
 
 	const pattern = config.admin?.dateFormat ?? DEFAULT_DATE_FORMAT
 	const createdAt = get('createdAt') as null | string
 	const completedAt = get('completedAt') as null | string
+	const waitUntil = get('waitUntil') as null | string
 	const absolute = (date: null | string): string | undefined =>
 		date ? formatDate({ date, i18n, pattern }) : undefined
 
@@ -123,18 +135,29 @@ export const JobStatusHeader: UIFieldClientComponent = () => {
 			<Pill pillStyle={meta.pillStyle} size="medium">
 				{t(meta.labelKey)}
 			</Pill>
-			<Fact label={runsLabel} value={runsValue} />
+			<Fact label={runsLabel} tooltip={runsFriendly ? runsSlug : undefined} value={runsValue} />
 			<Fact label={t(keys.fieldQueue)} value={String(get('queue') || 'default')} />
-			<Fact label={t(keys.fieldAttempts)} value={String((get('totalTried') as number) ?? 0)} />
+			<Fact
+				label={t(keys.fieldAttempts)}
+				tooltip={t(keys.attemptsTooltip)}
+				value={String((get('totalTried') as number) ?? 0)}
+			/>
+			{status === 'scheduled' && waitUntil ? (
+				<Fact
+					label={t(keys.fieldScheduledFor)}
+					tooltip={absolute(waitUntil)}
+					value={formatRelativeTime(waitUntil, Date.now(), i18n.language) || '—'}
+				/>
+			) : null}
 			<Fact
 				label={t(keys.fieldCreated)}
 				tooltip={absolute(createdAt)}
-				value={formatRelativeTime(createdAt) || '—'}
+				value={formatRelativeTime(createdAt, Date.now(), i18n.language) || '—'}
 			/>
 			<Fact
 				label={t(keys.fieldCompleted)}
 				tooltip={absolute(completedAt)}
-				value={completedAt ? formatRelativeTime(completedAt) : '—'}
+				value={completedAt ? formatRelativeTime(completedAt, Date.now(), i18n.language) : '—'}
 			/>
 		</div>
 	)

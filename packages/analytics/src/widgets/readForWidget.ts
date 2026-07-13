@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
+import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 
@@ -21,6 +22,8 @@ export interface ReadForWidgetArgs {
 	adapterId?: string
 	now: Date
 	range?: DateRange
+	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
+	scope?: string | null
 }
 
 export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetReadResult> => {
@@ -32,19 +35,18 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	if (!runtime) {
 		return { status: 'unavailable', adapterId: adapterId ?? '', ...base }
 	}
-	let adapter: AnalyticsAdapter
-	try {
-		adapter = adapterId ? runtime.registry.get(adapterId) : runtime.registry.default()
-	} catch {
+	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
+	if (!ctx.ok) {
 		return { status: 'unavailable', adapterId: adapterId ?? '', ...base }
 	}
+	const adapter: AnalyticsAdapter = ctx.adapter
 	if (!adapter.isConfigured()) {
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
 	}
 	if (!satisfiesCapabilities(adapter.capabilities, { metrics })) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
-	const result = await runtime.engine.read(adapter, { metrics, dateRange })
+	const result = await runtime.engine.read(adapter, { metrics, dateRange, scope: ctx.queryScope })
 	return {
 		status: 'ok',
 		adapterId: adapter.id,

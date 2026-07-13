@@ -1,0 +1,74 @@
+---
+title: Recall and prefill
+description: Pipe earlier answers into text, prefill from the URL, and capture hidden context.
+---
+
+## Recall (piping)
+
+Recall substitutes previously captured answers into displayed text with `{{ fieldName }}` and `{{ fieldName|fallback }}` tokens. Tokens work in field labels, field descriptions, option labels, and the success message, and resolve against the current values at render time:
+
+```ts
+// field 1: name (text)
+// field 2: label uses recall
+{
+  label: 'Hello {{name}}, what can we help with?',
+  successMessage: 'Thanks {{name}}, we will be in touch.',
+}
+```
+
+Values are formatted through the field type's `format` before substitution: a select shows its option label, a checkbox shows Yes or No. Token-free text passes through unchanged, so recall is safe to apply unconditionally.
+
+For custom layouts, the resolver is exported (pure and isomorphic, usable in server components and API routes):
+
+```ts
+import { buildRecallResolver, interpolate } from '@10x-media/form-builder/react'
+
+const resolve = buildRecallResolver({ fields, values, registry, locale, t })
+const label = interpolate('Hello {{name}}', resolve)
+```
+
+Recall also pipes [calculation results](/form-builder/calculations) into the success message: `Thanks, you scored {{score}} points!`
+
+## URL prefill
+
+`valuesFromSearchParams` maps query parameters to typed initial values. It maps known fields only, coerces to the field's value kind (number, boolean, multi-value, text), and silently ignores unknown params, denied fields, and invalid values. Prefilled values are never trusted; they validate on submit like anything else.
+
+```tsx title="app/contact/page.tsx"
+import { Form, valuesFromSearchParams } from '@10x-media/form-builder/react'
+
+// Server component: reads searchParams on the server, no hydration mismatch.
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>
+}) {
+  const form = await fetchForm('contact')
+  const params = new URLSearchParams(await searchParams)
+  const initialValues = valuesFromSearchParams(params, form.fields, registry)
+
+  return <Form form={form} initialValues={initialValues} />
+}
+```
+
+Control the mapping with options:
+
+```ts
+valuesFromSearchParams(params, fields, registry, {
+  map: { utm_email: 'email' }, // ?utm_email=... prefills the `email` field
+  allow: ['name', 'email'],    // only these fields may be prefilled
+  deny: ['internalRef'],       // these never are
+})
+```
+
+`allow` is evaluated after `map`, so list the mapped field name, not the param name.
+
+## Hidden context fields
+
+Any field can be marked hidden in the Advanced section of its settings. Hidden fields are captured and stored but not shown to the visitor. Pair with URL prefill to capture tracking context:
+
+```ts
+// The `source` field is hidden and prefilled from ?source=...
+valuesFromSearchParams(params, fields, registry, { allow: ['source'] })
+```
+
+The flag is render-only: the server stores and validates hidden fields normally. A hidden field that is required but not prefilled fails validation, so keep hidden fields optional or reliably prefilled.

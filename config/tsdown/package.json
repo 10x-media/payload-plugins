@@ -1,0 +1,19 @@
+{
+	"name": "@10x-media/tsdown-config",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./tsdown.shared": {
+			"development": "./tsdown.shared.ts",
+			"types": "./tsdown.shared.ts",
+			"default": "./tsdown.shared.ts"
+		}
+	},
+	"files": [
+		"tsdown.shared.ts"
+	],
+	"dependencies": {
+		"tsdown": "catalog:"
+	}
+}

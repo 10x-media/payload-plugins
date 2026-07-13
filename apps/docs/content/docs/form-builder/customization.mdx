@@ -1,0 +1,122 @@
+---
+title: Customization
+description: Collection overrides, submission admin UI options, and other plugin-level configuration.
+---
+
+## Submission answers UI
+
+When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component that formats each value using its field type's `format` function, shows repeater rows with numbered headings, displays consent proofs with agreed/declined indicators and a timestamp, and includes submission metadata. This replaces the raw JSON fields as the primary view.
+
+The raw `values`, `descriptors`, and `consent` JSON fields are hidden by default. They contain the same data as the formatted UI and are noisy alongside it. To show them (useful for debugging), set `showSubmissionRawFields`:
+
+```ts title="payload.config.ts"
+formBuilder({
+  showSubmissionRawFields: true,
+})
+```
+
+With this option off (the default), the `answers` UI field is the only visible representation of a submission's content in the admin. The raw JSON fields still exist in the database and are returned by the API; only the admin display is affected.
+
+---
+
+## Collection overrides
+
+The plugin manages three Payload collections: `forms`, `form-submissions`, and `form-uploads`. All three accept an `overrides` option that lets you extend them in a way that is explicit and predictable, without using a deep-merge utility that can silently drop plugin-critical config.
+
+## The spread convention
+
+Each key in `overrides` is a `CollectionOverrides` object. The plugin builds the defaults, then merges them with your overrides using explicit spreads. The spread order encodes who wins:
+
+- Keys where the consumer wins: `{ ...pluginDefault, ...(overrides?.key ?? {}) }` — your value is last.
+- Keys the plugin locks: `{ ...(overrides?.key ?? {}), pluginLockedValue }` — the plugin value is last and cannot be overwritten.
+- Hooks: `[...pluginHooks, ...(overrides?.hooks?.X ?? [])]` — the plugin's hooks always run first, your hooks are appended.
+
+This means you can always add a `beforeValidate` hook to `form-submissions` and it will run after the spam guard and submission validator, not instead of them.
+
+## Fields as a function
+
+The `fields` key is not an array; it is a function. You receive the plugin's default fields and return the final array:
+
+```ts title="payload.config.ts"
+import { formBuilder, type FieldsOverride } from '@10x-media/form-builder'
+
+formBuilder({
+  overrides: {
+    formSubmissions: {
+      fields: ({ defaultFields }) => [
+        ...defaultFields,
+        { name: 'source', type: 'text' },
+      ],
+    },
+  },
+})
+```
+
+This makes the intent explicit: you cannot accidentally wipe the defaults by forgetting to spread them. If you want to remove a field, `.filter()` it out. If you want to wrap or rename one, `.map()` over it.
+
+## Access control
+
+Access keys are spread with the plugin's defaults first and your overrides last:
+
+```ts
+formBuilder({
+  overrides: {
+    forms: {
+      access: {
+        // The plugin sets read: () => true (forms are public). Override it:
+        read: ({ req }) => Boolean(req.user),
+      },
+    },
+  },
+})
+```
+
+## Admin settings
+
+```ts
+formBuilder({
+  overrides: {
+    forms: {
+      admin: { group: 'Content' },
+      // Also valid: labels, defaultSort, pagination, etc.
+    },
+  },
+})
+```
+
+## Adding hooks
+
+```ts
+formBuilder({
+  overrides: {
+    formSubmissions: {
+      hooks: {
+        afterChange: [
+          async ({ doc }) => {
+            // Runs after the plugin's own afterChange (action dispatch + event sink)
+            await notifySlack(doc)
+          },
+        ],
+      },
+    },
+  },
+})
+```
+
+## API reference
+
+```ts
+import type { CollectionOverrides, FieldsOverride } from '@10x-media/form-builder/types'
+
+formBuilder({
+  overrides?: {
+    forms?: CollectionOverrides
+    formSubmissions?: CollectionOverrides
+    uploads?: CollectionOverrides
+  }
+})
+```
+
+`CollectionOverrides` is `{ fields?: FieldsOverride } & Partial<Omit<CollectionConfig, 'fields'>>`.
+
+`FieldsOverride` is `(args: { defaultFields: Field[] }) => Field[]`.

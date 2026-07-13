@@ -2,7 +2,8 @@
 
 import { Pill, useConfig, useForm } from '@payloadcms/ui'
 import { formatDate } from '@payloadcms/ui/shared'
-import type { ArrayFieldClientComponent } from 'payload'
+import type { ArrayFieldClientProps } from 'payload'
+import type { FC } from 'react'
 import { useState } from 'react'
 
 import { keys } from '../translations/keys'
@@ -89,7 +90,17 @@ const JsonBlock = ({ label, value }: { label: string; value: unknown }) => (
 	</div>
 )
 
-const LogRow = ({ entry, index, pattern }: { entry: LogEntry; index: number; pattern: string }) => {
+const LogRow = ({
+	entry,
+	index,
+	pattern,
+	taskLabels,
+}: {
+	entry: LogEntry
+	index: number
+	pattern: string
+	taskLabels?: Record<string, string>
+}) => {
 	const { i18n, t } = useTranslation()
 	const [open, setOpen] = useState(false)
 	const failed = entry.state === 'failed'
@@ -130,7 +141,13 @@ const LogRow = ({ entry, index, pattern }: { entry: LogEntry; index: number; pat
 				<Pill pillStyle={failed ? 'error' : 'success'} size="small">
 					{failed ? t(keys.statusFailed) : t(keys.statusSucceeded)}
 				</Pill>
-				<strong>{entry.taskSlug || t(keys.fieldTask)}</strong>
+				<strong>
+					{entry.taskSlug === 'inline'
+						? t(keys.inlineStep, { id: entry.taskID ?? '?' })
+						: taskLabels?.[entry.taskSlug ?? '']
+							? `${taskLabels[entry.taskSlug ?? '']} (${entry.taskSlug} / ${entry.taskID ?? '?'})`
+							: entry.taskSlug || t(keys.fieldTask)}
+				</strong>
 				{relative ? <span style={{ color: 'var(--theme-elevation-500)' }}>{relative}</span> : null}
 				{duration ? <span style={{ color: 'var(--theme-elevation-500)' }}>{duration}</span> : null}
 				{reason ? (
@@ -189,7 +206,9 @@ const LogRow = ({ entry, index, pattern }: { entry: LogEntry; index: number; pat
  * attempt collapses to a one-line summary and expands to reveal its full data
  * (timings, task ID, input, output, error) so nothing is hidden.
  */
-export const JobLogTimeline: ArrayFieldClientComponent = ({ path }) => {
+export const JobLogTimeline: FC<
+	ArrayFieldClientProps & { taskLabels?: Record<string, string> }
+> = ({ path, taskLabels }) => {
 	const { getDataByPath } = useForm()
 	const { config } = useConfig()
 	const { t } = useTranslation()
@@ -204,7 +223,13 @@ export const JobLogTimeline: ArrayFieldClientComponent = ({ path }) => {
 	return (
 		<div style={{ display: 'flex', flexDirection: 'column', gap: 'calc(var(--base) / 2)' }}>
 			{entries.map((entry, index) => (
-				<LogRow entry={entry} index={index} key={entry.id ?? index} pattern={pattern} />
+				<LogRow
+					entry={entry}
+					index={index}
+					key={entry.id ?? index}
+					pattern={pattern}
+					taskLabels={taskLabels}
+				/>
 			))}
 		</div>
 	)

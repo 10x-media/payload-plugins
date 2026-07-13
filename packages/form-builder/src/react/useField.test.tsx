@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useReducer } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FormContext, type FormStepInfo } from './FormContext'
+import type { RendererRegistry } from './registry'
 import { formReducer, initialFormState } from './state'
 import { useField } from './useField'
 
@@ -18,10 +19,21 @@ const step: FormStepInfo = {
 	goBack: () => {},
 }
 
+const emptyRegistry: RendererRegistry = new Map()
+
 const Harness = ({ validateField }: { validateField: (name: string, value: unknown) => void }) => {
 	const [state, dispatch] = useReducer(formReducer, initialFormState({ a: '' }))
 	return (
-		<FormContext.Provider value={{ state, dispatch, validateField, locale: 'en', step }}>
+		<FormContext.Provider
+			value={{
+				state,
+				dispatch,
+				validateField,
+				locale: 'en',
+				step,
+				rendererRegistry: emptyRegistry,
+			}}
+		>
 			<Field />
 		</FormContext.Provider>
 	)

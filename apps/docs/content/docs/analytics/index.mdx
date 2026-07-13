@@ -1,0 +1,42 @@
+---
+title: Analytics
+description: Adapter-based analytics for Payload v3, with dashboard widgets and per-document stats.
+---
+
+`@10x-media/analytics` puts web analytics inside the Payload admin. One adapter contract covers a self-hosted native engine and the major providers (GA4, Plausible, Umami, PostHog), so the same dashboard widgets and per-document stat fields work regardless of where the numbers come from, and switching providers is a config change.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { analytics, analyticsDefaultWidgets } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export default buildConfig({
+  admin: {
+    dashboard: { defaultLayout: [...analyticsDefaultWidgets()] },
+  },
+  plugins: [
+    analytics({
+      adapters: [native()],
+      collections: {
+        pages: { path: (doc) => (doc.slug ? `/${doc.slug}` : null) },
+      },
+    }),
+  ],
+})
+```
+
+## How it fits together
+
+Everything reads through one [adapter contract](/analytics/adapters) with a capabilities model: run the [native engine](/analytics/native), a provider, or several at once, and every surface hides what the active adapter cannot answer. The native engine gives you self-hosted, cookieless analytics stored in Payload collections, with atomic rollups, exact daily uniques, [geo resolution](/analytics/geo), retention pruning, and optional write batching.
+
+The numbers surface in two places. [Dashboard widgets](/analytics/widgets) (metric, trend, breakdown, and realtime, plus a public API for your own) render on Payload's Modular Dashboard. [Display fields](/analytics/display-fields) put per-document stats on your own collections through factories such as `analyticsStat` and `analyticsTab`; nothing is auto-injected into your schema.
+
+Underneath, reads are [cached](/analytics/cache) in `payload.kv` with request coalescing and optional scheduled warming, and an opt-in [sync tier](/analytics/sync) persists provider daily metrics into a queryable Payload collection. Admin strings are [typed translations](/analytics/i18n) following the shared plugin pattern.
+
+## When to use it
+
+Use the native engine when you want analytics without a third-party service: no cookies, data in your own database, one dependency. Use a provider adapter when the numbers already live in GA4, Plausible, Umami, or PostHog and you want them surfaced next to the content they describe. Mixing works too: multiple adapters can be registered and chosen per widget or field.
+
+## Requirements
+
+Payload `^3.82.0`, React 19. Dashboard widgets use Payload's Modular Dashboard, an experimental feature. Optional peers you install only if used: `@google-analytics/data` (GA4), `maxmind` (MaxMind geo lookup), `@payloadcms/db-postgres` (already present on Postgres projects).

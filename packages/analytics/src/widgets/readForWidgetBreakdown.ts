@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, DimensionKey, MetricKey } from '../core/contract'
+import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import type { WidgetReadStatus } from './readForWidget'
@@ -27,6 +28,8 @@ export interface ReadForWidgetBreakdownArgs {
 	adapterId?: string
 	now: Date
 	range?: DateRange
+	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
+	scope?: string | null
 }
 
 /**
@@ -45,12 +48,11 @@ export const readForWidgetBreakdown = async (
 	if (!runtime) {
 		return { status: 'unavailable', adapterId: adapterId ?? '', ...base }
 	}
-	let adapter: AnalyticsAdapter
-	try {
-		adapter = adapterId ? runtime.registry.get(adapterId) : runtime.registry.default()
-	} catch {
+	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
+	if (!ctx.ok) {
 		return { status: 'unavailable', adapterId: adapterId ?? '', ...base }
 	}
+	const adapter: AnalyticsAdapter = ctx.adapter
 	if (!adapter.isConfigured()) {
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
 	}
@@ -65,6 +67,7 @@ export const readForWidgetBreakdown = async (
 		dateRange,
 		limit,
 		order: { metric, direction: 'desc' },
+		scope: ctx.queryScope,
 	})
 	const rows = result.rows.map((row) => ({
 		label: row.dimensions?.[dimension] ?? '(none)',

@@ -1,6 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 
 import type { JobsPluginOptions } from './options'
+import { applyCollectionOverride } from './plugin/applyCollectionOverride'
 import { registerJobsEnhancements } from './plugin/registerJobsEnhancements'
 import { registerTranslations } from './plugin/registerTranslations'
 import { resolveQueueControlOptions } from './queueControl/options'
@@ -27,16 +28,40 @@ export const jobs = definePlugin<JobsPluginOptions>({
 		if (options.disabled === true) {
 			return config
 		}
-		registerTranslations(config)
-		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
-		registerJobsEnhancements(config, options)
+		registerTranslations(config, options.translations)
 		const reliability = resolveReliabilityOptions(options.reliability)
+		const queueControl = resolveQueueControlOptions(options.queueControl)
+		// JobsPluginOptions is assignable to JobsOptions (the extra `disabled` is ignored).
+		registerJobsEnhancements(config, options, [
+			...(options.queues ?? []),
+			...(queueControl?.queues ?? []),
+		])
 		if (reliability) {
 			registerReliability(config, reliability)
 		}
-		const queueControl = resolveQueueControlOptions(options.queueControl)
 		if (queueControl) {
 			registerQueueControl(config, queueControl, reliability)
+		}
+		// Core defaults jobs.access.run to any logged-in user (`defaultAccess`), gating both
+		// /payload-jobs/run and /handle-schedules. With queue control off nothing else hardens
+		// them, so deny unless the host made an explicit choice.
+		if (!queueControl && config.jobs && config.jobs.access?.run === undefined) {
+			config.jobs = {
+				...config.jobs,
+				access: { ...config.jobs.access, run: () => false },
+			}
+		}
+		if (options.overrides?.jobs) {
+			const previous = config.jobs?.jobsCollectionOverrides
+			const override = options.overrides.jobs
+			config.jobs = {
+				...config.jobs,
+				jobsCollectionOverrides: ({ defaultJobsCollection }) =>
+					applyCollectionOverride(
+						previous ? previous({ defaultJobsCollection }) : defaultJobsCollection,
+						override
+					),
+			}
 		}
 		return config
 	},
@@ -51,7 +76,13 @@ export { type DrainDeps, type DrainOptions, type DrainResult, drainWorker } from
 export { type CreateWorkerArgs, createWorker, type Worker } from './execution/worker'
 export type { JobStatus, JobStatusInput } from './jobs/deriveJobStatus'
 export { deriveJobStatus } from './jobs/deriveJobStatus'
-export type { JobsOptions, JobsPluginOptions, JobsPluginOptions as PluginOptions } from './options'
+export type {
+	CollectionOverride,
+	FieldsOverride,
+	JobsOptions,
+	JobsPluginOptions,
+	JobsPluginOptions as PluginOptions,
+} from './options'
 export {
 	multiNodePreset,
 	serverlessPreset,

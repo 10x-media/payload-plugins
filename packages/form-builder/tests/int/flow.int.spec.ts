@@ -58,6 +58,40 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 		expect(stepB.fields).toEqual(['email'])
 	})
 
+	it('rejects a single-step flow instead of silently discarding it', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Single-step flow',
+					fields: [{ blockType: 'text', name: 'name', label: 'Name' }],
+					flow: { steps: [{ id: 'only', fields: ['name'] }] },
+				},
+			})
+		).rejects.toThrow()
+	})
+
+	it('rejects a flow whose steps collapse to fewer than two unique ids', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Duplicate-id flow',
+					fields: [
+						{ blockType: 'text', name: 'name', label: 'Name' },
+						{ blockType: 'text', name: 'email', label: 'Email' },
+					],
+					flow: {
+						steps: [
+							{ id: 'dup', fields: ['name'] },
+							{ id: 'dup', fields: ['email'] },
+						],
+					},
+				},
+			})
+		).rejects.toThrow()
+	})
+
 	it('drops ghost fields, bad transition targets, and bad default next', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',

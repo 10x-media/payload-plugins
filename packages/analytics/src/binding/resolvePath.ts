@@ -64,7 +64,19 @@ export const resolvePathCached = (
 	return cached
 }
 
-export const resolveHostname = (binding: AnalyticsBinding, doc: BindingDoc): string | undefined => {
-	if (typeof binding.hostname === 'function') return binding.hostname(doc)
+/**
+ * Resolve a binding's hostname filter for one document. A function hostname is
+ * awaited with the same `(doc, ctx)` a path resolver receives; a nullish or empty
+ * result means no hostname filter is applied to the adapter query.
+ */
+export const resolveHostname = async (
+	binding: AnalyticsBinding,
+	doc: BindingDoc,
+	ctx: BindingContext
+): Promise<string | undefined> => {
+	if (typeof binding.hostname === 'function') {
+		const resolved = await binding.hostname(doc, ctx)
+		return nonEmptyString(resolved) ? resolved : undefined
+	}
 	return binding.hostname
 }

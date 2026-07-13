@@ -107,6 +107,10 @@ const main = async (): Promise<void> => {
 		fail('the in-flight job was not requeued on drain')
 	}
 
+	// Leave the DB empty so the Next app's onInit seed (guarded on zero jobs) runs
+	// for the Playwright admin tests.
+	await payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
+
 	await payload.destroy()
 	console.log(
 		'[worker-drain e2e] PASS: SIGTERM drained the worker (exit 0) and requeued the straggler'

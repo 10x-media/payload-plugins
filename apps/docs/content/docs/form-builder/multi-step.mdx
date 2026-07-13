@@ -1,0 +1,65 @@
+---
+title: Multi-step forms
+description: Layer a serializable step graph over a form, with conditional branching.
+---
+
+A form document can carry an optional `flow`: a step graph over its flat field list. With no `flow` (or fewer than two steps) `<Form>` behaves as a single-step form, so the feature is adopted incrementally with no schema change.
+
+## The flow model
+
+```ts
+import type { FormFlow } from '@10x-media/form-builder/types'
+
+const flow: FormFlow = {
+  steps: [
+    { id: 'contact', title: 'Contact details', fields: ['name', 'email'], next: 'message' },
+    {
+      id: 'message',
+      title: 'Your message',
+      fields: ['subject', 'body'],
+      transitions: [{ when: { subject: { equals: 'urgent' } }, to: 'urgent-confirm' }],
+      next: 'confirm',
+    },
+    { id: 'urgent-confirm', title: 'Confirm urgent request', fields: ['confirmUrgent'] },
+    { id: 'confirm', title: 'Review', fields: ['consent'] },
+  ],
+}
+```
+
+Each step groups fields by machine name. `transitions` are evaluated in order against the current answers using the same [condition engine](/form-builder/conditions) as `visibleWhen`; the first match wins. No match falls through to `next`. A step with neither is terminal.
+
+Flows are authored with the flow builder in the admin and stored as this serializable structure, so the client and server reason about the identical graph.
+
+## Renderer behavior
+
+`<Form>` reads `flow` from the document and drives it automatically:
+
+- renders only the current step's fields,
+- shows Back and Next between the first and last steps (labels overridable via `nextLabel` / `backLabel`),
+- validates the current step's visible fields before advancing; errors block progress,
+- shows Submit on the terminal step,
+- submits all accumulated answers as one submission.
+
+## `useFormStep` for custom step UIs
+
+```tsx
+import { useFormStep } from '@10x-media/form-builder/react'
+
+function StepProgress() {
+  const { stepIndex, stepCount, isTerminal } = useFormStep()
+  return <p>Step {stepIndex + 1} of {stepCount}{isTerminal ? ' (final)' : null}</p>
+}
+```
+
+`useFormStep()` returns `flow`, `currentStepId`, `stepIndex`, `stepCount`, `isFirst`, `isTerminal`, `goNext()`, and `goBack()`. `stepIndex`/`stepCount` follow the declared order, which reads exactly for linear flows; for branching flows derive progress from `currentStepId` (skipped steps make the raw index misleading).
+
+## The flow engine
+
+The graph logic is exported as four pure functions (no React, no DOM) from `./react`, so custom UIs never reimplement it:
+
+| Export | Signature |
+|---|---|
+| `firstStepId` | `(flow) => string \| undefined` |
+| `resolveNextStepId` | `(flow, currentId, answers) => string \| undefined` |
+| `isTerminalStepId` | `(flow, currentId, answers) => boolean` |
+| `stepFieldNames` | `(flow, id) => string[]` |

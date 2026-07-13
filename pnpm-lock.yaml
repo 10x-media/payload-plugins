@@ -95,6 +95,9 @@ importers:
       lint-staged:
         specifier: ^17.0.0
         version: 17.0.5
+      publint:
+        specifier: ^0.3.14
+        version: 0.3.21
       tsx:
         specifier: ^4.19.2
         version: 4.22.3
@@ -156,6 +159,12 @@ importers:
 
   config/biome: {}
 
+  config/tsdown:
+    dependencies:
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
+
   config/typescript: {}
 
   config/vitest:
@@ -172,6 +181,9 @@ importers:
       '@10x-media/tsconfig':
         specifier: workspace:*
         version: link:../../config/typescript
+      '@10x-media/tsdown-config':
+        specifier: workspace:*
+        version: link:../../config/tsdown
       '@10x-media/vitest-config':
         specifier: workspace:*
         version: link:../../config/vitest
@@ -186,7 +198,7 @@ importers:
         version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
@@ -222,7 +234,7 @@ importers:
         version: 19.2.6(react@19.2.6)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -246,7 +258,7 @@ importers:
         version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       next:
         specifier: 'catalog:'
         version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
@@ -272,6 +284,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      mongodb-memory-server:
+        specifier: ^10.1.0
+        version: 10.4.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -287,6 +302,9 @@ importers:
       '@10x-media/tsconfig':
         specifier: workspace:*
         version: link:../../config/typescript
+      '@10x-media/tsdown-config':
+        specifier: workspace:*
+        version: link:../../config/tsdown
       '@10x-media/vitest-config':
         specifier: workspace:*
         version: link:../../config/vitest
@@ -301,7 +319,7 @@ importers:
         version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
@@ -328,7 +346,7 @@ importers:
         version: 19.2.6(react@19.2.6)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -352,7 +370,7 @@ importers:
         version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       next:
         specifier: 'catalog:'
         version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
@@ -378,11 +396,24 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      mongodb-memory-server:
+        specifier: ^10.1.0
+        version: 10.4.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
 
   packages/form-builder:
+    dependencies:
+      '@payloadcms/email-nodemailer':
+        specifier: ^3.86.0
+        version: 3.86.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@standard-schema/spec':
+        specifier: ^1.0.0
+        version: 1.1.0
+      nodemailer:
+        specifier: ^9.0.3
+        version: 9.0.3
     devDependencies:
       '@10x-media/payload-test-harness':
         specifier: workspace:*
@@ -390,6 +421,9 @@ importers:
       '@10x-media/tsconfig':
         specifier: workspace:*
         version: link:../../config/typescript
+      '@10x-media/tsdown-config':
+        specifier: workspace:*
+        version: link:../../config/tsdown
       '@10x-media/vitest-config':
         specifier: workspace:*
         version: link:../../config/vitest
@@ -404,13 +438,10 @@ importers:
         version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
-      '@standard-schema/spec':
-        specifier: ^1.0.0
-        version: 1.1.0
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 6.9.1
@@ -449,7 +480,7 @@ importers:
         version: 2.10.0(@types/node@22.19.19)(typescript@5.9.3)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -473,7 +504,7 @@ importers:
         version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       next:
         specifier: 'catalog:'
         version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
@@ -499,11 +530,18 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      mongodb-memory-server:
+        specifier: ^10.1.0
+        version: 10.4.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
 
   packages/jobs:
+    dependencies:
+      qs-esm:
+        specifier: 8.0.1
+        version: 8.0.1
     devDependencies:
       '@10x-media/payload-test-harness':
         specifier: workspace:*
@@ -511,6 +549,9 @@ importers:
       '@10x-media/tsconfig':
         specifier: workspace:*
         version: link:../../config/typescript
+      '@10x-media/tsdown-config':
+        specifier: workspace:*
+        version: link:../../config/tsdown
       '@10x-media/vitest-config':
         specifier: workspace:*
         version: link:../../config/vitest
@@ -522,7 +563,7 @@ importers:
         version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
@@ -549,7 +590,7 @@ importers:
         version: 19.2.6(react@19.2.6)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -573,7 +614,7 @@ importers:
         version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       next:
         specifier: 'catalog:'
         version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
@@ -617,6 +658,9 @@ importers:
       '@10x-media/tsconfig':
         specifier: workspace:*
         version: link:../../config/typescript
+      '@10x-media/tsdown-config':
+        specifier: workspace:*
+        version: link:../../config/tsdown
       '@10x-media/vitest-config':
         specifier: workspace:*
         version: link:../../config/vitest
@@ -628,7 +672,7 @@ importers:
         version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
@@ -655,7 +699,7 @@ importers:
         version: 19.2.6(react@19.2.6)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -679,7 +723,7 @@ importers:
         version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@payloadcms/ui':
         specifier: 'catalog:'
-        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       next:
         specifier: 'catalog:'
         version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
@@ -705,6 +749,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      mongodb-memory-server:
+        specifier: ^10.1.0
+        version: 10.4.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2255,6 +2302,12 @@ packages:
     peerDependencies:
       payload: 3.85.0
 
+  '@payloadcms/email-nodemailer@3.86.0':
+    resolution: {integrity: sha512-z8Knd6w1ToPSc1yunage9dQS8pApIBwTK40PMEsQd7Hl79BxbQcEzGrWTKhTiJHu5K4LZJOXjZOtdNWVI07Jyw==}
+    engines: {node: ^18.20.2 || >=20.9.0}
+    peerDependencies:
+      payload: 3.86.0
+
   '@payloadcms/graphql@3.85.0':
     resolution: {integrity: sha512-QIAGSmtNS8XX5MxPZONMPX/xYANuzZ/xxAtlhFUxJvxTZVxbb1Aafx+dTIPTggJ4updzD3Rk/b76TYQc3jS13A==}
     hasBin: true
@@ -2323,6 +2376,10 @@ packages:
 
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
+
+  '@publint/pack@0.1.5':
+    resolution: {integrity: sha512-edgyN2pP07uXiP4tJs0s8KVmU8M8i60YPbbI0/WDeok1mIJHRXz+CgD8I0nelwDkoCh3EWL/G5kGfbuHjsdbvw==}
+    engines: {node: '>=18'}
 
   '@quansync/fs@1.0.0':
     resolution: {integrity: sha512-4TJ3DFtlf1L5LDMaM6CanJ/0lckGNtJcMjQ1NAV6zDmA0tEHKZtxNKin8EgPaVX1YzljbxckyT2tJrpQKAtngQ==}
@@ -4549,7 +4606,7 @@ packages:
   git-raw-commits@4.0.0:
     resolution: {integrity: sha512-ICsMM1Wk8xSGMowkOmPrzo2Fgmfo4bMHLNX6ytHjajRJUqvHOw/TFapQ+QG75c3X/tTDDhOSRPGC52dDbNM8FQ==}
     engines: {node: '>=16'}
-    deprecated: This package is no longer maintained. For the JavaScript API, please use @conventional-changelog/git-client instead.
+    deprecated: Deprecated and no longer maintained. Use @conventional-changelog/git-client instead.
     hasBin: true
 
   github-slugger@2.0.0:
@@ -5571,6 +5628,10 @@ packages:
     resolution: {integrity: sha512-Uzmd6LXpouKo8EUK68IjH4+E01w/hXyV3R3g/geCJo+rXLNfh1xucB+LOzYEOQPSiUK3h/xZf0cQGcSsmyL2Og==}
     engines: {node: '>=18'}
 
+  nodemailer@9.0.3:
+    resolution: {integrity: sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw==}
+    engines: {node: '>=6.0.0'}
+
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
@@ -5672,6 +5733,9 @@ packages:
 
   package-manager-detector@0.2.11:
     resolution: {integrity: sha512-BEnLolu+yuz22S56CU1SUKq3XC3PkwD5wv4ikR4MfGvnRVcmzXR9DwSlW2fEamyTPyXHomBJRzgapeuBvRNzJQ==}
+
+  package-manager-detector@1.7.0:
+    resolution: {integrity: sha512-xg1eHpwYL/D/HEdWw2goFZP6vV0FH7W+PZ5rFkGjdIDLtxq7EkzBUeT3m+lndYCt8wKbmofUu1MUdMCXkCk9ZQ==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -5901,6 +5965,11 @@ packages:
   proxy-addr@2.0.7:
     resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
     engines: {node: '>= 0.10'}
+
+  publint@0.3.21:
+    resolution: {integrity: sha512-OqejcnMV6E9zel2oCrUOJEiiFkGiAAni0A6ibfQNh1k9Gu5z4F+Yso8lllam7AzmV6Do0vp7u3UpZNRBwuXaHQ==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   pump@3.0.4:
     resolution: {integrity: sha512-VS7sjc6KR7e1ukRFhQSY5LM2uBWAUPiOPa/A3mkKmiMwSmRFUITt0xuj+/lesgnCv+dPIEYlkzrcyXgquIHMcA==}
@@ -6185,6 +6254,10 @@ packages:
 
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
+
+  sade@1.8.1:
+    resolution: {integrity: sha512-xal3CZX1Xlo/k4ApwCFrHVACi9fBqJ7V+mwhBsuf/1IOKbBy098Fex+Wa/5QMubw09pSZ/u8EY8PWgevJsXp1A==}
+    engines: {node: '>=6'}
 
   safe-buffer@5.1.2:
     resolution: {integrity: sha512-Gd2UZBJDkXlY7GbJxfsE8/nvKkUEU1G38c1siN6QP6a9PT9MmHB8GnpscSmMJSoF8LOIrt8ud/wPtojys4G6+g==}
@@ -6562,6 +6635,10 @@ packages:
 
   tinyexec@1.2.2:
     resolution: {integrity: sha512-M/Q0B2cp4K7kynaT/vnED1j8TlLY+Pp7C6Wl2bl/7u/F0mUVwdyOpwomQb8JpYLitHUssAJRmLZdMCGsrx7i+g==}
+    engines: {node: '>=18'}
+
+  tinyexec@1.2.4:
+    resolution: {integrity: sha512-SHf/r48b7vOrjve9PxJo3MN5v5yuyjHvdUcrQffT3WXMUfnGmHDVbC4k3sHJaJTgZCwpUplIaAo5ANtMyp3YHg==}
     engines: {node: '>=18'}
 
   tinyglobby@0.2.16:
@@ -8537,6 +8614,11 @@ snapshots:
       - sql.js
       - sqlite3
 
+  '@payloadcms/email-nodemailer@3.86.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))':
+    dependencies:
+      nodemailer: 9.0.3
+      payload: 3.85.0(graphql@16.14.0)(typescript@5.9.3)
+
   '@payloadcms/graphql@3.85.0(graphql@16.14.0)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(typescript@5.9.3)':
     dependencies:
       graphql: 16.14.0
@@ -8555,7 +8637,7 @@ snapshots:
       '@dnd-kit/sortable': 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)
       '@payloadcms/graphql': 3.85.0(graphql@16.14.0)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(typescript@5.9.3)
       '@payloadcms/translations': 3.85.0
-      '@payloadcms/ui': 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      '@payloadcms/ui': 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       busboy: 1.6.0
       dequal: 2.0.3
       file-type: 21.3.4
@@ -8581,7 +8663,7 @@ snapshots:
     dependencies:
       date-fns: 4.1.0
 
-  '@payloadcms/ui@3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)':
+  '@payloadcms/ui@3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)':
     dependencies:
       '@date-fns/tz': 1.2.0
       '@dnd-kit/core': 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -8646,6 +8728,10 @@ snapshots:
   '@protobufjs/pool@1.1.0': {}
 
   '@protobufjs/utf8@1.1.1': {}
+
+  '@publint/pack@0.1.5':
+    dependencies:
+      tinyexec: 1.2.4
 
   '@quansync/fs@1.0.0':
     dependencies:
@@ -12093,6 +12179,8 @@ snapshots:
 
   node-releases@2.0.47: {}
 
+  nodemailer@9.0.3: {}
+
   normalize-path@3.0.0: {}
 
   npm-run-path@5.3.0:
@@ -12186,6 +12274,8 @@ snapshots:
   package-manager-detector@0.2.11:
     dependencies:
       quansync: 0.2.11
+
+  package-manager-detector@1.7.0: {}
 
   parent-module@1.0.1:
     dependencies:
@@ -12463,6 +12553,13 @@ snapshots:
     dependencies:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
+
+  publint@0.3.21:
+    dependencies:
+      '@publint/pack': 0.1.5
+      package-manager-detector: 1.7.0
+      picocolors: 1.1.1
+      sade: 1.8.1
 
   pump@3.0.4:
     dependencies:
@@ -12860,6 +12957,10 @@ snapshots:
   run-parallel@1.2.0:
     dependencies:
       queue-microtask: 1.2.3
+
+  sade@1.8.1:
+    dependencies:
+      mri: 1.2.0
 
   safe-buffer@5.1.2: {}
 
@@ -13343,6 +13444,8 @@ snapshots:
 
   tinyexec@1.2.2: {}
 
+  tinyexec@1.2.4: {}
+
   tinyglobby@0.2.16:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
@@ -13423,7 +13526,7 @@ snapshots:
       minimist: 1.2.8
       strip-bom: 3.0.0
 
-  tsdown@0.22.1(tsx@4.22.3)(typescript@5.9.3):
+  tsdown@0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3):
     dependencies:
       ansis: 4.3.0
       cac: 7.0.0
@@ -13441,6 +13544,7 @@ snapshots:
       tree-kill: 1.2.2
       unconfig-core: 7.5.0
     optionalDependencies:
+      publint: 0.3.21
       tsx: 4.22.3
       typescript: 5.9.3
     transitivePeerDependencies:

@@ -1,0 +1,36 @@
+---
+title: Webhooks
+description: Outbound webhook subscriptions for Payload v3, with signing, retries, and a delivery log.
+---
+
+`@10x-media/webhooks` delivers signed HTTP POSTs whenever documents in opted-in collections are created, updated, or deleted. Subscribers are managed in the admin panel or registered in code; deliveries run inline or through Payload's jobs queue and land in an append-only log with a redeliver button.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { webhooks } from '@10x-media/webhooks'
+
+export default buildConfig({
+  plugins: [
+    webhooks({
+      collections: {
+        posts: true,
+        orders: { operations: ['create', 'delete'] },
+      },
+    }),
+  ],
+})
+```
+
+## The pieces
+
+Collections opt in per operation: `true` covers create, update, and delete, or pick operations and add a `transform` to reshape or redact the body. Receivers come from two [subscription sources](/webhooks/subscriptions), merged at delivery time: records operators manage in the admin, and code subscriptions for endpoints that belong in your repository. [Deliveries](/webhooks/deliveries) run queued through Payload jobs (retries, timeouts) or inline in the hook, with the default `auto` mode picking based on whether a job runner exists. When a subscription has a secret, every request is [HMAC-signed](/webhooks/signing); secrets are revealed once at creation, and each request carries id, event, and timestamp headers. Every attempt lands in a delivery log collection with status, response code, duration, the exact body sent, and one-click redelivery.
+
+The plugin composes with the [jobs family](/concepts/jobs-family): installing [Jobs](/jobs) switches delivery to the queue automatically, and installing [Automations](/automations) registers a `webhook` trigger slug for the future inbound phase.
+
+## When to use it
+
+Use it to push Payload changes into external systems (CRMs, search indexes, Slack, custom services) without polling. It is outbound-only today; inbound webhooks are a planned phase.
+
+## Next
+
+[Quick start](/webhooks/quick-start), then [subscriptions](/webhooks/subscriptions) and [deliveries](/webhooks/deliveries).

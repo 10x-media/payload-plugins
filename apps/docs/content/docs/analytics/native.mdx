@@ -1,0 +1,86 @@
+---
+title: Native engine
+description: Self-hosted, cookieless analytics stored inside Payload.
+---
+
+`native()` is an adapter that stores analytics in your own database. No external service, no cookies, no client fingerprinting beyond a salted daily visitor hash.
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+analytics({ adapters: [native()] })
+```
+
+Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`. Dimensions: `page`, `country`, `source`, `device`. Realtime is supported.
+
+## The ingest endpoint
+
+`POST /api/analytics/ingest` (path configurable via `ingestPath`) accepts one event per request:
+
+```ts
+interface RawEventInput {
+  type: 'pageview' | 'event'
+  path: string          // required
+  hostname: string      // required
+  name?: string         // event name, for type 'event'
+  referrer?: string
+  durationMs?: number
+  props?: Record<string, unknown>
+}
+```
+
+`type`, `path`, and `hostname` are required; anything else is optional. The server derives the rest at ingest time: device class from the user agent, traffic source from the referrer, geo from [resolvers](/analytics/geo), and a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days). The endpoint responds `202` on success and `400` on an invalid body.
+
+Events are written atomically, via `$inc` on Mongo and `ON CONFLICT DO UPDATE` on Postgres, so concurrent ingestion is safe.
+
+## Write batching (opt-in)
+
+By default each ingest is persisted before the endpoint responds. Under load, batch writes in memory:
+
+```ts
+native({ buffer: true }) // flush at 50 events or 2000 ms, whichever first
+native({ buffer: { maxSize: 100, maxAgeMs: 1000 } })
+```
+
+Batching coalesces per-bucket upserts and cuts database round trips. The trade is durability: the endpoint responds before the batch is persisted, so a hard crash can lose up to `maxAgeMs` of events (the same best-effort model Plausible and Umami use). Call `native().flush()` on graceful shutdown to drain the buffer; keep a reference to the adapter instance if you need to.
+
+## Uniques and sessions
+
+Distinct counts are exact per UTC day: a dedicated `analytics-seen` ledger records first-sightings at every granularity they are queried (per page, site-wide, site-wide per country), so uniques are read directly, never summed across breakdowns. Across a multi-day range the daily counts are summed, so longer-range uniques are approximate, the same trade Plausible, Fathom, and Umami make.
+
+### Production note (Mongo)
+
+Exact distinct counting relies on a unique index on `analytics-seen` being live under concurrent ingestion. Configure the Mongoose adapter with `ensureIndexes: true`:
+
+```ts
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+
+mongooseAdapter({ url: process.env.DATABASE_URI, ensureIndexes: true })
+```
+
+On Postgres the unique index comes from migrations; nothing extra is needed once they have run.
+
+## Geo resolution
+
+The engine resolves country, region, and city per event: platform headers first (Vercel, Cloudflare), MaxMind only when headers do not supply a country. Pass `geoDbPath` for MaxMind or `geoResolver` for a custom pipeline. Details on [Geo](/analytics/geo).
+
+## Retention pruning
+
+Raw events are kept indefinitely unless you opt in to pruning:
+
+```ts
+native({ retentionDays: 90 })
+```
+
+This registers a Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) that deletes raw `analytics-events` and `analytics-seen` rows older than the window. Rollups are untouched, so long-range aggregates survive pruning. Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler).
+
+## Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `buffer` | `boolean \| { maxSize?, maxAgeMs? }` | off | In-memory write batching (50 events / 2000 ms). |
+| `geoDbPath` | `string` | none | Path to a MaxMind `.mmdb`; enables IP-level geo lookup. |
+| `geoResolver` | `GeoResolver` | platform headers (+ MaxMind when `geoDbPath` set) | Custom geo pipeline. |
+| `ingestPath` | `string` | `/analytics/ingest` | Beacon endpoint path (served under `/api`). |
+| `retentionDays` | `number` | keep forever | Nightly pruning window for raw events. |

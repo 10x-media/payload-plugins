@@ -1,0 +1,105 @@
+---
+title: Adapters
+description: The adapter contract, the capabilities model, and the built-in providers.
+---
+
+Everything in the plugin reads through one interface. An adapter answers queries (`pageviews for /blog/post-1 over the last 30 days`) and declares what it can answer; the plugin never asks for more.
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { plausible } from '@10x-media/analytics/adapters/plausible'
+import { native } from '@10x-media/analytics/adapters/native'
+
+analytics({
+  adapters: [native(), plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY! })],
+  defaultAdapter: 'plausible', // used when a field or widget does not name one
+})
+```
+
+Adapters ship as code-split subpaths, so a site bundles only what it imports. Each adapter has a stable `id` (`native`, `plausible`, `umami`, `ga4`, `posthog`) that fields and widgets reference via their `adapter` / data source options.
+
+## The capabilities model
+
+Each adapter declares an `AnalyticsCapabilities` object: which `metrics` and `dimensions` it supports, whether it can query per page (`perPageQuery`) or in `realtime`, its `maxLookbackDays`, rate-limit hints, and recommended cache TTLs.
+
+Every surface is gated by it:
+
+- A [dashboard widget](/analytics/widgets) whose metric or dimension no configured adapter supports is not registered at all.
+- A [display field](/analytics/display-fields) drops unsupported metrics from its request and renders the rest.
+- A custom range that exceeds a provider's `maxLookbackDays` is narrowed to the provider maximum, visibly.
+
+Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `entries`, `exits`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
+
+An unconfigured adapter (missing credentials) degrades to an empty state and makes no network calls.
+
+## Plausible
+
+```ts
+import { plausible } from '@10x-media/analytics/adapters/plausible'
+
+plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY! })
+```
+
+Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance. Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, scrollDepth, revenue. Durations are normalized to milliseconds. Default `maxLookbackDays: 730` (set `null` to disable clamping).
+
+## Umami
+
+```ts
+import { umami } from '@10x-media/analytics/adapters/umami'
+
+// Umami Cloud
+umami({ websiteId: 'xxxx', apiKey: process.env.UMAMI_API_KEY! })
+
+// Self-hosted (token from POST /api/auth/login)
+umami({ websiteId: 'xxxx', token: process.env.UMAMI_TOKEN!, host: 'https://analytics.example.com/api' })
+```
+
+Metrics: pageviews, visitors, visits, sessions, plus bounceRate and avgDuration derived from visit totals. The `page` dimension maps to Umami's `/metrics?type=url`. Umami has no per-day source for visitors, bounce rate, or duration, so trend series on those metrics are empty while headlines stay correct.
+
+## GA4
+
+```ts
+import { ga4 } from '@10x-media/analytics/adapters/ga4'
+
+ga4({
+  propertyId: '123456789',
+  credentials: {
+    client_email: process.env.GA4_CLIENT_EMAIL!,
+    private_key: process.env.GA4_PRIVATE_KEY!,
+  },
+})
+```
+
+Uses the GA4 Data API (`runReport`) through the official SDK, declared as an optional peer dependency and loaded lazily:
+
+```bash
+pnpm add @google-analytics/data
+```
+
+Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, conversions, revenue. Durations normalize to milliseconds, bounce rate to a percentage. GA4 bills a token quota, so the adapter recommends a long aggregate TTL (6 hours); [cache warming](/analytics/cache) pairs well with it. Default `maxLookbackDays: 425` (GA4's rolling window).
+
+## PostHog
+
+```ts
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+
+posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY! })
+```
+
+Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default. Metrics: pageviews, visitors, visits, sessions. The `page` dimension returns a top-pages breakdown.
+
+## Testing: memoryAdapter
+
+```ts
+import { memoryAdapter } from '@10x-media/analytics/testing'
+
+const adapter = memoryAdapter()
+adapter.record({ path: '/a', timestamp: new Date(), visitor: 'v1' })
+// ...assert against widgets/fields; adapter.reset() between tests
+```
+
+A deterministic in-memory adapter for tests and local development, with wide declared capabilities so gated surfaces stay visible.
+
+## Writing your own adapter
+
+Implement `AnalyticsAdapter` from `@10x-media/analytics/types`: an `id`, a `label`, honest `capabilities`, `isConfigured()`, and `query(query, ctx)` returning rows and totals. Optional extras: `realtime(query, ctx)` for the realtime widget, and `register(config)` to add collections or endpoints (the native engine uses this hook). Declare only capabilities you actually serve; the plugin trusts them.

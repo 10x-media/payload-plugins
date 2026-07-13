@@ -9,7 +9,7 @@
 		"start": "next start",
 		"lint": "biome check app content lib components",
 		"lint:fix": "biome check --write app content lib components",
-		"typecheck": "fumadocs-mdx && next typegen && tsc -p tsconfig.json --noEmit"
+		"typecheck": "fumadocs-mdx && tsc -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
 		"fumadocs-core": "^16.9.2",

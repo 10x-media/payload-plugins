@@ -1,0 +1,74 @@
+---
+title: Deliveries
+description: Queue vs inline execution, retries, timeouts, the delivery log, and redelivery.
+---
+
+Every matching subscription produces a delivery row first, then the POST happens. How and when it happens is the `delivery` option.
+
+## Modes
+
+```ts title="payload.config.ts"
+webhooks({
+  collections: { posts: true },
+  delivery: 'auto', // the default
+})
+```
+
+| Mode | Behavior |
+|---|---|
+| `'auto'` (default) | Queue when a job runner is likely (`config.jobs.autoRun` set, or [`@10x-media/jobs`](/jobs) installed); inline otherwise. |
+| `'queue'` | Always enqueue a Payload job (task `webhooksDeliver`). Something must run the queue, or deliveries stay `pending`; the plugin logs a warning when it cannot detect a runner. |
+| `'inline'` | Send inside the `afterChange`/`afterDelete` hook. Zero moving parts, but adds outbound-HTTP latency to every matching write, and a failure is final (no retries). |
+
+Inline mode exists so the plugin is useful with no queue infrastructure at all: no worker, no cron, just the hook. The cost sits on the write path, where matching subscriptions are delivered sequentially and each attempt waits up to `timeoutMs`. Queue mode moves that latency out of the request and buys retries and crash recovery, which is why `auto` switches to it as soon as a runner is detectable.
+
+Pass an object to tune the rest:
+
+```ts
+webhooks({
+  collections: { posts: true },
+  delivery: {
+    mode: 'queue',
+    timeoutMs: 5_000, // default 10000
+    retries: 3,       // default 4
+    queue: 'webhooks', // default 'default'
+  },
+})
+```
+
+Queued deliveries inherit everything the jobs system provides: retries with backoff, visibility in the [Jobs dashboard](/jobs/dashboard), and recovery under the [reliability layer](/jobs/reliability). See [Jobs family interop](/concepts/jobs-family).
+
+## Timeouts and retries
+
+Each attempt aborts after `timeoutMs` and counts as a failure. In queue mode the task retries up to `retries` times; a delivery that exhausts them is marked `dead`. Inline mode makes exactly one attempt: failure goes straight to `dead`.
+
+## The delivery log
+
+The **Webhook Deliveries** collection (slug `webhook-deliveries` by default) is append-only: rows are created and updated by the server, never by admin users (read and delete require login; create and update are closed).
+
+| Field | Meaning |
+|---|---|
+| `status` | `pending`, `success`, `failed` (will retry), or `dead` (no more retries). |
+| `event`, `endpoint`, `subscriptionId` | What fired and where it went. |
+| `attempt` | 1-based attempt count. |
+| `responseStatus`, `responseBody` | The receiver's HTTP status and body (body truncated to 2000 characters). |
+| `error`, `durationMs`, `jobId` | Failure message, round-trip time, and the Payload job id when queued. |
+| `payload` | The exact JSON body that was sent. |
+
+## Redelivery
+
+Every delivery row has a **Redeliver** button, backed by `POST /api/webhook-deliveries/:id/redeliver` (requires a logged-in user; returns `202` with the new delivery id). Redelivery creates a fresh row and replays the original payload to the original URL through the configured mode.
+
+## The body
+
+```json
+{
+  "id": "<delivery-id>",
+  "event": "posts.updated",
+  "collection": "posts",
+  "operation": "update",
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "data": { "...": "the document, or your transform's return value" },
+  "previousData": { "...": "present on update when includePreviousData is on" }
+}
+```

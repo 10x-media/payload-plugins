@@ -1,0 +1,66 @@
+---
+title: Testing and local dev
+description: Run the plugin against an in-memory Mongo replica set, no Docker required.
+---
+
+Jobs code needs a real database: leases, sweeps, and leader election are all rows. For local development and integration tests, an in-memory MongoDB replica set gives you that in milliseconds, with no Docker and no installed Mongo. This is the same pattern Payload's own test suite uses.
+
+## The memory-Mongo pattern
+
+Add `mongodb-memory-server` as a dev dependency and boot a single-node replica set:
+
+```ts title="memoryDb.ts"
+import { MongoMemoryReplSet } from 'mongodb-memory-server'
+
+let replSet: MongoMemoryReplSet | undefined
+
+export const startMemoryMongo = async (): Promise<string> => {
+  replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } })
+
+  const stop = (): void => {
+    void replSet?.stop()
+    replSet = undefined
+  }
+  process.once('SIGINT', stop)
+  process.once('SIGTERM', stop)
+  process.once('exit', stop)
+
+  return replSet.getUri()
+}
+```
+
+Use it in your Payload config when no external database is configured:
+
+```ts title="payload.config.ts"
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { startMemoryMongo } from './memoryDb'
+
+const url = process.env.DATABASE_URI ?? (await startMemoryMongo())
+
+export default buildConfig({
+  db: mongooseAdapter({ url }),
+  // ...
+})
+```
+
+Two details matter. It must be a replica set, not a standalone: Payload's mongoose adapter enables transactions only when the connection URL carries a `replicaSet` parameter, which `MongoMemoryReplSet.getUri()` includes, so a standalone memory server would silently run without transactions and behave differently from production. And stop it on exit: the `process.once` handlers keep test runs and dev servers from leaking `mongod` processes.
+
+## Exercising the reliability layer in tests
+
+The reliability internals are exported precisely so tests can drive them without a worker process:
+
+```ts
+import { createWorker, resolveReliabilityOptions, runSweep, getQueueHealth } from '@10x-media/jobs'
+
+const reliability = resolveReliabilityOptions({ jobLeaseTtlMs: 1_000, sweepIntervalMs: 200 })
+
+// A worker without signal handlers, safe to create per test:
+const worker = createWorker({ payload, reliability: reliability!, installSignals: false })
+worker.start()
+// ...
+await worker.drain()
+```
+
+Short TTLs make orphan-recovery paths testable in seconds: claim a job, skip the heartbeat, advance past `jobLeaseTtlMs`, and assert `runSweep` requeues it. `getQueueHealth` gives you the same counts as the dashboard for assertions.
+
+Only one worker per process may install signal handlers, so always pass `installSignals: false` in tests that create several.

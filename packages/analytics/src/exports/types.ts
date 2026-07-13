@@ -7,6 +7,8 @@ export type {
 export * from '../core/contract'
 export type {
 	AnalyticsFieldsOptions,
+	AnalyticsMetricLabel,
+	AnalyticsMetricLabels,
 	AnalyticsStatOptions,
 	AnalyticsStatRowOptions,
 	AnalyticsTabOptions,

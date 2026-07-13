@@ -17,6 +17,7 @@ export interface RegisterWidgetsArgs {
 	multiProvider: boolean
 	disabled: string[]
 	register: CustomWidgetDef[]
+	localizeText?: boolean
 }
 
 interface WidgetDef {
@@ -34,14 +35,17 @@ export const widgetIsSupported = (
 	adapters: AnalyticsAdapter[]
 ): boolean => !requires || adapters.some((a) => satisfiesCapabilities(a.capabilities, requires))
 
+const titleField = (args: RegisterWidgetsArgs, placeholder: string): Field => ({
+	name: 'title',
+	type: 'text',
+	label: labelForKey(keys.widgetFieldTitle),
+	...(args.localizeText ? { localized: true } : {}),
+	admin: { placeholder },
+})
+
 const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 	const fields: Field[] = [
-		{
-			name: 'title',
-			type: 'text',
-			label: labelForKey(keys.widgetFieldTitle),
-			admin: { placeholder: en[keys.widgetFieldTitlePlaceholder] },
-		},
+		titleField(args, en[keys.widgetFieldTitlePlaceholder]),
 		{
 			name: 'metric',
 			type: 'select',
@@ -88,12 +92,7 @@ const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 
 const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => {
 	const fields: Field[] = [
-		{
-			name: 'title',
-			type: 'text',
-			label: labelForKey(keys.widgetFieldTitle),
-			admin: { placeholder: en[spec.label] },
-		},
+		titleField(args, en[spec.label]),
 		{
 			name: 'metric',
 			type: 'select',
@@ -148,12 +147,7 @@ const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): 
 
 const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 	const fields: Field[] = [
-		{
-			name: 'title',
-			type: 'text',
-			label: labelForKey(keys.widgetFieldTitle),
-			admin: { placeholder: en[keys.widgetFieldTitlePlaceholder] },
-		},
+		titleField(args, en[keys.widgetFieldTitlePlaceholder]),
 		{
 			name: 'metric',
 			type: 'select',

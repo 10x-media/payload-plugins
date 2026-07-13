@@ -1,0 +1,68 @@
+---
+title: Signing and secrets
+description: Reveal-once secrets, request headers, and verifying signatures in your receiver.
+---
+
+When a subscription has a secret, every delivery is signed so your receiver can prove the request came from your Payload instance and was not replayed with a different body.
+
+## Secrets are reveal-once
+
+Creating a subscription in the admin auto-generates a 48-character hex secret (24 random bytes). The create response shows it in full, exactly once. Every later read, through the admin, REST, or GraphQL, returns `__redacted__`, so the secret cannot leak through a screen share, an API response, or an export after that first look. The raw value is still used server-side to sign deliveries, but it never leaves the server again.
+
+To rotate a secret, delete the subscription and create a new one. [Code subscriptions](/webhooks/subscriptions#code-subscriptions) supply their secret from your environment instead.
+
+<Callout type="warn">
+Secrets are currently stored unencrypted at rest. Encryption at rest is planned. Treat database access as secret access.
+</Callout>
+
+## Request headers
+
+Every delivery carries:
+
+```
+Content-Type: application/json
+User-Agent: 10x-media-webhooks
+X-Webhook-Id: <delivery-id>
+X-Webhook-Event: posts.created
+X-Webhook-Timestamp: <unix-seconds>
+X-Webhook-Signature: v1=<hex>        (only when the subscription has a secret)
+```
+
+Plus any custom headers configured on the subscription.
+
+## The signature scheme
+
+The signature is HMAC-SHA256 over `${timestamp}.${rawBody}`, hex-encoded, where `timestamp` is the value of `X-Webhook-Timestamp` and `rawBody` is the exact request body string. Binding the timestamp into the MAC lets receivers reject stale replays.
+
+## Verifying in your receiver
+
+Read the raw body before any JSON parsing, compute the expected signature, and compare in constant time:
+
+```ts title="receiver.ts"
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
+export function verifyWebhook(args: {
+  secret: string
+  timestamp: string   // X-Webhook-Timestamp
+  rawBody: string     // the unparsed request body
+  signature: string   // X-Webhook-Signature
+  toleranceSeconds?: number
+}): boolean {
+  const { secret, timestamp, rawBody, signature, toleranceSeconds = 300 } = args
+
+  const age = Math.abs(Date.now() / 1000 - Number(timestamp))
+  if (!Number.isFinite(age) || age > toleranceSeconds) return false
+
+  const expected = `v1=${createHmac('sha256', secret)
+    .update(`${timestamp}.${rawBody}`)
+    .digest('hex')}`
+
+  const a = Buffer.from(signature)
+  const b = Buffer.from(expected)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+```
+
+<Callout>
+This scheme is intentionally different from Form Builder's `signedWebhook` action, which signs the body alone under an `X-Form-Signature` header. A receiver cannot mistake one for the other.
+</Callout>

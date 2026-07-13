@@ -846,6 +846,765 @@ export interface Form {
               | boolean
               | null;
             hidden?: boolean | null;
+            minRows?: number | null;
+            maxRows?: number | null;
+            addLabel?: string | null;
+            subFields?:
+              | (
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                min: number;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'minLength';
+                              }
+                            | {
+                                max: number;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'maxLength';
+                              }
+                            | {
+                                pattern: string;
+                                flags?: string | null;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'pattern';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'email';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'url';
+                              }
+                            | {
+                                values?:
+                                  | {
+                                      value: string;
+                                      id?: string | null;
+                                    }[]
+                                  | null;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'oneOf';
+                              }
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'text';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                min: number;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'minLength';
+                              }
+                            | {
+                                max: number;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'maxLength';
+                              }
+                            | {
+                                pattern: string;
+                                flags?: string | null;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'pattern';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'email';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'url';
+                              }
+                            | {
+                                values?:
+                                  | {
+                                      value: string;
+                                      id?: string | null;
+                                    }[]
+                                  | null;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'oneOf';
+                              }
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'textarea';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                min: number;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'minLength';
+                              }
+                            | {
+                                max: number;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'maxLength';
+                              }
+                            | {
+                                pattern: string;
+                                flags?: string | null;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'pattern';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'email';
+                              }
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'email';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                min: number;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'min';
+                              }
+                            | {
+                                max: number;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'max';
+                              }
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'number';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      options?:
+                        | {
+                            label: string;
+                            value: string;
+                            id?: string | null;
+                          }[]
+                        | null;
+                      validations?:
+                        | (
+                            | {
+                                values?:
+                                  | {
+                                      value: string;
+                                      id?: string | null;
+                                    }[]
+                                  | null;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'oneOf';
+                              }
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'select';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'checkbox';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      expression?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      calcDisplay?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'calculation';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      statement?: string | null;
+                      source?: ('static' | 'pageReference') | null;
+                      sourceConfig?: {
+                        label?: string | null;
+                        url?: string | null;
+                        version?: string | null;
+                        relationTo?: string | null;
+                        docId?: string | null;
+                        urlField?: string | null;
+                        captureVersion?: boolean | null;
+                      };
+                      optional?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'consent';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      relationTo?: string | null;
+                      mimeTypes?: string[] | null;
+                      maxSize?: number | null;
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'file';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      required?: boolean | null;
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      placeholder?: string | null;
+                      description?: string | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                            | {
+                                min: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'dateMin';
+                              }
+                            | {
+                                max: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'dateMax';
+                              }
+                          )[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'date';
+                    }
+                )[]
+              | null;
+            validations?:
+              | (
+                  | {
+                      field: string;
+                      message?: string | null;
+                      severity?: ('error' | 'warning') | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'matchesField';
+                    }
+                  | {
+                      message?: string | null;
+                      severity?: ('error' | 'warning') | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'notAlreadySubmitted';
+                    }
+                )[]
+              | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'repeater';
+          }
+        | {
+            name: string;
+            label?: string | null;
+            required?: boolean | null;
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            placeholder?: string | null;
+            description?: string | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
             validations?:
               | (
                   | {
@@ -887,15 +1646,22 @@ export interface Form {
           }
       )[]
     | null;
-  flow?:
-    | {
+  flow?: {
+    steps: {
+      id: string;
+      title?: string;
+      fields?: string[];
+      next?: string;
+      transitions?: {
+        to: string;
+        when?: {
+          [k: string]: unknown;
+        };
         [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
+      }[];
+      [k: string]: unknown;
+    }[];
+  };
   actions?:
     | (
         | {
@@ -920,6 +1686,13 @@ export interface Form {
             id?: string | null;
             blockName?: string | null;
             blockType: 'signedWebhook';
+          }
+        | {
+            url: string;
+            method?: ('POST' | 'PUT') | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'forward';
           }
       )[]
     | null;
@@ -1737,6 +2510,637 @@ export interface FormsSelect<T extends boolean = true> {
               id?: T;
               blockName?: T;
             };
+        repeater?:
+          | T
+          | {
+              name?: T;
+              label?: T;
+              required?: T;
+              width?: T;
+              placeholder?: T;
+              description?: T;
+              visibleWhen?: T;
+              validateWhen?: T;
+              hidden?: T;
+              minRows?: T;
+              maxRows?: T;
+              addLabel?: T;
+              subFields?:
+                | T
+                | {
+                    text?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          validations?:
+                            | T
+                            | {
+                                minLength?:
+                                  | T
+                                  | {
+                                      min?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                maxLength?:
+                                  | T
+                                  | {
+                                      max?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                pattern?:
+                                  | T
+                                  | {
+                                      pattern?: T;
+                                      flags?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                email?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                url?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                oneOf?:
+                                  | T
+                                  | {
+                                      values?:
+                                        | T
+                                        | {
+                                            value?: T;
+                                            id?: T;
+                                          };
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    textarea?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          validations?:
+                            | T
+                            | {
+                                minLength?:
+                                  | T
+                                  | {
+                                      min?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                maxLength?:
+                                  | T
+                                  | {
+                                      max?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                pattern?:
+                                  | T
+                                  | {
+                                      pattern?: T;
+                                      flags?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                email?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                url?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                oneOf?:
+                                  | T
+                                  | {
+                                      values?:
+                                        | T
+                                        | {
+                                            value?: T;
+                                            id?: T;
+                                          };
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    email?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          validations?:
+                            | T
+                            | {
+                                minLength?:
+                                  | T
+                                  | {
+                                      min?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                maxLength?:
+                                  | T
+                                  | {
+                                      max?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                pattern?:
+                                  | T
+                                  | {
+                                      pattern?: T;
+                                      flags?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                email?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    number?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          validations?:
+                            | T
+                            | {
+                                min?:
+                                  | T
+                                  | {
+                                      min?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                max?:
+                                  | T
+                                  | {
+                                      max?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    select?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          options?:
+                            | T
+                            | {
+                                label?: T;
+                                value?: T;
+                                id?: T;
+                              };
+                          validations?:
+                            | T
+                            | {
+                                oneOf?:
+                                  | T
+                                  | {
+                                      values?:
+                                        | T
+                                        | {
+                                            value?: T;
+                                            id?: T;
+                                          };
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    checkbox?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          validations?:
+                            | T
+                            | {
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    calculation?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          expression?: T;
+                          calcDisplay?: T;
+                          validations?:
+                            | T
+                            | {
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    consent?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          statement?: T;
+                          source?: T;
+                          sourceConfig?:
+                            | T
+                            | {
+                                label?: T;
+                                url?: T;
+                                version?: T;
+                                relationTo?: T;
+                                docId?: T;
+                                urlField?: T;
+                                captureVersion?: T;
+                              };
+                          optional?: T;
+                          validations?:
+                            | T
+                            | {
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    file?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          relationTo?: T;
+                          mimeTypes?: T;
+                          maxSize?: T;
+                          validations?:
+                            | T
+                            | {
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    date?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          required?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          visibleWhen?: T;
+                          validateWhen?: T;
+                          hidden?: T;
+                          validations?:
+                            | T
+                            | {
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                dateMin?:
+                                  | T
+                                  | {
+                                      min?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                dateMax?:
+                                  | T
+                                  | {
+                                      max?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                  };
+              validations?:
+                | T
+                | {
+                    matchesField?:
+                      | T
+                      | {
+                          field?: T;
+                          message?: T;
+                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    notAlreadySubmitted?:
+                      | T
+                      | {
+                          message?: T;
+                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                  };
+              id?: T;
+              blockName?: T;
+            };
         date?:
           | T
           | {
@@ -1819,6 +3223,14 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               url?: T;
               secret?: T;
+              id?: T;
+              blockName?: T;
+            };
+        forward?:
+          | T
+          | {
+              url?: T;
+              method?: T;
               id?: T;
               blockName?: T;
             };

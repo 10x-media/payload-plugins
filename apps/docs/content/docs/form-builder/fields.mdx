@@ -1,0 +1,86 @@
+---
+title: Fields
+description: The core field types, the registry, and defining your own with defineFormField.
+---
+
+Form fields are authored as Payload blocks: one block type per registered field type. A field type is defined once and yields four facets: its admin authoring fields, a typed isomorphic `validate`, a localized `format`, and a value kind that types the value flowing through validation and formatting.
+
+## Core field types
+
+`text`, `textarea`, `email`, `number`, `select`, `checkbox`, `file`, `consent`, `calculation`, and `repeater`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads), [Consent](/form-builder/consent), [Calculations](/form-builder/calculations).
+
+## Repeater
+
+The `repeater` type captures a dynamic list of rows, each containing the same set of sub-fields defined once in the admin UI. It is the right choice for anything list-shaped: team members, product variants, line items, references.
+
+**Admin config**
+
+| Option | Type | Description |
+|---|---|---|
+| `minRows` | `number` | Minimum rows required. A zero-row submission is rejected when `minRows > 0`. |
+| `maxRows` | `number` | Maximum rows allowed. |
+| `addLabel` | `string` | Label for the add-row button. Defaults to the built-in translation key. |
+| `subFields` | blocks | The fields inside each row. Authored in the admin add-field drawer; supports all non-repeater field types. |
+
+**Validation**
+
+Row-count validation runs on the server for every submission. An empty repeater (no rows submitted) is still validated against `minRows`, so `minRows: 2` correctly rejects a form submitted with zero rows. `maxRows` rejects arrays that are too long. Per-row sub-field validation (required checks, custom rules) runs after row-count validation; errors are reported with path `fieldName[rowIndex].subFieldName`.
+
+**Renderer**
+
+The built-in renderer renders each row in a `<fieldset>` with an add-row button and per-row remove buttons. It reads server-side sub-field errors from form state by composite key and displays them inline next to the offending input. Client-side sub-field validation also runs on submit, before the request is sent. To use a custom renderer, register one under the `'repeater'` slug via the `renderers` prop on `<Form>`.
+
+```ts title="payload.config.ts"
+formBuilder({
+  // Repeater is on by default; disable it like any other built-in
+  fields: { repeater: false },
+})
+```
+
+## The registry
+
+The `fields` option follows the plugin-wide [opt-in convention](/concepts#the-opt-in-convention): `false` removes a built-in, `true` keeps it, an object adds or replaces a type.
+
+```ts title="payload.config.ts"
+formBuilder({
+  fields: {
+    textarea: false,     // remove a built-in
+    text: true,          // keep (explicitly)
+    rating: myRating,    // add a custom type
+  },
+})
+```
+
+## Defining a field type
+
+```ts title="payload.config.ts"
+import { formBuilder, defineFormField, type FieldTypeOption } from '@10x-media/form-builder'
+
+export default buildConfig({
+  plugins: [
+    formBuilder({
+      fields: {
+        rating: defineFormField<'number'>({
+          type: 'rating',
+          label: 'Star rating',
+          value: 'number',
+          validate: ({ value }) => (value == null || value <= 5 ? true : 'Too high'),
+          format: ({ value }) => `${value ?? 0} / 5`,
+        }) as FieldTypeOption,
+      },
+    }),
+  ],
+})
+```
+
+`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Two optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings, and `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)).
+
+Field definitions use precise generics, so cast each registry entry to `FieldTypeOption` at the registry boundary (the erased type the registry stores), exactly as the built-ins do.
+
+To render a custom type on the frontend, register a matching renderer under the same slug: see [Rendering](/form-builder/rendering#renderers).
+
+## Submissions are typed and self-describing
+
+Each submission stores typed values plus a localized descriptor snapshot taken at submit time, all validated server-side. The snapshot means a submission stays readable even after the form's fields change: the admin answers view formats each value with the field type's `format`, falling back to the snapshot when a field has been removed or renamed.
+
+Submissions live in the `form-submissions` collection: anonymous create (public forms must submit), read for logged-in users, update closed.

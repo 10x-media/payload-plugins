@@ -6,7 +6,8 @@ import type { RollupDelta, RollupKey } from './deltas'
 import { insertIfNew } from './insertIfNew'
 
 export function bucketKey(key: RollupKey): string {
-	return `${key.granularity}|${key.period.toISOString()}|${key.path}|${key.dimension}|${key.dimvalue}`
+	const base = `${key.granularity}|${key.period.toISOString()}|${key.path}|${key.dimension}|${key.dimvalue}`
+	return key.scope !== undefined ? `${base}|${key.scope}` : base
 }
 
 // For each rollup bucket the event touches, count this visitor and session at most once.

@@ -1,0 +1,63 @@
+---
+title: File uploads
+description: The file field, the form-uploads collection, and the server-side trust boundary.
+---
+
+The `file` field lets visitors attach files. The client uploads to an upload collection and submits only the upload id; the server re-reads the stored document and enforces the constraints itself. Client-sent filenames, MIME types, and sizes are never trusted or stored.
+
+## The field
+
+```ts
+{
+  blockType: 'file',
+  name: 'resume',
+  label: 'Resume',
+  required: true,
+  relationTo: 'form-uploads',              // upload collection (default: form-uploads)
+  mimeTypes: ['application/pdf', 'image/*'],
+  maxSize: 5_000_000,                      // bytes
+}
+```
+
+The submitted value becomes a self-describing `FileRef`, captured server-side from the upload document:
+
+```ts
+type FileRef = { id: string | number; filename: string; mimeType: string; filesize: number; url?: string }
+```
+
+The admin answers view renders it as a download link when a `url` is present.
+
+## The uploads collection
+
+A built-in `form-uploads` collection ships on by default: anonymous create (public forms must upload), read/update/delete for authenticated users, and an `owner` stamp for [ownership scoping](/form-builder/spam#upload-ownership).
+
+```ts title="payload.config.ts"
+formBuilder({
+  uploads: true, // default
+  // uploads: false, // bring your own; point the file field's relationTo at it
+  // uploads: { slug: 'attachments', upload: { staticDir, mimeTypes }, access, fields },
+})
+```
+
+Storage is your project's concern: set `upload.staticDir` or configure a Payload storage adapter (S3 and friends). The collection defines no `imageSizes`, so it does not require `sharp`.
+
+## Server enforcement
+
+On submit, the server loads the referenced upload and re-validates it against the field's `mimeTypes` and `maxSize`, then captures the authoritative `FileRef`. A missing, disallowed, or oversize file blocks the submission with a per-field error. Required presence rides the normal required rule.
+
+Uploads on the public path are also rate limited and ownership-scoped by default; see [Spam protection](/form-builder/spam).
+
+## Renderer
+
+The built-in `file` renderer (and its shadcn parity) uploads on change and stores the returned id. `uploadFile` is the underlying helper for custom renderers:
+
+```ts
+import { uploadFile } from '@10x-media/form-builder/react'
+
+const result = await uploadFile({ file, collection: 'form-uploads' })
+if (result.ok) {
+  // result.id is the value to store on the field
+}
+```
+
+Multiple files per field is a planned follow-up.

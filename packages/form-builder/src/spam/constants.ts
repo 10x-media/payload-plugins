@@ -1,5 +1,9 @@
-/** Default honeypot decoy field name. Plausible to bots, unlikely to collide with a real field name. */
-export const DEFAULT_HONEYPOT_FIELD = 'confirm_email'
+/**
+ * Default honeypot decoy field name. "website" is plausible to bots but doesn't trigger Chrome's
+ * email-address autofill (unlike names containing "email"). Bots fill every input; real users
+ * never see the hidden field.
+ */
+export const DEFAULT_HONEYPOT_FIELD = 'website'
 
 /** Reserved `values` entry carrying a captcha token from the client. */
 export const CAPTCHA_TOKEN_KEY = '__fb_captcha'

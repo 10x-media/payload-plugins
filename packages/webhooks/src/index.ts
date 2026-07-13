@@ -28,7 +28,7 @@ export const webhooks = definePlugin<WebhooksPluginOptions>({
 		if (options.disabled === true) {
 			return config
 		}
-		registerTranslations(config)
+		registerTranslations(config, options.translations)
 
 		const automationsPlugin = plugins['@10x-media/automations']
 		if (automationsPlugin?.options) {

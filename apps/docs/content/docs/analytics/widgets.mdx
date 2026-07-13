@@ -1,0 +1,117 @@
+---
+title: Dashboard widgets
+description: Analytics widgets for Payload's Modular Dashboard, plus a public API for custom ones.
+---
+
+The plugin registers widgets into Payload's Modular Dashboard (`admin.dashboard.widgets`); they are the site-wide view, with [display fields](/analytics/display-fields) as the per-document counterpart. Each widget is capability-gated: if no configured adapter can answer its metric or dimension, it is not registered at all, so dead tiles never appear and nobody can configure a widget no data source could answer.
+
+<Callout>
+The Modular Dashboard is an experimental Payload feature. After configuring widgets, run `payload generate:importmap` so their server components resolve in the admin.
+</Callout>
+
+## Placing widgets
+
+Plugins must never set `admin.dashboard.defaultLayout` (Payload applies it with `??=`; a plugin setter would clobber the app's layout). The app owns the layout and spreads the exported helper:
+
+```ts title="payload.config.ts"
+import { analytics, analyticsDefaultWidgets } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export default buildConfig({
+  admin: {
+    dashboard: { defaultLayout: [...analyticsDefaultWidgets()] },
+  },
+  plugins: [analytics({ adapters: [native()] })],
+})
+```
+
+`analyticsDefaultWidgets()` returns a large pageviews trend, two small metric widgets (pageviews and visitors), and the four breakdown widgets (top pages, sources, devices, countries), all over the last 30 days. Compose your own layout instead by listing `{ widgetSlug, width, data }` instances directly. If you set `widgets: false`, do not spread the helper; its instances would reference unregistered widgets.
+
+## The built-in widgets
+
+| Slug | Shows |
+|---|---|
+| `analytics-metric` | One headline number. |
+| `analytics-trend` | A gradient area chart of one metric over time, with timeframe-aware axis labels and a hover tooltip. |
+| `analytics-breakdown-pages` | Top pages as a filled bar list. |
+| `analytics-breakdown-sources` | Top traffic sources. |
+| `analytics-breakdown-devices` | Device classes. |
+| `analytics-breakdown-countries` | Countries. |
+| `analytics-realtime` | An "active now" count with a per-minute sparkline. |
+
+Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
+
+The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoint every 15 seconds and registers only when a realtime-capable adapter (the native engine today) is configured.
+
+Trend widgets render a real daily series for every provider that has one; where a provider has no per-day source for a metric (Umami's visitors, for example), the headline stays correct and the series is empty. Headline totals are range-correct: distinct metrics like visitors are never summed across days.
+
+Charts are dependency-free SVG and CSS, themed with Payload's design tokens. The series color reads `--analytics-chart-1`, overridable from your admin stylesheet.
+
+## Options
+
+```ts
+analytics({
+  adapters: [native()],
+  widgets: {
+    disabled: ['analytics-breakdown-devices'], // drop specific slugs
+    localizeText: true,                        // make widget Titles localized fields
+    register: [/* custom widgets, below */],
+  },
+  // widgets: false  // disable the whole widget layer
+})
+```
+
+`localizeText` marks the free-text widget config fields (each widget's Title) as `localized`. It only takes effect when your Payload config enables localization; Payload strips the flag otherwise.
+
+## Custom widgets
+
+Register your own widgets alongside the built-ins. Each is slug-validated (the `analytics-` prefix is reserved) and capability-gated by `requires`:
+
+```ts
+analytics({
+  adapters: [native()],
+  widgets: {
+    register: [
+      {
+        slug: 'myapp-top-sources',
+        component: '/components/TopSourcesWidget#default',
+        label: 'Top sources',
+        requires: { dimensions: ['source'] },
+      },
+    ],
+  },
+})
+```
+
+Build the component as a server component. Reads come from `@10x-media/analytics/rsc` (`readForWidget`, `readForWidgetBreakdown`, `readForWidgetSeries`, `readForWidgetRealtime`, `formatMetricValue`), presentation from `@10x-media/analytics/client` (`BarList`, `TrendChart`, `RealtimeCounter`):
+
+```tsx title="components/TopSourcesWidget.tsx"
+import { BarList } from '@10x-media/analytics/client'
+import { formatMetricValue, readForWidgetBreakdown } from '@10x-media/analytics/rsc'
+import type { WidgetServerProps } from 'payload'
+
+export default async function TopSourcesWidget(props: WidgetServerProps) {
+  const locale = props.req.i18n.language ?? 'en-US'
+  const result = await readForWidgetBreakdown({
+    req: props.req,
+    metric: 'pageviews',
+    dimension: 'source',
+    timeframe: 'last30days',
+    limit: 5,
+    now: new Date(),
+  })
+  if (result.status !== 'ok') return <span>No data</span>
+  return (
+    <BarList
+      data={result.rows.map((r) => ({
+        label: r.label,
+        value: r.value,
+        display: formatMetricValue('pageviews', r.value, locale),
+      }))}
+      emptyLabel="No data"
+    />
+  )
+}
+```
+
+Run `payload generate:importmap` after registering. The widget appears only when a configured adapter satisfies its `requires` gate, exactly like the built-ins.

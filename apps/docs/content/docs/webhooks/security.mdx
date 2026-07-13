@@ -1,0 +1,31 @@
+---
+title: Security model
+description: Trust boundaries, SSRF exposure, and what to tighten in hostile environments.
+---
+
+The plugin's security posture is simple to state: **admin access is the trust boundary**. Everything below follows from it.
+
+## Operator-supplied URLs (SSRF)
+
+Deliveries POST to whatever URL a subscription specifies, including private and internal hosts. That is the feature working as designed for trusted admins, and an SSRF vector if your admins are not fully trusted. In that case:
+
+- restrict outbound egress from the Payload host at the network layer, or
+- front receivers with an allowlist, or
+- drop admin-managed subscriptions entirely and use only [code subscriptions](/webhooks/subscriptions#code-subscriptions), whose URLs live in your repository and environment.
+
+## Access defaults
+
+- Both collections require a logged-in user for every permitted operation; delivery rows additionally refuse create and update from any user (server-only writes).
+- The redeliver endpoint authorizes by login only: any authenticated user may redeliver any delivery.
+
+Tighten either with your own access control by overriding the collections through standard Payload config if you need role-based rules.
+
+## Secrets
+
+Signing secrets are reveal-once and masked on every read, but stored unencrypted at rest for now. See [Signing](/webhooks/signing). Keep code-subscription secrets in your secret manager, not in the config file.
+
+## Receiver-side checklist
+
+- Verify the signature and enforce a timestamp tolerance ([example](/webhooks/signing#verifying-in-your-receiver)).
+- Treat `data` as untrusted input; it is whatever the document (or your `transform`) contained.
+- Respond quickly and process async. The sender aborts at `timeoutMs` (default 10s) and a slow receiver burns retry attempts.

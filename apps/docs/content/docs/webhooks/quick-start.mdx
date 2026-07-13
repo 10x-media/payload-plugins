@@ -1,0 +1,57 @@
+---
+title: Quick start
+description: Install the plugin, opt a collection in, and deliver your first webhook.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/webhooks
+```
+
+## Configure
+
+Opt collections in. That is the whole minimum config:
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { webhooks } from '@10x-media/webhooks'
+
+export default buildConfig({
+  // ...
+  plugins: [
+    webhooks({
+      collections: {
+        posts: true, // create, update, and delete
+      },
+    }),
+  ],
+})
+```
+
+The plugin adds a **Webhooks** group to the admin with two collections: **Subscriptions** (endpoint records) and **Deliveries** (the log).
+
+## Create a subscription
+
+In the admin, create a Subscription: a name, the receiver URL, and which events it listens to (`posts.created`, `posts.updated`, `posts.deleted`). Saving generates a 48-character signing secret and shows it once, on that create response only. Copy it to your receiver now; it is masked forever after. See [Signing](/webhooks/signing).
+
+## Verify
+
+Create a `posts` document. The plugin's `afterChange` hook records a delivery and POSTs a JSON body to your URL:
+
+```json
+{
+  "id": "<delivery-id>",
+  "event": "posts.created",
+  "collection": "posts",
+  "operation": "create",
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "data": { "...": "the document" }
+}
+```
+
+Open **Webhook Deliveries** in the admin: the row shows the event, status (`success`, or `failed`/`dead` on errors), HTTP response code, and duration. The **Redeliver** button replays the exact payload.
+
+## If nothing is delivered
+
+With no job runner configured, `delivery: 'auto'` runs deliveries inline inside the hook, so they should fire immediately. If you set `delivery: 'queue'` (or installed [Jobs](/jobs), which switches auto to queue), deliveries wait as `pending` until a worker or `payload.jobs.run()` processes them. See [Deliveries](/webhooks/deliveries).

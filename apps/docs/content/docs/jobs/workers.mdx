@@ -1,0 +1,109 @@
+---
+title: Workers
+description: Run jobs in a standalone process with createWorker and a graceful drain.
+---
+
+The execution layer is a separate process, not your web server. Your Next.js / Payload server handles HTTP; the worker boots its own Payload instance against the same database and owns the run, schedule, and sweep loops. The one topology without a worker process is [serverless](/jobs/topologies#serverless-vercel).
+
+## The worker entrypoint
+
+```ts title="worker.ts"
+import { getPayload } from 'payload'
+import { createWorker, resolveReliabilityOptions } from '@10x-media/jobs'
+
+import config from './payload.config'
+
+const RELIABILITY_OPTIONS = {
+  jobLeaseTtlMs: 300_000,
+  leaderLeaseTtlMs: 30_000,
+  sweepIntervalMs: 60_000,
+}
+
+const main = async (): Promise<void> => {
+  const payload = await getPayload({ config })
+  const reliability = resolveReliabilityOptions(RELIABILITY_OPTIONS)
+  if (!reliability) {
+    throw new Error('worker: reliability resolved to null')
+  }
+  createWorker({
+    payload,
+    reliability,
+    drainTimeoutMs: 30_000,
+    runIntervalMs: 2_000,
+  }).start()
+  payload.logger.info('worker started; awaiting jobs and signals')
+}
+
+main().catch((err) => {
+  console.error('worker failed to start', err)
+  process.exit(1)
+})
+```
+
+Run it with `node --import tsx worker.ts` in development, or compile it and run `node dist/worker.js` in production. Share the reliability tuning between `payload.config.ts` and `worker.ts` (one exported constant) so lease TTLs match across the cluster.
+
+`resolveReliabilityOptions` fully defaults a `ReliabilityOptions` object; it returns `null` when reliability is off, which a worker cannot run with, hence the guard.
+
+## What the worker does
+
+`start()` runs three guarded loops. The run loop claims and runs due jobs every `runIntervalMs`, up to `runLimit` per tick, honoring cluster [pause state](/jobs/queue-control) when a `pauseStore` is passed. The maintenance loop (every `maintenanceIntervalMs`) renews or acquires the `scheduler` and `sweeper` leases and handles schedules while holding `scheduler`. The sweep loop (every `sweepIntervalMs`) recovers orphaned jobs while holding `sweeper`.
+
+Every node runs jobs; only lease holders schedule and sweep. See [Reliability](/jobs/reliability).
+
+## Graceful drain
+
+`createWorker` installs SIGTERM/SIGINT handlers by default. On signal it stops the loops, waits up to `drainTimeoutMs` for in-flight jobs, requeues any straggler, releases its leases, destroys the Payload instance, and exits `0` on a clean drain or `1` if the drain timed out (jobs were requeued for another node).
+
+Two deployment rules follow. Use exec-form CMD (`CMD ["node", "dist/worker.js"]`, never `CMD node dist/worker.js`): shell form runs Node under `/bin/sh`, which does not forward SIGTERM, so the worker is hard-killed every time. And set the orchestrator's stop grace to at least `drainTimeoutMs + pollIntervalMs + 5s` (Docker Compose `stop_grace_period`, Kubernetes `terminationGracePeriodSeconds`); anything shorter SIGKILLs a still-draining worker and you lose the clean requeue.
+
+## CreateWorkerArgs
+
+| Option | Default | Description |
+|---|---|---|
+| `payload` | required | The booted Payload instance. |
+| `reliability` | required | A `ResolvedReliabilityOptions` (from `resolveReliabilityOptions`). |
+| `queues` | all queues | Queues to run. |
+| `pauseStore` | none | Honor cluster-wide pause/resume. |
+| `runIntervalMs` | `2000` | Claim-and-run cadence. |
+| `maintenanceIntervalMs` | `leaderLeaseTtlMs / 3` (min 1s) | Leadership and scheduling cadence. |
+| `runLimit` | `10` | Max jobs per run tick. |
+| `drainTimeoutMs` | `30000` | Wall-clock budget for in-flight jobs on drain. |
+| `pollIntervalMs` | `500` | How often the drain re-counts in-flight jobs. |
+| `scheduling` | `true` | Contend for the scheduler lease and run schedules. `false` opts a worker out entirely. |
+| `installSignals` | `true` | Register SIGTERM/SIGINT drain handlers. |
+| `signals` | `['SIGTERM', 'SIGINT']` | Which signals drain. |
+
+The returned `Worker` exposes `start()`, `drain()` (idempotent; returns the same in-flight promise on repeat calls), and `isLeader(role)`.
+
+Only one worker per process may install signal handlers; creating a second with `installSignals: true` throws. Pass `installSignals: false` for extra in-process workers (test helpers).
+
+## Opting out of scheduling
+
+Pass `scheduling: false` for a worker that must never register crons or contend for the scheduler leadership lease:
+
+```ts title="worker.ts"
+createWorker({
+  payload,
+  reliability,
+  scheduling: false,
+}).start()
+```
+
+The run loop and sweeper are unaffected: the worker still claims and runs due jobs, and still contends for the sweeper lease to recover orphaned jobs. `isLeader('scheduler')` also reports `false` unconditionally, so code branching on leadership doesn't need its own check.
+
+This is for fleets that shouldn't own scheduling at all, most commonly per-PR or per-branch preview workers: every ephemeral deployment booting against a shared database would otherwise contend for the same scheduler lease and, if it won, start running crons meant for the long-lived environment. Pin scheduling to whichever worker is meant to hold it and set `scheduling: false` on the rest.
+
+## No worker at all
+
+If you prefer Payload's in-process `autoRun` crons instead of a separate process, `autoRunConfig` builds the config with sane defaults (every minute, limit 10, silent):
+
+```ts title="payload.config.ts"
+import { autoRunConfig } from '@10x-media/jobs'
+
+jobs: {
+  tasks: [/* ... */],
+  autoRun: autoRunConfig({ queues: [{ queue: 'default' }, { queue: 'emails', cron: '*/5 * * * *' }] }),
+}
+```
+
+Set `disableScheduling: true` on it when a worker owns scheduling, so the crons only run jobs.

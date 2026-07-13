@@ -1,0 +1,46 @@
+---
+title: Conditional logic
+description: Show, hide, and conditionally validate fields with Payload-style Where conditions.
+---
+
+Every field can carry two conditions over its sibling answers, expressed in Payload's `Where` shape: the same operators you already use in list filters and queries.
+
+```ts
+// Show `state` only for US respondents:
+visibleWhen: { or: [{ and: [{ country: { equals: 'US' } }] }] }
+```
+
+## Authoring
+
+Conditions are authored in the admin with a native Payload-style condition builder on each field (field, operator, value; the same look as list filters). The builder stores a canonical `Where`, normalized and validated server-side. Because the format is serializable data, the renderer evaluates the identical structure client-side; there is no translation layer to drift.
+
+## `visibleWhen`: visibility gates everything
+
+When a field's `visibleWhen` evaluates false:
+
+- it is not rendered,
+- it is not validated,
+- its value is not stored, and any value the client sent for it is ignored.
+
+A hidden field cannot leak data into a submission. This is enforced server-side on every submission, not just in the UI.
+
+## `validateWhen`: gate validation, keep the value
+
+When `validateWhen` evaluates false, the field's validation rules are skipped but its value is still stored. Use it for answers that are only required in certain cases ("phone required only if preferred contact is phone").
+
+## One engine, both sides
+
+`evaluateCondition` is a pure function that mirrors Payload's query-operator semantics (coerce, then compare), with no `req` and no database access. The server enforces with it; the renderer previews with it; it is exported from both the root and `./react` for your own code:
+
+```ts
+import { evaluateCondition } from '@10x-media/form-builder'
+
+evaluateCondition(
+  { or: [{ and: [{ country: { equals: 'US' } }] }] },
+  { country: 'US' }
+) // true
+```
+
+Conditions can reference [calculation](/form-builder/calculations) fields; the server evaluates against the authoritative recomputed value.
+
+Multi-step flows use the same engine for step branching: see [Multi-step forms](/form-builder/multi-step).

@@ -1,0 +1,62 @@
+---
+title: Validation
+description: Per-field rules, custom rule types, severities, and the Standard Schema escape hatch.
+---
+
+Validation is declarative and server-authoritative. Editors attach rules to fields as blocks in the admin; one engine runs them on the server for every submission, and the renderer runs the same client-safe rules for immediate feedback. A submission is never stored on the client's word.
+
+## Built-in rules
+
+`minLength`, `maxLength`, `min`, `max`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`. Two are special: `matchesField` is cross-field, validating one answer against another (confirm-email style), and `notAlreadySubmitted` is async and server-only, because it queries existing submissions.
+
+Every rule instance can override its message (with `{var}` interpolation for rule parameters) and its severity: an `error` blocks submission, a `warning` is advisory and does not.
+
+## Custom rules
+
+Define a rule type once with `defineValidationRule`; it gets admin-authorable params and a typed `validate`, exactly like the built-ins:
+
+```ts title="payload.config.ts"
+import { formBuilder, defineValidationRule, type ValidationRuleOption } from '@10x-media/form-builder'
+
+formBuilder({
+  rules: {
+    even: defineValidationRule<Record<string, never>, number>({
+      type: 'even',
+      label: 'Even number',
+      appliesTo: ['number'],
+      defaultMessage: 'Must be an even number',
+      validate: ({ value, message }) => (value == null || value % 2 === 0 ? true : message()),
+    }) as ValidationRuleOption,
+  },
+})
+```
+
+The `rules` option follows the same [opt-in convention](/concepts#the-opt-in-convention) as field types, and entries are cast to `ValidationRuleOption` at the registry boundary for the same erased-generics reason.
+
+Beyond the required pieces, a definition can set `appliesTo` (field type slugs the rule can attach to; omit for all), `params` (a Payload `Field[]` for the rule's per-instance configuration in the admin), and a default `severity`. Mark anything async or touching `payload`/`req` with `client: false`: the renderer skips it, the server still runs it.
+
+## Standard Schema
+
+Each field type can validate against any [Standard Schema](https://standardschema.dev) validator (zod, valibot, arktype, and others) via the `schema` property on its definition, bypassing the rule list where a schema is the better fit:
+
+```ts
+import { z } from 'zod'
+import { defineFormField, type FieldTypeOption } from '@10x-media/form-builder'
+
+const username = defineFormField<'text'>({
+  type: 'username',
+  label: 'Username',
+  value: 'text',
+  schema: z.string().min(3).regex(/^[a-z0-9-]+$/),
+}) as FieldTypeOption
+```
+
+The schema runs through the same engine, on the server always and isomorphically where the library allows. `@standard-schema/spec` types are part of the public API, so your definitions stay portable across validation libraries.
+
+## What gets validated when
+
+- On blur and change (client): visible fields, client-safe rules, for feedback. See [Rendering](/form-builder/rendering#progressive-validation).
+- On step advance (client, multi-step): the current step's visible fields.
+- On submit (server): every visible field, every rule, including cross-field, async, schema, [calculation](/form-builder/calculations) re-compute, [consent](/form-builder/consent), and [file constraints](/form-builder/uploads). Fields hidden by [conditions](/form-builder/conditions) are skipped entirely.
+
+Server-returned field errors are mapped back onto the right fields by the renderer.

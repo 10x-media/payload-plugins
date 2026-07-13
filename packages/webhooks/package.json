@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/webhooks",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.1",
 	"description": "Outbound webhook subscriptions for Payload v3",
 	"license": "MIT",
 	"repository": {
@@ -83,6 +83,7 @@
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",

@@ -1,6 +1,9 @@
 export type DrainDeps = {
-	/** Stop the worker's interval loops (stop claiming new jobs). */
-	stopLoops: () => void
+	/**
+	 * Stop the worker's interval loops (stop claiming new jobs). Resolves once any
+	 * in-flight tick has settled, so no run-loop write can outlive the drain.
+	 */
+	stopLoops: () => Promise<void>
 	/** Count this node's in-flight jobs (processing and claimed by it). */
 	countInFlight: () => Promise<number>
 	/** Requeue this node's remaining in-flight jobs. Returns how many were released. */
@@ -37,7 +40,10 @@ export type DrainResult = {
  * waiting. Always releases leadership and destroys, even when nothing was in flight.
  */
 export const drainWorker = async (deps: DrainDeps, options: DrainOptions): Promise<DrainResult> => {
-	deps.stopLoops()
+	// Stops claiming immediately. The settle promise is awaited bounded before
+	// destroy(): a tick mid-write gets to land, but a long-running handler must not
+	// block shutdown (its job is requeued as a straggler instead).
+	const loopsSettled = deps.stopLoops()
 	// Release leadership before the polling loop so other nodes can elect a new
 	// leader during the drain window rather than waiting for the full timeout.
 	await deps.releaseLeadership()
@@ -56,6 +62,7 @@ export const drainWorker = async (deps: DrainDeps, options: DrainOptions): Promi
 	// job can still read processing:true before its completion write lands; requeuing it
 	// would bump recoveryAttempts and re-run it. The sweeper recovers genuine orphans.
 	const requeued = timedOut ? await deps.requeueStragglers() : 0
+	await Promise.race([loopsSettled, deps.sleep(options.pollIntervalMs)])
 	await deps.destroy()
 	deps.logger?.info?.(
 		`@10x-media/jobs: drain complete (started ${inFlightAtStart}, requeued ${requeued}, timedOut ${timedOut})`

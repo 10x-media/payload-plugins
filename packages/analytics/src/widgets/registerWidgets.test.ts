@@ -138,6 +138,34 @@ describe('registerWidgets', () => {
 		expect(slugs).toEqual(['myapp-only'])
 	})
 
+	it('marks widget title fields localized only when localizeText is set', () => {
+		const titleFieldOf = (config: Config, slug: string) =>
+			config.admin?.dashboard?.widgets
+				?.find((w) => w.slug === slug)
+				?.fields?.find((f) => 'name' in f && f.name === 'title')
+		const plain = bareConfig()
+		registerWidgets(plain, {
+			adapters: [native()],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
+		const localized = bareConfig()
+		registerWidgets(localized, {
+			adapters: [native()],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+			localizeText: true,
+		})
+		for (const slug of ['analytics-metric', 'analytics-realtime', 'analytics-breakdown-pages']) {
+			const plainTitle = titleFieldOf(plain, slug)
+			const localizedTitle = titleFieldOf(localized, slug)
+			expect(plainTitle && 'localized' in plainTitle && plainTitle.localized).toBeFalsy()
+			expect(localizedTitle && 'localized' in localizedTitle && localizedTitle.localized).toBe(true)
+		}
+	})
+
 	it('preserves any widgets the host config already declared', () => {
 		const config: Config = {
 			admin: { dashboard: { widgets: [{ slug: 'host-widget', Component: 'x#y' }] } },

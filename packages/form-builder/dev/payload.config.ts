@@ -2,10 +2,13 @@
 
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { defineFormField, type FieldTypeOption, formBuilder } from '../src/index'
+import { forwardAction } from './helpers/actions'
+import { startMemoryMongo } from './helpers/memoryDb'
 import { customRules } from './helpers/rules'
 import { seedDev } from './helpers/seed'
 
@@ -34,9 +37,7 @@ const db =
 		: mongooseAdapter({
 				ensureIndexes: true,
 				migrationDir,
-				url:
-					process.env.DATABASE_URI_MONGO ??
-					'mongodb://localhost:37017/form-builder_e2e?replicaSet=rs0&directConnection=true',
+				url: process.env.DATABASE_URI_MONGO ?? (await startMemoryMongo()),
 			})
 
 export default buildConfig({
@@ -58,6 +59,9 @@ export default buildConfig({
 			rules: {
 				dateMin: customRules[0]!,
 				dateMax: customRules[1]!,
+			},
+			actions: {
+				forward: forwardAction,
 			},
 			spam: {
 				// captcha: defineCaptchaProvider({
@@ -88,4 +92,16 @@ export default buildConfig({
 			baseDir: path.resolve(dirname),
 		},
 	},
+	email: nodemailerAdapter({
+		defaultFromAddress: 'test@test.com',
+		defaultFromName: 'Tester',
+		transportOptions: {
+			host: 'smtp.gmail.com',
+			port: 465,
+			auth: {
+				user: 'hassine427@gmail.com',
+				pass: 'ctzw wlzw vdna mhsn',
+			},
+		},
+	}),
 })

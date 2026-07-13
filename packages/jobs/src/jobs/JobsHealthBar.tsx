@@ -1,10 +1,12 @@
-import { Pill } from '@payloadcms/ui'
+import { Link, Pill } from '@payloadcms/ui'
 import type { ServerProps } from 'payload'
 
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { type JobStatus, statusWhere } from './deriveJobStatus'
+import { JobsTotalChip } from './JobsTotalChip'
 import { jobStatusMeta } from './jobStatusMeta'
+import { jobsListURL } from './jobsListURL'
 
 const DEFAULT_CAP = 100
 
@@ -45,6 +47,7 @@ export const JobsHealthBar = async ({ cap = DEFAULT_CAP, i18n, payload }: Props)
 
 	const t = asTranslate(i18n.t)
 	const show = (n: number): string => (cap !== false && n > cap ? `${cap}+` : String(n))
+	const adminRoute = payload.config.routes?.admin ?? '/admin'
 
 	return (
 		<div
@@ -56,14 +59,23 @@ export const JobsHealthBar = async ({ cap = DEFAULT_CAP, i18n, payload }: Props)
 				marginBottom: 'var(--base)',
 			}}
 		>
-			<strong>
-				{show(total)} {t(total === 1 ? keys.jobSingular : keys.jobPlural)}
-			</strong>
+			<JobsTotalChip fallbackHref={jobsListURL(adminRoute)}>
+				<strong>
+					{show(total)} {t(total === 1 ? keys.jobSingular : keys.jobPlural)}
+				</strong>
+			</JobsTotalChip>
 			{results.map(({ count, status }) =>
 				count === 0 ? null : (
-					<Pill key={status} pillStyle={jobStatusMeta[status].pillStyle} size="small">
-						{show(count)} {t(jobStatusMeta[status].labelKey)}
-					</Pill>
+					<Link
+						href={jobsListURL(adminRoute, status, now)}
+						key={status}
+						prefetch={false}
+						style={{ textDecoration: 'none' }}
+					>
+						<Pill pillStyle={jobStatusMeta[status].pillStyle} size="small">
+							{show(count)} {t(jobStatusMeta[status].labelKey)}
+						</Pill>
+					</Link>
 				)
 			)}
 		</div>

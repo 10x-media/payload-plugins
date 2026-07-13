@@ -1,0 +1,14 @@
+{
+	"title": "Jobs",
+	"pages": [
+		"index",
+		"quick-start",
+		"dashboard",
+		"reliability",
+		"workers",
+		"topologies",
+		"queue-control",
+		"testing",
+		"i18n"
+	]
+}

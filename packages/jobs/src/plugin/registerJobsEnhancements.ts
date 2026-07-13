@@ -1,16 +1,26 @@
-import type {
-	CollectionBeforeChangeHook,
-	CollectionConfig,
-	Config,
-	Field,
-	LabelFunction,
-	PayloadComponent,
+import {
+	APIError,
+	type CollectionBeforeChangeHook,
+	type CollectionBeforeValidateHook,
+	type CollectionConfig,
+	type Config,
+	type Field,
+	type LabelFunction,
+	type PayloadComponent,
 } from 'payload'
 
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
-import { labelForKey } from '../translations/server'
+import { asTranslate, labelForKey } from '../translations/server'
+import { collectJobLabels, type JobLabelMaps } from './labelMaps'
 import { resolve } from './resolve'
+import {
+	collectJobSelectSlugs,
+	jobSelectField,
+	taskCondition,
+	unionSelectValues,
+	workflowCondition,
+} from './selectFields'
 
 const STATUS_CELL = '@10x-media/jobs/client#JobStatusCell'
 const STATUS_HEADER = '@10x-media/jobs/client#JobStatusHeader'
@@ -19,12 +29,21 @@ const ERROR_PANEL = '@10x-media/jobs/client#JobErrorPanel'
 const LOG_TIMELINE = '@10x-media/jobs/client#JobLogTimeline'
 const DOC_DESCRIPTION = '@10x-media/jobs/client#JobDocDescription'
 const HEALTH_BAR = '@10x-media/jobs/rsc#JobsHealthBar'
+const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
+const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
+const QUEUE_SELECT_FIELD = '@10x-media/jobs/client#QueueSelectField'
+const ATTEMPTS_CELL = '@10x-media/jobs/client#AttemptsCell'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
 	name: 'jobTitle',
 	type: 'text',
-	admin: { disableListColumn: true, hidden: true },
+	label: labelForKey(keys.fieldJob),
+	admin: {
+		// Form-only hide: admin.hidden would also strip it from list columns.
+		condition: () => false,
+		disableBulkEdit: true,
+	},
 }
 
 /**
@@ -39,17 +58,35 @@ const setJobTitle: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
 	return title ? { ...data, jobTitle: title } : data
 }
 
-/** Our default document Field component for specific job fields. */
-const FIELD_COMPONENTS: Record<string, string> = {
-	error: ERROR_PANEL,
-	log: LOG_TIMELINE,
+/** A job runs a workflow or a task; reject documents claiming both. */
+const rejectWorkflowAndTask: CollectionBeforeValidateHook = ({
+	data,
+	operation,
+	originalDoc,
+	req,
+}) => {
+	if (operation !== 'create') {
+		return data
+	}
+	const merged = { ...(originalDoc ?? {}), ...(data ?? {}) } as Record<string, unknown>
+	if (merged.workflowSlug && merged.taskSlug) {
+		throw new APIError(asTranslate(req.t)(keys.errorWorkflowTaskExclusive), 400)
+	}
+	return data
 }
 
-const DEFAULT_JOBS_COLUMNS = ['workflowSlug', 'status', 'queue', 'totalTried', 'updatedAt']
+/** Our default document Field component for specific job fields. */
+const FIELD_COMPONENTS: Record<string, PayloadComponent> = {
+	error: ERROR_PANEL,
+	waitUntil: WAIT_UNTIL_FIELD,
+}
+
+const DEFAULT_JOBS_COLUMNS = ['jobTitle', 'status', 'queue', 'totalTried', 'updatedAt']
 
 /** Friendlier labels for a few of Payload's default job fields. */
 const FIELD_LABELS: Record<string, LabelFunction> = {
 	totalTried: labelForKey(keys.fieldAttempts),
+	waitUntil: labelForKey(keys.fieldScheduledFor),
 	workflowSlug: labelForKey(keys.fieldWorkflow),
 }
 
@@ -83,9 +120,15 @@ const setCell = (field: Field, cell: PayloadComponent): Field =>
 		admin: { ...field.admin, components: { ...field.admin?.components, Cell: cell } },
 	}) as Field
 
+/** Plugin-default list cells for specific fields; explicit `cells` overrides still win. */
+const DEFAULT_FIELD_CELLS: Record<string, PayloadComponent> = {
+	totalTried: ATTEMPTS_CELL,
+}
+
 /**
  * Resolve a field's list cell: an explicit `cells` override wins (`false` keeps
- * Payload's default), otherwise date fields get the relative-time cell.
+ * Payload's default), then plugin defaults for specific fields, otherwise date
+ * fields get the relative-time cell.
  */
 const resolveCell = (field: Field, cells: JobsOptions['cells']): Field => {
 	const name = fieldName(field)
@@ -96,6 +139,9 @@ const resolveCell = (field: Field, cells: JobsOptions['cells']): Field => {
 	if (override) {
 		return setCell(field, override)
 	}
+	if (name && DEFAULT_FIELD_CELLS[name]) {
+		return setCell(field, DEFAULT_FIELD_CELLS[name])
+	}
 	if (field.type === 'date') {
 		return setCell(field, RELATIVE_CELL)
 	}
@@ -104,12 +150,10 @@ const resolveCell = (field: Field, cells: JobsOptions['cells']): Field => {
 
 /** Execution-state fields surfaced in the header; hidden from the form, kept as data/columns. */
 const HIDE_ALWAYS = new Set(['completedAt', 'totalTried', 'hasError', 'processing', 'taskStatus'])
-/** Inputs shown only when creating a job; hidden once it exists. */
-const HIDE_ON_EDIT = new Set(['waitUntil'])
 /** Execution output: read-only in the admin (admin-only, so the runner can still write it). */
 const READONLY_OUTPUTS = new Set(['error', 'log'])
 /** Config inputs: editable on Create, read-only on edit; kept in the sidebar. */
-const READONLY_INPUTS = new Set(['input', 'workflowSlug', 'taskSlug', 'queue'])
+const READONLY_INPUTS = new Set(['input', 'workflowSlug', 'taskSlug', 'queue', 'waitUntil'])
 
 /**
  * Lock a field for the read-only-record model. Runner-written fields use
@@ -121,15 +165,6 @@ const lockField = (field: Field, name: string): Field => {
 	if (HIDE_ALWAYS.has(name)) {
 		return { ...field, admin: { ...field.admin, hidden: true } } as Field
 	}
-	if (HIDE_ON_EDIT.has(name)) {
-		return {
-			...field,
-			admin: {
-				...field.admin,
-				condition: (_data, _siblingData, { operation }) => operation === 'create',
-			},
-		} as Field
-	}
 	if (READONLY_OUTPUTS.has(name)) {
 		return { ...field, admin: { ...field.admin, readOnly: true } } as Field
 	}
@@ -140,28 +175,30 @@ const lockField = (field: Field, name: string): Field => {
 	return field
 }
 
-/** Recursively relabel fields, apply cell overrides, and lock the record, descending into tabs. */
-const enhanceFields = (
-	fields: Field[],
-	cells: JobsOptions['cells'],
+type EnhanceContext = {
+	cells: JobsOptions['cells']
+	fieldComponents: Record<string, PayloadComponent>
 	lockRecord: boolean
-): Field[] =>
+}
+
+/** Recursively relabel fields, apply cell overrides, and lock the record, descending into tabs. */
+const enhanceFields = (fields: Field[], ctx: EnhanceContext): Field[] =>
 	fields.map((field): Field => {
 		let next = field
 		const name = fieldName(field)
 		if (name && FIELD_LABELS[name]) {
 			next = { ...field, label: FIELD_LABELS[name] } as Field
 		}
-		next = resolveCell(next, cells)
-		if (lockRecord && name) {
+		next = resolveCell(next, ctx.cells)
+		if (ctx.lockRecord && name) {
 			next = lockField(next, name)
 		}
-		if (name && FIELD_COMPONENTS[name]) {
+		if (name && ctx.fieldComponents[name]) {
 			next = {
 				...next,
 				admin: {
 					...next.admin,
-					components: { ...next.admin?.components, Field: FIELD_COMPONENTS[name] },
+					components: { ...next.admin?.components, Field: ctx.fieldComponents[name] },
 				},
 			} as Field
 		}
@@ -170,17 +207,17 @@ const enhanceFields = (
 				...next,
 				tabs: next.tabs.map((tab) => ({
 					...tab,
-					fields: enhanceFields(tab.fields, cells, lockRecord),
+					fields: enhanceFields(tab.fields, ctx),
 				})),
 			} as Field
 		} else if ('fields' in next) {
-			next = { ...next, fields: enhanceFields(next.fields, cells, lockRecord) } as Field
+			next = { ...next, fields: enhanceFields(next.fields, ctx) } as Field
 		}
 		return next
 	})
 
 /** Build the derived Status column, honoring the `status` override (`false` removes it). */
-const buildStatusField = (status: JobsOptions['status']): Field | null => {
+const buildStatusField = (status: JobsOptions['status'], labels: JobLabelMaps): Field | null => {
 	if (status === false) {
 		return null
 	}
@@ -188,7 +225,18 @@ const buildStatusField = (status: JobsOptions['status']): Field | null => {
 		name: 'status',
 		type: 'ui',
 		label: labelForKey(keys.fieldStatus),
-		admin: { components: { Cell: status ?? STATUS_CELL, Field: STATUS_HEADER } },
+		admin: {
+			components: {
+				Cell: status ?? STATUS_CELL,
+				Field: {
+					clientProps: {
+						taskLabels: labels.taskLabels,
+						workflowLabels: labels.workflowLabels,
+					},
+					path: STATUS_HEADER,
+				},
+			},
+		},
 	} as Field
 }
 
@@ -198,7 +246,11 @@ const buildStatusField = (status: JobsOptions['status']): Field | null => {
  * (ours layer on top of theirs) so neither clobbers the other, and every piece
  * is replaceable through `options` (`status`, `cells`, `beforeListTable`).
  */
-export const registerJobsEnhancements = (config: Config, options: JobsOptions): void => {
+export const registerJobsEnhancements = (
+	config: Config,
+	options: JobsOptions,
+	extraQueues: string[] = []
+): void => {
 	const existing = config.jobs?.jobsCollectionOverrides
 
 	const enhance = ({
@@ -219,7 +271,63 @@ export const registerJobsEnhancements = (config: Config, options: JobsOptions): 
 			return name ? !existingNames.has(name) : false
 		}).map((field) => resolveCell(field, options.cells))
 
-		const statusField = buildStatusField(options.status)
+		// Top-level swap only: the log array nests its own required taskSlug field.
+		// Existing option values are kept (core seeds runtime-only slugs like `inline`
+		// that the db-level select enum must keep accepting). The queue field keeps
+		// its text type under a select component: a real select would harden the
+		// options into a db enum and reject the arbitrary queue names
+		// `payload.jobs.queue()` may target.
+		const slugs = collectJobSelectSlugs(config, extraQueues)
+		const labels = collectJobLabels(config)
+		const fieldComponents: Record<string, PayloadComponent> = {
+			...FIELD_COMPONENTS,
+			log: { clientProps: { taskLabels: labels.taskLabels }, path: LOG_TIMELINE },
+		}
+		const withSelects = base.fields.map((field): Field => {
+			const name = fieldName(field)
+			if (name === 'workflowSlug') {
+				return {
+					...jobSelectField(field, unionSelectValues(field, slugs.workflows)),
+					admin: { ...field.admin, condition: workflowCondition(slugs.workflows.length) },
+				} as Field
+			}
+			if (name === 'taskSlug') {
+				return {
+					...jobSelectField(field, unionSelectValues(field, slugs.tasks)),
+					admin: { ...field.admin, condition: taskCondition(slugs.tasks.length) },
+				} as Field
+			}
+			if (name === 'queue') {
+				return {
+					...field,
+					admin: {
+						...field.admin,
+						components: {
+							...field.admin?.components,
+							Field: { clientProps: { options: slugs.queues }, path: QUEUE_SELECT_FIELD },
+						},
+					},
+				} as Field
+			}
+			return field
+		})
+
+		const statusField = buildStatusField(options.status, labels)
+		const titleField: Field = {
+			...TITLE_FIELD,
+			admin: {
+				...TITLE_FIELD.admin,
+				components: {
+					Cell: {
+						clientProps: {
+							taskLabels: labels.taskLabels,
+							workflowLabels: labels.workflowLabels,
+						},
+						path: JOB_TITLE_CELL,
+					},
+				},
+			},
+		}
 		const lockRecord = options.readOnlyRecord !== false
 		const hostBeforeTable = base.admin?.components?.beforeListTable ?? []
 		const ourBeforeTable: PayloadComponent[] =
@@ -236,6 +344,14 @@ export const registerJobsEnhancements = (config: Config, options: JobsOptions): 
 				hidden: options.hidden ?? false,
 				useAsTitle: 'jobTitle',
 				defaultColumns: resolve(options.defaultColumns, DEFAULT_JOBS_COLUMNS),
+				// jobTitle is only synced by a beforeChange hook; runtime-queued docs
+				// bypass hooks by default, so list search must cover the raw slugs too.
+				listSearchableFields: base.admin?.listSearchableFields ?? [
+					'jobTitle',
+					'workflowSlug',
+					'taskSlug',
+					'queue',
+				],
 				components: {
 					...base.admin?.components,
 					Description: DOC_DESCRIPTION,
@@ -245,11 +361,12 @@ export const registerJobsEnhancements = (config: Config, options: JobsOptions): 
 			hooks: {
 				...base.hooks,
 				beforeChange: [...(base.hooks?.beforeChange ?? []), setJobTitle],
+				beforeValidate: [...(base.hooks?.beforeValidate ?? []), rejectWorkflowAndTask],
 			},
 			fields: [
 				...(statusField ? [statusField] : []),
-				TITLE_FIELD,
-				...enhanceFields(base.fields, options.cells, lockRecord),
+				titleField,
+				...enhanceFields(withSelects, { cells: options.cells, fieldComponents, lockRecord }),
 				...timestamps,
 			],
 		} as CollectionConfig

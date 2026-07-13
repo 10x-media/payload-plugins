@@ -6,6 +6,8 @@ export interface RollupKey {
 	path: string
 	dimension: string
 	dimvalue: string
+	/** Present only in scoped installs, where it is part of the unique bucket. */
+	scope?: string
 }
 
 export type RollupMetric =
@@ -33,7 +35,14 @@ export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
 		samples: 1,
 	}
 	const make = (path: string, dimension: string, dimvalue: string): RollupDelta => ({
-		key: { granularity: 'day', period, path, dimension, dimvalue },
+		key: {
+			granularity: 'day',
+			period,
+			path,
+			dimension,
+			dimvalue,
+			...(event.scope !== undefined ? { scope: event.scope } : {}),
+		},
 		inc: { ...inc },
 	})
 	const deltas: RollupDelta[] = [make(event.path, '', ''), make('', '', '')]

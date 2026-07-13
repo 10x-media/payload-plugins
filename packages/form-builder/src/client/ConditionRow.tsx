@@ -1,6 +1,7 @@
 'use client'
 
 import {
+	Button,
 	DateCondition,
 	NumberCondition,
 	ReactSelect,
@@ -78,11 +79,8 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 	}
 
 	return (
-		<div
-			className="form-builder-condition-row"
-			style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}
-		>
-			<div style={{ minWidth: 160 }}>
+		<div className="fb-condition-row">
+			<div className="fb-condition-row__field">
 				<ReactSelect
 					options={fieldOptions}
 					value={fieldOptions.find((option) => option.value === condition.field)}
@@ -91,7 +89,7 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={handleFieldChange}
 				/>
 			</div>
-			<div style={{ minWidth: 140 }}>
+			<div className="fb-condition-row__operator">
 				<ReactSelect
 					options={operatorOptions}
 					value={operatorOptions.find((option) => option.value === condition.operator)}
@@ -100,7 +98,7 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={handleOperatorChange}
 				/>
 			</div>
-			<div style={{ flex: 1 }}>
+			<div className="fb-condition-row__value">
 				<ConditionValue
 					conditionType={conditionType}
 					operand={operand}
@@ -109,9 +107,15 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 					onChange={(value) => onChange({ ...condition, value })}
 				/>
 			</div>
-			<button type="button" onClick={onRemove} aria-label={t(keys.conditionRemove)}>
-				{t(keys.conditionRemove)}
-			</button>
+			<div className="fb-condition-row__remove">
+				<Button
+					buttonStyle="icon-label"
+					icon="x"
+					onClick={onRemove}
+					aria-label={t(keys.conditionRemove)}
+					margin={false}
+				/>
+			</div>
 		</div>
 	)
 }

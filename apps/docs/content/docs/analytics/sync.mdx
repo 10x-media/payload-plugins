@@ -1,0 +1,59 @@
+---
+title: Sync tier
+description: Persist provider daily metrics into a queryable Payload collection.
+---
+
+The cache keeps `payload.kv` hot, but kv is ephemeral. The sync tier is durable: an opt-in job that upserts each configured provider's daily metrics into a real Payload collection, so you can query third-party analytics with Payload's own APIs (`find`, `where`, REST, GraphQL, relationships, custom reports) without calling the provider live.
+
+```ts
+analytics({
+  adapters: [plausible({ /* ... */ })],
+  sync: true, // every 6h, last 3 days, into `analytics-daily`
+})
+```
+
+Or tuned:
+
+```ts
+analytics({
+  adapters: [/* ... */],
+  sync: {
+    cron: '0 4 * * *',
+    lookbackDays: 7,
+    collectionSlug: 'site-metrics',
+    adapters: ['plausible'], // default: every configured provider
+  },
+})
+```
+
+## How it works
+
+When enabled, the plugin registers the collection (default slug `analytics-daily`) and a Payload task (`analytics-sync`). On its cron, the task reads each provider's last `lookbackDays` of daily metrics through the surfacing engine and upserts one row per `(source, date)`.
+
+A unique `source + date` index makes re-runs idempotent: recent days are refreshed as provider data finalizes rather than duplicated, which is also why the default looks back three days instead of one. Each row carries `source`, `date`, `pageviews`, `visitors`, `sessions`, `avgDuration`, `bounceRate`, `events`, and `syncedAt`; metrics a provider does not report stay null. The collection is read-only in the admin (the job writes, users read). The native engine is excluded, since its data already lives durably in `analytics-rollups`, and one provider failing is logged without aborting the others.
+
+Reads go through the [surfacing cache](/analytics/cache), so persisted rows can reflect cached values up to the aggregate TTL old. Keep `cache.ttl.aggregate` below your sync interval for the freshest rows.
+
+## Running it
+
+Sync is off by default and needs Payload's jobs runner (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler) for the cron to fire. Run it on demand at any time:
+
+```ts
+await payload.jobs.queue({ task: 'analytics-sync' })
+await payload.jobs.run()
+```
+
+## Querying
+
+```ts
+const january = await payload.find({
+  collection: 'analytics-daily',
+  where: {
+    source: { equals: 'plausible' },
+    date: { greater_than_equal: '2026-01-01', less_than: '2026-02-01' },
+  },
+  sort: 'date',
+})
+```
+
+Daily breakdowns and serving widgets from the synced collection are planned follow-ups.

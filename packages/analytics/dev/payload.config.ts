@@ -6,6 +6,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { analytics, analyticsStat, analyticsStatRow, analyticsTab } from '../src/index'
 import { native } from '../src/native/nativeAdapter'
+import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -24,10 +25,20 @@ const pages: CollectionConfig = {
 	slug: 'pages',
 	admin: { useAsTitle: 'title' },
 	fields: [
-		{ name: 'title', type: 'text' },
-		{ name: 'slug', type: 'text', required: true },
+		{
+			type: 'tabs',
+			tabs: [
+				{
+					label: 'Content',
+					fields: [
+						{ name: 'title', type: 'text' },
+						{ name: 'slug', type: 'text', required: true },
+					],
+				},
+				analyticsTab(),
+			],
+		},
 		analyticsStat({ metric: 'pageviews', position: 'sidebar' }),
-		analyticsTab(),
 		analyticsStatRow({ name: 'analytics_inline' }),
 	],
 }
@@ -44,9 +55,7 @@ const db =
 		: mongooseAdapter({
 				ensureIndexes: true,
 				migrationDir,
-				url:
-					process.env.DATABASE_URI_MONGO ??
-					'mongodb://localhost:37017/analytics_e2e?replicaSet=rs0&directConnection=true',
+				url: process.env.DATABASE_URI_MONGO ?? (await startMemoryMongo()),
 			})
 
 export default buildConfig({
@@ -79,6 +88,7 @@ export default buildConfig({
 	admin: {
 		importMap: { autoGenerate, baseDir: path.resolve(dirname) },
 		dashboard: {
+			widgets: [],
 			defaultLayout: [
 				{
 					widgetSlug: 'analytics-realtime',

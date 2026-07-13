@@ -1,0 +1,78 @@
+---
+title: Subscriptions
+description: Opt collections in, manage subscribers in the admin, or register them in code.
+---
+
+A webhook fires when three things line up: a collection is opted in for the operation, and at least one enabled subscription listens for the resulting event.
+
+## Opting collections in
+
+```ts title="payload.config.ts"
+webhooks({
+  collections: {
+    posts: true, // shorthand: all three operations
+    orders: {
+      operations: ['create', 'delete'],
+      includePreviousData: true,
+      transform: ({ doc, operation }) => ({
+        id: doc.id,
+        status: doc.status,
+        operation,
+      }),
+    },
+  },
+})
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `operations` | `('create' \| 'update' \| 'delete')[]` | Which writes emit events. Default: all three. |
+| `includePreviousData` | `boolean` | Add a `previousData` key to the body on `update` events. |
+| `transform` | `({ doc, previousDoc, operation, req }) => unknown` | Reshape or redact before sending. The return value becomes the body's `data`. |
+
+Events are named `<collection>.<created|updated|deleted>`: a create in `posts` emits `posts.created`. The hooks run `afterChange` and `afterDelete`, so a webhook never blocks or fails the write that caused it.
+
+## Admin-managed subscriptions
+
+The **Webhook Subscriptions** collection (slug `webhook-subscriptions` by default) is where operators register receivers:
+
+- `name`, `url`, and an `enabled` toggle
+- `events`: a multi-select of every event the opted-in collections can emit
+- `secret`: generated on create, revealed once, then masked. See [Signing](/webhooks/signing)
+- `headers`: extra key/value headers injected on every delivery to this subscription
+- `description`: free-form notes
+
+All operations on the collection require a logged-in user.
+
+## Code subscriptions
+
+For receivers that belong in code (your own services, environment-dependent URLs), register them on the plugin. No admin record is created:
+
+```ts title="payload.config.ts"
+webhooks({
+  collections: { orders: true },
+  subscriptions: [
+    {
+      id: 'my-crm',
+      url: 'https://crm.example.com/hooks/orders',
+      events: ['orders.created', 'orders.updated'],
+      secret: process.env.WEBHOOK_SECRET,
+      headers: { 'x-source': 'payload' },
+    },
+  ],
+})
+```
+
+`CodeSubscription` fields: `id`, `url`, `events`, plus optional `secret`, `headers`, and `enabled` (default on). Code and admin subscriptions are merged at delivery time; each matching subscription gets its own delivery row.
+
+## Renaming or hiding the collections
+
+```ts
+webhooks({
+  collections: { posts: true },
+  subscriptionsCollection: { slug: 'endpoints', hidden: false },
+  deliveriesLog: { slug: 'endpoint-deliveries', hidden: true },
+})
+```
+
+`hidden: true` keeps a collection out of the admin nav while it continues to function.

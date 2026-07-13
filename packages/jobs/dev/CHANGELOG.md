@@ -1,5 +1,26 @@
 # @10x-media/jobs-dev
 
+## 0.0.1-beta.5
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/jobs@0.1.0-beta.5
+
+## 0.0.1-beta.4
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/jobs@0.1.0-beta.4
+
+## 0.0.1-beta.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/jobs@0.1.0-beta.3
+
 ## 0.0.1-beta.2
 
 ### Patch Changes

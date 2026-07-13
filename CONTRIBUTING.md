@@ -154,4 +154,4 @@ Versioning is independent per package: only packages with queued changesets are 
 
 ## Documentation
 
-The documentation site lives in `apps/docs/` (Fumadocs). Add plugin docs under `apps/docs/content/docs/<slug>/`. Run it locally with `pnpm dev docs` (apps under `apps/` are valid short-command targets, the same as plugins). It deploys separately as a Next.js standalone build (`apps/docs/Dockerfile`).
+The documentation site lives in `apps/docs/` (Fumadocs). Add plugin docs under `apps/docs/content/docs/<slug>/` with a `meta.json` for page order. Run it locally with `pnpm dev docs` (apps under `apps/` are valid short-command targets, the same as plugins). It builds as a static export (`pnpm build docs` writes `apps/docs/out/`) and deploys to GitHub Pages at [docs.10xmedia.de](https://docs.10xmedia.de) via `.github/workflows/docs.yml` on every push to `main` that touches `apps/docs/`.

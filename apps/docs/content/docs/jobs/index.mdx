@@ -1,0 +1,39 @@
+---
+title: Jobs
+description: An ops dashboard plus reliability, worker, and queue-control layers for Payload's built-in jobs queue.
+---
+
+`@10x-media/jobs` builds on Payload's native jobs system (`payload-jobs`). It does not replace the queue; it makes it operable in production: see what the queue is doing, recover jobs that die mid-run, run a proper worker process, and pause or drive the queue from the outside.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { jobs, singleNodePreset } from '@10x-media/jobs'
+
+export default buildConfig({
+  jobs: { tasks: [/* at least one task */] },
+  plugins: [jobs({ ...singleNodePreset() })],
+})
+```
+
+## Four layers, each opt-in
+
+| Layer | What it adds | How to enable |
+|---|---|---|
+| [Dashboard](/jobs/dashboard) | A derived Status column, a queue-health bar, error and log panels on the `payload-jobs` collection. | Always on with `jobs()`. |
+| [Reliability](/jobs/reliability) | Job leases, an orphan sweeper with dead-lettering, leader election, serverless staleness. | `reliability: true` or a tuned object. |
+| [Workers](/jobs/workers) | `createWorker`: a standalone worker process with graceful SIGTERM drain. | Run the worker entrypoint as its own process. |
+| [Queue control](/jobs/queue-control) | Cluster-wide pause/resume plus hardened `queue-run`, `queue-sweep`, and `queue-status` endpoints with access guards. | `queueControl: true` or a tuned object. |
+
+[Topology presets](/jobs/topologies) wire reliability and queue control consistently for serverless, single-node, and multi-node deployments.
+
+## When to use it
+
+Use this plugin when Payload jobs move from "nice to have" to "must not silently break": queued emails, webhook deliveries, imports, scheduled work. It is also the runtime half of the [jobs family](/concepts/jobs-family): [Webhooks](/webhooks) and [Form Builder](/form-builder) detect it and queue their work through it automatically.
+
+## Two facts to know up front
+
+Payload only materializes the `payload-jobs` collection when `jobs.tasks` or `jobs.workflows` is non-empty, so the plugin needs at least one task configured; `createWorker` throws a clear error otherwise. And Payload deletes completed jobs by default (`jobs.deleteJobOnComplete: true`), so the dashboard and status counts reflect live states only. Set it to `false` in `buildConfig` to keep succeeded jobs around for auditing.
+
+## Next
+
+Start with the [quick start](/jobs/quick-start), then pick the [topology](/jobs/topologies) that matches your deployment.

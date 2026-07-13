@@ -1,0 +1,39 @@
+---
+title: Form Builder
+description: An end-to-end forms platform for Payload v3. Author, validate, render, collect, aggregate, and act on forms.
+---
+
+`@10x-media/form-builder` is a complete forms stack built from Payload primitives and nothing else. Editors author forms as documents in the admin; your frontend renders them with a headless React layer; the server validates every submission from scratch; a post-submit pipeline emails, webhooks, and aggregates. Simple by default for editors, with a definition seam (`defineFormField`, `defineValidationRule`, `defineAction`, and friends) wherever developers need depth.
+
+```tsx title="app/contact/page.tsx"
+import { Form } from '@10x-media/form-builder/react'
+
+export default async function ContactPage() {
+  const form = await fetchForm('contact') // a `forms` document via Payload's API
+  return <Form form={form} />
+}
+```
+
+## What is in the box
+
+Editors compose forms from [fields](/form-builder/fields) authored as Payload blocks. Ten types ship (text, textarea, email, number, select, checkbox, file, consent, calculation, repeater), all built through the same `defineFormField` primitive your custom types use, so nothing about the built-ins is privileged. Fields carry declarative [validation rules](/form-builder/validation) with custom messages, warning-versus-error severities, cross-field and async server-only rules, and a [Standard Schema](https://standardschema.dev) escape hatch. [Conditional logic](/form-builder/conditions) is expressed in Payload's own `Where` shape and evaluated by one isomorphic engine on client and server, and a serializable step graph turns any form into a [multi-step flow](/form-builder/multi-step) with conditional branching.
+
+On the frontend, [`<Form>`](/form-builder/rendering) renders headless: progressive validation, lifecycle events, accessible primitives, swappable renderers, an optional layout grid. [Style it](/form-builder/styling) with CSS on stable class hooks, the shadcn registry, or your own components, and surface it as a page, inline block, modal, or drawer through [presentations](/form-builder/presentations). Accessibility is not left to the integrator: the defaults are verified by automated axe checks (jsdom and real-browser e2e), and custom renderers get a documented contract to uphold.
+
+Around the submission itself: [recall and prefill](/form-builder/recall-prefill) pipe earlier answers into labels and seed values from URL parameters, [calculations](/form-builder/calculations) derive totals and quiz scores through a no-eval expression engine recomputed on the server, [consent](/form-builder/consent) is captured with proof by reference and policy-version capture, and [file uploads](/form-builder/uploads) ride a dedicated collection with server-enforced MIME and size limits. Stored submissions trigger [post-submit actions](/form-builder/actions) (email, confirmation, signed webhook, custom) through Payload jobs with a bounded inline fallback, and [polls and aggregation](/form-builder/polls) turn them into publishable results via a gated endpoint, `<FormResults>`, and a turnkey `<Poll>`.
+
+[Spam protection](/form-builder/spam) is on by default: a honeypot decoy and per-identity rate limiting, a captcha seam, upload-ownership scoping, and privacy-first metadata capture. Every admin string is a [typed translation](/form-builder/i18n) following the shared plugin pattern.
+
+## The trust model
+
+The client is never trusted. Conditions, validation rules, calculations, consent capture, and file constraints are all re-evaluated server-side on every submission; client-side evaluation exists for UX only and uses the same exported engines, so the two cannot drift.
+
+## Extending and configuring the plugin
+
+All three plugin-managed collections (`forms`, `form-submissions`, `form-uploads`) accept an `overrides` option that uses explicit spreads. The submission admin view renders a formatted `SubmissionAnswers` component by default; raw JSON fields are hidden unless you set `showSubmissionRawFields: true`. See [Customization](/form-builder/customization) for the full API.
+
+## When to use it
+
+Any Payload project that needs forms beyond a hardcoded contact form: marketing sites where editors ship new forms without deploys, quizzes and calculators, gated downloads, surveys and polls. Everything is a Payload collection underneath (`forms`, `form-submissions`, `form-uploads`), so your existing access control, hooks, and APIs apply.
+
+Start with the [quick start](/form-builder/quick-start).
