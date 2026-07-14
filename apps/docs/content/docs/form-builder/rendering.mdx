@@ -17,7 +17,18 @@ import { Form } from '@10x-media/form-builder/react'
 />
 ```
 
-`form` is a `FormDocument` (`{ id, fields, flow?, defaultPresentation? }`): pass the `forms` document from Payload's Local or REST API directly.
+`form` is a `FormDocument` (`{ id, fields, flow?, response?, display?, poll? }`). Payload's generated types do not line up exactly (nullable groups, opaque JSON `flow`), so narrow the fetched document with `toFormDocument` instead of casting:
+
+```tsx title="app/contact/page.tsx"
+import { toFormDocument } from '@10x-media/form-builder/rsc'
+
+const doc = await payload.findByID({ collection: 'forms', id })
+return <ContactForm form={toFormDocument(doc)} />
+```
+
+`toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes `{ pollOptions }` as a second argument to inject [source-resolved poll options](/form-builder/polls#option-sources).
+
+Two `FormDocument` groups drive rendering beyond the fields. `display` renders above the fields: an optional title (`showTitle` gates it; `fb-form__title`) and a rich text `intro` (`fb-form__intro`), both supporting recall tokens. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too), and `submitLabel` feeds the submit button (see label precedence below).
 
 ### Progressive validation
 
@@ -54,7 +65,7 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
 | `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
 | `className` | `string` | none | Extra CSS classes on the root `<form>` element (and the post-submit success node). |
-| `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. |
+| `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit resolves prop, then the form's `response.submitLabel`, then the translated default. |
 | `submitButtonClassName` | `string` | none | CSS class on the default submit button. Ignored when `renderSubmit` is provided. |
 | `nextButtonClassName` | `string` | none | CSS class on the default Next button (multi-step). Ignored when `renderNext` is provided. |
 | `backButtonClassName` | `string` | none | CSS class on the default Back button (multi-step). Ignored when `renderBack` is provided. |
@@ -66,6 +77,12 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `initialValues` | `Record<string, unknown>` | none | Seed values; see [Prefill](/form-builder/recall-prefill#url-prefill). |
 | `honeypot`, `captchaToken` | | defaults on / none | See [Spam](/form-builder/spam). |
 | `children` | `ReactNode` | none | Custom layout mode; see below. |
+
+A repeater field with `minRows` starts pre-seeded with that many empty rows, matching the schema's floor. An explicit `initialValues` entry for the field (including an empty array) wins over the seed.
+
+### Form chrome and markup
+
+The chrome below the fields is a `.fb-form__controls` wrapper containing the default buttons, each with a stable class: `fb-form__back`, `fb-form__next`, `fb-form__submit`. The root form is `fb-form-root`; the post-submit node is `fb-form__success`, a submit failure renders in `fb-form__submit-error`, and the display group renders `fb-form__title` / `fb-form__intro`. The chrome itself is the exported `<FormControls>` component (below), so custom layouts get the identical behavior.
 
 ### Custom buttons
 
@@ -165,7 +182,7 @@ Widths: `full`, `half`, `third`, `twoThirds`. Skip the stylesheet (or pass `layo
 Pass `children` to `<Form>` and it renders them inside its context instead of the auto-rendered field loop, so you own the entire layout while `<Form>` keeps owning state and submission:
 
 ```tsx
-import { Form, useField } from '@10x-media/form-builder/react'
+import { Form, FormControls, useField } from '@10x-media/form-builder/react'
 
 function NameField() {
   const { value, errors, setValue, onBlur } = useField<string>('name')
@@ -180,10 +197,13 @@ function NameField() {
 
 <Form form={form}>
   <NameField />
-  <button type="submit">Send</button>
+  <FormControls />
 </Form>
 ```
+
+`<FormControls>` is the same chrome the default layout renders: back on non-first steps, next on non-terminal steps, submit on the terminal step, with labels resolved from context (props, `response.submitLabel`, translated defaults). It accepts the same per-button `className` and `render*` overrides as `<Form>`, so a custom layout keeps the built-in step logic and double-submit guard instead of hand-wiring buttons. `<FormSteps>` composes the same way for [step progress](/form-builder/multi-step#formsteps-progress-indicator).
 
 - `useField(name)` returns `value`, `errors`, `warnings`, `touched`, `setValue`, `onBlur`.
 - `useFormState()` returns the whole `FormState`: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, `submitError`.
 - `useFormStep()` drives [multi-step UIs](/form-builder/multi-step#useformstep-for-custom-step-uis).
+- `useFormContext()` returns the full controller context the focused hooks read from: `state`, `dispatch`, `validateField`, `locale`, `step`, `rendererRegistry`, the resolved chrome `labels`, the active translator `t`, and `effectiveValues` (answers overlaid with derived calc values). Reach for it when building renderer-like components (a custom repeater looking up sub-renderers, chrome that needs the resolved labels); the focused hooks stay the ergonomic default.

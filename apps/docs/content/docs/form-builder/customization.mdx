@@ -27,6 +27,25 @@ formBuilder({
 
 The same pattern works for rules via `defaultValidationRulesByType` under the `rules` option.
 
+### Spread-overrides and `localizeContent`
+
+The prebuilt default exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`, `defaultConsentSources`) are built with [content localization](/form-builder/fields#content-localization) on, so their content-bearing config fields carry `localized: true`. On a host running `localizeContent: false`, spreading one of them silently reintroduces the flag for that one type. Derive overrides from the builder functions instead, passing the same flag you gave the plugin:
+
+```ts title="payload.config.ts"
+import { buildDefaultFieldDefinitions, formBuilder, type FieldTypeOption } from '@10x-media/form-builder'
+
+const [textDefault] = buildDefaultFieldDefinitions(false).filter((d) => d.type === 'text')
+
+formBuilder({
+  localizeContent: false,
+  fields: {
+    text: { ...textDefault, validate: myValidate } as FieldTypeOption,
+  },
+})
+```
+
+`buildDefaultActionDefinitions(localize)` and `buildDefaultConsentSources(localize)` are the equivalent builders for actions and consent sources. With the default `localizeContent: true` the prebuilt exports are exactly the builder output, so the shorter spread recipe above stays correct.
+
 ## Submission answers UI
 
 When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component that formats each value using its field type's `format` function, shows repeater rows with numbered headings, displays consent proofs with agreed/declined indicators and a timestamp, and includes submission metadata. This replaces the raw JSON fields as the primary view.
@@ -45,7 +64,7 @@ With this option off (the default), the `answers` UI field is the only visible r
 
 ## Collection overrides
 
-The plugin manages three Payload collections: `forms`, `form-submissions`, and `form-uploads`. All three accept an `overrides` option that lets you extend them in a way that is explicit and predictable, without using a deep-merge utility that can silently drop plugin-critical config.
+The plugin manages two Payload collections, `forms` and `form-submissions`. Both accept an `overrides` option that lets you extend them in a way that is explicit and predictable, without using a deep-merge utility that can silently drop plugin-critical config. (The [uploads collection](/form-builder/uploads) needs no override seam: it is yours to begin with.)
 
 ## The spread convention
 
@@ -136,7 +155,6 @@ formBuilder({
   overrides?: {
     forms?: CollectionOverrides
     formSubmissions?: CollectionOverrides
-    uploads?: CollectionOverrides
   }
 })
 ```

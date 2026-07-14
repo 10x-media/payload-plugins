@@ -1,9 +1,38 @@
 ---
 title: File uploads
-description: The file field, the form-uploads collection, and the server-side trust boundary.
+description: The file field, bring-your-own upload collection, and the server-side trust boundary.
 ---
 
-The `file` field lets visitors attach files. The client uploads to an upload collection and submits only the upload id; the server re-reads the stored document and enforces the constraints itself. Client-sent filenames, MIME types, and sizes are never trusted or stored.
+The `file` field lets visitors attach files. The client uploads to your upload collection and submits only the upload id; the server re-reads the stored document and enforces the constraints itself. Client-sent filenames, MIME types, and sizes are never trusted or stored.
+
+## Bring your own collection
+
+Uploads are off by default: without an upload collection a file field would have nowhere to store anything, so the `file` type is removed from the field registry entirely and form authors never see it. Opt in by pointing the plugin at an upload-enabled collection your app owns, created with your storage adapter of choice:
+
+```ts title="payload.config.ts"
+formBuilder({
+  uploads: { collection: 'form-attachments' },
+})
+```
+
+```ts title="collections/FormAttachments.ts"
+export const FormAttachments: CollectionConfig = {
+  slug: 'form-attachments',
+  upload: true, // or an upload options object; add your storage adapter as usual
+  access: {
+    create: () => true, // public forms must upload anonymously
+  },
+  fields: [],
+}
+```
+
+The collection is yours: storage adapter (S3 and friends or `staticDir`), access control, extra fields, admin placement all stay in your hands. The plugin wires its own concerns into it at boot:
+
+- **Validation:** a missing collection, or one without an `upload` config, throws a descriptive error at startup, so a typo'd slug can never silently disable enforcement.
+- **Ownership:** a hidden `owner` text field is appended for [ownership scoping](/form-builder/spam#upload-ownership), unless you already define a field named `owner` (then yours is reused and must stay a text-compatible identity slot).
+- **Spam hooks:** the upload rate limit and owner stamp are prepended ahead of your own hooks, so abuse checks run first.
+
+The configured slug is stamped onto every `file` block server-side on each form save (a hidden `uploadsCollection` block field), so the client renderer always uploads to the collection from plugin config, never an author- or client-controlled value.
 
 ## The field
 
@@ -13,13 +42,12 @@ The `file` field lets visitors attach files. The client uploads to an upload col
   name: 'resume',
   label: 'Resume',
   required: true,
-  relationTo: 'form-uploads',              // upload collection (default: form-uploads)
   mimeTypes: ['application/pdf', 'image/*'],
   maxSize: 5_000_000,                      // bytes
 }
 ```
 
-In the admin, `mimeTypes` is a multi-select over a curated list of common types and `type/*` wildcards (images, PDF, Office documents, audio, video, and more); the list is exported as `fileMimeTypeOptions`. `maxSize` is entered in bytes and live-previews as a human-readable size (`= 2.5 MB`) while typing. Fields configured before the curated select existed keep their stored values and keep enforcing them, but a free-text value outside the curated list will need re-selecting the next time that field is edited; submitted data is untouched.
+In the admin, `mimeTypes` is a multi-select over a curated list of common types and `type/*` wildcards (images, PDF, Office documents, audio, video, and more); the list is exported as `fileMimeTypeOptions`. `maxSize` is entered in bytes and live-previews as a human-readable size (`= 2.5 MB`) while typing.
 
 The submitted value becomes a self-describing `FileRef`, captured server-side from the upload document:
 
@@ -29,20 +57,6 @@ type FileRef = { id: string | number; filename: string; mimeType: string; filesi
 
 The admin answers view renders it as a download link when a `url` is present.
 
-## The uploads collection
-
-A built-in `form-uploads` collection ships on by default: anonymous create (public forms must upload), read/update/delete for authenticated users, and an `owner` stamp for [ownership scoping](/form-builder/spam#upload-ownership).
-
-```ts title="payload.config.ts"
-formBuilder({
-  uploads: true, // default
-  // uploads: false, // bring your own; point the file field's relationTo at it
-  // uploads: { slug: 'attachments', upload: { staticDir, mimeTypes }, access, fields },
-})
-```
-
-Storage is your project's concern: set `upload.staticDir` or configure a Payload storage adapter (S3 and friends). The collection defines no `imageSizes`, so it does not require `sharp`.
-
 ## Server enforcement
 
 On submit, the server loads the referenced upload and re-validates it against the field's `mimeTypes` and `maxSize`, then captures the authoritative `FileRef`. A missing, disallowed, or oversize file blocks the submission with a per-field error. Required presence rides the normal required rule.
@@ -51,12 +65,12 @@ Uploads on the public path are also rate limited and ownership-scoped by default
 
 ## Renderer
 
-The built-in `file` renderer (and its shadcn parity) uploads on change and stores the returned id. It shows a hint line with the accepted types and maximum size, and pre-checks the selected file's size before uploading, so an oversize file fails instantly with a readable message instead of a round trip (the server check in the previous section remains the authority). `formatBytes` is exported from the root and from `./react` for the same human-readable sizes in custom renderers. `uploadFile` is the underlying helper:
+The built-in `file` renderer (and its shadcn parity) uploads on change to the stamped collection and stores the returned id. It shows a hint line with the accepted types and maximum size, and pre-checks the selected file's size before uploading, so an oversize file fails instantly with a readable message instead of a round trip (the server check in the previous section remains the authority). `formatBytes` is exported from the root and from `./react` for the same human-readable sizes in custom renderers. `uploadFile` is the underlying helper:
 
 ```ts
 import { uploadFile } from '@10x-media/form-builder/react'
 
-const result = await uploadFile({ file, collection: 'form-uploads' })
+const result = await uploadFile({ file, collection: field.uploadsCollection })
 if (result.ok) {
   // result.id is the value to store on the field
 }
