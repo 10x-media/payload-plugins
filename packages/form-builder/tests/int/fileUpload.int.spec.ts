@@ -45,6 +45,22 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 
+	const makeRepeaterForm = async (config: Record<string, unknown> = {}) =>
+		booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Attachments',
+				fields: [
+					{
+						blockType: 'repeater',
+						name: 'items',
+						label: 'Items',
+						subFields: [{ blockType: 'file', name: 'doc', label: 'Doc', ...config }],
+					},
+				],
+			},
+		})
+
 	it('appends the hidden owner field to the host collection', () => {
 		const fields = booted.payload.collections['app-uploads']?.config.fields ?? []
 		expect(fields.some((field) => 'name' in field && field.name === 'owner')).toBe(true)
@@ -100,6 +116,44 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 			booted.payload.create({
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
+			})
+		).rejects.toThrow()
+	})
+
+	it('captures a file sub-field nested in a repeater row to a FileRef', async () => {
+		const form = await makeRepeaterForm()
+		const upload = await uploadPdf()
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			depth: 0,
+			data: { form: form.id, values: [{ field: 'items', value: [{ doc: upload.id }] }] },
+		})
+		const rows = (submission.values as Array<{ field: string; value: unknown }>).find(
+			(v) => v.field === 'items'
+		)?.value as Array<{ doc: Record<string, unknown> }>
+		expect(rows[0]?.doc.id).toBe(upload.id)
+		expect(rows[0]?.doc.filename).toBe(upload.filename)
+		expect(rows[0]?.doc.mimeType).toBe('application/pdf')
+		expect(typeof rows[0]?.doc.filesize).toBe('number')
+	})
+
+	it('rejects a forged upload id in a repeater row', async () => {
+		const form = await makeRepeaterForm()
+		await expect(
+			booted.payload.create({
+				collection: 'form-submissions',
+				data: { form: form.id, values: [{ field: 'items', value: [{ doc: 'does-not-exist' }] }] },
+			})
+		).rejects.toThrow()
+	})
+
+	it('rejects a repeater-row file that violates the sub-field mimeTypes allowlist', async () => {
+		const form = await makeRepeaterForm({ mimeTypes: ['image/png'] })
+		const upload = await uploadPdf()
+		await expect(
+			booted.payload.create({
+				collection: 'form-submissions',
+				data: { form: form.id, values: [{ field: 'items', value: [{ doc: upload.id }] }] },
 			})
 		).rejects.toThrow()
 	})

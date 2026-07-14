@@ -61,6 +61,8 @@ The admin answers view renders it as a download link when a `url` is present.
 
 On submit, the server loads the referenced upload and re-validates it against the field's `mimeTypes` and `maxSize`, then captures the authoritative `FileRef`. A missing, disallowed, or oversize file blocks the submission with a per-field error. Required presence rides the normal required rule.
 
+A `file` field nested inside a [repeater](/form-builder/fields#repeater) sub-field is captured and enforced per row exactly like a top-level one, so give any repeater that contains a file sub-field a `maxRows` to bound the per-submission upload lookups.
+
 Uploads on the public path are also rate limited and ownership-scoped by default; see [Spam protection](/form-builder/spam).
 
 ## Renderer

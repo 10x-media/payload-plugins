@@ -30,6 +30,11 @@ Feedback round: flow authoring, localized content, response/display settings, br
 - The shadcn registry now covers every built-in field type (adds date, consent, calculation, and repeater renderers); the default `textarea` type label is now "Textarea".
 - Repeaters with `minRows` start pre-seeded with that many empty rows instead of appearing blank until validation; an explicit `initialValues` entry for the field (including `[]`) still wins over the seed.
 
+**Fixes:**
+
+- File fields nested inside a repeater row now get the same server-side upload enforcement as top-level file fields: each captured value is re-derived into a `FileRef` from the stored upload doc (owner, MIME type, and size checked against the sub-field config) instead of storing the raw client-submitted id, and the submission fails closed on a forged id or a missing uploads collection.
+- Upload enforcement is now driven by a field's value kind rather than its block type, so a custom field type registered with `value: 'file'` is captured and enforced (owner/MIME/size) at both the top level and inside repeaters, not just the built-in `file` type.
+
 **Notes:**
 
 - The voted cookie is deliberately not `Secure`: it is a UX-only marker (skip re-showing an answered form), never an integrity or auth signal, and staying non-Secure keeps plain-HTTP local development working.
