@@ -7,7 +7,11 @@ Form fields are authored as Payload blocks: one block type per registered field 
 
 ## Core field types
 
-`text`, `textarea`, `email`, `number`, `select`, `checkbox`, `file`, `consent`, `calculation`, and `repeater`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads), [Consent](/form-builder/consent), [Calculations](/form-builder/calculations).
+`text`, `textarea`, `email`, `number`, `date`, `select`, `checkbox`, `file`, `consent`, `calculation`, and `repeater`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads), [Consent](/form-builder/consent), [Calculations](/form-builder/calculations).
+
+## Date
+
+The `date` type stores an ISO `YYYY-MM-DD` string and renders as a native `<input type="date">`. The intrinsic validator rejects anything that is not a real calendar date (`2026-02-30` fails, not just malformed strings). Range constraints attach as the `minDate` / `maxDate` [validation rules](/form-builder/validation#built-in-rules).
 
 ## Repeater
 

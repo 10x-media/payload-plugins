@@ -19,6 +19,8 @@ The `file` field lets visitors attach files. The client uploads to an upload col
 }
 ```
 
+In the admin, `mimeTypes` is a multi-select over a curated list of common types and `type/*` wildcards (images, PDF, Office documents, audio, video, and more); the list is exported as `fileMimeTypeOptions`. `maxSize` is entered in bytes and live-previews as a human-readable size (`= 2.5 MB`) while typing. Fields configured before the curated select existed keep their stored values and keep enforcing them, but a free-text value outside the curated list will need re-selecting the next time that field is edited; submitted data is untouched.
+
 The submitted value becomes a self-describing `FileRef`, captured server-side from the upload document:
 
 ```ts
@@ -49,7 +51,7 @@ Uploads on the public path are also rate limited and ownership-scoped by default
 
 ## Renderer
 
-The built-in `file` renderer (and its shadcn parity) uploads on change and stores the returned id. `uploadFile` is the underlying helper for custom renderers:
+The built-in `file` renderer (and its shadcn parity) uploads on change and stores the returned id. It shows a hint line with the accepted types and maximum size, and pre-checks the selected file's size before uploading, so an oversize file fails instantly with a readable message instead of a round trip (the server check in the previous section remains the authority). `formatBytes` is exported from the root and from `./react` for the same human-readable sizes in custom renderers. `uploadFile` is the underlying helper:
 
 ```ts
 import { uploadFile } from '@10x-media/form-builder/react'

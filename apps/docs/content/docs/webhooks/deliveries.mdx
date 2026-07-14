@@ -57,7 +57,7 @@ The **Webhook Deliveries** collection (slug `webhook-deliveries` by default) is 
 
 ## Redelivery
 
-Every delivery row has a **Redeliver** button, backed by `POST /api/webhook-deliveries/:id/redeliver` (requires a logged-in user; returns `202` with the new delivery id). Redelivery creates a fresh row and replays the original payload to the original URL through the configured mode.
+Every delivery row has a **Redeliver** button, backed by `POST /api/webhook-deliveries/:id/redeliver` (requires a logged-in user; returns `202` with the new delivery id). Redelivery creates a fresh row and replays the original payload to the subscription's current URL through the configured mode, so a corrected endpoint receives the replay. A disabled or deleted subscription is not sent to; the new row lands as `dead`.
 
 ## The body
 

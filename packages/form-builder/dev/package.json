@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/form-builder-dev",
-	"version": "0.0.1-beta.2",
+	"version": "0.0.1-beta.3",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -24,6 +24,7 @@
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/next": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"next": "catalog:",
 		"payload": "catalog:",

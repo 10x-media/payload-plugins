@@ -7,9 +7,61 @@ When a submission is stored, the form's configured action blocks run in order. A
 
 ## Built-in actions
 
-Three ship. `emailTeam` emails one or more addresses via `payload.sendEmail`; subject and body are [recall templates](/form-builder/recall-prefill) (`New submission from {{name}}`), and with no email adapter configured it no-ops gracefully. `confirmation` sends to the submitter with the same templating. `signedWebhook` POSTs the submission as JSON with an HMAC signature header (below).
+Three ship. `emailTeam` emails one or more addresses via `payload.sendEmail`; the subject is a [recall template](/form-builder/recall-prefill) (`New submission from {{name}}`) and the body is rich text (below). `confirmation` sends to the submitter: its **Email field name** config is a select over the form's `email`-type fields, and the server validates the choice against the form's current fields on save, so a renamed or deleted field surfaces as a save error instead of a silently skipped email. `signedWebhook` POSTs the submission as JSON with an HMAC signature header (below); its URL is validated on save as an absolute `http(s)` URL.
 
 Editors add action blocks per form in the admin and fill in each block's config fields.
+
+## Rich text bodies
+
+The email body of `emailTeam` and `confirmation` is a `richText` field that uses your project's configured editor; the plugin sets no `editor` of its own. Your config must therefore set one (Payload throws `MissingEditorProp` at startup when a `richText` field exists and neither the field nor the config provides an editor):
+
+```ts title="payload.config.ts"
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+
+export default buildConfig({
+  editor: lexicalEditor(),
+  plugins: [formBuilder()],
+})
+```
+
+At send time the body is serialized to HTML. Author-typed text is HTML-escaped and supports recall tokens:
+
+| Token | Renders |
+|---|---|
+| `{{ name }}` | The `name` field's answer, escaped. Empty string when absent. |
+| `{{ name\|fallback }}` | The answer, or the literal fallback when the answer is empty. |
+| `{{*}}` | Every answer as `Label: value` lines separated by `<br />`. |
+| `{{*:table}}` | Every answer as a two-column HTML table. |
+
+The wildcard tokens render from the submission's descriptor snapshot, so internal values (the honeypot, hidden bookkeeping) never leak into an email. Link URLs are sanitized: only `http(s)`, `mailto:`, `tel:`, and relative URLs survive; anything else becomes `#`. Recall tokens also work inside link URLs.
+
+Bodies saved as plain strings before rich text existed keep working: a string body goes through recall interpolation exactly as before, no migration needed.
+
+### Custom nodes and non-HTML channels
+
+The plugin-level `richText` option customizes serialization. `converters` spread over the default Lexical node converters (keyed by `node.type`), for editors with custom blocks:
+
+```ts title="payload.config.ts"
+formBuilder({
+  richText: {
+    converters: {
+      callout: ({ children }) => `<div class="callout">${children}</div>`,
+    },
+  },
+})
+```
+
+`serialize` replaces the whole pipeline, for actions that target chat or plain text instead of email HTML:
+
+```ts
+formBuilder({
+  richText: {
+    serialize: ({ body, values }) => toSlackMarkdown(body, values),
+  },
+})
+```
+
+The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
 
 ## Custom actions
 
@@ -37,7 +89,7 @@ const slackNotify = defineAction({
 formBuilder({ actions: { slackNotify, confirmation: false } })
 ```
 
-`config` becomes the block's authoring fields in the form editor. `run` receives the form, submission id, `values`, `descriptors`, the stored `config`, `payload`, `req`, `locale`, and a translate helper. The `actions` option follows the [opt-in convention](/concepts#the-opt-in-convention).
+`config` becomes the block's authoring fields in the form editor. `run` receives the form, submission id, `values`, `descriptors`, the stored `config`, `payload`, `req`, `locale`, a translate helper, and `renderBody`, an async function that serializes a rich text (or legacy string) body config into channel-ready HTML through the same pipeline the built-in emails use, honoring the plugin's [`richText` option](#custom-nodes-and-non-html-channels). Give a custom action a `richText` config field and call `renderBody(config.body)` to get the built-in templating for free. The `actions` option follows the [opt-in convention](/concepts#the-opt-in-convention).
 
 ## Run model
 
@@ -65,6 +117,8 @@ function verifyFormSignature(rawBody: string, secret: string, header: string): b
 ```
 
 `signPayload` and `SIGNATURE_HEADER` are exported from the root for manual signing and verification.
+
+`signedWebhook` is a lightweight per-form push: one POST per submission, configured by the editor on the form itself. When you need delivery guarantees (automatic retries, manual redelivery, delivery logs, HMAC subscriptions managed at scale), pair the plugin with [@10x-media/webhooks](/webhooks) subscribed to the `form-submissions` collection. The two are complementary, not coupled: use `signedWebhook` for a quick per-form integration, the Webhooks plugin for operational delivery infrastructure.
 
 ## Lifecycle events
 

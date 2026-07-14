@@ -1,7 +1,8 @@
-import { defineConfig } from 'tsdown'
+import { defineConfig, type UserConfig } from 'tsdown'
 
 type PluginBuildOptions = {
 	entry: Record<string, string>
+	copy?: UserConfig['copy']
 }
 
 /**
@@ -11,6 +12,10 @@ type PluginBuildOptions = {
  * boundaries when Next.js imports a component through such a chunk, and it
  * silently inlines undeclared dependencies; per-file output makes both
  * failure modes impossible and keeps published files diffable across releases.
+ *
+ * CSS imported by client components stays external and is copied verbatim via
+ * `copy` (the Payload copyfiles pattern): the consumer's Next bundler resolves
+ * the import from dist, so no css processing happens at build time.
  */
 export const definePluginBuild = (options: PluginBuildOptions) =>
 	defineConfig({
@@ -21,6 +26,8 @@ export const definePluginBuild = (options: PluginBuildOptions) =>
 		unbundle: true,
 		sourcemap: true,
 		fixedExtension: false,
+		external: [/\.css$/],
+		copy: options.copy,
 		// Rolldown's default sanitizer rewrites '+' to '_' in preserved-module
 		// names, so a checkout path containing '+' no longer matches
 		// preserveModulesRoot and [name] becomes a rejected ../.. traversal.

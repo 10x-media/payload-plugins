@@ -96,7 +96,14 @@ const usage = (task: string, targets: string[]): never => {
 }
 
 const run = (command: string, args: string[]): void => {
-	const child = spawn(command, args, { stdio: 'inherit', shell: true })
+	const child = spawn(command, args, {
+		stdio: 'inherit',
+		shell: process.platform === 'win32',
+	})
+	child.on('error', (err) => {
+		console.error(`Failed to run "${command}": ${err.message}`)
+		process.exit(1)
+	})
 	child.on('exit', (code) => process.exit(code ?? 0))
 }
 

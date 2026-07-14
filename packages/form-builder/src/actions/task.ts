@@ -4,6 +4,7 @@ import { FORMS_SLUG } from '../collections/forms'
 import type { Translate } from '../fields/types'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 import { asFieldTranslate } from '../translations/server'
+import type { RichTextBodyOption } from './body/serializeBody'
 import type { ActionRegistry } from './registry'
 import type { ActionInstance } from './runActions'
 import { runActions } from './runActions'
@@ -32,8 +33,9 @@ export const runActionsForSubmission = async (args: {
 	registry: ActionRegistry
 	payload: Payload
 	req?: PayloadRequest
+	richText?: RichTextBodyOption
 }): Promise<void> => {
-	const { input, registry, payload, req } = args
+	const { input, registry, payload, req, richText } = args
 	const form = await payload
 		.findByID({
 			collection: FORMS_SLUG,
@@ -65,6 +67,7 @@ export const runActionsForSubmission = async (args: {
 	await runActions({
 		actions: asActions(form.actions),
 		registry,
+		richText,
 		form: { id: form.id, title: typeof form.title === 'string' ? form.title : undefined },
 		submissionId: submission.id,
 		values: asValues(submission.values),
@@ -77,7 +80,10 @@ export const runActionsForSubmission = async (args: {
 }
 
 /** Native Payload jobs task that runs a submission's post-submit actions out of band. */
-export const buildActionsTask = (registry: ActionRegistry): TaskConfig =>
+export const buildActionsTask = (
+	registry: ActionRegistry,
+	richText?: RichTextBodyOption
+): TaskConfig =>
 	({
 		slug: ACTIONS_TASK_SLUG,
 		inputSchema: [
@@ -90,14 +96,19 @@ export const buildActionsTask = (registry: ActionRegistry): TaskConfig =>
 				registry,
 				payload: req.payload,
 				req,
+				richText,
 			})
 			return { output: {} }
 		},
 	}) as TaskConfig
 
 /** Register the actions task on `config.jobs.tasks`, creating the jobs config if absent. */
-export const registerActionsTask = (config: Config, registry: ActionRegistry): void => {
+export const registerActionsTask = (
+	config: Config,
+	registry: ActionRegistry,
+	richText?: RichTextBodyOption
+): void => {
 	config.jobs ??= {}
 	config.jobs.tasks ??= []
-	config.jobs.tasks.push(buildActionsTask(registry))
+	config.jobs.tasks.push(buildActionsTask(registry, richText))
 }

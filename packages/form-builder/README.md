@@ -8,7 +8,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 ## Features
 
-- **Fields**: text, textarea, email, number, select, checkbox, file, consent, calculation, and repeater (dynamic row lists with per-row sub-field validation), authored as Payload blocks; custom types via `defineFormField` are never second-class.
+- **Fields**: text, textarea, email, number, date, select, checkbox, file, consent, calculation, and repeater (dynamic row lists with per-row sub-field validation), authored as Payload blocks; custom types via `defineFormField` are never second-class.
 - **Validation**: declarative per-field rules, custom messages and severities, cross-field and async server-only rules, a Standard Schema escape hatch (zod, valibot, ...), one server-authoritative engine.
 - **Conditional logic**: `visibleWhen` / `validateWhen` in Payload's `Where` shape, one isomorphic engine on client and server.
 - **Multi-step flows** with conditional branching, authored in the admin flow builder.
@@ -18,7 +18,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Calculations**: a safe no-eval expression engine for totals and quiz scores, recomputed on the server.
 - **Post-submit actions**: email, confirmation, signed webhook, and custom actions, queued via Payload jobs with a bounded inline fallback.
 - **Consent** with proof by reference and policy-version capture; **file uploads** with server-enforced MIME/size; **polls** with a gated public results endpoint.
-- **Spam protection** on by default: honeypot, per-identity rate limiting, a captcha seam, upload-ownership scoping, privacy-first metadata.
+- **Spam protection** on by default: honeypot, per-identity rate limiting, bundled captcha adapters (Turnstile, reCAPTCHA, hCaptcha), upload-ownership scoping, privacy-first metadata.
 - **Accessibility** verified by automated axe checks; **typed translations** via `@10x-media/form-builder/i18n`.
 - **Collection overrides**: extend `forms`, `form-submissions`, and `form-uploads` with extra fields, hooks, and access rules using an explicit spread API that guarantees plugin-critical hooks always run.
 

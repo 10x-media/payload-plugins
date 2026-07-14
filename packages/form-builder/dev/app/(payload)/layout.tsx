@@ -2,7 +2,6 @@
 /* DO NOT MODIFY IT BECAUSE IT COULD BE REWRITTEN AT ANY TIME. */
 import config from '@payload-config'
 import '@payloadcms/next/css'
-import '@10x-media/form-builder/styles.css'
 import { handleServerFunctions, RootLayout } from '@payloadcms/next/layouts'
 import type { ServerFunctionClient } from 'payload'
 import type React from 'react'

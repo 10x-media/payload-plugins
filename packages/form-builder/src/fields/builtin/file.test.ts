@@ -1,5 +1,6 @@
+import type { NumberField, SelectField } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { fileField } from './file'
+import { fileField, fileMimeTypeOptions } from './file'
 
 const fmt = (value: unknown) =>
 	fileField.format?.({ value: value as never, config: {}, locale: 'en', t: (k) => k })
@@ -24,5 +25,33 @@ describe('file field', () => {
 
 	it('defines no intrinsic validate (presence is the required rule, mime/size is the server capture)', () => {
 		expect(fileField.validate).toBeUndefined()
+	})
+
+	it('configures mimeTypes as a curated hasMany select with raw MIME values', () => {
+		const mimeTypes = fileField.config?.find(
+			(entry) => 'name' in entry && entry.name === 'mimeTypes'
+		) as SelectField
+		expect(mimeTypes.type).toBe('select')
+		expect(mimeTypes.hasMany).toBe(true)
+		expect(mimeTypes.options).toBe(fileMimeTypeOptions)
+		const values = fileMimeTypeOptions.map((option) => option.value)
+		expect(values).toContain('image/*')
+		expect(values).toContain('application/pdf')
+		expect(new Set(values).size).toBe(values.length)
+	})
+
+	it('keeps every mimeTypes option value within the 63-byte postgres enum label limit', () => {
+		for (const option of fileMimeTypeOptions) {
+			expect(Buffer.byteLength(option.value, 'utf8')).toBeLessThanOrEqual(63)
+		}
+	})
+
+	it('mounts the ByteSizeField component on maxSize', () => {
+		const maxSize = fileField.config?.find(
+			(entry) => 'name' in entry && entry.name === 'maxSize'
+		) as NumberField
+		expect(maxSize.type).toBe('number')
+		expect(maxSize.admin?.components?.Field).toBe('@10x-media/form-builder/client#ByteSizeField')
+		expect(maxSize.admin?.description).toBeDefined()
 	})
 })

@@ -1,6 +1,6 @@
 ---
 title: Spam protection
-description: Honeypot and rate limiting on by default, a captcha seam, upload ownership, privacy-first metadata.
+description: Honeypot and rate limiting on by default, bundled captcha adapters, upload ownership, privacy-first metadata.
 ---
 
 A honeypot decoy and per-identity rate limiting protect the public submission and upload paths out of the box. Everything is opt-out, per control or wholesale with `spam: false`.
@@ -12,7 +12,7 @@ formBuilder({
     // honeypot: { fieldName: 'nickname' },
     // rateLimit: { window: 60_000, max: 5 },       // defaults shown
     // uploadRateLimit: { window: 60_000, max: 20 },
-    // captcha: turnstileProvider,          // a defineCaptchaProvider adapter
+    // captcha: turnstileProvider({ secretKey }),   // bundled or custom adapter
     // identify: (req) => (req.user ? `user:${req.user.id}` : null),
     // ipHeader: 'cf-connecting-ip',        // trusted client-IP header
     // metadata: { ip: true, ua: true },    // opt in to storing IP/UA
@@ -34,31 +34,101 @@ Payload v3 has no `req.ip`. Identity resolves to the authenticated user id, else
 
 ## Captcha
 
-The seam ships; providers are yours to plug in (prebuilt adapters are planned):
+Bundled adapters cover Cloudflare Turnstile, Google reCAPTCHA (v2 and v3), and hCaptcha. Each pairs a server verify adapter (exported from the package root) with a headless widget component (exported from `/react`) that reports tokens for `<Form captchaToken>`. With a provider configured, an anonymous submission without a valid token is rejected.
+
+All adapters share the same semantics:
+
+- The token is POSTed form-encoded to the provider's siteverify endpoint, with `remoteip` taken from the trusted IP header (default `x-forwarded-for`, override per adapter via `ipHeader`).
+- Verification **fails closed**: a network error, a timeout (5s default, `timeoutMs`), or a non-2xx response rejects the submission rather than letting it through.
+- Widget components are unstyled beyond the vendor widget itself: a bare div the vendor renders into. Each calls `onToken(token)` on solve and `onToken(null)` on expiry or error, so the freshest token always reaches `<Form>`.
+
+### Turnstile
+
+```ts title="payload.config.ts"
+import { turnstileProvider } from '@10x-media/form-builder'
+
+formBuilder({
+  spam: { captcha: turnstileProvider({ secretKey: process.env.TURNSTILE_SECRET_KEY! }) },
+})
+```
+
+```tsx title="ContactForm.tsx"
+'use client'
+import { useState } from 'react'
+import { Form, TurnstileCaptcha } from '@10x-media/form-builder/react'
+
+export const ContactForm = ({ form }) => {
+  const [token, setToken] = useState<string | null>(null)
+  return (
+    <Form form={form} captchaToken={token ?? undefined}>
+      <TurnstileCaptcha siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!} onToken={setToken} />
+    </Form>
+  )
+}
+```
+
+Extra render params (theme, size, appearance) pass through `options`. A ref exposes `reset()`.
+
+### reCAPTCHA
+
+```ts title="payload.config.ts"
+import { recaptchaProvider } from '@10x-media/form-builder'
+
+formBuilder({
+  spam: {
+    captcha: recaptchaProvider({
+      secretKey: process.env.RECAPTCHA_SECRET_KEY!,
+      minScore: 0.5, // v3 threshold; v2 responses have no score and pass on success alone
+    }),
+  },
+})
+```
+
+One server adapter handles both versions; the client component picks the flow:
+
+```tsx
+// v2: checkbox widget, token arrives when the user solves it
+<RecaptchaCaptcha siteKey={siteKey} version="v2" onToken={setToken} />
+
+// v3: invisible, fetches an initial token on mount
+<RecaptchaCaptcha ref={captchaRef} siteKey={siteKey} version="v3" action="contact" onToken={setToken} />
+```
+
+v3 tokens expire after about two minutes. For a form the user may sit on, refresh right before submit via the ref: `await captchaRef.current?.execute()` resolves a fresh token and also reports it through `onToken`.
+
+### hCaptcha
+
+```ts title="payload.config.ts"
+import { hcaptchaProvider } from '@10x-media/form-builder'
+
+formBuilder({
+  spam: { captcha: hcaptchaProvider({ secretKey: process.env.HCAPTCHA_SECRET_KEY! }) },
+})
+```
+
+```tsx
+<HcaptchaCaptcha siteKey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!} onToken={setToken} />
+```
+
+### Custom providers
+
+Any other verification service plugs into the same seam with `defineCaptchaProvider`:
 
 ```ts
 import { defineCaptchaProvider } from '@10x-media/form-builder'
 
-const turnstile = defineCaptchaProvider({
-  type: 'turnstile',
-  verify: async ({ token }) => {
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: process.env.TURNSTILE_SECRET, response: token }),
-    })
-    return ((await res.json()) as { success: boolean }).success
+const myCaptcha = defineCaptchaProvider({
+  type: 'my-captcha',
+  verify: async ({ token, req }) => {
+    // return true to accept; return false (do not throw) to reject
+    return await myVerifyCall(token)
   },
 })
 
-formBuilder({ spam: { captcha: turnstile } })
+formBuilder({ spam: { captcha: myCaptcha } })
 ```
 
-```tsx
-<Form form={form} captchaToken={tokenFromYourWidget} />
-```
-
-With a provider configured, a submission without a valid token is rejected.
+`verify` receives the raw token and the `PayloadRequest`; returning `false` rejects the submission with a generic captcha error. Thrown errors are also treated as a failed verification.
 
 ## Upload ownership
 
@@ -75,7 +145,7 @@ The submission `meta` always records a timestamp and a spam signal. The client I
 | `honeypot` | on, field `website` | `false`, or `{ fieldName }`. |
 | `rateLimit` | on, 5 per 60s | `false`, or `{ window, max, limiter }` per identity. |
 | `uploadRateLimit` | on, 20 per 60s | Same shape, for the upload path. |
-| `captcha` | none | A `defineCaptchaProvider` adapter. |
+| `captcha` | none | `turnstileProvider`/`recaptchaProvider`/`hcaptchaProvider` or a `defineCaptchaProvider` adapter. |
 | `identify` | user id, else IP header | Identity resolver for limiting and ownership. |
 | `ipHeader` | `x-forwarded-for` | Trusted client-IP header. |
 | `metadata` | off | `{ ip?, ua? }` opt-in storage on the submission. |

@@ -28,7 +28,7 @@ webhooks({
 |---|---|---|
 | `operations` | `('create' \| 'update' \| 'delete')[]` | Which writes emit events. Default: all three. |
 | `includePreviousData` | `boolean` | Add a `previousData` key to the body on `update` events. |
-| `transform` | `({ doc, previousDoc, operation, req }) => unknown` | Reshape or redact before sending. The return value becomes the body's `data`. |
+| `transform` | `({ doc, previousDoc, operation, req, target }) => unknown` | Reshape or redact before sending. Applied to the body's `data` and, with `includePreviousData`, to `previousData` as well, so redaction covers both. `target` (`'data'` or `'previousData'`) names the slot; on the `previousData` call `doc` is the prior document. |
 
 Events are named `<collection>.<created|updated|deleted>`: a create in `posts` emits `posts.created`. The hooks run `afterChange` and `afterDelete`, so a webhook never blocks or fails the write that caused it.
 

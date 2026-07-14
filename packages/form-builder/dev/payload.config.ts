@@ -3,10 +3,16 @@
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { defineCaptchaProvider, defineFormField, type FieldTypeOption, formBuilder } from '../src/index'
+import {
+	defineCaptchaProvider,
+	defineFormField,
+	type FieldTypeOption,
+	formBuilder,
+} from '../src/index'
 import { forwardAction } from './helpers/actions'
 import { companyPolicies } from './helpers/consentSources'
 import { startMemoryMongo } from './helpers/memoryDb'
@@ -44,6 +50,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
+	editor: lexicalEditor(),
 	collections: [users],
 	plugins: [
 		formBuilder({

@@ -2,6 +2,7 @@ import type { FieldRenderer } from '../contract'
 import { calculationRenderer } from './calculation'
 import { checkboxRenderer } from './checkbox'
 import { consentRenderer } from './consent'
+import { dateRenderer } from './date'
 import { emailRenderer } from './email'
 import { fileRenderer } from './file'
 import { numberRenderer } from './number'
@@ -15,6 +16,7 @@ export const defaultRenderers: Record<string, FieldRenderer> = {
 	calculation: calculationRenderer as FieldRenderer,
 	checkbox: checkboxRenderer as FieldRenderer,
 	consent: consentRenderer as FieldRenderer,
+	date: dateRenderer as FieldRenderer,
 	email: emailRenderer as FieldRenderer,
 	file: fileRenderer as FieldRenderer,
 	number: numberRenderer as FieldRenderer,

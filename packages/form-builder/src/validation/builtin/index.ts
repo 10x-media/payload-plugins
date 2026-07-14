@@ -2,8 +2,10 @@ import type { AnyValidationRuleDefinition } from '../types'
 import { emailRule } from './email'
 import { matchesFieldRule } from './matchesField'
 import { maxRule } from './max'
+import { maxDateRule } from './maxDate'
 import { maxLengthRule } from './maxLength'
 import { minRule } from './min'
+import { minDateRule } from './minDate'
 import { minLengthRule } from './minLength'
 import { notAlreadySubmittedRule } from './notAlreadySubmitted'
 import { oneOfRule } from './oneOf'
@@ -17,6 +19,8 @@ export const defaultValidationRules: AnyValidationRuleDefinition[] = [
 	maxLengthRule as AnyValidationRuleDefinition,
 	minRule as AnyValidationRuleDefinition,
 	maxRule as AnyValidationRuleDefinition,
+	minDateRule as AnyValidationRuleDefinition,
+	maxDateRule as AnyValidationRuleDefinition,
 	patternRule as AnyValidationRuleDefinition,
 	emailRule as AnyValidationRuleDefinition,
 	urlRule as AnyValidationRuleDefinition,
@@ -24,3 +28,12 @@ export const defaultValidationRules: AnyValidationRuleDefinition[] = [
 	matchesFieldRule as AnyValidationRuleDefinition,
 	notAlreadySubmittedRule as AnyValidationRuleDefinition,
 ]
+
+/**
+ * `defaultValidationRules` indexed by `type`, so a single built-in can be spread and tweaked
+ * without hand-rolling a `.find()`, e.g.
+ * `rules: { minLength: { ...defaultValidationRulesByType.minLength, message: myMessage } }`. The
+ * `rules` plugin option replaces a built-in of the same `type`; `false` removes it, `true` keeps it.
+ */
+export const defaultValidationRulesByType: Record<string, AnyValidationRuleDefinition> =
+	Object.fromEntries(defaultValidationRules.map((rule) => [rule.type, rule]))

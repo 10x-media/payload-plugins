@@ -1,7 +1,42 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { en } from './en'
 import { translations } from './index'
 import { keys } from './keys'
+
+const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
+
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.turbo'])
+
+/** Files that enumerate every key by definition; they don't count as "usage". */
+const SELF_DEFINING_FILES = new Set([
+	join(packageRoot, 'src/translations/keys.ts'),
+	join(packageRoot, 'src/translations/en.ts'),
+])
+
+const collectSourceFiles = (dir: string, out: string[] = []): string[] => {
+	for (const entry of readdirSync(dir)) {
+		if (SKIP_DIRS.has(entry)) {
+			continue
+		}
+		const full = join(dir, entry)
+		if (statSync(full).isDirectory()) {
+			collectSourceFiles(full, out)
+			continue
+		}
+		if (
+			/\.(ts|tsx)$/.test(entry) &&
+			!entry.endsWith('.test.ts') &&
+			!entry.endsWith('.test.tsx') &&
+			!SELF_DEFINING_FILES.has(full)
+		) {
+			out.push(full)
+		}
+	}
+	return out
+}
 
 describe('form-builder translations', () => {
 	it('exposes the fieldTitle key', () => {
@@ -16,5 +51,18 @@ describe('form-builder translations', () => {
 
 	it('nests strings under the formBuilder namespace', () => {
 		expect(translations.en.formBuilder).toBeDefined()
+	})
+
+	it('references every translation key from production code', () => {
+		const files = [
+			...collectSourceFiles(join(packageRoot, 'src')),
+			...collectSourceFiles(join(packageRoot, 'registry', 'form-builder')),
+		]
+		const combined = files.map((file) => readFileSync(file, 'utf8')).join('\n')
+
+		const unused = Object.keys(keys).filter(
+			(name) => !new RegExp(`\\bkeys\\.${name}\\b`).test(combined)
+		)
+		expect(unused).toEqual([])
 	})
 })

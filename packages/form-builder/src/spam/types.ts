@@ -32,7 +32,7 @@ export type CaptchaVerifyArgs = {
 	req: PayloadRequest
 }
 
-/** A captcha adapter. v1 ships the seam only (no built-in provider). Build with `defineCaptchaProvider`. */
+/** A captcha adapter. Use a bundled provider (Turnstile/reCAPTCHA/hCaptcha) or build one with `defineCaptchaProvider`. */
 export type CaptchaProvider = {
 	type: string
 	verify(args: CaptchaVerifyArgs): Promise<boolean>
@@ -61,7 +61,7 @@ export type SpamConfig = {
 	rateLimit?: false | RateLimitConfig
 	/** Per-identity rate limit on upload create. Default on (60s window, max 20). `false` disables. */
 	uploadRateLimit?: false | RateLimitConfig
-	/** A captcha provider (none by default; seam only in v1). */
+	/** A captcha provider (none by default): `turnstileProvider`/`recaptchaProvider`/`hcaptchaProvider` or a custom adapter. */
 	captcha?: CaptchaProvider
 	/** Identity resolution for rate-limiting, upload ownership, and (future) poll dedup. Default: user id, else trusted IP header. */
 	identify?: IdentifyFn

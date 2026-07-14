@@ -2,14 +2,10 @@ import { APIError, type CollectionBeforeValidateHook } from 'payload'
 import type { SubmissionValue } from '../submissions/types'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
+import { firstHop } from './clientIp'
 import { IDENTITY_CONTEXT_KEY } from './constants'
 import { extractReservedValues, isHoneypotTripped } from './reserved'
 import type { ResolvedSpamConfig } from './types'
-
-const firstHop = (req: { headers?: Headers }, header: string): string | undefined => {
-	const raw = req.headers?.get(header)
-	return raw ? (raw.split(',')[0]?.trim() ?? undefined) : undefined
-}
 
 /**
  * Submissions spam guard, prepended before `validateSubmission` in `beforeValidate` so it rejects before
@@ -75,7 +71,7 @@ export const buildSpamGuard =
 			spam: { captcha: captchaChecked ? 'passed' : 'skipped' },
 		}
 		if (spam.metadata.ip) {
-			const ip = firstHop(req, spam.ipHeader)
+			const ip = firstHop(req.headers, spam.ipHeader)
 			if (ip) {
 				serverMeta.ip = ip
 			}

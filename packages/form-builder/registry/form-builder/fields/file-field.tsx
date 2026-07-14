@@ -1,16 +1,15 @@
 'use client'
 
-import { defineFieldRenderer, uploadFile } from '@10x-media/form-builder/react'
+import { defineFieldRenderer, formatBytes, uploadFile } from '@10x-media/form-builder/react'
 import { type ChangeEvent, useId, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-const acceptOf = (mimeTypes: unknown): string | undefined => {
+const typesOf = (mimeTypes: unknown): string[] => {
 	if (!Array.isArray(mimeTypes)) {
-		return undefined
+		return []
 	}
-	const types = mimeTypes.filter((entry): entry is string => typeof entry === 'string')
-	return types.length > 0 ? types.join(',') : undefined
+	return mimeTypes.filter((entry): entry is string => typeof entry === 'string')
 }
 
 export const fileField = defineFieldRenderer<string | number>(
@@ -20,7 +19,15 @@ export const fileField = defineFieldRenderer<string | number>(
 		const label = typeof field.label === 'string' ? field.label : undefined
 		const description = typeof field.description === 'string' ? field.description : undefined
 		const collection = typeof field.relationTo === 'string' ? field.relationTo : 'form-uploads'
-		const accept = acceptOf(field.mimeTypes)
+		const types = typesOf(field.mimeTypes)
+		const accept = types.length > 0 ? types.join(',') : undefined
+		// Zero is a real limit, matching resolveFileRef server-side (filesize > maxSize rejects any non-empty file).
+		const maxSize =
+			typeof field.maxSize === 'number' && field.maxSize >= 0 ? field.maxSize : undefined
+		const hints = [
+			types.length > 0 ? `Accepted: ${types.join(', ')}` : undefined,
+			maxSize !== undefined ? `Max size: ${formatBytes(maxSize)}` : undefined,
+		].filter((hint): hint is string => typeof hint === 'string')
 
 		const [uploading, setUploading] = useState(false)
 		const [filename, setFilename] = useState<string | undefined>(undefined)
@@ -33,6 +40,10 @@ export const fileField = defineFieldRenderer<string | number>(
 		const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
 			const selected = event.target.files?.[0]
 			if (!selected) {
+				return
+			}
+			if (maxSize !== undefined && selected.size > maxSize) {
+				setLocalError(`File is too large (max ${formatBytes(maxSize)})`)
 				return
 			}
 			setUploading(true)
@@ -79,6 +90,9 @@ export const fileField = defineFieldRenderer<string | number>(
 					}}
 					onBlur={onBlur}
 				/>
+				{hints.length > 0 ? (
+					<p className="text-sm text-muted-foreground">{hints.join(' · ')}</p>
+				) : null}
 				{uploading ? (
 					<p aria-live="polite" className="text-sm text-muted-foreground">
 						Uploading

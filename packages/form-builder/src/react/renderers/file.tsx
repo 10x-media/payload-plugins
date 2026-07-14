@@ -1,16 +1,18 @@
 'use client'
 
 import { type ChangeEvent, useId, useState } from 'react'
+import { keys } from '../../translations/keys'
+import { formatBytes } from '../../uploads/formatBytes'
+import { resolveMessage } from '../../validation/message'
 import { defineFieldRenderer } from '../contract'
 import { FieldShell } from '../primitives/FieldShell'
 import { uploadFile } from '../uploadFile'
 
-const acceptOf = (mimeTypes: unknown): string | undefined => {
+const typesOf = (mimeTypes: unknown): string[] => {
 	if (!Array.isArray(mimeTypes)) {
-		return undefined
+		return []
 	}
-	const types = mimeTypes.filter((entry): entry is string => typeof entry === 'string')
-	return types.length > 0 ? types.join(',') : undefined
+	return mimeTypes.filter((entry): entry is string => typeof entry === 'string')
 }
 
 /**
@@ -20,7 +22,7 @@ const acceptOf = (mimeTypes: unknown): string | undefined => {
  * control and surfaces upload errors. Single file (v1); the upload posts to the default `/api` route.
  */
 export const fileRenderer = defineFieldRenderer<string | number>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled, t }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const [uploading, setUploading] = useState(false)
@@ -28,7 +30,19 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 		const [localError, setLocalError] = useState<string | undefined>(undefined)
 
 		const collection = typeof field.relationTo === 'string' ? field.relationTo : 'form-uploads'
-		const accept = acceptOf(field.mimeTypes)
+		const types = typesOf(field.mimeTypes)
+		const accept = types.length > 0 ? types.join(',') : undefined
+		// Zero is a real limit, matching resolveFileRef server-side (filesize > maxSize rejects any non-empty file).
+		const maxSize =
+			typeof field.maxSize === 'number' && field.maxSize >= 0 ? field.maxSize : undefined
+		const hints = [
+			types.length > 0
+				? resolveMessage(t(keys.fileHintAccepted), { types: types.join(', ') })
+				: undefined,
+			maxSize !== undefined
+				? resolveMessage(t(keys.fileHintMaxSize), { max: formatBytes(maxSize) })
+				: undefined,
+		].filter((hint): hint is string => typeof hint === 'string')
 		const allErrors = localError ? [...errors, localError] : errors
 		// Show the just-uploaded filename, or a generic indicator when the field already holds an id (recall/prefill): the filename is not part of the client value.
 		const hasValue = value !== undefined && value !== null && value !== ''
@@ -37,6 +51,10 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 		const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
 			const selected = event.target.files?.[0]
 			if (!selected) {
+				return
+			}
+			if (maxSize !== undefined && selected.size > maxSize) {
+				setLocalError(resolveMessage(t(keys.fileTooLarge), { max: formatBytes(maxSize) }))
 				return
 			}
 			setUploading(true)
@@ -80,6 +98,7 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 					aria-invalid={allErrors.length > 0}
 					aria-describedby={describedById}
 				/>
+				{hints.length > 0 ? <p className="fb-field__file-hint">{hints.join(' · ')}</p> : null}
 				{uploading ? (
 					<p className="fb-field__file-status" aria-live="polite">
 						Uploading
