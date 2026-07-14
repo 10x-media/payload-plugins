@@ -12,7 +12,6 @@ Feedback round: flow authoring, localized content, response/display settings, br
 - **Content fields are localized by default.** Author-facing content (field labels, placeholders, descriptions, option labels, consent statements, action subjects/bodies, response/display content) carries `localized: true`; on hosts with Payload `localization` configured the stored data shape changes to per-locale objects. Hosts without localization are unaffected (Payload strips the flag). Opt out with `localizeContent: false`; when opting out, derive registry overrides from `buildDefaultFieldDefinitions(false)` / `buildDefaultActionDefinitions(false)` / `buildDefaultConsentSources(false)` instead of spreading the prebuilt defaults, which carry the localized flags.
 - **`<Poll hasVoted>` ORs with the localStorage guard.** `hasVoted: true` marks the visitor as voted regardless of localStorage; it previously could suppress the localStorage read. `false`/omitted falls back to localStorage as before.
 - **Form chrome markup changed.** The default buttons now carry stable classes (`fb-form__back`, `fb-form__next`, `fb-form__submit`) and always render inside a `.fb-form__controls` wrapper (previously classless buttons, wrapped only on multi-step forms). CSS or tests targeting the old bare buttons need the new hooks.
-- **Explicit `initialValues` beat repeater seeding.** A repeater with `minRows` pre-seeds that many empty rows on mount, but an explicit `initialValues` entry for the field (including `[]`) now wins over the seed.
 
 **Features:**
 
@@ -29,7 +28,7 @@ Feedback round: flow authoring, localized content, response/display settings, br
 - Server-safe `toFormDocument`: no `'use client'` directive, exported from the root and the `/rsc` subpath (which also gains `resolvePollOptions`, `resolvePollOutcome`, `hasVotedCookie`, `votedCookieName`, and `isPollClosed`), so Server Components narrow the document without pulling in the React client layer.
 - German (`de`) admin and renderer strings ship built in alongside English.
 - The shadcn registry now covers every built-in field type (adds date, consent, calculation, and repeater renderers); the default `textarea` type label is now "Textarea".
-- Repeaters with `minRows` start pre-seeded with that many empty rows instead of appearing blank until validation.
+- Repeaters with `minRows` start pre-seeded with that many empty rows instead of appearing blank until validation; an explicit `initialValues` entry for the field (including `[]`) still wins over the seed.
 
 **Notes:**
 
