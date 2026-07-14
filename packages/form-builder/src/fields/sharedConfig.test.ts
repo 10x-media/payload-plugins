@@ -7,10 +7,10 @@ const nameOf = (field: Field) => ('name' in field ? field.name : undefined)
 const sampleConditionTypes = { text: 'text', number: 'number' } as const
 
 const buildTabs = (typeConfig: Field[] = []) =>
-	fieldBlockTabs(sampleConditionTypes, typeConfig, {
-		name: 'validations',
-		type: 'blocks',
-		blocks: [],
+	fieldBlockTabs({
+		conditionTypes: sampleConditionTypes,
+		typeConfig,
+		validations: { name: 'validations', type: 'blocks', blocks: [] },
 	}) as TabsField
 
 const tabFields = (tabs: TabsField, index: number): Field[] => tabs.tabs[index]?.fields ?? []
@@ -30,6 +30,19 @@ describe('sharedFieldConfig', () => {
 	it('makes name required', () => {
 		const name = sharedFieldConfig().find((field) => 'name' in field && field.name === 'name')
 		expect(name && 'required' in name && name.required).toBe(true)
+	})
+
+	it('localizes content fields by default and never identifiers or flags', () => {
+		const localizedNames = sharedFieldConfig()
+			.filter((field) => 'localized' in field && field.localized === true)
+			.map(nameOf)
+		expect(localizedNames).toEqual(['label', 'placeholder', 'description'])
+	})
+
+	it('omits the localized flag entirely when localize is false', () => {
+		for (const field of sharedFieldConfig(false)) {
+			expect('localized' in field).toBe(false)
+		}
 	})
 })
 

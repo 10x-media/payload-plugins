@@ -2,6 +2,7 @@ import type { Field } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import { keys } from '../translations/keys'
 import { labelFor } from '../translations/server'
+import { localizedIf } from './localizedIf'
 
 const CONDITION_FIELD_REF = '@10x-media/form-builder/client#FormConditionField'
 
@@ -23,11 +24,13 @@ const conditionField = (
 /**
  * Config every field instance carries regardless of type. `name` is the machine key written into
  * submissions; `width` is stored for the layout grid. Field types add their own `config` after
- * these inside the Field tab (see `fieldBlockTabs`).
+ * these inside the Field tab (see `fieldBlockTabs`). Content-bearing fields (`label`,
+ * `placeholder`, `description`) are localized unless `localize` is false; identifiers and
+ * behavior flags never are.
  */
-export const sharedFieldConfig = (): Field[] => [
+export const sharedFieldConfig = (localize = true): Field[] => [
 	{ name: 'name', type: 'text', required: true, label: labelFor(keys.configName) },
-	{ name: 'label', type: 'text', label: labelFor(keys.configLabel) },
+	{ name: 'label', type: 'text', label: labelFor(keys.configLabel), ...localizedIf(localize) },
 	{ name: 'required', type: 'checkbox', label: labelFor(keys.configRequired) },
 	{
 		name: 'width',
@@ -41,8 +44,18 @@ export const sharedFieldConfig = (): Field[] => [
 			{ label: 'Two thirds', value: 'twoThirds' },
 		],
 	},
-	{ name: 'placeholder', type: 'text', label: labelFor(keys.configPlaceholder) },
-	{ name: 'description', type: 'textarea', label: labelFor(keys.configDescription) },
+	{
+		name: 'placeholder',
+		type: 'text',
+		label: labelFor(keys.configPlaceholder),
+		...localizedIf(localize),
+	},
+	{
+		name: 'description',
+		type: 'textarea',
+		label: labelFor(keys.configDescription),
+		...localizedIf(localize),
+	},
 ]
 
 /**
@@ -51,16 +64,24 @@ export const sharedFieldConfig = (): Field[] => [
  * `validateWhen`; Advanced holds `visibleWhen` and `hidden`. `visibleWhen`/`validateWhen` store a
  * canonical Payload `Where`, edited by the native condition builder.
  */
-export const fieldBlockTabs = (
-	conditionTypes: Record<string, ConditionFieldType>,
-	typeConfig: Field[],
+type FieldBlockTabsArgs = {
+	conditionTypes: Record<string, ConditionFieldType>
+	typeConfig: Field[]
 	validations: Field
-): Field => ({
+	localize?: boolean
+}
+
+export const fieldBlockTabs = ({
+	conditionTypes,
+	typeConfig,
+	validations,
+	localize = true,
+}: FieldBlockTabsArgs): Field => ({
 	type: 'tabs',
 	tabs: [
 		{
 			label: labelFor(keys.tabField),
-			fields: [...sharedFieldConfig(), ...typeConfig],
+			fields: [...sharedFieldConfig(localize), ...typeConfig],
 		},
 		{
 			label: labelFor(keys.tabValidation),

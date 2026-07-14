@@ -1,14 +1,14 @@
 import { type Config, definePlugin } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
-import { defaultActionDefinitions } from './actions/builtin'
+import { buildDefaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
 import { resolveUploads, type UploadsOption } from './collections/uploads'
-import { defaultConsentSources } from './consent/builtin'
+import { buildDefaultConsentSources } from './consent/builtin'
 import type { ConsentSourcesConfig } from './consent/registry'
 import { resolveConsentSources } from './consent/registry'
 import type { FormEventSink } from './events/types'
-import { defaultFieldDefinitions } from './fields/builtin'
+import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
 import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
@@ -33,6 +33,17 @@ export type FormBuilderPluginOptions = {
 	translations?: TranslationsOption
 	/** Pluggable sink for form lifecycle events. Defaults to a no-op; analytics adapters or a future analytics plugin subscribe here. */
 	events?: FormEventSink
+	/**
+	 * Content-bearing author fields (labels, placeholders, option labels, consent statements,
+	 * action subjects and bodies) are localized by default. Payload strips the `localized` flag
+	 * on hosts without `localization` configured, so the default is safe everywhere. Set `false`
+	 * to keep form content single-locale even on localized hosts. Spread-overrides of the prebuilt
+	 * default exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`,
+	 * `defaultConsentSources`) carry `localized` flags from the default-true set; when opting out,
+	 * derive overrides from `buildDefaultFieldDefinitions(false)` /
+	 * `buildDefaultActionDefinitions(false)` / `buildDefaultConsentSources(false)` instead.
+	 */
+	localizeContent?: boolean
 	/** Add, override, or remove field types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	fields?: FieldTypesConfig
 	/** Add, override, or remove presentations. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
@@ -86,14 +97,24 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		if (options.disabled === true) {
 			return config
 		}
-		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
+		const localizeContent = options.localizeContent !== false
+		const registry = resolveFieldTypes(
+			buildDefaultFieldDefinitions(localizeContent),
+			options.fields
+		)
 		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
-		const consentRegistry = resolveConsentSources(defaultConsentSources, options.consentSources)
+		const consentRegistry = resolveConsentSources(
+			buildDefaultConsentSources(localizeContent),
+			options.consentSources
+		)
 		const presentationRegistry = resolvePresentationDescriptors(
 			defaultPresentationDescriptors,
 			options.presentations
 		)
-		const actionRegistry = resolveActions(defaultActionDefinitions, options.actions)
+		const actionRegistry = resolveActions(
+			buildDefaultActionDefinitions(localizeContent),
+			options.actions
+		)
 		const uploads = resolveUploads(options.uploads)
 		const spam = resolveSpamConfig(options.spam)
 		registerTranslations(config, options.translations)
@@ -110,6 +131,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			uploads,
 			spam,
 			showSubmissionRawFields: options.showSubmissionRawFields ?? false,
+			localizeContent,
 			overrides: options.overrides,
 		})
 		return config
@@ -130,7 +152,7 @@ export type {
 } from './actions/body/serializeBody'
 export { serializeBody } from './actions/body/serializeBody'
 export { renderAllValues, renderAllValuesTable } from './actions/body/wildcards'
-export { defaultActionDefinitions } from './actions/builtin'
+export { buildDefaultActionDefinitions, defaultActionDefinitions } from './actions/builtin'
 export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
 export { defineAction } from './actions/defineAction'
 export type { ActionOption, ActionRegistry, ActionsConfig } from './actions/registry'
@@ -167,7 +189,7 @@ export type { UploadsCollectionConfig, UploadsOption } from './collections/uploa
 export { buildUploadsCollection, FORM_UPLOADS_SLUG, resolveUploads } from './collections/uploads'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
-export { defaultConsentSources } from './consent/builtin'
+export { buildDefaultConsentSources, defaultConsentSources } from './consent/builtin'
 export type { ConsentProof } from './consent/captureConsent'
 export { captureConsent } from './consent/captureConsent'
 export type {
@@ -186,9 +208,14 @@ export type {
 export { resolveConsentSources } from './consent/registry'
 export { resolveConsentLinks } from './consent/resolveConsentLinks'
 export { resolvePublishedVersionRef } from './consent/resolvePublishedVersionRef'
-export { defaultFieldDefinitions, defaultFieldDefinitionsByType } from './fields/builtin'
+export {
+	buildDefaultFieldDefinitions,
+	defaultFieldDefinitions,
+	defaultFieldDefinitionsByType,
+} from './fields/builtin'
 export { fileMimeTypeOptions } from './fields/builtin/file'
 export { defineFormField } from './fields/defineFormField'
+export { localizedIf } from './fields/localizedIf'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from './fields/registry'
 export type {
 	AnyFormFieldDefinition,

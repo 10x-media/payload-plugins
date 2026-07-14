@@ -69,6 +69,7 @@ type BuildFormsCollectionArgs = {
 	consentRegistry?: ConsentSourceRegistry
 	presentationRegistry?: PresentationDescriptorRegistry
 	actionRegistry?: ActionRegistry
+	localizeContent?: boolean
 	overrides?: CollectionOverrides
 }
 
@@ -79,6 +80,7 @@ export const buildFormsCollection = ({
 	consentRegistry,
 	presentationRegistry = new Map(Object.entries(defaultPresentationDescriptors)),
 	actionRegistry = new Map(),
+	localizeContent = true,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
@@ -130,7 +132,12 @@ export const buildFormsCollection = ({
 	const fieldsField: Field = {
 		name: 'fields',
 		type: 'blocks',
-		blocks: buildFieldBlocks(registry, ruleRegistry, consentRegistry),
+		blocks: buildFieldBlocks({
+			registry,
+			ruleRegistry,
+			consentRegistry,
+			localize: localizeContent,
+		}),
 	}
 
 	const flowField: Field = {

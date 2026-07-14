@@ -26,6 +26,7 @@ type RegisterCollectionsArgs = {
 	uploads: { enabled: boolean; slug: string; collection?: CollectionConfig }
 	spam: ResolvedSpamConfig | false
 	showSubmissionRawFields: boolean
+	localizeContent: boolean
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
@@ -46,6 +47,7 @@ export const registerCollections = ({
 	uploads,
 	spam,
 	showSubmissionRawFields,
+	localizeContent,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
@@ -102,6 +104,7 @@ export const registerCollections = ({
 			consentRegistry,
 			presentationRegistry,
 			actionRegistry,
+			localizeContent,
 			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({

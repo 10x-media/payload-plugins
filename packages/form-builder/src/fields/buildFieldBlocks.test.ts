@@ -15,10 +15,10 @@ const tabFields = (block: Block | undefined, index: number): Field[] =>
 	tabsOf(block)?.tabs[index]?.fields ?? []
 
 describe('buildFieldBlocks', () => {
-	const blocks = buildFieldBlocks(
-		buildRegistry(defaultFieldDefinitions),
-		buildRuleRegistry(defaultValidationRules)
-	)
+	const blocks = buildFieldBlocks({
+		registry: buildRegistry(defaultFieldDefinitions),
+		ruleRegistry: buildRuleRegistry(defaultValidationRules),
+	})
 
 	it('builds one block per registered type in registry order', () => {
 		expect(blocks.map((block) => block.slug)).toEqual([
@@ -75,6 +75,21 @@ describe('buildFieldBlocks', () => {
 	it('puts visibleWhen and hidden in the Advanced tab', () => {
 		const text = blocks.find((block) => block.slug === 'text')
 		expect(tabFields(text, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden'])
+	})
+
+	it('localizes the shared label field by default and not when localize is false', () => {
+		const labelOf = (all: Block[]) =>
+			tabFields(
+				all.find((block) => block.slug === 'text'),
+				0
+			).find((f) => 'name' in f && f.name === 'label')
+		expect(labelOf(blocks)).toMatchObject({ localized: true })
+		const unlocalized = buildFieldBlocks({
+			registry: buildRegistry(defaultFieldDefinitions),
+			ruleRegistry: buildRuleRegistry(defaultValidationRules),
+			localize: false,
+		})
+		expect('localized' in (labelOf(unlocalized) ?? {})).toBe(false)
 	})
 
 	it('appends subFields to the repeater Field tab, excluding the repeater itself', () => {

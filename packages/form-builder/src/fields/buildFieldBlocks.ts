@@ -16,12 +16,24 @@ const fieldTabOf = (block: Block): Field[] | undefined => {
 		?.fields
 }
 
-/** One add-field block per registered type: tabs holding shared config, type config, and validations. */
-export const buildFieldBlocks = (
-	registry: FieldTypeRegistry,
-	ruleRegistry: ValidationRuleRegistry,
+/**
+ * One add-field block per registered type: tabs holding shared config, type config, and
+ * validations. `localize` controls whether the shared content fields carry `localized: true`;
+ * per-type config fields carry their own flag from the registry definitions.
+ */
+type BuildFieldBlocksArgs = {
+	registry: FieldTypeRegistry
+	ruleRegistry: ValidationRuleRegistry
 	consentRegistry?: ConsentSourceRegistry
-): Block[] => {
+	localize?: boolean
+}
+
+export const buildFieldBlocks = ({
+	registry,
+	ruleRegistry,
+	consentRegistry,
+	localize = true,
+}: BuildFieldBlocksArgs): Block[] => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const blocks: Block[] = []
 	for (const definition of registry.values()) {
@@ -45,11 +57,16 @@ export const buildFieldBlocks = (
 			slug: definition.type,
 			labels: { singular: labelFor(definition.label), plural: labelFor(definition.label) },
 			fields: [
-				fieldBlockTabs(conditionTypes, typeConfig, {
-					name: 'validations',
-					type: 'blocks',
-					label: labelFor(keys.validationsLabel),
-					blocks: buildRuleBlocks(ruleRegistry, definition.type),
+				fieldBlockTabs({
+					conditionTypes,
+					typeConfig,
+					validations: {
+						name: 'validations',
+						type: 'blocks',
+						label: labelFor(keys.validationsLabel),
+						blocks: buildRuleBlocks(ruleRegistry, definition.type),
+					},
+					localize,
 				}),
 			],
 		})
