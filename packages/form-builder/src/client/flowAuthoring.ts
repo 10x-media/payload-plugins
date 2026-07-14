@@ -1,19 +1,6 @@
 import type { FlowStep } from '../flow/types'
 
-/**
- * Display label for a step: its trimmed title, else the fallback template with
- * `{n}` replaced by the 1-based index. Step ids never surface in the UI.
- */
-export const stepLabel = (
-	step: Pick<FlowStep, 'title'>,
-	index: number,
-	fallbackTemplate: string
-): string => {
-	const title = step.title?.trim()
-	return title !== undefined && title.length > 0
-		? title
-		: fallbackTemplate.replace('{n}', String(index + 1))
-}
+export { stepLabel } from '../flow/stepLabel'
 
 /** Field name to index of the step holding it (first occurrence wins). */
 export const fieldHolders = (steps: Pick<FlowStep, 'fields'>[]): Map<string, number> => {

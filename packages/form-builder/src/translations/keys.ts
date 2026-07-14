@@ -190,6 +190,9 @@ export const keys = {
 	displayShowTitle: 'formBuilder:display.showTitle',
 	displayTitle: 'formBuilder:display.title',
 	displayIntro: 'formBuilder:display.intro',
+	formBack: 'formBuilder:form.back',
+	formNext: 'formBuilder:form.next',
+	formSubmit: 'formBuilder:form.submit',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -4,13 +4,14 @@ import {
 	defineFieldRenderer,
 	type SubmissionValue,
 	serializeBody,
-	useFormState,
+	useFormContext,
 } from '@10x-media/form-builder/react'
 import { useMemo } from 'react'
 
 /** Display-only rich text rendered inline between fields; writes nothing to the submission. */
 export const messageField = defineFieldRenderer(({ field }) => {
-	const { values } = useFormState()
+	const { state, effectiveValues } = useFormContext()
+	const values = effectiveValues ?? state.values
 	const html = useMemo(() => {
 		const answered: SubmissionValue[] = Object.entries(values)
 			.filter(([, value]) => value != null && value !== '')

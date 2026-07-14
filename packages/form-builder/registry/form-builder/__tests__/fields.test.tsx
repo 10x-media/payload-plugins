@@ -153,4 +153,38 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		)
 		expect(within(container).getByText('Read me')).toBeInTheDocument()
 	})
+
+	it('message: interpolates recall tokens against calc-authoritative values', () => {
+		const content = {
+			root: {
+				type: 'root',
+				children: [{ type: 'paragraph', children: [{ type: 'text', text: 'Total: {{total}}' }] }],
+			},
+		}
+		const { container } = render(
+			<Form
+				form={{
+					id: 1,
+					fields: [
+						{ blockType: 'number', name: 'score', label: 'Score' },
+						{
+							blockType: 'calculation',
+							name: 'total',
+							expression: {
+								type: 'op',
+								op: '*',
+								left: { type: 'ref', field: 'score' },
+								right: { type: 'lit', value: 2 },
+							},
+						},
+						{ blockType: 'message', name: 'note', content },
+					],
+				}}
+				onSubmit={vi.fn()}
+				renderers={{ message: messageField }}
+			/>
+		)
+		fireEvent.change(within(container).getByLabelText('Score'), { target: { value: '21' } })
+		expect(within(container).getByText('Total: 42')).toBeInTheDocument()
+	})
 })

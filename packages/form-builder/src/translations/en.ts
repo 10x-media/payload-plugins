@@ -198,4 +198,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.displayShowTitle]: 'Show title',
 	[keys.displayTitle]: 'Display title',
 	[keys.displayIntro]: 'Intro',
+	[keys.formBack]: 'Back',
+	[keys.formNext]: 'Next',
+	[keys.formSubmit]: 'Submit',
 }

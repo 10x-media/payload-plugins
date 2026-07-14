@@ -25,20 +25,31 @@ export { cn } from '../react/cn'
 export type { FieldRenderer, FieldRendererProps, RendererTranslate } from '../react/contract'
 export { defineFieldRenderer } from '../react/contract'
 export type {
-	BackButtonRenderProps,
 	FormDisplaySettings,
 	FormDocument,
 	FormProps,
 	FormResponseSettings,
-	NextButtonRenderProps,
-	SubmitButtonRenderProps,
 } from '../react/Form'
 export { Form } from '../react/Form'
-export type { FormStepInfo } from '../react/FormContext'
+export type {
+	FormContextValue,
+	FormControlLabels,
+	FormStepInfo,
+} from '../react/FormContext'
+export { useFormContext } from '../react/FormContext'
+export type {
+	BackButtonRenderProps,
+	FormControlsProps,
+	NextButtonRenderProps,
+	SubmitButtonRenderProps,
+} from '../react/FormControls'
+export { FormControls } from '../react/FormControls'
 export type { FieldWidth, FormLayoutProps } from '../react/FormLayout'
 export { FormLayout, widthProps } from '../react/FormLayout'
 export type { FormResultsProps } from '../react/FormResults'
 export { FormResults } from '../react/FormResults'
+export type { FormStepsProps } from '../react/FormSteps'
+export { FormSteps } from '../react/FormSteps'
 export type { FetchResultsInput, FetchResultsResult } from '../react/fetchResults'
 export { fetchFormResults } from '../react/fetchResults'
 export type { HoneypotProps } from '../react/Honeypot'
@@ -74,7 +85,7 @@ export { Textarea } from '../react/primitives/Textarea'
 export type { RendererOption, RendererRegistry, RenderersConfig } from '../react/registry'
 export { resolveRenderers } from '../react/registry'
 export { defaultRenderers } from '../react/renderers'
-export type { FormState } from '../react/state'
+export type { FieldErrors, FormAction, FormState } from '../react/state'
 export type { SubmitFormResult, SubmitHandler } from '../react/submitForm'
 export { submitForm } from '../react/submitForm'
 export type { UploadFileInput, UploadFileResult } from '../react/uploadFile'

@@ -29,12 +29,19 @@ import { buildRecallResolver } from '../recall/resolver'
 import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import { en } from '../translations/en'
+import { keys } from '../translations/keys'
 import { makeTranslate } from '../translations/makeTranslate'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import { cn } from './cn'
 import type { FieldRenderer, RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
-import { FormContext, type FormStepInfo } from './FormContext'
+import { FormContext, type FormContextValue, type FormStepInfo } from './FormContext'
+import {
+	type BackButtonRenderProps,
+	FormControls,
+	type NextButtonRenderProps,
+	type SubmitButtonRenderProps,
+} from './FormControls'
 import { type FieldWidth, FormLayout, widthProps } from './FormLayout'
 import { Honeypot } from './Honeypot'
 import { defaultPresentations } from './presentation/presentations'
@@ -49,31 +56,16 @@ import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitF
 import { useField } from './useField'
 import { validateFieldValue } from './validateField'
 
+export type {
+	BackButtonRenderProps,
+	NextButtonRenderProps,
+	SubmitButtonRenderProps,
+} from './FormControls'
 // FormResponseSettings, FormDisplaySettings, and FormDocument live in `../form/types` (no
 // 'use client') so server code (e.g. `toFormDocument` in a Server Component) can use them
 // without pulling in this client module. Re-exported here so `./react` and existing `from
 // './Form'` imports keep working unchanged.
 export type { FormDisplaySettings, FormDocument, FormResponseSettings }
-
-/** Props passed to `renderSubmit`. */
-export type SubmitButtonRenderProps = {
-	label: string
-	submitting: boolean
-}
-
-/** Props passed to `renderNext`. */
-export type NextButtonRenderProps = {
-	label: string
-	submitting: boolean
-	onClick: () => void
-}
-
-/** Props passed to `renderBack`. */
-export type BackButtonRenderProps = {
-	label: string
-	submitting: boolean
-	onClick: () => void
-}
 
 export type FormProps = {
 	form: FormDocument
@@ -88,9 +80,11 @@ export type FormProps = {
 	t?: RendererTranslate
 	locale?: string
 	layout?: boolean
-	/** Submit button label. Precedence: this prop, then the form's `response.submitLabel`, then `'Submit'`. */
+	/** Submit button label. Precedence: this prop, then the form's `response.submitLabel`, then the translated default. */
 	submitLabel?: string
+	/** "Next" button label for multi-step forms. Defaults to the translated `'Next'`. */
 	nextLabel?: string
+	/** "Back" button label for multi-step forms. Defaults to the translated `'Back'`. */
 	backLabel?: string
 	/** Label for the overlay close control (modal/drawer). */
 	closeLabel?: string
@@ -197,8 +191,8 @@ export const Form = ({
 	locale = 'en',
 	layout,
 	submitLabel,
-	nextLabel = 'Next',
-	backLabel = 'Back',
+	nextLabel,
+	backLabel,
 	closeLabel = 'Close',
 	successMessage = 'Thank you.',
 	presentation,
@@ -241,7 +235,14 @@ export const Form = ({
 		typeof form.response?.submitLabel === 'string' && form.response.submitLabel.length > 0
 			? form.response.submitLabel
 			: undefined
-	const resolvedSubmitLabel = submitLabel ?? docSubmitLabel ?? 'Submit'
+	const labels = useMemo(
+		() => ({
+			back: backLabel ?? translate(keys.formBack),
+			next: nextLabel ?? translate(keys.formNext),
+			submit: submitLabel ?? docSubmitLabel ?? translate(keys.formSubmit),
+		}),
+		[backLabel, nextLabel, submitLabel, docSubmitLabel, translate]
+	)
 
 	// Latest-value refs so event emission and the mount/unmount effect tolerate an inline `events` prop or a changing form id.
 	const sinkRef = useRef<FormEventSink>(noopEventSink)
@@ -580,13 +581,15 @@ export const Form = ({
 				goBack: () => {},
 			}
 
-	const contextValue = {
+	const contextValue: FormContextValue = {
 		state,
 		dispatch,
 		validateField,
 		locale,
 		step,
 		rendererRegistry,
+		labels,
+		t: translate,
 		effectiveValues,
 	}
 
@@ -733,60 +736,14 @@ export const Form = ({
 							{state.submitError}
 						</p>
 					) : null}
-					{flow ? (
-						<div className="fb-form__controls">
-							{!step.isFirst ? (
-								renderBack ? (
-									renderBack({ label: backLabel, submitting: state.submitting, onClick: goBack })
-								) : (
-									<button
-										type="button"
-										className={backButtonClassName}
-										onClick={goBack}
-										disabled={state.submitting}
-									>
-										{backLabel}
-									</button>
-								)
-							) : null}
-							{step.isTerminal ? (
-								renderSubmit ? (
-									renderSubmit({ label: resolvedSubmitLabel, submitting: state.submitting })
-								) : (
-									<button
-										type="submit"
-										className={submitButtonClassName}
-										disabled={state.submitting}
-									>
-										{resolvedSubmitLabel}
-									</button>
-								)
-							) : renderNext ? (
-								renderNext({
-									label: nextLabel,
-									submitting: state.submitting,
-									onClick: () => void goNext(),
-								})
-							) : (
-								<button
-									type="button"
-									className={nextButtonClassName}
-									disabled={state.submitting}
-									onClick={() => {
-										void goNext()
-									}}
-								>
-									{nextLabel}
-								</button>
-							)}
-						</div>
-					) : renderSubmit ? (
-						renderSubmit({ label: resolvedSubmitLabel, submitting: state.submitting })
-					) : (
-						<button type="submit" className={submitButtonClassName} disabled={state.submitting}>
-							{resolvedSubmitLabel}
-						</button>
-					)}
+					<FormControls
+						backButtonClassName={backButtonClassName}
+						nextButtonClassName={nextButtonClassName}
+						submitButtonClassName={submitButtonClassName}
+						renderBack={renderBack}
+						renderNext={renderNext}
+						renderSubmit={renderSubmit}
+					/>
 				</form>
 			)}
 		</FormContext.Provider>
