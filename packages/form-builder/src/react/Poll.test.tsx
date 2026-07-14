@@ -145,6 +145,42 @@ describe('Poll', () => {
 		expect(fetchResultsImpl).not.toHaveBeenCalled()
 	})
 
+	it('renders the final state with winner highlight once an outcome is recorded', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const finalForm = {
+			...form,
+			poll: { enabled: true, outcome: { winningValue: 'red' } },
+		}
+		const { container } = render(
+			createElement(Poll, { form: finalForm, resultsField: 'colour', fetchResultsImpl })
+		)
+		expect(within(container).getByText('Final result')).toBeInTheDocument()
+		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+		await waitFor(() =>
+			expect(container.querySelector('.fb-results__bucket--winner')?.textContent).toContain('Red')
+		)
+	})
+
+	it('outcome supersedes the closed and afterClose states', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const finalClosedForm = {
+			...form,
+			poll: {
+				enabled: true,
+				resultsVisibility: 'afterClose' as const,
+				closesAt: new Date(Date.now() - 60_000).toISOString(),
+				outcome: { winningValue: 'red' },
+			},
+		}
+		const { container } = render(
+			createElement(Poll, { form: finalClosedForm, resultsField: 'colour', fetchResultsImpl })
+		)
+		expect(within(container).getByText('Final result')).toBeInTheDocument()
+		expect(within(container).queryByText('This poll is closed.')).toBeNull()
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+	})
+
 	it('shows the wait notice after voting on an open afterClose poll', async () => {
 		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })

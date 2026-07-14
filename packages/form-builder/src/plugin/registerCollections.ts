@@ -8,6 +8,7 @@ import { buildFormsCollection } from '../collections/forms'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
+import type { PollOptionSourceRegistry } from '../poll/registry'
 import type { ResolvedSpamConfig } from '../spam/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import type { CollectionOverrides } from './collectionOverrides'
@@ -28,6 +29,7 @@ type RegisterCollectionsArgs = {
 	localizeContent: boolean
 	resultsAccess?: FormResultsAccess
 	votedCookie: boolean
+	pollSourceRegistry: PollOptionSourceRegistry
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
@@ -49,6 +51,7 @@ export const registerCollections = ({
 	localizeContent,
 	resultsAccess,
 	votedCookie,
+	pollSourceRegistry,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
@@ -69,6 +72,7 @@ export const registerCollections = ({
 			localizeContent,
 			uploadsCollectionSlug: uploadSlug,
 			resultsAccess,
+			pollSourceRegistry,
 			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({
@@ -82,6 +86,7 @@ export const registerCollections = ({
 			uploadSlug,
 			spam,
 			votedCookie,
+			pollSourceRegistry,
 			showRawFields: showSubmissionRawFields,
 			overrides: overrides?.formSubmissions,
 		}),

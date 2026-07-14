@@ -14,6 +14,9 @@ import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 import type { UploadsOption } from './plugin/uploadsCollection'
+import type { PollOptionSourcesConfig } from './poll/registry'
+import { resolvePollOptionSources } from './poll/registry'
+import { stashPollOptionSources } from './poll/resolvePollOptions'
 import { resolveSpamConfig } from './spam/resolveSpam'
 import type { SpamOption } from './spam/types'
 import type { TranslationsOption } from './translations'
@@ -82,8 +85,12 @@ export type FormBuilderPluginOptions = {
 	 * Poll behavior. `votedCookie: true` sets an httpOnly `fb-voted-{formId}=1` cookie on each
 	 * successful submission to a poll-enabled form, letting SSR hosts read the voted state via
 	 * `hasVotedCookie` and pass it to `<Poll hasVoted>`. Default `false`.
+	 * `sources` registers poll option sources (`definePollOptionSource`), letting authors populate
+	 * a poll's choices from host domain data with stable values; there are no built-ins. With at
+	 * least one source registered, the forms poll group gains an `optionSource` select plus its
+	 * per-source `sourceConfig`, and submissions to a sourced poll only accept resolved values.
 	 */
-	poll?: { votedCookie?: boolean }
+	poll?: { votedCookie?: boolean; sources?: PollOptionSourcesConfig }
 	/**
 	 * When `true`, the raw `values`, `descriptors`, and `consent` JSON fields are visible in the
 	 * submission admin view. Default `false` — those fields are fully represented by the
@@ -134,6 +141,10 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			options.actions
 		)
 		const spam = resolveSpamConfig(options.spam)
+		const pollSourceRegistry = resolvePollOptionSources(options.poll?.sources)
+		// Stashed on config.custom so the root-level resolvePollOptions helper can reach the
+		// registry through `payload.config` at request time, without threading plugin state.
+		config.custom = stashPollOptionSources(config.custom, pollSourceRegistry)
 		registerTranslations(config, options.translations)
 		registerCollections({
 			config,
@@ -150,6 +161,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			localizeContent,
 			resultsAccess: options.results?.access,
 			votedCookie: options.poll?.votedCookie === true,
+			pollSourceRegistry,
 			overrides: options.overrides,
 		})
 		return config
@@ -243,6 +255,7 @@ export type {
 	FormFieldValueKind,
 } from './fields/types'
 export { isPollClosed } from './form/pollState'
+export type { ToFormDocumentOptions } from './form/toFormDocument'
 export { toFormDocument } from './form/toFormDocument'
 export type {
 	FormDisplaySettings,
@@ -251,6 +264,23 @@ export type {
 	FormResponseSettings,
 } from './form/types'
 export type { UploadsOption } from './plugin/uploadsCollection'
+export type {
+	AnyPollOptionSource,
+	PollOption,
+	PollOptionResolveArgs,
+	PollOptionSource,
+} from './poll/definePollOptionSource'
+export { definePollOptionSource } from './poll/definePollOptionSource'
+export type {
+	PollOptionSourceOption,
+	PollOptionSourceRegistry,
+	PollOptionSourcesConfig,
+} from './poll/registry'
+export { resolvePollOptionSources } from './poll/registry'
+export type { ResolvePollOptionsArgs } from './poll/resolvePollOptions'
+export { resolvePollOptions } from './poll/resolvePollOptions'
+export type { ResolvePollOutcomeArgs } from './poll/resolvePollOutcome'
+export { resolvePollOutcome } from './poll/resolvePollOutcome'
 export type { PrefillOptions } from './prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from './prefill/valuesFromSearchParams'
 export { DEFAULT_PRESENTATION_NAME, defaultPresentationDescriptors } from './presentations/defaults'

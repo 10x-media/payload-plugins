@@ -49,6 +49,8 @@ const writeVoted = (key: string): void => {
  * `<FormResults>`. Lifecycle comes from `form.poll`: past `closesAt` the poll is closed (a translated
  * notice plus results, which the endpoint serves for any visibility once closed); a voted-but-open
  * `afterClose` poll shows a translated wait notice instead of fetching (the endpoint would refuse). A
+ * recorded `outcome.winningValue` (via `resolvePollOutcome`) supersedes everything: a translated final
+ * notice plus results with the winning bucket highlighted. A
  * per-browser localStorage flag (`storageKey`) skips straight to results on revisit; `hasVoted: true`
  * (e.g. from the server-set voted cookie) marks voted regardless of localStorage. The guard is UX, not
  * integrity (bypassable): server-enforced
@@ -66,7 +68,9 @@ export const Poll = ({
 	const key = storageKey ?? `fb-poll-${formProps.form.id}`
 	const poll = formProps.form.poll
 	const closed = isPollClosed(poll)
-	const resultsAwaitClose = !closed && poll?.resultsVisibility === 'afterClose'
+	const winningValue = poll?.outcome?.winningValue
+	const finalized = typeof winningValue === 'string' && winningValue.length > 0
+	const resultsAwaitClose = !closed && !finalized && poll?.resultsVisibility === 'afterClose'
 	const [voted, setVoted] = useState(false)
 	const [results, setResults] = useState<FieldAggregation[] | null>(null)
 	const translate = useMemo(() => formProps.t ?? makeTranslate(en), [formProps.t])
@@ -85,10 +89,10 @@ export const Poll = ({
 		if (already) {
 			setVoted(true)
 		}
-		if ((already && !resultsAwaitClose) || closed) {
+		if ((already && !resultsAwaitClose) || closed || finalized) {
 			void loadResults()
 		}
-	}, [hasVoted, key, loadResults, closed, resultsAwaitClose])
+	}, [hasVoted, key, loadResults, closed, resultsAwaitClose, finalized])
 
 	const handleSuccess = useCallback(
 		(submissionId?: string) => {
@@ -101,6 +105,22 @@ export const Poll = ({
 		},
 		[key, loadResults, onSuccess, resultsAwaitClose]
 	)
+
+	if (finalized) {
+		return (
+			<div className="fb-poll fb-poll--final">
+				<p className="fb-poll__final">{translate(keys.pollFinalResult)}</p>
+				{results ? (
+					<FormResults
+						results={results}
+						winningValue={winningValue}
+						t={formProps.t}
+						locale={formProps.locale}
+					/>
+				) : null}
+			</div>
+		)
+	}
 
 	if (closed) {
 		return (

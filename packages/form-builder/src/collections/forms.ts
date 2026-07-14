@@ -21,6 +21,8 @@ import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
+import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
+import type { PollOptionSourceRegistry } from '../poll/registry'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -91,6 +93,8 @@ type BuildFormsCollectionArgs = {
 	uploadsCollectionSlug?: string
 	/** Host seam gating anonymous results reads (plugin option `results.access`). */
 	resultsAccess?: FormResultsAccess
+	/** Registered poll option sources (plugin option `poll.sources`); empty registry means no source fields. */
+	pollSourceRegistry?: PollOptionSourceRegistry
 	overrides?: CollectionOverrides
 }
 
@@ -103,6 +107,7 @@ export const buildFormsCollection = ({
 	localizeContent = true,
 	uploadsCollectionSlug,
 	resultsAccess,
+	pollSourceRegistry,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
@@ -364,6 +369,33 @@ export const buildFormsCollection = ({
 						date: { pickerAppearance: 'dayAndTime' },
 						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
 					},
+				},
+				...buildPollOptionSourceFields(pollSourceRegistry ?? new Map()),
+				// The outcome is written exclusively by `resolvePollOutcome` (host domain logic, server-side
+				// with overrideAccess). Field-level create/update access blocks every non-override write:
+				// Payload silently drops the denied value rather than erroring, so admin saves and API
+				// updates can never set or clear a winner. `admin.readOnly` mirrors that in the UI.
+				{
+					name: 'outcome',
+					type: 'group',
+					label: labelForKey(keys.pollOutcome),
+					admin: { condition: (_data, siblingData) => Boolean(siblingData?.enabled) },
+					fields: [
+						{
+							name: 'winningValue',
+							type: 'text',
+							label: labelForKey(keys.pollWinningValue),
+							admin: { readOnly: true },
+							access: { create: () => false, update: () => false },
+						},
+						{
+							name: 'resolvedAt',
+							type: 'date',
+							label: labelForKey(keys.pollResolvedAt),
+							admin: { readOnly: true },
+							access: { create: () => false, update: () => false },
+						},
+					],
 				},
 			],
 		},

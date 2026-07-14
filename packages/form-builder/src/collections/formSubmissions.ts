@@ -10,6 +10,7 @@ import type { FieldTypeRegistry } from '../fields/registry'
 import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
+import type { PollOptionSourceRegistry } from '../poll/registry'
 import { buildSpamGuard } from '../spam/spamGuard'
 import type { ResolvedSpamConfig } from '../spam/types'
 import { validateSubmission } from '../submissions/validateSubmission'
@@ -37,6 +38,8 @@ type BuildSubmissionsCollectionArgs = {
 	spam?: ResolvedSpamConfig | false
 	/** Opt-in (`poll.votedCookie`): set an httpOnly `fb-voted-{formId}` cookie on poll submission creates. */
 	votedCookie?: boolean
+	/** Registered poll option sources; submission validation resolves allowed values through them. */
+	pollSourceRegistry?: PollOptionSourceRegistry
 	/**
 	 * When `true`, shows the raw `values`, `descriptors`, and `consent` JSON fields in the admin UI.
 	 * Default `false` — they are fully represented by the `SubmissionAnswers` UI component.
@@ -170,6 +173,7 @@ export const buildSubmissionsCollection = ({
 	uploadSlug,
 	spam,
 	votedCookie = false,
+	pollSourceRegistry,
 	showRawFields = false,
 	overrides,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => {
@@ -224,7 +228,13 @@ export const buildSubmissionsCollection = ({
 			// Consumer beforeValidate hooks are appended after so they run on already-validated data.
 			beforeValidate: [
 				...(spam ? [buildSpamGuard(spam)] : []),
-				validateSubmission({ registry, ruleRegistry, consentRegistry, uploadSlug }),
+				validateSubmission({
+					registry,
+					ruleRegistry,
+					consentRegistry,
+					uploadSlug,
+					pollSourceRegistry,
+				}),
 				...(overrides?.hooks?.beforeValidate ?? []),
 			],
 			afterChange: [

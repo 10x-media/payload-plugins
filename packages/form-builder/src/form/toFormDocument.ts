@@ -1,6 +1,17 @@
 import type { FormFlow } from '../flow/types'
+import { applyPollOptions } from '../poll/applyPollOptions'
+import type { PollOption } from '../poll/definePollOptionSource'
 import type { FormFieldInstance } from '../submissions/types'
 import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './types'
+
+export type ToFormDocumentOptions = {
+	/**
+	 * Source-resolved poll options (from `resolvePollOptions`), injected as the options of the
+	 * field instance named by the form's `poll.resultsField` so the client renders the host's
+	 * current choices instead of hand-authored ones.
+	 */
+	pollOptions?: PollOption[]
+}
 
 /**
  * Narrows a Payload-generated form document (from `getPayload().findByID()` or `fetch`) to
@@ -10,32 +21,39 @@ import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `response` may be null; coerced to `undefined`
  * - `display` may be null; coerced to `undefined`
- * - `poll` may be null; coerced to `undefined` (`resultsField` is dropped: server-side only)
+ * - `poll` may be null; coerced to `undefined` (`resultsField`, `optionSource`, and
+ *   `sourceConfig` are dropped: server-side only; `outcome` passes through `winningValue` only)
  *
  * Pure and framework-agnostic (no 'use client'): safe to call from a Server Component or any
  * other server-side code before handing the result to the client `<Form>`.
  */
-export function toFormDocument(form: {
-	id: number | string
-	fields?: { blockType: string; name: string; [key: string]: unknown }[] | null
-	flow?: unknown
-	response?: {
-		type?: string | null
-		message?: unknown
-		redirect?: { url?: string | null } | null
-		submitLabel?: string | null
-	} | null
-	display?: {
-		showTitle?: boolean | null
-		title?: string | null
-		intro?: unknown
-	} | null
-	poll?: {
-		enabled?: boolean | null
-		resultsVisibility?: string | null
-		closesAt?: string | null
-	} | null
-}): FormDocument {
+export function toFormDocument(
+	form: {
+		id: number | string
+		fields?: { blockType: string; name: string; [key: string]: unknown }[] | null
+		flow?: unknown
+		response?: {
+			type?: string | null
+			message?: unknown
+			redirect?: { url?: string | null } | null
+			submitLabel?: string | null
+		} | null
+		display?: {
+			showTitle?: boolean | null
+			title?: string | null
+			intro?: unknown
+		} | null
+		poll?: {
+			enabled?: boolean | null
+			resultsField?: string | null
+			resultsVisibility?: string | null
+			closesAt?: string | null
+			outcome?: { winningValue?: string | null } | null
+		} | null
+	},
+	options?: ToFormDocumentOptions
+): FormDocument {
+	const winningValue = form.poll?.outcome?.winningValue
 	const poll = form.poll
 		? {
 				enabled: form.poll.enabled ?? undefined,
@@ -44,11 +62,18 @@ export function toFormDocument(form: {
 					| 'afterClose'
 					| undefined,
 				closesAt: form.poll.closesAt ?? undefined,
+				...(typeof winningValue === 'string' && winningValue.length > 0
+					? { outcome: { winningValue } }
+					: {}),
 			}
 		: undefined
+	let fields = (form.fields ?? []) as FormFieldInstance[]
+	if (options?.pollOptions) {
+		fields = applyPollOptions(fields, form.poll?.resultsField, options.pollOptions)
+	}
 	return {
 		id: form.id,
-		fields: (form.fields ?? []) as FormFieldInstance[],
+		fields,
 		flow: form.flow as FormFlow | undefined,
 		response: (form.response as FormResponseSettings | null | undefined) ?? undefined,
 		display: (form.display as FormDisplaySettings | null | undefined) ?? undefined,

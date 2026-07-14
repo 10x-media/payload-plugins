@@ -51,4 +51,47 @@ describe('toFormDocument', () => {
 			closesAt: undefined,
 		})
 	})
+
+	it('passes through the outcome winningValue only, dropping empty or null values', () => {
+		const withOutcome = toFormDocument({
+			id: 1,
+			poll: { enabled: true, outcome: { winningValue: 'ada' } },
+		})
+		expect(withOutcome.poll?.outcome).toEqual({ winningValue: 'ada' })
+		expect(
+			toFormDocument({ id: 1, poll: { enabled: true, outcome: { winningValue: null } } }).poll
+				?.outcome
+		).toBeUndefined()
+		expect(
+			toFormDocument({ id: 1, poll: { enabled: true, outcome: { winningValue: '' } } }).poll
+				?.outcome
+		).toBeUndefined()
+		expect(toFormDocument({ id: 1, poll: { enabled: true } }).poll?.outcome).toBeUndefined()
+	})
+
+	it('injects pollOptions into the resultsField-named instance', () => {
+		const fields = [
+			{ blockType: 'text', name: 'nickname' },
+			{ blockType: 'select', name: 'winner', options: [{ label: 'Old', value: 'old' }] },
+		]
+		const pollOptions = [
+			{ label: 'Ada', value: 'ada' },
+			{ label: 'Grace', value: 'grace' },
+		]
+		const doc = toFormDocument(
+			{ id: 1, fields, poll: { enabled: true, resultsField: 'winner' } },
+			{ pollOptions }
+		)
+		expect(doc.fields[1]?.options).toEqual(pollOptions)
+		expect(doc.fields[0]).toBe(fields[0])
+		expect(fields[1]?.options).toEqual([{ label: 'Old', value: 'old' }])
+	})
+
+	it('keeps no-arg behavior identical: authored options untouched without pollOptions', () => {
+		const fields = [
+			{ blockType: 'select', name: 'winner', options: [{ label: 'Old', value: 'old' }] },
+		]
+		const doc = toFormDocument({ id: 1, fields, poll: { enabled: true, resultsField: 'winner' } })
+		expect(doc.fields[0]?.options).toEqual([{ label: 'Old', value: 'old' }])
+	})
 })
