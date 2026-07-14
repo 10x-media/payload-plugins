@@ -29,7 +29,7 @@ type BuildSubmissionsCollectionArgs = {
 	hasRunner?: boolean
 	/** Body serialization customization forwarded to the inline action dispatch path. */
 	richText?: RichTextBodyOption
-	/** Upload collection slug for file fields without an explicit `relationTo`. */
+	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
 	uploadSlug?: string
 	/** Resolved spam config; when active, prepends the spam guard before validation. `false` disables it. */
 	spam?: ResolvedSpamConfig | false

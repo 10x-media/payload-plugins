@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { formBuilder } from '../../src/index'
 
@@ -9,8 +10,18 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 	const staticDir = mkdtempSync(join(tmpdir(), 'fb-uploads-'))
 
+	const appUploads: CollectionConfig = {
+		slug: 'app-uploads',
+		upload: { staticDir },
+		fields: [],
+	}
+
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: formBuilder({ uploads: { upload: { staticDir } } }), db })
+		booted = await bootPayload({
+			plugin: formBuilder({ uploads: { collection: 'app-uploads' } }),
+			collections: [appUploads],
+			db,
+		})
 	})
 
 	afterAll(async () => {
@@ -20,7 +31,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 
 	const uploadPdf = async (size = 1024) =>
 		booted.payload.create({
-			collection: 'form-uploads',
+			collection: 'app-uploads',
 			data: {},
 			file: { data: Buffer.alloc(size, 1), mimetype: 'application/pdf', name: 'resume.pdf', size },
 		})
@@ -33,6 +44,17 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 				fields: [{ blockType: 'file', name: 'resume', label: 'Resume', ...config }],
 			},
 		})
+
+	it('appends the hidden owner field to the host collection', () => {
+		const fields = booted.payload.collections['app-uploads']?.config.fields ?? []
+		expect(fields.some((field) => 'name' in field && field.name === 'owner')).toBe(true)
+	})
+
+	it('stamps the configured collection slug onto file blocks on save', async () => {
+		const form = await makeForm({ uploadsCollection: 'forged-by-author' })
+		const fields = form.fields as Array<{ uploadsCollection?: string }>
+		expect(fields[0]?.uploadsCollection).toBe('app-uploads')
+	})
 
 	it('captures a self-describing FileRef snapshot from the upload id', async () => {
 		const form = await makeForm()

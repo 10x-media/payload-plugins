@@ -38,7 +38,6 @@ const mimeTypesOf = (raw: unknown): string[] | undefined => {
 }
 
 const fileFieldConfigOf = (instance: FormFieldInstance): FileFieldConfig => ({
-	relationTo: typeof instance.relationTo === 'string' ? instance.relationTo : undefined,
 	mimeTypes: mimeTypesOf(instance.mimeTypes),
 	maxSize: typeof instance.maxSize === 'number' ? instance.maxSize : undefined,
 })
@@ -103,7 +102,10 @@ export type RunSubmissionInput = {
 	req?: PayloadRequest
 	payload?: Payload
 	formId?: number | string
-	/** Upload collection slug for file fields without an explicit `relationTo`. Defaults to `form-uploads`. */
+	/**
+	 * The plugin-configured uploads collection slug. The block's stamped `collection` is for the
+	 * client only; the server resolves the slug from plugin config and fails closed without one.
+	 */
 	uploadSlug?: string
 	/** Resolved request identity, verified against an upload's `owner` stamp when a file field is captured. */
 	expectedOwner?: string
@@ -241,11 +243,14 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				continue
 			}
 			if (payload) {
+				if (!uploadSlug) {
+					errors.push({ path: instance.name, message: t(errorKeyFor('missing')) })
+					continue
+				}
 				const fileConfig = fileFieldConfigOf(instance)
-				const slug = fileConfig.relationTo ?? uploadSlug ?? 'form-uploads'
 				const captured = await captureFileRef({
 					payload,
-					collectionSlug: slug,
+					collectionSlug: uploadSlug,
 					uploadId: value as string | number,
 					config: fileConfig,
 					req,

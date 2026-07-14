@@ -17,7 +17,6 @@ export type {
 	SubmissionStatusFilter,
 } from '../aggregation/types'
 export type { CalcExpression } from '../calc/types'
-export type { UploadsCollectionConfig, UploadsOption } from '../collections/uploads'
 export type { FieldCondition } from '../conditions/types'
 export type { ConsentProof } from '../consent/captureConsent'
 export type {
@@ -44,6 +43,7 @@ export type {
 export type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 export type { FormBuilderPluginOptions } from '../index'
 export type { CollectionOverrides, FieldsOverride } from '../plugin/collectionOverrides'
+export type { UploadsOption } from '../plugin/uploadsCollection'
 export type { PrefillOptions } from '../prefill/valuesFromSearchParams'
 export type {
 	PresentationDescriptorOption,

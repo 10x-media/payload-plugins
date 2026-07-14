@@ -21,6 +21,14 @@ const users: CollectionConfig = {
 	fields: [],
 }
 
+// Host-owned upload collection backing the plugin's file fields (uploads are bring-your-own).
+const formUploads: CollectionConfig = {
+	slug: 'form-uploads',
+	upload: { staticDir: path.resolve(dirname, 'uploads') },
+	access: { create: () => true },
+	fields: [],
+}
+
 const db =
 	useDb === 'postgres'
 		? postgresAdapter({
@@ -41,8 +49,8 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [users],
-	plugins: [formBuilder({})],
+	collections: [users, formUploads],
+	plugins: [formBuilder({ uploads: { collection: 'form-uploads' } })],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

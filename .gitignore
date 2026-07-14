@@ -21,6 +21,9 @@ coverage/
 playwright-report/
 test-results/
 
+# dev app upload storage
+packages/*/dev/uploads/
+
 # env
 .env
 .env.*

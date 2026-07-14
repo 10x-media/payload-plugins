@@ -769,7 +769,7 @@ export interface Form {
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
-            relationTo?: string | null;
+            uploadsCollection?: string | null;
             mimeTypes?:
               | (
                   | 'image/*'
@@ -1431,7 +1431,7 @@ export interface Form {
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
-                      relationTo?: string | null;
+                      uploadsCollection?: string | null;
                       mimeTypes?:
                         | (
                             | 'image/*'
@@ -1798,6 +1798,25 @@ export interface Form {
           }
       )[]
     | null;
+  display?: {
+    showTitle?: boolean | null;
+    title?: string | null;
+    intro?: {
+      root: {
+        type: string;
+        children: {
+          type: any;
+          version: number;
+          [k: string]: unknown;
+        }[];
+        direction: ('ltr' | 'rtl') | null;
+        format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+        indent: number;
+        version: number;
+      };
+      [k: string]: unknown;
+    } | null;
+  };
   flow?: {
     steps: {
       id: string;
@@ -2675,7 +2694,7 @@ export interface FormsSelect<T extends boolean = true> {
               placeholder?: T;
               description?: T;
               required?: T;
-              relationTo?: T;
+              uploadsCollection?: T;
               mimeTypes?: T;
               maxSize?: T;
               validations?:
@@ -3224,7 +3243,7 @@ export interface FormsSelect<T extends boolean = true> {
                           placeholder?: T;
                           description?: T;
                           required?: T;
-                          relationTo?: T;
+                          uploadsCollection?: T;
                           mimeTypes?: T;
                           maxSize?: T;
                           validations?:
@@ -3464,6 +3483,13 @@ export interface FormsSelect<T extends boolean = true> {
               id?: T;
               blockName?: T;
             };
+      };
+  display?:
+    | T
+    | {
+        showTitle?: T;
+        title?: T;
+        intro?: T;
       };
   flow?: T;
   actions?:

@@ -65,6 +65,24 @@ const providedFlowStepCount = (raw: unknown): number => {
 	return Array.isArray(steps) ? steps.length : 0
 }
 
+/**
+ * Stamp the configured uploads collection slug onto every `file` block (including repeater
+ * sub-fields) on each save. The block carries a hidden `uploadsCollection` field so the slug
+ * reaches the client renderer through the form document; the server always overwrites it from
+ * plugin config, so the stored value is never author- or client-controlled.
+ */
+const stampFileCollections = (rows: FieldRow[], slug: string): void => {
+	for (const row of rows) {
+		if (row.blockType === 'file') {
+			;(row as { uploadsCollection?: string }).uploadsCollection = slug
+		}
+		const subFields = (row as { subFields?: unknown }).subFields
+		if (Array.isArray(subFields)) {
+			stampFileCollections(subFields as FieldRow[], slug)
+		}
+	}
+}
+
 type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
@@ -72,6 +90,8 @@ type BuildFormsCollectionArgs = {
 	presentationRegistry?: PresentationDescriptorRegistry
 	actionRegistry?: ActionRegistry
 	localizeContent?: boolean
+	/** The host-owned uploads collection slug from plugin config; absent when uploads are disabled. */
+	uploadsCollectionSlug?: string
 	overrides?: CollectionOverrides
 }
 
@@ -83,6 +103,7 @@ export const buildFormsCollection = ({
 	presentationRegistry = new Map(Object.entries(defaultPresentationDescriptors)),
 	actionRegistry = new Map(),
 	localizeContent = true,
+	uploadsCollectionSlug,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
@@ -104,6 +125,9 @@ export const buildFormsCollection = ({
 				if ('expression' in field) {
 					field.expression = normalizeCalc(field.expression)
 				}
+			}
+			if (uploadsCollectionSlug) {
+				stampFileCollections(normalized, uploadsCollectionSlug)
 			}
 			data.fields = normalized
 			const fieldNames = normalized

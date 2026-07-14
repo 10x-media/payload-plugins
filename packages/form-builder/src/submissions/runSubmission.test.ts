@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import type { Payload } from 'payload'
+import { describe, expect, it, vi } from 'vitest'
 import { defaultFieldDefinitions } from '../fields/builtin'
 import { buildRegistry } from '../fields/registry'
 import { defaultValidationRules } from '../validation/builtin'
@@ -269,5 +270,22 @@ describe('runSubmission', () => {
 		})
 		expect(result.errors).toEqual([])
 		expect(result.values).toContainEqual({ field: 'code', value: 'ab' })
+	})
+
+	it('fails a file field closed when no uploads collection is configured', async () => {
+		const findByID = vi.fn()
+		const payload = { findByID } as unknown as Payload
+		const fields: FormFieldInstance[] = [{ blockType: 'file', name: 'resume', label: 'Resume' }]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'resume', value: 'up1' }],
+			payload,
+		})
+		expect(result.errors).toEqual([
+			{ path: 'resume', message: 'formBuilder:validation.file.missing' },
+		])
+		expect(result.values).toEqual([])
+		expect(findByID).not.toHaveBeenCalled()
 	})
 })

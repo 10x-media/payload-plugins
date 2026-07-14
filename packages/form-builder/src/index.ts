@@ -3,7 +3,6 @@ import type { RichTextBodyOption } from './actions/body/serializeBody'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
-import { resolveUploads, type UploadsOption } from './collections/uploads'
 import { buildDefaultConsentSources } from './consent/builtin'
 import type { ConsentSourcesConfig } from './consent/registry'
 import { resolveConsentSources } from './consent/registry'
@@ -13,6 +12,7 @@ import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
 import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
+import type { UploadsOption } from './plugin/uploadsCollection'
 import { defaultPresentationDescriptors } from './presentations/defaults'
 import type { PresentationsDescriptorConfig } from './presentations/registry'
 import { resolvePresentationDescriptors } from './presentations/registry'
@@ -60,7 +60,14 @@ export type FormBuilderPluginOptions = {
 	richText?: RichTextBodyOption
 	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	consentSources?: ConsentSourcesConfig
-	/** The built-in `form-uploads` collection backing file fields. `false` disables it (bring your own); an object overrides slug/upload/access/fields. */
+	/**
+	 * File uploads are bring-your-own. Default `false`: no upload collection is involved and the
+	 * built-in `file` field type is removed from the registry, so form authors cannot add a field
+	 * with nowhere to land (a developer-registered custom `file` type via `fields` still wins).
+	 * `{ collection: 'slug' }` points at a host-owned upload collection (created by the app with
+	 * its storage adapter); the plugin validates it at boot, appends its hidden `owner` field when
+	 * absent, and prepends the spam upload hooks.
+	 */
 	uploads?: UploadsOption
 	/** Honeypot + rate-limiting (on by default) + a captcha adapter seam + upload-ownership scoping. `false` disables the whole subsystem. */
 	spam?: SpamOption
@@ -80,7 +87,6 @@ export type FormBuilderPluginOptions = {
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
-		uploads?: CollectionOverrides
 	}
 }
 
@@ -98,10 +104,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			return config
 		}
 		const localizeContent = options.localizeContent !== false
-		const registry = resolveFieldTypes(
-			buildDefaultFieldDefinitions(localizeContent),
-			options.fields
+		const uploads = options.uploads ?? false
+		// Without an uploads collection the built-in file type has nowhere to store anything, so it
+		// never enters the registry; an explicit `fields.file` definition remains a developer choice.
+		const defaultFieldDefinitions = buildDefaultFieldDefinitions(localizeContent).filter(
+			(definition) => uploads !== false || definition.type !== 'file'
 		)
+		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
 		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
 		const consentRegistry = resolveConsentSources(
 			buildDefaultConsentSources(localizeContent),
@@ -115,7 +124,6 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			buildDefaultActionDefinitions(localizeContent),
 			options.actions
 		)
-		const uploads = resolveUploads(options.uploads)
 		const spam = resolveSpamConfig(options.spam)
 		registerTranslations(config, options.translations)
 		registerCollections({
@@ -185,8 +193,6 @@ export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
 export { evaluateCalc } from './calc/evaluate'
 export { normalizeCalc } from './calc/normalizeCalc'
 export type { CalcExpression } from './calc/types'
-export type { UploadsCollectionConfig, UploadsOption } from './collections/uploads'
-export { buildUploadsCollection, FORM_UPLOADS_SLUG, resolveUploads } from './collections/uploads'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { buildDefaultConsentSources, defaultConsentSources } from './consent/builtin'
@@ -224,6 +230,7 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 } from './fields/types'
+export type { UploadsOption } from './plugin/uploadsCollection'
 export type { PrefillOptions } from './prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from './prefill/valuesFromSearchParams'
 export { DEFAULT_PRESENTATION_NAME, defaultPresentationDescriptors } from './presentations/defaults'

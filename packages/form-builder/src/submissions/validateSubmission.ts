@@ -13,7 +13,7 @@ export type ValidateSubmissionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
 	consentRegistry: ConsentSourceRegistry
-	/** Upload collection slug for file fields without an explicit `relationTo`. */
+	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
 	uploadSlug?: string
 }
 
