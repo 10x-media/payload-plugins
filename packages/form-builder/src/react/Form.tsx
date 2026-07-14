@@ -19,7 +19,12 @@ import { noopEventSink } from '../events/noopSink'
 import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
-import type { FormDisplaySettings, FormDocument, FormResponseSettings } from '../form/types'
+import type {
+	FormDisplaySettings,
+	FormDocument,
+	FormPollSettings,
+	FormResponseSettings,
+} from '../form/types'
 import {
 	DEFAULT_PRESENTATION_NAME,
 	defaultPresentationDescriptors,
@@ -67,11 +72,11 @@ export type {
 	NextButtonRenderProps,
 	SubmitButtonRenderProps,
 } from './FormControls'
-// FormResponseSettings, FormDisplaySettings, and FormDocument live in `../form/types` (no
-// 'use client') so server code (e.g. `toFormDocument` in a Server Component) can use them
-// without pulling in this client module. Re-exported here so `./react` and existing `from
-// './Form'` imports keep working unchanged.
-export type { FormDisplaySettings, FormDocument, FormResponseSettings }
+// FormResponseSettings, FormDisplaySettings, FormPollSettings, and FormDocument live in
+// `../form/types` (no 'use client') so server code (e.g. `toFormDocument` in a Server Component)
+// can use them without pulling in this client module. Re-exported here so `./react` and existing
+// `from './Form'` imports keep working unchanged.
+export type { FormDisplaySettings, FormDocument, FormPollSettings, FormResponseSettings }
 
 export type FormProps = {
 	form: FormDocument

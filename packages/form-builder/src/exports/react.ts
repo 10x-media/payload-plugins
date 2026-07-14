@@ -27,6 +27,7 @@ export { defineFieldRenderer } from '../react/contract'
 export type {
 	FormDisplaySettings,
 	FormDocument,
+	FormPollSettings,
 	FormProps,
 	FormResponseSettings,
 } from '../react/Form'
