@@ -29,6 +29,8 @@ This registers three collections under a **Forms** admin group: `forms` (the doc
 
 The in-admin condition and flow builders ship their own styles; no admin setup is needed.
 
+`formBuilder` registers with `order: 50`. Plugins execute in ascending `order` (lower first), so any plugin that needs to run *after* it, for example `@payloadcms/plugin-multi-tenant`, which wraps every collection already present in the config including the three above, needs an explicit `order` higher than `50`.
+
 ## Author a form
 
 In the admin, create a `forms` document: give it a title, then add fields as blocks in the **Fields** tab (a text field `name`, an email field `email`, a textarea `message`); multi-step flow and post-submit actions live in the **Flow** and **Actions** tabs beside it. Each field block is tabbed too: **Field** holds the basics and type config, **Validation** the rules, **Advanced** the visibility condition and hidden flag.

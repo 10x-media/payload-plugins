@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { type FormState, formReducer, initialFormState } from './state'
+import type { FormFieldInstance } from '../submissions/types'
+import { type FormState, formReducer, initialFormState, seedFieldValues } from './state'
 
 const base: FormState = initialFormState({ a: '', b: 0 })
 
@@ -51,5 +52,30 @@ describe('formReducer', () => {
 		})
 		const cleared = formReducer(withErr, { type: 'SET_VALUE', name: 'a', value: 'x' })
 		expect(cleared.errors.a ?? []).toEqual([])
+	})
+})
+
+describe('seedFieldValues', () => {
+	it('seeds a repeater with a positive minRows as that many empty rows', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'repeater', name: 'members', minRows: 2, subFields: [] },
+		]
+		expect(seedFieldValues(fields)).toEqual({ members: [{}, {}] })
+	})
+
+	it('leaves a repeater with no minRows (or minRows 0) undefined', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'repeater', name: 'a', subFields: [] },
+			{ blockType: 'repeater', name: 'b', minRows: 0, subFields: [] },
+		]
+		expect(seedFieldValues(fields)).toEqual({ a: undefined, b: undefined })
+	})
+
+	it('leaves every non-repeater field undefined', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'name' },
+			{ blockType: 'number', name: 'age' },
+		]
+		expect(seedFieldValues(fields)).toEqual({ name: undefined, age: undefined })
 	})
 })

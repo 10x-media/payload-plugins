@@ -8,7 +8,7 @@ import { keys, type TranslationKey } from './keys'
 export const en: Record<TranslationKey, string> = {
 	[keys.fieldTitle]: 'Title',
 	[keys.fieldTypeText]: 'Text',
-	[keys.fieldTypeTextarea]: 'Long text',
+	[keys.fieldTypeTextarea]: 'Textarea',
 	[keys.fieldTypeEmail]: 'Email',
 	[keys.fieldTypeNumber]: 'Number',
 	[keys.fieldTypeSelect]: 'Select',

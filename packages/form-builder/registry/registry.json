@@ -61,6 +61,26 @@
 					"path": "form-builder/fields/message-field.tsx",
 					"type": "registry:component",
 					"target": "components/form-builder/fields/message-field.tsx"
+				},
+				{
+					"path": "form-builder/fields/date-field.tsx",
+					"type": "registry:component",
+					"target": "components/form-builder/fields/date-field.tsx"
+				},
+				{
+					"path": "form-builder/fields/consent-field.tsx",
+					"type": "registry:component",
+					"target": "components/form-builder/fields/consent-field.tsx"
+				},
+				{
+					"path": "form-builder/fields/calculation-field.tsx",
+					"type": "registry:component",
+					"target": "components/form-builder/fields/calculation-field.tsx"
+				},
+				{
+					"path": "form-builder/fields/repeater-field.tsx",
+					"type": "registry:component",
+					"target": "components/form-builder/fields/repeater-field.tsx"
 				}
 			]
 		},

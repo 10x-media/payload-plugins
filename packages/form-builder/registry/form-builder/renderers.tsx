@@ -1,11 +1,15 @@
 'use client'
 
 import type { FieldRenderer, RenderersConfig } from '@10x-media/form-builder/react'
+import { calculationField } from './fields/calculation-field'
 import { checkboxField } from './fields/checkbox-field'
+import { consentField } from './fields/consent-field'
+import { dateField } from './fields/date-field'
 import { emailField } from './fields/email-field'
 import { fileField } from './fields/file-field'
 import { messageField } from './fields/message-field'
 import { numberField } from './fields/number-field'
+import { repeaterField } from './fields/repeater-field'
 import { selectField } from './fields/select-field'
 import { textField } from './fields/text-field'
 import { textareaField } from './fields/textarea-field'
@@ -20,4 +24,8 @@ export const shadcnRenderers: RenderersConfig = {
 	checkbox: checkboxField as FieldRenderer,
 	file: fileField as FieldRenderer,
 	message: messageField as FieldRenderer,
+	date: dateField as FieldRenderer,
+	consent: consentField as FieldRenderer,
+	calculation: calculationField as FieldRenderer,
+	repeater: repeaterField as FieldRenderer,
 }

@@ -51,7 +51,13 @@ import { applyRecall } from './recall'
 import { type RenderersConfig, resolveRenderers } from './registry'
 import { defaultRenderers } from './renderers'
 import { buildFieldTypeRegistry, buildValidationRuleRegistry, visibleFields } from './resolveForm'
-import { type FieldErrors, type FormAction, formReducer, initialFormState } from './state'
+import {
+	type FieldErrors,
+	type FormAction,
+	formReducer,
+	initialFormState,
+	seedFieldValues,
+} from './state'
 import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitForm'
 import { useField } from './useField'
 import { validateFieldValue } from './validateField'
@@ -252,7 +258,7 @@ export const Form = ({
 
 	const [state, rawDispatch] = useReducer(formReducer, form.fields, (fields) =>
 		initialFormState({
-			...Object.fromEntries(fields.map((field) => [field.name, undefined])),
+			...seedFieldValues(fields),
 			...(initialValues ?? {}),
 		})
 	)
