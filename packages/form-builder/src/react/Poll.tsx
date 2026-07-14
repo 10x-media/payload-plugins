@@ -1,17 +1,25 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FieldAggregation } from '../aggregation/types'
+import { isPollClosed } from '../form/pollState'
+import { en } from '../translations/en'
+import { keys } from '../translations/keys'
+import { makeTranslate } from '../translations/makeTranslate'
 import { Form, type FormProps } from './Form'
 import { FormResults } from './FormResults'
 import { type FetchResultsResult, fetchFormResults } from './fetchResults'
 
 export type PollProps = FormProps & {
-	/** The choice field whose results are shown after voting (should match the form's public `resultsField`). */
+	/** The choice field whose results are shown after voting (should match the form's public `poll.resultsField`). */
 	resultsField: string
 	/** localStorage key for the per-browser voted guard. Default `fb-poll-{form.id}`. */
 	storageKey?: string
-	/** Force the voted state (controlled). Omit to use the localStorage guard. */
+	/**
+	 * Server-known voted state, ORed with the localStorage guard: `true` marks the visitor as voted;
+	 * `false`/omitted falls back to localStorage. SSR hosts using the plugin's `poll.votedCookie`
+	 * option pass `hasVotedCookie(cookieHeader, form.id)` here.
+	 */
 	hasVoted?: boolean
 	/**
 	 * Injectable results fetch (testing); defaults to `fetchFormResults`. Pass a stable reference (module
@@ -37,10 +45,14 @@ const writeVoted = (key: string): void => {
 }
 
 /**
- * A poll: renders `<Form>` until the visitor votes, then fetches the aggregate results and shows
- * `<FormResults>`. A per-browser localStorage flag (`storageKey`) skips straight to results on revisit. The
- * guard is UX, not integrity (bypassable): server-enforced one-per-identity dedup composes via `req.user`
- * (authed forms) or a `notAlreadySubmitted` rule, with cookie/IP identity deferred to the spam phase.
+ * A poll: renders `<Form>` while open and not yet voted, then fetches the aggregate results and shows
+ * `<FormResults>`. Lifecycle comes from `form.poll`: past `closesAt` the poll is closed (a translated
+ * notice plus results, which the endpoint serves for any visibility once closed); a voted-but-open
+ * `afterClose` poll shows a translated wait notice instead of fetching (the endpoint would refuse). A
+ * per-browser localStorage flag (`storageKey`) skips straight to results on revisit; `hasVoted: true`
+ * (e.g. from the server-set voted cookie) marks voted regardless of localStorage. The guard is UX, not
+ * integrity (bypassable): server-enforced
+ * one-per-identity dedup composes via `req.user` (authed forms) or a `notAlreadySubmitted` rule.
  */
 export const Poll = ({
 	resultsField,
@@ -52,8 +64,12 @@ export const Poll = ({
 	...formProps
 }: PollProps) => {
 	const key = storageKey ?? `fb-poll-${formProps.form.id}`
+	const poll = formProps.form.poll
+	const closed = isPollClosed(poll)
+	const resultsAwaitClose = !closed && poll?.resultsVisibility === 'afterClose'
 	const [voted, setVoted] = useState(false)
 	const [results, setResults] = useState<FieldAggregation[] | null>(null)
+	const translate = useMemo(() => formProps.t ?? makeTranslate(en), [formProps.t])
 
 	const loadResults = useCallback(async () => {
 		const result: FetchResultsResult = await fetchResultsImpl({
@@ -65,24 +81,42 @@ export const Poll = ({
 	}, [fetchResultsImpl, formProps.form.id, resultsField, apiRoute])
 
 	useEffect(() => {
-		const already = hasVoted ?? readVoted(key)
+		const already = hasVoted === true || readVoted(key)
 		if (already) {
 			setVoted(true)
+		}
+		if ((already && !resultsAwaitClose) || closed) {
 			void loadResults()
 		}
-	}, [hasVoted, key, loadResults])
+	}, [hasVoted, key, loadResults, closed, resultsAwaitClose])
 
 	const handleSuccess = useCallback(
 		(submissionId?: string) => {
 			writeVoted(key)
 			setVoted(true)
-			void loadResults()
+			if (!resultsAwaitClose) {
+				void loadResults()
+			}
 			onSuccess?.(submissionId)
 		},
-		[key, loadResults, onSuccess]
+		[key, loadResults, onSuccess, resultsAwaitClose]
 	)
 
+	if (closed) {
+		return (
+			<div className="fb-poll fb-poll--closed">
+				<p className="fb-poll__closed">{translate(keys.pollClosed)}</p>
+				{results ? (
+					<FormResults results={results} t={formProps.t} locale={formProps.locale} />
+				) : null}
+			</div>
+		)
+	}
+
 	if (voted) {
+		if (resultsAwaitClose) {
+			return <p className="fb-poll__await-close">{translate(keys.pollResultsAfterClose)}</p>
+		}
 		return results ? (
 			<FormResults results={results} t={formProps.t} locale={formProps.locale} />
 		) : null

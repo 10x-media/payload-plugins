@@ -1,13 +1,16 @@
-import { type CollectionBeforeValidateHook, ValidationError } from 'payload'
+import { APIError, type CollectionBeforeValidateHook, ValidationError } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { isPollClosed, pollConfigOf } from '../form/pollState'
 import { IDENTITY_CONTEXT_KEY } from '../spam/constants'
-import { asFieldTranslate } from '../translations/server'
+import { keys } from '../translations/keys'
+import { asFieldTranslate, asTranslate } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { runSubmission } from './runSubmission'
 import type { FormFieldInstance, SubmissionValue } from './types'
+import { POLL_CONTEXT_KEY } from './votedCookie'
 
 export type ValidateSubmissionArgs = {
 	registry: FieldTypeRegistry
@@ -47,6 +50,17 @@ export const validateSubmission =
 			locale: req.locale,
 			req,
 		})
+
+		// Stash the poll config (null = form has none) so the voted-cookie afterChange hook can
+		// skip a second form fetch on the same request.
+		const poll = pollConfigOf(form.poll)
+		req.context[POLL_CONTEXT_KEY] = poll ?? null
+
+		// Form-level lifecycle guard, before any field work: a closed poll accepts no submissions,
+		// regardless of what the client rendered.
+		if (poll?.enabled === true && isPollClosed(poll)) {
+			throw new APIError(asTranslate(req.i18n.t)(keys.pollClosed), 403)
+		}
 
 		const fields = ((form.fields as FormFieldInstance[] | undefined) ?? []) as FormFieldInstance[]
 		const incoming = ((data.values as SubmissionValue[] | undefined) ?? []) as SubmissionValue[]

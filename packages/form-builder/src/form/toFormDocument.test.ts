@@ -23,4 +23,32 @@ describe('toFormDocument', () => {
 		expect(doc.display).toBeUndefined()
 		expect(doc.response).toBeUndefined()
 	})
+
+	it('passes through poll lifecycle settings and drops the server-only resultsField', () => {
+		const poll = {
+			enabled: true,
+			resultsVisibility: 'afterClose',
+			closesAt: '2026-07-01T00:00:00.000Z',
+			resultsField: 'colour',
+		}
+		const doc = toFormDocument({ id: 1, fields: [], poll })
+		expect(doc.poll).toEqual({
+			enabled: true,
+			resultsVisibility: 'afterClose',
+			closesAt: '2026-07-01T00:00:00.000Z',
+		})
+	})
+
+	it('coerces a null poll and null poll members to undefined', () => {
+		expect(toFormDocument({ id: 1, poll: null }).poll).toBeUndefined()
+		const doc = toFormDocument({
+			id: 1,
+			poll: { enabled: null, resultsVisibility: null, closesAt: null },
+		})
+		expect(doc.poll).toEqual({
+			enabled: undefined,
+			resultsVisibility: undefined,
+			closesAt: undefined,
+		})
+	})
 })

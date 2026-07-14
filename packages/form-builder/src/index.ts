@@ -3,6 +3,7 @@ import type { RichTextBodyOption } from './actions/body/serializeBody'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
+import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
 import { buildDefaultConsentSources } from './consent/builtin'
 import type { ConsentSourcesConfig } from './consent/registry'
 import { resolveConsentSources } from './consent/registry'
@@ -70,6 +71,20 @@ export type FormBuilderPluginOptions = {
 	/** Honeypot + rate-limiting (on by default) + a captcha adapter seam + upload-ownership scoping. `false` disables the whole subsystem. */
 	spam?: SpamOption
 	/**
+	 * Aggregate-results endpoint options. `access` gates anonymous reads after the form is loaded
+	 * and before anything is served; absent keeps the plugin-default gating (poll opt-in +
+	 * visibility + enumerable-field guard). Multi-tenant hosts should compare `form.tenant` against
+	 * the tenant derived from `req` so one tenant's poll counts are never readable under another
+	 * tenant's id. Authenticated callers bypass this seam.
+	 */
+	results?: { access?: FormResultsAccess }
+	/**
+	 * Poll behavior. `votedCookie: true` sets an httpOnly `fb-voted-{formId}=1` cookie on each
+	 * successful submission to a poll-enabled form, letting SSR hosts read the voted state via
+	 * `hasVotedCookie` and pass it to `<Poll hasVoted>`. Default `false`.
+	 */
+	poll?: { votedCookie?: boolean }
+	/**
 	 * When `true`, the raw `values`, `descriptors`, and `consent` JSON fields are visible in the
 	 * submission admin view. Default `false` — those fields are fully represented by the
 	 * `SubmissionAnswers` UI component and are noisy when shown alongside it.
@@ -133,6 +148,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			spam,
 			showSubmissionRawFields: options.showSubmissionRawFields ?? false,
 			localizeContent,
+			resultsAccess: options.results?.access,
+			votedCookie: options.poll?.votedCookie === true,
 			overrides: options.overrides,
 		})
 		return config
@@ -171,6 +188,8 @@ export {
 } from './aggregation/aggregateResponses'
 export { aggregateRowForField, aggregateRowsForFields } from './aggregation/aggregateRows'
 export type {
+	FormResultsAccess,
+	FormResultsAccessArgs,
 	ResolveResultsRequestArgs,
 	ResolveResultsRequestResult,
 } from './aggregation/resolveResultsRequest'
@@ -223,8 +242,14 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 } from './fields/types'
+export { isPollClosed } from './form/pollState'
 export { toFormDocument } from './form/toFormDocument'
-export type { FormDisplaySettings, FormDocument, FormResponseSettings } from './form/types'
+export type {
+	FormDisplaySettings,
+	FormDocument,
+	FormPollSettings,
+	FormResponseSettings,
+} from './form/types'
 export type { UploadsOption } from './plugin/uploadsCollection'
 export type { PrefillOptions } from './prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from './prefill/valuesFromSearchParams'
@@ -260,6 +285,7 @@ export type {
 	SpamMetadataConfig,
 	SpamOption,
 } from './spam/types'
+export { hasVotedCookie, votedCookieName } from './submissions/votedCookie'
 export { captureFileRef } from './uploads/captureFileRef'
 export { formatBytes } from './uploads/formatBytes'
 export { resolveFileRef } from './uploads/resolveFileRef'

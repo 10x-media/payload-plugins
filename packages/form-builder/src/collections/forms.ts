@@ -7,7 +7,10 @@ import {
 } from 'payload'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { ActionRegistry } from '../actions/registry'
-import { resolveFormResultsRequest } from '../aggregation/resolveResultsRequest'
+import {
+	type FormResultsAccess,
+	resolveFormResultsRequest,
+} from '../aggregation/resolveResultsRequest'
 import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
@@ -86,6 +89,8 @@ type BuildFormsCollectionArgs = {
 	localizeContent?: boolean
 	/** The host-owned uploads collection slug from plugin config; absent when uploads are disabled. */
 	uploadsCollectionSlug?: string
+	/** Host seam gating anonymous results reads (plugin option `results.access`). */
+	resultsAccess?: FormResultsAccess
 	overrides?: CollectionOverrides
 }
 
@@ -97,6 +102,7 @@ export const buildFormsCollection = ({
 	actionRegistry = new Map(),
 	localizeContent = true,
 	uploadsCollectionSlug,
+	resultsAccess,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
@@ -312,23 +318,54 @@ export const buildFormsCollection = ({
 				{ label: labelForKey(keys.tabResponse), fields: [responseField] },
 			],
 		},
+		// Poll lifecycle config; identifiers and behavior, never localized. Sidebar keeps parity with
+		// the pre-group showResults/resultsField placement. `resultsVisibility` is defaulted and not
+		// clearable rather than `required` for the same generated-types reason as `response.type`.
 		{
-			name: 'showResults',
-			type: 'checkbox',
-			defaultValue: false,
-			label: labelForKey(keys.configShowResults),
+			name: 'poll',
+			type: 'group',
+			label: labelForKey(keys.pollGroup),
 			admin: { position: 'sidebar' },
-		},
-		{
-			name: 'resultsField',
-			type: 'text',
-			label: labelForKey(keys.configResultsField),
-			admin: {
-				position: 'sidebar',
-				description:
-					'Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.',
-				condition: (data) => Boolean(data?.showResults),
-			},
+			fields: [
+				{
+					name: 'enabled',
+					type: 'checkbox',
+					defaultValue: false,
+					label: labelForKey(keys.pollEnabled),
+				},
+				{
+					name: 'resultsField',
+					type: 'text',
+					label: labelForKey(keys.pollResultsField),
+					admin: {
+						description: labelForKey(keys.pollResultsFieldDescription),
+						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
+					},
+				},
+				{
+					name: 'resultsVisibility',
+					type: 'select',
+					defaultValue: 'afterVote',
+					label: labelForKey(keys.pollResultsVisibility),
+					admin: {
+						isClearable: false,
+						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
+					},
+					options: [
+						{ label: labelForKey(keys.pollVisibilityAfterVote), value: 'afterVote' },
+						{ label: labelForKey(keys.pollVisibilityAfterClose), value: 'afterClose' },
+					],
+				},
+				{
+					name: 'closesAt',
+					type: 'date',
+					label: labelForKey(keys.pollClosesAt),
+					admin: {
+						date: { pickerAppearance: 'dayAndTime' },
+						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
+					},
+				},
+			],
 		},
 	]
 
@@ -344,6 +381,7 @@ export const buildFormsCollection = ({
 					field,
 					isAuthed: Boolean(req.user),
 					req,
+					access: resultsAccess,
 				})
 				return Response.json(body, { status })
 			},

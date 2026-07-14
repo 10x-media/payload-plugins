@@ -1910,11 +1910,12 @@ export interface Form {
     };
     submitLabel?: string | null;
   };
-  showResults?: boolean | null;
-  /**
-   * Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.
-   */
-  resultsField?: string | null;
+  poll?: {
+    enabled?: boolean | null;
+    resultsField?: string | null;
+    resultsVisibility?: ('afterVote' | 'afterClose') | null;
+    closesAt?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -3533,8 +3534,14 @@ export interface FormsSelect<T extends boolean = true> {
             };
         submitLabel?: T;
       };
-  showResults?: T;
-  resultsField?: T;
+  poll?:
+    | T
+    | {
+        enabled?: T;
+        resultsField?: T;
+        resultsVisibility?: T;
+        closesAt?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

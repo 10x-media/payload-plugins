@@ -2,6 +2,7 @@ import type { Config } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
+import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
 import type { ConsentSourceRegistry } from '../consent/registry'
@@ -25,6 +26,8 @@ type RegisterCollectionsArgs = {
 	spam: ResolvedSpamConfig | false
 	showSubmissionRawFields: boolean
 	localizeContent: boolean
+	resultsAccess?: FormResultsAccess
+	votedCookie: boolean
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
@@ -44,6 +47,8 @@ export const registerCollections = ({
 	spam,
 	showSubmissionRawFields,
 	localizeContent,
+	resultsAccess,
+	votedCookie,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
@@ -63,6 +68,7 @@ export const registerCollections = ({
 			actionRegistry,
 			localizeContent,
 			uploadsCollectionSlug: uploadSlug,
+			resultsAccess,
 			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({
@@ -75,6 +81,7 @@ export const registerCollections = ({
 			hasRunner,
 			uploadSlug,
 			spam,
+			votedCookie,
 			showRawFields: showSubmissionRawFields,
 			overrides: overrides?.formSubmissions,
 		}),

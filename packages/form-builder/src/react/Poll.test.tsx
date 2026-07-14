@@ -86,4 +86,92 @@ describe('Poll', () => {
 		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
 		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
 	})
+
+	it('falls back to localStorage when hasVoted is false (cookie absent)', async () => {
+		window.localStorage.setItem('fb-poll-1', '1')
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const { container } = render(
+			createElement(Poll, { form, resultsField: 'colour', hasVoted: false, fetchResultsImpl })
+		)
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
+	})
+
+	it('renders a closed notice plus results once closesAt has passed', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const closedForm = {
+			...form,
+			poll: { enabled: true, closesAt: new Date(Date.now() - 60_000).toISOString() },
+		}
+		const { container } = render(
+			createElement(Poll, { form: closedForm, resultsField: 'colour', fetchResultsImpl })
+		)
+		expect(within(container).getByText('This poll is closed.')).toBeInTheDocument()
+		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+		await waitFor(() => expect(within(container).getByText('100%')).toBeInTheDocument())
+	})
+
+	it('keeps the form while closesAt is in the future', () => {
+		const openForm = {
+			...form,
+			poll: { enabled: true, closesAt: new Date(Date.now() + 60 * 60_000).toISOString() },
+		}
+		const { container } = render(
+			createElement(Poll, { form: openForm, resultsField: 'colour', fetchResultsImpl: vi.fn() })
+		)
+		expect(within(container).getByRole('button', { name: /submit|vote/i })).toBeInTheDocument()
+	})
+
+	it('shows a wait notice instead of fetching when an afterClose poll is voted but still open', async () => {
+		window.localStorage.setItem('fb-poll-1', '1')
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const awaitCloseForm = {
+			...form,
+			poll: {
+				enabled: true,
+				resultsVisibility: 'afterClose' as const,
+				closesAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+			},
+		}
+		const { container } = render(
+			createElement(Poll, { form: awaitCloseForm, resultsField: 'colour', fetchResultsImpl })
+		)
+		await waitFor(() =>
+			expect(
+				within(container).getByText('Results will be shown after the poll closes.')
+			).toBeInTheDocument()
+		)
+		expect(fetchResultsImpl).not.toHaveBeenCalled()
+	})
+
+	it('shows the wait notice after voting on an open afterClose poll', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })
+		const awaitCloseForm = {
+			...form,
+			poll: {
+				enabled: true,
+				resultsVisibility: 'afterClose' as const,
+				closesAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+			},
+		}
+		const { container } = render(
+			createElement(Poll, {
+				form: awaitCloseForm,
+				resultsField: 'colour',
+				onSubmit,
+				fetchResultsImpl,
+			})
+		)
+		const select = within(container).getByRole('combobox')
+		fireEvent.change(select, { target: { value: 'red' } })
+		fireEvent.click(within(container).getByRole('button', { name: /submit|vote/i }))
+		await waitFor(() =>
+			expect(
+				within(container).getByText('Results will be shown after the poll closes.')
+			).toBeInTheDocument()
+		)
+		expect(fetchResultsImpl).not.toHaveBeenCalled()
+	})
 })

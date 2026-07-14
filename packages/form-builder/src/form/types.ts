@@ -20,6 +20,19 @@ export type FormDisplaySettings = {
 }
 
 /**
+ * Serializable per-form poll settings the client needs for lifecycle rendering (open/voted/closed).
+ * `resultsField` intentionally stays server-side: the results endpoint resolves the public field
+ * itself, so the client never needs it from the document.
+ */
+export type FormPollSettings = {
+	enabled?: boolean
+	/** When anonymous callers may read aggregate results. Default 'afterVote'. */
+	resultsVisibility?: 'afterVote' | 'afterClose' | null
+	/** ISO date after which submissions are rejected and the poll renders as closed. */
+	closesAt?: string | null
+}
+
+/**
  * Serializable shape `<Form>` expects, and what `toFormDocument` narrows a Payload-generated
  * document to. Framework-agnostic (no React, no 'use client') so it can be constructed and
  * consumed on the server, e.g. in a Server Component before handing it to the client `<Form>`.
@@ -30,4 +43,5 @@ export type FormDocument = {
 	flow?: FormFlow
 	response?: FormResponseSettings
 	display?: FormDisplaySettings
+	poll?: FormPollSettings
 }

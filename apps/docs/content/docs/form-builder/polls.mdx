@@ -40,9 +40,23 @@ Anonymous voters cannot read raw submissions, so public results are served as ag
 GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
 ```
 
-Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `showResults` toggle is on, only for its configured `resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
+Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `poll.enabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
 
-Set `resultsField` to a choice field, never free text or PII.
+Set `poll.resultsField` to a choice field, never free text or PII.
+
+On multi-tenant hosts, add the `results.access` plugin option: it runs for anonymous requests after the form is loaded and before anything is served, so you can compare the form's tenant against the request's and refuse cross-tenant reads. Authenticated callers bypass it:
+
+```ts
+formBuilder({
+  results: {
+    access: ({ req, form }) => form.tenant === tenantFromRequest(req),
+  },
+})
+```
+
+## Poll lifecycle
+
+The forms sidebar carries a `poll` group: `enabled`, `resultsField`, `resultsVisibility` (`afterVote` | `afterClose`), and an optional `closesAt`. Once `closesAt` passes, the server rejects new submissions for that form (submission-time guard, not just UI) and `<Poll>` renders a closed notice plus the results.
 
 ## Rendering results
 
@@ -58,7 +72,7 @@ import { FormResults } from '@10x-media/form-builder/react'
 
 ## `<Poll>`
 
-Renders `<Form>` until the visitor votes, then fetches and shows results. A per-browser localStorage flag skips straight to results on revisit:
+Renders `<Form>` while the poll is open and unvoted, then fetches and shows results. A per-browser localStorage flag skips straight to results on revisit; past `closesAt` it shows a closed notice plus results, and a voted-but-open `afterClose` poll shows a wait notice instead of fetching:
 
 ```tsx
 import { Poll } from '@10x-media/form-builder/react'
@@ -68,19 +82,18 @@ import { Poll } from '@10x-media/form-builder/react'
 
 The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/form-builder/spam) caps anonymous repeat voting per identity.
 
-For an SSR poll, aggregate server-side and choose what to render:
+## SSR voted state
+
+The plugin option `poll: { votedCookie: true }` sets an httpOnly `fb-voted-{formId}=1` cookie on every successful submission to a poll-enabled form. Being httpOnly it is invisible to client JS; read it server-side with `hasVotedCookie` and pass the result to `<Poll hasVoted>`:
 
 ```tsx title="app/poll/[id]/page.tsx"
-import { aggregateFieldResponses } from '@10x-media/form-builder'
-import { Form, FormResults } from '@10x-media/form-builder/react'
+import { hasVotedCookie, toFormDocument } from '@10x-media/form-builder/rsc'
+import { Poll } from '@10x-media/form-builder/react'
+import { headers } from 'next/headers'
 
 export default async function PollPage({ params }) {
   const form = await payload.findByID({ collection: 'forms', id: params.id })
-  const voted = (await cookies()).has(`voted-${form.id}`)
-  if (voted) {
-    const results = await aggregateFieldResponses({ payload, formId: form.id, field: 'colour' })
-    return <FormResults results={results ? [results] : []} />
-  }
-  return <Form form={form} />
+  const voted = hasVotedCookie((await headers()).get('cookie'), form.id)
+  return <Poll form={toFormDocument(form)} resultsField="colour" hasVoted={voted} />
 }
 ```

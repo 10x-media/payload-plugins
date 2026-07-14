@@ -10,6 +10,7 @@ import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `response` may be null; coerced to `undefined`
  * - `display` may be null; coerced to `undefined`
+ * - `poll` may be null; coerced to `undefined` (`resultsField` is dropped: server-side only)
  *
  * Pure and framework-agnostic (no 'use client'): safe to call from a Server Component or any
  * other server-side code before handing the result to the client `<Form>`.
@@ -29,12 +30,28 @@ export function toFormDocument(form: {
 		title?: string | null
 		intro?: unknown
 	} | null
+	poll?: {
+		enabled?: boolean | null
+		resultsVisibility?: string | null
+		closesAt?: string | null
+	} | null
 }): FormDocument {
+	const poll = form.poll
+		? {
+				enabled: form.poll.enabled ?? undefined,
+				resultsVisibility: (form.poll.resultsVisibility ?? undefined) as
+					| 'afterVote'
+					| 'afterClose'
+					| undefined,
+				closesAt: form.poll.closesAt ?? undefined,
+			}
+		: undefined
 	return {
 		id: form.id,
 		fields: (form.fields ?? []) as FormFieldInstance[],
 		flow: form.flow as FormFlow | undefined,
 		response: (form.response as FormResponseSettings | null | undefined) ?? undefined,
 		display: (form.display as FormDisplaySettings | null | undefined) ?? undefined,
+		poll,
 	}
 }
