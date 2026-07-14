@@ -195,4 +195,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.responseRedirect]: 'Redirect',
 	[keys.responseUrl]: 'URL',
 	[keys.responseSubmitLabel]: 'Submit button label',
+	[keys.tabDisplay]: 'Display',
+	[keys.displayShowTitle]: 'Show title',
+	[keys.displayTitle]: 'Display title',
+	[keys.displayIntro]: 'Intro',
 }

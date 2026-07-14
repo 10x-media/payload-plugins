@@ -253,13 +253,50 @@ export const buildFormsCollection = ({
 		],
 	}
 
+	// What the visitor sees above the fields, before submit. Its own tab mirrors `response`
+	// (the after-submit counterpart): both are visitor-facing content, not form behavior, so
+	// they don't belong inside the Fields tab. `showTitle` gates whether `title` renders at all
+	// (defaults to false: most forms rely on the host page's own heading and would otherwise
+	// double up); the admin input for `title` is shown only while `showTitle` is checked, and
+	// toggling it off hides the input but preserves the stored value, so it comes back with the
+	// checkbox. `intro` has no such gate: an empty rich text field already renders nothing, so a
+	// separate visibility flag would be redundant.
+	const displayField: Field = {
+		name: 'display',
+		type: 'group',
+		fields: [
+			{
+				name: 'showTitle',
+				type: 'checkbox',
+				defaultValue: false,
+				label: labelForKey(keys.displayShowTitle),
+			},
+			{
+				name: 'title',
+				type: 'text',
+				label: labelForKey(keys.displayTitle),
+				admin: { condition: (_data, siblingData) => Boolean(siblingData?.showTitle) },
+				...localizedIf(localizeContent),
+			},
+			{
+				name: 'intro',
+				type: 'richText',
+				label: labelForKey(keys.displayIntro),
+				...localizedIf(localizeContent),
+			},
+		],
+	}
+
 	const defaultFields: Field[] = [
 		{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
-		// Unnamed tabs are presentational only: fields/flow/actions/response stay at the document root.
+		// Unnamed tabs are presentational only: fields/flow/actions/response/display stay at the
+		// document root. Fields keeps default focus (authors spend their time there and showTitle
+		// defaults off); Display follows as the next visitor-facing concern.
 		{
 			type: 'tabs',
 			tabs: [
 				{ label: labelForKey(keys.tabFields), fields: [fieldsField] },
+				{ label: labelForKey(keys.tabDisplay), fields: [displayField] },
 				{ label: labelForKey(keys.tabFlow), fields: [flowField] },
 				{ label: labelForKey(keys.tabActions), fields: [actionsField] },
 				{ label: labelForKey(keys.tabResponse), fields: [responseField] },

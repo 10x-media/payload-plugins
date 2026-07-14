@@ -187,6 +187,10 @@ export const keys = {
 	responseRedirect: 'formBuilder:response.redirect',
 	responseUrl: 'formBuilder:response.url',
 	responseSubmitLabel: 'formBuilder:response.submitLabel',
+	tabDisplay: 'formBuilder:tab.display',
+	displayShowTitle: 'formBuilder:display.showTitle',
+	displayTitle: 'formBuilder:display.title',
+	displayIntro: 'formBuilder:display.intro',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -56,6 +56,14 @@ export type FormResponseSettings = {
 	submitLabel?: string | null
 }
 
+/** Serializable per-form display settings: what the visitor sees above the fields, before submit. */
+export type FormDisplaySettings = {
+	showTitle?: boolean
+	title?: string
+	/** Rich text state serialized via `serializeBody`; rendered above the fields when non-empty. */
+	intro?: unknown
+}
+
 export type FormDocument = {
 	id: number | string
 	fields: FormFieldInstance[]
@@ -63,6 +71,7 @@ export type FormDocument = {
 	/** Stored presentation name; overridden by the `presentation` prop. */
 	defaultPresentation?: string
 	response?: FormResponseSettings
+	display?: FormDisplaySettings
 }
 
 /** Props passed to `renderSubmit`. */
@@ -111,7 +120,11 @@ export type FormProps = {
 	presentations?: PresentationsConfig
 	/** Invoked when an overlay presentation dismisses (close button, Escape, outside click, or `dismissOnSuccess`). */
 	onClose?: () => void
-	/** Accessible name for an overlay surface. */
+	/**
+	 * Accessible name for an overlay surface (modal/drawer). Hosts choosing between a trigger
+	 * label and the form's own display title should prefer `form.display?.title` when
+	 * `form.display?.showTitle` is set, falling back to their own label otherwise.
+	 */
 	title?: string
 	/** Seed initial field values (e.g. from `valuesFromSearchParams`). Still validated on submit. */
 	initialValues?: Record<string, unknown>
@@ -671,6 +684,16 @@ export const Form = ({
 		(field) => field.hidden !== true && field.calcDisplay !== false
 	)
 
+	const displayTitleText =
+		form.display?.showTitle &&
+		typeof form.display.title === 'string' &&
+		form.display.title.length > 0
+			? interpolate(form.display.title, recall)
+			: undefined
+	const displayIntroHtml = form.display?.intro
+		? serializeBody(form.display.intro, { values: answeredValues(), descriptors: [] })
+		: ''
+
 	return (
 		<FormContext.Provider value={contextValue}>
 			{wrap(
@@ -682,6 +705,15 @@ export const Form = ({
 					data-fb-density={activePresentation.density}
 				>
 					{honeypotName ? <Honeypot name={honeypotName} inputRef={honeypotRef} /> : null}
+					{displayTitleText ? <h2 className="fb-form__title">{displayTitleText}</h2> : null}
+					{displayIntroHtml ? (
+						<div
+							className="fb-form__intro"
+							// Safe to inject: serializeBody HTML-escapes all text (recall values included) and sanitizes link URLs.
+							// biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is produced by our escaping serializer, never raw user input
+							dangerouslySetInnerHTML={{ __html: displayIntroHtml }}
+						/>
+					) : null}
 					<FormLayout enabled={layout !== false}>
 						{rendered.map((field) => {
 							const renderer = rendererRegistry.get(field.blockType)

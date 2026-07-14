@@ -2,7 +2,7 @@
 
 import type { FormFlow } from '../flow/types'
 import type { FormFieldInstance } from '../submissions/types'
-import type { FormDocument, FormResponseSettings } from './Form'
+import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './Form'
 
 /**
  * Narrows a Payload-generated form document (from `getPayload().findByID()` or `fetch`) to
@@ -12,6 +12,7 @@ import type { FormDocument, FormResponseSettings } from './Form'
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `defaultPresentation` may be null; coerced to `undefined`
  * - `response` may be null; coerced to `undefined`
+ * - `display` may be null; coerced to `undefined`
  */
 export function toFormDocument(form: {
 	id: number | string
@@ -24,6 +25,11 @@ export function toFormDocument(form: {
 		redirect?: { url?: string | null } | null
 		submitLabel?: string | null
 	} | null
+	display?: {
+		showTitle?: boolean | null
+		title?: string | null
+		intro?: unknown
+	} | null
 }): FormDocument {
 	return {
 		id: form.id,
@@ -31,5 +37,6 @@ export function toFormDocument(form: {
 		flow: form.flow as FormFlow | undefined,
 		defaultPresentation: form.defaultPresentation ?? undefined,
 		response: (form.response as FormResponseSettings | null | undefined) ?? undefined,
+		display: (form.display as FormDisplaySettings | null | undefined) ?? undefined,
 	}
 }

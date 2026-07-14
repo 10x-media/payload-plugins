@@ -25,6 +25,7 @@ export type { FieldRenderer, FieldRendererProps, RendererTranslate } from '../re
 export { defineFieldRenderer } from '../react/contract'
 export type {
 	BackButtonRenderProps,
+	FormDisplaySettings,
 	FormDocument,
 	FormProps,
 	FormResponseSettings,
