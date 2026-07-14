@@ -1,6 +1,7 @@
-import { defineConfig, devices } from '@playwright/test'
+// biome-ignore-all lint/plugin/noProcessEnv: e2e config env boundary
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { defineConfig, devices } from '@playwright/test'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -29,8 +30,7 @@ export default defineConfig({
 			DEV_DB: process.env.DEV_DB ?? 'mongo',
 			DATABASE_URI_MONGO:
 				'mongodb://localhost:37017/automations_e2e?replicaSet=rs0&directConnection=true',
-			DATABASE_URI_POSTGRES:
-				'postgres://e2e:e2e@localhost:35432/automations_e2e',
+			DATABASE_URI_POSTGRES: 'postgres://e2e:e2e@localhost:35432/automations_e2e',
 			PAYLOAD_SECRET: 'e2e-secret',
 		},
 	},

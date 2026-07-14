@@ -94,7 +94,9 @@
 		"react-dom": "^19.0.0"
 	},
 	"dependencies": {
-		"@standard-schema/spec": "^1.0.0"
+		"@payloadcms/email-nodemailer": "^3.86.0",
+		"@standard-schema/spec": "^1.0.0",
+		"nodemailer": "^9.0.3"
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",

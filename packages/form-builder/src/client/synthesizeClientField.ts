@@ -65,4 +65,5 @@ export const selectClientField = (operand: ConditionOperand): SelectFieldClient 
 		label: operand.label,
 		type: 'select',
 		options: operand.options ?? [],
+		admin: {},
 	}) as SelectFieldClient

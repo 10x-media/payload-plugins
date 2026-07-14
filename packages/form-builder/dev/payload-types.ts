@@ -709,7 +709,7 @@ export interface Form {
             placeholder?: string | null;
             description?: string | null;
             statement?: string | null;
-            source?: ('static' | 'pageReference') | null;
+            source?: ('static' | 'pageReference' | 'companyPolicies') | null;
             sourceConfig?: {
               label?: string | null;
               url?: string | null;
@@ -718,6 +718,9 @@ export interface Form {
               docId?: string | null;
               urlField?: string | null;
               captureVersion?: boolean | null;
+              policyLabel?: string | null;
+              policyUrl?: string | null;
+              policyVersion?: string | null;
             };
             optional?: boolean | null;
             validations?:
@@ -783,9 +786,8 @@ export interface Form {
                   | 'text/csv'
                   | 'application/zip'
                   | 'application/msword'
-                  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                   | 'application/vnd.ms-excel'
-                  | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                  | 'application/vnd.openxmlformats-officedocument.*'
                   | 'audio/*'
                   | 'video/*'
                 )[]
@@ -1372,7 +1374,7 @@ export interface Form {
                       placeholder?: string | null;
                       description?: string | null;
                       statement?: string | null;
-                      source?: ('static' | 'pageReference') | null;
+                      source?: ('static' | 'pageReference' | 'companyPolicies') | null;
                       sourceConfig?: {
                         label?: string | null;
                         url?: string | null;
@@ -1381,6 +1383,9 @@ export interface Form {
                         docId?: string | null;
                         urlField?: string | null;
                         captureVersion?: boolean | null;
+                        policyLabel?: string | null;
+                        policyUrl?: string | null;
+                        policyVersion?: string | null;
                       };
                       optional?: boolean | null;
                       validations?:
@@ -1446,9 +1451,8 @@ export interface Form {
                             | 'text/csv'
                             | 'application/zip'
                             | 'application/msword'
-                            | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                             | 'application/vnd.ms-excel'
-                            | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                            | 'application/vnd.openxmlformats-officedocument.*'
                             | 'audio/*'
                             | 'video/*'
                           )[]
@@ -1535,6 +1539,22 @@ export interface Form {
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
+                              }
+                            | {
+                                min: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'dateMin';
+                              }
+                            | {
+                                max: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'dateMax';
                               }
                           )[]
                         | null;
@@ -1645,6 +1665,22 @@ export interface Form {
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
                     }
+                  | {
+                      min: string;
+                      message?: string | null;
+                      severity?: ('error' | 'warning') | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'dateMin';
+                    }
+                  | {
+                      max: string;
+                      message?: string | null;
+                      severity?: ('error' | 'warning') | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'dateMax';
+                    }
                 )[]
               | null;
             validateWhen?:
@@ -1741,9 +1777,16 @@ export interface Form {
             blockName?: string | null;
             blockType: 'signedWebhook';
           }
+        | {
+            url: string;
+            method?: ('POST' | 'PUT') | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'forward';
+          }
       )[]
     | null;
-  defaultPresentation?: ('page' | 'inline' | 'modal' | 'drawer') | null;
+  defaultPresentation?: ('page' | 'inline' | 'modal' | 'drawer' | 'wizard') | null;
   showResults?: boolean | null;
   /**
    * Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.
@@ -2489,6 +2532,9 @@ export interface FormsSelect<T extends boolean = true> {
                     docId?: T;
                     urlField?: T;
                     captureVersion?: T;
+                    policyLabel?: T;
+                    policyUrl?: T;
+                    policyVersion?: T;
                   };
               optional?: T;
               validations?:
@@ -3038,6 +3084,9 @@ export interface FormsSelect<T extends boolean = true> {
                                 docId?: T;
                                 urlField?: T;
                                 captureVersion?: T;
+                                policyLabel?: T;
+                                policyUrl?: T;
+                                policyVersion?: T;
                               };
                           optional?: T;
                           validations?:
@@ -3153,6 +3202,24 @@ export interface FormsSelect<T extends boolean = true> {
                                       id?: T;
                                       blockName?: T;
                                     };
+                                dateMin?:
+                                  | T
+                                  | {
+                                      min?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                dateMax?:
+                                  | T
+                                  | {
+                                      max?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
                               };
                           validateWhen?: T;
                           visibleWhen?: T;
@@ -3235,6 +3302,24 @@ export interface FormsSelect<T extends boolean = true> {
                           id?: T;
                           blockName?: T;
                         };
+                    dateMin?:
+                      | T
+                      | {
+                          min?: T;
+                          message?: T;
+                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    dateMax?:
+                      | T
+                      | {
+                          max?: T;
+                          message?: T;
+                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
                   };
               validateWhen?: T;
               visibleWhen?: T;
@@ -3270,6 +3355,14 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               url?: T;
               secret?: T;
+              id?: T;
+              blockName?: T;
+            };
+        forward?:
+          | T
+          | {
+              url?: T;
+              method?: T;
               id?: T;
               blockName?: T;
             };
