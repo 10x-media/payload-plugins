@@ -19,7 +19,7 @@ import { noopEventSink } from '../events/noopSink'
 import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
-import type { FormFlow } from '../flow/types'
+import type { FormDisplaySettings, FormDocument, FormResponseSettings } from '../form/types'
 import {
 	DEFAULT_PRESENTATION_NAME,
 	defaultPresentationDescriptors,
@@ -49,31 +49,11 @@ import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitF
 import { useField } from './useField'
 import { validateFieldValue } from './validateField'
 
-/** Serializable per-form response settings: what the visitor gets after a successful submit. */
-export type FormResponseSettings = {
-	type?: 'message' | 'redirect' | null
-	/** Rich text state serialized via `serializeBody`; shown instead of the plain `successMessage`. */
-	message?: unknown
-	/** Applies on the custom-`children` path too (part of submit handling); `message`/`submitLabel` only affect default rendering. */
-	redirect?: { url?: string | null } | null
-	submitLabel?: string | null
-}
-
-/** Serializable per-form display settings: what the visitor sees above the fields, before submit. */
-export type FormDisplaySettings = {
-	showTitle?: boolean
-	title?: string
-	/** Rich text state serialized via `serializeBody`; rendered above the fields when non-empty. */
-	intro?: unknown
-}
-
-export type FormDocument = {
-	id: number | string
-	fields: FormFieldInstance[]
-	flow?: FormFlow
-	response?: FormResponseSettings
-	display?: FormDisplaySettings
-}
+// FormResponseSettings, FormDisplaySettings, and FormDocument live in `../form/types` (no
+// 'use client') so server code (e.g. `toFormDocument` in a Server Component) can use them
+// without pulling in this client module. Re-exported here so `./react` and existing `from
+// './Form'` imports keep working unchanged.
+export type { FormDisplaySettings, FormDocument, FormResponseSettings }
 
 /** Props passed to `renderSubmit`. */
 export type SubmitButtonRenderProps = {

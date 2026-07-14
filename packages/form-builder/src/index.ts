@@ -223,6 +223,8 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 } from './fields/types'
+export { toFormDocument } from './form/toFormDocument'
+export type { FormDisplaySettings, FormDocument, FormResponseSettings } from './form/types'
 export type { UploadsOption } from './plugin/uploadsCollection'
 export type { PrefillOptions } from './prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from './prefill/valuesFromSearchParams'

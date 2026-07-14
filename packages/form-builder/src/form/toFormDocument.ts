@@ -1,8 +1,6 @@
-'use client'
-
 import type { FormFlow } from '../flow/types'
 import type { FormFieldInstance } from '../submissions/types'
-import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './Form'
+import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './types'
 
 /**
  * Narrows a Payload-generated form document (from `getPayload().findByID()` or `fetch`) to
@@ -12,6 +10,9 @@ import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `response` may be null; coerced to `undefined`
  * - `display` may be null; coerced to `undefined`
+ *
+ * Pure and framework-agnostic (no 'use client'): safe to call from a Server Component or any
+ * other server-side code before handing the result to the client `<Form>`.
  */
 export function toFormDocument(form: {
 	id: number | string

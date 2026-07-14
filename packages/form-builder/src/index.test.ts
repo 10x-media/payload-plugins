@@ -74,4 +74,10 @@ describe('formBuilder factory', () => {
 		expect(typeof moduleExports.resolveFormResultsRequest).toBe('function')
 		expect(typeof moduleExports.fieldHasOptions).toBe('function')
 	})
+
+	it('exports toFormDocument from the root and maps a doc', async () => {
+		const moduleExports = await import('./index')
+		const doc = moduleExports.toFormDocument({ id: 1, fields: [] })
+		expect(doc).toEqual({ id: 1, fields: [] })
+	})
 })
