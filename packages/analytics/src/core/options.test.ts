@@ -34,10 +34,18 @@ describe('resolveOptions widgets.localizeText', () => {
 })
 
 describe('resolveOptions', () => {
-	it('fills cache TTL defaults', () => {
+	it('leaves cache TTL unset so the adapter recommendedTtl applies', () => {
 		const r = resolveOptions({ adapters: [memoryAdapter()] })
-		expect(r.cache.ttl.aggregate).toBeGreaterThan(0)
-		expect(r.cache.ttl.realtime).toBeGreaterThan(0)
+		expect(r.cache.ttl.aggregate).toBeUndefined()
+		expect(r.cache.ttl.realtime).toBeUndefined()
+	})
+	it('keeps an explicit cache TTL override', () => {
+		const r = resolveOptions({
+			adapters: [memoryAdapter()],
+			cache: { ttl: { aggregate: 1800, realtime: 30 } },
+		})
+		expect(r.cache.ttl.aggregate).toBe(1800)
+		expect(r.cache.ttl.realtime).toBe(30)
 	})
 	it('throws when no adapters are supplied', () => {
 		expect(() => resolveOptions({ adapters: [] })).toThrow(/at least one adapter/i)

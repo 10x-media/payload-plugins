@@ -1,6 +1,6 @@
 import type { Config, Field, Widget, WidgetWidth } from 'payload'
 import { type CapabilityRequirement, satisfiesCapabilities } from '../core/capabilities'
-import type { AnalyticsAdapter } from '../core/contract'
+import type { AnalyticsAdapter, MetricKey } from '../core/contract'
 import { dateRangeField } from '../fields/dateRange/field'
 import { TIMEFRAME_PRESETS } from '../timeframe/presets'
 import { en } from '../translations/en'
@@ -35,6 +35,23 @@ export const widgetIsSupported = (
 	adapters: AnalyticsAdapter[]
 ): boolean => !requires || adapters.some((a) => satisfiesCapabilities(a.capabilities, requires))
 
+/**
+ * Metric select options limited to metrics at least one configured adapter can serve,
+ * mirroring the OR-across-adapters gating used to hide whole widgets. `extra` layers on
+ * further requirements (a breakdown widget's dimension, realtime) so the picker never
+ * offers a metric the read path would report as unavailable.
+ */
+const metricOptions = (
+	candidates: MetricKey[],
+	args: RegisterWidgetsArgs,
+	extra?: Omit<CapabilityRequirement, 'metrics'>
+): { value: MetricKey; label: ReturnType<typeof labelForKey> }[] =>
+	candidates
+		.filter((m) =>
+			args.adapters.some((a) => satisfiesCapabilities(a.capabilities, { ...extra, metrics: [m] }))
+		)
+		.map((m) => ({ value: m, label: labelForKey(METRIC_KEYS[m]) }))
+
 const titleField = (args: RegisterWidgetsArgs, placeholder: string): Field => ({
 	name: 'title',
 	type: 'text',
@@ -52,7 +69,7 @@ const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 			required: true,
 			defaultValue: 'pageviews',
 			label: labelForKey(keys.widgetFieldMetric),
-			options: WIDGET_METRICS.map((m) => ({ value: m, label: labelForKey(METRIC_KEYS[m]) })),
+			options: metricOptions(WIDGET_METRICS, args),
 		},
 		{
 			name: 'timeframe',
@@ -99,7 +116,7 @@ const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): 
 			required: true,
 			defaultValue: 'pageviews',
 			label: labelForKey(keys.widgetFieldMetric),
-			options: WIDGET_METRICS.map((m) => ({ value: m, label: labelForKey(METRIC_KEYS[m]) })),
+			options: metricOptions(WIDGET_METRICS, args, { dimensions: [spec.dimension] }),
 		},
 		{
 			name: 'timeframe',
@@ -154,10 +171,7 @@ const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 			required: true,
 			defaultValue: 'visitors',
 			label: labelForKey(keys.widgetFieldMetric),
-			options: [
-				{ value: 'visitors', label: labelForKey(METRIC_KEYS.visitors) },
-				{ value: 'pageviews', label: labelForKey(METRIC_KEYS.pageviews) },
-			],
+			options: metricOptions(['visitors', 'pageviews'], args, { realtime: true }),
 		},
 		{
 			name: 'windowMinutes',

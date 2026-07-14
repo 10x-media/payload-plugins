@@ -93,6 +93,59 @@ describe('registerWidgets', () => {
 		expect(slugs).toContain('analytics-metric')
 	})
 
+	it('filters the metric select to metrics a configured adapter supports', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
+		const metricField = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'metric')
+		const values =
+			metricField && 'options' in metricField
+				? (metricField.options as { value: string }[]).map((o) => o.value)
+				: []
+		// native supports pageviews/visitors/sessions/events/avgDuration but not bounceRate.
+		expect(values).toContain('pageviews')
+		expect(values).toContain('events')
+		expect(values).not.toContain('bounceRate')
+	})
+
+	it('narrows a breakdown widget metric select by both metric and dimension support', () => {
+		// An adapter with the page dimension but only pageviews should offer only pageviews
+		// on the page breakdown.
+		const pagePageviews: AnalyticsAdapter = {
+			id: 'pp',
+			label: 'PP',
+			capabilities: {
+				...native().capabilities,
+				metrics: new Set<MetricKey>(['pageviews', 'events']),
+				dimensions: new Set<DimensionKey>(['page']),
+			},
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'pp', fetchedAt: '' } }),
+		}
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [pagePageviews],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
+		const metricField = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-breakdown-pages')
+			?.fields?.find((f) => 'name' in f && f.name === 'metric')
+		const values =
+			metricField && 'options' in metricField
+				? (metricField.options as { value: string }[]).map((o) => o.value)
+				: []
+		expect(values).toEqual(expect.arrayContaining(['pageviews', 'events']))
+		expect(values).not.toContain('visitors')
+	})
+
 	it('registers only the page breakdown when an adapter supports only the page dimension', () => {
 		const pageOnly: AnalyticsAdapter = {
 			id: 'pageonly',

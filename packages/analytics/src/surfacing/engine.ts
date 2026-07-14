@@ -25,7 +25,8 @@ const clampRange = (
 export interface EngineOptions {
 	store: CacheStore
 	queue: QueueOptions
-	ttl: { aggregate: number; realtime: number }
+	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
+	ttl: { aggregate?: number; realtime?: number }
 }
 
 export interface Engine {
@@ -56,7 +57,7 @@ export function createEngine(opts: EngineOptions): Engine {
 				const result: AnalyticsResult = clamped
 					? { ...fresh, meta: { ...fresh.meta, clamped: true } }
 					: fresh
-				const ttl = adapter.capabilities.recommendedTtl.aggregate || opts.ttl.aggregate
+				const ttl = opts.ttl.aggregate ?? adapter.capabilities.recommendedTtl.aggregate
 				await opts.store.set(key, result, ttl)
 				return result
 			})

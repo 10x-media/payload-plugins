@@ -78,6 +78,53 @@ describe('ga4 adapter', () => {
 		expect(result.meta.provider).toBe('ga4')
 	})
 
+	it('combines path and hostname into an andGroup dimension filter', async () => {
+		runReport.mockResolvedValue([
+			{
+				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
+				rows: [{ dimensionValues: [], metricValues: [{ value: '1' }] }],
+			},
+		])
+		await ga4(config).query(
+			q({ metrics: ['pageviews'], path: '/pricing', hostname: 'a.example.com' }),
+			{}
+		)
+		expect(sentRequest().dimensionFilter).toEqual({
+			andGroup: {
+				expressions: [
+					{
+						filter: {
+							fieldName: 'pagePath',
+							stringFilter: { matchType: 'EXACT', value: '/pricing' },
+						},
+					},
+					{
+						filter: {
+							fieldName: 'hostName',
+							stringFilter: { matchType: 'EXACT', value: 'a.example.com' },
+						},
+					},
+				],
+			},
+		})
+	})
+
+	it('filters by hostname alone as a single dimension filter', async () => {
+		runReport.mockResolvedValue([
+			{
+				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
+				rows: [{ dimensionValues: [], metricValues: [{ value: '1' }] }],
+			},
+		])
+		await ga4(config).query(q({ metrics: ['pageviews'], hostname: 'a.example.com' }), {})
+		expect(sentRequest().dimensionFilter).toEqual({
+			filter: {
+				fieldName: 'hostName',
+				stringFilter: { matchType: 'EXACT', value: 'a.example.com' },
+			},
+		})
+	})
+
 	it('converts the bounceRate ratio to a percentage', async () => {
 		runReport.mockResolvedValue([
 			{

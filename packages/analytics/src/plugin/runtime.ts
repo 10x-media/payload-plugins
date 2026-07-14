@@ -15,7 +15,8 @@ export interface AnalyticsRuntime {
 	platformRead?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 	bindings: Record<string, ResolvedBinding>
 	engine: Engine
-	ttl: { aggregate: number; realtime: number }
+	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
+	ttl: { aggregate?: number; realtime?: number }
 }
 
 /**

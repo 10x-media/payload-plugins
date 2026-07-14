@@ -14,14 +14,14 @@ analytics({
   adapters: [/* ... */],
   cache: {
     ttl: {
-      aggregate: 3600, // seconds; historical reads. Default 3600.
-      realtime: 300,   // seconds; realtime reads. Default 300.
+      aggregate: 3600, // seconds; historical reads.
+      realtime: 300,   // seconds; realtime reads.
     },
   },
 })
 ```
 
-Adapters recommend TTLs through their capabilities (GA4 suggests 6 hours because its quota is token-billed); the configured values apply across adapters.
+Each adapter recommends its own TTLs through its capabilities (GA4 suggests 6 hours because its quota is token-billed; the native engine suggests short TTLs because reads are local). Those recommendations are the default. A value you set in `cache.ttl` overrides the adapter recommendation for every adapter; leave a value unset to keep each adapter's own recommendation.
 
 ## Scheduled warming (opt-in)
 
