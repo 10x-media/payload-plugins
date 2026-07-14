@@ -1915,6 +1915,10 @@ export interface Form {
     resultsField?: string | null;
     resultsVisibility?: ('afterVote' | 'afterClose') | null;
     closesAt?: string | null;
+    outcome?: {
+      winningValue?: string | null;
+      resolvedAt?: string | null;
+    };
   };
   updatedAt: string;
   createdAt: string;
@@ -3541,6 +3545,12 @@ export interface FormsSelect<T extends boolean = true> {
         resultsField?: T;
         resultsVisibility?: T;
         closesAt?: T;
+        outcome?:
+          | T
+          | {
+              winningValue?: T;
+              resolvedAt?: T;
+            };
       };
   updatedAt?: T;
   createdAt?: T;

@@ -77,7 +77,11 @@ export const resolveFormResultsRequest = async (
 		}
 		if (access) {
 			// No req means the seam cannot be evaluated; fail closed rather than skip a configured gate.
-			const allowed = req ? await access({ req, form }) : false
+			// The concrete generated Form doc has no index signature; the seam's Record<string, unknown>
+			// is the ergonomic host-facing contract, so widen the doc to it here.
+			const allowed = req
+				? await access({ req, form: form as unknown as FormResultsAccessArgs['form'] })
+				: false
 			if (!allowed) {
 				return forbidden
 			}
