@@ -48,9 +48,12 @@ export type FormBuilderPluginOptions = {
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	actions?: ActionsConfig
 	/**
-	 * Customize how rich text action bodies are rendered. `converters` spread over the default
-	 * Lexical node converters; `serialize` replaces the whole pipeline (e.g. to target chat or
-	 * plain-text channels instead of email HTML).
+	 * Customize how rich text action bodies are authored and rendered. `editor` overrides the
+	 * Lexical/richText editor on both the emailTeam and confirmation action body fields.
+	 * `converters` spread over the default Lexical node converters; `serialize` replaces the
+	 * whole pipeline (e.g. to target chat or plain-text channels instead of email HTML). A
+	 * custom `serialize` receives the submitted `form` (id/title) and `req`, enabling per-tenant
+	 * lookups or handing the raw body off to a renderer like react-email.
 	 */
 	richText?: RichTextBodyOption
 	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
@@ -112,7 +115,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			options.consentSources
 		)
 		const actionRegistry = resolveActions(
-			buildDefaultActionDefinitions(localizeContent),
+			buildDefaultActionDefinitions(localizeContent, options.richText?.editor),
 			options.actions
 		)
 		const spam = resolveSpamConfig(options.spam)

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SubmissionValue } from '../../submissions/types'
 import { makeRenderBody } from '../body/serializeBody'
 import type { ActionRunArgs } from '../defineAction'
-import { emailTeam } from './emailTeam'
+import { buildEmailTeam, emailTeam } from './emailTeam'
 
 const form = { id: 'form-1', title: 'Test Form' }
 const submissionId = 'sub-1'
@@ -17,7 +17,7 @@ const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {
 		locale,
 		t,
 		descriptors: [],
-		renderBody: makeRenderBody({ values, descriptors: [] }),
+		renderBody: makeRenderBody({ values, descriptors: [], form }),
 		req: undefined,
 		...overrides,
 	} as ActionRunArgs<Record<string, unknown>>
@@ -104,5 +104,19 @@ describe('emailTeam', () => {
 				})
 			)
 		).rejects.toThrow('no email adapter')
+	})
+
+	const bodyFieldOf = (definition: ReturnType<typeof buildEmailTeam>) =>
+		definition.config?.find((field) => 'name' in field && field.name === 'body') as
+			| { editor?: unknown }
+			| undefined
+
+	it('omits editor from the body field by default', () => {
+		expect(bodyFieldOf(buildEmailTeam(true))?.editor).toBeUndefined()
+	})
+
+	it('spreads a custom editor onto the body field when given', () => {
+		const editor = { fake: 'editor' } as never
+		expect(bodyFieldOf(buildEmailTeam(true, editor))?.editor).toBe(editor)
 	})
 })

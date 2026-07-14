@@ -1,3 +1,4 @@
+import type { RichTextField } from 'payload'
 import type { AnyActionDefinition } from '../defineAction'
 import { buildConfirmation } from './confirmation'
 import { buildEmailTeam } from './emailTeam'
@@ -5,14 +6,16 @@ import { signedWebhook } from './signedWebhook'
 
 /**
  * Built-in action definitions with content-bearing config fields (email subjects and rich text
- * bodies) carrying `localized: true` when `localize` is true. `signedWebhook` has no content
- * fields and is shared static.
+ * bodies) carrying `localized: true` when `localize` is true. `editor`, when given, overrides
+ * the Lexical/richText editor on both action bodies (from the plugin's `richText.editor` option).
+ * `signedWebhook` has no content fields and is shared static.
  */
 export const buildDefaultActionDefinitions = (
-	localize: boolean
+	localize: boolean,
+	editor?: RichTextField['editor']
 ): Record<string, AnyActionDefinition> => ({
-	emailTeam: buildEmailTeam(localize) as AnyActionDefinition,
-	confirmation: buildConfirmation(localize) as AnyActionDefinition,
+	emailTeam: buildEmailTeam(localize, editor) as AnyActionDefinition,
+	confirmation: buildConfirmation(localize, editor) as AnyActionDefinition,
 	signedWebhook: signedWebhook as AnyActionDefinition,
 })
 

@@ -1,3 +1,4 @@
+import type { RichTextField } from 'payload'
 import { localizedIf } from '../../fields/localizedIf'
 import { interpolate } from '../../recall/interpolate'
 import { keys } from '../../translations/keys'
@@ -7,8 +8,11 @@ import { defineAction } from '../defineAction'
 
 type EmailTeamConfig = { to?: string; subject?: string; body?: unknown }
 
-/** `subject` and `body` are email content and follow `localize`; the `to` address never does. */
-export const buildEmailTeam = (localize: boolean) =>
+/**
+ * `subject` and `body` are email content and follow `localize`; the `to` address never does.
+ * `editor` overrides the body field's Lexical/richText editor (from the plugin's `richText.editor` option).
+ */
+export const buildEmailTeam = (localize: boolean, editor?: RichTextField['editor']) =>
 	defineAction<EmailTeamConfig>({
 		type: 'emailTeam',
 		label: keys.actionEmailTeam,
@@ -26,6 +30,7 @@ export const buildEmailTeam = (localize: boolean) =>
 				label: labelFor(keys.actionConfigBody),
 				admin: { description: labelFor(keys.actionConfigBodyDescription) },
 				...localizedIf(localize),
+				...(editor ? { editor } : {}),
 			},
 		],
 		run: async (args) => {

@@ -1,4 +1,4 @@
-import type { PayloadRequest } from 'payload'
+import type { PayloadRequest, RichTextField } from 'payload'
 import { fieldNamesOfType } from '../../fields/fieldNamesOfType'
 import { localizedIf } from '../../fields/localizedIf'
 import { interpolate } from '../../recall/interpolate'
@@ -29,8 +29,11 @@ export const validateToField = (
 		: asTranslate(req.t)(keys.validationEmailFieldUnknown)
 }
 
-/** `subject` and `body` are email content and follow `localize`; `toField` is an identifier and never does. */
-export const buildConfirmation = (localize: boolean) =>
+/**
+ * `subject` and `body` are email content and follow `localize`; `toField` is an identifier and never does.
+ * `editor` overrides the body field's Lexical/richText editor (from the plugin's `richText.editor` option).
+ */
+export const buildConfirmation = (localize: boolean, editor?: RichTextField['editor']) =>
 	defineAction<ConfirmationConfig>({
 		type: 'confirmation',
 		label: keys.actionConfirmation,
@@ -57,6 +60,7 @@ export const buildConfirmation = (localize: boolean) =>
 				label: labelFor(keys.actionConfigBody),
 				admin: { description: labelFor(keys.actionConfigBodyDescription) },
 				...localizedIf(localize),
+				...(editor ? { editor } : {}),
 			},
 		],
 		run: async (args) => {
