@@ -16,13 +16,32 @@ export default async function ContactPage() {
 
 ## What is in the box
 
-Editors compose forms from [fields](/form-builder/fields) authored as Payload blocks. Eleven types ship (text, textarea, email, number, date, select, checkbox, file, consent, calculation, repeater), all built through the same `defineFormField` primitive your custom types use, so nothing about the built-ins is privileged. Fields carry declarative [validation rules](/form-builder/validation) with custom messages, warning-versus-error severities, cross-field and async server-only rules, and a [Standard Schema](https://standardschema.dev) escape hatch. [Conditional logic](/form-builder/conditions) is expressed in Payload's own `Where` shape and evaluated by one isomorphic engine on client and server, and a serializable step graph turns any form into a [multi-step flow](/form-builder/multi-step) with conditional branching.
+Editors compose forms from [fields](/form-builder/fields) authored as Payload blocks. Eleven types ship (text, textarea, email, number, date, select, checkbox, file, consent, calculation, repeater), all built through the same `defineFormField` primitive your custom types use, so nothing about the built-ins is privileged.
 
-On the frontend, [`<Form>`](/form-builder/rendering) renders headless: progressive validation, lifecycle events, accessible primitives, swappable renderers, an optional layout grid. [Style it](/form-builder/styling) with CSS on stable class hooks, the shadcn registry, or your own components, and surface it as a page, inline block, modal, or drawer through [presentations](/form-builder/presentations). Accessibility is not left to the integrator: the defaults are verified by automated axe checks (jsdom and real-browser e2e), and custom renderers get a documented contract to uphold.
+### Authoring
 
-Around the submission itself: [recall and prefill](/form-builder/recall-prefill) pipe earlier answers into labels and seed values from URL parameters, [calculations](/form-builder/calculations) derive totals and quiz scores through a no-eval expression engine recomputed on the server, [consent](/form-builder/consent) is captured with proof by reference and policy-version capture, and [file uploads](/form-builder/uploads) ride a dedicated collection with server-enforced MIME and size limits. Stored submissions trigger [post-submit actions](/form-builder/actions) (email, confirmation, signed webhook, custom) through Payload jobs with a bounded inline fallback, and [polls and aggregation](/form-builder/polls) turn them into publishable results via a gated endpoint, `<FormResults>`, and a turnkey `<Poll>`.
+- [Fields](/form-builder/fields): eleven built-in block types, plus your own through `defineFormField`.
+- [Validation](/form-builder/validation): declarative rules with custom messages, warning-versus-error severities, cross-field and async server-only rules, and a [Standard Schema](https://standardschema.dev) escape hatch.
+- [Conditional logic](/form-builder/conditions): expressed in Payload's own `Where` shape, evaluated by one isomorphic engine on client and server.
+- [Multi-step flows](/form-builder/multi-step): a serializable step graph with conditional branching.
 
-[Spam protection](/form-builder/spam) is on by default: a honeypot decoy and per-identity rate limiting, bundled captcha adapters (Turnstile, reCAPTCHA, hCaptcha), upload-ownership scoping, and privacy-first metadata capture. Every admin string is a [typed translation](/form-builder/i18n) following the shared plugin pattern.
+### Frontend
+
+- [`<Form>`](/form-builder/rendering): headless rendering with progressive validation, lifecycle events, accessible primitives, swappable renderers, and an optional layout grid.
+- [Styling](/form-builder/styling): CSS on stable class hooks, the shadcn registry, or your own components.
+- [Presentations](/form-builder/presentations): surface a form as a page, inline block, modal, or drawer.
+- Accessibility: defaults verified by automated axe checks (jsdom and real-browser e2e); custom renderers get a documented contract to uphold.
+
+### Around the submission
+
+- [Recall and prefill](/form-builder/recall-prefill): pipe earlier answers into labels and seed values from URL parameters.
+- [Calculations](/form-builder/calculations): derive totals and quiz scores through a no-eval expression engine recomputed on the server.
+- [Consent](/form-builder/consent): captured with proof by reference and policy-version capture.
+- [File uploads](/form-builder/uploads): a dedicated collection with server-enforced MIME and size limits.
+- [Post-submit actions](/form-builder/actions): email, confirmation, signed webhook, or custom, run through Payload jobs with a bounded inline fallback.
+- [Polls and aggregation](/form-builder/polls): publishable results via a gated endpoint, `<FormResults>`, and a turnkey `<Poll>`.
+- [Spam protection](/form-builder/spam): honeypot, per-identity rate limiting, bundled captcha adapters (Turnstile, reCAPTCHA, hCaptcha), upload-ownership scoping, and privacy-first metadata capture, on by default.
+- [Typed translations](/form-builder/i18n): every admin string follows the shared plugin pattern.
 
 ## The trust model
 

@@ -45,7 +45,11 @@ const scoreQ1: CalcExpression = {
 
 ## Authoring in the admin
 
-Expressions are authored in the field's JSON config field. The field describes the node shapes inline and ships a JSON schema for the admin's Monaco editor, so authors get autocomplete and inline diagnostics while typing. Validity is enforced on save: an expression that does not normalize into a well-formed tree is rejected with a field error, so a broken calculation cannot reach the public form. A visual builder is planned.
+Expressions are authored in the field's JSON config field. The field describes the node shapes inline and ships a JSON schema for the admin's Monaco editor, so authors get autocomplete and inline diagnostics while typing. Validity is enforced on save: an expression that does not normalize into a well-formed tree is rejected with a field error, so a broken calculation cannot reach the public form.
+
+<Callout type="info">
+A visual expression builder is planned; expressions are authored as data today.
+</Callout>
 
 ## Totality and safety
 
