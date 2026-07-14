@@ -82,10 +82,8 @@ export default buildConfig({
 			},
 			translations: {
 				en: {
-					'formBuilder:pluginName': 'Custom Forms',
 					'formBuilder:validation.required': 'Gotta fill this in!',
 					'formBuilder:config.required': 'Is required?',
-					'formBuilder:results.title': 'Poll Results',
 					'formBuilder:results.responses': '{count} votes',
 					'formBuilder:results.noResponses': 'No votes yet — be the first!',
 					'formBuilder:submission.meta.receivedAt': 'Submitted',
