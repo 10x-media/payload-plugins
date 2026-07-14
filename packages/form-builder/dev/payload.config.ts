@@ -1,11 +1,11 @@
 // biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
 
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { buildConfig, type CollectionConfig } from 'payload'
 import {
 	defineCaptchaProvider,
@@ -61,7 +61,7 @@ export default buildConfig({
 					label: 'Date',
 					value: 'date',
 					validate: ({ value }) =>
-						value != null && isNaN(Date.parse(String(value))) ? 'Invalid date' : true,
+						value != null && Number.isNaN(Date.parse(String(value))) ? 'Invalid date' : true,
 					format: ({ value }) => (value ? new Date(String(value)).toLocaleDateString() : ''),
 				}) as FieldTypeOption,
 			},
@@ -74,7 +74,9 @@ export default buildConfig({
 				},
 			},
 			rules: {
+				// biome-ignore lint/style/noNonNullAssertion: array is defined inline above
 				dateMin: customRules[0]!,
+				// biome-ignore lint/style/noNonNullAssertion: array is defined inline above
 				dateMax: customRules[1]!,
 			},
 			actions: {

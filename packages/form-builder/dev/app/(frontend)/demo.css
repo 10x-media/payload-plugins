@@ -88,7 +88,7 @@
 	gap: 0.1rem;
 }
 
-.fb-form-root button[type='submit'],
+.fb-form-root button[type="submit"],
 .fb-form__controls button {
 	padding: 0.65rem 1.5rem;
 	font-size: 0.95rem;
@@ -99,20 +99,20 @@
 	transition: background 0.15s;
 }
 
-.fb-form-root button[type='submit']:disabled,
+.fb-form-root button[type="submit"]:disabled,
 .fb-form__controls button:disabled {
 	opacity: 0.6;
 	cursor: not-allowed;
 }
 
 /* Single-step submit */
-.fb-form-root > button[type='submit'] {
+.fb-form-root > button[type="submit"] {
 	background: #3b82f6;
 	color: #fff;
 	margin-top: 0.5rem;
 }
 
-.fb-form-root > button[type='submit']:hover:not(:disabled) {
+.fb-form-root > button[type="submit"]:hover:not(:disabled) {
 	background: #2563eb;
 }
 
@@ -124,24 +124,24 @@
 }
 
 /* Back button — always first */
-.fb-form__controls button[type='button']:first-child {
+.fb-form__controls button[type="button"]:first-child {
 	background: #f3f4f6;
 	color: #374151;
 }
 
-.fb-form__controls button[type='button']:first-child:hover:not(:disabled) {
+.fb-form__controls button[type="button"]:first-child:hover:not(:disabled) {
 	background: #e5e7eb;
 }
 
 /* Next / Submit (last button in controls) */
-.fb-form__controls button[type='submit'],
-.fb-form__controls button[type='button']:not(:first-child) {
+.fb-form__controls button[type="submit"],
+.fb-form__controls button[type="button"]:not(:first-child) {
 	background: #3b82f6;
 	color: #fff;
 }
 
-.fb-form__controls button[type='submit']:hover:not(:disabled),
-.fb-form__controls button[type='button']:not(:first-child):hover:not(:disabled) {
+.fb-form__controls button[type="submit"]:hover:not(:disabled),
+.fb-form__controls button[type="button"]:not(:first-child):hover:not(:disabled) {
 	background: #2563eb;
 }
 

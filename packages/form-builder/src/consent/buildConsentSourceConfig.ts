@@ -24,7 +24,8 @@ export const buildConsentSourceConfig = (registry: ConsentSourceRegistry): Field
 				...field,
 				admin: {
 					...existingAdmin,
-					condition: (_data, _sibling, { blockData }) => (blockData as Record<string, unknown>)?.source === source.type,
+					condition: (_data, _sibling, { blockData }) =>
+						(blockData as Record<string, unknown>)?.source === source.type,
 				},
 			} as Field
 		})

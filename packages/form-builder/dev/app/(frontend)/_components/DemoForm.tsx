@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin/noProcessEnv: dev frontend env boundary
 'use client'
 
 import {

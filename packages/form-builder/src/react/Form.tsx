@@ -41,7 +41,7 @@ import { type RenderersConfig, resolveRenderers } from './registry'
 import { defaultRenderers } from './renderers'
 import { buildFieldTypeRegistry, buildValidationRuleRegistry, visibleFields } from './resolveForm'
 import { type FieldErrors, type FormAction, formReducer, initialFormState } from './state'
-import { submitForm, type SubmitFormResult, type SubmitHandler } from './submitForm'
+import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitForm'
 import { useField } from './useField'
 import { validateFieldValue } from './validateField'
 
