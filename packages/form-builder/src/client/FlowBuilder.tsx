@@ -18,7 +18,17 @@ import type { ChangeEvent } from 'react'
 import { useMemo, useRef, useState } from 'react'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
+import { keys } from '../translations/keys'
+import { useTranslation } from '../translations/useTranslation'
+import { resolveMessage } from '../validation/message'
 import { ConditionBuilder } from './ConditionBuilder'
+import {
+	assignFieldToStep,
+	fieldHolders,
+	removeFieldFromStep,
+	stepLabel,
+	unassignedFields,
+} from './flowAuthoring'
 import type { FieldRow } from './synthesizeClientField'
 import { toStaticLabel } from './toStaticLabel'
 import './admin.css'
@@ -39,7 +49,7 @@ const extractFieldNames = (data: Record<string, unknown>): string[] => {
 
 type TransitionRowProps = {
 	transition: FlowTransition
-	stepIds: string[]
+	stepOptions: ReactSelectOption[]
 	conditionTypes: Record<string, ConditionFieldType>
 	isFirst: boolean
 	isLast: boolean
@@ -51,7 +61,7 @@ type TransitionRowProps = {
 
 const TransitionRow = ({
 	transition,
-	stepIds,
+	stepOptions,
 	conditionTypes,
 	isFirst,
 	isLast,
@@ -60,8 +70,6 @@ const TransitionRow = ({
 	onMoveUp,
 	onMoveDown,
 }: TransitionRowProps) => {
-	const toOptions: ReactSelectOption[] = stepIds.map((id) => ({ label: id, value: id }))
-
 	const handleGotoChange = (selected: ReactSelectOption | ReactSelectOption[]) => {
 		const chosen = Array.isArray(selected) ? selected[0] : selected
 		if (chosen) onChange({ ...transition, to: chosen.value as string })
@@ -73,8 +81,8 @@ const TransitionRow = ({
 				<span className="fb-flow-transition__label">go to</span>
 				<div className="fb-flow-transition__goto">
 					<ReactSelect
-						options={toOptions}
-						value={toOptions.find((o) => o.value === transition.to) ?? undefined}
+						options={stepOptions}
+						value={stepOptions.find((o) => o.value === transition.to) ?? undefined}
 						placeholder="Select step…"
 						isClearable={false}
 						onChange={handleGotoChange}
@@ -125,12 +133,15 @@ type StepCardProps = {
 	stepKey: string
 	stepIndex: number
 	stepCount: number
-	otherStepIds: string[]
+	otherStepOptions: ReactSelectOption[]
+	holders: Map<string, number>
+	stepLabels: string[]
 	fieldNames: string[]
 	conditionTypes: Record<string, ConditionFieldType>
 	isExpanded: boolean
 	onToggle: () => void
 	onChange: (next: FlowStep) => void
+	onToggleField: (name: string, checked: boolean) => void
 	onRemove: () => void
 	onMoveUp: () => void
 	onMoveDown: () => void
@@ -143,21 +154,26 @@ const StepCard = ({
 	stepKey,
 	stepIndex,
 	stepCount,
-	otherStepIds,
+	otherStepOptions,
+	holders,
+	stepLabels,
 	fieldNames,
 	conditionTypes,
 	isExpanded,
 	onToggle,
 	onChange,
+	onToggleField,
 	onRemove,
 	onMoveUp,
 	onMoveDown,
 	onAddAbove,
 	onAddBelow,
 }: StepCardProps) => {
+	const { t } = useTranslation()
+
 	const nextOptions: ReactSelectOption[] = [
-		{ label: '— terminal —', value: '' },
-		...otherStepIds.map((id) => ({ label: id, value: id })),
+		{ label: t(keys.flowNextTerminal), value: '' },
+		...otherStepOptions,
 	]
 
 	const transitions = step.transitions ?? []
@@ -171,8 +187,8 @@ const StepCard = ({
 	const tKeys = tKeysRef.current
 
 	const addTransition = () => {
-		const firstOtherStep = otherStepIds[0]
-		if (!firstOtherStep) return
+		const firstOtherStep = otherStepOptions[0]?.value as string | undefined
+		if (firstOtherStep === undefined) return
 		tKeysRef.current = [...tKeys, crypto.randomUUID()]
 		onChange({
 			...step,
@@ -209,12 +225,14 @@ const StepCard = ({
 		onChange({ ...step, next })
 	}
 
+	const title = step.title?.trim() ?? ''
+
 	const stepHeader = (
 		<div className="fb-flow-step__header-content">
-			<span className="fb-flow-step__index">Step {stepIndex + 1}</span>
-			<span className="fb-flow-step__id-preview">
-				{step.id.length > 0 ? step.id : <em>no id</em>}
+			<span className="fb-flow-step__index">
+				{resolveMessage(t(keys.flowStepFallbackTitle), { n: stepIndex + 1 })}
 			</span>
+			{title.length > 0 ? <span className="fb-flow-step__title">{title}</span> : null}
 		</div>
 	)
 
@@ -248,14 +266,6 @@ const StepCard = ({
 		>
 			<div className="fb-flow-step__body">
 				<TextInput
-					path={`fb-flow-step-${stepKey}-id`}
-					label="Step ID"
-					value={step.id}
-					placeholder="e.g. intro"
-					onChange={(e: ChangeEvent<HTMLInputElement>) => onChange({ ...step, id: e.target.value })}
-				/>
-
-				<TextInput
 					path={`fb-flow-step-${stepKey}-title`}
 					label="Title"
 					value={step.title ?? ''}
@@ -271,19 +281,30 @@ const StepCard = ({
 						<p className="fb-flow-step__hint">No fields defined on the form yet.</p>
 					) : (
 						<div className="fb-flow-step__field-picker">
-							{fieldNames.map((name) => (
-								<CheckboxInput
-									key={name}
-									label={name}
-									checked={step.fields.includes(name)}
-									onToggle={(e) => {
-										const fields = e.target.checked
-											? [...step.fields, name]
-											: step.fields.filter((f) => f !== name)
-										onChange({ ...step, fields })
-									}}
-								/>
-							))}
+							{fieldNames.map((name) => {
+								const holder = holders.get(name)
+								const inOtherStep = holder !== undefined && holder !== stepIndex
+								return (
+									<div key={name} className="fb-flow-step__field-option">
+										<CheckboxInput
+											label={name}
+											checked={step.fields.includes(name) || inOtherStep}
+											readOnly={inOtherStep}
+											onToggle={(e) => {
+												if (inOtherStep) return
+												onToggleField(name, e.target.checked)
+											}}
+										/>
+										{inOtherStep ? (
+											<span className="fb-flow-step__field-hint">
+												{resolveMessage(t(keys.flowFieldInStep), {
+													step: stepLabels[holder] ?? '',
+												})}
+											</span>
+										) : null}
+									</div>
+								)
+							})}
 						</div>
 					)}
 				</div>
@@ -314,7 +335,7 @@ const StepCard = ({
 							<TransitionRow
 								key={tKey}
 								transition={transition}
-								stepIds={otherStepIds}
+								stepOptions={otherStepOptions}
 								conditionTypes={conditionTypes}
 								isFirst={tIndex === 0}
 								isLast={tIndex === transitions.length - 1}
@@ -343,6 +364,7 @@ const StepCard = ({
 
 export const FlowBuilder = (props: FlowBuilderProps) => {
 	const { setValue, value } = useField<FormFlow | undefined>()
+	const { t } = useTranslation()
 	const label = toStaticLabel(props.field?.label ?? props.label)
 	const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
@@ -352,16 +374,22 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 	const fieldNames = useMemo(() => JSON.parse(fieldNamesJson) as string[], [fieldNamesJson])
 
 	const steps = value?.steps ?? []
-	const allStepIds = steps.map((s) => s.id).filter((id) => id.length > 0)
+	const fallbackTitle = t(keys.flowStepFallbackTitle)
+	const stepLabels = steps.map((step, index) => stepLabel(step, index, fallbackTitle))
+	const stepOptions: ReactSelectOption[] = steps
+		.map((step, index) => ({ label: stepLabels[index] ?? '', value: step.id }))
+		.filter((option) => (option.value as string).length > 0)
+	const holders = fieldHolders(steps)
+	const unassigned = unassignedFields(fieldNames, steps)
 
-	// Stable per-step keys, decoupled from the user-editable step.id. Reorder/insert/remove
-	// reconcile by identity so the focused Step ID input and each step's expand state stay with
-	// their step instead of jumping to whichever step now sits at that array position.
+	// Stable per-step React keys, independent of step ids. Reorder/insert/remove reconcile by
+	// identity so focused inputs and each step's expand state stay with their step instead of
+	// jumping to whichever step now sits at that array position.
 	const keysRef = useRef<string[]>([])
 	if (keysRef.current.length !== steps.length) {
 		keysRef.current = steps.map((_, i) => keysRef.current[i] ?? crypto.randomUUID())
 	}
-	const keys = keysRef.current
+	const stepKeys = keysRef.current
 
 	const toggleExpanded = (key: string) => {
 		setExpandedKeys((prev) => {
@@ -381,7 +409,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 		const key = crypto.randomUUID()
 		const nextSteps = [...steps]
 		nextSteps.splice(at, 0, { id: crypto.randomUUID(), fields: [] })
-		const nextKeys = [...keys]
+		const nextKeys = [...stepKeys]
 		nextKeys.splice(at, 0, key)
 		emit(nextSteps, nextKeys)
 		setExpandedKeys((prev) => new Set(prev).add(key))
@@ -392,15 +420,28 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 	const updateStep = (index: number, next: FlowStep) => {
 		emit(
 			steps.map((s, i) => (i === index ? next : s)),
-			keys
+			stepKeys
 		)
 	}
 
+	const toggleField = (stepIndex: number, name: string, checked: boolean) => {
+		const nextSteps = checked
+			? assignFieldToStep(steps, stepIndex, name)
+			: removeFieldFromStep(steps, stepIndex, name)
+		emit(nextSteps, stepKeys)
+	}
+
+	const assignUnassignedField = (name: string, stepId: string) => {
+		const targetIndex = steps.findIndex((s) => s.id === stepId)
+		if (targetIndex === -1) return
+		emit(assignFieldToStep(steps, targetIndex, name), stepKeys)
+	}
+
 	const removeStep = (index: number) => {
-		const removedKey = keys[index]
+		const removedKey = stepKeys[index]
 		emit(
 			steps.filter((_, i) => i !== index),
-			keys.filter((_, i) => i !== index)
+			stepKeys.filter((_, i) => i !== index)
 		)
 		if (removedKey !== undefined) {
 			setExpandedKeys((prev) => {
@@ -416,7 +457,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 		const [movedStep] = nextSteps.splice(from, 1)
 		if (movedStep === undefined) return
 		nextSteps.splice(to, 0, movedStep)
-		const nextKeys = [...keys]
+		const nextKeys = [...stepKeys]
 		const [movedKey] = nextKeys.splice(from, 1)
 		if (movedKey !== undefined) nextKeys.splice(to, 0, movedKey)
 		emit(nextSteps, nextKeys)
@@ -429,6 +470,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 					<h3>{typeof label === 'string' ? label : 'Flow'}</h3>
 				</div>
 			</div>
+			<p className="fb-flow-builder__description">{t(keys.flowDescription)}</p>
 			{steps.length === 0 ? (
 				<p className="fb-flow-builder__hint">
 					No steps defined. Add at least two steps to enable multi-page flow routing.
@@ -436,9 +478,9 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 			) : (
 				<div className="fb-flow-builder__steps">
 					{steps.map((step, index) => {
-						const key = keys[index]
+						const key = stepKeys[index]
 						if (key === undefined) return null
-						const otherStepIds = allStepIds.filter((id) => id !== step.id)
+						const otherStepOptions = stepOptions.filter((option) => option.value !== step.id)
 						return (
 							<StepCard
 								key={key}
@@ -446,12 +488,15 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 								step={step}
 								stepIndex={index}
 								stepCount={steps.length}
-								otherStepIds={otherStepIds}
+								otherStepOptions={otherStepOptions}
+								holders={holders}
+								stepLabels={stepLabels}
 								fieldNames={fieldNames}
 								conditionTypes={props.conditionTypes}
 								isExpanded={expandedKeys.has(key)}
 								onToggle={() => toggleExpanded(key)}
 								onChange={(next) => updateStep(index, next)}
+								onToggleField={(name, checked) => toggleField(index, name, checked)}
 								onRemove={() => removeStep(index)}
 								onMoveUp={() => moveStep(index, index - 1)}
 								onMoveDown={() => moveStep(index, index + 1)}
@@ -462,6 +507,29 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 					})}
 				</div>
 			)}
+			{steps.length > 0 && unassigned.length > 0 ? (
+				<div className="fb-flow-unassigned">
+					<FieldLabel label={t(keys.flowUnassigned)} />
+					<div className="fb-flow-unassigned__rows">
+						{unassigned.map((name) => (
+							<div key={name} className="fb-flow-unassigned__row">
+								<span className="fb-flow-unassigned__name">{name}</span>
+								<div className="fb-flow-unassigned__select">
+									<ReactSelect
+										options={stepOptions}
+										placeholder={t(keys.flowAssignToStep)}
+										isClearable={false}
+										onChange={(selected: ReactSelectOption | ReactSelectOption[]) => {
+											const chosen = Array.isArray(selected) ? selected[0] : selected
+											if (chosen) assignUnassignedField(name, chosen.value as string)
+										}}
+									/>
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			) : null}
 			<div className="fb-flow-builder__actions">
 				<Button
 					buttonStyle="icon-label"

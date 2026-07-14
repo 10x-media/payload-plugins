@@ -171,6 +171,12 @@ export const keys = {
 	submissionMetaIp: 'formBuilder:submission.meta.ip',
 	submissionMetaUserAgent: 'formBuilder:submission.meta.userAgent',
 	submissionMetaCaptcha: 'formBuilder:submission.meta.captcha',
+	flowDescription: 'formBuilder:flow.description',
+	flowStepFallbackTitle: 'formBuilder:flow.stepFallbackTitle',
+	flowFieldInStep: 'formBuilder:flow.fieldInStep',
+	flowUnassigned: 'formBuilder:flow.unassigned',
+	flowAssignToStep: 'formBuilder:flow.assignToStep',
+	flowNextTerminal: 'formBuilder:flow.nextTerminal',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

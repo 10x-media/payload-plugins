@@ -42,6 +42,47 @@ describe('normalizeFlow', () => {
 		)
 		expect(flow?.steps[0]?.transitions).toEqual([{ when: { name: { equals: 'y' } }, to: 'b' }])
 	})
+	it('keeps only the first occurrence of a field assigned to two steps', () => {
+		const flow = normalizeFlow(
+			{
+				steps: [
+					{ id: 'a', fields: ['name', 'email'], next: 'b' },
+					{ id: 'b', fields: ['email', 'x'] },
+				],
+			},
+			fieldNames
+		)
+		expect(flow?.steps[0]?.fields).toEqual(['name', 'email'])
+		expect(flow?.steps[1]?.fields).toEqual(['x'])
+	})
+	it('keeps only the first occurrence of a field assigned to three steps', () => {
+		const flow = normalizeFlow(
+			{
+				steps: [
+					{ id: 'a', fields: ['name'], next: 'b' },
+					{ id: 'b', fields: ['name', 'x'], next: 'c' },
+					{ id: 'c', fields: ['name'] },
+				],
+			},
+			fieldNames
+		)
+		expect(flow?.steps.map((s) => s.fields)).toEqual([['name'], ['x'], []])
+	})
+	it('leaves steps without duplicate fields unchanged', () => {
+		const flow = normalizeFlow(
+			{
+				steps: [
+					{ id: 'a', fields: ['name', 'x'], next: 'b' },
+					{ id: 'b', fields: ['email', 'y'] },
+				],
+			},
+			fieldNames
+		)
+		expect(flow?.steps.map((s) => s.fields)).toEqual([
+			['name', 'x'],
+			['email', 'y'],
+		])
+	})
 	it('drops a default next that points at an unknown step', () => {
 		const flow = normalizeFlow(
 			{

@@ -115,8 +115,7 @@ export const buildFormsCollection = ({
 						errors: [
 							{
 								path: 'flow',
-								message:
-									'A flow needs at least two steps with unique, non-empty IDs. Add another step or remove the flow.',
+								message: 'A flow needs at least two steps. Add another step or remove the flow.',
 							},
 						],
 					},
