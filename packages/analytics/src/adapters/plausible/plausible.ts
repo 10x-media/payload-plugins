@@ -94,6 +94,9 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			if (q.path) {
 				filters.push(['is', 'event:page', [q.path]])
 			}
+			if (q.hostname) {
+				filters.push(['is', 'event:hostname', [q.hostname]])
+			}
 
 			const readRow = (row: { metrics: number[] }): Partial<Record<MetricKey, number>> => {
 				const out: Partial<Record<MetricKey, number>> = {}

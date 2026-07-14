@@ -132,7 +132,11 @@ export interface ResolvedOptions {
 		resolve?: ProvidersResolve
 	}
 	bindings: Record<string, ResolvedBinding>
-	cache: { ttl: { aggregate: number; realtime: number }; warm: { enabled: boolean; cron: string } }
+	cache: {
+		/** Undefined when unset: adapter recommendedTtl is the fallback, an explicit value wins. */
+		ttl: { aggregate?: number; realtime?: number }
+		warm: { enabled: boolean; cron: string }
+	}
 	widgets: {
 		enabled: boolean
 		disabled: string[]
@@ -251,9 +255,11 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		providers,
 		bindings: resolveBindings(options.collections),
 		cache: {
+			// Left undefined when the app did not set them so the adapter's recommendedTtl
+			// applies as the default; an explicit value overrides the adapter recommendation.
 			ttl: {
-				aggregate: options.cache?.ttl?.aggregate ?? 3600,
-				realtime: options.cache?.ttl?.realtime ?? 300,
+				aggregate: options.cache?.ttl?.aggregate,
+				realtime: options.cache?.ttl?.realtime,
 			},
 			warm,
 		},

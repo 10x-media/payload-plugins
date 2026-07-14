@@ -39,7 +39,7 @@ export default buildConfig({
 | `analytics-breakdown-countries` | Countries. |
 | `analytics-realtime` | An "active now" count with a per-minute sparkline. |
 
-Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
+Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. The metric select lists only metrics a configured adapter can serve (a breakdown widget also requires its dimension), so you cannot pick a metric that would render "not available". A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
 
 The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoint every 15 seconds and registers only when a realtime-capable adapter (the native engine today) is configured.
 
