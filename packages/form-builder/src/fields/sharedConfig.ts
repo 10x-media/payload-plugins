@@ -26,29 +26,54 @@ const conditionField = (
  * submissions; `width` is stored for the layout grid. Field types add their own `config` after
  * these inside the Field tab (see `fieldBlockTabs`). Content-bearing fields (`label`,
  * `placeholder`, `description`) are localized unless `localize` is false; identifiers and
- * behavior flags never are.
+ * behavior flags never are. The rows below are presentational only (unnamed, data paths stay
+ * flat); `required` sits last, under `description`, per the admin layout.
  */
 export const sharedFieldConfig = (localize = true): Field[] => [
-	{ name: 'name', type: 'text', required: true, label: labelFor(keys.configName) },
-	{ name: 'label', type: 'text', label: labelFor(keys.configLabel), ...localizedIf(localize) },
-	{ name: 'required', type: 'checkbox', label: labelFor(keys.configRequired) },
 	{
-		name: 'width',
-		type: 'select',
-		defaultValue: 'full',
-		label: labelFor(keys.configWidth),
-		options: [
-			{ label: 'Full', value: 'full' },
-			{ label: 'Half', value: 'half' },
-			{ label: 'Third', value: 'third' },
-			{ label: 'Two thirds', value: 'twoThirds' },
+		type: 'row',
+		fields: [
+			{
+				name: 'name',
+				type: 'text',
+				required: true,
+				label: labelFor(keys.configName),
+				admin: { width: '50%' },
+			},
+			{
+				name: 'label',
+				type: 'text',
+				label: labelFor(keys.configLabel),
+				admin: { width: '50%' },
+				...localizedIf(localize),
+			},
 		],
 	},
 	{
-		name: 'placeholder',
-		type: 'text',
-		label: labelFor(keys.configPlaceholder),
-		...localizedIf(localize),
+		type: 'row',
+		fields: [
+			{
+				name: 'width',
+				type: 'select',
+				required: true,
+				defaultValue: 'full',
+				label: labelFor(keys.configWidth),
+				admin: { width: '50%', isClearable: false },
+				options: [
+					{ label: 'Full', value: 'full' },
+					{ label: 'Half', value: 'half' },
+					{ label: 'Third', value: 'third' },
+					{ label: 'Two thirds', value: 'twoThirds' },
+				],
+			},
+			{
+				name: 'placeholder',
+				type: 'text',
+				label: labelFor(keys.configPlaceholder),
+				admin: { width: '50%' },
+				...localizedIf(localize),
+			},
+		],
 	},
 	{
 		name: 'description',
@@ -56,6 +81,7 @@ export const sharedFieldConfig = (localize = true): Field[] => [
 		label: labelFor(keys.configDescription),
 		...localizedIf(localize),
 	},
+	{ name: 'required', type: 'checkbox', label: labelFor(keys.configRequired) },
 ]
 
 /**

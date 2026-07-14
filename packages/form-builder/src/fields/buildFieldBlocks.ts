@@ -9,11 +9,19 @@ import type { ValidationRuleRegistry } from '../validation/registry'
 import type { FieldTypeRegistry } from './registry'
 import { fieldBlockTabs } from './sharedConfig'
 
+/** Whether `fields` contains a field named `name`, descending into presentational rows. */
+const hasNameField = (fields: Field[]): boolean =>
+	fields.some((f) => {
+		if ('name' in f && f.name === 'name') {
+			return true
+		}
+		return f.type === 'row' && hasNameField(f.fields)
+	})
+
 /** The tab whose fields hold the shared basics and type config, found by the `name` field it carries. */
 const fieldTabOf = (block: Block): Field[] | undefined => {
 	const tabsField = block.fields.find((f): f is TabsField => f.type === 'tabs')
-	return tabsField?.tabs.find((tab) => tab.fields.some((f) => 'name' in f && f.name === 'name'))
-		?.fields
+	return tabsField?.tabs.find((tab) => hasNameField(tab.fields))?.fields
 }
 
 /**
