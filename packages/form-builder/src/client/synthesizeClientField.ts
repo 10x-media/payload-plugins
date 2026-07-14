@@ -24,7 +24,10 @@ export type ConditionOperand = {
 	options?: Option[]
 }
 
-/** Project a stored field row into a condition operand, or `null` when the row has no usable name. */
+/**
+ * Project a stored field row into a condition operand, or `null` when the row has no usable name or
+ * its type is absent from the condition-type map (not conditionable, e.g. a display-only message).
+ */
 export const operandFromRow = (
 	row: FieldRow,
 	conditionTypes: Record<string, ConditionFieldType>
@@ -33,7 +36,10 @@ export const operandFromRow = (
 	if (name.length === 0) {
 		return null
 	}
-	const conditionType = conditionTypes[row.blockType] ?? 'text'
+	const conditionType = conditionTypes[row.blockType]
+	if (!conditionType) {
+		return null
+	}
 	return {
 		name,
 		label: typeof row.label === 'string' && row.label.length > 0 ? row.label : name,

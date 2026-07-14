@@ -5,6 +5,7 @@ import { buildConsentField } from './consent'
 import { dateField } from './date'
 import { emailField } from './email'
 import { fileField } from './file'
+import { buildMessageField } from './message'
 import { numberField } from './number'
 import { buildRepeaterField } from './repeater'
 import { buildSelectField } from './select'
@@ -30,6 +31,7 @@ export const buildDefaultFieldDefinitions = (localize: boolean): AnyFormFieldDef
 	fileField as AnyFormFieldDefinition,
 	buildRepeaterField(localize) as AnyFormFieldDefinition,
 	dateField as AnyFormFieldDefinition,
+	buildMessageField(localize) as AnyFormFieldDefinition,
 ]
 
 export const defaultFieldDefinitions: AnyFormFieldDefinition[] = buildDefaultFieldDefinitions(true)

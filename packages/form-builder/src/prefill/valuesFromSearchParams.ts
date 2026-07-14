@@ -57,7 +57,8 @@ export const valuesFromSearchParams = (
 
 		const field = byName.get(fieldName)
 		const definition = field && registry.get(field.blockType)
-		if (!field || !definition) {
+		// 'none'-kind (display-only) fields carry no value, so a param under their name is ignored.
+		if (!field || !definition || definition.value === 'none') {
 			continue
 		}
 

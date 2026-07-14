@@ -1,5 +1,7 @@
 'use client'
 
+export type { BodyContext } from '../actions/body/serializeBody'
+export { serializeBody } from '../actions/body/serializeBody'
 export type { AggregationBucket, FieldAggregation } from '../aggregation/types'
 export { computeCalcFields } from '../calc/computeCalcFields'
 export { evaluateCalc } from '../calc/evaluate'
@@ -25,6 +27,7 @@ export type {
 	BackButtonRenderProps,
 	FormDocument,
 	FormProps,
+	FormResponseSettings,
 	NextButtonRenderProps,
 	SubmitButtonRenderProps,
 } from '../react/Form'
@@ -83,7 +86,7 @@ export { interpolate } from '../recall/interpolate'
 export type { RecallResolver } from '../recall/resolver'
 export { buildRecallResolver } from '../recall/resolver'
 export { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
-export type { FormFieldInstance } from '../submissions/types'
+export type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 export { en } from '../translations/en'
 export { makeTranslate } from '../translations/makeTranslate'
 export { formatBytes } from '../uploads/formatBytes'

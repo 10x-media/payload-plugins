@@ -27,6 +27,8 @@ export type FormContextValue = {
 	step: FormStepInfo
 	/** The active renderer registry, exposed so nested renderers (e.g. repeater) can look up sub-renderers. */
 	rendererRegistry: RendererRegistry
+	/** Calc-authoritative answers: `state.values` overlaid with derived calc values. Consumers fall back to `state.values` when absent. */
+	effectiveValues?: Record<string, unknown>
 }
 
 export const FormContext = createContext<FormContextValue | null>(null)

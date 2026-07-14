@@ -1,0 +1,127 @@
+import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import { afterAll, beforeAll, expect, it } from 'vitest'
+import { formBuilder } from '../../src/index'
+
+const lexical = (text: string) => ({
+	root: {
+		type: 'root',
+		children: [{ type: 'paragraph', children: [{ type: 'text', text }] }],
+	},
+})
+
+describeForDb('form-builder message field + response settings', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: formBuilder({}), db })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('round-trips a message-type response with rich text and submit label', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Response message',
+				fields: [{ blockType: 'text', name: 'name', label: 'Name' }],
+				response: {
+					type: 'message',
+					message: lexical('Thanks!'),
+					submitLabel: 'Send',
+				},
+			},
+		})
+		const response = form.response as {
+			type?: string
+			message?: unknown
+			submitLabel?: string
+		}
+		expect(response.type).toBe('message')
+		expect(response.message).toMatchObject(lexical('Thanks!'))
+		expect(response.submitLabel).toBe('Send')
+	})
+
+	it('round-trips a redirect-type response and validates the URL', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Response redirect',
+				fields: [{ blockType: 'text', name: 'name', label: 'Name' }],
+				response: {
+					type: 'redirect',
+					redirect: { url: 'https://example.com/thanks' },
+				},
+			},
+		})
+		expect((form.response as { redirect?: { url?: string } }).redirect?.url).toBe(
+			'https://example.com/thanks'
+		)
+
+		await expect(
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Bad redirect',
+					response: { type: 'redirect', redirect: { url: 'javascript:alert(1)' } },
+				},
+			})
+		).rejects.toThrow()
+	})
+
+	it('authors a message field block and stores its content', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Message block',
+				fields: [
+					{ blockType: 'text', name: 'first', label: 'First' },
+					{ blockType: 'message', name: 'note', content: lexical('Read me') },
+					{ blockType: 'text', name: 'last', label: 'Last' },
+				],
+			},
+		})
+		const note = (form.fields as { blockType: string; content?: unknown }[]).find(
+			(f) => f.blockType === 'message'
+		)
+		expect(note?.content).toMatchObject(lexical('Read me'))
+	})
+
+	it('a submission stores only the surrounding answers: no message key, no validation', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Message submission',
+				fields: [
+					{ blockType: 'text', name: 'first', label: 'First' },
+					{
+						blockType: 'message',
+						name: 'note',
+						required: true,
+						content: lexical('Between'),
+					},
+					{ blockType: 'text', name: 'last', label: 'Last' },
+				],
+			},
+		})
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			depth: 0,
+			data: {
+				form: form.id,
+				values: [
+					{ field: 'first', value: 'a' },
+					{ field: 'note', value: 'client-injected' },
+					{ field: 'last', value: 'b' },
+				],
+			},
+		})
+		expect(submission.values).toEqual([
+			{ field: 'first', value: 'a' },
+			{ field: 'last', value: 'b' },
+		])
+		const descriptors = submission.descriptors as { field: string }[]
+		expect(descriptors.map((d) => d.field)).toEqual(['first', 'last'])
+	})
+})

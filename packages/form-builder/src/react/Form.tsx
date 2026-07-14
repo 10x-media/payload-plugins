@@ -12,6 +12,7 @@ import {
 	useRef,
 	useState,
 } from 'react'
+import { serializeBody } from '../actions/body/serializeBody'
 import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
 import { noopEventSink } from '../events/noopSink'
@@ -45,12 +46,23 @@ import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitF
 import { useField } from './useField'
 import { validateFieldValue } from './validateField'
 
+/** Serializable per-form response settings: what the visitor gets after a successful submit. */
+export type FormResponseSettings = {
+	type?: 'message' | 'redirect' | null
+	/** Rich text state serialized via `serializeBody`; shown instead of the plain `successMessage`. */
+	message?: unknown
+	/** Applies on the custom-`children` path too (part of submit handling); `message`/`submitLabel` only affect default rendering. */
+	redirect?: { url?: string | null } | null
+	submitLabel?: string | null
+}
+
 export type FormDocument = {
 	id: number | string
 	fields: FormFieldInstance[]
 	flow?: FormFlow
 	/** Stored presentation name; overridden by the `presentation` prop. */
 	defaultPresentation?: string
+	response?: FormResponseSettings
 }
 
 /** Props passed to `renderSubmit`. */
@@ -86,6 +98,7 @@ export type FormProps = {
 	t?: RendererTranslate
 	locale?: string
 	layout?: boolean
+	/** Submit button label. Precedence: this prop, then the form's `response.submitLabel`, then `'Submit'`. */
 	submitLabel?: string
 	nextLabel?: string
 	backLabel?: string
@@ -189,7 +202,7 @@ export const Form = ({
 	t,
 	locale = 'en',
 	layout,
-	submitLabel = 'Submit',
+	submitLabel,
 	nextLabel = 'Next',
 	backLabel = 'Back',
 	closeLabel = 'Close',
@@ -230,6 +243,11 @@ export const Form = ({
 		[form.fields]
 	)
 	const translate = useMemo<RendererTranslate>(() => t ?? makeTranslate(en), [t])
+	const docSubmitLabel =
+		typeof form.response?.submitLabel === 'string' && form.response.submitLabel.length > 0
+			? form.response.submitLabel
+			: undefined
+	const resolvedSubmitLabel = submitLabel ?? docSubmitLabel ?? 'Submit'
 
 	// Latest-value refs so event emission and the mount/unmount effect tolerate an inline `events` prop or a changing form id.
 	const sinkRef = useRef<FormEventSink>(noopEventSink)
@@ -320,6 +338,14 @@ export const Form = ({
 	)
 
 	const visible = visibleFields(form.fields, effectiveValues)
+
+	/** Answered visible fields as submission values. Display-only ('none' kind) fields never contribute. */
+	const answeredValues = (): SubmissionValue[] =>
+		visibleFields(form.fields, effectiveValues)
+			.filter((field) => registry.get(field.blockType)?.value !== 'none')
+			.filter((field) => !isEmpty(effectiveValues[field.name]))
+			.map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
+
 	const stepNames = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
 	const stepVisible: FormFieldInstance[] = stepNames
 		.map((name) => visible.find((field) => field.name === name))
@@ -332,6 +358,7 @@ export const Form = ({
 		const results = await Promise.all(
 			stepVisible
 				.filter((field) => !calcExpressionOf(field))
+				.filter((field) => registry.get(field.blockType)?.value !== 'none')
 				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
 				.map(async (field) => ({
 					field,
@@ -416,9 +443,11 @@ export const Form = ({
 		const visible = visibleFields(form.fields, effectiveValues)
 		const results = await Promise.all(
 			// Calc fields carry no rules and have no input; they are always satisfied, so skip validating them.
+			// Display-only ('none' kind, e.g. message) fields are skipped too, mirroring the server.
 			// A field whose `validateWhen` is unmet is skipped too, mirroring the server (no client/server divergence).
 			visible
 				.filter((field) => !calcExpressionOf(field))
+				.filter((field) => registry.get(field.blockType)?.value !== 'none')
 				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
 				.map(async (field) => ({
 					field,
@@ -489,9 +518,7 @@ export const Form = ({
 			return
 		}
 		rawDispatch({ type: 'SUBMIT_START' })
-		const values: SubmissionValue[] = visible
-			.filter((field) => !isEmpty(effectiveValues[field.name]))
-			.map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
+		const values: SubmissionValue[] = answeredValues()
 		if (honeypotName) {
 			const decoy = honeypotRef.current?.value ?? ''
 			if (decoy !== '') {
@@ -515,6 +542,17 @@ export const Form = ({
 			onSuccess?.(result.submissionId)
 			if (activePresentation.dismissOnSuccess) {
 				handleClose()
+			}
+			const redirectUrl =
+				form.response?.type === 'redirect' ? form.response.redirect?.url : undefined
+			// Part of submit handling, not rendering: fires on the custom-`children` path too.
+			// Browser-only: no-op during SSR or in non-DOM test environments.
+			if (
+				typeof redirectUrl === 'string' &&
+				redirectUrl.length > 0 &&
+				typeof window !== 'undefined'
+			) {
+				window.location.assign(redirectUrl)
 			}
 		} else {
 			if (result.fieldErrors) {
@@ -548,7 +586,15 @@ export const Form = ({
 				goBack: () => {},
 			}
 
-	const contextValue = { state, dispatch, validateField, locale, step, rendererRegistry }
+	const contextValue = {
+		state,
+		dispatch,
+		validateField,
+		locale,
+		step,
+		rendererRegistry,
+		effectiveValues,
+	}
 
 	const PresentationWrapper = activePresentation.Wrapper
 	const wrap = (content: ReactNode): ReactNode =>
@@ -586,17 +632,36 @@ export const Form = ({
 	}
 
 	if (state.submitted) {
+		const responseMessage =
+			form.response?.type === 'message' || form.response?.type == null
+				? form.response?.message
+				: undefined
+		const responseHtml = responseMessage
+			? serializeBody(responseMessage, { values: answeredValues(), descriptors: [] })
+			: undefined
 		return (
 			<FormContext.Provider value={contextValue}>
 				{wrap(
-					<p
-						role="status"
-						className={cn('fb-form__success', className)}
-						data-fb-presentation={activePresentation.name}
-						data-fb-density={activePresentation.density}
-					>
-						{interpolate(successMessage, recall)}
-					</p>
+					responseHtml ? (
+						// Safe to inject: serializeBody HTML-escapes all text (recall values included) and sanitizes link URLs.
+						<div
+							role="status"
+							className={cn('fb-form__success', className)}
+							data-fb-presentation={activePresentation.name}
+							data-fb-density={activePresentation.density}
+							// biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is produced by our escaping serializer, never raw user input
+							dangerouslySetInnerHTML={{ __html: responseHtml }}
+						/>
+					) : (
+						<p
+							role="status"
+							className={cn('fb-form__success', className)}
+							data-fb-presentation={activePresentation.name}
+							data-fb-density={activePresentation.density}
+						>
+							{interpolate(successMessage, recall)}
+						</p>
+					)
 				)}
 			</FormContext.Provider>
 		)
@@ -673,14 +738,14 @@ export const Form = ({
 							) : null}
 							{step.isTerminal ? (
 								renderSubmit ? (
-									renderSubmit({ label: submitLabel, submitting: state.submitting })
+									renderSubmit({ label: resolvedSubmitLabel, submitting: state.submitting })
 								) : (
 									<button
 										type="submit"
 										className={submitButtonClassName}
 										disabled={state.submitting}
 									>
-										{submitLabel}
+										{resolvedSubmitLabel}
 									</button>
 								)
 							) : renderNext ? (
@@ -703,10 +768,10 @@ export const Form = ({
 							)}
 						</div>
 					) : renderSubmit ? (
-						renderSubmit({ label: submitLabel, submitting: state.submitting })
+						renderSubmit({ label: resolvedSubmitLabel, submitting: state.submitting })
 					) : (
 						<button type="submit" className={submitButtonClassName} disabled={state.submitting}>
-							{submitLabel}
+							{resolvedSubmitLabel}
 						</button>
 					)}
 				</form>

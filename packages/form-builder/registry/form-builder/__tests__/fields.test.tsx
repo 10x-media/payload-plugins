@@ -1,9 +1,10 @@
-import type { FieldRendererProps } from '@10x-media/form-builder/react'
+import { type FieldRendererProps, Form } from '@10x-media/form-builder/react'
 import { cleanup, fireEvent, render, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { checkboxField } from '../fields/checkbox-field'
 import { emailField } from '../fields/email-field'
+import { messageField } from '../fields/message-field'
 import { numberField } from '../fields/number-field'
 import { selectField } from '../fields/select-field'
 import { textField } from '../fields/text-field'
@@ -134,5 +135,22 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		)
 		fireEvent.click(within(container).getByRole('checkbox'))
 		expect(onChange).toHaveBeenCalledWith(true)
+	})
+
+	it('message: renders serialized rich text inline within a form', () => {
+		const content = {
+			root: {
+				type: 'root',
+				children: [{ type: 'paragraph', children: [{ type: 'text', text: 'Read me' }] }],
+			},
+		}
+		const { container } = render(
+			<Form
+				form={{ id: 1, fields: [{ blockType: 'message', name: 'note', content }] }}
+				onSubmit={vi.fn()}
+				renderers={{ message: messageField }}
+			/>
+		)
+		expect(within(container).getByText('Read me')).toBeInTheDocument()
 	})
 })

@@ -125,8 +125,10 @@ export type RunSubmissionResult = {
  * (conditions, validation, storage). Conditions gate the second pass against these effective answers: a
  * field whose `visibleWhen` is false is skipped entirely (never validated, never stored, so a client-sent
  * value for it is ignored), and a visible field whose `validateWhen` is false stores its value but skips
- * validation. A visible calc field stores its derived value and is never validated. Only `error` severity
- * blocks; warnings are computed but not surfaced server-side (the renderer surfaces them).
+ * validation. A visible calc field stores its derived value and is never validated. Display-only field
+ * types (value kind 'none', e.g. message) are skipped in both passes: never validated, never stored, and
+ * a client-sent value under their name is dropped. Only `error` severity blocks; warnings are computed
+ * but not surfaced server-side (the renderer surfaces them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
 	const {
@@ -152,7 +154,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		const definition = registry.get(instance.blockType)
 		const raw = incoming.get(instance.name)
 		// Never seed a calc field's client value: its value is derived below, so the client cannot influence it (even for a self-referencing expression).
-		if (!definition || calcExpressionOf(instance)) {
+		// A display-only ('none' kind) field carries no value at all, so a client-sent value under its name is dropped here.
+		if (!definition || definition.value === 'none' || calcExpressionOf(instance)) {
 			continue
 		}
 		// A consent field's "not agreed" state is semantically meaningful: treat a missing value as
@@ -185,7 +188,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 
 	for (const instance of fields) {
 		const definition = registry.get(instance.blockType)
-		if (!definition) {
+		// A 'none'-kind (display-only) field is never validated and never stored: no value, no descriptor.
+		if (!definition || definition.value === 'none') {
 			continue
 		}
 		const raw = incoming.get(instance.name)

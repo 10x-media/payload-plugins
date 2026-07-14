@@ -13,6 +13,7 @@ import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
+import { localizedIf } from '../fields/localizedIf'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
 import { isLoggedIn } from '../plugin/access'
@@ -25,6 +26,7 @@ import type { PresentationDescriptorRegistry } from '../presentations/registry'
 import { keys } from '../translations/keys'
 import { labelFor, labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
+import { validateUrl } from '../validation/validateUrl'
 
 export const FORMS_SLUG = 'forms'
 
@@ -199,15 +201,68 @@ export const buildFormsCollection = ({
 		access: { read: isLoggedIn },
 	}
 
+	// What the visitor sees after a successful submit. Publicly readable (unlike actions): the
+	// client renderer needs message/redirect/submitLabel. `type`/`url` are behavior, never
+	// localized; `message`/`submitLabel` are visitor-facing content and follow `localizeContent`.
+	// `type` is defaulted and not clearable rather than `required`: a required member would make
+	// the whole group required in generated types, breaking typed `payload.create` calls that
+	// omit `response`. Consumers treat a missing type as 'message'.
+	const responseField: Field = {
+		name: 'response',
+		type: 'group',
+		fields: [
+			{
+				name: 'type',
+				type: 'select',
+				defaultValue: 'message',
+				label: labelForKey(keys.responseType),
+				admin: { isClearable: false },
+				options: [
+					{ label: labelForKey(keys.responseTypeMessage), value: 'message' },
+					{ label: labelForKey(keys.responseTypeRedirect), value: 'redirect' },
+				],
+			},
+			{
+				name: 'message',
+				type: 'richText',
+				label: labelForKey(keys.responseMessage),
+				// Unset type (docs predating this field) means 'message', matching the client fallback.
+				admin: { condition: (_data, siblingData) => siblingData?.type !== 'redirect' },
+				...localizedIf(localizeContent),
+			},
+			{
+				name: 'redirect',
+				type: 'group',
+				label: labelForKey(keys.responseRedirect),
+				admin: { condition: (_data, siblingData) => siblingData?.type === 'redirect' },
+				fields: [
+					{
+						name: 'url',
+						type: 'text',
+						label: labelForKey(keys.responseUrl),
+						validate: validateUrl,
+					},
+				],
+			},
+			{
+				name: 'submitLabel',
+				type: 'text',
+				label: labelForKey(keys.responseSubmitLabel),
+				...localizedIf(localizeContent),
+			},
+		],
+	}
+
 	const defaultFields: Field[] = [
 		{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
-		// Unnamed tabs are presentational only: fields/flow/actions stay at the document root.
+		// Unnamed tabs are presentational only: fields/flow/actions/response stay at the document root.
 		{
 			type: 'tabs',
 			tabs: [
 				{ label: labelForKey(keys.tabFields), fields: [fieldsField] },
 				{ label: labelForKey(keys.tabFlow), fields: [flowField] },
 				{ label: labelForKey(keys.tabActions), fields: [actionsField] },
+				{ label: labelForKey(keys.tabResponse), fields: [responseField] },
 			],
 		},
 		{

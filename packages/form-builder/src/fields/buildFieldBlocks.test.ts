@@ -40,6 +40,7 @@ describe('buildFieldBlocks', () => {
 			'file',
 			'repeater',
 			'date',
+			'message',
 		])
 	})
 

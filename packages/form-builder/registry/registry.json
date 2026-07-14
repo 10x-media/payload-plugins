@@ -56,6 +56,11 @@
 					"path": "form-builder/fields/file-field.tsx",
 					"type": "registry:component",
 					"target": "components/form-builder/fields/file-field.tsx"
+				},
+				{
+					"path": "form-builder/fields/message-field.tsx",
+					"type": "registry:component",
+					"target": "components/form-builder/fields/message-field.tsx"
 				}
 			]
 		},

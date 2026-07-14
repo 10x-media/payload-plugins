@@ -4,6 +4,7 @@ import type { FieldRenderer, RenderersConfig } from '@10x-media/form-builder/rea
 import { checkboxField } from './fields/checkbox-field'
 import { emailField } from './fields/email-field'
 import { fileField } from './fields/file-field'
+import { messageField } from './fields/message-field'
 import { numberField } from './fields/number-field'
 import { selectField } from './fields/select-field'
 import { textField } from './fields/text-field'
@@ -18,4 +19,5 @@ export const shadcnRenderers: RenderersConfig = {
 	select: selectField as FieldRenderer,
 	checkbox: checkboxField as FieldRenderer,
 	file: fileField as FieldRenderer,
+	message: messageField as FieldRenderer,
 }

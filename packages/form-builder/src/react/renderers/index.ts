@@ -5,6 +5,7 @@ import { consentRenderer } from './consent'
 import { dateRenderer } from './date'
 import { emailRenderer } from './email'
 import { fileRenderer } from './file'
+import { messageRenderer } from './message'
 import { numberRenderer } from './number'
 import { repeaterRenderer } from './repeater'
 import { selectRenderer } from './select'
@@ -19,6 +20,7 @@ export const defaultRenderers: Record<string, FieldRenderer> = {
 	date: dateRenderer as FieldRenderer,
 	email: emailRenderer as FieldRenderer,
 	file: fileRenderer as FieldRenderer,
+	message: messageRenderer as FieldRenderer,
 	number: numberRenderer as FieldRenderer,
 	repeater: repeaterRenderer as FieldRenderer,
 	select: selectRenderer as FieldRenderer,

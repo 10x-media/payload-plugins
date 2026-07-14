@@ -177,6 +177,16 @@ export const keys = {
 	flowUnassigned: 'formBuilder:flow.unassigned',
 	flowAssignToStep: 'formBuilder:flow.assignToStep',
 	flowNextTerminal: 'formBuilder:flow.nextTerminal',
+	fieldTypeMessage: 'formBuilder:fieldType.message',
+	configContent: 'formBuilder:config.content',
+	tabResponse: 'formBuilder:tab.response',
+	responseType: 'formBuilder:response.type',
+	responseTypeMessage: 'formBuilder:response.type.message',
+	responseTypeRedirect: 'formBuilder:response.type.redirect',
+	responseMessage: 'formBuilder:response.message',
+	responseRedirect: 'formBuilder:response.redirect',
+	responseUrl: 'formBuilder:response.url',
+	responseSubmitLabel: 'formBuilder:response.submitLabel',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
