@@ -93,7 +93,6 @@ export const keys = {
 	configExpressionDescription: 'formBuilder:config.expressionDescription',
 	configCalcDisplay: 'formBuilder:config.calcDisplay',
 	validationCalcExpressionInvalid: 'formBuilder:validation.calcExpressionInvalid',
-	configDefaultPresentation: 'formBuilder:config.defaultPresentation',
 	presentationPage: 'formBuilder:presentation.page',
 	presentationModal: 'formBuilder:presentation.modal',
 	presentationDrawer: 'formBuilder:presentation.drawer',

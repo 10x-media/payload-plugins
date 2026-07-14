@@ -7,7 +7,6 @@ import { buildFormsCollection } from '../collections/forms'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
-import type { PresentationDescriptorRegistry } from '../presentations/registry'
 import type { ResolvedSpamConfig } from '../spam/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import type { CollectionOverrides } from './collectionOverrides'
@@ -18,7 +17,6 @@ type RegisterCollectionsArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
 	consentRegistry: ConsentSourceRegistry
-	presentationRegistry: PresentationDescriptorRegistry
 	actionRegistry: ActionRegistry
 	richText?: RichTextBodyOption
 	hasJobsPlugin: boolean
@@ -38,7 +36,6 @@ export const registerCollections = ({
 	registry,
 	ruleRegistry,
 	consentRegistry,
-	presentationRegistry,
 	actionRegistry,
 	richText,
 	hasJobsPlugin,
@@ -63,7 +60,6 @@ export const registerCollections = ({
 			registry,
 			ruleRegistry,
 			consentRegistry,
-			presentationRegistry,
 			actionRegistry,
 			localizeContent,
 			uploadsCollectionSlug: uploadSlug,

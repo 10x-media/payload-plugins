@@ -13,9 +13,6 @@ import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 import type { UploadsOption } from './plugin/uploadsCollection'
-import { defaultPresentationDescriptors } from './presentations/defaults'
-import type { PresentationsDescriptorConfig } from './presentations/registry'
-import { resolvePresentationDescriptors } from './presentations/registry'
 import { resolveSpamConfig } from './spam/resolveSpam'
 import type { SpamOption } from './spam/types'
 import type { TranslationsOption } from './translations'
@@ -46,8 +43,6 @@ export type FormBuilderPluginOptions = {
 	localizeContent?: boolean
 	/** Add, override, or remove field types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	fields?: FieldTypesConfig
-	/** Add, override, or remove presentations. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
-	presentations?: PresentationsDescriptorConfig
 	/** Add, override, or remove validation rule types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	rules?: ValidationRulesConfig
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
@@ -116,10 +111,6 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			buildDefaultConsentSources(localizeContent),
 			options.consentSources
 		)
-		const presentationRegistry = resolvePresentationDescriptors(
-			defaultPresentationDescriptors,
-			options.presentations
-		)
 		const actionRegistry = resolveActions(
 			buildDefaultActionDefinitions(localizeContent),
 			options.actions
@@ -131,7 +122,6 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			registry,
 			ruleRegistry,
 			consentRegistry,
-			presentationRegistry,
 			actionRegistry,
 			richText: options.richText,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
@@ -234,12 +224,6 @@ export type { UploadsOption } from './plugin/uploadsCollection'
 export type { PrefillOptions } from './prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from './prefill/valuesFromSearchParams'
 export { DEFAULT_PRESENTATION_NAME, defaultPresentationDescriptors } from './presentations/defaults'
-export type {
-	PresentationDescriptorOption,
-	PresentationDescriptorRegistry,
-	PresentationsDescriptorConfig,
-} from './presentations/registry'
-export { resolvePresentationDescriptors } from './presentations/registry'
 export type {
 	PresentationDensity,
 	PresentationDescriptor,

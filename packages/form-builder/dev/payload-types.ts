@@ -1910,7 +1910,6 @@ export interface Form {
     };
     submitLabel?: string | null;
   };
-  defaultPresentation?: ('page' | 'inline' | 'modal' | 'drawer') | null;
   showResults?: boolean | null;
   /**
    * Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.
@@ -3534,7 +3533,6 @@ export interface FormsSelect<T extends boolean = true> {
             };
         submitLabel?: T;
       };
-  defaultPresentation?: T;
   showResults?: T;
   resultsField?: T;
   updatedAt?: T;

@@ -10,7 +10,6 @@ import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './
  * the auto-generated collection types and what `<Form>` expects:
  * - `fields` may be a typed blocks-union array or null; normalized to `FormFieldInstance[]`
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
- * - `defaultPresentation` may be null; coerced to `undefined`
  * - `response` may be null; coerced to `undefined`
  * - `display` may be null; coerced to `undefined`
  */
@@ -18,7 +17,6 @@ export function toFormDocument(form: {
 	id: number | string
 	fields?: { blockType: string; name: string; [key: string]: unknown }[] | null
 	flow?: unknown
-	defaultPresentation?: string | null
 	response?: {
 		type?: string | null
 		message?: unknown
@@ -35,7 +33,6 @@ export function toFormDocument(form: {
 		id: form.id,
 		fields: (form.fields ?? []) as FormFieldInstance[],
 		flow: form.flow as FormFlow | undefined,
-		defaultPresentation: form.defaultPresentation ?? undefined,
 		response: (form.response as FormResponseSettings | null | undefined) ?? undefined,
 		display: (form.display as FormDisplaySettings | null | undefined) ?? undefined,
 	}

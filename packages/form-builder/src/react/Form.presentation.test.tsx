@@ -38,10 +38,11 @@ describe('Form presentations', () => {
 		expect(container.querySelector('[data-fb-presentation="page"]')).not.toBeNull()
 	})
 
-	it('wraps the form in a dialog for a modal default', () => {
+	it('wraps the form in a dialog for a modal presentation', () => {
 		render(
 			<Form
-				form={doc([oneTextField], { defaultPresentation: 'modal' })}
+				form={doc([oneTextField])}
+				presentation="modal"
 				onSubmit={vi.fn().mockResolvedValue({ ok: true })}
 			/>
 		)
@@ -54,7 +55,8 @@ describe('Form presentations', () => {
 	it('uses a custom closeLabel for the overlay close control', () => {
 		render(
 			<Form
-				form={doc([oneTextField], { defaultPresentation: 'modal' })}
+				form={doc([oneTextField])}
+				presentation="modal"
 				closeLabel="Dismiss"
 				onSubmit={vi.fn().mockResolvedValue({ ok: true })}
 			/>
@@ -63,22 +65,12 @@ describe('Form presentations', () => {
 		expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
 	})
 
-	it('lets the presentation prop override the stored default', () => {
-		render(
-			<Form
-				form={doc([oneTextField], { defaultPresentation: 'page' })}
-				presentation="modal"
-				onSubmit={vi.fn().mockResolvedValue({ ok: true })}
-			/>
-		)
-		expect(screen.getByRole('dialog')).toBeInTheDocument()
-	})
-
 	it('fires onClose on Escape for an overlay', () => {
 		const onClose = vi.fn()
 		render(
 			<Form
-				form={doc([oneTextField], { defaultPresentation: 'modal' })}
+				form={doc([oneTextField])}
+				presentation="modal"
 				onClose={onClose}
 				onSubmit={vi.fn().mockResolvedValue({ ok: true })}
 			/>
@@ -91,7 +83,8 @@ describe('Form presentations', () => {
 		const onClose = vi.fn()
 		render(
 			<Form
-				form={doc([oneTextField], { defaultPresentation: 'modal' })}
+				form={doc([oneTextField])}
+				presentation="modal"
 				onClose={onClose}
 				onSubmit={vi.fn().mockResolvedValue({ ok: true, submissionId: '1' })}
 			/>
@@ -105,7 +98,8 @@ describe('Form presentations', () => {
 	it('renders multi-step controls inside a modal', () => {
 		render(
 			<Form
-				form={doc(linearFields, { defaultPresentation: 'modal', flow: linearFlow })}
+				form={doc(linearFields, { flow: linearFlow })}
+				presentation="modal"
 				onSubmit={vi.fn()}
 			/>
 		)

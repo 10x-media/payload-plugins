@@ -20,7 +20,10 @@ import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
 import type { FormFlow } from '../flow/types'
-import { defaultPresentationDescriptors } from '../presentations/defaults'
+import {
+	DEFAULT_PRESENTATION_NAME,
+	defaultPresentationDescriptors,
+} from '../presentations/defaults'
 import { interpolate } from '../recall/interpolate'
 import { buildRecallResolver } from '../recall/resolver'
 import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
@@ -68,8 +71,6 @@ export type FormDocument = {
 	id: number | string
 	fields: FormFieldInstance[]
 	flow?: FormFlow
-	/** Stored presentation name; overridden by the `presentation` prop. */
-	defaultPresentation?: string
 	response?: FormResponseSettings
 	display?: FormDisplaySettings
 }
@@ -114,7 +115,7 @@ export type FormProps = {
 	/** Label for the overlay close control (modal/drawer). */
 	closeLabel?: string
 	successMessage?: string
-	/** Active presentation: a name into the registry or an inline presentation. Overrides the form's stored default. */
+	/** Active presentation: a name into the registry or an inline presentation. Defaults to `'page'` when omitted. */
 	presentation?: string | FormPresentation
 	/** Per-render presentation overrides merged onto the defaults (add, replace, or `false` to remove). */
 	presentations?: PresentationsConfig
@@ -248,8 +249,8 @@ export const Form = ({
 	const activePresentation: FormPresentation =
 		typeof presentation === 'object'
 			? presentation
-			: (presentationRegistry.get(presentation ?? form.defaultPresentation ?? 'page') ??
-				presentationRegistry.get('page') ??
+			: (presentationRegistry.get(presentation ?? DEFAULT_PRESENTATION_NAME) ??
+				presentationRegistry.get(DEFAULT_PRESENTATION_NAME) ??
 				defaultPresentationDescriptors.page)
 	const fieldsByName = useMemo(
 		() => new Map(form.fields.map((field) => [field.name, field])),

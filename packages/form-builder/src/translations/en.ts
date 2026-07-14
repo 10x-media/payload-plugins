@@ -96,7 +96,6 @@ export const en: Record<TranslationKey, string> = {
 		'Expression tree of nodes {"type":"lit"|"ref"|"op"|"neg"|"fn"|"weight"}. Example: {"type":"op","op":"+","left":{"type":"ref","field":"qty"},"right":{"type":"lit","value":10}}',
 	[keys.configCalcDisplay]: 'Show computed value',
 	[keys.validationCalcExpressionInvalid]: 'Enter a valid calculation expression',
-	[keys.configDefaultPresentation]: 'Presentation',
 	[keys.presentationPage]: 'Page',
 	[keys.presentationModal]: 'Modal',
 	[keys.presentationDrawer]: 'Drawer',

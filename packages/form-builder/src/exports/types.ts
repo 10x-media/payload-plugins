@@ -46,11 +46,6 @@ export type { CollectionOverrides, FieldsOverride } from '../plugin/collectionOv
 export type { UploadsOption } from '../plugin/uploadsCollection'
 export type { PrefillOptions } from '../prefill/valuesFromSearchParams'
 export type {
-	PresentationDescriptorOption,
-	PresentationDescriptorRegistry,
-	PresentationsDescriptorConfig,
-} from '../presentations/registry'
-export type {
 	PresentationDensity,
 	PresentationDescriptor,
 	PresentationSurface,

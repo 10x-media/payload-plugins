@@ -18,13 +18,8 @@ import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
-import {
-	DEFAULT_PRESENTATION_NAME,
-	defaultPresentationDescriptors,
-} from '../presentations/defaults'
-import type { PresentationDescriptorRegistry } from '../presentations/registry'
 import { keys } from '../translations/keys'
-import { labelFor, labelForKey } from '../translations/server'
+import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { validateUrl } from '../validation/validateUrl'
 
@@ -87,7 +82,6 @@ type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
 	consentRegistry?: ConsentSourceRegistry
-	presentationRegistry?: PresentationDescriptorRegistry
 	actionRegistry?: ActionRegistry
 	localizeContent?: boolean
 	/** The host-owned uploads collection slug from plugin config; absent when uploads are disabled. */
@@ -100,7 +94,6 @@ export const buildFormsCollection = ({
 	registry,
 	ruleRegistry,
 	consentRegistry,
-	presentationRegistry = new Map(Object.entries(defaultPresentationDescriptors)),
 	actionRegistry = new Map(),
 	localizeContent = true,
 	uploadsCollectionSlug,
@@ -109,13 +102,6 @@ export const buildFormsCollection = ({
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
-		if (
-			data &&
-			typeof data.defaultPresentation === 'string' &&
-			!presentationRegistry.has(data.defaultPresentation)
-		) {
-			data.defaultPresentation = DEFAULT_PRESENTATION_NAME
-		}
 		if (data && Array.isArray(data.fields)) {
 			const normalized: FieldRow[] = normalizeFormConditions(
 				data.fields as FieldRow[],
@@ -325,17 +311,6 @@ export const buildFormsCollection = ({
 				{ label: labelForKey(keys.tabActions), fields: [actionsField] },
 				{ label: labelForKey(keys.tabResponse), fields: [responseField] },
 			],
-		},
-		{
-			name: 'defaultPresentation',
-			type: 'select',
-			defaultValue: DEFAULT_PRESENTATION_NAME,
-			options: [...presentationRegistry.values()].map((descriptor) => ({
-				label: labelFor(descriptor.label),
-				value: descriptor.name,
-			})),
-			label: labelForKey(keys.configDefaultPresentation),
-			admin: { position: 'sidebar' },
 		},
 		{
 			name: 'showResults',
