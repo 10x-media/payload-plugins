@@ -734,7 +734,7 @@ export interface Form {
               | null;
             hidden?: boolean | null;
             statement?: string | null;
-            source?: ('static' | 'pageReference') | null;
+            source?: ('static' | 'pageReference' | 'companyPolicies') | null;
             sourceConfig?: {
               label?: string | null;
               url?: string | null;
@@ -743,6 +743,9 @@ export interface Form {
               docId?: string | null;
               urlField?: string | null;
               captureVersion?: boolean | null;
+              policyLabel?: string | null;
+              policyUrl?: string | null;
+              policyVersion?: string | null;
             };
             optional?: boolean | null;
             validations?:
@@ -1403,7 +1406,7 @@ export interface Form {
                         | null;
                       hidden?: boolean | null;
                       statement?: string | null;
-                      source?: ('static' | 'pageReference') | null;
+                      source?: ('static' | 'pageReference' | 'companyPolicies') | null;
                       sourceConfig?: {
                         label?: string | null;
                         url?: string | null;
@@ -1412,6 +1415,9 @@ export interface Form {
                         docId?: string | null;
                         urlField?: string | null;
                         captureVersion?: boolean | null;
+                        policyLabel?: string | null;
+                        policyUrl?: string | null;
+                        policyVersion?: string | null;
                       };
                       optional?: boolean | null;
                       validations?:
@@ -2445,6 +2451,9 @@ export interface FormsSelect<T extends boolean = true> {
                     docId?: T;
                     urlField?: T;
                     captureVersion?: T;
+                    policyLabel?: T;
+                    policyUrl?: T;
+                    policyVersion?: T;
                   };
               optional?: T;
               validations?:
@@ -2997,6 +3006,9 @@ export interface FormsSelect<T extends boolean = true> {
                                 docId?: T;
                                 urlField?: T;
                                 captureVersion?: T;
+                                policyLabel?: T;
+                                policyUrl?: T;
+                                policyVersion?: T;
                               };
                           optional?: T;
                           validations?:

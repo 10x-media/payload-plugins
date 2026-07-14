@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { defineCaptchaProvider, defineFormField, type FieldTypeOption, formBuilder } from '../src/index'
 import { forwardAction } from './helpers/actions'
+import { companyPolicies } from './helpers/consentSources'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { customRules } from './helpers/rules'
 import { seedDev } from './helpers/seed'
@@ -112,6 +113,7 @@ export default buildConfig({
 					},
 				}),
 			},
+			consentSources: { companyPolicies },
 		}),
 	],
 	telemetry: false,
