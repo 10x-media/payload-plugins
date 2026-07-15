@@ -14,8 +14,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.metricEvents]: 'Events',
 	[keys.metricAvgDuration]: 'Avg. time',
 	[keys.metricBounceRate]: 'Bounce rate',
-	[keys.metricEntries]: 'Entries',
-	[keys.metricExits]: 'Exits',
 	[keys.metricScrollDepth]: 'Scroll depth',
 	[keys.metricConversions]: 'Conversions',
 	[keys.metricRevenue]: 'Revenue',

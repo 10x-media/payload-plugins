@@ -28,7 +28,7 @@ Every surface is gated by it:
 - A [display field](/analytics/display-fields) drops unsupported metrics from its request and renders the rest.
 - A custom range that exceeds a provider's `maxLookbackDays` is narrowed to the provider maximum, visibly.
 
-Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `entries`, `exits`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
+Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
 
 An unconfigured adapter (missing credentials) degrades to an empty state and makes no network calls.
 

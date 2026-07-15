@@ -13,8 +13,6 @@ export type MetricKey =
 	| 'sessions'
 	| 'bounceRate'
 	| 'avgDuration'
-	| 'entries'
-	| 'exits'
 	| 'scrollDepth'
 	| 'events'
 	| 'conversions'

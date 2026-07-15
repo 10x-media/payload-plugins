@@ -12,8 +12,6 @@ export const keys = {
 	metricEvents: 'analytics:metricEvents',
 	metricAvgDuration: 'analytics:metricAvgDuration',
 	metricBounceRate: 'analytics:metricBounceRate',
-	metricEntries: 'analytics:metricEntries',
-	metricExits: 'analytics:metricExits',
 	metricScrollDepth: 'analytics:metricScrollDepth',
 	metricConversions: 'analytics:metricConversions',
 	metricRevenue: 'analytics:metricRevenue',
