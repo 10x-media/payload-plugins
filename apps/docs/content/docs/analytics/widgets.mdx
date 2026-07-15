@@ -45,6 +45,8 @@ The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoin
 
 Trend widgets render a real daily series for every provider that has one; where a provider has no per-day source for a metric (Umami's visitors, for example), the headline stays correct and the series is empty. Headline totals are range-correct: distinct metrics like visitors are never summed across days.
 
+The metric and trend widgets show a period-over-period comparison when the active adapter declares `capabilities.comparison`: the plugin reads the equal-length window immediately preceding the current one and renders a colored delta (an up/down arrow with the signed percentage) and a "vs. previous period" caption. The comparison is capability-gated, so adapters that cannot answer a second window simply omit it. All comparison strings are typed translations, localizable through the [`translations` option](/analytics/i18n).
+
 Charts are dependency-free SVG and CSS, themed with Payload's design tokens. The series color reads `--analytics-chart-1`, overridable from your admin stylesheet.
 
 ## Options

@@ -6,6 +6,7 @@ import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { addDaysInTz, DEFAULT_TIMEZONE, startOfDayInTz, zonedDayIso } from '../timeframe/tz'
+import { previousWindow } from './comparison'
 import type { WidgetReadStatus } from './readForWidget'
 
 export interface SeriesPoint {
@@ -20,6 +21,10 @@ export interface WidgetSeriesResult {
 	points: SeriesPoint[]
 	total: number
 	clamped?: boolean
+	/** Previous-window headline total, present only when the adapter supports comparison. */
+	previousTotal?: number
+	/** The previous comparable window, present only when comparison ran. */
+	comparisonRange?: DateRange
 }
 
 export interface ReadForWidgetSeriesArgs {
@@ -117,6 +122,18 @@ export const readForWidgetSeries = async (
 		timezone: tz,
 		scope: ctx.queryScope,
 	})
+	let previousTotal: number | undefined
+	let comparisonRange: DateRange | undefined
+	if (adapter.capabilities.comparison) {
+		comparisonRange = previousWindow(dateRange)
+		const previous = await runtime.engine.read(adapter, {
+			metrics: [metric],
+			dateRange: comparisonRange,
+			timezone: tz,
+			scope: ctx.queryScope,
+		})
+		previousTotal = previous.totals?.[metric] ?? 0
+	}
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
@@ -124,5 +141,7 @@ export const readForWidgetSeries = async (
 		points: fillDailySeries({ rows: result.rows, dateRange, metric, tz }),
 		total: result.totals?.[metric] ?? 0,
 		clamped: result.meta.clamped ?? false,
+		previousTotal,
+		comparisonRange,
 	}
 }

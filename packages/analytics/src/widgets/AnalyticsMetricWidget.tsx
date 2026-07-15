@@ -5,6 +5,7 @@ import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
+import { ComparisonDelta } from './ComparisonDelta'
 import { cardStyle, labelStyle } from './cardChrome'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import { readForWidget, type WidgetReadStatus } from './readForWidget'
@@ -61,6 +62,14 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 				{value === undefined ? '–' : formatMetricValue(metric, value, locale)}
 			</span>
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
+			{result.comparisonRange ? (
+				<ComparisonDelta
+					current={value}
+					previous={result.previousMetrics?.[metric]}
+					locale={locale}
+					t={t}
+				/>
+			) : null}
 			{result.clamped ? (
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
 					{t(keys.stateClamped)}

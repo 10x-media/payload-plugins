@@ -110,6 +110,29 @@ describe('readForWidgetSeries', () => {
 		expect(result.points.at(-2)).toEqual({ date: '2026-06-02T00:00:00.000Z', value: 5 })
 	})
 
+	it('returns previous-window comparison data when the adapter supports it', async () => {
+		const result = await readForWidgetSeries({
+			req: reqWith([seriesAdapter({ capabilities: { ...baseCaps(), comparison: true } })]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(result.status).toBe('ok')
+		expect(result.comparisonRange).toBeDefined()
+		expect(result.previousTotal).toBe(12)
+	})
+
+	it('omits comparison data when the adapter does not support it', async () => {
+		const result = await readForWidgetSeries({
+			req: reqWith([seriesAdapter()]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(result.comparisonRange).toBeUndefined()
+		expect(result.previousTotal).toBeUndefined()
+	})
+
 	it('returns unavailable when the adapter cannot bucket by day', async () => {
 		const result = await readForWidgetSeries({
 			req: reqWith([seriesAdapter({ capabilities: baseCaps('month') })]),

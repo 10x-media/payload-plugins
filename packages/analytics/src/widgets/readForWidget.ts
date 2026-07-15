@@ -4,6 +4,7 @@ import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
+import { previousWindow } from './comparison'
 
 export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable'
 
@@ -13,6 +14,10 @@ export interface WidgetReadResult {
 	dateRange: DateRange
 	metrics: Partial<Record<MetricKey, number>>
 	clamped?: boolean
+	/** Previous-window totals, present only when the adapter supports comparison. */
+	previousMetrics?: Partial<Record<MetricKey, number>>
+	/** The previous comparable window, present only when comparison ran. */
+	comparisonRange?: DateRange
 }
 
 export interface ReadForWidgetArgs {
@@ -64,11 +69,25 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		timezone: tz,
 		scope: ctx.queryScope,
 	})
+	let previousMetrics: Partial<Record<MetricKey, number>> | undefined
+	let comparisonRange: DateRange | undefined
+	if (adapter.capabilities.comparison) {
+		comparisonRange = previousWindow(dateRange)
+		const previous = await runtime.engine.read(adapter, {
+			metrics,
+			dateRange: comparisonRange,
+			timezone: tz,
+			scope: ctx.queryScope,
+		})
+		previousMetrics = previous.totals ?? {}
+	}
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
 		dateRange,
 		metrics: result.totals ?? {},
 		clamped: result.meta.clamped ?? false,
+		previousMetrics,
+		comparisonRange,
 	}
 }

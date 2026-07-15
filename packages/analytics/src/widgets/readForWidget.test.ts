@@ -112,6 +112,50 @@ describe('readForWidget', () => {
 		expect(result.metrics.pageviews).toBe(2)
 	})
 
+	it('returns previous-window totals when the adapter supports comparison', async () => {
+		const adapter = memoryAdapter()
+		// Current window (last 7 days ending NOW) has two hits; the prior 7 days has one.
+		adapter.record({ path: '/c', timestamp: new Date('2026-05-30T12:00:00Z') })
+		adapter.record({ path: '/c', timestamp: new Date('2026-05-31T12:00:00Z') })
+		adapter.record({ path: '/c', timestamp: new Date('2026-05-24T12:00:00Z') })
+		const result = await readForWidget({
+			req: reqWith([adapter]),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(result.status).toBe('ok')
+		expect(result.metrics.pageviews).toBe(2)
+		expect(result.comparisonRange).toBeDefined()
+		expect(result.previousMetrics?.pageviews).toBe(1)
+	})
+
+	it('omits comparison data when the adapter does not support it', async () => {
+		const base = memoryAdapter()
+		const adapter: AnalyticsAdapter = {
+			id: 'no-compare',
+			label: 'No compare',
+			capabilities: { ...base.capabilities, comparison: false },
+			isConfigured: () => true,
+			async query(_q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				return {
+					rows: [],
+					totals: { pageviews: 3 },
+					meta: { provider: 'no-compare', fetchedAt: NOW.toISOString() },
+				}
+			},
+		}
+		const result = await readForWidget({
+			req: reqWith([adapter]),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(result.status).toBe('ok')
+		expect(result.comparisonRange).toBeUndefined()
+		expect(result.previousMetrics).toBeUndefined()
+	})
+
 	it('returns unavailable for an unknown adapterId', async () => {
 		const result = await readForWidget({
 			req: reqWith([memoryAdapter()]),
