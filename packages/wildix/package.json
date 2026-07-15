@@ -1,0 +1,196 @@
+{
+	"name": "@10x-media/wildix",
+	"version": "0.0.0",
+	"description": "Payload plugin for Wildix Unified Communications telephony integration",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/10x-media/payload-plugins.git",
+		"directory": "packages/wildix"
+	},
+	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/wildix",
+	"bugs": "https://github.com/10x-media/payload-plugins/issues",
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin"
+	],
+	"author": "10x-media",
+	"engines": {
+		"node": ">=22.18.0"
+	},
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./types": {
+			"development": "./src/exports/types.ts",
+			"types": "./src/exports/types.ts",
+			"default": "./dist/exports/types.js"
+		},
+		"./client": {
+			"development": "./src/exports/client.ts",
+			"types": "./src/exports/client.ts",
+			"default": "./dist/exports/client.js"
+		},
+		"./i18n": {
+			"development": "./src/exports/i18n.ts",
+			"types": "./src/exports/i18n.ts",
+			"default": "./dist/exports/i18n.js"
+		},
+		"./ui/ClickToDialField": {
+			"development": "./src/ui/ClickToDialField.tsx",
+			"types": "./src/ui/ClickToDialField.tsx",
+			"default": "./dist/ui/ClickToDialField.js"
+		},
+		"./ui/CallActivityWidget": {
+			"development": "./src/ui/CallActivityWidget.tsx",
+			"types": "./src/ui/CallActivityWidget.tsx",
+			"default": "./dist/ui/CallActivityWidget.js"
+		},
+		"./ui/LiveCallFloatingWindow": {
+			"development": "./src/ui/LiveCallFloatingWindow.tsx",
+			"types": "./src/ui/LiveCallFloatingWindow.tsx",
+			"default": "./dist/ui/LiveCallFloatingWindow.js"
+		},
+		"./ui/ContactMatchUiField": {
+			"development": "./src/ui/ContactMatchUiField.tsx",
+			"types": "./src/ui/ContactMatchUiField.tsx",
+			"default": "./dist/ui/ContactMatchUiField.js"
+		},
+		"./ui/WildixSyncButton": {
+			"development": "./src/ui/WildixSyncButton.tsx",
+			"types": "./src/ui/WildixSyncButton.tsx",
+			"default": "./dist/ui/WildixSyncButton.js"
+		},
+		"./ui/WildixOAuthButton": {
+			"development": "./src/ui/WildixOAuthButton.tsx",
+			"types": "./src/ui/WildixOAuthButton.tsx",
+			"default": "./dist/ui/WildixOAuthButton.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"lint": "biome check src tests dev",
+		"lint:fix": "biome check --write src tests dev",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run",
+		"test:unit": "vitest run src",
+		"test:int": "vitest run tests/int",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:e2e": "bash scripts/e2e.sh",
+		"dev": "pnpm --filter @10x-media/wildix-dev dev",
+		"start": "pnpm --filter @10x-media/wildix-dev start",
+		"generate": "pnpm --filter @10x-media/wildix-dev generate",
+		"generate:types": "pnpm --filter @10x-media/wildix-dev generate:types",
+		"generate:importmap": "pnpm --filter @10x-media/wildix-dev generate:importmap",
+		"migrate": "pnpm --filter @10x-media/wildix-dev migrate",
+		"migrate:create": "pnpm --filter @10x-media/wildix-dev migrate:create",
+		"migrate:down": "pnpm --filter @10x-media/wildix-dev migrate:down",
+		"migrate:refresh": "pnpm --filter @10x-media/wildix-dev migrate:refresh",
+		"migrate:reset": "pnpm --filter @10x-media/wildix-dev migrate:reset",
+		"migrate:status": "pnpm --filter @10x-media/wildix-dev migrate:status",
+		"migrate:fresh": "pnpm --filter @10x-media/wildix-dev migrate:fresh",
+		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
+	},
+	"peerDependencies": {
+		"@payloadcms/ui": "^3.82.0",
+		"payload": "^3.82.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"devDependencies": {
+		"@10x-media/payload-test-harness": "workspace:*",
+		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
+		"@10x-media/vitest-config": "workspace:*",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"@playwright/test": "catalog:",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"payload": "catalog:",
+		"playwright": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true,
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js",
+				"default": "./dist/index.js"
+			},
+			"./types": {
+				"types": "./dist/exports/types.d.ts",
+				"import": "./dist/exports/types.js",
+				"default": "./dist/exports/types.js"
+			},
+			"./client": {
+				"types": "./dist/exports/client.d.ts",
+				"import": "./dist/exports/client.js",
+				"default": "./dist/exports/client.js"
+			},
+			"./i18n": {
+				"types": "./dist/exports/i18n.d.ts",
+				"import": "./dist/exports/i18n.js",
+				"default": "./dist/exports/i18n.js"
+			},
+			"./ui/ClickToDialField": {
+				"types": "./dist/ui/ClickToDialField.d.ts",
+				"import": "./dist/ui/ClickToDialField.js",
+				"default": "./dist/ui/ClickToDialField.js"
+			},
+			"./ui/CallActivityWidget": {
+				"types": "./dist/ui/CallActivityWidget.d.ts",
+				"import": "./dist/ui/CallActivityWidget.js",
+				"default": "./dist/ui/CallActivityWidget.js"
+			},
+			"./ui/LiveCallFloatingWindow": {
+				"types": "./dist/ui/LiveCallFloatingWindow.d.ts",
+				"import": "./dist/ui/LiveCallFloatingWindow.js",
+				"default": "./dist/ui/LiveCallFloatingWindow.js"
+			},
+			"./ui/ContactMatchUiField": {
+				"types": "./dist/ui/ContactMatchUiField.d.ts",
+				"import": "./dist/ui/ContactMatchUiField.js",
+				"default": "./dist/ui/ContactMatchUiField.js"
+			},
+			"./ui/WildixOAuthButton": {
+				"types": "./dist/ui/WildixOAuthButton.d.ts",
+				"import": "./dist/ui/WildixOAuthButton.js",
+				"default": "./dist/ui/WildixOAuthButton.js"
+			},
+			"./ui/WildixSyncButton": {
+				"types": "./dist/ui/WildixSyncButton.d.ts",
+				"import": "./dist/ui/WildixSyncButton.js",
+				"default": "./dist/ui/WildixSyncButton.js"
+			}
+		}
+	},
+	"dependencies": {
+		"@wildix/wda-history-client": "^1.2.22",
+		"@wildix/wms-api-client": "^1.2.2",
+		"chart.js": "^4.5.1",
+		"libphonenumber-js": "^1.13.8",
+		"react-chartjs-2": "^5.3.1"
+	}
+}
