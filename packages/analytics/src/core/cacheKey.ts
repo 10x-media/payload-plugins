@@ -1,19 +1,12 @@
+import { addDaysInTz, DEFAULT_TIMEZONE, startOfDayInTz } from '../timeframe/tz'
 import type { AnalyticsQuery } from './contract'
 
 const stable = (xs?: string[]): string => (xs ? [...xs].sort().join(',') : '')
 
-const startOfUtcDay = (d: Date): Date =>
-	new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-
-const startOfNextUtcDay = (d: Date): Date => {
-	const day = startOfUtcDay(d)
-	day.setUTCDate(day.getUTCDate() + 1)
-	return day
-}
-
 export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
 	const pathKey = q.path ?? 'site'
-	const range = `${startOfUtcDay(q.dateRange.start).toISOString()}_${startOfNextUtcDay(q.dateRange.end).toISOString()}`
+	const tz = q.timezone ?? DEFAULT_TIMEZONE
+	const range = `${startOfDayInTz(q.dateRange.start, tz).toISOString()}_${addDaysInTz(q.dateRange.end, 1, tz).toISOString()}`
 	const filters = (q.filters ?? [])
 		.map((f) => `${f.dimension}${f.operator}${f.value}`)
 		.sort()
@@ -30,7 +23,8 @@ export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
 		filters,
 		String(q.limit ?? '_'),
 		q.order ? `${q.order.metric}:${q.order.direction}` : '_',
-		// Appended only for scoped reads so unscoped keys keep their historical format.
+		// Appended only for a non-UTC timezone so default (UTC) keys keep their format.
+		...(q.timezone !== undefined && q.timezone !== DEFAULT_TIMEZONE ? [q.timezone] : []),
 		...(q.scope !== undefined ? [encodeURIComponent(q.scope)] : []),
 	].join('|')
 }

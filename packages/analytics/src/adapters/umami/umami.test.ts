@@ -89,6 +89,22 @@ describe('umami adapter', () => {
 		expect(result.totals?.avgDuration).toBeUndefined()
 	})
 
+	it('forwards the query timezone to the pageviews series endpoint', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/pageviews', ({ request }) => {
+				expect(new URL(request.url).searchParams.get('timezone')).toBe('Europe/Berlin')
+				return HttpResponse.json({ pageviews: [], sessions: [] })
+			}),
+			http.get('https://api.umami.is/v1/websites/w/stats', () =>
+				HttpResponse.json({ pageviews: 0, visitors: 0, visits: 0, bounces: 0, totaltime: 0 })
+			)
+		)
+		await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'day', timezone: 'Europe/Berlin' }),
+			{}
+		)
+	})
+
 	it('returns a per-day pageviews/sessions series plus full totals when granularity is day', async () => {
 		server.use(
 			http.get('https://api.umami.is/v1/websites/w/pageviews', ({ request }) => {

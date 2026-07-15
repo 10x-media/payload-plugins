@@ -3,6 +3,7 @@ import type { Config, Endpoint, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readForField } from '../../src/fields/readForDocument'
 import { analytics } from '../../src/index'
+import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from '../../src/native/collections/rollups'
 import { SEEN_SLUG, seenCollection } from '../../src/native/collections/seen'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
@@ -17,6 +18,7 @@ import { computeRollupDeltas } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { startOfDayInTz } from '../../src/timeframe/tz'
 import { readForWidget } from '../../src/widgets/readForWidget'
 
 describeForDb('analytics cross-db', {}, (db) => {
@@ -426,6 +428,56 @@ describeForDb('native scoped ingest and reads', {}, (db) => {
 		})
 		expect(allowed.status).toBe('ok')
 		expect(allowed.metrics.pageviews).toBe(7)
+	})
+})
+
+describeForDb('native reporting timezone bucketing', {}, (db) => {
+	const TZ = 'America/New_York'
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], reportingTimezone: TZ }),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const ingest = async (): Promise<void> => {
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		const res = await endpoint.handler({
+			payload: booted.payload,
+			headers: new Headers({ 'content-type': 'application/json', 'user-agent': 'UA' }),
+			json: async () => ({ type: 'pageview', path: '/tz', hostname: 'h', durationMs: 100 }),
+		} as never)
+		expect(res.status).toBe(202)
+	}
+
+	it(`buckets the rollup period at the reporting timezone's local day on ${db}`, async () => {
+		await ingest()
+		const events = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/tz' } },
+			pagination: false,
+			overrideAccess: true,
+		})
+		const eventTs = new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
+		const rollups = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/tz' }, dimension: { equals: '' } },
+			pagination: false,
+			overrideAccess: true,
+		})
+		const period = new Date((rollups.docs[0] as unknown as { period: string }).period)
+		expect(period.toISOString()).toBe(startOfDayInTz(eventTs, TZ).toISOString())
 	})
 })
 

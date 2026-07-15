@@ -116,11 +116,10 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				{
 					method: 'post',
 					path: options.ingestPath ?? '/analytics/ingest',
-					handler: makeIngestHandler(
-						geoResolver,
-						() => buffer,
-						scoped ? context?.resolveScope : undefined
-					),
+					handler: makeIngestHandler(geoResolver, () => buffer, {
+						scope: scoped ? context?.resolveScope : undefined,
+						timezone: context?.resolveTimezone,
+					}),
 				},
 			]
 			if (options.retentionDays && options.retentionDays > 0) {
@@ -177,7 +176,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			if (!dim) {
 				if (q.granularity === 'day') {
 					return {
-						rows: seriesFromRollups(totalsDocs, q.metrics),
+						rows: seriesFromRollups(totalsDocs, q.metrics, q.timezone),
 						totals,
 						meta: { provider: 'native', fetchedAt },
 					}

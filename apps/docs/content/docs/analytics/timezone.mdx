@@ -1,0 +1,72 @@
+---
+title: Reporting timezone
+description: Align daily analytics boundaries to a reporting timezone, per install or per tenant, with @10x-media/analytics.
+---
+
+By default every day boundary in the plugin is UTC: timeframe windows (`today`, `last30days`), the daily series axis, native rollup buckets, and the surfacing cache key all snap to UTC midnight. A team reporting from Europe or the Americas sees each "day" cut at their local 01:00 or 20:00, which is rarely what they want.
+
+`reportingTimezone` aligns those boundaries to an [IANA timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) instead. It defaults to `'UTC'`, so an install that does not set it behaves exactly as before.
+
+## Setting it
+
+`reportingTimezone` takes either a fixed string or a resolver function.
+
+### A fixed timezone (single-site, or forcing one zone)
+
+Without multi-tenancy, set the timezone at the plugin config level:
+
+```ts
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+analytics({
+  adapters: [native()],
+  reportingTimezone: 'Europe/Berlin',
+})
+```
+
+### A resolver (per tenant, per user, or a selector)
+
+The resolver receives the request and its already-resolved `scope`, so it covers the common ways a consumer might derive the zone:
+
+```ts
+analytics({
+  adapters: [native()],
+  scopeResolver: ({ req }) => getTenantFromCookie(req),
+  reportingTimezone: async ({ req, scope }) => {
+    // Per tenant: look the zone up by scope.
+    if (scope) return (await lookupTenantTimezone(req.payload, scope)) ?? 'UTC'
+    // Per user account preference.
+    if (req.user?.timezone) return req.user.timezone as string
+    // A selector stored in a cookie / preference.
+    return readTimezoneCookie(req) ?? 'UTC'
+  },
+})
+```
+
+Return `null` to fall back to UTC. An unresolvable zone string also falls back to UTC (with a warning), so a bad value never breaks a read.
+
+## What it controls
+
+- Timeframe presets resolve their window in the timezone (`today` starts at that zone's midnight).
+- The daily trend series buckets and labels each point by the zone's day.
+- The surfacing cache key partitions by timezone, so a Berlin read and a UTC read never share a cached result.
+- Native rollups are bucketed into the zone's day **at ingest** (see below).
+
+## Native rollups bucket at ingest
+
+The native engine fixes each event's rollup day when the event is written, using the timezone resolved for that request. This keeps reads cheap (they read pre-bucketed daily rows) and correct for the tenant's own zone.
+
+The trade-offs:
+
+- Changing a tenant's `reportingTimezone` does **not** re-bucket history. Existing rollups keep the day boundary they were written with; only new events use the new zone.
+- A per-user selector or per-user-account timezone cannot re-slice already-written native days into a different zone. For the native engine, use a fixed or per-tenant timezone. Per-user and selector strategies apply cleanly to external providers (whose windows are recomputed per read) and to the read-side series labels, but not to native historical buckets.
+
+## External providers
+
+Providers that accept a timezone are told the resolved zone:
+
+- **Umami** sends it as the `timezone` query parameter on the daily series.
+- **PostHog** buckets the daily series with `toStartOfDay(timestamp, '<zone>')` in HogQL.
+
+**GA4** and **Plausible** bucket in their own property / site timezone; the plugin cannot override that per read, so align the provider's own configured timezone with `reportingTimezone` for consistent daily boundaries.

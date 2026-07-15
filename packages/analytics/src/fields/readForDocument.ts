@@ -4,7 +4,7 @@ import type { BindingDoc } from '../binding/types'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
-import { getRuntime } from '../plugin/runtime'
+import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 
 export type FieldReadStatus = 'ok' | 'no-path' | 'not-bound' | 'not-configured' | 'unavailable'
@@ -44,7 +44,7 @@ export interface ReadForFieldArgs {
  */
 export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadResult> => {
 	const { req, collectionSlug, data, metrics, timeframe, adapterId, now } = args
-	const dateRange = resolveTimeframe(timeframe, now)
+	let dateRange = resolveTimeframe(timeframe, now)
 	const empty = { metrics: {}, supportedMetrics: [], droppedMetrics: [] }
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
@@ -58,6 +58,8 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 	if (!ctx.ok) {
 		return { status: 'unavailable', adapterId: adapterId ?? '', dateRange, ...empty }
 	}
+	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	dateRange = resolveTimeframe(timeframe, now, tz)
 	const adapter: AnalyticsAdapter = ctx.adapter
 	const bindingCtx = { req, locale: req.locale ?? undefined }
 	let path: string | null
@@ -97,6 +99,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 		hostname: await resolveHostname(binding, data, bindingCtx),
 		metrics: supportedMetrics,
 		dateRange,
+		timezone: tz,
 		scope: ctx.queryScope,
 	})
 	return {

@@ -138,7 +138,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			if (q.granularity === 'day') {
 				const p = params(q)
 				p.set('unit', 'day')
-				p.set('timezone', 'UTC')
+				p.set('timezone', q.timezone ?? 'UTC')
 				const fetchSeries = () =>
 					fetchJson<{
 						pageviews: Array<{ x: string; y: number }>

@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, DimensionKey, MetricKey } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
-import { getRuntime } from '../plugin/runtime'
+import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import type { WidgetReadStatus } from './readForWidget'
 
@@ -41,17 +41,29 @@ export const readForWidgetBreakdown = async (
 	args: ReadForWidgetBreakdownArgs
 ): Promise<WidgetBreakdownResult> => {
 	const { req, metric, dimension, timeframe, limit, adapterId, now, range } = args
-	const dateRange = range ?? resolveTimeframe(timeframe, now)
-	const base = { dateRange, rows: [] as BreakdownRow[] }
+	const emptyRows = [] as BreakdownRow[]
 
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return { status: 'unavailable', adapterId: adapterId ?? '', ...base }
+		return {
+			status: 'unavailable',
+			adapterId: adapterId ?? '',
+			dateRange: range ?? resolveTimeframe(timeframe, now),
+			rows: emptyRows,
+		}
 	}
 	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
 	if (!ctx.ok) {
-		return { status: 'unavailable', adapterId: adapterId ?? '', ...base }
+		return {
+			status: 'unavailable',
+			adapterId: adapterId ?? '',
+			dateRange: range ?? resolveTimeframe(timeframe, now),
+			rows: emptyRows,
+		}
 	}
+	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
+	const base = { dateRange, rows: emptyRows }
 	const adapter: AnalyticsAdapter = ctx.adapter
 	if (!adapter.isConfigured()) {
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
@@ -67,6 +79,7 @@ export const readForWidgetBreakdown = async (
 		dateRange,
 		limit,
 		order: { metric, direction: 'desc' },
+		timezone: tz,
 		scope: ctx.queryScope,
 	})
 	const rows = result.rows.map((row) => ({

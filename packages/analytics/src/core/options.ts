@@ -21,6 +21,17 @@ export type ScopeResolver = (args: {
 }) => string | null | Promise<string | null>
 
 /**
+ * Resolves the IANA reporting timezone a read's (or ingest's) day boundaries align
+ * to. Receives the request and its already-resolved scope, so per-tenant, per-user
+ * (`req.user`), and selector (cookie/preference) strategies are all expressible.
+ * Return `null` to fall back to UTC.
+ */
+export type TimezoneResolver = (args: {
+	req: PayloadRequest
+	scope: string | null
+}) => string | null | Promise<string | null>
+
+/**
  * Escape hatch replacing the provider-collection lookup: return the runtime
  * adapters for a scope yourself (any store, any shape). Results are layered onto
  * the static config adapters exactly like collection-resolved ones, but are not
@@ -74,6 +85,14 @@ export type AnalyticsPluginOptions = {
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver?: ScopeResolver
+	/**
+	 * IANA reporting timezone that day boundaries (timeframe windows, series axes,
+	 * native rollup buckets) align to. Defaults to UTC. A string forces one timezone
+	 * (the single-tenant / no-multi-tenancy case); a resolver derives it per request
+	 * from the scope, user, or a selector. Native rollups bucket at ingest in the
+	 * resolved timezone, so changing it does not re-bucket existing history.
+	 */
+	reportingTimezone?: string | TimezoneResolver
 	providers?: ProvidersOptions
 	/**
 	 * Id of one config adapter shared by every scope (the platform's own analytics,
@@ -119,6 +138,8 @@ export interface ResolvedOptions {
 	scopeResolver: ScopeResolver
 	/** True when the app configured a scopeResolver (scoped install). */
 	scoped: boolean
+	/** Raw reportingTimezone option; normalized into a resolver at init. */
+	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
 	access: { platformRead: PlatformReadAccess }
 	providers: {
@@ -250,6 +271,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		defaultAdapter: options.defaultAdapter,
 		scopeResolver: options.scopeResolver ?? (() => null),
 		scoped: options.scopeResolver !== undefined,
+		reportingTimezone: options.reportingTimezone,
 		platformAdapter: options.platformAdapter,
 		access: { platformRead: options.access?.platformRead ?? (({ req }) => Boolean(req.user)) },
 		providers,

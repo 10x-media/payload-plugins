@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
-import { getRuntime } from '../plugin/runtime'
+import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 
 export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable'
@@ -28,17 +28,29 @@ export interface ReadForWidgetArgs {
 
 export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetReadResult> => {
 	const { req, metrics, timeframe, adapterId, now, range } = args
-	const dateRange = range ?? resolveTimeframe(timeframe, now)
-	const base = { dateRange, metrics: {} as Partial<Record<MetricKey, number>> }
+	const emptyMetrics = {} as Partial<Record<MetricKey, number>>
 
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return { status: 'unavailable', adapterId: adapterId ?? '', ...base }
+		return {
+			status: 'unavailable',
+			adapterId: adapterId ?? '',
+			dateRange: range ?? resolveTimeframe(timeframe, now),
+			metrics: emptyMetrics,
+		}
 	}
 	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
 	if (!ctx.ok) {
-		return { status: 'unavailable', adapterId: adapterId ?? '', ...base }
+		return {
+			status: 'unavailable',
+			adapterId: adapterId ?? '',
+			dateRange: range ?? resolveTimeframe(timeframe, now),
+			metrics: emptyMetrics,
+		}
 	}
+	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
+	const base = { dateRange, metrics: emptyMetrics }
 	const adapter: AnalyticsAdapter = ctx.adapter
 	if (!adapter.isConfigured()) {
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
@@ -46,7 +58,12 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	if (!satisfiesCapabilities(adapter.capabilities, { metrics })) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
-	const result = await runtime.engine.read(adapter, { metrics, dateRange, scope: ctx.queryScope })
+	const result = await runtime.engine.read(adapter, {
+		metrics,
+		dateRange,
+		timezone: tz,
+		scope: ctx.queryScope,
+	})
 	return {
 		status: 'ok',
 		adapterId: adapter.id,

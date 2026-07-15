@@ -16,6 +16,7 @@ import { kvCacheStore } from './surfacing/cacheStore'
 import { createEngine } from './surfacing/engine'
 import { syncCollection } from './sync/collection'
 import { syncTask } from './sync/syncTask'
+import { DEFAULT_TIMEZONE, isValidTimeZone } from './timeframe/tz'
 import { registerWidgets } from './widgets/registerWidgets'
 
 declare module 'payload' {
@@ -67,8 +68,26 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			]
 		}
 		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
+		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {
+			const opt = resolved.reportingTimezone
+			if (opt === undefined) {
+				return DEFAULT_TIMEZONE
+			}
+			try {
+				const tz =
+					typeof opt === 'string'
+						? opt
+						: await opt({ req, scope: scope !== undefined ? scope : await resolveScope(req) })
+				return tz && isValidTimeZone(tz) ? tz : DEFAULT_TIMEZONE
+			} catch (err) {
+				req.payload?.logger?.warn?.(
+					`analytics: reportingTimezone resolution failed, falling back to UTC: ${String(err)}`
+				)
+				return DEFAULT_TIMEZONE
+			}
+		}
 		for (const adapter of resolved.adapters) {
-			adapter.register?.(config, { scoped: resolved.scoped, resolveScope })
+			adapter.register?.(config, { scoped: resolved.scoped, resolveScope, resolveTimezone })
 		}
 		if (
 			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function')
@@ -123,6 +142,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				registry,
 				resolveRegistry,
 				resolveScope,
+				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
 				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
@@ -150,6 +170,7 @@ export type {
 	ProvidersOptions,
 	ProvidersResolve,
 	ScopeResolver,
+	TimezoneResolver,
 } from './core/options'
 export type {
 	AnalyticsFieldsOptions,

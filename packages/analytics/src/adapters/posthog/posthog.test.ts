@@ -247,6 +247,44 @@ describe('posthog adapter', () => {
 		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, sessions: 15 })
 	})
 
+	it('buckets the day series in the query timezone when set', async () => {
+		let seriesSql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY day')) {
+					seriesSql = sql
+					return HttpResponse.json({ columns: ['day', 'm0'], types: [], results: [] })
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'day', timezone: 'Europe/Berlin' }),
+			{}
+		)
+		expect(seriesSql).toContain("toStartOfDay(timestamp, 'Europe/Berlin')")
+	})
+
+	it('buckets the day series in UTC without a timezone argument by default', async () => {
+		let seriesSql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY day')) {
+					seriesSql = sql
+					return HttpResponse.json({ columns: ['day', 'm0'], types: [], results: [] })
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'day' }),
+			{}
+		)
+		expect(seriesSql).toContain('toStartOfDay(timestamp) AS day')
+	})
+
 	it('targets the configured host (EU / self-host)', async () => {
 		server.use(
 			http.post('https://eu.posthog.com/api/projects/9/query/', () =>
