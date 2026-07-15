@@ -28,7 +28,11 @@ const flow: FormFlow = {
 
 Each step groups fields by machine name. `transitions` are evaluated in order against the current answers using the same [condition engine](/form-builder/conditions) as `visibleWhen`; the first match wins. No match falls through to `next`. A step with neither is terminal. Transitions see effective values, including computed [calculation fields](/form-builder/calculations), so a flow can branch on a quiz score or a running total.
 
-Flows are authored with the flow builder in the admin and stored as this serializable structure, so the client and server reason about the identical graph.
+## Authoring in the admin
+
+Flows are authored with the flow builder in the admin and stored as this serializable structure, so the client and server reason about the identical graph. Authors work entirely with step titles: step ids are generated automatically and never surface in the UI (a step without a title displays as `Step 1`, `Step 2`, and so on). Anywhere a step is referenced, the next step, a transition target, the label is its title.
+
+Field assignment is exclusive: each form field belongs to at most one step, and assigning a field to a step removes it from whichever step held it before. The builder lists the form's unassigned fields so nothing silently falls out of the flow, and the save-time normalizer enforces the same invariant (a field appearing in multiple steps keeps only its first occurrence, and unknown field names are dropped). A flow that collapses to fewer than two valid steps is rejected with a validation error rather than silently discarded.
 
 ## Renderer behavior
 
@@ -39,6 +43,22 @@ Flows are authored with the flow builder in the admin and stored as this seriali
 - validates the current step's visible fields before advancing; errors block progress,
 - shows Submit on the terminal step,
 - submits all accumulated answers as one submission.
+
+## `<FormSteps>` progress indicator
+
+`<FormSteps>` renders the flow as an ordered list with the current step marked (`aria-current="step"` plus an `fb-form-steps__step--current` class), using each step's title with the same numbered-step fallback as the admin builder. It reads the form context, so it works inside the default layout and custom `children` layouts alike, and renders nothing for single-step forms:
+
+```tsx
+import { Form, FormSteps, FormControls } from '@10x-media/form-builder/react'
+
+<Form form={form}>
+  <FormSteps />
+  {/* your fields */}
+  <FormControls />
+</Form>
+```
+
+It carries no styling beyond `fb-form-steps` classes; for fully custom progress UIs drop to the hook below.
 
 ## `useFormStep` for custom step UIs
 

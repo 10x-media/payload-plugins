@@ -9,8 +9,6 @@ export type FileRef = {
 
 /** Per-field file constraints, authored in the field config. */
 export type FileFieldConfig = {
-	/** Upload collection slug to read from. Defaults to the plugin's `form-uploads`. */
-	relationTo?: string
 	/** Allowed MIME types (exact match or a `type/*` wildcard). Empty/absent allows any. */
 	mimeTypes?: string[]
 	/** Maximum file size in bytes. Absent allows any size (subject to the collection limit). */

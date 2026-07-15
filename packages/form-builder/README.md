@@ -17,10 +17,10 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Recall and prefill**: pipe answers into labels and messages; URL prefill; hidden context fields.
 - **Calculations**: a safe no-eval expression engine for totals and quiz scores, recomputed on the server.
 - **Post-submit actions**: email, confirmation, signed webhook, and custom actions, queued via Payload jobs with a bounded inline fallback.
-- **Consent** with proof by reference and policy-version capture; **file uploads** with server-enforced MIME/size; **polls** with a gated public results endpoint.
+- **Consent** with proof by reference and policy-version capture; **file uploads** into your own upload collection with server-enforced MIME/size; **polls** with a gated public results endpoint.
 - **Spam protection** on by default: honeypot, per-identity rate limiting, bundled captcha adapters (Turnstile, reCAPTCHA, hCaptcha), upload-ownership scoping, privacy-first metadata.
 - **Accessibility** verified by automated axe checks; **typed translations** via `@10x-media/form-builder/i18n`.
-- **Collection overrides**: extend `forms`, `form-submissions`, and `form-uploads` with extra fields, hooks, and access rules using an explicit spread API that guarantees plugin-critical hooks always run.
+- **Collection overrides**: extend `forms` and `form-submissions` with extra fields, hooks, and access rules using an explicit spread API that guarantees plugin-critical hooks always run.
 
 ## Quick start
 

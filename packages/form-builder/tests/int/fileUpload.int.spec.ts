@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { formBuilder } from '../../src/index'
 
@@ -9,8 +10,18 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 	const staticDir = mkdtempSync(join(tmpdir(), 'fb-uploads-'))
 
+	const appUploads: CollectionConfig = {
+		slug: 'app-uploads',
+		upload: { staticDir },
+		fields: [],
+	}
+
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: formBuilder({ uploads: { upload: { staticDir } } }), db })
+		booted = await bootPayload({
+			plugin: formBuilder({ uploads: { collection: 'app-uploads' } }),
+			collections: [appUploads],
+			db,
+		})
 	})
 
 	afterAll(async () => {
@@ -20,7 +31,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 
 	const uploadPdf = async (size = 1024) =>
 		booted.payload.create({
-			collection: 'form-uploads',
+			collection: 'app-uploads',
 			data: {},
 			file: { data: Buffer.alloc(size, 1), mimetype: 'application/pdf', name: 'resume.pdf', size },
 		})
@@ -33,6 +44,33 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 				fields: [{ blockType: 'file', name: 'resume', label: 'Resume', ...config }],
 			},
 		})
+
+	const makeRepeaterForm = async (config: Record<string, unknown> = {}) =>
+		booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Attachments',
+				fields: [
+					{
+						blockType: 'repeater',
+						name: 'items',
+						label: 'Items',
+						subFields: [{ blockType: 'file', name: 'doc', label: 'Doc', ...config }],
+					},
+				],
+			},
+		})
+
+	it('appends the hidden owner field to the host collection', () => {
+		const fields = booted.payload.collections['app-uploads']?.config.fields ?? []
+		expect(fields.some((field) => 'name' in field && field.name === 'owner')).toBe(true)
+	})
+
+	it('stamps the configured collection slug onto file blocks on save', async () => {
+		const form = await makeForm({ uploadsCollection: 'forged-by-author' })
+		const fields = form.fields as Array<{ uploadsCollection?: string }>
+		expect(fields[0]?.uploadsCollection).toBe('app-uploads')
+	})
 
 	it('captures a self-describing FileRef snapshot from the upload id', async () => {
 		const form = await makeForm()
@@ -78,6 +116,44 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 			booted.payload.create({
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
+			})
+		).rejects.toThrow()
+	})
+
+	it('captures a file sub-field nested in a repeater row to a FileRef', async () => {
+		const form = await makeRepeaterForm()
+		const upload = await uploadPdf()
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			depth: 0,
+			data: { form: form.id, values: [{ field: 'items', value: [{ doc: upload.id }] }] },
+		})
+		const rows = (submission.values as Array<{ field: string; value: unknown }>).find(
+			(v) => v.field === 'items'
+		)?.value as Array<{ doc: Record<string, unknown> }>
+		expect(rows[0]?.doc.id).toBe(upload.id)
+		expect(rows[0]?.doc.filename).toBe(upload.filename)
+		expect(rows[0]?.doc.mimeType).toBe('application/pdf')
+		expect(typeof rows[0]?.doc.filesize).toBe('number')
+	})
+
+	it('rejects a forged upload id in a repeater row', async () => {
+		const form = await makeRepeaterForm()
+		await expect(
+			booted.payload.create({
+				collection: 'form-submissions',
+				data: { form: form.id, values: [{ field: 'items', value: [{ doc: 'does-not-exist' }] }] },
+			})
+		).rejects.toThrow()
+	})
+
+	it('rejects a repeater-row file that violates the sub-field mimeTypes allowlist', async () => {
+		const form = await makeRepeaterForm({ mimeTypes: ['image/png'] })
+		const upload = await uploadPdf()
+		await expect(
+			booted.payload.create({
+				collection: 'form-submissions',
+				data: { form: form.id, values: [{ field: 'items', value: [{ doc: upload.id }] }] },
 			})
 		).rejects.toThrow()
 	})

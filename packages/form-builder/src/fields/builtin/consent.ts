@@ -1,6 +1,7 @@
 import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
 import { defineFormField } from '../defineFormField'
+import { localizedIf } from '../localizedIf'
 
 type ConsentConfig = {
 	statement?: string
@@ -12,24 +13,33 @@ type ConsentConfig = {
 /**
  * Base consent field definition. `source` select and `sourceConfig` group are injected
  * by `buildFieldBlocks` from the live `consentRegistry`, so only the selected source's
- * fields are visible in the admin UI via `admin.condition`.
+ * fields are visible in the admin UI via `admin.condition`. The `statement` is
+ * author-facing content and follows `localize`.
  */
-export const consentField = defineFormField<'boolean', ConsentConfig>({
-	type: 'consent',
-	label: keys.fieldTypeConsent,
-	value: 'boolean',
-	config: [
-		{ name: 'statement', type: 'text', label: labelFor(keys.consentConfigStatement) },
-		// source select and sourceConfig group are injected by buildFieldBlocks at plugin boot
-		// so the options reflect the live consentRegistry rather than this static list.
-		{ name: 'optional', type: 'checkbox', label: labelFor(keys.consentConfigOptional) },
-	],
-	validate: ({ value, config, t }) => {
-		const optional = (config as ConsentConfig).optional === true
-		if (!optional && value !== true) {
-			return t(keys.validationRequired)
-		}
-		return true
-	},
-	format: ({ value, t }) => t(value === true ? keys.formatYes : keys.formatNo),
-})
+export const buildConsentField = (localize: boolean) =>
+	defineFormField<'boolean', ConsentConfig>({
+		type: 'consent',
+		label: keys.fieldTypeConsent,
+		value: 'boolean',
+		config: [
+			{
+				name: 'statement',
+				type: 'text',
+				label: labelFor(keys.consentConfigStatement),
+				...localizedIf(localize),
+			},
+			// source select and sourceConfig group are injected by buildFieldBlocks at plugin boot
+			// so the options reflect the live consentRegistry rather than this static list.
+			{ name: 'optional', type: 'checkbox', label: labelFor(keys.consentConfigOptional) },
+		],
+		validate: ({ value, config, t }) => {
+			const optional = (config as ConsentConfig).optional === true
+			if (!optional && value !== true) {
+				return t(keys.validationRequired)
+			}
+			return true
+		},
+		format: ({ value, t }) => t(value === true ? keys.formatYes : keys.formatNo),
+	})
+
+export const consentField = buildConsentField(true)

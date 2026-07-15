@@ -4,7 +4,7 @@ import type { FileRef } from '../../uploads/types'
 import { defineFormField } from '../defineFormField'
 
 type FileConfig = {
-	relationTo?: string
+	uploadsCollection?: string
 	mimeTypes?: string[]
 	maxSize?: number
 }
@@ -46,15 +46,19 @@ export const fileMimeTypeOptions = [
  * The `file` field type. Its stored value is a server-captured {@link FileRef}; the client only ever submits
  * the upload id, and `runSubmission` re-reads filename/mimeType/filesize from the upload doc at the trust
  * boundary (see `captureFileRef`). The intrinsic validator is intentionally a no-op: MIME/size/existence are
- * enforced authoritatively server-side against the stored doc, never against client metadata. `relationTo`,
- * `mimeTypes`, and `maxSize` persist on the block so the capture can enforce them.
+ * enforced authoritatively server-side against the stored doc, never against client metadata. `mimeTypes`
+ * and `maxSize` persist on the block so the capture can enforce them. `uploadsCollection` is not
+ * author-editable: a forms hook stamps the plugin-configured uploads collection slug onto it on every save
+ * so the client renderer knows where to POST; the server never trusts it at submit time (plugin config
+ * stays the source of truth). Named `uploadsCollection` because `collection` is a mongoose-reserved
+ * schema pathname.
  */
 export const fileField = defineFormField<'file', FileConfig>({
 	type: 'file',
 	label: keys.fieldTypeFile,
 	value: 'file',
 	config: [
-		{ name: 'relationTo', type: 'text', label: labelFor(keys.fileConfigRelationTo) },
+		{ name: 'uploadsCollection', type: 'text', admin: { hidden: true } },
 		{
 			name: 'mimeTypes',
 			type: 'select',

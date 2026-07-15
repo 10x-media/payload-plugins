@@ -1,35 +1,38 @@
-import type { CollectionConfig, Config, Field } from 'payload'
+import type { Config } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
+import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
-import type { PresentationDescriptorRegistry } from '../presentations/registry'
+import type { PollOptionSourceRegistry } from '../poll/registry'
 import type { ResolvedSpamConfig } from '../spam/types'
-import { buildUploadOwnerStamp, buildUploadRateLimit } from '../spam/uploadHooks'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import type { CollectionOverrides } from './collectionOverrides'
+import { attachUploadsCollection, type UploadsOption } from './uploadsCollection'
 
 type RegisterCollectionsArgs = {
 	config: Config
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
 	consentRegistry: ConsentSourceRegistry
-	presentationRegistry: PresentationDescriptorRegistry
 	actionRegistry: ActionRegistry
 	richText?: RichTextBodyOption
 	hasJobsPlugin: boolean
 	events?: FormEventSink
-	uploads: { enabled: boolean; slug: string; collection?: CollectionConfig }
+	uploads: UploadsOption
 	spam: ResolvedSpamConfig | false
 	showSubmissionRawFields: boolean
+	localizeContent: boolean
+	resultsAccess?: FormResultsAccess
+	votedCookie: boolean
+	pollSourceRegistry: PollOptionSourceRegistry
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
-		uploads?: CollectionOverrides
 	}
 }
 
@@ -38,7 +41,6 @@ export const registerCollections = ({
 	registry,
 	ruleRegistry,
 	consentRegistry,
-	presentationRegistry,
 	actionRegistry,
 	richText,
 	hasJobsPlugin,
@@ -46,62 +48,31 @@ export const registerCollections = ({
 	uploads,
 	spam,
 	showSubmissionRawFields,
+	localizeContent,
+	resultsAccess,
+	votedCookie,
+	pollSourceRegistry,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
 
-	let uploadsCollection: CollectionConfig | null = null
-	if (uploads.enabled && uploads.collection) {
-		const col = uploads.collection
-
-		// Spam hooks are added first (plugin-owned invariant)
-		if (spam) {
-			col.hooks = col.hooks ?? {}
-			col.hooks.beforeOperation = [...(col.hooks.beforeOperation ?? []), buildUploadRateLimit(spam)]
-			col.hooks.beforeValidate = [...(col.hooks.beforeValidate ?? []), buildUploadOwnerStamp(spam)]
-		}
-
-		// Apply CollectionOverrides using explicit spreads after spam hooks are in place.
-		// ...col first so the plugin defaults are the base, ...(ov ?? {}) second so the consumer
-		// wins for any top-level key not explicitly re-set below (consistent with forms/formSubmissions).
-		// The locked keys (hooks array ordering, fields function) are spread last.
-		const ov = overrides?.uploads
-		if (ov) {
-			const defaultFields = (col.fields ?? []) as Field[]
-			uploadsCollection = {
-				...col,
-				...(ov ?? {}),
-				access: { ...(col.access ?? {}), ...(ov.access ?? {}) },
-				admin: { ...(col.admin ?? {}), ...(ov.admin ?? {}) },
-				hooks: {
-					...(ov.hooks ?? {}),
-					// Spam hooks stay first in each array; consumer hooks appended
-					beforeOperation: [
-						...(col.hooks?.beforeOperation ?? []),
-						...(ov.hooks?.beforeOperation ?? []),
-					],
-					beforeValidate: [
-						...(col.hooks?.beforeValidate ?? []),
-						...(ov.hooks?.beforeValidate ?? []),
-					],
-				},
-				fields: ov.fields ? ov.fields({ defaultFields }) : defaultFields,
-			}
-		} else {
-			uploadsCollection = col
-		}
+	const uploadSlug = uploads === false ? undefined : uploads.collection
+	if (uploads !== false) {
+		attachUploadsCollection({ config, slug: uploads.collection, spam })
 	}
 
 	config.collections = [
 		...(config.collections ?? []),
-		...(uploadsCollection ? [uploadsCollection] : []),
 		buildFormsCollection({
 			registry,
 			ruleRegistry,
 			consentRegistry,
-			presentationRegistry,
 			actionRegistry,
+			localizeContent,
+			uploadsCollectionSlug: uploadSlug,
+			resultsAccess,
+			pollSourceRegistry,
 			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({
@@ -112,8 +83,10 @@ export const registerCollections = ({
 			richText,
 			events,
 			hasRunner,
-			uploadSlug: uploads.slug,
+			uploadSlug,
 			spam,
+			votedCookie,
+			pollSourceRegistry,
 			showRawFields: showSubmissionRawFields,
 			overrides: overrides?.formSubmissions,
 		}),

@@ -25,13 +25,15 @@ export default buildConfig({
 
 The plugin's notification bodies are rich text fields that inherit your project's `editor`, so the config must set one (any editor works; Payload throws `MissingEditorProp` at startup otherwise). See [rich text bodies](/form-builder/actions#rich-text-bodies).
 
-This registers three collections under a **Forms** admin group: `forms` (the documents editors author), `form-submissions` (typed, validated responses), and `form-uploads` (backing the file field).
+This registers two collections under a **Forms** admin group: `forms` (the documents editors author) and `form-submissions` (typed, validated responses). File uploads are opt-in and bring-your-own: point `uploads: { collection: '...' }` at an upload collection you own to enable the `file` field type (see [File uploads](/form-builder/uploads)).
 
 The in-admin condition and flow builders ship their own styles; no admin setup is needed.
 
+`formBuilder` registers with `order: 50`. Plugins execute in ascending `order` (lower first), so any plugin that needs to run *after* it, for example `@payloadcms/plugin-multi-tenant`, which wraps every collection already present in the config including the three above, needs an explicit `order` higher than `50`.
+
 ## Author a form
 
-In the admin, create a `forms` document: give it a title, then add fields as blocks in the **Fields** tab (a text field `name`, an email field `email`, a textarea `message`); multi-step flow and post-submit actions live in the **Flow** and **Actions** tabs beside it. Each field block is tabbed too: **Field** holds the basics and type config, **Validation** the rules, **Advanced** the visibility condition and hidden flag.
+In the admin, create a `forms` document: give it a title, then add fields as blocks in the **Fields** tab (a text field `name`, an email field `email`, a textarea `message`). The tabs beside it cover the rest: **Display** (an optional title and intro shown above the fields), **Flow** (multi-step), **Actions** (post-submit), and **Response** (the success message, or a redirect, and the submit button label). Each field block is tabbed too: **Field** holds the basics and type config, **Validation** the rules, **Advanced** the visibility condition and hidden flag.
 
 ## Render it
 
@@ -40,6 +42,7 @@ Fetch the form document and hand it to the headless renderer:
 ```tsx title="app/contact/page.tsx"
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { toFormDocument } from '@10x-media/form-builder/rsc'
 import { ContactForm } from './ContactForm'
 
 export default async function ContactPage() {
@@ -49,9 +52,11 @@ export default async function ContactPage() {
     where: { title: { equals: 'Contact' } },
     limit: 1,
   })
-  return <ContactForm form={docs[0]} />
+  return <ContactForm form={toFormDocument(docs[0])} />
 }
 ```
+
+`toFormDocument` narrows the Payload-generated document to the `FormDocument` shape the renderer expects, without a cast; it is server-safe, so calling it in a Server Component is fine.
 
 ```tsx title="app/contact/ContactForm.tsx"
 'use client'

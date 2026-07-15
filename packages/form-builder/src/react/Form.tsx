@@ -12,25 +12,41 @@ import {
 	useRef,
 	useState,
 } from 'react'
+import { serializeBody } from '../actions/body/serializeBody'
 import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
 import { noopEventSink } from '../events/noopSink'
 import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
-import type { FormFlow } from '../flow/types'
-import { defaultPresentationDescriptors } from '../presentations/defaults'
+import type {
+	FormDisplaySettings,
+	FormDocument,
+	FormPollSettings,
+	FormResponseSettings,
+} from '../form/types'
+import {
+	DEFAULT_PRESENTATION_NAME,
+	defaultPresentationDescriptors,
+} from '../presentations/defaults'
 import { interpolate } from '../recall/interpolate'
 import { buildRecallResolver } from '../recall/resolver'
 import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import { en } from '../translations/en'
+import { keys } from '../translations/keys'
 import { makeTranslate } from '../translations/makeTranslate'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import { cn } from './cn'
 import type { FieldRenderer, RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
-import { FormContext, type FormStepInfo } from './FormContext'
+import { FormContext, type FormContextValue, type FormStepInfo } from './FormContext'
+import {
+	type BackButtonRenderProps,
+	FormControls,
+	type NextButtonRenderProps,
+	type SubmitButtonRenderProps,
+} from './FormControls'
 import { type FieldWidth, FormLayout, widthProps } from './FormLayout'
 import { Honeypot } from './Honeypot'
 import { defaultPresentations } from './presentation/presentations'
@@ -40,38 +56,27 @@ import { applyRecall } from './recall'
 import { type RenderersConfig, resolveRenderers } from './registry'
 import { defaultRenderers } from './renderers'
 import { buildFieldTypeRegistry, buildValidationRuleRegistry, visibleFields } from './resolveForm'
-import { type FieldErrors, type FormAction, formReducer, initialFormState } from './state'
+import {
+	type FieldErrors,
+	type FormAction,
+	formReducer,
+	initialFormState,
+	seedFieldValues,
+} from './state'
 import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitForm'
 import { useField } from './useField'
 import { validateFieldValue } from './validateField'
 
-export type FormDocument = {
-	id: number | string
-	fields: FormFieldInstance[]
-	flow?: FormFlow
-	/** Stored presentation name; overridden by the `presentation` prop. */
-	defaultPresentation?: string
-}
-
-/** Props passed to `renderSubmit`. */
-export type SubmitButtonRenderProps = {
-	label: string
-	submitting: boolean
-}
-
-/** Props passed to `renderNext`. */
-export type NextButtonRenderProps = {
-	label: string
-	submitting: boolean
-	onClick: () => void
-}
-
-/** Props passed to `renderBack`. */
-export type BackButtonRenderProps = {
-	label: string
-	submitting: boolean
-	onClick: () => void
-}
+export type {
+	BackButtonRenderProps,
+	NextButtonRenderProps,
+	SubmitButtonRenderProps,
+} from './FormControls'
+// FormResponseSettings, FormDisplaySettings, FormPollSettings, and FormDocument live in
+// `../form/types` (no 'use client') so server code (e.g. `toFormDocument` in a Server Component)
+// can use them without pulling in this client module. Re-exported here so `./react` and existing
+// `from './Form'` imports keep working unchanged.
+export type { FormDisplaySettings, FormDocument, FormPollSettings, FormResponseSettings }
 
 export type FormProps = {
 	form: FormDocument
@@ -86,19 +91,26 @@ export type FormProps = {
 	t?: RendererTranslate
 	locale?: string
 	layout?: boolean
+	/** Submit button label. Precedence: this prop, then the form's `response.submitLabel`, then the translated default. */
 	submitLabel?: string
+	/** "Next" button label for multi-step forms. Defaults to the translated `'Next'`. */
 	nextLabel?: string
+	/** "Back" button label for multi-step forms. Defaults to the translated `'Back'`. */
 	backLabel?: string
 	/** Label for the overlay close control (modal/drawer). */
 	closeLabel?: string
 	successMessage?: string
-	/** Active presentation: a name into the registry or an inline presentation. Overrides the form's stored default. */
+	/** Active presentation: a name into the registry or an inline presentation. Defaults to `'page'` when omitted. */
 	presentation?: string | FormPresentation
 	/** Per-render presentation overrides merged onto the defaults (add, replace, or `false` to remove). */
 	presentations?: PresentationsConfig
 	/** Invoked when an overlay presentation dismisses (close button, Escape, outside click, or `dismissOnSuccess`). */
 	onClose?: () => void
-	/** Accessible name for an overlay surface. */
+	/**
+	 * Accessible name for an overlay surface (modal/drawer). Hosts choosing between a trigger
+	 * label and the form's own display title should prefer `form.display?.title` when
+	 * `form.display?.showTitle` is set, falling back to their own label otherwise.
+	 */
 	title?: string
 	/** Seed initial field values (e.g. from `valuesFromSearchParams`). Still validated on submit. */
 	initialValues?: Record<string, unknown>
@@ -189,9 +201,9 @@ export const Form = ({
 	t,
 	locale = 'en',
 	layout,
-	submitLabel = 'Submit',
-	nextLabel = 'Next',
-	backLabel = 'Back',
+	submitLabel,
+	nextLabel,
+	backLabel,
 	closeLabel = 'Close',
 	successMessage = 'Thank you.',
 	presentation,
@@ -222,14 +234,26 @@ export const Form = ({
 	const activePresentation: FormPresentation =
 		typeof presentation === 'object'
 			? presentation
-			: (presentationRegistry.get(presentation ?? form.defaultPresentation ?? 'page') ??
-				presentationRegistry.get('page') ??
+			: (presentationRegistry.get(presentation ?? DEFAULT_PRESENTATION_NAME) ??
+				presentationRegistry.get(DEFAULT_PRESENTATION_NAME) ??
 				defaultPresentationDescriptors.page)
 	const fieldsByName = useMemo(
 		() => new Map(form.fields.map((field) => [field.name, field])),
 		[form.fields]
 	)
 	const translate = useMemo<RendererTranslate>(() => t ?? makeTranslate(en), [t])
+	const docSubmitLabel =
+		typeof form.response?.submitLabel === 'string' && form.response.submitLabel.length > 0
+			? form.response.submitLabel
+			: undefined
+	const labels = useMemo(
+		() => ({
+			back: backLabel ?? translate(keys.formBack),
+			next: nextLabel ?? translate(keys.formNext),
+			submit: submitLabel ?? docSubmitLabel ?? translate(keys.formSubmit),
+		}),
+		[backLabel, nextLabel, submitLabel, docSubmitLabel, translate]
+	)
 
 	// Latest-value refs so event emission and the mount/unmount effect tolerate an inline `events` prop or a changing form id.
 	const sinkRef = useRef<FormEventSink>(noopEventSink)
@@ -239,7 +263,7 @@ export const Form = ({
 
 	const [state, rawDispatch] = useReducer(formReducer, form.fields, (fields) =>
 		initialFormState({
-			...Object.fromEntries(fields.map((field) => [field.name, undefined])),
+			...seedFieldValues(fields),
 			...(initialValues ?? {}),
 		})
 	)
@@ -320,6 +344,14 @@ export const Form = ({
 	)
 
 	const visible = visibleFields(form.fields, effectiveValues)
+
+	/** Answered visible fields as submission values. Display-only ('none' kind) fields never contribute. */
+	const answeredValues = (): SubmissionValue[] =>
+		visibleFields(form.fields, effectiveValues)
+			.filter((field) => registry.get(field.blockType)?.value !== 'none')
+			.filter((field) => !isEmpty(effectiveValues[field.name]))
+			.map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
+
 	const stepNames = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
 	const stepVisible: FormFieldInstance[] = stepNames
 		.map((name) => visible.find((field) => field.name === name))
@@ -332,6 +364,7 @@ export const Form = ({
 		const results = await Promise.all(
 			stepVisible
 				.filter((field) => !calcExpressionOf(field))
+				.filter((field) => registry.get(field.blockType)?.value !== 'none')
 				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
 				.map(async (field) => ({
 					field,
@@ -416,9 +449,11 @@ export const Form = ({
 		const visible = visibleFields(form.fields, effectiveValues)
 		const results = await Promise.all(
 			// Calc fields carry no rules and have no input; they are always satisfied, so skip validating them.
+			// Display-only ('none' kind, e.g. message) fields are skipped too, mirroring the server.
 			// A field whose `validateWhen` is unmet is skipped too, mirroring the server (no client/server divergence).
 			visible
 				.filter((field) => !calcExpressionOf(field))
+				.filter((field) => registry.get(field.blockType)?.value !== 'none')
 				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
 				.map(async (field) => ({
 					field,
@@ -489,9 +524,7 @@ export const Form = ({
 			return
 		}
 		rawDispatch({ type: 'SUBMIT_START' })
-		const values: SubmissionValue[] = visible
-			.filter((field) => !isEmpty(effectiveValues[field.name]))
-			.map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
+		const values: SubmissionValue[] = answeredValues()
 		if (honeypotName) {
 			const decoy = honeypotRef.current?.value ?? ''
 			if (decoy !== '') {
@@ -515,6 +548,17 @@ export const Form = ({
 			onSuccess?.(result.submissionId)
 			if (activePresentation.dismissOnSuccess) {
 				handleClose()
+			}
+			const redirectUrl =
+				form.response?.type === 'redirect' ? form.response.redirect?.url : undefined
+			// Part of submit handling, not rendering: fires on the custom-`children` path too.
+			// Browser-only: no-op during SSR or in non-DOM test environments.
+			if (
+				typeof redirectUrl === 'string' &&
+				redirectUrl.length > 0 &&
+				typeof window !== 'undefined'
+			) {
+				window.location.assign(redirectUrl)
 			}
 		} else {
 			if (result.fieldErrors) {
@@ -548,7 +592,17 @@ export const Form = ({
 				goBack: () => {},
 			}
 
-	const contextValue = { state, dispatch, validateField, locale, step, rendererRegistry }
+	const contextValue: FormContextValue = {
+		state,
+		dispatch,
+		validateField,
+		locale,
+		step,
+		rendererRegistry,
+		labels,
+		t: translate,
+		effectiveValues,
+	}
 
 	const PresentationWrapper = activePresentation.Wrapper
 	const wrap = (content: ReactNode): ReactNode =>
@@ -586,17 +640,36 @@ export const Form = ({
 	}
 
 	if (state.submitted) {
+		const responseMessage =
+			form.response?.type === 'message' || form.response?.type == null
+				? form.response?.message
+				: undefined
+		const responseHtml = responseMessage
+			? serializeBody(responseMessage, { values: answeredValues(), descriptors: [] })
+			: undefined
 		return (
 			<FormContext.Provider value={contextValue}>
 				{wrap(
-					<p
-						role="status"
-						className={cn('fb-form__success', className)}
-						data-fb-presentation={activePresentation.name}
-						data-fb-density={activePresentation.density}
-					>
-						{interpolate(successMessage, recall)}
-					</p>
+					responseHtml ? (
+						// Safe to inject: serializeBody HTML-escapes all text (recall values included) and sanitizes link URLs.
+						<div
+							role="status"
+							className={cn('fb-form__success', className)}
+							data-fb-presentation={activePresentation.name}
+							data-fb-density={activePresentation.density}
+							// biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is produced by our escaping serializer, never raw user input
+							dangerouslySetInnerHTML={{ __html: responseHtml }}
+						/>
+					) : (
+						<p
+							role="status"
+							className={cn('fb-form__success', className)}
+							data-fb-presentation={activePresentation.name}
+							data-fb-density={activePresentation.density}
+						>
+							{interpolate(successMessage, recall)}
+						</p>
+					)
 				)}
 			</FormContext.Provider>
 		)
@@ -605,6 +678,16 @@ export const Form = ({
 	const rendered = (flow ? stepVisible : visible).filter(
 		(field) => field.hidden !== true && field.calcDisplay !== false
 	)
+
+	const displayTitleText =
+		form.display?.showTitle &&
+		typeof form.display.title === 'string' &&
+		form.display.title.length > 0
+			? interpolate(form.display.title, recall)
+			: undefined
+	const displayIntroHtml = form.display?.intro
+		? serializeBody(form.display.intro, { values: answeredValues(), descriptors: [] })
+		: ''
 
 	return (
 		<FormContext.Provider value={contextValue}>
@@ -617,6 +700,15 @@ export const Form = ({
 					data-fb-density={activePresentation.density}
 				>
 					{honeypotName ? <Honeypot name={honeypotName} inputRef={honeypotRef} /> : null}
+					{displayTitleText ? <h2 className="fb-form__title">{displayTitleText}</h2> : null}
+					{displayIntroHtml ? (
+						<div
+							className="fb-form__intro"
+							// Safe to inject: serializeBody HTML-escapes all text (recall values included) and sanitizes link URLs.
+							// biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is produced by our escaping serializer, never raw user input
+							dangerouslySetInnerHTML={{ __html: displayIntroHtml }}
+						/>
+					) : null}
 					<FormLayout enabled={layout !== false}>
 						{rendered.map((field) => {
 							const renderer = rendererRegistry.get(field.blockType)
@@ -655,60 +747,14 @@ export const Form = ({
 							{state.submitError}
 						</p>
 					) : null}
-					{flow ? (
-						<div className="fb-form__controls">
-							{!step.isFirst ? (
-								renderBack ? (
-									renderBack({ label: backLabel, submitting: state.submitting, onClick: goBack })
-								) : (
-									<button
-										type="button"
-										className={backButtonClassName}
-										onClick={goBack}
-										disabled={state.submitting}
-									>
-										{backLabel}
-									</button>
-								)
-							) : null}
-							{step.isTerminal ? (
-								renderSubmit ? (
-									renderSubmit({ label: submitLabel, submitting: state.submitting })
-								) : (
-									<button
-										type="submit"
-										className={submitButtonClassName}
-										disabled={state.submitting}
-									>
-										{submitLabel}
-									</button>
-								)
-							) : renderNext ? (
-								renderNext({
-									label: nextLabel,
-									submitting: state.submitting,
-									onClick: () => void goNext(),
-								})
-							) : (
-								<button
-									type="button"
-									className={nextButtonClassName}
-									disabled={state.submitting}
-									onClick={() => {
-										void goNext()
-									}}
-								>
-									{nextLabel}
-								</button>
-							)}
-						</div>
-					) : renderSubmit ? (
-						renderSubmit({ label: submitLabel, submitting: state.submitting })
-					) : (
-						<button type="submit" className={submitButtonClassName} disabled={state.submitting}>
-							{submitLabel}
-						</button>
-					)}
+					<FormControls
+						backButtonClassName={backButtonClassName}
+						nextButtonClassName={nextButtonClassName}
+						submitButtonClassName={submitButtonClassName}
+						renderBack={renderBack}
+						renderNext={renderNext}
+						renderSubmit={renderSubmit}
+					/>
 				</form>
 			)}
 		</FormContext.Provider>

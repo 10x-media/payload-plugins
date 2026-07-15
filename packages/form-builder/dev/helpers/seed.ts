@@ -80,7 +80,6 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				],
 			},
 		],
-		showResults: true,
-		resultsField: 'framework',
+		poll: { enabled: true, resultsField: 'framework' },
 	})
 }

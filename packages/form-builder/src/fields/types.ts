@@ -3,7 +3,11 @@ import type { Field } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import type { FileRef } from '../uploads/types'
 
-/** The stored value shapes a field type can declare. Drives `validate`/`format` typing and value coercion. */
+/**
+ * The stored value shapes a field type can declare. Drives `validate`/`format` typing and value
+ * coercion. `'none'` marks a display-only type (e.g. `message`): the engine never seeds, validates,
+ * or stores a value for it, and a client-sent value under its name is dropped.
+ */
 export type FormFieldValueKind =
 	| 'text'
 	| 'number'
@@ -12,6 +16,7 @@ export type FormFieldValueKind =
 	| 'text[]'
 	| 'file'
 	| 'repeater'
+	| 'none'
 
 export type ValueKindTypeMap = {
 	text: string
@@ -21,6 +26,7 @@ export type ValueKindTypeMap = {
 	'text[]': string[]
 	file: FileRef
 	repeater: Array<Record<string, unknown>>
+	none: never
 }
 
 export type ValueOfKind<K extends FormFieldValueKind> = ValueKindTypeMap[K]

@@ -17,7 +17,7 @@ export type FetchResultsResult =
 /**
  * Fetch aggregate poll/survey results from the form-builder results endpoint
  * (`GET {apiRoute}/forms/:id/results`). Returns the server-resolved aggregations; the endpoint gates public
- * access by the form's `showResults` opt-in. Pure: inject `fetchImpl` in tests.
+ * access by the form's poll opt-in and results visibility. Pure: inject `fetchImpl` in tests.
  */
 export const fetchFormResults = async (input: FetchResultsInput): Promise<FetchResultsResult> => {
 	const { formId, field, apiRoute = '/api', fetchImpl = fetch } = input

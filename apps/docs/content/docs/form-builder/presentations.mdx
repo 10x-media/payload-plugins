@@ -14,7 +14,7 @@ A presentation is a named bundle controlling how a form surfaces: in the page fl
 
 ## Choosing a presentation
 
-Editors pick a `defaultPresentation` on the form document; the renderer uses it automatically (`page` is the fallback). Override at render time with the `presentation` prop, as a registered name or an inline object:
+Presentation is a rendering concern, decided by the code that renders the form, not stored on the form document. Pass the `presentation` prop, as a registered name or an inline object (`page` is the default when omitted):
 
 ```tsx
 <Form form={form} presentation="modal" onClose={() => setOpen(false)} title="Contact us" />
@@ -24,24 +24,7 @@ Editors pick a `defaultPresentation` on the form document; the renderer uses it 
 
 ## Custom presentations
 
-Register through the plugin option to add a presentation to the admin select everywhere, following the [opt-in convention](/concepts#the-opt-in-convention):
-
-```ts title="payload.config.ts"
-formBuilder({
-  presentations: {
-    drawer: false, // remove a built-in
-    fullscreen: {
-      name: 'fullscreen',
-      label: 'Fullscreen',
-      surface: 'overlay',
-      density: 'comfortable',
-      dismissOnSuccess: true,
-    },
-  },
-})
-```
-
-The plugin option lives in server config, so it takes serializable descriptors only. The React `Wrapper` an overlay needs is supplied at render time instead: pass a full `FormPresentation` to `<Form>` via its `presentations` prop:
+Register at render time through the `presentations` prop, following the [opt-in convention](/concepts#the-opt-in-convention) (`false` removes a built-in, an object adds or replaces one). An overlay presentation is a full `FormPresentation` with the React `Wrapper` it needs:
 
 ```tsx
 import { DialogSurface, type FormPresentation } from '@10x-media/form-builder/react'

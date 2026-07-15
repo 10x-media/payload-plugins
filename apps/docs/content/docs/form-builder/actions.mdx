@@ -24,6 +24,20 @@ export default buildConfig({
 })
 ```
 
+When the project editor is feature-rich (blocks, embeds, admin-only conveniences) and you want email authors on a minimal toolbar instead, `richText.editor` overrides the editor on both action body fields without touching the rest of the admin:
+
+```ts title="payload.config.ts"
+import { FixedToolbarFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
+
+formBuilder({
+  richText: {
+    editor: lexicalEditor({
+      features: ({ defaultFeatures }) => [...defaultFeatures, FixedToolbarFeature()],
+    }),
+  },
+})
+```
+
 At send time the body is serialized to HTML. Author-typed text is HTML-escaped and supports recall tokens:
 
 | Token | Renders |
@@ -57,6 +71,21 @@ formBuilder({
 formBuilder({
   richText: {
     serialize: ({ body, values }) => toSlackMarkdown(body, values),
+  },
+})
+```
+
+Beyond `body`, `values`, and `descriptors`, `serialize` receives the submitted `form` (`{ id, title }`) and the `req`, so the replacement can branch on context: look up a per-tenant template, or hand the raw body off to a component renderer like react-email:
+
+```tsx
+formBuilder({
+  richText: {
+    serialize: async ({ body, values, form, req }) => {
+      const tenant = await tenantFromRequest(req)
+      return render(
+        <SubmissionEmail body={body} values={values} formTitle={form.title} branding={tenant.branding} />
+      )
+    },
   },
 })
 ```

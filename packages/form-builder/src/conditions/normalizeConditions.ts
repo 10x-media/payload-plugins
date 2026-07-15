@@ -68,8 +68,11 @@ export const normalizeFormConditions = (
 	const operandTypes = new Map<string, ConditionFieldType>()
 	for (const row of fields) {
 		const name = typeof row.name === 'string' ? row.name.trim() : ''
-		if (name.length > 0) {
-			operandTypes.set(name, conditionTypes[row.blockType] ?? 'text')
+		// A type absent from the map is not conditionable (display-only, e.g. message): constraints
+		// referencing it are stripped, matching the client operand list.
+		const conditionType = conditionTypes[row.blockType]
+		if (name.length > 0 && conditionType) {
+			operandTypes.set(name, conditionType)
 		}
 	}
 	return fields.map((row) => {

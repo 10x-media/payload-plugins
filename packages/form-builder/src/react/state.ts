@@ -1,3 +1,5 @@
+import type { FormFieldInstance } from '../submissions/types'
+
 export type FieldErrors = Record<string, string[]>
 
 export type FormState = {
@@ -19,6 +21,25 @@ export type FormAction =
 	| { type: 'SUBMIT_START' }
 	| { type: 'SUBMIT_SUCCESS' }
 	| { type: 'SUBMIT_ERROR'; message: string }
+
+/**
+ * Per-field defaults for the reducer's initial state. A repeater with a positive `minRows` starts
+ * pre-seeded with that many empty rows, matching the schema's own floor. Computed once, ahead of the
+ * reducer, so seeding is never an action: it can't touch a field, trigger validation, or (via `Form`'s
+ * dispatch wrapper) be mistaken for the user's first edit and fire `form.started`.
+ */
+export const seedFieldValues = (fields: FormFieldInstance[]): Record<string, unknown> =>
+	Object.fromEntries(
+		fields.map((field) => {
+			if (field.blockType === 'repeater') {
+				const minRows = typeof field.minRows === 'number' ? field.minRows : 0
+				if (minRows > 0) {
+					return [field.name, Array.from({ length: minRows }, () => ({}))]
+				}
+			}
+			return [field.name, undefined]
+		})
+	)
 
 export const initialFormState = (values: Record<string, unknown>): FormState => ({
 	values,

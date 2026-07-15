@@ -23,10 +23,13 @@ describe('operandFromRow', () => {
 		expect(operand?.options).toEqual([{ label: 'US', value: 'us' }])
 	})
 
-	it('falls back to the name when label is absent, and to text when type is unknown', () => {
-		const operand = operandFromRow({ blockType: 'mystery', name: 'x' }, {})
+	it('falls back to the name when label is absent', () => {
+		const operand = operandFromRow({ blockType: 'text', name: 'x' }, { text: 'text' })
 		expect(operand?.label).toBe('x')
-		expect(operand?.conditionType).toBe('text')
+	})
+
+	it('skips rows whose type is absent from the map (not conditionable, e.g. message)', () => {
+		expect(operandFromRow({ blockType: 'message', name: 'note' }, { text: 'text' })).toBeNull()
 	})
 
 	it('skips rows without a usable name', () => {

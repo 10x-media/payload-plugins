@@ -41,6 +41,19 @@ describe('shadcn FormResults', () => {
 		expect(within(container).getByText('No responses yet')).toBeInTheDocument()
 	})
 
+	it('highlights the winning bucket with class and a badge', () => {
+		const { container } = render(createElement(FormResults, { results: agg, winningValue: 'red' }))
+		const winner = container.querySelector('.fb-results__bucket--winner')
+		expect(winner).not.toBeNull()
+		expect(winner?.textContent).toContain('Red')
+		expect(winner?.textContent).toContain('Winner')
+	})
+
+	it('marks no winner without a winningValue', () => {
+		const { container } = render(createElement(FormResults, { results: agg }))
+		expect(container.querySelector('.fb-results__bucket--winner')).toBeNull()
+	})
+
 	it('notes a sampled total only when truncated', () => {
 		const plain = render(createElement(FormResults, { results: agg }))
 		expect(plain.container.textContent).not.toContain('(sample)')

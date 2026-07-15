@@ -18,7 +18,9 @@ export const fileField = defineFieldRenderer<string | number>(
 		const describedById = `${id}-desc`
 		const label = typeof field.label === 'string' ? field.label : undefined
 		const description = typeof field.description === 'string' ? field.description : undefined
-		const collection = typeof field.relationTo === 'string' ? field.relationTo : 'form-uploads'
+		// Stamped server-side onto the block from the plugin's `uploads.collection` config.
+		const collection =
+			typeof field.uploadsCollection === 'string' ? field.uploadsCollection : undefined
 		const types = typesOf(field.mimeTypes)
 		const accept = types.length > 0 ? types.join(',') : undefined
 		// Zero is a real limit, matching resolveFileRef server-side (filesize > maxSize rejects any non-empty file).
@@ -44,6 +46,10 @@ export const fileField = defineFieldRenderer<string | number>(
 			}
 			if (maxSize !== undefined && selected.size > maxSize) {
 				setLocalError(`File is too large (max ${formatBytes(maxSize)})`)
+				return
+			}
+			if (!collection) {
+				setLocalError('Upload failed')
 				return
 			}
 			setUploading(true)
