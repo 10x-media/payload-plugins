@@ -53,6 +53,7 @@
 		"fb-form-document-types",
 		"fb-forms-secret-access",
 		"fb-honeypot-autofill",
+		"fb-paddle-feedback",
 		"fb-repeater-field",
 		"fb-submission-status",
 		"form-builder-feedback",
