@@ -7,7 +7,7 @@ Every read (widgets, display fields, sync) goes through a surfacing engine that 
 
 ## TTLs
 
-Cache entries are keyed per adapter and query and snapped to the day of the [reporting timezone](/docs/analytics/timezone) (UTC by default). Two reads on the same day therefore share a cached result, and reads in different timezones never collide. Two TTLs apply:
+Cache entries are keyed per adapter and query and snapped to the day of the [reporting timezone](/analytics/timezone) (UTC by default). Two reads on the same day therefore share a cached result, and reads in different timezones never collide. Two TTLs apply:
 
 ```ts
 analytics({

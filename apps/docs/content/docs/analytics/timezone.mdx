@@ -46,6 +46,8 @@ analytics({
 
 Return `null` to fall back to UTC. An unresolvable zone string also falls back to UTC (with a warning), so a bad value never breaks a read.
 
+The resolver runs on every ingest request and widget read, so cache anything that hits the database (a per-scope in-memory map with a short TTL is enough); the plugin does not memoize it for you.
+
 ## What it controls
 
 - Timeframe presets resolve their window in the timezone (`today` starts at that zone's midnight).
