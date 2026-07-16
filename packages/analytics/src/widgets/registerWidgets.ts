@@ -90,6 +90,8 @@ const metricSelectField = (
 		...(defaultValue !== undefined ? { defaultValue } : {}),
 		label: labelForKey(keys.widgetFieldMetric),
 		options,
+		// A required metric has no meaningful cleared state.
+		admin: { isClearable: false },
 		...(args.multiProvider ? { filterOptions } : {}),
 	}
 }
@@ -102,20 +104,13 @@ const titleField = (args: RegisterWidgetsArgs, placeholder: string): Field => ({
 	admin: { placeholder },
 })
 
-const half = (field: Field): Field =>
-	({
-		...field,
-		admin: { ...('admin' in field ? field.admin : {}), width: '50%' },
-	}) as Field
-
-const row = (fields: Field[]): Field => ({ type: 'row', fields })
-
 const timeframeSelectField = (): Field => ({
 	name: 'timeframe',
 	type: 'select',
 	required: true,
 	defaultValue: 'last30days',
 	label: labelForKey(keys.widgetFieldTimeframe),
+	admin: { isClearable: false },
 	options: [
 		...TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
 		{ value: 'custom', label: labelForKey(keys.widgetTimeframeCustom) },
@@ -127,6 +122,8 @@ const dataSourceField = (args: RegisterWidgetsArgs): Field => ({
 	type: 'select',
 	label: labelForKey(keys.widgetFieldDataSource),
 	defaultValue: args.adapters[0]?.id,
+	// Clearing would leave no source; the widget always reads through one.
+	admin: { isClearable: false },
 	options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
 })
 
@@ -144,76 +141,55 @@ const customRangeField = (): Field =>
 		}),
 	})
 
-/** The metric select, wherever it sits (top level or inside a row). */
-export const findMetricField = (fields: Field[]): Field | undefined => {
-	for (const field of fields) {
-		if ('name' in field && field.name === 'metric') {
-			return field
-		}
-		if (field.type === 'row') {
-			const nested = findMetricField(field.fields)
-			if (nested) {
-				return nested
-			}
-		}
-	}
-	return undefined
-}
+/** The metric select in a widget's field list. */
+export const findMetricField = (fields: Field[]): Field | undefined =>
+	fields.find((field) => 'name' in field && field.name === 'metric')
 
 const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
 	titleField(args, en[keys.widgetFieldTitlePlaceholder]),
-	row([half(metricSelectField(WIDGET_METRICS, args)), half(timeframeSelectField())]),
+	metricSelectField(WIDGET_METRICS, args),
+	timeframeSelectField(),
 	customRangeField(),
 	...(args.multiProvider ? [dataSourceField(args)] : []),
 ]
 
-const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => {
-	const limitField: Field = {
+const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => [
+	titleField(args, en[spec.label]),
+	metricSelectField(WIDGET_METRICS, args, { extra: { dimensions: [spec.dimension] } }),
+	timeframeSelectField(),
+	customRangeField(),
+	{
 		name: 'limit',
 		type: 'number',
 		defaultValue: 5,
 		min: 1,
 		max: 20,
 		label: labelForKey(keys.widgetFieldLimit),
-	}
-	return [
-		titleField(args, en[spec.label]),
-		row([
-			half(metricSelectField(WIDGET_METRICS, args, { extra: { dimensions: [spec.dimension] } })),
-			half(timeframeSelectField()),
-		]),
-		customRangeField(),
-		...(args.multiProvider ? [row([half(limitField), half(dataSourceField(args))])] : [limitField]),
-	]
-}
+	},
+	...(args.multiProvider ? [dataSourceField(args)] : []),
+]
 
-const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
-	const windowField: Field = {
+const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+	titleField(args, en[keys.widgetFieldTitlePlaceholder]),
+	metricSelectField(['visitors', 'pageviews'], args, {
+		extra: { realtime: true },
+		preferredDefault: 'visitors',
+	}),
+	{
 		name: 'windowMinutes',
 		type: 'select',
 		defaultValue: '30',
 		label: labelForKey(keys.widgetFieldWindow),
+		admin: { isClearable: false },
 		options: [
 			{ value: '5', label: '5 min' },
 			{ value: '15', label: '15 min' },
 			{ value: '30', label: '30 min' },
 			{ value: '60', label: '60 min' },
 		],
-	}
-	return [
-		titleField(args, en[keys.widgetFieldTitlePlaceholder]),
-		row([
-			half(
-				metricSelectField(['visitors', 'pageviews'], args, {
-					extra: { realtime: true },
-					preferredDefault: 'visitors',
-				})
-			),
-			half(windowField),
-		]),
-		...(args.multiProvider ? [dataSourceField(args)] : []),
-	]
-}
+	},
+	...(args.multiProvider ? [dataSourceField(args)] : []),
+]
 
 const WIDGET_DEFS: WidgetDef[] = [
 	{
