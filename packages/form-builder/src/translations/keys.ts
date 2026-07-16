@@ -22,6 +22,7 @@ export const keys = {
 	validationDate: 'formBuilder:validation.date',
 	validationSelect: 'formBuilder:validation.select',
 	validationEmailFieldUnknown: 'formBuilder:validation.emailFieldUnknown',
+	validationResultsFieldUnknown: 'formBuilder:validation.resultsFieldUnknown',
 	formatYes: 'formBuilder:format.yes',
 	formatNo: 'formBuilder:format.no',
 	configName: 'formBuilder:config.name',

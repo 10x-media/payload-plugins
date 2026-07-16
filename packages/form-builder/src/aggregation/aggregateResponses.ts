@@ -18,6 +18,12 @@ export type AggregateFormResponsesArgs = {
 	maxSubmissions?: number
 	/** Page size for the submission scan. Default 500. */
 	pageSize?: number
+	/**
+	 * Source-resolved options by field name (an option-source poll's results field). They replace
+	 * the instance's authored options for bucket seeding, order, and labels, and mark the field
+	 * enumerable for the default field selection.
+	 */
+	resolvedOptions?: Record<string, { value: string; label: string }[]>
 }
 
 const optionsOf = (field: FormFieldInstance): { value: string; label: string }[] | undefined => {
@@ -33,11 +39,14 @@ const optionsOf = (field: FormFieldInstance): { value: string; label: string }[]
 /** True when a field declares non-empty options (a choice field safe to aggregate publicly). */
 export const fieldHasOptions = (field: FormFieldInstance): boolean => optionsOf(field) !== undefined
 
-const metaFor = (field: NamedFormFieldInstance): FieldMeta => ({
+const metaFor = (
+	field: NamedFormFieldInstance,
+	resolved?: { value: string; label: string }[]
+): FieldMeta => ({
 	field: field.name,
 	label: field.label ?? field.name,
 	fieldType: field.blockType,
-	options: optionsOf(field),
+	options: resolved && resolved.length > 0 ? resolved : optionsOf(field),
 })
 
 /**
@@ -57,6 +66,7 @@ export const aggregateFormResponses = async (
 		req,
 		maxSubmissions = 10000,
 		pageSize = 500,
+		resolvedOptions,
 	} = args
 	const form = await payload
 		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
@@ -72,12 +82,13 @@ export const aggregateFormResponses = async (
 			)
 		: instances.filter(
 				(field): field is NamedFormFieldInstance =>
-					isNamedField(field) && optionsOf(field) !== undefined
+					isNamedField(field) &&
+					(optionsOf(field) !== undefined || (resolvedOptions?.[field.name]?.length ?? 0) > 0)
 			)
 	if (selected.length === 0) {
 		return []
 	}
-	const metas = selected.map(metaFor)
+	const metas = selected.map((field) => metaFor(field, resolvedOptions?.[field.name]))
 
 	const statusWhere = status === 'all' ? [] : [{ status: { equals: status } }]
 	const where = { and: [{ form: { equals: formId } }, ...statusWhere] }

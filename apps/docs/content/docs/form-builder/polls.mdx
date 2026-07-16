@@ -40,9 +40,9 @@ Anonymous voters cannot read raw submissions, so public results are served as ag
 GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
 ```
 
-Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `poll.enabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
+Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `poll.enabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured. A poll with an [option source](#option-sources) is enumerable through its resolved options instead: the endpoint resolves the source server-side, seeds buckets in resolved order with the source's labels, forbids results while resolution is empty, and fails closed with a 503 when resolution fails.
 
-Set `poll.resultsField` to a choice field, never free text or PII.
+`poll.resultsField` is authored as a select listing the form's eligible fields: named instances of field types that declare `pollEligible` (built-in: `select`). Server validation enforces the same rule, so a free-text or PII field can never be stored while the poll is enabled.
 
 On multi-tenant hosts, add the `results.access` plugin option: it runs for anonymous requests after the form is loaded and before anything is served, so you can compare the form's tenant against the request's and refuse cross-tenant reads. Authenticated callers bypass it:
 
@@ -93,7 +93,29 @@ const pollOptions = await resolvePollOptions({ payload, form })
 return <Poll form={toFormDocument(form, { pollOptions })} resultsField="choice" />
 ```
 
-At submission time the server resolves the source again and accepts only the resolved values (fail closed), so a stale or forged option can never be recorded.
+At submission time the server resolves the source again and accepts only the resolved values (fail closed), so a stale or forged option can never be recorded. The [results endpoint](#the-results-endpoint) does the same for anonymous reads, so a sourced poll serves public results end to end without ever storing options on the form.
+
+### Custom eligible field types
+
+The eligibility rule extends to your own field types: declare `pollEligible` on the [definition](/form-builder/fields#defining-a-field-type) and it appears in the results-field select alongside `select`. Pair it with an option source so its answers stay enumerable; an athlete-vote field that renders as relationship picks, for example:
+
+```ts title="payload.config.ts"
+import { defineFormField, type FieldTypeOption } from '@10x-media/form-builder'
+
+const athleteVote = defineFormField<'text'>({
+  type: 'athleteVote',
+  label: 'Athlete vote',
+  value: 'text',
+  pollEligible: true,
+})
+
+formBuilder({
+  fields: { athleteVote: athleteVote as FieldTypeOption },
+  poll: { sources: { raceEntrants } },
+})
+```
+
+An author then adds an `athleteVote` field, picks it as the results field, and selects the `raceEntrants` source: submissions accept only resolved entrant ids, and anonymous results are bucketed and labelled from the same resolution.
 
 ## Outcome
 

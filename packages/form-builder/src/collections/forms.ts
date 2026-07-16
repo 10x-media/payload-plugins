@@ -25,6 +25,7 @@ import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
 import type { PollOptionSourceRegistry } from '../poll/registry'
+import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -131,6 +132,7 @@ export const buildFormsCollection = ({
 	buttons,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
+	const pollResultsTypes = pollEligibleTypes(registry)
 	const bareTypes = new Set(
 		[...registry.values()].filter((d) => d.bare === true).map((d) => d.type)
 	)
@@ -140,6 +142,7 @@ export const buildFormsCollection = ({
 		[...registry.values()].filter((d) => d.bare === true).map((d) => [d.type, d.label])
 	)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
+	const FIELD_NAME_SELECT_REF = '@10x-media/form-builder/client#FieldNameSelect'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
 		if (data && Array.isArray(data.fields)) {
@@ -351,13 +354,20 @@ export const buildFormsCollection = ({
 					defaultValue: false,
 					label: labelForKey(keys.pollEnabled),
 				},
+				// Authored by picking from the form's poll-eligible fields; the stored value stays a
+				// plain text field name. Select options and server validate share `pollResultsTypes`,
+				// so they cannot drift.
 				{
 					name: 'resultsField',
 					type: 'text',
 					label: labelForKey(keys.pollResultsField),
+					validate: buildValidateResultsField(pollResultsTypes),
 					admin: {
 						description: labelForKey(keys.pollResultsFieldDescription),
 						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
+						components: {
+							Field: { path: FIELD_NAME_SELECT_REF, clientProps: { types: pollResultsTypes } },
+						},
 					},
 				},
 				{
@@ -427,6 +437,7 @@ export const buildFormsCollection = ({
 					isAuthed: Boolean(req.user),
 					req,
 					access: resultsAccess,
+					eligibleTypes: pollResultsTypes,
 				})
 				return Response.json(body, { status })
 			},

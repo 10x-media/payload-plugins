@@ -128,20 +128,35 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 		expect(res.status).toBe(403)
 	})
 
+	// The resultsField validate refuses to store a non-eligible field, so misconfigured polls are
+	// planted below Payload (payload.db) to prove the endpoint guard holds for pre-existing docs.
+	const plantPoll = async (formId: number | string, poll: Record<string, unknown>) =>
+		booted.payload.db.updateOne({ collection: 'forms', id: formId, data: { poll } })
+
+	it('rejects saving a resultsField that names a non-eligible or unknown field', async () => {
+		await expect(makeForm({ poll: { enabled: true, resultsField: 'note' } })).rejects.toThrow()
+		await expect(makeForm({ poll: { enabled: true, resultsField: 'ghost' } })).rejects.toThrow()
+	})
+
+	it('accepts a stale resultsField while the poll is disabled (validation follows the condition)', async () => {
+		const form = await makeForm({ poll: { enabled: false, resultsField: 'ghost' } })
+		expect(form.id).toBeDefined()
+	})
+
 	it('forbids anonymous results when the public field is not enumerable (PII guard)', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'note' } })
+		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		await plantPoll(form.id, { enabled: true, resultsField: 'note' })
 		const res = await request(form.id)
 		expect(res.status).toBe(403)
 	})
 
 	it('forbids anonymous results for a closed poll whose field is not enumerable (PII guard survives close)', async () => {
-		const form = await makeForm({
-			poll: {
-				enabled: true,
-				resultsField: 'note',
-				resultsVisibility: 'afterClose',
-				closesAt: past(),
-			},
+		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		await plantPoll(form.id, {
+			enabled: true,
+			resultsField: 'note',
+			resultsVisibility: 'afterClose',
+			closesAt: past(),
 		})
 		const res = await request(form.id)
 		expect(res.status).toBe(403)

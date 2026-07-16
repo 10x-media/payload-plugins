@@ -13,6 +13,7 @@ export const buildSelectField = (localize: boolean) =>
 		label: keys.fieldTypeSelect,
 		value: 'text',
 		conditionType: 'select',
+		pollEligible: true,
 		config: [
 			{
 				name: 'options',

@@ -24,6 +24,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.validationDate]: 'Gib ein gültiges Datum ein',
 	[keys.validationSelect]: 'Wähle eine gültige Option',
 	[keys.validationEmailFieldUnknown]: 'Wähle ein bestehendes E-Mail-Feld dieses Formulars',
+	[keys.validationResultsFieldUnknown]: 'Wähle ein geeignetes Auswahlfeld dieses Formulars',
 	[keys.formatYes]: 'Ja',
 	[keys.formatNo]: 'Nein',
 	[keys.configName]: 'Name',
@@ -141,7 +142,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.resultsTruncated]: 'Zeigt eine Stichprobe der Antworten',
 	[keys.pollGroup]: 'Umfrage',
 	[keys.pollEnabled]: 'Umfrageergebnisse aktivieren',
-	[keys.pollResultsField]: 'Ergebnisfeld (technischer Name)',
+	[keys.pollResultsField]: 'Ergebnisfeld',
 	[keys.pollResultsFieldDescription]:
 		'Feld, dessen aggregierte Ergebnisse öffentlich sind. Verwende ein Auswahlfeld, niemals ein Freitext- oder personenbezogenes Feld.',
 	[keys.pollResultsVisibility]: 'Sichtbarkeit der Ergebnisse',

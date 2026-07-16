@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { FORMS_SLUG } from '../collections/forms'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
+import { resolvePollOptions } from '../poll/resolvePollOptions'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateFormResponses, fieldHasOptions } from './aggregateResponses'
 import type { FieldAggregation } from './types'
@@ -29,6 +30,13 @@ export type ResolveResultsRequestArgs = {
 	req?: PayloadRequest
 	/** Optional host seam for anonymous reads; absent means plugin-default gating only. */
 	access?: FormResultsAccess
+	/**
+	 * Poll-eligible field types (registry-derived). When set, an anonymous read of an
+	 * option-source poll also requires the results field's instance to be one of these types,
+	 * so legacy or db-written docs pointing at a free-text field can never expose stored
+	 * answers as leftover result buckets.
+	 */
+	eligibleTypes?: readonly string[]
 }
 
 export type ResolveResultsRequestResult = {
@@ -41,19 +49,30 @@ const forbidden: ResolveResultsRequestResult = {
 	body: { errors: [{ message: 'Forbidden' }] },
 }
 
+// 503 over 403 for a failed option-source resolve: the form and its poll config are already
+// publicly readable, so "temporarily unavailable" leaks nothing new, matches the submission
+// path's precedent, and does not mislabel a transient server fault as an authorization denial.
+const unavailable: ResolveResultsRequestResult = {
+	status: 503,
+	body: { errors: [{ message: 'Poll options unavailable' }] },
+}
+
 /**
  * Authorize and resolve a poll/survey results request. Authed callers may aggregate any field (or all
  * enumerable fields) and bypass the `access` seam. Anonymous callers are allowed only when the form's
  * poll is enabled, the poll's `resultsVisibility` permits it (`afterVote`: any time; `afterClose`: only
  * once `closesAt` has passed), and the optional host `access` seam approves; and then only for the
- * configured `poll.resultsField`, and only if that field is enumerable (has options) so a misconfigured
- * `resultsField` pointing at a free-text or PII field can never be dumped publicly. Returns only
- * aggregate counts, never raw submissions.
+ * configured `poll.resultsField`, and only if that field is enumerable so a misconfigured
+ * `resultsField` pointing at a free-text or PII field can never be dumped publicly. A static poll is
+ * enumerable through its authored options; a poll with an `optionSource` resolves its options here
+ * (registry via `config.custom`, per-request cache) and is enumerable when resolution yields any,
+ * with the resolved options driving bucket order and labels. Resolution failure fails closed (503).
+ * Returns only aggregate counts, never raw submissions.
  */
 export const resolveFormResultsRequest = async (
 	args: ResolveResultsRequestArgs
 ): Promise<ResolveResultsRequestResult> => {
-	const { payload, formId, field, isAuthed, req, access } = args
+	const { payload, formId, field, isAuthed, req, access, eligibleTypes } = args
 	if (formId == null) {
 		return { status: 400, body: { errors: [{ message: 'Missing form id' }] } }
 	}
@@ -65,6 +84,7 @@ export const resolveFormResultsRequest = async (
 	}
 
 	let fields: string[] | undefined
+	let resolvedOptions: Record<string, { value: string; label: string }[]> | undefined
 	if (isAuthed) {
 		fields = field ? [field] : undefined
 	} else {
@@ -98,12 +118,29 @@ export const resolveFormResultsRequest = async (
 		}
 		const instances = Array.isArray(form.fields) ? (form.fields as FormFieldInstance[]) : []
 		const instance = instances.find((entry) => entry.name === publicField)
-		if (!instance || !fieldHasOptions(instance)) {
+		if (!instance) {
+			return forbidden
+		}
+		if (typeof poll.optionSource === 'string' && poll.optionSource.length > 0) {
+			if (eligibleTypes && !eligibleTypes.includes(instance.blockType)) {
+				return forbidden
+			}
+			let options: { value: string; label: string }[] | undefined
+			try {
+				options = await resolvePollOptions({ payload, req, form })
+			} catch {
+				return unavailable
+			}
+			if (!options || options.length === 0) {
+				return forbidden
+			}
+			resolvedOptions = { [publicField]: options }
+		} else if (!fieldHasOptions(instance)) {
 			return forbidden
 		}
 		fields = [publicField]
 	}
 
-	const results = await aggregateFormResponses({ payload, formId, fields, req })
+	const results = await aggregateFormResponses({ payload, formId, fields, req, resolvedOptions })
 	return { status: 200, body: { results } }
 }

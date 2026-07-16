@@ -1,6 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, Field } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import { resolveFormResultsRequest } from '../../src/aggregation/resolveResultsRequest'
 import { buildFormsCollection } from '../../src/collections/forms'
 import { buildDefaultFieldDefinitions } from '../../src/fields/builtin'
 import { resolveFieldTypes } from '../../src/fields/registry'
@@ -22,6 +23,9 @@ const athletes = definePollOptionSource<{ eventId?: string }>({
 		resolveCalls.push(args)
 		if (args.config.eventId === 'boom') {
 			throw new Error('source down')
+		}
+		if (args.config.eventId === 'empty') {
+			return []
 		}
 		return [
 			{ label: 'Ada', value: 'ada' },
@@ -139,6 +143,92 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			{ label: 'Ada', value: 'ada' },
 			{ label: 'Grace', value: 'grace' },
 		])
+	})
+
+	it('serves anonymous results for a sourced poll, buckets seeded in resolved order with source labels', async () => {
+		const form = await makeForm()
+		await vote(form.id, 'grace')
+		const res = await resolveFormResultsRequest({
+			payload: booted.payload,
+			formId: form.id,
+			isAuthed: false,
+		})
+		expect(res.status).toBe(200)
+		const results = 'results' in res.body ? res.body.results : []
+		expect(results[0]?.total).toBe(1)
+		expect(results[0]?.buckets.map((b) => [b.value, b.label, b.count])).toEqual([
+			['ada', 'Ada', 0],
+			['grace', 'Grace', 1],
+		])
+	})
+
+	it('fails closed (503) when the source throws on the anonymous results path', async () => {
+		const form = await makeForm({ sourceConfig: { eventId: 'boom' } })
+		const res = await resolveFormResultsRequest({
+			payload: booted.payload,
+			formId: form.id,
+			isAuthed: false,
+		})
+		expect(res.status).toBe(503)
+		expect('errors' in res.body).toBe(true)
+	})
+
+	it('forbids anonymous results when the source resolves zero options', async () => {
+		const form = await makeForm({ sourceConfig: { eventId: 'empty' } })
+		const res = await resolveFormResultsRequest({
+			payload: booted.payload,
+			formId: form.id,
+			isAuthed: false,
+		})
+		expect(res.status).toBe(403)
+	})
+
+	it('forbids anonymous sourced results when the results field type is not poll-eligible', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Planted sourced poll',
+				fields: [
+					{ blockType: 'select', name: 'winner', label: 'Winner', options: [] },
+					{ blockType: 'text', name: 'note', label: 'Note' },
+				],
+				poll: { enabled: true, resultsField: 'winner', optionSource: 'athletes' },
+			},
+		})
+		// The resultsField validate refuses a non-eligible field, so the misconfiguration is
+		// planted below Payload to prove the endpoint's read-time gate holds for legacy docs.
+		await booted.payload.db.updateOne({
+			collection: 'forms',
+			id: form.id,
+			data: { poll: { enabled: true, resultsField: 'note', optionSource: 'athletes' } },
+		})
+		const gated = await resolveFormResultsRequest({
+			payload: booted.payload,
+			formId: form.id,
+			isAuthed: false,
+			eligibleTypes: ['select'],
+		})
+		expect(gated.status).toBe(403)
+
+		// Without the gate the request resolves options and serves results, which is exactly
+		// the leftover-bucket exposure the eligibleTypes check exists to prevent.
+		const ungated = await resolveFormResultsRequest({
+			payload: booted.payload,
+			formId: form.id,
+			isAuthed: false,
+		})
+		expect(ungated.status).toBe(200)
+	})
+
+	it('leaves the authed results path unaffected by source resolution', async () => {
+		const form = await makeForm({ sourceConfig: { eventId: 'boom' } })
+		const res = await resolveFormResultsRequest({
+			payload: booted.payload,
+			formId: form.id,
+			field: 'winner',
+			isAuthed: true,
+		})
+		expect(res.status).toBe(200)
 	})
 
 	it('records the outcome via resolvePollOutcome and rejects non-poll forms', async () => {

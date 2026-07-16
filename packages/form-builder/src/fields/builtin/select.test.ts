@@ -11,6 +11,9 @@ const config = {
 const base = { siblingData: {}, data: {}, locale: 'en', t }
 
 describe('selectField', () => {
+	it('declares poll eligibility', () => {
+		expect(selectField.pollEligible).toBe(true)
+	})
 	it('accepts a value present in options', () => {
 		expect(selectField.validate?.({ value: 'pro', config, ...base })).toBe(true)
 	})

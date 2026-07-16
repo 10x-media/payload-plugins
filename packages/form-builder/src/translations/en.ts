@@ -24,6 +24,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.validationDate]: 'Enter a valid date',
 	[keys.validationSelect]: 'Choose a valid option',
 	[keys.validationEmailFieldUnknown]: 'Choose an existing email field on this form',
+	[keys.validationResultsFieldUnknown]: 'Choose an eligible choice field on this form',
 	[keys.formatYes]: 'Yes',
 	[keys.formatNo]: 'No',
 	[keys.configName]: 'Name',
@@ -140,7 +141,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.resultsTruncated]: 'Showing a sample of responses',
 	[keys.pollGroup]: 'Poll',
 	[keys.pollEnabled]: 'Enable poll results',
-	[keys.pollResultsField]: 'Results field (machine name)',
+	[keys.pollResultsField]: 'Results field',
 	[keys.pollResultsFieldDescription]:
 		'Field whose aggregate results are public. Use a choice field, never a free-text or PII field.',
 	[keys.pollResultsVisibility]: 'Results visibility',

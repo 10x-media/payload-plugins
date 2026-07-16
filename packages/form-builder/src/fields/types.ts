@@ -98,6 +98,11 @@ export type FormFieldDefinition<
 	 * must be display-only (`value: 'none'`): with no name there is nothing to validate or store.
 	 */
 	bare?: boolean
+	/**
+	 * The type can be chosen as a poll's results field. Its instances must produce enumerable
+	 * answers: either authored `options` or options resolved from a poll option source.
+	 */
+	pollEligible?: boolean
 }
 
 /** The erased shape stored in the heterogeneous registry. Value is `unknown`; config re-narrows per matched type at execution. */
@@ -133,4 +138,6 @@ export type AnyFormFieldDefinition = {
 	conditionType?: ConditionFieldType
 	/** See `FormFieldDefinition.bare`: the block is the definition's `config` alone, instances are nameless. */
 	bare?: boolean
+	/** See `FormFieldDefinition.pollEligible`: choosable as a poll's results field. */
+	pollEligible?: boolean
 }
