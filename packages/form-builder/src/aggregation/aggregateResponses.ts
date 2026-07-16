@@ -2,6 +2,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
 import { isNamedField, type NamedFormFieldInstance } from '../fields/fieldKey'
+import { instanceOptionsOf } from '../fields/instanceOptions'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateRowsForFields } from './aggregateRows'
 import type { AggregationRow, FieldAggregation, FieldMeta, SubmissionStatusFilter } from './types'
@@ -26,18 +27,9 @@ export type AggregateFormResponsesArgs = {
 	resolvedOptions?: Record<string, { value: string; label: string }[]>
 }
 
-const optionsOf = (field: FormFieldInstance): { value: string; label: string }[] | undefined => {
-	if (!Array.isArray(field.options)) {
-		return undefined
-	}
-	const options = (field.options as Array<{ label?: string; value?: string }>)
-		.filter((option) => typeof option?.value === 'string')
-		.map((option) => ({ value: String(option.value), label: option.label ?? String(option.value) }))
-	return options.length > 0 ? options : undefined
-}
-
 /** True when a field declares non-empty options (a choice field safe to aggregate publicly). */
-export const fieldHasOptions = (field: FormFieldInstance): boolean => optionsOf(field) !== undefined
+export const fieldHasOptions = (field: FormFieldInstance): boolean =>
+	instanceOptionsOf(field) !== undefined
 
 const metaFor = (
 	field: NamedFormFieldInstance,
@@ -46,7 +38,7 @@ const metaFor = (
 	field: field.name,
 	label: field.label ?? field.name,
 	fieldType: field.blockType,
-	options: resolved && resolved.length > 0 ? resolved : optionsOf(field),
+	options: resolved && resolved.length > 0 ? resolved : instanceOptionsOf(field),
 })
 
 /**
@@ -83,7 +75,8 @@ export const aggregateFormResponses = async (
 		: instances.filter(
 				(field): field is NamedFormFieldInstance =>
 					isNamedField(field) &&
-					(optionsOf(field) !== undefined || (resolvedOptions?.[field.name]?.length ?? 0) > 0)
+					(instanceOptionsOf(field) !== undefined ||
+						(resolvedOptions?.[field.name]?.length ?? 0) > 0)
 			)
 	if (selected.length === 0) {
 		return []

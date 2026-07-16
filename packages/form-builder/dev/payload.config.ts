@@ -5,7 +5,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { formBuilder } from '../src/index'
+import { definePollOptionSource, formBuilder } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -29,6 +29,27 @@ const formUploads: CollectionConfig = {
 	fields: [],
 }
 
+// Demo option source: a sourced poll's choices and outcome come from domain data instead of
+// authored options. `decidedWinner` simulates the moment the result is known, driving both the
+// admin winner select and `resolvePollOutcome` auto mode.
+const athletes = definePollOptionSource<{ eventId?: string; decidedWinner?: string }>({
+	type: 'athletes',
+	label: 'Athletes (demo)',
+	config: [
+		{ name: 'eventId', type: 'text' },
+		{ name: 'decidedWinner', type: 'text' },
+	],
+	resolve: () => [
+		{ label: 'Ada Lovelace', value: 'ada' },
+		{ label: 'Grace Hopper', value: 'grace' },
+		{ label: 'Margaret Hamilton', value: 'margaret' },
+	],
+	resolveOutcome: ({ config }) =>
+		typeof config.decidedWinner === 'string' && config.decidedWinner.length > 0
+			? config.decidedWinner
+			: undefined,
+})
+
 const db =
 	useDb === 'postgres'
 		? postgresAdapter({
@@ -50,7 +71,9 @@ export default buildConfig({
 	db,
 	editor: lexicalEditor(),
 	collections: [users, formUploads],
-	plugins: [formBuilder({ uploads: { collection: 'form-uploads' } })],
+	plugins: [
+		formBuilder({ uploads: { collection: 'form-uploads' }, poll: { sources: { athletes } } }),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

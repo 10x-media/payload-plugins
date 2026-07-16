@@ -17,9 +17,10 @@ const ensureForm = async (
 }
 
 /**
- * Seed the dev Payload app: an admin user plus two demo forms the `(frontend)` pages render and the e2e
+ * Seed the dev Payload app: an admin user plus demo forms the `(frontend)` pages render and the e2e
  * suite drives -- a multi-step contact form (a conditional field, a required consent, required-field
- * validation) and a single-choice poll with public results. Idempotent (keyed on title).
+ * validation), a single-choice poll with public results, and a sourced poll (options and outcome
+ * from the demo `athletes` source). Idempotent (keyed on title).
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
 	const userCount = await payload.count({ collection: 'users' })
@@ -81,5 +82,17 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			},
 		],
 		poll: { enabled: true, resultsField: 'framework' },
+	})
+
+	await ensureForm(payload, 'Race winner', {
+		fields: [
+			{ blockType: 'select', name: 'winner', label: 'Who wins?', required: true, options: [] },
+		],
+		poll: {
+			enabled: true,
+			resultsField: 'winner',
+			optionSource: 'athletes',
+			sourceConfig: { eventId: 'demo-race' },
+		},
 	})
 }

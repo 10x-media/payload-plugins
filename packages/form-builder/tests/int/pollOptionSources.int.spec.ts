@@ -9,16 +9,20 @@ import { formBuilder } from '../../src/index'
 import type { PollOptionResolveArgs } from '../../src/poll/definePollOptionSource'
 import { definePollOptionSource } from '../../src/poll/definePollOptionSource'
 import { resolvePollOptions } from '../../src/poll/resolvePollOptions'
+import { resolvePollOptionsRequest } from '../../src/poll/resolvePollOptionsRequest'
 import { resolvePollOutcome } from '../../src/poll/resolvePollOutcome'
 import { defaultValidationRules } from '../../src/validation/builtin'
 import { resolveValidationRules } from '../../src/validation/registry'
 
 const resolveCalls: PollOptionResolveArgs[] = []
 
-const athletes = definePollOptionSource<{ eventId?: string }>({
+const athletes = definePollOptionSource<{ eventId?: string; winner?: string }>({
 	type: 'athletes',
 	label: 'Athletes',
-	config: [{ name: 'eventId', type: 'text' }],
+	config: [
+		{ name: 'eventId', type: 'text' },
+		{ name: 'winner', type: 'text' },
+	],
 	resolve: (args) => {
 		resolveCalls.push(args)
 		if (args.config.eventId === 'boom') {
@@ -32,6 +36,7 @@ const athletes = definePollOptionSource<{ eventId?: string }>({
 			{ label: 'Grace', value: 'grace' },
 		]
 	},
+	resolveOutcome: ({ config }) => config.winner,
 })
 
 const pollSubfieldNames = (collection: CollectionConfig): (string | undefined)[] => {
@@ -82,6 +87,15 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			depth: 0,
 			data: { form: formId, values: [{ field: 'winner', value }] },
 		})
+
+	const fieldErrorOf = async (promise: Promise<unknown>): Promise<string | undefined> => {
+		try {
+			await promise
+		} catch (error) {
+			return (error as { data?: { errors?: { message?: string }[] } }).data?.errors?.[0]?.message
+		}
+		throw new Error('expected the write to be rejected')
+	}
 
 	it('adds the optionSource select and sourceConfig group when sources are registered', () => {
 		const formsCollection = booted.payload.collections.forms
@@ -249,19 +263,194 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		).rejects.toThrow(/not poll-enabled/)
 	})
 
-	it('field access blocks outcome writes without overrideAccess', async () => {
+	it('rejects an explicit outcome outside the resolved options', async () => {
 		const form = await makeForm()
-		await resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValue: 'ada' })
+		const message = await fieldErrorOf(
+			resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValue: 'zorro' })
+		)
+		expect(message).toBe('The winning value must be one of the poll options.')
+	})
+
+	it('resolves the outcome from the source when winningValue is omitted', async () => {
+		const form = await makeForm({ sourceConfig: { eventId: 'race-1', winner: 'grace' } })
+		const recorded = await resolvePollOutcome({ payload: booted.payload, formId: form.id })
+		expect(recorded).toBe('grace')
+		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const outcome = (updated.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
+			.outcome
+		expect(outcome?.winningValue).toBe('grace')
+		expect(outcome?.resolvedAt).toBeTruthy()
+	})
+
+	it('explains auto mode failures', async () => {
+		const undecided = await makeForm({ sourceConfig: { eventId: 'race-1' } })
+		await expect(
+			resolvePollOutcome({ payload: booted.payload, formId: undecided.id })
+		).rejects.toThrow(/not be decided yet/)
+
+		const sourceless = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Static poll',
+				fields: [
+					{
+						blockType: 'select',
+						name: 'winner',
+						label: 'Winner',
+						options: [{ label: 'Ada', value: 'ada' }],
+					},
+				],
+				poll: { enabled: true, resultsField: 'winner' },
+			},
+		})
+		await expect(
+			resolvePollOutcome({ payload: booted.payload, formId: sourceless.id })
+		).rejects.toThrow(/no poll option source/)
+	})
+
+	it('accepts an admin-path winner, stamps resolvedAt, and clears both together', async () => {
+		const form = await makeForm()
+		const before = Date.now()
 		await booted.payload.update({
 			collection: 'forms',
 			id: form.id,
-			data: { poll: { outcome: { winningValue: 'hacked', resolvedAt: null } } },
+			data: { poll: { outcome: { winningValue: 'ada' } } },
+			overrideAccess: false,
+		})
+		const recorded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const outcome = (recorded.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
+			.outcome
+		expect(outcome?.winningValue).toBe('ada')
+		expect(Date.parse(outcome?.resolvedAt ?? '')).toBeGreaterThanOrEqual(before)
+
+		await booted.payload.update({
+			collection: 'forms',
+			id: form.id,
+			data: { poll: { outcome: { winningValue: '' } } },
+			overrideAccess: false,
+		})
+		const cleared = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const clearedOutcome = (
+			cleared.poll as { outcome?: { winningValue?: string | null; resolvedAt?: string | null } }
+		).outcome
+		expect(clearedOutcome?.winningValue ?? null).toBeNull()
+		expect(clearedOutcome?.resolvedAt ?? null).toBeNull()
+	})
+
+	it('rejects an admin-path winner outside the resolved options', async () => {
+		const form = await makeForm()
+		const message = await fieldErrorOf(
+			booted.payload.update({
+				collection: 'forms',
+				id: form.id,
+				data: { poll: { outcome: { winningValue: 'zorro' } } },
+				overrideAccess: false,
+			})
+		)
+		expect(message).toBe('The winning value must be one of the poll options.')
+	})
+
+	it('keeps resolvedAt locked against direct writes', async () => {
+		const form = await makeForm()
+		await resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValue: 'ada' })
+		const recorded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const stamp = (recorded.poll as { outcome?: { resolvedAt?: string } }).outcome?.resolvedAt
+		expect(stamp).toBeTruthy()
+
+		// Same winner, tampered stamp: the field access strips resolvedAt and the hook sees no
+		// transition, so the stored stamp survives.
+		await booted.payload.update({
+			collection: 'forms',
+			id: form.id,
+			data: { poll: { outcome: { winningValue: 'ada', resolvedAt: '2000-01-01T00:00:00.000Z' } } },
 			overrideAccess: false,
 		})
 		const after = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
 		const outcome = (after.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
 			.outcome
 		expect(outcome?.winningValue).toBe('ada')
-		expect(outcome?.resolvedAt).toBeTruthy()
+		expect(outcome?.resolvedAt).toBe(stamp)
+
+		// A stamp write without touching the winner is ignored the same way.
+		await booted.payload.update({
+			collection: 'forms',
+			id: form.id,
+			data: { poll: { outcome: { resolvedAt: '2000-01-01T00:00:00.000Z' } } },
+			overrideAccess: false,
+		})
+		const untouched = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		expect((untouched.poll as { outcome?: { resolvedAt?: string } }).outcome?.resolvedAt).toBe(
+			stamp
+		)
+	})
+
+	it('registers the poll-options endpoint on the forms collection', () => {
+		const endpoints = booted.payload.collections.forms?.config.endpoints
+		expect(
+			Array.isArray(endpoints) &&
+				endpoints.some((endpoint) => endpoint.path === '/:id/poll-options')
+		).toBe(true)
+	})
+
+	it('serves poll options to authed callers only', async () => {
+		const form = await makeForm()
+		const anon = await resolvePollOptionsRequest({
+			payload: booted.payload,
+			formId: form.id,
+			isAuthed: false,
+		})
+		expect(anon.status).toBe(403)
+
+		const authed = await resolvePollOptionsRequest({
+			payload: booted.payload,
+			formId: form.id,
+			isAuthed: true,
+		})
+		expect(authed.status).toBe(200)
+		expect('options' in authed.body ? authed.body.options : []).toEqual([
+			{ label: 'Ada', value: 'ada' },
+			{ label: 'Grace', value: 'grace' },
+		])
+	})
+
+	it('serves authored options for a static poll and errors like the results endpoint', async () => {
+		const staticPoll = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Static poll',
+				fields: [
+					{
+						blockType: 'select',
+						name: 'winner',
+						label: 'Winner',
+						options: [{ label: 'Ada', value: 'ada' }],
+					},
+				],
+				poll: { enabled: true, resultsField: 'winner' },
+			},
+		})
+		const res = await resolvePollOptionsRequest({
+			payload: booted.payload,
+			formId: staticPoll.id,
+			isAuthed: true,
+		})
+		expect(res.status).toBe(200)
+		expect('options' in res.body ? res.body.options : []).toEqual([{ label: 'Ada', value: 'ada' }])
+
+		const missing = await resolvePollOptionsRequest({
+			payload: booted.payload,
+			formId: 999999,
+			isAuthed: true,
+		})
+		expect(missing.status).toBe(404)
+
+		const broken = await makeForm({ sourceConfig: { eventId: 'boom' } })
+		const failed = await resolvePollOptionsRequest({
+			payload: booted.payload,
+			formId: broken.id,
+			isAuthed: true,
+		})
+		expect(failed.status).toBe(503)
+		expect('errors' in failed.body).toBe(true)
 	})
 })

@@ -119,15 +119,43 @@ An author then adds an `athleteVote` field, picks it as the results field, and s
 
 ## Outcome
 
-When the real-world result is decided, record it from host domain logic with `resolvePollOutcome`:
+When the real-world result is decided ("which athlete won?"), record it one of two ways; both land in `poll.outcome.winningValue`, both are validated against the poll's current options (source-resolved or authored), and both stamp `resolvedAt` server-side.
+
+**In the admin.** The outcome group's winning-value select loads the poll's effective options from the authenticated `GET /api/forms/:id/poll-options` endpoint, so an editor opens the form after the race and picks the winner; clearing the select reopens the outcome. `resolvedAt` itself stays locked (a beforeChange hook stamps it on every winner set, change, or clear; direct writes are dropped).
+
+**From domain logic.** Call `resolvePollOutcome` server-side, explicitly or in auto mode. Explicit mode passes the value; auto mode omits it and asks the poll's option source, which can implement `resolveOutcome` next to `resolve`:
+
+```ts title="payload.config.ts"
+const raceEntrants = definePollOptionSource({
+  type: 'raceEntrants',
+  label: 'Race entrants',
+  config: [{ name: 'raceId', type: 'text', required: true }],
+  resolve: async ({ config, payload }) => {
+    const { docs } = await payload.find({
+      collection: 'entrants',
+      where: { race: { equals: config.raceId } },
+    })
+    return docs.map((doc) => ({ label: doc.name, value: String(doc.id) }))
+  },
+  resolveOutcome: async ({ config, payload }) => {
+    const { docs } = await payload.find({
+      collection: 'race-results',
+      where: { race: { equals: config.raceId } },
+    })
+    // undefined = not decided yet; resolvePollOutcome throws a descriptive error
+    return docs[0] ? String(docs[0].winner) : undefined
+  },
+})
+```
 
 ```ts
 import { resolvePollOutcome } from '@10x-media/form-builder' // also on /rsc
 
-await resolvePollOutcome({ payload, formId, winningValue: 'entrant-42' })
+await resolvePollOutcome({ payload, formId, winningValue: 'entrant-42' }) // explicit
+const winner = await resolvePollOutcome({ payload, formId }) // auto, via resolveOutcome
 ```
 
-It writes `poll.outcome.winningValue` and stamps `resolvedAt`. The outcome fields are read-only in the admin with field-level access that blocks every non-override write, so this server-side call is the only write path. A recorded outcome supersedes the rest of the lifecycle: `<Poll>` renders a final notice plus results with the winning bucket highlighted (`<FormResults winningValue>` underneath), regardless of voted or closed state.
+Auto mode throws when the poll has no option source, the configured source type is not registered, the source lacks `resolveOutcome`, or the outcome is not yet decidable, so a cron that resolves polls fails loudly instead of guessing. A recorded outcome supersedes the rest of the lifecycle: `<Poll>` renders a final notice plus results with the winning bucket highlighted (`<FormResults winningValue>` underneath), regardless of voted or closed state.
 
 ## Rendering results
 

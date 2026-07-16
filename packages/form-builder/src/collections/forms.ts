@@ -24,7 +24,9 @@ import { END_OF_FORM } from '../flow/types'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
+import { pollOutcomeBeforeChange } from '../poll/outcomeBeforeChange'
 import type { PollOptionSourceRegistry } from '../poll/registry'
+import { resolvePollOptionsRequest } from '../poll/resolvePollOptionsRequest'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
@@ -143,6 +145,7 @@ export const buildFormsCollection = ({
 	)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 	const FIELD_NAME_SELECT_REF = '@10x-media/form-builder/client#FieldNameSelect'
+	const ENDPOINT_OPTIONS_SELECT_REF = '@10x-media/form-builder/client#EndpointOptionsSelect'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
 		if (data && Array.isArray(data.fields)) {
@@ -394,10 +397,12 @@ export const buildFormsCollection = ({
 					},
 				},
 				...buildPollOptionSourceFields(pollSourceRegistry ?? new Map()),
-				// The outcome is written exclusively by `resolvePollOutcome` (host domain logic, server-side
-				// with overrideAccess). Field-level create/update access blocks every non-override write:
-				// Payload silently drops the denied value rather than erroring, so admin saves and API
-				// updates can never set or clear a winner. `admin.readOnly` mirrors that in the UI.
+				// `winningValue` is recorded either by an admin picking from the poll's effective options
+				// (served by `/:id/poll-options`) or by `resolvePollOutcome` (host domain logic); the
+				// `pollOutcomeBeforeChange` hook validates both paths and owns the `resolvedAt` stamp.
+				// `resolvedAt` itself stays fully locked: field-level create/update access blocks every
+				// non-override caller write (Payload silently drops the denied value rather than erroring)
+				// while the hook's stamp, applied after access filtering, still persists.
 				{
 					name: 'outcome',
 					type: 'group',
@@ -408,8 +413,17 @@ export const buildFormsCollection = ({
 							name: 'winningValue',
 							type: 'text',
 							label: labelForKey(keys.pollWinningValue),
-							admin: { readOnly: true },
-							access: { create: () => false, update: () => false },
+							admin: {
+								components: {
+									Field: {
+										path: ENDPOINT_OPTIONS_SELECT_REF,
+										clientProps: {
+											endpoint: 'poll-options',
+											descriptionKey: keys.pollWinningValueDescription,
+										},
+									},
+								},
+							},
 						},
 						{
 							name: 'resolvedAt',
@@ -442,6 +456,19 @@ export const buildFormsCollection = ({
 				return Response.json(body, { status })
 			},
 		},
+		{
+			path: '/:id/poll-options',
+			method: 'get',
+			handler: async (req: PayloadRequest) => {
+				const { status, body } = await resolvePollOptionsRequest({
+					payload: req.payload,
+					formId: req.routeParams?.id as number | string | undefined,
+					isAuthed: Boolean(req.user),
+					req,
+				})
+				return Response.json(body, { status })
+			},
+		},
 	]
 
 	return {
@@ -458,6 +485,7 @@ export const buildFormsCollection = ({
 			...(overrides?.hooks ?? {}),
 			// beforeValidate normalizes conditions and flow; consumer hooks run after
 			beforeValidate: [beforeValidate, ...(overrides?.hooks?.beforeValidate ?? [])],
+			beforeChange: [pollOutcomeBeforeChange, ...(overrides?.hooks?.beforeChange ?? [])],
 		},
 		endpoints: [
 			...defaultEndpoints,

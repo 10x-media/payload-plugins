@@ -156,7 +156,13 @@ export const en: Record<TranslationKey, string> = {
 	[keys.pollSourceConfig]: 'Source settings',
 	[keys.pollOutcome]: 'Outcome',
 	[keys.pollWinningValue]: 'Winning value',
+	[keys.pollWinningValueDescription]:
+		'Pick the winning option once the outcome is decided. Saving records the resolution time; clear it to reopen the outcome.',
 	[keys.pollResolvedAt]: 'Resolved at',
+	[keys.validationWinningValueUnknown]: 'The winning value must be one of the poll options.',
+	[keys.validationWinningValueDisabled]: 'Enable the poll before recording an outcome.',
+	[keys.endpointOptionsLoading]: 'Loading options...',
+	[keys.endpointOptionsError]: 'Options could not be loaded.',
 	[keys.pollOptionsUnavailable]: 'Poll options are currently unavailable. Please try again later.',
 	[keys.pollFinalResult]: 'Final result',
 	[keys.resultsWinner]: 'Winner',

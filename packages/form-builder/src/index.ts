@@ -302,6 +302,8 @@ export type {
 	PollOptionSource,
 } from './poll/definePollOptionSource'
 export { definePollOptionSource } from './poll/definePollOptionSource'
+export type { ResolveEffectivePollOptionsArgs } from './poll/effectivePollOptions'
+export { resolveEffectivePollOptions } from './poll/effectivePollOptions'
 export type {
 	PollOptionSourceOption,
 	PollOptionSourceRegistry,

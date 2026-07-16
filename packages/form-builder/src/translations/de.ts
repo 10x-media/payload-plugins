@@ -157,7 +157,13 @@ export const de: Record<TranslationKey, string> = {
 	[keys.pollSourceConfig]: 'Quelleinstellungen',
 	[keys.pollOutcome]: 'Ergebnis',
 	[keys.pollWinningValue]: 'Siegerwert',
+	[keys.pollWinningValueDescription]:
+		'Wähle die Gewinneroption, sobald das Ergebnis feststeht. Beim Speichern wird der Entscheidungszeitpunkt erfasst; leeren öffnet das Ergebnis wieder.',
 	[keys.pollResolvedAt]: 'Entschieden am',
+	[keys.validationWinningValueUnknown]: 'Der Siegerwert muss eine der Umfrageoptionen sein.',
+	[keys.validationWinningValueDisabled]: 'Aktiviere die Umfrage, bevor ein Ergebnis erfasst wird.',
+	[keys.endpointOptionsLoading]: 'Optionen werden geladen...',
+	[keys.endpointOptionsError]: 'Optionen konnten nicht geladen werden.',
 	[keys.pollOptionsUnavailable]:
 		'Umfrageoptionen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
 	[keys.pollFinalResult]: 'Endergebnis',
