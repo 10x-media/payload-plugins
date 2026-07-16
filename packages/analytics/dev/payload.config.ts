@@ -65,7 +65,9 @@ export default buildConfig({
 		analytics({
 			adapters: [native(), devMemoryAdapter],
 			cache: { warm: true },
-			sync: true,
+			// Surface analytics-daily in the dev nav so the sync tier is inspectable
+			// (hidden by default in real installs).
+			sync: { hidden: false },
 			reportingTimezone: DEV_REPORTING_TIMEZONE,
 			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
 			widgets: {

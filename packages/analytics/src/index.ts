@@ -122,7 +122,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		if (resolved.sync.enabled) {
 			config.collections = [
 				...(config.collections ?? []),
-				syncCollection(resolved.sync.collectionSlug),
+				syncCollection(resolved.sync.collectionSlug, resolved.sync.hidden),
 			]
 			config.jobs = {
 				...config.jobs,

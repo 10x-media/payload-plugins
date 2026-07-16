@@ -183,6 +183,7 @@ describe('resolveOptions sync', () => {
 			collectionSlug: 'analytics-daily',
 			cron: '0 */6 * * *',
 			lookbackDays: 3,
+			hidden: true,
 		})
 	})
 	it('enables sync with defaults when sync is true', () => {
@@ -191,6 +192,7 @@ describe('resolveOptions sync', () => {
 			collectionSlug: 'analytics-daily',
 			cron: '0 */6 * * *',
 			lookbackDays: 3,
+			hidden: true,
 		})
 	})
 	it('keeps sync disabled when sync is false', () => {
@@ -205,6 +207,7 @@ describe('resolveOptions sync', () => {
 			cron: '0 0 * * *',
 			lookbackDays: 3,
 			adapters: ['plausible'],
+			hidden: true,
 		})
 	})
 	it('overrides slug and lookbackDays from an object option', () => {
@@ -214,6 +217,10 @@ describe('resolveOptions sync', () => {
 		}).sync
 		expect(sync.collectionSlug).toBe('metrics')
 		expect(sync.lookbackDays).toBe(7)
+	})
+	it('hides the sync collection by default and surfaces it on request', () => {
+		expect(resolveOptions({ adapters, sync: true }).sync.hidden).toBe(true)
+		expect(resolveOptions({ adapters, sync: { hidden: false } }).sync.hidden).toBe(false)
 	})
 })
 

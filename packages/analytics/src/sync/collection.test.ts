@@ -32,4 +32,9 @@ describe('syncCollection', () => {
 		expect(access?.read?.({ req: {} } as never)).toBe(false)
 		expect(access?.read?.({ req: { user: { id: '1' } } } as never)).toBe(true)
 	})
+
+	it('is hidden from the admin nav by default, and surfaces when asked', () => {
+		expect(syncCollection('x').admin?.hidden).toBe(true)
+		expect(syncCollection('x', false).admin?.hidden).toBe(false)
+	})
 })

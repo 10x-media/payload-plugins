@@ -135,7 +135,14 @@ export type AnalyticsPluginOptions = {
 	 */
 	sync?:
 		| boolean
-		| { collectionSlug?: CollectionSlug; cron?: string; lookbackDays?: number; adapters?: string[] }
+		| {
+				collectionSlug?: CollectionSlug
+				cron?: string
+				lookbackDays?: number
+				adapters?: string[]
+				/** Surface the analytics-daily collection in the admin nav. Default false (hidden). */
+				hidden?: boolean
+		  }
 }
 
 export interface ResolvedOptions {
@@ -177,6 +184,8 @@ export interface ResolvedOptions {
 		cron: string
 		lookbackDays: number
 		adapters?: string[]
+		/** True hides the analytics-daily collection from the admin nav (default). */
+		hidden: boolean
 	}
 }
 
@@ -261,6 +270,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 					collectionSlug: DEFAULT_SYNC_COLLECTION,
 					cron: DEFAULT_SYNC_CRON,
 					lookbackDays: DEFAULT_SYNC_LOOKBACK,
+					hidden: true,
 				}
 			: syncOpt && typeof syncOpt === 'object'
 				? {
@@ -269,12 +279,14 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 						cron: syncOpt.cron ?? DEFAULT_SYNC_CRON,
 						lookbackDays: syncOpt.lookbackDays ?? DEFAULT_SYNC_LOOKBACK,
 						adapters: syncOpt.adapters,
+						hidden: syncOpt.hidden ?? true,
 					}
 				: {
 						enabled: false,
 						collectionSlug: DEFAULT_SYNC_COLLECTION,
 						cron: DEFAULT_SYNC_CRON,
 						lookbackDays: DEFAULT_SYNC_LOOKBACK,
+						hidden: true,
 					}
 	return {
 		adapters: options.adapters,
