@@ -204,6 +204,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.flowFieldInStep]: 'in {step}',
 	[keys.flowUnassigned]: 'Not in any step',
 	[keys.flowAssignToStep]: 'Add to step',
+	[keys.flowNextSequential]: 'Next step in order',
 	[keys.flowNextTerminal]: 'End of form',
 	[keys.fieldTypeMessage]: 'Message',
 	[keys.configContent]: 'Content',

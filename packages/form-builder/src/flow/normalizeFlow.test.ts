@@ -106,5 +106,21 @@ describe('normalizeFlow', () => {
 			fieldNames
 		)
 		expect(flow?.steps[0]?.next).toBeUndefined()
+		expect(flow?.steps[0] ? 'next' in flow.steps[0] : undefined).toBe(false)
+	})
+	it('preserves next: null as distinct from an absent next', () => {
+		const flow = normalizeFlow(
+			{
+				steps: [
+					{ id: 'a', fields: ['name'], next: null },
+					{ id: 'b', fields: ['x'] },
+					{ id: 'c', fields: ['email'], next: 'a' },
+				],
+			},
+			fieldNames
+		)
+		expect(flow?.steps[0]?.next).toBeNull()
+		expect(flow?.steps[1] ? 'next' in flow.steps[1] : undefined).toBe(false)
+		expect(flow?.steps[2]?.next).toBe('a')
 	})
 })

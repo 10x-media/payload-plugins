@@ -71,6 +71,27 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 		).rejects.toThrow()
 	})
 
+	it('rejects a step that claims the reserved end-of-form sentinel as its id', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Sentinel-id flow',
+					fields: [
+						{ blockType: 'text', name: 'name', label: 'Name' },
+						{ blockType: 'text', name: 'email', label: 'Email' },
+					],
+					flow: {
+						steps: [
+							{ id: '__end__', fields: ['name'] },
+							{ id: 'step-b', fields: ['email'] },
+						],
+					},
+				},
+			})
+		).rejects.toThrow()
+	})
+
 	it('rejects a flow whose steps collapse to fewer than two unique ids', async () => {
 		await expect(
 			booted.payload.create({

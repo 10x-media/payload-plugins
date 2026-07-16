@@ -24,10 +24,14 @@ import { resolveMessage } from '../validation/message'
 import { ConditionBuilder } from './ConditionBuilder'
 import {
 	assignFieldToStep,
+	END_OF_FORM,
 	type FlowFieldEntry,
 	fieldHolders,
 	flowFieldEntries,
+	nextFromSelectValue,
+	nextToSelectValue,
 	removeFieldFromStep,
+	removeStepCascade,
 	stepLabel,
 	unassignedEntries,
 } from './flowAuthoring'
@@ -175,7 +179,8 @@ const StepCard = ({
 	const { t } = useTranslation()
 
 	const nextOptions: ReactSelectOption[] = [
-		{ label: t(keys.flowNextTerminal), value: '' },
+		{ label: t(keys.flowNextSequential), value: '' },
+		{ label: t(keys.flowNextTerminal), value: END_OF_FORM },
 		...otherStepOptions,
 	]
 
@@ -224,8 +229,7 @@ const StepCard = ({
 
 	const handleNextChange = (selected: ReactSelectOption | ReactSelectOption[]) => {
 		const chosen = Array.isArray(selected) ? selected[0] : selected
-		const next = (chosen?.value as string | undefined) || undefined
-		onChange({ ...step, next })
+		if (chosen) onChange({ ...step, next: nextFromSelectValue(chosen.value as string) })
 	}
 
 	const title = step.title?.trim() ?? ''
@@ -316,11 +320,7 @@ const StepCard = ({
 					<FieldLabel label="Default next" />
 					<ReactSelect
 						options={nextOptions}
-						value={
-							step.next
-								? (nextOptions.find((o) => o.value === step.next) ?? undefined)
-								: (nextOptions[0] ?? undefined)
-						}
+						value={nextOptions.find((o) => o.value === nextToSelectValue(step.next)) ?? undefined}
 						isClearable={false}
 						onChange={handleNextChange}
 					/>
@@ -457,7 +457,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 	const removeStep = (index: number) => {
 		const removedKey = stepKeys[index]
 		emit(
-			steps.filter((_, i) => i !== index),
+			removeStepCascade(steps, index),
 			stepKeys.filter((_, i) => i !== index)
 		)
 		if (removedKey !== undefined) {

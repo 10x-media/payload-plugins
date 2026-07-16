@@ -1,7 +1,16 @@
-import type { FlowStep } from '../flow/types'
+import { END_OF_FORM, type FlowStep } from '../flow/types'
 import type { FieldRow } from './synthesizeClientField'
 
 export { stepLabel } from '../flow/stepLabel'
+export { END_OF_FORM }
+
+/** Project a step's stored `next` onto its select option value ('' = sequential fall-through). */
+export const nextToSelectValue = (next: FlowStep['next']): string =>
+	next === null ? END_OF_FORM : (next ?? '')
+
+/** Parse a select option value back into a stored `next` (undefined = sequential fall-through). */
+export const nextFromSelectValue = (value: string): FlowStep['next'] =>
+	value === END_OF_FORM ? null : value.length > 0 ? value : undefined
 
 /** A form field as the flow builder addresses it: its stable key plus a display label. */
 export type FlowFieldEntry = { key: string; label: string }
@@ -95,3 +104,29 @@ export const removeFieldFromStep = (
 			? { ...step, fields: step.fields.filter((f) => f !== field) }
 			: step
 	)
+
+/**
+ * Remove the step at `index` and every reference to it: another step's `next` pointing at it
+ * returns to absent (sequential fall-through), and transitions targeting it are dropped. Without
+ * the cascade a dangling `next` would silently route into whatever step follows it in the array.
+ */
+export const removeStepCascade = (steps: FlowStep[], index: number): FlowStep[] => {
+	const removed = steps[index]
+	const rest = steps.filter((_, i) => i !== index)
+	if (!removed) {
+		return rest
+	}
+	return rest.map((step) => {
+		const keptTransitions = (step.transitions ?? []).filter((t) => t.to !== removed.id)
+		const dropsNext = step.next === removed.id
+		const dropsTransitions = keptTransitions.length !== (step.transitions?.length ?? 0)
+		if (!dropsNext && !dropsTransitions) {
+			return step
+		}
+		const { next, transitions, ...base } = step
+		const cleaned: FlowStep = { ...base }
+		if (!dropsNext && next !== undefined) cleaned.next = next
+		if (keptTransitions.length > 0) cleaned.transitions = keptTransitions
+		return cleaned
+	})
+}

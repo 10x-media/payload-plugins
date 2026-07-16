@@ -193,6 +193,7 @@ export const keys = {
 	flowFieldInStep: 'formBuilder:flow.fieldInStep',
 	flowUnassigned: 'formBuilder:flow.unassigned',
 	flowAssignToStep: 'formBuilder:flow.assignToStep',
+	flowNextSequential: 'formBuilder:flow.nextSequential',
 	flowNextTerminal: 'formBuilder:flow.nextTerminal',
 	fieldTypeMessage: 'formBuilder:fieldType.message',
 	configContent: 'formBuilder:config.content',

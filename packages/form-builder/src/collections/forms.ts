@@ -20,6 +20,7 @@ import { buildFieldBlocks } from '../fields/buildFieldBlocks'
 import { localizedIf } from '../fields/localizedIf'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
+import { END_OF_FORM } from '../flow/types'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
@@ -32,6 +33,15 @@ import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
 
 export const FORMS_SLUG = 'forms'
 
+/**
+ * Field-level validation for the raw flow JSON: step ids must be non-empty, unique, and not the
+ * reserved `END_OF_FORM` sentinel, and every explicit step-id reference (a string `next`, a
+ * transition `to`) must resolve to a known step. `next: null` (explicit end of form) and an
+ * absent `next` (fall through to the next step in array order) are always valid. On full-document
+ * saves the beforeValidate pass has already run `normalizeFlow` and laundered dangling
+ * references, so the unknown-target checks mainly protect partial API updates that send `flow`
+ * without `fields`.
+ */
 const validateFlow = (raw: unknown): string | true => {
 	if (raw === null || raw === undefined) return true
 	const r = raw as Record<string, unknown>
@@ -39,6 +49,9 @@ const validateFlow = (raw: unknown): string | true => {
 	const steps = r.steps as Array<Record<string, unknown>>
 	const emptyIdStep = steps.find((s) => typeof s?.id !== 'string' || s.id.length === 0)
 	if (emptyIdStep) return 'Flow: every step must have a non-empty ID'
+	if (steps.some((s) => s.id === END_OF_FORM)) {
+		return `Flow: step ID "${END_OF_FORM}" is reserved`
+	}
 	const ids = steps.map((s) => s.id as string)
 	if (new Set(ids).size !== ids.length) {
 		return 'Flow: duplicate step IDs found'
@@ -213,7 +226,7 @@ export const buildFormsCollection = ({
 								id: { type: 'string' as const },
 								title: { type: 'string' as const },
 								fields: { type: 'array' as const, items: { type: 'string' as const } },
-								next: { type: 'string' as const },
+								next: { type: ['string', 'null'] as ('string' | 'null')[] },
 								transitions: {
 									type: 'array' as const,
 									items: {

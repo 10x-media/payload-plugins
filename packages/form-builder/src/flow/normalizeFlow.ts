@@ -9,7 +9,9 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
  * field keys (machine names for named fields, block row ids for bare blocks; see `fieldKey`).
  * Returns `undefined` when the flow is absent, empty, or resolves to fewer than two steps
  * (a single step is an ordinary form). A field assigned to multiple steps keeps only its
- * first occurrence in step order.
+ * first occurrence in step order. `next: null` (explicit end of form) is preserved as distinct
+ * from an absent `next` (sequential fall-through); a `next` pointing at an unknown step is
+ * dropped to absent.
  */
 export const normalizeFlow = (raw: unknown, fieldKeys: string[]): FormFlow | undefined => {
 	if (!isRecord(raw) || !Array.isArray(raw.steps)) {
@@ -52,7 +54,12 @@ export const normalizeFlow = (raw: unknown, fieldKeys: string[]): FormFlow | und
 			)
 			.map((t) => ({ when: t.when as Where, to: t.to as string }))
 
-		const next = typeof s.next === 'string' && knownIds.has(s.next) ? (s.next as string) : undefined
+		const next =
+			s.next === null
+				? null
+				: typeof s.next === 'string' && knownIds.has(s.next)
+					? (s.next as string)
+					: undefined
 
 		const step: FlowStep = { id, fields }
 		if (typeof s.title === 'string') step.title = s.title

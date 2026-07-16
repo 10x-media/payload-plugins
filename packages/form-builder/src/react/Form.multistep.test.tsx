@@ -52,7 +52,7 @@ const branchingFlow: FormFlow = {
 			transitions: [{ when: { plan: { equals: 'pro' } }, to: 'pro' }],
 			next: 'basic',
 		},
-		{ id: 'basic', fields: ['basicInfo'] },
+		{ id: 'basic', fields: ['basicInfo'], next: null },
 		{ id: 'pro', fields: ['proInfo'] },
 	],
 }
@@ -116,6 +116,51 @@ describe('Form multi-step flow', () => {
 		expect(screen.queryByLabelText('Pro info')).not.toBeInTheDocument()
 	})
 
+	it('advances sequentially through steps without next values and submits from the last', async () => {
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '1' })
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'first', label: 'First' },
+			{ blockType: 'text', name: 'middle', label: 'Middle' },
+			{ blockType: 'text', name: 'last', label: 'Last' },
+		]
+		const flow: FormFlow = {
+			steps: [
+				{ id: 's1', fields: ['first'] },
+				{ id: 's2', fields: ['middle'] },
+				{ id: 's3', fields: ['last'] },
+			],
+		}
+		render(<Form form={doc(fields, flow)} onSubmit={onSubmit} />)
+
+		expect(screen.getByLabelText('First')).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument()
+		fireEvent.change(screen.getByLabelText('First'), { target: { value: 'Ada' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+		expect(await screen.findByLabelText('Middle')).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument()
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+		expect(await screen.findByLabelText('Last')).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+		await waitFor(() => {
+			expect(onSubmit).toHaveBeenCalledWith({
+				formId: 1,
+				values: [{ field: 'first', value: 'Ada' }],
+			})
+		})
+	})
+
+	it('ends the form on a mid-array step with an explicit next: null', async () => {
+		render(<Form form={doc(branchingFields, branchingFlow)} onSubmit={vi.fn()} />)
+		fireEvent.change(screen.getByLabelText('Plan'), { target: { value: 'free' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		expect(await screen.findByLabelText('Basic info')).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+	})
+
 	it('emits step.viewed on mount and step.completed + step.viewed on advance', async () => {
 		const emit = vi.fn()
 		const events: FormEventSink = { emit }
@@ -157,7 +202,7 @@ describe('Form multi-step flow', () => {
 				transitions: [{ when: { doubled: { equals: 20 } }, to: 'high' }],
 				next: 'low',
 			},
-			{ id: 'high', fields: ['highInfo'] },
+			{ id: 'high', fields: ['highInfo'], next: null },
 			{ id: 'low', fields: ['lowInfo'] },
 		],
 	}

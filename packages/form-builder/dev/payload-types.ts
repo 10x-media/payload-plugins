@@ -708,7 +708,21 @@ export interface Form {
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
-            statement?: string | null;
+            statement?: {
+              root: {
+                type: string;
+                children: {
+                  type: any;
+                  version: number;
+                  [k: string]: unknown;
+                }[];
+                direction: ('ltr' | 'rtl') | null;
+                format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                indent: number;
+                version: number;
+              };
+              [k: string]: unknown;
+            } | null;
             source?: ('static' | 'pageReference') | null;
             sourceConfig?: {
               label?: string | null;
@@ -1370,7 +1384,21 @@ export interface Form {
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
-                      statement?: string | null;
+                      statement?: {
+                        root: {
+                          type: string;
+                          children: {
+                            type: any;
+                            version: number;
+                            [k: string]: unknown;
+                          }[];
+                          direction: ('ltr' | 'rtl') | null;
+                          format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                          indent: number;
+                          version: number;
+                        };
+                        [k: string]: unknown;
+                      } | null;
                       source?: ('static' | 'pageReference') | null;
                       sourceConfig?: {
                         label?: string | null;
@@ -1559,70 +1587,6 @@ export interface Form {
                       blockName?: string | null;
                       blockType: 'date';
                     }
-                  | {
-                      name: string;
-                      label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
-                      placeholder?: string | null;
-                      description?: string | null;
-                      required?: boolean | null;
-                      content?: {
-                        root: {
-                          type: string;
-                          children: {
-                            type: any;
-                            version: number;
-                            [k: string]: unknown;
-                          }[];
-                          direction: ('ltr' | 'rtl') | null;
-                          format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-                          indent: number;
-                          version: number;
-                        };
-                        [k: string]: unknown;
-                      } | null;
-                      validations?:
-                        | (
-                            | {
-                                field: string;
-                                message?: string | null;
-                                severity?: ('error' | 'warning') | null;
-                                id?: string | null;
-                                blockName?: string | null;
-                                blockType: 'matchesField';
-                              }
-                            | {
-                                message?: string | null;
-                                severity?: ('error' | 'warning') | null;
-                                id?: string | null;
-                                blockName?: string | null;
-                                blockType: 'notAlreadySubmitted';
-                              }
-                          )[]
-                        | null;
-                      validateWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      visibleWhen?:
-                        | {
-                            [k: string]: unknown;
-                          }
-                        | unknown[]
-                        | string
-                        | number
-                        | boolean
-                        | null;
-                      hidden?: boolean | null;
-                      id?: string | null;
-                      blockName?: string | null;
-                      blockType: 'message';
-                    }
                 )[]
               | null;
             validations?:
@@ -1733,12 +1697,6 @@ export interface Form {
             blockType: 'date';
           }
         | {
-            name: string;
-            label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
-            placeholder?: string | null;
-            description?: string | null;
-            required?: boolean | null;
             content?: {
               root: {
                 type: string;
@@ -1754,75 +1712,23 @@ export interface Form {
               };
               [k: string]: unknown;
             } | null;
-            validations?:
-              | (
-                  | {
-                      field: string;
-                      message?: string | null;
-                      severity?: ('error' | 'warning') | null;
-                      id?: string | null;
-                      blockName?: string | null;
-                      blockType: 'matchesField';
-                    }
-                  | {
-                      message?: string | null;
-                      severity?: ('error' | 'warning') | null;
-                      id?: string | null;
-                      blockName?: string | null;
-                      blockType: 'notAlreadySubmitted';
-                    }
-                )[]
-              | null;
-            validateWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            visibleWhen?:
-              | {
-                  [k: string]: unknown;
-                }
-              | unknown[]
-              | string
-              | number
-              | boolean
-              | null;
-            hidden?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'message';
           }
       )[]
     | null;
-  display?: {
-    showTitle?: boolean | null;
-    title?: string | null;
-    intro?: {
-      root: {
-        type: string;
-        children: {
-          type: any;
-          version: number;
-          [k: string]: unknown;
-        }[];
-        direction: ('ltr' | 'rtl') | null;
-        format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-        indent: number;
-        version: number;
-      };
-      [k: string]: unknown;
-    } | null;
+  buttons?: {
+    submitLabel?: string | null;
+    nextLabel?: string | null;
+    backLabel?: string | null;
   };
   flow?: {
     steps: {
       id: string;
       title?: string;
       fields?: string[];
-      next?: string;
+      next?: string | null;
       transitions?: {
         to: string;
         when?: {
@@ -1908,7 +1814,6 @@ export interface Form {
     redirect?: {
       url?: string | null;
     };
-    submitLabel?: string | null;
   };
   poll?: {
     enabled?: boolean | null;
@@ -3331,43 +3236,6 @@ export interface FormsSelect<T extends boolean = true> {
                           id?: T;
                           blockName?: T;
                         };
-                    message?:
-                      | T
-                      | {
-                          name?: T;
-                          label?: T;
-                          width?: T;
-                          placeholder?: T;
-                          description?: T;
-                          required?: T;
-                          content?: T;
-                          validations?:
-                            | T
-                            | {
-                                matchesField?:
-                                  | T
-                                  | {
-                                      field?: T;
-                                      message?: T;
-                                      severity?: T;
-                                      id?: T;
-                                      blockName?: T;
-                                    };
-                                notAlreadySubmitted?:
-                                  | T
-                                  | {
-                                      message?: T;
-                                      severity?: T;
-                                      id?: T;
-                                      blockName?: T;
-                                    };
-                              };
-                          validateWhen?: T;
-                          visibleWhen?: T;
-                          hidden?: T;
-                          id?: T;
-                          blockName?: T;
-                        };
                   };
               validations?:
                 | T
@@ -3453,47 +3321,17 @@ export interface FormsSelect<T extends boolean = true> {
         message?:
           | T
           | {
-              name?: T;
-              label?: T;
-              width?: T;
-              placeholder?: T;
-              description?: T;
-              required?: T;
               content?: T;
-              validations?:
-                | T
-                | {
-                    matchesField?:
-                      | T
-                      | {
-                          field?: T;
-                          message?: T;
-                          severity?: T;
-                          id?: T;
-                          blockName?: T;
-                        };
-                    notAlreadySubmitted?:
-                      | T
-                      | {
-                          message?: T;
-                          severity?: T;
-                          id?: T;
-                          blockName?: T;
-                        };
-                  };
-              validateWhen?: T;
-              visibleWhen?: T;
-              hidden?: T;
               id?: T;
               blockName?: T;
             };
       };
-  display?:
+  buttons?:
     | T
     | {
-        showTitle?: T;
-        title?: T;
-        intro?: T;
+        submitLabel?: T;
+        nextLabel?: T;
+        backLabel?: T;
       };
   flow?: T;
   actions?:
@@ -3536,7 +3374,6 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               url?: T;
             };
-        submitLabel?: T;
       };
   poll?:
     | T

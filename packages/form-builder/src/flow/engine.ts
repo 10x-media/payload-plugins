@@ -13,15 +13,18 @@ export const stepFieldNames = (flow: FormFlow, id: string): string[] =>
 	getStep(flow, id)?.fields ?? []
 
 /**
- * Resolve the next step id from the current step + answers: the first transition whose `when` matches
- * (via `evaluateCondition`), else the default `next`, else `undefined` (terminal). Pure + isomorphic.
+ * Resolve the next step id from the current step + answers. Precedence: the first transition whose
+ * `when` matches (via `evaluateCondition`) wins, else the step's `next` (a step id to jump to, or
+ * `null` for an explicit end), else the next step in array order (the last step ends the flow).
+ * Returns `undefined` when the flow ends here. Pure + isomorphic.
  */
 export const resolveNextStepId = (
 	flow: FormFlow,
 	currentId: string,
 	answers: Record<string, unknown>
 ): string | undefined => {
-	const step = getStep(flow, currentId)
+	const index = flow.steps.findIndex((step) => step.id === currentId)
+	const step = flow.steps[index]
 	if (!step) {
 		return undefined
 	}
@@ -30,10 +33,16 @@ export const resolveNextStepId = (
 			return transition.to
 		}
 	}
-	return step.next
+	if (step.next === null) {
+		return undefined
+	}
+	if (step.next !== undefined) {
+		return step.next
+	}
+	return flow.steps[index + 1]?.id
 }
 
-/** Whether the current step is terminal (no matching transition + no default next). */
+/** Whether the flow ends at the current step (`resolveNextStepId` finds no step to advance to). */
 export const isTerminalStepId = (
 	flow: FormFlow,
 	currentId: string,
