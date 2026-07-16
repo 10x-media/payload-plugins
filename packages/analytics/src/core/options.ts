@@ -120,6 +120,12 @@ export type AnalyticsPluginOptions = {
 				 * enables localization (Payload strips the flag otherwise).
 				 */
 				localizeText?: boolean
+				/**
+				 * Period-over-period comparison on the metric and trend widgets. On by
+				 * default for adapters that declare `capabilities.comparison`; set false
+				 * to skip the second (previous-window) read entirely.
+				 */
+				comparison?: boolean
 		  }
 	/**
 	 * Opt-in sync tier: a cron job that persists each provider's daily metrics into a
@@ -163,6 +169,7 @@ export interface ResolvedOptions {
 		disabled: string[]
 		register: CustomWidgetDef[]
 		localizeText: boolean
+		comparison: boolean
 	}
 	sync: {
 		enabled: boolean
@@ -206,6 +213,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 					disabled: [] as string[],
 					register: [] as CustomWidgetDef[],
 					localizeText: false,
+					comparison: true,
 				}
 			: options.widgets === undefined || options.widgets === true
 				? {
@@ -213,12 +221,14 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 						disabled: [] as string[],
 						register: [] as CustomWidgetDef[],
 						localizeText: false,
+						comparison: true,
 					}
 				: {
 						enabled: true,
 						disabled: options.widgets.disabled ?? [],
 						register: options.widgets.register ?? [],
 						localizeText: options.widgets.localizeText ?? false,
+						comparison: options.widgets.comparison ?? true,
 					}
 	const warmOpt = options.cache?.warm
 	const warm =

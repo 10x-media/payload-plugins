@@ -148,6 +148,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,
+				comparison: resolved.widgets.comparison,
 			})
 		}
 		return config

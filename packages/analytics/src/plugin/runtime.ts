@@ -20,6 +20,8 @@ export interface AnalyticsRuntime {
 	engine: Engine
 	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
 	ttl: { aggregate?: number; realtime?: number }
+	/** Widget period-over-period comparison; false skips the previous-window read. */
+	comparison: boolean
 }
 
 /**

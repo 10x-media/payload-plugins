@@ -115,25 +115,28 @@ export const readForWidgetSeries = async (
 	) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
-	const result = await runtime.engine.read(adapter, {
-		metrics: [metric],
-		dateRange,
-		granularity: 'day',
-		timezone: tz,
-		scope: ctx.queryScope,
-	})
-	let previousTotal: number | undefined
-	let comparisonRange: DateRange | undefined
-	if (adapter.capabilities.comparison) {
-		comparisonRange = previousWindow(dateRange)
-		const previous = await runtime.engine.read(adapter, {
+	const comparisonRange =
+		runtime.comparison && adapter.capabilities.comparison
+			? (previousWindow(dateRange, tz) ?? undefined)
+			: undefined
+	const [result, previous] = await Promise.all([
+		runtime.engine.read(adapter, {
 			metrics: [metric],
-			dateRange: comparisonRange,
+			dateRange,
+			granularity: 'day',
 			timezone: tz,
 			scope: ctx.queryScope,
-		})
-		previousTotal = previous.totals?.[metric] ?? 0
-	}
+		}),
+		comparisonRange
+			? runtime.engine.read(adapter, {
+					metrics: [metric],
+					dateRange: comparisonRange,
+					timezone: tz,
+					scope: ctx.queryScope,
+				})
+			: undefined,
+	])
+	const previousTotal = previous ? previous.totals?.[metric] : undefined
 	return {
 		status: 'ok',
 		adapterId: adapter.id,

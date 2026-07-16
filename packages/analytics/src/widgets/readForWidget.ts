@@ -63,24 +63,22 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	if (!satisfiesCapabilities(adapter.capabilities, { metrics })) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
-	const result = await runtime.engine.read(adapter, {
-		metrics,
-		dateRange,
-		timezone: tz,
-		scope: ctx.queryScope,
-	})
-	let previousMetrics: Partial<Record<MetricKey, number>> | undefined
-	let comparisonRange: DateRange | undefined
-	if (adapter.capabilities.comparison) {
-		comparisonRange = previousWindow(dateRange)
-		const previous = await runtime.engine.read(adapter, {
-			metrics,
-			dateRange: comparisonRange,
-			timezone: tz,
-			scope: ctx.queryScope,
-		})
-		previousMetrics = previous.totals ?? {}
-	}
+	const comparisonRange =
+		runtime.comparison && adapter.capabilities.comparison
+			? (previousWindow(dateRange, tz) ?? undefined)
+			: undefined
+	const [result, previous] = await Promise.all([
+		runtime.engine.read(adapter, { metrics, dateRange, timezone: tz, scope: ctx.queryScope }),
+		comparisonRange
+			? runtime.engine.read(adapter, {
+					metrics,
+					dateRange: comparisonRange,
+					timezone: tz,
+					scope: ctx.queryScope,
+				})
+			: undefined,
+	])
+	const previousMetrics = previous ? (previous.totals ?? {}) : undefined
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
