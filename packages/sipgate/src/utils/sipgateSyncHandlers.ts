@@ -1,11 +1,5 @@
 import type { CollectionSlug, Payload } from 'payload'
-import type {
-	CallStatus,
-	NeoCallEvent,
-	SipgateCredentials,
-	SipgateHistoryParams,
-	SipgateHistoryResponse,
-} from '../types'
+import type { CallStatus, NeoCallEvent, SipgateCredentials, SipgateHistoryParams } from '../types'
 import { createOrUpdateCallLog } from './callLog'
 import {
 	buildSipgateRest,
@@ -343,25 +337,6 @@ export const syncChannels = async ({
 	return { synced, errors, deleted }
 }
 
-const CLASSIC_DIRECTION_MAP: Record<string, 'in' | 'out'> = {
-	INCOMING: 'in',
-	OUTGOING: 'out',
-	MISSED_INCOMING: 'in',
-	MISSED_OUTGOING: 'out',
-}
-
-const CLASSIC_DIRECTION_MISSED = new Set(['MISSED_INCOMING', 'MISSED_OUTGOING'])
-
-const CLASSIC_STATUS_MAP: Record<string, CallStatus> = {
-	PICKUP: 'completed',
-	NOPICKUP: 'missed',
-	VOICEMAIL: 'voicemail',
-	MISSED: 'missed',
-	BUSY: 'missed',
-	REJECTED: 'rejected',
-	FAILED: 'missed',
-}
-
 const NEO_DIRECTION_MAP: Record<string, 'in' | 'out'> = {
 	INCOMING: 'in',
 	OUTGOING: 'out',
@@ -389,24 +364,6 @@ type NormalizedCallLog = {
 	fromNumber: string
 	toNumber: string
 	startedAt: Date
-}
-
-function normalizeClassicItem(item: SipgateHistoryResponse['items'][0]): NormalizedCallLog | null {
-	const direction = item.direction?.toUpperCase()
-	const callType = CLASSIC_DIRECTION_MAP[direction]
-	if (!callType) return null
-	const callStatus = CLASSIC_DIRECTION_MISSED.has(direction)
-		? 'missed'
-		: (CLASSIC_STATUS_MAP[item.status?.toUpperCase()] ?? 'completed')
-	return {
-		callId: item.id,
-		callType,
-		callStatus,
-		callDuration: 0,
-		fromNumber: item.source,
-		toNumber: item.target,
-		startedAt: new Date(item.created),
-	}
 }
 
 function normalizeNeoEvent(event: NeoCallEvent): NormalizedCallLog | null {
@@ -438,17 +395,9 @@ function normalizeNeoEvent(event: NeoCallEvent): NormalizedCallLog | null {
 	}
 }
 
-export function normalizeCallHistory(
-	history: SipgateHistoryResponse | NeoCallEvent[]
-): NormalizedCallLog[] {
-	if (Array.isArray(history)) {
-		return history.flatMap((event) => {
-			const normalized = normalizeNeoEvent(event as NeoCallEvent)
-			return normalized ? [normalized] : []
-		})
-	}
-	return (history as SipgateHistoryResponse).items.flatMap((item) => {
-		const normalized = normalizeClassicItem(item)
+export function normalizeCallHistory(events: NeoCallEvent[]): NormalizedCallLog[] {
+	return events.flatMap((event) => {
+		const normalized = normalizeNeoEvent(event)
 		return normalized ? [normalized] : []
 	})
 }
@@ -470,7 +419,6 @@ export const syncCallHistory = async ({
 	sipgateUserId,
 }: SyncCallHistoryOptions): Promise<SyncResult> => {
 	const history = await getCallHistory(rest, {
-		types: ['CALL'],
 		limit: 100,
 		...params,
 	})
@@ -591,24 +539,23 @@ export const syncCallHistoryOAuth = async ({
  *   await createSipgateOnInit(credentials)(payload)
  * }
  * ```
+ *
+ * Pass `slugs` if you customized the collection slugs via `overrides`.
  */
+export type SipgateOnInitSlugs = {
+	sipgateUsersSlug?: string
+	sipgateDevicesSlug?: string
+	sipgateChannelsSlug?: string
+}
+
 export const createSipgateOnInit =
-	(credentials: SipgateCredentials) =>
+	(credentials: SipgateCredentials, slugs: SipgateOnInitSlugs = {}) =>
 	async (payload: Payload): Promise<void> => {
+		const sipgateUsersSlug = slugs.sipgateUsersSlug ?? 'sipgate-users'
+		const sipgateDevicesSlug = slugs.sipgateDevicesSlug ?? 'sipgate-devices'
+		const sipgateChannelsSlug = slugs.sipgateChannelsSlug ?? 'sipgate-channels'
 		const rest = buildSipgateRest(credentials)
-		await syncUsers({ payload, rest, sipgateUsersSlug: 'sipgate-users', prune: true })
-		await syncDevices({
-			payload,
-			rest,
-			sipgateDevicesSlug: 'sipgate-devices',
-			sipgateUsersSlug: 'sipgate-users',
-			prune: true,
-		})
-		await syncChannels({
-			payload,
-			rest,
-			sipgateChannelsSlug: 'sipgate-channels',
-			sipgateUsersSlug: 'sipgate-users',
-			prune: true,
-		})
+		await syncUsers({ payload, rest, sipgateUsersSlug, prune: true })
+		await syncDevices({ payload, rest, sipgateDevicesSlug, sipgateUsersSlug, prune: true })
+		await syncChannels({ payload, rest, sipgateChannelsSlug, sipgateUsersSlug, prune: true })
 	}

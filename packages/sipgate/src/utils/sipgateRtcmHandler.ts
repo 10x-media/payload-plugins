@@ -15,7 +15,7 @@ import {
 } from './sipgate.rest'
 import { buildSipgateRestOAuth } from './sipgateOAuthRest'
 
-export type SipgateRtcmAction = 'answer' | 'hold' | 'mute' | 'recordings' | 'hangup'
+export type SipgateRtcmAction = 'answer' | 'hold' | 'mute' | 'recordings' | 'hangup' | 'transfer'
 
 type SipgateRtcmHandlerOptions = {
 	credentials: SipgateCredentials
@@ -99,7 +99,7 @@ export const sipgateRtcmHandler =
 		if (!req.json) {
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
-		const { callId, action, deviceId } = await req.json()
+		const { callId, action, deviceId, phoneNumber, callerId, attended } = await req.json()
 		if (!callId) {
 			return Response.json({ error: 'callId is required' }, { status: 400 })
 		}
@@ -125,19 +125,31 @@ export const sipgateRtcmHandler =
 				}
 				await store.update({ status: 'active' })
 				break
-			case 'transfer':
-				if (!deviceId) {
+			case 'transfer': {
+				if (!phoneNumber) {
 					return Response.json(
-						{ error: 'deviceId is required to transfer a call' },
+						{ error: 'phoneNumber is required to transfer a call' },
+						{ status: 400 }
+					)
+				}
+				const transferCallerId = callerId ?? credentials.callerId
+				if (!transferCallerId) {
+					return Response.json(
+						{ error: 'callerId is required to transfer a call' },
 						{ status: 400 }
 					)
 				}
 				try {
-					await transferCall(rest, callId, deviceId)
+					await transferCall(rest, callId, {
+						attended: attended ?? false,
+						callerId: transferCallerId,
+						phoneNumber,
+					})
 				} catch {
 					return Response.json({ error: 'Failed to transfer call' }, { status: 500 })
 				}
 				break
+			}
 			case 'hold': {
 				const current = await store.getOne()
 				const newValue = !current?.held

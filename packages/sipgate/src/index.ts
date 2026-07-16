@@ -39,7 +39,7 @@ import { createLiveCallFloatingWindow } from './widgets/liveCallFloatingWindow.c
 
 export type { SipgateAuthType, SipgateCredentials } from './types'
 export type { SipgateAccess, SipgateAccessFn } from './utils/access'
-export { createSipgateOnInit } from './utils/sipgateSyncHandlers'
+export { createSipgateOnInit, type SipgateOnInitSlugs } from './utils/sipgateSyncHandlers'
 
 export type SipgatePluginOptions = {
 	/**
@@ -95,13 +95,6 @@ export type SipgatePluginOptions = {
 	 * @default true
 	 */
 	filterDevicesByUser?: boolean
-
-	/**
-	 * Maximum number of device IDs to probe when discovering sipgate devices.
-	 * Devices are probed as e0, e1, ... until a 404 is returned or this limit is reached.
-	 * @default 25
-	 */
-	maxDeviceProbeCount?: number
 
 	/**
 	 * Access control for sipgate endpoints. Each key maps to a specific endpoint.
@@ -173,12 +166,15 @@ export type SipgatePluginOptions = {
 		sipgateUsers?: Partial<CollectionConfig>
 		sipgateDevices?: Partial<CollectionConfig>
 		sipgateChannels?: Partial<CollectionConfig>
+		ivrVoiceLines?: Partial<CollectionConfig>
+		ivrFlows?: Partial<CollectionConfig>
 		allActivityWidget?: Partial<Widget>
 		sipgateWebhooks?: Partial<Endpoint>
 		sipgateActiveCall?: Partial<Endpoint>
 		sipgateDial?: Partial<Endpoint>
 		sipgateRtcm?: Partial<Endpoint>
 		sipgateContacts?: Partial<Endpoint>
+		sipgateIvr?: Partial<Endpoint>
 		liveCallFloatingWindow?: Partial<CustomComponent<Record<string, never>>>
 	}
 }
@@ -224,7 +220,6 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 		const sipgateChannelsSlug = 'sipgate-channels'
 		const contactCollections = options.contactCollections ?? []
 		const phoneNumberFields = options.phoneNumberFields ?? []
-		const _maxDeviceProbeCount = options.maxDeviceProbeCount ?? 25
 
 		const ivrOptions = options.ivr === true ? {} : (options.ivr ?? false)
 		const ivrEnabled = ivrOptions !== false
@@ -235,8 +230,8 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 
 		if (ivrEnabled) {
 			config.collections.push(
-				createIvrVoiceLinesCollection(ivrVoiceLinesSlug),
-				createIvrFlowsCollection(ivrFlowsSlug, ivrVoiceLinesSlug)
+				createIvrVoiceLinesCollection(ivrVoiceLinesSlug, options.overrides?.ivrVoiceLines),
+				createIvrFlowsCollection(ivrFlowsSlug, ivrVoiceLinesSlug, options.overrides?.ivrFlows)
 			)
 		}
 
@@ -294,9 +289,8 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 
 		config.endpoints.push(
 			createSipgateWebhooks({
-				contactCollections,
-				phoneNumberFields,
 				callLogsSlug,
+				webhookUrl: options.webhookUrl,
 				ivr: ivrEnabled
 					? {
 							flowsSlug: ivrFlowsSlug,
@@ -325,6 +319,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 					flowsSlug: ivrFlowsSlug,
 					voiceLinesSlug: ivrVoiceLinesSlug,
 					ivrEndpointUrl: `${webhookUrl}/api/sipgate/ivr`,
+					overrides: options.overrides?.sipgateIvr,
 				})
 			)
 		}

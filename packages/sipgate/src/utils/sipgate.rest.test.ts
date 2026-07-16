@@ -21,6 +21,27 @@ describe('hangupCall / transferCall — error propagation', () => {
 		).rejects.toThrow()
 	})
 
+	it('transferCall posts the transfer props to /calls/{id}/transfer', async () => {
+		const calls: Array<{ url: string; options: RequestInit }> = []
+		const capturingRest = async (url: string, options: RequestInit) => {
+			calls.push({ url, options })
+			return new Response(null, { status: 200 })
+		}
+		await transferCall(capturingRest, 'call-42', {
+			attended: true,
+			callerId: '+4915100000000',
+			phoneNumber: '+4930123456',
+		})
+		expect(calls).toHaveLength(1)
+		expect(calls[0]?.url).toBe('/calls/call-42/transfer')
+		expect(calls[0]?.options.method).toBe('POST')
+		expect(JSON.parse(calls[0]?.options.body as string)).toEqual({
+			attended: true,
+			callerId: '+4915100000000',
+			phoneNumber: '+4930123456',
+		})
+	})
+
 	test.skipIf(!HAS_LIVE_CREDS)(
 		'hangupCall throws on a real sipgate 4xx for a nonexistent call',
 		async () => {

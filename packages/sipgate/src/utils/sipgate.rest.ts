@@ -4,7 +4,6 @@ import type {
 	SipgateContact,
 	SipgateCredentials,
 	SipgateHistoryParams,
-	SipgateHistoryResponse,
 } from '../types'
 import { getNeoCallHistory, NeoDial, type NeoDialProps } from './sipgate.neo.rest'
 
@@ -81,9 +80,9 @@ export const getContacts = async (rest: SipgateRestFetch) => {
 
 export const getCallHistory = async (
 	rest: SipgateRestFetch,
-	_params?: SipgateHistoryParams
-): Promise<SipgateHistoryResponse | NeoCallEvent[]> => {
-	return getNeoCallHistory(rest)
+	params?: SipgateHistoryParams
+): Promise<NeoCallEvent[]> => {
+	return getNeoCallHistory(rest, params?.limit != null ? { limit: params.limit } : undefined)
 }
 
 export type SipgateDialProps = {
@@ -268,26 +267,6 @@ export const getGroups = async (rest: SipgateRestFetch): Promise<SipgateGroupApi
 	if (!response.ok) throw new Error('Failed to get channels')
 	const data = (await response.json()) as { items: SipgateGroupApiItem[] }
 	return data.items
-}
-
-/**
- * Probes /devices/e0, /devices/e1, ... until 404 or maxCount is reached.
- * Sipgate does not expose CLINQ/web-app devices via /{userId}/devices,
- * so sequential probing is the only reliable discovery mechanism.
- */
-export const probeDevices = async (
-	rest: SipgateRestFetch,
-	maxCount = 25
-): Promise<SipgateDevice[]> => {
-	const devices: SipgateDevice[] = []
-	for (let i = 0; i < maxCount; i++) {
-		const response = await rest(`/devices/e${i}`, { method: 'GET' })
-		if (response.status === 404) break
-		if (response.ok) {
-			devices.push((await response.json()) as SipgateDevice)
-		}
-	}
-	return devices
 }
 
 export const getDevices = async (

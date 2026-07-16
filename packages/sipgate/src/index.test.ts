@@ -19,6 +19,31 @@ describe('sipgate factory', () => {
 		const cfg = fakeConfig()
 		expect(sipgate({ disabled: true })(cfg)).toBe(cfg)
 	})
+
+	it('throws when oauth2 is enabled without webhookUrl', () => {
+		expect(() =>
+			sipgate({
+				sipgateCredentials: {
+					authType: 'oauth2',
+					clientId: 'id',
+					clientSecret: 'secret',
+				},
+			})(fakeConfig())
+		).toThrow(/webhookUrl is required/)
+	})
+
+	it('throws when ivr is enabled without webhookUrl', () => {
+		expect(() => sipgate({ ivr: true })(fakeConfig())).toThrow(/webhookUrl is required/)
+	})
+
+	it('registers authenticated access on core collections', () => {
+		const result = sipgate({})(fakeConfig()) as Config
+		for (const slug of ['call-logs', 'sipgate-users', 'sipgate-devices', 'sipgate-channels']) {
+			const collection = result.collections?.find((c) => c.slug === slug)
+			expect(collection?.access?.read).toBeTypeOf('function')
+			expect(collection?.access?.create).toBeTypeOf('function')
+		}
+	})
 })
 
 describe('enableContactMatchUi option', () => {

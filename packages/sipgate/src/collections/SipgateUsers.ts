@@ -2,6 +2,7 @@ import type { CollectionConfig, CollectionSlug } from 'payload'
 import { deepMerge } from 'payload'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
+import { authenticatedCollectionAccess } from '../utils/access'
 
 type CreateSipgateUsersCollectionOptions = {
 	slug: string
@@ -27,6 +28,7 @@ export const createSipgateUsersCollection = ({
 }: CreateSipgateUsersCollectionOptions): CollectionConfig => {
 	const defaults: CollectionConfig = {
 		slug,
+		access: authenticatedCollectionAccess,
 		labels: {
 			singular: labelForKey(keys.sipgateUsersSingular),
 			plural: labelForKey(keys.sipgateUsersPlural),
