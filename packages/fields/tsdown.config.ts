@@ -17,4 +17,8 @@ export default definePluginBuild({
 		'exports/icon-adapters/tabler': 'src/exports/icon-adapters/tabler.ts',
 		'exports/encrypted': 'src/exports/encrypted.ts',
 	},
+	copy: [
+		{ from: 'src/fields/color/client/colorField.css', to: 'dist/fields/color/client' },
+		{ from: 'src/fields/color/server/colorCell.css', to: 'dist/fields/color/server' },
+	],
 })
