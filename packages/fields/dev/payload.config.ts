@@ -5,6 +5,8 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { fields } from '../src/index'
+import { colors } from './collections/colors'
+import { tenants } from './collections/tenants'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -38,8 +40,15 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [fields({})],
+	collections: [users, colors, tenants],
+	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
+	plugins: [
+		fields({
+			color: {
+				presets: ['#16a34a', '#dc2626', { key: 'global', label: 'Global blue', value: '#1d4ed8' }],
+			},
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
