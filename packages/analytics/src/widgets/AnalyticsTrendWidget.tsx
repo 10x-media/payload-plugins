@@ -76,6 +76,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 				<ComparisonDelta
 					current={result.total}
 					previous={result.previousTotal}
+					metric={metric}
 					locale={locale}
 					t={t}
 				/>

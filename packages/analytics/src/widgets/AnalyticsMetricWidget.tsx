@@ -66,6 +66,7 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 				<ComparisonDelta
 					current={value}
 					previous={result.previousMetrics?.[metric]}
+					metric={metric}
 					locale={locale}
 					t={t}
 				/>

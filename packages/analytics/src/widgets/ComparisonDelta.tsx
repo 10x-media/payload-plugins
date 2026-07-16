@@ -1,52 +1,84 @@
+import type { MetricKey } from '../core/contract'
 import { keys, type TranslationKey } from '../translations/keys'
-import { computeDelta } from './comparison'
+import { computeDelta, type DeltaDirection } from './comparison'
 
-const DIRECTION_COLOR: Record<'up' | 'down' | 'none', string> = {
-	up: 'var(--theme-success-500, #2e8540)',
-	down: 'var(--theme-error-500, #c0392b)',
-	none: 'var(--theme-elevation-400)',
+// Payload's admin palette maps success to its blue ramp and error to its red ramp; the
+// fallbacks mirror @payloadcms/ui colors.scss so the chip renders identically outside
+// a themed admin shell.
+const SUCCESS = 'var(--theme-success-500, rgb(21, 135, 186))'
+const ERROR = 'var(--theme-error-500, rgb(218, 75, 72))'
+const NEUTRAL = 'var(--theme-elevation-400)'
+
+/** Metrics where a decrease is the good outcome, inverting the delta colors. */
+const LOWER_IS_BETTER: ReadonlySet<MetricKey> = new Set<MetricKey>(['bounceRate'])
+
+const colorFor = (direction: DeltaDirection, metric?: MetricKey): string => {
+	if (direction === 'none') {
+		return NEUTRAL
+	}
+	const goodWhenDown = metric !== undefined && LOWER_IS_BETTER.has(metric)
+	const improved = (direction === 'up') !== goodWhenDown
+	return improved ? SUCCESS : ERROR
 }
 
-const ARROW: Record<'up' | 'down', string> = { up: '▲', down: '▼' }
-
-const DIRECTION_LABEL: Record<'up' | 'down' | 'none', TranslationKey> = {
+const DIRECTION_LABEL: Record<DeltaDirection, TranslationKey> = {
 	up: keys.comparisonIncrease,
 	down: keys.comparisonDecrease,
 	none: keys.comparisonNoChange,
 }
 
+const DeltaArrow = ({ direction }: { direction: 'up' | 'down' }) => (
+	<svg
+		aria-hidden="true"
+		focusable="false"
+		width="8"
+		height="8"
+		viewBox="0 0 8 8"
+		style={{
+			flexShrink: 0,
+			transform: direction === 'down' ? 'rotate(180deg)' : undefined,
+		}}
+	>
+		<path d="M4 1.2 7.3 6.8H0.7Z" fill="currentColor" />
+	</svg>
+)
+
 export interface ComparisonDeltaProps {
 	current?: number
 	previous?: number
+	/** Inverts good/bad coloring for metrics in {@link LOWER_IS_BETTER}. */
+	metric?: MetricKey
 	locale: string
 	t: (key: TranslationKey) => string
 }
 
 /**
- * Period-over-period delta chip: a colored arrow, the signed percentage change, and a
- * localized "vs. previous period" caption. Renders nothing when there is no comparable
- * previous value. All text routes through typed translation keys; the arrow glyph is
- * decorative and carried by an aria-label with the localized direction word.
+ * Period-over-period delta chip: a colored arrow, the percentage change, and a localized
+ * "vs. previous period" caption. Renders nothing when there is no comparable previous
+ * value; when the previous value is 0 (no percentage baseline) the localized direction
+ * word stands in for the number. All text routes through typed translation keys; the
+ * arrow is decorative and carried by an aria-label with the localized direction word.
  */
-export function ComparisonDelta({ current, previous, locale, t }: ComparisonDeltaProps) {
+export function ComparisonDelta({ current, previous, metric, locale, t }: ComparisonDeltaProps) {
 	const delta = computeDelta(current, previous)
 	if (!delta) {
 		return null
 	}
 	const percentText =
 		delta.percent === null
-			? '—'
+			? null
 			: new Intl.NumberFormat(locale, {
 					style: 'percent',
 					maximumFractionDigits: 1,
 					signDisplay: 'never',
 				}).format(Math.abs(delta.percent) / 100)
-	const arrow = delta.direction === 'none' ? '' : ARROW[delta.direction]
 	const visible =
-		delta.direction === 'none' ? t(keys.comparisonNoChange) : `${arrow} ${percentText}`
-	const ariaLabel = `${t(DIRECTION_LABEL[delta.direction])} ${
-		delta.direction === 'none' ? '' : percentText
-	} ${t(keys.comparisonVsPrevious)}`
+		delta.direction === 'none' || percentText === null
+			? t(DIRECTION_LABEL[delta.direction])
+			: percentText
+	const ariaLabel = `${t(DIRECTION_LABEL[delta.direction])} ${percentText ?? ''} ${t(
+		keys.comparisonVsPrevious
+	)}`
 		.replace(/\s+/g, ' ')
 		.trim()
 	return (
@@ -60,7 +92,18 @@ export function ComparisonDelta({ current, previous, locale, t }: ComparisonDelt
 				fontSize: '0.75rem',
 			}}
 		>
-			<span style={{ color: DIRECTION_COLOR[delta.direction], fontWeight: 600 }}>{visible}</span>
+			<span
+				style={{
+					display: 'inline-flex',
+					alignItems: 'center',
+					gap: '0.25rem',
+					color: colorFor(delta.direction, metric),
+					fontWeight: 600,
+				}}
+			>
+				{delta.direction !== 'none' ? <DeltaArrow direction={delta.direction} /> : null}
+				{visible}
+			</span>
 			<span style={{ color: 'var(--theme-elevation-400)' }}>{t(keys.comparisonVsPrevious)}</span>
 		</span>
 	)
