@@ -3,6 +3,7 @@ import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
 import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
+import type { ButtonsOption } from '../collections/buttonFields'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
 import type { ConsentSourceRegistry } from '../consent/registry'
@@ -30,6 +31,7 @@ type RegisterCollectionsArgs = {
 	resultsAccess?: FormResultsAccess
 	votedCookie: boolean
 	pollSourceRegistry: PollOptionSourceRegistry
+	buttons?: ButtonsOption
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
@@ -52,6 +54,7 @@ export const registerCollections = ({
 	resultsAccess,
 	votedCookie,
 	pollSourceRegistry,
+	buttons,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
@@ -74,6 +77,7 @@ export const registerCollections = ({
 			uploadsCollectionSlug: uploadSlug,
 			resultsAccess,
 			pollSourceRegistry,
+			buttons,
 			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({

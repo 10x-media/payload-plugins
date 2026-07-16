@@ -57,6 +57,7 @@ const Harness = ({
 	return (
 		<FormContext.Provider
 			value={{
+				form: { id: 1, fields: [] },
 				state,
 				dispatch,
 				validateField: vi.fn(),

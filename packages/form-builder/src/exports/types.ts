@@ -17,6 +17,11 @@ export type {
 	SubmissionStatusFilter,
 } from '../aggregation/types'
 export type { CalcExpression } from '../calc/types'
+export type {
+	ButtonFieldsOverride,
+	ButtonsOption,
+	DefaultButtonFields,
+} from '../collections/buttonFields'
 export type { FieldCondition } from '../conditions/types'
 export type { ConsentProof } from '../consent/captureConsent'
 export type {
@@ -41,7 +46,12 @@ export type {
 	FormFieldValueKind,
 } from '../fields/types'
 export type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
-export type { FormDocument, FormPollSettings, FormResponseSettings } from '../form/types'
+export type {
+	FormButtonSettings,
+	FormDocument,
+	FormPollSettings,
+	FormResponseSettings,
+} from '../form/types'
 export type { FormBuilderPluginOptions } from '../index'
 export type { CollectionOverrides, FieldsOverride } from '../plugin/collectionOverrides'
 export type { UploadsOption } from '../plugin/uploadsCollection'

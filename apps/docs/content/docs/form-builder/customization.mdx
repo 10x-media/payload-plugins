@@ -60,6 +60,71 @@ formBuilder({
 
 With this option off (the default), the `answers` UI field is the only visible representation of a submission's content in the admin. The raw JSON fields still exist in the database and are returned by the API; only the admin display is affected.
 
+## Form-level buttons
+
+Every form carries a `buttons` group at the bottom of its Fields tab with three localized labels: `submitLabel`, `nextLabel`, and `backLabel` (next/back apply to multi-step forms). The rendered chrome resolves each label as `<Form>` prop, then the stored value, then the translated default.
+
+The group is composable. The plugin's `buttons.fields` option receives the three default fields, localization flag already applied, and returns the group's final field array verbatim. Wrap a default in a row with your own field, reorder, or drop one. Here the submit label gets an accompanying icon select:
+
+```ts title="payload.config.ts"
+formBuilder({
+  buttons: {
+    fields: ({ defaultFields }) => [
+      {
+        type: 'row',
+        fields: [
+          defaultFields.submit,
+          {
+            name: 'submitIcon',
+            type: 'select',
+            options: [
+              { label: 'Arrow right', value: 'arrow-right' },
+              { label: 'Paper plane', value: 'paper-plane' },
+            ],
+          },
+        ],
+      },
+      defaultFields.next,
+      defaultFields.back,
+    ],
+  },
+})
+```
+
+Host-added fields ride along on `FormDocument.buttons` as extra keys (`toFormDocument` passes the whole group through). On the frontend, read them from the form context in a custom button renderer:
+
+```tsx title="submit-with-icon.tsx"
+'use client'
+
+import {
+  Form,
+  type FormDocument,
+  type SubmitButtonRenderProps,
+  useFormContext,
+} from '@10x-media/form-builder/react'
+
+const icons: Record<string, string> = { 'arrow-right': '→', 'paper-plane': '✈' }
+
+const SubmitWithIcon = ({ label, submitting }: SubmitButtonRenderProps) => {
+  const { form } = useFormContext()
+  const icon = typeof form.buttons?.submitIcon === 'string' ? form.buttons.submitIcon : undefined
+  return (
+    <button type="submit" disabled={submitting}>
+      {icon ? <span aria-hidden>{icons[icon]}</span> : null}
+      {label}
+    </button>
+  )
+}
+
+export const ContactForm = ({ form }: { form: FormDocument }) => (
+  <Form form={form} renderSubmit={(props) => <SubmitWithIcon {...props} />} />
+)
+```
+
+The same pattern extends to button variants, per-button styling flags, or anything else: add the field next to a default, read it back from `useFormContext().form.buttons`. `renderNext` and `renderBack` compose identically.
+
+To assemble the group from scratch instead of receiving the defaults, the individual builders are exported: `buildSubmitLabelField(localize)`, `buildNextLabelField(localize)`, and `buildBackLabelField(localize)`, plus `buildDefaultButtonFields(localize)` returning all three.
+
 ---
 
 ## Collection overrides

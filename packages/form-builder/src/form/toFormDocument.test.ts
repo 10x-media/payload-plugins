@@ -19,6 +19,18 @@ describe('toFormDocument', () => {
 		expect(doc.response).toBeUndefined()
 	})
 
+	it('passes buttons through wholesale so host-added keys survive to the client', () => {
+		const buttons = { submitLabel: 'Send', submitIcon: 'arrow-right' }
+		const doc = toFormDocument({ id: 1, fields: [], buttons })
+		expect(doc.buttons).toBe(buttons)
+		expect(doc.buttons?.submitIcon).toBe('arrow-right')
+	})
+
+	it('coerces a null or omitted buttons to undefined', () => {
+		expect(toFormDocument({ id: 1, buttons: null }).buttons).toBeUndefined()
+		expect(toFormDocument({ id: 1 }).buttons).toBeUndefined()
+	})
+
 	it('passes a nameless bare row through with its block row id intact', () => {
 		const doc = toFormDocument({
 			id: 1,

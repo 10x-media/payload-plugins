@@ -22,7 +22,7 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 		await booted.stop()
 	})
 
-	it('round-trips a message-type response with rich text and submit label', async () => {
+	it('round-trips a message-type response with rich text', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',
 			data: {
@@ -31,18 +31,15 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 				response: {
 					type: 'message',
 					message: lexical('Thanks!'),
-					submitLabel: 'Send',
 				},
 			},
 		})
 		const response = form.response as {
 			type?: string
 			message?: unknown
-			submitLabel?: string
 		}
 		expect(response.type).toBe('message')
 		expect(response.message).toMatchObject(lexical('Thanks!'))
-		expect(response.submitLabel).toBe('Send')
 	})
 
 	it('round-trips a redirect-type response and validates the URL', async () => {

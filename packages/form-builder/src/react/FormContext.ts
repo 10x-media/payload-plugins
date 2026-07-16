@@ -3,6 +3,7 @@
 import type { Dispatch } from 'react'
 import { createContext, useContext } from 'react'
 import type { FormFlow } from '../flow/types'
+import type { FormDocument } from '../form/types'
 import type { RendererTranslate } from './contract'
 import type { RendererRegistry } from './registry'
 import type { FormAction, FormState } from './state'
@@ -19,7 +20,7 @@ export type FormStepInfo = {
 	goBack: () => void
 }
 
-/** Resolved chrome button labels. Precedence per label: the `<Form>` prop, then (submit only) the form's `response.submitLabel`, then the translated default. */
+/** Resolved chrome button labels. Precedence per label: the `<Form>` prop, then the form's `buttons` value, then the translated default. */
 export type FormControlLabels = {
 	back: string
 	next: string
@@ -32,6 +33,8 @@ export type FormControlLabels = {
  * custom `children` layouts and custom field renderers.
  */
 export type FormContextValue = {
+	/** The document rendered by this `<Form>`. Custom chrome reads host-added `buttons` keys from here. */
+	form: FormDocument
 	/** Current form state: values, errors, warnings, touched, submitting, submitted, submitError. */
 	state: FormState
 	/**

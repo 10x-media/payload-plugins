@@ -28,6 +28,7 @@ import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { validateUrl } from '../validation/validateUrl'
+import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
 
 export const FORMS_SLUG = 'forms'
 
@@ -98,6 +99,8 @@ type BuildFormsCollectionArgs = {
 	resultsAccess?: FormResultsAccess
 	/** Registered poll option sources (plugin option `poll.sources`); empty registry means no source fields. */
 	pollSourceRegistry?: PollOptionSourceRegistry
+	/** The plugin `buttons` option; `fields` composes the buttons group from the localized defaults. */
+	buttons?: ButtonsOption
 	overrides?: CollectionOverrides
 }
 
@@ -112,6 +115,7 @@ export const buildFormsCollection = ({
 	uploadsCollectionSlug,
 	resultsAccess,
 	pollSourceRegistry,
+	buttons,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const bareTypes = new Set(
@@ -242,8 +246,8 @@ export const buildFormsCollection = ({
 	}
 
 	// What the visitor sees after a successful submit. Publicly readable (unlike actions): the
-	// client renderer needs message/redirect/submitLabel. `type`/`url` are behavior, never
-	// localized; `message`/`submitLabel` are visitor-facing content and follow `localizeContent`.
+	// client renderer needs message/redirect. `type`/`url` are behavior, never localized;
+	// `message` is visitor-facing content and follows `localizeContent`.
 	// `type` is defaulted and not clearable rather than `required`: a required member would make
 	// the whole group required in generated types, breaking typed `payload.create` calls that
 	// omit `response`. Consumers treat a missing type as 'message'.
@@ -285,13 +289,22 @@ export const buildFormsCollection = ({
 					},
 				],
 			},
-			{
-				name: 'submitLabel',
-				type: 'text',
-				label: labelForKey(keys.responseSubmitLabel),
-				...localizedIf(localizeContent),
-			},
 		],
+	}
+
+	// Form-level button labels, at the bottom of the Fields tab; visitor-facing content following
+	// `localizeContent`. The `buttons.fields` seam receives the already-localized defaults and its
+	// return becomes the group's fields verbatim, so a host can wrap a default in a row with its
+	// own field (e.g. an icon select), reorder, or drop one. Host-added fields ride along on
+	// `FormDocument.buttons` for custom chrome to read.
+	const defaultButtonFields = buildDefaultButtonFields(localizeContent)
+	const buttonsField: Field = {
+		name: 'buttons',
+		type: 'group',
+		label: labelForKey(keys.buttonsGroup),
+		fields: buttons?.fields
+			? buttons.fields({ defaultFields: defaultButtonFields })
+			: [defaultButtonFields.submit, defaultButtonFields.next, defaultButtonFields.back],
 	}
 
 	const defaultFields: Field[] = [
@@ -304,7 +317,7 @@ export const buildFormsCollection = ({
 		{
 			type: 'tabs',
 			tabs: [
-				{ label: labelForKey(keys.tabFields), fields: [fieldsField] },
+				{ label: labelForKey(keys.tabFields), fields: [fieldsField, buttonsField] },
 				{ label: labelForKey(keys.tabFlow), fields: [flowField] },
 				{ label: labelForKey(keys.tabActions), fields: [actionsField] },
 				{ label: labelForKey(keys.tabResponse), fields: [responseField] },

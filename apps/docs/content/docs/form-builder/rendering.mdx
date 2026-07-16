@@ -28,7 +28,7 @@ return <ContactForm form={toFormDocument(doc)} />
 
 `toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes `{ pollOptions }` as a second argument to inject [source-resolved poll options](/form-builder/polls#option-sources).
 
-`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too), and `submitLabel` feeds the submit button (see label precedence below).
+`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too). `buttons` carries the form-level submit/next/back labels, plus any [host-added button fields](/form-builder/customization#form-level-buttons) (see label precedence below).
 
 ### Progressive validation
 
@@ -65,7 +65,7 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
 | `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
 | `className` | `string` | none | Extra CSS classes on the root `<form>` element (and the post-submit success node). |
-| `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit resolves prop, then the form's `response.submitLabel`, then the translated default. |
+| `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit, next, and back each resolve prop, then the form's `buttons` value, then the translated default. |
 | `submitButtonClassName` | `string` | none | CSS class on the default submit button. Ignored when `renderSubmit` is provided. |
 | `nextButtonClassName` | `string` | none | CSS class on the default Next button (multi-step). Ignored when `renderNext` is provided. |
 | `backButtonClassName` | `string` | none | CSS class on the default Back button (multi-step). Ignored when `renderBack` is provided. |
@@ -201,7 +201,7 @@ function NameField() {
 </Form>
 ```
 
-`<FormControls>` is the same chrome the default layout renders: back on non-first steps, next on non-terminal steps, submit on the terminal step, with labels resolved from context (props, `response.submitLabel`, translated defaults). It accepts the same per-button `className` and `render*` overrides as `<Form>`, so a custom layout keeps the built-in step logic and double-submit guard instead of hand-wiring buttons. `<FormSteps>` composes the same way for [step progress](/form-builder/multi-step#formsteps-progress-indicator).
+`<FormControls>` is the same chrome the default layout renders: back on non-first steps, next on non-terminal steps, submit on the terminal step, with labels resolved from context (props, the form's `buttons` labels, translated defaults). It accepts the same per-button `className` and `render*` overrides as `<Form>`, so a custom layout keeps the built-in step logic and double-submit guard instead of hand-wiring buttons. `<FormSteps>` composes the same way for [step progress](/form-builder/multi-step#formsteps-progress-indicator).
 
 - `useField(name)` returns `value`, `errors`, `warnings`, `touched`, `setValue`, `onBlur`.
 - `useFormState()` returns the whole `FormState`: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, `submitError`.

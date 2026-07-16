@@ -2,7 +2,7 @@ import type { FormFlow } from '../flow/types'
 import { applyPollOptions } from '../poll/applyPollOptions'
 import type { PollOption } from '../poll/definePollOptionSource'
 import type { FormFieldInstance } from '../submissions/types'
-import type { FormDocument, FormResponseSettings } from './types'
+import type { FormButtonSettings, FormDocument, FormResponseSettings } from './types'
 
 export type ToFormDocumentOptions = {
 	/**
@@ -21,6 +21,8 @@ export type ToFormDocumentOptions = {
  *   (nameless bare rows, e.g. message blocks, pass through with their row `id` intact)
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `response` may be null; coerced to `undefined`
+ * - `buttons` may be null; passed through wholesale, so keys a host added to the buttons group
+ *   via the plugin `buttons.fields` seam survive to the client untouched
  * - `title` may be null; coerced to `undefined`
  * - `poll` may be null; coerced to `undefined` (`resultsField`, `optionSource`, and
  *   `sourceConfig` are dropped: server-side only; `outcome` passes through `winningValue` only)
@@ -37,7 +39,12 @@ export function toFormDocument(
 			type?: string | null
 			message?: unknown
 			redirect?: { url?: string | null } | null
+		} | null
+		buttons?: {
 			submitLabel?: string | null
+			nextLabel?: string | null
+			backLabel?: string | null
+			[key: string]: unknown
 		} | null
 		title?: string | null
 		poll?: {
@@ -73,6 +80,7 @@ export function toFormDocument(
 		fields,
 		flow: form.flow as FormFlow | undefined,
 		response: (form.response as FormResponseSettings | null | undefined) ?? undefined,
+		buttons: (form.buttons as FormButtonSettings | null | undefined) ?? undefined,
 		title: form.title ?? undefined,
 		poll,
 	}

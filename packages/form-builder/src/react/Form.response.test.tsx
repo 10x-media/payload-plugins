@@ -191,16 +191,4 @@ describe('Form response settings', () => {
 			})
 		}
 	})
-
-	it('uses the stored submitLabel when no prop is passed', () => {
-		const form = doc(nameField, { response: { type: 'message', submitLabel: 'Send it' } })
-		render(<Form form={form} onSubmit={vi.fn()} />)
-		expect(screen.getByRole('button', { name: 'Send it' })).toBeInTheDocument()
-	})
-
-	it('submitLabel prop wins over the stored value', () => {
-		const form = doc(nameField, { response: { type: 'message', submitLabel: 'Send it' } })
-		render(<Form form={form} onSubmit={vi.fn()} submitLabel="Go" />)
-		expect(screen.getByRole('button', { name: 'Go' })).toBeInTheDocument()
-	})
 })

@@ -20,7 +20,12 @@ import type { FormEventSink } from '../events/types'
 import { fieldKey, isNamedField, type NamedFormFieldInstance } from '../fields/fieldKey'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
-import type { FormDocument, FormPollSettings, FormResponseSettings } from '../form/types'
+import type {
+	FormButtonSettings,
+	FormDocument,
+	FormPollSettings,
+	FormResponseSettings,
+} from '../form/types'
 import {
 	DEFAULT_PRESENTATION_NAME,
 	defaultPresentationDescriptors,
@@ -68,11 +73,11 @@ export type {
 	NextButtonRenderProps,
 	SubmitButtonRenderProps,
 } from './FormControls'
-// FormResponseSettings, FormPollSettings, and FormDocument live in `../form/types` (no
-// 'use client') so server code (e.g. `toFormDocument` in a Server Component) can use them
-// without pulling in this client module. Re-exported here so `./react` and existing
+// FormResponseSettings, FormButtonSettings, FormPollSettings, and FormDocument live in
+// `../form/types` (no 'use client') so server code (e.g. `toFormDocument` in a Server Component)
+// can use them without pulling in this client module. Re-exported here so `./react` and existing
 // `from './Form'` imports keep working unchanged.
-export type { FormDocument, FormPollSettings, FormResponseSettings }
+export type { FormButtonSettings, FormDocument, FormPollSettings, FormResponseSettings }
 
 export type FormProps = {
 	form: FormDocument
@@ -87,11 +92,11 @@ export type FormProps = {
 	t?: RendererTranslate
 	locale?: string
 	layout?: boolean
-	/** Submit button label. Precedence: this prop, then the form's `response.submitLabel`, then the translated default. */
+	/** Submit button label. Precedence: this prop, then the form's `buttons.submitLabel`, then the translated default. */
 	submitLabel?: string
-	/** "Next" button label for multi-step forms. Defaults to the translated `'Next'`. */
+	/** "Next" button label for multi-step forms. Precedence: this prop, then the form's `buttons.nextLabel`, then the translated default. */
 	nextLabel?: string
-	/** "Back" button label for multi-step forms. Defaults to the translated `'Back'`. */
+	/** "Back" button label for multi-step forms. Precedence: this prop, then the form's `buttons.backLabel`, then the translated default. */
 	backLabel?: string
 	/** Label for the overlay close control (modal/drawer). */
 	closeLabel?: string
@@ -134,6 +139,10 @@ export type FormProps = {
 
 const isEmpty = (value: unknown): boolean =>
 	value == null || value === '' || (Array.isArray(value) && value.length === 0)
+
+/** A stored button label counts only when it is a non-empty string; anything else falls through. */
+const storedLabel = (value: unknown): string | undefined =>
+	typeof value === 'string' && value.length > 0 ? value : undefined
 
 const FIELD_WIDTHS = new Set<string>(['full', 'half', 'third', 'twoThirds'])
 
@@ -261,17 +270,14 @@ export const Form = ({
 		[form.fields]
 	)
 	const translate = useMemo<RendererTranslate>(() => t ?? makeTranslate(en), [t])
-	const docSubmitLabel =
-		typeof form.response?.submitLabel === 'string' && form.response.submitLabel.length > 0
-			? form.response.submitLabel
-			: undefined
+	const docButtons: FormButtonSettings | undefined = form.buttons
 	const labels = useMemo(
 		() => ({
-			back: backLabel ?? translate(keys.formBack),
-			next: nextLabel ?? translate(keys.formNext),
-			submit: submitLabel ?? docSubmitLabel ?? translate(keys.formSubmit),
+			back: backLabel ?? storedLabel(docButtons?.backLabel) ?? translate(keys.formBack),
+			next: nextLabel ?? storedLabel(docButtons?.nextLabel) ?? translate(keys.formNext),
+			submit: submitLabel ?? storedLabel(docButtons?.submitLabel) ?? translate(keys.formSubmit),
 		}),
-		[backLabel, nextLabel, submitLabel, docSubmitLabel, translate]
+		[backLabel, nextLabel, submitLabel, docButtons, translate]
 	)
 
 	// Latest-value refs so event emission and the mount/unmount effect tolerate an inline `events` prop or a changing form id.
@@ -618,6 +624,7 @@ export const Form = ({
 			}
 
 	const contextValue: FormContextValue = {
+		form,
 		state,
 		dispatch,
 		validateField,

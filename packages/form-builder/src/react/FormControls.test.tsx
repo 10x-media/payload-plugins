@@ -42,12 +42,9 @@ describe('FormControls', () => {
 		expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
 	})
 
-	it("defaults the submit label to the form's response.submitLabel", () => {
+	it("defaults the submit label to the form's buttons.submitLabel", () => {
 		render(
-			<Form
-				form={doc({ response: { type: 'message', submitLabel: 'Send it' } })}
-				onSubmit={vi.fn()}
-			>
+			<Form form={doc({ buttons: { submitLabel: 'Send it' } })} onSubmit={vi.fn()}>
 				<FormControls />
 			</Form>
 		)
@@ -56,11 +53,7 @@ describe('FormControls', () => {
 
 	it('prefers the Form submitLabel prop over the stored value', () => {
 		render(
-			<Form
-				form={doc({ response: { type: 'message', submitLabel: 'Send it' } })}
-				onSubmit={vi.fn()}
-				submitLabel="Go"
-			>
+			<Form form={doc({ buttons: { submitLabel: 'Send it' } })} onSubmit={vi.fn()} submitLabel="Go">
 				<FormControls />
 			</Form>
 		)

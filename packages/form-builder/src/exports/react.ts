@@ -26,7 +26,13 @@ export type { CaptchaWidgetHandle } from '../react/captcha/types'
 export { cn } from '../react/cn'
 export type { FieldRenderer, FieldRendererProps, RendererTranslate } from '../react/contract'
 export { defineFieldRenderer } from '../react/contract'
-export type { FormDocument, FormPollSettings, FormProps, FormResponseSettings } from '../react/Form'
+export type {
+	FormButtonSettings,
+	FormDocument,
+	FormPollSettings,
+	FormProps,
+	FormResponseSettings,
+} from '../react/Form'
 export { Form } from '../react/Form'
 export type {
 	FormContextValue,

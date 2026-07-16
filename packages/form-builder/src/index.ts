@@ -4,6 +4,7 @@ import { buildDefaultActionDefinitions } from './actions/builtin'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
+import type { ButtonsOption } from './collections/buttonFields'
 import { buildDefaultConsentSources } from './consent/builtin'
 import type { ConsentSourcesConfig } from './consent/registry'
 import { resolveConsentSources } from './consent/registry'
@@ -64,6 +65,16 @@ export type FormBuilderPluginOptions = {
 	richText?: RichTextBodyOption
 	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	consentSources?: ConsentSourcesConfig
+	/**
+	 * Form-level button labels. Every form carries a `buttons` group (`submitLabel`, `nextLabel`,
+	 * `backLabel`) at the bottom of its Fields tab; the rendered chrome resolves each label as
+	 * `<Form>` prop, then the stored value, then the translated default. `fields` composes the
+	 * group: it receives the three default fields with the content localization flag already
+	 * applied and returns the group's final field array verbatim, so wrapping a default in a row
+	 * with a host field (e.g. an icon select), reordering, or dropping one is explicit. Host-added
+	 * fields ride along on `FormDocument.buttons` for custom chrome to read.
+	 */
+	buttons?: ButtonsOption
 	/**
 	 * File uploads are bring-your-own. Default `false`: no upload collection is involved and the
 	 * built-in `file` field type is removed from the registry, so form authors cannot add a field
@@ -168,6 +179,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			resultsAccess: options.results?.access,
 			votedCookie: options.poll?.votedCookie === true,
 			pollSourceRegistry,
+			buttons: options.buttons,
 			overrides: options.overrides,
 		})
 		return config
@@ -224,6 +236,17 @@ export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
 export { evaluateCalc } from './calc/evaluate'
 export { normalizeCalc } from './calc/normalizeCalc'
 export type { CalcExpression } from './calc/types'
+export type {
+	ButtonFieldsOverride,
+	ButtonsOption,
+	DefaultButtonFields,
+} from './collections/buttonFields'
+export {
+	buildBackLabelField,
+	buildDefaultButtonFields,
+	buildNextLabelField,
+	buildSubmitLabelField,
+} from './collections/buttonFields'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { buildDefaultConsentSources, defaultConsentSources } from './consent/builtin'
@@ -265,7 +288,12 @@ export type {
 export { isPollClosed } from './form/pollState'
 export type { ToFormDocumentOptions } from './form/toFormDocument'
 export { toFormDocument } from './form/toFormDocument'
-export type { FormDocument, FormPollSettings, FormResponseSettings } from './form/types'
+export type {
+	FormButtonSettings,
+	FormDocument,
+	FormPollSettings,
+	FormResponseSettings,
+} from './form/types'
 export type { UploadsOption } from './plugin/uploadsCollection'
 export type {
 	AnyPollOptionSource,
