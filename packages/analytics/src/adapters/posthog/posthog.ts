@@ -155,13 +155,12 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			}
 
 			if (q.granularity === 'day' && !breakdownDim) {
-				// HogQL buckets in the timezone argument when given; without it PostHog uses the
-				// project's own timezone. The window literals stay UTC instants (already aligned
-				// to the reporting-timezone day boundary by the caller).
-				const dayExpr =
-					q.timezone && q.timezone !== 'UTC'
-						? `toStartOfDay(timestamp, ${sqlString(q.timezone)})`
-						: 'toStartOfDay(timestamp)'
+				// HogQL buckets in the timezone argument when given; without it PostHog falls back
+				// to the project's own timezone, so the resolved reporting timezone (UTC included)
+				// is always passed to keep day buckets deterministic across projects. The window
+				// literals stay UTC instants (already aligned to the reporting-timezone day
+				// boundary by the caller).
+				const dayExpr = `toStartOfDay(timestamp, ${sqlString(q.timezone ?? 'UTC')})`
 				const seriesSql = `SELECT ${dayExpr} AS day, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY day ORDER BY day`
 				const [seriesData, totals] = await Promise.all([runSql(seriesSql), fetchTotals()])
 				const rows: AnalyticsRow[] = []

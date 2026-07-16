@@ -266,7 +266,7 @@ describe('posthog adapter', () => {
 		expect(seriesSql).toContain("toStartOfDay(timestamp, 'Europe/Berlin')")
 	})
 
-	it('buckets the day series in UTC without a timezone argument by default', async () => {
+	it('buckets the day series explicitly in UTC by default (never the project timezone)', async () => {
 		let seriesSql = ''
 		server.use(
 			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
@@ -282,7 +282,7 @@ describe('posthog adapter', () => {
 			q({ metrics: ['pageviews'], granularity: 'day' }),
 			{}
 		)
-		expect(seriesSql).toContain('toStartOfDay(timestamp) AS day')
+		expect(seriesSql).toContain("toStartOfDay(timestamp, 'UTC') AS day")
 	})
 
 	it('targets the configured host (EU / self-host)', async () => {
