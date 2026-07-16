@@ -73,6 +73,85 @@ describe('registerWidgets', () => {
 		])
 	})
 
+	it('narrows the metric picker to the selected data source via filterOptions', () => {
+		const eventsOnly: AnalyticsAdapter = {
+			id: 'events-only',
+			label: 'Events only',
+			capabilities: { ...native().capabilities, metrics: new Set<MetricKey>(['events']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'events-only', fetchedAt: '' } }),
+		}
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native(), eventsOnly],
+			multiProvider: true,
+			disabled: [],
+			register: [],
+		})
+		const metricField = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'metric')
+		if (metricField?.type !== 'select' || !metricField.filterOptions) {
+			throw new Error('metric select with filterOptions not registered')
+		}
+		const filterOptions = metricField.filterOptions
+		const filter = (dataSource?: string) =>
+			filterOptions({
+				data: {},
+				options: metricField.options,
+				req: {} as never,
+				siblingData: { dataSource },
+			}).map((o) => (typeof o === 'object' ? o.value : o))
+		expect(filter('events-only')).toEqual(['events'])
+		expect(filter('native')).toContain('pageviews')
+		// An id unknown at config time (runtime/DB provider) keeps the union.
+		expect(filter('runtime-provider')).toEqual(
+			(metricField.options as { value: string }[]).map((o) => o.value)
+		)
+	})
+
+	it('clamps the metric default to a servable option', () => {
+		const visitorsOnly: AnalyticsAdapter = {
+			id: 'visitors-only',
+			label: 'Visitors only',
+			capabilities: { ...native().capabilities, metrics: new Set<MetricKey>(['visitors']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'visitors-only', fetchedAt: '' } }),
+		}
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [visitorsOnly],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
+		const metricField = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'metric')
+		expect(metricField && 'defaultValue' in metricField && metricField.defaultValue).toBe(
+			'visitors'
+		)
+	})
+
+	it('skips a widget whose metric select would have no options', () => {
+		const scrollOnly: AnalyticsAdapter = {
+			id: 'scroll-only',
+			label: 'Scroll only',
+			capabilities: { ...native().capabilities, metrics: new Set<MetricKey>(['scrollDepth']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'scroll-only', fetchedAt: '' } }),
+		}
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [scrollOnly],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
+		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugs).not.toContain('analytics-metric')
+	})
+
 	it('drops the trend widget when no adapter supports its required metric', () => {
 		const noPageviews: AnalyticsAdapter = {
 			id: 'limited',

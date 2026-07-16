@@ -1,4 +1,4 @@
-import type { Config, Field, Widget, WidgetWidth } from 'payload'
+import type { Config, Field, SelectField, Widget, WidgetWidth } from 'payload'
 import { type CapabilityRequirement, satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, MetricKey } from '../core/contract'
 import { dateRangeField } from '../fields/dateRange/field'
@@ -36,21 +36,52 @@ export const widgetIsSupported = (
 ): boolean => !requires || adapters.some((a) => satisfiesCapabilities(a.capabilities, requires))
 
 /**
- * Metric select options limited to metrics at least one configured adapter can serve,
- * mirroring the OR-across-adapters gating used to hide whole widgets. `extra` layers on
- * further requirements (a breakdown widget's dimension, realtime) so the picker never
- * offers a metric the read path would report as unavailable.
+ * The widget metric select. Options are limited to metrics at least one configured
+ * adapter can serve, mirroring the OR-across-adapters gating used to hide whole widgets;
+ * `extra` layers on further requirements (a breakdown widget's dimension, realtime) so
+ * the picker never offers a metric the read path would report as unavailable. In
+ * multi-provider installs `filterOptions` additionally narrows the picker to the selected
+ * `dataSource`'s capabilities; an id not known at config time (a runtime/DB provider)
+ * keeps the union. The default clamps to the first option when the preferred metric is
+ * not servable, and options can come out empty for exotic adapter sets, which
+ * {@link registerWidgets} treats as "skip this widget".
  */
-const metricOptions = (
+const metricSelectField = (
 	candidates: MetricKey[],
 	args: RegisterWidgetsArgs,
-	extra?: Omit<CapabilityRequirement, 'metrics'>
-): { value: MetricKey; label: ReturnType<typeof labelForKey> }[] =>
-	candidates
-		.filter((m) =>
-			args.adapters.some((a) => satisfiesCapabilities(a.capabilities, { ...extra, metrics: [m] }))
-		)
+	opts: {
+		extra?: Omit<CapabilityRequirement, 'metrics'>
+		preferredDefault?: MetricKey
+	} = {}
+): Field => {
+	const { extra, preferredDefault = 'pageviews' } = opts
+	const supports = (adapter: AnalyticsAdapter, metric: MetricKey): boolean =>
+		satisfiesCapabilities(adapter.capabilities, { ...extra, metrics: [metric] })
+	const options = candidates
+		.filter((m) => args.adapters.some((a) => supports(a, m)))
 		.map((m) => ({ value: m, label: labelForKey(METRIC_KEYS[m]) }))
+	const defaultValue = options.some((o) => o.value === preferredDefault)
+		? preferredDefault
+		: options[0]?.value
+	const filterOptions: SelectField['filterOptions'] = ({ options: opts, siblingData }) => {
+		const sourceId = (siblingData as { dataSource?: unknown } | undefined)?.dataSource
+		const adapter =
+			typeof sourceId === 'string' ? args.adapters.find((a) => a.id === sourceId) : undefined
+		if (!adapter) {
+			return opts
+		}
+		return opts.filter((o) => typeof o === 'object' && supports(adapter, o.value as MetricKey))
+	}
+	return {
+		name: 'metric',
+		type: 'select',
+		required: true,
+		...(defaultValue !== undefined ? { defaultValue } : {}),
+		label: labelForKey(keys.widgetFieldMetric),
+		options,
+		...(args.multiProvider ? { filterOptions } : {}),
+	}
+}
 
 const titleField = (args: RegisterWidgetsArgs, placeholder: string): Field => ({
 	name: 'title',
@@ -63,14 +94,7 @@ const titleField = (args: RegisterWidgetsArgs, placeholder: string): Field => ({
 const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 	const fields: Field[] = [
 		titleField(args, en[keys.widgetFieldTitlePlaceholder]),
-		{
-			name: 'metric',
-			type: 'select',
-			required: true,
-			defaultValue: 'pageviews',
-			label: labelForKey(keys.widgetFieldMetric),
-			options: metricOptions(WIDGET_METRICS, args),
-		},
+		metricSelectField(WIDGET_METRICS, args),
 		{
 			name: 'timeframe',
 			type: 'select',
@@ -110,14 +134,7 @@ const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => {
 	const fields: Field[] = [
 		titleField(args, en[spec.label]),
-		{
-			name: 'metric',
-			type: 'select',
-			required: true,
-			defaultValue: 'pageviews',
-			label: labelForKey(keys.widgetFieldMetric),
-			options: metricOptions(WIDGET_METRICS, args, { dimensions: [spec.dimension] }),
-		},
+		metricSelectField(WIDGET_METRICS, args, { extra: { dimensions: [spec.dimension] } }),
 		{
 			name: 'timeframe',
 			type: 'select',
@@ -165,14 +182,10 @@ const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): 
 const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
 	const fields: Field[] = [
 		titleField(args, en[keys.widgetFieldTitlePlaceholder]),
-		{
-			name: 'metric',
-			type: 'select',
-			required: true,
-			defaultValue: 'visitors',
-			label: labelForKey(keys.widgetFieldMetric),
-			options: metricOptions(['visitors', 'pageviews'], args, { realtime: true }),
-		},
+		metricSelectField(['visitors', 'pageviews'], args, {
+			extra: { realtime: true },
+			preferredDefault: 'visitors',
+		}),
 		{
 			name: 'windowMinutes',
 			type: 'select',
@@ -247,11 +260,18 @@ export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void
 		if (!widgetIsSupported(def.requires, args.adapters)) {
 			continue
 		}
+		const fields = def.fields(args)
+		// A required metric select with no servable option would make the widget
+		// impossible to configure; skip it like an unsupported widget.
+		const metricField = fields.find((f) => 'name' in f && f.name === 'metric')
+		if (metricField && 'options' in metricField && metricField.options.length === 0) {
+			continue
+		}
 		built.push({
 			slug: def.slug,
 			Component: def.component,
 			label: labelForKey(def.label),
-			fields: def.fields(args),
+			fields,
 			minWidth: def.minWidth,
 			maxWidth: def.maxWidth,
 		})
