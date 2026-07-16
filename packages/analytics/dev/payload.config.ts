@@ -67,6 +67,7 @@ export default buildConfig({
 			adapters: [native()],
 			cache: { warm: true },
 			sync: true,
+			reportingTimezone: 'America/New_York',
 			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
 			widgets: {
 				register: [
