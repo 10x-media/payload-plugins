@@ -1,6 +1,36 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import type { Condition, Field } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { formBuilder } from '../../src/index'
+
+type ConditionProps = Parameters<Condition>[2]
+
+const conditionProps = (blockData: ConditionProps['blockData']): ConditionProps => ({
+	blockData,
+	operation: 'update',
+	path: ['fields', 0, 'sourceConfig'],
+	user: null,
+})
+
+const flatten = (fields: Field[]): Field[] =>
+	fields.flatMap((field) => {
+		if (field.type === 'row') {
+			return flatten(field.fields)
+		}
+		if (field.type === 'tabs') {
+			return field.tabs.flatMap((tab) => flatten(tab.fields))
+		}
+		return [field]
+	})
+
+const conditionOf = (children: Field[], name: string): Condition => {
+	const field = children.find((f) => 'name' in f && f.name === name)
+	const admin = field?.admin as { condition?: Condition } | undefined
+	if (typeof admin?.condition !== 'function') {
+		throw new Error(`expected admin.condition on sourceConfig field: ${name}`)
+	}
+	return admin.condition
+}
 
 describeForDb('form-builder consent capture', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -11,6 +41,37 @@ describeForDb('form-builder consent capture', { dbs: ['mongo'] }, (db) => {
 
 	afterAll(async () => {
 		await booted.stop()
+	})
+
+	it('gates consent sourceConfig fields on blockData.source in the sanitized config', () => {
+		const forms = booted.payload.config.collections.find((c) => c.slug === 'forms')
+		const blocksField = flatten(forms?.fields ?? []).find(
+			(f): f is Extract<Field, { type: 'blocks' }> =>
+				f.type === 'blocks' && 'name' in f && f.name === 'fields'
+		)
+		const consent = blocksField?.blocks.find((b) => b.slug === 'consent')
+		const consentFields = flatten(consent?.fields ?? [])
+
+		const source = consentFields.find((f) => 'name' in f && f.name === 'source')
+		expect(source).toMatchObject({
+			type: 'select',
+			defaultValue: 'static',
+			admin: { isClearable: false },
+		})
+
+		const group = consentFields.find((f) => 'name' in f && f.name === 'sourceConfig')
+		const children = group?.type === 'group' ? group.fields : []
+
+		for (const name of ['label', 'url', 'version']) {
+			const condition = conditionOf(children, name)
+			expect(condition({}, {}, conditionProps({ source: 'static' }))).toBe(true)
+			expect(condition({}, {}, conditionProps({ source: 'pageReference' }))).toBe(false)
+		}
+		for (const name of ['relationTo', 'docId', 'urlField', 'captureVersion']) {
+			const condition = conditionOf(children, name)
+			expect(condition({}, {}, conditionProps({ source: 'pageReference' }))).toBe(true)
+			expect(condition({}, {}, conditionProps({ source: 'static' }))).toBe(false)
+		}
 	})
 
 	it('stores a consent proof when a required consent field is agreed', async () => {
