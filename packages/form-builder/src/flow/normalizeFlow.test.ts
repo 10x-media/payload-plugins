@@ -22,6 +22,18 @@ describe('normalizeFlow', () => {
 		expect(flow?.steps[0]?.fields).toEqual(['name'])
 		expect(flow?.steps).toHaveLength(2)
 	})
+	it('accepts bare block row ids as field keys alongside names', () => {
+		const flow = normalizeFlow(
+			{
+				steps: [
+					{ id: 'a', fields: ['name', 'row-note'], next: 'b' },
+					{ id: 'b', fields: ['email'] },
+				],
+			},
+			['name', 'row-note', 'email']
+		)
+		expect(flow?.steps[0]?.fields).toEqual(['name', 'row-note'])
+	})
 	it('drops a transition whose target step does not exist', () => {
 		const flow = normalizeFlow(
 			{

@@ -70,6 +70,7 @@ export const registerCollections = ({
 			consentRegistry,
 			actionRegistry,
 			localizeContent,
+			richText,
 			uploadsCollectionSlug: uploadSlug,
 			resultsAccess,
 			pollSourceRegistry,

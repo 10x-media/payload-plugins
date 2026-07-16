@@ -5,17 +5,18 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 	v !== null && typeof v === 'object' && !Array.isArray(v)
 
 /**
- * Pure guard that normalizes a raw (possibly untrusted) flow value against the
- * form's current field list. Returns `undefined` when the flow is absent, empty,
- * or resolves to fewer than two steps (a single step is an ordinary form).
- * A field assigned to multiple steps keeps only its first occurrence in step order.
+ * Pure guard that normalizes a raw (possibly untrusted) flow value against the form's current
+ * field keys (machine names for named fields, block row ids for bare blocks; see `fieldKey`).
+ * Returns `undefined` when the flow is absent, empty, or resolves to fewer than two steps
+ * (a single step is an ordinary form). A field assigned to multiple steps keeps only its
+ * first occurrence in step order.
  */
-export const normalizeFlow = (raw: unknown, fieldNames: string[]): FormFlow | undefined => {
+export const normalizeFlow = (raw: unknown, fieldKeys: string[]): FormFlow | undefined => {
 	if (!isRecord(raw) || !Array.isArray(raw.steps)) {
 		return undefined
 	}
 
-	const knownFields = new Set(fieldNames)
+	const knownFields = new Set(fieldKeys)
 
 	const rawSteps = raw.steps.filter(
 		(s): s is Record<string, unknown> => isRecord(s) && typeof s.id === 'string'

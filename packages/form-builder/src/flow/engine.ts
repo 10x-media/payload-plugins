@@ -8,7 +8,7 @@ export const firstStepId = (flow: FormFlow): string | undefined => flow.steps[0]
 export const getStep = (flow: FormFlow, id: string): FlowStep | undefined =>
 	flow.steps.find((step) => step.id === id)
 
-/** The field machine names a step renders (empty for an unknown step). */
+/** The field keys a step renders (names for named fields, block row ids for bare blocks; empty for an unknown step). */
 export const stepFieldNames = (flow: FormFlow, id: string): string[] =>
 	getStep(flow, id)?.fields ?? []
 

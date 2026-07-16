@@ -7,8 +7,9 @@ import { signedWebhook } from './signedWebhook'
 /**
  * Built-in action definitions with content-bearing config fields (email subjects and rich text
  * bodies) carrying `localized: true` when `localize` is true. `editor`, when given, overrides
- * the Lexical/richText editor on both action bodies (from the plugin's `richText.editor` option).
- * `signedWebhook` has no content fields and is shared static.
+ * the Lexical/richText editor on both action bodies (the plugin passes
+ * `richText.bodyEditor ?? richText.editor`). `signedWebhook` has no content fields and is
+ * shared static.
  */
 export const buildDefaultActionDefinitions = (
 	localize: boolean,

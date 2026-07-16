@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
+import { isNamedField, type NamedFormFieldInstance } from '../fields/fieldKey'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateRowsForFields } from './aggregateRows'
 import type { AggregationRow, FieldAggregation, FieldMeta, SubmissionStatusFilter } from './types'
@@ -32,7 +33,7 @@ const optionsOf = (field: FormFieldInstance): { value: string; label: string }[]
 /** True when a field declares non-empty options (a choice field safe to aggregate publicly). */
 export const fieldHasOptions = (field: FormFieldInstance): boolean => optionsOf(field) !== undefined
 
-const metaFor = (field: FormFieldInstance): FieldMeta => ({
+const metaFor = (field: NamedFormFieldInstance): FieldMeta => ({
 	field: field.name,
 	label: field.label ?? field.name,
 	fieldType: field.blockType,
@@ -65,8 +66,14 @@ export const aggregateFormResponses = async (
 	}
 	const instances = form.fields as FormFieldInstance[]
 	const selected = fields
-		? instances.filter((field) => fields.includes(field.name))
-		: instances.filter((field) => optionsOf(field) !== undefined)
+		? instances.filter(
+				(field): field is NamedFormFieldInstance =>
+					isNamedField(field) && fields.includes(field.name)
+			)
+		: instances.filter(
+				(field): field is NamedFormFieldInstance =>
+					isNamedField(field) && optionsOf(field) !== undefined
+			)
 	if (selected.length === 0) {
 		return []
 	}

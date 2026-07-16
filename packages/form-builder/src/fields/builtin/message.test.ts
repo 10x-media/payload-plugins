@@ -1,3 +1,4 @@
+import type { RichTextField } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { runSubmission } from '../../submissions/runSubmission'
 import type { FormFieldInstance } from '../../submissions/types'
@@ -18,22 +19,29 @@ const base = {
 }
 
 describe('messageField', () => {
-	it('has type "message" and value kind "none"', () => {
+	it('has type "message", value kind "none", and is bare', () => {
 		expect(messageField.type).toBe('message')
 		expect(messageField.value).toBe('none')
+		expect(messageField.bare).toBe(true)
 	})
 
 	it('is registered as a built-in', () => {
 		expect(registry.get('message')).toBeDefined()
 	})
 
-	it('config is a single richText content field with no editor key', () => {
+	it('config is a single richText content field with no editor key by default', () => {
 		const config = messageField.config ?? []
 		expect(config).toHaveLength(1)
 		const content = config[0] as { name?: string; type?: string; editor?: unknown }
 		expect(content.name).toBe('content')
 		expect(content.type).toBe('richText')
 		expect('editor' in content).toBe(false)
+	})
+
+	it('threads a given editor onto the content field', () => {
+		const editor = { fake: 'editor' } as unknown as RichTextField['editor']
+		const content = buildMessageField(true, editor).config?.[0] as { editor?: unknown }
+		expect(content.editor).toBe(editor)
 	})
 
 	it('content is localized when localize is true, not when false', () => {
@@ -49,10 +57,10 @@ describe('messageField', () => {
 	})
 })
 
-describe('runSubmission with a message field', () => {
+describe('runSubmission with a nameless message block', () => {
 	const fields: FormFieldInstance[] = [
 		{ blockType: 'text', name: 'first', label: 'First' },
-		{ blockType: 'message', name: 'note', label: 'Note', content: { root: { children: [] } } },
+		{ blockType: 'message', id: 'row-note', content: { root: { children: [] } } },
 		{ blockType: 'text', name: 'last', label: 'Last' },
 	]
 
@@ -73,26 +81,44 @@ describe('runSubmission with a message field', () => {
 		expect(result.descriptors.map((d) => d.field)).toEqual(['first', 'last'])
 	})
 
-	it('drops a client-sent value under the message field name', async () => {
+	it('drops a client-sent value aimed at the message row (by row id or any stray key)', async () => {
 		const result = await runSubmission({
 			...base,
 			fields,
 			values: [
 				{ field: 'first', value: 'a' },
-				{ field: 'note', value: '<script>alert(1)</script>' },
+				{ field: 'row-note', value: '<script>alert(1)</script>' },
+				{ field: 'note', value: 'stray' },
 			],
 		})
 		expect(result.errors).toEqual([])
 		expect(result.values).toEqual([{ field: 'first', value: 'a' }])
 	})
 
-	it('never validates a message field, even when marked required', async () => {
+	it('never validates a message block, even when row data claims required', async () => {
 		const requiredMessage: FormFieldInstance[] = [
-			{ blockType: 'message', name: 'note', label: 'Note', required: true },
+			{ blockType: 'message', id: 'row-note', required: true },
 		]
 		const result = await runSubmission({ ...base, fields: requiredMessage, values: [] })
 		expect(result.errors).toEqual([])
 		expect(result.values).toEqual([])
+	})
+
+	it('still drops values under a legacy named message row', async () => {
+		const legacy: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'first', label: 'First' },
+			{ blockType: 'message', name: 'note', content: { root: { children: [] } } },
+		]
+		const result = await runSubmission({
+			...base,
+			fields: legacy,
+			values: [
+				{ field: 'first', value: 'a' },
+				{ field: 'note', value: 'client-injected' },
+			],
+		})
+		expect(result.errors).toEqual([])
+		expect(result.values).toEqual([{ field: 'first', value: 'a' }])
 	})
 
 	it('localize flag threads through buildDefaultFieldDefinitions', () => {
@@ -100,5 +126,17 @@ describe('runSubmission with a message field', () => {
 		const without = buildDefaultFieldDefinitions(false).find((d) => d.type === 'message')
 		expect((withLocalization?.config?.[0] as { localized?: boolean }).localized).toBe(true)
 		expect('localized' in (without?.config?.[0] as object)).toBe(false)
+	})
+
+	it('editor threads through buildDefaultFieldDefinitions to message and consent', () => {
+		const editor = { fake: 'editor' } as unknown as RichTextField['editor']
+		const definitions = buildDefaultFieldDefinitions(true, editor)
+		const message = definitions.find((d) => d.type === 'message')
+		const consent = definitions.find((d) => d.type === 'consent')
+		expect((message?.config?.[0] as { editor?: unknown }).editor).toBe(editor)
+		const statement = consent?.config?.find(
+			(f) => 'name' in f && (f as { name?: string }).name === 'statement'
+		)
+		expect((statement as { editor?: unknown }).editor).toBe(editor)
 	})
 })

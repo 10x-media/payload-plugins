@@ -1,3 +1,4 @@
+import type { RichTextField } from 'payload'
 import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
 import { defineFormField } from '../defineFormField'
@@ -14,12 +15,13 @@ type ConsentConfig = {
  * Base consent field definition. `source` select and `sourceConfig` group are injected
  * by `buildFieldBlocks` from the live `consentRegistry`, so only the selected source's
  * fields are visible in the admin UI via `admin.condition`. The `statement` is
- * author-facing rich text (no `editor` key: uses the host config's default) so authors can
- * inline links (e.g. to the privacy policy) rather than relying solely on the separate
- * `consentLinks` row, and follows `localize`. A legacy plain-string `statement` (data authored
- * before this field became richText) still renders; see `consentRenderer`.
+ * author-facing rich text so authors can inline links (e.g. to the privacy policy) rather
+ * than relying solely on the separate `consentLinks` row, and follows `localize`; `editor`,
+ * when given, overrides the host config's default richText editor (from the plugin's
+ * `richText.editor`). A legacy plain-string `statement` (data authored before this field
+ * became richText) still renders; see `consentRenderer`.
  */
-export const buildConsentField = (localize: boolean) =>
+export const buildConsentField = (localize: boolean, editor?: RichTextField['editor']) =>
 	defineFormField<'boolean', ConsentConfig>({
 		type: 'consent',
 		label: keys.fieldTypeConsent,
@@ -30,6 +32,7 @@ export const buildConsentField = (localize: boolean) =>
 				type: 'richText',
 				label: labelFor(keys.consentConfigStatement),
 				admin: { description: labelFor(keys.consentConfigStatementDescription) },
+				...(editor ? { editor } : {}),
 				...localizedIf(localize),
 			},
 			// source select and sourceConfig group are injected by buildFieldBlocks at plugin boot

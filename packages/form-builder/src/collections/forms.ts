@@ -5,6 +5,7 @@ import {
 	type PayloadRequest,
 	ValidationError,
 } from 'payload'
+import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { ActionRegistry } from '../actions/registry'
 import {
@@ -89,6 +90,8 @@ type BuildFormsCollectionArgs = {
 	consentRegistry?: ConsentSourceRegistry
 	actionRegistry?: ActionRegistry
 	localizeContent?: boolean
+	/** The plugin `richText` option; `editor` overrides the response message's richText editor. */
+	richText?: RichTextBodyOption
 	/** The host-owned uploads collection slug from plugin config; absent when uploads are disabled. */
 	uploadsCollectionSlug?: string
 	/** Host seam gating anonymous results reads (plugin option `results.access`). */
@@ -105,11 +108,20 @@ export const buildFormsCollection = ({
 	consentRegistry,
 	actionRegistry = new Map(),
 	localizeContent = true,
+	richText,
 	uploadsCollectionSlug,
 	resultsAccess,
 	pollSourceRegistry,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
+	const bareTypes = new Set(
+		[...registry.values()].filter((d) => d.bare === true).map((d) => d.type)
+	)
+	// Handed to the FlowBuilder so it can list bare (nameless) blocks in the step picker: slug ->
+	// label (an i18n key or literal, resolved client-side).
+	const bareTypeLabels = Object.fromEntries(
+		[...registry.values()].filter((d) => d.bare === true).map((d) => [d.type, d.label])
+	)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
@@ -127,10 +139,17 @@ export const buildFormsCollection = ({
 				stampFileCollections(normalized, uploadsCollectionSlug)
 			}
 			data.fields = normalized
-			const fieldNames = normalized
-				.map((field: FieldRow) => (typeof field.name === 'string' ? field.name : undefined))
-				.filter((name): name is string => name !== undefined)
-			const normalizedFlow = normalizeFlow(data.flow, fieldNames)
+			// Flow step assignments store field keys: machine names for named fields, block row ids
+			// for bare (nameless) blocks. Mirrors `fieldKey` over the raw rows.
+			const fieldKeys = normalized
+				.map((field: FieldRow) => {
+					if (typeof field.name === 'string' && field.name.length > 0) {
+						return field.name
+					}
+					return bareTypes.has(field.blockType) && field.id != null ? String(field.id) : undefined
+				})
+				.filter((key): key is string => key !== undefined)
+			const normalizedFlow = normalizeFlow(data.flow, fieldKeys)
 			// A flow the author built but that collapses to fewer than two valid steps would
 			// otherwise vanish silently. Surface it instead of discarding their work.
 			if (providedFlowStepCount(data.flow) > 0 && normalizedFlow === undefined) {
@@ -169,7 +188,7 @@ export const buildFormsCollection = ({
 		validate: validateFlow,
 		admin: {
 			components: {
-				Field: { path: FLOW_BUILDER_REF, clientProps: { conditionTypes } },
+				Field: { path: FLOW_BUILDER_REF, clientProps: { conditionTypes, bareTypeLabels } },
 			},
 		},
 		// Narrows the generated TypeScript type from opaque JSON to FormFlow so callers
@@ -249,6 +268,7 @@ export const buildFormsCollection = ({
 				label: labelForKey(keys.responseMessage),
 				// Unset type (docs predating this field) means 'message', matching the client fallback.
 				admin: { condition: (_data, siblingData) => siblingData?.type !== 'redirect' },
+				...(richText?.editor ? { editor: richText.editor } : {}),
 				...localizedIf(localizeContent),
 			},
 			{

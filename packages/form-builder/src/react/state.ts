@@ -1,3 +1,4 @@
+import { isNamedField } from '../fields/fieldKey'
 import type { FormFieldInstance } from '../submissions/types'
 
 export type FieldErrors = Record<string, string[]>
@@ -23,14 +24,15 @@ export type FormAction =
 	| { type: 'SUBMIT_ERROR'; message: string }
 
 /**
- * Per-field defaults for the reducer's initial state. A repeater with a positive `minRows` starts
- * pre-seeded with that many empty rows, matching the schema's own floor. Computed once, ahead of the
- * reducer, so seeding is never an action: it can't touch a field, trigger validation, or (via `Form`'s
- * dispatch wrapper) be mistaken for the user's first edit and fire `form.started`.
+ * Per-field defaults for the reducer's initial state. Nameless (bare) blocks carry no value and
+ * are skipped. A repeater with a positive `minRows` starts pre-seeded with that many empty rows,
+ * matching the schema's own floor. Computed once, ahead of the reducer, so seeding is never an
+ * action: it can't touch a field, trigger validation, or (via `Form`'s dispatch wrapper) be
+ * mistaken for the user's first edit and fire `form.started`.
  */
 export const seedFieldValues = (fields: FormFieldInstance[]): Record<string, unknown> =>
 	Object.fromEntries(
-		fields.map((field) => {
+		fields.filter(isNamedField).map((field) => {
 			if (field.blockType === 'repeater') {
 				const minRows = typeof field.minRows === 'number' ? field.minRows : 0
 				if (minRows > 0) {

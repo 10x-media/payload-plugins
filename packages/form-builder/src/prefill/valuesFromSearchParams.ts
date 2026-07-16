@@ -1,3 +1,4 @@
+import { isNamedField } from '../fields/fieldKey'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { FormFieldValueKind } from '../fields/types'
 import type { FormFieldInstance } from '../submissions/types'
@@ -42,7 +43,7 @@ export const valuesFromSearchParams = (
 ): Record<string, unknown> => {
 	const isSearch = params instanceof URLSearchParams
 	const paramKeys = isSearch ? [...new Set(params.keys())] : Object.keys(params)
-	const byName = new Map(fields.map((field) => [field.name, field]))
+	const byName = new Map(fields.filter(isNamedField).map((field) => [field.name, field]))
 	const result: Record<string, unknown> = {}
 
 	for (const param of paramKeys) {

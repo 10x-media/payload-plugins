@@ -16,10 +16,14 @@ export type SubmissionDescriptor = {
 /** A per-field validation failure (`path` is the field name, for renderer error mapping). */
 export type SubmissionFieldError = { path: string; message: string }
 
-/** A field instance as stored in a form's `fields` blocks array (shared config plus type-specific keys). */
+/**
+ * A field instance as stored in a form's `fields` blocks array (shared config plus type-specific
+ * keys). `name` is absent on bare blocks (e.g. `message`), which are identified by the hidden
+ * block row `id` Payload injects into every row (see `fieldKey`).
+ */
 export type FormFieldInstance = {
 	blockType: string
-	name: string
+	name?: string
 	label?: string
 	required?: boolean
 	visibleWhen?: Where

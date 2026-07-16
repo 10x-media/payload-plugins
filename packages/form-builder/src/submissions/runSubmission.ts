@@ -4,6 +4,7 @@ import { evaluateCondition } from '../conditions/evaluate'
 import type { ConsentProof } from '../consent/captureConsent'
 import { captureConsent } from '../consent/captureConsent'
 import type { ConsentSourceRegistry } from '../consent/registry'
+import { isNamedField } from '../fields/fieldKey'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { Translate } from '../fields/types'
 import { keys } from '../translations/keys'
@@ -128,9 +129,9 @@ export type RunSubmissionResult = {
  * field whose `visibleWhen` is false is skipped entirely (never validated, never stored, so a client-sent
  * value for it is ignored), and a visible field whose `validateWhen` is false stores its value but skips
  * validation. A visible calc field stores its derived value and is never validated. Display-only field
- * types (value kind 'none', e.g. message) are skipped in both passes: never validated, never stored, and
- * a client-sent value under their name is dropped. Only `error` severity blocks; warnings are computed
- * but not surfaced server-side (the renderer surfaces them).
+ * types (value kind 'none', e.g. message) and nameless (bare) rows are skipped in both passes: never
+ * validated, never stored, and a client-sent value under their name is dropped. Only `error` severity
+ * blocks; warnings are computed but not surfaced server-side (the renderer surfaces them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
 	const {
@@ -154,12 +155,18 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 	const coercedByName = new Map<string, unknown>()
 	for (const instance of fields) {
 		const definition = registry.get(instance.blockType)
-		const raw = incoming.get(instance.name)
 		// Never seed a calc field's client value: its value is derived below, so the client cannot influence it (even for a self-referencing expression).
 		// A display-only ('none' kind) field carries no value at all, so a client-sent value under its name is dropped here.
-		if (!definition || definition.value === 'none' || calcExpressionOf(instance)) {
+		// A nameless (bare) row has no key to read a value under.
+		if (
+			!definition ||
+			definition.value === 'none' ||
+			calcExpressionOf(instance) ||
+			!isNamedField(instance)
+		) {
 			continue
 		}
+		const raw = incoming.get(instance.name)
 		// A consent field's "not agreed" state is semantically meaningful: treat a missing value as
 		// `false` so the intrinsic validate can enforce required-agreement (not optional = must be true).
 		// A repeater with no rows is coerced to [] so validate() can check minRows. The empty-guard
@@ -191,7 +198,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 	for (const instance of fields) {
 		const definition = registry.get(instance.blockType)
 		// A 'none'-kind (display-only) field is never validated and never stored: no value, no descriptor.
-		if (!definition || definition.value === 'none') {
+		// A nameless (bare) row has no key to store under, so it is skipped the same way.
+		if (!definition || definition.value === 'none' || !isNamedField(instance)) {
 			continue
 		}
 		const raw = incoming.get(instance.name)
@@ -296,9 +304,11 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 
 		if (instance.blockType === 'repeater') {
 			const rows = Array.isArray(value) ? (value as Array<Record<string, unknown>>) : []
-			const subFields = Array.isArray(instance.subFields)
-				? (instance.subFields as FormFieldInstance[])
-				: []
+			// Nameless sub-rows are dropped like top-level ones (bare blocks are excluded from the
+			// repeater's subFields config, so any encountered here is stray data).
+			const subFields = (
+				Array.isArray(instance.subFields) ? (instance.subFields as FormFieldInstance[]) : []
+			).filter(isNamedField)
 
 			// Per-row sub-field processing. Validation is gated by the sub-field's visibleWhen and
 			// validateWhen against the row's own values; errors carry the path

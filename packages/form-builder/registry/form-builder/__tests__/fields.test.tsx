@@ -302,7 +302,7 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		}
 		const { container } = render(
 			<Form
-				form={{ id: 1, fields: [{ blockType: 'message', name: 'note', content }] }}
+				form={{ id: 1, fields: [{ blockType: 'message', id: 'row-note', content }] }}
 				onSubmit={vi.fn()}
 				renderers={{ message: messageField }}
 			/>
@@ -333,7 +333,7 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 								right: { type: 'lit', value: 2 },
 							},
 						},
-						{ blockType: 'message', name: 'note', content },
+						{ blockType: 'message', id: 'row-note', content },
 					],
 				}}
 				onSubmit={vi.fn()}

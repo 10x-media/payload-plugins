@@ -31,16 +31,19 @@ export type SerializeBodyArgs = {
 }
 
 /**
- * Customizes how action bodies are authored and rendered. `converters` spread over the default
- * Lexical node converters; `serialize` replaces the whole pipeline (for non-HTML channels like
- * chat or plain text, or to hand the body plus the submitted `form`/`req` off to a renderer like
- * react-email). `editor` overrides the Lexical/richText editor on both the emailTeam and
- * confirmation action body fields (see `buildDefaultActionDefinitions`).
+ * Customizes how the plugin's rich text is authored and rendered. `converters` spread over the
+ * default Lexical node converters; `serialize` replaces the whole action-body pipeline (for
+ * non-HTML channels like chat or plain text, or to hand the body plus the submitted `form`/`req`
+ * off to a renderer like react-email). `editor` is the default Lexical/richText editor for every
+ * plugin-authored richText field: message content, consent statement, the response message, and
+ * the action body fields. `bodyEditor` overrides the action body fields specifically (emailTeam
+ * and confirmation), falling back to `editor` when absent.
  */
 export type RichTextBodyOption = {
 	converters?: Record<string, BodyConverter>
 	serialize?: (args: SerializeBodyArgs) => Promise<string> | string
 	editor?: RichTextField['editor']
+	bodyEditor?: RichTextField['editor']
 }
 
 /** Recall resolver over submission values: field name to stringified value, `''` when absent. */

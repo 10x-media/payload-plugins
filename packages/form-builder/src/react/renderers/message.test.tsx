@@ -1,6 +1,7 @@
 import { cleanup, render } from '@testing-library/react'
 import { createElement, useReducer } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fieldKey } from '../../fields/fieldKey'
 import type { FormFieldInstance } from '../../submissions/types'
 import type { FieldRendererProps } from '../contract'
 import { FormContext, type FormStepInfo } from '../FormContext'
@@ -33,7 +34,7 @@ const emptyRegistry: RendererRegistry = new Map()
 const rendererProps = (field: FormFieldInstance): FieldRendererProps => ({
 	field,
 	id: 'msg',
-	name: field.name,
+	name: fieldKey(field),
 	value: undefined,
 	onChange: () => {},
 	onBlur: () => {},
@@ -76,7 +77,7 @@ describe('messageRenderer', () => {
 	it('renders the serialized rich text as inline HTML', () => {
 		const field: FormFieldInstance = {
 			blockType: 'message',
-			name: 'note',
+			id: 'row-1',
 			content: lexical('Read this first', 1),
 		}
 		const { container } = render(<Harness field={field} values={{}} />)
@@ -87,7 +88,7 @@ describe('messageRenderer', () => {
 	it('interpolates recall tokens from the current answers, HTML-escaped', () => {
 		const field: FormFieldInstance = {
 			blockType: 'message',
-			name: 'note',
+			id: 'row-1',
 			content: lexical('Hello {{first}}'),
 		}
 		const { container } = render(<Harness field={field} values={{ first: '<b>Ada</b>' }} />)
@@ -99,7 +100,7 @@ describe('messageRenderer', () => {
 	it('prefers calc-authoritative effectiveValues over raw state values', () => {
 		const field: FormFieldInstance = {
 			blockType: 'message',
-			name: 'note',
+			id: 'row-1',
 			content: lexical('Total: {{total}}'),
 		}
 		const { container } = render(
@@ -109,7 +110,7 @@ describe('messageRenderer', () => {
 	})
 
 	it('renders nothing when content is empty', () => {
-		const field: FormFieldInstance = { blockType: 'message', name: 'note' }
+		const field: FormFieldInstance = { blockType: 'message', id: 'row-1' }
 		const { container } = render(<Harness field={field} values={{}} />)
 		expect(container.querySelector('.fb-field__message')).toBeNull()
 	})
@@ -117,7 +118,7 @@ describe('messageRenderer', () => {
 	it('renders without a form context (empty answers)', () => {
 		const field: FormFieldInstance = {
 			blockType: 'message',
-			name: 'note',
+			id: 'row-1',
 			content: lexical('Standalone'),
 		}
 		const { container } = render(createElement(messageRenderer, rendererProps(field)))

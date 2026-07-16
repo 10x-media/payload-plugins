@@ -1,3 +1,4 @@
+import type { RichTextField } from 'payload'
 import type { AnyFormFieldDefinition } from '../types'
 import { calculationField } from './calculation'
 import { checkboxField } from './checkbox'
@@ -14,12 +15,17 @@ import { textareaField } from './textarea'
 
 /**
  * Built-in field definitions with content-bearing config fields (select option labels, consent
- * statement, repeater add label) carrying `localized: true` when `localize` is true. Field types
- * without content config are shared static definitions. Definitions are authored with precise
- * value/config generics; the registry stores them erased (config is re-narrowed per matched type
- * at execution), hence one cast per built-in, no `any`.
+ * statement, repeater add label) carrying `localized: true` when `localize` is true. `editor`,
+ * when given, overrides the richText editor on the message content and consent statement fields
+ * (from the plugin's `richText.editor` option). Field types without content config are shared
+ * static definitions. Definitions are authored with precise value/config generics; the registry
+ * stores them erased (config is re-narrowed per matched type at execution), hence one cast per
+ * built-in, no `any`.
  */
-export const buildDefaultFieldDefinitions = (localize: boolean): AnyFormFieldDefinition[] => [
+export const buildDefaultFieldDefinitions = (
+	localize: boolean,
+	editor?: RichTextField['editor']
+): AnyFormFieldDefinition[] => [
 	textField as AnyFormFieldDefinition,
 	textareaField as AnyFormFieldDefinition,
 	emailField as AnyFormFieldDefinition,
@@ -27,11 +33,11 @@ export const buildDefaultFieldDefinitions = (localize: boolean): AnyFormFieldDef
 	buildSelectField(localize) as AnyFormFieldDefinition,
 	checkboxField as AnyFormFieldDefinition,
 	calculationField as AnyFormFieldDefinition,
-	buildConsentField(localize) as AnyFormFieldDefinition,
+	buildConsentField(localize, editor) as AnyFormFieldDefinition,
 	fileField as AnyFormFieldDefinition,
 	buildRepeaterField(localize) as AnyFormFieldDefinition,
 	dateField as AnyFormFieldDefinition,
-	buildMessageField(localize) as AnyFormFieldDefinition,
+	buildMessageField(localize, editor) as AnyFormFieldDefinition,
 ]
 
 export const defaultFieldDefinitions: AnyFormFieldDefinition[] = buildDefaultFieldDefinitions(true)

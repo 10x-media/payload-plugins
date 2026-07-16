@@ -52,12 +52,14 @@ export type FormBuilderPluginOptions = {
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	actions?: ActionsConfig
 	/**
-	 * Customize how rich text action bodies are authored and rendered. `editor` overrides the
-	 * Lexical/richText editor on both the emailTeam and confirmation action body fields.
-	 * `converters` spread over the default Lexical node converters; `serialize` replaces the
-	 * whole pipeline (e.g. to target chat or plain-text channels instead of email HTML). A
-	 * custom `serialize` receives the submitted `form` (id/title) and `req`, enabling per-tenant
-	 * lookups or handing the raw body off to a renderer like react-email.
+	 * Customize how the plugin's rich text is authored and rendered. `editor` is the default
+	 * Lexical/richText editor for every plugin richText field (message content, consent
+	 * statement, response message, action bodies); `bodyEditor` overrides the action body
+	 * fields specifically, falling back to `editor`. `converters` spread over the default
+	 * Lexical node converters; `serialize` replaces the whole action-body pipeline (e.g. to
+	 * target chat or plain-text channels instead of email HTML). A custom `serialize` receives
+	 * the submitted `form` (id/title) and `req`, enabling per-tenant lookups or handing the raw
+	 * body off to a renderer like react-email.
 	 */
 	richText?: RichTextBodyOption
 	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
@@ -127,9 +129,10 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		const uploads = options.uploads ?? false
 		// Without an uploads collection the built-in file type has nowhere to store anything, so it
 		// never enters the registry; an explicit `fields.file` definition remains a developer choice.
-		const defaultFieldDefinitions = buildDefaultFieldDefinitions(localizeContent).filter(
-			(definition) => uploads !== false || definition.type !== 'file'
-		)
+		const defaultFieldDefinitions = buildDefaultFieldDefinitions(
+			localizeContent,
+			options.richText?.editor
+		).filter((definition) => uploads !== false || definition.type !== 'file')
 		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
 		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
 		const consentRegistry = resolveConsentSources(
@@ -137,7 +140,10 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			options.consentSources
 		)
 		const actionRegistry = resolveActions(
-			buildDefaultActionDefinitions(localizeContent, options.richText?.editor),
+			buildDefaultActionDefinitions(
+				localizeContent,
+				options.richText?.bodyEditor ?? options.richText?.editor
+			),
 			options.actions
 		)
 		const spam = resolveSpamConfig(options.spam)
@@ -246,6 +252,7 @@ export {
 } from './fields/builtin'
 export { fileMimeTypeOptions } from './fields/builtin/file'
 export { defineFormField } from './fields/defineFormField'
+export { fieldKey } from './fields/fieldKey'
 export { localizedIf } from './fields/localizedIf'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from './fields/registry'
 export type {

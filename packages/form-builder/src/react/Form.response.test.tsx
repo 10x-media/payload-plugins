@@ -20,19 +20,19 @@ const doc = (fields: FormFieldInstance[], extra?: Partial<FormDocument>): FormDo
 	...extra,
 })
 
-describe('Form with a message field', () => {
+describe('Form with a nameless message block', () => {
 	const fields: FormFieldInstance[] = [
 		{ blockType: 'text', name: 'first', label: 'First' },
 		{
 			blockType: 'message',
-			name: 'note',
+			id: 'row-note',
 			required: true,
 			content: lexical('Between the fields'),
 		},
 		{ blockType: 'text', name: 'last', label: 'Last' },
 	]
 
-	it('renders the message inline and submits only the text answers', async () => {
+	it('renders the message inline between the fields and submits only the text answers', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true })
 		render(<Form form={doc(fields)} onSubmit={onSubmit} />)
 
@@ -53,7 +53,25 @@ describe('Form with a message field', () => {
 		})
 	})
 
-	it('ignores required on a message field: submit is never blocked by it', async () => {
+	it('renders multiple nameless messages, each keyed by its own row id', () => {
+		const two: FormFieldInstance[] = [
+			{ blockType: 'message', id: 'row-1', content: lexical('First note') },
+			{ blockType: 'text', name: 'first', label: 'First' },
+			{ blockType: 'message', id: 'row-2', content: lexical('Second note') },
+		]
+		render(<Form form={doc(two)} onSubmit={vi.fn()} />)
+		expect(screen.getByText('First note')).toBeInTheDocument()
+		expect(screen.getByText('Second note')).toBeInTheDocument()
+	})
+
+	it('keeps the message rendered while answers change (stable row-id key, no state binding)', () => {
+		render(<Form form={doc(fields)} onSubmit={vi.fn()} />)
+		fireEvent.change(screen.getByLabelText('First'), { target: { value: 'x' } })
+		fireEvent.change(screen.getByLabelText('First'), { target: { value: 'y' } })
+		expect(screen.getByText('Between the fields')).toBeInTheDocument()
+	})
+
+	it('ignores required on a message block: submit is never blocked by it', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true })
 		render(<Form form={doc(fields)} onSubmit={onSubmit} />)
 
@@ -64,12 +82,12 @@ describe('Form with a message field', () => {
 		})
 	})
 
-	it('respects visibleWhen on a message field', () => {
+	it('respects visibleWhen on a message block (programmatic docs)', () => {
 		const conditional: FormFieldInstance[] = [
 			{ blockType: 'text', name: 'a', label: 'A' },
 			{
 				blockType: 'message',
-				name: 'note',
+				id: 'row-note',
 				content: lexical('Only when go'),
 				visibleWhen: { a: { equals: 'go' } },
 			},
@@ -78,6 +96,15 @@ describe('Form with a message field', () => {
 		expect(screen.queryByText('Only when go')).not.toBeInTheDocument()
 		fireEvent.change(screen.getByLabelText('A'), { target: { value: 'go' } })
 		expect(screen.getByText('Only when go')).toBeInTheDocument()
+	})
+
+	it('still renders a legacy named message row (name unused)', () => {
+		const legacy: FormFieldInstance[] = [
+			{ blockType: 'message', name: 'note', content: lexical('Legacy note') },
+			{ blockType: 'text', name: 'first', label: 'First' },
+		]
+		render(<Form form={doc(legacy)} onSubmit={vi.fn()} />)
+		expect(screen.getByText('Legacy note')).toBeInTheDocument()
 	})
 })
 

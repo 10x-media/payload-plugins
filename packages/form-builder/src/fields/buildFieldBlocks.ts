@@ -26,8 +26,10 @@ const fieldTabOf = (block: Block): Field[] | undefined => {
 
 /**
  * One add-field block per registered type: tabs holding shared config, type config, and
- * validations. `localize` controls whether the shared content fields carry `localized: true`;
- * per-type config fields carry their own flag from the registry definitions.
+ * validations. Bare definitions (e.g. `message`) skip all of that: their block is the
+ * definition's `config` alone, no name/shared basics/tabs. `localize` controls whether the
+ * shared content fields carry `localized: true`; per-type config fields carry their own flag
+ * from the registry definitions.
  */
 type BuildFieldBlocksArgs = {
 	registry: FieldTypeRegistry
@@ -44,8 +46,19 @@ export const buildFieldBlocks = ({
 }: BuildFieldBlocksArgs): Block[] => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const blocks: Block[] = []
+	const bareSlugs = new Set<string>()
 	for (const definition of registry.values()) {
 		let typeConfig: Field[] = definition.config ?? []
+
+		if (definition.bare === true) {
+			bareSlugs.add(definition.type)
+			blocks.push({
+				slug: definition.type,
+				labels: { singular: labelFor(definition.label), plural: labelFor(definition.label) },
+				fields: typeConfig,
+			})
+			continue
+		}
 
 		// Inject dynamic source select + conditional sourceConfig group for the consent field.
 		// consent.ts intentionally omits source/sourceConfig; the live registry drives the
@@ -83,13 +96,14 @@ export const buildFieldBlocks = ({
 	// Second pass: inject subFields into the repeater block using all non-repeater blocks.
 	// Done after the main loop so every sibling block is already built.
 	// Repeater-in-repeater is not supported in v1; the repeater block is excluded from subFields.
+	// Bare blocks are excluded too: repeater row plumbing (values, composite error paths) is name-keyed.
 	const repeaterBlock = blocks.find((b) => b.slug === 'repeater')
 	if (repeaterBlock) {
 		const subFieldsField: Field = {
 			name: 'subFields',
 			type: 'blocks',
 			label: labelFor(keys.configSubFields),
-			blocks: blocks.filter((b) => b.slug !== 'repeater'),
+			blocks: blocks.filter((b) => b.slug !== 'repeater' && !bareSlugs.has(b.slug)),
 		}
 		const fieldTabFields = fieldTabOf(repeaterBlock)
 		;(fieldTabFields ?? (repeaterBlock.fields as Field[])).push(subFieldsField)

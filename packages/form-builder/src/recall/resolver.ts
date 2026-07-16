@@ -1,3 +1,4 @@
+import { isNamedField } from '../fields/fieldKey'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import type { FormFieldInstance } from '../submissions/types'
 
@@ -32,7 +33,7 @@ export const buildRecallResolver = (args: {
 	locale: string
 	t: (key: string) => string
 }): RecallResolver => {
-	const byName = new Map(args.fields.map((field) => [field.name, field]))
+	const byName = new Map(args.fields.filter(isNamedField).map((field) => [field.name, field]))
 	return (name) => {
 		const field = byName.get(name)
 		if (!field) {

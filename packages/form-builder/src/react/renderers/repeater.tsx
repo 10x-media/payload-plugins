@@ -1,6 +1,7 @@
 'use client'
 
 import { createElement, useId } from 'react'
+import { isNamedField } from '../../fields/fieldKey'
 import type { FormFieldInstance } from '../../submissions/types'
 import { keys } from '../../translations/keys'
 import type { FieldRenderer } from '../contract'
@@ -29,13 +30,15 @@ const SubFieldWrapper = ({
 }
 
 export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
-	({ field, id: rootId, errors, warnings, required, t, locale }) => {
+	({ field, name, id: rootId, errors, warnings, required, t, locale }) => {
 		const { rendererRegistry } = useFormContext()
-		const { value, setValue, onBlur } = useField<RepeaterRow[]>(field.name)
+		const { value, setValue, onBlur } = useField<RepeaterRow[]>(name)
 		const addId = useId()
 
 		const rows = Array.isArray(value) ? value : []
-		const subFields = Array.isArray(field.subFields) ? (field.subFields as FormFieldInstance[]) : []
+		const subFields = (
+			Array.isArray(field.subFields) ? (field.subFields as FormFieldInstance[]) : []
+		).filter(isNamedField)
 		const maxRows = typeof field.maxRows === 'number' ? field.maxRows : undefined
 		const minRows = typeof field.minRows === 'number' ? field.minRows : 0
 		const addLabel =
@@ -92,7 +95,7 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 										const renderer = rendererRegistry.get(subField.blockType)
 										if (!renderer) return null
 										const subId = `${rootId}-${rowIndex}-${subField.name}`
-										const compositeName = `${field.name}[${rowIndex}].${subField.name}`
+										const compositeName = `${name}[${rowIndex}].${subField.name}`
 										return (
 											<div key={subField.name} className="fb-repeater__sub-field">
 												{createElement(SubFieldWrapper, {

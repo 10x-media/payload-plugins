@@ -91,6 +91,13 @@ export type FormFieldDefinition<
 	group?: string
 	/** How this field appears in the condition builder. Defaults from `value` (see `defaultConditionType`). */
 	conditionType?: ConditionFieldType
+	/**
+	 * Bare definitions render without the shared chrome: no name/label/width/required/placeholder/
+	 * description and no validation tabs; the definition's `config` IS the entire block. Instances
+	 * are nameless (identified by Payload's hidden block row `id`, see `fieldKey`), so bare types
+	 * must be display-only (`value: 'none'`): with no name there is nothing to validate or store.
+	 */
+	bare?: boolean
 }
 
 /** The erased shape stored in the heterogeneous registry. Value is `unknown`; config re-narrows per matched type at execution. */
@@ -124,4 +131,6 @@ export type AnyFormFieldDefinition = {
 	group?: string
 	/** How this field appears in the condition builder. Defaults from `value` (see `defaultConditionType`). */
 	conditionType?: ConditionFieldType
+	/** See `FormFieldDefinition.bare`: the block is the definition's `config` alone, instances are nameless. */
+	bare?: boolean
 }

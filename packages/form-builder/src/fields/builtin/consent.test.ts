@@ -1,3 +1,4 @@
+import type { RichTextField } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { buildConsentField, consentField } from './consent'
 
@@ -22,6 +23,14 @@ describe('consentField', () => {
 		expect(statement?.type).toBe('richText')
 		expect(statement?.admin?.description).toBeDefined()
 		expect('editor' in (statement ?? {})).toBe(false)
+	})
+
+	it('threads a given editor onto the statement field', () => {
+		const editor = { fake: 'editor' } as unknown as RichTextField['editor']
+		const statement = (buildConsentField(true, editor).config ?? []).find(
+			(f) => 'name' in f && f.name === 'statement'
+		) as { editor?: unknown }
+		expect(statement.editor).toBe(editor)
 	})
 
 	it('statement is localized when localize is true, not when false', () => {

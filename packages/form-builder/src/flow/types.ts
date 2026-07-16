@@ -7,7 +7,10 @@ export type FlowTransition = { when: Where; to: string }
 export type FlowStep = {
 	id: string
 	title?: string
-	/** Field machine names rendered in this step (a subset of the form's fields). */
+	/**
+	 * Field keys rendered in this step (a subset of the form's fields): machine names for named
+	 * fields, block row ids for bare (nameless) blocks. See `fieldKey`.
+	 */
 	fields: string[]
 	/** Default next step id when no transition matches. Absent -> this step is terminal. */
 	next?: string

@@ -44,8 +44,8 @@ describe('buildFieldBlocks', () => {
 		])
 	})
 
-	it('gives every block a single unnamed tabs field', () => {
-		for (const block of blocks) {
+	it('gives every non-bare block a single unnamed tabs field', () => {
+		for (const block of blocks.filter((b) => b.slug !== 'message')) {
 			expect(block.fields).toHaveLength(1)
 			const tabs = tabsOf(block)
 			expect(tabs?.tabs).toHaveLength(3)
@@ -53,6 +53,15 @@ describe('buildFieldBlocks', () => {
 				expect('name' in tab && tab.name).toBeFalsy()
 			}
 		}
+	})
+
+	it('builds a bare block as the definition config alone: one richText content field, no tabs, no name', () => {
+		const message = blocks.find((block) => block.slug === 'message')
+		expect(message?.fields).toHaveLength(1)
+		expect(tabsOf(message)).toBeUndefined()
+		const [content] = message?.fields ?? []
+		expect(content).toMatchObject({ name: 'content', type: 'richText' })
+		expect(flatten(message?.fields ?? []).map(fieldName)).toEqual(['content'])
 	})
 
 	it('puts shared config then type config in the Field tab', () => {
@@ -120,7 +129,7 @@ describe('buildFieldBlocks', () => {
 		expect('localized' in (labelOf(unlocalized) ?? {})).toBe(false)
 	})
 
-	it('appends subFields to the repeater Field tab, excluding the repeater itself', () => {
+	it('appends subFields to the repeater Field tab, excluding the repeater itself and bare blocks', () => {
 		const repeater = blocks.find((block) => block.slug === 'repeater')
 		const fieldTab = tabFields(repeater, 0)
 		const subFields = fieldTab.find((f) => 'name' in f && f.name === 'subFields')
@@ -128,6 +137,7 @@ describe('buildFieldBlocks', () => {
 		expect(subFields).toMatchObject({ type: 'blocks' })
 		const subBlocks = (subFields as { blocks: Block[] }).blocks
 		expect(subBlocks.map((b) => b.slug)).not.toContain('repeater')
-		expect(subBlocks.length).toBe(blocks.length - 1)
+		expect(subBlocks.map((b) => b.slug)).not.toContain('message')
+		expect(subBlocks.length).toBe(blocks.length - 2)
 	})
 })

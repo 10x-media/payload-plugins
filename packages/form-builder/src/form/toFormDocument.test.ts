@@ -19,6 +19,19 @@ describe('toFormDocument', () => {
 		expect(doc.response).toBeUndefined()
 	})
 
+	it('passes a nameless bare row through with its block row id intact', () => {
+		const doc = toFormDocument({
+			id: 1,
+			fields: [
+				{ blockType: 'text', name: 'first' },
+				{ blockType: 'message', id: 'row-note', content: { root: { children: [] } } },
+			],
+		})
+		expect(doc.fields).toHaveLength(2)
+		expect(doc.fields[1]).toMatchObject({ blockType: 'message', id: 'row-note' })
+		expect(doc.fields[1]?.name).toBeUndefined()
+	})
+
 	it('passes through poll lifecycle settings and drops the server-only resultsField', () => {
 		const poll = {
 			enabled: true,

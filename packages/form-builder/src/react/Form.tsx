@@ -17,6 +17,7 @@ import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
 import { noopEventSink } from '../events/noopSink'
 import type { FormEventSink } from '../events/types'
+import { fieldKey, isNamedField, type NamedFormFieldInstance } from '../fields/fieldKey'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
 import type { FormDocument, FormPollSettings, FormResponseSettings } from '../form/types'
@@ -137,7 +138,7 @@ const isEmpty = (value: unknown): boolean =>
 const FIELD_WIDTHS = new Set<string>(['full', 'half', 'third', 'twoThirds'])
 
 type FieldHostProps = {
-	field: FormFieldInstance
+	field: NamedFormFieldInstance
 	renderer: FieldRenderer
 	locale: string
 	t: RendererTranslate
@@ -177,6 +178,29 @@ const CalcFieldHost = ({ field, renderer, value, locale, t }: CalcFieldHostProps
 		warnings: [],
 		required: false,
 		disabled: true,
+		locale,
+		t,
+	})
+}
+
+type StaticFieldHostProps = Omit<FieldHostProps, 'field'> & { field: FormFieldInstance }
+
+/**
+ * Hosts a nameless (bare) display block, e.g. a message: no `useField` binding at all. The
+ * renderer reads only the instance and the form context; `name` is the row key for consistency.
+ */
+const StaticFieldHost = ({ field, renderer, locale, t }: StaticFieldHostProps) => {
+	const id = useId()
+	return createElement(renderer, {
+		field,
+		id,
+		name: fieldKey(field),
+		value: undefined,
+		onChange: () => {},
+		onBlur: () => {},
+		errors: [],
+		warnings: [],
+		required: false,
 		locale,
 		t,
 	})
@@ -233,7 +257,7 @@ export const Form = ({
 				presentationRegistry.get(DEFAULT_PRESENTATION_NAME) ??
 				defaultPresentationDescriptors.page)
 	const fieldsByName = useMemo(
-		() => new Map(form.fields.map((field) => [field.name, field])),
+		() => new Map(form.fields.filter(isNamedField).map((field) => [field.name, field])),
 		[form.fields]
 	)
 	const translate = useMemo<RendererTranslate>(() => t ?? makeTranslate(en), [t])
@@ -340,16 +364,18 @@ export const Form = ({
 
 	const visible = visibleFields(form.fields, effectiveValues)
 
-	/** Answered visible fields as submission values. Display-only ('none' kind) fields never contribute. */
+	/** Answered visible fields as submission values. Display-only ('none' kind) and nameless (bare) fields never contribute. */
 	const answeredValues = (): SubmissionValue[] =>
 		visibleFields(form.fields, effectiveValues)
 			.filter((field) => registry.get(field.blockType)?.value !== 'none')
+			.filter(isNamedField)
 			.filter((field) => !isEmpty(effectiveValues[field.name]))
 			.map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
 
-	const stepNames = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
-	const stepVisible: FormFieldInstance[] = stepNames
-		.map((name) => visible.find((field) => field.name === name))
+	// Steps address fields by key: machine names for named fields, block row ids for bare blocks.
+	const stepKeys = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
+	const stepVisible: FormFieldInstance[] = stepKeys
+		.map((key) => visible.find((field) => fieldKey(field) === key))
 		.filter((field): field is FormFieldInstance => Boolean(field))
 
 	const goNext = async () => {
@@ -360,6 +386,7 @@ export const Form = ({
 			stepVisible
 				.filter((field) => !calcExpressionOf(field))
 				.filter((field) => registry.get(field.blockType)?.value !== 'none')
+				.filter(isNamedField)
 				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
 				.map(async (field) => ({
 					field,
@@ -444,11 +471,12 @@ export const Form = ({
 		const visible = visibleFields(form.fields, effectiveValues)
 		const results = await Promise.all(
 			// Calc fields carry no rules and have no input; they are always satisfied, so skip validating them.
-			// Display-only ('none' kind, e.g. message) fields are skipped too, mirroring the server.
+			// Display-only ('none' kind, e.g. message) and nameless (bare) fields are skipped too, mirroring the server.
 			// A field whose `validateWhen` is unmet is skipped too, mirroring the server (no client/server divergence).
 			visible
 				.filter((field) => !calcExpressionOf(field))
 				.filter((field) => registry.get(field.blockType)?.value !== 'none')
+				.filter(isNamedField)
 				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
 				.map(async (field) => ({
 					field,
@@ -485,13 +513,15 @@ export const Form = ({
 		// Validate sub-fields within each visible repeater, mirroring the server's per-row pass.
 		// Errors are stored under the composite key `fieldName[rowIndex].subFieldName` so the
 		// repeater renderer can look them up from form state and display them inline.
-		for (const field of visible.filter((f) => f.blockType === 'repeater')) {
+		for (const field of visible.filter(
+			(f): f is NamedFormFieldInstance => f.blockType === 'repeater' && isNamedField(f)
+		)) {
 			const rows = Array.isArray(effectiveValues[field.name])
 				? (effectiveValues[field.name] as Array<Record<string, unknown>>)
 				: []
-			const subFields = Array.isArray(field.subFields)
-				? (field.subFields as FormFieldInstance[])
-				: []
+			const subFields = (
+				Array.isArray(field.subFields) ? (field.subFields as FormFieldInstance[]) : []
+			).filter(isNamedField)
 			for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
 				const row = rows[rowIndex] ?? {}
 				for (const subField of subFields) {
@@ -697,12 +727,19 @@ export const Form = ({
 									: undefined
 							const recalledField = applyRecall(field, recall)
 							return (
-								<div key={field.name} {...widthProps(width)}>
-									{calcExpressionOf(field) ? (
+								<div key={fieldKey(field)} {...widthProps(width)}>
+									{!isNamedField(recalledField) ? (
+										<StaticFieldHost
+											field={recalledField}
+											renderer={renderer}
+											locale={locale}
+											t={translate}
+										/>
+									) : calcExpressionOf(recalledField) ? (
 										<CalcFieldHost
 											field={recalledField}
 											renderer={renderer}
-											value={effectiveValues[field.name]}
+											value={effectiveValues[recalledField.name]}
 											locale={locale}
 											t={translate}
 										/>

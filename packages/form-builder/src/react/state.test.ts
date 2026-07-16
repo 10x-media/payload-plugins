@@ -78,4 +78,14 @@ describe('seedFieldValues', () => {
 		]
 		expect(seedFieldValues(fields)).toEqual({ name: undefined, age: undefined })
 	})
+
+	it('skips nameless (bare) blocks entirely', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'message', id: 'row-1', content: {} },
+			{ blockType: 'text', name: 'name' },
+		]
+		const seeded = seedFieldValues(fields)
+		expect(seeded).toEqual({ name: undefined })
+		expect(Object.keys(seeded)).toEqual(['name'])
+	})
 })

@@ -18,16 +18,18 @@ import type { ChangeEvent } from 'react'
 import { useMemo, useRef, useState } from 'react'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
-import { keys } from '../translations/keys'
+import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { resolveMessage } from '../validation/message'
 import { ConditionBuilder } from './ConditionBuilder'
 import {
 	assignFieldToStep,
+	type FlowFieldEntry,
 	fieldHolders,
+	flowFieldEntries,
 	removeFieldFromStep,
 	stepLabel,
-	unassignedFields,
+	unassignedEntries,
 } from './flowAuthoring'
 import type { FieldRow } from './synthesizeClientField'
 import { toStaticLabel } from './toStaticLabel'
@@ -38,13 +40,14 @@ export type FlowBuilderProps = {
 	field?: { label?: unknown }
 	label?: unknown
 	conditionTypes: Record<string, ConditionFieldType>
+	/** Bare (nameless) block slugs to their display label: an i18n key or a literal. */
+	bareTypeLabels?: Record<string, string>
 }
 
-const extractFieldNames = (data: Record<string, unknown>): string[] => {
+/** The row facets the flow builder keys and labels by, projected for a stable JSON identity. */
+const extractFieldRows = (data: Record<string, unknown>): FieldRow[] => {
 	const rows = Array.isArray(data.fields) ? (data.fields as FieldRow[]) : []
-	return rows
-		.map((row) => (typeof row.name === 'string' ? row.name.trim() : null))
-		.filter((name): name is string => name !== null && name.length > 0)
+	return rows.map((row) => ({ blockType: row.blockType, name: row.name, id: row.id }))
 }
 
 type TransitionRowProps = {
@@ -136,12 +139,12 @@ type StepCardProps = {
 	otherStepOptions: ReactSelectOption[]
 	holders: Map<string, number>
 	stepLabels: string[]
-	fieldNames: string[]
+	entries: FlowFieldEntry[]
 	conditionTypes: Record<string, ConditionFieldType>
 	isExpanded: boolean
 	onToggle: () => void
 	onChange: (next: FlowStep) => void
-	onToggleField: (name: string, checked: boolean) => void
+	onToggleField: (key: string, checked: boolean) => void
 	onRemove: () => void
 	onMoveUp: () => void
 	onMoveDown: () => void
@@ -157,7 +160,7 @@ const StepCard = ({
 	otherStepOptions,
 	holders,
 	stepLabels,
-	fieldNames,
+	entries,
 	conditionTypes,
 	isExpanded,
 	onToggle,
@@ -277,22 +280,22 @@ const StepCard = ({
 
 				<div className="fb-flow-step__row">
 					<FieldLabel label="Fields" />
-					{fieldNames.length === 0 ? (
+					{entries.length === 0 ? (
 						<p className="fb-flow-step__hint">No fields defined on the form yet.</p>
 					) : (
 						<div className="fb-flow-step__field-picker">
-							{fieldNames.map((name) => {
-								const holder = holders.get(name)
+							{entries.map((entry) => {
+								const holder = holders.get(entry.key)
 								const inOtherStep = holder !== undefined && holder !== stepIndex
 								return (
-									<div key={name} className="fb-flow-step__field-option">
+									<div key={entry.key} className="fb-flow-step__field-option">
 										<CheckboxInput
-											label={name}
-											checked={step.fields.includes(name) || inOtherStep}
+											label={entry.label}
+											checked={step.fields.includes(entry.key) || inOtherStep}
 											readOnly={inOtherStep}
 											onToggle={(e) => {
 												if (inOtherStep) return
-												onToggleField(name, e.target.checked)
+												onToggleField(entry.key, e.target.checked)
 											}}
 										/>
 										{inOtherStep ? (
@@ -368,10 +371,24 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 	const label = toStaticLabel(props.field?.label ?? props.label)
 	const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
-	const fieldNamesJson = useFormFields(([fields]) =>
-		JSON.stringify(extractFieldNames(reduceFieldsToValues(fields, true) as Record<string, unknown>))
+	const fieldRowsJson = useFormFields(([fields]) =>
+		JSON.stringify(extractFieldRows(reduceFieldsToValues(fields, true) as Record<string, unknown>))
 	)
-	const fieldNames = useMemo(() => JSON.parse(fieldNamesJson) as string[], [fieldNamesJson])
+	// Registry labels may be host-registered keys or literals; Payload's `t` returns unknown keys unchanged.
+	const translatedBareLabels = useMemo(
+		() =>
+			Object.fromEntries(
+				Object.entries(props.bareTypeLabels ?? {}).map(([type, label]) => [
+					type,
+					t(label as TranslationKey),
+				])
+			),
+		[props.bareTypeLabels, t]
+	)
+	const entries = useMemo(
+		() => flowFieldEntries(JSON.parse(fieldRowsJson) as FieldRow[], translatedBareLabels),
+		[fieldRowsJson, translatedBareLabels]
+	)
 
 	const steps = value?.steps ?? []
 	const fallbackTitle = t(keys.flowStepFallbackTitle)
@@ -380,7 +397,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 		.map((step, index) => ({ label: stepLabels[index] ?? '', value: step.id }))
 		.filter((option) => (option.value as string).length > 0)
 	const holders = fieldHolders(steps)
-	const unassigned = unassignedFields(fieldNames, steps)
+	const unassigned = unassignedEntries(entries, steps)
 
 	// Stable per-step React keys, independent of step ids. Reorder/insert/remove reconcile by
 	// identity so focused inputs and each step's expand state stay with their step instead of
@@ -424,17 +441,17 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 		)
 	}
 
-	const toggleField = (stepIndex: number, name: string, checked: boolean) => {
+	const toggleField = (stepIndex: number, key: string, checked: boolean) => {
 		const nextSteps = checked
-			? assignFieldToStep(steps, stepIndex, name)
-			: removeFieldFromStep(steps, stepIndex, name)
+			? assignFieldToStep(steps, stepIndex, key)
+			: removeFieldFromStep(steps, stepIndex, key)
 		emit(nextSteps, stepKeys)
 	}
 
-	const assignUnassignedField = (name: string, stepId: string) => {
+	const assignUnassignedField = (key: string, stepId: string) => {
 		const targetIndex = steps.findIndex((s) => s.id === stepId)
 		if (targetIndex === -1) return
-		emit(assignFieldToStep(steps, targetIndex, name), stepKeys)
+		emit(assignFieldToStep(steps, targetIndex, key), stepKeys)
 	}
 
 	const removeStep = (index: number) => {
@@ -491,12 +508,12 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 								otherStepOptions={otherStepOptions}
 								holders={holders}
 								stepLabels={stepLabels}
-								fieldNames={fieldNames}
+								entries={entries}
 								conditionTypes={props.conditionTypes}
 								isExpanded={expandedKeys.has(key)}
 								onToggle={() => toggleExpanded(key)}
 								onChange={(next) => updateStep(index, next)}
-								onToggleField={(name, checked) => toggleField(index, name, checked)}
+								onToggleField={(fieldKey, checked) => toggleField(index, fieldKey, checked)}
 								onRemove={() => removeStep(index)}
 								onMoveUp={() => moveStep(index, index - 1)}
 								onMoveDown={() => moveStep(index, index + 1)}
@@ -511,9 +528,9 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 				<div className="fb-flow-unassigned">
 					<FieldLabel label={t(keys.flowUnassigned)} />
 					<div className="fb-flow-unassigned__rows">
-						{unassigned.map((name) => (
-							<div key={name} className="fb-flow-unassigned__row">
-								<span className="fb-flow-unassigned__name">{name}</span>
+						{unassigned.map((entry) => (
+							<div key={entry.key} className="fb-flow-unassigned__row">
+								<span className="fb-flow-unassigned__name">{entry.label}</span>
 								<div className="fb-flow-unassigned__select">
 									<ReactSelect
 										options={stepOptions}
@@ -521,7 +538,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 										isClearable={false}
 										onChange={(selected: ReactSelectOption | ReactSelectOption[]) => {
 											const chosen = Array.isArray(selected) ? selected[0] : selected
-											if (chosen) assignUnassignedField(name, chosen.value as string)
+											if (chosen) assignUnassignedField(entry.key, chosen.value as string)
 										}}
 									/>
 								</div>

@@ -177,4 +177,36 @@ describe('Form multi-step flow', () => {
 		expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument()
 		expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
 	})
+
+	it('renders a nameless message assigned to step 2 by row id only on step 2 of a 3-step flow', async () => {
+		const lexical = (text: string) => ({
+			root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', text }] }] },
+		})
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'first', label: 'First' },
+			{ blockType: 'message', id: 'row-note', content: lexical('Step-two note') },
+			{ blockType: 'text', name: 'middle', label: 'Middle' },
+			{ blockType: 'text', name: 'last', label: 'Last' },
+		]
+		const flow: FormFlow = {
+			steps: [
+				{ id: 's1', fields: ['first'], next: 's2' },
+				{ id: 's2', fields: ['row-note', 'middle'], next: 's3' },
+				{ id: 's3', fields: ['last'] },
+			],
+		}
+		render(<Form form={doc(fields, flow)} onSubmit={vi.fn()} />)
+
+		expect(screen.queryByText('Step-two note')).not.toBeInTheDocument()
+
+		fireEvent.change(screen.getByLabelText('First'), { target: { value: 'a' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+		expect(await screen.findByText('Step-two note')).toBeInTheDocument()
+		expect(screen.getByLabelText('Middle')).toBeInTheDocument()
+
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		expect(await screen.findByLabelText('Last')).toBeInTheDocument()
+		expect(screen.queryByText('Step-two note')).not.toBeInTheDocument()
+	})
 })

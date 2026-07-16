@@ -18,6 +18,7 @@ export type ToFormDocumentOptions = {
  * `FormDocument` without an unsafe `as` cast. Handles the small structural mismatches between
  * the auto-generated collection types and what `<Form>` expects:
  * - `fields` may be a typed blocks-union array or null; normalized to `FormFieldInstance[]`
+ *   (nameless bare rows, e.g. message blocks, pass through with their row `id` intact)
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `response` may be null; coerced to `undefined`
  * - `title` may be null; coerced to `undefined`
@@ -30,7 +31,7 @@ export type ToFormDocumentOptions = {
 export function toFormDocument(
 	form: {
 		id: number | string
-		fields?: { blockType: string; name: string; [key: string]: unknown }[] | null
+		fields?: { blockType: string; name?: string; [key: string]: unknown }[] | null
 		flow?: unknown
 		response?: {
 			type?: string | null
