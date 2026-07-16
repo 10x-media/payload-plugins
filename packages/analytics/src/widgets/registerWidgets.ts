@@ -3,6 +3,7 @@ import { type CapabilityRequirement, satisfiesCapabilities } from '../core/capab
 import type { AnalyticsAdapter, MetricKey } from '../core/contract'
 import { dateRangeField } from '../fields/dateRange/field'
 import { TIMEFRAME_PRESETS } from '../timeframe/presets'
+import { de } from '../translations/de'
 import { en } from '../translations/en'
 import type { TranslationKey } from '../translations/keys'
 import { keys } from '../translations/keys'
@@ -11,6 +12,16 @@ import { labelForKey } from '../translations/server'
 import { BREAKDOWN_SPECS, type BreakdownSpec } from './breakdownTypes'
 import { buildCustomWidgets, type CustomWidgetDef } from './customWidget'
 import { WIDGET_METRICS } from './types'
+
+/**
+ * Select options must carry static labels: `filterOptions` results are serialized
+ * into client form state at request time, where a label function cannot cross the
+ * server/client boundary.
+ */
+const staticLabel = (key: TranslationKey): Record<string, string> => ({
+	de: de[key],
+	en: en[key],
+})
 
 export interface RegisterWidgetsArgs {
 	adapters: AnalyticsAdapter[]
@@ -59,7 +70,7 @@ const metricSelectField = (
 		satisfiesCapabilities(adapter.capabilities, { ...extra, metrics: [metric] })
 	const options = candidates
 		.filter((m) => args.adapters.some((a) => supports(a, m)))
-		.map((m) => ({ value: m, label: labelForKey(METRIC_KEYS[m]) }))
+		.map((m) => ({ value: m, label: staticLabel(METRIC_KEYS[m]) }))
 	const defaultValue = options.some((o) => o.value === preferredDefault)
 		? preferredDefault
 		: options[0]?.value
@@ -91,124 +102,117 @@ const titleField = (args: RegisterWidgetsArgs, placeholder: string): Field => ({
 	admin: { placeholder },
 })
 
-const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
-	const fields: Field[] = [
-		titleField(args, en[keys.widgetFieldTitlePlaceholder]),
-		metricSelectField(WIDGET_METRICS, args),
-		{
-			name: 'timeframe',
-			type: 'select',
-			required: true,
-			defaultValue: 'last30days',
-			label: labelForKey(keys.widgetFieldTimeframe),
-			options: [
-				...TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
-				{ value: 'custom', label: labelForKey(keys.widgetTimeframeCustom) },
-			],
-		},
-		dateRangeField({
-			name: 'range',
-			label: labelForKey(keys.widgetFieldRange),
-			pickerAppearance: 'dayOnly',
-			overrides: (f) => ({
-				...f,
-				admin: {
-					...f.admin,
-					condition: (_data, siblingData) => siblingData?.timeframe === 'custom',
-				},
-			}),
+const half = (field: Field): Field =>
+	({
+		...field,
+		admin: { ...('admin' in field ? field.admin : {}), width: '50%' },
+	}) as Field
+
+const row = (fields: Field[]): Field => ({ type: 'row', fields })
+
+const timeframeSelectField = (): Field => ({
+	name: 'timeframe',
+	type: 'select',
+	required: true,
+	defaultValue: 'last30days',
+	label: labelForKey(keys.widgetFieldTimeframe),
+	options: [
+		...TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
+		{ value: 'custom', label: labelForKey(keys.widgetTimeframeCustom) },
+	],
+})
+
+const dataSourceField = (args: RegisterWidgetsArgs): Field => ({
+	name: 'dataSource',
+	type: 'select',
+	label: labelForKey(keys.widgetFieldDataSource),
+	defaultValue: args.adapters[0]?.id,
+	options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
+})
+
+const customRangeField = (): Field =>
+	dateRangeField({
+		name: 'range',
+		label: labelForKey(keys.widgetFieldRange),
+		pickerAppearance: 'dayOnly',
+		overrides: (f) => ({
+			...f,
+			admin: {
+				...f.admin,
+				condition: (_data, siblingData) => siblingData?.timeframe === 'custom',
+			},
 		}),
-	]
-	if (args.multiProvider) {
-		fields.push({
-			name: 'dataSource',
-			type: 'select',
-			label: labelForKey(keys.widgetFieldDataSource),
-			defaultValue: args.adapters[0]?.id,
-			options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
-		})
+	})
+
+/** The metric select, wherever it sits (top level or inside a row). */
+export const findMetricField = (fields: Field[]): Field | undefined => {
+	for (const field of fields) {
+		if ('name' in field && field.name === 'metric') {
+			return field
+		}
+		if (field.type === 'row') {
+			const nested = findMetricField(field.fields)
+			if (nested) {
+				return nested
+			}
+		}
 	}
-	return fields
+	return undefined
 }
 
+const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+	titleField(args, en[keys.widgetFieldTitlePlaceholder]),
+	row([half(metricSelectField(WIDGET_METRICS, args)), half(timeframeSelectField())]),
+	customRangeField(),
+	...(args.multiProvider ? [dataSourceField(args)] : []),
+]
+
 const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => {
-	const fields: Field[] = [
-		titleField(args, en[spec.label]),
-		metricSelectField(WIDGET_METRICS, args, { extra: { dimensions: [spec.dimension] } }),
-		{
-			name: 'timeframe',
-			type: 'select',
-			required: true,
-			defaultValue: 'last30days',
-			label: labelForKey(keys.widgetFieldTimeframe),
-			options: [
-				...TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
-				{ value: 'custom', label: labelForKey(keys.widgetTimeframeCustom) },
-			],
-		},
-		dateRangeField({
-			name: 'range',
-			label: labelForKey(keys.widgetFieldRange),
-			pickerAppearance: 'dayOnly',
-			overrides: (f) => ({
-				...f,
-				admin: {
-					...f.admin,
-					condition: (_data, siblingData) => siblingData?.timeframe === 'custom',
-				},
-			}),
-		}),
-		{
-			name: 'limit',
-			type: 'number',
-			defaultValue: 5,
-			min: 1,
-			max: 20,
-			label: labelForKey(keys.widgetFieldLimit),
-		},
-	]
-	if (args.multiProvider) {
-		fields.push({
-			name: 'dataSource',
-			type: 'select',
-			label: labelForKey(keys.widgetFieldDataSource),
-			defaultValue: args.adapters[0]?.id,
-			options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
-		})
+	const limitField: Field = {
+		name: 'limit',
+		type: 'number',
+		defaultValue: 5,
+		min: 1,
+		max: 20,
+		label: labelForKey(keys.widgetFieldLimit),
 	}
-	return fields
+	return [
+		titleField(args, en[spec.label]),
+		row([
+			half(metricSelectField(WIDGET_METRICS, args, { extra: { dimensions: [spec.dimension] } })),
+			half(timeframeSelectField()),
+		]),
+		customRangeField(),
+		...(args.multiProvider ? [row([half(limitField), half(dataSourceField(args))])] : [limitField]),
+	]
 }
 
 const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => {
-	const fields: Field[] = [
-		titleField(args, en[keys.widgetFieldTitlePlaceholder]),
-		metricSelectField(['visitors', 'pageviews'], args, {
-			extra: { realtime: true },
-			preferredDefault: 'visitors',
-		}),
-		{
-			name: 'windowMinutes',
-			type: 'select',
-			defaultValue: '30',
-			label: labelForKey(keys.widgetFieldWindow),
-			options: [
-				{ value: '5', label: '5 min' },
-				{ value: '15', label: '15 min' },
-				{ value: '30', label: '30 min' },
-				{ value: '60', label: '60 min' },
-			],
-		},
-	]
-	if (args.multiProvider) {
-		fields.push({
-			name: 'dataSource',
-			type: 'select',
-			label: labelForKey(keys.widgetFieldDataSource),
-			defaultValue: args.adapters[0]?.id,
-			options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
-		})
+	const windowField: Field = {
+		name: 'windowMinutes',
+		type: 'select',
+		defaultValue: '30',
+		label: labelForKey(keys.widgetFieldWindow),
+		options: [
+			{ value: '5', label: '5 min' },
+			{ value: '15', label: '15 min' },
+			{ value: '30', label: '30 min' },
+			{ value: '60', label: '60 min' },
+		],
 	}
-	return fields
+	return [
+		titleField(args, en[keys.widgetFieldTitlePlaceholder]),
+		row([
+			half(
+				metricSelectField(['visitors', 'pageviews'], args, {
+					extra: { realtime: true },
+					preferredDefault: 'visitors',
+				})
+			),
+			half(windowField),
+		]),
+		...(args.multiProvider ? [dataSourceField(args)] : []),
+	]
 }
 
 const WIDGET_DEFS: WidgetDef[] = [
@@ -263,7 +267,7 @@ export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void
 		const fields = def.fields(args)
 		// A required metric select with no servable option would make the widget
 		// impossible to configure; skip it like an unsupported widget.
-		const metricField = fields.find((f) => 'name' in f && f.name === 'metric')
+		const metricField = findMetricField(fields)
 		if (metricField && 'options' in metricField && metricField.options.length === 0) {
 			continue
 		}

@@ -20,8 +20,10 @@ describe('previousWindow', () => {
 			end: new Date('2026-06-14T15:30:00.000Z'),
 		}
 		const prev = previousWindow(range)
-		expect(prev).not.toBeNull()
-		expect(prev!.end.getTime()).toBeLessThan(range.start.getTime())
+		if (!prev) {
+			throw new Error('expected a previous window')
+		}
+		expect(prev.end.getTime()).toBeLessThan(range.start.getTime())
 	})
 
 	it('aligns the previous window to reporting-timezone day starts', () => {

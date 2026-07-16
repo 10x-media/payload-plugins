@@ -3,9 +3,14 @@ import { describe, expect, it } from 'vitest'
 import type { AnalyticsAdapter, DimensionKey, MetricKey } from '../core/contract'
 import { native } from '../native/nativeAdapter'
 import { memoryAdapter } from '../testing/memoryAdapter'
-import { registerWidgets, widgetIsSupported } from './registerWidgets'
+import { findMetricField, registerWidgets, widgetIsSupported } from './registerWidgets'
 
 const bareConfig = (): Config => ({}) as Config
+
+const metricFieldOf = (config: Config, slug = 'analytics-metric') => {
+	const widget = config.admin?.dashboard?.widgets?.find((w) => w.slug === slug)
+	return widget?.fields ? findMetricField(widget.fields) : undefined
+}
 
 describe('widgetIsSupported', () => {
 	it('keeps a widget when an adapter satisfies its requirement', () => {
@@ -88,9 +93,7 @@ describe('registerWidgets', () => {
 			disabled: [],
 			register: [],
 		})
-		const metricField = config.admin?.dashboard?.widgets
-			?.find((w) => w.slug === 'analytics-metric')
-			?.fields?.find((f) => 'name' in f && f.name === 'metric')
+		const metricField = metricFieldOf(config)
 		if (metricField?.type !== 'select' || !metricField.filterOptions) {
 			throw new Error('metric select with filterOptions not registered')
 		}
@@ -125,9 +128,7 @@ describe('registerWidgets', () => {
 			disabled: [],
 			register: [],
 		})
-		const metricField = config.admin?.dashboard?.widgets
-			?.find((w) => w.slug === 'analytics-metric')
-			?.fields?.find((f) => 'name' in f && f.name === 'metric')
+		const metricField = metricFieldOf(config)
 		expect(metricField && 'defaultValue' in metricField && metricField.defaultValue).toBe(
 			'visitors'
 		)
@@ -180,9 +181,7 @@ describe('registerWidgets', () => {
 			disabled: [],
 			register: [],
 		})
-		const metricField = config.admin?.dashboard?.widgets
-			?.find((w) => w.slug === 'analytics-metric')
-			?.fields?.find((f) => 'name' in f && f.name === 'metric')
+		const metricField = metricFieldOf(config)
 		const values =
 			metricField && 'options' in metricField
 				? (metricField.options as { value: string }[]).map((o) => o.value)
@@ -214,9 +213,7 @@ describe('registerWidgets', () => {
 			disabled: [],
 			register: [],
 		})
-		const metricField = config.admin?.dashboard?.widgets
-			?.find((w) => w.slug === 'analytics-breakdown-pages')
-			?.fields?.find((f) => 'name' in f && f.name === 'metric')
+		const metricField = metricFieldOf(config, 'analytics-breakdown-pages')
 		const values =
 			metricField && 'options' in metricField
 				? (metricField.options as { value: string }[]).map((o) => o.value)
