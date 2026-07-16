@@ -80,6 +80,12 @@ fields: [
 
 Every factory accepts `timeframe` (`today`, `last7days`, `last30days` (default), `last90days`, `thisMonth`, `thisYear`, `lastYear`, `allTime`) and `adapter` (an adapter id, when several are configured).
 
+## The interactive Analytics tab
+
+`analyticsTab` (and `analyticsTabsField`) renders an interactive panel by default: metric cards with period-over-period deltas (when the adapter declares `capabilities.comparison`), a daily trend chart for the first metric, and a timeframe picker that refetches without leaving the document. Reads go through an authenticated `GET /api/analytics/document` endpoint that enforces read access on the document itself, so analytics never leak for content a user cannot see. Pass `interactive: false` to render the static stats row instead.
+
+The endpoint also serves your own UIs: `collection`, `id`, `timeframe` (or `timeframe=custom` with `from`/`to`), `metrics` (comma-separated), `dataSource`, and the `compare=1` / `series=1` flags mirror the panel's reads.
+
 Composing the tab into an existing tabs field:
 
 ```ts
