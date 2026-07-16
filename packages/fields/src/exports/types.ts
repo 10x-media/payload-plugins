@@ -1,3 +1,11 @@
+export type {
+	ColorFieldClientOptions,
+	ColorFieldOptions,
+	ColorLinkedOptions,
+	ColorPresetsResolver,
+	ColorPresetsSource,
+	ResolvedColorPreset,
+} from '../fields/color/options'
 export type { FieldsPluginOptions } from '../index'
 export type {
 	ColorFormat,
