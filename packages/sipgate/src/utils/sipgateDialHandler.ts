@@ -28,8 +28,14 @@ export const createSipgateDialHandler =
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
 		const { callee, deviceId: bodyDeviceId, channelId: bodyChannelId } = await req.json()
-		req.payload.logger.info(
-			{ callee, bodyDeviceId, bodyChannelId, authType: credentials.authType, userId: req.user?.id },
+		req.payload.logger.debug(
+			{
+				hasCallee: Boolean(callee),
+				bodyDeviceId,
+				bodyChannelId,
+				authType: credentials.authType,
+				userId: req.user?.id,
+			},
 			'[sipgate:dial] incoming dial request'
 		)
 		if (!callee) {

@@ -5,13 +5,13 @@ import type {
 } from '../types'
 import type { SipgateRestFetch } from './sipgate.rest'
 
-export const getNeoCallHistory = async (rest: SipgateRestFetch) => {
+export const getNeoCallHistory = async (rest: SipgateRestFetch, params?: { limit?: number }) => {
 	const channelsResponse = await getChannels(rest)
 
 	const allEvents = await Promise.all(
 		channelsResponse.items.map(async (channel) => {
 			try {
-				const eventsResponse = await getChannelEvents(rest, channel.id)
+				const eventsResponse = await getChannelEvents(rest, channel.id, params)
 				return eventsResponse.events.filter((event) => event.type === 'CALL')
 			} catch (err) {
 				console.warn(`[sipgate] Skipping channel ${channel.id}:`, err)
@@ -66,10 +66,6 @@ export type NeoDialProps = {
 	channelId: string
 	deviceId: string
 	targetNumber: string
-}
-
-export type SigpateNeoNewChannelResponse = {
-	callSid: string
 }
 
 export const NeoDial = async (rest: SipgateRestFetch, props: NeoDialProps) => {

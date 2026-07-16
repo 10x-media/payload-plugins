@@ -188,7 +188,6 @@
 	"dependencies": {
 		"chart.js": "^4.5.1",
 		"libphonenumber-js": "^1.13.8",
-		"query-string": "^9.4.0",
 		"react-chartjs-2": "^5.3.1"
 	}
 }

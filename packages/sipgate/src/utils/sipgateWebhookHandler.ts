@@ -1,9 +1,9 @@
-import type { CollectionSlug, PayloadHandler } from 'payload'
-import queryString from 'query-string'
+import type { PayloadHandler } from 'payload'
 import { env } from '../env'
 import { createActiveCallStore } from './activeCall'
 import { createOrUpdateCallLog } from './callLog'
 import { createIvrStore } from './ivrStore'
+import { parseFormBody } from './parseFormBody'
 import { buildStepAction, findFlowForNumber, resolveVoiceLineUrl } from './sipgateIvrHandler'
 import { xmlResponse } from './xmlFactory'
 
@@ -64,14 +64,18 @@ const HANGUP_CAUSE_STATUS: Record<string, 'completed' | 'missed' | 'rejected'> =
 }
 
 type SipgateWebhookHandlerOptions = {
-	contactCollections: CollectionSlug[]
-	phoneNumberFields: string[]
 	callLogsSlug: string
 	ivr?: IvrOptions
+	/**
+	 * Public base URL of the Payload instance. When set, `onAnswer`/`onHangup`
+	 * callbacks point at `${webhookUrl}/api/sipgate/webhooks`. Falls back to the
+	 * `SIPGATE_WEBHOOK_URL` env var for backwards compatibility.
+	 */
+	webhookUrl?: string
 }
 
 export const sipgateWebhookHandler =
-	({ callLogsSlug, ivr }: SipgateWebhookHandlerOptions): PayloadHandler =>
+	({ callLogsSlug, ivr, webhookUrl }: SipgateWebhookHandlerOptions): PayloadHandler =>
 	async (req) => {
 		if (!req.text) {
 			return Response.json({ error: 'No body' }, { status: 400 })
@@ -82,7 +86,7 @@ export const sipgateWebhookHandler =
 			return Response.json({ error: 'Method not allowed' }, { status: 405 })
 		}
 
-		const data = queryString.parse(body) as
+		const data = parseFormBody(body) as unknown as
 			| SipgateNewCallWebhookData
 			| SipgateAnswerWebhookData
 			| SipgateHangupWebhookData
@@ -98,10 +102,13 @@ export const sipgateWebhookHandler =
 					recording: false,
 					startedAt: Date.now(),
 				})
-				if (!env.SIPGATE_WEBHOOK_URL) {
+				const callbackUrl = webhookUrl
+					? `${webhookUrl}/api/sipgate/webhooks`
+					: env.SIPGATE_WEBHOOK_URL
+				if (!callbackUrl) {
 					return new Response(null, { status: 204 })
 				}
-				return xmlResponse({ onAnswer: env.SIPGATE_WEBHOOK_URL, onHangup: env.SIPGATE_WEBHOOK_URL })
+				return xmlResponse({ onAnswer: callbackUrl, onHangup: callbackUrl })
 			}
 			case 'dtmf':
 				await createActiveCallStore(req.payload, data.callId).update({ dtmf: data.dtmf })

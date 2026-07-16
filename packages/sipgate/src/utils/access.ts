@@ -1,4 +1,24 @@
-import type { PayloadRequest } from 'payload'
+import type { Access, PayloadRequest } from 'payload'
+
+/** Collection access predicate: allow any authenticated Payload user. */
+const authenticated: Access = ({ req }) => Boolean(req.user)
+
+/**
+ * Default collection access for the plugin's collections: read/create/update/delete
+ * all require an authenticated Payload user. Hosts can widen or narrow this per
+ * collection via the matching `overrides` key.
+ */
+export const authenticatedCollectionAccess: {
+	read: Access
+	create: Access
+	update: Access
+	delete: Access
+} = {
+	read: authenticated,
+	create: authenticated,
+	update: authenticated,
+	delete: authenticated,
+}
 
 export type SipgateAccessFn = (req: PayloadRequest) => boolean | Promise<boolean>
 

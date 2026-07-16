@@ -78,14 +78,15 @@ sipgate({
 
 OAuth2 lets each Payload user connect their own sipgate account. Tokens are stored per user in the `sipgate-users` collection. Dialing, call logs, device lists, and sync are all scoped to the individual user.
 
-**`serverURL` is required** when using OAuth2. Sipgate redirects the browser back to your Payload server after authentication, and the plugin constructs the `redirect_uri` from `serverURL`. Without it, the OAuth2 flow cannot complete.
+**`webhookUrl` is required** when using OAuth2. The plugin builds the OAuth2 `redirect_uri` as `${webhookUrl}/api/sipgate/oauth/callback`, so it must be the public base URL of your Payload instance and be reachable by sipgate (not `localhost`). Without it, the plugin throws at startup. `serverURL` is only used to build the post-callback admin redirect (where the browser lands after connecting).
 
 ```ts
 // payload.config.ts
 export default buildConfig({
-  serverURL: process.env.SITE_URL!, // required for OAuth2
+  serverURL: process.env.SITE_URL!, // used for the post-connect admin redirect
   plugins: [
     sipgate({
+      webhookUrl: process.env.SITE_URL!, // required for OAuth2 — builds the redirect_uri
       sipgateCredentials: {
         authType: 'oauth2',
         clientId: process.env.SIPGATE_CLIENT_ID!,
@@ -107,14 +108,14 @@ SIPGATE_CLIENT_SECRET=your-oauth2-client-secret
 
 **Prerequisites:**
 
-- `serverURL` must be set in your Payload config (the plugin uses it to build the OAuth2 `redirect_uri`).
+- `webhookUrl` must be set on the plugin options (the plugin uses it to build the OAuth2 `redirect_uri`). It must be publicly reachable by sipgate.
 - `payloadUsersSlug` must be set to the slug(s) of your Payload auth collection(s). The plugin injects the **Connect Sipgate** button into those collections' document edit views, so users can link their Sipgate account directly from their own profile page.
 
 **Setup steps:**
 
-1. Create an OAuth2 client in the [sipgate console](https://console.sipgate.com). Set the redirect URI to `{SITE_URL}/api/sipgate/oauth/callback`.
-2. Configure the plugin with `authType: 'oauth2'`, the client credentials, and `payloadUsersSlug` matching your auth collection.
-3. Set `serverURL` to your app's public URL.
+1. Create an OAuth2 client in the [sipgate console](https://console.sipgate.com). Set the redirect URI to `{webhookUrl}/api/sipgate/oauth/callback`.
+2. Configure the plugin with `authType: 'oauth2'`, the client credentials, `webhookUrl`, and `payloadUsersSlug` matching your auth collection.
+3. Set `serverURL` to your app's public URL so the post-connect admin redirect lands in the right place.
 4. Each Payload user opens their own profile in the admin and clicks the **Connect Sipgate** button (also visible in the admin navigation). They follow the Sipgate login flow.
 5. After connecting, devices and channels are synced automatically for that user.
 
@@ -292,9 +293,11 @@ sipgate({
 
 The window polls `GET /api/sipgate/active-call` every 3 seconds and lets users answer incoming calls on a specific device, hold, record, and hang up.
 
-**User scoping:** When a Payload user has a linked sipgate account (via OAuth2 connect or manual `payloadUser` link in PAT mode), the endpoint filters active calls to only those involving their sipgate user ID. Users without a linked account see all active calls.
+**User scoping:** When a Payload user has a linked sipgate account (via OAuth2 connect or manual `payloadUser` link in PAT mode), the endpoint filters active calls to only those involving their sipgate user ID. An authenticated user **without** a linked account sees an empty list rather than every user's active calls.
 
 Incoming calls are received via sipgate webhooks. Configure your sipgate account to POST to `/api/sipgate/webhooks`.
+
+> **Shared state:** Active calls, IVR sessions, OAuth CSRF nonces, and the contact cache are stored in Payload's KV. If you run more than one Payload instance, the KV backend must be shared (e.g. Redis). With the default in-memory KV, live-call state, OAuth connect, and IVR will not work reliably across replicas.
 
 ## Call activity dashboard widget
 
@@ -308,15 +311,35 @@ sipgate({
 })
 ```
 
-`syncCallLogs: true` registers a Payload job that periodically pulls call history from sipgate into the `call-logs` collection. Use Payload's jobs runner to execute it.
+`syncCallLogs: true` only **registers** a Payload task; it does not schedule it. You must run it via Payload's jobs runner, for example with a `jobs.autoRun` cron in your config or an external scheduler that calls `payload.jobs.run()`.
 
-**User scoping:** When a Payload user has a linked sipgate account, the widget shows only their calls. In PAT mode (or when no link exists), all call logs are shown.
+**User scoping:** When a Payload user has a linked sipgate account, the widget shows only their calls. In PAT mode (or when no link exists), all call logs are shown. Note this differs from the live-call window, where an unlinked user sees an empty list.
 
 **OAuth2 mode:** Call logs are fetched per user using each user's own access token. The `call-logs` collection stores a `sipgateUserId` field on each record to enable this filtering. In PAT mode, `sipgateUserId` is left empty and the widget shows everything.
+
+## IVR (Interactive Voice Response)
+
+Enable a menu-driven call flow (play a greeting, gather DTMF digits, branch to further steps) for incoming calls. When enabled, the plugin registers two collections and an endpoint:
+
+- `ivr-voice-lines` (upload): the audio files played to callers. Read access is public so sipgate can fetch the audio URLs.
+- `ivr-flows`: the flow definitions (entry step, steps, DTMF branches).
+- `POST /api/sipgate/ivr`: sipgate posts DTMF input here; the plugin advances the caller through the flow.
+
+```ts
+sipgate({
+  sipgateCredentials: { ... },
+  webhookUrl: process.env.SITE_URL!, // required for IVR — builds the /api/sipgate/ivr callback
+  ivr: true, // or { voiceLinesSlug: 'ivr-audio', flowsSlug: 'ivr-menus' } to customize slugs
+})
+```
+
+`webhookUrl` is required when IVR is enabled (same rule as OAuth2): the plugin builds the IVR callback URL as `${webhookUrl}/api/sipgate/ivr`, so it must be publicly reachable by sipgate. IVR routing runs on the `answer` webhook event: the plugin matches the dialed number against an active flow's `phoneNumber` and plays the entry step. Each caller's position in the flow is stored in Payload's KV, keyed by call ID.
 
 ## Access control
 
 By default, all API endpoints require an authenticated Payload session (`req.user != null`). The webhooks endpoint is always public (sipgate calls it from their servers).
+
+The plugin's collections (`sipgate-users`, `sipgate-devices`, `sipgate-channels`, `call-logs`, and the IVR collections) default to requiring an authenticated Payload user for read/create/update/delete. The exception is `ivr-voice-lines`, whose `read` is public so sipgate can fetch audio. Override any collection's access via the matching `overrides` key.
 
 Override per-endpoint or globally:
 
@@ -377,7 +400,7 @@ sipgate({
 })
 ```
 
-Available override keys: `callLogs`, `sipgateUsers`, `sipgateDevices`, `sipgateChannels`, `allActivityWidget`, `sipgateWebhooks`, `sipgateActiveCall`, `sipgateDial`, `sipgateRtcm`, `sipgateContacts`, `liveCallFloatingWindow`.
+Available override keys: `callLogs`, `sipgateUsers`, `sipgateDevices`, `sipgateChannels`, `ivrVoiceLines`, `ivrFlows`, `allActivityWidget`, `sipgateWebhooks`, `sipgateActiveCall`, `sipgateDial`, `sipgateRtcm`, `sipgateContacts`, `sipgateIvr`, `liveCallFloatingWindow`.
 
 ## API endpoints
 
@@ -442,7 +465,7 @@ import { buildConfig } from 'payload'
 import { sipgate } from '@10x-media/sipgate'
 
 export default buildConfig({
-  serverURL: process.env.SITE_URL!, // required — used to build the OAuth redirect URI
+  serverURL: process.env.SITE_URL!, // used for the post-connect admin redirect
   collections: [
     {
       slug: 'contacts',
@@ -454,6 +477,7 @@ export default buildConfig({
   ],
   plugins: [
     sipgate({
+      webhookUrl: process.env.SITE_URL!, // required for OAuth2 — builds the redirect_uri
       sipgateCredentials: {
         authType: 'oauth2',
         clientId: process.env.SIPGATE_CLIENT_ID!,
