@@ -9,12 +9,14 @@ const isMatrixRun = Boolean(process.env.DB_MATRIX)
 
 // Test selection is controlled by package.json scripts that pass explicit
 // paths. Default `test` runs everything below; `test:unit`/`test:int`/
-// `test:matrix` narrow the include glob. Unit tests are co-located with their
-// source (`src/**/*.test.ts`); int and e2e tests live under `tests/`.
+// `test:matrix`/`test:dist` narrow the include glob. Unit tests are co-located
+// with their source (`src/**/*.test.ts`); int, dist, and e2e tests live under
+// `tests/`. The dist suite self-skips when dist/ is absent and hard-requires
+// it under REQUIRE_DIST=1 (the `test:dist` script).
 export default mergeConfig(sharedVitestConfig, {
 	test: {
 		dangerouslyIgnoreUnhandledErrors: isMatrixRun,
-		include: ['tests/int/**/*.int.spec.ts', 'src/**/*.test.ts'],
+		include: ['tests/int/**/*.int.spec.ts', 'tests/dist/**/*.spec.ts', 'src/**/*.test.ts'],
 		exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**'],
 	},
 })
