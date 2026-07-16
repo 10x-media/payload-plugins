@@ -258,12 +258,7 @@ export type {
 export { isPollClosed } from './form/pollState'
 export type { ToFormDocumentOptions } from './form/toFormDocument'
 export { toFormDocument } from './form/toFormDocument'
-export type {
-	FormDisplaySettings,
-	FormDocument,
-	FormPollSettings,
-	FormResponseSettings,
-} from './form/types'
+export type { FormDocument, FormPollSettings, FormResponseSettings } from './form/types'
 export type { UploadsOption } from './plugin/uploadsCollection'
 export type {
 	AnyPollOptionSource,

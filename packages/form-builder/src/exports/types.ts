@@ -41,12 +41,7 @@ export type {
 	FormFieldValueKind,
 } from '../fields/types'
 export type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
-export type {
-	FormDisplaySettings,
-	FormDocument,
-	FormPollSettings,
-	FormResponseSettings,
-} from '../form/types'
+export type { FormDocument, FormPollSettings, FormResponseSettings } from '../form/types'
 export type { FormBuilderPluginOptions } from '../index'
 export type { CollectionOverrides, FieldsOverride } from '../plugin/collectionOverrides'
 export type { UploadsOption } from '../plugin/uploadsCollection'

@@ -2,7 +2,7 @@ import type { FormFlow } from '../flow/types'
 import { applyPollOptions } from '../poll/applyPollOptions'
 import type { PollOption } from '../poll/definePollOptionSource'
 import type { FormFieldInstance } from '../submissions/types'
-import type { FormDisplaySettings, FormDocument, FormResponseSettings } from './types'
+import type { FormDocument, FormResponseSettings } from './types'
 
 export type ToFormDocumentOptions = {
 	/**
@@ -20,7 +20,7 @@ export type ToFormDocumentOptions = {
  * - `fields` may be a typed blocks-union array or null; normalized to `FormFieldInstance[]`
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `response` may be null; coerced to `undefined`
- * - `display` may be null; coerced to `undefined`
+ * - `title` may be null; coerced to `undefined`
  * - `poll` may be null; coerced to `undefined` (`resultsField`, `optionSource`, and
  *   `sourceConfig` are dropped: server-side only; `outcome` passes through `winningValue` only)
  *
@@ -38,11 +38,7 @@ export function toFormDocument(
 			redirect?: { url?: string | null } | null
 			submitLabel?: string | null
 		} | null
-		display?: {
-			showTitle?: boolean | null
-			title?: string | null
-			intro?: unknown
-		} | null
+		title?: string | null
 		poll?: {
 			enabled?: boolean | null
 			resultsField?: string | null
@@ -76,7 +72,7 @@ export function toFormDocument(
 		fields,
 		flow: form.flow as FormFlow | undefined,
 		response: (form.response as FormResponseSettings | null | undefined) ?? undefined,
-		display: (form.display as FormDisplaySettings | null | undefined) ?? undefined,
+		title: form.title ?? undefined,
 		poll,
 	}
 }

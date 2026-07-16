@@ -17,7 +17,7 @@ import { Form } from '@10x-media/form-builder/react'
 />
 ```
 
-`form` is a `FormDocument` (`{ id, fields, flow?, response?, display?, poll? }`). Payload's generated types do not line up exactly (nullable groups, opaque JSON `flow`), so narrow the fetched document with `toFormDocument` instead of casting:
+`form` is a `FormDocument` (`{ id, fields, flow?, response?, title?, poll? }`). Payload's generated types do not line up exactly (nullable groups, opaque JSON `flow`), so narrow the fetched document with `toFormDocument` instead of casting:
 
 ```tsx title="app/contact/page.tsx"
 import { toFormDocument } from '@10x-media/form-builder/rsc'
@@ -28,7 +28,7 @@ return <ContactForm form={toFormDocument(doc)} />
 
 `toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes `{ pollOptions }` as a second argument to inject [source-resolved poll options](/form-builder/polls#option-sources).
 
-Two `FormDocument` groups drive rendering beyond the fields. `display` renders above the fields: an optional title (`showTitle` gates it; `fb-form__title`) and a rich text `intro` (`fb-form__intro`), both supporting recall tokens. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too), and `submitLabel` feeds the submit button (see label precedence below).
+`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too), and `submitLabel` feeds the submit button (see label precedence below).
 
 ### Progressive validation
 
@@ -82,7 +82,7 @@ A repeater field with `minRows` starts pre-seeded with that many empty rows, mat
 
 ### Form chrome and markup
 
-The chrome below the fields is a `.fb-form__controls` wrapper containing the default buttons, each with a stable class: `fb-form__back`, `fb-form__next`, `fb-form__submit`. The root form is `fb-form-root`; the post-submit node is `fb-form__success`, a submit failure renders in `fb-form__submit-error`, and the display group renders `fb-form__title` / `fb-form__intro`. The chrome itself is the exported `<FormControls>` component (below), so custom layouts get the identical behavior.
+The chrome below the fields is a `.fb-form__controls` wrapper containing the default buttons, each with a stable class: `fb-form__back`, `fb-form__next`, `fb-form__submit`. The root form is `fb-form-root`; the post-submit node is `fb-form__success`, and a submit failure renders in `fb-form__submit-error`. The chrome itself is the exported `<FormControls>` component (below), so custom layouts get the identical behavior.
 
 ### Custom buttons
 

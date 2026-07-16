@@ -19,12 +19,7 @@ import { noopEventSink } from '../events/noopSink'
 import type { FormEventSink } from '../events/types'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
-import type {
-	FormDisplaySettings,
-	FormDocument,
-	FormPollSettings,
-	FormResponseSettings,
-} from '../form/types'
+import type { FormDocument, FormPollSettings, FormResponseSettings } from '../form/types'
 import {
 	DEFAULT_PRESENTATION_NAME,
 	defaultPresentationDescriptors,
@@ -72,11 +67,11 @@ export type {
 	NextButtonRenderProps,
 	SubmitButtonRenderProps,
 } from './FormControls'
-// FormResponseSettings, FormDisplaySettings, FormPollSettings, and FormDocument live in
-// `../form/types` (no 'use client') so server code (e.g. `toFormDocument` in a Server Component)
-// can use them without pulling in this client module. Re-exported here so `./react` and existing
+// FormResponseSettings, FormPollSettings, and FormDocument live in `../form/types` (no
+// 'use client') so server code (e.g. `toFormDocument` in a Server Component) can use them
+// without pulling in this client module. Re-exported here so `./react` and existing
 // `from './Form'` imports keep working unchanged.
-export type { FormDisplaySettings, FormDocument, FormPollSettings, FormResponseSettings }
+export type { FormDocument, FormPollSettings, FormResponseSettings }
 
 export type FormProps = {
 	form: FormDocument
@@ -108,8 +103,8 @@ export type FormProps = {
 	onClose?: () => void
 	/**
 	 * Accessible name for an overlay surface (modal/drawer). Hosts choosing between a trigger
-	 * label and the form's own display title should prefer `form.display?.title` when
-	 * `form.display?.showTitle` is set, falling back to their own label otherwise.
+	 * label and the form's own admin title should prefer `form.title` when set, falling back to
+	 * their own label otherwise.
 	 */
 	title?: string
 	/** Seed initial field values (e.g. from `valuesFromSearchParams`). Still validated on submit. */
@@ -679,16 +674,6 @@ export const Form = ({
 		(field) => field.hidden !== true && field.calcDisplay !== false
 	)
 
-	const displayTitleText =
-		form.display?.showTitle &&
-		typeof form.display.title === 'string' &&
-		form.display.title.length > 0
-			? interpolate(form.display.title, recall)
-			: undefined
-	const displayIntroHtml = form.display?.intro
-		? serializeBody(form.display.intro, { values: answeredValues(), descriptors: [] })
-		: ''
-
 	return (
 		<FormContext.Provider value={contextValue}>
 			{wrap(
@@ -700,15 +685,6 @@ export const Form = ({
 					data-fb-density={activePresentation.density}
 				>
 					{honeypotName ? <Honeypot name={honeypotName} inputRef={honeypotRef} /> : null}
-					{displayTitleText ? <h2 className="fb-form__title">{displayTitleText}</h2> : null}
-					{displayIntroHtml ? (
-						<div
-							className="fb-form__intro"
-							// Safe to inject: serializeBody HTML-escapes all text (recall values included) and sanitizes link URLs.
-							// biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is produced by our escaping serializer, never raw user input
-							dangerouslySetInnerHTML={{ __html: displayIntroHtml }}
-						/>
-					) : null}
 					<FormLayout enabled={layout !== false}>
 						{rendered.map((field) => {
 							const renderer = rendererRegistry.get(field.blockType)

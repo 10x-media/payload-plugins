@@ -11,14 +11,6 @@ export type FormResponseSettings = {
 	submitLabel?: string | null
 }
 
-/** Serializable per-form display settings: what the visitor sees above the fields, before submit. */
-export type FormDisplaySettings = {
-	showTitle?: boolean
-	title?: string
-	/** Rich text state serialized via `serializeBody`; rendered above the fields when non-empty. */
-	intro?: unknown
-}
-
 /**
  * Serializable per-form poll settings the client needs for lifecycle rendering (open/voted/closed).
  * `resultsField` intentionally stays server-side: the results endpoint resolves the public field
@@ -44,6 +36,7 @@ export type FormDocument = {
 	fields: FormFieldInstance[]
 	flow?: FormFlow
 	response?: FormResponseSettings
-	display?: FormDisplaySettings
+	/** The form's admin title (the collection's `useAsTitle` field). Render it, or not: the host decides. */
+	title?: string
 	poll?: FormPollSettings
 }
