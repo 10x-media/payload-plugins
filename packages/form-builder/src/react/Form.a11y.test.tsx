@@ -90,4 +90,45 @@ describe('Form accessibility (axe)', () => {
 		expect(await axeViolations(container)).toEqual([])
 		expect(screen.getByText('I agree to the terms')).toBeTruthy()
 	})
+
+	it('a consent field with a rich text statement containing an inline link has no structural violations', async () => {
+		const statement = {
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						children: [
+							{ type: 'text', text: 'I agree to the ' },
+							{
+								type: 'link',
+								fields: { url: 'https://example.com/privacy', newTab: true },
+								children: [{ type: 'text', text: 'Privacy Policy' }],
+							},
+							{ type: 'text', text: '.' },
+						],
+					},
+				],
+			},
+		}
+		const { container } = render(
+			<Form
+				form={doc([
+					{
+						blockType: 'consent',
+						name: 'terms',
+						statement,
+						source: 'static',
+					} as FormFieldInstance,
+				])}
+			/>
+		)
+		expect(await axeViolations(container)).toEqual([])
+		const checkbox = screen.getByRole('checkbox')
+		expect(checkbox).toHaveAccessibleName('I agree to the Privacy Policy.')
+		expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
+			'href',
+			'https://example.com/privacy'
+		)
+	})
 })

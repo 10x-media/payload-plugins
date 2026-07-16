@@ -8,6 +8,35 @@ afterEach(() => {
 	cleanup()
 })
 
+const richStatementWithLink = {
+	root: {
+		type: 'root',
+		children: [
+			{
+				type: 'paragraph',
+				children: [
+					{ type: 'text', text: 'I agree to the ' },
+					{
+						type: 'link',
+						fields: { url: 'https://example.com/privacy', newTab: true },
+						children: [{ type: 'text', text: 'Privacy Policy' }],
+					},
+					{ type: 'text', text: '.' },
+				],
+			},
+		],
+	},
+}
+
+const scriptStatement = {
+	root: {
+		type: 'root',
+		children: [
+			{ type: 'paragraph', children: [{ type: 'text', text: '<script>alert(1)</script>' }] },
+		],
+	},
+}
+
 const props = (overrides: Partial<FieldRendererProps<boolean>>): FieldRendererProps<boolean> => ({
 	field: {
 		blockType: 'consent',
@@ -34,7 +63,7 @@ describe('consent renderer', () => {
 		expect(checkbox).not.toBeChecked()
 	})
 
-	it('renders the consent statement as the label', () => {
+	it('renders a legacy string statement as text', () => {
 		const { container } = render(createElement(consentRenderer, props({})))
 		expect(within(container).getByText('I agree to the terms')).toBeInTheDocument()
 	})
@@ -102,5 +131,149 @@ describe('consent renderer', () => {
 			createElement(consentRenderer, props({ errors: ['You must agree'] }))
 		)
 		expect(within(container).getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true')
+	})
+
+	it('renders a rich text statement, including an inline link, as HTML next to the checkbox', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({
+					field: { blockType: 'consent', name: 'terms', statement: richStatementWithLink },
+				})
+			)
+		)
+		const link = within(container).getByRole('link', { name: 'Privacy Policy' })
+		expect(link).toHaveAttribute('href', 'https://example.com/privacy')
+		expect(within(container).getByText(/I agree to the/)).toBeInTheDocument()
+	})
+
+	it('escapes a script injection attempt inside a rich text statement', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({
+					field: { blockType: 'consent', name: 'terms', statement: scriptStatement },
+				})
+			)
+		)
+		expect(container.querySelector('script')).toBeNull()
+		expect(within(container).getByText('<script>alert(1)</script>')).toBeInTheDocument()
+	})
+
+	it('never renders a legacy string statement as HTML, even when it looks like markup', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({
+					field: {
+						blockType: 'consent',
+						name: 'terms',
+						statement: '<b>Bold</b> and <script>alert(1)</script>',
+					},
+				})
+			)
+		)
+		expect(container.querySelector('script')).toBeNull()
+		expect(container.querySelector('b')).toBeNull()
+		expect(
+			within(container).getByText('<b>Bold</b> and <script>alert(1)</script>')
+		).toBeInTheDocument()
+	})
+
+	it('renders a block-level statement in a div and space-joins its aria-label', () => {
+		const statement = {
+			root: {
+				type: 'root',
+				children: [
+					{ type: 'heading', tag: 'h2', children: [{ type: 'text', text: 'Important Terms' }] },
+					{
+						type: 'list',
+						tag: 'ul',
+						children: [
+							{ type: 'listitem', children: [{ type: 'text', text: 'Option A' }] },
+							{ type: 'listitem', children: [{ type: 'text', text: 'Option B' }] },
+						],
+					},
+				],
+			},
+		}
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({ field: { blockType: 'consent', name: 'terms', statement } })
+			)
+		)
+		const wrapper = container.querySelector('div.fb-consent__statement')
+		expect(wrapper).not.toBeNull()
+		expect(wrapper?.querySelector('h2')?.textContent).toBe('Important Terms')
+		expect(wrapper?.querySelectorAll('li')).toHaveLength(2)
+		expect(within(container).getByRole('checkbox')).toHaveAttribute(
+			'aria-label',
+			'Important Terms Option A Option B'
+		)
+	})
+
+	it('renders a malformed lexical-looking statement safely as empty', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({ field: { blockType: 'consent', name: 'terms', statement: { root: {} } } })
+			)
+		)
+		expect(container.querySelector('.fb-consent__statement')).toBeNull()
+		const checkbox = within(container).getByRole('checkbox')
+		expect(checkbox).not.toHaveAttribute('aria-label')
+		expect(checkbox).not.toBeChecked()
+	})
+
+	it('sets the checkbox aria-label to the flattened plain text of a rich text statement', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({
+					field: { blockType: 'consent', name: 'terms', statement: richStatementWithLink },
+				})
+			)
+		)
+		expect(within(container).getByRole('checkbox')).toHaveAttribute(
+			'aria-label',
+			'I agree to the Privacy Policy.'
+		)
+	})
+
+	it('sets the checkbox aria-label to the legacy string statement', () => {
+		const { container } = render(createElement(consentRenderer, props({})))
+		expect(within(container).getByRole('checkbox')).toHaveAttribute(
+			'aria-label',
+			'I agree to the terms'
+		)
+	})
+
+	it('falls back to field.label for the aria-label when statement is absent', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({
+					field: { blockType: 'consent', name: 'terms', label: 'Accept the rules' },
+				})
+			)
+		)
+		expect(within(container).getByRole('checkbox')).toHaveAttribute(
+			'aria-label',
+			'Accept the rules'
+		)
+	})
+
+	it('does not render a dangling required marker when there is no statement or label', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({
+					field: { blockType: 'consent', name: 'terms' },
+					required: true,
+				})
+			)
+		)
+		expect(container.querySelector('.fb-field__required')).toBeNull()
 	})
 })

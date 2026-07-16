@@ -256,4 +256,62 @@ describeForDb('form-builder consent capture', { dbs: ['mongo'] }, (db) => {
 		) as Record<string, unknown>
 		expect(marketingProof.agreed).toBe(false)
 	})
+
+	it('boots a consent block with a rich text statement and still captures proof by reference, never statement text', async () => {
+		const statement = {
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						children: [
+							{ type: 'text', text: 'I agree to the ' },
+							{
+								type: 'link',
+								fields: { url: 'https://example.com/privacy', newTab: true },
+								children: [{ type: 'text', text: 'Privacy Policy' }],
+							},
+						],
+					},
+				],
+			},
+		}
+
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Rich statement',
+				fields: [
+					{
+						blockType: 'consent',
+						name: 'terms',
+						statement,
+						source: 'static',
+						sourceConfig: { label: 'Terms of Service', url: 'https://example.com/terms' },
+					},
+				],
+			},
+		})
+
+		const stored = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const storedField = (stored.fields as Array<Record<string, unknown>>)[0]
+		expect(storedField?.statement).toBeTruthy()
+
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			depth: 0,
+			data: {
+				form: form.id,
+				values: [{ field: 'terms', value: true }],
+			},
+		})
+
+		expect(Array.isArray(submission.consent)).toBe(true)
+		const proof = (submission.consent as unknown[])[0] as Record<string, unknown>
+		expect(proof.field).toBe('terms')
+		expect(proof.agreed).toBe(true)
+		expect(proof.ref).toBe('https://example.com/terms')
+		expect(typeof proof.at).toBe('string')
+		expect(proof.statement).toBeUndefined()
+	})
 })

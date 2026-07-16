@@ -131,6 +131,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.consentConfigCaptureVersion]: 'Veröffentlichte Version erfassen',
 	[keys.fieldTypeConsent]: 'Einwilligung',
 	[keys.consentConfigStatement]: 'Erklärung',
+	[keys.consentConfigStatementDescription]:
+		'Rich-Text-Feld; Links lassen sich direkt in den Satz einfügen (z. B. zur Datenschutzerklärung).',
 	[keys.consentConfigSource]: 'Quelle',
 	[keys.consentConfigSourceConfig]: 'Quelleinstellungen',
 	[keys.consentConfigOptional]: 'Optional (z. B. Marketing)',

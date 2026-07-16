@@ -2,6 +2,7 @@
 
 export type { BodyContext } from '../actions/body/serializeBody'
 export { serializeBody } from '../actions/body/serializeBody'
+export { textOfBody } from '../actions/body/textOfBody'
 export type { AggregationBucket, FieldAggregation } from '../aggregation/types'
 export { computeCalcFields } from '../calc/computeCalcFields'
 export { evaluateCalc } from '../calc/evaluate'

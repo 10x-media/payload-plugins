@@ -4,7 +4,7 @@ import { defineFormField } from '../defineFormField'
 import { localizedIf } from '../localizedIf'
 
 type ConsentConfig = {
-	statement?: string
+	statement?: unknown
 	source?: string
 	sourceConfig?: Record<string, unknown>
 	optional?: boolean
@@ -14,7 +14,10 @@ type ConsentConfig = {
  * Base consent field definition. `source` select and `sourceConfig` group are injected
  * by `buildFieldBlocks` from the live `consentRegistry`, so only the selected source's
  * fields are visible in the admin UI via `admin.condition`. The `statement` is
- * author-facing content and follows `localize`.
+ * author-facing rich text (no `editor` key: uses the host config's default) so authors can
+ * inline links (e.g. to the privacy policy) rather than relying solely on the separate
+ * `consentLinks` row, and follows `localize`. A legacy plain-string `statement` (data authored
+ * before this field became richText) still renders; see `consentRenderer`.
  */
 export const buildConsentField = (localize: boolean) =>
 	defineFormField<'boolean', ConsentConfig>({
@@ -24,8 +27,9 @@ export const buildConsentField = (localize: boolean) =>
 		config: [
 			{
 				name: 'statement',
-				type: 'text',
+				type: 'richText',
 				label: labelFor(keys.consentConfigStatement),
+				admin: { description: labelFor(keys.consentConfigStatementDescription) },
 				...localizedIf(localize),
 			},
 			// source select and sourceConfig group are injected by buildFieldBlocks at plugin boot

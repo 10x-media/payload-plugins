@@ -198,6 +198,87 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		)
 	})
 
+	it('consent: renders a rich text statement with an inline link and a plain-text aria-label', () => {
+		const statement = {
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						children: [
+							{ type: 'text', text: 'I agree to the ' },
+							{
+								type: 'link',
+								fields: { url: 'https://example.com/privacy', newTab: true },
+								children: [{ type: 'text', text: 'Privacy Policy' }],
+							},
+							{ type: 'text', text: '.' },
+						],
+					},
+				],
+			},
+		}
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: { blockType: 'consent', name: 'terms', statement },
+				})
+			)
+		)
+		const link = within(container).getByRole('link', { name: 'Privacy Policy' })
+		expect(link).toHaveAttribute('href', 'https://example.com/privacy')
+		expect(within(container).getByRole('checkbox')).toHaveAttribute(
+			'aria-label',
+			'I agree to the Privacy Policy.'
+		)
+	})
+
+	it('consent: escapes a script injection attempt inside a rich text statement', () => {
+		const statement = {
+			root: {
+				type: 'root',
+				children: [
+					{ type: 'paragraph', children: [{ type: 'text', text: '<script>alert(1)</script>' }] },
+				],
+			},
+		}
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: { blockType: 'consent', name: 'terms', statement },
+				})
+			)
+		)
+		expect(container.querySelector('script')).toBeNull()
+		expect(within(container).getByText('<script>alert(1)</script>')).toBeInTheDocument()
+	})
+
+	it('consent: never renders a legacy string statement as HTML, even when it looks like markup', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: {
+						blockType: 'consent',
+						name: 'terms',
+						statement: '<b>Bold</b> and <script>alert(1)</script>',
+					},
+				})
+			)
+		)
+		expect(container.querySelector('script')).toBeNull()
+		expect(container.querySelector('b')).toBeNull()
+		expect(
+			within(container).getByText('<b>Bold</b> and <script>alert(1)</script>')
+		).toBeInTheDocument()
+		expect(within(container).getByRole('checkbox')).toHaveAttribute(
+			'aria-label',
+			'<b>Bold</b> and <script>alert(1)</script>'
+		)
+	})
+
 	it('calculation: renders the computed value read-only, never editable', () => {
 		const { container } = render(
 			createElement(

@@ -22,6 +22,32 @@ The `consent` field captures affirmative, checkbox-based consent with a complian
 
 Set `optional: true` for marketing opt-ins and similar non-required consent. Keep terms-of-service consent separate and required.
 
+## Rich text and inline links
+
+`statement` is a localized rich text field, authored with your project's configured editor (the same one the [message field](/form-builder/fields#message) and action bodies use). In the admin UI, select a phrase and use the editor's link tool to link directly to your privacy policy or terms page, rather than relying solely on the separate policy-link row described under [Rendering](#rendering):
+
+```ts
+statement: {
+  root: {
+    type: 'root',
+    children: [
+      {
+        type: 'paragraph',
+        children: [
+          { type: 'text', text: 'I have read and agree to the ' },
+          { type: 'link', fields: { url: 'https://example.com/privacy' }, children: [{ type: 'text', text: 'Privacy Policy' }] },
+          { type: 'text', text: '.' },
+        ],
+      },
+    ],
+  },
+}
+```
+
+Keep the statement to a short sentence with inline links. Headings and lists render fine, but a checkbox reads best against one plain sentence; put longer terms in a [message field](/form-builder/fields#message) above the consent field or behind a link.
+
+The plain string shown in the first example still works: a `statement` written before this field became rich text (or written directly through the Local API) renders as plain, escaped text rather than through the rich text pipeline, so it can never be mistaken for HTML. Either way, the checkbox keeps a single, unambiguous plain-text accessible name (the statement flattened to its visible words, links included), so formatting and inline links never affect screen reader users.
+
 ## Sources
 
 The `source` decides how the policy link resolves. `static` (the default) is a fixed URL and label from `sourceConfig`; no server step, the renderer reads it directly. `pageReference` resolves the policy URL at display time from a Payload document (`relationTo`, `docId`, and optionally `urlField` in `sourceConfig`), the right choice when the policy is content whose URL can change. Anything else is a custom source via `defineConsentSource`:
@@ -42,6 +68,8 @@ formBuilder({ consentSources: { mySource } })
 
 The `consentSources` option follows the [opt-in convention](/concepts#the-opt-in-convention).
 
+`pageReference`'s `relationTo` and `docId` are plain text fields in the admin UI, not a relationship picker: the editor must type the exact collection slug and document ID by hand. A typo or a deleted document isn't caught at authoring time (`resolve` falls back to a link with an empty `url` when the lookup fails), so review these fields carefully after renaming a collection or removing a document.
+
 ## Proof by reference
 
 At submit, each consent field produces a `ConsentProof` stored on the submission's `consent` array:
@@ -50,7 +78,7 @@ At submit, each consent field produces a `ConsentProof` stored on the submission
 // { agreed: true, ref: 'https://example.com/privacy', versionRef?: '...', at: '<ISO-8601>' }
 ```
 
-`ref` is the policy URL resolved at submit time (not page load), `at` is the submission timestamp. Policy text is never stored, so a policy edit does not silently rewrite past proofs.
+`ref` is the policy URL resolved at submit time (not page load), `at` is the submission timestamp. Policy text is never stored, so a policy edit does not silently rewrite past proofs. This holds regardless of whether `statement` is a plain string or rich text: the statement is display-only copy and is never part of the proof.
 
 ### Version capture
 
@@ -58,9 +86,9 @@ Set `captureVersion: true` in `sourceConfig` for sources that support it (`pageR
 
 ## Rendering
 
-The `consent` renderer ships in `defaultRenderers`: the statement as the label, the unchecked checkbox, and the policy links (opening in a new tab with `rel="noopener noreferrer"`).
+The `consent` renderer ships in `defaultRenderers`: the statement rendered next to the unchecked checkbox (as rich HTML when authored as rich text, as plain text for a legacy string), and the policy links (opening in a new tab with `rel="noopener noreferrer"`).
 
-For the `pageReference` and custom sources, resolve links server-side before rendering so the visitor sees them without a client round trip:
+For the `pageReference` and custom sources, resolve links server-side before rendering so the visitor sees them without a client round trip (the client renderer never resolves a source itself, so skipping this step means the field renders with no policy link at all):
 
 ```ts
 import { resolveConsentLinks } from '@10x-media/form-builder'

@@ -130,6 +130,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.consentConfigCaptureVersion]: 'Capture published version',
 	[keys.fieldTypeConsent]: 'Consent',
 	[keys.consentConfigStatement]: 'Statement',
+	[keys.consentConfigStatementDescription]:
+		'Rich text; add links inline (e.g. to the privacy policy) so they read naturally in the sentence.',
 	[keys.consentConfigSource]: 'Source',
 	[keys.consentConfigSourceConfig]: 'Source settings',
 	[keys.consentConfigOptional]: 'Optional (e.g. marketing)',

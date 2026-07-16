@@ -123,6 +123,7 @@ export const keys = {
 	consentConfigCaptureVersion: 'formBuilder:consent.config.captureVersion',
 	fieldTypeConsent: 'formBuilder:fieldType.consent',
 	consentConfigStatement: 'formBuilder:consent.config.statement',
+	consentConfigStatementDescription: 'formBuilder:consent.config.statementDescription',
 	consentConfigSource: 'formBuilder:consent.config.source',
 	consentConfigSourceConfig: 'formBuilder:consent.config.sourceConfig',
 	consentConfigOptional: 'formBuilder:consent.config.optional',

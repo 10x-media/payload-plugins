@@ -181,6 +181,7 @@ export type {
 	SerializeBodyArgs,
 } from './actions/body/serializeBody'
 export { serializeBody } from './actions/body/serializeBody'
+export { textOfBody } from './actions/body/textOfBody'
 export { renderAllValues, renderAllValuesTable } from './actions/body/wildcards'
 export { buildDefaultActionDefinitions, defaultActionDefinitions } from './actions/builtin'
 export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
