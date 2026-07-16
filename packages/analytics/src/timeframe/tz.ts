@@ -16,17 +16,27 @@ interface ZonedParts {
 	second: number
 }
 
-const partsFormatter = (tz: string): Intl.DateTimeFormat =>
-	new Intl.DateTimeFormat('en-US', {
-		timeZone: tz,
-		hourCycle: 'h23',
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit',
-		hour: '2-digit',
-		minute: '2-digit',
-		second: '2-digit',
-	})
+// Constructing Intl.DateTimeFormat dominates the cost of these helpers (~14x), and they
+// run per event at ingest and in series loops, so formatters are cached per zone.
+const formatterCache = new Map<string, Intl.DateTimeFormat>()
+
+const partsFormatter = (tz: string): Intl.DateTimeFormat => {
+	let formatter = formatterCache.get(tz)
+	if (!formatter) {
+		formatter = new Intl.DateTimeFormat('en-US', {
+			timeZone: tz,
+			hourCycle: 'h23',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit',
+		})
+		formatterCache.set(tz, formatter)
+	}
+	return formatter
+}
 
 /** Wall-clock parts `date` maps to in `tz`. */
 const zonedParts = (date: Date, tz: string): ZonedParts => {
@@ -54,13 +64,36 @@ const offsetMs = (date: Date, tz: string): number => {
 	return asUtc - Math.floor(date.getTime() / 1000) * 1000
 }
 
-/** The instant of local midnight for a wall-clock calendar date in `tz`. */
+const sameLocalDay = (
+	date: Date,
+	ymd: { year: number; month: number; day: number },
+	tz: string
+): boolean => {
+	const p = zonedParts(date, tz)
+	return p.year === ymd.year && p.month === ymd.month && p.day === ymd.day
+}
+
+/**
+ * The first instant of a wall-clock calendar date in `tz`. Usually local midnight; when a
+ * spring-forward transition lands exactly at midnight (Chile, Cuba) the 00:00 wall clock
+ * does not exist and the refinement below oscillates between the pre- and post-transition
+ * offsets, so the candidate that still falls on `ymd` (the transition instant, local
+ * 01:00) is taken instead of the refined one that fell back onto the previous day.
+ */
 const zonedMidnight = (ymd: { year: number; month: number; day: number }, tz: string): Date => {
 	const asUtc = Date.UTC(ymd.year, ymd.month - 1, ymd.day)
-	const guess = asUtc - offsetMs(new Date(asUtc), tz)
-	// One refinement pass resolves DST edges where the offset at local midnight differs
-	// from the offset at the naive UTC midnight used for the first guess.
-	return new Date(asUtc - offsetMs(new Date(guess), tz))
+	const guess = new Date(asUtc - offsetMs(new Date(asUtc), tz))
+	const refined = new Date(asUtc - offsetMs(guess, tz))
+	if (sameLocalDay(refined, ymd, tz)) {
+		return refined
+	}
+	if (sameLocalDay(guess, ymd, tz)) {
+		return guess
+	}
+	// Neither candidate lands on ymd (the calendar date was skipped entirely, e.g. a
+	// dateline change): fall forward to the later candidate's day start.
+	const later = refined.getTime() > guess.getTime() ? refined : guess
+	return zonedMidnight(zonedParts(later, tz), tz)
 }
 
 /** Start of `date`'s local day in `tz`. */
