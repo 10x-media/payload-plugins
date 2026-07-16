@@ -8,6 +8,11 @@
 	gap: 0.5rem;
 	margin-block-end: 1rem;
 }
+.fb-flow-builder__description {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+}
 .fb-flow-builder__hint {
 	color: var(--theme-elevation-400);
 	font-size: 0.875rem;
@@ -36,15 +41,11 @@
 	color: var(--theme-elevation-400);
 	flex-shrink: 0;
 }
-.fb-flow-step__id-preview {
+.fb-flow-step__title {
 	font-size: 0.875rem;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-.fb-flow-step__id-preview em {
-	color: var(--theme-elevation-400);
-	font-style: italic;
 }
 .fb-flow-step__body {
 	padding: 0.75rem;
@@ -68,6 +69,16 @@
 	gap: 0.25rem 1.25rem;
 	padding-block: 0.25rem;
 }
+.fb-flow-step__field-option {
+	display: flex;
+	align-items: center;
+	gap: 0.375rem;
+}
+.fb-flow-step__field-hint {
+	font-size: 0.75rem;
+	color: var(--theme-elevation-400);
+	white-space: nowrap;
+}
 .fb-flow-step__transitions {
 	display: flex;
 	flex-direction: column;
@@ -78,6 +89,37 @@
 	display: flex;
 	align-items: baseline;
 	gap: 0.5rem;
+}
+
+.fb-flow-unassigned {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	padding: 0.75rem;
+	border: 1px solid var(--theme-border-color);
+	border-radius: var(--style-radius-s);
+}
+.fb-flow-unassigned__rows {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+}
+.fb-flow-unassigned__row {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+.fb-flow-unassigned__name {
+	font-size: 0.875rem;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fb-flow-unassigned__select {
+	flex: 0 1 14rem;
+	min-width: 9rem;
 }
 
 .fb-flow-transition {

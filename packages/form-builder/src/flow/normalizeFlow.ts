@@ -8,6 +8,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
  * Pure guard that normalizes a raw (possibly untrusted) flow value against the
  * form's current field list. Returns `undefined` when the flow is absent, empty,
  * or resolves to fewer than two steps (a single step is an ordinary form).
+ * A field assigned to multiple steps keeps only its first occurrence in step order.
  */
 export const normalizeFlow = (raw: unknown, fieldNames: string[]): FormFlow | undefined => {
 	if (!isRecord(raw) || !Array.isArray(raw.steps)) {
@@ -26,11 +27,17 @@ export const normalizeFlow = (raw: unknown, fieldNames: string[]): FormFlow | un
 		return undefined
 	}
 
+	const seenFields = new Set<string>()
+
 	const steps: FlowStep[] = rawSteps.map((s) => {
 		const id = s.id as string
 
 		const fields = Array.isArray(s.fields)
-			? s.fields.filter((f): f is string => typeof f === 'string' && knownFields.has(f))
+			? s.fields.filter((f): f is string => {
+					if (typeof f !== 'string' || !knownFields.has(f) || seenFields.has(f)) return false
+					seenFields.add(f)
+					return true
+				})
 			: []
 
 		const rawTransitions = Array.isArray(s.transitions) ? s.transitions : []

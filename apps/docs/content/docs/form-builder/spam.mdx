@@ -132,7 +132,7 @@ formBuilder({ spam: { captcha: myCaptcha } })
 
 ## Upload ownership
 
-Uploads to the built-in `form-uploads` collection are stamped with the uploader's identity. At submit, a file reference counts only if the submitting identity matches the upload's owner, so an anonymous submitter cannot reference someone else's upload; a mismatch is treated as a missing file. Where no identity resolves, scoping fails open (it could not apply fairly anyway). Granularity is identity-level: NAT-sharing clients share scope, and an IP that rotates between upload and submit will not match itself. A per-session token is a planned option.
+Uploads to the [configured uploads collection](/form-builder/uploads#bring-your-own-collection) are stamped with the uploader's identity. At submit, a file reference counts only if the submitting identity matches the upload's owner, so an anonymous submitter cannot reference someone else's upload; a mismatch is treated as a missing file. Where no identity resolves, scoping fails open (it could not apply fairly anyway). Granularity is identity-level: NAT-sharing clients share scope, and an IP that rotates between upload and submit will not match itself. A per-session token is a planned option.
 
 ## Capture metadata (privacy)
 

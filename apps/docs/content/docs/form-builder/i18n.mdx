@@ -3,9 +3,16 @@ title: i18n
 description: Override or localize the Form Builder admin strings, and translate the frontend.
 ---
 
+## Content vs UI strings
+
+Two separate systems localize two separate things:
+
+- **Content** is what editors author on a form document: labels, placeholders, option labels, consent statements, the response message. It is stored data, localized through Payload's own `localization` on the `forms` collection. Content fields are [localized by default](/form-builder/fields#content-localization); the plugin option `localizeContent: false` opts a project out.
+- **UI strings** are the plugin's own words: admin authoring labels and frontend renderer strings ("Add row", validation messages, poll notices). These are typed translations, overridden via the `translations` option (admin) and the `t` prop (frontend), below.
+
 ## Admin strings
 
-Field type names, rule labels and messages, action labels, and the rest of the authoring UI are typed translations under the `formBuilder:` namespace. Override or extend them through the `translations` option:
+Field type names, rule labels and messages, action labels, and the rest of the authoring UI are typed translations under the `formBuilder:` namespace. English and German ship built in; override either, or add another locale, through the `translations` option:
 
 ```ts title="payload.config.ts"
 import { formBuilder } from '@10x-media/form-builder'
@@ -13,12 +20,13 @@ import { keys } from '@10x-media/form-builder/i18n'
 
 formBuilder({
   translations: {
-    de: { [keys.fieldTitle]: 'Titel' },
+    fr: { [keys.fieldTitle]: 'Titre' /* ... */ },
+    de: { [keys.fieldTitle]: 'Bezeichnung' }, // key-by-key override of the built-in German
   },
 })
 ```
 
-`@10x-media/form-builder/i18n` exports `keys`, the built-in English `translations`, and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile. Merge semantics and app-level overrides are shared across plugins: see [Translations](/concepts/translations).
+`@10x-media/form-builder/i18n` exports `keys`, the built-in `translations` (`en` and `de`), and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile. Merge semantics and app-level overrides are shared across plugins: see [Translations](/concepts/translations).
 
 ## Frontend strings
 
@@ -27,5 +35,3 @@ The renderer is independent of the admin i18n: `<Form>` takes a `t` translator a
 ```tsx
 <Form form={form} locale="de" t={(key) => myMessages[key] ?? key} />
 ```
-
-Content strings (field labels, descriptions, option labels, statements, the success message) are editor-authored document content; localize them with Payload's own localization on the `forms` collection like any other content.

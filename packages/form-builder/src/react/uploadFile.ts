@@ -1,7 +1,7 @@
 export type UploadFileInput = {
 	file: File
-	/** Upload collection slug. Defaults to `form-uploads`. */
-	collection?: string
+	/** Upload collection slug. File fields carry it as the server-stamped `collection` block config. */
+	collection: string
 	apiRoute?: string
 	fetchImpl?: typeof fetch
 }
@@ -14,7 +14,7 @@ export type UploadFileResult = { ok: true; id: string | number } | { ok: false; 
  * at submit, so the client is never trusted for it. Pure: inject `fetchImpl` in tests.
  */
 export const uploadFile = async (input: UploadFileInput): Promise<UploadFileResult> => {
-	const { file, collection = 'form-uploads', apiRoute = '/api', fetchImpl = fetch } = input
+	const { file, collection, apiRoute = '/api', fetchImpl = fetch } = input
 	const body = new FormData()
 	body.append('file', file)
 	let response: Response

@@ -14,7 +14,7 @@ afterEach(() => {
 const props = (
 	overrides: Partial<FieldRendererProps<string | number>>
 ): FieldRendererProps<string | number> => ({
-	field: { blockType: 'file', name: 'resume', label: 'Resume' },
+	field: { blockType: 'file', name: 'resume', label: 'Resume', uploadsCollection: 'app-uploads' },
 	id: 'x',
 	name: 'resume',
 	value: undefined,
@@ -172,7 +172,12 @@ describe('file renderer', () => {
 			createElement(
 				fileRenderer,
 				props({
-					field: { blockType: 'file', name: 'resume', maxSize: 1024 },
+					field: {
+						blockType: 'file',
+						name: 'resume',
+						maxSize: 1024,
+						uploadsCollection: 'app-uploads',
+					},
 					onChange,
 					t: makeTranslate(en),
 				})
@@ -208,5 +213,19 @@ describe('file renderer', () => {
 		fireEvent.change(input, { target: { files: [pdf()] } })
 		await waitFor(() => expect(onChange).toHaveBeenCalledWith('up2'))
 		expect(within(container).queryByRole('alert')).toBeNull()
+	})
+
+	it('shows an error without fetching when the block has no stamped collection', async () => {
+		const fetchMock = vi.fn()
+		vi.stubGlobal('fetch', fetchMock)
+		const onChange = vi.fn()
+		const { container } = render(
+			createElement(fileRenderer, props({ field: { blockType: 'file', name: 'resume' }, onChange }))
+		)
+		const input = container.querySelector('input[type="file"]') as HTMLInputElement
+		fireEvent.change(input, { target: { files: [pdf()] } })
+		await waitFor(() => expect(within(container).getByRole('alert')).toBeInTheDocument())
+		expect(fetchMock).not.toHaveBeenCalled()
+		expect(onChange).not.toHaveBeenCalled()
 	})
 })

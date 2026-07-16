@@ -12,7 +12,7 @@ afterEach(() => {
 const props = (
 	overrides: Partial<FieldRendererProps<string | number>>
 ): FieldRendererProps<string | number> => ({
-	field: { blockType: 'file', name: 'resume', label: 'Resume' },
+	field: { blockType: 'file', name: 'resume', label: 'Resume', uploadsCollection: 'app-uploads' },
 	id: 'x',
 	name: 'resume',
 	value: undefined,

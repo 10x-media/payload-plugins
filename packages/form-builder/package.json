@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/form-builder",
-	"version": "0.1.0-beta.3",
+	"version": "0.1.0-beta.4",
 	"description": "End-to-end forms platform for Payload: author, validate, render, collect, aggregate, and act.",
 	"license": "MIT",
 	"repository": {
@@ -104,6 +104,7 @@
 		"@axe-core/playwright": "catalog:",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@testing-library/jest-dom": "catalog:",

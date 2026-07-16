@@ -16,14 +16,14 @@ export default async function ContactPage() {
 
 ## What is in the box
 
-Editors compose forms from [fields](/form-builder/fields) authored as Payload blocks. Eleven types ship (text, textarea, email, number, date, select, checkbox, file, consent, calculation, repeater), all built through the same `defineFormField` primitive your custom types use, so nothing about the built-ins is privileged.
+Editors compose forms from [fields](/form-builder/fields) authored as Payload blocks. Twelve types ship (text, textarea, email, number, date, select, checkbox, file, consent, calculation, repeater, message), all built through the same `defineFormField` primitive your custom types use, so nothing about the built-ins is privileged, and content fields are [localized by default](/form-builder/fields#content-localization) on hosts with Payload localization.
 
 ### Authoring
 
-- [Fields](/form-builder/fields): eleven built-in block types, plus your own through `defineFormField`.
+- [Fields](/form-builder/fields): twelve built-in block types, plus your own through `defineFormField`.
 - [Validation](/form-builder/validation): declarative rules with custom messages, warning-versus-error severities, cross-field and async server-only rules, and a [Standard Schema](https://standardschema.dev) escape hatch.
 - [Conditional logic](/form-builder/conditions): expressed in Payload's own `Where` shape, evaluated by one isomorphic engine on client and server.
-- [Multi-step flows](/form-builder/multi-step): a serializable step graph with conditional branching.
+- [Multi-step flows](/form-builder/multi-step): a serializable step graph with conditional branching, authored by step titles with exclusive field assignment.
 
 ### Frontend
 
@@ -37,11 +37,11 @@ Editors compose forms from [fields](/form-builder/fields) authored as Payload bl
 - [Recall and prefill](/form-builder/recall-prefill): pipe earlier answers into labels and seed values from URL parameters.
 - [Calculations](/form-builder/calculations): derive totals and quiz scores through a no-eval expression engine recomputed on the server.
 - [Consent](/form-builder/consent): captured with proof by reference and policy-version capture.
-- [File uploads](/form-builder/uploads): a dedicated collection with server-enforced MIME and size limits.
+- [File uploads](/form-builder/uploads): your own upload collection with server-enforced MIME and size limits.
 - [Post-submit actions](/form-builder/actions): email, confirmation, signed webhook, or custom, run through Payload jobs with a bounded inline fallback.
-- [Polls and aggregation](/form-builder/polls): publishable results via a gated endpoint, `<FormResults>`, and a turnkey `<Poll>`.
+- [Polls and aggregation](/form-builder/polls): a full lifecycle of close dates, gated result visibility, options resolved from host domain data, and a recorded final outcome, all rendered by `<FormResults>` and a turnkey `<Poll>` over a gated public endpoint.
 - [Spam protection](/form-builder/spam): honeypot, per-identity rate limiting, bundled captcha adapters (Turnstile, reCAPTCHA, hCaptcha), upload-ownership scoping, and privacy-first metadata capture, on by default.
-- [Typed translations](/form-builder/i18n): every admin string follows the shared plugin pattern.
+- [Typed translations](/form-builder/i18n): every admin string follows the shared plugin pattern, with English and German built in.
 
 ## The trust model
 
@@ -49,10 +49,10 @@ The client is never trusted. Conditions, validation rules, calculations, consent
 
 ## Extending and configuring the plugin
 
-All three plugin-managed collections (`forms`, `form-submissions`, `form-uploads`) accept an `overrides` option that uses explicit spreads. The submission admin view renders a formatted `SubmissionAnswers` component by default; raw JSON fields are hidden unless you set `showSubmissionRawFields: true`. See [Customization](/form-builder/customization) for the full API.
+Both plugin-managed collections (`forms`, `form-submissions`) accept an `overrides` option that uses explicit spreads. The submission admin view renders a formatted `SubmissionAnswers` component by default; raw JSON fields are hidden unless you set `showSubmissionRawFields: true`. See [Customization](/form-builder/customization) for the full API.
 
 ## When to use it
 
-Any Payload project that needs forms beyond a hardcoded contact form: marketing sites where editors ship new forms without deploys, quizzes and calculators, gated downloads, surveys and polls. Everything is a Payload collection underneath (`forms`, `form-submissions`, `form-uploads`), so your existing access control, hooks, and APIs apply.
+Any Payload project that needs forms beyond a hardcoded contact form: marketing sites where editors ship new forms without deploys, quizzes and calculators, gated downloads, surveys and polls. Everything is a Payload collection underneath (`forms`, `form-submissions`, and your uploads collection), so your existing access control, hooks, and APIs apply.
 
 Start with the [quick start](/form-builder/quick-start).

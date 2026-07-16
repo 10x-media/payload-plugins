@@ -7,24 +7,26 @@ import {
 } from 'payload'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { ActionRegistry } from '../actions/registry'
-import { resolveFormResultsRequest } from '../aggregation/resolveResultsRequest'
+import {
+	type FormResultsAccess,
+	resolveFormResultsRequest,
+} from '../aggregation/resolveResultsRequest'
 import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
+import { localizedIf } from '../fields/localizedIf'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
-import {
-	DEFAULT_PRESENTATION_NAME,
-	defaultPresentationDescriptors,
-} from '../presentations/defaults'
-import type { PresentationDescriptorRegistry } from '../presentations/registry'
+import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
+import type { PollOptionSourceRegistry } from '../poll/registry'
 import { keys } from '../translations/keys'
-import { labelFor, labelForKey } from '../translations/server'
+import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
+import { validateUrl } from '../validation/validateUrl'
 
 export const FORMS_SLUG = 'forms'
 
@@ -63,12 +65,36 @@ const providedFlowStepCount = (raw: unknown): number => {
 	return Array.isArray(steps) ? steps.length : 0
 }
 
+/**
+ * Stamp the configured uploads collection slug onto every `file` block (including repeater
+ * sub-fields) on each save. The block carries a hidden `uploadsCollection` field so the slug
+ * reaches the client renderer through the form document; the server always overwrites it from
+ * plugin config, so the stored value is never author- or client-controlled.
+ */
+const stampFileCollections = (rows: FieldRow[], slug: string): void => {
+	for (const row of rows) {
+		if (row.blockType === 'file') {
+			;(row as { uploadsCollection?: string }).uploadsCollection = slug
+		}
+		const subFields = (row as { subFields?: unknown }).subFields
+		if (Array.isArray(subFields)) {
+			stampFileCollections(subFields as FieldRow[], slug)
+		}
+	}
+}
+
 type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
 	consentRegistry?: ConsentSourceRegistry
-	presentationRegistry?: PresentationDescriptorRegistry
 	actionRegistry?: ActionRegistry
+	localizeContent?: boolean
+	/** The host-owned uploads collection slug from plugin config; absent when uploads are disabled. */
+	uploadsCollectionSlug?: string
+	/** Host seam gating anonymous results reads (plugin option `results.access`). */
+	resultsAccess?: FormResultsAccess
+	/** Registered poll option sources (plugin option `poll.sources`); empty registry means no source fields. */
+	pollSourceRegistry?: PollOptionSourceRegistry
 	overrides?: CollectionOverrides
 }
 
@@ -77,20 +103,16 @@ export const buildFormsCollection = ({
 	registry,
 	ruleRegistry,
 	consentRegistry,
-	presentationRegistry = new Map(Object.entries(defaultPresentationDescriptors)),
 	actionRegistry = new Map(),
+	localizeContent = true,
+	uploadsCollectionSlug,
+	resultsAccess,
+	pollSourceRegistry,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
-		if (
-			data &&
-			typeof data.defaultPresentation === 'string' &&
-			!presentationRegistry.has(data.defaultPresentation)
-		) {
-			data.defaultPresentation = DEFAULT_PRESENTATION_NAME
-		}
 		if (data && Array.isArray(data.fields)) {
 			const normalized: FieldRow[] = normalizeFormConditions(
 				data.fields as FieldRow[],
@@ -100,6 +122,9 @@ export const buildFormsCollection = ({
 				if ('expression' in field) {
 					field.expression = normalizeCalc(field.expression)
 				}
+			}
+			if (uploadsCollectionSlug) {
+				stampFileCollections(normalized, uploadsCollectionSlug)
 			}
 			data.fields = normalized
 			const fieldNames = normalized
@@ -115,8 +140,7 @@ export const buildFormsCollection = ({
 						errors: [
 							{
 								path: 'flow',
-								message:
-									'A flow needs at least two steps with unique, non-empty IDs. Add another step or remove the flow.',
+								message: 'A flow needs at least two steps. Add another step or remove the flow.',
 							},
 						],
 					},
@@ -131,7 +155,12 @@ export const buildFormsCollection = ({
 	const fieldsField: Field = {
 		name: 'fields',
 		type: 'blocks',
-		blocks: buildFieldBlocks(registry, ruleRegistry, consentRegistry),
+		blocks: buildFieldBlocks({
+			registry,
+			ruleRegistry,
+			consentRegistry,
+			localize: localizeContent,
+		}),
 	}
 
 	const flowField: Field = {
@@ -193,45 +222,182 @@ export const buildFormsCollection = ({
 		access: { read: isLoggedIn },
 	}
 
+	// What the visitor sees after a successful submit. Publicly readable (unlike actions): the
+	// client renderer needs message/redirect/submitLabel. `type`/`url` are behavior, never
+	// localized; `message`/`submitLabel` are visitor-facing content and follow `localizeContent`.
+	// `type` is defaulted and not clearable rather than `required`: a required member would make
+	// the whole group required in generated types, breaking typed `payload.create` calls that
+	// omit `response`. Consumers treat a missing type as 'message'.
+	const responseField: Field = {
+		name: 'response',
+		type: 'group',
+		fields: [
+			{
+				name: 'type',
+				type: 'select',
+				defaultValue: 'message',
+				label: labelForKey(keys.responseType),
+				admin: { isClearable: false },
+				options: [
+					{ label: labelForKey(keys.responseTypeMessage), value: 'message' },
+					{ label: labelForKey(keys.responseTypeRedirect), value: 'redirect' },
+				],
+			},
+			{
+				name: 'message',
+				type: 'richText',
+				label: labelForKey(keys.responseMessage),
+				// Unset type (docs predating this field) means 'message', matching the client fallback.
+				admin: { condition: (_data, siblingData) => siblingData?.type !== 'redirect' },
+				...localizedIf(localizeContent),
+			},
+			{
+				name: 'redirect',
+				type: 'group',
+				label: labelForKey(keys.responseRedirect),
+				admin: { condition: (_data, siblingData) => siblingData?.type === 'redirect' },
+				fields: [
+					{
+						name: 'url',
+						type: 'text',
+						label: labelForKey(keys.responseUrl),
+						validate: validateUrl,
+					},
+				],
+			},
+			{
+				name: 'submitLabel',
+				type: 'text',
+				label: labelForKey(keys.responseSubmitLabel),
+				...localizedIf(localizeContent),
+			},
+		],
+	}
+
+	// What the visitor sees above the fields, before submit. Its own tab mirrors `response`
+	// (the after-submit counterpart): both are visitor-facing content, not form behavior, so
+	// they don't belong inside the Fields tab. `showTitle` gates whether `title` renders at all
+	// (defaults to false: most forms rely on the host page's own heading and would otherwise
+	// double up); the admin input for `title` is shown only while `showTitle` is checked, and
+	// toggling it off hides the input but preserves the stored value, so it comes back with the
+	// checkbox. `intro` has no such gate: an empty rich text field already renders nothing, so a
+	// separate visibility flag would be redundant.
+	const displayField: Field = {
+		name: 'display',
+		type: 'group',
+		fields: [
+			{
+				name: 'showTitle',
+				type: 'checkbox',
+				defaultValue: false,
+				label: labelForKey(keys.displayShowTitle),
+			},
+			{
+				name: 'title',
+				type: 'text',
+				label: labelForKey(keys.displayTitle),
+				admin: { condition: (_data, siblingData) => Boolean(siblingData?.showTitle) },
+				...localizedIf(localizeContent),
+			},
+			{
+				name: 'intro',
+				type: 'richText',
+				label: labelForKey(keys.displayIntro),
+				...localizedIf(localizeContent),
+			},
+		],
+	}
+
 	const defaultFields: Field[] = [
 		{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
-		// Unnamed tabs are presentational only: fields/flow/actions stay at the document root.
+		// Unnamed tabs are presentational only: fields/flow/actions/response/display stay at the
+		// document root. Fields keeps default focus (authors spend their time there and showTitle
+		// defaults off); Display follows as the next visitor-facing concern.
 		{
 			type: 'tabs',
 			tabs: [
 				{ label: labelForKey(keys.tabFields), fields: [fieldsField] },
+				{ label: labelForKey(keys.tabDisplay), fields: [displayField] },
 				{ label: labelForKey(keys.tabFlow), fields: [flowField] },
 				{ label: labelForKey(keys.tabActions), fields: [actionsField] },
+				{ label: labelForKey(keys.tabResponse), fields: [responseField] },
 			],
 		},
+		// Poll lifecycle config; identifiers and behavior, never localized. Sidebar keeps parity with
+		// the pre-group showResults/resultsField placement. `resultsVisibility` is defaulted and not
+		// clearable rather than `required` for the same generated-types reason as `response.type`.
 		{
-			name: 'defaultPresentation',
-			type: 'select',
-			defaultValue: DEFAULT_PRESENTATION_NAME,
-			options: [...presentationRegistry.values()].map((descriptor) => ({
-				label: labelFor(descriptor.label),
-				value: descriptor.name,
-			})),
-			label: labelForKey(keys.configDefaultPresentation),
+			name: 'poll',
+			type: 'group',
+			label: labelForKey(keys.pollGroup),
 			admin: { position: 'sidebar' },
-		},
-		{
-			name: 'showResults',
-			type: 'checkbox',
-			defaultValue: false,
-			label: labelForKey(keys.configShowResults),
-			admin: { position: 'sidebar' },
-		},
-		{
-			name: 'resultsField',
-			type: 'text',
-			label: labelForKey(keys.configResultsField),
-			admin: {
-				position: 'sidebar',
-				description:
-					'Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.',
-				condition: (data) => Boolean(data?.showResults),
-			},
+			fields: [
+				{
+					name: 'enabled',
+					type: 'checkbox',
+					defaultValue: false,
+					label: labelForKey(keys.pollEnabled),
+				},
+				{
+					name: 'resultsField',
+					type: 'text',
+					label: labelForKey(keys.pollResultsField),
+					admin: {
+						description: labelForKey(keys.pollResultsFieldDescription),
+						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
+					},
+				},
+				{
+					name: 'resultsVisibility',
+					type: 'select',
+					defaultValue: 'afterVote',
+					label: labelForKey(keys.pollResultsVisibility),
+					admin: {
+						isClearable: false,
+						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
+					},
+					options: [
+						{ label: labelForKey(keys.pollVisibilityAfterVote), value: 'afterVote' },
+						{ label: labelForKey(keys.pollVisibilityAfterClose), value: 'afterClose' },
+					],
+				},
+				{
+					name: 'closesAt',
+					type: 'date',
+					label: labelForKey(keys.pollClosesAt),
+					admin: {
+						date: { pickerAppearance: 'dayAndTime' },
+						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
+					},
+				},
+				...buildPollOptionSourceFields(pollSourceRegistry ?? new Map()),
+				// The outcome is written exclusively by `resolvePollOutcome` (host domain logic, server-side
+				// with overrideAccess). Field-level create/update access blocks every non-override write:
+				// Payload silently drops the denied value rather than erroring, so admin saves and API
+				// updates can never set or clear a winner. `admin.readOnly` mirrors that in the UI.
+				{
+					name: 'outcome',
+					type: 'group',
+					label: labelForKey(keys.pollOutcome),
+					admin: { condition: (_data, siblingData) => Boolean(siblingData?.enabled) },
+					fields: [
+						{
+							name: 'winningValue',
+							type: 'text',
+							label: labelForKey(keys.pollWinningValue),
+							admin: { readOnly: true },
+							access: { create: () => false, update: () => false },
+						},
+						{
+							name: 'resolvedAt',
+							type: 'date',
+							label: labelForKey(keys.pollResolvedAt),
+							admin: { readOnly: true },
+							access: { create: () => false, update: () => false },
+						},
+					],
+				},
+			],
 		},
 	]
 
@@ -247,6 +413,7 @@ export const buildFormsCollection = ({
 					field,
 					isAuthed: Boolean(req.user),
 					req,
+					access: resultsAccess,
 				})
 				return Response.json(body, { status })
 			},

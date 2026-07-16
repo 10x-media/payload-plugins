@@ -77,6 +77,27 @@ describe('FormResults', () => {
 		expect(within(container).getByText('66.7%')).toBeInTheDocument()
 	})
 
+	it('highlights the winning bucket with class and a translated badge', () => {
+		const { container } = render(
+			createElement(FormResults, { results: agg(), winningValue: 'red', t: (k) => k })
+		)
+		const winner = container.querySelector('.fb-results__bucket--winner')
+		expect(winner).not.toBeNull()
+		expect(winner?.textContent).toContain('Red')
+		expect(winner?.querySelector('.fb-results__winner-badge')?.textContent).toBe(
+			'formBuilder:results.winner'
+		)
+		expect(container.querySelectorAll('.fb-results__bucket--winner')).toHaveLength(1)
+	})
+
+	it('marks no winner without a winningValue or when it matches no bucket', () => {
+		const plain = render(createElement(FormResults, { results: agg() }))
+		expect(plain.container.querySelector('.fb-results__bucket--winner')).toBeNull()
+		cleanup()
+		const unmatched = render(createElement(FormResults, { results: agg(), winningValue: 'purple' }))
+		expect(unmatched.container.querySelector('.fb-results__bucket--winner')).toBeNull()
+	})
+
 	it('appends the sample note only when the aggregation is truncated', () => {
 		const plain = render(createElement(FormResults, { results: agg(), t: (k) => k }))
 		expect(plain.container.querySelector('.fb-results__total')?.textContent).not.toContain(

@@ -7,11 +7,14 @@ import type { ConsentSourceRegistry } from '../consent/registry'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
+import type { PollOptionSourceRegistry } from '../poll/registry'
 import { buildSpamGuard } from '../spam/spamGuard'
 import type { ResolvedSpamConfig } from '../spam/types'
 import { validateSubmission } from '../submissions/validateSubmission'
+import { POLL_CONTEXT_KEY, votedCookieName } from '../submissions/votedCookie'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -29,10 +32,14 @@ type BuildSubmissionsCollectionArgs = {
 	hasRunner?: boolean
 	/** Body serialization customization forwarded to the inline action dispatch path. */
 	richText?: RichTextBodyOption
-	/** Upload collection slug for file fields without an explicit `relationTo`. */
+	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
 	uploadSlug?: string
 	/** Resolved spam config; when active, prepends the spam guard before validation. `false` disables it. */
 	spam?: ResolvedSpamConfig | false
+	/** Opt-in (`poll.votedCookie`): set an httpOnly `fb-voted-{formId}` cookie on poll submission creates. */
+	votedCookie?: boolean
+	/** Registered poll option sources; submission validation resolves allowed values through them. */
+	pollSourceRegistry?: PollOptionSourceRegistry
 	/**
 	 * When `true`, shows the raw `values`, `descriptors`, and `consent` JSON fields in the admin UI.
 	 * Default `false` — they are fully represented by the `SubmissionAnswers` UI component.
@@ -118,6 +125,43 @@ const makeAfterChange =
 		return doc
 	}
 
+/**
+ * Opt-in (`poll.votedCookie`) hook: after a submission to a poll-enabled form is created, appends
+ * an httpOnly `fb-voted-{formId}=1` cookie via `req.responseHeaders`, Payload's supported channel
+ * for hook-set response headers (its own auth strategies use it; `handleEndpoints` merges it into
+ * every REST response). Reads the poll config `validateSubmission` stashed on `req.context`,
+ * falling back to a form fetch when absent. httpOnly keeps the marker readable only server-side
+ * (`hasVotedCookie`); the client `<Poll>` keeps its localStorage guard.
+ */
+const makeVotedCookieHook = (): CollectionAfterChangeHook => {
+	return async ({ doc, operation, req }) => {
+		if (operation !== 'create') {
+			return doc
+		}
+		const formId = formIdOf(doc.form)
+		if (formId == null) {
+			return doc
+		}
+		const stashed = req.context?.[POLL_CONTEXT_KEY]
+		let poll = pollConfigOf(stashed)
+		if (stashed === undefined) {
+			const form = await req.payload
+				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+				.catch(() => null)
+			poll = form ? pollConfigOf(form.poll) : undefined
+		}
+		if (poll?.enabled !== true) {
+			return doc
+		}
+		req.responseHeaders ??= new Headers()
+		req.responseHeaders.append(
+			'Set-Cookie',
+			`${votedCookieName(formId)}=1; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax`
+		)
+		return doc
+	}
+}
+
 export const buildSubmissionsCollection = ({
 	registry,
 	ruleRegistry,
@@ -128,6 +172,8 @@ export const buildSubmissionsCollection = ({
 	richText,
 	uploadSlug,
 	spam,
+	votedCookie = false,
+	pollSourceRegistry,
 	showRawFields = false,
 	overrides,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => {
@@ -182,11 +228,18 @@ export const buildSubmissionsCollection = ({
 			// Consumer beforeValidate hooks are appended after so they run on already-validated data.
 			beforeValidate: [
 				...(spam ? [buildSpamGuard(spam)] : []),
-				validateSubmission({ registry, ruleRegistry, consentRegistry, uploadSlug }),
+				validateSubmission({
+					registry,
+					ruleRegistry,
+					consentRegistry,
+					uploadSlug,
+					pollSourceRegistry,
+				}),
 				...(overrides?.hooks?.beforeValidate ?? []),
 			],
 			afterChange: [
 				makeAfterChange({ actionRegistry, events, hasRunner, richText }),
+				...(votedCookie ? [makeVotedCookieHook()] : []),
 				...(overrides?.hooks?.afterChange ?? []),
 			],
 		},

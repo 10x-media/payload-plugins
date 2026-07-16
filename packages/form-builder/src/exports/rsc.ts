@@ -1,1 +1,6 @@
+export { isPollClosed } from '../form/pollState'
+export { toFormDocument } from '../form/toFormDocument'
+export { resolvePollOptions } from '../poll/resolvePollOptions'
+export { resolvePollOutcome } from '../poll/resolvePollOutcome'
 export { SubmissionAnswers } from '../submissions/SubmissionAnswers'
+export { hasVotedCookie, votedCookieName } from '../submissions/votedCookie'

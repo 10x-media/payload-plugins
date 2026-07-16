@@ -1,3 +1,4 @@
+import type { PayloadRequest, RichTextField } from 'payload'
 import { interpolate } from '../../recall/interpolate'
 import type { SubmissionDescriptor, SubmissionValue } from '../../submissions/types'
 import type { BodyConverter, BodyRender } from './converters'
@@ -6,6 +7,9 @@ import { escapeHtml } from './escapeHtml'
 import { serializeSlate } from './serializeSlate'
 import { renderAllValues, renderAllValuesTable } from './wildcards'
 
+/** Minimal form identity threaded alongside a rendered body (e.g. per-tenant template lookups). */
+type SerializeBodyForm = { id: number | string; title?: string }
+
 /** Submission data plus optional converter overrides available while serializing a body. */
 export type BodyContext = {
 	values: SubmissionValue[]
@@ -13,21 +17,30 @@ export type BodyContext = {
 	converters?: Record<string, BodyConverter>
 }
 
-/** Args a custom `richText.serialize` replacement receives per rendered body. */
+/**
+ * Args a custom `richText.serialize` replacement receives per rendered body. Always populated by
+ * `makeRenderBody` (the action-body pipeline): `form` and `req` enable per-tenant template
+ * lookups or handing the body off to a renderer like react-email.
+ */
 export type SerializeBodyArgs = {
 	body: unknown
 	values: SubmissionValue[]
 	descriptors: SubmissionDescriptor[]
+	form: SerializeBodyForm
+	req?: PayloadRequest
 }
 
 /**
- * Customizes how action bodies become channel-ready strings. `converters` spread over the
- * defaults per Lexical node type; `serialize` replaces the whole pipeline (for non-HTML
- * channels like chat or plain text).
+ * Customizes how action bodies are authored and rendered. `converters` spread over the default
+ * Lexical node converters; `serialize` replaces the whole pipeline (for non-HTML channels like
+ * chat or plain text, or to hand the body plus the submitted `form`/`req` off to a renderer like
+ * react-email). `editor` overrides the Lexical/richText editor on both the emailTeam and
+ * confirmation action body fields (see `buildDefaultActionDefinitions`).
  */
 export type RichTextBodyOption = {
 	converters?: Record<string, BodyConverter>
 	serialize?: (args: SerializeBodyArgs) => Promise<string> | string
+	editor?: RichTextField['editor']
 }
 
 /** Recall resolver over submission values: field name to stringified value, `''` when absent. */
@@ -110,6 +123,8 @@ export const makeRenderBody =
 	(args: {
 		values: SubmissionValue[]
 		descriptors: SubmissionDescriptor[]
+		form: SerializeBodyForm
+		req?: PayloadRequest
 		richText?: RichTextBodyOption
 	}) =>
 	async (body: unknown): Promise<string> => {
@@ -118,6 +133,8 @@ export const makeRenderBody =
 				body,
 				values: args.values,
 				descriptors: args.descriptors,
+				form: args.form,
+				req: args.req,
 			})
 		}
 		return serializeBody(body, {

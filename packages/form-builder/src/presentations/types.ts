@@ -4,8 +4,9 @@ export type PresentationSurface = 'inline' | 'page' | 'overlay'
 export type PresentationDensity = 'comfortable' | 'compact'
 
 /**
- * Serializable, framework-agnostic description of a presentation. The admin select and the
- * stored `defaultPresentation` use only this; the React `Wrapper` is added in `./react`. No React here.
+ * Serializable, framework-agnostic description of a presentation. `presentations/defaults.ts`
+ * ships the built-ins the React presentation registry wraps with a `Wrapper` (see `./react`). No
+ * React here.
  */
 export type PresentationDescriptor = {
 	name: string

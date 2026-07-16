@@ -46,4 +46,15 @@ describe('normalizeFormConditions', () => {
 		)
 		expect(next[1]?.visibleWhen).toEqual({ or: [{ and: [{ age: { greater_than: 18 } }] }] })
 	})
+
+	it('strips a constraint referencing a non-conditionable field type (message)', () => {
+		const next = normalizeFormConditions(
+			[
+				{ blockType: 'message', name: 'note' },
+				{ ...fText, visibleWhen: { note: { exists: true } } },
+			],
+			conditionTypes
+		)
+		expect(next[1]?.visibleWhen).toBeUndefined()
+	})
 })

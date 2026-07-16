@@ -38,7 +38,6 @@ const mimeTypesOf = (raw: unknown): string[] | undefined => {
 }
 
 const fileFieldConfigOf = (instance: FormFieldInstance): FileFieldConfig => ({
-	relationTo: typeof instance.relationTo === 'string' ? instance.relationTo : undefined,
 	mimeTypes: mimeTypesOf(instance.mimeTypes),
 	maxSize: typeof instance.maxSize === 'number' ? instance.maxSize : undefined,
 })
@@ -103,7 +102,10 @@ export type RunSubmissionInput = {
 	req?: PayloadRequest
 	payload?: Payload
 	formId?: number | string
-	/** Upload collection slug for file fields without an explicit `relationTo`. Defaults to `form-uploads`. */
+	/**
+	 * The plugin-configured uploads collection slug. The block's stamped `collection` is for the
+	 * client only; the server resolves the slug from plugin config and fails closed without one.
+	 */
 	uploadSlug?: string
 	/** Resolved request identity, verified against an upload's `owner` stamp when a file field is captured. */
 	expectedOwner?: string
@@ -125,8 +127,10 @@ export type RunSubmissionResult = {
  * (conditions, validation, storage). Conditions gate the second pass against these effective answers: a
  * field whose `visibleWhen` is false is skipped entirely (never validated, never stored, so a client-sent
  * value for it is ignored), and a visible field whose `validateWhen` is false stores its value but skips
- * validation. A visible calc field stores its derived value and is never validated. Only `error` severity
- * blocks; warnings are computed but not surfaced server-side (the renderer surfaces them).
+ * validation. A visible calc field stores its derived value and is never validated. Display-only field
+ * types (value kind 'none', e.g. message) are skipped in both passes: never validated, never stored, and
+ * a client-sent value under their name is dropped. Only `error` severity blocks; warnings are computed
+ * but not surfaced server-side (the renderer surfaces them).
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
 	const {
@@ -152,7 +156,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		const definition = registry.get(instance.blockType)
 		const raw = incoming.get(instance.name)
 		// Never seed a calc field's client value: its value is derived below, so the client cannot influence it (even for a self-referencing expression).
-		if (!definition || calcExpressionOf(instance)) {
+		// A display-only ('none' kind) field carries no value at all, so a client-sent value under its name is dropped here.
+		if (!definition || definition.value === 'none' || calcExpressionOf(instance)) {
 			continue
 		}
 		// A consent field's "not agreed" state is semantically meaningful: treat a missing value as
@@ -185,7 +190,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 
 	for (const instance of fields) {
 		const definition = registry.get(instance.blockType)
-		if (!definition) {
+		// A 'none'-kind (display-only) field is never validated and never stored: no value, no descriptor.
+		if (!definition || definition.value === 'none') {
 			continue
 		}
 		const raw = incoming.get(instance.name)
@@ -232,16 +238,22 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 			}
 		}
 
-		if (instance.blockType === 'file') {
+		// Gate on the field-type definition's value kind, not the blockType literal, so a custom
+		// type registered with value:'file' gets the same server-side capture and enforcement as
+		// the built-in file field (a blockType check would leave it storing the raw client id).
+		if (definition.value === 'file') {
 			if (isEmpty(value)) {
 				continue
 			}
 			if (payload) {
+				if (!uploadSlug) {
+					errors.push({ path: instance.name, message: t(errorKeyFor('missing')) })
+					continue
+				}
 				const fileConfig = fileFieldConfigOf(instance)
-				const slug = fileConfig.relationTo ?? uploadSlug ?? 'form-uploads'
 				const captured = await captureFileRef({
 					payload,
-					collectionSlug: slug,
+					collectionSlug: uploadSlug,
 					uploadId: value as string | number,
 					config: fileConfig,
 					req,
@@ -288,38 +300,75 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				? (instance.subFields as FormFieldInstance[])
 				: []
 
-			// Per-row sub-field validation: evaluate each sub-field's visibleWhen against the
-			// row's own values, then run its validation rules. Errors are reported with path
-			// fieldName[rowIndex].subFieldName so the client can map them to the right input.
+			// Per-row sub-field processing. Validation is gated by the sub-field's visibleWhen and
+			// validateWhen against the row's own values; errors carry the path
+			// fieldName[rowIndex].subFieldName so the client maps them to the right input. File
+			// sub-fields additionally cross the server trust boundary: they are captured
+			// unconditionally (a crafted request could carry an id for a conditionally-hidden field),
+			// so a stored row never holds a raw, unenforced upload id.
 			for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
 				const row = rows[rowIndex] ?? {}
 				for (const subField of subFields) {
 					const subDef = registry.get(subField.blockType)
 					if (!subDef) continue
-					if (!evaluateCondition(subField.visibleWhen, row)) continue
-					if (!evaluateCondition(subField.validateWhen, row)) continue
-					const subValue = row[subField.name]
-					const { errors: subErrors } = await runValidation({
-						field: subField,
-						fieldDefinition: subDef,
-						value: subValue,
-						fieldType: subField.blockType,
-						ruleRegistry,
-						answers: row,
-						locale,
-						t,
-						operation,
-						event: 'submit',
-						mode: 'server',
-						req,
-						payload,
-						formId,
-					})
-					for (const issue of subErrors.filter((e) => e.severity === 'error')) {
-						errors.push({
-							path: `${instance.name}[${rowIndex}].${subField.name}`,
-							message: issue.message,
+					// Display-only ('none' kind) sub-fields mirror the top-level skip: never validated,
+					// never captured, and stripped from the stored row below so a client-injected value
+					// under their name cannot ride along.
+					if (subDef.value === 'none') continue
+					const subPath = `${instance.name}[${rowIndex}].${subField.name}`
+					if (
+						evaluateCondition(subField.visibleWhen, row) &&
+						evaluateCondition(subField.validateWhen, row)
+					) {
+						const { errors: subErrors } = await runValidation({
+							field: subField,
+							fieldDefinition: subDef,
+							value: row[subField.name],
+							fieldType: subField.blockType,
+							ruleRegistry,
+							answers: row,
+							locale,
+							t,
+							operation,
+							event: 'submit',
+							mode: 'server',
+							req,
+							payload,
+							formId,
 						})
+						for (const issue of subErrors.filter((e) => e.severity === 'error')) {
+							errors.push({ path: subPath, message: issue.message })
+						}
+					}
+
+					// Mirror the top-level file capture: the client submits only an upload id, so
+					// re-derive filename/mimeType/filesize from the stored doc and enforce
+					// owner/mime/size against the sub-field's config, failing closed on a missing
+					// uploads slug or any capture rejection. The captured FileRef replaces the raw
+					// id in the row. Without a payload (pure unit context) the value stays verbatim,
+					// exactly like the top-level path.
+					if (subDef.value === 'file' && payload) {
+						const subValue = row[subField.name]
+						if (isEmpty(subValue)) {
+							continue
+						}
+						if (!uploadSlug) {
+							errors.push({ path: subPath, message: t(errorKeyFor('missing')) })
+							continue
+						}
+						const captured = await captureFileRef({
+							payload,
+							collectionSlug: uploadSlug,
+							uploadId: subValue as string | number,
+							config: fileFieldConfigOf(subField),
+							req,
+							expectedOwner,
+						})
+						if (!captured.ok) {
+							errors.push({ path: subPath, message: t(errorKeyFor(captured.code)) })
+							continue
+						}
+						row[subField.name] = captured.ref
 					}
 				}
 			}
@@ -335,7 +384,19 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				...((sf.options as unknown) ? { optionLabels: optionLabelsFor(sf) ?? undefined } : {}),
 			}))
 
-			outValues.push({ field: instance.name, value: rows })
+			// Strip display-only sub-fields from the stored rows: like top-level 'none' fields they
+			// carry no answer, so a client-injected value under their name must never persist.
+			const displayOnly = new Set(
+				subFields.filter((sf) => registry.get(sf.blockType)?.value === 'none').map((sf) => sf.name)
+			)
+			const storedRows =
+				displayOnly.size === 0
+					? rows
+					: rows.map((row) =>
+							Object.fromEntries(Object.entries(row).filter(([key]) => !displayOnly.has(key)))
+						)
+
+			outValues.push({ field: instance.name, value: storedRows })
 			descriptors.push({
 				field: instance.name,
 				label: instance.label ?? instance.name,

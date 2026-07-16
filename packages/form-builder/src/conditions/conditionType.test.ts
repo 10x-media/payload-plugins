@@ -24,4 +24,18 @@ describe('conditionType resolution', () => {
 		expect(map.calculation).toBe('number')
 		expect(map.consent).toBe('checkbox')
 	})
+
+	it('excludes valueless (display-only) types like message from the map', () => {
+		const map = buildConditionTypeMap(buildRegistry(defaultFieldDefinitions))
+		expect('message' in map).toBe(false)
+	})
+
+	it('keeps a valueless type that explicitly declares a conditionType', () => {
+		const map = buildConditionTypeMap(
+			new Map([
+				['banner', { type: 'banner', label: 'Banner', value: 'none', conditionType: 'text' }],
+			])
+		)
+		expect(map.banner).toBe('text')
+	})
 })

@@ -40,9 +40,72 @@ Anonymous voters cannot read raw submissions, so public results are served as ag
 GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
 ```
 
-Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `showResults` toggle is on, only for its configured `resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
+Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `poll.enabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
 
-Set `resultsField` to a choice field, never free text or PII.
+Set `poll.resultsField` to a choice field, never free text or PII.
+
+On multi-tenant hosts, add the `results.access` plugin option: it runs for anonymous requests after the form is loaded and before anything is served, so you can compare the form's tenant against the request's and refuse cross-tenant reads. Authenticated callers bypass it:
+
+```ts
+formBuilder({
+  results: {
+    access: ({ req, form }) => form.tenant === tenantFromRequest(req),
+  },
+})
+```
+
+## Poll lifecycle
+
+The forms sidebar carries a `poll` group: `enabled`, `resultsField`, `resultsVisibility` (`afterVote` | `afterClose`), and an optional `closesAt`. Once `closesAt` passes, the server rejects new submissions for that form (submission-time guard, not just UI) and `<Poll>` renders a closed notice plus the results.
+
+## Option sources
+
+By default a poll's choices are the options hand-authored on its results field. When the choices live in your domain data (races, candidates, products), register an option source so authors pick a source instead of retyping options:
+
+```ts title="payload.config.ts"
+import { definePollOptionSource } from '@10x-media/form-builder'
+
+const raceEntrants = definePollOptionSource({
+  type: 'raceEntrants',
+  label: 'Race entrants',
+  config: [{ name: 'raceId', type: 'text', required: true }],
+  resolve: async ({ config, payload }) => {
+    const { docs } = await payload.find({
+      collection: 'entrants',
+      where: { race: { equals: config.raceId } },
+    })
+    return docs.map((doc) => ({ label: doc.name, value: String(doc.id) }))
+  },
+})
+
+formBuilder({ poll: { sources: { raceEntrants } } })
+```
+
+With at least one source registered, the poll group gains an `optionSource` select plus the source's `config` fields (there are no built-in sources, and hand-authored options remain the default: a source is an explicit per-form opt-in). `resolve` maps that per-form config to the current options; each option's `value` is your stable identifier contract, stored in submissions and later matched against the outcome, so it must never change once votes exist.
+
+Resolution happens server-side in two places. At render time you call `resolvePollOptions` and inject the result via `toFormDocument`'s second argument, so visitors see the host's current choices:
+
+```tsx title="app/poll/[id]/page.tsx"
+import { resolvePollOptions, toFormDocument } from '@10x-media/form-builder/rsc'
+
+const form = await payload.findByID({ collection: 'forms', id: params.id })
+const pollOptions = await resolvePollOptions({ payload, form })
+return <Poll form={toFormDocument(form, { pollOptions })} resultsField="choice" />
+```
+
+At submission time the server resolves the source again and accepts only the resolved values (fail closed), so a stale or forged option can never be recorded.
+
+## Outcome
+
+When the real-world result is decided, record it from host domain logic with `resolvePollOutcome`:
+
+```ts
+import { resolvePollOutcome } from '@10x-media/form-builder' // also on /rsc
+
+await resolvePollOutcome({ payload, formId, winningValue: 'entrant-42' })
+```
+
+It writes `poll.outcome.winningValue` and stamps `resolvedAt`. The outcome fields are read-only in the admin with field-level access that blocks every non-override write, so this server-side call is the only write path. A recorded outcome supersedes the rest of the lifecycle: `<Poll>` renders a final notice plus results with the winning bucket highlighted (`<FormResults winningValue>` underneath), regardless of voted or closed state.
 
 ## Rendering results
 
@@ -58,7 +121,7 @@ import { FormResults } from '@10x-media/form-builder/react'
 
 ## `<Poll>`
 
-Renders `<Form>` until the visitor votes, then fetches and shows results. A per-browser localStorage flag skips straight to results on revisit:
+Renders `<Form>` while the poll is open and unvoted, then fetches and shows results. A per-browser localStorage flag skips straight to results on revisit; past `closesAt` it shows a closed notice plus results, a voted-but-open `afterClose` poll shows a wait notice instead of fetching, and a recorded [outcome](#outcome) shows the final notice with the winner highlighted:
 
 ```tsx
 import { Poll } from '@10x-media/form-builder/react'
@@ -68,19 +131,20 @@ import { Poll } from '@10x-media/form-builder/react'
 
 The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/form-builder/spam) caps anonymous repeat voting per identity.
 
-For an SSR poll, aggregate server-side and choose what to render:
+## SSR voted state
+
+The plugin option `poll: { votedCookie: true }` sets an httpOnly `fb-voted-{formId}=1` cookie on every successful submission to a poll-enabled form. Being httpOnly it is invisible to client JS; read it server-side with `hasVotedCookie` and pass the result to `<Poll hasVoted>`. `hasVoted: true` ORs with the localStorage guard (either marks the visitor as voted); `false` or omitted just falls back to localStorage, so passing the cookie read unconditionally is always safe:
 
 ```tsx title="app/poll/[id]/page.tsx"
-import { aggregateFieldResponses } from '@10x-media/form-builder'
-import { Form, FormResults } from '@10x-media/form-builder/react'
+import { hasVotedCookie, toFormDocument } from '@10x-media/form-builder/rsc'
+import { Poll } from '@10x-media/form-builder/react'
+import { headers } from 'next/headers'
 
 export default async function PollPage({ params }) {
   const form = await payload.findByID({ collection: 'forms', id: params.id })
-  const voted = (await cookies()).has(`voted-${form.id}`)
-  if (voted) {
-    const results = await aggregateFieldResponses({ payload, formId: form.id, field: 'colour' })
-    return <FormResults results={results ? [results] : []} />
-  }
-  return <Form form={form} />
+  const voted = hasVotedCookie((await headers()).get('cookie'), form.id)
+  return <Poll form={toFormDocument(form)} resultsField="colour" hasVoted={voted} />
 }
 ```
+
+The cookie is `HttpOnly; SameSite=Lax` with a one-year `Max-Age`, and deliberately not `Secure`: it is a UX marker only (skip re-showing a form the visitor already answered), never an integrity or auth signal, and omitting `Secure` keeps it working on plain-HTTP local development. Do not build any server-side trust on its presence; one-per-identity enforcement is the previous section's territory.

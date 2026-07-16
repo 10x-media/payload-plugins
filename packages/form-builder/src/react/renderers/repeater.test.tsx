@@ -61,7 +61,16 @@ const Harness = ({
 	const validateField = vi.fn()
 	return (
 		<FormContext.Provider
-			value={{ state, dispatch, validateField, locale: 'en', step, rendererRegistry }}
+			value={{
+				state,
+				dispatch,
+				validateField,
+				locale: 'en',
+				step,
+				rendererRegistry,
+				labels: { back: 'Back', next: 'Next', submit: 'Submit' },
+				t: (key) => key,
+			}}
 		>
 			{createElement(RepeaterField, {
 				field: fieldDef,

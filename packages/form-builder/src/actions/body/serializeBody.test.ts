@@ -1,3 +1,4 @@
+import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 import type { SubmissionDescriptor, SubmissionValue } from '../../submissions/types'
 import { makeRenderBody, serializeBody } from './serializeBody'
@@ -13,6 +14,8 @@ const descriptors: SubmissionDescriptor[] = [
 ]
 
 const ctx = { values, descriptors }
+
+const form = { id: 'form-1', title: 'Contact' }
 
 const lexical = (children: unknown[]) => ({ root: { type: 'root', children } })
 const paragraph = (text: string, extra: Record<string, unknown> = {}) => ({
@@ -84,7 +87,7 @@ describe('serializeBody', () => {
 
 describe('makeRenderBody', () => {
 	it('renders through the default pipeline', async () => {
-		const renderBody = makeRenderBody({ values, descriptors })
+		const renderBody = makeRenderBody({ values, descriptors, form })
 		await expect(renderBody(lexical([paragraph('Hello {{name}}')]))).resolves.toBe(
 			'<p>Hello A &amp; B</p>'
 		)
@@ -94,6 +97,7 @@ describe('makeRenderBody', () => {
 		const renderBody = makeRenderBody({
 			values,
 			descriptors,
+			form,
 			richText: { converters: { paragraph: ({ children }) => `<section>${children}</section>` } },
 		})
 		await expect(renderBody(lexical([paragraph('x')]))).resolves.toBe('<section>x</section>')
@@ -103,10 +107,25 @@ describe('makeRenderBody', () => {
 		const renderBody = makeRenderBody({
 			values,
 			descriptors,
+			form,
 			richText: {
 				serialize: ({ body, values: v }) => `custom:${typeof body}:${v.length}`,
 			},
 		})
 		await expect(renderBody(lexical([]))).resolves.toBe('custom:object:2')
+	})
+
+	it('passes form and req through to a custom serialize', async () => {
+		const req = { locale: 'en' } as unknown as PayloadRequest
+		const renderBody = makeRenderBody({
+			values,
+			descriptors,
+			form,
+			req,
+			richText: {
+				serialize: ({ form: f, req: r }) => `${String(f.id)}:${f.title}:${r === req}`,
+			},
+		})
+		await expect(renderBody(lexical([]))).resolves.toBe('form-1:Contact:true')
 	})
 })

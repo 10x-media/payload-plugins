@@ -19,6 +19,28 @@ describe('formBuilder factory', () => {
 		expect(i18n.en?.formBuilder?.fieldTitle).toBe('Title')
 	})
 
+	it('threads richText.editor onto both action body fields', async () => {
+		const editor = { fake: 'editor' } as never
+		const plugin = formBuilder({ richText: { editor } })
+		const config = { collections: [] } as unknown as Config
+		const out = await Promise.resolve(plugin(config))
+		const forms = out.collections?.find((c) => c.slug === 'forms')
+		const tabsField = forms?.fields.find(
+			(f): f is Extract<typeof f, { type: 'tabs' }> => f.type === 'tabs'
+		)
+		const actionsField = tabsField?.tabs
+			.flatMap((tab) => ('fields' in tab ? tab.fields : []))
+			.find((f): f is Extract<typeof f, { type: 'blocks' }> => 'name' in f && f.name === 'actions')
+		const bodyFieldOf = (blockSlug: string) => {
+			const block = actionsField?.blocks?.find((b) => b.slug === blockSlug)
+			return block?.fields.find((f) => 'name' in f && f.name === 'body') as
+				| { editor?: unknown }
+				| undefined
+		}
+		expect(bodyFieldOf('emailTeam')?.editor).toBe(editor)
+		expect(bodyFieldOf('confirmation')?.editor).toBe(editor)
+	})
+
 	it('returns the config untouched when disabled', async () => {
 		const plugin = formBuilder({ disabled: true })
 		const config = { collections: [{ slug: 'users', fields: [] }] } as unknown as Config
@@ -51,5 +73,11 @@ describe('formBuilder factory', () => {
 		const moduleExports = await import('./index')
 		expect(typeof moduleExports.resolveFormResultsRequest).toBe('function')
 		expect(typeof moduleExports.fieldHasOptions).toBe('function')
+	})
+
+	it('exports toFormDocument from the root and maps a doc', async () => {
+		const moduleExports = await import('./index')
+		const doc = moduleExports.toFormDocument({ id: 1, fields: [] })
+		expect(doc).toEqual({ id: 1, fields: [] })
 	})
 })

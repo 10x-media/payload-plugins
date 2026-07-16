@@ -14,6 +14,12 @@
 			"port": 3101
 		},
 		{
+			"name": "form-builder",
+			"runtimeExecutable": "bash",
+			"runtimeArgs": ["-c", "PAYLOAD_SKIP_AUTOGEN=1 PORT=3103 pnpm dev form-builder"],
+			"port": 3103
+		},
+		{
 			"name": "jobs",
 			"runtimeExecutable": "bash",
 			"runtimeArgs": ["-c", "PAYLOAD_SKIP_AUTOGEN=1 PORT=3102 pnpm dev jobs"],

@@ -100,6 +100,31 @@ describe('Form', () => {
 		expect(typeof viewed.at).toBe('string')
 	})
 
+	it('seeds a repeater field with minRows on the first render, without emitting form.started', async () => {
+		const emit = vi.fn()
+		const events: FormEventSink = { emit }
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'repeater',
+				name: 'members',
+				label: 'Members',
+				minRows: 2,
+				subFields: [{ blockType: 'text', name: 'firstName', label: 'First name' }],
+			},
+		]
+		render(<Form form={doc(fields)} onSubmit={vi.fn()} events={events} />)
+
+		// Seeded rows are present immediately: no add-row click, no field interaction.
+		expect(screen.getAllByRole('textbox')).toHaveLength(2)
+
+		await waitFor(() => {
+			expect(emit).toHaveBeenCalledWith(
+				expect.objectContaining({ type: 'form.viewed', formId: '1' })
+			)
+		})
+		expect(emit).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'form.started' }))
+	})
+
 	it('renders custom children bound via useField and submits their values', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '3' })
 		const fields: FormFieldInstance[] = [{ blockType: 'text', name: 'name', label: 'Name' }]

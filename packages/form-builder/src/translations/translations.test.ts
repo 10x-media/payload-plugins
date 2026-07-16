@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { de } from './de'
 import { en } from './en'
 import { translations } from './index'
 import { keys } from './keys'
@@ -49,8 +50,25 @@ describe('form-builder translations', () => {
 		}
 	})
 
+	it('has a non-empty de string for every key', () => {
+		for (const key of Object.values(keys)) {
+			expect(typeof de[key]).toBe('string')
+			expect(de[key].length).toBeGreaterThan(0)
+		}
+	})
+
+	it('preserves every {token} from en in the matching de string', () => {
+		const tokenPattern = /\{(\w+)\}/g
+		for (const key of Object.values(keys)) {
+			const enTokens = [...en[key].matchAll(tokenPattern)].map((match) => match[1]).sort()
+			const deTokens = [...de[key].matchAll(tokenPattern)].map((match) => match[1]).sort()
+			expect(deTokens).toEqual(enTokens)
+		}
+	})
+
 	it('nests strings under the formBuilder namespace', () => {
 		expect(translations.en.formBuilder).toBeDefined()
+		expect(translations.de.formBuilder).toBeDefined()
 	})
 
 	it('references every translation key from production code', () => {

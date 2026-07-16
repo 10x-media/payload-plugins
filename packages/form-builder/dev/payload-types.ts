@@ -185,10 +185,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             validations?:
               | (
                   | {
@@ -286,10 +286,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             validations?:
               | (
                   | {
@@ -387,10 +387,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             validations?:
               | (
                   | {
@@ -468,10 +468,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             validations?:
               | (
                   | {
@@ -533,10 +533,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             options?:
               | {
                   label: string;
@@ -602,10 +602,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             validations?:
               | (
                   | {
@@ -651,10 +651,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             expression?: {
               [k: string]: unknown;
             };
@@ -704,10 +704,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             statement?: string | null;
             source?: ('static' | 'pageReference') | null;
             sourceConfig?: {
@@ -765,11 +765,11 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
-            relationTo?: string | null;
+            required?: boolean | null;
+            uploadsCollection?: string | null;
             mimeTypes?:
               | (
                   | 'image/*'
@@ -783,9 +783,8 @@ export interface Form {
                   | 'text/csv'
                   | 'application/zip'
                   | 'application/msword'
-                  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                   | 'application/vnd.ms-excel'
-                  | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                  | 'application/vnd.openxmlformats-officedocument.*'
                   | 'audio/*'
                   | 'video/*'
                 )[]
@@ -836,10 +835,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             minRows?: number | null;
             maxRows?: number | null;
             addLabel?: string | null;
@@ -848,10 +847,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -949,10 +948,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1050,10 +1049,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1131,10 +1130,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1196,10 +1195,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       options?:
                         | {
                             label: string;
@@ -1265,10 +1264,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1314,10 +1313,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       expression?: {
                         [k: string]: unknown;
                       };
@@ -1367,10 +1366,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       statement?: string | null;
                       source?: ('static' | 'pageReference') | null;
                       sourceConfig?: {
@@ -1428,11 +1427,11 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
-                      relationTo?: string | null;
+                      required?: boolean | null;
+                      uploadsCollection?: string | null;
                       mimeTypes?:
                         | (
                             | 'image/*'
@@ -1446,9 +1445,8 @@ export interface Form {
                             | 'text/csv'
                             | 'application/zip'
                             | 'application/msword'
-                            | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                             | 'application/vnd.ms-excel'
-                            | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                            | 'application/vnd.openxmlformats-officedocument.*'
                             | 'audio/*'
                             | 'video/*'
                           )[]
@@ -1499,10 +1497,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      required?: boolean | null;
-                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
                       placeholder?: string | null;
                       description?: string | null;
+                      required?: boolean | null;
                       validations?:
                         | (
                             | {
@@ -1561,6 +1559,70 @@ export interface Form {
                       blockName?: string | null;
                       blockType: 'date';
                     }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      placeholder?: string | null;
+                      description?: string | null;
+                      required?: boolean | null;
+                      content?: {
+                        root: {
+                          type: string;
+                          children: {
+                            type: any;
+                            version: number;
+                            [k: string]: unknown;
+                          }[];
+                          direction: ('ltr' | 'rtl') | null;
+                          format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                          indent: number;
+                          version: number;
+                        };
+                        [k: string]: unknown;
+                      } | null;
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'message';
+                    }
                 )[]
               | null;
             validations?:
@@ -1608,10 +1670,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            required?: boolean | null;
-            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
             placeholder?: string | null;
             description?: string | null;
+            required?: boolean | null;
             validations?:
               | (
                   | {
@@ -1670,8 +1732,91 @@ export interface Form {
             blockName?: string | null;
             blockType: 'date';
           }
+        | {
+            name: string;
+            label?: string | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
+            placeholder?: string | null;
+            description?: string | null;
+            required?: boolean | null;
+            content?: {
+              root: {
+                type: string;
+                children: {
+                  type: any;
+                  version: number;
+                  [k: string]: unknown;
+                }[];
+                direction: ('ltr' | 'rtl') | null;
+                format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                indent: number;
+                version: number;
+              };
+              [k: string]: unknown;
+            } | null;
+            validations?:
+              | (
+                  | {
+                      field: string;
+                      message?: string | null;
+                      severity?: ('error' | 'warning') | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'matchesField';
+                    }
+                  | {
+                      message?: string | null;
+                      severity?: ('error' | 'warning') | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'notAlreadySubmitted';
+                    }
+                )[]
+              | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'message';
+          }
       )[]
     | null;
+  display?: {
+    showTitle?: boolean | null;
+    title?: string | null;
+    intro?: {
+      root: {
+        type: string;
+        children: {
+          type: any;
+          version: number;
+          [k: string]: unknown;
+        }[];
+        direction: ('ltr' | 'rtl') | null;
+        format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+        indent: number;
+        version: number;
+      };
+      [k: string]: unknown;
+    } | null;
+  };
   flow?: {
     steps: {
       id: string;
@@ -1743,12 +1888,38 @@ export interface Form {
           }
       )[]
     | null;
-  defaultPresentation?: ('page' | 'inline' | 'modal' | 'drawer') | null;
-  showResults?: boolean | null;
-  /**
-   * Field whose aggregate results are public when "Show results publicly" is on. Use a choice field, never a free-text or PII field.
-   */
-  resultsField?: string | null;
+  response?: {
+    type?: ('message' | 'redirect') | null;
+    message?: {
+      root: {
+        type: string;
+        children: {
+          type: any;
+          version: number;
+          [k: string]: unknown;
+        }[];
+        direction: ('ltr' | 'rtl') | null;
+        format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+        indent: number;
+        version: number;
+      };
+      [k: string]: unknown;
+    } | null;
+    redirect?: {
+      url?: string | null;
+    };
+    submitLabel?: string | null;
+  };
+  poll?: {
+    enabled?: boolean | null;
+    resultsField?: string | null;
+    resultsVisibility?: ('afterVote' | 'afterClose') | null;
+    closesAt?: string | null;
+    outcome?: {
+      winningValue?: string | null;
+      resolvedAt?: string | null;
+    };
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -2028,10 +2199,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               validations?:
                 | T
                 | {
@@ -2122,10 +2293,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               validations?:
                 | T
                 | {
@@ -2216,10 +2387,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               validations?:
                 | T
                 | {
@@ -2288,10 +2459,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               validations?:
                 | T
                 | {
@@ -2342,10 +2513,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               options?:
                 | T
                 | {
@@ -2399,10 +2570,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               validations?:
                 | T
                 | {
@@ -2435,10 +2606,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               expression?: T;
               calcDisplay?: T;
               validations?:
@@ -2473,10 +2644,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               statement?: T;
               source?: T;
               sourceConfig?:
@@ -2523,11 +2694,11 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
-              relationTo?: T;
+              required?: T;
+              uploadsCollection?: T;
               mimeTypes?: T;
               maxSize?: T;
               validations?:
@@ -2562,10 +2733,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               minRows?: T;
               maxRows?: T;
               addLabel?: T;
@@ -2577,10 +2748,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           validations?:
                             | T
                             | {
@@ -2671,10 +2842,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           validations?:
                             | T
                             | {
@@ -2765,10 +2936,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           validations?:
                             | T
                             | {
@@ -2837,10 +3008,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           validations?:
                             | T
                             | {
@@ -2891,10 +3062,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           options?:
                             | T
                             | {
@@ -2948,10 +3119,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           validations?:
                             | T
                             | {
@@ -2984,10 +3155,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           expression?: T;
                           calcDisplay?: T;
                           validations?:
@@ -3022,10 +3193,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           statement?: T;
                           source?: T;
                           sourceConfig?:
@@ -3072,11 +3243,11 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
-                          relationTo?: T;
+                          required?: T;
+                          uploadsCollection?: T;
                           mimeTypes?: T;
                           maxSize?: T;
                           validations?:
@@ -3111,10 +3282,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           label?: T;
-                          required?: T;
                           width?: T;
                           placeholder?: T;
                           description?: T;
+                          required?: T;
                           validations?:
                             | T
                             | {
@@ -3136,6 +3307,43 @@ export interface FormsSelect<T extends boolean = true> {
                                       id?: T;
                                       blockName?: T;
                                     };
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    message?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          required?: T;
+                          content?: T;
+                          validations?:
+                            | T
+                            | {
                                 matchesField?:
                                   | T
                                   | {
@@ -3193,10 +3401,10 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               label?: T;
-              required?: T;
               width?: T;
               placeholder?: T;
               description?: T;
+              required?: T;
               validations?:
                 | T
                 | {
@@ -3242,6 +3450,50 @@ export interface FormsSelect<T extends boolean = true> {
               id?: T;
               blockName?: T;
             };
+        message?:
+          | T
+          | {
+              name?: T;
+              label?: T;
+              width?: T;
+              placeholder?: T;
+              description?: T;
+              required?: T;
+              content?: T;
+              validations?:
+                | T
+                | {
+                    matchesField?:
+                      | T
+                      | {
+                          field?: T;
+                          message?: T;
+                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    notAlreadySubmitted?:
+                      | T
+                      | {
+                          message?: T;
+                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                  };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
+              id?: T;
+              blockName?: T;
+            };
+      };
+  display?:
+    | T
+    | {
+        showTitle?: T;
+        title?: T;
+        intro?: T;
       };
   flow?: T;
   actions?:
@@ -3274,9 +3526,32 @@ export interface FormsSelect<T extends boolean = true> {
               blockName?: T;
             };
       };
-  defaultPresentation?: T;
-  showResults?: T;
-  resultsField?: T;
+  response?:
+    | T
+    | {
+        type?: T;
+        message?: T;
+        redirect?:
+          | T
+          | {
+              url?: T;
+            };
+        submitLabel?: T;
+      };
+  poll?:
+    | T
+    | {
+        enabled?: T;
+        resultsField?: T;
+        resultsVisibility?: T;
+        closesAt?: T;
+        outcome?:
+          | T
+          | {
+              winningValue?: T;
+              resolvedAt?: T;
+            };
+      };
   updatedAt?: T;
   createdAt?: T;
 }

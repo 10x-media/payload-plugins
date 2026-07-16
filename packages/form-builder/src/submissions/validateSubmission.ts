@@ -1,20 +1,29 @@
-import { type CollectionBeforeValidateHook, ValidationError } from 'payload'
+import { APIError, type CollectionBeforeValidateHook, ValidationError } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
 import type { ConsentSourceRegistry } from '../consent/registry'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { isPollClosed, pollConfigOf } from '../form/pollState'
+import { applyPollOptions } from '../poll/applyPollOptions'
+import type { PollOption } from '../poll/definePollOptionSource'
+import type { PollOptionSourceRegistry } from '../poll/registry'
+import { resolvePollOptions } from '../poll/resolvePollOptions'
 import { IDENTITY_CONTEXT_KEY } from '../spam/constants'
-import { asFieldTranslate } from '../translations/server'
+import { keys } from '../translations/keys'
+import { asFieldTranslate, asTranslate } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { runSubmission } from './runSubmission'
 import type { FormFieldInstance, SubmissionValue } from './types'
+import { POLL_CONTEXT_KEY } from './votedCookie'
 
 export type ValidateSubmissionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
 	consentRegistry: ConsentSourceRegistry
-	/** Upload collection slug for file fields without an explicit `relationTo`. */
+	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
 	uploadSlug?: string
+	/** Registered poll option sources; a form's configured `optionSource` resolves through this at validation time. */
+	pollSourceRegistry?: PollOptionSourceRegistry
 }
 
 /**
@@ -30,6 +39,7 @@ export const validateSubmission =
 		ruleRegistry,
 		consentRegistry,
 		uploadSlug,
+		pollSourceRegistry,
 	}: ValidateSubmissionArgs): CollectionBeforeValidateHook =>
 	async ({ data, operation, req }) => {
 		if (operation !== 'create' || !data) {
@@ -48,10 +58,58 @@ export const validateSubmission =
 			req,
 		})
 
-		const fields = ((form.fields as FormFieldInstance[] | undefined) ?? []) as FormFieldInstance[]
+		// Stash the poll config (null = form has none) so the voted-cookie afterChange hook can
+		// skip a second form fetch on the same request.
+		const poll = pollConfigOf(form.poll)
+		req.context[POLL_CONTEXT_KEY] = poll ?? null
+
+		// Form-level lifecycle guard, before any field work: a closed poll accepts no submissions,
+		// regardless of what the client rendered.
+		if (poll?.enabled === true && isPollClosed(poll)) {
+			throw new APIError(asTranslate(req.i18n.t)(keys.pollClosed), 403)
+		}
+
+		let fields = ((form.fields as FormFieldInstance[] | undefined) ?? []) as FormFieldInstance[]
 		const incoming = ((data.values as SubmissionValue[] | undefined) ?? []) as SubmissionValue[]
 		const locale = req.locale ?? 'en'
 		const t = asFieldTranslate(req.i18n.t)
+
+		// With an option source configured, the source's resolved values are the only accepted
+		// answers for the results field: options are injected into the field instance (so the
+		// select's membership check and the stored option labels use them) and membership is also
+		// enforced directly, so an empty resolution or a non-select results field still fails
+		// closed. A resolve failure rejects the whole submission rather than skipping the check.
+		if (poll?.enabled === true && typeof poll.optionSource === 'string' && poll.optionSource) {
+			let resolved: PollOption[]
+			try {
+				resolved =
+					(await resolvePollOptions({
+						payload: req.payload,
+						req,
+						form,
+						sources: pollSourceRegistry ?? new Map(),
+					})) ?? []
+			} catch {
+				throw new APIError(asTranslate(req.i18n.t)(keys.pollOptionsUnavailable), 503)
+			}
+			const resultsField = typeof poll.resultsField === 'string' ? poll.resultsField : undefined
+			fields = applyPollOptions(fields, resultsField, resolved)
+			if (resultsField) {
+				const answer = incoming.find((entry) => entry.field === resultsField)?.value
+				const isAnswered = answer != null && answer !== ''
+				if (isAnswered && !resolved.some((option) => option.value === answer)) {
+					throw new ValidationError(
+						{
+							collection: FORM_SUBMISSIONS_SLUG,
+							errors: [
+								{ path: resultsField, message: asTranslate(req.i18n.t)(keys.validationSelect) },
+							],
+						},
+						req.t
+					)
+				}
+			}
+		}
 		const expectedOwner =
 			typeof req.context?.[IDENTITY_CONTEXT_KEY] === 'string'
 				? (req.context[IDENTITY_CONTEXT_KEY] as string)

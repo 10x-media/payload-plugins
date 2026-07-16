@@ -17,7 +17,7 @@
 			"persistent": true
 		},
 		"lint": {
-			"inputs": ["src/**", "tests/**", "dev/**", "biome.json"],
+			"inputs": ["src/**", "tests/**", "dev/**", "registry/**", "biome.json"],
 			"outputs": []
 		},
 		"typecheck": {
@@ -37,7 +37,7 @@
 		},
 		"test": {
 			"dependsOn": ["^typecheck"],
-			"inputs": ["src/**", "tests/**", "dev/**", "vitest.config.ts"],
+			"inputs": ["src/**", "tests/**", "dev/**", "registry/**", "vitest.config.ts"],
 			"outputs": []
 		},
 		"test:unit": {
