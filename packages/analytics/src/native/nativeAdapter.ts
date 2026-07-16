@@ -129,8 +129,9 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				}
 			}
 			const prevOnInit = config.onInit
+			// payloadRef is set before the app's own onInit so consumer init code can
+			// already query the native adapter.
 			config.onInit = async (p) => {
-				await prevOnInit?.(p)
 				payloadRef = p
 				if (options.buffer) {
 					const cfg = options.buffer === true ? {} : options.buffer
@@ -143,6 +144,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 						},
 					})
 				}
+				await prevOnInit?.(p)
 			}
 		},
 		async query(q: AnalyticsQuery): Promise<AnalyticsResult> {

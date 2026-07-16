@@ -2,6 +2,7 @@ import { type Config, definePlugin, type PayloadRequest } from 'payload'
 
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
+import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
@@ -97,6 +98,12 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				{ method: 'get', path: REALTIME_PATH, handler: makeRealtimeHandler() },
 			]
 		}
+		if (Object.keys(resolved.bindings).length > 0) {
+			config.endpoints = [
+				...(config.endpoints ?? []),
+				{ method: 'get', path: DOCUMENT_PATH, handler: makeDocumentHandler() },
+			]
+		}
 		if (resolved.widgets.enabled) {
 			registerWidgets(config, {
 				adapters: resolved.adapters,
@@ -131,8 +138,9 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			}
 		}
 		const prevOnInit = config.onInit
+		// The runtime is installed before the app's own onInit runs so consumer init code
+		// (seeding, cache warming, sync passes) can already read through the plugin.
 		config.onInit = async (payload) => {
-			await prevOnInit?.(payload)
 			const engine = createEngine({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },
@@ -150,6 +158,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				ttl: resolved.cache.ttl,
 				comparison: resolved.widgets.comparison,
 			})
+			await prevOnInit?.(payload)
 		}
 		return config
 	},
