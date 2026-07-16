@@ -105,47 +105,14 @@ export type SipgateContact = {
 	totalCount: number
 }
 
+/**
+ * Params for the Neo call-history sync. Only `limit` is forwarded to the sipgate
+ * channel-events API today; `from`/`to` are accepted as task inputs for future use.
+ */
 export type SipgateHistoryParams = {
-	connectionIds?: string[]
-	types?: ('CALL' | 'VOICEMAIL' | 'SMS' | 'FAX')[]
-	directions?: ('INCOMING' | 'OUTGOING' | 'MISSED_INCOMING' | 'MISSED_OUTGOING')[]
-	offset?: number
 	limit?: number
-	archived?: boolean
-	starred?: boolean
 	from?: string
 	to?: string
-	phonenumber?: string
-}
-
-export type SipgateHistoryResponse = {
-	items: Array<{
-		archived: boolean
-		connectionIds: string[]
-		created: string
-		direction: string
-		endpoints: Array<{
-			endpoint: {
-				extension: string
-				type: string
-			}
-			type: string
-		}>
-		id: string
-		incoming: boolean
-		labels: string[]
-		lastModified: string
-		note: string
-		read: boolean
-		source: string
-		sourceAlias: string
-		starred: boolean
-		status: string
-		target: string
-		targetAlias: string
-		type: string
-	}>
-	totalCount: number
 }
 
 export type SipgateChannelResponse = {
@@ -234,9 +201,5 @@ export type SipgateChannelEventsResponse = {
 }
 
 export type NeoCallEvent = SipgateChannelEventsResponse['events'][0]
-
-export type UnifiedCallHistoryResponse<T extends 'classic' | 'neo'> = T extends 'classic'
-	? SipgateHistoryResponse
-	: NeoCallEvent[]
 
 export type CallStatus = 'ringing' | 'connected' | 'completed' | 'missed' | 'voicemail' | 'rejected'

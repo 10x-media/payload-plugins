@@ -2,6 +2,7 @@ import type { CollectionConfig, CollectionSlug } from 'payload'
 import { deepMerge } from 'payload'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
+import { authenticatedCollectionAccess } from '../utils/access'
 import { resolveRelatedContact } from '../utils/resolveRelatedContact'
 
 type CreateCallLogsCollectionOptions = {
@@ -19,6 +20,7 @@ export const createCallLogsCollection = ({
 }: CreateCallLogsCollectionOptions): CollectionConfig => {
 	const defaultCallLogs: CollectionConfig = {
 		slug: 'call-logs',
+		access: authenticatedCollectionAccess,
 		labels: {
 			singular: labelForKey(keys.callLogsSingular),
 			plural: labelForKey(keys.callLogsPlural),

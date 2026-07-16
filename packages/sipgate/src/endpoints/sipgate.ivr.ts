@@ -1,6 +1,6 @@
-import type { CollectionSlug, Endpoint } from 'payload'
-import queryString from 'query-string'
+import { type CollectionSlug, deepMerge, type Endpoint } from 'payload'
 import { createIvrStore } from '../utils/ivrStore'
+import { parseFormBody } from '../utils/parseFormBody'
 import { buildStepAction, resolveNextStepId, resolveVoiceLineUrl } from '../utils/sipgateIvrHandler'
 import { xmlResponse } from '../utils/xmlFactory'
 
@@ -13,6 +13,7 @@ type CreateSipgateIvrOptions = {
 	flowsSlug: string
 	voiceLinesSlug: string
 	ivrEndpointUrl: string
+	overrides?: Partial<Endpoint>
 }
 
 const createSipgateIvrHandler =
@@ -22,7 +23,7 @@ const createSipgateIvrHandler =
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
 		const body = await req.text()
-		const data = queryString.parse(body) as unknown as IvrDtmfPayload
+		const data = parseFormBody(body) as unknown as IvrDtmfPayload
 
 		if (!data.callId) {
 			return Response.json({ error: 'Missing callId' }, { status: 400 })
@@ -81,8 +82,16 @@ const createSipgateIvrHandler =
 		return xmlResponse({ action: buildStepAction(nextStep, voiceLineUrl, ivrEndpointUrl) })
 	}
 
-export const createSipgateIvr = (options: CreateSipgateIvrOptions): Endpoint => ({
-	path: '/sipgate/ivr',
-	method: 'post',
-	handler: createSipgateIvrHandler(options),
-})
+export const createSipgateIvr = ({
+	flowsSlug,
+	voiceLinesSlug,
+	ivrEndpointUrl,
+	overrides,
+}: CreateSipgateIvrOptions): Endpoint => {
+	const defaultEndpoint: Endpoint = {
+		path: '/sipgate/ivr',
+		method: 'post',
+		handler: createSipgateIvrHandler({ flowsSlug, voiceLinesSlug, ivrEndpointUrl }),
+	}
+	return deepMerge<Endpoint>(defaultEndpoint, overrides ?? {})
+}

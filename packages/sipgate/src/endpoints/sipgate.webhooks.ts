@@ -1,26 +1,24 @@
-import { type CollectionSlug, deepMerge, type Endpoint } from 'payload'
+import { deepMerge, type Endpoint } from 'payload'
 import type { IvrOptions } from '../utils/sipgateWebhookHandler'
 import { sipgateWebhookHandler } from '../utils/sipgateWebhookHandler'
 
 type CreateSipgateWebhooksOptions = {
-	contactCollections: CollectionSlug[]
-	phoneNumberFields: string[]
 	callLogsSlug: string
 	ivr?: IvrOptions
+	webhookUrl?: string
 	overrides?: Partial<Endpoint>
 }
 
 export const createSipgateWebhooks = ({
-	contactCollections,
-	phoneNumberFields,
 	callLogsSlug,
 	ivr,
+	webhookUrl,
 	overrides,
 }: CreateSipgateWebhooksOptions): Endpoint => {
 	const defaultEndpoint: Endpoint = {
 		path: '/sipgate/webhooks',
 		method: 'post',
-		handler: sipgateWebhookHandler({ contactCollections, phoneNumberFields, callLogsSlug, ivr }),
+		handler: sipgateWebhookHandler({ callLogsSlug, ivr, webhookUrl }),
 	}
 	return deepMerge<Endpoint>(defaultEndpoint, overrides ?? {})
 }

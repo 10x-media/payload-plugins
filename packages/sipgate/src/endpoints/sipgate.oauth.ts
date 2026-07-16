@@ -26,6 +26,11 @@ type CreateSipgateOAuthOptions = {
 
 const noop: (tokens: OAuthTokens) => Promise<void> = async () => {}
 
+/** OAuth CSRF state nonce lifetime. Abandoned connect flows expire instead of lingering forever. */
+const OAUTH_NONCE_TTL_MS = 10 * 60 * 1000
+
+type OAuthNonce = { userId: string; exp: number }
+
 /** Redirects the authenticated Payload user to the sipgate OAuth2 authorization page. */
 export const createSipgateOAuthConnect = ({
 	credentials,
@@ -51,7 +56,10 @@ export const createSipgateOAuthConnect = ({
 		}
 
 		const nonce = crypto.randomUUID()
-		await req.payload.kv.set(`sipgate:oauth:nonce:${nonce}`, req.user.id as string)
+		await req.payload.kv.set(`sipgate:oauth:nonce:${nonce}`, {
+			userId: req.user.id as string,
+			exp: Date.now() + OAUTH_NONCE_TTL_MS,
+		} satisfies OAuthNonce)
 
 		const redirectUri = `${webhookUrl}/api/sipgate/oauth/callback`
 		const authorizeUrl = buildAuthorizeUrl({ clientId, realm, redirectUri, scopes, state: nonce })
@@ -102,11 +110,12 @@ export const createSipgateOAuthCallback = ({
 		}
 
 		const usersCollection = Array.isArray(payloadUsersSlug) ? payloadUsersSlug[0] : payloadUsersSlug
-		const payloadUserId = await req.payload.kv.get<string>(`sipgate:oauth:nonce:${state}`)
+		const nonce = await req.payload.kv.get<OAuthNonce>(`sipgate:oauth:nonce:${state}`)
 		await req.payload.kv.delete(`sipgate:oauth:nonce:${state}`)
-		if (!payloadUserId) {
+		if (!nonce || nonce.exp < Date.now()) {
 			return Response.redirect(`${adminUrl}?sipgate_error=invalid_state`, 302)
 		}
+		const payloadUserId = nonce.userId
 
 		try {
 			const user = await req.payload.findByID({
@@ -262,6 +271,8 @@ export const createSipgateOAuthCallback = ({
 			return Response.redirect(`${adminUrl}?sipgate_error=upsert_failed`, 302)
 		}
 
+		let syncFailed = false
+
 		try {
 			await syncDevices({
 				payload: req.payload,
@@ -270,7 +281,10 @@ export const createSipgateOAuthCallback = ({
 				sipgateUsersSlug,
 				scopeToUserId: sipgateUser.id,
 			})
-		} catch {}
+		} catch (err) {
+			syncFailed = true
+			req.payload.logger.warn({ msg: '[sipgate oauth] device sync failed after connect', err })
+		}
 
 		try {
 			await syncChannels({
@@ -280,7 +294,14 @@ export const createSipgateOAuthCallback = ({
 				sipgateUsersSlug,
 				scopeToUserId: sipgateUser.id,
 			})
-		} catch {}
+		} catch (err) {
+			syncFailed = true
+			req.payload.logger.warn({ msg: '[sipgate oauth] channel sync failed after connect', err })
+		}
+
+		if (syncFailed) {
+			return Response.redirect(`${adminUrl}?sipgate_warning=sync_partial`, 302)
+		}
 
 		return Response.redirect(adminUrl, 302)
 	},
