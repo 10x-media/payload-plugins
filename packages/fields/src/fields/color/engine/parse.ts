@@ -8,8 +8,12 @@ const NUMBER_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value))
 
-const parseNumberToken = (token: string): null | number =>
-	NUMBER_RE.test(token) ? Number.parseFloat(token) : null
+const parseNumberToken = (token: string): null | number => {
+	if (!NUMBER_RE.test(token)) return null
+	const value = Number.parseFloat(token)
+	// Overflowing exponents like 1e400 pass the regex but parse to Infinity
+	return Number.isFinite(value) ? value : null
+}
 
 /** Numeric token that may carry a % suffix. Returns the raw number plus whether it was a percentage. */
 const parseMaybePercent = (token: string): null | { isPercent: boolean; value: number } => {

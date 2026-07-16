@@ -44,12 +44,25 @@ describe('formatColor', () => {
 			['rgb(14 165 233)', 'rgb'],
 			['hsl(210 40% 30%)', 'hsl'],
 			['oklch(0.62 0.25 29)', 'oklch'],
+			['oklch(0.5 0.1 359.996)', 'oklch'],
+			['hsl(359.98 50% 50%)', 'hsl'],
 			['rgb(255 0 0 / 0.502)', 'rgb'],
 		]
 		for (const [input, format] of cases) {
 			const once = formatColor(parse(input), format)
 			expect(formatColor(parse(once), format), input).toBe(once)
 		}
+	})
+
+	it('never emits a hue of 360, wrapping to 0 instead', () => {
+		expect(formatColor(parse('oklch(0.5 0.1 359.996)'), 'oklch')).toBe('oklch(0.5 0.1 0)')
+	})
+
+	it('clamps crafted alpha values instead of leaking them into output', () => {
+		const red = parse('#ff0000')
+		expect(formatColor({ ...red, alpha: -0.5 }, 'rgb')).toBe('rgb(255 0 0 / 0)')
+		expect(formatColor({ ...red, alpha: Number.NaN }, 'hex')).toBe('#ff0000')
+		expect(formatColor({ ...red, alpha: Number.POSITIVE_INFINITY }, 'rgb')).toBe('rgb(255 0 0)')
 	})
 
 	it('gamut-maps out-of-gamut oklch when emitting srgb formats', () => {

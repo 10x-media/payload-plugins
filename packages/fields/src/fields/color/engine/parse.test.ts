@@ -62,7 +62,9 @@ describe('parseColor', () => {
 			'rgb(1,2,3,4,5)',
 			'rgb(25x 0 0)',
 			'hsl(0 1 2 3 4)',
+			'hsl(1e400 50% 50%)',
 			'oklch()',
+			'oklch(0.5 0.1 1e400)',
 			'color(display-p3 1 0 0)',
 		]
 		for (const input of bad) {

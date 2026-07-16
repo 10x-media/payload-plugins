@@ -8,7 +8,12 @@ const trimNumber = (value: number, decimals: number): string => {
 	return fixed.replace(/0+$/, '').replace(/\.$/, '')
 }
 
-const channel255 = (value: number): number => Math.round(Math.min(1, Math.max(0, value)) * 255)
+/** Rounds to the emitted precision first so hues in [360 - half-step, 360) wrap to 0, not '360'. */
+const wrapHue = (value: number, decimals: number): number => Number(value.toFixed(decimals)) % 360
+
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value))
+
+const channel255 = (value: number): number => Math.round(clamp01(value) * 255)
 
 const hexPair = (value: number): string => channel255(value).toString(16).padStart(2, '0')
 
@@ -22,7 +27,8 @@ export const formatColor = (
 	format: ColorFormat,
 	options: FormatColorOptions = {}
 ): string => {
-	const alpha = options.alpha === false ? 1 : color.alpha
+	const rawAlpha = options.alpha === false ? 1 : color.alpha
+	const alpha = Number.isFinite(rawAlpha) ? clamp01(rawAlpha) : 1
 	const alphaText = trimNumber(alpha, 3)
 	const suffix = alphaText === '1' ? '' : ` / ${alphaText}`
 	switch (format) {
@@ -34,11 +40,11 @@ export const formatColor = (
 		}
 		case 'hsl': {
 			const hsl = rgbToHsl(toRgb(color))
-			return `hsl(${trimNumber(hsl.h, 1)} ${trimNumber(hsl.s * 100, 1)}% ${trimNumber(hsl.l * 100, 1)}%${suffix})`
+			return `hsl(${trimNumber(wrapHue(hsl.h, 1), 1)} ${trimNumber(hsl.s * 100, 1)}% ${trimNumber(hsl.l * 100, 1)}%${suffix})`
 		}
 		case 'oklch': {
 			const oklch = toOklch(color)
-			return `oklch(${trimNumber(oklch.l, 4)} ${trimNumber(oklch.c, 4)} ${trimNumber(oklch.h, 2)}${suffix})`
+			return `oklch(${trimNumber(oklch.l, 4)} ${trimNumber(oklch.c, 4)} ${trimNumber(wrapHue(oklch.h, 2), 2)}${suffix})`
 		}
 		case 'rgb': {
 			const rgb = toRgb(color)
