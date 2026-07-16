@@ -7,7 +7,7 @@ import { buildConfig, type CollectionConfig } from 'payload'
 import { analytics, analyticsStat, analyticsStatRow, analyticsTab } from '../src/index'
 import { native } from '../src/native/nativeAdapter'
 import { startMemoryMongo } from './helpers/memoryDb'
-import { seedDev } from './helpers/seed'
+import { DEV_REPORTING_TIMEZONE, seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
@@ -67,7 +67,7 @@ export default buildConfig({
 			adapters: [native()],
 			cache: { warm: true },
 			sync: true,
-			reportingTimezone: 'America/New_York',
+			reportingTimezone: DEV_REPORTING_TIMEZONE,
 			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
 			widgets: {
 				register: [

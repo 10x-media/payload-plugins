@@ -6,6 +6,14 @@ import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
 
+/**
+ * Shared with the plugin's `reportingTimezone` in `payload.config.ts`. Seeding bypasses
+ * the ingest endpoint (no request to resolve a timezone from), so events carry the zone
+ * explicitly; otherwise their rollups bucket on UTC days and a "Today" read aligned to
+ * this zone misses them.
+ */
+export const DEV_REPORTING_TIMEZONE = 'America/New_York'
+
 const SEED_PATHS = ['/', '/about', '/pricing', '/blog', '/contact']
 const SEED_COUNTRIES = ['US', 'DE', 'GB', 'FR']
 const SEED_DEVICES = ['desktop', 'mobile', 'tablet'] as const
@@ -32,6 +40,7 @@ const buildSeedEvents = (now: Date): StoredEvent[] => {
 				country: SEED_COUNTRIES[(day + i) % SEED_COUNTRIES.length],
 				device: SEED_DEVICES[(day + i) % SEED_DEVICES.length],
 				source: SEED_SOURCES[(day + i) % SEED_SOURCES.length],
+				timezone: DEV_REPORTING_TIMEZONE,
 			})
 		}
 	}
