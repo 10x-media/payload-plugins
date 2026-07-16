@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -35,6 +35,9 @@ const sharedEntries = [
 ]
 
 const allFamilies: Family[] = ['color', 'icon', 'encrypted']
+
+/** Families whose engine has landed under dist/fields/<family>; grows as families ship. */
+const familiesWithSource: Family[] = ['color']
 
 const familyPrefix = (family: Family): string => join(distDir, 'fields', family) + sep
 
@@ -111,6 +114,21 @@ describe.skipIf(!hasDist)('dist bundle isolation', () => {
 			})
 		}
 	}
+
+	for (const family of familiesWithSource) {
+		it(`${family} entries actually reach dist/fields/${family} code`, () => {
+			const graph = new Set(familyEntries[family].flatMap((entry) => [...importGraph(entry)]))
+			const reached = [...graph].filter((file) => file.startsWith(familyPrefix(family)))
+			expect(reached.length, `no ${family} entry imports dist/fields/${family}, isolation checks are vacuous`).toBeGreaterThan(0)
+		})
+	}
+
+	it('dist/fields children are a subset of the known families', () => {
+		const fieldsDir = join(distDir, 'fields')
+		const children = existsSync(fieldsDir) ? readdirSync(fieldsDir) : []
+		const known = new Set<string>(allFamilies)
+		expect(children.filter((child) => !known.has(child))).toEqual([])
+	})
 
 	it('client barrel graph never imports node:crypto', () => {
 		const offenders = [...importGraph('exports/client.js')].filter((file) =>
