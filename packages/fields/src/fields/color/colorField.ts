@@ -1,4 +1,4 @@
-import type { FieldHook, TextField, TextFieldValidation } from 'payload'
+import type { FieldHook, PayloadRequest, TextField, TextFieldValidation } from 'payload'
 import { text } from 'payload/shared'
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
@@ -104,14 +104,29 @@ export function colorField(options: ColorFieldOptions = {}): TextField | [TextFi
 
 	if (!linked) return field
 
-	const resolveHook: FieldHook = async ({ req, siblingData }) => {
+	const loggedRequests = new WeakSet<PayloadRequest>()
+
+	const resolveHook: FieldHook = async ({ collection, global, req, siblingData }) => {
 		const raw = siblingData?.[field.name]
 		if (typeof raw !== 'string' || raw === '') return null
 		if (!raw.startsWith(PRESET_PREFIX)) return raw
 		const key = raw.slice(PRESET_PREFIX.length)
-		const all = await resolvePresets({ memoKey, req, source: presets })
-		const match = all.find((preset) => preset.key === key)
-		return match ? match.value : linkedFallback
+		try {
+			const all = await resolvePresets({ memoKey, req, source: presets })
+			const match = all.find((preset) => preset.key === key)
+			return match ? match.value : linkedFallback
+		} catch (error) {
+			// A broken resolver must not take down reads; degrade like a missing preset
+			if (!loggedRequests.has(req)) {
+				loggedRequests.add(req)
+				const slug = collection?.slug ?? global?.slug ?? 'unknown'
+				req.payload.logger.error(
+					{ err: error },
+					`colorField preset resolver failed for ${slug}.${field.name}`
+				)
+			}
+			return linkedFallback
+		}
 	}
 
 	const resolvedField: TextField = {

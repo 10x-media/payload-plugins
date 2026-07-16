@@ -9,6 +9,10 @@ const resolverSpy = vi.fn(
 	async (_args: FieldsResolverArgs): Promise<ColorPreset[]> => [{ key: 'brand', value: '#0ea5e9' }]
 )
 
+const throwingResolver = vi.fn(async (_args: FieldsResolverArgs): Promise<ColorPreset[]> => {
+	throw new Error('resolver exploded')
+})
+
 const swatches: CollectionConfig = {
 	slug: 'swatches',
 	fields: [
@@ -28,6 +32,11 @@ const swatches: CollectionConfig = {
 			presets: [{ key: 'brand', value: '#7c3aed' }],
 		}),
 		...colorField({ linked: true, name: 'linkedAsync', presets: resolverSpy }),
+		...colorField({
+			linked: { fallback: '#fa11ba' },
+			name: 'linkedThrowing',
+			presets: throwingResolver,
+		}),
 	],
 }
 
@@ -76,6 +85,13 @@ describeForDb('fields color', {}, (db) => {
 		// Round-trip safety: the stored reference survives reads; only the sibling resolves
 		expect(fetched.linkedStatic).toBe('preset:brand')
 		expect(fetched.linkedStaticResolved).toBe('#7c3aed')
+		// At rest: the raw reference string is stored and the virtual sibling has no column/key
+		const raw = await booted.payload.db.findOne<{ id: number | string } & Record<string, unknown>>({
+			collection: 'swatches',
+			where: { id: { equals: doc.id } },
+		})
+		expect(raw?.linkedStatic).toBe('preset:brand')
+		expect(raw?.linkedStaticResolved).toBeUndefined()
 	})
 
 	it('linked mode passes plain css values through to the sibling', async () => {
@@ -111,6 +127,23 @@ describeForDb('fields color', {}, (db) => {
 			expect(doc.linkedAsyncResolved).toBe('#0ea5e9')
 		}
 		expect(resolverSpy).toHaveBeenCalledTimes(1)
+	})
+
+	it('degrades to the fallback when a preset resolver throws', async () => {
+		const doc = await create({ linkedThrowing: 'preset:brand' })
+		expect(doc.linkedThrowing).toBe('preset:brand')
+		expect(doc.linkedThrowingResolved).toBe('#fa11ba')
+		const fetched = await booted.payload.findByID({ collection: 'swatches', id: doc.id })
+		expect(fetched.linkedThrowing).toBe('preset:brand')
+		expect(fetched.linkedThrowingResolved).toBe('#fa11ba')
+		const found = await booted.payload.find({
+			collection: 'swatches',
+			where: { linkedThrowing: { equals: 'preset:brand' } },
+		})
+		expect(found.docs.length).toBeGreaterThanOrEqual(1)
+		for (const item of found.docs) {
+			expect(item.linkedThrowingResolved).toBe('#fa11ba')
+		}
 	})
 
 	it('supports querying by preset reference', async () => {
