@@ -3,9 +3,16 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 
+interface InspectedField {
+	name?: string
+	type?: string
+	options?: Array<{ value?: string }>
+	fields?: InspectedField[]
+}
+
 interface RegisteredWidget {
 	slug: string
-	fields?: Array<{ name?: string; type?: string; options?: Array<{ value?: string }> }>
+	fields?: InspectedField[]
 }
 
 // payload.config's widget types are deeply generic (TypedWidget); read them through a
@@ -16,6 +23,10 @@ const registeredWidgets = (booted: BootedPayload): RegisteredWidget[] => {
 	}
 	return config.admin?.dashboard?.widgets ?? []
 }
+
+/** Named fields at any depth; drawer layouts nest selects inside row fields. */
+const flatFields = (fields: InspectedField[] | undefined): InspectedField[] =>
+	(fields ?? []).flatMap((f) => (f.type === 'row' ? flatFields(f.fields) : [f]))
 
 describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -35,7 +46,9 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 
 	it('keeps the metric widget configurable (title, metric, timeframe fields)', () => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
-		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		const fieldNames = flatFields(widget?.fields)
+			.map((f) => f.name)
+			.filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'timeframe']))
 	})
 
@@ -46,7 +59,9 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 
 	it('keeps the trend widget configurable (title, metric, timeframe fields)', () => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-trend')
-		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		const fieldNames = flatFields(widget?.fields)
+			.map((f) => f.name)
+			.filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'timeframe']))
 	})
 
@@ -64,34 +79,36 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 
 	it('gives breakdown widgets an editable title field', () => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-breakdown-pages')
-		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		const fieldNames = flatFields(widget?.fields)
+			.map((f) => f.name)
+			.filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'timeframe', 'limit']))
 	})
 
 	it('exposes a range group field on the metric widget', () => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
-		const rangeField = (widget?.fields ?? []).find((f) => f.name === 'range')
+		const rangeField = flatFields(widget?.fields).find((f) => f.name === 'range')
 		expect(rangeField).toBeDefined()
 		expect(rangeField?.type).toBe('group')
 	})
 
 	it('exposes a range group field on the breakdown-pages widget', () => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-breakdown-pages')
-		const rangeField = (widget?.fields ?? []).find((f) => f.name === 'range')
+		const rangeField = flatFields(widget?.fields).find((f) => f.name === 'range')
 		expect(rangeField).toBeDefined()
 		expect(rangeField?.type).toBe('group')
 	})
 
 	it('includes a custom option in the metric widget timeframe select', () => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
-		const timeframeField = (widget?.fields ?? []).find((f) => f.name === 'timeframe')
+		const timeframeField = flatFields(widget?.fields).find((f) => f.name === 'timeframe')
 		const values = (timeframeField?.options ?? []).map((o) => o.value)
 		expect(values).toContain('custom')
 	})
 
 	it('includes a custom option in the breakdown-pages widget timeframe select', () => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-breakdown-pages')
-		const timeframeField = (widget?.fields ?? []).find((f) => f.name === 'timeframe')
+		const timeframeField = flatFields(widget?.fields).find((f) => f.name === 'timeframe')
 		const values = (timeframeField?.options ?? []).map((o) => o.value)
 		expect(values).toContain('custom')
 	})
@@ -103,7 +120,9 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 
 	it('gives the realtime widget metric and windowMinutes fields', () => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-realtime')
-		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		const fieldNames = flatFields(widget?.fields)
+			.map((f) => f.name)
+			.filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'windowMinutes']))
 	})
 })

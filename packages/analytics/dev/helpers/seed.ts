@@ -1,7 +1,9 @@
-import type { Payload } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { syncTask } from '../../src/sync/syncTask'
+import { devMemoryAdapter } from './adapters'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
@@ -47,10 +49,30 @@ const buildSeedEvents = (now: Date): StoredEvent[] => {
 	return events
 }
 
+const SEED_PAGES = [
+	{ title: 'About', slug: 'about' },
+	{ title: 'Pricing', slug: 'pricing' },
+	{ title: 'Blog', slug: 'blog' },
+	{ title: 'Contact', slug: 'contact' },
+]
+
+/** Mirror the native seed into the memory provider so multi-provider reads have data. */
+const seedMemoryAdapter = (events: StoredEvent[]): void => {
+	for (const event of events) {
+		devMemoryAdapter.record({
+			path: event.path,
+			timestamp: event.timestamp,
+			visitor: event.visitorHash,
+		})
+	}
+}
+
 /**
- * Seed the dev Payload app: an admin user to log in with, plus a fortnight of sample
- * native-analytics pageviews so the dashboard widgets render real numbers. Idempotent on
- * both (each block is skipped once its collection is populated).
+ * Seed the dev Payload app: an admin user to log in with, page documents matching the
+ * seeded traffic paths (so the per-document Analytics tab shows real numbers), a
+ * fortnight of sample pageviews in both the native engine and the memory provider,
+ * and one sync pass so the analytics-daily collection has rows to inspect. Idempotent
+ * (each block is skipped once its collection is populated).
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
 	const userCount = await payload.count({ collection: 'users' })
@@ -62,10 +84,34 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
+	const pageCount = await payload.count({ collection: 'pages' as never })
+	if (pageCount.totalDocs === 0) {
+		for (const page of SEED_PAGES) {
+			await payload.create({ collection: 'pages' as never, data: page as never })
+		}
+		payload.logger.info(`Seeded ${SEED_PAGES.length} pages matching the traffic paths`)
+	}
+
+	const events = buildSeedEvents(new Date())
+	seedMemoryAdapter(events)
 	const eventCount = await payload.count({ collection: EVENTS_SLUG as never })
 	if (eventCount.totalDocs === 0) {
-		const events = buildSeedEvents(new Date())
 		await flushBatch(payload, events)
 		payload.logger.info(`Seeded ${events.length} analytics pageview events`)
+	}
+
+	const dailyCount = await payload.count({ collection: 'analytics-daily' as never })
+	if (dailyCount.totalDocs === 0) {
+		const task = syncTask({
+			cron: '0 */6 * * *',
+			lookbackDays: 14,
+			collectionSlug: 'analytics-daily',
+		})
+		const handler = task.handler
+		if (typeof handler === 'function') {
+			const req = { payload } as unknown as PayloadRequest
+			await handler({ req } as unknown as Parameters<typeof handler>[0])
+			payload.logger.info('Seeded analytics-daily via one sync pass')
+		}
 	}
 }

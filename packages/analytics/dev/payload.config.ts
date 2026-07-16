@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { analytics, analyticsStat, analyticsStatRow, analyticsTab } from '../src/index'
+import { analytics, analyticsTab } from '../src/index'
 import { native } from '../src/native/nativeAdapter'
+import { devMemoryAdapter } from './helpers/adapters'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { DEV_REPORTING_TIMEZONE, seedDev } from './helpers/seed'
 
@@ -38,8 +39,6 @@ const pages: CollectionConfig = {
 				analyticsTab(),
 			],
 		},
-		analyticsStat({ metric: 'pageviews', position: 'sidebar' }),
-		analyticsStatRow({ name: 'analytics_inline' }),
 	],
 }
 
@@ -64,7 +63,7 @@ export default buildConfig({
 	collections: [users, pages],
 	plugins: [
 		analytics({
-			adapters: [native()],
+			adapters: [native(), devMemoryAdapter],
 			cache: { warm: true },
 			sync: true,
 			reportingTimezone: DEV_REPORTING_TIMEZONE,

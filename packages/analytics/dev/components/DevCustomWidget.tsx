@@ -1,7 +1,16 @@
 import { BarList } from '@10x-media/analytics/client'
-import { formatMetricValue, readForWidgetBreakdown } from '@10x-media/analytics/rsc'
+import {
+	formatMetricValue,
+	readForWidgetBreakdown,
+	widgetCardStyle,
+	widgetLabelStyle,
+} from '@10x-media/analytics/rsc'
 import type { WidgetServerProps } from 'payload'
 
+/**
+ * Demo of the public custom-widget API: read through the plugin's helpers and render
+ * inside the exported card chrome so a registered widget matches the built-ins.
+ */
 export default async function DevCustomWidget(props: WidgetServerProps) {
 	const locale = props.req.i18n.language ?? 'en-US'
 	const result = await readForWidgetBreakdown({
@@ -12,23 +21,17 @@ export default async function DevCustomWidget(props: WidgetServerProps) {
 		limit: 5,
 		now: new Date(),
 	})
-	const style = {
-		display: 'flex',
-		flexDirection: 'column' as const,
-		gap: '0.5rem',
-		padding: '1rem',
-	}
 	if (result.status !== 'ok') {
 		return (
-			<div style={style}>
-				<span style={{ fontWeight: 600 }}>Custom widget: top sources</span>
+			<div style={widgetCardStyle}>
+				<span style={widgetLabelStyle}>Custom: Top sources</span>
 				<span style={{ color: 'var(--theme-elevation-400)' }}>No data</span>
 			</div>
 		)
 	}
 	return (
-		<div style={style}>
-			<span style={{ fontWeight: 600 }}>Custom widget: top sources</span>
+		<div style={widgetCardStyle}>
+			<span style={widgetLabelStyle}>Custom: Top sources</span>
 			<BarList
 				data={result.rows.map((r) => ({
 					label: r.label,
