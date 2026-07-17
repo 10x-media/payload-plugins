@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveCommitValue } from './commitValue'
+import { convertColor, salvageColor } from './engine'
 
 describe('resolveCommitValue', () => {
 	it('clearable empty commit clears the value', () => {
@@ -44,5 +45,19 @@ describe('resolveCommitValue', () => {
 		expect(
 			resolveCommitValue({ draft: 'zzz', isClearable: false, lastValid: null, parsed: null })
 		).toEqual({ lastValid: null, reverted: false, value: 'zzz' })
+	})
+
+	it('salvaged dirty input flows through the pipeline as a valid commit', () => {
+		const salvaged = salvageColor('#0f172a#0f172a')
+		expect(salvaged).toBe('#0f172a')
+		const normalized = salvaged === null ? null : convertColor(salvaged, 'hex')
+		expect(
+			resolveCommitValue({
+				draft: salvaged ?? '',
+				isClearable: false,
+				lastValid: '#ff0000',
+				parsed: normalized,
+			})
+		).toEqual({ lastValid: '#0f172a', reverted: false, value: '#0f172a' })
 	})
 })

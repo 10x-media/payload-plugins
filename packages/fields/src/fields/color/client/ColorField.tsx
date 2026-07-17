@@ -18,7 +18,7 @@ import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import type { ColorFormat } from '../../../types'
 import { resolveCommitValue } from '../commitValue'
-import { formatColor, parseColor, rgbToHsv, toRgb } from '../engine'
+import { formatColor, parseColor, rgbToHsv, salvageColor, toRgb } from '../engine'
 import { type ColorFieldClientOptions, PRESET_PREFIX, type ResolvedColorPreset } from '../options'
 import { derivePresetChip } from '../presetChip'
 import { ColorPickerPanel, type Hsva } from './ColorPickerPanel'
@@ -174,12 +174,24 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		}
 		if (editingRef.current) {
 			editingRef.current = false
-			// A reverted commit usually leaves the form value unchanged, so the
-			// displayValue resync effect never fires; restore the draft here
-			if (commitText(draft)) setDraft(displayValue)
+			// Blur-only salvage: recover the first valid color from dirty input
+			// (double pastes, stray junk) before the normal commit pipeline
+			const isPresetDraft = linked && draft.startsWith(PRESET_PREFIX)
+			const salvaged =
+				!isPresetDraft && draft.trim() !== '' && !parseColor(draft) ? salvageColor(draft) : null
+			if (commitText(salvaged ?? draft)) {
+				// A reverted commit usually leaves the form value unchanged, so the
+				// displayValue resync effect never fires; restore the draft here
+				setDraft(displayValue)
+			} else if (salvaged !== null) {
+				// A salvaged commit can store the same value as before (double paste of
+				// the current color), which also skips the resync; clean the draft here
+				const parsedSalvaged = parseColor(salvaged)
+				setDraft(parsedSalvaged ? formatColor(parsedSalvaged, displayFormat, { alpha }) : salvaged)
+			}
 		}
 		setChipDismissed(false)
-	}, [commitText, displayValue, draft])
+	}, [alpha, commitText, displayFormat, displayValue, draft, linked])
 
 	// Backspace/Delete on the empty chip input never fires a change event, so clear here
 	const onTextKeyDown = useCallback(

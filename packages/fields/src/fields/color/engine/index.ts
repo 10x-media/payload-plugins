@@ -19,6 +19,7 @@ export {
 export { convertColor, formatColor } from './format'
 export { namedColors } from './namedColors'
 export { parseColor } from './parse'
+export { salvageColor } from './salvage'
 export type {
 	ColorFormat,
 	FormatColorOptions,

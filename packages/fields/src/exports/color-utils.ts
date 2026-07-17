@@ -21,6 +21,7 @@ export {
 	rgbToHsl,
 	rgbToHsv,
 	rgbToOklch,
+	salvageColor,
 	toOklch,
 	toRgb,
 } from '../fields/color/engine'
