@@ -120,6 +120,7 @@
 		"generate": "pnpm --filter @10x-media/fields-dev generate",
 		"generate:types": "pnpm --filter @10x-media/fields-dev generate:types",
 		"generate:importmap": "pnpm --filter @10x-media/fields-dev generate:importmap",
+		"generate:manifests": "tsx scripts/generateIconManifests.ts",
 		"migrate": "pnpm --filter @10x-media/fields-dev migrate",
 		"migrate:create": "pnpm --filter @10x-media/fields-dev migrate:create",
 		"migrate:down": "pnpm --filter @10x-media/fields-dev migrate:down",
@@ -132,8 +133,8 @@
 	"peerDependencies": {
 		"@payloadcms/ui": "^3.83.0",
 		"@radix-ui/react-icons": "^1.3.0",
-		"@tabler/icons-react": ">=3.0.0",
-		"lucide-react": ">=0.460.0",
+		"@tabler/icons-react": "^3.0.0",
+		"lucide-react": ">=0.500.0",
 		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
@@ -150,7 +151,7 @@
 		}
 	},
 	"dependencies": {
-		"@tanstack/react-virtual": "^3.14.6"
+		"@tanstack/react-virtual": "catalog:"
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
@@ -161,9 +162,14 @@
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
+		"@radix-ui/react-icons": "catalog:",
+		"@tabler/icons": "catalog:",
+		"@tabler/icons-react": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
+		"lucide-react": "catalog:",
+		"lucide-static": "catalog:",
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",

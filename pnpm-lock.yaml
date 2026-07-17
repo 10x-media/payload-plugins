@@ -30,6 +30,18 @@ catalogs:
     '@playwright/test':
       specifier: 1.60.0
       version: 1.60.0
+    '@radix-ui/react-icons':
+      specifier: 1.3.2
+      version: 1.3.2
+    '@tabler/icons':
+      specifier: 3.31.0
+      version: 3.31.0
+    '@tabler/icons-react':
+      specifier: 3.31.0
+      version: 3.31.0
+    '@tanstack/react-virtual':
+      specifier: ^3.13.0
+      version: 3.14.6
     '@testing-library/jest-dom':
       specifier: ^6.6.3
       version: 6.9.1
@@ -51,6 +63,12 @@ catalogs:
     jsdom:
       specifier: ^25.0.1
       version: 25.0.1
+    lucide-react:
+      specifier: 0.561.0
+      version: 0.561.0
+    lucide-static:
+      specifier: 0.561.0
+      version: 0.561.0
     msw:
       specifier: ^2.14.6
       version: 2.14.6
@@ -417,18 +435,9 @@ importers:
 
   packages/fields:
     dependencies:
-      '@radix-ui/react-icons':
-        specifier: ^1.3.0
-        version: 1.3.2(react@19.2.6)
-      '@tabler/icons-react':
-        specifier: '>=3.0.0'
-        version: 3.44.0(react@19.2.6)
       '@tanstack/react-virtual':
-        specifier: ^3.14.6
+        specifier: 'catalog:'
         version: 3.14.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      lucide-react:
-        specifier: '>=0.460.0'
-        version: 1.17.0(react@19.2.6)
     devDependencies:
       '@10x-media/payload-test-harness':
         specifier: workspace:*
@@ -454,6 +463,15 @@ importers:
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
+      '@radix-ui/react-icons':
+        specifier: 'catalog:'
+        version: 1.3.2(react@19.2.6)
+      '@tabler/icons':
+        specifier: 'catalog:'
+        version: 3.31.0
+      '@tabler/icons-react':
+        specifier: 'catalog:'
+        version: 3.31.0(react@19.2.6)
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.19
@@ -463,6 +481,12 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 0.561.0(react@19.2.6)
+      lucide-static:
+        specifier: 'catalog:'
+        version: 0.561.0
       payload:
         specifier: 'catalog:'
         version: 3.85.0(graphql@16.14.0)(typescript@5.9.3)
@@ -3233,13 +3257,13 @@ packages:
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
 
-  '@tabler/icons-react@3.44.0':
-    resolution: {integrity: sha512-8+rvzBbVm/1Z3sG3x7GUNAaxIKxwgz8xaMhRs23nrCnMTKRFAhEC+82zAIFeAA0seXdrAGX5HFCkaLpGK2rVHg==}
+  '@tabler/icons-react@3.31.0':
+    resolution: {integrity: sha512-2rrCM5y/VnaVKnORpDdAua9SEGuJKVqPtWxeQ/vUVsgaUx30LDgBZph7/lterXxDY1IKR6NO//HDhWiifXTi3w==}
     peerDependencies:
       react: '>= 16'
 
-  '@tabler/icons@3.44.0':
-    resolution: {integrity: sha512-Wn0AOZG9sg0L+bjfMqq4eNhC6pQjIrk94LvvWYNYkY8KH8wC3YILRzQlrnVJc4FUeMxH/AK97QsYCX35H3LndA==}
+  '@tabler/icons@3.31.0':
+    resolution: {integrity: sha512-dblAdeKY3+GA1U+Q9eziZ0ooVlZMHsE8dqP0RkwvRtEsAULoKOYaCUOcJ4oW1DjWegdxk++UAt2SlQVnmeHv+g==}
 
   '@tailwindcss/node@4.3.0':
     resolution: {integrity: sha512-aFb4gUhFOgdh9AXo4IzBEOzBkkAxm9VigwDJnMIYv3lcfXCJVesNfbEaBl4BNgVRyid92AmdviqwBUBRKSeY3g==}
@@ -5461,10 +5485,18 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
+  lucide-react@0.561.0:
+    resolution: {integrity: sha512-Y59gMY38tl4/i0qewcqohPdEbieBy7SovpBL9IFebhc2mDd8x4PZSOsiFRkpPcOq6bj1r/mjH/Rk73gSlIJP2A==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   lucide-react@1.17.0:
     resolution: {integrity: sha512-9FA9evdox/JQL5PT57fdA1x/yg8T7knJ98+zjTL3UfKza6pflQUUh3XtaQIHKvnsJw1lmsEyHVlt5jchYxOQ5w==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  lucide-static@0.561.0:
+    resolution: {integrity: sha512-g8ZH7FmkASB/fxutFHXqsBdJnM9S9/p1Mei005CskWTws7+U+evwZUVWUyz8CSquJ8p4G/CBJ488Ip3ZlamxfQ==}
 
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -9791,12 +9823,12 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@tabler/icons-react@3.44.0(react@19.2.6)':
+  '@tabler/icons-react@3.31.0(react@19.2.6)':
     dependencies:
-      '@tabler/icons': 3.44.0
+      '@tabler/icons': 3.31.0
       react: 19.2.6
 
-  '@tabler/icons@3.44.0': {}
+  '@tabler/icons@3.31.0': {}
 
   '@tailwindcss/node@4.3.0':
     dependencies:
@@ -12039,9 +12071,15 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
+  lucide-react@0.561.0(react@19.2.6):
+    dependencies:
+      react: 19.2.6
+
   lucide-react@1.17.0(react@19.2.6):
     dependencies:
       react: 19.2.6
+
+  lucide-static@0.561.0: {}
 
   lz-string@1.5.0: {}
 
