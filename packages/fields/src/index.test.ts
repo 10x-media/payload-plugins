@@ -49,6 +49,12 @@ describe('fields factory', () => {
 		})
 	})
 
+	it('leaves registry.icon unset when icon options carry no adapters', () => {
+		const out = fields({ icon: { defaultLibrary: 'lucide' } })(fakeConfig()) as Config
+		expect(getFieldsRegistry(asSanitized(out))?.icon).toBeUndefined()
+		expect(out.admin?.dependencies).toBeUndefined()
+	})
+
 	it('writes an empty registry when no family options are set', () => {
 		const out = fields({})(fakeConfig()) as Config
 		expect(getFieldsRegistry(asSanitized(out))).toEqual({})

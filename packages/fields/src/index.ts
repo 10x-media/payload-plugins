@@ -43,9 +43,8 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
 	if (options.color) {
 		registry.color = options.color
 	}
-	if (options.icon) {
-		registry.icon = options.icon
-	}
+	// registry.icon is owned solely by registerIcon, which validates adapter
+	// slugs and the default library before writing the normalized slice.
 	if (options.encrypted) {
 		registry.encrypted = options.encrypted
 	}
@@ -68,8 +67,9 @@ export const fields = definePlugin<FieldsPluginOptions>({
 		}
 		registerTranslations(config, options.translations)
 		setFieldsRegistry(config, normalizeRegistry(options))
-		// Runs last: it replaces the raw icon slice with a validated one and adds
-		// the adapters' client components to admin.dependencies.
+		// Sole owner of registry.icon: validates adapters + default library and
+		// registers their client components in admin.dependencies. A no-op when no
+		// adapters are configured, leaving registry.icon unset.
 		registerIcon(config, options.icon)
 		return config
 	},
