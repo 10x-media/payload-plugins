@@ -10,7 +10,7 @@ import {
 	type ColorPresetsSource,
 	type ResolvedColorPreset,
 } from '../options'
-import { resolvePresets } from '../resolvePresets'
+import { type NormalizedColorPreset, resolvePresets } from '../resolvePresets'
 
 // Standalone fields built outside colorField() (hand-written config) have no memoKey;
 // keyed per resolver so two standalone fields never share each other's cached presets
@@ -51,13 +51,24 @@ export const ColorFieldServer = async (props: ColorFieldServerComponentProps) =>
 		props
 
 	const custom = (field.custom?.[COLOR_CUSTOM_KEY] ?? {}) as Partial<ColorFieldCustom>
-	const presets = await resolvePresets({
-		data,
-		memoKey: custom.memoKey ?? fallbackMemoKey(custom.presets),
-		req,
-		siblingData,
-		source: custom.presets,
-	})
+	let presets: NormalizedColorPreset[] = []
+	try {
+		presets = await resolvePresets({
+			data,
+			memoKey: custom.memoKey ?? fallbackMemoKey(custom.presets),
+			req,
+			siblingData,
+			source: custom.presets,
+		})
+	} catch (error) {
+		// A throwing preset resolver must not 500 the edit view; render the picker
+		// without dynamic presets. The afterRead resolve hook logs and degrades reads
+		// separately (be8d91e); this guards the field's own server render.
+		req.payload.logger.error(
+			{ err: error },
+			`[fields] colorField preset resolver failed for ${field.name}; rendering without dynamic presets`
+		)
+	}
 
 	const language = req.i18n.language
 	const resolvedPresets: ResolvedColorPreset[] = presets.map((preset) => ({
