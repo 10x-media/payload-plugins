@@ -2,8 +2,8 @@ import type { LabelFunction } from 'payload'
 
 import type { TranslationKey } from './keys'
 
-/** A `t`-like function narrowed to this plugin's typed keys. */
-type Translate = (key: TranslationKey) => string
+/** A `t`-like function narrowed to this plugin's typed keys, with `{{var}}` interpolation. */
+type Translate = (key: TranslationKey, vars?: Record<string, unknown>) => string
 
 /**
  * Adapt a Payload request `t` (typed to core keys only) so it also accepts this
