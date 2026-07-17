@@ -48,6 +48,8 @@ Keep the statement to a short sentence with inline links. Headings and lists ren
 
 The plain string shown in the first example still works: a `statement` written before this field became rich text (or written directly through the Local API) renders as plain, escaped text rather than through the rich text pipeline, so it can never be mistaken for HTML. Either way, the checkbox keeps a single, unambiguous plain-text accessible name (the statement flattened to its visible words, links included), so formatting and inline links never affect screen reader users.
 
+The statement renders as a sibling of the checkbox rather than wrapping it in a `<label>`, which is what makes an inline link safe: anchors are not labelable elements, so a link inside a `<label>` would toggle the checkbox when clicked. The flattening helper is exported as `textOfBody` (root and `./react`) for custom renderers that need the same accessible name, or a preview line, out of any body: it takes rich text, legacy Slate, or a plain string and never throws.
+
 ## Sources
 
 The `source` decides how the policy link resolves. `static` (the default) is a fixed URL and label from `sourceConfig`; no server step, the renderer reads it directly. `pageReference` resolves the policy URL at display time from a Payload document (`relationTo`, `docId`, and optionally `urlField` in `sourceConfig`), the right choice when the policy is content whose URL can change. Anything else is a custom source via `defineConsentSource`:

@@ -33,7 +33,9 @@ The in-admin condition and flow builders ship their own styles; no admin setup i
 
 ## Author a form
 
-In the admin, create a `forms` document: give it a title, then add fields as blocks in the **Fields** tab (a text field `name`, an email field `email`, a textarea `message`). The tabs beside it cover the rest: **Flow** (multi-step), **Actions** (post-submit), and **Response** (the success message, or a redirect, and the submit button label). Each field block is tabbed too: **Field** holds the basics and type config, **Validation** the rules, **Advanced** the visibility condition and hidden flag.
+In the admin, create a `forms` document: give it a title, then add fields as blocks in the **Fields** tab (a text field `name`, an email field `email`, a textarea `message`). Below the blocks, the same tab carries **Buttons**, the form's submit/next/back labels. The tabs beside it cover the rest: **Flow** (multi-step), **Actions** (post-submit), and **Response** (the success message, or a redirect). Each field block is tabbed too: **Field** holds the basics and type config, **Validation** the rules, **Advanced** the visibility condition and hidden flag.
+
+The title is the document's own, for finding the form in the admin. The plugin never renders it: [`<Form>`](/form-builder/rendering) draws the fields and nothing above them, and `form.title` is there for your page to render or ignore.
 
 ## Render it
 

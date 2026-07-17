@@ -46,6 +46,30 @@ formBuilder({
 
 `buildDefaultActionDefinitions(localize)` and `buildDefaultConsentSources(localize)` are the equivalent builders for actions and consent sources. With the default `localizeContent: true` the prebuilt exports are exactly the builder output, so the shorter spread recipe above stays correct.
 
+## Rich text editors
+
+The plugin authors rich text in four places: [message](/form-builder/fields#message) content, the [consent](/form-builder/consent#rich-text-and-inline-links) statement, the response message, and [action bodies](/form-builder/actions#rich-text-bodies). None of them set an editor of their own, so all four inherit your config's `editor`, which is why the config must set one.
+
+Two options redirect that:
+
+| Option | Scope |
+|---|---|
+| `richText.editor` | The default editor for every plugin rich text field |
+| `richText.bodyEditor` | The action body fields only; falls back to `editor` |
+
+```ts title="payload.config.ts"
+formBuilder({
+  richText: {
+    // Every plugin rich text field, instead of the project editor
+    editor: formCopyEditor,
+    // ...except action bodies, which get their own
+    bodyEditor: emailBodyEditor,
+  },
+})
+```
+
+Set neither and all four stay on the project editor. Set only `editor` to move the whole plugin, bodies included, onto one editor. Set only `bodyEditor` to single out email bodies and leave the rest on the project editor. The split exists because a form's on-page copy and an email's body land in different renderers: the features a consent statement wants are rarely the ones that survive an email client.
+
 ## Submission answers UI
 
 When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component that formats each value using its field type's `format` function, shows repeater rows with numbered headings, displays consent proofs with agreed/declined indicators and a timestamp, and includes submission metadata. This replaces the raw JSON fields as the primary view.

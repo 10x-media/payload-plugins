@@ -19,7 +19,11 @@ Content-bearing authoring fields (labels, placeholders, descriptions, select opt
 
 ## Message
 
-The `message` type is display-only rich text rendered inline between fields: section headings, explanatory copy, legal notices. Its value kind is `'none'`: it is never validated and never written to submissions (its `name` exists only for block identity and [conditions](/form-builder/conditions) targeting, so a message can appear and disappear with `visibleWhen` like any field). Recall tokens in the content resolve against the current answers, calc values included.
+The `message` type is display-only rich text rendered inline between fields: section headings, explanatory copy, legal notices. Its value kind is `'none'`: it is never validated and never written to submissions. Its `content` is authored with the [plugin's rich text editor](/form-builder/customization#rich-text-editors) and follows [content localization](#content-localization); recall tokens in it resolve against the current answers, calc values included.
+
+Message is a **bare** block: the block is its `content` field alone. No name, label, width, placeholder, description, required flag, or validation rules, since none of them carry meaning for copy that holds no value. Nor a `visibleWhen`, so a message cannot be conditionally shown: when copy has to react to an answer, put each variant on its own [flow step](/form-builder/multi-step), or register a display-only [custom type](#defining-a-field-type) (`value: 'none'` without `bare`), which keeps the shared chrome and with it the condition.
+
+Being nameless, a message instance is identified by the block row id Payload assigns it. Everywhere a field is addressed by key, the key is its name if it has one, else its row id, so flow step assignment works for bare blocks the same as for named fields (the flow builder lists them under their type label, numbered when repeated). Bare blocks are excluded from repeater `subFields`, whose row plumbing is name-keyed.
 
 ## Date
 
@@ -89,7 +93,9 @@ export default buildConfig({
 })
 ```
 
-`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings; `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)); and `pollEligible`, marking the type choosable as a poll's [results field](/form-builder/polls#the-results-endpoint) (its instances must produce enumerable answers, via authored options or a [poll option source](/form-builder/polls#option-sources); built-in: `select`).
+`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings; `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)); `pollEligible`, marking the type choosable as a poll's [results field](/form-builder/polls#the-results-endpoint) (its instances must produce enumerable answers, via authored options or a [poll option source](/form-builder/polls#option-sources); built-in: `select`); and `bare`, dropping the shared chrome so the block is your `config` alone, as the [message](#message) type does.
+
+`bare` requires `value: 'none'`, and the plugin throws at boot otherwise: a bare instance is nameless, so a value-bearing one would have nowhere to store its answer and would silently drop it. Reach for it for display-only types; anything a visitor answers stays named.
 
 Field definitions use precise generics, so cast each registry entry to `FieldTypeOption` at the registry boundary (the erased type the registry stores), exactly as the built-ins do.
 

@@ -11,6 +11,14 @@ Validation is declarative and server-authoritative. Editors attach rules to fiel
 
 Every rule instance can override its message (with `{var}` interpolation for rule parameters) and its severity: an `error` blocks submission, a `warning` is advisory and does not.
 
+`pattern` takes two params: `pattern`, the regular expression source, and an optional `flags` (`i`, `g`, `m`, and the rest), applied as `new RegExp(pattern, flags)`. Write the source alone, without delimiters: `^[a-z0-9-]+$`, not `/^[a-z0-9-]+$/i`.
+
+### Rule params are checked at authoring time
+
+Both `pattern` params validate as the editor saves, so an expression that cannot compile is a save error rather than a rule that quietly never fires (`minDate` / `maxDate` guard their bounds the same way). `pattern` is compiled against its sibling `flags`, since flags decide validity; a bad flag is reported on the `flags` field alone, so one typo raises one error.
+
+At submit time an uncompilable regex still fails open, passing the value rather than rejecting it. That is the safety net for rules stored before these guards existed: a bad expression that predates them must not suddenly start rejecting every visitor's answer. The authoring guard is what stops new ones from being written.
+
 ## Custom rules
 
 Define a rule type once with `defineValidationRule`; it gets admin-authorable params and a typed `validate`, exactly like the built-ins:
