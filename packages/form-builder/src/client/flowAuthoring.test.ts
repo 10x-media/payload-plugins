@@ -6,9 +6,12 @@ import {
 	fieldHolders,
 	flowFieldEntries,
 	nextFromSelectValue,
+	nextSelectOptions,
 	nextToSelectValue,
+	otherStepSelectOptions,
 	removeFieldFromStep,
 	removeStepCascade,
+	stepSelectOptions,
 	unassignedEntries,
 } from './flowAuthoring'
 
@@ -174,6 +177,65 @@ describe('removeStepCascade', () => {
 		]
 		expect(removeStepCascade(steps, 1)[0]).toBe(steps[0])
 		expect(removeStepCascade(steps, 9)).toEqual(steps)
+	})
+})
+
+describe('stepSelectOptions', () => {
+	it('pairs each step id with its label, in step order', () => {
+		expect(stepSelectOptions([{ id: 'a' }, { id: 'b' }], ['One', 'Two'])).toEqual([
+			{ label: 'One', value: 'a' },
+			{ label: 'Two', value: 'b' },
+		])
+	})
+
+	it('falls back to an empty label when one is missing', () => {
+		expect(stepSelectOptions([{ id: 'a' }], [])).toEqual([{ label: '', value: 'a' }])
+	})
+
+	it('drops a step with an empty id, which would collide with the sequential option value', () => {
+		expect(stepSelectOptions([{ id: '' }, { id: 'b' }], ['One', 'Two'])).toEqual([
+			{ label: 'Two', value: 'b' },
+		])
+	})
+})
+
+describe('otherStepSelectOptions', () => {
+	it('excludes the given step so it cannot route to itself', () => {
+		const options = stepSelectOptions([{ id: 'a' }, { id: 'b' }, { id: 'c' }], ['A', 'B', 'C'])
+		expect(otherStepSelectOptions(options, 'b')).toEqual([
+			{ label: 'A', value: 'a' },
+			{ label: 'C', value: 'c' },
+		])
+	})
+
+	it('returns every option when the step id matches none', () => {
+		const options = stepSelectOptions([{ id: 'a' }], ['A'])
+		expect(otherStepSelectOptions(options, 'zzz')).toEqual(options)
+	})
+})
+
+describe('nextSelectOptions', () => {
+	const labels = { sequentialLabel: 'Next step in order', terminalLabel: 'End of form' }
+
+	it('lists sequential first, then end of form, then the other steps', () => {
+		expect(nextSelectOptions({ ...labels, otherSteps: [{ label: 'B', value: 'b' }] })).toEqual([
+			{ label: 'Next step in order', value: '' },
+			{ label: 'End of form', value: END_OF_FORM },
+			{ label: 'B', value: 'b' },
+		])
+	})
+
+	it('offers sequential and end of form even with no other steps', () => {
+		expect(nextSelectOptions({ ...labels, otherSteps: [] })).toHaveLength(2)
+	})
+
+	it('emits values that round-trip through nextFromSelectValue', () => {
+		const options = nextSelectOptions({ ...labels, otherSteps: [{ label: 'B', value: 'b' }] })
+		expect(options.map((option) => nextFromSelectValue(option.value))).toEqual([
+			undefined,
+			null,
+			'b',
+		])
 	})
 })
 

@@ -15,6 +15,43 @@ export const nextFromSelectValue = (value: string): FlowStep['next'] =>
 /** A form field as the flow builder addresses it: its stable key plus a display label. */
 export type FlowFieldEntry = { key: string; label: string }
 
+/** A flow builder select option. Structurally a `ReactSelectOption`, without the client-only import. */
+export type FlowSelectOption = { label: string; value: string }
+
+/**
+ * One option per step, labeled like its step card. A step whose id is empty is dropped: the id is
+ * the option's value, so such a step cannot be routed to and an empty value would collide with the
+ * next select's sequential option.
+ */
+export const stepSelectOptions = (
+	steps: Pick<FlowStep, 'id'>[],
+	labels: string[]
+): FlowSelectOption[] =>
+	steps
+		.map((step, index) => ({ label: labels[index] ?? '', value: step.id }))
+		.filter((option) => option.value.length > 0)
+
+/** Every step but `stepId`, so a step's own next/transition selects cannot route it to itself. */
+export const otherStepSelectOptions = (
+	options: FlowSelectOption[],
+	stepId: string
+): FlowSelectOption[] => options.filter((option) => option.value !== stepId)
+
+/**
+ * The `next` select's options: sequential fall-through first (the default, and what an absent
+ * `next` maps to), then explicit end of form, then every other step. Values round-trip through
+ * `nextFromSelectValue`.
+ */
+export const nextSelectOptions = (args: {
+	sequentialLabel: string
+	terminalLabel: string
+	otherSteps: FlowSelectOption[]
+}): FlowSelectOption[] => [
+	{ label: args.sequentialLabel, value: '' },
+	{ label: args.terminalLabel, value: END_OF_FORM },
+	...args.otherSteps,
+]
+
 /**
  * Project the form's field rows into flow entries. Named rows are keyed and labeled by their
  * trimmed name. Nameless rows of a bare type are keyed by their block row id and labeled with

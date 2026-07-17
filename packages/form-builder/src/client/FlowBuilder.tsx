@@ -24,15 +24,18 @@ import { resolveMessage } from '../validation/message'
 import { ConditionBuilder } from './ConditionBuilder'
 import {
 	assignFieldToStep,
-	END_OF_FORM,
 	type FlowFieldEntry,
+	type FlowSelectOption,
 	fieldHolders,
 	flowFieldEntries,
 	nextFromSelectValue,
+	nextSelectOptions,
 	nextToSelectValue,
+	otherStepSelectOptions,
 	removeFieldFromStep,
 	removeStepCascade,
 	stepLabel,
+	stepSelectOptions,
 	unassignedEntries,
 } from './flowAuthoring'
 import type { FieldRow } from './synthesizeClientField'
@@ -56,7 +59,7 @@ const extractFieldRows = (data: Record<string, unknown>): FieldRow[] => {
 
 type TransitionRowProps = {
 	transition: FlowTransition
-	stepOptions: ReactSelectOption[]
+	stepOptions: FlowSelectOption[]
 	conditionTypes: Record<string, ConditionFieldType>
 	isFirst: boolean
 	isLast: boolean
@@ -140,7 +143,7 @@ type StepCardProps = {
 	stepKey: string
 	stepIndex: number
 	stepCount: number
-	otherStepOptions: ReactSelectOption[]
+	otherStepOptions: FlowSelectOption[]
 	holders: Map<string, number>
 	stepLabels: string[]
 	entries: FlowFieldEntry[]
@@ -178,11 +181,11 @@ const StepCard = ({
 }: StepCardProps) => {
 	const { t } = useTranslation()
 
-	const nextOptions: ReactSelectOption[] = [
-		{ label: t(keys.flowNextSequential), value: '' },
-		{ label: t(keys.flowNextTerminal), value: END_OF_FORM },
-		...otherStepOptions,
-	]
+	const nextOptions = nextSelectOptions({
+		sequentialLabel: t(keys.flowNextSequential),
+		terminalLabel: t(keys.flowNextTerminal),
+		otherSteps: otherStepOptions,
+	})
 
 	const transitions = step.transitions ?? []
 
@@ -195,7 +198,7 @@ const StepCard = ({
 	const tKeys = tKeysRef.current
 
 	const addTransition = () => {
-		const firstOtherStep = otherStepOptions[0]?.value as string | undefined
+		const firstOtherStep = otherStepOptions[0]?.value
 		if (firstOtherStep === undefined) return
 		tKeysRef.current = [...tKeys, crypto.randomUUID()]
 		onChange({
@@ -393,9 +396,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 	const steps = value?.steps ?? []
 	const fallbackTitle = t(keys.flowStepFallbackTitle)
 	const stepLabels = steps.map((step, index) => stepLabel(step, index, fallbackTitle))
-	const stepOptions: ReactSelectOption[] = steps
-		.map((step, index) => ({ label: stepLabels[index] ?? '', value: step.id }))
-		.filter((option) => (option.value as string).length > 0)
+	const stepOptions = stepSelectOptions(steps, stepLabels)
 	const holders = fieldHolders(steps)
 	const unassigned = unassignedEntries(entries, steps)
 
@@ -497,7 +498,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 					{steps.map((step, index) => {
 						const key = stepKeys[index]
 						if (key === undefined) return null
-						const otherStepOptions = stepOptions.filter((option) => option.value !== step.id)
+						const otherStepOptions = otherStepSelectOptions(stepOptions, step.id)
 						return (
 							<StepCard
 								key={key}
