@@ -11,6 +11,7 @@
 		"cache",
 		"sync",
 		"multi-tenancy",
+		"proxy",
 		"i18n"
 	]
 }
