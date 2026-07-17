@@ -10,6 +10,7 @@ import { buildFormsCollection } from '../collections/forms'
 import type { ConsentSourcesResolver } from '../consent/types'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
+import type { OutcomeFieldsOverride } from '../poll/outcomeFields'
 import type { PollOptionSourceRegistry } from '../poll/registry'
 import type { ResolvedSpamConfig } from '../spam/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -32,6 +33,7 @@ type RegisterCollectionsArgs = {
 	resultsAccess?: FormResultsAccess
 	votedCookie: boolean
 	pollSourceRegistry: PollOptionSourceRegistry
+	outcomeFields?: OutcomeFieldsOverride
 	buttons?: ButtonsOption
 	fromAddresses?: FromAddressesResolver
 	overrides?: {
@@ -56,6 +58,7 @@ export const registerCollections = ({
 	resultsAccess,
 	votedCookie,
 	pollSourceRegistry,
+	outcomeFields,
 	buttons,
 	fromAddresses,
 	overrides,
@@ -80,6 +83,7 @@ export const registerCollections = ({
 			uploadsCollectionSlug: uploadSlug,
 			resultsAccess,
 			pollSourceRegistry,
+			outcomeFields,
 			buttons,
 			fromAddresses,
 			overrides: overrides?.forms,

@@ -28,6 +28,7 @@ import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
 import { pollOutcomeBeforeChange } from '../poll/outcomeBeforeChange'
+import { buildDefaultOutcomeFields, type OutcomeFieldsOverride } from '../poll/outcomeFields'
 import type { PollOptionSourceRegistry } from '../poll/registry'
 import { resolvePollOptionsRequest } from '../poll/resolvePollOptionsRequest'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
@@ -122,6 +123,8 @@ type BuildFormsCollectionArgs = {
 	resultsAccess?: FormResultsAccess
 	/** Registered poll option sources (plugin option `poll.sources`); empty registry means no source fields. */
 	pollSourceRegistry?: PollOptionSourceRegistry
+	/** The plugin `poll.outcomeFields` seam; composes the outcome group from the two default fields. */
+	outcomeFields?: OutcomeFieldsOverride
 	/** The plugin `buttons` option; `fields` composes the buttons group from the localized defaults. */
 	buttons?: ButtonsOption
 	/**
@@ -143,6 +146,7 @@ export const buildFormsCollection = ({
 	uploadsCollectionSlug,
 	resultsAccess,
 	pollSourceRegistry,
+	outcomeFields,
 	buttons,
 	fromAddresses,
 }: BuildFormsCollectionArgs): CollectionConfig => {
@@ -158,7 +162,6 @@ export const buildFormsCollection = ({
 	)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 	const FIELD_NAME_SELECT_REF = '@10x-media/form-builder/client#FieldNameSelect'
-	const ENDPOINT_OPTIONS_SELECT_REF = '@10x-media/form-builder/client#EndpointOptionsSelect'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
 		if (data && Array.isArray(data.fields)) {
@@ -327,6 +330,7 @@ export const buildFormsCollection = ({
 	// return becomes the group's fields verbatim, so a host can wrap a default in a row with its
 	// own field (e.g. an icon select), reorder, or drop one. Host-added fields ride along on
 	// `FormDocument.buttons` for custom chrome to read.
+	const defaultOutcomeFields = buildDefaultOutcomeFields()
 	const defaultButtonFields = buildDefaultButtonFields(localizeContent)
 	// Half-width copy of a default field for the prev/next row; preserves the field's own admin
 	// (e.g. the multi-step description) rather than replacing it. The cast is safe: `width` is a
@@ -430,7 +434,10 @@ export const buildFormsCollection = ({
 				// `pollOutcomeBeforeChange` hook validates both paths and owns the `resolvedAt` stamp.
 				// `resolvedAt` itself stays fully locked: field-level create/update access blocks every
 				// non-override caller write (Payload silently drops the denied value rather than erroring)
-				// while the hook's stamp, applied after access filtering, still persists.
+				// while the hook's stamp, applied after access filtering, still persists. The
+				// `poll.outcomeFields` seam receives both defaults and its return becomes the group's
+				// fields verbatim, so a host can swap `winningValue` for its own component; the hook
+				// still validates the stored value against the effective options, so no swap bypasses it.
 				{
 					name: 'outcome',
 					type: 'group',
@@ -439,31 +446,9 @@ export const buildFormsCollection = ({
 						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
 						hideGutter: true,
 					},
-					fields: [
-						{
-							name: 'winningValue',
-							type: 'text',
-							label: labelForKey(keys.pollWinningValue),
-							admin: {
-								components: {
-									Field: {
-										path: ENDPOINT_OPTIONS_SELECT_REF,
-										clientProps: {
-											endpoint: 'poll-options',
-											descriptionKey: keys.pollWinningValueDescription,
-										},
-									},
-								},
-							},
-						},
-						{
-							name: 'resolvedAt',
-							type: 'date',
-							label: labelForKey(keys.pollResolvedAt),
-							admin: { readOnly: true },
-							access: { create: () => false, update: () => false },
-						},
-					],
+					fields: outcomeFields
+						? outcomeFields({ defaultFields: defaultOutcomeFields })
+						: [defaultOutcomeFields.winningValue, defaultOutcomeFields.resolvedAt],
 				},
 			],
 		},

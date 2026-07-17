@@ -1,7 +1,8 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { FORMS_SLUG } from '../collections/forms'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
-import { resolvePollOptions } from '../poll/resolvePollOptions'
+import type { PollOption } from '../poll/definePollOptionSource'
+import { resolveEffectivePollOptions } from '../poll/effectivePollOptions'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateFormResponses, fieldHasOptions } from './aggregateResponses'
 import type { FieldAggregation } from './types'
@@ -59,15 +60,18 @@ const unavailable: ResolveResultsRequestResult = {
 
 /**
  * Authorize and resolve a poll/survey results request. Authed callers may aggregate any field (or all
- * enumerable fields) and bypass the `access` seam. Anonymous callers are allowed only when the form's
- * poll is enabled, the poll's `resultsVisibility` permits it (`afterVote`: any time; `afterClose`: only
- * once `closesAt` has passed), and the optional host `access` seam approves; and then only for the
- * configured `poll.resultsField`, and only if that field is enumerable so a misconfigured
- * `resultsField` pointing at a free-text or PII field can never be dumped publicly. A static poll is
- * enumerable through its authored options; a poll with an `optionSource` resolves its options here
- * (registry via `config.custom`, per-request cache) and is enumerable when resolution yields any,
- * with the resolved options driving bucket order and labels. Resolution failure fails closed (503).
- * Returns only aggregate counts, never raw submissions.
+ * enumerable fields) and bypass the `access` seam; for a poll-enabled form they also get the results
+ * field's effective options injected so sourced/resolver-backed polls render labels (best-effort, a
+ * resolve failure degrades to raw values rather than blocking the trusted read). Anonymous callers are
+ * allowed only when the form's poll is enabled, the poll's `resultsVisibility` permits it (`afterVote`:
+ * any time; `afterClose`: only once `closesAt` has passed), and the optional host `access` seam
+ * approves; and then only for the configured `poll.resultsField`, and only if that field is enumerable
+ * so a misconfigured `resultsField` pointing at a free-text or PII field can never be dumped publicly. A
+ * static poll is enumerable through its authored options; a poll whose options come from an
+ * `optionSource` or the field type's own `resolveOptions` resolves them here (registry via
+ * `config.custom`, per-request cache), gated by `eligibleTypes` and enumerable only when resolution
+ * yields any, with the resolved options driving bucket order and labels. Resolution failure fails
+ * closed (503) on the anonymous path. Returns only aggregate counts, never raw submissions.
  */
 export const resolveFormResultsRequest = async (
 	args: ResolveResultsRequestArgs
@@ -87,6 +91,27 @@ export const resolveFormResultsRequest = async (
 	let resolvedOptions: Record<string, { value: string; label: string }[]> | undefined
 	if (isAuthed) {
 		fields = field ? [field] : undefined
+		// Label a poll's results field for admins: resolve its effective options (a source, the
+		// field type's own resolver, or authored options) and inject them so a sourced/resolved poll
+		// shows labels instead of raw stored values, and so an all-fields read still surfaces a
+		// resolver-backed field that carries no authored options. Best-effort: a resolver/source
+		// failure degrades to raw values rather than blocking the trusted read (the anonymous path
+		// below fails closed instead). Only run when the read would actually surface the results field.
+		const poll = pollConfigOf(form.poll)
+		const resultsField =
+			typeof poll?.resultsField === 'string' && poll.resultsField.length > 0
+				? poll.resultsField
+				: undefined
+		if (poll?.enabled === true && resultsField && (!field || field === resultsField)) {
+			const options: PollOption[] = await resolveEffectivePollOptions({
+				payload,
+				req,
+				form,
+			}).catch(() => [])
+			if (options.length > 0) {
+				resolvedOptions = { [resultsField]: options }
+			}
+		}
 	} else {
 		const poll = pollConfigOf(form.poll)
 		if (poll?.enabled !== true) {
@@ -121,23 +146,25 @@ export const resolveFormResultsRequest = async (
 		if (!instance) {
 			return forbidden
 		}
-		if (typeof poll.optionSource === 'string' && poll.optionSource.length > 0) {
-			if (eligibleTypes && !eligibleTypes.includes(instance.blockType)) {
-				return forbidden
-			}
-			let options: { value: string; label: string }[] | undefined
-			try {
-				options = await resolvePollOptions({ payload, req, form })
-			} catch {
-				return unavailable
-			}
-			if (!options || options.length === 0) {
-				return forbidden
-			}
-			resolvedOptions = { [publicField]: options }
-		} else if (!fieldHasOptions(instance)) {
+		const hasSource = typeof poll.optionSource === 'string' && poll.optionSource.length > 0
+		const authored = fieldHasOptions(instance)
+		// Options that don't come from the author's own literal `options` list (a source or a
+		// field-typed resolver) require the results field to be a poll-eligible type, so a legacy or
+		// db-written doc pointing `resultsField` at a free-text field can never dump raw answers as
+		// leftover buckets. A static authored poll is a choice field already, so it keeps serving.
+		if ((hasSource || !authored) && eligibleTypes && !eligibleTypes.includes(instance.blockType)) {
 			return forbidden
 		}
+		let options: PollOption[]
+		try {
+			options = await resolveEffectivePollOptions({ payload, req, form })
+		} catch {
+			return unavailable
+		}
+		if (options.length === 0) {
+			return forbidden
+		}
+		resolvedOptions = { [publicField]: options }
 		fields = [publicField]
 	}
 

@@ -7,8 +7,8 @@ import type { FieldTypeRegistry } from '../fields/registry'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
 import { applyPollOptions } from '../poll/applyPollOptions'
 import type { PollOption } from '../poll/definePollOptionSource'
+import { resolveEffectivePollOptions } from '../poll/effectivePollOptions'
 import type { PollOptionSourceRegistry } from '../poll/registry'
-import { resolvePollOptions } from '../poll/resolvePollOptions'
 import { IDENTITY_CONTEXT_KEY } from '../spam/constants'
 import { keys } from '../translations/keys'
 import { asFieldTranslate, asTranslate } from '../translations/server'
@@ -77,40 +77,51 @@ export const validateSubmission =
 		const locale = req.locale ?? 'en'
 		const t = asFieldTranslate(req.i18n.t)
 
-		// With an option source configured, the source's resolved values are the only accepted
-		// answers for the results field: options are injected into the field instance (so the
-		// select's membership check and the stored option labels use them) and membership is also
-		// enforced directly, so an empty resolution or a non-select results field still fails
-		// closed. A resolve failure rejects the whole submission rather than skipping the check.
-		if (poll?.enabled === true && typeof poll.optionSource === 'string' && poll.optionSource) {
+		// With a resolved choice set for the results field (a poll `optionSource`, or the field type's
+		// own `resolveOptions`) the resolved values are the only accepted answers: options are injected
+		// into the field instance (so the select's membership check and the stored option labels use
+		// them) and membership is also enforced directly, so an empty resolution or a non-select results
+		// field still fails closed. A resolve failure rejects the whole submission rather than skipping
+		// the check. Static authored polls are unaffected: their field validates against its own options
+		// through the normal field pipeline.
+		const resultsField =
+			poll?.enabled === true &&
+			typeof poll.resultsField === 'string' &&
+			poll.resultsField.length > 0
+				? poll.resultsField
+				: undefined
+		const resultsInstance = resultsField
+			? fields.find((instance) => instance.name === resultsField)
+			: undefined
+		const usesResolver =
+			(typeof poll?.optionSource === 'string' && poll.optionSource.length > 0) ||
+			Boolean(resultsInstance && registry.get(resultsInstance.blockType)?.resolveOptions)
+		if (resultsField && usesResolver) {
 			let resolved: PollOption[]
 			try {
-				resolved =
-					(await resolvePollOptions({
-						payload: req.payload,
-						req,
-						form,
-						sources: pollSourceRegistry ?? new Map(),
-					})) ?? []
+				resolved = await resolveEffectivePollOptions({
+					payload: req.payload,
+					req,
+					form,
+					sources: pollSourceRegistry ?? new Map(),
+					fieldTypes: registry,
+				})
 			} catch {
 				throw new APIError(asTranslate(req.i18n.t)(keys.pollOptionsUnavailable), 503)
 			}
-			const resultsField = typeof poll.resultsField === 'string' ? poll.resultsField : undefined
 			fields = applyPollOptions(fields, resultsField, resolved)
-			if (resultsField) {
-				const answer = incoming.find((entry) => entry.field === resultsField)?.value
-				const isAnswered = answer != null && answer !== ''
-				if (isAnswered && !resolved.some((option) => option.value === answer)) {
-					throw new ValidationError(
-						{
-							collection: FORM_SUBMISSIONS_SLUG,
-							errors: [
-								{ path: resultsField, message: asTranslate(req.i18n.t)(keys.validationSelect) },
-							],
-						},
-						req.t
-					)
-				}
+			const answer = incoming.find((entry) => entry.field === resultsField)?.value
+			const isAnswered = answer != null && answer !== ''
+			if (isAnswered && !resolved.some((option) => option.value === answer)) {
+				throw new ValidationError(
+					{
+						collection: FORM_SUBMISSIONS_SLUG,
+						errors: [
+							{ path: resultsField, message: asTranslate(req.i18n.t)(keys.validationSelect) },
+						],
+					},
+					req.t
+				)
 			}
 		}
 		const expectedOwner =

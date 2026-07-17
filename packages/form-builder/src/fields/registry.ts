@@ -1,3 +1,5 @@
+import type { Payload } from 'payload'
+import { customStateOf, stashCustomState } from '../plugin/customState'
 import type { AnyFormFieldDefinition } from './types'
 
 export type FieldTypeRegistry = Map<string, AnyFormFieldDefinition>
@@ -53,3 +55,20 @@ export const resolveFieldTypes = (
 	}
 	return registry
 }
+
+type FieldTypesCustomState = { fieldTypes: FieldTypeRegistry }
+
+/**
+ * Park the resolved field-type registry on the config so `resolveEffectivePollOptions` can look up
+ * a poll results field's definition (and its `resolveOptions`) at request time via `payload.config`,
+ * the same way poll option sources and consent sources are stashed for root-level helpers.
+ */
+export const stashFieldTypes = (
+	custom: Record<string, unknown> | undefined,
+	registry: FieldTypeRegistry
+): Record<string, unknown> =>
+	stashCustomState<FieldTypesCustomState>(custom, { fieldTypes: registry })
+
+/** The field-type registry stashed at boot, or an empty registry when the plugin never booted. */
+export const fieldTypesOf = (payload: Payload): FieldTypeRegistry =>
+	customStateOf<FieldTypesCustomState>(payload).fieldTypes ?? new Map()

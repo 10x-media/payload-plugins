@@ -1,6 +1,8 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { Field } from 'payload'
+import type { Field, Payload, PayloadRequest } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
+import type { PollOption } from '../poll/definePollOptionSource'
+import type { FormFieldInstance } from '../submissions/types'
 import type { FileRef } from '../uploads/types'
 
 /**
@@ -76,6 +78,15 @@ export type FormFieldFormat<K extends FormFieldValueKind, TConfig extends FormFi
 	args: FormFieldFormatArgs<K, TConfig>
 ) => string
 
+/** Arguments a {@link FormFieldDefinition.resolveOptions} implementation receives. */
+export type ResolveFieldOptionsArgs = {
+	/** The configured field instance, so the resolver can read the values the author selected. */
+	instance: FormFieldInstance
+	form: { id: number | string; title?: string }
+	payload: Payload
+	req?: PayloadRequest
+}
+
 /**
  * A field type, authored once. `value` drives typed `validate`/`format`; `config` is a Payload
  * `Field[]` for the add-field drawer; `Field` is the client renderer import-map ref;
@@ -117,6 +128,16 @@ export type FormFieldDefinition<
 	 * answers: either authored `options` or options resolved from a poll option source.
 	 */
 	pollEligible?: boolean
+	/**
+	 * Source this `pollEligible` type's poll choices from the field instance itself, instead of
+	 * authored `options` or a poll `optionSource`. A type that holds enumerable data (for example a
+	 * `hasMany` relationship to the voteable records) returns one {@link PollOption} per selectable
+	 * value, read from the live instance the author configured (so it can `payload.find` over the
+	 * ids it holds). The result backs submission validation, the admin winner select, and results
+	 * labeling exactly like a source would; it is consulted after an `optionSource` and before the
+	 * instance's authored `options`.
+	 */
+	resolveOptions?: (args: ResolveFieldOptionsArgs) => PollOption[] | Promise<PollOption[]>
 }
 
 /** The erased shape stored in the heterogeneous registry. Value is `unknown`; config re-narrows per matched type at execution. */
@@ -156,4 +177,6 @@ export type AnyFormFieldDefinition = {
 	omitShared?: OmittableSharedField[]
 	/** See `FormFieldDefinition.pollEligible`: choosable as a poll's results field. */
 	pollEligible?: boolean
+	/** See `FormFieldDefinition.resolveOptions`: source poll choices from the instance itself. */
+	resolveOptions?: (args: ResolveFieldOptionsArgs) => PollOption[] | Promise<PollOption[]>
 }

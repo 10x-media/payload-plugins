@@ -10,11 +10,12 @@ import { stashConsentSources } from './consent/resolveConsentEntries'
 import type { ConsentSourcesResolver } from './consent/types'
 import type { FormEventSink } from './events/types'
 import { buildDefaultFieldDefinitions } from './fields/builtin'
-import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
+import { type FieldTypesConfig, resolveFieldTypes, stashFieldTypes } from './fields/registry'
 import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 import type { UploadsOption } from './plugin/uploadsCollection'
+import type { OutcomeFieldsOverride } from './poll/outcomeFields'
 import type { PollOptionSourcesConfig } from './poll/registry'
 import { resolvePollOptionSources } from './poll/registry'
 import { stashPollOptionSources } from './poll/resolvePollOptions'
@@ -128,8 +129,16 @@ export type FormBuilderPluginOptions = {
 	 * a poll's choices from host domain data with stable values; there are no built-ins. With at
 	 * least one source registered, the forms poll group gains an `optionSource` select plus its
 	 * per-source `sourceConfig`, and submissions to a sourced poll only accept resolved values.
+	 * `outcomeFields` composes the poll `outcome` group: it receives the two default fields
+	 * (`winningValue`, `resolvedAt`) and returns the group's final field array verbatim, so a host
+	 * can swap `winningValue` for its own component (e.g. a relationship picker over the voteable
+	 * records). Membership validation runs server-side regardless, so a swap cannot bypass it.
 	 */
-	poll?: { votedCookie?: boolean; sources?: PollOptionSourcesConfig }
+	poll?: {
+		votedCookie?: boolean
+		sources?: PollOptionSourcesConfig
+		outcomeFields?: OutcomeFieldsOverride
+	}
 	/**
 	 * When `true`, the raw `values`, `descriptors`, and `consent` JSON fields are visible in the
 	 * submission admin view. Default `false`, because the `SubmissionAnswers` UI component already
@@ -190,10 +199,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		)
 		const spam = resolveSpamConfig(options.spam)
 		const pollSourceRegistry = resolvePollOptionSources(options.poll?.sources)
-		// Stashed on config.custom so the root-level resolvePollOptions and resolveConsentStatements
-		// helpers can reach these through `payload.config` at request time, without threading plugin
-		// state through the host's own server code.
+		// Stashed on config.custom so the root-level resolvePollOptions, resolveEffectivePollOptions,
+		// and resolveConsentStatements helpers can reach these through `payload.config` at request
+		// time, without threading plugin state through the host's own server code. The field-type
+		// registry rides along so resolveEffectivePollOptions can look up a results field's
+		// definition (and its `resolveOptions`) from a bare `payload` instance.
 		config.custom = stashPollOptionSources(config.custom, pollSourceRegistry)
+		config.custom = stashFieldTypes(config.custom, registry)
 		if (consentSources) {
 			config.custom = stashConsentSources(config.custom, consentSources)
 		}
@@ -214,6 +226,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			resultsAccess: options.results?.access,
 			votedCookie: options.poll?.votedCookie === true,
 			pollSourceRegistry,
+			outcomeFields: options.poll?.outcomeFields,
 			buttons: options.buttons,
 			fromAddresses,
 			overrides: options.overrides,
@@ -329,6 +342,7 @@ export type {
 	FormFieldValidate,
 	FormFieldValueKind,
 	OmittableSharedField,
+	ResolveFieldOptionsArgs,
 } from './fields/types'
 export { isPollClosed } from './form/pollState'
 export type { ToFormDocumentOptions } from './form/toFormDocument'
@@ -349,6 +363,12 @@ export type {
 export { definePollOptionSource } from './poll/definePollOptionSource'
 export type { ResolveEffectivePollOptionsArgs } from './poll/effectivePollOptions'
 export { resolveEffectivePollOptions } from './poll/effectivePollOptions'
+export type { DefaultOutcomeFields, OutcomeFieldsOverride } from './poll/outcomeFields'
+export {
+	buildDefaultOutcomeFields,
+	buildResolvedAtField,
+	buildWinningValueField,
+} from './poll/outcomeFields'
 export type {
 	PollOptionSourceOption,
 	PollOptionSourceRegistry,
