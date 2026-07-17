@@ -69,6 +69,8 @@ export interface Config {
   collections: {
     users: User;
     'form-uploads': FormUpload;
+    'legal-pages': LegalPage;
+    notices: Notice;
     forms: Form;
     'form-submissions': FormSubmission;
     'payload-kv': PayloadKv;
@@ -81,6 +83,8 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     'form-uploads': FormUploadsSelect<false> | FormUploadsSelect<true>;
+    'legal-pages': LegalPagesSelect<false> | LegalPagesSelect<true>;
+    notices: NoticesSelect<false> | NoticesSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -93,8 +97,12 @@ export interface Config {
     defaultIDType: string;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    settings: Setting;
+  };
+  globalsSelect: {
+    settings: SettingsSelect<false> | SettingsSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -172,6 +180,29 @@ export interface FormUpload {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "legal-pages".
+ */
+export interface LegalPage {
+  id: string;
+  title: string;
+  slug: string;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notices".
+ */
+export interface Notice {
+  id: string;
+  title: string;
+  slug: string;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -700,37 +731,10 @@ export interface Form {
           }
         | {
             name: string;
-            label?: string | null;
             width: 'full' | 'half' | 'third' | 'twoThirds';
-            placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
-            statement?: {
-              root: {
-                type: string;
-                children: {
-                  type: any;
-                  version: number;
-                  [k: string]: unknown;
-                }[];
-                direction: ('ltr' | 'rtl') | null;
-                format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-                indent: number;
-                version: number;
-              };
-              [k: string]: unknown;
-            } | null;
-            source?: ('static' | 'pageReference') | null;
-            sourceConfig?: {
-              label?: string | null;
-              url?: string | null;
-              version?: string | null;
-              relationTo?: string | null;
-              docId?: string | null;
-              urlField?: string | null;
-              captureVersion?: boolean | null;
-            };
-            optional?: boolean | null;
+            source?: string | null;
             validations?:
               | (
                   | {
@@ -1371,37 +1375,10 @@ export interface Form {
                     }
                   | {
                       name: string;
-                      label?: string | null;
                       width: 'full' | 'half' | 'third' | 'twoThirds';
-                      placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
-                      statement?: {
-                        root: {
-                          type: string;
-                          children: {
-                            type: any;
-                            version: number;
-                            [k: string]: unknown;
-                          }[];
-                          direction: ('ltr' | 'rtl') | null;
-                          format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-                          indent: number;
-                          version: number;
-                        };
-                        [k: string]: unknown;
-                      } | null;
-                      source?: ('static' | 'pageReference') | null;
-                      sourceConfig?: {
-                        label?: string | null;
-                        url?: string | null;
-                        version?: string | null;
-                        relationTo?: string | null;
-                        docId?: string | null;
-                        urlField?: string | null;
-                        captureVersion?: boolean | null;
-                      };
-                      optional?: boolean | null;
+                      source?: string | null;
                       validations?:
                         | (
                             | {
@@ -1995,6 +1972,14 @@ export interface PayloadLockedDocument {
         value: string | FormUpload;
       } | null)
     | ({
+        relationTo: 'legal-pages';
+        value: string | LegalPage;
+      } | null)
+    | ({
+        relationTo: 'notices';
+        value: string | Notice;
+      } | null)
+    | ({
         relationTo: 'forms';
         value: string | Form;
       } | null)
@@ -2083,6 +2068,27 @@ export interface FormUploadsSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "legal-pages_select".
+ */
+export interface LegalPagesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notices_select".
+ */
+export interface NoticesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2539,25 +2545,10 @@ export interface FormsSelect<T extends boolean = true> {
           | T
           | {
               name?: T;
-              label?: T;
               width?: T;
-              placeholder?: T;
               description?: T;
               required?: T;
-              statement?: T;
               source?: T;
-              sourceConfig?:
-                | T
-                | {
-                    label?: T;
-                    url?: T;
-                    version?: T;
-                    relationTo?: T;
-                    docId?: T;
-                    urlField?: T;
-                    captureVersion?: T;
-                  };
-              optional?: T;
               validations?:
                 | T
                 | {
@@ -3083,25 +3074,10 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           name?: T;
-                          label?: T;
                           width?: T;
-                          placeholder?: T;
                           description?: T;
                           required?: T;
-                          statement?: T;
                           source?: T;
-                          sourceConfig?:
-                            | T
-                            | {
-                                label?: T;
-                                url?: T;
-                                version?: T;
-                                relationTo?: T;
-                                docId?: T;
-                                urlField?: T;
-                                captureVersion?: T;
-                              };
-                          optional?: T;
                           validations?:
                             | T
                             | {
@@ -3467,6 +3443,64 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "settings".
+ */
+export interface Setting {
+  id: string;
+  consentSources?:
+    | {
+        key: string;
+        label?: string | null;
+        statement?: {
+          root: {
+            type: string;
+            children: {
+              type: any;
+              version: number;
+              [k: string]: unknown;
+            }[];
+            direction: ('ltr' | 'rtl') | null;
+            format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+            indent: number;
+            version: number;
+          };
+          [k: string]: unknown;
+        } | null;
+        page?:
+          | ({
+              relationTo: 'legal-pages';
+              value: string | LegalPage;
+            } | null)
+          | ({
+              relationTo: 'notices';
+              value: string | Notice;
+            } | null);
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "settings_select".
+ */
+export interface SettingsSelect<T extends boolean = true> {
+  consentSources?:
+    | T
+    | {
+        key?: T;
+        label?: T;
+        statement?: T;
+        page?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

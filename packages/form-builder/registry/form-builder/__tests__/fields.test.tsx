@@ -161,7 +161,7 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 						blockType: 'consent',
 						name: 'terms',
 						statement: 'I agree to the terms',
-						sourceConfig: { label: 'Privacy Policy', url: 'https://example.com/privacy' },
+						link: { label: 'Privacy Policy', url: 'https://example.com/privacy' },
 					},
 					value: false,
 					onChange,
@@ -174,6 +174,40 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		expect(link).toHaveAttribute('href', 'https://example.com/privacy')
 		fireEvent.click(checkbox)
 		expect(onChange).toHaveBeenCalledWith(true)
+	})
+
+	it('consent: renders no link when the resolved link has a url but no label', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: {
+						blockType: 'consent',
+						name: 'terms',
+						statement: 'I agree',
+						link: { url: 'https://example.com/tos' },
+					},
+				})
+			)
+		)
+		expect(within(container).queryByRole('link')).toBeNull()
+	})
+
+	it('consent: routes the link href through sanitizeUrl', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: {
+						blockType: 'consent',
+						name: 'terms',
+						statement: 'I agree',
+						link: { label: 'Policy', url: `${'java'}script:alert(1)` },
+					},
+				})
+			)
+		)
+		expect(within(container).getByRole('link', { name: 'Policy' })).toHaveAttribute('href', '#')
 	})
 
 	it('consent: marks a required statement, like every other labelled field', () => {
@@ -189,7 +223,7 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		expect(container.textContent).toContain('I agree to the terms *')
 	})
 
-	it('consent: renders no dangling marker when there is no statement or label', () => {
+	it('consent: renders no dangling marker when there is no statement', () => {
 		const { container } = render(
 			createElement(
 				consentField,
@@ -202,26 +236,14 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		expect(container.textContent).not.toContain('*')
 	})
 
-	it('consent: prefers consentLinks over sourceConfig when both are present', () => {
+	it('consent: names the checkbox by its machine name when no statement resolved, never leaving it unnamed', () => {
 		const { container } = render(
 			createElement(
 				consentField,
-				baseProps<boolean>({
-					field: {
-						blockType: 'consent',
-						name: 'terms',
-						statement: 'I agree',
-						sourceConfig: { label: 'Fallback', url: 'https://example.com/fallback' },
-						consentLinks: [{ label: 'Terms of Service', url: 'https://example.com/tos' }],
-					},
-				})
+				baseProps<boolean>({ field: { blockType: 'consent', name: 'f' }, name: 'f' })
 			)
 		)
-		expect(within(container).queryByRole('link', { name: 'Fallback' })).toBeNull()
-		expect(within(container).getByRole('link', { name: 'Terms of Service' })).toHaveAttribute(
-			'href',
-			'https://example.com/tos'
-		)
+		expect(within(container).getByRole('checkbox')).toHaveAttribute('aria-label', 'f')
 	})
 
 	it('consent: renders a rich text statement with an inline link and a plain-text aria-label', () => {

@@ -2,7 +2,7 @@ import type { RichTextField } from 'payload'
 import type { AnyFormFieldDefinition } from '../types'
 import { calculationField } from './calculation'
 import { checkboxField } from './checkbox'
-import { buildConsentField } from './consent'
+import { consentField } from './consent'
 import { dateField } from './date'
 import { emailField } from './email'
 import { fileField } from './file'
@@ -14,13 +14,12 @@ import { textField } from './text'
 import { textareaField } from './textarea'
 
 /**
- * Built-in field definitions with content-bearing config fields (select option labels, consent
- * statement, repeater add label) carrying `localized: true` when `localize` is true. `editor`,
- * when given, overrides the richText editor on the message content and consent statement fields
- * (from the plugin's `richText.editor` option). Field types without content config are shared
- * static definitions. Definitions are authored with precise value/config generics; the registry
- * stores them erased (config is re-narrowed per matched type at execution), hence one cast per
- * built-in, no `any`.
+ * Built-in field definitions with content-bearing config fields (select option labels, repeater add
+ * label) carrying `localized: true` when `localize` is true. `editor`, when given, overrides the
+ * richText editor on the message content field (from the plugin's `richText.editor` option). Field
+ * types without content config are shared static definitions. Definitions are authored with precise
+ * value/config generics; the registry stores them erased (config is re-narrowed per matched type at
+ * execution), hence one cast per built-in, no `any`.
  */
 export const buildDefaultFieldDefinitions = (
 	localize: boolean,
@@ -33,7 +32,7 @@ export const buildDefaultFieldDefinitions = (
 	buildSelectField(localize) as AnyFormFieldDefinition,
 	checkboxField as AnyFormFieldDefinition,
 	calculationField as AnyFormFieldDefinition,
-	buildConsentField(localize, editor) as AnyFormFieldDefinition,
+	consentField as AnyFormFieldDefinition,
 	fileField as AnyFormFieldDefinition,
 	buildRepeaterField(localize) as AnyFormFieldDefinition,
 	dateField as AnyFormFieldDefinition,

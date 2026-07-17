@@ -128,22 +128,29 @@ export const en: Record<TranslationKey, string> = {
 		'HMAC key used for the X-Form-Signature header, shared with the receiver.',
 	[keys.validationUrlInvalid]: 'Enter a valid http or https URL',
 	[keys.configActions]: 'Actions',
-	[keys.consentSourceStatic]: 'Static text',
-	[keys.consentSourcePageReference]: 'Page reference',
-	[keys.consentConfigLabel]: 'Label',
-	[keys.consentConfigUrl]: 'URL',
-	[keys.consentConfigVersion]: 'Version',
-	[keys.consentConfigRelationTo]: 'Collection',
-	[keys.consentConfigDocId]: 'Document ID',
-	[keys.consentConfigUrlField]: 'URL field',
-	[keys.consentConfigCaptureVersion]: 'Capture published version',
 	[keys.fieldTypeConsent]: 'Consent',
-	[keys.consentConfigStatement]: 'Statement',
-	[keys.consentConfigStatementDescription]:
-		'Rich text; add links inline (e.g. to the privacy policy) so they read naturally in the sentence.',
 	[keys.consentConfigSource]: 'Source',
-	[keys.consentConfigSourceConfig]: 'Source settings',
-	[keys.consentConfigOptional]: 'Optional (e.g. marketing)',
+	[keys.consentConfigSourceDescription]:
+		'The statement the visitor agrees to. Its wording and policy page live with the source, so an edit there applies to every form using it.',
+	[keys.consentSourcesField]: 'Consent sources',
+	[keys.consentSourcesFieldDescription]:
+		'The statements forms can ask visitors to agree to. Each is referenced by its key, so wording can be corrected at any time without touching a form.',
+	[keys.consentSourceSingular]: 'Consent source',
+	[keys.consentSourcePlural]: 'Consent sources',
+	[keys.consentSourceKey]: 'Key',
+	[keys.consentSourceKeyDescription]:
+		'The stable reference forms and stored proofs point at. Changing it orphans both.',
+	[keys.consentSourceKeyDuplicate]: 'Another source already uses this key. Keys must be unique.',
+	[keys.consentSourceLabel]: 'Name',
+	[keys.consentSourceLabelDescription]:
+		"The source's name. Shown when picking it on a form, and used as the policy link text beside the statement.",
+	[keys.consentSourceStatement]: 'Statement',
+	[keys.consentSourceStatementDescription]:
+		'What the visitor reads beside the checkbox. Add links inline so they read naturally in the sentence.',
+	[keys.consentSourcePage]: 'Policy page',
+	[keys.consentSourcePageDescription]:
+		'The document this statement covers. Each submission records which page, and with drafts enabled which published version of it, was agreed to.',
+	[keys.consentSourcesUnavailable]: 'Consent sources are unavailable. Try again shortly.',
 	[keys.resultsResponses]: 'responses',
 	[keys.resultsNoResponses]: 'No responses yet',
 	[keys.resultsTruncated]: 'Showing a sample of responses',

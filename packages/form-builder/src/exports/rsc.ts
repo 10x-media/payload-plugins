@@ -1,3 +1,4 @@
+export { resolveConsentStatements } from '../consent/resolveConsentStatements'
 export { isPollClosed } from '../form/pollState'
 export { toFormDocument } from '../form/toFormDocument'
 export { resolveEffectivePollOptions } from '../poll/effectivePollOptions'

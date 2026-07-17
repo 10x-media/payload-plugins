@@ -28,18 +28,24 @@ export type {
 } from '../collections/buttonFields'
 export type { FieldCondition } from '../conditions/types'
 export type { ConsentProof } from '../consent/captureConsent'
-export type {
-	AnyConsentSource,
-	ConsentLink,
-	ConsentResolveArgs,
-	ConsentResolved,
-	ConsentSource,
-} from '../consent/defineConsentSource'
+export type { ConsentSourcesFieldOptions } from '../consent/consentSourcesField'
+export type { ResolveConsentEntriesArgs } from '../consent/resolveConsentEntries'
 export type {
 	ConsentSourceOption,
-	ConsentSourceRegistry,
-	ConsentSourcesConfig,
-} from '../consent/registry'
+	ResolveConsentSourcesRequestArgs,
+	ResolveConsentSourcesRequestResult,
+} from '../consent/resolveConsentSourcesRequest'
+export type {
+	ConsentStatement,
+	ConsentStatements,
+	ResolveConsentStatementsArgs,
+} from '../consent/resolveConsentStatements'
+export type { ResolvePublishedVersionRefArgs } from '../consent/resolvePublishedVersionRef'
+export type {
+	ConsentSourceEntry,
+	ConsentSourcePage,
+	ConsentSourcesResolver,
+} from '../consent/types'
 export type { FormEvent, FormEventSink } from '../events/types'
 export type { FieldTypeOption, FieldTypeRegistry, FieldTypesConfig } from '../fields/registry'
 export type {

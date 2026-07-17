@@ -1,3 +1,5 @@
+import { applyConsentStatements } from '../consent/applyConsentStatements'
+import type { ConsentStatements } from '../consent/resolveConsentStatements'
 import type { FormFlow } from '../flow/types'
 import { applyPollOptions } from '../poll/applyPollOptions'
 import type { PollOption } from '../poll/definePollOptionSource'
@@ -11,6 +13,12 @@ export type ToFormDocumentOptions = {
 	 * current choices instead of hand-authored ones.
 	 */
 	pollOptions?: PollOption[]
+	/**
+	 * Source-resolved consent statements (from `resolveConsentStatements`), injected into the
+	 * consent field instances they name. A form stores only a source key, so without these its
+	 * consent fields render with no statement at all.
+	 */
+	consentStatements?: ConsentStatements
 }
 
 /**
@@ -82,6 +90,9 @@ export function toFormDocument(
 	let fields = (form.fields ?? []) as FormFieldInstance[]
 	if (options?.pollOptions) {
 		fields = applyPollOptions(fields, form.poll?.resultsField, options.pollOptions)
+	}
+	if (options?.consentStatements) {
+		fields = applyConsentStatements(fields, options.consentStatements)
 	}
 	return {
 		id: form.id,

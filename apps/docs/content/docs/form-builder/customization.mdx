@@ -29,7 +29,7 @@ The same pattern works for rules via `defaultValidationRulesByType` under the `r
 
 ### Spread-overrides and `localizeContent`
 
-The prebuilt default exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`, `defaultConsentSources`) are built with [content localization](/form-builder/fields#content-localization) on, so their content-bearing config fields carry `localized: true`. On a host running `localizeContent: false`, spreading one of them silently reintroduces the flag for that one type. Derive overrides from the builder functions instead, passing the same flag you gave the plugin:
+The prebuilt default exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`) are built with [content localization](/form-builder/fields#content-localization) on, so their content-bearing config fields carry `localized: true`. On a host running `localizeContent: false`, spreading one of them silently reintroduces the flag for that one type. Derive overrides from the builder functions instead, passing the same flag you gave the plugin:
 
 ```ts title="payload.config.ts"
 import { buildDefaultFieldDefinitions, formBuilder, type FieldTypeOption } from '@10x-media/form-builder'
@@ -44,11 +44,11 @@ formBuilder({
 })
 ```
 
-`buildDefaultActionDefinitions(localize)` and `buildDefaultConsentSources(localize)` are the equivalent builders for actions and consent sources. With the default `localizeContent: true` the prebuilt exports are exactly the builder output, so the shorter spread recipe above stays correct.
+`buildDefaultActionDefinitions(localize)` is the equivalent builder for actions. With the default `localizeContent: true` the prebuilt exports are exactly the builder output, so the shorter spread recipe above stays correct. Consent statements are not affected either way: they live on your own [consent sources field](/form-builder/consent#setting-it-up), which carries its own `localized` option.
 
 ## Rich text editors
 
-The plugin authors rich text in four places: [message](/form-builder/fields#message) content, the [consent](/form-builder/consent#rich-text-and-inline-links) statement, the response message, and [action bodies](/form-builder/actions#rich-text-bodies). None of them set an editor of their own, so all four inherit your config's `editor`, which is why the config must set one.
+The plugin authors rich text in three places: [message](/form-builder/fields#message) content, the response message, and [action bodies](/form-builder/actions#rich-text-bodies). None of them set an editor of their own, so all three inherit your config's `editor`, which is why the config must set one. [Consent statements](/form-builder/consent) are a fourth, but they live on a field you place yourself, so `consentSourcesField({ editor })` is what redirects those.
 
 Two options redirect that:
 
@@ -68,7 +68,7 @@ formBuilder({
 })
 ```
 
-Set neither and all four stay on the project editor. Set only `editor` to move the whole plugin, bodies included, onto one editor. Set only `bodyEditor` to single out email bodies and leave the rest on the project editor. The split exists because a form's on-page copy and an email's body land in different renderers: the features a consent statement wants are rarely the ones that survive an email client.
+Set neither and all three stay on the project editor. Set only `editor` to move the whole plugin, bodies included, onto one editor. Set only `bodyEditor` to single out email bodies and leave the rest on the project editor. The split exists because a form's on-page copy and an email's body land in different renderers: the features a consent statement wants are rarely the ones that survive an email client.
 
 ## Submission answers UI
 

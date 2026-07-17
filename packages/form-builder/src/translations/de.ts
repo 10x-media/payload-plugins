@@ -130,22 +130,31 @@ export const de: Record<TranslationKey, string> = {
 		'HMAC-Schlüssel für den X-Form-Signature-Header, der mit dem Empfänger geteilt wird.',
 	[keys.validationUrlInvalid]: 'Gib eine gültige http- oder https-URL ein',
 	[keys.configActions]: 'Aktionen',
-	[keys.consentSourceStatic]: 'Statischer Text',
-	[keys.consentSourcePageReference]: 'Seitenverweis',
-	[keys.consentConfigLabel]: 'Bezeichnung',
-	[keys.consentConfigUrl]: 'URL',
-	[keys.consentConfigVersion]: 'Version',
-	[keys.consentConfigRelationTo]: 'Sammlung',
-	[keys.consentConfigDocId]: 'Dokument-ID',
-	[keys.consentConfigUrlField]: 'URL-Feld',
-	[keys.consentConfigCaptureVersion]: 'Veröffentlichte Version erfassen',
 	[keys.fieldTypeConsent]: 'Einwilligung',
-	[keys.consentConfigStatement]: 'Erklärung',
-	[keys.consentConfigStatementDescription]:
-		'Rich-Text-Feld; Links lassen sich direkt in den Satz einfügen (z. B. zur Datenschutzerklärung).',
 	[keys.consentConfigSource]: 'Quelle',
-	[keys.consentConfigSourceConfig]: 'Quelleinstellungen',
-	[keys.consentConfigOptional]: 'Optional (z. B. Marketing)',
+	[keys.consentConfigSourceDescription]:
+		'Die Erklärung, der Besucher zustimmen. Wortlaut und Rechtsseite gehören zur Quelle: eine Änderung dort gilt für jedes Formular, das sie nutzt.',
+	[keys.consentSourcesField]: 'Einwilligungsquellen',
+	[keys.consentSourcesFieldDescription]:
+		'Die Erklärungen, denen Besucher in Formularen zustimmen können. Formulare verweisen nur auf den Schlüssel, der Wortlaut lässt sich also jederzeit korrigieren, ohne ein Formular anzufassen.',
+	[keys.consentSourceSingular]: 'Einwilligungsquelle',
+	[keys.consentSourcePlural]: 'Einwilligungsquellen',
+	[keys.consentSourceKey]: 'Schlüssel',
+	[keys.consentSourceKeyDescription]:
+		'Die feste Referenz, auf die Formulare und gespeicherte Nachweise zeigen. Wird er geändert, laufen beide ins Leere.',
+	[keys.consentSourceKeyDuplicate]:
+		'Eine andere Quelle nutzt diesen Schlüssel bereits. Schlüssel müssen eindeutig sein.',
+	[keys.consentSourceLabel]: 'Name',
+	[keys.consentSourceLabelDescription]:
+		'Der Name der Quelle. Wird bei der Auswahl im Formular gezeigt und als Text des Rechtslinks neben der Erklärung verwendet.',
+	[keys.consentSourceStatement]: 'Erklärung',
+	[keys.consentSourceStatementDescription]:
+		'Was der Besucher neben dem Kontrollkästchen liest. Links lassen sich direkt in den Satz einfügen.',
+	[keys.consentSourcePage]: 'Rechtsseite',
+	[keys.consentSourcePageDescription]:
+		'Das Dokument, für das diese Erklärung gilt. Jede Einsendung hält fest, welcher Seite zugestimmt wurde, bei aktivierten Entwürfen zusätzlich welcher veröffentlichten Version.',
+	[keys.consentSourcesUnavailable]:
+		'Einwilligungsquellen sind nicht verfügbar. Versuche es gleich noch einmal.',
 	[keys.resultsResponses]: 'Antworten',
 	[keys.resultsNoResponses]: 'Noch keine Antworten',
 	[keys.resultsTruncated]: 'Zeigt eine Stichprobe der Antworten',

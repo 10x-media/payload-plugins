@@ -49,20 +49,10 @@ describe('formBuilder factory', () => {
 		const messageContent = messageBlock?.fields.find((f) => 'name' in f && f.name === 'content') as
 			| { editor?: unknown }
 			| undefined
-		const consentStatement = (() => {
-			const block = fieldsField?.blocks?.find((b) => b.slug === 'consent')
-			const tabs = block?.fields.find(
-				(f): f is Extract<typeof f, { type: 'tabs' }> => f.type === 'tabs'
-			)
-			return tabs?.tabs
-				.flatMap((tab) => ('fields' in tab ? tab.fields : []))
-				.find((f) => 'name' in f && f.name === 'statement') as { editor?: unknown } | undefined
-		})()
 		return {
 			emailTeamBody: fieldOf(actionsField, 'emailTeam', 'body'),
 			confirmationBody: fieldOf(actionsField, 'confirmation', 'body'),
 			messageContent,
-			consentStatement,
 			responseMessage,
 		}
 	}
@@ -73,7 +63,6 @@ describe('formBuilder factory', () => {
 		expect(fields.emailTeamBody?.editor).toBe(editor)
 		expect(fields.confirmationBody?.editor).toBe(editor)
 		expect(fields.messageContent?.editor).toBe(editor)
-		expect(fields.consentStatement?.editor).toBe(editor)
 		expect(fields.responseMessage?.editor).toBe(editor)
 	})
 
@@ -84,7 +73,6 @@ describe('formBuilder factory', () => {
 		expect(fields.emailTeamBody?.editor).toBe(bodyEditor)
 		expect(fields.confirmationBody?.editor).toBe(bodyEditor)
 		expect(fields.messageContent?.editor).toBe(editor)
-		expect(fields.consentStatement?.editor).toBe(editor)
 		expect(fields.responseMessage?.editor).toBe(editor)
 	})
 
@@ -94,7 +82,6 @@ describe('formBuilder factory', () => {
 		expect(fields.emailTeamBody?.editor).toBe(bodyEditor)
 		expect(fields.confirmationBody?.editor).toBe(bodyEditor)
 		expect(fields.messageContent && 'editor' in fields.messageContent).toBe(false)
-		expect(fields.consentStatement && 'editor' in fields.consentStatement).toBe(false)
 		expect(fields.responseMessage && 'editor' in fields.responseMessage).toBe(false)
 	})
 

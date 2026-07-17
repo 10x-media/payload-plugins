@@ -42,7 +42,7 @@ const props = (overrides: Partial<FieldRendererProps<boolean>>): FieldRendererPr
 		blockType: 'consent',
 		name: 'terms',
 		statement: 'I agree to the terms',
-		sourceConfig: { label: 'Privacy Policy', url: 'https://example.com/privacy' },
+		link: { label: 'Privacy Policy', url: 'https://example.com/privacy' },
 	},
 	id: 'x',
 	name: 'terms',
@@ -63,12 +63,12 @@ describe('consent renderer', () => {
 		expect(checkbox).not.toBeChecked()
 	})
 
-	it('renders a legacy string statement as text', () => {
+	it('renders a plain string statement as text', () => {
 		const { container } = render(createElement(consentRenderer, props({})))
 		expect(within(container).getByText('I agree to the terms')).toBeInTheDocument()
 	})
 
-	it('renders the policy link from sourceConfig with correct href', () => {
+	it('renders the resolved policy link with the correct href', () => {
 		const { container } = render(createElement(consentRenderer, props({})))
 		const link = within(container).getByRole('link', { name: 'Privacy Policy' })
 		expect(link).toHaveAttribute('href', 'https://example.com/privacy')
@@ -90,7 +90,7 @@ describe('consent renderer', () => {
 		expect(onChange).toHaveBeenCalledWith(false)
 	})
 
-	it('prefers consentLinks over sourceConfig when both present', () => {
+	it('renders no link when the resolved link carries a url but no label', () => {
 		const { container } = render(
 			createElement(
 				consentRenderer,
@@ -99,18 +99,32 @@ describe('consent renderer', () => {
 						blockType: 'consent',
 						name: 'terms',
 						statement: 'I agree',
-						sourceConfig: { label: 'Fallback', url: 'https://example.com/fallback' },
-						consentLinks: [{ label: 'Terms of Service', url: 'https://example.com/tos' }],
+						link: { url: 'https://example.com/tos' },
 					},
 				})
 			)
 		)
-		expect(within(container).queryByRole('link', { name: 'Fallback' })).toBeNull()
-		const link = within(container).getByRole('link', { name: 'Terms of Service' })
-		expect(link).toHaveAttribute('href', 'https://example.com/tos')
+		expect(within(container).queryByRole('link')).toBeNull()
 	})
 
-	it('shows no link when sourceConfig has no url', () => {
+	it('routes the link href through sanitizeUrl, neutralizing a javascript: url', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({
+					field: {
+						blockType: 'consent',
+						name: 'terms',
+						statement: 'I agree',
+						link: { label: 'Policy', url: `${'java'}script:alert(1)` },
+					},
+				})
+			)
+		)
+		expect(within(container).getByRole('link', { name: 'Policy' })).toHaveAttribute('href', '#')
+	})
+
+	it('shows no link when the source resolved none', () => {
 		const { container } = render(
 			createElement(
 				consentRenderer,
@@ -160,7 +174,7 @@ describe('consent renderer', () => {
 		expect(within(container).getByText('<script>alert(1)</script>')).toBeInTheDocument()
 	})
 
-	it('never renders a legacy string statement as HTML, even when it looks like markup', () => {
+	it('never renders a plain string statement as HTML, even when it looks like markup', () => {
 		const { container } = render(
 			createElement(
 				consentRenderer,
@@ -221,9 +235,7 @@ describe('consent renderer', () => {
 			)
 		)
 		expect(container.querySelector('.fb-consent__statement')).toBeNull()
-		const checkbox = within(container).getByRole('checkbox')
-		expect(checkbox).not.toHaveAttribute('aria-label')
-		expect(checkbox).not.toBeChecked()
+		expect(within(container).getByRole('checkbox')).not.toBeChecked()
 	})
 
 	it('sets the checkbox aria-label to the flattened plain text of a rich text statement', () => {
@@ -241,7 +253,7 @@ describe('consent renderer', () => {
 		)
 	})
 
-	it('sets the checkbox aria-label to the legacy string statement', () => {
+	it('sets the checkbox aria-label to a plain string statement', () => {
 		const { container } = render(createElement(consentRenderer, props({})))
 		expect(within(container).getByRole('checkbox')).toHaveAttribute(
 			'aria-label',
@@ -249,22 +261,16 @@ describe('consent renderer', () => {
 		)
 	})
 
-	it('falls back to field.label for the aria-label when statement is absent', () => {
+	// A statement is the only text a consent field has, so an unresolved one leaves the checkbox
+	// with nothing to be named by. The machine name is a poor name but beats an unnamed control.
+	it('falls back to the field name for the aria-label when no statement resolved', () => {
 		const { container } = render(
-			createElement(
-				consentRenderer,
-				props({
-					field: { blockType: 'consent', name: 'terms', label: 'Accept the rules' },
-				})
-			)
+			createElement(consentRenderer, props({ field: { blockType: 'consent', name: 'terms' } }))
 		)
-		expect(within(container).getByRole('checkbox')).toHaveAttribute(
-			'aria-label',
-			'Accept the rules'
-		)
+		expect(within(container).getByRole('checkbox')).toHaveAttribute('aria-label', 'terms')
 	})
 
-	it('does not render a dangling required marker when there is no statement or label', () => {
+	it('does not render a dangling required marker when there is no statement', () => {
 		const { container } = render(
 			createElement(
 				consentRenderer,

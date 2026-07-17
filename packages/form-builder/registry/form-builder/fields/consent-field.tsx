@@ -1,6 +1,11 @@
 'use client'
 
-import { defineFieldRenderer, serializeBody, textOfBody } from '@10x-media/form-builder/react'
+import {
+	defineFieldRenderer,
+	sanitizeUrl,
+	serializeBody,
+	textOfBody,
+} from '@10x-media/form-builder/react'
 import { useId, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -10,10 +15,9 @@ const text = (raw: unknown): string | undefined =>
 	typeof raw === 'string' && raw.trim() !== '' ? raw : undefined
 
 /**
- * HTML for a rich text (Lexical/legacy Slate) statement. A legacy plain string never goes through
- * this path: `serializeBody` interpolates a string body unescaped (its pre-richText behavior), so
- * rendering one as HTML would let literal markup in old data execute; a plain string renders as
- * text instead.
+ * HTML for a rich text statement. A plain string never goes through this path: `serializeBody`
+ * interpolates a string body unescaped (its pre-richText behavior), so rendering one as HTML would
+ * let literal markup execute; a plain string renders as text instead.
  */
 const richStatementHtml = (statement: unknown): string | undefined => {
 	if (typeof statement === 'string' || statement == null) {
@@ -23,32 +27,38 @@ const richStatementHtml = (statement: unknown): string | undefined => {
 	return html === '' ? undefined : html
 }
 
+/**
+ * The resolved policy link, or nothing unless the source carries both a url and a name to show
+ * for it: an anchor labelled by a raw URL or a machine key is worse than no anchor. The href is
+ * sanitized like every other url the package renders, since a source is admin-authored and can
+ * point anywhere (`sanitizeUrl` keeps http(s)/mailto/tel and relative urls, and neutralizes the
+ * rest to `#`).
+ */
+const linkOf = (raw: unknown): ConsentLink | undefined => {
+	const link = raw as Partial<ConsentLink> | undefined
+	const label = text(link?.label)
+	return label && typeof link?.url === 'string' && link.url !== ''
+		? { label, url: sanitizeUrl(link.url) }
+		: undefined
+}
+
+/**
+ * The `statement` and `link` are server-resolved from the field's consent source and injected by
+ * `toFormDocument(doc, { consentStatements })`; the form document itself carries only the source
+ * key, so a form rendered without that step shows no statement rather than a stale one.
+ */
 export const consentField = defineFieldRenderer<boolean>(
 	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const invalid = errors.length > 0
-		// The checkbox's accessible name is always plain text, regardless of the statement's shape
-		// (rich text, legacy string, or absent). Prefer the explicit `statement`; fall back to
-		// `label` so a consent field authored with only a label is never an unlabelled control (a11y).
-		const statement = text(textOfBody(field.statement)) ?? text(field.label)
+		// The checkbox's accessible name is always plain text, regardless of the statement's shape.
+		// With no statement resolved the field is misconfigured; the machine name still beats
+		// leaving the control unnamed.
+		const statement = text(textOfBody(field.statement))
 		const html = useMemo(() => richStatementHtml(field.statement), [field.statement])
 		const description = typeof field.description === 'string' ? field.description : undefined
-
-		const links: ConsentLink[] = Array.isArray(field.consentLinks)
-			? (field.consentLinks as ConsentLink[])
-			: (() => {
-					const sourceConfig = field.sourceConfig as Record<string, unknown> | undefined
-					if (sourceConfig && typeof sourceConfig.url === 'string' && sourceConfig.url) {
-						return [
-							{
-								label: typeof sourceConfig.label === 'string' ? sourceConfig.label : 'Policy',
-								url: sourceConfig.url,
-							},
-						]
-					}
-					return []
-				})()
+		const link = linkOf(field.link)
 
 		return (
 			<div className="grid gap-2">
@@ -62,7 +72,7 @@ export const consentField = defineFieldRenderer<boolean>(
 						disabled={disabled}
 						aria-invalid={invalid || undefined}
 						aria-describedby={describedById}
-						aria-label={statement}
+						aria-label={statement ?? name}
 						className={cn('h-4 w-4 rounded border border-input', invalid && 'border-destructive')}
 						onChange={(event) => onChange(event.target.checked)}
 						onBlur={onBlur}
@@ -88,19 +98,16 @@ export const consentField = defineFieldRenderer<boolean>(
 						</span>
 					) : null}
 				</div>
-				{links.length > 0 ? (
+				{link ? (
 					<span className="flex flex-wrap gap-3">
-						{links.map((link) => (
-							<a
-								key={link.url}
-								href={link.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-sm text-primary underline underline-offset-4"
-							>
-								{link.label}
-							</a>
-						))}
+						<a
+							href={link.url}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-sm text-primary underline underline-offset-4"
+						>
+							{link.label}
+						</a>
 					</span>
 				) : null}
 				<div id={describedById} className="grid gap-1 text-sm">

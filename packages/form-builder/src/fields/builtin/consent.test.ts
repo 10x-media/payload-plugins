@@ -1,6 +1,5 @@
-import type { RichTextField } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { buildConsentField, consentField } from './consent'
+import { consentField } from './consent'
 
 const t = (key: string) => key
 const base = { siblingData: {}, data: {}, locale: 'en', t }
@@ -14,59 +13,52 @@ describe('consentField', () => {
 		expect(consentField.value).toBe('boolean')
 	})
 
-	it('statement is a richText field with an admin description, no editor key', () => {
-		const config = consentField.config ?? []
-		const statement = config.find((f) => 'name' in f && f.name === 'statement') as
-			| { type?: string; admin?: { description?: unknown }; editor?: unknown }
-			| undefined
-		expect(statement).toBeDefined()
-		expect(statement?.type).toBe('richText')
-		expect(statement?.admin?.description).toBeDefined()
-		expect('editor' in (statement ?? {})).toBe(false)
+	it('is configured by a source reference alone', () => {
+		expect((consentField.config ?? []).map((f) => ('name' in f ? f.name : f.type))).toEqual([
+			'source',
+		])
 	})
 
-	it('threads a given editor onto the statement field', () => {
-		const editor = { fake: 'editor' } as unknown as RichTextField['editor']
-		const statement = (buildConsentField(true, editor).config ?? []).find(
-			(f) => 'name' in f && f.name === 'statement'
-		) as { editor?: unknown }
-		expect(statement.editor).toBe(editor)
+	it('drops the shared label and placeholder, since the statement is the visible text', () => {
+		expect(consentField.omitShared).toEqual(['label', 'placeholder'])
 	})
 
-	it('statement is localized when localize is true, not when false', () => {
-		const localized = (buildConsentField(true).config ?? []).find(
-			(f) => 'name' in f && f.name === 'statement'
-		) as { localized?: boolean }
-		const plain = (buildConsentField(false).config ?? []).find(
-			(f) => 'name' in f && f.name === 'statement'
-		) as { localized?: boolean }
-		expect(localized.localized).toBe(true)
-		expect('localized' in plain).toBe(false)
+	it('renders the source through the consent-sources endpoint select', () => {
+		const source = (consentField.config ?? []).find((f) => 'name' in f && f.name === 'source') as {
+			type?: string
+			admin?: { components?: { Field?: { path?: string; clientProps?: Record<string, unknown> } } }
+		}
+		expect(source.type).toBe('text')
+		const component = source.admin?.components?.Field
+		expect(component?.path).toBe('@10x-media/form-builder/client#EndpointOptionsSelect')
+		expect(component?.clientProps).toMatchObject({
+			endpoint: 'consent-sources',
+			isClearable: false,
+		})
+		expect(component?.clientProps?.descriptionKey).toBeDefined()
 	})
 
-	it('validates: required (default) + value not true -> error', () => {
-		const result = consentField.validate?.({ ...base, value: false, config: {} })
-		expect(result).toBe('formBuilder:validation.required')
+	it('validates: required + value not true -> error', () => {
+		expect(consentField.validate?.({ ...base, value: false, config: { required: true } })).toBe(
+			'formBuilder:validation.required'
+		)
 	})
 
-	it('validates: required (default) + value undefined -> error', () => {
-		const result = consentField.validate?.({ ...base, value: undefined, config: {} })
-		expect(result).toBe('formBuilder:validation.required')
+	it('validates: required + value undefined -> error', () => {
+		expect(consentField.validate?.({ ...base, value: undefined, config: { required: true } })).toBe(
+			'formBuilder:validation.required'
+		)
 	})
 
-	it('validates: required (default) + value true -> valid', () => {
-		const result = consentField.validate?.({ ...base, value: true, config: {} })
-		expect(result).toBe(true)
+	it('validates: required + value true -> valid', () => {
+		expect(consentField.validate?.({ ...base, value: true, config: { required: true } })).toBe(true)
 	})
 
-	it('validates: optional=true + value false -> valid (marketing-style opt-in)', () => {
-		const result = consentField.validate?.({ ...base, value: false, config: { optional: true } })
-		expect(result).toBe(true)
-	})
-
-	it('validates: optional=false (explicit) + value false -> error', () => {
-		const result = consentField.validate?.({ ...base, value: false, config: { optional: false } })
-		expect(result).toBe('formBuilder:validation.required')
+	it('validates: not required + value false -> valid (marketing-style opt-in)', () => {
+		expect(consentField.validate?.({ ...base, value: false, config: {} })).toBe(true)
+		expect(consentField.validate?.({ ...base, value: false, config: { required: false } })).toBe(
+			true
+		)
 	})
 
 	it('formats true as Yes key', () => {

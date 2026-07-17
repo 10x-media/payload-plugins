@@ -26,7 +26,8 @@ test.describe('rendered multi-step form', () => {
 		await page.getByRole('button', { name: 'Submit' }).click()
 		await expect(page.getByRole('alert').first()).toBeVisible()
 
-		await page.getByLabel(/I agree to the terms/).check()
+		// The statement is resolved live from the consent source, never stored on the form.
+		await page.getByLabel(/I have read and agree to the privacy policy/).check()
 		await page.getByRole('button', { name: 'Submit' }).click()
 
 		await expect(page.getByText('Thank you.')).toBeVisible()

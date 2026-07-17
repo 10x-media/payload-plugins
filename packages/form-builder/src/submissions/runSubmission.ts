@@ -3,7 +3,7 @@ import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
 import type { ConsentProof } from '../consent/captureConsent'
 import { captureConsent } from '../consent/captureConsent'
-import type { ConsentSourceRegistry } from '../consent/registry'
+import type { ConsentSourceEntry } from '../consent/types'
 import { isNamedField } from '../fields/fieldKey'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { Translate } from '../fields/types'
@@ -96,7 +96,11 @@ export type RunSubmissionInput = {
 	values: SubmissionValue[]
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry: ConsentSourceRegistry
+	/**
+	 * The host's consent sources, resolved once by the caller (which owns the request-scoped
+	 * resolver and how a failure surfaces) and read here to build each consent proof.
+	 */
+	consentEntries?: ConsentSourceEntry[]
 	locale: string
 	t: Translate
 	operation: 'create' | 'update'
@@ -139,7 +143,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		values,
 		registry,
 		ruleRegistry,
-		consentRegistry,
+		consentEntries,
 		locale,
 		t,
 		operation,
@@ -292,10 +296,9 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 			const proof = await captureConsent({
 				field: instance,
 				agreed: value === true,
-				registry: consentRegistry,
+				entries: consentEntries ?? [],
 				payload,
 				req,
-				locale,
 				now,
 			})
 			consentProofs.push({ field: instance.name, ...proof })

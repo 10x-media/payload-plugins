@@ -12,7 +12,6 @@ const ruleRegistry = buildRuleRegistry([])
 const base = {
 	registry,
 	ruleRegistry,
-	consentRegistry: new Map(),
 	locale: 'en',
 	t: (key: string) => key,
 	operation: 'create' as const,
@@ -128,15 +127,9 @@ describe('runSubmission with a nameless message block', () => {
 		expect('localized' in (without?.config?.[0] as object)).toBe(false)
 	})
 
-	it('editor threads through buildDefaultFieldDefinitions to message and consent', () => {
+	it('editor threads through buildDefaultFieldDefinitions to message', () => {
 		const editor = { fake: 'editor' } as unknown as RichTextField['editor']
-		const definitions = buildDefaultFieldDefinitions(true, editor)
-		const message = definitions.find((d) => d.type === 'message')
-		const consent = definitions.find((d) => d.type === 'consent')
+		const message = buildDefaultFieldDefinitions(true, editor).find((d) => d.type === 'message')
 		expect((message?.config?.[0] as { editor?: unknown }).editor).toBe(editor)
-		const statement = consent?.config?.find(
-			(f) => 'name' in f && (f as { name?: string }).name === 'statement'
-		)
-		expect((statement as { editor?: unknown }).editor).toBe(editor)
 	})
 })

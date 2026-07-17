@@ -62,33 +62,29 @@ describe('Form accessibility (axe)', () => {
 					{
 						blockType: 'consent',
 						name: 'terms',
-						label: 'I agree to the terms',
-						source: 'static',
-						sourceConfig: { label: 'Terms of Service', url: 'https://example.com/terms' },
+						source: 'terms-of-service',
+						statement: 'I agree to the terms',
+						link: { label: 'Terms of Service', url: 'https://example.com/terms' },
 					} as FormFieldInstance,
 				])}
 			/>
 		)
 		expect(await axeViolations(container)).toEqual([])
+		expect(screen.getByRole('checkbox')).toHaveAccessibleName('I agree to the terms')
 	})
 
-	it('a consent field with a blank statement falls back to the field label (still labelled)', async () => {
+	// A form rendered without resolveConsentStatements has no statement to show. The field is
+	// misconfigured either way, but it must not degrade into an unlabelled control.
+	it('a consent field with no resolved statement is still a labelled control', async () => {
 		const { container } = render(
 			<Form
 				form={doc([
-					{
-						blockType: 'consent',
-						name: 'terms',
-						label: 'I agree to the terms',
-						statement: '',
-						source: 'static',
-						sourceConfig: { label: 'Terms of Service', url: 'https://example.com/terms' },
-					} as FormFieldInstance,
+					{ blockType: 'consent', name: 'terms', source: 'terms-of-service' } as FormFieldInstance,
 				])}
 			/>
 		)
 		expect(await axeViolations(container)).toEqual([])
-		expect(screen.getByText('I agree to the terms')).toBeTruthy()
+		expect(screen.getByRole('checkbox')).toHaveAccessibleName('terms')
 	})
 
 	it('a consent field with a rich text statement containing an inline link has no structural violations', async () => {
@@ -117,8 +113,8 @@ describe('Form accessibility (axe)', () => {
 					{
 						blockType: 'consent',
 						name: 'terms',
+						source: 'privacy',
 						statement,
-						source: 'static',
 					} as FormFieldInstance,
 				])}
 			/>

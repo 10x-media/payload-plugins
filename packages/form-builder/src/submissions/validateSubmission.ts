@@ -1,7 +1,8 @@
 import { APIError, type CollectionBeforeValidateHook, ValidationError } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
-import type { ConsentSourceRegistry } from '../consent/registry'
+import { resolveConsentEntries } from '../consent/resolveConsentEntries'
+import type { ConsentSourceEntry, ConsentSourcesResolver } from '../consent/types'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
 import { applyPollOptions } from '../poll/applyPollOptions'
@@ -19,7 +20,8 @@ import { POLL_CONTEXT_KEY } from './votedCookie'
 export type ValidateSubmissionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry: ConsentSourceRegistry
+	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
+	consentSources?: ConsentSourcesResolver
 	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
 	uploadSlug?: string
 	/** Registered poll option sources; a form's configured `optionSource` resolves through this at validation time. */
@@ -31,13 +33,14 @@ export type ValidateSubmissionArgs = {
  * field's required check, intrinsic validator, and declarative rules through `runSubmission`, threading
  * `req`/`payload` so server-only async rules can hit the DB, and throws a Payload `ValidationError` with
  * per-field paths on any error-severity failure. The client is never trusted.
- * Consent fields are captured into `result.consent` (array of proofs, one per visible consent field).
+ * Consent fields are captured into `result.consent` (array of proofs, one per visible consent field),
+ * built from the host's sources re-resolved here rather than from anything the form or client carries.
  */
 export const validateSubmission =
 	({
 		registry,
 		ruleRegistry,
-		consentRegistry,
+		consentSources,
 		uploadSlug,
 		pollSourceRegistry,
 	}: ValidateSubmissionArgs): CollectionBeforeValidateHook =>
@@ -115,12 +118,29 @@ export const validateSubmission =
 				? (req.context[IDENTITY_CONTEXT_KEY] as string)
 				: undefined
 
+		// Every consent proof is built from the source as it reads right now, not from anything the
+		// form or the client carries, so a resolver failure rejects the submission rather than
+		// recording an agreement to a statement the server cannot vouch for.
+		let consentEntries: ConsentSourceEntry[] = []
+		if (consentSources && fields.some((field) => field.blockType === 'consent')) {
+			try {
+				consentEntries = await resolveConsentEntries({
+					payload: req.payload,
+					req,
+					form,
+					sources: consentSources,
+				})
+			} catch {
+				throw new APIError(asTranslate(req.i18n.t)(keys.consentSourcesUnavailable), 503)
+			}
+		}
+
 		const result = await runSubmission({
 			fields,
 			values: incoming,
 			registry,
 			ruleRegistry,
-			consentRegistry,
+			consentEntries,
 			locale,
 			t,
 			operation: 'create',

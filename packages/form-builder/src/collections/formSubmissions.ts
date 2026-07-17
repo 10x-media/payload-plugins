@@ -3,7 +3,7 @@ import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
-import type { ConsentSourceRegistry } from '../consent/registry'
+import type { ConsentSourcesResolver } from '../consent/types'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
@@ -25,7 +25,8 @@ export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 type BuildSubmissionsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry: ConsentSourceRegistry
+	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
+	consentSources?: ConsentSourcesResolver
 	actionRegistry?: ActionRegistry
 	events?: FormEventSink
 	/** Whether a job runner is likely present; gates the queued vs bounded-inline dispatch path. */
@@ -165,7 +166,7 @@ const makeVotedCookieHook = (): CollectionAfterChangeHook => {
 export const buildSubmissionsCollection = ({
 	registry,
 	ruleRegistry,
-	consentRegistry,
+	consentSources,
 	actionRegistry = new Map(),
 	events,
 	hasRunner = false,
@@ -234,7 +235,7 @@ export const buildSubmissionsCollection = ({
 				validateSubmission({
 					registry,
 					ruleRegistry,
-					consentRegistry,
+					consentSources,
 					uploadSlug,
 					pollSourceRegistry,
 				}),

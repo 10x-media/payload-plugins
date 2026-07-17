@@ -10,12 +10,10 @@ import type { FormFieldInstance } from './types'
 
 const registry = buildRegistry(defaultFieldDefinitions)
 const ruleRegistry = buildRuleRegistry(defaultValidationRules)
-const consentRegistry = new Map()
 const t = (key: string) => key
 const base = {
 	registry,
 	ruleRegistry,
-	consentRegistry,
 	locale: 'en',
 	t,
 	operation: 'create' as const,
@@ -152,7 +150,7 @@ describe('runSubmission', () => {
 	})
 
 	it('rejects a required consent submitted as the string "false"', async () => {
-		const fields: FormFieldInstance[] = [{ blockType: 'consent', name: 'terms', label: 'I agree' }]
+		const fields: FormFieldInstance[] = [{ blockType: 'consent', name: 'terms', required: true }]
 		const result = await runSubmission({
 			...base,
 			fields,

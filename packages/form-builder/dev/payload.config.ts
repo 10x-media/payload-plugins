@@ -4,8 +4,13 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { buildConfig, type CollectionConfig } from 'payload'
-import { definePollOptionSource, formBuilder } from '../src/index'
+import { buildConfig, type CollectionConfig, type GlobalConfig, type PayloadRequest } from 'payload'
+import {
+	type ConsentSourceEntry,
+	consentSourcesField,
+	definePollOptionSource,
+	formBuilder,
+} from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -27,6 +32,69 @@ const formUploads: CollectionConfig = {
 	upload: { staticDir: path.resolve(dirname, 'uploads') },
 	access: { create: () => true },
 	fields: [],
+}
+
+// Policy pages with drafts on: a consent proof against one of these pins the published version it
+// was agreed to.
+const legalPages: CollectionConfig = {
+	slug: 'legal-pages',
+	admin: { useAsTitle: 'title' },
+	versions: { drafts: true },
+	fields: [
+		{ name: 'title', type: 'text', required: true },
+		{ name: 'slug', type: 'text', required: true },
+	],
+}
+
+// The same idea without versions, proving the other half: proofs stay id-based and carry no
+// versionRef at all rather than a fabricated one.
+const notices: CollectionConfig = {
+	slug: 'notices',
+	admin: { useAsTitle: 'title' },
+	fields: [
+		{ name: 'title', type: 'text', required: true },
+		{ name: 'slug', type: 'text', required: true },
+	],
+}
+
+// Where this app keeps its consent statements. Any collection or global works; a multi-tenant app
+// would place the field on its tenant document and scope the resolver below by req instead.
+const settings: GlobalConfig = {
+	slug: 'settings',
+	fields: [consentSourcesField({ relationTo: ['legal-pages', 'notices'] })],
+}
+
+type ConsentSourceRow = {
+	key?: string | null
+	label?: string | null
+	statement?: unknown
+	page?: { relationTo: string; value: unknown } | null
+}
+
+/**
+ * Reads the placed field back for the request's locale, mapping rows to entries. `url` is this
+ * app's own routing (only the host knows how a document id becomes a public URL), while `page`
+ * stays an id so a page can be renamed or re-slugged without stranding past proofs.
+ */
+const consentSources = async ({ req }: { req: PayloadRequest }): Promise<ConsentSourceEntry[]> => {
+	const doc = await req.payload.findGlobal({ slug: 'settings', depth: 1, locale: req.locale, req })
+	const rows = (doc.consentSources ?? []) as ConsentSourceRow[]
+	return rows.flatMap((row): ConsentSourceEntry[] => {
+		if (!row.key) {
+			return []
+		}
+		const page = row.page
+		const doc = page?.value as { id?: number | string; slug?: string } | undefined
+		return [
+			{
+				key: row.key,
+				...(row.label ? { label: row.label } : {}),
+				...(row.statement != null ? { statement: row.statement } : {}),
+				...(page && doc?.id != null ? { page: { relationTo: page.relationTo, id: doc.id } } : {}),
+				...(doc?.slug ? { url: `/${page?.relationTo}/${doc.slug}` } : {}),
+			},
+		]
+	})
 }
 
 // Demo option source: a sourced poll's choices and outcome come from domain data instead of
@@ -70,9 +138,14 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [users, formUploads],
+	collections: [users, formUploads, legalPages, notices],
+	globals: [settings],
 	plugins: [
-		formBuilder({ uploads: { collection: 'form-uploads' }, poll: { sources: { athletes } } }),
+		formBuilder({
+			uploads: { collection: 'form-uploads' },
+			poll: { sources: { athletes } },
+			consent: { sources: consentSources },
+		}),
 	],
 	telemetry: false,
 	onInit: async (payload) => {

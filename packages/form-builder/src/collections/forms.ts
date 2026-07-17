@@ -17,7 +17,8 @@ import {
 import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
-import type { ConsentSourceRegistry } from '../consent/registry'
+import { resolveConsentSourcesRequest } from '../consent/resolveConsentSourcesRequest'
+import type { ConsentSourcesResolver } from '../consent/types'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
 import { localizedIf } from '../fields/localizedIf'
 import type { FieldTypeRegistry } from '../fields/registry'
@@ -106,7 +107,11 @@ const stampFileCollections = (rows: FieldRow[], slug: string): void => {
 type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry?: ConsentSourceRegistry
+	/**
+	 * The plugin `consent.sources` option. Present: the `/:id/consent-sources` endpoint backing the
+	 * consent field's source select is registered. Absent: neither it nor the consent field type exists.
+	 */
+	consentSources?: ConsentSourcesResolver
 	actionRegistry?: ActionRegistry
 	localizeContent?: boolean
 	/** The plugin `richText` option; `editor` overrides the response message's richText editor. */
@@ -131,7 +136,7 @@ export const buildFormsCollection = ({
 	overrides,
 	registry,
 	ruleRegistry,
-	consentRegistry,
+	consentSources,
 	actionRegistry = new Map(),
 	localizeContent = true,
 	richText,
@@ -205,12 +210,7 @@ export const buildFormsCollection = ({
 	const fieldsField: Field = {
 		name: 'fields',
 		type: 'blocks',
-		blocks: buildFieldBlocks({
-			registry,
-			ruleRegistry,
-			consentRegistry,
-			localize: localizeContent,
-		}),
+		blocks: buildFieldBlocks({ registry, ruleRegistry, localize: localizeContent }),
 	}
 
 	const flowField: Field = {
@@ -482,6 +482,24 @@ export const buildFormsCollection = ({
 				return Response.json(body, { status })
 			},
 		},
+		...(consentSources
+			? [
+					{
+						path: '/:id/consent-sources',
+						method: 'get' as const,
+						handler: async (req: PayloadRequest) => {
+							const { status, body } = await resolveConsentSourcesRequest({
+								payload: req.payload,
+								formId: req.routeParams?.id as number | string | undefined,
+								isAuthed: Boolean(req.user),
+								req,
+								resolver: consentSources,
+							})
+							return Response.json(body, { status })
+						},
+					},
+				]
+			: []),
 		// The route id is unused: the from-addresses set is request-scoped (e.g. per tenant), not
 		// per-form. Registered as a doc-scoped route only so the admin field can reuse
 		// EndpointOptionsSelect unmodified (see buildFromField).

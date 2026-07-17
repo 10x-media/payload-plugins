@@ -1,7 +1,5 @@
 import type { Block, Field, TabsField } from 'payload'
 import { buildConditionTypeMap } from '../conditions/conditionType'
-import { buildConsentSourceConfig } from '../consent/buildConsentSourceConfig'
-import type { ConsentSourceRegistry } from '../consent/registry'
 import { keys } from '../translations/keys'
 import { labelFor } from '../translations/server'
 import { buildRuleBlocks } from '../validation/buildRuleBlocks'
@@ -34,21 +32,19 @@ const fieldTabOf = (block: Block): Field[] | undefined => {
 type BuildFieldBlocksArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry?: ConsentSourceRegistry
 	localize?: boolean
 }
 
 export const buildFieldBlocks = ({
 	registry,
 	ruleRegistry,
-	consentRegistry,
 	localize = true,
 }: BuildFieldBlocksArgs): Block[] => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const blocks: Block[] = []
 	const bareSlugs = new Set<string>()
 	for (const definition of registry.values()) {
-		let typeConfig: Field[] = definition.config ?? []
+		const typeConfig: Field[] = definition.config ?? []
 
 		if (definition.bare === true) {
 			bareSlugs.add(definition.type)
@@ -58,20 +54,6 @@ export const buildFieldBlocks = ({
 				fields: typeConfig,
 			})
 			continue
-		}
-
-		// Inject dynamic source select + conditional sourceConfig group for the consent field.
-		// consent.ts intentionally omits source/sourceConfig; the live registry drives the
-		// select options and per-source field visibility (admin.condition).
-		if (definition.type === 'consent' && consentRegistry) {
-			// statement is first; optional is last; source/sourceConfig go in between.
-			const statement = typeConfig.find((f) => (f as { name?: string }).name === 'statement')
-			const optional = typeConfig.find((f) => (f as { name?: string }).name === 'optional')
-			typeConfig = [
-				...(statement ? [statement] : []),
-				...buildConsentSourceConfig(consentRegistry),
-				...(optional ? [optional] : []),
-			]
 		}
 
 		blocks.push({

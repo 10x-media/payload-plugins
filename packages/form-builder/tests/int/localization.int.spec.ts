@@ -69,16 +69,8 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 		expect(isLocalized(namedField(optionFields, 'value'))).toBe(false)
 	})
 
-	it('localizes the consent statement and static source label but not the url', () => {
-		const consentBlock = blockOf(formsFields(booted), 'fields', 'consent')
-		const fields = consentBlock?.fields ?? []
-		expect(isLocalized(namedField(fields, 'statement'))).toBe(true)
-		const sourceConfig = namedField(fields, 'sourceConfig')
-		const sourceFields = sourceConfig && 'fields' in sourceConfig ? sourceConfig.fields : []
-		expect(isLocalized(namedField(sourceFields, 'label'))).toBe(true)
-		expect(isLocalized(namedField(sourceFields, 'url'))).toBe(false)
-		expect(isLocalized(namedField(sourceFields, 'version'))).toBe(false)
-	})
+	// Consent carries no localized content of its own: the statement lives on the host's placed
+	// `consentSourcesField()`, whose own `localized` option covers it (see its unit tests).
 
 	it('localizes the repeater add label but not the row bounds', () => {
 		const repeaterBlock = blockOf(formsFields(booted), 'fields', 'repeater')

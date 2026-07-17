@@ -6,9 +6,8 @@ import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
 import type { ButtonsOption } from './collections/buttonFields'
-import { buildDefaultConsentSources } from './consent/builtin'
-import type { ConsentSourcesConfig } from './consent/registry'
-import { resolveConsentSources } from './consent/registry'
+import { stashConsentSources } from './consent/resolveConsentEntries'
+import type { ConsentSourcesResolver } from './consent/types'
 import type { FormEventSink } from './events/types'
 import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from './fields/registry'
@@ -37,14 +36,15 @@ export type FormBuilderPluginOptions = {
 	/** Pluggable sink for form lifecycle events. Defaults to a no-op; analytics adapters or a future analytics plugin subscribe here. */
 	events?: FormEventSink
 	/**
-	 * Content-bearing author fields (labels, placeholders, option labels, consent statements,
-	 * action subjects and bodies) are localized by default. Payload strips the `localized` flag
-	 * on hosts without `localization` configured, so the default is safe everywhere. Set `false`
-	 * to keep form content single-locale even on localized hosts. Spread-overrides of the prebuilt
-	 * default exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`,
-	 * `defaultConsentSources`) carry `localized` flags from the default-true set; when opting out,
-	 * derive overrides from `buildDefaultFieldDefinitions(false)` /
-	 * `buildDefaultActionDefinitions(false)` / `buildDefaultConsentSources(false)` instead.
+	 * Content-bearing author fields (labels, placeholders, option labels, action subjects and
+	 * bodies) are localized by default. Payload strips the `localized` flag on hosts without
+	 * `localization` configured, so the default is safe everywhere. Set `false` to keep form
+	 * content single-locale even on localized hosts. Spread-overrides of the prebuilt default
+	 * exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`) carry `localized`
+	 * flags from the default-true set; when opting out, derive overrides from
+	 * `buildDefaultFieldDefinitions(false)` / `buildDefaultActionDefinitions(false)` instead.
+	 * Consent statements are unaffected either way: they live on the host's own
+	 * `consentSourcesField()`, which carries its own `localized` option.
 	 */
 	localizeContent?: boolean
 	/** Add, override, or remove field types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
@@ -76,8 +76,21 @@ export type FormBuilderPluginOptions = {
 	 * action actually sends (the config is admin-authored, not visitor-controlled).
 	 */
 	email?: { fromAddresses?: FromAddressesResolver }
-	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
-	consentSources?: ConsentSourcesConfig
+	/**
+	 * Where the consent statements a form can reference come from. Absent (the default): no sources,
+	 * so the built-in `consent` field type is not registered at all and authors cannot add a consent
+	 * field with nothing to reference (a developer-registered custom `consent` type via `fields`
+	 * still wins).
+	 *
+	 * `sources` is an async `req`-scoped resolver returning the sources available to this request.
+	 * The intended shape: place `consentSourcesField()` on a collection or global you own and read it
+	 * back here. Multi-tenant hosts scope that read by the tenant derived from `req`, so a tenant's
+	 * authors only ever see, and their visitors only ever agree to, their own statements. A form
+	 * stores only a source's `key`; the statement is resolved live per request (see
+	 * `resolveConsentStatements`) and the proof is rebuilt from the source at submit, so neither is
+	 * ever a copy the client could stale or forge.
+	 */
+	consent?: { sources: ConsentSourcesResolver }
 	/**
 	 * Form-level button labels. Every form carries a `buttons` group (`submitLabel`, `nextLabel`,
 	 * `backLabel`) at the bottom of its Fields tab; the rendered chrome resolves each label as
@@ -151,18 +164,21 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const localizeContent = options.localizeContent !== false
 		const uploads = options.uploads ?? false
-		// Without an uploads collection the built-in file type has nowhere to store anything, so it
-		// never enters the registry; an explicit `fields.file` definition remains a developer choice.
+		const consentSources = options.consent?.sources
+		// A built-in with nowhere to point never enters the registry, so an author is never offered a
+		// field that cannot work: file without an uploads collection has nowhere to store anything,
+		// consent without sources has no statement to reference. An explicit `fields.file` /
+		// `fields.consent` definition remains a developer choice.
 		const defaultFieldDefinitions = buildDefaultFieldDefinitions(
 			localizeContent,
 			options.richText?.editor
-		).filter((definition) => uploads !== false || definition.type !== 'file')
+		).filter(
+			(definition) =>
+				(uploads !== false || definition.type !== 'file') &&
+				(consentSources !== undefined || definition.type !== 'consent')
+		)
 		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
 		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
-		const consentRegistry = resolveConsentSources(
-			buildDefaultConsentSources(localizeContent),
-			options.consentSources
-		)
 		const fromAddresses = options.email?.fromAddresses
 		const actionRegistry = resolveActions(
 			buildDefaultActionDefinitions(
@@ -174,15 +190,19 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		)
 		const spam = resolveSpamConfig(options.spam)
 		const pollSourceRegistry = resolvePollOptionSources(options.poll?.sources)
-		// Stashed on config.custom so the root-level resolvePollOptions helper can reach the
-		// registry through `payload.config` at request time, without threading plugin state.
+		// Stashed on config.custom so the root-level resolvePollOptions and resolveConsentStatements
+		// helpers can reach these through `payload.config` at request time, without threading plugin
+		// state through the host's own server code.
 		config.custom = stashPollOptionSources(config.custom, pollSourceRegistry)
+		if (consentSources) {
+			config.custom = stashConsentSources(config.custom, consentSources)
+		}
 		registerTranslations(config, options.translations)
 		registerCollections({
 			config,
 			registry,
 			ruleRegistry,
-			consentRegistry,
+			consentSources,
 			actionRegistry,
 			richText: options.richText,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
@@ -266,25 +286,32 @@ export {
 } from './collections/buttonFields'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
-export { buildDefaultConsentSources, defaultConsentSources } from './consent/builtin'
+export { applyConsentStatements } from './consent/applyConsentStatements'
 export type { ConsentProof } from './consent/captureConsent'
 export { captureConsent } from './consent/captureConsent'
-export type {
-	AnyConsentSource,
-	ConsentLink,
-	ConsentResolveArgs,
-	ConsentResolved,
-	ConsentSource,
-} from './consent/defineConsentSource'
-export { defineConsentSource } from './consent/defineConsentSource'
+export type { ConsentSourcesFieldOptions } from './consent/consentSourcesField'
+export { consentSourcesField } from './consent/consentSourcesField'
+export type { ResolveConsentEntriesArgs } from './consent/resolveConsentEntries'
+export { resolveConsentEntries } from './consent/resolveConsentEntries'
 export type {
 	ConsentSourceOption,
-	ConsentSourceRegistry,
-	ConsentSourcesConfig,
-} from './consent/registry'
-export { resolveConsentSources } from './consent/registry'
-export { resolveConsentLinks } from './consent/resolveConsentLinks'
+	ResolveConsentSourcesRequestArgs,
+	ResolveConsentSourcesRequestResult,
+} from './consent/resolveConsentSourcesRequest'
+export { resolveConsentSourcesRequest } from './consent/resolveConsentSourcesRequest'
+export type {
+	ConsentStatement,
+	ConsentStatements,
+	ResolveConsentStatementsArgs,
+} from './consent/resolveConsentStatements'
+export { resolveConsentStatements } from './consent/resolveConsentStatements'
+export type { ResolvePublishedVersionRefArgs } from './consent/resolvePublishedVersionRef'
 export { resolvePublishedVersionRef } from './consent/resolvePublishedVersionRef'
+export type {
+	ConsentSourceEntry,
+	ConsentSourcePage,
+	ConsentSourcesResolver,
+} from './consent/types'
 export {
 	buildDefaultFieldDefinitions,
 	defaultFieldDefinitions,

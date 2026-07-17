@@ -7,7 +7,7 @@ Form fields are authored as Payload blocks: one block type per registered field 
 
 ## Core field types
 
-`text`, `textarea`, `email`, `number`, `date`, `select`, `checkbox`, `file`, `consent`, `calculation`, `repeater`, and `message`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads) (the `file` type only exists once an uploads collection is [configured](/form-builder/uploads#bring-your-own-collection)), [Consent](/form-builder/consent), [Calculations](/form-builder/calculations).
+`text`, `textarea`, `email`, `number`, `date`, `select`, `checkbox`, `file`, `consent`, `calculation`, `repeater`, and `message`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads) (the `file` type only exists once an uploads collection is [configured](/form-builder/uploads#bring-your-own-collection)), [Consent](/form-builder/consent) (likewise, only once [consent sources](/form-builder/consent#setting-it-up) are), [Calculations](/form-builder/calculations).
 
 ## Authoring layout
 
@@ -17,7 +17,7 @@ A type leaves out the basics it never reads via `omitShared`, so an author is ne
 
 ## Content localization
 
-Content-bearing authoring fields (labels, placeholders, descriptions, select option labels, consent statements, repeater add labels, message content) are `localized: true` by default, so on a host with Payload `localization` configured, editors translate form content per locale out of the box. Payload strips the flag on hosts without localization, so the default is safe everywhere. Opt out with the plugin option `localizeContent: false` (see [i18n](/form-builder/i18n#content-vs-ui-strings) for the content-versus-UI-strings distinction and [Customization](/form-builder/customization#tweaking-one-built-in) for the interplay with spread-overrides).
+Content-bearing authoring fields (labels, placeholders, descriptions, select option labels, repeater add labels, message content) are `localized: true` by default, so on a host with Payload `localization` configured, editors translate form content per locale out of the box. Payload strips the flag on hosts without localization, so the default is safe everywhere. Opt out with the plugin option `localizeContent: false` (see [i18n](/form-builder/i18n#content-vs-ui-strings) for the content-versus-UI-strings distinction and [Customization](/form-builder/customization#tweaking-one-built-in) for the interplay with spread-overrides).
 
 ## Message
 

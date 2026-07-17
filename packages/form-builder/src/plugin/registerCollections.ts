@@ -7,7 +7,7 @@ import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
 import type { ButtonsOption } from '../collections/buttonFields'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
-import type { ConsentSourceRegistry } from '../consent/registry'
+import type { ConsentSourcesResolver } from '../consent/types'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { PollOptionSourceRegistry } from '../poll/registry'
@@ -20,7 +20,7 @@ type RegisterCollectionsArgs = {
 	config: Config
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry: ConsentSourceRegistry
+	consentSources?: ConsentSourcesResolver
 	actionRegistry: ActionRegistry
 	richText?: RichTextBodyOption
 	hasJobsPlugin: boolean
@@ -44,7 +44,7 @@ export const registerCollections = ({
 	config,
 	registry,
 	ruleRegistry,
-	consentRegistry,
+	consentSources,
 	actionRegistry,
 	richText,
 	hasJobsPlugin,
@@ -73,7 +73,7 @@ export const registerCollections = ({
 		buildFormsCollection({
 			registry,
 			ruleRegistry,
-			consentRegistry,
+			consentSources,
 			actionRegistry,
 			localizeContent,
 			richText,
@@ -87,7 +87,7 @@ export const registerCollections = ({
 		buildSubmissionsCollection({
 			registry,
 			ruleRegistry,
-			consentRegistry,
+			consentSources,
 			actionRegistry,
 			richText,
 			events,
