@@ -176,6 +176,32 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		expect(onChange).toHaveBeenCalledWith(true)
 	})
 
+	it('consent: marks a required statement, like every other labelled field', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: { blockType: 'consent', name: 'terms', statement: 'I agree to the terms' },
+					required: true,
+				})
+			)
+		)
+		expect(container.textContent).toContain('I agree to the terms *')
+	})
+
+	it('consent: renders no dangling marker when there is no statement or label', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: { blockType: 'consent', name: 'terms' },
+					required: true,
+				})
+			)
+		)
+		expect(container.textContent).not.toContain('*')
+	})
+
 	it('consent: prefers consentLinks over sourceConfig when both are present', () => {
 		const { container } = render(
 			createElement(

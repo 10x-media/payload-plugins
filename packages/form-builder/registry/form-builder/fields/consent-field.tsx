@@ -82,6 +82,11 @@ export const consentField = defineFieldRenderer<boolean>(
 					) : statement ? (
 						<span className="text-sm">{statement}</span>
 					) : null}
+					{required && (html || statement) ? (
+						<span aria-hidden className="text-destructive">
+							{' *'}
+						</span>
+					) : null}
 				</div>
 				{links.length > 0 ? (
 					<span className="flex flex-wrap gap-3">
