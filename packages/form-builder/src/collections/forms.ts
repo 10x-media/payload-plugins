@@ -374,10 +374,15 @@ export const buildFormsCollection = ({
 					label: labelForKey(keys.pollResultsField),
 					validate: buildValidateResultsField(pollResultsTypes),
 					admin: {
-						description: labelForKey(keys.pollResultsFieldDescription),
 						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
 						components: {
-							Field: { path: FIELD_NAME_SELECT_REF, clientProps: { types: pollResultsTypes } },
+							Field: {
+								path: FIELD_NAME_SELECT_REF,
+								clientProps: {
+									types: pollResultsTypes,
+									descriptionKey: keys.pollResultsFieldDescription,
+								},
+							},
 						},
 					},
 				},

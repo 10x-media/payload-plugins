@@ -1,6 +1,7 @@
 'use client'
 
 import {
+	FieldDescription,
 	FieldLabel,
 	ReactSelect,
 	type ReactSelectOption,
@@ -10,16 +11,24 @@ import {
 import { reduceFieldsToValues } from 'payload/shared'
 import { useMemo } from 'react'
 import { fieldNamesOfType } from '../fields/fieldNamesOfType'
+import type { TranslationKey } from '../translations/keys'
+import { useTranslation } from '../translations/useTranslation'
 import type { FieldRow } from './synthesizeClientField'
 import { toStaticLabel } from './toStaticLabel'
 
 /** Props: standard JSON/text field client props plus the `types` allow-list we pass via clientProps. */
 export type FieldNameSelectProps = {
 	path?: string
-	field?: { label?: unknown }
+	field?: { label?: unknown; admin?: { description?: unknown } }
 	label?: unknown
 	/** Sibling `fields` blocks whose `blockType` is in this list populate the select's options. */
 	types: string[]
+	/**
+	 * Field description as a translation key, resolved client-side. Payload drops `admin.description`
+	 * functions from client fields, so a translated description must travel as a key; a static
+	 * `admin.description` string still renders when this is unset.
+	 */
+	descriptionKey?: TranslationKey
 }
 
 const optionsFromData = (data: Record<string, unknown>, types: string[]): ReactSelectOption[] => {
@@ -49,6 +58,10 @@ const optionsFromData = (data: Record<string, unknown>, types: string[]): ReactS
 export const FieldNameSelect = (props: FieldNameSelectProps) => {
 	const { path, setValue, value } = useField<string>({ path: props.path })
 	const label = toStaticLabel(props.field?.label ?? props.label)
+	const { t } = useTranslation()
+	const description = props.descriptionKey
+		? t(props.descriptionKey)
+		: toStaticLabel(props.field?.admin?.description)
 
 	const optionsJson = useFormFields(([fields]) =>
 		JSON.stringify(optionsFromData(reduceFieldsToValues(fields, true), props.types))
@@ -74,6 +87,7 @@ export const FieldNameSelect = (props: FieldNameSelectProps) => {
 				isClearable
 				onChange={handleChange}
 			/>
+			<FieldDescription description={description} path={path} />
 		</div>
 	)
 }

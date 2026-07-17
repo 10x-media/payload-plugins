@@ -51,8 +51,15 @@ export const buildConfirmation = (
 				type: 'text',
 				label: labelFor(keys.actionConfigToField),
 				admin: {
-					description: labelFor(keys.actionConfigToFieldDescription),
-					components: { Field: { path: TO_FIELD_REF, clientProps: { types: ['email'] } } },
+					components: {
+						Field: {
+							path: TO_FIELD_REF,
+							clientProps: {
+								types: ['email'],
+								descriptionKey: keys.actionConfigToFieldDescription,
+							},
+						},
+					},
 				},
 				validate: validateToField,
 			},

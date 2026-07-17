@@ -72,8 +72,12 @@ export const fileField = defineFormField<'file', FileConfig>({
 			min: 0,
 			label: labelFor(keys.fileConfigMaxSize),
 			admin: {
-				description: labelFor(keys.fileConfigMaxSizeDescription),
-				components: { Field: MAX_SIZE_REF },
+				components: {
+					Field: {
+						path: MAX_SIZE_REF,
+						clientProps: { descriptionKey: keys.fileConfigMaxSizeDescription },
+					},
+				},
 			},
 		},
 	],

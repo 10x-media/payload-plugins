@@ -26,7 +26,7 @@ const resultsFieldOf = (collection: CollectionConfig) => {
 
 const clientComponentOf = (field: Extract<Field, { type: 'text' }>) =>
 	field.admin?.components?.Field as
-		| { path?: string; clientProps?: { types?: string[] } }
+		| { path?: string; clientProps?: { types?: string[]; descriptionKey?: string } }
 		| undefined
 
 const groupNamed = (fields: Field[], name: string): Extract<Field, { type: 'group' }> => {
@@ -118,6 +118,17 @@ describe('forms poll.resultsField', () => {
 		expect(component?.clientProps?.types).toEqual(['select'])
 	})
 
+	it('threads the PII-warning description in as a translation key, not admin.description', () => {
+		const field = resultsFieldOf(buildCollection())
+		// A custom Field component replaces Payload's whole default render, including the
+		// description slot, so admin.description would be silently inert here; the description
+		// must travel as a clientProp the component resolves and renders itself.
+		expect(clientComponentOf(field)?.clientProps?.descriptionKey).toBe(
+			'formBuilder:poll.resultsFieldDescription'
+		)
+		expect(field.admin?.description).toBeUndefined()
+	})
+
 	it('threads custom pollEligible types into the select options', () => {
 		const athleteVote: AnyFormFieldDefinition = {
 			type: 'athleteVote',
@@ -129,10 +140,9 @@ describe('forms poll.resultsField', () => {
 		expect(clientComponentOf(field)?.clientProps?.types).toEqual(['select', 'athleteVote'])
 	})
 
-	it('stores a plain text name, keeps the PII description, and stays gated on enabled', () => {
+	it('stores a plain text name and stays gated on enabled', () => {
 		const field = resultsFieldOf(buildCollection())
 		expect(field.type).toBe('text')
-		expect(field.admin?.description).toBeDefined()
 		expect(typeof field.validate).toBe('function')
 		const condition = field.admin?.condition
 		expect(condition?.({}, { enabled: true }, {} as never)).toBe(true)

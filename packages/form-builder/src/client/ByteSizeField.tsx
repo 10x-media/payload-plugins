@@ -2,6 +2,8 @@
 
 import { FieldDescription, FieldLabel, useField } from '@payloadcms/ui'
 import type { ChangeEvent } from 'react'
+import type { TranslationKey } from '../translations/keys'
+import { useTranslation } from '../translations/useTranslation'
 import { formatBytes } from '../uploads/formatBytes'
 import { toStaticLabel } from './toStaticLabel'
 
@@ -10,6 +12,12 @@ export type ByteSizeFieldProps = {
 	path?: string
 	field?: { label?: unknown; admin?: { description?: unknown } }
 	label?: unknown
+	/**
+	 * Field description as a translation key, resolved client-side. Payload drops `admin.description`
+	 * functions from client fields, so a translated description must travel as a key; a static
+	 * `admin.description` string still renders when this is unset.
+	 */
+	descriptionKey?: TranslationKey
 }
 
 /**
@@ -20,7 +28,10 @@ export type ByteSizeFieldProps = {
 export const ByteSizeField = (props: ByteSizeFieldProps) => {
 	const { path, setValue, value } = useField<number>({ path: props.path })
 	const label = toStaticLabel(props.field?.label ?? props.label)
-	const description = toStaticLabel(props.field?.admin?.description)
+	const { t } = useTranslation()
+	const description = props.descriptionKey
+		? t(props.descriptionKey)
+		: toStaticLabel(props.field?.admin?.description)
 
 	const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
 		if (event.target.value === '') {

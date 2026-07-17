@@ -237,6 +237,26 @@ describe('confirmation', () => {
 		expect(component?.path).toBe('@10x-media/form-builder/client#EndpointOptionsSelect')
 		expect(component?.clientProps?.endpoint).toBe('from-addresses')
 	})
+
+	const toFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
+		definition.config?.find((field) => 'name' in field && field.name === 'toField') as
+			| { admin?: { components?: { Field?: unknown }; description?: unknown } }
+			| undefined
+
+	it('mounts FieldNameSelect on toField with the PII-warning description as a translation key', () => {
+		const field = toFieldOf(buildConfirmation(true))
+		const component = field?.admin?.components?.Field as
+			| { path?: string; clientProps?: { types?: string[]; descriptionKey?: string } }
+			| undefined
+		expect(component?.path).toBe('@10x-media/form-builder/client#FieldNameSelect')
+		expect(component?.clientProps?.types).toEqual(['email'])
+		// A custom Field component replaces Payload's whole default render, including the
+		// description slot, so admin.description would be silently inert here.
+		expect(component?.clientProps?.descriptionKey).toBe(
+			'formBuilder:action.config.toFieldDescription'
+		)
+		expect(field?.admin?.description).toBeUndefined()
+	})
 })
 
 describe('validateToField', () => {
