@@ -88,6 +88,7 @@ export const buildFieldBlocks = ({
 						blocks: buildRuleBlocks(ruleRegistry, definition.type),
 					},
 					localize,
+					omitShared: definition.omitShared,
 				}),
 			],
 		})

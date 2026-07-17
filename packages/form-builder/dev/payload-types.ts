@@ -603,7 +603,6 @@ export interface Form {
             name: string;
             label?: string | null;
             width: 'full' | 'half' | 'third' | 'twoThirds';
-            placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
             validations?:
@@ -652,9 +651,7 @@ export interface Form {
             name: string;
             label?: string | null;
             width: 'full' | 'half' | 'third' | 'twoThirds';
-            placeholder?: string | null;
             description?: string | null;
-            required?: boolean | null;
             expression?: {
               [k: string]: unknown;
             };
@@ -780,7 +777,6 @@ export interface Form {
             name: string;
             label?: string | null;
             width: 'full' | 'half' | 'third' | 'twoThirds';
-            placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
             uploadsCollection?: string | null;
@@ -850,7 +846,6 @@ export interface Form {
             name: string;
             label?: string | null;
             width: 'full' | 'half' | 'third' | 'twoThirds';
-            placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
             minRows?: number | null;
@@ -1279,7 +1274,6 @@ export interface Form {
                       name: string;
                       label?: string | null;
                       width: 'full' | 'half' | 'third' | 'twoThirds';
-                      placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
                       validations?:
@@ -1328,9 +1322,7 @@ export interface Form {
                       name: string;
                       label?: string | null;
                       width: 'full' | 'half' | 'third' | 'twoThirds';
-                      placeholder?: string | null;
                       description?: string | null;
-                      required?: boolean | null;
                       expression?: {
                         [k: string]: unknown;
                       };
@@ -1456,7 +1448,6 @@ export interface Form {
                       name: string;
                       label?: string | null;
                       width: 'full' | 'half' | 'third' | 'twoThirds';
-                      placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
                       uploadsCollection?: string | null;
@@ -1526,7 +1517,6 @@ export interface Form {
                       name: string;
                       label?: string | null;
                       width: 'full' | 'half' | 'third' | 'twoThirds';
-                      placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
                       validations?:
@@ -1635,7 +1625,6 @@ export interface Form {
             name: string;
             label?: string | null;
             width: 'full' | 'half' | 'third' | 'twoThirds';
-            placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
             validations?:
@@ -1820,6 +1809,11 @@ export interface Form {
     resultsField?: string | null;
     resultsVisibility?: ('afterVote' | 'afterClose') | null;
     closesAt?: string | null;
+    optionSource?: 'athletes' | null;
+    sourceConfig?: {
+      eventId?: string | null;
+      decidedWinner?: string | null;
+    };
     outcome?: {
       winningValue?: string | null;
       resolvedAt?: string | null;
@@ -2476,7 +2470,6 @@ export interface FormsSelect<T extends boolean = true> {
               name?: T;
               label?: T;
               width?: T;
-              placeholder?: T;
               description?: T;
               required?: T;
               validations?:
@@ -2512,9 +2505,7 @@ export interface FormsSelect<T extends boolean = true> {
               name?: T;
               label?: T;
               width?: T;
-              placeholder?: T;
               description?: T;
-              required?: T;
               expression?: T;
               calcDisplay?: T;
               validations?:
@@ -2600,7 +2591,6 @@ export interface FormsSelect<T extends boolean = true> {
               name?: T;
               label?: T;
               width?: T;
-              placeholder?: T;
               description?: T;
               required?: T;
               uploadsCollection?: T;
@@ -2639,7 +2629,6 @@ export interface FormsSelect<T extends boolean = true> {
               name?: T;
               label?: T;
               width?: T;
-              placeholder?: T;
               description?: T;
               required?: T;
               minRows?: T;
@@ -3025,7 +3014,6 @@ export interface FormsSelect<T extends boolean = true> {
                           name?: T;
                           label?: T;
                           width?: T;
-                          placeholder?: T;
                           description?: T;
                           required?: T;
                           validations?:
@@ -3061,9 +3049,7 @@ export interface FormsSelect<T extends boolean = true> {
                           name?: T;
                           label?: T;
                           width?: T;
-                          placeholder?: T;
                           description?: T;
-                          required?: T;
                           expression?: T;
                           calcDisplay?: T;
                           validations?:
@@ -3149,7 +3135,6 @@ export interface FormsSelect<T extends boolean = true> {
                           name?: T;
                           label?: T;
                           width?: T;
-                          placeholder?: T;
                           description?: T;
                           required?: T;
                           uploadsCollection?: T;
@@ -3188,7 +3173,6 @@ export interface FormsSelect<T extends boolean = true> {
                           name?: T;
                           label?: T;
                           width?: T;
-                          placeholder?: T;
                           description?: T;
                           required?: T;
                           validations?:
@@ -3270,7 +3254,6 @@ export interface FormsSelect<T extends boolean = true> {
               name?: T;
               label?: T;
               width?: T;
-              placeholder?: T;
               description?: T;
               required?: T;
               validations?:
@@ -3382,6 +3365,13 @@ export interface FormsSelect<T extends boolean = true> {
         resultsField?: T;
         resultsVisibility?: T;
         closesAt?: T;
+        optionSource?: T;
+        sourceConfig?:
+          | T
+          | {
+              eventId?: T;
+              decidedWinner?: T;
+            };
         outcome?:
           | T
           | {

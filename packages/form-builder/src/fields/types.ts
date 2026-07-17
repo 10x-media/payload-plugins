@@ -34,6 +34,13 @@ export type ValueOfKind<K extends FormFieldValueKind> = ValueKindTypeMap[K]
 /** Resolved per-instance config values for a field type (loose at the DB boundary, narrowed by the author's generic). */
 export type FormFieldConfigValues = Record<string, unknown>
 
+/**
+ * The shared config fields a type may drop via {@link FormFieldDefinition.omitShared}. `name` is
+ * deliberately absent and can never be dropped: it is the storage key every read and write path
+ * gates on (see `isNamedField`), so a named field without it would silently store nothing.
+ */
+export type OmittableSharedField = 'label' | 'placeholder' | 'description' | 'width' | 'required'
+
 /** A `t`-like resolver. The engine supplies one from the request i18n; the renderer will supply the client i18n. */
 export type Translate = (key: string) => string
 
@@ -99,6 +106,13 @@ export type FormFieldDefinition<
 	 */
 	bare?: boolean
 	/**
+	 * Shared config fields this type never uses, so authors are not offered a setting the renderer
+	 * ignores (e.g. a placeholder on a checkbox). Unlike `bare`, which drops the shared chrome
+	 * wholesale, this keeps the rest of it. An emptied layout row collapses and a lone survivor
+	 * spans the row (see `sharedFieldConfig`).
+	 */
+	omitShared?: OmittableSharedField[]
+	/**
 	 * The type can be chosen as a poll's results field. Its instances must produce enumerable
 	 * answers: either authored `options` or options resolved from a poll option source.
 	 */
@@ -138,6 +152,8 @@ export type AnyFormFieldDefinition = {
 	conditionType?: ConditionFieldType
 	/** See `FormFieldDefinition.bare`: the block is the definition's `config` alone, instances are nameless. */
 	bare?: boolean
+	/** See `FormFieldDefinition.omitShared`: shared config fields this type never uses, never authored. */
+	omitShared?: OmittableSharedField[]
 	/** See `FormFieldDefinition.pollEligible`: choosable as a poll's results field. */
 	pollEligible?: boolean
 }

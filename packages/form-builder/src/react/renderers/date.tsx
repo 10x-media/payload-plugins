@@ -26,7 +26,6 @@ export const dateRenderer = defineFieldRenderer<string>(
 					value={value ?? ''}
 					onChange={onChange}
 					onBlur={onBlur}
-					placeholder={typeof field.placeholder === 'string' ? field.placeholder : undefined}
 					required={required}
 					disabled={disabled}
 					invalid={errors.length > 0}

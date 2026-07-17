@@ -48,6 +48,7 @@ export type {
 	FormFieldFormat,
 	FormFieldValidate,
 	FormFieldValueKind,
+	OmittableSharedField,
 } from '../fields/types'
 export type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
 export type {

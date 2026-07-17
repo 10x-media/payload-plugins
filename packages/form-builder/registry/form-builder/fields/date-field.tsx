@@ -13,7 +13,6 @@ export const dateField = defineFieldRenderer<string>(
 		const invalid = errors.length > 0
 		const label = typeof field.label === 'string' ? field.label : undefined
 		const description = typeof field.description === 'string' ? field.description : undefined
-		const placeholder = typeof field.placeholder === 'string' ? field.placeholder : undefined
 
 		return (
 			<div className="grid gap-2">
@@ -32,7 +31,6 @@ export const dateField = defineFieldRenderer<string>(
 					name={name}
 					type="date"
 					value={value ?? ''}
-					placeholder={placeholder}
 					required={required}
 					disabled={disabled}
 					aria-invalid={invalid || undefined}

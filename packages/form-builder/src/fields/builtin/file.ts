@@ -57,6 +57,7 @@ export const fileField = defineFormField<'file', FileConfig>({
 	type: 'file',
 	label: keys.fieldTypeFile,
 	value: 'file',
+	omitShared: ['placeholder'],
 	config: [
 		{ name: 'uploadsCollection', type: 'text', admin: { hidden: true } },
 		{

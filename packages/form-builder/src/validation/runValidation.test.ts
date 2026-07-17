@@ -69,6 +69,26 @@ describe('runValidation', () => {
 		expect(result.errors).toEqual([{ message: 'formBuilder:validation.email', severity: 'error' }])
 	})
 
+	// `false` is a present value, so the required guard above never fires for a checked-then-unchecked
+	// box; only the checkbox's intrinsic validator rejects it. Guards both sides: this same engine
+	// runs on the client (validateFieldValue) and the server (runSubmission).
+	it('rejects a required checkbox submitted as an explicit false', async () => {
+		const result = await run({ blockType: 'checkbox', name: 'terms', required: true }, false)
+		expect(result.errors).toEqual([
+			{ message: 'formBuilder:validation.required', severity: 'error' },
+		])
+	})
+
+	it('accepts a required checkbox submitted as true', async () => {
+		const result = await run({ blockType: 'checkbox', name: 'terms', required: true }, true)
+		expect(result.errors).toEqual([])
+	})
+
+	it('accepts an optional checkbox submitted as false', async () => {
+		const result = await run({ blockType: 'checkbox', name: 'news' }, false)
+		expect(result.errors).toEqual([])
+	})
+
 	it('runs a declarative rule instance with a custom message', async () => {
 		const field: FormFieldInstance = {
 			blockType: 'text',

@@ -162,6 +162,46 @@ describe('runSubmission', () => {
 		expect(result.errors[0]?.path).toBe('terms')
 	})
 
+	// `false` is a present value, so the engine's required guard never fires on it; the checkbox's
+	// intrinsic validator is what stops a client posting an explicit refusal to a required box.
+	it('rejects a required checkbox submitted as false', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'checkbox', name: 'terms', label: 'I agree', required: true },
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'terms', value: false }],
+		})
+		expect(result.errors).toEqual([{ path: 'terms', message: 'formBuilder:validation.required' }])
+	})
+
+	it('accepts a required checkbox submitted as true', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'checkbox', name: 'terms', label: 'I agree', required: true },
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'terms', value: true }],
+		})
+		expect(result.errors).toEqual([])
+		expect(result.values).toEqual([{ field: 'terms', value: true }])
+	})
+
+	it('stores an optional checkbox left unchecked', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'checkbox', name: 'news', label: 'Newsletter' },
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'news', value: false }],
+		})
+		expect(result.errors).toEqual([])
+		expect(result.values).toEqual([{ field: 'news', value: false }])
+	})
+
 	it('enforces a declarative minLength rule with the coerced value', async () => {
 		const fields: FormFieldInstance[] = [
 			{

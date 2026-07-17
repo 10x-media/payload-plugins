@@ -301,6 +301,7 @@ export type {
 	FormFieldFormat,
 	FormFieldValidate,
 	FormFieldValueKind,
+	OmittableSharedField,
 } from './fields/types'
 export { isPollClosed } from './form/pollState'
 export type { ToFormDocumentOptions } from './form/toFormDocument'
