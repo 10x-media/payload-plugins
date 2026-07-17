@@ -39,24 +39,27 @@ const IconGridCell: React.FC<CellProps> = React.memo(
 	({ entry, focused, icon, index, isSelected, onSelect, registerRef }) => {
 		const [showTooltip, setShowTooltip] = useState(false)
 		const labelRef = useRef<HTMLSpanElement>(null)
+		const revealIfTruncated = () => {
+			const label = labelRef.current
+			setShowTooltip(label != null && label.scrollWidth > label.clientWidth)
+		}
+		const hideTooltip = () => setShowTooltip(false)
 		return (
-			// biome-ignore lint/a11y/useSemanticElements: the virtualizer positions rows with transforms, which a real <table>/<td> cannot do
-			// biome-ignore lint/a11y/useFocusableInteractive: focus rides the inner <button> via roving tabindex, not the cell (ARIA grid pattern)
-			<div className="tenx-icon-drawer__cell" role="gridcell">
+			<div className="tenx-icon-drawer__cell" role="presentation">
 				<button
-					aria-pressed={isSelected}
+					aria-selected={isSelected}
 					className={
 						isSelected
 							? 'tenx-icon-drawer__cell-button tenx-icon-drawer__cell-button--selected'
 							: 'tenx-icon-drawer__cell-button'
 					}
+					onBlur={hideTooltip}
 					onClick={() => onSelect(icon.name)}
-					onMouseEnter={() => {
-						const label = labelRef.current
-						setShowTooltip(label != null && label.scrollWidth > label.clientWidth)
-					}}
-					onMouseLeave={() => setShowTooltip(false)}
+					onFocus={revealIfTruncated}
+					onMouseEnter={revealIfTruncated}
+					onMouseLeave={hideTooltip}
 					ref={(element) => registerRef(index, element)}
+					role="option"
 					tabIndex={focused ? 0 : -1}
 					type="button"
 				>
@@ -138,7 +141,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 		setGridWidth(element.offsetWidth)
 		return () => observer.disconnect()
 	}, [])
-	const columns = Math.max(3, Math.floor(gridWidth / CELL_WIDTH) || 3)
+	const columns = Math.max(3, Math.floor(gridWidth / CELL_WIDTH))
 	const rowCount = Math.ceil(visible.length / columns)
 
 	const virtualizer = useVirtualizer({
@@ -229,7 +232,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 				) : null}
 			</div>
 			<div className="tenx-icon-drawer__body">
-				<nav aria-label={t(keys.allIcons)} className="tenx-icon-drawer__rail">
+				<nav aria-label={t(keys.iconCategories)} className="tenx-icon-drawer__rail">
 					{railItems.map((item) => (
 						<button
 							className={
@@ -245,13 +248,12 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 						</button>
 					))}
 				</nav>
-				{/* biome-ignore lint/a11y/useSemanticElements: the virtualizer positions rows with transforms, which a real <table> cannot do */}
 				<div
-					aria-label={t(keys.allIcons)}
+					aria-label={t(keys.iconGrid)}
 					className="tenx-icon-drawer__grid"
 					onKeyDown={handleGridKeyDown}
 					ref={gridRef}
-					role="grid"
+					role="listbox"
 				>
 					{!manifest ? (
 						<div className="tenx-icon-drawer__loading">
@@ -264,16 +266,15 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 						<div className="tenx-icon-drawer__empty">{t(keys.noIconsFound)}</div>
 					) : (
 						<div
+							role="presentation"
 							style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
 						>
 							{virtualizer.getVirtualItems().map((row) => (
-								// biome-ignore lint/a11y/useSemanticElements: the virtualizer positions rows with transforms, which a real <tr> cannot do
-								// biome-ignore lint/a11y/useFocusableInteractive: focus rides the inner buttons via roving tabindex, not the row (ARIA grid pattern)
 								<div
 									className="tenx-icon-drawer__row"
 									data-index={row.index}
 									key={row.key}
-									role="row"
+									role="presentation"
 									style={{
 										left: 0,
 										position: 'absolute',

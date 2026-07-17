@@ -22,6 +22,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.browseAll]: 'Browse all',
 	[keys.recent]: 'Recent',
 	[keys.allIcons]: 'All icons',
+	[keys.iconCategories]: 'Icon categories',
+	[keys.iconGrid]: 'Icons',
 	[keys.libraryUnavailable]: 'This icon library is no longer available',
 	[keys.missingPreset]: 'Missing preset',
 	[keys.preset]: 'Preset',

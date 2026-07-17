@@ -20,6 +20,8 @@ export const keys = {
 	browseAll: 'fields:browseAll',
 	recent: 'fields:recent',
 	allIcons: 'fields:allIcons',
+	iconCategories: 'fields:iconCategories',
+	iconGrid: 'fields:iconGrid',
 	libraryUnavailable: 'fields:libraryUnavailable',
 	missingPreset: 'fields:missingPreset',
 	preset: 'fields:preset',

@@ -22,6 +22,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.browseAll]: 'Alle durchsuchen',
 	[keys.recent]: 'Zuletzt verwendet',
 	[keys.allIcons]: 'Alle Icons',
+	[keys.iconCategories]: 'Icon-Kategorien',
+	[keys.iconGrid]: 'Symbole',
 	[keys.libraryUnavailable]: 'Diese Icon-Bibliothek ist nicht mehr verfügbar',
 	[keys.missingPreset]: 'Fehlende Voreinstellung',
 	[keys.preset]: 'Voreinstellung',

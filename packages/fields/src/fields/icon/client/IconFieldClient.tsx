@@ -120,6 +120,7 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 				{BeforeInput}
 				<div className="tenx-icon-field__row">
 					<button
+						aria-expanded={isModalOpen(drawerSlug)}
 						aria-haspopup="dialog"
 						className="tenx-icon-field__trigger"
 						disabled={isDisabled || availableAdapters.length === 0}
@@ -173,19 +174,17 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 				Fallback={<FieldDescription description={field.admin?.description} path={path} />}
 			/>
 			<Drawer className="tenx-icon-drawer-modal" slug={drawerSlug} title={t(keys.selectIcon)}>
-				{isModalOpen(drawerSlug) ? (
-					<Suspense fallback={<div className="tenx-icon-drawer__loading" />}>
-						<IconDrawerContent
-							activeLibrary={activeLibrary}
-							adapterComponents={adapterComponents}
-							adapters={availableAdapters}
-							onLibraryChange={setActiveLibrary}
-							onSelect={handleSelect}
-							selected={resolved}
-							slugPrefix={drawerSlug}
-						/>
-					</Suspense>
-				) : null}
+				<Suspense fallback={<div className="tenx-icon-drawer__loading" />}>
+					<IconDrawerContent
+						activeLibrary={activeLibrary}
+						adapterComponents={adapterComponents}
+						adapters={availableAdapters}
+						onLibraryChange={setActiveLibrary}
+						onSelect={handleSelect}
+						selected={resolved}
+						slugPrefix={drawerSlug}
+					/>
+				</Suspense>
 			</Drawer>
 		</div>
 	)
