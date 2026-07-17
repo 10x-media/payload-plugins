@@ -4,6 +4,7 @@ import {
 	isValidTimeZone,
 	startOfDayInTz,
 	startOfMonthInTz,
+	startOfWeekInTz,
 	startOfYearInTz,
 	zonedDayIso,
 } from './tz'
@@ -68,6 +69,26 @@ describe('addDaysInTz', () => {
 		const d = new Date('2026-03-28T12:00:00.000Z')
 		const next = addDaysInTz(d, 1, 'Europe/Berlin')
 		expect(zonedDayIso(next, 'Europe/Berlin')).toBe(next.toISOString())
+	})
+})
+
+describe('startOfWeekInTz', () => {
+	it('floors to the local Monday week start (east of UTC)', () => {
+		// 2026-06-01 is a Monday, so 2026-06-17 is a Wednesday; its week starts Mon Jun 15.
+		// Berlin midnight Jun 15 (CEST, UTC+2) is 2026-06-14T22:00Z.
+		const wed = new Date('2026-06-17T10:00:00.000Z')
+		expect(startOfWeekInTz(wed, 'Europe/Berlin').toISOString()).toBe('2026-06-14T22:00:00.000Z')
+	})
+
+	it('matches the UTC Monday for the UTC zone', () => {
+		const wed = new Date('2026-06-17T10:00:00.000Z')
+		expect(startOfWeekInTz(wed, 'UTC').toISOString()).toBe('2026-06-15T00:00:00.000Z')
+	})
+
+	it('treats Sunday as the last day of the week, not the first', () => {
+		// Sunday Jun 21 2026 still belongs to the week starting Mon Jun 15 (UTC).
+		const sun = new Date('2026-06-21T12:00:00.000Z')
+		expect(startOfWeekInTz(sun, 'UTC').toISOString()).toBe('2026-06-15T00:00:00.000Z')
 	})
 })
 

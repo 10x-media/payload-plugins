@@ -51,6 +51,7 @@ export const AnalyticsPanelField = async (props: AnalyticsPanelFieldProps) => {
 		metrics: result.metrics,
 		supportedMetrics: result.supportedMetrics,
 		previousMetrics: result.previousMetrics,
+		timezone: result.timezone,
 		comparisonRange: result.comparisonRange
 			? {
 					start: result.comparisonRange.start.toISOString(),

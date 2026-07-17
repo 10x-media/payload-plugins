@@ -124,6 +124,18 @@ export const addDaysInTz = (date: Date, days: number, tz: string = DEFAULT_TIMEZ
 	return startOfDayInTz(new Date(start.getTime() + days * 86_400_000 + 43_200_000), tz)
 }
 
+/**
+ * Start of the ISO week (Monday) containing `date`'s local day in `tz`. The weekday of a
+ * calendar Y-M-D is timezone-independent, so it is derived from the zoned date and the
+ * step back to Monday runs through `addDaysInTz` to stay DST-safe.
+ */
+export const startOfWeekInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
+	const p = zonedParts(date, tz)
+	const dow = new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()
+	const mondayIndex = (dow + 6) % 7
+	return addDaysInTz(startOfDayInTz(date, tz), -mondayIndex, tz)
+}
+
 /** ISO string of `date`'s local day start in `tz`; the canonical day-bucket key. */
 export const zonedDayIso = (date: Date, tz: string = DEFAULT_TIMEZONE): string =>
 	startOfDayInTz(date, tz).toISOString()

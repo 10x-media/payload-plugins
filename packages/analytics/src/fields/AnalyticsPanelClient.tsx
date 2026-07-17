@@ -22,6 +22,8 @@ export interface PanelData {
 	supportedMetrics: MetricKey[]
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	comparisonRange?: { start: string; end: string } | null
+	/** Reporting timezone the read resolved in; the trend axis buckets in it. */
+	timezone?: string
 	points?: SeriesPoint[]
 }
 
@@ -124,7 +126,7 @@ export function AnalyticsPanelClient(props: AnalyticsPanelClientProps) {
 	const firstMetric = data.supportedMetrics[0]
 	const buckets =
 		data.points && data.points.length > 0 && firstMetric
-			? bucketSeries(data.points, timeframe, new Date()).map((b) => ({
+			? bucketSeries(data.points, timeframe, data.timezone).map((b) => ({
 					...b,
 					display: formatMetricValue(firstMetric, b.value, locale),
 				}))

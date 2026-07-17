@@ -18,6 +18,8 @@ export interface WidgetSeriesResult {
 	status: WidgetReadStatus
 	adapterId: string
 	dateRange: DateRange
+	/** Reporting timezone the read resolved in; the trend axis buckets in it. */
+	timezone: string
 	points: SeriesPoint[]
 	total: number
 	clamped?: boolean
@@ -90,6 +92,7 @@ export const readForWidgetSeries = async (
 		status,
 		adapterId: id,
 		dateRange: range ?? resolveTimeframe(timeframe, now),
+		timezone: DEFAULT_TIMEZONE,
 		points: [],
 		total: 0,
 	})
@@ -104,7 +107,7 @@ export const readForWidgetSeries = async (
 	}
 	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
 	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
-	const base = { dateRange, points: [] as SeriesPoint[], total: 0 }
+	const base = { dateRange, timezone: tz, points: [] as SeriesPoint[], total: 0 }
 	const adapter: AnalyticsAdapter = ctx.adapter
 	if (!adapter.isConfigured()) {
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
@@ -141,6 +144,7 @@ export const readForWidgetSeries = async (
 		status: 'ok',
 		adapterId: adapter.id,
 		dateRange,
+		timezone: tz,
 		points: fillDailySeries({ rows: result.rows, dateRange, metric, tz }),
 		total: result.totals?.[metric] ?? 0,
 		clamped: result.meta.clamped ?? false,
