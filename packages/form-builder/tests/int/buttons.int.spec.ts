@@ -38,8 +38,13 @@ describeForDb('form-builder buttons group (localized host)', { dbs: ['mongo'] },
 	it('localizes all three button label fields', () => {
 		const group = buttonsGroupOf(booted)
 		expect(group).toBeDefined()
-		for (const name of ['submitLabel', 'nextLabel', 'backLabel']) {
-			const field = group?.fields.find((f) => 'name' in f && f.name === name)
+		// submitLabel sits at the group's top level; prevLabel/nextLabel are one level down,
+		// inside the row that lays them out side by side.
+		const flatFields = (group?.fields ?? []).flatMap((f) =>
+			'fields' in f && Array.isArray(f.fields) ? f.fields : [f]
+		)
+		for (const name of ['submitLabel', 'nextLabel', 'prevLabel']) {
+			const field = flatFields.find((f) => 'name' in f && f.name === name)
 			expect(isLocalized(field)).toBe(true)
 		}
 	})
@@ -50,7 +55,7 @@ describeForDb('form-builder buttons group (localized host)', { dbs: ['mongo'] },
 			data: {
 				title: 'Buttons',
 				fields: [{ blockType: 'text', name: 'name', label: 'Name' }],
-				buttons: { submitLabel: 'Send', nextLabel: 'Continue', backLabel: 'Previous' },
+				buttons: { submitLabel: 'Send', nextLabel: 'Continue', prevLabel: 'Previous' },
 			},
 		})
 		await booted.payload.update({
@@ -58,7 +63,7 @@ describeForDb('form-builder buttons group (localized host)', { dbs: ['mongo'] },
 			id: form.id,
 			locale: 'de',
 			data: {
-				buttons: { submitLabel: 'Abschicken', nextLabel: 'Weiter', backLabel: 'Zurück' },
+				buttons: { submitLabel: 'Abschicken', nextLabel: 'Weiter', prevLabel: 'Zurück' },
 			},
 		})
 		const de = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'de' })
@@ -66,12 +71,12 @@ describeForDb('form-builder buttons group (localized host)', { dbs: ['mongo'] },
 		expect(de.buttons).toMatchObject({
 			submitLabel: 'Abschicken',
 			nextLabel: 'Weiter',
-			backLabel: 'Zurück',
+			prevLabel: 'Zurück',
 		})
 		expect(en.buttons).toMatchObject({
 			submitLabel: 'Send',
 			nextLabel: 'Continue',
-			backLabel: 'Previous',
+			prevLabel: 'Previous',
 		})
 	})
 })
@@ -101,7 +106,7 @@ describeForDb('form-builder buttons seam (host-extended group)', {}, (db) => {
 							],
 						},
 						defaultFields.next,
-						defaultFields.back,
+						defaultFields.prev,
 					],
 				},
 			}),
@@ -113,17 +118,17 @@ describeForDb('form-builder buttons seam (host-extended group)', {}, (db) => {
 		await booted.stop()
 	})
 
-	it('boots with the composed group: row wrapping submit + icon, then next and back', () => {
+	it('boots with the composed group: row wrapping submit + icon, then next and prev', () => {
 		const group = buttonsGroupOf(booted)
 		expect(group?.fields).toHaveLength(3)
-		const [row, next, back] = group?.fields ?? []
+		const [row, next, prev] = group?.fields ?? []
 		expect(row?.type).toBe('row')
 		const rowNames = (row && 'fields' in row ? row.fields : []).map((f) =>
 			'name' in f ? f.name : undefined
 		)
 		expect(rowNames).toEqual(['submitLabel', 'submitIcon'])
 		expect(next).toMatchObject({ name: 'nextLabel' })
-		expect(back).toMatchObject({ name: 'backLabel' })
+		expect(prev).toMatchObject({ name: 'prevLabel' })
 	})
 
 	it('persists the host-added field and hands it to the client via toFormDocument', async () => {

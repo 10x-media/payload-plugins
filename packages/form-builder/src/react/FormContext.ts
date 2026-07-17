@@ -22,7 +22,7 @@ export type FormStepInfo = {
 
 /** Resolved chrome button labels. Precedence per label: the `<Form>` prop, then the form's `buttons` value, then the translated default. */
 export type FormControlLabels = {
-	back: string
+	prev: string
 	next: string
 	submit: string
 }
@@ -51,7 +51,7 @@ export type FormContextValue = {
 	step: FormStepInfo
 	/** The active renderer registry, exposed so nested renderers (e.g. repeater) can look up sub-renderers. */
 	rendererRegistry: RendererRegistry
-	/** Resolved back/next/submit labels used by `<FormControls>` and available to custom chrome. */
+	/** Resolved prev/next/submit labels used by `<FormControls>` and available to custom chrome. */
 	labels: FormControlLabels
 	/** The active translator: the `<Form>` `t` prop, else the bundled English fallback. */
 	t: RendererTranslate

@@ -33,7 +33,7 @@ const Harness = ({ validateField }: { validateField: (name: string, value: unkno
 				locale: 'en',
 				step,
 				rendererRegistry: emptyRegistry,
-				labels: { back: 'Back', next: 'Next', submit: 'Submit' },
+				labels: { prev: 'Back', next: 'Next', submit: 'Submit' },
 				t: (key) => key,
 			}}
 		>

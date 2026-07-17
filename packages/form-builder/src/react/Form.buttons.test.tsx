@@ -47,16 +47,16 @@ describe('button label resolution', () => {
 		expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument()
 	})
 
-	it('doc-driven next and back labels drive the multi-step chrome', async () => {
-		const form = doc({ flow, buttons: { nextLabel: 'Continue', backLabel: 'Previous' } })
+	it('doc-driven next and prev labels drive the multi-step chrome', async () => {
+		const form = doc({ flow, buttons: { nextLabel: 'Continue', prevLabel: 'Previous' } })
 		render(<Form form={form} onSubmit={vi.fn()} />)
 		fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
 		expect(await screen.findByRole('button', { name: 'Previous' })).toBeInTheDocument()
 	})
 
-	it('next and back props win over the stored values', async () => {
-		const form = doc({ flow, buttons: { nextLabel: 'Continue', backLabel: 'Previous' } })
-		render(<Form form={form} onSubmit={vi.fn()} nextLabel="Onward" backLabel="Rewind" />)
+	it('next and prev props win over the stored values', async () => {
+		const form = doc({ flow, buttons: { nextLabel: 'Continue', prevLabel: 'Previous' } })
+		render(<Form form={form} onSubmit={vi.fn()} nextLabel="Onward" prevLabel="Rewind" />)
 		fireEvent.click(screen.getByRole('button', { name: 'Onward' }))
 		expect(await screen.findByRole('button', { name: 'Rewind' })).toBeInTheDocument()
 	})

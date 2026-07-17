@@ -2,9 +2,9 @@ import type { Config, Field } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { formBuilder } from '../index'
 import {
-	buildBackLabelField,
 	buildDefaultButtonFields,
 	buildNextLabelField,
+	buildPrevLabelField,
 	buildSubmitLabelField,
 } from './buttonFields'
 
@@ -34,20 +34,22 @@ const namesOf = (fields: Field[] | undefined): (string | undefined)[] =>
 const isLocalized = (field: Field | undefined): boolean =>
 	Boolean(field && 'localized' in field && field.localized === true)
 
+type FieldWithAdmin = { name?: string; admin?: { description?: unknown; width?: string } }
+
 describe('default button label fields', () => {
-	it('builds localized text fields named submitLabel/nextLabel/backLabel', () => {
+	it('builds localized text fields named submitLabel/prevLabel/nextLabel', () => {
 		expect(buildSubmitLabelField(true)).toMatchObject({
 			name: 'submitLabel',
 			type: 'text',
 			localized: true,
 		})
-		expect(buildNextLabelField(true)).toMatchObject({
-			name: 'nextLabel',
+		expect(buildPrevLabelField(true)).toMatchObject({
+			name: 'prevLabel',
 			type: 'text',
 			localized: true,
 		})
-		expect(buildBackLabelField(true)).toMatchObject({
-			name: 'backLabel',
+		expect(buildNextLabelField(true)).toMatchObject({
+			name: 'nextLabel',
 			type: 'text',
 			localized: true,
 		})
@@ -61,12 +63,29 @@ describe('default button label fields', () => {
 })
 
 describe('forms buttons group', () => {
-	it('sits at the bottom of the Fields tab with submit, next, back in order', async () => {
+	it('sits at the bottom of the Fields tab: submit full width, then a prev/next row', async () => {
 		const fields = await formsFieldsOf({})
 		const tab = fieldsTabOf(fields)
 		expect(tab?.fields.at(-1)).toMatchObject({ type: 'group', name: 'buttons' })
 		const group = buttonsGroupOf(fields)
-		expect(namesOf(group?.fields)).toEqual(['submitLabel', 'nextLabel', 'backLabel'])
+		expect(group?.fields).toHaveLength(2)
+		const [submit, row] = group?.fields ?? []
+		expect(submit).toMatchObject({ name: 'submitLabel' })
+		expect(row).toMatchObject({ type: 'row' })
+		const rowFields = row && 'fields' in row ? row.fields : []
+		expect(namesOf(rowFields)).toEqual(['prevLabel', 'nextLabel'])
+		expect(rowFields[0]).toMatchObject({ name: 'prevLabel', admin: { width: '50%' } })
+		expect(rowFields[1]).toMatchObject({ name: 'nextLabel', admin: { width: '50%' } })
+	})
+
+	it('keeps the multi-step description on prev/next after the width merge', async () => {
+		const fields = await formsFieldsOf({})
+		const group = buttonsGroupOf(fields)
+		const [, row] = group?.fields ?? []
+		const rowFields = (row && 'fields' in row ? row.fields : []) as FieldWithAdmin[]
+		for (const field of rowFields) {
+			expect(typeof field.admin?.description).toBe('function')
+		}
 	})
 
 	it('no longer carries a submitLabel in the response group', async () => {
@@ -97,16 +116,16 @@ describe('forms buttons group', () => {
 							},
 						],
 					},
-					defaultFields.back,
+					defaultFields.prev,
 				],
 			},
 		})
 		const group = buttonsGroupOf(fields)
 		expect(group?.fields).toHaveLength(2)
-		const [row, back] = group?.fields ?? []
+		const [row, prev] = group?.fields ?? []
 		expect(row).toMatchObject({ type: 'row' })
 		expect(namesOf(row && 'fields' in row ? row.fields : [])).toEqual(['submitLabel', 'submitIcon'])
-		expect(back).toMatchObject({ name: 'backLabel' })
+		expect(prev).toMatchObject({ name: 'prevLabel' })
 	})
 
 	it('hands the seam already-localized defaults, following localizeContent', async () => {
@@ -119,9 +138,9 @@ describe('forms buttons group', () => {
 						seen.push(
 							isLocalized(defaultFields.submit),
 							isLocalized(defaultFields.next),
-							isLocalized(defaultFields.back)
+							isLocalized(defaultFields.prev)
 						)
-						return [defaultFields.submit, defaultFields.next, defaultFields.back]
+						return [defaultFields.submit, defaultFields.next, defaultFields.prev]
 					},
 				},
 			})

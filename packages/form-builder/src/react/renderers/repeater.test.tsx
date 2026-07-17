@@ -70,7 +70,7 @@ const Harness = ({
 				locale: 'en',
 				step,
 				rendererRegistry,
-				labels: { back: 'Back', next: 'Next', submit: 'Submit' },
+				labels: { prev: 'Back', next: 'Next', submit: 'Submit' },
 				t: (key) => key,
 			}}
 		>

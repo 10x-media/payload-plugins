@@ -96,8 +96,8 @@ export type FormProps = {
 	submitLabel?: string
 	/** "Next" button label for multi-step forms. Precedence: this prop, then the form's `buttons.nextLabel`, then the translated default. */
 	nextLabel?: string
-	/** "Back" button label for multi-step forms. Precedence: this prop, then the form's `buttons.backLabel`, then the translated default. */
-	backLabel?: string
+	/** "Back" button label for multi-step forms. Precedence: this prop, then the form's `buttons.prevLabel`, then the translated default. */
+	prevLabel?: string
 	/** Label for the overlay close control (modal/drawer). */
 	closeLabel?: string
 	successMessage?: string
@@ -231,7 +231,7 @@ export const Form = ({
 	layout,
 	submitLabel,
 	nextLabel,
-	backLabel,
+	prevLabel,
 	closeLabel = 'Close',
 	successMessage = 'Thank you.',
 	presentation,
@@ -273,11 +273,11 @@ export const Form = ({
 	const docButtons: FormButtonSettings | undefined = form.buttons
 	const labels = useMemo(
 		() => ({
-			back: backLabel ?? storedLabel(docButtons?.backLabel) ?? translate(keys.formBack),
+			prev: prevLabel ?? storedLabel(docButtons?.prevLabel) ?? translate(keys.formBack),
 			next: nextLabel ?? storedLabel(docButtons?.nextLabel) ?? translate(keys.formNext),
 			submit: submitLabel ?? storedLabel(docButtons?.submitLabel) ?? translate(keys.formSubmit),
 		}),
-		[backLabel, nextLabel, submitLabel, docButtons, translate]
+		[prevLabel, nextLabel, submitLabel, docButtons, translate]
 	)
 
 	// Latest-value refs so event emission and the mount/unmount effect tolerate an inline `events` prop or a changing form id.

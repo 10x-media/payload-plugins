@@ -80,6 +80,8 @@ const TransitionRow = ({
 	onMoveUp,
 	onMoveDown,
 }: TransitionRowProps) => {
+	const { t } = useTranslation()
+
 	const handleGotoChange = (selected: ReactSelectOption | ReactSelectOption[]) => {
 		const chosen = Array.isArray(selected) ? selected[0] : selected
 		if (chosen) onChange({ ...transition, to: chosen.value as string })
@@ -93,7 +95,7 @@ const TransitionRow = ({
 					<ReactSelect
 						options={stepOptions}
 						value={stepOptions.find((o) => o.value === transition.to) ?? undefined}
-						placeholder="Select step…"
+						placeholder={t(keys.flowSelectStepPlaceholder)}
 						isClearable={false}
 						onChange={handleGotoChange}
 					/>
@@ -104,7 +106,7 @@ const TransitionRow = ({
 						className="fb-flow__move-btn"
 						onClick={onMoveUp}
 						disabled={isFirst}
-						aria-label="Move transition up"
+						aria-label={t(keys.flowMoveTransitionUp)}
 					>
 						↑
 					</button>
@@ -113,7 +115,7 @@ const TransitionRow = ({
 						className="fb-flow__move-btn"
 						onClick={onMoveDown}
 						disabled={isLast}
-						aria-label="Move transition down"
+						aria-label={t(keys.flowMoveTransitionDown)}
 					>
 						↓
 					</button>
@@ -122,7 +124,7 @@ const TransitionRow = ({
 						icon="x"
 						onClick={onRemove}
 						margin={false}
-						aria-label="Remove transition"
+						aria-label={t(keys.flowRemoveTransition)}
 					/>
 				</div>
 			</div>
@@ -258,8 +260,8 @@ const StepCard = ({
 					verticalAlign="bottom"
 				>
 					<PopupList.ButtonGroup>
-						<PopupList.Button onClick={onAddAbove}>Add above</PopupList.Button>
-						<PopupList.Button onClick={onAddBelow}>Add below</PopupList.Button>
+						<PopupList.Button onClick={onAddAbove}>{t(keys.flowAddAbove)}</PopupList.Button>
+						<PopupList.Button onClick={onAddBelow}>{t(keys.flowAddBelow)}</PopupList.Button>
 						<PopupList.Button onClick={onMoveUp} disabled={stepIndex === 0}>
 							Move up
 						</PopupList.Button>
@@ -277,9 +279,8 @@ const StepCard = ({
 			<div className="fb-flow-step__body">
 				<TextInput
 					path={`fb-flow-step-${stepKey}-title`}
-					label="Title"
+					label={t(keys.flowStepTitleLabel)}
 					value={step.title ?? ''}
-					placeholder="Optional display title"
 					onChange={(e: ChangeEvent<HTMLInputElement>) =>
 						onChange({ ...step, title: e.target.value.length > 0 ? e.target.value : undefined })
 					}

@@ -92,8 +92,8 @@ export type FormBuilderPluginOptions = {
 	 */
 	consent?: { sources: ConsentSourcesResolver }
 	/**
-	 * Form-level button labels. Every form carries a `buttons` group (`submitLabel`, `nextLabel`,
-	 * `backLabel`) at the bottom of its Fields tab; the rendered chrome resolves each label as
+	 * Form-level button labels. Every form carries a `buttons` group (`submitLabel`, `prevLabel`,
+	 * `nextLabel`) at the bottom of its Fields tab; the rendered chrome resolves each label as
 	 * `<Form>` prop, then the stored value, then the translated default. `fields` composes the
 	 * group: it receives the three default fields with the content localization flag already
 	 * applied and returns the group's final field array verbatim, so wrapping a default in a row
@@ -279,9 +279,9 @@ export type {
 	DefaultButtonFields,
 } from './collections/buttonFields'
 export {
-	buildBackLabelField,
 	buildDefaultButtonFields,
 	buildNextLabelField,
+	buildPrevLabelField,
 	buildSubmitLabelField,
 } from './collections/buttonFields'
 export { evaluateCondition } from './conditions/evaluate'

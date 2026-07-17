@@ -63,7 +63,7 @@ describe('FormControls', () => {
 	it('per-button props override the context labels', async () => {
 		render(
 			<Form form={doc({ flow })} onSubmit={vi.fn()}>
-				<FormControls backLabel="Previous" nextLabel="Continue" submitLabel="Finish" />
+				<FormControls prevLabel="Previous" nextLabel="Continue" submitLabel="Finish" />
 			</Form>
 		)
 		fireEvent.click(screen.getByRole('button', { name: 'Continue' }))

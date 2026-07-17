@@ -18,7 +18,7 @@ export type FormResponseSettings = {
 export type FormButtonSettings = {
 	submitLabel?: string | null
 	nextLabel?: string | null
-	backLabel?: string | null
+	prevLabel?: string | null
 	[key: string]: unknown
 }
 

@@ -1686,8 +1686,8 @@ export interface Form {
     | null;
   buttons?: {
     submitLabel?: string | null;
+    prevLabel?: string | null;
     nextLabel?: string | null;
-    backLabel?: string | null;
   };
   flow?: {
     steps: {
@@ -3289,8 +3289,8 @@ export interface FormsSelect<T extends boolean = true> {
     | T
     | {
         submitLabel?: T;
+        prevLabel?: T;
         nextLabel?: T;
-        backLabel?: T;
       };
   flow?: T;
   actions?:

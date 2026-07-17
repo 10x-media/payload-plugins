@@ -26,7 +26,7 @@ export type BackButtonRenderProps = {
 
 export type FormControlsProps = {
 	/** Override the context-resolved back label for this instance. */
-	backLabel?: string
+	prevLabel?: string
 	/** Override the context-resolved next label for this instance. */
 	nextLabel?: string
 	/** Override the context-resolved submit label for this instance. */
@@ -56,7 +56,7 @@ export type FormControlsProps = {
  * inside `<Form>`, within its `<form>` element so the submit button submits.
  */
 export const FormControls = ({
-	backLabel,
+	prevLabel,
 	nextLabel,
 	submitLabel,
 	className,
@@ -69,7 +69,7 @@ export const FormControls = ({
 }: FormControlsProps) => {
 	const { state, step, labels } = useFormContext()
 	const submitting = state.submitting
-	const back = backLabel ?? labels.back
+	const back = prevLabel ?? labels.prev
 	const next = nextLabel ?? labels.next
 	const submit = submitLabel ?? labels.submit
 	return (

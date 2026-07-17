@@ -306,7 +306,10 @@ export const buildFormsCollection = ({
 				name: 'redirect',
 				type: 'group',
 				label: labelForKey(keys.responseRedirect),
-				admin: { condition: (_data, siblingData) => siblingData?.type === 'redirect' },
+				admin: {
+					condition: (_data, siblingData) => siblingData?.type === 'redirect',
+					hideGutter: true,
+				},
 				fields: [
 					{
 						name: 'url',
@@ -325,13 +328,25 @@ export const buildFormsCollection = ({
 	// own field (e.g. an icon select), reorder, or drop one. Host-added fields ride along on
 	// `FormDocument.buttons` for custom chrome to read.
 	const defaultButtonFields = buildDefaultButtonFields(localizeContent)
+	// Half-width copy of a default field for the prev/next row; preserves the field's own admin
+	// (e.g. the multi-step description) rather than replacing it. The cast is safe: `width` is a
+	// valid admin option on every field variant, but spreading a `Field`-typed value's `admin`
+	// back into a union-typed object literal loses the discriminant TS needs to check it structurally.
+	const halfWidth = (field: Field): Field =>
+		({ ...field, admin: { ...field.admin, width: '50%' } }) as Field
 	const buttonsField: Field = {
 		name: 'buttons',
 		type: 'group',
 		label: labelForKey(keys.buttonsGroup),
 		fields: buttons?.fields
 			? buttons.fields({ defaultFields: defaultButtonFields })
-			: [defaultButtonFields.submit, defaultButtonFields.next, defaultButtonFields.back],
+			: [
+					defaultButtonFields.submit,
+					{
+						type: 'row',
+						fields: [halfWidth(defaultButtonFields.prev), halfWidth(defaultButtonFields.next)],
+					},
+				],
 	}
 
 	const defaultFields: Field[] = [
@@ -420,7 +435,10 @@ export const buildFormsCollection = ({
 					name: 'outcome',
 					type: 'group',
 					label: labelForKey(keys.pollOutcome),
-					admin: { condition: (_data, siblingData) => Boolean(siblingData?.enabled) },
+					admin: {
+						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
+						hideGutter: true,
+					},
 					fields: [
 						{
 							name: 'winningValue',

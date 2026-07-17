@@ -6,8 +6,8 @@ import { labelForKey } from '../translations/server'
 /** The default button-label fields, keyed by button. What the `buttons.fields` seam receives. */
 export type DefaultButtonFields = {
 	submit: Field
+	prev: Field
 	next: Field
-	back: Field
 }
 
 /**
@@ -39,11 +39,11 @@ export const buildNextLabelField = (localize: boolean): Field => ({
 	...localizedIf(localize),
 })
 
-/** The default "Back" button label field (`buttons.backLabel`); applies to multi-step forms. */
-export const buildBackLabelField = (localize: boolean): Field => ({
-	name: 'backLabel',
+/** The default "Previous" button label field (`buttons.prevLabel`); applies to multi-step forms. */
+export const buildPrevLabelField = (localize: boolean): Field => ({
+	name: 'prevLabel',
 	type: 'text',
-	label: labelForKey(keys.buttonsBackLabel),
+	label: labelForKey(keys.buttonsPrevLabel),
 	admin: { description: labelForKey(keys.buttonsMultiStepDescription) },
 	...localizedIf(localize),
 })
@@ -51,6 +51,6 @@ export const buildBackLabelField = (localize: boolean): Field => ({
 /** All three defaults with the localization flag applied: exactly what the seam is handed. */
 export const buildDefaultButtonFields = (localize: boolean): DefaultButtonFields => ({
 	submit: buildSubmitLabelField(localize),
+	prev: buildPrevLabelField(localize),
 	next: buildNextLabelField(localize),
-	back: buildBackLabelField(localize),
 })

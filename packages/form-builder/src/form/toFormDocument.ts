@@ -59,7 +59,7 @@ export function toFormDocument(
 		buttons?: {
 			submitLabel?: string | null
 			nextLabel?: string | null
-			backLabel?: string | null
+			prevLabel?: string | null
 			[key: string]: unknown
 		} | null
 		title?: string | null
