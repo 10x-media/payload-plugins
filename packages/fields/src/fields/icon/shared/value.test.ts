@@ -14,6 +14,11 @@ describe('icon value', () => {
 		expect(parseIconValue('a:b:c')).toEqual({ library: 'a', name: 'b:c' })
 	})
 
+	it('reads an empty library prefix as absent', () => {
+		expect(parseIconValue(':house')).toEqual({ library: null, name: 'house' })
+		expect(resolveIconValue(':house', 'lucide')).toEqual({ library: 'lucide', name: 'house' })
+	})
+
 	it('formats values', () => {
 		expect(formatIconValue('tabler', 'heart')).toBe('tabler:heart')
 	})

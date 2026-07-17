@@ -1,9 +1,11 @@
 export type ParsedIconValue = { library: null | string; name: string }
 
+/** An empty prefix (`:house`) reads as no library, not as a library named ''. */
 export const parseIconValue = (value: string): ParsedIconValue => {
 	const separator = value.indexOf(':')
 	if (separator === -1) return { library: null, name: value }
-	return { library: value.slice(0, separator), name: value.slice(separator + 1) }
+	const library = value.slice(0, separator)
+	return { library: library === '' ? null : library, name: value.slice(separator + 1) }
 }
 
 export const formatIconValue = (library: string, name: string): string => `${library}:${name}`

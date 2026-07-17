@@ -27,6 +27,7 @@
 		"generate": "tsx scripts/run.ts generate",
 		"generate:types": "tsx scripts/run.ts generate:types",
 		"generate:importmap": "tsx scripts/run.ts generate:importmap",
+		"generate:manifests": "pnpm --filter @10x-media/fields run generate:manifests",
 		"migrate": "tsx scripts/run.ts migrate",
 		"migrate:create": "tsx scripts/run.ts migrate:create",
 		"migrate:down": "tsx scripts/run.ts migrate:down",

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -30,10 +31,11 @@ describe('generateIconManifest', () => {
 		const manifest = await readFile(path.join(outDir, 'manifest.ts'), 'utf8')
 		expect(manifest.startsWith(GENERATED_HEADER)).toBe(true)
 		const parsed = JSON.parse(manifest.slice(manifest.indexOf('= ') + 2)) as {
-			icons: { name: string }[]
+			icons: { name: string; categories: string[] }[]
 			categories: string[]
 		}
 		expect(parsed.icons.map((icon) => icon.name)).toEqual(['alpha', 'zeta'])
+		expect(parsed.icons[1]?.categories).toEqual(['a', 'b'])
 		expect(parsed.categories).toEqual(['a', 'b'])
 		const imports = await readFile(path.join(outDir, 'imports.ts'), 'utf8')
 		expect(imports).toContain(`'alpha': () => import('custom-lib/alpha.js'),`)
@@ -47,6 +49,46 @@ describe('generateIconManifest', () => {
 			source: { icons: [{ name: 'solo', tags: [], categories: [] }] },
 		})
 		expect(result.files.map((file) => path.basename(file))).toEqual(['manifest.ts'])
+	})
+
+	it('rejects icon names that are not kebab-case', async () => {
+		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
+		dirs.push(outDir)
+		await expect(
+			generateIconManifest({
+				outDir,
+				source: { icons: [{ name: "ev'il", tags: [], categories: [] }] },
+			})
+		).rejects.toThrow('invalid icon name: "ev\'il"')
+	})
+
+	it('rejects module specifiers that would break out of the emitted literal', async () => {
+		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
+		dirs.push(outDir)
+		await expect(
+			generateIconManifest({
+				outDir,
+				source: {
+					icons: [{ name: 'solo', tags: [], categories: [] }],
+					importFor: () => ({ module: "x'); evil(); ('" }),
+				},
+			})
+		).rejects.toThrow('unsafe module specifier')
+		expect(existsSync(path.join(outDir, 'manifest.ts'))).toBe(false)
+	})
+
+	it('rejects export names that are not identifiers', async () => {
+		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
+		dirs.push(outDir)
+		await expect(
+			generateIconManifest({
+				outDir,
+				source: {
+					icons: [{ name: 'solo', tags: [], categories: [] }],
+					importFor: () => ({ module: 'lib', exportName: 'Icon); evil((' }),
+				},
+			})
+		).rejects.toThrow('export name is not an identifier')
 	})
 
 	it('rejects duplicate icon names', async () => {

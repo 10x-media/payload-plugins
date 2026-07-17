@@ -31,9 +31,7 @@ const iconsJsonPath = (): string => {
 /** Outline set only in v1; filled variants would double the manifest for little picker value. */
 export const loadTablerSource = (): LoadedIconSource => {
 	const json = require(iconsJsonPath()) as Record<string, TablerIconEntry>
-	const entries = Object.values(json)
-		.filter((entry) => 'outline' in entry.styles)
-		.sort((a, b) => a.name.localeCompare(b.name))
+	const entries = Object.values(json).filter((entry) => 'outline' in entry.styles)
 	const icons: IconMeta[] = entries.map((entry) => ({
 		name: entry.name,
 		tags: entry.tags.filter((tag): tag is string => typeof tag === 'string'),

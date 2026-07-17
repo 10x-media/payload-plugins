@@ -502,6 +502,9 @@ importers:
       tsdown:
         specifier: 'catalog:'
         version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
