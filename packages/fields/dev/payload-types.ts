@@ -70,6 +70,7 @@ export interface Config {
     users: User;
     colors: Color;
     tenants: Tenant;
+    icons: Icon;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -80,6 +81,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     colors: ColorsSelect<false> | ColorsSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
+    icons: IconsSelect<false> | IconsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -178,6 +180,7 @@ export interface Color {
 export interface Tenant {
   id: string;
   name: string;
+  enabledLibraries?: string[] | null;
   primary?: string | null;
   accent?: string | null;
   brandColors?:
@@ -188,6 +191,22 @@ export interface Tenant {
         id?: string | null;
       }[]
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "icons".
+ */
+export interface Icon {
+  id: string;
+  title: string;
+  tenant?: (string | null) | Tenant;
+  iconMulti?: string | null;
+  iconSingle?: string | null;
+  iconWithText?: string | null;
+  iconRequired: string;
+  iconTenantRestricted?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -226,6 +245,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'tenants';
         value: string | Tenant;
+      } | null)
+    | ({
+        relationTo: 'icons';
+        value: string | Icon;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -323,6 +346,7 @@ export interface ColorsSelect<T extends boolean = true> {
  */
 export interface TenantsSelect<T extends boolean = true> {
   name?: T;
+  enabledLibraries?: T;
   primary?: T;
   accent?: T;
   brandColors?:
@@ -333,6 +357,21 @@ export interface TenantsSelect<T extends boolean = true> {
         value?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "icons_select".
+ */
+export interface IconsSelect<T extends boolean = true> {
+  title?: T;
+  tenant?: T;
+  iconMulti?: T;
+  iconSingle?: T;
+  iconWithText?: T;
+  iconRequired?: T;
+  iconTenantRestricted?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -3,7 +3,7 @@ import type { Payload } from 'payload'
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
 
-/** Seed the dev Payload app: an admin user plus the color showcase docs. Idempotent. */
+/** Seed the dev Payload app: an admin user plus the color and icon showcase docs. Idempotent. */
 export const seedDev = async (payload: Payload): Promise<void> => {
 	const userCount = await payload.count({ collection: 'users' })
 	if (userCount.totalDocs === 0) {
@@ -24,6 +24,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				name: 'acme',
 				accent: '#f59e0b',
 				brandColors: [{ key: 'surface', label: 'Acme surface', value: '#f5f3ff' }],
+				enabledLibraries: ['lucide', 'radix'],
 				primary: '#7c3aed',
 			},
 		})
@@ -32,6 +33,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			data: {
 				name: 'globex',
 				brandColors: [{ key: 'primary', label: 'Globex primary', value: 'oklch(0.65 0.18 250)' }],
+				enabledLibraries: ['tabler'],
 			},
 		})
 		await payload.create({
@@ -52,5 +54,41 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			},
 		})
 		payload.logger.info('Seeded color showcase: tenants + colors')
+	}
+
+	const iconCount = await payload.count({ collection: 'icons' })
+	if (iconCount.totalDocs === 0) {
+		const tenantDocs = await payload.find({ collection: 'tenants', limit: 100 })
+		const acme = tenantDocs.docs.find((doc) => doc.name === 'acme')
+		const globex = tenantDocs.docs.find((doc) => doc.name === 'globex')
+		if (acme && globex) {
+			// acme enables lucide+radix, so its restricted value renders normally.
+			await payload.create({
+				collection: 'icons',
+				data: {
+					iconMulti: 'radix:cube',
+					iconRequired: 'lucide:anchor',
+					iconSingle: 'lucide:house',
+					iconTenantRestricted: 'lucide:heart',
+					iconWithText: 'tabler:heart',
+					tenant: acme.id,
+					title: 'Showcase icons (acme)',
+				},
+			})
+			// globex enables only tabler, so the stored lucide value is from a
+			// disabled library and demonstrates graceful degradation. iconMulti uses
+			// a bare legacy name that reads as the default library (lucide).
+			await payload.create({
+				collection: 'icons',
+				data: {
+					iconMulti: 'house',
+					iconRequired: 'tabler:heart',
+					iconTenantRestricted: 'lucide:star',
+					tenant: globex.id,
+					title: 'Legacy + globex',
+				},
+			})
+			payload.logger.info('Seeded icon showcase')
+		}
 	}
 }

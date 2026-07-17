@@ -6,8 +6,12 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { de } from '@payloadcms/translations/languages/de'
 import { en } from '@payloadcms/translations/languages/en'
 import { buildConfig, type CollectionConfig } from 'payload'
+import { lucideAdapter } from '../src/exports/icon-adapters/lucide'
+import { radixAdapter } from '../src/exports/icon-adapters/radix'
+import { tablerAdapter } from '../src/exports/icon-adapters/tabler'
 import { fields } from '../src/index'
 import { colors } from './collections/colors'
+import { icons } from './collections/icons'
 import { tenants } from './collections/tenants'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
@@ -42,13 +46,17 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users, colors, tenants],
+	collections: [users, colors, tenants, icons],
 	i18n: { supportedLanguages: { de, en } },
 	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
 	plugins: [
 		fields({
 			color: {
 				presets: ['#16a34a', '#dc2626', { key: 'global', label: 'Global blue', value: '#1d4ed8' }],
+			},
+			icon: {
+				adapters: [lucideAdapter(), radixAdapter(), tablerAdapter()],
+				defaultLibrary: 'lucide',
 			},
 		}),
 	],
