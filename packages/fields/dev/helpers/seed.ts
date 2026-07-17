@@ -42,6 +42,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				linkedStatic: 'preset:brand',
 				linkedTenant: 'preset:acme/primary',
 				noAlpha: '#16a34a',
+				notClearable: '#f59e0b',
 				oklchFormat: 'oklch(0.62 0.25 29)',
 				readOnlyColor: '#334155',
 				requiredColor: '#0ea5e9',

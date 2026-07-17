@@ -47,6 +47,7 @@ export const colors: CollectionConfig = {
 		colorField({ name: 'oklchFormat', format: 'oklch' }),
 		colorField({ name: 'noAlpha', alpha: false }),
 		colorField({ name: 'noEyedropper', enableEyedropper: false }),
+		colorField({ name: 'notClearable', isClearable: false }),
 		colorField({
 			name: 'withPresets',
 			presets: staticPresets,

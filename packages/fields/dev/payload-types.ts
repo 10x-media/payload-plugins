@@ -158,6 +158,7 @@ export interface Color {
   oklchFormat?: string | null;
   noAlpha?: string | null;
   noEyedropper?: string | null;
+  notClearable?: string | null;
   withPresets?: string | null;
   pluginPresets?: string | null;
   requiredColor: string;
@@ -303,6 +304,7 @@ export interface ColorsSelect<T extends boolean = true> {
   oklchFormat?: T;
   noAlpha?: T;
   noEyedropper?: T;
+  notClearable?: T;
   withPresets?: T;
   pluginPresets?: T;
   requiredColor?: T;
