@@ -20,16 +20,23 @@ export type IconMeta = { name: string; tags: string[]; categories: string[] }
 export type IconManifest = { icons: IconMeta[]; categories: string[] }
 
 /**
- * An icon library adapter. `Icon` is an importMap component path string so
- * adapters stay serializable inside field configs.
+ * An icon library adapter. `Icon` and `Assets` are importMap component path
+ * strings so adapters stay serializable inside field configs.
  */
 export type IconAdapter = {
 	slug: string
 	label: StaticLabel
+	/** Lazy manifest loader; used server-side for validation and never bundled eagerly. */
 	loadManifest: () => Promise<IconManifest>
+	/** importMap path of a client component rendering one icon by name, e.g. '@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon'. */
 	Icon: string
+	/** importMap path of a client component that loads the manifest for the admin drawer. */
+	Assets: string
 	version: 1
 }
+
+/** Resolves which library slugs a request may pick from. */
+export type IconAvailabilityResolver = (args: FieldsResolverArgs) => Promise<string[]> | string[]
 
 /** Encryption key set. Values are raw key material or async providers (KMS/Vault). */
 export type KeysConfig = {
@@ -54,7 +61,8 @@ export type ColorGlobalConfig = {
 /** Plugin-level defaults for iconField(). Per-field options always win. */
 export type IconGlobalConfig = {
 	adapters?: IconAdapter[]
-	resolveAvailable?: (args: FieldsResolverArgs) => Promise<string[]>
+	defaultLibrary?: string
+	resolveAvailable?: IconAvailabilityResolver
 }
 
 /** Plugin-level defaults for encryptedField(). Per-field options always win. */
