@@ -3,14 +3,18 @@
 }
 
 /* Mirrors Payload's formInput mixin (packages/ui/src/scss/vars.scss) so the composite
-   container reads as one native text input; focus rides :focus-within */
+   container reads as one native text input; focus rides :focus-within.
+   Dimensions are static px on purpose: Payload compiles scss base() to literal px
+   (native inputs stay 40px tall at every breakpoint), while the runtime --base var
+   is rem-based and shrinks with the responsive html font-size. Deriving from
+   var(--base) made this container 3px shorter than native inputs at <=1024px. */
 .fields-color__container {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base, 20px) * 0.35);
+	gap: 7px;
 	width: 100%;
-	height: calc(var(--base, 20px) * 2);
-	padding: 0 calc(var(--base, 20px) * 0.4) 0 calc(var(--base, 20px) * 0.3);
+	height: 40px;
+	padding: 0 8px 0 6px;
 	border: 1px solid var(--theme-elevation-150);
 	border-radius: var(--style-radius-s);
 	background: var(--theme-input-bg);
@@ -131,7 +135,7 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 	color: inherit;
 	font-family: inherit;
 	font-size: inherit;
-	line-height: var(--base, 20px);
+	line-height: 20px;
 	appearance: none;
 	-webkit-appearance: none;
 }
@@ -179,9 +183,9 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 .fields-color__panel {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base, 20px) * 0.5);
+	gap: 10px;
 	width: 260px;
-	padding: calc(var(--base, 20px) * 0.25);
+	padding: 5px;
 }
 
 .fields-color__sv {
@@ -261,7 +265,7 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 .fields-color__controls {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base, 20px) * 0.25);
+	gap: 5px;
 }
 
 .fields-color__formats {
@@ -272,7 +276,7 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 
 .fields-color__format {
 	flex: 1 1 0;
-	height: calc(var(--base, 20px) * 1.4);
+	height: 28px;
 	border: 1px solid var(--theme-elevation-150);
 	border-radius: var(--style-radius-s);
 	background: transparent;
@@ -292,8 +296,8 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: calc(var(--base, 20px) * 1.4);
-	height: calc(var(--base, 20px) * 1.4);
+	width: 28px;
+	height: 28px;
 	border: 1px solid var(--theme-elevation-150);
 	border-radius: var(--style-radius-s);
 	background: transparent;
