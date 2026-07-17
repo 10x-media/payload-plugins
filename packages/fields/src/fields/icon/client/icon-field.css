@@ -110,8 +110,29 @@
 .tenx-icon-drawer {
 	display: flex;
 	flex-direction: column;
-	height: 100%;
 	min-height: 0;
+}
+
+/* Payload's Drawer Gutter (.drawer__content-children) is overflow:auto and stacks
+   its title header above our content, so a full-height body overflows the Gutter
+   and adds a second scrollbar on top of the grid's own. Convert the Gutter to a
+   flex column so the native header stays fixed and our body flex-fills, leaving
+   the listbox grid as the sole scroller. Scoped to our modal class, same technique
+   as the color Popup :has() override. */
+.tenx-icon-drawer-modal .drawer__content-children {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.tenx-icon-drawer-modal .drawer__content-children > .tenx-icon-drawer {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: auto;
+}
+
+.tenx-icon-drawer-modal .drawer__header {
+	flex-shrink: 0;
 }
 
 .tenx-icon-drawer__header {
