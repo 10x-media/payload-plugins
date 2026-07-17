@@ -10,7 +10,7 @@ import type { AnalyticsMetricLabel, AnalyticsMetricLabels } from './factories'
 import { formatMetricValue } from './format'
 import { type FieldReadStatus, readForField } from './readForDocument'
 
-type StatFieldI18n = { t: unknown; language?: string }
+export type StatFieldI18n = { t: unknown; language?: string }
 
 interface AnalyticsStatFieldProps {
 	req: PayloadRequest
@@ -24,7 +24,7 @@ interface AnalyticsStatFieldProps {
 	labels?: AnalyticsMetricLabels
 }
 
-const resolveMetricLabel = (
+export const resolveMetricLabel = (
 	override: AnalyticsMetricLabel | undefined,
 	i18n: StatFieldI18n,
 	fallback: () => string

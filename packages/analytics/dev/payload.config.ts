@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { analytics, analyticsStat, analyticsStatRow, analyticsTab } from '../src/index'
+import { analytics, analyticsTab } from '../src/index'
 import { native } from '../src/native/nativeAdapter'
+import { devMemoryAdapter } from './helpers/adapters'
 import { startMemoryMongo } from './helpers/memoryDb'
-import { seedDev } from './helpers/seed'
+import { DEV_REPORTING_TIMEZONE, seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
@@ -38,8 +39,6 @@ const pages: CollectionConfig = {
 				analyticsTab(),
 			],
 		},
-		analyticsStat({ metric: 'pageviews', position: 'sidebar' }),
-		analyticsStatRow({ name: 'analytics_inline' }),
 	],
 }
 
@@ -64,9 +63,12 @@ export default buildConfig({
 	collections: [users, pages],
 	plugins: [
 		analytics({
-			adapters: [native()],
+			adapters: [native(), devMemoryAdapter],
 			cache: { warm: true },
-			sync: true,
+			// Surface analytics-daily in the dev nav so the sync tier is inspectable
+			// (hidden by default in real installs).
+			sync: { hidden: false },
+			reportingTimezone: DEV_REPORTING_TIMEZONE,
 			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
 			widgets: {
 				register: [
@@ -93,7 +95,7 @@ export default buildConfig({
 				{
 					widgetSlug: 'analytics-realtime',
 					width: 'small',
-					data: { metric: 'visitors', windowMinutes: 30 },
+					data: { metric: 'visitors', windowMinutes: '30' },
 				},
 				{
 					widgetSlug: 'analytics-trend',

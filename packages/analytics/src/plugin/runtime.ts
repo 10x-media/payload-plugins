@@ -2,6 +2,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import type { ResolvedBinding } from '../binding/types'
 import type { AdapterRegistry, RegistryResolver, ResolveRegistryArgs } from '../core/registry'
 import type { Engine } from '../surfacing/engine'
+import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 
 export interface AnalyticsRuntime {
 	registry: AdapterRegistry
@@ -9,13 +10,18 @@ export interface AnalyticsRuntime {
 	resolveRegistry?: RegistryResolver
 	/** The plugin's scopeResolver bound at init; absent runtimes resolve null. */
 	resolveScope?: (req: PayloadRequest) => Promise<string | null>
+	/** The plugin's reportingTimezone bound at init; absent runtimes resolve 'UTC'. */
+	resolveTimezone?: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	/** Id of the config adapter shared by every scope, when one is designated. */
 	platformAdapterId?: string
 	/** Gate for cross-scope reads; absent runtimes require an authenticated user. */
 	platformRead?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 	bindings: Record<string, ResolvedBinding>
 	engine: Engine
-	ttl: { aggregate: number; realtime: number }
+	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
+	ttl: { aggregate?: number; realtime?: number }
+	/** Widget period-over-period comparison; false skips the previous-window read. */
+	comparison: boolean
 }
 
 /**
@@ -40,6 +46,12 @@ export const resolveScopeFor = (
 	runtime: AnalyticsRuntime,
 	req: PayloadRequest
 ): Promise<string | null> => runtime.resolveScope?.(req) ?? Promise.resolve(null)
+
+export const resolveTimezoneFor = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	scope?: string | null
+): Promise<string> => runtime.resolveTimezone?.(req, scope) ?? Promise.resolve(DEFAULT_TIMEZONE)
 
 export const resolveRegistryFor = (
 	runtime: AnalyticsRuntime,

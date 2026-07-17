@@ -1,3 +1,4 @@
+import { startOfDayInTz } from '../../timeframe/tz'
 import type { StoredEvent } from '../ingest/normalizeEvent'
 
 export interface RollupKey {
@@ -23,11 +24,10 @@ export interface RollupDelta {
 	inc: { pageviews: number; events: number; durationMs: number; samples: number }
 }
 
-const startOfUtcDay = (d: Date): Date =>
-	new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-
 export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
-	const period = startOfUtcDay(event.timestamp)
+	// Bucket into the event's reporting-timezone day (UTC when unset), fixing the day
+	// boundary at ingest. Existing rollups are not re-bucketed if the timezone changes.
+	const period = startOfDayInTz(event.timestamp, event.timezone)
 	const inc = {
 		pageviews: event.type === 'pageview' ? 1 : 0,
 		events: event.type === 'event' ? 1 : 0,

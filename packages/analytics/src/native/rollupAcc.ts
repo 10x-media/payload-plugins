@@ -1,4 +1,5 @@
 import type { AnalyticsRow, MetricKey } from '../core/contract'
+import { DEFAULT_TIMEZONE, startOfDayInTz } from '../timeframe/tz'
 
 export interface RollupDoc {
 	path: string
@@ -50,18 +51,22 @@ export const selectMetrics = (
 	return out
 }
 
-const startOfUtcDay = (d: Date): Date =>
-	new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-
 /**
- * Collapse per-day rollup docs into one time-series row per UTC day, ascending by
- * day. Distinct metrics (visitors/sessions) come from each day's own rollup and are
- * never summed across days, so a daily trend shows that day's uniques.
+ * Collapse per-day rollup docs into one time-series row per day in `tz` (UTC by
+ * default), ascending by day. Rollups are already bucketed to their reporting-timezone
+ * day at ingest, so flooring in the same `tz` is idempotent; passing the read's timezone
+ * keeps a trend aligned to that zone. Distinct metrics (visitors/sessions) come from each
+ * day's own rollup and are never summed across days, so a daily trend shows that day's
+ * uniques.
  */
-export const seriesFromRollups = (docs: RollupDoc[], metrics: MetricKey[]): AnalyticsRow[] => {
+export const seriesFromRollups = (
+	docs: RollupDoc[],
+	metrics: MetricKey[],
+	tz: string = DEFAULT_TIMEZONE
+): AnalyticsRow[] => {
 	const byDay = new Map<string, Acc>()
 	for (const d of docs) {
-		const day = startOfUtcDay(new Date(d.period)).toISOString()
+		const day = startOfDayInTz(new Date(d.period), tz).toISOString()
 		let acc = byDay.get(day)
 		if (!acc) {
 			acc = emptyAcc()
