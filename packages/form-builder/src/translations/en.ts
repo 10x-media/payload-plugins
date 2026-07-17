@@ -23,6 +23,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.validationNumber]: 'Enter a valid number',
 	[keys.validationDate]: 'Enter a valid date',
 	[keys.validationSelect]: 'Choose a valid option',
+	[keys.validationRegexPattern]: 'Enter a valid regular expression',
+	[keys.validationRegexFlags]: 'Enter valid regular expression flags, for example i or gi',
 	[keys.validationEmailFieldUnknown]: 'Choose an existing email field on this form',
 	[keys.validationResultsFieldUnknown]: 'Choose an eligible choice field on this form',
 	[keys.formatYes]: 'Yes',

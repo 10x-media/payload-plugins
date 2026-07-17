@@ -23,6 +23,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.validationNumber]: 'Gib eine gültige Zahl ein',
 	[keys.validationDate]: 'Gib ein gültiges Datum ein',
 	[keys.validationSelect]: 'Wähle eine gültige Option',
+	[keys.validationRegexPattern]: 'Gib einen gültigen regulären Ausdruck ein',
+	[keys.validationRegexFlags]:
+		'Gib gültige Flags für reguläre Ausdrücke ein, zum Beispiel i oder gi',
 	[keys.validationEmailFieldUnknown]: 'Wähle ein bestehendes E-Mail-Feld dieses Formulars',
 	[keys.validationResultsFieldUnknown]: 'Wähle ein geeignetes Auswahlfeld dieses Formulars',
 	[keys.formatYes]: 'Ja',
