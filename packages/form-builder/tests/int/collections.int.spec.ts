@@ -26,6 +26,19 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 		expect(booted.payload.collections['form-submissions']).toBeDefined()
 	})
 
+	it('defaults submission status to complete and refuses to let it be cleared', () => {
+		// Aggregation counts `status: complete`, so a cleared status would silently drop the
+		// submission out of every poll result.
+		const status = booted.payload.collections['form-submissions']?.config.fields.find(
+			(field) => 'name' in field && field.name === 'status'
+		)
+		expect(status).toMatchObject({
+			type: 'select',
+			defaultValue: 'complete',
+			admin: { isClearable: false },
+		})
+	})
+
 	it('stores a form with a fields blocks array', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',

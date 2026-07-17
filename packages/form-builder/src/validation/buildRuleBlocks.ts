@@ -31,6 +31,9 @@ export const buildRuleBlocks = (registry: ValidationRuleRegistry, fieldType: str
 					type: 'select',
 					defaultValue: 'error',
 					label: labelFor(keys.validationSeverityLabel),
+					// Not clearable: `runValidation` reads a cleared severity as "unset" and falls back to
+					// the rule's own default, so an empty select would still behave as some severity.
+					admin: { isClearable: false },
 					options: [
 						{ label: labelFor(keys.validationSeverityError), value: 'error' },
 						{ label: labelFor(keys.validationSeverityWarning), value: 'warning' },

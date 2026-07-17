@@ -187,6 +187,9 @@ export const buildSubmissionsCollection = ({
 				{ label: labelForKey(keys.statusComplete), value: 'complete' },
 				{ label: labelForKey(keys.statusPartial), value: 'partial' },
 			],
+			// Not clearable: aggregation counts `status: complete` submissions, so a cleared status
+			// would drop the submission out of every poll result with nothing in the UI saying so.
+			admin: { isClearable: false },
 			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
 			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
 			access: { create: isLoggedIn, update: isLoggedIn },

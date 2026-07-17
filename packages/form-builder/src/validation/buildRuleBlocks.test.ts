@@ -26,6 +26,16 @@ describe('buildRuleBlocks', () => {
 		)
 		expect(names).toEqual(['min', 'message', 'severity'])
 	})
+	it('defaults severity to error and refuses to let it be cleared', () => {
+		for (const block of buildRuleBlocks(registry, 'text')) {
+			const severity = block.fields.find((field) => 'name' in field && field.name === 'severity')
+			expect(severity).toMatchObject({
+				type: 'select',
+				defaultValue: 'error',
+				admin: { isClearable: false },
+			})
+		}
+	})
 	it('throws when a custom rule declares a reserved param name', () => {
 		const bad = buildRuleRegistry([
 			defineValidationRule({
