@@ -178,6 +178,8 @@ export interface Color {
 export interface Tenant {
   id: string;
   name: string;
+  primary?: string | null;
+  accent?: string | null;
   brandColors?:
     | {
         key: string;
@@ -321,6 +323,8 @@ export interface ColorsSelect<T extends boolean = true> {
  */
 export interface TenantsSelect<T extends boolean = true> {
   name?: T;
+  primary?: T;
+  accent?: T;
   brandColors?:
     | T
     | {

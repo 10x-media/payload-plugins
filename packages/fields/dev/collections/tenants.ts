@@ -6,6 +6,8 @@ export const tenants: CollectionConfig = {
 	admin: { useAsTitle: 'name' },
 	fields: [
 		{ name: 'name', type: 'text', required: true },
+		colorField({ name: 'primary', label: { de: 'Primär', en: 'Primary' } }),
+		colorField({ name: 'accent', label: { de: 'Akzent', en: 'Accent' } }),
 		{
 			name: 'brandColors',
 			type: 'array',

@@ -24,6 +24,7 @@
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/next": "catalog:",
+		"@payloadcms/translations": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"next": "catalog:",
 		"payload": "catalog:",

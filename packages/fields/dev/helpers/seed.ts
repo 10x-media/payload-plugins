@@ -16,14 +16,15 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 
 	const tenantCount = await payload.count({ collection: 'tenants' })
 	if (tenantCount.totalDocs === 0) {
+		// acme/primary comes from the individual field, not an array row, so the
+		// seeded 'preset:acme/primary' ref exercises the presetsFromDoc path
 		await payload.create({
 			collection: 'tenants',
 			data: {
 				name: 'acme',
-				brandColors: [
-					{ key: 'primary', label: 'Acme primary', value: '#7c3aed' },
-					{ key: 'surface', label: 'Acme surface', value: '#f5f3ff' },
-				],
+				accent: '#f59e0b',
+				brandColors: [{ key: 'surface', label: 'Acme surface', value: '#f5f3ff' }],
+				primary: '#7c3aed',
 			},
 		})
 		await payload.create({

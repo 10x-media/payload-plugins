@@ -9,5 +9,6 @@ export {
 	PRESET_PREFIX,
 	type ResolvedColorPreset,
 } from '../fields/color/options'
+export { type PresetsFromDocArgs, presetsFromDoc } from '../fields/color/presetsFromDoc'
 export { normalizePresets, resolvePresets } from '../fields/color/resolvePresets'
 export type { ColorFormat, ColorGlobalConfig, ColorPreset } from '../types'

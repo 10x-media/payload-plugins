@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { colorField } from '../../src/exports/color'
+import { colorField, presetsFromDoc } from '../../src/exports/color'
 import type { ColorPreset, FieldsResolverArgs } from '../../src/types'
 
 type TenantDoc = {
@@ -12,11 +12,20 @@ const tenantBrandPresets = async ({ req }: FieldsResolverArgs): Promise<ColorPre
 	const result = await req.payload.find({ collection: 'tenants', depth: 0, limit: 25 })
 	return result.docs.flatMap((doc) => {
 		const tenant = doc as unknown as TenantDoc
-		return (tenant.brandColors ?? []).map((color) => ({
-			key: `${tenant.name}/${color.key}`,
-			label: color.label ?? color.key,
-			value: color.value,
-		}))
+		return [
+			...presetsFromDoc({
+				collection: 'tenants',
+				doc: doc as unknown as Record<string, unknown>,
+				fields: ['primary', 'accent'],
+				keyPrefix: `${tenant.name}/`,
+				req,
+			}),
+			...(tenant.brandColors ?? []).map((color) => ({
+				key: `${tenant.name}/${color.key}`,
+				label: color.label ?? color.key,
+				value: color.value,
+			})),
+		]
 	})
 }
 

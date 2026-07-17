@@ -3,6 +3,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { de } from '@payloadcms/translations/languages/de'
+import { en } from '@payloadcms/translations/languages/en'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { fields } from '../src/index'
 import { colors } from './collections/colors'
@@ -41,6 +43,7 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	collections: [users, colors, tenants],
+	i18n: { supportedLanguages: { de, en } },
 	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
 	plugins: [
 		fields({

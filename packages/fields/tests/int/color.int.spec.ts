@@ -1,7 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig } from 'payload'
+import { type CollectionConfig, createLocalReq } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import { colorField } from '../../src/exports/color'
+import { colorField, presetsFromDoc } from '../../src/exports/color'
 import { fields } from '../../src/index'
 import type { ColorPreset, FieldsResolverArgs } from '../../src/types'
 
@@ -12,6 +12,52 @@ const resolverSpy = vi.fn(
 const throwingResolver = vi.fn(async (_args: FieldsResolverArgs): Promise<ColorPreset[]> => {
 	throw new Error('resolver exploded')
 })
+
+const primaryLabel = { de: 'Primär', en: 'Primary' }
+
+const tenants: CollectionConfig = {
+	slug: 'tenants',
+	fields: [
+		{ name: 'name', type: 'text', required: true },
+		colorField({ name: 'primary', label: primaryLabel }),
+		colorField({ name: 'accent' }),
+		{
+			name: 'brandColors',
+			type: 'array',
+			fields: [
+				{ name: 'key', type: 'text', required: true },
+				{ name: 'label', type: 'text' },
+				colorField({ name: 'value', required: true }),
+			],
+		},
+	],
+}
+
+type TenantDoc = {
+	brandColors?: Array<{ key: string; label?: null | string; value: string }> | null
+	name: string
+}
+
+const tenantPresets = async ({ req }: FieldsResolverArgs): Promise<ColorPreset[]> => {
+	const result = await req.payload.find({ collection: 'tenants', depth: 0, limit: 25 })
+	return result.docs.flatMap((doc) => {
+		const tenant = doc as unknown as TenantDoc
+		return [
+			...presetsFromDoc({
+				collection: 'tenants',
+				doc: doc as unknown as Record<string, unknown>,
+				fields: ['primary', 'accent'],
+				keyPrefix: `${tenant.name}/`,
+				req,
+			}),
+			...(tenant.brandColors ?? []).map((color) => ({
+				key: `${tenant.name}/${color.key}`,
+				label: color.label ?? color.key,
+				value: color.value,
+			})),
+		]
+	})
+}
 
 const swatches: CollectionConfig = {
 	slug: 'swatches',
@@ -37,6 +83,7 @@ const swatches: CollectionConfig = {
 			name: 'linkedThrowing',
 			presets: throwingResolver,
 		}),
+		...colorField({ linked: true, name: 'linkedBrand', presets: tenantPresets }),
 	],
 }
 
@@ -47,7 +94,16 @@ describeForDb('fields color', {}, (db) => {
 		booted.payload.create({ collection: 'swatches', data })
 
 	beforeAll(async () => {
-		booted = await bootPayload({ collections: [swatches], db, plugin: fields({}) })
+		booted = await bootPayload({ collections: [swatches, tenants], db, plugin: fields({}) })
+		await booted.payload.create({
+			collection: 'tenants',
+			data: {
+				name: 'acme',
+				accent: '#f59e0b',
+				brandColors: [{ key: 'surface', label: 'Acme surface', value: '#f5f3ff' }],
+				primary: '#7c3aed',
+			},
+		})
 	})
 
 	afterAll(async () => {
@@ -152,5 +208,41 @@ describeForDb('fields color', {}, (db) => {
 			where: { linkedStatic: { equals: 'preset:brand' } },
 		})
 		expect(found.docs.length).toBeGreaterThanOrEqual(1)
+	})
+
+	it('resolves a field-derived preset through the virtual sibling', async () => {
+		const doc = await create({ linkedBrand: 'preset:acme/primary' })
+		expect(doc.linkedBrand).toBe('preset:acme/primary')
+		expect(doc.linkedBrandResolved).toBe('#7c3aed')
+		const fetched = await booted.payload.findByID({ collection: 'swatches', id: doc.id })
+		expect(fetched.linkedBrandResolved).toBe('#7c3aed')
+	})
+
+	it('serves field-derived and array-derived presets from one combined resolver', async () => {
+		const fieldDerived = await create({ linkedBrand: 'preset:acme/accent' })
+		expect(fieldDerived.linkedBrandResolved).toBe('#f59e0b')
+		const arrayDerived = await create({ linkedBrand: 'preset:acme/surface' })
+		expect(arrayDerived.linkedBrandResolved).toBe('#f5f3ff')
+	})
+
+	it('passes localized record labels through presetsFromDoc untouched', async () => {
+		const req = await createLocalReq({}, booted.payload)
+		const found = await booted.payload.find({
+			collection: 'tenants',
+			limit: 1,
+			where: { name: { equals: 'acme' } },
+		})
+		const presets = presetsFromDoc({
+			collection: 'tenants',
+			doc: found.docs[0] as unknown as Record<string, unknown>,
+			fields: ['primary', 'accent', 'ghost'],
+			keyPrefix: 'acme/',
+			req,
+		})
+		// Sanitized configs humanize missing labels (toWords), so accent -> 'Accent'
+		expect(presets).toEqual([
+			{ key: 'acme/primary', label: primaryLabel, value: '#7c3aed' },
+			{ key: 'acme/accent', label: 'Accent', value: '#f59e0b' },
+		])
 	})
 })
