@@ -124,6 +124,48 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 	background: repeating-linear-gradient(45deg, var(--theme-error-500) 0 4px, transparent 4px 8px);
 }
 
+/* The sibling input's width: 100% basis would otherwise squeeze the chip to nothing;
+   the max-width keeps runaway labels ellipsizing instead of overflowing */
+.fields-color__chip {
+	display: flex;
+	flex-shrink: 0;
+	max-width: 60%;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 8px;
+	border-radius: var(--style-radius-s);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-700);
+	font-size: 0.85rem;
+	line-height: 1.2;
+}
+
+.fields-color__chip-swatch {
+	position: relative;
+	flex-shrink: 0;
+	width: 12px;
+	height: 12px;
+	overflow: hidden;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: 2px;
+}
+
+.fields-color__chip-color {
+	position: absolute;
+	inset: 0;
+	display: block;
+}
+
+.fields-color__chip-color[data-missing="true"] {
+	background: repeating-linear-gradient(45deg, var(--theme-error-500) 0 3px, transparent 3px 6px);
+}
+
+.fields-color__chip-label {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
 .fields-color__input {
 	flex: 1 1 auto;
 	width: 100%;

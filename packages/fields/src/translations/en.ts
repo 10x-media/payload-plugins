@@ -15,6 +15,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.allIcons]: 'All icons',
 	[keys.libraryUnavailable]: 'This icon library is no longer available',
 	[keys.missingPreset]: 'Missing preset',
+	[keys.preset]: 'Preset',
 	[keys.missingPresetHint]: 'This preset no longer exists. Pick a replacement.',
 	[keys.invalidColor]: 'Invalid color',
 	[keys.pickColor]: 'Pick a color',

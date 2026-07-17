@@ -15,6 +15,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.allIcons]: 'Alle Icons',
 	[keys.libraryUnavailable]: 'Diese Icon-Bibliothek ist nicht mehr verfügbar',
 	[keys.missingPreset]: 'Fehlende Voreinstellung',
+	[keys.preset]: 'Voreinstellung',
 	[keys.missingPresetHint]: 'Diese Voreinstellung existiert nicht mehr. Bitte einen Ersatz wählen.',
 	[keys.invalidColor]: 'Ungültige Farbe',
 	[keys.pickColor]: 'Farbe wählen',

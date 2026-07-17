@@ -13,6 +13,7 @@ export const keys = {
 	allIcons: 'fields:allIcons',
 	libraryUnavailable: 'fields:libraryUnavailable',
 	missingPreset: 'fields:missingPreset',
+	preset: 'fields:preset',
 	missingPresetHint: 'fields:missingPresetHint',
 	invalidColor: 'fields:invalidColor',
 	pickColor: 'fields:pickColor',

@@ -19,6 +19,7 @@ import { useTranslation } from '../../../translations/useTranslation'
 import type { ColorFormat } from '../../../types'
 import { formatColor, parseColor, rgbToHsv, toRgb } from '../engine'
 import { type ColorFieldClientOptions, PRESET_PREFIX, type ResolvedColorPreset } from '../options'
+import { derivePresetChip } from '../presetChip'
 import { ColorPickerPanel, type Hsva } from './ColorPickerPanel'
 import './colorField.css'
 
@@ -99,6 +100,19 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		if (!editingRef.current) setDraft(displayValue)
 	}, [displayValue])
 
+	// Typing dismisses the chip into plain text entry; blur re-derives it from the committed value
+	const [chipDismissed, setChipDismissed] = useState(false)
+	const chip = useMemo(
+		() =>
+			derivePresetChip({
+				editing: chipDismissed,
+				linked,
+				presets: resolvedPresets,
+				value: stringValue,
+			}),
+		[chipDismissed, linked, resolvedPresets, stringValue]
+	)
+
 	const debounceRef = useRef<null | ReturnType<typeof setTimeout>>(null)
 	useEffect(
 		() => () => {
@@ -129,6 +143,7 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		(event: React.ChangeEvent<HTMLInputElement>) => {
 			const raw = event.target.value
 			editingRef.current = true
+			setChipDismissed(true)
 			setDraft(raw)
 			if (debounceRef.current) clearTimeout(debounceRef.current)
 			debounceRef.current = setTimeout(() => commitText(raw), 250)
@@ -145,7 +160,21 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 			editingRef.current = false
 			commitText(draft)
 		}
+		setChipDismissed(false)
 	}, [commitText, draft])
+
+	// Backspace/Delete on the empty chip input never fires a change event, so clear here
+	const onTextKeyDown = useCallback(
+		(event: React.KeyboardEvent<HTMLInputElement>) => {
+			if (!chip || isReadOnly) return
+			if (event.key === 'Backspace' || event.key === 'Delete') {
+				event.preventDefault()
+				setDraft('')
+				setValue(null)
+			}
+		},
+		[chip, isReadOnly, setValue]
+	)
 
 	const commitCss = useCallback(
 		(css: string) => {
@@ -238,19 +267,33 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 							verticalAlign="bottom"
 						/>
 					)}
+					{chip ? (
+						<span className={`${baseClass}__chip`}>
+							<span className={`${baseClass}__chip-swatch ${baseClass}__checker`}>
+								{swatchCss ? (
+									<span className={`${baseClass}__chip-color`} style={{ background: swatchCss }} />
+								) : null}
+								{chip.missing && !swatchCss ? (
+									<span className={`${baseClass}__chip-color`} data-missing="true" />
+								) : null}
+							</span>
+							<span className={`${baseClass}__chip-label`}>{chip.label}</span>
+						</span>
+					) : null}
 					<input
 						className={`${baseClass}__input`}
 						id={`field-${path?.replace(/\./g, '__')}`}
 						name={path}
 						onBlur={onTextBlur}
 						onChange={onTextChange}
-						placeholder={typeof placeholder === 'string' ? placeholder : undefined}
+						onKeyDown={onTextKeyDown}
+						placeholder={chip || typeof placeholder !== 'string' ? undefined : placeholder}
 						readOnly={isReadOnly}
 						type="text"
-						value={draft}
+						value={chip ? '' : draft}
 					/>
 					<span aria-hidden="true" className={`${baseClass}__badge`}>
-						{displayFormat}
+						{chip ? t(keys.preset) : displayFormat}
 					</span>
 					{isClearable && !required && !isReadOnly && stringValue !== '' ? (
 						<button
