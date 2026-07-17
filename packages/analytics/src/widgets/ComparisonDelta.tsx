@@ -72,10 +72,9 @@ export function ComparisonDelta({ current, previous, metric, locale, t }: Compar
 					maximumFractionDigits: 1,
 					signDisplay: 'never',
 				}).format(Math.abs(delta.percent) / 100)
-	const visible =
-		delta.direction === 'none' || percentText === null
-			? t(DIRECTION_LABEL[delta.direction])
-			: percentText
+	// An unchanged value is a real 0%, so it reads as one; only a zero previous value
+	// (no percentage exists to report) falls back to the direction word.
+	const visible = percentText ?? t(DIRECTION_LABEL[delta.direction])
 	const ariaLabel = `${t(DIRECTION_LABEL[delta.direction])} ${percentText ?? ''} ${t(
 		keys.comparisonVsPrevious
 	)}`
@@ -88,8 +87,11 @@ export function ComparisonDelta({ current, previous, metric, locale, t }: Compar
 			style={{
 				display: 'inline-flex',
 				gap: '0.375rem',
-				alignItems: 'baseline',
+				// Not `baseline`: the value's own flex box takes its baseline from the arrow
+				// glyph rather than its text, which lifts the value off the caption's line.
+				alignItems: 'center',
 				fontSize: '0.75rem',
+				lineHeight: 1.25,
 			}}
 		>
 			<span
@@ -99,12 +101,15 @@ export function ComparisonDelta({ current, previous, metric, locale, t }: Compar
 					gap: '0.25rem',
 					color: colorFor(delta.direction, metric),
 					fontWeight: 600,
+					lineHeight: 'inherit',
 				}}
 			>
 				{delta.direction !== 'none' ? <DeltaArrow direction={delta.direction} /> : null}
 				{visible}
 			</span>
-			<span style={{ color: 'var(--theme-elevation-400)' }}>{t(keys.comparisonVsPrevious)}</span>
+			<span style={{ color: 'var(--theme-elevation-400)', lineHeight: 'inherit' }}>
+				{t(keys.comparisonVsPrevious)}
+			</span>
 		</span>
 	)
 }

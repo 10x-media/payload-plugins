@@ -3,6 +3,7 @@ import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { syncTask } from '../../src/sync/syncTask'
+import { startOfDayInTz } from '../../src/timeframe/tz'
 import { devMemoryAdapter } from './adapters'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
@@ -23,10 +24,35 @@ const SEED_SOURCES = ['google.com', 'Direct', 't.co', 'news.ycombinator.com']
 const SEED_VISITOR_COUNT = 6
 const DAY_MS = 24 * 60 * 60 * 1000
 
+/**
+ * Two years, so every preset compares against a populated previous window and the widgets
+ * always show a real percentage: `lastYear` looks back 365 days and compares against the
+ * 365 before that. (`allTime` is the one preset with no previous window by definition, and
+ * omits its comparison.)
+ */
+const SEED_DAYS = 730
+
+/** The recent span carrying realistic day-to-day traffic and the dimension breakdowns. */
+const SEED_DENSE_DAYS = 180
+
+/**
+ * Traffic decays with age and wobbles day to day, so each window is measurably busier than
+ * the one before it and no comparison lands on a flat 0%. Beyond the dense span the seed
+ * thins to an occasional pageview: enough to give the year-long presets a real baseline
+ * without paying for two years of daily rollups on every dev boot. Deterministic: the same
+ * `day` always yields the same count.
+ */
+const pageviewsForDay = (day: number): number =>
+	day < SEED_DENSE_DAYS
+		? Math.max(1, Math.round(6 * Math.exp(-day / 90) * (1 + 0.3 * Math.sin(day * 1.7))))
+		: day % 3 === 0
+			? 1
+			: 0
+
 const buildSeedEvents = (now: Date): StoredEvent[] => {
 	const events: StoredEvent[] = []
-	for (let day = 0; day < 14; day++) {
-		const pageviewsToday = 3 + (day % 4)
+	for (let day = 0; day < SEED_DAYS; day++) {
+		const pageviewsToday = pageviewsForDay(day)
 		for (let i = 0; i < pageviewsToday; i++) {
 			// Pair consecutive pageviews onto one visitor (and drift the window across days)
 			// so visitors stay realistically below pageviews rather than one-to-one.
@@ -47,6 +73,34 @@ const buildSeedEvents = (now: Date): StoredEvent[] => {
 		}
 	}
 	return events
+}
+
+/**
+ * Flush the seed one rollup period at a time, several periods at once. Every rollup bucket
+ * and seen-ledger row is keyed by the event's period (`bucketKey` includes it), so batches
+ * from different periods touch disjoint rows and cannot race; only the per-batch work is
+ * serial. Grouping must use the same timezone-aware day the rollups bucket on, not the UTC
+ * day, or two events sharing a local day could land in different batches and race. Without
+ * this the ledger's insert-if-new gate runs sequentially across the whole span and the boot
+ * seed takes minutes.
+ */
+const flushSeedEvents = async (payload: Payload, events: StoredEvent[]): Promise<void> => {
+	const byDay = new Map<string, StoredEvent[]>()
+	for (const event of events) {
+		const day = startOfDayInTz(event.timestamp, event.timezone).toISOString()
+		const batch = byDay.get(day)
+		if (batch) {
+			batch.push(event)
+		} else {
+			byDay.set(day, [event])
+		}
+	}
+	const batches = [...byDay.values()]
+	// Past ~24 the in-memory mongo contends and the seed gets slower, not faster.
+	const CONCURRENCY = 24
+	for (let i = 0; i < batches.length; i += CONCURRENCY) {
+		await Promise.all(batches.slice(i, i + CONCURRENCY).map((b) => flushBatch(payload, b)))
+	}
 }
 
 const SEED_PAGES = [
@@ -96,7 +150,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	seedMemoryAdapter(events)
 	const eventCount = await payload.count({ collection: EVENTS_SLUG as never })
 	if (eventCount.totalDocs === 0) {
-		await flushBatch(payload, events)
+		await flushSeedEvents(payload, events)
 		payload.logger.info(`Seeded ${events.length} analytics pageview events`)
 	}
 
