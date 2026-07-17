@@ -40,7 +40,7 @@ Anonymous voters cannot read raw submissions, so public results are served as ag
 GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
 ```
 
-Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `poll.enabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured. A poll with an [option source](#option-sources) is enumerable through its resolved options instead: the endpoint resolves the source server-side, seeds buckets in resolved order with the source's labels, forbids results while resolution is empty, and fails closed with a 503 when resolution fails.
+Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted; for a poll-enabled form the results field's effective options (source-resolved, `resolveOptions`-backed, or authored) are injected too, so a sourced poll renders labels in the admin rather than raw stored values (best-effort: a resolve failure there degrades to raw values rather than blocking the trusted read). Anonymous callers are served only when the form's `poll.enabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured. A poll with an [option source](#option-sources) is enumerable through its resolved options instead: the endpoint resolves the source server-side, seeds buckets in resolved order with the source's labels, forbids results while resolution is empty, and fails closed with a 503 when resolution fails.
 
 `poll.resultsField` is authored as a select listing the form's eligible fields: named instances of field types that declare `pollEligible` (built-in: `select`). Server validation enforces the same rule, so a free-text or PII field can never be stored while the poll is enabled.
 
@@ -97,7 +97,9 @@ At submission time the server resolves the source again and accepts only the res
 
 ### Custom eligible field types
 
-The eligibility rule extends to your own field types: declare `pollEligible` on the [definition](/form-builder/fields#defining-a-field-type) and it appears in the results-field select alongside `select`. Pair it with an option source so its answers stay enumerable; an athlete-vote field that renders as relationship picks, for example:
+The eligibility rule extends to your own field types. Declare `pollEligible` on the [definition](/form-builder/fields#defining-a-field-type) and the type appears in the results-field select alongside `select`. Its instances still have to yield enumerable answers, and a custom type has two ways to do that.
+
+The direct one is `resolveOptions`: the type sources its own choices from the instance the author configured, so the options live in the field itself rather than in a separate source. A vote field holding a `hasMany` relationship to the records being voted on turns the selected ids into options:
 
 ```ts title="payload.config.ts"
 import { defineFormField, type FieldTypeOption } from '@10x-media/form-builder'
@@ -107,21 +109,34 @@ const athleteVote = defineFormField<'text'>({
   label: 'Athlete vote',
   value: 'text',
   pollEligible: true,
+  config: [
+    { name: 'athletes', type: 'relationship', relationTo: 'athletes', hasMany: true, required: true },
+  ],
+  resolveOptions: async ({ instance, payload, req }) => {
+    const ids = (Array.isArray(instance.athletes) ? instance.athletes : []).filter(Boolean)
+    if (ids.length === 0) return []
+    const { docs } = await payload.find({
+      collection: 'athletes',
+      where: { id: { in: ids } },
+      depth: 0,
+      req,
+    })
+    return docs.map((doc) => ({ value: String(doc.id), label: doc.name }))
+  },
 })
 
-formBuilder({
-  fields: { athleteVote: athleteVote as FieldTypeOption },
-  poll: { sources: { raceEntrants } },
-})
+formBuilder({ fields: { athleteVote: athleteVote as FieldTypeOption } })
 ```
 
-An author then adds an `athleteVote` field, picks it as the results field, and selects the `raceEntrants` source: submissions accept only resolved entrant ids, and anonymous results are bucketed and labelled from the same resolution.
+An author adds an `athleteVote` field, marks a few athletes voteable, and picks it as the results field. That one resolution backs everything: submissions accept only the resolved ids, the public voting UI and the admin winner select offer exactly those athletes, and results are labelled from the same records. No option source is involved; the field is self-sourcing.
+
+`resolveOptions` is consulted after an `optionSource` and before the instance's authored `options`, so the other way is to pair `pollEligible` with a shared [option source](#option-sources) when several field types should draw from one domain query instead of each carrying its own.
 
 ## Outcome
 
-When the real-world result is decided ("which athlete won?"), record it one of two ways; both land in `poll.outcome.winningValue`, both are validated against the poll's current options (source-resolved or authored), and both stamp `resolvedAt` server-side.
+When the real-world result is decided ("which athlete won?"), record it one of two ways; both land in `poll.outcome.winningValue`, both are validated against the poll's current options (source-resolved, `resolveOptions`-backed, or authored), and both stamp `resolvedAt` server-side.
 
-**In the admin.** The outcome group's winning-value select loads the poll's effective options from the authenticated `GET /api/forms/:id/poll-options` endpoint, so an editor opens the form after the race and picks the winner; clearing the select reopens the outcome. `resolvedAt` itself stays locked (a beforeChange hook stamps it on every winner set, change, or clear; direct writes are dropped).
+**In the admin.** The outcome group's winning-value select loads the poll's effective options from the authenticated `GET /api/forms/:id/poll-options` endpoint, so an editor opens the form after the race and picks the winner; clearing the select reopens the outcome. `resolvedAt` itself stays locked (a beforeChange hook stamps it on every winner set, change, or clear; direct writes are dropped). The group is composable through the `poll.outcomeFields` seam, which hands you the two default fields (`winningValue`, `resolvedAt`) to reorder, wrap, or swap the winner picker for a component of your own (see [Customization](/form-builder/customization#poll-outcome-fields)); membership validation runs server-side regardless, so a swap cannot bypass it.
 
 The select is document-scoped, so it stays empty on a form that has never been saved: there is no id yet for the endpoint to resolve options against. This costs nothing in practice, since a poll only has a winner after it has run, but it does mean the winner cannot be set in the same breath as creating the form. Save first, then pick.
 
@@ -159,7 +174,7 @@ const winner = await resolvePollOutcome({ payload, formId }) // auto, via resolv
 
 Auto mode throws when the poll has no option source, the configured source type is not registered, the source lacks `resolveOutcome`, or the outcome is not yet decidable, so a cron that resolves polls fails loudly instead of guessing. Either way the call returns the recorded value, so a caller that let the source decide still learns the winner. A recorded outcome supersedes the rest of the lifecycle: `<Poll>` renders a final notice plus results with the winning bucket highlighted (`<FormResults winningValue>` underneath), regardless of voted or closed state.
 
-Both paths validate against one set, `resolveEffectivePollOptions` (exported from the root and `/rsc`): source-resolved options when the poll has an `optionSource`, otherwise the authored options of the results field. It backs the admin select, the endpoint, and outcome validation alike, so what the admin offers and what the server accepts cannot drift. Call it directly to render a winner picker of your own.
+Both paths validate against one set, `resolveEffectivePollOptions` (exported from the root and `/rsc`): source-resolved options when the poll has an `optionSource`, the results field type's own `resolveOptions` when it declares one, otherwise the field's authored options. It backs the admin select, the endpoint, and outcome validation alike, so what the admin offers and what the server accepts cannot drift. Call it directly to render a winner picker of your own.
 
 ## Rendering results
 

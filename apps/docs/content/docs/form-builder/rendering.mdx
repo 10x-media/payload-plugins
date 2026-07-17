@@ -26,9 +26,9 @@ const doc = await payload.findByID({ collection: 'forms', id })
 return <ContactForm form={toFormDocument(doc)} />
 ```
 
-`toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes `{ pollOptions }` as a second argument to inject [source-resolved poll options](/form-builder/polls#option-sources).
+`toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes a second argument for injecting request-resolved data: `{ pollOptions }` for [source-resolved poll options](/form-builder/polls#option-sources) (from `resolvePollOptions`) and `{ consentStatements }` for [live consent statements](/form-builder/consent#rendering-the-statement) (from `resolveConsentStatements`), since a form stores only a source key and resolves the sentence per request.
 
-`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too). `buttons` carries the form-level submit/next/back labels, plus any [host-added button fields](/form-builder/customization#form-level-buttons) (see label precedence below).
+`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too). `buttons` carries the form-level submit/next/prev labels, plus any [host-added button fields](/form-builder/customization#form-level-buttons) (see label precedence below).
 
 ### Progressive validation
 
@@ -65,7 +65,7 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
 | `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
 | `className` | `string` | none | Extra CSS classes on the root `<form>` element (and the post-submit success node). |
-| `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit, next, and back each resolve prop, then the form's `buttons` value, then the translated default. |
+| `submitLabel`, `nextLabel`, `prevLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit, next, and prev each resolve prop, then the form's `buttons` value, then the translated default. |
 | `submitButtonClassName` | `string` | none | CSS class on the default submit button. Ignored when `renderSubmit` is provided. |
 | `nextButtonClassName` | `string` | none | CSS class on the default Next button (multi-step). Ignored when `renderNext` is provided. |
 | `backButtonClassName` | `string` | none | CSS class on the default Back button (multi-step). Ignored when `renderBack` is provided. |

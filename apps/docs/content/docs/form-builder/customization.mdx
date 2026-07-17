@@ -86,7 +86,7 @@ With this option off (the default), the `answers` UI field is the only visible r
 
 ## Form-level buttons
 
-Every form carries a `buttons` group at the bottom of its Fields tab with three localized labels: `submitLabel`, `nextLabel`, and `backLabel` (next/back apply to multi-step forms). The rendered chrome resolves each label as `<Form>` prop, then the stored value, then the translated default.
+Every form carries a `buttons` group at the bottom of its Fields tab with three localized labels: `submitLabel`, `nextLabel`, and `prevLabel` (next/prev apply to multi-step forms). The rendered chrome resolves each label as `<Form>` prop, then the stored value, then the translated default.
 
 The group is composable. The plugin's `buttons.fields` option receives the three default fields, localization flag already applied, and returns the group's final field array verbatim. Wrap a default in a row with your own field, reorder, or drop one. Here the submit label gets an accompanying icon select:
 
@@ -109,7 +109,7 @@ formBuilder({
         ],
       },
       defaultFields.next,
-      defaultFields.back,
+      defaultFields.prev,
     ],
   },
 })
@@ -147,7 +147,29 @@ export const ContactForm = ({ form }: { form: FormDocument }) => (
 
 The same pattern extends to button variants, per-button styling flags, or anything else: add the field next to a default, read it back from `useFormContext().form.buttons`. `renderNext` and `renderBack` compose identically.
 
-To assemble the group from scratch instead of receiving the defaults, the individual builders are exported: `buildSubmitLabelField(localize)`, `buildNextLabelField(localize)`, and `buildBackLabelField(localize)`, plus `buildDefaultButtonFields(localize)` returning all three.
+To assemble the group from scratch instead of receiving the defaults, the individual builders are exported: `buildSubmitLabelField(localize)`, `buildNextLabelField(localize)`, and `buildPrevLabelField(localize)`, plus `buildDefaultButtonFields(localize)` returning all three (keyed `submit`/`next`/`prev`).
+
+## Poll outcome fields
+
+The forms `poll.outcome` group holds a poll's recorded winner. Its `winningValue` select is backed by the `GET /api/forms/:id/poll-options` endpoint (the poll's [effective options](/form-builder/polls#outcome)); `resolvedAt` is a server-stamped date locked against every caller write. Compose the group with the `poll.outcomeFields` option, which mirrors [`buttons.fields`](#form-level-buttons): it receives the two default fields and returns the group's final field array verbatim, so you can reorder, wrap, or swap the winner picker for a component of your own, for example a relationship select over the voteable records:
+
+```ts title="payload.config.ts"
+formBuilder({
+  poll: {
+    outcomeFields: ({ defaultFields }) => [
+      {
+        ...defaultFields.winningValue,
+        admin: {
+          components: { Field: { path: './WinnerPicker#WinnerPicker' } },
+        },
+      },
+      defaultFields.resolvedAt,
+    ],
+  },
+})
+```
+
+Keep the stored value a `PollOption.value` string whatever component renders it: `pollOutcomeBeforeChange` validates the winner against the poll's effective options server-side regardless of which field authored it, so a swap cannot bypass the membership check. Preserve `defaultFields.resolvedAt` (or rebuild the same field-level access lock) to keep the stamp tamper-proof. `buildWinningValueField()`, `buildResolvedAtField()`, and `buildDefaultOutcomeFields()` are exported for assembling the group from scratch.
 
 ---
 

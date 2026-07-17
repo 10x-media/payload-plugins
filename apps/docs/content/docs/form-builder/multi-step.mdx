@@ -49,7 +49,7 @@ A step whose every field has since been deleted from the form keeps its place ra
 `<Form>` reads `flow` from the document and drives it automatically:
 
 - renders only the current step's fields,
-- shows Back and Next between the first and last steps (labels overridable via `nextLabel` / `backLabel`),
+- shows Back and Next between the first and last steps (labels overridable via `nextLabel` / `prevLabel`),
 - validates the current step's visible fields before advancing; errors block progress,
 - shows Submit on the terminal step,
 - submits all accumulated answers as one submission.
