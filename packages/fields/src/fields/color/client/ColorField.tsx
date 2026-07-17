@@ -35,7 +35,7 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		colorOptions,
 		field,
 		field: {
-			admin: { className, description, placeholder } = {},
+			admin: { className, description, placeholder, readOnly: readOnlyFromAdmin } = {},
 			label,
 			localized,
 			name,
@@ -72,7 +72,10 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		value,
 	} = useField<string>({ potentiallyStalePath: pathFromProps, validate: memoizedValidate })
 
-	const isReadOnly = Boolean(readOnlyFromProps || disabled)
+	// renderField only maps permissions into the readOnly clientProp; admin.readOnly
+	// reaches custom Field components solely via clientField.admin (native fields get
+	// it merged client-side in RenderFields, a path custom components bypass)
+	const isReadOnly = Boolean(readOnlyFromProps || disabled || readOnlyFromAdmin)
 
 	const stringValue = typeof value === 'string' ? value : ''
 	const presetKey =
