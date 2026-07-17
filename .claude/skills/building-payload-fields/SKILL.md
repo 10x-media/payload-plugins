@@ -23,10 +23,34 @@ A custom field is done when an admin cannot tell it apart from a native Payload 
 - Wrapper structure mirrors native fields exactly: outer `div` with `fieldBaseClass`, the field-type class, and state classes (`error`, `read-only`), inner `field-type__wrap`. Copy the structure from a native field in `@payloadcms/ui`, not from memory.
 - Render Label, Error, and Description through `RenderCustomComponent` so server-provided component overrides (`admin.components.Label` etc.) win over the defaults.
 - Apply `mergeFieldStyles` for `admin.width` and `admin.style`.
-- Combine `readOnly || disabled` at the leaf control, like native fields do.
+- Combine `readOnly || disabled` at the leaf control, like native fields do, and see the `admin.readOnly` gotcha below.
 - Input rows are EXACTLY 40px, matching Payload's `base(2)` form input height. Pickers, drawers, and popovers carry the extra UI; the field row itself never grows.
-- CSS uses only Payload custom properties: `--theme-elevation-*`, `--theme-error-*`, `--style-radius-*`, `--base`, `--theme-input-bg`. Dark mode comes free via elevation inversion; hardcoded colors break it.
-- No `!important`. No z-index values beyond Payload's own scale. No emojis in UI; icons are inline SVG or Payload-provided icons.
+- **Size in literal px, not `var(--base)` arithmetic.** Payload compiles its scss `base()` calls to literal px, but the `--base` custom property is rem-derived and shrinks with the responsive root font size. A row built from `calc(var(--base) * 2)` measures 40px at desktop and ~37px below 1024px, next to a native input that stays 40px. Use the same literal values the `formInput` mixin compiles to.
+- CSS uses only Payload custom properties: `--theme-elevation-*`, `--theme-error-*`, `--style-radius-*`, `--theme-input-bg`. Dark mode comes free via elevation inversion; hardcoded colors break it.
+- No `!important`. No z-index values beyond Payload's own scale. No emojis in UI; icons are inline SVG or Payload-provided icons (`XIcon` and friends are exported from `@payloadcms/ui`).
+
+## Composite inputs (fields with more than one control)
+
+When a field needs a trigger, a text entry, a badge, and a clear button, they belong INSIDE one input-shaped container, not side by side as separate controls. Adjacent controls read as several fields; one container reads as one native input.
+
+- The container replicates the `formInput` mixin (border `--theme-elevation-150`, radius `--style-radius-s`, `--theme-input-bg`, shadow, 40px, the 100ms triple transition), hover goes to elevation-250, and focus rides `:focus-within` to elevation-400. Error and readOnly states style the container, not the children.
+- Inner controls are chrome-less: the text input is borderless with `background: transparent; color: inherit; min-width: 0` so it flexes inside a row.
+- Clear affordances copy the native select's clear indicator (`ClearIndicator` in `packages/ui/src/elements/ReactSelect`): bare icon, no button chrome, `--accessibility-outline` on focus-visible.
+- Read the real thing before styling: `packages/ui/src/scss/vars.scss` (`formInput`, `readOnly`, `lightInputError`, `darkInputError`).
+
+## Gotchas verified against the Payload source
+
+- **`admin.readOnly` does not reach custom Field components.** `renderField.tsx` derives `clientProps.readOnly` from doc-level locks and permissions only; native fields pick up `admin.readOnly` later, in `RenderFields`, on a path that a custom `Field` component short-circuits. A custom field MUST read it itself: `readOnly || disabled || field.admin?.readOnly`. Symptom if you miss it: a field configured `admin: { readOnly: true }` stays fully editable.
+- **`Popup` portals its content to `document.body`.** A className you pass to `Popup` lands on the trigger root, so no ancestor selector from it can reach the panel. Target portalled content by a class on your own panel (`.popup__scroll-container:has(> .my-panel)`). Payload also caps that scroll container at `calc(var(--base) * 10)` = 200px, which silently clips any taller panel behind a hidden scrollbar.
+- **Field rhythm is not yours to set.** Vertical spacing comes from `.render-fields > .field-type { margin-bottom: var(--spacing-field) }`. Inside a `row`, children get `--spacing-field: 0` and spacing comes from `row-gap`, which goes inert when the row flips to `display: block` at `max-width: 1024px`: native row children touch there too. Never add a hand-tuned margin to "fix" spacing; verify against a native field at the same breakpoint first.
+- **Verify styling by measurement, not by eye.** `getComputedStyle` on your control and on a native input, at several viewport widths, is the only proof that they match.
+
+## Input UX semantics
+
+- Normalize at commit boundaries (blur, debounced commit), never mid-keystroke: rewriting the input while it is focused throws the caret and fights the user.
+- Be forgiving on blur: salvage the first valid token out of dirty input (double pastes, wrapping CSS syntax) rather than erroring. Extract candidates and validate them; never blind-strip characters, which can fabricate a value the user never typed.
+- `isClearable: false` means the value cannot be REMOVED, not merely that the X is hidden. Emptying the input and committing must revert to the last valid value. A never-set field may stay empty; `required` enforces the rest.
+- Anything derived from an external source (presets, options) renders as a chip with its resolved label, never as a raw reference string.
 
 ## Admin-prop passthrough checklist
 
