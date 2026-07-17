@@ -26,8 +26,11 @@ export default async function DevPage({ params }: { params: Promise<{ slug: stri
 			</p>
 			<h1>{page.title ?? page.slug}</h1>
 			<p>
-				This is the <code>/{page.slug}</code> demo page. Loading it fired a pageview event; its
-				numbers appear on this document&apos;s Analytics tab in the admin panel.
+				This is the <code>/{page.slug}</code>{' '}
+				<span>
+					demo page. Loading it fired a pageview event; its numbers appear on this document&apos;s
+					Analytics tab in the admin panel.
+				</span>
 			</p>
 		</main>
 	)
