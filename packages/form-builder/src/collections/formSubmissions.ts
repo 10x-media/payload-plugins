@@ -42,7 +42,7 @@ type BuildSubmissionsCollectionArgs = {
 	pollSourceRegistry?: PollOptionSourceRegistry
 	/**
 	 * When `true`, shows the raw `values`, `descriptors`, and `consent` JSON fields in the admin UI.
-	 * Default `false` — they are fully represented by the `SubmissionAnswers` UI component.
+	 * Default `false`, because the `SubmissionAnswers` UI component already represents them fully.
 	 */
 	showRawFields?: boolean
 	overrides?: CollectionOverrides

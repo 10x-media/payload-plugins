@@ -23,6 +23,13 @@ const FROM_FIELD_REF = '@10x-media/form-builder/client#EndpointOptionsSelect'
  * `toField` and poll's `resultsField`): unset is fine, otherwise the value must be one of the
  * resolver's options for this request. A throwing resolver fails closed with a translated message
  * rather than surfacing a raw error on save.
+ *
+ * Failing closed has an operational cost worth knowing: Payload runs this on every save, not only
+ * when `from` changed, so for as long as the resolver is down no form carrying an email action with
+ * a `from` set can be saved at all, including edits that never touch the address. That is the
+ * deliberate trade: failing open would persist a sender the host can no longer vouch for, and
+ * unlike `toField` and `resultsField` this seam depends on host infrastructure that can be down.
+ * A resolver reaching a flaky upstream should cache or fall back internally rather than throw.
  */
 export const validateFromField =
 	(resolver: FromAddressesResolver) =>

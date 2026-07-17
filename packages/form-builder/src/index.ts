@@ -119,8 +119,8 @@ export type FormBuilderPluginOptions = {
 	poll?: { votedCookie?: boolean; sources?: PollOptionSourcesConfig }
 	/**
 	 * When `true`, the raw `values`, `descriptors`, and `consent` JSON fields are visible in the
-	 * submission admin view. Default `false` — those fields are fully represented by the
-	 * `SubmissionAnswers` UI component and are noisy when shown alongside it.
+	 * submission admin view. Default `false`, because the `SubmissionAnswers` UI component already
+	 * represents those fields fully and they are noisy shown alongside it.
 	 */
 	showSubmissionRawFields?: boolean
 	/**
