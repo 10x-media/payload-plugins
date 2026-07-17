@@ -16,6 +16,7 @@ export const keys = {
 	metricConversions: 'analytics:metricConversions',
 	metricRevenue: 'analytics:metricRevenue',
 	stateNoData: 'analytics:stateNoData',
+	stateNew: 'analytics:stateNew',
 	stateNotBound: 'analytics:stateNotBound',
 	stateNotConfigured: 'analytics:stateNotConfigured',
 	stateUnavailable: 'analytics:stateUnavailable',

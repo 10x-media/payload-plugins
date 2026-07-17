@@ -12,6 +12,7 @@ import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { useTranslation } from '../translations/useTranslation'
 import { ComparisonDelta } from '../widgets/ComparisonDelta'
 import type { SeriesPoint } from '../widgets/readForWidgetSeries'
+import { AnalyticsEmptyState, isNewDocumentAnalytics } from './emptyState'
 import { formatMetricValue } from './format'
 import type { FieldReadStatus } from './readForDocument'
 
@@ -154,8 +155,10 @@ export function AnalyticsPanelClient(props: AnalyticsPanelClientProps) {
 				</div>
 			</div>
 			<div style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
-				{data.status !== 'ok' ? (
-					<div style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEYS[data.status])}</div>
+				{isNewDocumentAnalytics(data) ? (
+					<AnalyticsEmptyState isNew label={t(keys.stateNew)} />
+				) : data.status !== 'ok' ? (
+					<AnalyticsEmptyState isNew={false} label={t(STATE_KEYS[data.status])} />
 				) : (
 					<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 						<div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
