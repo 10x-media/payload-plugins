@@ -30,6 +30,16 @@ describe('colorField', () => {
 		expect(typeof custom.presets).toBe('function')
 	})
 
+	it('defaults isClearable to true and forwards false to client props', () => {
+		const defaulted = components(colorField()).Field.clientProps.colorOptions as {
+			isClearable: boolean
+		}
+		expect(defaulted.isClearable).toBe(true)
+		const disabled = components(colorField({ isClearable: false })).Field.clientProps
+			.colorOptions as { isClearable: boolean }
+		expect(disabled.isClearable).toBe(false)
+	})
+
 	it('linked mode returns the field plus a hidden virtual sibling', () => {
 		const [main, resolved] = colorField({
 			linked: true,

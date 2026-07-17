@@ -57,6 +57,7 @@ export function colorField(options: ColorFieldOptions = {}): TextField | [TextFi
 		alpha = true,
 		enableEyedropper = true,
 		format = 'hex',
+		isClearable = true,
 		label,
 		linked: linkedOption = false,
 		localized,
@@ -74,6 +75,7 @@ export function colorField(options: ColorFieldOptions = {}): TextField | [TextFi
 		alpha,
 		enableEyedropper,
 		format,
+		isClearable,
 		linked,
 		linkedFallback,
 	}

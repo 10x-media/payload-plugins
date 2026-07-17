@@ -26,6 +26,8 @@ export type ColorFieldOptions = {
 	presets?: ColorPresetsSource
 	presetsLabel?: StaticLabel
 	linked?: boolean | ColorLinkedOptions
+	/** Default true. False removes the inline clear control; required fields never render it. */
+	isClearable?: boolean
 	/** Default true. Chromium EyeDropper API, feature-detected at runtime. */
 	enableEyedropper?: boolean
 	overrides?: (args: { field: TextField }) => TextField
@@ -36,6 +38,7 @@ export type ColorFieldClientOptions = {
 	alpha: boolean
 	enableEyedropper: boolean
 	format: ColorFormat
+	isClearable: boolean
 	linked: boolean
 	linkedFallback: null | string
 }

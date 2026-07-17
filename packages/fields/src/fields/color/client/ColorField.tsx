@@ -7,6 +7,7 @@ import {
 	Popup,
 	RenderCustomComponent,
 	useField,
+	XIcon,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { TextFieldClientProps, Validate } from 'payload'
@@ -19,7 +20,6 @@ import type { ColorFormat } from '../../../types'
 import { formatColor, parseColor, rgbToHsv, toRgb } from '../engine'
 import { type ColorFieldClientOptions, PRESET_PREFIX, type ResolvedColorPreset } from '../options'
 import { ColorPickerPanel, type Hsva } from './ColorPickerPanel'
-import { ClearIcon } from './icons'
 import './colorField.css'
 
 const baseClass = 'fields-color'
@@ -46,7 +46,7 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		readOnly: readOnlyFromProps,
 		resolvedPresets = [],
 	} = props
-	const { alpha, enableEyedropper, format, linked, linkedFallback } = colorOptions
+	const { alpha, enableEyedropper, format, isClearable, linked, linkedFallback } = colorOptions
 	const { t } = useTranslation()
 
 	const memoizedValidate = useCallback<Validate<string>>(
@@ -173,7 +173,7 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 			{presetMissing && !swatchCss ? (
 				<span className={`${baseClass}__swatch-color`} data-missing="true" />
 			) : null}
-			<span className={`${baseClass}__sr-only`}>{t(keys.pickColor)}</span>
+			{isReadOnly ? null : <span className={`${baseClass}__sr-only`}>{t(keys.pickColor)}</span>}
 		</span>
 	)
 
@@ -202,7 +202,7 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 					Fallback={<FieldError path={path} showError={showError} />}
 				/>
 				{BeforeInput}
-				<div className={`${baseClass}__row`}>
+				<div className={`${baseClass}__container`}>
 					{isReadOnly ? (
 						<span className={`${baseClass}__swatch-button ${baseClass}__swatch-button--static`}>
 							{swatch}
@@ -240,19 +240,19 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 					)}
 					<input
 						className={`${baseClass}__input`}
-						disabled={isReadOnly}
 						id={`field-${path?.replace(/\./g, '__')}`}
 						name={path}
 						onBlur={onTextBlur}
 						onChange={onTextChange}
 						placeholder={typeof placeholder === 'string' ? placeholder : undefined}
+						readOnly={isReadOnly}
 						type="text"
 						value={draft}
 					/>
-					<span aria-hidden="true" className={`${baseClass}__chip`}>
+					<span aria-hidden="true" className={`${baseClass}__badge`}>
 						{displayFormat}
 					</span>
-					{!required && !isReadOnly && stringValue !== '' ? (
+					{isClearable && !required && !isReadOnly && stringValue !== '' ? (
 						<button
 							aria-label={t(keys.clearColor)}
 							className={`${baseClass}__clear`}
@@ -262,7 +262,7 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 							}}
 							type="button"
 						>
-							<ClearIcon />
+							<XIcon />
 						</button>
 					) : null}
 				</div>
