@@ -20,12 +20,20 @@ export type ToFormDocumentOptions = {
  * - `fields` may be a typed blocks-union array or null; normalized to `FormFieldInstance[]`
  *   (nameless bare rows, e.g. message blocks, pass through with their row `id` intact)
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
- * - `response` may be null; coerced to `undefined`
+ * - `response` may be null; coerced to `undefined`, otherwise passed through wholesale
  * - `buttons` may be null; passed through wholesale, so keys a host added to the buttons group
  *   via the plugin `buttons.fields` seam survive to the client untouched
  * - `title` may be null; coerced to `undefined`
  * - `poll` may be null; coerced to `undefined` (`resultsField`, `optionSource`, and
  *   `sourceConfig` are dropped: server-side only; `outcome` passes through `winningValue` only)
+ *
+ * Unknown keys survive on `response` and `buttons` but not on `poll`, which is deliberate rather
+ * than incidental. `response` and `buttons` are visitor-facing groups a host is meant to extend
+ * (`buttons.fields`, or `overrides.forms.fields`) and read back off `FormDocument` in custom
+ * chrome, so they are cast wholesale. `poll` is plugin-owned config that is split between
+ * client-safe lifecycle state and server-only members, so it is rebuilt from an allowlist: a
+ * passthrough would ship whatever a host put in `sourceConfig` (domain config, ids, credentials)
+ * to every anonymous visitor. Adding a client-visible poll member means naming it here.
  *
  * Pure and framework-agnostic (no 'use client'): safe to call from a Server Component or any
  * other server-side code before handing the result to the client `<Form>`.

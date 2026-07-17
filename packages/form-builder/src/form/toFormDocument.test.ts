@@ -31,6 +31,54 @@ describe('toFormDocument', () => {
 		expect(toFormDocument({ id: 1 }).buttons).toBeUndefined()
 	})
 
+	// The asymmetry is a contract, not an accident: response and buttons are host-extensible
+	// visitor-facing groups, poll is an allowlist so server-only members cannot leak to the client.
+	describe('unknown-key preservation', () => {
+		it('preserves unknown keys on response', () => {
+			const response = { type: 'message', message: 'Thanks', tone: 'celebratory' }
+			const doc = toFormDocument({ id: 1, response })
+			expect(doc.response).toBe(response)
+			expect((doc.response as Record<string, unknown>)?.tone).toBe('celebratory')
+		})
+
+		it('preserves unknown keys on buttons', () => {
+			const buttons = { submitLabel: 'Send', submitIcon: 'arrow-right' }
+			const doc = toFormDocument({ id: 1, buttons })
+			expect(doc.buttons).toBe(buttons)
+			expect((doc.buttons as Record<string, unknown>)?.submitIcon).toBe('arrow-right')
+		})
+
+		it('drops unknown keys on poll, including anything a host stored in sourceConfig', () => {
+			const doc = toFormDocument({
+				id: 1,
+				poll: {
+					enabled: true,
+					resultsField: 'colour',
+					optionSource: 'catalogue',
+					sourceConfig: { apiKey: 'secret', tenantId: 'acme' },
+					internalNote: 'not for visitors',
+				} as Parameters<typeof toFormDocument>[0]['poll'],
+			})
+			expect(doc.poll).toEqual({
+				enabled: true,
+				resultsVisibility: undefined,
+				closesAt: undefined,
+			})
+			expect(Object.keys(doc.poll ?? {})).toEqual(['enabled', 'resultsVisibility', 'closesAt'])
+		})
+
+		it('drops unknown keys on poll.outcome, keeping winningValue alone', () => {
+			const doc = toFormDocument({
+				id: 1,
+				poll: {
+					enabled: true,
+					outcome: { winningValue: 'ada', resolvedAt: '2026-07-01T00:00:00.000Z' },
+				} as Parameters<typeof toFormDocument>[0]['poll'],
+			})
+			expect(doc.poll?.outcome).toEqual({ winningValue: 'ada' })
+		})
+	})
+
 	it('passes a nameless bare row through with its block row id intact', () => {
 		const doc = toFormDocument({
 			id: 1,

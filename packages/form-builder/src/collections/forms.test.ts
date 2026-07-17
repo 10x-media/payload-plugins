@@ -1,4 +1,4 @@
-import type { CollectionConfig, Field, PayloadRequest } from 'payload'
+import type { CollectionConfig, Condition, Field, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { FromAddressOption } from '../actions/fromAddresses'
 import { buildDefaultFieldDefinitions } from '../fields/builtin'
@@ -28,6 +28,84 @@ const clientComponentOf = (field: Extract<Field, { type: 'text' }>) =>
 	field.admin?.components?.Field as
 		| { path?: string; clientProps?: { types?: string[] } }
 		| undefined
+
+const groupNamed = (fields: Field[], name: string): Extract<Field, { type: 'group' }> => {
+	const group = fields.find((field) => 'name' in field && field.name === name)
+	if (group?.type !== 'group') {
+		throw new Error(`missing group ${name}`)
+	}
+	return group
+}
+
+const conditionOf = (fields: Field[], name: string) => {
+	const field = fields.find((f) => 'name' in f && f.name === name)
+	const condition = (field?.admin as { condition?: Condition } | undefined)?.condition
+	if (typeof condition !== 'function') {
+		throw new Error(`missing admin.condition on ${name}`)
+	}
+	return condition
+}
+
+/** Payload types the third argument as always present; conditions here read only the first two. */
+const props = {} as Parameters<Condition>[2]
+
+const tabFields = (collection: CollectionConfig): Field[] => {
+	const tabs = collection.fields.find((field) => field.type === 'tabs')
+	if (tabs?.type !== 'tabs') {
+		throw new Error('missing tabs')
+	}
+	return tabs.tabs.flatMap((tab) => tab.fields)
+}
+
+/**
+ * Every `admin.condition` in the forms collection reads `siblingData`, so each must be gated by the
+ * group it actually sits in. Reading the wrong scope is silent (the field just never shows) and is
+ * the bug class round one hit on the consent block.
+ */
+describe('forms admin.condition scopes', () => {
+	const collection = buildCollection()
+
+	it('gates response.message and response.redirect on their own group type', () => {
+		const response = groupNamed(tabFields(collection), 'response')
+		const message = conditionOf(response.fields, 'message')
+		const redirect = conditionOf(response.fields, 'redirect')
+
+		expect(message({}, { type: 'message' }, props)).toBe(true)
+		expect(message({}, { type: 'redirect' }, props)).toBe(false)
+		expect(redirect({}, { type: 'redirect' }, props)).toBe(true)
+		expect(redirect({}, { type: 'message' }, props)).toBe(false)
+	})
+
+	it('treats an unset response.type as message, matching the client fallback', () => {
+		const response = groupNamed(tabFields(collection), 'response')
+		expect(conditionOf(response.fields, 'message')({}, {}, props)).toBe(true)
+		expect(conditionOf(response.fields, 'redirect')({}, {}, props)).toBe(false)
+	})
+
+	it('reads the response group, not the document, for response.message', () => {
+		const response = groupNamed(tabFields(collection), 'response')
+		const message = conditionOf(response.fields, 'message')
+		expect(message({ type: 'redirect' }, { type: 'message' }, props)).toBe(true)
+		expect(message({ type: 'message' }, { type: 'redirect' }, props)).toBe(false)
+	})
+
+	it('gates every conditional poll field on the poll group being enabled', () => {
+		const poll = groupNamed(collection.fields, 'poll')
+		for (const name of ['resultsField', 'resultsVisibility', 'closesAt', 'outcome']) {
+			const condition = conditionOf(poll.fields, name)
+			expect(condition({}, { enabled: true }, props)).toBe(true)
+			expect(condition({}, { enabled: false }, props)).toBe(false)
+			expect(condition({}, {}, props)).toBe(false)
+		}
+	})
+
+	it('reads the poll group, not the document, for the poll enabled gate', () => {
+		const poll = groupNamed(collection.fields, 'poll')
+		const condition = conditionOf(poll.fields, 'closesAt')
+		expect(condition({ enabled: true }, { enabled: false }, props)).toBe(false)
+		expect(condition({ poll: { enabled: true } }, {}, props)).toBe(false)
+	})
+})
 
 describe('forms poll.resultsField', () => {
 	it('mounts FieldNameSelect with the poll-eligible types as clientProps', () => {
