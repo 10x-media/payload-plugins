@@ -71,12 +71,15 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 			return
 		}
 		if (draggingRef.current) return
-		// Skip echoes of our own commit: achromatic values round-trip with h/s zeroed and would clobber the local hue/saturation
+		// Skip echoes of our own commit: achromatic values round-trip with h/s zeroed and would clobber the local hue/saturation.
+		// Compared opaque (alpha quantizes through hex storage) and one-shot (a stale ref must not suppress a later genuine match)
 		const incomingCss = formatColor(
-			hsvToRgb({ h: initial.h, s: initial.s, v: initial.v }, alphaEnabled ? initial.a : 1),
+			hsvToRgb({ h: initial.h, s: initial.s, v: initial.v }, 1),
 			'rgb'
 		)
-		if (incomingCss === lastEmittedRef.current) return
+		const skip = incomingCss === lastEmittedRef.current
+		lastEmittedRef.current = null
+		if (skip) return
 		setHsva(initial)
 	}, [initialKey])
 
@@ -96,12 +99,16 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 				rafRef.current = null
 				const pending = pendingRef.current
 				if (!pending) return
-				const css = formatColor(
-					hsvToRgb({ h: pending.h, s: pending.s, v: pending.v }, alphaEnabled ? pending.a : 1),
+				lastEmittedRef.current = formatColor(
+					hsvToRgb({ h: pending.h, s: pending.s, v: pending.v }, 1),
 					'rgb'
 				)
-				lastEmittedRef.current = css
-				onPickCss(css)
+				onPickCss(
+					formatColor(
+						hsvToRgb({ h: pending.h, s: pending.s, v: pending.v }, alphaEnabled ? pending.a : 1),
+						'rgb'
+					)
+				)
 			})
 		},
 		[alphaEnabled, onPickCss]
