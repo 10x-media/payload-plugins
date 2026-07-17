@@ -1,5 +1,6 @@
 import { type Config, definePlugin } from 'payload'
 
+import { registerIcon } from './fields/icon/plugin'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setFieldsRegistry } from './plugin/registry'
 import type { TranslationsOption } from './translations'
@@ -67,6 +68,9 @@ export const fields = definePlugin<FieldsPluginOptions>({
 		}
 		registerTranslations(config, options.translations)
 		setFieldsRegistry(config, normalizeRegistry(options))
+		// Runs last: it replaces the raw icon slice with a validated one and adds
+		// the adapters' client components to admin.dependencies.
+		registerIcon(config, options.icon)
 		return config
 	},
 })

@@ -1,6 +1,7 @@
 import type { Config, SanitizedConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 
+import { lucideAdapter } from './fields/icon/adapters/lucide/adapter'
 import { fields } from './index'
 import { getFieldsRegistry } from './plugin/registry'
 import { keys } from './translations'
@@ -36,6 +37,16 @@ describe('fields factory', () => {
 		expect(registry?.color?.format).toBe('oklch')
 		expect(registry?.icon).toBeUndefined()
 		expect(registry?.encrypted).toBeUndefined()
+	})
+
+	it('normalizes icon options and registers adapter components for the importMap', () => {
+		const out = fields({ icon: { adapters: [lucideAdapter()] } })(fakeConfig()) as Config
+		const registry = getFieldsRegistry(asSanitized(out))
+		expect(registry?.icon?.defaultLibrary).toBe('lucide')
+		expect(out.admin?.dependencies?.['fields-icon-lucide-Icon']).toEqual({
+			path: '@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon',
+			type: 'component',
+		})
 	})
 
 	it('writes an empty registry when no family options are set', () => {
