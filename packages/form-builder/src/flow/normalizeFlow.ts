@@ -12,6 +12,12 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
  * first occurrence in step order. `next: null` (explicit end of form) is preserved as distinct
  * from an absent `next` (sequential fall-through); a `next` pointing at an unknown step is
  * dropped to absent.
+ *
+ * A step is kept even when it ends up with no fields, which happens when every field it named was
+ * deleted from the form. Dropping it would be wrong twice over: a host can render its own content
+ * per step off `useFormStep()`, so an empty step is not necessarily an empty page, and dropping
+ * one would strand the `next` and transition targets that point at it. The visitor gets a page with
+ * only navigation on it, which is visible to the author in the flow builder and recoverable there.
  */
 export const normalizeFlow = (raw: unknown, fieldKeys: string[]): FormFlow | undefined => {
 	if (!isRecord(raw) || !Array.isArray(raw.steps)) {

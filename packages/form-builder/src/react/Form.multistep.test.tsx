@@ -58,6 +58,35 @@ const branchingFlow: FormFlow = {
 }
 
 describe('Form multi-step flow', () => {
+	it('renders a fieldless step as a navigable page rather than a dead end', async () => {
+		// A step keeps its place when every field it named is deleted from the form; the visitor gets
+		// navigation only, and must still be able to pass through it in both directions.
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '1' })
+		const emptyMiddleFlow: FormFlow = {
+			steps: [
+				{ id: 's1', fields: ['first'] },
+				{ id: 's2', fields: [] },
+				{ id: 's3', fields: ['last'] },
+			],
+		}
+		render(<Form form={doc(linearFields, emptyMiddleFlow)} onSubmit={onSubmit} />)
+
+		fireEvent.change(screen.getByLabelText('First'), { target: { value: 'Ada' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+		expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument()
+		expect(screen.queryByLabelText('First')).not.toBeInTheDocument()
+		expect(screen.queryByLabelText('Last')).not.toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument()
+
+		fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+		expect(await screen.findByLabelText('First')).toHaveValue('Ada')
+
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		fireEvent.click(await screen.findByRole('button', { name: 'Next' }))
+		expect(await screen.findByLabelText('Last')).toBeInTheDocument()
+	})
+
 	it('renders only the current step, advances and returns with values preserved, then submits', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '1' })
 		render(<Form form={doc(linearFields, linearFlow)} onSubmit={onSubmit} />)

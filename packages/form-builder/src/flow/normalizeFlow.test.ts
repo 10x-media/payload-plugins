@@ -22,6 +22,23 @@ describe('normalizeFlow', () => {
 		expect(flow?.steps[0]?.fields).toEqual(['name'])
 		expect(flow?.steps).toHaveLength(2)
 	})
+	it('keeps a step whose fields were all deleted from the form', () => {
+		// Dropping it would strand the next/transition targets pointing at it, and a host can render
+		// its own content for a step off useFormStep(). The author sees the empty step in the builder.
+		const flow = normalizeFlow(
+			{
+				steps: [
+					{ id: 'a', fields: ['name'], next: 'b' },
+					{ id: 'b', fields: ['deletedField'] },
+					{ id: 'c', fields: ['email'] },
+				],
+			},
+			fieldNames
+		)
+		expect(flow?.steps).toHaveLength(3)
+		expect(flow?.steps[1]).toEqual({ id: 'b', fields: [] })
+		expect(flow?.steps[0]?.next).toBe('b')
+	})
 	it('accepts bare block row ids as field keys alongside names', () => {
 		const flow = normalizeFlow(
 			{
