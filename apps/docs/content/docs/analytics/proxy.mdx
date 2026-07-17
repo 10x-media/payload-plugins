@@ -1,0 +1,79 @@
+---
+title: Client tracking and proxy
+description: First-party reverse proxy and script-snippet helpers so browsers load a provider's real SDK through your own origin, never the vendor domain.
+---
+
+The plugin surfaces analytics (widgets, display fields, reads) but does not, by itself, collect events in the browser. The native engine exposes a `POST /analytics/ingest` endpoint, and external providers (Plausible, PostHog, Umami, GA4) are wired up with each vendor's own client script.
+
+Two goals shape the collection story:
+
+1. A first-class way to collect client-side events without every consumer hand-rolling it.
+2. One first-party tracking surface, so browsers do not load vendor domains directly (ad-block resistance, privacy, fewer third-party requests).
+
+Two costs to avoid:
+
+1. A homemade universal capture endpoint means a database write and rollup work on your own server for every event, exactly where a busy site hits performance and scaling problems. Forwarding to a real provider (a reverse proxy) is cheap and offloads all of that.
+2. A homemade tracker cannot match a vendor SDK's features (autocapture, session replay, consent integration, funnels). Silently supporting less is a downgrade.
+
+The recommended default is a first-party reverse proxy: the browser loads the provider's own SDK and sends events through your origin (e.g. `/ph`, `/pa`, `/um`); the provider does all ingestion and aggregation.
+
+## Provider support matrix
+
+| Provider | First-party proxy | Notes |
+|---|---|---|
+| PostHog | Supported | `analyticsProxyRewrites({ provider: 'posthog' })`; vendor documents the reverse-proxy pattern. |
+| Plausible | Supported | Proxies the script and the `/api/event` endpoint. The snippet must pin `data-api` to the proxy path (handled by `providerScriptSnippet`). |
+| Umami | Supported | Cloud serves the script from `cloud.umami.is` but collects at `gateway.umami.is`; the two proxy to different upstreams. The snippet must set `data-host-url` to the proxy path. |
+| GA4 (gtag) | Not recommended | Google's collection domains and consent mode make a clean first-party proxy impractical. Use Google's server-side tagging if first-party GA is required. |
+
+## Rewrites
+
+`analyticsProxyRewrites` builds the Next.js `rewrites()` entries for one provider. It takes a single discriminated object so each provider carries only the fields it uses:
+
+```ts
+// next.config.ts
+import { analyticsProxyRewrites } from '@10x-media/analytics/next'
+
+const nextConfig = {
+  // PostHog capture endpoints use trailing slashes.
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      ...analyticsProxyRewrites({ provider: 'posthog', region: 'eu' }),
+      ...analyticsProxyRewrites({ provider: 'plausible' }),
+      ...analyticsProxyRewrites({ provider: 'umami' }),
+    ]
+  },
+}
+```
+
+For a self-hosted Plausible or Umami instance, pass `host`:
+
+```ts
+analyticsProxyRewrites({ provider: 'umami', host: 'https://umami.example.com' })
+```
+
+## Script snippets
+
+`providerScriptSnippet` builds the provider's real `<script>` markup pointed at the same proxy `path`, so the vendor domain never appears in the browser. Pair it with `analyticsProxyRewrites` for the same provider and path.
+
+```tsx
+import { providerScriptSnippet } from '@10x-media/analytics/next'
+
+const plausible = providerScriptSnippet({ provider: 'plausible', domain: 'example.com' })
+const umami = providerScriptSnippet({ provider: 'umami', websiteId: 'abc-123' })
+const posthog = providerScriptSnippet({ provider: 'posthog', token: 'phc_...', region: 'eu' })
+
+// Inject into the public site's <head> or <body>.
+<div dangerouslySetInnerHTML={{ __html: plausible }} />
+```
+
+The snippet returns an HTML string. It runs only in server-rendered initial HTML and cannot carry a CSP nonce. If you need a CSP nonce, or correct execution across client-side navigation, wrap the vendor SDK in a client component with `next/script` instead; the string helper is the low-level escape hatch.
+
+## Client IP forwarding
+
+Vendors geo-locate from the connecting IP. Next.js rewrites must forward `X-Forwarded-For` to the upstream, or every visitor geo-locates to your server and geo breakdowns become meaningless. Confirm this in your deployment (most platforms forward it by default; some require explicit configuration).
+
+## Follow-up: runtime proxy
+
+The helpers above are build-time and fit a single provider/region per path (the common single-tenant case). Multi-tenant or multiple-providers-per-request needs a runtime handler that resolves the provider config per hostname/scope (reusing `scopeResolver` and the providers collection) and forwards accordingly. That is a planned follow-up, not part of these helpers.

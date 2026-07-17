@@ -1,3 +1,5 @@
+import { normalizePath } from './utils'
+
 export type PosthogProxyRegion = 'eu' | 'us'
 
 /** One Next.js rewrite entry (the shape `next.config` `rewrites()` returns). */
@@ -8,12 +10,6 @@ export type PosthogProxyRewritesOptions = {
 	path?: string
 	/** PostHog Cloud region. Default 'eu'. */
 	region?: PosthogProxyRegion
-}
-
-const normalizePath = (path: string): string => {
-	const withLeading = path.startsWith('/') ? path : `/${path}`
-	const trimmed = withLeading.replace(/\/+$/, '')
-	return trimmed === '' ? '/' : trimmed
 }
 
 /**

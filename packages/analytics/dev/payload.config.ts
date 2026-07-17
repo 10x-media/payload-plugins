@@ -93,7 +93,7 @@ export default buildConfig({
 				{
 					widgetSlug: 'analytics-realtime',
 					width: 'small',
-					data: { metric: 'visitors', windowMinutes: 30 },
+					data: { metric: 'visitors', windowMinutes: '30' },
 				},
 				{
 					widgetSlug: 'analytics-trend',
