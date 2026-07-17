@@ -163,6 +163,50 @@ describe('confirmation', () => {
 		).rejects.toThrow()
 	})
 
+	it('omits from from sendEmail when config.from is unset', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: { toField: 'email', subject: 'Hi', body: 'body' },
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+		})
+	})
+
+	it('includes from in sendEmail when config.from is set', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: {
+					toField: 'email',
+					from: 'Support <support@example.com>',
+					subject: 'Hi',
+					body: 'body',
+				},
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+			from: 'Support <support@example.com>',
+		})
+	})
+
 	const bodyFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
 		definition.config?.find((field) => 'name' in field && field.name === 'body') as
 			| { editor?: unknown }
@@ -175,6 +219,23 @@ describe('confirmation', () => {
 	it('spreads a custom editor onto the body field when given', () => {
 		const editor = { fake: 'editor' } as never
 		expect(bodyFieldOf(buildConfirmation(true, editor))?.editor).toBe(editor)
+	})
+
+	const fromFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
+		definition.config?.find((field) => 'name' in field && field.name === 'from')
+
+	it('omits the from field when no fromAddresses resolver is given', () => {
+		expect(fromFieldOf(buildConfirmation(true))).toBeUndefined()
+	})
+
+	it('adds a from field backed by the from-addresses endpoint when a resolver is given', () => {
+		const field = fromFieldOf(buildConfirmation(true, undefined, () => []))
+		expect(field?.type).toBe('text')
+		expect(typeof (field as { validate?: unknown })?.validate).toBe('function')
+		const component = (field as { admin?: { components?: { Field?: unknown } } })?.admin?.components
+			?.Field as { path?: string; clientProps?: { endpoint?: string } } | undefined
+		expect(component?.path).toBe('@10x-media/form-builder/client#EndpointOptionsSelect')
+		expect(component?.clientProps?.endpoint).toBe('from-addresses')
 	})
 })
 

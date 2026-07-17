@@ -1,5 +1,6 @@
 import type { Config } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
+import type { FromAddressesResolver } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
 import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
@@ -32,6 +33,7 @@ type RegisterCollectionsArgs = {
 	votedCookie: boolean
 	pollSourceRegistry: PollOptionSourceRegistry
 	buttons?: ButtonsOption
+	fromAddresses?: FromAddressesResolver
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
@@ -55,6 +57,7 @@ export const registerCollections = ({
 	votedCookie,
 	pollSourceRegistry,
 	buttons,
+	fromAddresses,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
@@ -78,6 +81,7 @@ export const registerCollections = ({
 			resultsAccess,
 			pollSourceRegistry,
 			buttons,
+			fromAddresses,
 			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({

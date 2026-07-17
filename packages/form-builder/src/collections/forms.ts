@@ -7,6 +7,8 @@ import {
 } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
+import type { FromAddressesResolver } from '../actions/fromAddresses'
+import { resolveFromAddressesRequest } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
 import {
 	type FormResultsAccess,
@@ -117,6 +119,11 @@ type BuildFormsCollectionArgs = {
 	pollSourceRegistry?: PollOptionSourceRegistry
 	/** The plugin `buttons` option; `fields` composes the buttons group from the localized defaults. */
 	buttons?: ButtonsOption
+	/**
+	 * The plugin `email.fromAddresses` option. Present: both email actions gain a `from` select and
+	 * the `/:id/from-addresses` endpoint is registered. Absent: neither exists.
+	 */
+	fromAddresses?: FromAddressesResolver
 	overrides?: CollectionOverrides
 }
 
@@ -132,6 +139,7 @@ export const buildFormsCollection = ({
 	resultsAccess,
 	pollSourceRegistry,
 	buttons,
+	fromAddresses,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const pollResultsTypes = pollEligibleTypes(registry)
@@ -469,6 +477,25 @@ export const buildFormsCollection = ({
 				return Response.json(body, { status })
 			},
 		},
+		// The route id is unused: the from-addresses set is request-scoped (e.g. per tenant), not
+		// per-form. Registered as a doc-scoped route only so the admin field can reuse
+		// EndpointOptionsSelect unmodified (see buildFromField).
+		...(fromAddresses
+			? [
+					{
+						path: '/:id/from-addresses',
+						method: 'get' as const,
+						handler: async (req: PayloadRequest) => {
+							const { status, body } = await resolveFromAddressesRequest({
+								isAuthed: Boolean(req.user),
+								req,
+								resolver: fromAddresses,
+							})
+							return Response.json(body, { status })
+						},
+					},
+				]
+			: []),
 	]
 
 	return {

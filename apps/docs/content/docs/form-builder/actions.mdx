@@ -92,6 +92,25 @@ formBuilder({
 
 The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
 
+## From addresses
+
+By default `emailTeam` and `confirmation` send through your email adapter's default sender and neither action has a **From** field. Set `email.fromAddresses` to add one to both, backed by a resolver you supply:
+
+```ts title="payload.config.ts"
+formBuilder({
+  email: {
+    fromAddresses: async ({ req }) => {
+      const tenant = await tenantFromRequest(req)
+      return tenant.senders.map((sender) => ({ label: sender.label, value: sender.address }))
+    },
+  },
+})
+```
+
+The resolver runs per request against an authenticated endpoint, so a multi-tenant host can scope the address list to the tenant derived from `req` instead of exposing every tenant's senders to every editor. Each option's `value` is the literal string handed to `payload.sendEmail`'s `from` (`'Name <addr@example.com>'` or a bare address).
+
+The chosen `from` is validated against the resolver on save (an address outside the resolved set is a save error), but not re-checked when the action sends: the config is admin-authored, not visitor-controlled, so the stored value is trusted at send time.
+
 ## Custom actions
 
 ```ts title="payload.config.ts"

@@ -1,6 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
 import { buildDefaultActionDefinitions } from './actions/builtin'
+import type { FromAddressesResolver } from './actions/fromAddresses'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
@@ -63,6 +64,18 @@ export type FormBuilderPluginOptions = {
 	 * body off to a renderer like react-email.
 	 */
 	richText?: RichTextBodyOption
+	/**
+	 * Sender address for `emailTeam` and `confirmation`. Absent (default): no `from` field on
+	 * either action and every send uses the email adapter's default sender. With
+	 * `fromAddresses` set, both actions gain a `from` select whose options come from the
+	 * resolver, evaluated per request via a `req`-scoped endpoint. The intended use is
+	 * multi-tenant hosts where each tenant may only send from particular addresses (derive the
+	 * tenant from `req` and return only its allowed senders). Values are the literal string
+	 * `payload.sendEmail` accepts as `from` (e.g. `'Name <addr@x.com>'` or a plain address). The
+	 * choice is validated against the resolver at save time only; it is not re-checked when the
+	 * action actually sends (the config is admin-authored, not visitor-controlled).
+	 */
+	email?: { fromAddresses?: FromAddressesResolver }
 	/** Add, override, or remove consent source types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	consentSources?: ConsentSourcesConfig
 	/**
@@ -150,10 +163,12 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			buildDefaultConsentSources(localizeContent),
 			options.consentSources
 		)
+		const fromAddresses = options.email?.fromAddresses
 		const actionRegistry = resolveActions(
 			buildDefaultActionDefinitions(
 				localizeContent,
-				options.richText?.bodyEditor ?? options.richText?.editor
+				options.richText?.bodyEditor ?? options.richText?.editor,
+				fromAddresses
 			),
 			options.actions
 		)
@@ -180,6 +195,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			votedCookie: options.poll?.votedCookie === true,
 			pollSourceRegistry,
 			buttons: options.buttons,
+			fromAddresses,
 			overrides: options.overrides,
 		})
 		return config
@@ -204,6 +220,7 @@ export { renderAllValues, renderAllValuesTable } from './actions/body/wildcards'
 export { buildDefaultActionDefinitions, defaultActionDefinitions } from './actions/builtin'
 export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
 export { defineAction } from './actions/defineAction'
+export type { FromAddressesResolver, FromAddressOption } from './actions/fromAddresses'
 export type { ActionOption, ActionRegistry, ActionsConfig } from './actions/registry'
 export { resolveActions } from './actions/registry'
 export type { ActionResult } from './actions/runActions'

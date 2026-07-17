@@ -106,6 +106,46 @@ describe('emailTeam', () => {
 		).rejects.toThrow('no email adapter')
 	})
 
+	it('omits from from sendEmail when config.from is unset', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+
+		await emailTeam.run(
+			baseArgs({
+				config: { to: 'team@example.com', subject: 'Hi', body: 'body' },
+				values: [],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({ to: 'team@example.com', subject: 'Hi', html: 'body' })
+	})
+
+	it('includes from in sendEmail when config.from is set', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+
+		await emailTeam.run(
+			baseArgs({
+				config: {
+					to: 'team@example.com',
+					from: 'Support <support@example.com>',
+					subject: 'Hi',
+					body: 'body',
+				},
+				values: [],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'team@example.com',
+			subject: 'Hi',
+			html: 'body',
+			from: 'Support <support@example.com>',
+		})
+	})
+
 	const bodyFieldOf = (definition: ReturnType<typeof buildEmailTeam>) =>
 		definition.config?.find((field) => 'name' in field && field.name === 'body') as
 			| { editor?: unknown }
@@ -118,5 +158,22 @@ describe('emailTeam', () => {
 	it('spreads a custom editor onto the body field when given', () => {
 		const editor = { fake: 'editor' } as never
 		expect(bodyFieldOf(buildEmailTeam(true, editor))?.editor).toBe(editor)
+	})
+
+	const fromFieldOf = (definition: ReturnType<typeof buildEmailTeam>) =>
+		definition.config?.find((field) => 'name' in field && field.name === 'from')
+
+	it('omits the from field when no fromAddresses resolver is given', () => {
+		expect(fromFieldOf(buildEmailTeam(true))).toBeUndefined()
+	})
+
+	it('adds a from field backed by the from-addresses endpoint when a resolver is given', () => {
+		const field = fromFieldOf(buildEmailTeam(true, undefined, () => []))
+		expect(field?.type).toBe('text')
+		expect(typeof (field as { validate?: unknown })?.validate).toBe('function')
+		const component = (field as { admin?: { components?: { Field?: unknown } } })?.admin?.components
+			?.Field as { path?: string; clientProps?: { endpoint?: string } } | undefined
+		expect(component?.path).toBe('@10x-media/form-builder/client#EndpointOptionsSelect')
+		expect(component?.clientProps?.endpoint).toBe('from-addresses')
 	})
 })

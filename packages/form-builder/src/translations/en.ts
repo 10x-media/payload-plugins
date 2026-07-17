@@ -112,6 +112,12 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigToField]: 'Email field name',
 	[keys.actionConfigToFieldDescription]:
 		'The email field on this form the confirmation is sent to.',
+	[keys.actionConfigFrom]: 'From',
+	[keys.actionConfigFromDescription]:
+		'Sender address for this action. Leave empty to use the email adapter default.',
+	[keys.validationFromUnknown]: 'Choose one of the configured from addresses',
+	[keys.validationFromUnavailable]:
+		'From addresses are currently unavailable. Please try again later.',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigUrlDescription]:
 		'The endpoint that receives a signed JSON POST for each submission.',

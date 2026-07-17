@@ -5,19 +5,28 @@ import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
 import { resolverFor } from '../body/serializeBody'
 import { defineAction } from '../defineAction'
+import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
 
-type EmailTeamConfig = { to?: string; subject?: string; body?: unknown }
+type EmailTeamConfig = { to?: string; from?: string; subject?: string; body?: unknown }
 
 /**
- * `subject` and `body` are email content and follow `localize`; the `to` address never does.
- * `editor` overrides the body field's Lexical/richText editor (from the plugin's `richText.editor` option).
+ * `subject` and `body` are email content and follow `localize`; `to` and `from` are addresses and
+ * never do. `editor` overrides the body field's Lexical/richText editor (from the plugin's
+ * `richText.editor` option). `fromAddresses`, when given (the plugin's `email.fromAddresses`
+ * option), adds a `from` select sourced from the host resolver; absent, no `from` field exists and
+ * every send uses the email adapter's default sender.
  */
-export const buildEmailTeam = (localize: boolean, editor?: RichTextField['editor']) =>
+export const buildEmailTeam = (
+	localize: boolean,
+	editor?: RichTextField['editor'],
+	fromAddresses?: FromAddressesResolver
+) =>
 	defineAction<EmailTeamConfig>({
 		type: 'emailTeam',
 		label: keys.actionEmailTeam,
 		config: [
 			{ name: 'to', type: 'text', label: labelFor(keys.actionConfigTo) },
+			...(fromAddresses ? [buildFromField(fromAddresses)] : []),
 			{
 				name: 'subject',
 				type: 'text',
@@ -47,7 +56,15 @@ export const buildEmailTeam = (localize: boolean, editor?: RichTextField['editor
 			const subject = interpolate(config.subject ?? '', resolverFor(values))
 			const html = await renderBody(config.body)
 
-			await payload.sendEmail({ to: config.to, subject, html })
+			// `from` was validated at save time against `fromAddresses(req)`; not re-checked here
+			// (the job's `req` may differ from the authoring admin's, and the config is
+			// admin-authored, not visitor-controlled), so the stored value is forwarded verbatim.
+			await payload.sendEmail({
+				to: config.to,
+				subject,
+				html,
+				...(config.from ? { from: config.from } : {}),
+			})
 		},
 	})
 

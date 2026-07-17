@@ -113,6 +113,12 @@ export const de: Record<TranslationKey, string> = {
 	[keys.actionConfigToField]: 'Name des E-Mail-Feldes',
 	[keys.actionConfigToFieldDescription]:
 		'Das E-Mail-Feld dieses Formulars, an das die Bestätigung gesendet wird.',
+	[keys.actionConfigFrom]: 'Von',
+	[keys.actionConfigFromDescription]:
+		'Absenderadresse für diese Aktion. Leer lassen, um den Standard des E-Mail-Adapters zu verwenden.',
+	[keys.validationFromUnknown]: 'Wähle eine der konfigurierten Absenderadressen',
+	[keys.validationFromUnavailable]:
+		'Absenderadressen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigUrlDescription]:
 		'Der Endpunkt, der für jede Übermittlung einen signierten JSON-POST erhält.',

@@ -6,8 +6,9 @@ import { keys } from '../../translations/keys'
 import { asTranslate, labelFor } from '../../translations/server'
 import { resolverFor } from '../body/serializeBody'
 import { defineAction } from '../defineAction'
+import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
 
-type ConfirmationConfig = { toField?: string; subject?: string; body?: unknown }
+type ConfirmationConfig = { toField?: string; from?: string; subject?: string; body?: unknown }
 
 const TO_FIELD_REF = '@10x-media/form-builder/client#FieldNameSelect'
 
@@ -30,10 +31,17 @@ export const validateToField = (
 }
 
 /**
- * `subject` and `body` are email content and follow `localize`; `toField` is an identifier and never does.
- * `editor` overrides the body field's Lexical/richText editor (from the plugin's `richText.editor` option).
+ * `subject` and `body` are email content and follow `localize`; `toField` is an identifier and
+ * `from` an address, neither of which ever does. `editor` overrides the body field's
+ * Lexical/richText editor (from the plugin's `richText.editor` option). `fromAddresses`, when
+ * given (the plugin's `email.fromAddresses` option), adds a `from` select sourced from the host
+ * resolver; absent, no `from` field exists and every send uses the email adapter's default sender.
  */
-export const buildConfirmation = (localize: boolean, editor?: RichTextField['editor']) =>
+export const buildConfirmation = (
+	localize: boolean,
+	editor?: RichTextField['editor'],
+	fromAddresses?: FromAddressesResolver
+) =>
 	defineAction<ConfirmationConfig>({
 		type: 'confirmation',
 		label: keys.actionConfirmation,
@@ -48,6 +56,7 @@ export const buildConfirmation = (localize: boolean, editor?: RichTextField['edi
 				},
 				validate: validateToField,
 			},
+			...(fromAddresses ? [buildFromField(fromAddresses)] : []),
 			{
 				name: 'subject',
 				type: 'text',
@@ -84,7 +93,15 @@ export const buildConfirmation = (localize: boolean, editor?: RichTextField['edi
 			const subject = interpolate(config.subject ?? '', resolve)
 			const html = await renderBody(config.body)
 
-			await payload.sendEmail({ to, subject, html })
+			// `from` was validated at save time against `fromAddresses(req)`; not re-checked here
+			// (the job's `req` may differ from the authoring admin's, and the config is
+			// admin-authored, not visitor-controlled), so the stored value is forwarded verbatim.
+			await payload.sendEmail({
+				to,
+				subject,
+				html,
+				...(config.from ? { from: config.from } : {}),
+			})
 		},
 	})
 

@@ -137,4 +137,42 @@ describe('formBuilder factory', () => {
 		const doc = moduleExports.toFormDocument({ id: 1, fields: [] })
 		expect(doc).toEqual({ id: 1, fields: [] })
 	})
+
+	const buildWithEmail = async (email: Parameters<typeof formBuilder>[0]['email']) => {
+		const plugin = formBuilder({ email })
+		const config = { collections: [] } as unknown as Config
+		const out = await Promise.resolve(plugin(config))
+		const forms = out.collections?.find((c) => c.slug === 'forms')
+		const tabsField = forms?.fields.find(
+			(f): f is Extract<typeof f, { type: 'tabs' }> => f.type === 'tabs'
+		)
+		const tabFields = tabsField?.tabs.flatMap((tab) => ('fields' in tab ? tab.fields : [])) ?? []
+		const actionsField = tabFields.find(
+			(f): f is Extract<typeof f, { type: 'blocks' }> => 'name' in f && f.name === 'actions'
+		)
+		const fromFieldOf = (slug: string) =>
+			actionsField?.blocks
+				?.find((b) => b.slug === slug)
+				?.fields.find((f) => 'name' in f && f.name === 'from')
+		const endpoints = forms?.endpoints as Array<{ path: string }> | undefined
+		return {
+			emailTeamFrom: fromFieldOf('emailTeam'),
+			confirmationFrom: fromFieldOf('confirmation'),
+			hasFromAddressesEndpoint: endpoints?.some((e) => e.path === '/:id/from-addresses') ?? false,
+		}
+	}
+
+	it('adds no from field and no endpoint when email.fromAddresses is unset', async () => {
+		const result = await buildWithEmail(undefined)
+		expect(result.emailTeamFrom).toBeUndefined()
+		expect(result.confirmationFrom).toBeUndefined()
+		expect(result.hasFromAddressesEndpoint).toBe(false)
+	})
+
+	it('adds a from field to both email actions and registers the endpoint when email.fromAddresses is set', async () => {
+		const result = await buildWithEmail({ fromAddresses: () => [] })
+		expect(result.emailTeamFrom).toBeDefined()
+		expect(result.confirmationFrom).toBeDefined()
+		expect(result.hasFromAddressesEndpoint).toBe(true)
+	})
 })
