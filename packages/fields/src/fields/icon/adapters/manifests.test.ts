@@ -12,6 +12,7 @@ const assertManifestShape = (manifest: IconManifest, minIcons: number) => {
 		expect(names.has(icon.name)).toBe(false)
 		names.add(icon.name)
 		expect(Array.isArray(icon.tags)).toBe(true)
+		expect(icon.categories).toEqual([...icon.categories].sort())
 		for (const category of icon.categories) expect(categorySet.has(category)).toBe(true)
 	}
 	expect(manifest.categories).toEqual([...manifest.categories].sort())
@@ -22,6 +23,9 @@ describe('committed adapter manifests', () => {
 		const { manifest } = await import('./lucide/generated/manifest')
 		assertManifestShape(manifest, 1500)
 		expect(manifest.icons.some((icon) => icon.name === 'house')).toBe(true)
+		// Categories are fetched at generation time; an empty set means a regen
+		// silently dropped them (see loadLucideSource).
+		expect(manifest.categories.length).toBeGreaterThan(0)
 	})
 
 	it('radix manifest is well formed and has an imports map', async () => {
@@ -34,6 +38,7 @@ describe('committed adapter manifests', () => {
 	it('tabler manifest is well formed and has an imports map', async () => {
 		const { manifest } = await import('./tabler/generated/manifest')
 		assertManifestShape(manifest, 4000)
+		expect(manifest.categories.length).toBeGreaterThan(0)
 		const { iconImports } = await import('./tabler/generated/imports')
 		expect(Object.keys(iconImports).length).toBe(manifest.icons.length)
 		expect(iconImports.heart).toBeDefined()
