@@ -44,7 +44,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				noAlpha: '#16a34a',
 				notClearable: '#f59e0b',
 				oklchFormat: 'oklch(0.62 0.25 29)',
-				readOnlyColor: '#334155',
+				readOnlyColor: '#e11d48',
 				requiredColor: '#0ea5e9',
 				rgbFormat: 'rgb(14 165 233)',
 				withPresets: '#0ea5e9',
