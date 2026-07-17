@@ -124,6 +124,13 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 	background: repeating-linear-gradient(45deg, var(--theme-error-500) 0 4px, transparent 4px 8px);
 }
 
+/* Read-only muting stops at the container chrome: the swatch fill must keep
+   showing the stored color exactly, so no muting may ever reach it */
+.fields-color.read-only .fields-color__swatch-color {
+	opacity: 1;
+	filter: none;
+}
+
 /* The sibling input's width: 100% basis would otherwise squeeze the chip to nothing;
    the max-width keeps runaway labels ellipsizing instead of overflowing */
 .fields-color__chip {

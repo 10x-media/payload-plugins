@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import type { ColorFormat } from '../../../types'
+import { resolveCommitValue } from '../commitValue'
 import { formatColor, parseColor, rgbToHsv, toRgb } from '../engine'
 import { type ColorFieldClientOptions, PRESET_PREFIX, type ResolvedColorPreset } from '../options'
 import { derivePresetChip } from '../presetChip'
@@ -121,22 +122,37 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		[]
 	)
 
-	// Commits to the form without touching editingRef: the debounced path must not let the draft resync mid-typing
+	// Revert target for non-clearable commits; tracked from committed values so
+	// picker commits, preset picks, and the initially loaded value all count
+	const lastValidRef = useRef<null | string>(null)
+	useEffect(() => {
+		if (stringValue === '') return
+		if (presetKey ? true : parseColor(stringValue) !== null) lastValidRef.current = stringValue
+	}, [presetKey, stringValue])
+
+	// Commits to the form without touching editingRef: the debounced path must not let the draft resync mid-typing.
+	// Returns true when a non-clearable empty or unparseable draft was reverted to the last valid value.
 	const commitText = useCallback(
-		(raw: string) => {
-			if (raw.trim() === '') {
-				setValue(null)
-				return
-			}
+		(raw: string): boolean => {
+			let normalized: null | string = null
 			if (linked && raw.startsWith(PRESET_PREFIX)) {
-				setValue(raw)
-				return
+				if (raw.length > PRESET_PREFIX.length) normalized = raw
+			} else {
+				const parsedRaw = parseColor(raw)
+				// Unparseable input commits raw so validation surfaces the error
+				if (parsedRaw) normalized = formatColor(parsedRaw, format, { alpha })
 			}
-			const parsedRaw = parseColor(raw)
-			// Unparseable input commits raw so validation surfaces the error
-			setValue(parsedRaw ? formatColor(parsedRaw, format, { alpha }) : raw)
+			const resolution = resolveCommitValue({
+				draft: raw,
+				isClearable,
+				lastValid: lastValidRef.current,
+				parsed: normalized,
+			})
+			lastValidRef.current = resolution.lastValid
+			setValue(resolution.value)
+			return resolution.reverted
 		},
-		[alpha, format, linked, setValue]
+		[alpha, format, isClearable, linked, setValue]
 	)
 
 	const onTextChange = useCallback(
@@ -158,10 +174,12 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		}
 		if (editingRef.current) {
 			editingRef.current = false
-			commitText(draft)
+			// A reverted commit usually leaves the form value unchanged, so the
+			// displayValue resync effect never fires; restore the draft here
+			if (commitText(draft)) setDraft(displayValue)
 		}
 		setChipDismissed(false)
-	}, [commitText, draft])
+	}, [commitText, displayValue, draft])
 
 	// Backspace/Delete on the empty chip input never fires a change event, so clear here
 	const onTextKeyDown = useCallback(
@@ -170,10 +188,16 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 			if (event.key === 'Backspace' || event.key === 'Delete') {
 				event.preventDefault()
 				setDraft('')
-				setValue(null)
+				if (isClearable) {
+					setValue(null)
+				} else {
+					// Keep the stored ref; the emptied draft reverts or gets replaced at commit
+					editingRef.current = true
+					setChipDismissed(true)
+				}
 			}
 		},
-		[chip, isReadOnly, setValue]
+		[chip, isClearable, isReadOnly, setValue]
 	)
 
 	const commitCss = useCallback(
