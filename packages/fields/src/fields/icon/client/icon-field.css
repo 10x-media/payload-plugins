@@ -1,0 +1,258 @@
+.tenx-icon-field__row {
+	display: flex;
+	align-items: stretch;
+	gap: calc(var(--base) * 0.25);
+}
+
+/* Height and horizontal padding are the literal px Payload's formInput mixin
+   compiles base(2)/base(0.75) to; the runtime --base var is rem-based and shrinks
+   below 1024px, which would leave the row shorter than the native inputs beside it. */
+.tenx-icon-field__trigger {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+	flex-grow: 1;
+	min-width: 0;
+	height: 40px;
+	padding: 0 15px;
+	background: var(--theme-input-bg);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-800);
+	font-family: inherit;
+	font-size: 1rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.tenx-icon-field__trigger:hover:not(:disabled) {
+	border-color: var(--theme-elevation-250);
+}
+
+.tenx-icon-field__trigger:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-offset);
+}
+
+.tenx-icon-field__trigger:disabled {
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-450);
+	cursor: not-allowed;
+}
+
+.tenx-icon-field .error .tenx-icon-field__trigger,
+.tenx-icon-field.error .tenx-icon-field__trigger {
+	border-color: var(--theme-error-500);
+}
+
+.tenx-icon-field__preview {
+	display: flex;
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+}
+
+.tenx-icon-field__name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tenx-icon-field__placeholder {
+	color: var(--theme-elevation-400);
+}
+
+.tenx-icon-field__hint {
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	padding: calc(var(--base) * 0.1) calc(var(--base) * 0.4);
+	background: var(--theme-elevation-100);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-600);
+	font-size: 0.75rem;
+	white-space: nowrap;
+}
+
+.tenx-icon-field__text-input {
+	flex-basis: 220px;
+	flex-shrink: 0;
+	height: 40px;
+	padding: 0 15px;
+	background: var(--theme-input-bg);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-800);
+	font-family: inherit;
+	font-size: 1rem;
+}
+
+.tenx-icon-field__text-input:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-offset);
+}
+
+.tenx-icon-placeholder {
+	display: inline-block;
+	width: 24px;
+	height: 24px;
+	background: var(--theme-elevation-100);
+	border-radius: var(--style-radius-s);
+}
+
+.tenx-icon-cell {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+}
+
+.tenx-icon-drawer {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.tenx-icon-drawer__header {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	display: flex;
+	align-items: flex-start;
+	gap: calc(var(--base) * 0.5);
+	padding-bottom: calc(var(--base) * 0.5);
+	background: var(--theme-bg);
+}
+
+.tenx-icon-drawer__search {
+	flex-grow: 1;
+	margin-bottom: 0;
+}
+
+.tenx-icon-drawer__switcher {
+	flex-basis: 220px;
+	flex-shrink: 0;
+}
+
+.tenx-icon-drawer__body {
+	display: flex;
+	flex-grow: 1;
+	gap: var(--base);
+	min-height: 0;
+}
+
+.tenx-icon-drawer__rail {
+	display: flex;
+	flex-direction: column;
+	flex-shrink: 0;
+	gap: 2px;
+	width: 200px;
+	overflow-y: auto;
+	padding-right: calc(var(--base) * 0.25);
+	border-right: 1px solid var(--theme-elevation-100);
+}
+
+.tenx-icon-drawer__rail-item {
+	padding: calc(var(--base) * 0.25) calc(var(--base) * 0.5);
+	background: transparent;
+	border: none;
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-600);
+	font-family: inherit;
+	font-size: 0.875rem;
+	text-align: left;
+	text-transform: capitalize;
+	cursor: pointer;
+}
+
+.tenx-icon-drawer__rail-item:hover {
+	background: var(--theme-elevation-50);
+}
+
+.tenx-icon-drawer__rail-item--active {
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-800);
+}
+
+.tenx-icon-drawer__grid {
+	flex-grow: 1;
+	min-width: 0;
+	overflow-y: auto;
+}
+
+.tenx-icon-drawer__row {
+	display: flex;
+}
+
+.tenx-icon-drawer__cell {
+	flex: 1 0 0;
+	max-width: 120px;
+	padding: 2px;
+}
+
+.tenx-icon-drawer__cell-button {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: calc(var(--base) * 0.25);
+	width: 100%;
+	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.25);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-800);
+	cursor: pointer;
+}
+
+.tenx-icon-drawer__cell-button:hover {
+	background: var(--theme-elevation-50);
+	border-color: var(--theme-elevation-150);
+}
+
+.tenx-icon-drawer__cell-button:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-offset);
+}
+
+.tenx-icon-drawer__cell-button--selected {
+	border-color: var(--theme-elevation-800);
+}
+
+.tenx-icon-drawer__cell-label {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--theme-elevation-500);
+	font-size: 0.75rem;
+}
+
+.tenx-icon-drawer__glyph {
+	display: flex;
+	width: 24px;
+	height: 24px;
+}
+
+.tenx-icon-drawer__empty {
+	padding: var(--base);
+	color: var(--theme-elevation-500);
+}
+
+.tenx-icon-drawer__loading {
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) * 0.5);
+	padding: var(--base) 0;
+}
+
+.tenx-icon-drawer__footer {
+	position: sticky;
+	bottom: 0;
+	padding-top: calc(var(--base) * 0.5);
+	background: var(--theme-bg);
+	border-top: 1px solid var(--theme-elevation-100);
+	color: var(--theme-elevation-500);
+	font-size: 0.75rem;
+}
