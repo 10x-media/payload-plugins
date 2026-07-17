@@ -164,8 +164,6 @@ export interface Color {
   requiredColor: string;
   readOnlyColor?: string | null;
   localizedColor?: string | null;
-  pairLeft?: string | null;
-  pairRight?: string | null;
   linkedStatic?: string | null;
   linkedStaticResolved?: string | null;
   linkedTenant?: string | null;
@@ -310,8 +308,6 @@ export interface ColorsSelect<T extends boolean = true> {
   requiredColor?: T;
   readOnlyColor?: T;
   localizedColor?: T;
-  pairLeft?: T;
-  pairRight?: T;
   linkedStatic?: T;
   linkedStaticResolved?: T;
   linkedTenant?: T;

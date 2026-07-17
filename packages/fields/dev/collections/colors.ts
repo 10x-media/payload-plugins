@@ -42,8 +42,21 @@ export const colors: CollectionConfig = {
 				}),
 			],
 		},
-		colorField({ name: 'rgbFormat', format: 'rgb' }),
-		colorField({ name: 'hslFormat', format: 'hsl' }),
+		{
+			type: 'row',
+			fields: [
+				colorField({
+					name: 'rgbFormat',
+					format: 'rgb',
+					overrides: ({ field }) => ({ ...field, admin: { ...field.admin, width: '50%' } }),
+				}),
+				colorField({
+					name: 'hslFormat',
+					format: 'hsl',
+					overrides: ({ field }) => ({ ...field, admin: { ...field.admin, width: '50%' } }),
+				}),
+			],
+		},
 		colorField({ name: 'oklchFormat', format: 'oklch' }),
 		colorField({ name: 'noAlpha', alpha: false }),
 		colorField({ name: 'noEyedropper', enableEyedropper: false }),
@@ -60,20 +73,6 @@ export const colors: CollectionConfig = {
 			overrides: ({ field }) => ({ ...field, admin: { ...field.admin, readOnly: true } }),
 		}),
 		colorField({ name: 'localizedColor', localized: true }),
-		{
-			type: 'row',
-			fields: [
-				colorField({
-					name: 'pairLeft',
-					overrides: ({ field }) => ({ ...field, admin: { ...field.admin, width: '50%' } }),
-				}),
-				colorField({
-					name: 'pairRight',
-					format: 'oklch',
-					overrides: ({ field }) => ({ ...field, admin: { ...field.admin, width: '50%' } }),
-				}),
-			],
-		},
 		...colorField({ linked: true, name: 'linkedStatic', presets: staticPresets }),
 		...colorField({
 			linked: { fallback: '#94a3b8' },
