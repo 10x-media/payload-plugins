@@ -286,7 +286,7 @@ const StepCard = ({
 				/>
 
 				<div className="fb-flow-step__row">
-					<FieldLabel label="Fields" />
+					<FieldLabel label={t(keys.flowFields)} />
 					{entries.length === 0 ? (
 						<p className="fb-flow-step__hint">No fields defined on the form yet.</p>
 					) : (
@@ -320,7 +320,7 @@ const StepCard = ({
 				</div>
 
 				<div className="fb-flow-step__row">
-					<FieldLabel label="Default next" />
+					<FieldLabel label={t(keys.flowDefaultNext)} />
 					<ReactSelect
 						options={nextOptions}
 						value={nextOptions.find((o) => o.value === nextToSelectValue(step.next)) ?? undefined}
@@ -331,7 +331,7 @@ const StepCard = ({
 
 				<div className="fb-flow-step__transitions">
 					<div className="fb-flow-step__transitions-header">
-						<FieldLabel label="Conditional transitions" />
+						<FieldLabel label={t(keys.flowConditionalTransitions)} />
 						<span className="fb-flow-step__hint">(first match wins)</span>
 					</div>
 					{transitions.map((transition, tIndex) => {
