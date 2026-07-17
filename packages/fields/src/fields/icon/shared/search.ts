@@ -22,7 +22,12 @@ const scoreToken = (entry: IndexEntry, token: string): number => {
 	return 0
 }
 
-/** Every whitespace-separated token must match name or tags; score is the sum. Ties break by name. */
+/**
+ * Every whitespace-separated token must match name or tags; score is the sum.
+ * Ties break by name length first: within a score band the query covers more of
+ * a short name than a long one, so `arrow-up` outranks `arrow-autofit-content`.
+ * Length ties then break alphabetically to keep results stable.
+ */
 export const searchIcons = (index: IconSearchIndex, query: string): IconMeta[] => {
 	const tokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean)
 	if (tokens.length === 0) return index.map((entry) => entry.icon)
@@ -41,6 +46,11 @@ export const searchIcons = (index: IconSearchIndex, query: string): IconMeta[] =
 		if (matchedAll) scored.push({ icon: entry.icon, score: total })
 	}
 	return scored
-		.sort((a, b) => b.score - a.score || a.icon.name.localeCompare(b.icon.name))
+		.sort(
+			(a, b) =>
+				b.score - a.score ||
+				a.icon.name.length - b.icon.name.length ||
+				a.icon.name.localeCompare(b.icon.name)
+		)
 		.map((entry) => entry.icon)
 }
