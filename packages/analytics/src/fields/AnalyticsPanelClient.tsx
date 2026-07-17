@@ -156,9 +156,9 @@ export function AnalyticsPanelClient(props: AnalyticsPanelClientProps) {
 			</div>
 			<div style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
 				{isNewDocumentAnalytics(data) ? (
-					<AnalyticsEmptyState isNew label={t(keys.stateNew)} />
+					<AnalyticsEmptyState isNew>{t(keys.stateNew)}</AnalyticsEmptyState>
 				) : data.status !== 'ok' ? (
-					<AnalyticsEmptyState isNew={false} label={t(STATE_KEYS[data.status])} />
+					<AnalyticsEmptyState isNew={false}>{t(STATE_KEYS[data.status])}</AnalyticsEmptyState>
 				) : (
 					<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 						<div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>

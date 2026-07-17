@@ -65,7 +65,7 @@ describeForDb('analytics stat field render', { dbs: ['mongo'] }, (db) => {
 		expect(text).toContain('analytics:metricPageviews')
 	})
 
-	it('renders an empty state for an unsaved document', async () => {
+	it('renders the New state for an unsaved document', async () => {
 		const element = await AnalyticsStatField({
 			req: { payload: booted.payload, locale: undefined } as unknown as PayloadRequest,
 			data: {},
@@ -75,7 +75,7 @@ describeForDb('analytics stat field render', { dbs: ['mongo'] }, (db) => {
 			timeframe: 'last30days',
 			variant: 'stat',
 		})
-		expect(flatten(element)).toContain('analytics:stateNoData')
+		expect(flatten(element)).toContain('analytics:stateNew')
 	})
 
 	it('renders the supported subset when some metrics are unsupported', async () => {

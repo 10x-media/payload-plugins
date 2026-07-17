@@ -82,14 +82,14 @@ export const AnalyticsStatField = async (props: AnalyticsStatFieldProps) => {
 	if (isNewDocumentAnalytics(result)) {
 		return (
 			<div className="field-type">
-				<AnalyticsEmptyState isNew label={t(keys.stateNew)} />
+				<AnalyticsEmptyState isNew>{t(keys.stateNew)}</AnalyticsEmptyState>
 			</div>
 		)
 	}
 	if (result.status !== 'ok') {
 		return (
 			<div className="field-type" style={{ opacity: 0.6 }}>
-				<AnalyticsEmptyState isNew={false} label={t(STATE_KEYS[result.status])} />
+				<AnalyticsEmptyState isNew={false}>{t(STATE_KEYS[result.status])}</AnalyticsEmptyState>
 			</div>
 		)
 	}

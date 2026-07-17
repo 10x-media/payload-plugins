@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { MetricKey } from '../core/contract'
 import type { FieldReadStatus } from './readForDocument'
 
@@ -40,17 +40,17 @@ const pillStyle: CSSProperties = {
  * hooks so both the server stat field and the client panel render it the same way; the
  * `analytics-empty-state` classes are stable hooks for overriding the look.
  */
-export function AnalyticsEmptyState({ isNew, label }: { isNew: boolean; label: string }) {
+export function AnalyticsEmptyState({ isNew, children }: { isNew: boolean; children: ReactNode }) {
 	if (isNew) {
 		return (
 			<span className="analytics-empty-state analytics-empty-state--new" style={pillStyle}>
-				{label}
+				{children}
 			</span>
 		)
 	}
 	return (
 		<div className="analytics-empty-state" style={{ color: 'var(--theme-elevation-400)' }}>
-			{label}
+			{children}
 		</div>
 	)
 }
