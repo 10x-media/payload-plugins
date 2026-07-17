@@ -43,7 +43,10 @@ export const captureConsent = async (args: {
 	if (!page) {
 		return { agreed: args.agreed, source, at: args.now }
 	}
-	const collection = args.payload.collections[page.relationTo]
+	// `page.relationTo` is a runtime string; cast the key so the lookup type-checks against a host's
+	// narrowed collection map (a consumer's generated `CollectionSlug`) as well as the plugin's own
+	// broad one. The value is still guarded below, since an unregistered slug resolves to undefined.
+	const collection = args.payload.collections[page.relationTo as keyof Payload['collections']]
 	const versionRef =
 		collection && hasDraftsEnabled(collection.config)
 			? await resolvePublishedVersionRef({

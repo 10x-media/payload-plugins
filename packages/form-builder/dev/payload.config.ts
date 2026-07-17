@@ -6,9 +6,10 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig, type GlobalConfig, type PayloadRequest } from 'payload'
 import {
+	type AnyFormFieldDefinition,
 	type ConsentSourceEntry,
 	consentSourcesField,
-	definePollOptionSource,
+	defineFormField,
 	formBuilder,
 } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
@@ -57,6 +58,18 @@ const notices: CollectionConfig = {
 	],
 }
 
+// The app's own domain data the poll draws its choices from. The `athleteVote` field type below
+// holds a relationship to these records; whichever the author picks become the voteable options.
+const athletes: CollectionConfig = {
+	slug: 'athletes',
+	admin: { useAsTitle: 'name', defaultColumns: ['name', 'discipline', 'country'] },
+	fields: [
+		{ name: 'name', type: 'text', required: true },
+		{ name: 'discipline', type: 'text' },
+		{ name: 'country', type: 'text' },
+	],
+}
+
 // Where this app keeps its consent statements. Any collection or global works; a multi-tenant app
 // would place the field on its tenant document and scope the resolver below by req instead.
 const settings: GlobalConfig = {
@@ -97,25 +110,61 @@ const consentSources = async ({ req }: { req: PayloadRequest }): Promise<Consent
 	})
 }
 
-// Demo option source: a sourced poll's choices and outcome come from domain data instead of
-// authored options. `decidedWinner` simulates the moment the result is known, driving both the
-// admin winner select and `resolvePollOutcome` auto mode.
-const athletes = definePollOptionSource<{ eventId?: string; decidedWinner?: string }>({
-	type: 'athletes',
-	label: 'Athletes (demo)',
+/**
+ * A poll-eligible field type whose choices are the athletes the author selected, not hand-authored
+ * options. The `athletes` relationship holds the voteable records; `resolveOptions` turns those ids
+ * into `{ value: id, label: name }` via `payload.find`. That one set backs the public voting UI, the
+ * admin winner select, and results labeling, so a form can only accept and only report votes for the
+ * athletes the author made voteable. This is the owner's real use case: seed many athletes, mark a
+ * few voteable per form, and the manual winner picker offers exactly those.
+ */
+const athleteVote = defineFormField<'text'>({
+	type: 'athleteVote',
+	label: 'Athlete vote',
+	value: 'text',
+	pollEligible: true,
 	config: [
-		{ name: 'eventId', type: 'text' },
-		{ name: 'decidedWinner', type: 'text' },
+		{
+			name: 'athletes',
+			type: 'relationship',
+			relationTo: 'athletes',
+			hasMany: true,
+			required: true,
+			label: 'Voteable athletes',
+			admin: { description: 'Only these athletes can receive votes and appear as options.' },
+		},
 	],
-	resolve: () => [
-		{ label: 'Ada Lovelace', value: 'ada' },
-		{ label: 'Grace Hopper', value: 'grace' },
-		{ label: 'Margaret Hamilton', value: 'margaret' },
-	],
-	resolveOutcome: ({ config }) =>
-		typeof config.decidedWinner === 'string' && config.decidedWinner.length > 0
-			? config.decidedWinner
-			: undefined,
+	resolveOptions: async ({ instance, payload, req }) => {
+		const raw = instance.athletes
+		const ids = (Array.isArray(raw) ? raw : [])
+			.map((entry) =>
+				entry != null && typeof entry === 'object'
+					? ((entry as { id?: string | number; value?: string | number }).id ??
+						(entry as { value?: string | number }).value)
+					: (entry as string | number)
+			)
+			.filter((id): id is string | number => id != null)
+		if (ids.length === 0) {
+			return []
+		}
+		const found = await payload.find({
+			collection: 'athletes',
+			where: { id: { in: ids } },
+			depth: 0,
+			overrideAccess: true,
+			req,
+			limit: 100,
+		})
+		const byId = new Map(found.docs.map((doc) => [String(doc.id), doc]))
+		// Preserve the author's selection order; the `in` query returns database order.
+		return ids
+			.map((id) => byId.get(String(id)))
+			.filter((doc): doc is NonNullable<typeof doc> => doc != null)
+			.map((doc) => ({
+				value: String(doc.id),
+				label: typeof doc.name === 'string' ? doc.name : String(doc.id),
+			}))
+	},
 })
 
 const db =
@@ -138,12 +187,14 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [users, formUploads, legalPages, notices],
+	collections: [users, formUploads, legalPages, notices, athletes],
 	globals: [settings],
 	plugins: [
 		formBuilder({
 			uploads: { collection: 'form-uploads' },
-			poll: { sources: { athletes } },
+			// Cast mirrors the built-ins (see `buildDefaultFieldDefinitions`): a definition authored with
+			// precise value/config generics is stored erased in the registry, so one cast per type.
+			fields: { athleteVote: athleteVote as AnyFormFieldDefinition },
 			consent: { sources: consentSources },
 		}),
 	],

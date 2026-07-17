@@ -39,14 +39,14 @@ const ensurePage = async (
 const statement = (text: string) => ({
 	root: {
 		type: 'root',
-		format: '',
+		format: '' as const,
 		indent: 0,
 		version: 1,
 		direction: 'ltr' as const,
 		children: [
 			{
 				type: 'paragraph',
-				format: '',
+				format: '' as const,
 				indent: 0,
 				version: 1,
 				direction: 'ltr' as const,
@@ -86,13 +86,13 @@ const seedConsentSources = async (payload: Payload): Promise<void> => {
 					key: 'privacy',
 					label: 'Privacy policy',
 					statement: statement('I have read and agree to the privacy policy'),
-					page: { relationTo: 'legal-pages', value: privacyId },
+					page: { relationTo: 'legal-pages', value: privacyId as string },
 				},
 				{
 					key: 'marketing',
 					label: 'Marketing emails',
 					statement: statement('Send me occasional product news'),
-					page: { relationTo: 'notices', value: marketingId },
+					page: { relationTo: 'notices', value: marketingId as string },
 				},
 			],
 		},
@@ -100,12 +100,42 @@ const seedConsentSources = async (payload: Payload): Promise<void> => {
 	payload.logger.info('Seeded consent sources: privacy, marketing')
 }
 
+const ATHLETES: { name: string; discipline: string; country: string }[] = [
+	{ name: 'Mara Vieira', discipline: 'Sprint', country: 'Brazil' },
+	{ name: 'Jonas Keller', discipline: 'Marathon', country: 'Germany' },
+	{ name: 'Aiko Tanaka', discipline: 'Sprint', country: 'Japan' },
+	{ name: 'Liam Byrne', discipline: 'Middle distance', country: 'Ireland' },
+	{ name: 'Nadia Haddad', discipline: 'Hurdles', country: 'Morocco' },
+	{ name: 'Sven Larsson', discipline: 'Long jump', country: 'Sweden' },
+	{ name: 'Priya Nair', discipline: 'Sprint', country: 'India' },
+	{ name: 'Diego Morales', discipline: 'Marathon', country: 'Mexico' },
+	{ name: 'Zoe Bennett', discipline: 'Hurdles', country: 'Australia' },
+	{ name: 'Kofi Mensah', discipline: 'Sprint', country: 'Ghana' },
+]
+
+// The first four athletes are the ones this form makes voteable; the rest exist but never appear as
+// choices, which is the whole point of the demo.
+const VOTEABLE_NAMES = ATHLETES.slice(0, 4).map((athlete) => athlete.name)
+
+/** Seed the ten athletes the `athleteVote` field draws from. Idempotent (skips once any exist). */
+const seedAthletes = async (payload: Payload): Promise<void> => {
+	const existing = await payload.count({ collection: 'athletes' })
+	if (existing.totalDocs > 0) {
+		return
+	}
+	for (const data of ATHLETES) {
+		await payload.create({ collection: 'athletes', data })
+	}
+	payload.logger.info(`Seeded ${ATHLETES.length} athletes`)
+}
+
 /**
  * Seed the dev Payload app: an admin user, the consent sources and the policy pages they reference,
- * plus demo forms the `(frontend)` pages render and the e2e suite drives -- a multi-step contact form
- * (a conditional field, a required consent, required-field validation), a single-choice poll with
- * public results, and a sourced poll (options and outcome from the demo `athletes` source).
- * Idempotent (keyed on title).
+ * an `athletes` collection, plus demo forms the `(frontend)` pages render and the e2e suite drives --
+ * a multi-step contact form (a conditional field, a required consent, required-field validation), a
+ * single-choice poll with public results, and a relationship-backed poll whose `athleteVote` field
+ * makes four of the seeded athletes voteable (its `resolveOptions` sources the choices, the winner
+ * select, and the results labels from those records). Idempotent (keyed on title).
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
 	const userCount = await payload.count({ collection: 'users' })
@@ -118,6 +148,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	}
 
 	await seedConsentSources(payload)
+	await seedAthletes(payload)
 
 	await ensureForm(payload, 'Demo Contact', {
 		fields: [
@@ -166,15 +197,23 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		poll: { enabled: true, resultsField: 'framework' },
 	})
 
-	await ensureForm(payload, 'Race winner', {
+	const voteable = await payload.find({
+		collection: 'athletes',
+		where: { name: { in: VOTEABLE_NAMES } },
+		depth: 0,
+		limit: VOTEABLE_NAMES.length,
+	})
+	const voteableIds = voteable.docs.map((athlete) => athlete.id)
+	await ensureForm(payload, 'Who will win?', {
 		fields: [
-			{ blockType: 'select', name: 'winner', label: 'Who wins?', required: true, options: [] },
+			{
+				blockType: 'athleteVote',
+				name: 'pick',
+				label: 'Cast your vote',
+				required: true,
+				athletes: voteableIds,
+			},
 		],
-		poll: {
-			enabled: true,
-			resultsField: 'winner',
-			optionSource: 'athletes',
-			sourceConfig: { eventId: 'demo-race' },
-		},
+		poll: { enabled: true, resultsField: 'pick' },
 	})
 }

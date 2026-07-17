@@ -71,6 +71,7 @@ export interface Config {
     'form-uploads': FormUpload;
     'legal-pages': LegalPage;
     notices: Notice;
+    athletes: Athlete;
     forms: Form;
     'form-submissions': FormSubmission;
     'payload-kv': PayloadKv;
@@ -85,6 +86,7 @@ export interface Config {
     'form-uploads': FormUploadsSelect<false> | FormUploadsSelect<true>;
     'legal-pages': LegalPagesSelect<false> | LegalPagesSelect<true>;
     notices: NoticesSelect<false> | NoticesSelect<true>;
+    athletes: AthletesSelect<false> | AthletesSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -201,6 +203,18 @@ export interface Notice {
   id: string;
   title: string;
   slug: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "athletes".
+ */
+export interface Athlete {
+  id: string;
+  name: string;
+  discipline?: string | null;
+  country?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1554,6 +1568,59 @@ export interface Form {
                       blockName?: string | null;
                       blockType: 'date';
                     }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      placeholder?: string | null;
+                      description?: string | null;
+                      required?: boolean | null;
+                      /**
+                       * Only these athletes can receive votes and appear as options.
+                       */
+                      athletes: (string | Athlete)[];
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                severity?: ('error' | 'warning') | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'athleteVote';
+                    }
                 )[]
               | null;
             validations?:
@@ -1682,6 +1749,59 @@ export interface Form {
             blockName?: string | null;
             blockType: 'message';
           }
+        | {
+            name: string;
+            label?: string | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
+            placeholder?: string | null;
+            description?: string | null;
+            required?: boolean | null;
+            /**
+             * Only these athletes can receive votes and appear as options.
+             */
+            athletes: (string | Athlete)[];
+            validations?:
+              | (
+                  | {
+                      field: string;
+                      message?: string | null;
+                      severity?: ('error' | 'warning') | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'matchesField';
+                    }
+                  | {
+                      message?: string | null;
+                      severity?: ('error' | 'warning') | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'notAlreadySubmitted';
+                    }
+                )[]
+              | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'athleteVote';
+          }
       )[]
     | null;
   buttons?: {
@@ -1786,11 +1906,6 @@ export interface Form {
     resultsField?: string | null;
     resultsVisibility?: ('afterVote' | 'afterClose') | null;
     closesAt?: string | null;
-    optionSource?: 'athletes' | null;
-    sourceConfig?: {
-      eventId?: string | null;
-      decidedWinner?: string | null;
-    };
     outcome?: {
       winningValue?: string | null;
       resolvedAt?: string | null;
@@ -1980,6 +2095,10 @@ export interface PayloadLockedDocument {
         value: string | Notice;
       } | null)
     | ({
+        relationTo: 'athletes';
+        value: string | Athlete;
+      } | null)
+    | ({
         relationTo: 'forms';
         value: string | Form;
       } | null)
@@ -2087,6 +2206,17 @@ export interface LegalPagesSelect<T extends boolean = true> {
 export interface NoticesSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "athletes_select".
+ */
+export interface AthletesSelect<T extends boolean = true> {
+  name?: T;
+  discipline?: T;
+  country?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3196,6 +3326,43 @@ export interface FormsSelect<T extends boolean = true> {
                           id?: T;
                           blockName?: T;
                         };
+                    athleteVote?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          required?: T;
+                          athletes?: T;
+                          validations?:
+                            | T
+                            | {
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
                   };
               validations?:
                 | T
@@ -3284,6 +3451,43 @@ export interface FormsSelect<T extends boolean = true> {
               id?: T;
               blockName?: T;
             };
+        athleteVote?:
+          | T
+          | {
+              name?: T;
+              label?: T;
+              width?: T;
+              placeholder?: T;
+              description?: T;
+              required?: T;
+              athletes?: T;
+              validations?:
+                | T
+                | {
+                    matchesField?:
+                      | T
+                      | {
+                          field?: T;
+                          message?: T;
+                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    notAlreadySubmitted?:
+                      | T
+                      | {
+                          message?: T;
+                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                  };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
+              id?: T;
+              blockName?: T;
+            };
       };
   buttons?:
     | T
@@ -3341,13 +3545,6 @@ export interface FormsSelect<T extends boolean = true> {
         resultsField?: T;
         resultsVisibility?: T;
         closesAt?: T;
-        optionSource?: T;
-        sourceConfig?:
-          | T
-          | {
-              eventId?: T;
-              decidedWinner?: T;
-            };
         outcome?:
           | T
           | {
