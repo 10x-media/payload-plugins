@@ -24,6 +24,12 @@
 	height: 100%;
 }
 
+/* Payload caps popup scroll containers at base*10 (200px) and portals popup content to body,
+   so the panel must be targeted via :has, not through the .popup root our className lands on */
+.popup__scroll-container:has(> .fields-color__panel) {
+	max-height: none;
+}
+
 .fields-color__swatch-button {
 	display: flex;
 	height: 100%;
