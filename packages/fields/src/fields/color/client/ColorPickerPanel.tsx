@@ -61,11 +61,23 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 	const svRef = useRef<HTMLDivElement>(null)
 	const rafRef = useRef<null | number>(null)
 	const pendingRef = useRef<Hsva | null>(null)
+	const lastEmittedRef = useRef<null | string>(null)
 
 	const initialKey = initial ? `${initial.h}|${initial.s}|${initial.v}|${initial.a}` : ''
 	// biome-ignore lint/correctness/useExhaustiveDependencies: resync only when the committed color changes, not on every initial object identity change
 	useEffect(() => {
-		if (!draggingRef.current && initial) setHsva(initial)
+		if (!initial) {
+			lastEmittedRef.current = null
+			return
+		}
+		if (draggingRef.current) return
+		// Skip echoes of our own commit: achromatic values round-trip with h/s zeroed and would clobber the local hue/saturation
+		const incomingCss = formatColor(
+			hsvToRgb({ h: initial.h, s: initial.s, v: initial.v }, alphaEnabled ? initial.a : 1),
+			'rgb'
+		)
+		if (incomingCss === lastEmittedRef.current) return
+		setHsva(initial)
 	}, [initialKey])
 
 	useEffect(
@@ -84,12 +96,12 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 				rafRef.current = null
 				const pending = pendingRef.current
 				if (!pending) return
-				onPickCss(
-					formatColor(
-						hsvToRgb({ h: pending.h, s: pending.s, v: pending.v }, alphaEnabled ? pending.a : 1),
-						'rgb'
-					)
+				const css = formatColor(
+					hsvToRgb({ h: pending.h, s: pending.s, v: pending.v }, alphaEnabled ? pending.a : 1),
+					'rgb'
 				)
+				lastEmittedRef.current = css
+				onPickCss(css)
 			})
 		},
 		[alphaEnabled, onPickCss]
@@ -137,6 +149,11 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 		if (event.key.startsWith('Arrow')) event.stopPropagation()
 	}, [])
 
+	// Fires after pointerup AND pointercancel, so an interrupted drag never leaves draggingRef stuck
+	const endDrag = useCallback(() => {
+		draggingRef.current = false
+	}, [])
+
 	const opaqueCss = formatColor(hsvToRgb({ h: hsva.h, s: hsva.s, v: hsva.v }, 1), 'rgb')
 	const eyeDropperCtor = enableEyedropper ? getEyeDropper() : null
 
@@ -155,12 +172,11 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 					event.currentTarget.setPointerCapture(event.pointerId)
 					svPointer(event)
 				}}
+				onLostPointerCapture={endDrag}
 				onPointerMove={(event) => {
 					if (draggingRef.current) svPointer(event)
 				}}
-				onPointerUp={() => {
-					draggingRef.current = false
-				}}
+				onPointerUp={endDrag}
 				ref={svRef}
 				role="slider"
 				style={{ backgroundColor: `hsl(${Math.round(hsva.h)} 100% 50%)` }}
@@ -179,6 +195,7 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 				min={0}
 				onChange={(event) => applyPartial({ h: Number(event.target.value) })}
 				onKeyDown={stopArrowKeys}
+				onLostPointerCapture={endDrag}
 				step={1}
 				type="range"
 				value={Math.round(hsva.h)}
@@ -192,6 +209,7 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 					min={0}
 					onChange={(event) => applyPartial({ a: Number(event.target.value) / 100 })}
 					onKeyDown={stopArrowKeys}
+					onLostPointerCapture={endDrag}
 					step={1}
 					style={{
 						backgroundImage: `linear-gradient(to right, transparent, ${opaqueCss}), conic-gradient(var(--theme-elevation-150) 0 25%, transparent 0 50%, var(--theme-elevation-150) 0 75%, transparent 0)`,

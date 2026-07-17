@@ -6,12 +6,26 @@ import {
 	COLOR_CUSTOM_KEY,
 	type ColorFieldClientOptions,
 	type ColorFieldCustom,
+	type ColorPresetsResolver,
+	type ColorPresetsSource,
 	type ResolvedColorPreset,
 } from '../options'
 import { resolvePresets } from '../resolvePresets'
 
-// Standalone fields built outside colorField() (hand-written config) have no memoKey
+// Standalone fields built outside colorField() (hand-written config) have no memoKey;
+// keyed per resolver so two standalone fields never share each other's cached presets
 const FALLBACK_MEMO_KEY = Symbol('colorField:presets')
+const fallbackMemoKeys = new WeakMap<ColorPresetsResolver, symbol>()
+
+const fallbackMemoKey = (source: ColorPresetsSource | undefined): symbol => {
+	if (typeof source !== 'function') return FALLBACK_MEMO_KEY
+	let key = fallbackMemoKeys.get(source)
+	if (!key) {
+		key = Symbol('colorField:presets')
+		fallbackMemoKeys.set(source, key)
+	}
+	return key
+}
 
 const resolveStaticLabel = (
 	label: StaticLabel | undefined,
@@ -39,7 +53,7 @@ export const ColorFieldServer = async (props: ColorFieldServerComponentProps) =>
 	const custom = (field.custom?.[COLOR_CUSTOM_KEY] ?? {}) as Partial<ColorFieldCustom>
 	const presets = await resolvePresets({
 		data,
-		memoKey: custom.memoKey ?? FALLBACK_MEMO_KEY,
+		memoKey: custom.memoKey ?? fallbackMemoKey(custom.presets),
 		req,
 		siblingData,
 		source: custom.presets,

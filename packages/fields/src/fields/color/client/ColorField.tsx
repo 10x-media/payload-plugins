@@ -51,13 +51,12 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 
 	const memoizedValidate = useCallback<Validate<string>>(
 		(value, options) => {
-			if (
-				typeof value === 'string' &&
-				value !== '' &&
-				!(linked && value.startsWith(PRESET_PREFIX)) &&
-				!parseColor(value)
-			) {
-				return t(keys.invalidColor)
+			if (typeof value === 'string' && value !== '') {
+				if (linked && value.startsWith(PRESET_PREFIX)) {
+					if (value.length === PRESET_PREFIX.length) return t(keys.missingPreset)
+				} else if (!parseColor(value)) {
+					return t(keys.invalidColor)
+				}
 			}
 			return text(value, { ...options, name, required, type: 'text' })
 		},
@@ -105,9 +104,9 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		[]
 	)
 
+	// Commits to the form without touching editingRef: the debounced path must not let the draft resync mid-typing
 	const commitText = useCallback(
 		(raw: string) => {
-			editingRef.current = false
 			if (raw.trim() === '') {
 				setValue(null)
 				return
@@ -139,7 +138,10 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 			clearTimeout(debounceRef.current)
 			debounceRef.current = null
 		}
-		if (editingRef.current) commitText(draft)
+		if (editingRef.current) {
+			editingRef.current = false
+			commitText(draft)
+		}
 	}, [commitText, draft])
 
 	const commitCss = useCallback(
