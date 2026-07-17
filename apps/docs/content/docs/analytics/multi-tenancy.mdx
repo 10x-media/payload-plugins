@@ -14,7 +14,7 @@ description: Per-tenant analytics providers, a shared platform provider, and sco
 | `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
 | `access.platformRead` | Gates cross-scope reads. Defaults to any authenticated admin user. |
 | `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
-| `posthogProxyRewrites` | Next.js rewrites for a first-party PostHog reverse proxy. |
+| `analyticsProxyRewrites` / `providerScriptSnippet` | First-party reverse proxy so browsers talk to your origin, not the vendor (PostHog, Plausible, Umami). See [Client tracking and proxy](/analytics/proxy). |
 
 ## 1. Resolve the tenant as the scope
 
@@ -67,16 +67,16 @@ Without a tenant plugin, the same collection works standalone: the hidden `scope
 
 ## 3. Platform analytics through a first-party proxy
 
-The platform (host) project captures events from **all** tenant pages through the app's own domain, which also survives ad blockers. Wire PostHog's recommended reverse proxy with the exported helper:
+The platform (host) project captures events from **all** tenant pages through the app's own domain, which also survives ad blockers. Use `analyticsProxyRewrites` (or the PostHog-only `posthogProxyRewrites` alias) and pair it with `providerScriptSnippet` or your own SDK init. Full provider matrix and caveats: [Client tracking and proxy](/analytics/proxy).
 
 ```ts
 // next.config.ts
-import { posthogProxyRewrites } from '@10x-media/analytics/next'
+import { analyticsProxyRewrites } from '@10x-media/analytics/next'
 
 const nextConfig = {
   skipTrailingSlashRedirect: true, // PostHog capture endpoints use trailing slashes
   async rewrites() {
-    return posthogProxyRewrites({ path: '/ph', region: 'eu' })
+    return analyticsProxyRewrites({ provider: 'posthog', path: '/ph', region: 'eu' })
   },
 }
 ```

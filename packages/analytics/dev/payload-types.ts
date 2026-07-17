@@ -681,6 +681,7 @@ export interface AnalyticsMetricWidget {
       from?: string | null;
       to?: string | null;
     };
+    dataSource?: ('native' | 'posthog') | null;
   };
   width: 'x-small' | 'small' | 'medium';
 }
@@ -706,6 +707,7 @@ export interface AnalyticsTrendWidget {
       from?: string | null;
       to?: string | null;
     };
+    dataSource?: ('native' | 'posthog') | null;
   };
   width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }
@@ -718,6 +720,7 @@ export interface AnalyticsRealtimeWidget {
     title?: string | null;
     metric: 'visitors' | 'pageviews';
     windowMinutes?: ('5' | '15' | '30' | '60') | null;
+    dataSource?: ('native' | 'posthog') | null;
   };
   width: 'small' | 'medium';
 }
@@ -744,6 +747,7 @@ export interface AnalyticsBreakdownPagesWidget {
       to?: string | null;
     };
     limit?: number | null;
+    dataSource?: ('native' | 'posthog') | null;
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -770,6 +774,7 @@ export interface AnalyticsBreakdownSourcesWidget {
       to?: string | null;
     };
     limit?: number | null;
+    dataSource?: ('native' | 'posthog') | null;
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -796,6 +801,7 @@ export interface AnalyticsBreakdownDevicesWidget {
       to?: string | null;
     };
     limit?: number | null;
+    dataSource?: ('native' | 'posthog') | null;
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -822,6 +828,7 @@ export interface AnalyticsBreakdownCountriesWidget {
       to?: string | null;
     };
     limit?: number | null;
+    dataSource?: ('native' | 'posthog') | null;
   };
   width: 'small' | 'medium' | 'large';
 }
