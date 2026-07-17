@@ -11,11 +11,14 @@ const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.turbo'])
 
-/** Files that enumerate every key by definition; they don't count as "usage". */
-const SELF_DEFINING_FILES = new Set([
-	join(packageRoot, 'src/translations/keys.ts'),
-	join(packageRoot, 'src/translations/en.ts'),
-])
+const KEYS_FILE = join(packageRoot, 'src/translations/keys.ts')
+
+/**
+ * Marks a locale table, which enumerates every key by definition and so can never count as usage.
+ * Matched on the `Record<TranslationKey, string>` annotation that already keeps locales in lockstep
+ * rather than on a filename list: a list silently blinds this scan the day a locale is left off it.
+ */
+const LOCALE_TABLE_ANNOTATION = /:\s*Record<\s*TranslationKey\s*,\s*string\s*>/
 
 const collectSourceFiles = (dir: string, out: string[] = []): string[] => {
 	for (const entry of readdirSync(dir)) {
@@ -27,16 +30,28 @@ const collectSourceFiles = (dir: string, out: string[] = []): string[] => {
 			collectSourceFiles(full, out)
 			continue
 		}
-		if (
-			/\.(ts|tsx)$/.test(entry) &&
-			!entry.endsWith('.test.ts') &&
-			!entry.endsWith('.test.tsx') &&
-			!SELF_DEFINING_FILES.has(full)
-		) {
+		if (/\.(ts|tsx)$/.test(entry) && !entry.endsWith('.test.ts') && !entry.endsWith('.test.tsx')) {
 			out.push(full)
 		}
 	}
 	return out
+}
+
+/** Production files a key must be referenced from to count as used. */
+const usageFiles = (): string[] =>
+	[
+		...collectSourceFiles(join(packageRoot, 'src')),
+		...collectSourceFiles(join(packageRoot, 'registry', 'form-builder')),
+	].filter(
+		(file) => file !== KEYS_FILE && !LOCALE_TABLE_ANNOTATION.test(readFileSync(file, 'utf8'))
+	)
+
+/** The subset of `names` no production file references as `keys.<name>`. */
+const unusedKeyNames = (names: string[]): string[] => {
+	const combined = usageFiles()
+		.map((file) => readFileSync(file, 'utf8'))
+		.join('\n')
+	return names.filter((name) => !new RegExp(`\\bkeys\\.${name}\\b`).test(combined))
 }
 
 describe('form-builder translations', () => {
@@ -72,15 +87,19 @@ describe('form-builder translations', () => {
 	})
 
 	it('references every translation key from production code', () => {
-		const files = [
-			...collectSourceFiles(join(packageRoot, 'src')),
-			...collectSourceFiles(join(packageRoot, 'registry', 'form-builder')),
-		]
-		const combined = files.map((file) => readFileSync(file, 'utf8')).join('\n')
+		expect(unusedKeyNames(Object.keys(keys))).toEqual([])
+	})
 
-		const unused = Object.keys(keys).filter(
-			(name) => !new RegExp(`\\bkeys\\.${name}\\b`).test(combined)
-		)
-		expect(unused).toEqual([])
+	it('scans a non-empty corpus that excludes every key-enumerating file', () => {
+		const scanned = usageFiles()
+		expect(scanned.length).toBeGreaterThan(0)
+		expect(scanned).not.toContain(KEYS_FILE)
+		for (const file of scanned) {
+			expect(LOCALE_TABLE_ANNOTATION.test(readFileSync(file, 'utf8'))).toBe(false)
+		}
+	})
+
+	it('reports a key that production code never references', () => {
+		expect(unusedKeyNames(['keyNoProductionFileMentions'])).toEqual(['keyNoProductionFileMentions'])
 	})
 })
