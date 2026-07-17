@@ -102,8 +102,11 @@ describe('forms admin.condition scopes', () => {
 	it('reads the poll group, not the document, for the poll enabled gate', () => {
 		const poll = groupNamed(collection.fields, 'poll')
 		const condition = conditionOf(poll.fields, 'closesAt')
-		expect(condition({ enabled: true }, { enabled: false }, props)).toBe(false)
-		expect(condition({ poll: { enabled: true } }, {}, props)).toBe(false)
+		// Every plausible wrong scope is present and says the opposite of the sibling group, so
+		// reading data.enabled, data.poll.enabled, or siblingData.poll.enabled fails both directions.
+		const wrong = (enabled: boolean) => ({ enabled, poll: { enabled } })
+		expect(condition(wrong(false), { enabled: true, poll: { enabled: false } }, props)).toBe(true)
+		expect(condition(wrong(true), { enabled: false, poll: { enabled: true } }, props)).toBe(false)
 	})
 })
 
