@@ -17,7 +17,7 @@ export default async function FormPage() {
 	if (!form) {
 		return <p>Demo form not seeded.</p>
 	}
-	// The form stores only a source key per consent field; the statement the visitor reads is
+	// The form stores only a source id per consent field; the statement the visitor reads is
 	// resolved here, for this request's locale, from whatever the source says right now.
 	// `createLocalReq` is what gives the host resolver a real `req` outside a route handler.
 	const req = await createLocalReq({}, payload)

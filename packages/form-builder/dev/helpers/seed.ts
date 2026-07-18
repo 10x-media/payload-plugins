@@ -320,52 +320,6 @@ const seedDemoContactSubmissions = async (payload: Payload, formId: string): Pro
 }
 
 /**
- * Votes for the athlete poll, then closes it retroactively (`closesAt` set to a past, literal ISO
- * date so the seed stays deterministic across boots). `mostVoted` then has real data to resolve from,
- * and since this dev app registers no jobs plugin, the results endpoint's no-runner fallback
- * (`resolveFormResultsRequest` -> `shouldAutoResolvePoll` -> `resolvePollOutcome`) resolves the winner
- * the next time anyone reads results, rather than a scheduled job.
- *
- * Votes are cast before the closing update (the poll is still open when they are submitted), because
- * once `closesAt` is in the past, `validateSubmission` rejects every further submission to this form.
- */
-const seedAthletePollVotes = async (
-	payload: Payload,
-	formId: string,
-	athleteIdByName: Map<string, string | number>
-): Promise<void> => {
-	const mara = athleteIdByName.get('Mara Vieira')
-	const jonas = athleteIdByName.get('Jonas Keller')
-	if (mara != null) {
-		await payload.create({
-			collection: 'form-submissions',
-			locale: 'en',
-			data: { form: formId, values: [{ field: 'pick', value: mara }] },
-		})
-		await payload.create({
-			collection: 'form-submissions',
-			locale: 'de',
-			data: { form: formId, values: [{ field: 'pick', value: mara }] },
-		})
-	}
-	if (jonas != null) {
-		await payload.create({
-			collection: 'form-submissions',
-			locale: 'en',
-			data: { form: formId, values: [{ field: 'pick', value: jonas }] },
-		})
-	}
-	payload.logger.info('Seeded votes: Who will win? (Mara Vieira x2, Jonas Keller x1)')
-
-	await payload.update({
-		collection: 'forms',
-		id: formId,
-		data: { poll: { closesAt: '2026-07-15T18:00:00.000Z' } },
-	})
-	payload.logger.info('Closed poll: Who will win? (closesAt in the past; type stays mostVoted)')
-}
-
-/**
  * Seed the dev Payload app: an admin user, the consent sources and department addresses and the
  * policy pages they reference, an `athletes` collection, plus demo forms the `(frontend)` pages
  * render and the e2e suite drives -- a multi-step contact form (a conditional field, a required
@@ -449,7 +403,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		limit: VOTEABLE_NAMES.length,
 	})
 	const voteableIds = voteable.docs.map((athlete) => athlete.id)
-	const whoWillWin = await ensureForm(payload, 'Who will win?', {
+	await ensureForm(payload, 'Who will win?', {
 		fields: [
 			{
 				blockType: 'athleteVote',
@@ -460,12 +414,8 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			},
 		],
 		pollEnabled: true,
+		// A relationship-backed mostVoted poll, left open so the dev frontend (and the e2e) can vote.
+		// The scheduled auto-close and resolve-on-read path is covered by the poll int and matrix suites.
 		poll: { resultsField: 'pick', type: 'mostVoted' },
 	})
-	if (whoWillWin.created) {
-		const athleteIdByName = new Map(
-			voteable.docs.map((athlete) => [athlete.name, athlete.id] as const)
-		)
-		await seedAthletePollVotes(payload, String(whoWillWin.doc.id), athleteIdByName)
-	}
 }
