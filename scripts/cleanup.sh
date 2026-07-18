@@ -14,13 +14,16 @@
 #     - tsdown --watch
 #     - vitest --watch / vitest --ui
 #   Machine-wide:
-#     - orphaned mongodb-memory-server mongods: PPID=1 and path under
-#       ~/.cache/mongodb-binaries. These leak when a test run dies before its
-#       afterAll teardown fires (deadline SIGKILL, force-stopped session, crash),
-#       and they live outside the repo path so the repo-scoped scan above can
-#       never see them. The PPID=1 guard means a live test's mongod (whose parent
-#       is the test process) is skipped; the path guard means the Homebrew mongod
-#       (/opt/homebrew/.../mongod) is skipped.
+#     - orphaned mongodb-memory-server mongods: PPID=1 and either a binary under
+#       ~/.cache/mongodb-binaries or a `--dbpath .../mongo-mem-*` temp data dir.
+#       These leak when a test run dies before its afterAll teardown fires
+#       (deadline SIGKILL, force-stopped session, crash) or when a dev server's
+#       HMR reload orphans an old in-memory mongod, and they live outside the
+#       repo path so the repo-scoped scan above can never see them. The PPID=1
+#       guard means a live test's or dev server's mongod (whose parent is still
+#       alive) is skipped; the binary and dbpath signatures are specific to
+#       mongodb-memory-server, so the Homebrew mongod (/opt/homebrew/.../mongod,
+#       dbpath /opt/homebrew/var/mongodb) is skipped.
 
 set -eu
 
@@ -38,11 +41,13 @@ repo_candidates() {
 			 $0 ~ /vitest.*(--watch|--ui)/) { print }'
 }
 
-# Orphaned mongodb-memory-server pids. The awk program text itself contains
+# Orphaned mongodb-memory-server pids. Match either the cached binary path or a
+# mongo-mem-* temp dbpath (covers system-binary setups too), gated on PPID=1 so a
+# live parent's mongod is never touched. The awk program text itself contains
 # "mongodb-binaries", so exclude the awk line to avoid matching this scan.
 orphan_mongo_pids() {
 	ps axo pid,ppid,command \
-		| awk '$2 == 1 && $0 ~ /mongodb-binaries\/mongod/ && $0 !~ /awk/ { print $1 }'
+		| awk '$2 == 1 && ($0 ~ /mongodb-binaries\/mongod/ || $0 ~ /--dbpath[ =][^ ]*mongo-mem-/) && $0 !~ /awk/ { print $1 }'
 }
 
 CANDIDATES=$(repo_candidates)
