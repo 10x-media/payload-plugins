@@ -4,6 +4,7 @@ import {
 	type CollectionConfig,
 	type Field,
 	type PayloadRequest,
+	type TextFieldSingleValidation,
 	ValidationError,
 } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
@@ -43,6 +44,23 @@ import { validateUrl } from '../validation/validateUrl'
 import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
 
 export const FORMS_SLUG = 'forms'
+
+/**
+ * Require the title in the default locale (and on hosts without localization), but let it be empty in
+ * other locales so a localized form falls back to the default-locale title rather than forcing a
+ * translation for every locale. Payload's field-level `required` cannot express this: it enforces per
+ * write-locale, which would make a title mandatory in every locale and break the documented fallback.
+ */
+const validateFormTitle: TextFieldSingleValidation = (value, { req }) => {
+	const localization = req.payload.config.localization
+	const defaultLocale = localization ? localization.defaultLocale : undefined
+	const enforced =
+		defaultLocale === undefined || req.locale === undefined || req.locale === defaultLocale
+	if (enforced && (typeof value !== 'string' || value.trim().length === 0)) {
+		return req.t('validation:required')
+	}
+	return true
+}
 
 /**
  * Field-level validation for the raw flow JSON: step ids must be non-empty, unique, and not the
@@ -484,9 +502,14 @@ export const buildFormsCollection = ({
 		{
 			name: 'title',
 			type: 'text',
-			required: true,
 			label: labelForKey(keys.fieldTitle),
 			admin: { width: '50%' },
+			// Visitor-facing content, so it follows `localizeContent` like the response message and
+			// consent statement: hosts with localization get a per-locale title (and a locale-aware
+			// `useAsTitle`), hosts without it are unaffected since Payload strips the flag. `validate`
+			// (not `required`) keeps it mandatory only in the default locale so other locales fall back.
+			...localizedIf(localizeContent),
+			validate: validateFormTitle,
 		},
 		// The two form-type flags: behavior, never localized. `multistep` gates the Flow tab and the
 		// client's step navigation; `pollEnabled` gates the Poll tab and marks the form a poll.

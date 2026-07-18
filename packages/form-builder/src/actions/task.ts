@@ -1,4 +1,4 @@
-import type { Config, Payload, PayloadRequest, TaskConfig } from 'payload'
+import type { Config, Payload, PayloadRequest, TaskConfig, TypedLocale } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
 import type { Translate } from '../fields/types'
@@ -61,7 +61,10 @@ export const runActionsForSubmission = async (args: {
 			id: input.formId,
 			depth: 0,
 			overrideAccess: true,
-			locale,
+			// Cast: the stored locale is a plain string; a host's concrete locale union is unknowable from
+			// the plugin, and an unrecognized code just falls back on read, so this narrows (zero runtime
+			// delta) to satisfy a host whose `findByID` locale is a real union.
+			locale: locale as TypedLocale,
 			req,
 		})
 		.catch(() => null)

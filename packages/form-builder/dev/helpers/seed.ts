@@ -274,9 +274,9 @@ const localizeDemoContact = async (payload: Payload, form: Form): Promise<void> 
 		collection: 'forms',
 		id: form.id,
 		locale: 'de',
-		data: { fields: localized as unknown as Form['fields'] },
+		data: { title: 'Demo Kontakt', fields: localized as unknown as Form['fields'] },
 	})
-	payload.logger.info('Localized form field label (de): Demo Contact > fullName')
+	payload.logger.info('Localized form title + field label (de): Demo Contact > fullName')
 }
 
 /**
@@ -390,6 +390,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	await seedAthletes(payload)
 
 	const demoContact = await ensureForm(payload, 'Demo Contact', {
+		multistep: true,
 		fields: [
 			{ blockType: 'text', name: 'fullName', label: 'Full name', required: true },
 			{ blockType: 'email', name: 'email', label: 'Email', required: true },
