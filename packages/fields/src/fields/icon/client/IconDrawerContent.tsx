@@ -5,10 +5,11 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations'
 import { useTranslation } from '../../../translations/useTranslation'
-import type { IconManifest, IconMeta } from '../../../types'
+import type { IconManifest, IconMeta, IconNode, IconNodeMap } from '../../../types'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
 import { formatIconLabel } from '../shared/formatIconLabel'
 import { buildIconSearchIndex, searchIcons } from '../shared/search'
+import { DrawerGlyph } from './DrawerGlyph'
 import { useRecentIcons } from './useRecentIcons'
 
 // One fixed size drives both the column count and the virtualizer row height. With no
@@ -35,12 +36,14 @@ type CellProps = {
 	icon: IconMeta
 	index: number
 	isSelected: boolean
+	/** Bulk glyph data for inline rendering; when absent the cell falls back to the per-icon Icon. */
+	nodes: IconNode[] | undefined
 	onSelect: (name: string) => void
 	registerRef: (index: number, element: HTMLButtonElement | null) => void
 }
 
 const IconGridCell: React.FC<CellProps> = React.memo(
-	({ entry, focused, icon, index, isSelected, onSelect, registerRef }) => {
+	({ entry, focused, icon, index, isSelected, nodes, onSelect, registerRef }) => {
 		const [showTooltip, setShowTooltip] = useState(false)
 		// The name is not rendered in-flow (that variance broke grid alignment); it lives on
 		// the accessible name and a hover/focus tooltip, sentence-cased for readability.
@@ -69,7 +72,11 @@ const IconGridCell: React.FC<CellProps> = React.memo(
 						{label}
 					</Tooltip>
 					<span className="tenx-icon-drawer__glyph">
-						{entry ? <entry.Icon name={icon.name} size={24} /> : null}
+						{nodes ? (
+							<DrawerGlyph nodes={nodes} size={24} />
+						) : entry ? (
+							<entry.Icon name={icon.name} size={24} />
+						) : null}
 					</span>
 				</button>
 			</div>
@@ -89,6 +96,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 }) => {
 	const { t } = useTranslation()
 	const [manifests, setManifests] = useState<Map<string, IconManifest>>(() => new Map())
+	const [nodeMaps, setNodeMaps] = useState<Map<string, IconNodeMap>>(() => new Map())
 	const [query, setQuery] = useState('')
 	const deferredQuery = useDeferredValue(query)
 	const [category, setCategory] = useState<string>(ALL)
@@ -97,10 +105,22 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	const manifest = manifests.get(activeLibrary)
 	const entry = adapterComponents[activeLibrary]
 	const Assets = entry?.Assets
+	const NodesLoader = entry?.Nodes
+	const nodeMap = nodeMaps.get(activeLibrary)
+	// Libraries with a Nodes loader render the grid from bulk node-data; the grid
+	// waits for that data before showing cells, others (radix) render immediately.
+	const nodesPending = Boolean(NodesLoader) && !nodeMap
 
 	const handleManifest = useCallback(
 		(loaded: IconManifest) => {
 			setManifests((previous) => new Map(previous).set(activeLibrary, loaded))
+		},
+		[activeLibrary]
+	)
+
+	const handleNodes = useCallback(
+		(loaded: IconNodeMap) => {
+			setNodeMaps((previous) => new Map(previous).set(activeLibrary, loaded))
 		},
 		[activeLibrary]
 	)
@@ -153,7 +173,8 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 		count: rowCount,
 		estimateSize: () => CELL_SIZE,
 		getScrollElement: () => gridRef.current,
-		overscan: 4,
+		// Cells are cheap inline SVG now, so a deeper overscan buys smoother fast scrolls.
+		overscan: 8,
 	})
 
 	const [focusIndex, setFocusIndex] = useState(0)
@@ -217,6 +238,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	return (
 		<div className="tenx-icon-drawer">
 			{Assets && !manifest ? <Assets key={activeLibrary} onReady={handleManifest} /> : null}
+			{NodesLoader && !nodeMap ? <NodesLoader key={activeLibrary} onReady={handleNodes} /> : null}
 			{selectedUnavailable ? (
 				<div className="tenx-icon-drawer__banner" role="status">
 					{t(keys.libraryUnavailable)}
@@ -284,7 +306,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 						ref={gridRef}
 						role="listbox"
 					>
-						{!manifest ? (
+						{!manifest || nodesPending ? (
 							<div className="tenx-icon-drawer__loading">
 								{Array.from({ length: 24 }, (_, skeletonIndex) => (
 									// biome-ignore lint/suspicious/noArrayIndexKey: fixed-count static placeholders that never reorder
@@ -326,6 +348,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 															selected?.library === activeLibrary && selected.name === icon.name
 														}
 														key={icon.name}
+														nodes={NodesLoader ? nodeMap?.[icon.name] : undefined}
 														onSelect={handleSelect}
 														registerRef={registerRef}
 													/>
