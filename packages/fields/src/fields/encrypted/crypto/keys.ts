@@ -12,8 +12,19 @@ const INFO_DATA = '10x-fields/encrypted/v1/data'
 const INFO_BIDX = '10x-fields/encrypted/v1/bidx'
 const KEY_LENGTH = 32
 
+/**
+ * Minimum accepted key-material length in bytes. HKDF will happily stretch a
+ * 1-byte or all-whitespace secret to a full 32-byte key, hiding a catastrophic
+ * lack of entropy, so material shorter than this is rejected outright. 16 is the
+ * hard floor; 32+ is recommended and surfaced in the error message.
+ */
+const MIN_KEY_BYTES = 16
+
 /** Key ids are embedded in the dot-delimited wire format, so dots are banned. */
 const KEY_ID_PATTERN = /^[A-Za-z0-9_-]+$/
+
+const materialByteLength = (material: Uint8Array | string): number =>
+	typeof material === 'string' ? Buffer.byteLength(material, 'utf8') : material.length
 
 /** Key id used by the zero-config ring derived from the Payload secret. */
 export const DEFAULT_KEY_ID = 'k0'
@@ -65,8 +76,13 @@ export const validateKeysConfig = (config: KeysConfig): void => {
 			)
 		}
 		const material = config.keys[id]
-		if (typeof material === 'string' && material.length === 0) {
-			throw new InvalidKeysConfigError(`key '${id}' has empty string material`)
+		if (typeof material === 'string') {
+			const bytes = materialByteLength(material)
+			if (bytes < MIN_KEY_BYTES) {
+				throw new InvalidKeysConfigError(
+					`key '${id}' has ${bytes} bytes of string material; provide at least ${MIN_KEY_BYTES} (recommend >= 32)`
+				)
+			}
 		}
 	}
 }
@@ -76,12 +92,25 @@ const ringFromConfig = async (config: KeysConfig): Promise<KeyRing> => {
 	const dataKeys = new Map<string, Buffer>()
 	let activeMaterial: Uint8Array | string | undefined
 	for (const [id, material] of Object.entries(config.keys)) {
-		const resolved = typeof material === 'function' ? await material() : material
-		if (typeof resolved !== 'string' && !(resolved instanceof Uint8Array)) {
-			throw new InvalidKeysConfigError(`key '${id}' provider returned a non-Uint8Array value`)
+		const fromProvider = typeof material === 'function'
+		const resolved = fromProvider ? await material() : material
+		if (fromProvider) {
+			// The provider type is `() => Promise<Uint8Array>`; a string return
+			// (e.g. a KMS handing back hex/base64) must not be silently used as
+			// UTF-8 IKM. Literal string material stays allowed as a config value.
+			if (!(resolved instanceof Uint8Array)) {
+				throw new InvalidKeysConfigError(
+					`key '${id}' provider must resolve to a Uint8Array, not ${typeof resolved} (string material is only allowed as a literal config value)`
+				)
+			}
+		} else if (typeof resolved !== 'string') {
+			throw new InvalidKeysConfigError(`key '${id}' has non-string material`)
 		}
-		if (resolved.length === 0) {
-			throw new InvalidKeysConfigError(`key '${id}' resolved to empty material`)
+		const bytes = materialByteLength(resolved)
+		if (bytes < MIN_KEY_BYTES) {
+			throw new InvalidKeysConfigError(
+				`key '${id}' resolved to ${bytes} bytes of material; provide at least ${MIN_KEY_BYTES} (recommend >= 32)`
+			)
 		}
 		dataKeys.set(id, hkdf(resolved, INFO_DATA))
 		if (id === config.active) {

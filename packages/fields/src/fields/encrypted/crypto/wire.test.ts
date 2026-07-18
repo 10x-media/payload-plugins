@@ -1,7 +1,9 @@
+import { createCipheriv, randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { resolveKeys } from './keys'
 import {
 	AuthenticationFailedError,
+	CorruptPlaintextError,
 	isSealed,
 	MalformedCiphertextError,
 	parseWire,
@@ -83,6 +85,28 @@ describe('tamper detection', () => {
 			AuthenticationFailedError
 		)
 		expect(unseal(sealed, ring.dataKeys, ['people.ssn.en', 'people.ssn.de'])).toBe('x')
+	})
+
+	it('reports authenticated-but-non-JSON plaintext as corruption, not auth failure (L1)', () => {
+		// Craft a ciphertext that authenticates under the correct key+AAD but whose
+		// plaintext is not valid JSON, which seal() (JSON.stringify) can never emit.
+		const iv = randomBytes(12)
+		const cipher = createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 })
+		cipher.setAAD(Buffer.from(AAD, 'utf8'))
+		const ciphertext = Buffer.concat([
+			cipher.update(Buffer.from('not valid json {{{', 'utf8')),
+			cipher.final(),
+		])
+		const tag = cipher.getAuthTag()
+		const wire = [
+			WIRE_PREFIX,
+			ring.activeId,
+			iv.toString('base64url'),
+			ciphertext.toString('base64url'),
+			tag.toString('base64url'),
+		].join('.')
+		expect(() => unseal(wire, ring.dataKeys, [AAD])).toThrow(CorruptPlaintextError)
+		expect(() => unseal(wire, ring.dataKeys, [AAD])).not.toThrow(AuthenticationFailedError)
 	})
 })
 

@@ -60,7 +60,7 @@ describe('resolveKeys: custom KeysConfig', () => {
 
 	it('keeps every configured key decryptable while only active encrypts', async () => {
 		const ring = await resolveKeys(
-			{ active: 'k2', keys: { k1: 'old-material', k2: 'new-material' } },
+			{ active: 'k2', keys: { k1: 'old-key-material-v1', k2: 'new-key-material-v2' } },
 			SECRET
 		)
 		expect(ring.activeId).toBe('k2')
@@ -89,6 +89,40 @@ describe('resolveKeys: custom KeysConfig', () => {
 		)
 		await expect(
 			resolveKeys({ active: 'k1', keys: { k1: async () => new Uint8Array(0) } }, SECRET)
+		).rejects.toBeInstanceOf(InvalidKeysConfigError)
+	})
+
+	it('rejects string material below the minimum byte length (M1)', async () => {
+		expect(() => validateKeysConfig({ active: 'k1', keys: { k1: 'x' } })).toThrow(
+			InvalidKeysConfigError
+		)
+		expect(() => validateKeysConfig({ active: 'k1', keys: { k1: '   ' } })).toThrow(
+			InvalidKeysConfigError
+		)
+		await expect(resolveKeys({ active: 'k1', keys: { k1: 'x' } }, SECRET)).rejects.toBeInstanceOf(
+			InvalidKeysConfigError
+		)
+	})
+
+	it('accepts string material at or above the minimum byte length (M1)', async () => {
+		expect(() =>
+			validateKeysConfig({ active: 'k1', keys: { k1: 'sixteen-byte-key' } })
+		).not.toThrow()
+		const ring = await resolveKeys({ active: 'k1', keys: { k1: 'sixteen-byte-key' } }, SECRET)
+		expect(ring.dataKeys.get('k1')?.length).toBe(32)
+	})
+
+	it('rejects a provider returning a short Uint8Array (M1)', async () => {
+		await expect(
+			resolveKeys({ active: 'k1', keys: { k1: async () => new Uint8Array(8) } }, SECRET)
+		).rejects.toBeInstanceOf(InvalidKeysConfigError)
+	})
+
+	it('rejects a provider that returns a string instead of Uint8Array (L3)', async () => {
+		const stringProvider = (async () =>
+			'a-string-longer-than-sixteen-bytes') as unknown as () => Promise<Uint8Array>
+		await expect(
+			resolveKeys({ active: 'k1', keys: { k1: stringProvider } }, SECRET)
 		).rejects.toBeInstanceOf(InvalidKeysConfigError)
 	})
 })

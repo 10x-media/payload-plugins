@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeBidx, normalizeForBidx } from './bidx'
+import { BidxValueError, computeBidx, normalizeForBidx } from './bidx'
 import { resolveKeys } from './keys'
 
 const SECRET = 'test-secret-not-for-prod'
@@ -10,6 +10,16 @@ describe('normalizeForBidx', () => {
 		expect(normalizeForBidx('  User@Example.com ', 'email')).toBe('user@example.com')
 		expect(normalizeForBidx('  MixedCase ', 'standard')).toBe('MixedCase')
 		expect(normalizeForBidx(42, 'standard')).toBe('42')
+	})
+
+	it('accepts only scalar string/number and rejects everything else (M2)', () => {
+		expect(normalizeForBidx('hello', 'standard')).toBe('hello')
+		expect(normalizeForBidx(0, 'standard')).toBe('0')
+		expect(() => normalizeForBidx({}, 'standard')).toThrow(BidxValueError)
+		expect(() => normalizeForBidx(['a', 'b'], 'standard')).toThrow(BidxValueError)
+		expect(() => normalizeForBidx(null, 'standard')).toThrow(BidxValueError)
+		expect(() => normalizeForBidx(undefined, 'standard')).toThrow(BidxValueError)
+		expect(() => normalizeForBidx(true, 'standard')).toThrow(BidxValueError)
 	})
 })
 

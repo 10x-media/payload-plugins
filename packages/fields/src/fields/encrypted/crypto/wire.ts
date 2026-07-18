@@ -32,6 +32,23 @@ export class AuthenticationFailedError extends Error {
 }
 
 /**
+ * The ciphertext authenticated (correct key + AAD + tag) but the decrypted
+ * bytes are not valid JSON. Distinct from AuthenticationFailedError: auth
+ * succeeded, so this is non-retryable corruption, not a wrong key or AAD.
+ */
+export class CorruptPlaintextError extends Error {
+	readonly keyId: string
+	constructor(keyId: string, cause: unknown) {
+		super(
+			`@10x-media/fields: ciphertext authenticated but plaintext is not valid JSON (keyId '${keyId}')`
+		)
+		this.name = 'CorruptPlaintextError'
+		this.keyId = keyId
+		this.cause = cause
+	}
+}
+
+/**
  * Cheap shape check used on hot paths (hooks run per field per document).
  * A full parse only happens inside unseal.
  */
@@ -125,14 +142,22 @@ export const unseal = (
 		throw new UnknownKeyIdError(keyId)
 	}
 	for (const aad of aadCandidates) {
+		let json: string
 		try {
 			const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: TAG_LENGTH })
 			decipher.setAAD(Buffer.from(aad, 'utf8'))
 			decipher.setAuthTag(tag)
-			const json = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8')
-			return JSON.parse(json)
+			json = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8')
 		} catch {
-			// auth failure for this candidate; try the next
+			// GCM auth failed for this candidate; try the next
+			continue
+		}
+		// Auth succeeded: a JSON parse failure is non-retryable corruption, not an
+		// auth failure. Do not fall through to the next candidate or the final throw.
+		try {
+			return JSON.parse(json)
+		} catch (cause) {
+			throw new CorruptPlaintextError(keyId, cause)
 		}
 	}
 	throw new AuthenticationFailedError(keyId)
