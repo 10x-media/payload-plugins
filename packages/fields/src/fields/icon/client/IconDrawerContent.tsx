@@ -162,9 +162,10 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	}, [])
 	const columns = Math.max(3, Math.floor(gridWidth / CELL_SIZE))
 	const rowCount = Math.ceil(visible.length / columns)
-	// Shared width for the search control and the grid content: both span exactly
-	// `columns` cells from the same left origin, so the search right edge lines up
-	// with the last icon column. Set as a custom property, sized only from CELL_SIZE.
+	// Cell-box span of a full row (columns * CELL_SIZE), published to CSS as a custom property.
+	// The header row and banner derive their width from this (inset to the button outlines in
+	// icon-field.css) so the search, switcher, banner, and visible grid share one left and one
+	// right edge. Sized only from CELL_SIZE.
 	const mainStyle = {
 		'--tenx-icon-grid-width': `${columns * CELL_SIZE}px`,
 	} as React.CSSProperties
@@ -245,11 +246,6 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 			{NodesLoader && !nodeMap ? (
 				<NodesLoader key={`nodes-${activeLibrary}`} onReady={handleNodes} />
 			) : null}
-			{selectedUnavailable ? (
-				<div className="tenx-icon-drawer__banner" role="status">
-					{t(keys.libraryUnavailable)}
-				</div>
-			) : null}
 			<div className="tenx-icon-drawer__body">
 				<nav aria-label={t(keys.iconCategories)} className="tenx-icon-drawer__rail">
 					{railItems.map((item) => (
@@ -268,8 +264,29 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 					))}
 				</nav>
 				<div className="tenx-icon-drawer__main" style={mainStyle}>
+					{selectedUnavailable ? (
+						<div className="tenx-icon-drawer__banner" role="status">
+							{t(keys.libraryUnavailable)}
+						</div>
+					) : null}
 					<div className="tenx-icon-drawer__header">
-						{/* adapters is the available-filtered set, so this shows only with 2+ available libraries */}
+						{/* Bordered control mirrors Payload's list-view search: SearchIcon inside-left, borderless input. */}
+						<div className="tenx-icon-drawer__search">
+							<span aria-hidden="true" className="tenx-icon-drawer__search-icon">
+								<SearchIcon />
+							</span>
+							<input
+								aria-label={t(keys.searchIcons)}
+								className="tenx-icon-drawer__search-input"
+								onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+									setQuery(event.target.value)
+								}
+								placeholder={t(keys.searchIcons)}
+								type="text"
+								value={query}
+							/>
+						</div>
+						{/* adapters is the available-filtered set; the switcher shows only with 2+ libraries, fixed width beside the growing search */}
 						{adapters.length > 1 ? (
 							<div className="tenx-icon-drawer__switcher">
 								<SelectInput
@@ -288,22 +305,6 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 								/>
 							</div>
 						) : null}
-						{/* Bordered control mirrors Payload's list-view search: SearchIcon inside-left, borderless input. */}
-						<div className="tenx-icon-drawer__search">
-							<span aria-hidden="true" className="tenx-icon-drawer__search-icon">
-								<SearchIcon />
-							</span>
-							<input
-								aria-label={t(keys.searchIcons)}
-								className="tenx-icon-drawer__search-input"
-								onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-									setQuery(event.target.value)
-								}
-								placeholder={t(keys.searchIcons)}
-								type="text"
-								value={query}
-							/>
-						</div>
 					</div>
 					<div
 						aria-label={t(keys.iconGrid)}

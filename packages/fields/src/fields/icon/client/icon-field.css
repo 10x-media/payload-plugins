@@ -216,6 +216,17 @@ html[data-theme="dark"] .tenx-icon-field__control--warning {
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
+	/* Cell geometry in one place. The cell box is a fixed square that must equal CELL_SIZE in
+	   IconDrawerContent (it drives the column count and the virtualizer row height); the outlined
+	   button is smaller and centered, so cell-inset is the gap from each cell-box edge to the
+	   button outline. The search row and banner align to the button outlines, insetting by
+	   cell-inset on both sides. */
+	--tenx-icon-cell-size: 64px;
+	--tenx-icon-cell-button-size: 56px;
+	--tenx-icon-cell-inset: calc(
+		(var(--tenx-icon-cell-size) - var(--tenx-icon-cell-button-size)) /
+		2
+	);
 }
 
 /* Payload's Drawer Gutter (.drawer__content-children) is overflow:auto and stacks
@@ -259,37 +270,51 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
 	background: var(--theme-warning-100);
 }
 
-/* Right column beside the rail: the search sits directly above the grid and shares
-   its left origin, so aligning the search width to the grid width lines up their
-   right edges. --tenx-icon-grid-width is set inline from columns * CELL_SIZE. */
+/* Right column beside the rail. --tenx-icon-grid-width (set inline from columns * CELL_SIZE) is
+   the cell-box span of a full row; aligned-width insets that to the button outlines so the
+   banner, the search + switcher row, and the visible grid share one left and one right edge. */
 .tenx-icon-drawer__main {
 	display: flex;
 	flex-direction: column;
 	flex-grow: 1;
 	min-width: 0;
 	min-height: 0;
+	--tenx-icon-aligned-width: calc(var(--tenx-icon-grid-width) - 2 * var(--tenx-icon-cell-inset));
 }
 
+/* Banner and search row align to the icon button OUTLINES, not the cell boxes: the outer cells
+   leave a cell-inset gap before the first button and after the last, so insetting these by that
+   gap lands their left and right edges exactly on the first and last button borders. Both are
+   children of __main, sharing its left origin and inheriting the width from it. */
+.tenx-icon-drawer__banner,
+.tenx-icon-drawer__header {
+	width: var(--tenx-icon-aligned-width);
+	max-width: 100%;
+	margin-left: var(--tenx-icon-cell-inset);
+}
+
+/* Search grows to fill the row; the switcher sits at the fixed-width right end so its right
+   edge is the row's right edge. Width and left inset come from the shared rule above. */
 .tenx-icon-drawer__header {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	flex-shrink: 0;
-	align-items: flex-start;
+	align-items: center;
 	gap: calc(var(--base) * 0.5);
 	padding-bottom: calc(var(--base) * 0.5);
 	background: var(--theme-bg);
 }
 
-/* Bordered control mirroring Payload's formInput: SearchIcon inside-left, borderless
-   input flexing beside it, focus riding :focus-within. Width matches the grid so the
-   search right edge aligns with the last icon column. Literal 40px per the field height
+/* Bordered control mirroring Payload's formInput: SearchIcon inside-left, borderless input
+   flexing beside it, focus riding :focus-within. Grows to fill the header row left of the
+   switcher (min-width: 0 lets it shrink below its content). Literal 40px per the field height
    rule (Payload compiles base(2) to px; the --base var shrinks below 1024px). */
 .tenx-icon-drawer__search {
 	position: relative;
 	display: flex;
+	flex: 1 1 auto;
 	align-items: center;
-	width: var(--tenx-icon-grid-width);
-	max-width: 100%;
+	min-width: 0;
 	height: 40px;
 	border: 1px solid var(--theme-elevation-150);
 	border-radius: var(--style-radius-s);
@@ -343,6 +368,7 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
 }
 
 .tenx-icon-drawer__switcher {
+	flex: 0 0 auto;
 	width: 220px;
 	max-width: 100%;
 }
@@ -401,7 +427,7 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
 	justify-content: flex-start;
 }
 
-/* Fixed CELL_SIZE square: width and height both equal CELL_SIZE (the column-count divisor and
+/* Fixed cell-size square: width and height both the cell size (the column-count divisor and
    virtualizer row height in IconDrawerContent). Height keeps rows from overlapping or gapping;
    fixing the width instead of growing it left-aligns every row, so a partial last row places its
    cells under the same columns as the full rows above it. Containment is deliberately kept off
@@ -409,10 +435,10 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
    overflows the cell upward; the glyph carries content-visibility instead. */
 .tenx-icon-drawer__cell {
 	display: flex;
-	flex: 0 0 64px;
+	flex: 0 0 var(--tenx-icon-cell-size);
 	align-items: center;
 	justify-content: center;
-	height: 64px;
+	height: var(--tenx-icon-cell-size);
 }
 
 .tenx-icon-drawer__cell-button {
@@ -420,8 +446,8 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 56px;
-	height: 56px;
+	width: var(--tenx-icon-cell-button-size);
+	height: var(--tenx-icon-cell-button-size);
 	padding: 0;
 	background: transparent;
 	border: 1px solid var(--theme-elevation-150);
