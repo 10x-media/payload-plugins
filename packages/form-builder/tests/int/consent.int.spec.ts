@@ -42,8 +42,8 @@ const settings: GlobalConfig = {
 }
 
 type SettingsRow = {
-	key?: string | null
-	label?: string | null
+	id?: string | number | null
+	name?: string | null
 	statement?: unknown
 	page?: { relationTo: string; value: unknown } | null
 }
@@ -53,7 +53,9 @@ let resolverFails = false
 /**
  * A host resolver of the intended shape: read the placed field back, map rows to entries. A
  * multi-tenant host would scope the read by the tenant it derives from `req`; this reads a global,
- * which is enough to prove the seam receives the real per-request `req` and its locale.
+ * which is enough to prove the seam receives the real per-request `req` and its locale. `url` is
+ * derived from each row's own auto-assigned `id`, the stable per-row identifier this app's fixture
+ * routing keys off (a real host would derive its own public route instead).
  */
 const sources: ConsentSourcesResolver = async ({ req }) => {
 	if (resolverFails) {
@@ -66,22 +68,15 @@ const sources: ConsentSourcesResolver = async ({ req }) => {
 		req,
 	})
 	const rows = ((doc as { consentSources?: SettingsRow[] }).consentSources ?? []) as SettingsRow[]
-	return rows.flatMap((row): ConsentSourceEntry[] => {
-		if (typeof row.key !== 'string' || row.key === '') {
-			return []
-		}
+	return rows.map((row): ConsentSourceEntry => {
 		const page = row.page
-		return [
-			{
-				key: row.key,
-				...(row.label ? { label: row.label } : {}),
-				...(row.statement != null ? { statement: row.statement } : {}),
-				...(page
-					? { page: { relationTo: page.relationTo, id: page.value as number | string } }
-					: {}),
-				url: `https://example.com/${row.key}`,
-			},
-		]
+		return {
+			id: String(row.id),
+			...(row.name ? { name: row.name } : {}),
+			...(row.statement != null ? { statement: row.statement } : {}),
+			...(page ? { page: { relationTo: page.relationTo, id: page.value as number | string } } : {}),
+			url: `https://example.com/${String(row.id)}`,
+		}
 	})
 }
 
@@ -91,6 +86,9 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		let pageId: number | string
 		let noticeId: number | string
 		let leafletId: number | string
+		let privacySourceId: string
+		let termsSourceId: string
+		let marketingSourceId: string
 
 		beforeAll(async () => {
 			resolverFails = false
@@ -122,37 +120,42 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 
 			const rows = [
 				{
-					key: 'privacy',
-					label: 'Privacy policy',
+					name: 'Privacy policy',
 					statement: statement('I agree to the privacy policy'),
 					page: { relationTo: 'pages', value: pageId },
 				},
 				{
-					key: 'terms',
-					label: 'Terms',
+					name: 'Terms',
 					statement: statement('I accept the terms'),
 					page: { relationTo: 'notices', value: noticeId },
 				},
 				{
-					key: 'marketing',
-					label: 'Marketing',
+					name: 'Marketing',
 					statement: statement('Send me email'),
 					page: { relationTo: 'leaflets', value: leafletId },
 				},
 			]
 			await booted.payload.updateGlobal({ slug: 'settings', data: { consentSources: rows } })
-			// The array itself is not localized, only its statement and label are, so the German pass
+			// The array itself is not localized, only its statement and name are, so the German pass
 			// must address the existing rows by id. Re-sending id-less rows would replace them, taking
-			// the English values with them.
+			// the English values with them. The same read also captures each row's auto-assigned id,
+			// which the tests below reference as a consent field's `source`.
 			const seeded = await booted.payload.findGlobal({ slug: 'settings', depth: 0 })
+			const savedRows = (seeded as { consentSources?: SettingsRow[] }).consentSources ?? []
+			const byName = (name: string) => String(savedRows.find((row) => row.name === name)?.id)
+			privacySourceId = byName('Privacy policy')
+			termsSourceId = byName('Terms')
+			marketingSourceId = byName('Marketing')
+
 			const german = ['Ich stimme der Datenschutzerklärung zu', 'AGB', 'Werbung']
 			await booted.payload.updateGlobal({
 				slug: 'settings',
 				locale: 'de',
 				data: {
-					consentSources: ((seeded as { consentSources?: SettingsRow[] }).consentSources ?? []).map(
-						(row, index) => ({ ...row, statement: statement(german[index] ?? '') })
-					),
+					consentSources: savedRows.map((row, index) => ({
+						...row,
+						statement: statement(german[index] ?? ''),
+					})),
 				},
 			})
 		})
@@ -222,7 +225,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('serves the host sources as options to an authenticated caller', async () => {
-			const form = await makeForm('privacy')
+			const form = await makeForm(privacySourceId)
 			const response = await callEndpoint({
 				user: { id: 1, collection: 'users' },
 				routeParams: { id: form.id },
@@ -230,15 +233,15 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			expect(response?.status).toBe(200)
 			expect(await response?.json()).toEqual({
 				options: [
-					{ label: 'Privacy policy', value: 'privacy' },
-					{ label: 'Terms', value: 'terms' },
-					{ label: 'Marketing', value: 'marketing' },
+					{ label: 'Privacy policy', value: privacySourceId },
+					{ label: 'Terms', value: termsSourceId },
+					{ label: 'Marketing', value: marketingSourceId },
 				],
 			})
 		})
 
 		it('fails closed with a 503 when the host resolver throws', async () => {
-			const form = await makeForm('privacy')
+			const form = await makeForm(privacySourceId)
 			resolverFails = true
 			try {
 				const response = await callEndpoint({
@@ -252,7 +255,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('stores an id-based proof pinned to the published version when drafts are on', async () => {
-			const form = await makeForm('privacy')
+			const form = await makeForm(privacySourceId)
 			const submission = await booted.payload.create({
 				collection: 'form-submissions',
 				depth: 0,
@@ -261,7 +264,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			const proof = proofOf(submission)
 			expect(proof.field).toBe('terms')
 			expect(proof.agreed).toBe(true)
-			expect(proof.source).toBe('privacy')
+			expect(proof.source).toBe(privacySourceId)
 			expect(proof.page).toEqual({ relationTo: 'pages', id: pageId })
 			expect(typeof proof.at).toBe('string')
 
@@ -274,7 +277,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('never stores the statement text, so a policy edit cannot rewrite past proofs', async () => {
-			const form = await makeForm('privacy')
+			const form = await makeForm(privacySourceId)
 			const submission = await booted.payload.create({
 				collection: 'form-submissions',
 				depth: 0,
@@ -284,7 +287,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('records no versionRef for a versioned page whose collection has drafts off', async () => {
-			const form = await makeForm('terms')
+			const form = await makeForm(termsSourceId)
 			const submission = await booted.payload.create({
 				collection: 'form-submissions',
 				depth: 0,
@@ -296,7 +299,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('records no versionRef for a page whose collection has no versions', async () => {
-			const form = await makeForm('marketing')
+			const form = await makeForm(marketingSourceId)
 			const submission = await booted.payload.create({
 				collection: 'form-submissions',
 				depth: 0,
@@ -308,7 +311,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('keeps a proof resolvable after the policy page is renamed and re-slugged', async () => {
-			const form = await makeForm('privacy')
+			const form = await makeForm(privacySourceId)
 			const submission = await booted.payload.create({
 				collection: 'form-submissions',
 				depth: 0,
@@ -338,7 +341,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('rejects a required consent that is refused, and one that is simply absent', async () => {
-			const form = await makeForm('privacy')
+			const form = await makeForm(privacySourceId)
 			await expect(
 				booted.payload.create({
 					collection: 'form-submissions',
@@ -354,7 +357,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('stores an agreed:false proof for a consent field that is not required', async () => {
-			const form = await makeForm('marketing', false)
+			const form = await makeForm(marketingSourceId, false)
 			const submission = await booted.payload.create({
 				collection: 'form-submissions',
 				depth: 0,
@@ -362,11 +365,11 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			})
 			const proof = proofOf(submission)
 			expect(proof.agreed).toBe(false)
-			expect(proof.source).toBe('marketing')
+			expect(proof.source).toBe(marketingSourceId)
 		})
 
 		it('rejects the submission when the host resolver is down, rather than proving nothing', async () => {
-			const form = await makeForm('privacy')
+			const form = await makeForm(privacySourceId)
 			resolverFails = true
 			try {
 				await expect(
@@ -381,7 +384,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('resolves the live statement and link for the request locale', async () => {
-			const form = await makeForm('privacy')
+			const form = await makeForm(privacySourceId)
 			const loaded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
 
 			const en = await resolveConsentStatements({
@@ -391,7 +394,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			})
 			expect(en.terms?.link).toEqual({
 				label: 'Privacy policy',
-				url: 'https://example.com/privacy',
+				url: `https://example.com/${privacySourceId}`,
 			})
 			expect(JSON.stringify(en.terms?.statement)).toContain('I agree to the privacy policy')
 
@@ -406,7 +409,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('reflects an edited statement immediately, with no form to re-save', async () => {
-			const form = await makeForm('marketing')
+			const form = await makeForm(marketingSourceId)
 			const loaded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
 			const req = () =>
 				({ payload: booted.payload, context: {}, locale: 'en' }) as unknown as PayloadRequest
@@ -424,7 +427,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 				slug: 'settings',
 				data: {
 					consentSources: rows.map((row) =>
-						row.key === 'marketing'
+						String(row.id) === marketingSourceId
 							? { ...row, statement: statement('Send me the newsletter') }
 							: row
 					),
@@ -437,22 +440,6 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 				form: loaded as never,
 			})
 			expect(JSON.stringify(after.terms?.statement)).toContain('Send me the newsletter')
-		})
-
-		// Last, and deliberately: this asserts a validation-failed save, so keeping it after every
-		// other test means its aborted write can never perturb one that follows.
-		it('rejects saving the sources field with two rows sharing a key', async () => {
-			await expect(
-				booted.payload.updateGlobal({
-					slug: 'settings',
-					data: {
-						consentSources: [
-							{ key: 'dupe', statement: statement('One') },
-							{ key: 'dupe', statement: statement('Two') },
-						],
-					},
-				})
-			).rejects.toThrow()
 		})
 	})
 

@@ -78,8 +78,8 @@ const settings: GlobalConfig = {
 }
 
 type ConsentSourceRow = {
-	key?: string | null
-	label?: string | null
+	id?: string | number | null
+	name?: string | null
 	statement?: unknown
 	page?: { relationTo: string; value: unknown } | null
 }
@@ -91,22 +91,19 @@ type ConsentSourceRow = {
  */
 const consentSources = async ({ req }: { req: PayloadRequest }): Promise<ConsentSourceEntry[]> => {
 	const doc = await req.payload.findGlobal({ slug: 'settings', depth: 1, locale: req.locale, req })
-	const rows = (doc.consentSources ?? []) as ConsentSourceRow[]
-	return rows.flatMap((row): ConsentSourceEntry[] => {
-		if (!row.key) {
-			return []
-		}
+	const rows = (doc.consentSources ?? []) as unknown as ConsentSourceRow[]
+	return rows.map((row): ConsentSourceEntry => {
 		const page = row.page
-		const doc = page?.value as { id?: number | string; slug?: string } | undefined
-		return [
-			{
-				key: row.key,
-				...(row.label ? { label: row.label } : {}),
-				...(row.statement != null ? { statement: row.statement } : {}),
-				...(page && doc?.id != null ? { page: { relationTo: page.relationTo, id: doc.id } } : {}),
-				...(doc?.slug ? { url: `/${page?.relationTo}/${doc.slug}` } : {}),
-			},
-		]
+		const pageDoc = page?.value as { id?: number | string; slug?: string } | undefined
+		return {
+			id: String(row.id),
+			...(row.name ? { name: row.name } : {}),
+			...(row.statement != null ? { statement: row.statement } : {}),
+			...(page && pageDoc?.id != null
+				? { page: { relationTo: page.relationTo, id: pageDoc.id } }
+				: {}),
+			...(pageDoc?.slug ? { url: `/${page?.relationTo}/${pageDoc.slug}` } : {}),
+		}
 	})
 }
 

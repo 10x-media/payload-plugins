@@ -1,4 +1,5 @@
 import type { CollectionSlug, Payload } from 'payload'
+import type { Setting } from '../payload-types'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
@@ -58,16 +59,28 @@ const statement = (text: string) => ({
 	},
 })
 
+type ConsentSourceIds = { privacy: string; marketing: string }
+
+type SeededRow = { id?: string | number | null; name?: string | null }
+
+const idByName = (rows: SeededRow[], name: string): string =>
+	String(rows.find((r) => r.name === name)?.id)
+
 /**
  * The consent statements this app's forms reference, on the `settings` global where the plugin's
  * `consent.sources` resolver reads them. `privacy` points at a drafts-enabled page, so its proofs
  * pin a published version; `marketing` points at a version-less notice, so its proofs carry a page
- * and no version. Idempotent (skips once any row exists).
+ * and no version. Idempotent (skips creation once any row exists), and always returns each row's
+ * auto-assigned id so the demo forms below can reference them as a consent field's `source`.
  */
-const seedConsentSources = async (payload: Payload): Promise<void> => {
+const seedConsentSources = async (payload: Payload): Promise<ConsentSourceIds> => {
 	const current = await payload.findGlobal({ slug: 'settings', depth: 0 })
-	if (((current.consentSources ?? []) as unknown[]).length > 0) {
-		return
+	const existingRows = (current.consentSources ?? []) as unknown as SeededRow[]
+	if (existingRows.length > 0) {
+		return {
+			privacy: idByName(existingRows, 'Privacy policy'),
+			marketing: idByName(existingRows, 'Marketing emails'),
+		}
 	}
 	const privacyId = await ensurePage(payload, 'legal-pages', {
 		title: 'Privacy Policy',
@@ -78,26 +91,29 @@ const seedConsentSources = async (payload: Payload): Promise<void> => {
 		title: 'Marketing Preferences',
 		slug: 'marketing',
 	})
-	await payload.updateGlobal({
+	const updated = await payload.updateGlobal({
 		slug: 'settings',
 		data: {
 			consentSources: [
 				{
-					key: 'privacy',
-					label: 'Privacy policy',
+					name: 'Privacy policy',
 					statement: statement('I have read and agree to the privacy policy'),
 					page: { relationTo: 'legal-pages', value: privacyId as string },
 				},
 				{
-					key: 'marketing',
-					label: 'Marketing emails',
+					name: 'Marketing emails',
 					statement: statement('Send me occasional product news'),
 					page: { relationTo: 'notices', value: marketingId as string },
 				},
-			],
+			] as unknown as Setting['consentSources'],
 		},
 	})
 	payload.logger.info('Seeded consent sources: privacy, marketing')
+	const savedRows = (updated.consentSources ?? []) as unknown as SeededRow[]
+	return {
+		privacy: idByName(savedRows, 'Privacy policy'),
+		marketing: idByName(savedRows, 'Marketing emails'),
+	}
 }
 
 const ATHLETES: { name: string; discipline: string; country: string }[] = [
@@ -147,7 +163,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	await seedConsentSources(payload)
+	const consentSourceIds = await seedConsentSources(payload)
 	await seedAthletes(payload)
 
 	await ensureForm(payload, 'Demo Contact', {
@@ -169,8 +185,8 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				label: 'Please specify',
 				visibleWhen: { or: [{ and: [{ role: { equals: 'other' } }] }] },
 			},
-			{ blockType: 'consent', name: 'terms', source: 'privacy', required: true },
-			{ blockType: 'consent', name: 'news', source: 'marketing' },
+			{ blockType: 'consent', name: 'terms', source: consentSourceIds.privacy, required: true },
+			{ blockType: 'consent', name: 'news', source: consentSourceIds.marketing },
 		],
 		flow: {
 			steps: [

@@ -48,7 +48,7 @@ export const resolveConsentSourcesRequest = async (
 		return {
 			status: 200,
 			body: {
-				options: entries.map((entry) => ({ label: entry.label ?? entry.key, value: entry.key })),
+				options: entries.map((entry) => ({ label: entry.name ?? entry.id, value: entry.id })),
 			},
 		}
 	} catch {

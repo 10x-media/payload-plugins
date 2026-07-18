@@ -6,7 +6,7 @@ import type { ConsentSourceEntry, ConsentSourcePage } from './types'
 
 export type ConsentProof = {
 	agreed: boolean
-	/** The source `key` the field referenced; empty when the author never picked one. */
+	/** The source `id` the field referenced; empty when the author never picked one. */
 	source: string
 	page?: ConsentSourcePage
 	versionRef?: string
@@ -15,7 +15,7 @@ export type ConsentProof = {
 
 /**
  * The authoritative consent proof, built at submit time from the server's own view of the source
- * (the field carries a key, never a statement, so there is nothing here the client could forge).
+ * (the field carries an id, never a statement, so there is nothing here the client could forge).
  *
  * Proof is id-based on purpose: it records which document was agreed to, so renaming, re-slugging,
  * or re-routing the policy leaves every past proof intact and resolvable. The statement text is
@@ -39,7 +39,7 @@ export const captureConsent = async (args: {
 	now: string
 }): Promise<ConsentProof> => {
 	const source = typeof args.field.source === 'string' ? args.field.source : ''
-	const page = source ? args.entries.find((entry) => entry.key === source)?.page : undefined
+	const page = source ? args.entries.find((entry) => entry.id === source)?.page : undefined
 	if (!page) {
 		return { agreed: args.agreed, source, at: args.now }
 	}

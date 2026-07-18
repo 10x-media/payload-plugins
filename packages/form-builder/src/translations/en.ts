@@ -133,23 +133,14 @@ export const en: Record<TranslationKey, string> = {
 	[keys.consentConfigSourceDescription]:
 		'The statement the visitor agrees to. Its wording and policy page live with the source, so an edit there applies to every form using it.',
 	[keys.consentSourcesField]: 'Consent sources',
-	[keys.consentSourcesFieldDescription]:
-		'The statements forms can ask visitors to agree to. Each is referenced by its key, so wording can be corrected at any time without touching a form.',
+	[keys.consentSourcesFieldDescription]: 'Statements forms can utilize in consent fields',
 	[keys.consentSourceSingular]: 'Consent source',
 	[keys.consentSourcePlural]: 'Consent sources',
-	[keys.consentSourceKey]: 'Key',
-	[keys.consentSourceKeyDescription]:
-		'The stable reference forms and stored proofs point at. Changing it orphans both.',
-	[keys.consentSourceKeyDuplicate]: 'Another source already uses this key. Keys must be unique.',
 	[keys.consentSourceLabel]: 'Name',
-	[keys.consentSourceLabelDescription]:
-		"The source's name. Shown when picking it on a form, and used as the policy link text beside the statement.",
 	[keys.consentSourceStatement]: 'Statement',
-	[keys.consentSourceStatementDescription]:
-		'What the visitor reads beside the checkbox. Add links inline so they read naturally in the sentence.',
-	[keys.consentSourcePage]: 'Policy page',
+	[keys.consentSourcePage]: 'Statement source',
 	[keys.consentSourcePageDescription]:
-		'The document this statement covers. Each submission records which page, and with drafts enabled which published version of it, was agreed to.',
+		'Must be set if you want form submissions to save a reference to your policy.',
 	[keys.consentSourcesUnavailable]: 'Consent sources are unavailable. Try again shortly.',
 	[keys.resultsResponses]: 'responses',
 	[keys.resultsNoResponses]: 'No responses yet',

@@ -12,7 +12,7 @@ const payloadWith = (custom: Record<string, unknown> | undefined) =>
 
 const makeReq = () => ({ context: {} }) as unknown as PayloadRequest
 
-const entries: ConsentSourceEntry[] = [{ key: 'privacy', label: 'Privacy' }]
+const entries: ConsentSourceEntry[] = [{ id: 'privacy', name: 'Privacy' }]
 const form = { id: 'form-1', title: 'Contact' }
 
 describe('stashConsentSources / consentSourcesOf', () => {

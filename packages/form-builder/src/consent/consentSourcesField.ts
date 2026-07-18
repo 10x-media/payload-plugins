@@ -2,10 +2,9 @@ import type { ArrayField, CollectionSlug, Field, RichTextField } from 'payload'
 import { localizedIf } from '../fields/localizedIf'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
-import { validateConsentSourceKey } from './validateConsentSourceKey'
 
 export type ConsentSourcesFieldOptions = {
-	/** Field name, i.e. the key the row array is stored under. Defaults to `consentSources`. */
+	/** Field name, i.e. what the row array is stored under. Defaults to `consentSources`. */
 	name?: string
 	/** Field label. Defaults to the plugin's translated one. */
 	label?: ArrayField['label']
@@ -16,7 +15,7 @@ export type ConsentSourcesFieldOptions = {
 	 */
 	relationTo?: CollectionSlug | CollectionSlug[]
 	/**
-	 * Whether the visitor-facing `statement` and `label` carry `localized: true`. Default `true`;
+	 * Whether the visitor-facing `statement` and `name` carry `localized: true`. Default `true`;
 	 * Payload strips the flag on hosts without `localization`, so it is safe either way. Mirrors
 	 * the plugin's `localizeContent` option, which this host-called factory cannot see.
 	 */
@@ -33,10 +32,11 @@ export type ConsentSourcesFieldOptions = {
  * place this on the tenant-scoped document and have the resolver return only the sources of the
  * tenant it derives from `req`.
  *
- * A row is `key` (the stable reference a consent field stores, and the only part that must outlive
- * edits), a `label` naming the source (shown when picking it on a form, and used as the policy
- * link text beside the statement), the `statement` the visitor agrees to, and optionally the
- * `page` that statement belongs to. Authors fill in no version, no URL, and no document id by
+ * A row is a `name` (shown when picking the source on a form, and used as the policy link text
+ * beside the statement), the `statement` the visitor agrees to, and optionally the `page` that
+ * statement belongs to. The stable reference a consent field stores, and the only part that must
+ * outlive edits, is the row's own auto-assigned `id`: it survives a `name` edit or reordering,
+ * unlike a hand-authored key would. Authors fill in no version, no URL, and no document id by
  * hand: the version is detected and recorded at submit time, and the page is a picker.
  *
  * `page` is always polymorphic, even when `relationTo` names a single collection, because a
@@ -89,25 +89,15 @@ export const consentSourcesField = (options: ConsentSourcesFieldOptions = {}): A
 		admin: { description: labelForKey(keys.consentSourcesFieldDescription) },
 		fields: [
 			{
-				name: 'key',
-				type: 'text',
-				required: true,
-				label: labelForKey(keys.consentSourceKey),
-				admin: { description: labelForKey(keys.consentSourceKeyDescription) },
-				validate: validateConsentSourceKey,
-			},
-			{
-				name: 'label',
+				name: 'name',
 				type: 'text',
 				label: labelForKey(keys.consentSourceLabel),
-				admin: { description: labelForKey(keys.consentSourceLabelDescription) },
 				...localizedIf(localize),
 			},
 			{
 				name: 'statement',
 				type: 'richText',
 				label: labelForKey(keys.consentSourceStatement),
-				admin: { description: labelForKey(keys.consentSourceStatementDescription) },
 				...(options.editor ? { editor: options.editor } : {}),
 				...localizedIf(localize),
 			},

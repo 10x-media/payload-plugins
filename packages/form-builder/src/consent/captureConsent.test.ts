@@ -23,14 +23,14 @@ const field = (source?: string): FormFieldInstance =>
 	({ blockType: 'consent', name: 'terms', ...(source ? { source } : {}) }) as FormFieldInstance
 
 const privacy: ConsentSourceEntry = {
-	key: 'privacy',
-	label: 'Privacy',
+	id: 'privacy',
+	name: 'Privacy',
 	page: { relationTo: 'pages', id: 'page-1' },
 }
 const entries: ConsentSourceEntry[] = [
 	privacy,
-	{ key: 'notice', label: 'Notice', page: { relationTo: 'notices', id: 7 } },
-	{ key: 'marketing', label: 'Marketing' },
+	{ id: 'notice', name: 'Notice', page: { relationTo: 'notices', id: 7 } },
+	{ id: 'marketing', name: 'Marketing' },
 ]
 
 describe('captureConsent', () => {
@@ -144,7 +144,7 @@ describe('captureConsent', () => {
 		expect(proof).toEqual({ agreed: true, source: '', at: NOW })
 	})
 
-	it('records the key alone when the host no longer carries that source', async () => {
+	it('records the id alone when the host no longer carries that source', async () => {
 		const proof = await captureConsent({
 			field: field('deleted'),
 			agreed: true,

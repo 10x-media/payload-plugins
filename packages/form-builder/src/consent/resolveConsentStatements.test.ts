@@ -11,21 +11,21 @@ const statement = (text: string) => ({
 })
 
 const privacy: ConsentSourceEntry = {
-	key: 'privacy',
-	label: 'Privacy policy',
+	id: 'privacy-id',
+	name: 'Privacy policy',
 	statement: statement('I agree to the privacy policy'),
 	page: { relationTo: 'pages', id: 'page-1' },
 	url: 'https://example.com/privacy',
 }
-const marketing: ConsentSourceEntry = { key: 'marketing', statement: statement('Send me email') }
+const marketing: ConsentSourceEntry = { id: 'marketing-id', statement: statement('Send me email') }
 const entries: ConsentSourceEntry[] = [privacy, marketing]
 
 const form = {
 	id: 'form-1',
 	fields: [
 		{ blockType: 'text', name: 'email' },
-		{ blockType: 'consent', name: 'terms', source: 'privacy' },
-		{ blockType: 'consent', name: 'news', source: 'marketing' },
+		{ blockType: 'consent', name: 'terms', source: 'privacy-id' },
+		{ blockType: 'consent', name: 'news', source: 'marketing-id' },
 	],
 }
 
@@ -41,16 +41,16 @@ describe('resolveConsentStatements', () => {
 		})
 	})
 
-	it('adds no link for a source with a url but no label, never showing the raw key to a visitor', async () => {
-		const sources = vi.fn().mockResolvedValue([{ key: 'privacy', url: 'https://x.test/p' }])
+	it('adds no link for a source with a url but no name, never showing the raw id to a visitor', async () => {
+		const sources = vi.fn().mockResolvedValue([{ id: 'privacy-id', url: 'https://x.test/p' }])
 		const result = await resolveConsentStatements({ payload, req: makeReq(), form, sources })
 		expect(result.terms).toEqual({})
 	})
 
-	it('adds no link for a source with a blank label', async () => {
+	it('adds no link for a source with a blank name', async () => {
 		const sources = vi
 			.fn()
-			.mockResolvedValue([{ key: 'privacy', label: '   ', url: 'https://x.test/p' }])
+			.mockResolvedValue([{ id: 'privacy-id', name: '   ', url: 'https://x.test/p' }])
 		const result = await resolveConsentStatements({ payload, req: makeReq(), form, sources })
 		expect(result.terms).toEqual({})
 	})
@@ -58,7 +58,7 @@ describe('resolveConsentStatements', () => {
 	it('adds no link for a source with no url, since only the host knows its routes', async () => {
 		const sources = vi
 			.fn()
-			.mockResolvedValue([{ key: 'privacy', page: { relationTo: 'pages', id: 'page-1' } }])
+			.mockResolvedValue([{ id: 'privacy-id', page: { relationTo: 'pages', id: 'page-1' } }])
 		const result = await resolveConsentStatements({ payload, req: makeReq(), form, sources })
 		expect(result.terms).toEqual({})
 	})
@@ -70,7 +70,7 @@ describe('resolveConsentStatements', () => {
 	})
 
 	it('passes through whatever the request locale resolved, without re-reading it', async () => {
-		const de: ConsentSourceEntry = { key: 'privacy', statement: statement('Ich stimme zu') }
+		const de: ConsentSourceEntry = { id: 'privacy-id', statement: statement('Ich stimme zu') }
 		const sources = vi.fn().mockResolvedValue([de])
 		const result = await resolveConsentStatements({ payload, req: makeReq(), form, sources })
 		expect(result.terms?.statement).toBe(de.statement)
@@ -99,12 +99,12 @@ describe('resolveConsentStatements', () => {
 		).toEqual({})
 	})
 
-	it('skips a nameless consent row, which has no key to inject under', async () => {
+	it('skips a nameless consent row, since there is no field name to store its statement under', async () => {
 		const sources = vi.fn().mockResolvedValue(entries)
 		const result = await resolveConsentStatements({
 			payload,
 			req: makeReq(),
-			form: { id: 'f', fields: [{ blockType: 'consent', source: 'privacy' }] },
+			form: { id: 'f', fields: [{ blockType: 'consent', source: 'privacy-id' }] },
 			sources,
 		})
 		expect(result).toEqual({})

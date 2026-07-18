@@ -4,8 +4,8 @@ import { resolveConsentSourcesRequest } from './resolveConsentSourcesRequest'
 import type { ConsentSourceEntry } from './types'
 
 const entries: ConsentSourceEntry[] = [
-	{ key: 'privacy', label: 'Privacy policy' },
-	{ key: 'marketing' },
+	{ id: 'privacy-id', name: 'Privacy policy' },
+	{ id: 'marketing-id' },
 ]
 
 const makeReq = () => ({ context: {} }) as unknown as PayloadRequest
@@ -28,8 +28,8 @@ describe('resolveConsentSourcesRequest', () => {
 			status: 200,
 			body: {
 				options: [
-					{ label: 'Privacy policy', value: 'privacy' },
-					{ label: 'marketing', value: 'marketing' },
+					{ label: 'Privacy policy', value: 'privacy-id' },
+					{ label: 'marketing-id', value: 'marketing-id' },
 				],
 			},
 		})

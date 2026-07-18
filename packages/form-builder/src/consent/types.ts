@@ -7,21 +7,21 @@ export type ConsentSourcePage = {
 }
 
 /**
- * One consent source a form author can reference by `key`: the statement the visitor agrees to, and
+ * One consent source a form author can reference by `id`: the statement the visitor agrees to, and
  * optionally the policy document that statement belongs to. Produced by the host's
  * {@link ConsentSourcesResolver}, normally by mapping the rows of a placed `consentSourcesField()`.
  *
- * `key` is the stable reference stored on the consent field and in every proof, so it must outlive
- * edits to everything else here. `statement` is rich text state (the visitor-facing sentence),
- * already resolved for the request's locale by virtue of the resolver reading its own localized
- * field under `req.locale`. `page` drives proof: an id and its collection, never a URL, so the
- * document can be renamed, re-slugged, or re-routed without stranding past proofs. `url` is the
- * visitor-facing link the renderer shows beside the statement; only the host knows how a document
- * id maps to a public route, so the plugin never derives one.
+ * `id` is the array row's own auto-assigned identifier, so it survives name edits and reordering
+ * and is the stable reference stored on the consent field and in every proof. `statement` is rich
+ * text state (the visitor-facing sentence), already resolved for the request's locale by virtue of
+ * the resolver reading its own localized field under `req.locale`. `page` drives proof: an id and
+ * its collection, never a URL, so the document can be renamed, re-slugged, or re-routed without
+ * stranding past proofs. `url` is the visitor-facing link the renderer shows beside the statement;
+ * only the host knows how a document id maps to a public route, so the plugin never derives one.
  */
 export type ConsentSourceEntry = {
-	key: string
-	label?: string
+	id: string
+	name?: string
 	statement?: unknown
 	page?: ConsentSourcePage
 	url?: string

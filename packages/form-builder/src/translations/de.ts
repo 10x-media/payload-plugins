@@ -136,23 +136,14 @@ export const de: Record<TranslationKey, string> = {
 		'Die Erklärung, der Besucher zustimmen. Wortlaut und Rechtsseite gehören zur Quelle: eine Änderung dort gilt für jedes Formular, das sie nutzt.',
 	[keys.consentSourcesField]: 'Einwilligungsquellen',
 	[keys.consentSourcesFieldDescription]:
-		'Die Erklärungen, denen Besucher in Formularen zustimmen können. Formulare verweisen nur auf den Schlüssel, der Wortlaut lässt sich also jederzeit korrigieren, ohne ein Formular anzufassen.',
+		'Erklärungen, die Formulare in Einwilligungsfeldern verwenden können',
 	[keys.consentSourceSingular]: 'Einwilligungsquelle',
 	[keys.consentSourcePlural]: 'Einwilligungsquellen',
-	[keys.consentSourceKey]: 'Schlüssel',
-	[keys.consentSourceKeyDescription]:
-		'Die feste Referenz, auf die Formulare und gespeicherte Nachweise zeigen. Wird er geändert, laufen beide ins Leere.',
-	[keys.consentSourceKeyDuplicate]:
-		'Eine andere Quelle nutzt diesen Schlüssel bereits. Schlüssel müssen eindeutig sein.',
 	[keys.consentSourceLabel]: 'Name',
-	[keys.consentSourceLabelDescription]:
-		'Der Name der Quelle. Wird bei der Auswahl im Formular gezeigt und als Text des Rechtslinks neben der Erklärung verwendet.',
 	[keys.consentSourceStatement]: 'Erklärung',
-	[keys.consentSourceStatementDescription]:
-		'Was der Besucher neben dem Kontrollkästchen liest. Links lassen sich direkt in den Satz einfügen.',
-	[keys.consentSourcePage]: 'Rechtsseite',
+	[keys.consentSourcePage]: 'Erklärungsquelle',
 	[keys.consentSourcePageDescription]:
-		'Das Dokument, für das diese Erklärung gilt. Jede Einsendung hält fest, welcher Seite zugestimmt wurde, bei aktivierten Entwürfen zusätzlich welcher veröffentlichten Version.',
+		'Muss gesetzt sein, wenn Formulareinsendungen einen Verweis auf deine Richtlinie speichern sollen.',
 	[keys.consentSourcesUnavailable]:
 		'Einwilligungsquellen sind nicht verfügbar. Versuche es gleich noch einmal.',
 	[keys.resultsResponses]: 'Antworten',
