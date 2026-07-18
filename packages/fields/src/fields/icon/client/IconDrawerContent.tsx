@@ -237,8 +237,14 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 
 	return (
 		<div className="tenx-icon-drawer">
-			{Assets && !manifest ? <Assets key={activeLibrary} onReady={handleManifest} /> : null}
-			{NodesLoader && !nodeMap ? <NodesLoader key={activeLibrary} onReady={handleNodes} /> : null}
+			{/* Sibling loaders keyed distinctly per library: a shared key collides ("two children
+			    with the same key") when both mount on open, while distinct keys keep the per-library remount. */}
+			{Assets && !manifest ? (
+				<Assets key={`assets-${activeLibrary}`} onReady={handleManifest} />
+			) : null}
+			{NodesLoader && !nodeMap ? (
+				<NodesLoader key={`nodes-${activeLibrary}`} onReady={handleNodes} />
+			) : null}
 			{selectedUnavailable ? (
 				<div className="tenx-icon-drawer__banner" role="status">
 					{t(keys.libraryUnavailable)}
