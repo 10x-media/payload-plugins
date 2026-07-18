@@ -1,7 +1,6 @@
 'use client'
 
 import {
-	Button,
 	Drawer,
 	FieldDescription,
 	FieldError,
@@ -12,6 +11,7 @@ import {
 	useEditDepth,
 	useField,
 	useModal,
+	XIcon,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { TextFieldClientProps } from 'payload'
@@ -19,10 +19,30 @@ import React, { Suspense, useCallback, useMemo, useState } from 'react'
 import { keys } from '../../../translations'
 import { useTranslation } from '../../../translations/useTranslation'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
+import { formatIconLabel } from '../shared/formatIconLabel'
 import { formatIconValue, resolveIconValue } from '../shared/value'
+import { filterAvailableLibraries, pickInitialLibrary } from './availableLibraries'
 import './icon-field.css'
 
 const IconDrawerContent = React.lazy(() => import('./IconDrawerContent'))
+
+/** Muted grid glyph shown in the square when the field has no value: a picker affordance, not a value. */
+const PlaceholderGlyph: React.FC = () => (
+	<svg aria-hidden="true" fill="currentColor" height={20} viewBox="0 0 20 20" width={20}>
+		<rect height="6" rx="1.5" width="6" x="3" y="3" />
+		<rect height="6" rx="1.5" width="6" x="11" y="3" />
+		<rect height="6" rx="1.5" width="6" x="3" y="11" />
+		<rect height="6" rx="1.5" width="6" x="11" y="11" />
+	</svg>
+)
+
+const WarningIcon: React.FC = () => (
+	<svg aria-hidden="true" fill="none" height={16} viewBox="0 0 16 16" width={16}>
+		<path d="M8 1.75 15 14H1z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.4" />
+		<path d="M8 6.25v3.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.4" />
+		<circle cx="8" cy="11.75" fill="currentColor" r="0.85" />
+	</svg>
+)
 
 export type IconFieldClientExtraProps = {
 	adapterComponents: Record<string, AdapterComponentsEntry>
@@ -71,19 +91,20 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 		resolved !== null &&
 		(!registeredSlugs.has(resolved.library) || !available.includes(resolved.library))
 	const previewEntry = resolved ? adapterComponents[resolved.library] : undefined
-
-	const initialLibrary =
-		resolved && available.includes(resolved.library)
-			? resolved.library
-			: available.includes(defaultLibrary)
-				? defaultLibrary
-				: (available[0] ?? defaultLibrary)
-	const [activeLibrary, setActiveLibrary] = useState(initialLibrary)
+	const hasGlyph = Boolean(resolved && previewEntry)
+	const displayLabel = resolved ? formatIconLabel(resolved.name) : ''
 
 	const availableAdapters = useMemo(
-		() => adapters.filter((adapter) => available.includes(adapter.slug)),
+		() => filterAvailableLibraries(adapters, available),
 		[adapters, available]
 	)
+	const [activeLibrary, setActiveLibrary] = useState(() =>
+		pickInitialLibrary({ available, defaultLibrary, selectedLibrary: resolved?.library ?? null })
+	)
+
+	// Text-input mode shows the raw `library:name` while focused for editing and the
+	// formatted label otherwise, so the editor never has to read a colon-prefixed value.
+	const [editing, setEditing] = useState(false)
 
 	const handleSelect = useCallback(
 		(library: string, name: string) => {
@@ -92,6 +113,15 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 		},
 		[closeModal, drawerSlug, setValue]
 	)
+
+	const triggerDisabled = isDisabled || availableAdapters.length === 0
+	const glyphClass = `tenx-icon-field__glyph${hasGlyph ? '' : ' tenx-icon-field__glyph--empty'}`
+	const glyph =
+		resolved && previewEntry ? (
+			<previewEntry.Icon name={resolved.name} size={20} />
+		) : (
+			<PlaceholderGlyph />
+		)
 
 	const wrapperClasses = [
 		fieldBaseClass,
@@ -102,6 +132,8 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 	]
 		.filter(Boolean)
 		.join(' ')
+
+	const controlClasses = `tenx-icon-field__control${isUnavailable ? ' tenx-icon-field__control--warning' : ''}`
 
 	return (
 		<div className={wrapperClasses} id={`field-${path.replace(/\./g, '__')}`} style={styles}>
@@ -116,63 +148,85 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 					/>
 				}
 			/>
-			<div className="field-type__wrap">
-				{BeforeInput}
-				<div className="tenx-icon-field__row">
-					<button
-						aria-expanded={isModalOpen(drawerSlug)}
-						aria-haspopup="dialog"
-						className="tenx-icon-field__trigger"
-						disabled={isDisabled || availableAdapters.length === 0}
-						onClick={() => openModal(drawerSlug)}
-						type="button"
-					>
-						{resolved ? (
-							<>
-								<span className="tenx-icon-field__preview">
-									{previewEntry ? <previewEntry.Icon name={resolved.name} size={20} /> : null}
-								</span>
-								<span className="tenx-icon-field__name">{value}</span>
-							</>
-						) : (
-							<span className="tenx-icon-field__placeholder">{t(keys.selectIcon)}</span>
-						)}
-					</button>
-					{isUnavailable ? (
-						<span className="tenx-icon-field__hint">{t(keys.libraryUnavailable)}</span>
-					) : null}
-					{value && !field.required && !isDisabled ? (
-						<Button
-							aria-label={t(keys.clearIcon)}
-							buttonStyle="icon-label"
-							icon="x"
-							iconStyle="with-border"
-							margin={false}
-							onClick={() => setValue(null)}
-						/>
-					) : null}
-					{showTextInput ? (
-						<input
-							aria-label={t(keys.fieldIconLabel)}
-							className="tenx-icon-field__text-input"
-							disabled={isDisabled}
-							onChange={(event) => setValue(event.target.value)}
-							placeholder={t(keys.textInputPlaceholder)}
-							type="text"
-							value={value ?? ''}
-						/>
-					) : null}
-				</div>
-				{AfterInput}
+			<div className={`${fieldBaseClass}__wrap`}>
 				<RenderCustomComponent
 					CustomComponent={ErrorComponent}
 					Fallback={<FieldError path={path} showError={showError} />}
 				/>
+				{BeforeInput}
+				<div className={controlClasses}>
+					{showTextInput ? (
+						<>
+							<button
+								aria-expanded={isModalOpen(drawerSlug)}
+								aria-haspopup="dialog"
+								aria-label={t(keys.selectIcon)}
+								className={glyphClass}
+								disabled={triggerDisabled}
+								onClick={() => openModal(drawerSlug)}
+								type="button"
+							>
+								{glyph}
+							</button>
+							<input
+								aria-label={t(keys.fieldIconLabel)}
+								className="tenx-icon-field__value tenx-icon-field__value--input"
+								onBlur={() => setEditing(false)}
+								onChange={(event) => setValue(event.target.value || null)}
+								onFocus={() => setEditing(true)}
+								placeholder={t(keys.textInputPlaceholder)}
+								readOnly={isDisabled}
+								type="text"
+								value={editing ? (value ?? '') : displayLabel}
+							/>
+						</>
+					) : (
+						<button
+							aria-expanded={isModalOpen(drawerSlug)}
+							aria-haspopup="dialog"
+							className="tenx-icon-field__open"
+							disabled={triggerDisabled}
+							onClick={() => openModal(drawerSlug)}
+							type="button"
+						>
+							<span aria-hidden="true" className={glyphClass}>
+								{glyph}
+							</span>
+							<span className="tenx-icon-field__value">
+								{resolved ? (
+									displayLabel
+								) : (
+									<span className="tenx-icon-field__placeholder">{t(keys.selectIcon)}</span>
+								)}
+							</span>
+						</button>
+					)}
+					{isUnavailable ? (
+						<span className="tenx-icon-field__marker" title={t(keys.iconUnavailable)}>
+							<WarningIcon />
+							<span className="tenx-icon-field__sr-only">{t(keys.iconUnavailable)}</span>
+						</span>
+					) : null}
+					{value && !field.required && !isDisabled ? (
+						<button
+							aria-label={t(keys.clearIcon)}
+							className="tenx-icon-field__clear"
+							onClick={() => {
+								setValue(null)
+								setEditing(false)
+							}}
+							type="button"
+						>
+							<XIcon />
+						</button>
+					) : null}
+				</div>
+				{AfterInput}
+				<RenderCustomComponent
+					CustomComponent={Description}
+					Fallback={<FieldDescription description={field.admin?.description} path={path} />}
+				/>
 			</div>
-			<RenderCustomComponent
-				CustomComponent={Description}
-				Fallback={<FieldDescription description={field.admin?.description} path={path} />}
-			/>
 			<Drawer className="tenx-icon-drawer-modal" slug={drawerSlug} title={t(keys.selectIcon)}>
 				<Suspense fallback={<div className="tenx-icon-drawer__loading" />}>
 					<IconDrawerContent

@@ -23,6 +23,7 @@ export const keys = {
 	iconCategories: 'fields:iconCategories',
 	iconGrid: 'fields:iconGrid',
 	libraryUnavailable: 'fields:libraryUnavailable',
+	iconUnavailable: 'fields:iconUnavailable',
 	missingPreset: 'fields:missingPreset',
 	preset: 'fields:preset',
 	missingPresetHint: 'fields:missingPresetHint',

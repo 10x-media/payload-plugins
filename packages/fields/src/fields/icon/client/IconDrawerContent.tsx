@@ -7,17 +7,21 @@ import { keys } from '../../../translations'
 import { useTranslation } from '../../../translations/useTranslation'
 import type { IconManifest, IconMeta } from '../../../types'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
+import { formatIconLabel } from '../shared/formatIconLabel'
 import { buildIconSearchIndex, searchIcons } from '../shared/search'
 import { useRecentIcons } from './useRecentIcons'
 
-const CELL_WIDTH = 96
-const ROW_HEIGHT = 88
+// One fixed size drives both the column count and the virtualizer row height. With no
+// in-flow label to vary a cell's height, every cell is an identical square and the grid
+// stays aligned regardless of icon name length.
+const CELL_SIZE = 64
 const RECENT = '__recent__'
 const ALL = '__all__'
 
 export type IconDrawerContentProps = {
 	activeLibrary: string
 	adapterComponents: Record<string, AdapterComponentsEntry>
+	/** Libraries available for selection: registered adapters already intersected with `available`. */
 	adapters: { label: string; slug: string }[]
 	onLibraryChange: (slug: string) => void
 	onSelect: (library: string, name: string) => void
@@ -38,39 +42,34 @@ type CellProps = {
 const IconGridCell: React.FC<CellProps> = React.memo(
 	({ entry, focused, icon, index, isSelected, onSelect, registerRef }) => {
 		const [showTooltip, setShowTooltip] = useState(false)
-		const labelRef = useRef<HTMLSpanElement>(null)
-		const revealIfTruncated = () => {
-			const label = labelRef.current
-			setShowTooltip(label != null && label.scrollWidth > label.clientWidth)
-		}
-		const hideTooltip = () => setShowTooltip(false)
+		// The name is not rendered in-flow (that variance broke grid alignment); it lives on
+		// the accessible name and a hover/focus tooltip, sentence-cased for readability.
+		const label = formatIconLabel(icon.name)
 		return (
 			<div className="tenx-icon-drawer__cell" role="presentation">
 				<button
+					aria-label={label}
 					aria-selected={isSelected}
 					className={
 						isSelected
 							? 'tenx-icon-drawer__cell-button tenx-icon-drawer__cell-button--selected'
 							: 'tenx-icon-drawer__cell-button'
 					}
-					onBlur={hideTooltip}
+					onBlur={() => setShowTooltip(false)}
 					onClick={() => onSelect(icon.name)}
-					onFocus={revealIfTruncated}
-					onMouseEnter={revealIfTruncated}
-					onMouseLeave={hideTooltip}
+					onFocus={() => setShowTooltip(true)}
+					onMouseEnter={() => setShowTooltip(true)}
+					onMouseLeave={() => setShowTooltip(false)}
 					ref={(element) => registerRef(index, element)}
 					role="option"
 					tabIndex={focused ? 0 : -1}
 					type="button"
 				>
 					<Tooltip show={showTooltip} staticPositioning>
-						{icon.name}
+						{label}
 					</Tooltip>
 					<span className="tenx-icon-drawer__glyph">
 						{entry ? <entry.Icon name={icon.name} size={24} /> : null}
-					</span>
-					<span className="tenx-icon-drawer__cell-label" ref={labelRef}>
-						{icon.name}
 					</span>
 				</button>
 			</div>
@@ -141,12 +140,12 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 		setGridWidth(element.offsetWidth)
 		return () => observer.disconnect()
 	}, [])
-	const columns = Math.max(3, Math.floor(gridWidth / CELL_WIDTH))
+	const columns = Math.max(3, Math.floor(gridWidth / CELL_SIZE))
 	const rowCount = Math.ceil(visible.length / columns)
 
 	const virtualizer = useVirtualizer({
 		count: rowCount,
-		estimateSize: () => ROW_HEIGHT,
+		estimateSize: () => CELL_SIZE,
 		getScrollElement: () => gridRef.current,
 		overscan: 4,
 	})
@@ -204,9 +203,19 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 		[manifest, t]
 	)
 
+	// The stored value points at a library that is no longer offered for selection; the
+	// full explanation lives here, the trigger only carries a compact marker.
+	const selectedUnavailable =
+		selected !== null && !adapters.some((adapter) => adapter.slug === selected.library)
+
 	return (
 		<div className="tenx-icon-drawer">
 			{Assets && !manifest ? <Assets key={activeLibrary} onReady={handleManifest} /> : null}
+			{selectedUnavailable ? (
+				<div className="tenx-icon-drawer__banner" role="status">
+					{t(keys.libraryUnavailable)}
+				</div>
+			) : null}
 			<div className="tenx-icon-drawer__header">
 				<TextInput
 					className="tenx-icon-drawer__search"
@@ -215,6 +224,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 					placeholder={t(keys.searchIcons)}
 					value={query}
 				/>
+				{/* adapters is the available-filtered set, so this shows only with 2+ available libraries */}
 				{adapters.length > 1 ? (
 					<div className="tenx-icon-drawer__switcher">
 						<SelectInput
