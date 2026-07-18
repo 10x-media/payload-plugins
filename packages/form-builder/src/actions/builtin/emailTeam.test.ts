@@ -176,4 +176,30 @@ describe('emailTeam', () => {
 		expect(component?.path).toBe('@10x-media/form-builder/client#EndpointOptionsSelect')
 		expect(component?.clientProps?.endpoint).toBe('from-addresses')
 	})
+
+	const toFieldOf = (definition: ReturnType<typeof buildEmailTeam>) =>
+		definition.config?.find((field) => 'name' in field && field.name === 'to')
+
+	it('keeps to a plain, localized text field when no departments resolver is given', () => {
+		const field = toFieldOf(buildEmailTeam(true))
+		expect(field?.type).toBe('text')
+		expect((field as { localized?: boolean })?.localized).toBe(true)
+		expect((field as { admin?: { components?: unknown } })?.admin?.components).toBeUndefined()
+	})
+
+	it('drops the localized flag on to when localize is false', () => {
+		const field = toFieldOf(buildEmailTeam(false))
+		expect((field as { localized?: boolean })?.localized).toBeUndefined()
+	})
+
+	it('turns to into a departments select when a resolver is given', () => {
+		const field = toFieldOf(buildEmailTeam(true, undefined, undefined, () => []))
+		expect(field?.type).toBe('text')
+		expect((field as { localized?: boolean })?.localized).toBe(true)
+		expect(typeof (field as { validate?: unknown })?.validate).toBe('function')
+		const component = (field as { admin?: { components?: { Field?: unknown } } })?.admin?.components
+			?.Field as { path?: string; clientProps?: { endpoint?: string } } | undefined
+		expect(component?.path).toBe('@10x-media/form-builder/client#EndpointOptionsSelect')
+		expect(component?.clientProps?.endpoint).toBe('departments')
+	})
 })

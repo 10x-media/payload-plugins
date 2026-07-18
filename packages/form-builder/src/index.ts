@@ -8,6 +8,7 @@ import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
 import type { ButtonsOption } from './collections/buttonFields'
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import type { ConsentSourcesResolver } from './consent/types'
+import type { DepartmentEmailsResolver } from './email/departments'
 import type { FormEventSink } from './events/types'
 import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes, stashFieldTypes } from './fields/registry'
@@ -78,7 +79,18 @@ export type FormBuilderPluginOptions = {
 	 * choice is validated against the resolver at save time only; it is not re-checked when the
 	 * action actually sends (the config is admin-authored, not visitor-controlled).
 	 */
-	email?: { fromAddresses?: FromAddressesResolver }
+	/**
+	 * `departments`, when set, turns the `emailTeam` action's `to` into a select whose options come
+	 * from the resolver, evaluated per request via a `req`-scoped `/:id/departments` endpoint. The
+	 * intended use: place `departmentsField()` on a document you own and read it back here with
+	 * `resolveDepartmentOptions`, which resolves each department's address for the requesting locale.
+	 * Because `to` is localized, each admin locale stores its own resolved address, so a submission's
+	 * locale selects the address it routes to (Payload-native, no per-send lookup). Multi-tenant hosts
+	 * scope which document they read by the tenant derived from `req`. Absent, `to` stays a plain
+	 * localized text field. Validated against the resolver at save time only; the config is
+	 * admin-authored, not visitor-controlled.
+	 */
+	email?: { fromAddresses?: FromAddressesResolver; departments?: DepartmentEmailsResolver }
 	/**
 	 * Where the consent statements a form can reference come from. Absent (the default): no sources,
 	 * so the built-in `consent` field type is not registered at all and authors cannot add a consent
@@ -197,11 +209,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
 		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
 		const fromAddresses = options.email?.fromAddresses
+		const departments = options.email?.departments
 		const actionRegistry = resolveActions(
 			buildDefaultActionDefinitions(
 				localizeContent,
 				options.richText?.bodyEditor ?? options.richText?.editor,
-				fromAddresses
+				fromAddresses,
+				departments
 			),
 			options.actions
 		)
@@ -240,6 +254,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			outcomeFields: options.poll?.outcomeFields,
 			buttons: options.buttons,
 			fromAddresses,
+			departments,
 			overrides: options.overrides,
 		})
 		return config
@@ -336,6 +351,14 @@ export type {
 	ConsentSourcePage,
 	ConsentSourcesResolver,
 } from './consent/types'
+export type {
+	DepartmentEmailsResolver,
+	DepartmentOption,
+	ResolveDepartmentOptionsArgs,
+	ResolveDepartmentsRequestArgs,
+	ResolveDepartmentsRequestResult,
+} from './email/departments'
+export { resolveDepartmentOptions } from './email/departments'
 export type { DepartmentsFieldOptions } from './email/departmentsField'
 export { departmentsField } from './email/departmentsField'
 export {

@@ -80,15 +80,20 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 		expect(isLocalized(namedField(fields, 'maxRows'))).toBe(false)
 	})
 
-	it('localizes action subjects and bodies but not addresses or secrets', () => {
+	it('localizes action subjects, bodies, and the team "to" but not identifiers or secrets', () => {
 		const fields = formsFields(booted)
 		for (const slug of ['emailTeam', 'confirmation']) {
 			const block = blockOf(fields, 'actions', slug)
 			expect(isLocalized(namedField(block?.fields ?? [], 'subject'))).toBe(true)
 			expect(isLocalized(namedField(block?.fields ?? [], 'body'))).toBe(true)
 		}
+		// The team `to` is a routing target: localized so each locale keeps its own address and a
+		// submission's locale selects the address it routes to. The confirmation `toField` names a
+		// form field (an identifier), so it stays non-localized, as do webhook addresses and secrets.
 		const emailTeamBlock = blockOf(fields, 'actions', 'emailTeam')
-		expect(isLocalized(namedField(emailTeamBlock?.fields ?? [], 'to'))).toBe(false)
+		expect(isLocalized(namedField(emailTeamBlock?.fields ?? [], 'to'))).toBe(true)
+		const confirmationBlock = blockOf(fields, 'actions', 'confirmation')
+		expect(isLocalized(namedField(confirmationBlock?.fields ?? [], 'toField'))).toBe(false)
 		const webhookBlock = blockOf(fields, 'actions', 'signedWebhook')
 		expect(isLocalized(namedField(webhookBlock?.fields ?? [], 'url'))).toBe(false)
 	})

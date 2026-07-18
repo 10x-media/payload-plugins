@@ -20,6 +20,7 @@ import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
 import { resolveConsentSourcesRequest } from '../consent/resolveConsentSourcesRequest'
 import type { ConsentSourcesResolver } from '../consent/types'
+import { type DepartmentEmailsResolver, resolveDepartmentsRequest } from '../email/departments'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
 import { localizedIf } from '../fields/localizedIf'
 import type { FieldTypeRegistry } from '../fields/registry'
@@ -137,6 +138,11 @@ type BuildFormsCollectionArgs = {
 	 * the `/:id/from-addresses` endpoint is registered. Absent: neither exists.
 	 */
 	fromAddresses?: FromAddressesResolver
+	/**
+	 * The plugin `email.departments` option. Present: the `emailTeam` `to` becomes a department select
+	 * and the `/:id/departments` endpoint backing it is registered. Absent: `to` stays a plain field.
+	 */
+	departments?: DepartmentEmailsResolver
 	overrides?: CollectionOverrides
 }
 
@@ -155,6 +161,7 @@ export const buildFormsCollection = ({
 	outcomeFields,
 	buttons,
 	fromAddresses,
+	departments,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const pollTypes = pollTypeRegistry ?? resolvePollTypes()
@@ -587,6 +594,24 @@ export const buildFormsCollection = ({
 								isAuthed: Boolean(req.user),
 								req,
 								resolver: fromAddresses,
+							})
+							return Response.json(body, { status })
+						},
+					},
+				]
+			: []),
+		// Same request-scoped, id-unused shape as from-addresses: registered doc-scoped only so the
+		// admin `to` select can reuse EndpointOptionsSelect unmodified (see buildToField).
+		...(departments
+			? [
+					{
+						path: '/:id/departments',
+						method: 'get' as const,
+						handler: async (req: PayloadRequest) => {
+							const { status, body } = await resolveDepartmentsRequest({
+								isAuthed: Boolean(req.user),
+								req,
+								resolver: departments,
 							})
 							return Response.json(body, { status })
 						},

@@ -8,6 +8,7 @@ import type { ButtonsOption } from '../collections/buttonFields'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
 import type { ConsentSourcesResolver } from '../consent/types'
+import type { DepartmentEmailsResolver } from '../email/departments'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { registerPollCloseTask } from '../poll/closeJob'
@@ -39,6 +40,7 @@ type RegisterCollectionsArgs = {
 	outcomeFields?: OutcomeFieldsOverride
 	buttons?: ButtonsOption
 	fromAddresses?: FromAddressesResolver
+	departments?: DepartmentEmailsResolver
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
@@ -65,6 +67,7 @@ export const registerCollections = ({
 	outcomeFields,
 	buttons,
 	fromAddresses,
+	departments,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
@@ -111,6 +114,7 @@ export const registerCollections = ({
 			outcomeFields,
 			buttons,
 			fromAddresses,
+			departments,
 			overrides: overrides?.forms,
 		}),
 	]

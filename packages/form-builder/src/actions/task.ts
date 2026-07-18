@@ -36,18 +36,6 @@ export const runActionsForSubmission = async (args: {
 	richText?: RichTextBodyOption
 }): Promise<void> => {
 	const { input, registry, payload, req, richText } = args
-	const form = await payload
-		.findByID({
-			collection: FORMS_SLUG,
-			id: input.formId,
-			depth: 0,
-			overrideAccess: true,
-			req,
-		})
-		.catch(() => null)
-	if (!form) {
-		return
-	}
 	const submission = await payload
 		.findByID({
 			collection: FORM_SUBMISSIONS_SLUG,
@@ -61,7 +49,26 @@ export const runActionsForSubmission = async (args: {
 		return
 	}
 
+	// The submission's own stored locale (set from req.locale at submit) is authoritative, so the form
+	// is loaded at it. A localized action config, notably the emailTeam `to`, then resolves to the
+	// submission's locale even on the queued path, where the job runner's req may carry a different
+	// (or no) locale than the visitor who submitted.
 	const locale = typeof submission.locale === 'string' ? submission.locale : (req?.locale ?? 'en')
+
+	const form = await payload
+		.findByID({
+			collection: FORMS_SLUG,
+			id: input.formId,
+			depth: 0,
+			overrideAccess: true,
+			locale,
+			req,
+		})
+		.catch(() => null)
+	if (!form) {
+		return
+	}
+
 	const t: Translate = asFieldTranslate(req?.i18n?.t ?? ((key: string) => key))
 
 	await runActions({

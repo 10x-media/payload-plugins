@@ -109,6 +109,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.actionConfirmation]: 'Bestätigungs-E-Mail',
 	[keys.actionSignedWebhook]: 'Signierter Webhook',
 	[keys.actionConfigTo]: 'An',
+	[keys.actionConfigToDescription]:
+		'Die Abteilung, an die diese Einsendung geleitet wird. Jede Sprache behält ihre eigene Adresse.',
 	[keys.actionConfigSubject]: 'Betreff',
 	[keys.actionConfigBody]: 'Nachrichtentext',
 	[keys.actionConfigBodyDescription]:
@@ -122,6 +124,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.validationFromUnknown]: 'Wähle eine der konfigurierten Absenderadressen',
 	[keys.validationFromUnavailable]:
 		'Absenderadressen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
+	[keys.validationToUnknown]: 'Wähle eine der konfigurierten Abteilungen',
+	[keys.validationToUnavailable]:
+		'Abteilungen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigUrlDescription]:
 		'Der Endpunkt, der für jede Übermittlung einen signierten JSON-POST erhält.',

@@ -107,6 +107,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfirmation]: 'Confirmation email',
 	[keys.actionSignedWebhook]: 'Signed webhook',
 	[keys.actionConfigTo]: 'To',
+	[keys.actionConfigToDescription]:
+		'The department this submission is routed to. Each locale keeps its own address.',
 	[keys.actionConfigSubject]: 'Subject',
 	[keys.actionConfigBody]: 'Body',
 	[keys.actionConfigBodyDescription]:
@@ -120,6 +122,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.validationFromUnknown]: 'Choose one of the configured from addresses',
 	[keys.validationFromUnavailable]:
 		'From addresses are currently unavailable. Please try again later.',
+	[keys.validationToUnknown]: 'Choose one of the configured departments',
+	[keys.validationToUnavailable]: 'Departments are currently unavailable. Please try again later.',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigUrlDescription]:
 		'The endpoint that receives a signed JSON POST for each submission.',

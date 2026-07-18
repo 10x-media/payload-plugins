@@ -19,10 +19,9 @@ export type DepartmentsFieldOptions = {
 /**
  * The department-emails array, for the host to place on any collection or global they own: a
  * settings global, a tenants collection, a departments parent, wherever the addresses belong. The
- * plugin never registers it and never guesses where it lives; a matching routing resolver reads it
- * back (built in T5b), which is also where multi-tenant scoping goes: place this on the
- * tenant-scoped document and have the resolver return only that tenant's addresses, derived from
- * `req`.
+ * plugin never registers it and never guesses where it lives; the `email.departments` resolver reads
+ * it back, which is also where multi-tenant scoping goes: place this on the tenant-scoped document
+ * and have the resolver return only that tenant's addresses, derived from `req`.
  *
  * A row is a `label` (how the address is named when routing a submission to it) and the `email` it
  * resolves to. Because `email` is `localized` by default, a host can hold a different address per
@@ -37,12 +36,13 @@ export type DepartmentsFieldOptions = {
  * // The host's own collection or global:
  * fields: [departmentsField()]
  *
- * // The plugin (T5b), reading it back to route a submission:
+ * // The plugin, reading it back to route a submission. `resolveDepartmentOptions` reads the array
+ * // (fetched at `locale: 'all'`) and resolves each row's address for the requesting locale:
  * formBuilder({
  *   email: {
  *     departments: async ({ req }) => {
- *       const settings = await req.payload.findGlobal({ slug: 'settings', depth: 0, locale: req.locale, req })
- *       return (settings.departmentEmails ?? []).map((row) => ({ label: row.label, email: row.email }))
+ *       const settings = await req.payload.findGlobal({ slug: 'settings', depth: 0, locale: 'all' })
+ *       return resolveDepartmentOptions({ payload: req.payload, req, doc: settings })
  *     },
  *   },
  * })
