@@ -65,7 +65,18 @@ export const IconFieldServer = async (props: ServerProps): Promise<ReactNode> =>
 			schemaPath: `${schemaPath ?? path}.icon-adapter`,
 			silent: true,
 		})
-		if (Icon && Assets) adapterComponents[adapter.slug] = { Assets, Icon }
+		// Optional: libraries with bulk node-data (lucide, tabler) resolve a Nodes
+		// loader so the drawer renders glyphs inline; radix omits it and falls back
+		// to the per-icon Icon component.
+		const Nodes = adapter.Nodes
+			? getFromImportMap<NonNullable<AdapterComponentsEntry['Nodes']>>({
+					importMap: payload.importMap,
+					PayloadComponent: adapter.Nodes,
+					schemaPath: `${schemaPath ?? path}.icon-adapter`,
+					silent: true,
+				})
+			: undefined
+		if (Icon && Assets) adapterComponents[adapter.slug] = { Assets, Icon, Nodes }
 	}
 
 	return (

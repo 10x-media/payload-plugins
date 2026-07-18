@@ -3,6 +3,7 @@
 import type { IconName } from 'lucide-react/dynamic'
 import type { ComponentType } from 'react'
 import React, { Suspense, useEffect, useRef } from 'react'
+import { createNodesLoader } from '../../client/generatedAdapter'
 import type { AdapterAssetsProps, AdapterIconProps } from '../../shared/adapterComponents'
 
 // lucide-react ships DynamicIcon with per-icon lazy chunks, so this adapter needs no generated import map.
@@ -40,3 +41,7 @@ export const LucideAdapterAssets: ComponentType<AdapterAssetsProps> = ({ onReady
 	}, [])
 	return null
 }
+
+export const LucideAdapterNodes = createNodesLoader(() =>
+	import('./generated/nodes').then((m) => m.nodes)
+)

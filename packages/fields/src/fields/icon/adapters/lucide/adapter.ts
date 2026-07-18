@@ -7,5 +7,6 @@ export const lucideAdapter = (): IconAdapter => ({
 	loadManifest: () => import('./generated/manifest').then((m) => m.manifest),
 	Icon: '@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon',
 	Assets: '@10x-media/fields/icon/adapters/lucide#LucideAdapterAssets',
+	Nodes: '@10x-media/fields/icon/adapters/lucide#LucideAdapterNodes',
 	version: 1,
 })

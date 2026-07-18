@@ -7,5 +7,6 @@ export const tablerAdapter = (): IconAdapter => ({
 	loadManifest: () => import('./generated/manifest').then((m) => m.manifest),
 	Icon: '@10x-media/fields/icon/adapters/tabler#TablerAdapterIcon',
 	Assets: '@10x-media/fields/icon/adapters/tabler#TablerAdapterAssets',
+	Nodes: '@10x-media/fields/icon/adapters/tabler#TablerAdapterNodes',
 	version: 1,
 })

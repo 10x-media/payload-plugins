@@ -2,8 +2,41 @@
 
 import type { ComponentType, CSSProperties } from 'react'
 import React, { Suspense, useEffect, useRef } from 'react'
-import type { IconManifest } from '../../../types'
-import type { AdapterAssetsProps, AdapterIconProps } from '../shared/adapterComponents'
+import type { IconManifest, IconNodeMap } from '../../../types'
+import type {
+	AdapterAssetsProps,
+	AdapterIconProps,
+	AdapterNodesProps,
+} from '../shared/adapterComponents'
+
+/**
+ * Builds an `AdapterNodesProps` component that lazily imports a library's bulk
+ * node-data once and hands it back through `onReady`. The drawer renders every
+ * cell from this data as inline SVG, so scrolling a large library never triggers
+ * the per-icon dynamic imports the `Icon` component would. The import lives
+ * inside this factory, keeping the node-data off every static bundle graph.
+ */
+export const createNodesLoader = (
+	loadNodes: () => Promise<IconNodeMap>
+): ComponentType<AdapterNodesProps> => {
+	const Nodes: ComponentType<AdapterNodesProps> = ({ onReady }) => {
+		const onReadyRef = useRef(onReady)
+		onReadyRef.current = onReady
+		useEffect(() => {
+			let live = true
+			void loadNodes().then((nodes) => {
+				if (live) {
+					onReadyRef.current(nodes)
+				}
+			})
+			return () => {
+				live = false
+			}
+		}, [])
+		return null
+	}
+	return Nodes
+}
 
 /** The prop surface the codegen'd import maps expose, widened by `style` for libraries sized through CSS. */
 type GeneratedIconProps = { className?: string; size?: number | string; style?: CSSProperties }

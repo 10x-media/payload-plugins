@@ -1,6 +1,6 @@
 'use client'
 
-import { createGeneratedAdapterComponents } from '../../client/generatedAdapter'
+import { createGeneratedAdapterComponents, createNodesLoader } from '../../client/generatedAdapter'
 
 const { Assets, Icon } = createGeneratedAdapterComponents({
 	iconProps: ({ className, size }) => ({ className, size }),
@@ -10,3 +10,7 @@ const { Assets, Icon } = createGeneratedAdapterComponents({
 
 export const TablerAdapterIcon = Icon
 export const TablerAdapterAssets = Assets
+
+export const TablerAdapterNodes = createNodesLoader(() =>
+	import('./generated/nodes').then((m) => m.nodes)
+)
