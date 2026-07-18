@@ -3,7 +3,7 @@ title: Consent
 description: Checkbox consent referencing statements you own, with proof stored by document id and version.
 ---
 
-Consent is a reference, not a copy. You keep your statements in one place, forms point at them by key, and what the visitor reads is resolved per request. So a form author picks a source and nothing else: no wording to paste, no URL, no version number to type. Correcting a sentence corrects every form using it, with nothing to re-save.
+Consent is a reference, not a copy. You keep your statements in one place, forms point at them by id, and what the visitor reads is resolved per request. So a form author picks a source and nothing else: no wording to paste, no URL, no version number to type. Correcting a sentence corrects every form using it, with nothing to re-save.
 
 The proof stored on each submission is id-based: which source, which document, and, where drafts are enabled, which published version. Never the policy text, so editing a policy cannot rewrite history, and never a URL or slug, so renaming or re-routing a page leaves past proofs intact.
 
@@ -33,8 +33,8 @@ formBuilder({
         req,
       })
       return (settings.consentSources ?? []).map((row) => ({
-        key: row.key,
-        label: row.label,
+        id: row.id,
+        name: row.name,
         statement: row.statement,
         // `page` is an id, so proofs survive a rename; `url` is your routing, only you know it.
         ...(row.page && {
@@ -51,14 +51,14 @@ Without `consent.sources`, the `consent` field type is not registered at all: a 
 
 ### The row
 
-Each row is a `key`, a `label`, the `statement`, and optionally the `page`:
+Each row is a `name`, the `statement`, and optionally a `page`:
 
-- **`key`** is the stable reference. Forms store it, proofs record it, so it must outlive edits to everything else. Changing it orphans both, and it must be unique across the array (the field rejects a duplicate on save).
-- **`label`** names the source: it is shown when picking the source on a form, and it is the text of the policy link rendered beside the statement. A source with a link `url` but no `label` renders no link, since a link needs a human name to click.
+- **The row's own `id`**, Payload's auto-assigned array-row id, is the stable reference: forms store it and proofs record it. Nothing you author, so a rename or a reorder never orphans either.
+- **`name`** is shown when picking the source on a form, and it is the text of the policy link rendered beside the statement. A source with a link `url` but no `name` renders no link, since a link needs a human name to click.
 - **`statement`** is the sentence beside the checkbox, authored as rich text with your project's editor. Put the policy link inline. Pass `editor` to `consentSourcesField` to override it.
-- **`page`** is the document the statement covers, and is what makes the proof provable. Always a polymorphic relationship, even when `relationTo` names one collection, because a proof needs the collection recorded alongside the id. Omit `relationTo` entirely and there is no page picker: statements only, and proofs with no page or version.
+- **`page`**, labeled "Statement source" in the admin, is the document the statement covers, and is what makes the proof provable. Always a polymorphic relationship, even when `relationTo` names one collection, because a proof needs the collection recorded alongside the id. Omit `relationTo` entirely and there is no page picker: statements only, and proofs with no page or version. Set it when you want a submission to save a reference to your policy.
 
-`statement` and `label` are localized by default (`localized: false` opts out); `key` never is.
+Only the array itself and `page` carry a description in the admin; `name` and `statement` are self-explanatory enough not to need one. `statement` and `name` are localized by default (`localized: false` opts out).
 
 ### Multi-tenancy
 
@@ -66,7 +66,7 @@ There is nothing to configure. Place the field on your tenant-scoped document an
 
 ## Rendering the statement
 
-The form document carries only a source key, so resolve the statements server-side and hand them to `toFormDocument`:
+The form document carries only a source id, so resolve the statements server-side and hand them to `toFormDocument`:
 
 ```ts
 import { resolveConsentStatements } from '@10x-media/form-builder/rsc'
@@ -93,12 +93,12 @@ The statement renders as a sibling of the checkbox rather than wrapping it in a 
 
 ## Proof
 
-Each consent field produces a `ConsentProof` on the submission's `consent` array:
+Each consent field produces a `ConsentProof` on the submission's `consent` array, `source` holding the row id it referenced:
 
 ```ts
 // {
 //   agreed: true,
-//   source: 'privacy',
+//   source: '64f3a9c1...',
 //   page: { relationTo: 'legal-pages', id: '507f...' },
 //   versionRef: '65a1...',
 //   at: '<ISO-8601>',

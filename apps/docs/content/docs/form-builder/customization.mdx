@@ -86,15 +86,15 @@ With this option off (the default), the `answers` UI field is the only visible r
 
 ## Form-level buttons
 
-Every form carries a `buttons` group at the bottom of its Fields tab with three localized labels: `submitLabel`, `nextLabel`, and `prevLabel` (next/prev apply to multi-step forms). The rendered chrome resolves each label as `<Form>` prop, then the stored value, then the translated default.
+Every form carries three localized button-label fields at the document root, not in a group: `submitLabel` at the bottom of the Fields tab, and `nextLabel` / `prevLabel` in a row at the bottom of the Flow tab (shown once the flow has at least one step). The rendered chrome resolves each label as `<Form>` prop, then the stored value, then the translated default.
 
-The group is composable. The plugin's `buttons.fields` option receives the three default fields, localization flag already applied, and returns the group's final field array verbatim. Wrap a default in a row with your own field, reorder, or drop one. Here the submit label gets an accompanying icon select:
+Each slot is composable independently through the plugin's `buttons.fields` option: it receives the three default fields and returns a field for each slot, `submit` / `prev` / `next`, not an array. Wrap a default in a row with your own field, reorder within that row, or replace a default outright. Here the submit label gets an accompanying icon select:
 
 ```ts title="payload.config.ts"
 formBuilder({
   buttons: {
-    fields: ({ defaultFields }) => [
-      {
+    fields: ({ defaultFields }) => ({
+      submit: {
         type: 'row',
         fields: [
           defaultFields.submit,
@@ -108,14 +108,24 @@ formBuilder({
           },
         ],
       },
-      defaultFields.next,
-      defaultFields.prev,
-    ],
+      prev: defaultFields.prev,
+      next: defaultFields.next,
+    }),
   },
 })
 ```
 
-Host-added fields ride along on `FormDocument.buttons` as extra keys (`toFormDocument` passes the whole group through). On the frontend, read them from the form context in a custom button renderer:
+A field added this way is stored on the form document (`submitIcon` beside `submitLabel`), but it does not automatically reach the client. `buttons`, like `poll`, is a deliberately narrow allowlist on `toFormDocument` (unlike `response`, which is cast through wholesale), so admin-only config, or a poll source's secrets, can never leak to an anonymous visitor. Surface a host-added button field yourself by reading it off the raw fetched document and merging it into `toFormDocument`'s output before handing it to `<Form>`:
+
+```tsx title="app/contact/page.tsx"
+import { toFormDocument } from '@10x-media/form-builder/rsc'
+
+const raw = await payload.findByID({ collection: 'forms', id })
+const doc = toFormDocument(raw)
+doc.buttons = { ...doc.buttons, submitIcon: raw.submitIcon }
+```
+
+Then read it back from the form context in a custom button renderer:
 
 ```tsx title="submit-with-icon.tsx"
 'use client'
@@ -145,9 +155,25 @@ export const ContactForm = ({ form }: { form: FormDocument }) => (
 )
 ```
 
-The same pattern extends to button variants, per-button styling flags, or anything else: add the field next to a default, read it back from `useFormContext().form.buttons`. `renderNext` and `renderBack` compose identically.
+`renderNext` and `renderBack` compose identically.
 
-To assemble the group from scratch instead of receiving the defaults, the individual builders are exported: `buildSubmitLabelField(localize)`, `buildNextLabelField(localize)`, and `buildPrevLabelField(localize)`, plus `buildDefaultButtonFields(localize)` returning all three (keyed `submit`/`next`/`prev`).
+To assemble a slot from scratch instead of receiving the default, the individual builders are exported: `buildSubmitLabelField(localize)`, `buildNextLabelField(localize)`, and `buildPrevLabelField(localize)`, plus `buildDefaultButtonFields(localize)` returning all three keyed `submit`/`next`/`prev`, exactly what `buttons.fields` is handed as `defaultFields`.
+
+## List view
+
+The `forms` list favors compact, localized summaries over Payload's defaults: the Fields column shows a count ("6 Fields") instead of listing every block type, and the Flow column shows a step count ("2 steps", or `—` with no flow) instead of raw JSON. Both cells read from the plugin's own translations.
+
+The default column sets are curated rather than "every field": `forms` shows Title, Fields, Flow, Poll, and Updated At; `form-submissions` shows Form, Status, Locale, and Created At. Both are ordinary `admin.defaultColumns` and go through the standard [collection overrides](#collection-overrides) seam like anything else:
+
+```ts title="payload.config.ts"
+formBuilder({
+  overrides: {
+    forms: {
+      admin: { defaultColumns: ['title', 'pollEnabled', 'updatedAt'] },
+    },
+  },
+})
+```
 
 ## Poll outcome fields
 
@@ -169,7 +195,7 @@ formBuilder({
 })
 ```
 
-Keep the stored value a `PollOption.value` string whatever component renders it: `pollOutcomeBeforeChange` validates the winner against the poll's effective options server-side regardless of which field authored it, so a swap cannot bypass the membership check. Preserve `defaultFields.resolvedAt` (or rebuild the same field-level access lock) to keep the stamp tamper-proof. `buildWinningValueField()`, `buildResolvedAtField()`, and `buildDefaultOutcomeFields()` are exported for assembling the group from scratch.
+Keep the stored value a `PollOption.value` string whatever component renders it: `pollOutcomeBeforeChange` validates the winner against the poll's effective options server-side regardless of which field authored it, so a swap cannot bypass the membership check. Preserve `defaultFields.resolvedAt` (or rebuild the same field-level access lock) to keep the stamp tamper-proof. `buildWinningValuesField()`, `buildResolvedAtField()`, and `buildDefaultOutcomeFields()` are exported for assembling the group from scratch.
 
 ---
 

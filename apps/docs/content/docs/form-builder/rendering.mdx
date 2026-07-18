@@ -17,7 +17,7 @@ import { Form } from '@10x-media/form-builder/react'
 />
 ```
 
-`form` is a `FormDocument` (`{ id, fields, flow?, response?, buttons?, title?, poll? }`). Payload's generated types do not line up exactly (nullable groups, opaque JSON `flow`), so narrow the fetched document with `toFormDocument` instead of casting:
+`form` is a `FormDocument` (`{ id, fields, flow?, response?, buttons?, title?, multistep, pollEnabled, poll? }`). Payload's generated types do not line up exactly (nullable groups, opaque JSON `flow`), so narrow the fetched document with `toFormDocument` instead of casting:
 
 ```tsx title="app/contact/page.tsx"
 import { toFormDocument } from '@10x-media/form-builder/rsc'
@@ -26,9 +26,9 @@ const doc = await payload.findByID({ collection: 'forms', id })
 return <ContactForm form={toFormDocument(doc)} />
 ```
 
-`toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes a second argument for injecting request-resolved data: `{ pollOptions }` for [source-resolved poll options](/form-builder/polls#option-sources) (from `resolvePollOptions`) and `{ consentStatements }` for [live consent statements](/form-builder/consent#rendering-the-statement) (from `resolveConsentStatements`), since a form stores only a source key and resolves the sentence per request.
+`toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes a second argument for injecting request-resolved data: `{ pollOptions }` for [source-resolved poll options](/form-builder/polls#option-sources) (from `resolvePollOptions`) and `{ consentStatements }` for [live consent statements](/form-builder/consent#rendering-the-statement) (from `resolveConsentStatements`), since a form stores only a source id and resolves the sentence per request.
 
-`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too). `buttons` carries the form-level submit/next/prev labels, plus any [host-added button fields](/form-builder/customization#form-level-buttons) (see label precedence below).
+`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `multistep` and `pollEnabled` mirror the form's two admin checkboxes; `<Form>` reads `multistep` (via `flow`) for step navigation, and a poll page typically renders `<Poll>` instead of `<Form>` when `pollEnabled` is true. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, its `{{field}}` / `{{field||fallback}}` tokens interpolated against the submission's own formatted answers (option labels, Yes/No, localized dates) exactly like an [action body](/form-builder/actions#rich-text-bodies); type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too). `buttons` carries the form-level submit/next/prev labels (see label precedence below); a host-added button field needs merging into `toFormDocument`'s output by hand to reach the client, see [Customization](/form-builder/customization#form-level-buttons).
 
 ### Progressive validation
 

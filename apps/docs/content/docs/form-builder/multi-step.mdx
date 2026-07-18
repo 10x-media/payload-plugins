@@ -38,7 +38,9 @@ Above, `contact` falls through to `message`, `message` jumps to `confirm` (skipp
 
 ## Authoring in the admin
 
-Flows are authored with the flow builder in the admin and stored as this serializable structure, so the client and server reason about the identical graph. Authors work entirely with step titles: step ids are generated automatically and never surface in the UI (a step without a title displays as `Step 1`, `Step 2`, and so on). Anywhere a step is referenced, the next step, a transition target, the label is its title.
+A form's header carries a **Multi-step** checkbox; turning it on reveals a **Flow** tab holding the flow builder (off, the tab and `multistep` stay hidden, and `<Form>` renders as a single page regardless of any flow data already stored). Flows are authored with the flow builder and stored as this serializable structure, so the client and server reason about the identical graph. Authors work entirely with step titles: step ids are generated automatically and never surface in the UI (a step without a title displays as `Step 1`, `Step 2`, and so on). Anywhere a step is referenced, the next step, a transition target, the label is its title.
+
+The same tab carries the multi-step Next/Previous button labels, at the bottom, once the flow has at least one step; see [Form-level buttons](/form-builder/customization#form-level-buttons).
 
 Field assignment is exclusive: each form field belongs to at most one step, and assigning a field to a step removes it from whichever step held it before. Bare blocks are assignable like any field, listed under their translated type label and numbered when the form holds more than one. The builder lists the form's unassigned fields so nothing silently falls out of the flow, and the save-time normalizer enforces the same invariant (a field appearing in multiple steps keeps only its first occurrence, and keys matching no current field are dropped). A flow that collapses to fewer than two valid steps is rejected with a validation error rather than silently discarded.
 
