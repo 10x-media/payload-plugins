@@ -41,4 +41,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.reveal]: 'Anzeigen',
 	[keys.conceal]: 'Verbergen',
 	[keys.encryptedValue]: 'Verschlüsselter Wert',
+	[keys.richTextApiOnly]:
+		'Verschlüsselter Rich-Text wird über die API bearbeitet. Diese Ansicht ist schreibgeschützt.',
 }

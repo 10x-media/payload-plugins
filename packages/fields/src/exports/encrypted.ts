@@ -1,1 +1,15 @@
+export { DEFAULT_KEY_ID, InvalidKeysConfigError } from '../fields/encrypted/crypto/keys'
+export {
+	AuthenticationFailedError,
+	isSealed,
+	MalformedCiphertextError,
+	UnknownKeyIdError,
+} from '../fields/encrypted/crypto/wire'
+export { encryptedField } from '../fields/encrypted/encryptedField'
+export { DecryptFailedError } from '../fields/encrypted/hooks'
+export type {
+	EncryptedFieldOptions,
+	EncryptedProtection,
+	EncryptedSourceField,
+} from '../fields/encrypted/types'
 export type { DecryptFailurePolicy, EncryptedGlobalConfig, KeysConfig } from '../types'

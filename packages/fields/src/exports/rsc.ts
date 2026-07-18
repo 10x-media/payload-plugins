@@ -1,5 +1,6 @@
 export { ColorCell } from '../fields/color/server/ColorCell'
 export { ColorFieldServer } from '../fields/color/server/ColorFieldServer'
+export { ProtectedCell } from '../fields/encrypted/components/ProtectedCell'
 export { createRscIcon } from '../fields/icon/react/createRscIcon'
 export { IconCell } from '../fields/icon/rsc/IconCell'
 export { IconFieldServer } from '../fields/icon/rsc/IconFieldServer'

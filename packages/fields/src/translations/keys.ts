@@ -38,6 +38,7 @@ export const keys = {
 	reveal: 'fields:reveal',
 	conceal: 'fields:conceal',
 	encryptedValue: 'fields:encryptedValue',
+	richTextApiOnly: 'fields:richTextApiOnly',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -40,4 +40,5 @@ export const en: Record<TranslationKey, string> = {
 	[keys.reveal]: 'Reveal',
 	[keys.conceal]: 'Conceal',
 	[keys.encryptedValue]: 'Encrypted value',
+	[keys.richTextApiOnly]: 'Encrypted rich text is edited via the API. This view is read-only.',
 }
