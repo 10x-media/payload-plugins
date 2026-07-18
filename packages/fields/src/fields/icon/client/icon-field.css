@@ -328,13 +328,16 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
 
 .tenx-icon-drawer__row {
 	display: flex;
+	justify-content: flex-start;
 }
 
-/* Fixed-height square cell. The height MUST equal CELL_SIZE (the virtualizer row height in
-   IconDrawerContent) so rows never overlap or gap; flex:1 spreads the fixed buttons evenly. */
+/* Fixed CELL_SIZE square: width and height both equal CELL_SIZE (the column-count divisor and
+   virtualizer row height in IconDrawerContent). Height keeps rows from overlapping or gapping;
+   fixing the width instead of growing it left-aligns every row, so a partial last row places its
+   cells under the same columns as the full rows above it. */
 .tenx-icon-drawer__cell {
 	display: flex;
-	flex: 1 0 0;
+	flex: 0 0 64px;
 	align-items: center;
 	justify-content: center;
 	height: 64px;
