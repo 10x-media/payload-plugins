@@ -150,4 +150,28 @@ describe('encryptedField factory shape', () => {
 			encryptedField({ name: 'ssn', type: 'text' }, { keys: { active: 'k9', keys: { k1: 'x' } } })
 		).toThrow(/active key/)
 	})
+
+	it('strips defaultValue and source-type-only constraints from the stored column (L1, L3)', () => {
+		const storedOf = (source: Parameters<typeof encryptedField>[0]): Record<string, unknown> =>
+			encryptedField(source)[0] as unknown as Record<string, unknown>
+
+		// A static defaultValue would emit a PLAINTEXT column default in drizzle.
+		const textStored = storedOf({
+			defaultValue: 'seed',
+			maxLength: 10,
+			minLength: 2,
+			name: 'code',
+			type: 'text',
+		})
+		expect('defaultValue' in textStored).toBe(false)
+		expect('minLength' in textStored).toBe(false)
+		expect('maxLength' in textStored).toBe(false)
+
+		const numberStored = storedOf({ max: 100, min: 1, name: 'amount', type: 'number' })
+		expect('min' in numberStored).toBe(false)
+		expect('max' in numberStored).toBe(false)
+
+		const selectStored = storedOf({ name: 'tier', options: ['a', 'b'], type: 'select' })
+		expect('options' in selectStored).toBe(false)
+	})
 })

@@ -119,11 +119,23 @@ export const encryptedField = (
 	const sourceAdmin = source.admin as TextField['admin']
 
 	// Spread keeps admin passthrough (description, width, condition, readOnly,
-	// position, custom labels) and access control on the stored field.
+	// position, custom labels) and access control on the stored field. Stripped:
+	// hooks/validate/typescriptSchema/index/unique/editor (rebuilt or moved to the
+	// bidx sibling); defaultValue (a static default emits a PLAINTEXT column
+	// default in drizzle, i.e. plaintext at rest on an INSERT that omits the
+	// column); and source-type-only constraints (options/min/max/min-maxLength)
+	// which are inert on a text column and already enforced on plaintext by the
+	// effective validator.
 	const {
+		defaultValue: _defaultValue,
 		editor: _editor,
 		hooks: sourceHooks,
 		index: _index,
+		max: _max,
+		maxLength: _maxLength,
+		min: _min,
+		minLength: _minLength,
+		options: _options,
 		typescriptSchema: _ts,
 		unique: _unique,
 		validate: _validate,
