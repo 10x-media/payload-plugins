@@ -29,8 +29,17 @@ describe('computeBidx', () => {
 		expect(computeBidx('user@example.com', ring.indexKey, 'email')).toBe('76n6Ms7MNulV8J7MfEefE-Fm')
 	})
 
-	it('is deterministic, normalization-aware, and key-dependent', async () => {
-		const other = await resolveKeys({ active: 'k1', keys: { k1: 'k1-secret-material' } }, SECRET)
+	it('is deterministic, normalization-aware, and index-key-dependent', async () => {
+		// Post-H2 the index key follows dedicated indexKey material (or the secret),
+		// not the active data key, so a distinct bidx needs distinct indexKey material.
+		const other = await resolveKeys(
+			{
+				active: 'k1',
+				indexKey: 'dedicated-index-key-material',
+				keys: { k1: 'k1-secret-material' },
+			},
+			SECRET
+		)
 		const a = computeBidx('User@Example.COM  ', ring.indexKey, 'email')
 		expect(a).toBe(computeBidx('user@example.com', ring.indexKey, 'email'))
 		expect(a).toHaveLength(24)
