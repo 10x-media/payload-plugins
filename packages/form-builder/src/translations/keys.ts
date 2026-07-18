@@ -231,6 +231,10 @@ export const keys = {
 	formSubmit: 'formBuilder:form.submit',
 	formMultistep: 'formBuilder:form.multistep',
 	formPollEnabled: 'formBuilder:form.pollEnabled',
+	cellStepCountOne: 'formBuilder:cell.stepCount.one',
+	cellStepCountOther: 'formBuilder:cell.stepCount.other',
+	cellFieldCountOne: 'formBuilder:cell.fieldCount.one',
+	cellFieldCountOther: 'formBuilder:cell.fieldCount.other',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

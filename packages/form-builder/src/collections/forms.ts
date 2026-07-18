@@ -162,6 +162,8 @@ export const buildFormsCollection = ({
 	)
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 	const FIELD_NAME_SELECT_REF = '@10x-media/form-builder/client#FieldNameSelect'
+	const FLOW_STEPS_CELL_REF = '@10x-media/form-builder/client#FlowStepsCell'
+	const FIELD_COUNT_CELL_REF = '@10x-media/form-builder/client#FieldCountCell'
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
 		if (data && Array.isArray(data.fields)) {
@@ -214,6 +216,7 @@ export const buildFormsCollection = ({
 		name: 'fields',
 		type: 'blocks',
 		blocks: buildFieldBlocks({ registry, ruleRegistry, localize: localizeContent }),
+		admin: { components: { Cell: FIELD_COUNT_CELL_REF } },
 	}
 
 	const flowField: Field = {
@@ -222,6 +225,7 @@ export const buildFormsCollection = ({
 		validate: validateFlow,
 		admin: {
 			components: {
+				Cell: FLOW_STEPS_CELL_REF,
 				Field: { path: FLOW_BUILDER_REF, clientProps: { conditionTypes, bareTypeLabels } },
 			},
 		},
@@ -564,7 +568,12 @@ export const buildFormsCollection = ({
 			plural: labelForKey(keys.collectionFormPlural),
 			...(overrides?.labels ?? {}),
 		},
-		admin: { group: 'Forms', useAsTitle: 'title', ...(overrides?.admin ?? {}) },
+		admin: {
+			group: 'Forms',
+			useAsTitle: 'title',
+			defaultColumns: ['title', 'fields', 'flow', 'pollEnabled', 'updatedAt'],
+			...(overrides?.admin ?? {}),
+		},
 		access: { read: () => true, ...(overrides?.access ?? {}) },
 		hooks: {
 			...(overrides?.hooks ?? {}),

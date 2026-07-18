@@ -217,7 +217,11 @@ export const buildSubmissionsCollection = ({
 			plural: labelForKey(keys.collectionSubmissionPlural),
 			...(overrides?.labels ?? {}),
 		},
-		admin: { group: 'Forms', ...(overrides?.admin ?? {}) },
+		admin: {
+			group: 'Forms',
+			defaultColumns: ['form', 'status', 'locale', 'createdAt'],
+			...(overrides?.admin ?? {}),
+		},
 		access: {
 			create: () => true,
 			read: isLoggedIn,

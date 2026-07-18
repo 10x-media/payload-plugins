@@ -251,4 +251,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.formSubmit]: 'Absenden',
 	[keys.formMultistep]: 'Mehrstufig',
 	[keys.formPollEnabled]: 'Umfrage',
+	[keys.cellStepCountOne]: '{{count}} Schritt',
+	[keys.cellStepCountOther]: '{{count}} Schritte',
+	[keys.cellFieldCountOne]: '{{count}} Feld',
+	[keys.cellFieldCountOther]: '{{count}} Felder',
 }
