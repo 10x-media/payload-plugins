@@ -1,5 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 
+import { validateEncryptedBoot } from './fields/encrypted/boot'
+import { withEncryptedQueryRewrite } from './fields/encrypted/queryRewrite'
 import { registerIcon } from './fields/icon/plugin'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setFieldsRegistry } from './plugin/registry'
@@ -71,6 +73,16 @@ export const fields = definePlugin<FieldsPluginOptions>({
 		// registers their client components in admin.dependencies. A no-op when no
 		// adapters are configured, leaving registry.icon unset.
 		registerIcon(config, options.icon)
+		// Transparently rewrite equals/in on queryable encrypted fields to their
+		// blind-index siblings; a no-op for collections that have none.
+		config.collections = (config.collections ?? []).map(withEncryptedQueryRewrite)
+		// Validate encrypted key material at boot, before any prior onInit runs, so
+		// missing secrets or broken providers fail fast instead of on first write.
+		const priorOnInit = config.onInit
+		config.onInit = async (payload) => {
+			await validateEncryptedBoot(payload, options.encrypted?.keys)
+			await priorOnInit?.(payload)
+		}
 		return config
 	},
 })
