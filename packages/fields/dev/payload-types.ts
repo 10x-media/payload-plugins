@@ -168,7 +168,7 @@ export interface Icon {
    */
   iconSingle?: string | null;
   /**
-   * showTextInput makes the field editable, so you can type or paste a raw library:name (e.g. lucide:star) instead of only picking from the drawer.
+   * Type or paste a raw library:name (e.g. lucide:star), or pick from the drawer.
    */
   iconWithText?: string | null;
   /**
@@ -179,6 +179,10 @@ export interface Icon {
    * resolveAvailable reads the selected tenant's enabledLibraries. Acme enables Lucide and Radix, so its drawer shows a switcher for those two; Globex enables only Tabler, so the switcher is hidden. An icon stored from a library the tenant no longer enables still renders, but is flagged as unavailable with a banner in the drawer.
    */
   iconTenantRestricted?: string | null;
+  /**
+   * The Social library is forced-available in every tenant via alwaysAvailable; other libraries are gated by the tenant's enabledLibraries. Both Acme and Globex show Social in the switcher even though neither enables it.
+   */
+  iconWithForced?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -348,6 +352,7 @@ export interface IconsSelect<T extends boolean = true> {
   iconWithText?: T;
   iconRequired?: T;
   iconTenantRestricted?: T;
+  iconWithForced?: T;
   updatedAt?: T;
   createdAt?: T;
 }

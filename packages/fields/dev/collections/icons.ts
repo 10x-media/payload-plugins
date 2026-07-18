@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { iconField } from '../../src/exports/icon'
+import { type IconAvailabilityResolver, iconField } from '../../src/exports/icon'
 import { lucideAdapter } from '../../src/exports/icon-adapters/lucide'
 
 /** Every library the dev app registers; the fallback when no tenant scopes the selection. */
@@ -15,6 +15,17 @@ const readTenantId = (value: unknown): number | string | null => {
 		return typeof id === 'string' || typeof id === 'number' ? id : null
 	}
 	return null
+}
+
+/** Scopes selectable libraries to the picked tenant's enabledLibraries; all libraries when none is picked. */
+const resolveTenantLibraries: IconAvailabilityResolver = async ({ req, siblingData }) => {
+	const tenantId = readTenantId(siblingData?.tenant)
+	if (tenantId == null) {
+		return ALL_DEV_LIBRARIES
+	}
+	const tenant = await req.payload.findByID({ collection: 'tenants', id: tenantId })
+	const enabled = tenant.enabledLibraries
+	return Array.isArray(enabled) ? (enabled as string[]) : []
 }
 
 export const icons: CollectionConfig = {
@@ -103,21 +114,30 @@ export const icons: CollectionConfig = {
 		iconField({
 			name: 'iconTenantRestricted',
 			label: 'Tenant-scoped',
-			resolveAvailable: async ({ req, siblingData }) => {
-				const tenantId = readTenantId(siblingData?.tenant)
-				if (tenantId == null) {
-					return ALL_DEV_LIBRARIES
-				}
-				const tenant = await req.payload.findByID({ collection: 'tenants', id: tenantId })
-				const enabled = tenant.enabledLibraries
-				return Array.isArray(enabled) ? (enabled as string[]) : []
-			},
+			resolveAvailable: resolveTenantLibraries,
 			overrides: ({ field }) => ({
 				...field,
 				admin: {
 					...field.admin,
 					description:
 						"resolveAvailable reads the selected tenant's enabledLibraries. Acme enables Lucide and Radix, so its drawer shows a switcher for those two; Globex enables only Tabler, so the switcher is hidden. An icon stored from a library the tenant no longer enables still renders, but is flagged as unavailable with a banner in the drawer.",
+				},
+			}),
+		}),
+		iconField({
+			name: 'iconWithForced',
+			label: 'Forced + tenant-scoped',
+			// The custom Social library is forced into every tenant's picker; the other
+			// libraries stay gated by resolveTenantLibraries. Globex enables only Tabler,
+			// yet its drawer still offers Social alongside Tabler.
+			alwaysAvailable: ['social'],
+			resolveAvailable: resolveTenantLibraries,
+			overrides: ({ field }) => ({
+				...field,
+				admin: {
+					...field.admin,
+					description:
+						"The Social library is forced-available in every tenant via alwaysAvailable; other libraries are gated by the tenant's enabledLibraries. Both Acme and Globex show Social in the switcher even though neither enables it.",
 				},
 			}),
 		}),

@@ -12,6 +12,9 @@ import { RadixAdapterAssets as RadixAdapterAssets_623eadea8fd172c162e441429619d2
 import { TablerAdapterIcon as TablerAdapterIcon_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
 import { TablerAdapterAssets as TablerAdapterAssets_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
 import { TablerAdapterNodes as TablerAdapterNodes_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
+import { SocialAdapterIcon as SocialAdapterIcon_1d64e85d6e2d4c232079878ca5845e09 } from '../../../icon-adapters/social/client'
+import { SocialAdapterAssets as SocialAdapterAssets_1d64e85d6e2d4c232079878ca5845e09 } from '../../../icon-adapters/social/client'
+import { SocialAdapterNodes as SocialAdapterNodes_1d64e85d6e2d4c232079878ca5845e09 } from '../../../icon-adapters/social/client'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -28,5 +31,8 @@ export const importMap = {
   "@10x-media/fields/icon/adapters/radix#RadixAdapterAssets": RadixAdapterAssets_623eadea8fd172c162e441429619d241,
   "@10x-media/fields/icon/adapters/tabler#TablerAdapterIcon": TablerAdapterIcon_06944727e7d257f3bfff2c407b2bc913,
   "@10x-media/fields/icon/adapters/tabler#TablerAdapterAssets": TablerAdapterAssets_06944727e7d257f3bfff2c407b2bc913,
-  "@10x-media/fields/icon/adapters/tabler#TablerAdapterNodes": TablerAdapterNodes_06944727e7d257f3bfff2c407b2bc913
+  "@10x-media/fields/icon/adapters/tabler#TablerAdapterNodes": TablerAdapterNodes_06944727e7d257f3bfff2c407b2bc913,
+  "/icon-adapters/social/client#SocialAdapterIcon": SocialAdapterIcon_1d64e85d6e2d4c232079878ca5845e09,
+  "/icon-adapters/social/client#SocialAdapterAssets": SocialAdapterAssets_1d64e85d6e2d4c232079878ca5845e09,
+  "/icon-adapters/social/client#SocialAdapterNodes": SocialAdapterNodes_1d64e85d6e2d4c232079878ca5845e09
 }

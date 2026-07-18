@@ -15,6 +15,7 @@ import { icons } from './collections/icons'
 import { tenants } from './collections/tenants'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
+import { socialAdapter } from './icon-adapters/social/adapter'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
@@ -58,7 +59,7 @@ export default buildConfig({
 				presets: ['#16a34a', '#dc2626', { key: 'global', label: 'Global blue', value: '#1d4ed8' }],
 			},
 			icon: {
-				adapters: [lucideAdapter(), radixAdapter(), tablerAdapter()],
+				adapters: [lucideAdapter(), radixAdapter(), tablerAdapter(), socialAdapter()],
 				defaultLibrary: 'lucide',
 			},
 		}),
