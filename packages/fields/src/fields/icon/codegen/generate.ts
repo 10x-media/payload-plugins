@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { emitImportsModule, emitManifestModule, emitNodesModule } from './emit'
+import { emitImportsModule, emitManifestModule, emitNodesModule, generatedHeader } from './emit'
 import { loadLucideSource } from './sources/lucide'
 import { loadRadixSource } from './sources/radix'
 import { loadTablerSource } from './sources/tabler'
@@ -41,9 +41,10 @@ export const generateIconManifest = async (
 	// Emit every module before writing any, so a specifier or node the emitter
 	// rejects cannot leave the directory holding a new manifest beside a stale
 	// imports map or node-data.
-	const manifestSource = emitManifestModule(icons, categories)
-	const importsSource = importFor ? emitImportsModule(icons, importFor) : undefined
-	const nodesSource = nodes ? emitNodesModule(icons, nodes) : undefined
+	const header = generatedHeader(options.regenCommand)
+	const manifestSource = emitManifestModule(icons, categories, header)
+	const importsSource = importFor ? emitImportsModule(icons, importFor, header) : undefined
+	const nodesSource = nodes ? emitNodesModule(icons, nodes, header) : undefined
 	await mkdir(options.outDir, { recursive: true })
 	const files: string[] = []
 	const manifestPath = path.join(options.outDir, 'manifest.ts')

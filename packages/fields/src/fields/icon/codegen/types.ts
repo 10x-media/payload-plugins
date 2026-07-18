@@ -26,6 +26,11 @@ export type GenerateIconManifestOptions = {
 	 * instead of quietly overwriting committed output with the categories dropped.
 	 */
 	allowMissingCategories?: boolean
+	/**
+	 * Command named in the generated-file header so a reader runs the right regen.
+	 * Defaults to `pnpm generate:manifests`; a BYO source pass its own script.
+	 */
+	regenCommand?: string
 }
 
 export type LoadedIconSource = {
