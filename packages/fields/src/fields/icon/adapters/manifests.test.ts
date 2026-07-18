@@ -1,7 +1,38 @@
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import type { IconManifest } from '../../../types'
+import type { IconManifest, IconNodeMap } from '../../../types'
+
+const here = dirname(fileURLToPath(import.meta.url))
 
 const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/
+const SVG_NODE_TAGS = new Set([
+	'circle',
+	'ellipse',
+	'g',
+	'line',
+	'path',
+	'polygon',
+	'polyline',
+	'rect',
+])
+
+const assertNodesCoverManifest = (manifest: IconManifest, nodes: IconNodeMap) => {
+	const names = Object.keys(nodes)
+	// One glyph per manifest icon, keyed identically, so the drawer always finds a glyph.
+	expect(names.length).toBe(manifest.icons.length)
+	for (const icon of manifest.icons) {
+		const glyph = nodes[icon.name]
+		expect(glyph).toBeDefined()
+		if (!glyph) continue
+		expect(glyph.length).toBeGreaterThan(0)
+		for (const [tag, attrs] of glyph) {
+			expect(SVG_NODE_TAGS.has(tag)).toBe(true)
+			expect(typeof attrs).toBe('object')
+		}
+	}
+}
 
 const assertManifestShape = (manifest: IconManifest, minIcons: number) => {
 	expect(manifest.icons.length).toBeGreaterThan(minIcons)
@@ -28,6 +59,12 @@ describe('committed adapter manifests', () => {
 		expect(manifest.categories.length).toBeGreaterThan(0)
 	})
 
+	it('lucide node-data covers the manifest for inline drawer rendering', async () => {
+		const { manifest } = await import('./lucide/generated/manifest')
+		const { nodes } = await import('./lucide/generated/nodes')
+		assertNodesCoverManifest(manifest, nodes)
+	})
+
 	it('radix manifest is well formed and has an imports map', async () => {
 		const { manifest } = await import('./radix/generated/manifest')
 		assertManifestShape(manifest, 300)
@@ -42,5 +79,15 @@ describe('committed adapter manifests', () => {
 		const { iconImports } = await import('./tabler/generated/imports')
 		expect(Object.keys(iconImports).length).toBe(manifest.icons.length)
 		expect(iconImports.heart).toBeDefined()
+	})
+
+	it('tabler node-data covers the manifest for inline drawer rendering', async () => {
+		const { manifest } = await import('./tabler/generated/manifest')
+		const { nodes } = await import('./tabler/generated/nodes')
+		assertNodesCoverManifest(manifest, nodes)
+	})
+
+	it('radix ships no node-data (drawer renders it through the per-icon Icon)', () => {
+		expect(existsSync(join(here, 'radix/generated/nodes.ts'))).toBe(false)
 	})
 })

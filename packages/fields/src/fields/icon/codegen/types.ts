@@ -1,4 +1,4 @@
-import type { IconMeta } from '../../../types'
+import type { IconMeta, IconNodeMap } from '../../../types'
 
 export type IconImportSpec = { module: string; exportName?: string }
 
@@ -6,6 +6,12 @@ export type CustomIconSource = {
 	icons: IconMeta[]
 	/** Omit when the library has its own dynamic loader (no imports.ts is emitted). */
 	importFor?: (icon: IconMeta) => IconImportSpec
+	/**
+	 * Bulk glyph node-data keyed by icon name. Present emits `nodes.ts` for the
+	 * drawer to render inline SVG without per-icon imports; omit for libraries the
+	 * drawer renders through the per-icon `Icon` component (e.g. radix).
+	 */
+	nodes?: IconNodeMap
 }
 
 export type IconManifestSource = 'lucide' | 'radix' | 'tabler' | CustomIconSource
@@ -25,4 +31,5 @@ export type GenerateIconManifestOptions = {
 export type LoadedIconSource = {
 	icons: IconMeta[]
 	importFor?: (icon: IconMeta) => IconImportSpec
+	nodes?: IconNodeMap
 }

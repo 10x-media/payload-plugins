@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { emitImportsModule, emitManifestModule } from './emit'
+import { emitImportsModule, emitManifestModule, emitNodesModule } from './emit'
 import { loadLucideSource } from './sources/lucide'
 import { loadRadixSource } from './sources/radix'
 import { loadTablerSource } from './sources/tabler'
@@ -25,7 +25,7 @@ const loadSource = async (options: GenerateIconManifestOptions): Promise<LoadedI
 export const generateIconManifest = async (
 	options: GenerateIconManifestOptions
 ): Promise<{ iconCount: number; files: string[] }> => {
-	const { icons: rawIcons, importFor } = await loadSource(options)
+	const { icons: rawIcons, importFor, nodes } = await loadSource(options)
 	const icons = rawIcons
 		.map((icon) => ({ ...icon, categories: [...icon.categories].sort(byCodepoint) }))
 		.sort((a, b) => byCodepoint(a.name, b.name))
@@ -38,10 +38,12 @@ export const generateIconManifest = async (
 		seen.add(icon.name)
 	}
 	const categories = [...new Set(icons.flatMap((icon) => icon.categories))].sort(byCodepoint)
-	// Emit both modules before writing either, so a specifier the emitter rejects
-	// cannot leave the directory holding a new manifest beside a stale imports map.
+	// Emit every module before writing any, so a specifier or node the emitter
+	// rejects cannot leave the directory holding a new manifest beside a stale
+	// imports map or node-data.
 	const manifestSource = emitManifestModule(icons, categories)
 	const importsSource = importFor ? emitImportsModule(icons, importFor) : undefined
+	const nodesSource = nodes ? emitNodesModule(icons, nodes) : undefined
 	await mkdir(options.outDir, { recursive: true })
 	const files: string[] = []
 	const manifestPath = path.join(options.outDir, 'manifest.ts')
@@ -51,6 +53,11 @@ export const generateIconManifest = async (
 		const importsPath = path.join(options.outDir, 'imports.ts')
 		await writeFile(importsPath, importsSource)
 		files.push(importsPath)
+	}
+	if (nodesSource !== undefined) {
+		const nodesPath = path.join(options.outDir, 'nodes.ts')
+		await writeFile(nodesPath, nodesSource)
+		files.push(nodesPath)
 	}
 	return { files, iconCount: icons.length }
 }

@@ -19,9 +19,15 @@ export type IconMeta = { name: string; tags: string[]; categories: string[] }
 /** Lazily loaded icon library manifest. */
 export type IconManifest = { icons: IconMeta[]; categories: string[] }
 
+/** One SVG child of a glyph: an element tag and its attribute map, matching lucide-static's icon-nodes shape. */
+export type IconNode = [tag: string, attrs: Record<string, string>]
+
+/** An icon library's glyphs keyed by name, so the drawer renders inline SVG in bulk instead of per-icon imports. */
+export type IconNodeMap = Record<string, IconNode[]>
+
 /**
- * An icon library adapter. `Icon` and `Assets` are importMap component path
- * strings so adapters stay serializable inside field configs.
+ * An icon library adapter. `Icon`, `Assets`, and `Nodes` are importMap component
+ * path strings so adapters stay serializable inside field configs.
  */
 export type IconAdapter = {
 	slug: string
@@ -32,6 +38,12 @@ export type IconAdapter = {
 	Icon: string
 	/** importMap path of a client component that loads the manifest for the admin drawer. */
 	Assets: string
+	/**
+	 * importMap path of a client component that loads this library's bulk node-data
+	 * for fast drawer rendering. Omit for libraries that ship a single shared module
+	 * (e.g. radix); the drawer then falls back to the per-icon `Icon` component.
+	 */
+	Nodes?: string
 	version: 1
 }
 

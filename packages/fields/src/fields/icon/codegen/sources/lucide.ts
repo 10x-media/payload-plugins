@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import type { IconMeta } from '../../../../types'
+import type { IconMeta, IconNodeMap } from '../../../../types'
 import type { LoadedIconSource } from '../types'
 
 const require = createRequire(import.meta.url)
@@ -66,5 +66,8 @@ export const loadLucideSource = async (
 			`lucide categories from ${CATEGORIES_URL} matched no installed icon, so the response shape has likely changed. Pass allowMissingCategories to generate without them.`
 		)
 	}
-	return { icons }
+	// lucide-static/icon-nodes.json is the exact shape lucide-react consumes
+	// (name -> [tag, attrs][]) and is keyed by the same bare kebab names as tags.json.
+	const nodes = require('lucide-static/icon-nodes.json') as IconNodeMap
+	return { icons, nodes }
 }

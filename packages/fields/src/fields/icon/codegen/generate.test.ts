@@ -51,6 +51,40 @@ describe('generateIconManifest', () => {
 		expect(result.files.map((file) => path.basename(file))).toEqual(['manifest.ts'])
 	})
 
+	it('emits nodes.ts when the source carries node-data', async () => {
+		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
+		dirs.push(outDir)
+		const result = await generateIconManifest({
+			outDir,
+			source: {
+				icons: [{ name: 'solo', tags: [], categories: [] }],
+				nodes: { solo: [['path', { d: 'M0 0h10' }]] },
+			},
+		})
+		expect(result.files.map((file) => path.basename(file))).toEqual(['manifest.ts', 'nodes.ts'])
+		const nodes = await readFile(path.join(outDir, 'nodes.ts'), 'utf8')
+		expect(nodes).toContain('export const nodes')
+		expect(nodes).toContain(`"solo":[["path",{"d":"M0 0h10"}]]`)
+	})
+
+	it('rejects generation when node-data is missing a manifest icon', async () => {
+		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
+		dirs.push(outDir)
+		await expect(
+			generateIconManifest({
+				outDir,
+				source: {
+					icons: [
+						{ name: 'has-nodes', tags: [], categories: [] },
+						{ name: 'no-nodes', tags: [], categories: [] },
+					],
+					nodes: { 'has-nodes': [['path', { d: 'M0 0' }]] },
+				},
+			})
+		).rejects.toThrow('no node-data')
+		expect(existsSync(path.join(outDir, 'manifest.ts'))).toBe(false)
+	})
+
 	it('rejects icon names that are not kebab-case', async () => {
 		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
 		dirs.push(outDir)
