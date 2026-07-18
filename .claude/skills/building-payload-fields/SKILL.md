@@ -87,9 +87,21 @@ Consumers return a new object built with spreads. deepMerge, in any form or from
 - Server-only code (`node:crypto`) never enters the `./client` graph.
 - New subpaths keep package.json `exports`, `publishConfig.exports`, and `tsdown.config.ts` entries in lockstep, then get added to the isolation spec's entry lists.
 
+## Rendering many items (pickers, grids over hundreds/thousands)
+
+A per-item lazy-imported component is right for a production frontend (a page shows a few, so the bundle stays tiny) and wrong for an admin picker that shows hundreds at once: scrolling mounts a dynamic import per cell and the list janks. For the admin surface, render from bulk data loaded ONCE per source (e.g. an icon library's node-data JSON, lazy-imported when the picker opens), as inline SVG or plain markup, so scrolling touches no imports. Keep the per-item-lazy path for the field's own frontend renderer. This split (bulk-in-admin, lazy-on-frontend) is what keeps scroll smooth AND consumer bundles small; the dist lazy-graph test must still prove the bulk data is dynamic-import-only. Measured payoff on the icon drawer: median 6ms/frame and one network request for a full scroll, versus thousands of per-icon imports.
+
+Guarantee grid alignment structurally: fixed square cells (fixed px, `flex: 0 0 <size>`, `justify-content: flex-start`) whose height equals the virtualizer's `estimateSize`, so full and partial rows tile at identical column positions. In-flow labels of variable height break this; put the label on hover (Payload `Tooltip`) instead. Align a header/search/banner to the visible grid edge by deriving its width from the cell geometry (`columns * cellSize - 2 * cellInset`), not the raw container width, since the outlined button is inset within its cell box.
+
+Payload `Drawer`, like `Popup`, portals its content and its Gutter is `overflow:auto` with its own title header: size the drawer body to fill the remaining height via a `min-height:0` flex chain, or you get a second scrollbar.
+
 ## Verification step (before declaring a field done)
 
+Verify by measurement and by driving it, not by screenshot alone. Code review passes clean and the field still ships a runtime bug (a React duplicate-key warning that renders icons wrong, a search bar overhanging the grid by 4px); the live console and `getComputedStyle` catch what reading the diff cannot.
+
 1. `pnpm dev fields`, open the field's showcase collection.
-2. Compare against the native text field rendered next to it: row height (40px), border color and width, radius, focus ring, error state, readOnly rendering, placeholder color, dark mode.
-3. Exercise every admin prop from the passthrough checklist at least once via the showcase configs.
-4. `pnpm lint fields && pnpm typecheck fields && pnpm test fields`, plus `pnpm build fields && pnpm --filter @10x-media/fields test:dist`, plus `pnpm check:processes`.
+2. Compare against the native text field rendered next to it BY MEASUREMENT (`getComputedStyle` on your control and a native input at several viewport widths): row height (40px), `margin-bottom` (must equal native; a custom field is a `.field-type` and inherits `.render-fields > .field-type` margin, so any stray margin on your root is a bug), border color and width, radius, focus ring, error/readOnly rendering, placeholder color, dark mode.
+3. Read the browser console for errors (React key warnings, hydration) while exercising the field. Zero tolerance.
+4. Exercise every admin prop from the passthrough checklist at least once via the showcase configs.
+5. `pnpm lint fields && pnpm typecheck fields && pnpm test fields`, plus `pnpm build fields && pnpm --filter @10x-media/fields test:dist`, plus `pnpm check:processes`.
+6. Dev-app gotcha: `touch`ing a config does NOT trigger a Turbopack HMR recompile (content-hashed) - edit the file's content to force a real reload. And `startMemoryMongo()` must cache its replica set on `globalThis` or every reload leaks a mongod.
