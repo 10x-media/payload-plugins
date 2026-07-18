@@ -46,7 +46,10 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users, colors, tenants, icons],
+	// Payload orders the admin sidebar by this array. Field-example collections
+	// (colors, icons) come first so a reviewer lands on them; infrastructure
+	// collections (tenants, users) sit at the bottom. Each group is alphabetical.
+	collections: [colors, icons, tenants, users],
 	i18n: { supportedLanguages: { de, en } },
 	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
 	plugins: [

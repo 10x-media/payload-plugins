@@ -67,10 +67,10 @@ export interface Config {
   };
   blocks: {};
   collections: {
-    users: User;
     colors: Color;
-    tenants: Tenant;
     icons: Icon;
+    tenants: Tenant;
+    users: User;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,10 +78,10 @@ export interface Config {
   };
   collectionsJoins: {};
   collectionsSelect: {
-    users: UsersSelect<false> | UsersSelect<true>;
     colors: ColorsSelect<false> | ColorsSelect<true>;
-    tenants: TenantsSelect<false> | TenantsSelect<true>;
     icons: IconsSelect<false> | IconsSelect<true>;
+    tenants: TenantsSelect<false> | TenantsSelect<true>;
+    users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -123,31 +123,6 @@ export interface UserAuthOperations {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "users".
- */
-export interface User {
-  id: string;
-  updatedAt: string;
-  createdAt: string;
-  email: string;
-  resetPasswordToken?: string | null;
-  resetPasswordExpiration?: string | null;
-  salt?: string | null;
-  hash?: string | null;
-  loginAttempts?: number | null;
-  lockUntil?: string | null;
-  sessions?:
-    | {
-        id: string;
-        createdAt?: string | null;
-        expiresAt: string;
-      }[]
-    | null;
-  password?: string | null;
-  collection: 'users';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "colors".
  */
 export interface Color {
@@ -175,6 +150,40 @@ export interface Color {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "icons".
+ */
+export interface Icon {
+  id: string;
+  title: string;
+  /**
+   * Pick a tenant to scope the Tenant-scoped field below to its enabled libraries.
+   */
+  tenant?: (string | null) | Tenant;
+  /**
+   * All registered libraries; the drawer shows a library switcher.
+   */
+  iconMulti?: string | null;
+  /**
+   * Only Lucide is offered, so the drawer hides the switcher.
+   */
+  iconSingle?: string | null;
+  /**
+   * showTextInput makes the field editable, so you can type or paste a raw library:name (e.g. lucide:star) instead of only picking from the drawer.
+   */
+  iconWithText?: string | null;
+  /**
+   * Required: a valid library:name must be set before the document can save.
+   */
+  iconRequired: string;
+  /**
+   * resolveAvailable reads the selected tenant's enabledLibraries. Acme enables Lucide and Radix, so its drawer shows a switcher for those two; Globex enables only Tabler, so the switcher is hidden. An icon stored from a library the tenant no longer enables still renders, but is flagged as unavailable with a banner in the drawer.
+   */
+  iconTenantRestricted?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "tenants".
  */
 export interface Tenant {
@@ -196,19 +205,28 @@ export interface Tenant {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "icons".
+ * via the `definition` "users".
  */
-export interface Icon {
+export interface User {
   id: string;
-  title: string;
-  tenant?: (string | null) | Tenant;
-  iconMulti?: string | null;
-  iconSingle?: string | null;
-  iconWithText?: string | null;
-  iconRequired: string;
-  iconTenantRestricted?: string | null;
   updatedAt: string;
   createdAt: string;
+  email: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpiration?: string | null;
+  salt?: string | null;
+  hash?: string | null;
+  loginAttempts?: number | null;
+  lockUntil?: string | null;
+  sessions?:
+    | {
+        id: string;
+        createdAt?: string | null;
+        expiresAt: string;
+      }[]
+    | null;
+  password?: string | null;
+  collection: 'users';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -235,20 +253,20 @@ export interface PayloadLockedDocument {
   id: string;
   document?:
     | ({
-        relationTo: 'users';
-        value: string | User;
-      } | null)
-    | ({
         relationTo: 'colors';
         value: string | Color;
+      } | null)
+    | ({
+        relationTo: 'icons';
+        value: string | Icon;
       } | null)
     | ({
         relationTo: 'tenants';
         value: string | Tenant;
       } | null)
     | ({
-        relationTo: 'icons';
-        value: string | Icon;
+        relationTo: 'users';
+        value: string | User;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -294,28 +312,6 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "users_select".
- */
-export interface UsersSelect<T extends boolean = true> {
-  updatedAt?: T;
-  createdAt?: T;
-  email?: T;
-  resetPasswordToken?: T;
-  resetPasswordExpiration?: T;
-  salt?: T;
-  hash?: T;
-  loginAttempts?: T;
-  lockUntil?: T;
-  sessions?:
-    | T
-    | {
-        id?: T;
-        createdAt?: T;
-        expiresAt?: T;
-      };
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "colors_select".
  */
 export interface ColorsSelect<T extends boolean = true> {
@@ -342,6 +338,21 @@ export interface ColorsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "icons_select".
+ */
+export interface IconsSelect<T extends boolean = true> {
+  title?: T;
+  tenant?: T;
+  iconMulti?: T;
+  iconSingle?: T;
+  iconWithText?: T;
+  iconRequired?: T;
+  iconTenantRestricted?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "tenants_select".
  */
 export interface TenantsSelect<T extends boolean = true> {
@@ -362,18 +373,25 @@ export interface TenantsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "icons_select".
+ * via the `definition` "users_select".
  */
-export interface IconsSelect<T extends boolean = true> {
-  title?: T;
-  tenant?: T;
-  iconMulti?: T;
-  iconSingle?: T;
-  iconWithText?: T;
-  iconRequired?: T;
-  iconTenantRestricted?: T;
+export interface UsersSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
+  email?: T;
+  resetPasswordToken?: T;
+  resetPasswordExpiration?: T;
+  salt?: T;
+  hash?: T;
+  loginAttempts?: T;
+  lockUntil?: T;
+  sessions?:
+    | T
+    | {
+        id?: T;
+        createdAt?: T;
+        expiresAt?: T;
+      };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

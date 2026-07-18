@@ -62,7 +62,8 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		const acme = tenantDocs.docs.find((doc) => doc.name === 'acme')
 		const globex = tenantDocs.docs.find((doc) => doc.name === 'globex')
 		if (acme && globex) {
-			// acme enables lucide+radix, so its restricted value renders normally.
+			// acme enables lucide+radix, so Tenant-scoped shows a switcher for those
+			// two and its stored lucide value renders normally.
 			await payload.create({
 				collection: 'icons',
 				data: {
@@ -72,20 +73,22 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					iconTenantRestricted: 'lucide:heart',
 					iconWithText: 'tabler:heart',
 					tenant: acme.id,
-					title: 'Showcase icons (acme)',
+					title: 'Acme (multi-library tenant)',
 				},
 			})
-			// globex enables only tabler, so the stored lucide value is from a
-			// disabled library and demonstrates graceful degradation. iconMulti uses
-			// a bare legacy name that reads as the default library (lucide).
+			// globex enables only tabler, so Tenant-scoped hides the switcher, and the
+			// stored lucide value is from a disabled library and demonstrates graceful
+			// degradation. iconMulti uses a bare legacy name that reads as the default
+			// library (lucide).
 			await payload.create({
 				collection: 'icons',
 				data: {
 					iconMulti: 'house',
 					iconRequired: 'tabler:heart',
 					iconTenantRestricted: 'lucide:star',
+					iconWithText: 'tabler:star',
 					tenant: globex.id,
-					title: 'Legacy + globex',
+					title: 'Globex (single-library + degradation)',
 				},
 			})
 			payload.logger.info('Seeded icon showcase')
