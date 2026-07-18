@@ -1,6 +1,6 @@
 'use client'
 
-import { SelectInput, TextInput, Tooltip } from '@payloadcms/ui'
+import { SearchIcon, SelectInput, Tooltip } from '@payloadcms/ui'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations'
@@ -142,6 +142,12 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	}, [])
 	const columns = Math.max(3, Math.floor(gridWidth / CELL_SIZE))
 	const rowCount = Math.ceil(visible.length / columns)
+	// Shared width for the search control and the grid content: both span exactly
+	// `columns` cells from the same left origin, so the search right edge lines up
+	// with the last icon column. Set as a custom property, sized only from CELL_SIZE.
+	const mainStyle = {
+		'--tenx-icon-grid-width': `${columns * CELL_SIZE}px`,
+	} as React.CSSProperties
 
 	const virtualizer = useVirtualizer({
 		count: rowCount,
@@ -216,31 +222,6 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 					{t(keys.libraryUnavailable)}
 				</div>
 			) : null}
-			<div className="tenx-icon-drawer__header">
-				<TextInput
-					className="tenx-icon-drawer__search"
-					onChange={(event: React.ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
-					path={`${slugPrefix}-search`}
-					placeholder={t(keys.searchIcons)}
-					value={query}
-				/>
-				{/* adapters is the available-filtered set, so this shows only with 2+ available libraries */}
-				{adapters.length > 1 ? (
-					<div className="tenx-icon-drawer__switcher">
-						<SelectInput
-							isClearable={false}
-							name={`${slugPrefix}-library`}
-							onChange={(option) => {
-								const single = Array.isArray(option) ? option[0] : option
-								if (single && typeof single.value === 'string') onLibraryChange(single.value)
-							}}
-							options={adapters.map((adapter) => ({ label: adapter.label, value: adapter.slug }))}
-							path={`${slugPrefix}-library`}
-							value={activeLibrary}
-						/>
-					</div>
-				) : null}
-			</div>
 			<div className="tenx-icon-drawer__body">
 				<nav aria-label={t(keys.iconCategories)} className="tenx-icon-drawer__rail">
 					{railItems.map((item) => (
@@ -258,64 +239,103 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 						</button>
 					))}
 				</nav>
-				<div
-					aria-label={t(keys.iconGrid)}
-					className="tenx-icon-drawer__grid"
-					onKeyDown={handleGridKeyDown}
-					ref={gridRef}
-					role="listbox"
-				>
-					{!manifest ? (
-						<div className="tenx-icon-drawer__loading">
-							{Array.from({ length: 24 }, (_, skeletonIndex) => (
-								// biome-ignore lint/suspicious/noArrayIndexKey: fixed-count static placeholders that never reorder
-								<span className="tenx-icon-placeholder" key={`skeleton-${skeletonIndex}`} />
-							))}
-						</div>
-					) : visible.length === 0 ? (
-						<div className="tenx-icon-drawer__empty">{t(keys.noIconsFound)}</div>
-					) : (
-						<div
-							role="presentation"
-							style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
-						>
-							{virtualizer.getVirtualItems().map((row) => (
-								<div
-									className="tenx-icon-drawer__row"
-									data-index={row.index}
-									key={row.key}
-									role="presentation"
-									style={{
-										left: 0,
-										position: 'absolute',
-										top: 0,
-										transform: `translateY(${row.start}px)`,
-										width: '100%',
+				<div className="tenx-icon-drawer__main" style={mainStyle}>
+					<div className="tenx-icon-drawer__header">
+						{/* adapters is the available-filtered set, so this shows only with 2+ available libraries */}
+						{adapters.length > 1 ? (
+							<div className="tenx-icon-drawer__switcher">
+								<SelectInput
+									isClearable={false}
+									name={`${slugPrefix}-library`}
+									onChange={(option) => {
+										const single = Array.isArray(option) ? option[0] : option
+										if (single && typeof single.value === 'string') onLibraryChange(single.value)
 									}}
-								>
-									{visible
-										.slice(row.index * columns, row.index * columns + columns)
-										.map((icon, columnIndex) => {
-											const cellIndex = row.index * columns + columnIndex
-											return (
-												<IconGridCell
-													entry={entry}
-													focused={cellIndex === focusIndex}
-													icon={icon}
-													index={cellIndex}
-													isSelected={
-														selected?.library === activeLibrary && selected.name === icon.name
-													}
-													key={icon.name}
-													onSelect={handleSelect}
-													registerRef={registerRef}
-												/>
-											)
-										})}
-								</div>
-							))}
+									options={adapters.map((adapter) => ({
+										label: adapter.label,
+										value: adapter.slug,
+									}))}
+									path={`${slugPrefix}-library`}
+									value={activeLibrary}
+								/>
+							</div>
+						) : null}
+						{/* Bordered control mirrors Payload's list-view search: SearchIcon inside-left, borderless input. */}
+						<div className="tenx-icon-drawer__search">
+							<span aria-hidden="true" className="tenx-icon-drawer__search-icon">
+								<SearchIcon />
+							</span>
+							<input
+								aria-label={t(keys.searchIcons)}
+								className="tenx-icon-drawer__search-input"
+								onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+									setQuery(event.target.value)
+								}
+								placeholder={t(keys.searchIcons)}
+								type="text"
+								value={query}
+							/>
 						</div>
-					)}
+					</div>
+					<div
+						aria-label={t(keys.iconGrid)}
+						className="tenx-icon-drawer__grid"
+						onKeyDown={handleGridKeyDown}
+						ref={gridRef}
+						role="listbox"
+					>
+						{!manifest ? (
+							<div className="tenx-icon-drawer__loading">
+								{Array.from({ length: 24 }, (_, skeletonIndex) => (
+									// biome-ignore lint/suspicious/noArrayIndexKey: fixed-count static placeholders that never reorder
+									<span className="tenx-icon-placeholder" key={`skeleton-${skeletonIndex}`} />
+								))}
+							</div>
+						) : visible.length === 0 ? (
+							<div className="tenx-icon-drawer__empty">{t(keys.noIconsFound)}</div>
+						) : (
+							<div
+								role="presentation"
+								style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
+							>
+								{virtualizer.getVirtualItems().map((row) => (
+									<div
+										className="tenx-icon-drawer__row"
+										data-index={row.index}
+										key={row.key}
+										role="presentation"
+										style={{
+											left: 0,
+											position: 'absolute',
+											top: 0,
+											transform: `translateY(${row.start}px)`,
+											width: '100%',
+										}}
+									>
+										{visible
+											.slice(row.index * columns, row.index * columns + columns)
+											.map((icon, columnIndex) => {
+												const cellIndex = row.index * columns + columnIndex
+												return (
+													<IconGridCell
+														entry={entry}
+														focused={cellIndex === focusIndex}
+														icon={icon}
+														index={cellIndex}
+														isSelected={
+															selected?.library === activeLibrary && selected.name === icon.name
+														}
+														key={icon.name}
+														onSelect={handleSelect}
+														registerRef={registerRef}
+													/>
+												)
+											})}
+									</div>
+								))}
+							</div>
+						)}
+					</div>
 				</div>
 			</div>
 			<div className="tenx-icon-drawer__footer">
