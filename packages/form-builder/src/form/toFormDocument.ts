@@ -15,7 +15,7 @@ export type ToFormDocumentOptions = {
 	pollOptions?: PollOption[]
 	/**
 	 * Source-resolved consent statements (from `resolveConsentStatements`), injected into the
-	 * consent field instances they name. A form stores only a source key, so without these its
+	 * consent field instances they name. A form stores only a source id, so without these its
 	 * consent fields render with no statement at all.
 	 */
 	consentStatements?: ConsentStatements

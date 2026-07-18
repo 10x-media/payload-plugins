@@ -101,19 +101,20 @@ export type FormBuilderPluginOptions = {
 	 * The intended shape: place `consentSourcesField()` on a collection or global you own and read it
 	 * back here. Multi-tenant hosts scope that read by the tenant derived from `req`, so a tenant's
 	 * authors only ever see, and their visitors only ever agree to, their own statements. A form
-	 * stores only a source's `key`; the statement is resolved live per request (see
+	 * stores only a source's row `id`; the statement is resolved live per request (see
 	 * `resolveConsentStatements`) and the proof is rebuilt from the source at submit, so neither is
 	 * ever a copy the client could stale or forge.
 	 */
 	consent?: { sources: ConsentSourcesResolver }
 	/**
-	 * Form-level button labels. Every form carries a `buttons` group (`submitLabel`, `prevLabel`,
-	 * `nextLabel`) at the bottom of its Fields tab; the rendered chrome resolves each label as
-	 * `<Form>` prop, then the stored value, then the translated default. `fields` composes the
-	 * group: it receives the three default fields with the content localization flag already
-	 * applied and returns the group's final field array verbatim, so wrapping a default in a row
-	 * with a host field (e.g. an icon select), reordering, or dropping one is explicit. Host-added
-	 * fields ride along on `FormDocument.buttons` for custom chrome to read.
+	 * Form-level button labels: `submitLabel` at the bottom of the Fields tab, `prevLabel` and
+	 * `nextLabel` in a row at the bottom of the Flow tab (shown once the flow has a step). The
+	 * rendered chrome resolves each label as `<Form>` prop, then the stored value, then the
+	 * translated default. `fields` composes them: it receives the three default fields as a
+	 * `{ submit, prev, next }` map with the content localization flag already applied and returns
+	 * the map, so wrapping a default in a row with a host field (e.g. an icon select) or replacing
+	 * one is explicit. `FormDocument.buttons` reassembles only those three known labels, so a
+	 * host-added sibling field is still stored but is read off the raw document, not `doc.buttons`.
 	 */
 	buttons?: ButtonsOption
 	/**

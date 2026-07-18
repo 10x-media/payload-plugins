@@ -149,7 +149,7 @@ type BuildFormsCollectionArgs = {
 	pollTypeRegistry?: PollTypeRegistry
 	/** The plugin `poll.outcomeFields` seam; composes the outcome group from the two default fields. */
 	outcomeFields?: OutcomeFieldsOverride
-	/** The plugin `buttons` option; `fields` composes the buttons group from the localized defaults. */
+	/** The plugin `buttons` option; `fields` composes the `{ submit, prev, next }` labels from the localized defaults. */
 	buttons?: ButtonsOption
 	/**
 	 * The plugin `email.fromAddresses` option. Present: both email actions gain a `from` select and
@@ -375,11 +375,6 @@ export const buildFormsCollection = ({
 		],
 	}
 
-	// Form-level button labels, at the bottom of the Fields tab; visitor-facing content following
-	// `localizeContent`. The `buttons.fields` seam receives the already-localized defaults and its
-	// return becomes the group's fields verbatim, so a host can wrap a default in a row with its
-	// own field (e.g. an icon select), reorder, or drop one. Host-added fields ride along on
-	// `FormDocument.buttons` for custom chrome to read.
 	const defaultOutcomeFields = buildDefaultOutcomeFields()
 	const defaultButtonFields = buildDefaultButtonFields(localizeContent)
 	// Half-width copy of a default field for the prev/next row; preserves the field's own admin
