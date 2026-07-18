@@ -232,3 +232,39 @@
 	flex-shrink: 0;
 	align-self: center;
 }
+
+/* Condensed array (host-placed department emails): flat [label, email] rows, no per-row collapsible.
+ * The 50/50 split reuses Payload's own --field-width variable, set from each subfield's admin.width. */
+.fb-condensed-array {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-block-end: 1rem;
+}
+.fb-condensed-array__rows {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.fb-condensed-array__row {
+	display: flex;
+	align-items: flex-end;
+	gap: 0.5rem;
+}
+.fb-condensed-array__fields {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-wrap: wrap;
+	column-gap: 0.75rem;
+}
+.fb-condensed-array__fields > .field-type {
+	flex: 0 1 calc(var(--field-width, 50%) - 0.375rem);
+	min-width: 0;
+}
+.fb-condensed-array__remove {
+	flex-shrink: 0;
+}
+.fb-condensed-array__actions {
+	margin-block-start: 0.25rem;
+}

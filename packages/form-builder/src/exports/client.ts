@@ -1,6 +1,7 @@
 'use client'
 
 export { ByteSizeField } from '../client/ByteSizeField'
+export { CondensedArray } from '../client/CondensedArray'
 export { EndpointOptionsSelect } from '../client/EndpointOptionsSelect'
 export { FieldNameSelect } from '../client/FieldNameSelect'
 export { FlowBuilder } from '../client/FlowBuilder'

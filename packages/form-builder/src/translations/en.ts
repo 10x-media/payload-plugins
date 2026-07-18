@@ -254,4 +254,13 @@ export const en: Record<TranslationKey, string> = {
 	[keys.cellStepCountOther]: '{{count}} steps',
 	[keys.cellFieldCountOne]: '{{count}} Field',
 	[keys.cellFieldCountOther]: '{{count}} Fields',
+	[keys.departmentsField]: 'Department emails',
+	[keys.departmentsFieldDescription]:
+		'Addresses a form can route submissions to, each shown by its label.',
+	[keys.departmentSingular]: 'Department email',
+	[keys.departmentPlural]: 'Department emails',
+	[keys.departmentLabel]: 'Label',
+	[keys.departmentEmail]: 'Email',
+	[keys.departmentAddRow]: 'Add email',
+	[keys.departmentRemoveRow]: 'Remove email',
 }

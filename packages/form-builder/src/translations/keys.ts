@@ -239,6 +239,14 @@ export const keys = {
 	cellStepCountOther: 'formBuilder:cell.stepCount.other',
 	cellFieldCountOne: 'formBuilder:cell.fieldCount.one',
 	cellFieldCountOther: 'formBuilder:cell.fieldCount.other',
+	departmentsField: 'formBuilder:departments.field',
+	departmentsFieldDescription: 'formBuilder:departments.fieldDescription',
+	departmentSingular: 'formBuilder:departments.singular',
+	departmentPlural: 'formBuilder:departments.plural',
+	departmentLabel: 'formBuilder:departments.label',
+	departmentEmail: 'formBuilder:departments.email',
+	departmentAddRow: 'formBuilder:departments.addRow',
+	departmentRemoveRow: 'formBuilder:departments.removeRow',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

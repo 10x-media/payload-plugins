@@ -259,4 +259,13 @@ export const de: Record<TranslationKey, string> = {
 	[keys.cellStepCountOther]: '{{count}} Schritte',
 	[keys.cellFieldCountOne]: '{{count}} Feld',
 	[keys.cellFieldCountOther]: '{{count}} Felder',
+	[keys.departmentsField]: 'Abteilungs-E-Mails',
+	[keys.departmentsFieldDescription]:
+		'Adressen, an die ein Formular Einsendungen weiterleiten kann, jeweils mit Bezeichnung.',
+	[keys.departmentSingular]: 'Abteilungs-E-Mail',
+	[keys.departmentPlural]: 'Abteilungs-E-Mails',
+	[keys.departmentLabel]: 'Bezeichnung',
+	[keys.departmentEmail]: 'E-Mail',
+	[keys.departmentAddRow]: 'E-Mail hinzufügen',
+	[keys.departmentRemoveRow]: 'E-Mail entfernen',
 }

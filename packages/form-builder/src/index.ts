@@ -336,6 +336,8 @@ export type {
 	ConsentSourcePage,
 	ConsentSourcesResolver,
 } from './consent/types'
+export type { DepartmentsFieldOptions } from './email/departmentsField'
+export { departmentsField } from './email/departmentsField'
 export {
 	buildDefaultFieldDefinitions,
 	defaultFieldDefinitions,
