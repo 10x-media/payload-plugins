@@ -31,7 +31,7 @@ import {
 	defaultPresentationDescriptors,
 } from '../presentations/defaults'
 import { interpolate } from '../recall/interpolate'
-import { buildRecallResolver } from '../recall/resolver'
+import { buildRecallResolver, descriptorsFor } from '../recall/resolver'
 import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import { en } from '../translations/en'
@@ -372,13 +372,23 @@ export const Form = ({
 
 	const visible = visibleFields(form.fields, effectiveValues)
 
-	/** Answered visible fields as submission values. Display-only ('none' kind) and nameless (bare) fields never contribute. */
-	const answeredValues = (): SubmissionValue[] =>
+	/** Visible, answered named fields. Display-only ('none' kind) and nameless (bare) fields never contribute. */
+	const answerableFields = (): NamedFormFieldInstance[] =>
 		visibleFields(form.fields, effectiveValues)
 			.filter((field) => registry.get(field.blockType)?.value !== 'none')
 			.filter(isNamedField)
 			.filter((field) => !isEmpty(effectiveValues[field.name]))
-			.map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
+
+	/** Answered visible fields as raw submission values, sent to the server on submit. */
+	const answeredValues = (): SubmissionValue[] =>
+		answerableFields().map((field) => ({ field: field.name, value: effectiveValues[field.name] }))
+
+	/**
+	 * Same fields, formatted via `recall` (option labels, Yes/No, localized dates): recall-fidelity
+	 * values for client-rendered templates, matching what the server gives email-team's body.
+	 */
+	const formattedValues = (): SubmissionValue[] =>
+		answerableFields().map((field) => ({ field: field.name, value: recall(field.name) }))
 
 	// Steps address fields by key: machine names for named fields, block row ids for bare blocks.
 	const stepKeys = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
@@ -679,7 +689,10 @@ export const Form = ({
 				? form.response?.message
 				: undefined
 		const responseHtml = responseMessage
-			? serializeBody(responseMessage, { values: answeredValues(), descriptors: [] })
+			? serializeBody(responseMessage, {
+					values: formattedValues(),
+					descriptors: descriptorsFor(answerableFields()),
+				})
 			: undefined
 		return (
 			<FormContext.Provider value={contextValue}>

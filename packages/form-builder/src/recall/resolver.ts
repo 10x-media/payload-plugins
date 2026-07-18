@@ -1,6 +1,6 @@
 import { isNamedField } from '../fields/fieldKey'
 import type { AnyFormFieldDefinition } from '../fields/types'
-import type { FormFieldInstance } from '../submissions/types'
+import type { FormFieldInstance, SubmissionDescriptor } from '../submissions/types'
 
 export type RecallResolver = (name: string) => string
 
@@ -56,3 +56,16 @@ export const buildRecallResolver = (args: {
 		return Array.isArray(value) ? value.join(', ') : String(value)
 	}
 }
+
+/**
+ * Build a submission-shaped descriptor per named field: the client-side counterpart to the
+ * per-field descriptors `runSubmission` snapshots server-side. Lets client-rendered templates
+ * (the response message) label rows the same way server-rendered ones (email-team) do. `optionLabels`
+ * is omitted: pair with values already formatted via `buildRecallResolver`, not raw stored values.
+ */
+export const descriptorsFor = (fields: FormFieldInstance[]): SubmissionDescriptor[] =>
+	fields.filter(isNamedField).map((field) => ({
+		field: field.name,
+		label: field.label ?? field.name,
+		fieldType: field.blockType,
+	}))
