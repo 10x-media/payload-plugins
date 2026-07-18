@@ -11,9 +11,9 @@ export type FormResponseSettings = {
 }
 
 /**
- * Serializable per-form button labels. Fields a host adds to the buttons group (the plugin
- * `buttons.fields` seam) ride along as extra keys; custom chrome reads them via
- * `useFormContext().form.buttons`.
+ * Serializable per-form button labels. `toFormDocument` reassembles these from the document's
+ * top-level `submitLabel`/`prevLabel`/`nextLabel` fields (there is no longer a `buttons` group).
+ * The index signature lets custom chrome read any extra label a host threads on itself.
  */
 export type FormButtonSettings = {
 	submitLabel?: string | null
@@ -51,5 +51,9 @@ export type FormDocument = {
 	buttons?: FormButtonSettings
 	/** The form's admin title (the collection's `useAsTitle` field). Render it, or not: the host decides. */
 	title?: string
+	/** Whether the form uses multi-step (flow) navigation. Drives client step rendering; flow data may still exist when false. */
+	multistep: boolean
+	/** Whether this form is a poll. Gates poll rendering and results; the poll config lives under `poll`. */
+	pollEnabled: boolean
 	poll?: FormPollSettings
 }

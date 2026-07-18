@@ -11,11 +11,15 @@ export type DefaultButtonFields = {
 }
 
 /**
- * Composes the forms `buttons` group. Receives the three default fields with the content
- * localization flag already applied; the returned array becomes the group's fields verbatim, so
- * wrapping a default in a `row` with a host field, reordering, or dropping one is explicit.
+ * Composes the three form-level button fields. Receives the defaults with the content localization
+ * flag already applied and returns the field for each slot; the collection places `submit` at the
+ * bottom of the Fields tab and `prev`/`next` in a row on the Flow tab. Any slot may return the
+ * default, a replacement, or the default wrapped in a `row` alongside a host field (e.g. an icon
+ * select), so adjacent fields ride along in the same slot.
  */
-export type ButtonFieldsOverride = (args: { defaultFields: DefaultButtonFields }) => Field[]
+export type ButtonFieldsOverride = (args: {
+	defaultFields: DefaultButtonFields
+}) => DefaultButtonFields
 
 /** The plugin `buttons` option: form-level button labels and the group's composition seam. */
 export type ButtonsOption = {

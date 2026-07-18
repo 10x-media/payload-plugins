@@ -122,7 +122,7 @@ describe('formBuilder factory', () => {
 	it('exports toFormDocument from the root and maps a doc', async () => {
 		const moduleExports = await import('./index')
 		const doc = moduleExports.toFormDocument({ id: 1, fields: [] })
-		expect(doc).toEqual({ id: 1, fields: [] })
+		expect(doc).toEqual({ id: 1, fields: [], multistep: false, pollEnabled: false })
 	})
 
 	const buildWithEmail = async (email: Parameters<typeof formBuilder>[0]['email']) => {

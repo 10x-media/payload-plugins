@@ -5,7 +5,12 @@ import { Form, type FormDocument } from './Form'
 
 afterEach(cleanup)
 
-const doc = (fields: FormFieldInstance[]): FormDocument => ({ id: 1, fields })
+const doc = (fields: FormFieldInstance[]): FormDocument => ({
+	id: 1,
+	fields,
+	multistep: false,
+	pollEnabled: false,
+})
 
 describe('Form submit hardening', () => {
 	it('does not double-submit on a rapid second activation', async () => {

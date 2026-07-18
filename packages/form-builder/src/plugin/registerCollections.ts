@@ -71,23 +71,12 @@ export const registerCollections = ({
 		attachUploadsCollection({ config, slug: uploads.collection, spam })
 	}
 
+	// Payload has no nav-sort option, so it lists collections in registration order. Register
+	// `form-submissions` before `forms` so the "Forms" nav group reads alphabetically
+	// (`form-submissions` < `forms`); ordering plugin nav groups against a host's own collections
+	// stays a host concern.
 	config.collections = [
 		...(config.collections ?? []),
-		buildFormsCollection({
-			registry,
-			ruleRegistry,
-			consentSources,
-			actionRegistry,
-			localizeContent,
-			richText,
-			uploadsCollectionSlug: uploadSlug,
-			resultsAccess,
-			pollSourceRegistry,
-			outcomeFields,
-			buttons,
-			fromAddresses,
-			overrides: overrides?.forms,
-		}),
 		buildSubmissionsCollection({
 			registry,
 			ruleRegistry,
@@ -102,6 +91,21 @@ export const registerCollections = ({
 			pollSourceRegistry,
 			showRawFields: showSubmissionRawFields,
 			overrides: overrides?.formSubmissions,
+		}),
+		buildFormsCollection({
+			registry,
+			ruleRegistry,
+			consentSources,
+			actionRegistry,
+			localizeContent,
+			richText,
+			uploadsCollectionSlug: uploadSlug,
+			resultsAccess,
+			pollSourceRegistry,
+			outcomeFields,
+			buttons,
+			fromAddresses,
+			overrides: overrides?.forms,
 		}),
 	]
 }

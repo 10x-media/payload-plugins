@@ -23,7 +23,13 @@ const flow: FormFlow = {
 	],
 }
 
-const doc = (extra?: Partial<FormDocument>): FormDocument => ({ id: 1, fields, ...extra })
+const doc = (extra?: Partial<FormDocument>): FormDocument => ({
+	id: 1,
+	fields,
+	multistep: extra?.flow !== undefined,
+	pollEnabled: false,
+	...extra,
+})
 
 describe('button label resolution', () => {
 	it('uses the stored buttons.submitLabel when no prop is passed', () => {

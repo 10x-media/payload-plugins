@@ -11,7 +11,14 @@ export type ResolveEffectivePollOptionsArgs = {
 	payload: Payload
 	req?: PayloadRequest
 	/** A forms document (or an equivalent merged view of one during a save). */
-	form: { id: number | string; title?: string | null; poll?: unknown; fields?: unknown }
+	form: {
+		id: number | string
+		title?: string | null
+		/** Top-level poll-enable flag; the poll config (results field, source) stays under `poll`. */
+		pollEnabled?: boolean | null
+		poll?: unknown
+		fields?: unknown
+	}
 	/** Registry override for plugin-internal callers; defaults to the registry stashed on the config. */
 	sources?: PollOptionSourceRegistry
 	/**
@@ -54,7 +61,7 @@ export const resolveEffectivePollOptions = async (
 ): Promise<PollOption[]> => {
 	const { payload, req, form, sources, fieldTypes } = args
 	const poll = pollConfigOf(form.poll)
-	if (poll?.enabled !== true) {
+	if (form.pollEnabled !== true || !poll) {
 		return []
 	}
 	const sourced = await resolvePollOptions({ payload, req, form, sources })

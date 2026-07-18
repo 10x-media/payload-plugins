@@ -12,6 +12,7 @@ const payload = { config: { custom: {} } } as unknown as Payload
 const staticForm = (poll: Record<string, unknown> | undefined) => ({
 	id: 1,
 	title: 'Race',
+	pollEnabled: poll?.enabled === true,
 	poll,
 	fields: [
 		{
@@ -124,6 +125,7 @@ const athleteVoteDefinition = (
 const voteForm = (poll: Record<string, unknown> | undefined) => ({
 	id: 7,
 	title: 'Athlete vote',
+	pollEnabled: poll?.enabled === true,
 	poll,
 	fields: [
 		{ blockType: 'athleteVote', name: 'pick', label: 'Pick', athleteIds: ['a1', 'a2'] },

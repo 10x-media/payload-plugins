@@ -19,7 +19,12 @@ const axeViolations = async (node: Element) => {
 	return results.violations.map((violation) => violation.id)
 }
 
-const doc = (fields: FormFieldInstance[]): FormDocument => ({ id: 1, fields })
+const doc = (fields: FormFieldInstance[]): FormDocument => ({
+	id: 1,
+	fields,
+	multistep: false,
+	pollEnabled: false,
+})
 
 describe('Form accessibility (axe)', () => {
 	it('a representative single-step form has no structural violations', async () => {

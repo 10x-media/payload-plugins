@@ -26,7 +26,9 @@ const sources: PollOptionSourceRegistry = new Map([
 ])
 
 const payloadWith = (poll: unknown) => {
-	const findByID = vi.fn().mockResolvedValue({ id: 1, title: 'Race', poll })
+	const pollEnabled =
+		poll != null && typeof poll === 'object' && (poll as { enabled?: unknown }).enabled === true
+	const findByID = vi.fn().mockResolvedValue({ id: 1, title: 'Race', pollEnabled, poll })
 	const update = vi.fn().mockResolvedValue({})
 	const payload = {
 		findByID,

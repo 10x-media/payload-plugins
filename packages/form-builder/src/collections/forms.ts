@@ -338,19 +338,96 @@ export const buildFormsCollection = ({
 	// back into a union-typed object literal loses the discriminant TS needs to check it structurally.
 	const halfWidth = (field: Field): Field =>
 		({ ...field, admin: { ...field.admin, width: '50%' } }) as Field
-	const buttonsField: Field = {
-		name: 'buttons',
+	// The three button-label fields sit at the document root now (no `buttons` group): `submit` at
+	// the bottom of the Fields tab, `prev`/`next` in a row on the Flow tab. The `buttons.fields` seam
+	// composes each slot from the already-localized defaults, so a host can wrap a default in a row
+	// with its own field (e.g. an icon select) or replace it; `toFormDocument` reassembles the three
+	// labels into `FormDocument.buttons` for the client.
+	const composedButtons = buttons?.fields
+		? buttons.fields({ defaultFields: defaultButtonFields })
+		: defaultButtonFields
+	const submitField = composedButtons.submit
+	const prevNextRow: Field = {
+		type: 'row',
+		// The prev/next labels only matter once the flow has a step; the Flow tab itself is gated on
+		// `multistep`. `data` (1st arg) is the whole document, so `flow.steps` reads the stored flow.
+		admin: {
+			condition: (data) => {
+				const steps = (data as { flow?: { steps?: unknown } })?.flow?.steps
+				return Array.isArray(steps) && steps.length >= 1
+			},
+		},
+		fields: [halfWidth(composedButtons.prev), halfWidth(composedButtons.next)],
+	}
+
+	// Poll lifecycle config; identifiers and behavior, never localized. Lives inside the conditional
+	// Poll tab (gated on the top-level `pollEnabled` flag), so the per-field enabled conditions are
+	// gone; `label: false` suppresses the group header the tab label already provides.
+	// `resultsVisibility` is defaulted and not clearable rather than `required` for the same
+	// generated-types reason as `response.type`.
+	const pollGroupField: Field = {
+		name: 'poll',
 		type: 'group',
-		label: labelForKey(keys.buttonsGroup),
-		fields: buttons?.fields
-			? buttons.fields({ defaultFields: defaultButtonFields })
-			: [
-					defaultButtonFields.submit,
-					{
-						type: 'row',
-						fields: [halfWidth(defaultButtonFields.prev), halfWidth(defaultButtonFields.next)],
+		label: false,
+		fields: [
+			// Authored by picking from the form's poll-eligible fields; the stored value stays a plain
+			// text field name. Select options and server validate share `pollResultsTypes`, so they
+			// cannot drift.
+			{
+				name: 'resultsField',
+				type: 'text',
+				label: labelForKey(keys.pollResultsField),
+				validate: buildValidateResultsField(pollResultsTypes),
+				admin: {
+					components: {
+						Field: {
+							path: FIELD_NAME_SELECT_REF,
+							clientProps: {
+								types: pollResultsTypes,
+								descriptionKey: keys.pollResultsFieldDescription,
+							},
+						},
 					},
+				},
+			},
+			{
+				name: 'resultsVisibility',
+				type: 'select',
+				defaultValue: 'afterVote',
+				label: labelForKey(keys.pollResultsVisibility),
+				admin: { isClearable: false },
+				options: [
+					{ label: labelForKey(keys.pollVisibilityAfterVote), value: 'afterVote' },
+					{ label: labelForKey(keys.pollVisibilityAfterClose), value: 'afterClose' },
 				],
+			},
+			{
+				name: 'closesAt',
+				type: 'date',
+				label: labelForKey(keys.pollClosesAt),
+				admin: { date: { pickerAppearance: 'dayAndTime' } },
+			},
+			...buildPollOptionSourceFields(pollSourceRegistry ?? new Map()),
+			// `winningValue` is recorded either by an admin picking from the poll's effective options
+			// (served by `/:id/poll-options`) or by `resolvePollOutcome` (host domain logic); the
+			// `pollOutcomeBeforeChange` hook validates both paths and owns the `resolvedAt` stamp.
+			// `resolvedAt` itself stays fully locked: field-level create/update access blocks every
+			// non-override caller write (Payload silently drops the denied value rather than erroring)
+			// while the hook's stamp, applied after access filtering, still persists. The
+			// `poll.outcomeFields` seam receives both defaults and its return becomes the group's
+			// fields verbatim, so a host can swap `winningValue` for its own component; the hook still
+			// validates the stored value against the effective options, so no swap bypasses it.
+			// `hideGutter` stays: outcome is still a group nested inside the poll group.
+			{
+				name: 'outcome',
+				type: 'group',
+				label: labelForKey(keys.pollOutcome),
+				admin: { hideGutter: true },
+				fields: outcomeFields
+					? outcomeFields({ defaultFields: defaultOutcomeFields })
+					: [defaultOutcomeFields.winningValue, defaultOutcomeFields.resolvedAt],
+			},
+		],
 	}
 
 	const defaultFields: Field[] = [
@@ -358,98 +435,53 @@ export const buildFormsCollection = ({
 		// always required (drives `useAsTitle` in the admin list/relationship views) and is passed
 		// through `toFormDocument` as `FormDocument.title`. Whether and how a host renders it above
 		// the fields is entirely the host's call; the plugin does not gate or duplicate it.
-		{ name: 'title', type: 'text', required: true, label: labelForKey(keys.fieldTitle) },
-		// Unnamed tabs are presentational only: fields/flow/actions/response stay at the document root.
+		{
+			name: 'title',
+			type: 'text',
+			required: true,
+			label: labelForKey(keys.fieldTitle),
+			admin: { width: '50%' },
+		},
+		// The two form-type flags: behavior, never localized. `multistep` gates the Flow tab and the
+		// client's step navigation; `pollEnabled` gates the Poll tab and marks the form a poll.
+		{
+			type: 'row',
+			fields: [
+				{
+					name: 'multistep',
+					type: 'checkbox',
+					defaultValue: false,
+					label: labelForKey(keys.formMultistep),
+					admin: { width: '50%' },
+				},
+				{
+					name: 'pollEnabled',
+					type: 'checkbox',
+					defaultValue: false,
+					label: labelForKey(keys.formPollEnabled),
+					admin: { width: '50%' },
+				},
+			],
+		},
+		// Unnamed tabs are presentational: their fields stay at the document root. An unnamed tab's
+		// `admin.condition` receives the whole document as its 2nd arg, so the Flow and Poll tabs gate
+		// on the root-level flags. The poll group nests its config under `form.poll` as before.
 		{
 			type: 'tabs',
 			tabs: [
-				{ label: labelForKey(keys.tabFields), fields: [fieldsField, buttonsField] },
-				{ label: labelForKey(keys.tabFlow), fields: [flowField] },
+				{ label: labelForKey(keys.tabFields), fields: [fieldsField, submitField] },
+				{
+					label: labelForKey(keys.tabFlow),
+					admin: { condition: (_data, siblingData) => siblingData?.multistep === true },
+					fields: [flowField, prevNextRow],
+				},
+				{
+					label: labelForKey(keys.pollGroup),
+					admin: { condition: (_data, siblingData) => siblingData?.pollEnabled === true },
+					fields: [pollGroupField],
+				},
 				{ label: labelForKey(keys.tabActions), fields: [actionsField] },
 				{ label: labelForKey(keys.tabResponse), fields: [responseField] },
-			],
-		},
-		// Poll lifecycle config; identifiers and behavior, never localized. Sidebar keeps parity with
-		// the pre-group showResults/resultsField placement. `resultsVisibility` is defaulted and not
-		// clearable rather than `required` for the same generated-types reason as `response.type`.
-		{
-			name: 'poll',
-			type: 'group',
-			label: labelForKey(keys.pollGroup),
-			admin: { position: 'sidebar' },
-			fields: [
-				{
-					name: 'enabled',
-					type: 'checkbox',
-					defaultValue: false,
-					label: labelForKey(keys.pollEnabled),
-				},
-				// Authored by picking from the form's poll-eligible fields; the stored value stays a
-				// plain text field name. Select options and server validate share `pollResultsTypes`,
-				// so they cannot drift.
-				{
-					name: 'resultsField',
-					type: 'text',
-					label: labelForKey(keys.pollResultsField),
-					validate: buildValidateResultsField(pollResultsTypes),
-					admin: {
-						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
-						components: {
-							Field: {
-								path: FIELD_NAME_SELECT_REF,
-								clientProps: {
-									types: pollResultsTypes,
-									descriptionKey: keys.pollResultsFieldDescription,
-								},
-							},
-						},
-					},
-				},
-				{
-					name: 'resultsVisibility',
-					type: 'select',
-					defaultValue: 'afterVote',
-					label: labelForKey(keys.pollResultsVisibility),
-					admin: {
-						isClearable: false,
-						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
-					},
-					options: [
-						{ label: labelForKey(keys.pollVisibilityAfterVote), value: 'afterVote' },
-						{ label: labelForKey(keys.pollVisibilityAfterClose), value: 'afterClose' },
-					],
-				},
-				{
-					name: 'closesAt',
-					type: 'date',
-					label: labelForKey(keys.pollClosesAt),
-					admin: {
-						date: { pickerAppearance: 'dayAndTime' },
-						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
-					},
-				},
-				...buildPollOptionSourceFields(pollSourceRegistry ?? new Map()),
-				// `winningValue` is recorded either by an admin picking from the poll's effective options
-				// (served by `/:id/poll-options`) or by `resolvePollOutcome` (host domain logic); the
-				// `pollOutcomeBeforeChange` hook validates both paths and owns the `resolvedAt` stamp.
-				// `resolvedAt` itself stays fully locked: field-level create/update access blocks every
-				// non-override caller write (Payload silently drops the denied value rather than erroring)
-				// while the hook's stamp, applied after access filtering, still persists. The
-				// `poll.outcomeFields` seam receives both defaults and its return becomes the group's
-				// fields verbatim, so a host can swap `winningValue` for its own component; the hook
-				// still validates the stored value against the effective options, so no swap bypasses it.
-				{
-					name: 'outcome',
-					type: 'group',
-					label: labelForKey(keys.pollOutcome),
-					admin: {
-						condition: (_data, siblingData) => Boolean(siblingData?.enabled),
-						hideGutter: true,
-					},
-					fields: outcomeFields
-						? outcomeFields({ defaultFields: defaultOutcomeFields })
-						: [defaultOutcomeFields.winningValue, defaultOutcomeFields.resolvedAt],
-				},
 			],
 		},
 	]

@@ -64,7 +64,10 @@ export const pollOutcomeBeforeChange: CollectionBeforeChangeHook = async ({
 			? (originalDoc.poll as Record<string, unknown>)
 			: undefined
 	const mergedPoll = { ...(originalPoll ?? {}), ...incomingPoll }
-	if (pollConfigOf(mergedPoll)?.enabled !== true) {
+	// The poll-enable flag lives at the document root now; merge the incoming partial over the stored
+	// doc so a partial update that omits it still validates against the persisted value.
+	const mergedPollEnabled = { ...(originalDoc ?? {}), ...data }.pollEnabled === true
+	if (!mergedPollEnabled) {
 		fail(t(keys.validationWinningValueDisabled))
 	}
 	const id = (originalDoc?.id ?? data?.id) as number | string | undefined
@@ -72,6 +75,7 @@ export const pollOutcomeBeforeChange: CollectionBeforeChangeHook = async ({
 		id: id ?? '',
 		title:
 			typeof data?.title === 'string' ? data.title : (originalDoc?.title as string | undefined),
+		pollEnabled: mergedPollEnabled,
 		poll: mergedPoll,
 		fields: data?.fields ?? originalDoc?.fields,
 	}

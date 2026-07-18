@@ -54,7 +54,7 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 		})
 
 	it('afterVote + open: serves public results anonymously', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
 		await vote(form.id, 'red')
 		await vote(form.id, 'blue')
 		const res = await request(form.id, { field: 'colour' })
@@ -64,8 +64,8 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 
 	it('afterVote + closed: still serves results anonymously', async () => {
 		const form = await makeForm({
+			pollEnabled: true,
 			poll: {
-				enabled: true,
 				resultsField: 'colour',
 				resultsVisibility: 'afterVote',
 				closesAt: past(),
@@ -77,8 +77,8 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 
 	it('afterClose + open: forbids anonymous results until closesAt passes', async () => {
 		const form = await makeForm({
+			pollEnabled: true,
 			poll: {
-				enabled: true,
 				resultsField: 'colour',
 				resultsVisibility: 'afterClose',
 				closesAt: future(),
@@ -90,7 +90,8 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 
 	it('afterClose without a closesAt: forbids anonymous results', async () => {
 		const form = await makeForm({
-			poll: { enabled: true, resultsField: 'colour', resultsVisibility: 'afterClose' },
+			pollEnabled: true,
+			poll: { resultsField: 'colour', resultsVisibility: 'afterClose' },
 		})
 		const res = await request(form.id)
 		expect(res.status).toBe(403)
@@ -98,8 +99,8 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 
 	it('afterClose + closed: serves results anonymously', async () => {
 		const form = await makeForm({
+			pollEnabled: true,
 			poll: {
-				enabled: true,
 				resultsField: 'colour',
 				resultsVisibility: 'afterClose',
 				closesAt: past(),
@@ -117,13 +118,13 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 	})
 
 	it('forbids anonymous results when only resultsField is set but the poll is disabled', async () => {
-		const form = await makeForm({ poll: { enabled: false, resultsField: 'colour' } })
+		const form = await makeForm({ pollEnabled: false, poll: { resultsField: 'colour' } })
 		const res = await request(form.id)
 		expect(res.status).toBe(403)
 	})
 
 	it('forbids an anonymous request for a field other than the public one', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
 		const res = await request(form.id, { field: 'note' })
 		expect(res.status).toBe(403)
 	})
@@ -134,26 +135,25 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 		booted.payload.db.updateOne({ collection: 'forms', id: formId, data: { poll } })
 
 	it('rejects saving a resultsField that names a non-eligible or unknown field', async () => {
-		await expect(makeForm({ poll: { enabled: true, resultsField: 'note' } })).rejects.toThrow()
-		await expect(makeForm({ poll: { enabled: true, resultsField: 'ghost' } })).rejects.toThrow()
+		await expect(makeForm({ pollEnabled: true, poll: { resultsField: 'note' } })).rejects.toThrow()
+		await expect(makeForm({ pollEnabled: true, poll: { resultsField: 'ghost' } })).rejects.toThrow()
 	})
 
 	it('accepts a stale resultsField while the poll is disabled (validation follows the condition)', async () => {
-		const form = await makeForm({ poll: { enabled: false, resultsField: 'ghost' } })
+		const form = await makeForm({ pollEnabled: false, poll: { resultsField: 'ghost' } })
 		expect(form.id).toBeDefined()
 	})
 
 	it('forbids anonymous results when the public field is not enumerable (PII guard)', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
-		await plantPoll(form.id, { enabled: true, resultsField: 'note' })
+		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
+		await plantPoll(form.id, { resultsField: 'note' })
 		const res = await request(form.id)
 		expect(res.status).toBe(403)
 	})
 
 	it('forbids anonymous results for a closed poll whose field is not enumerable (PII guard survives close)', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
 		await plantPoll(form.id, {
-			enabled: true,
 			resultsField: 'note',
 			resultsVisibility: 'afterClose',
 			closesAt: past(),
@@ -172,8 +172,8 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 
 	it('allows an authed caller before an afterClose poll closes', async () => {
 		const form = await makeForm({
+			pollEnabled: true,
 			poll: {
-				enabled: true,
 				resultsField: 'colour',
 				resultsVisibility: 'afterClose',
 				closesAt: future(),
@@ -192,7 +192,7 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 	// the collection is what blocks anonymous writes. This boot has no access overrides, proving
 	// the unlock still rides that gate.
 	it('default access gates outcome writes to authenticated callers', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
 		await expect(
 			booted.payload.update({
 				collection: 'forms',

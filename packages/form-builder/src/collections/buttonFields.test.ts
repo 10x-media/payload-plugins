@@ -15,18 +15,15 @@ const formsFieldsOf = async (options: Parameters<typeof formBuilder>[0]): Promis
 	return out.collections?.find((c) => c.slug === 'forms')?.fields ?? []
 }
 
-const fieldsTabOf = (fields: Field[]) => {
+const tabWith = (fields: Field[], fieldName: string) => {
 	const tabs = fields.find((f): f is Extract<Field, { type: 'tabs' }> => f.type === 'tabs')
 	return tabs?.tabs.find(
-		(tab) => 'fields' in tab && tab.fields.some((f) => 'name' in f && f.name === 'fields')
+		(tab) => 'fields' in tab && tab.fields.some((f) => 'name' in f && f.name === fieldName)
 	)
 }
 
-const buttonsGroupOf = (fields: Field[]) =>
-	fieldsTabOf(fields)?.fields.find(
-		(f): f is Extract<Field, { type: 'group' }> =>
-			f.type === 'group' && 'name' in f && f.name === 'buttons'
-	)
+const fieldsTabOf = (fields: Field[]) => tabWith(fields, 'fields')
+const flowTabOf = (fields: Field[]) => tabWith(fields, 'flow')
 
 const namesOf = (fields: Field[] | undefined): (string | undefined)[] =>
 	(fields ?? []).map((f) => ('name' in f ? f.name : undefined))
@@ -62,15 +59,11 @@ describe('default button label fields', () => {
 	})
 })
 
-describe('forms buttons group', () => {
-	it('sits at the bottom of the Fields tab: submit full width, then a prev/next row', async () => {
+describe('forms buttons fields', () => {
+	it('places submit at the bottom of the Fields tab and prev/next in a row on the Flow tab', async () => {
 		const fields = await formsFieldsOf({})
-		const tab = fieldsTabOf(fields)
-		expect(tab?.fields.at(-1)).toMatchObject({ type: 'group', name: 'buttons' })
-		const group = buttonsGroupOf(fields)
-		expect(group?.fields).toHaveLength(2)
-		const [submit, row] = group?.fields ?? []
-		expect(submit).toMatchObject({ name: 'submitLabel' })
+		expect(fieldsTabOf(fields)?.fields.at(-1)).toMatchObject({ name: 'submitLabel' })
+		const row = flowTabOf(fields)?.fields.at(-1)
 		expect(row).toMatchObject({ type: 'row' })
 		const rowFields = row && 'fields' in row ? row.fields : []
 		expect(namesOf(rowFields)).toEqual(['prevLabel', 'nextLabel'])
@@ -80,8 +73,7 @@ describe('forms buttons group', () => {
 
 	it('keeps the multi-step description on prev/next after the width merge', async () => {
 		const fields = await formsFieldsOf({})
-		const group = buttonsGroupOf(fields)
-		const [, row] = group?.fields ?? []
+		const row = flowTabOf(fields)?.fields.at(-1)
 		const rowFields = (row && 'fields' in row ? row.fields : []) as FieldWithAdmin[]
 		for (const field of rowFields) {
 			expect(typeof field.admin?.description).toBe('function')
@@ -101,11 +93,11 @@ describe('forms buttons group', () => {
 		expect(namesOf(response?.fields)).not.toContain('submitLabel')
 	})
 
-	it('uses the buttons.fields return verbatim', async () => {
+	it('places each slot the buttons.fields map returns', async () => {
 		const fields = await formsFieldsOf({
 			buttons: {
-				fields: ({ defaultFields }) => [
-					{
+				fields: ({ defaultFields }) => ({
+					submit: {
 						type: 'row',
 						fields: [
 							defaultFields.submit,
@@ -116,16 +108,19 @@ describe('forms buttons group', () => {
 							},
 						],
 					},
-					defaultFields.prev,
-				],
+					prev: defaultFields.prev,
+					next: defaultFields.next,
+				}),
 			},
 		})
-		const group = buttonsGroupOf(fields)
-		expect(group?.fields).toHaveLength(2)
-		const [row, prev] = group?.fields ?? []
-		expect(row).toMatchObject({ type: 'row' })
-		expect(namesOf(row && 'fields' in row ? row.fields : [])).toEqual(['submitLabel', 'submitIcon'])
-		expect(prev).toMatchObject({ name: 'prevLabel' })
+		const submit = fieldsTabOf(fields)?.fields.at(-1)
+		expect(submit).toMatchObject({ type: 'row' })
+		expect(namesOf(submit && 'fields' in submit ? submit.fields : [])).toEqual([
+			'submitLabel',
+			'submitIcon',
+		])
+		const row = flowTabOf(fields)?.fields.at(-1)
+		expect(namesOf(row && 'fields' in row ? row.fields : [])).toEqual(['prevLabel', 'nextLabel'])
 	})
 
 	it('hands the seam already-localized defaults, following localizeContent', async () => {
@@ -140,7 +135,7 @@ describe('forms buttons group', () => {
 							isLocalized(defaultFields.next),
 							isLocalized(defaultFields.prev)
 						)
-						return [defaultFields.submit, defaultFields.next, defaultFields.prev]
+						return defaultFields
 					},
 				},
 			})

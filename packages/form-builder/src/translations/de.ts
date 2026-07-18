@@ -150,7 +150,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.resultsNoResponses]: 'Noch keine Antworten',
 	[keys.resultsTruncated]: 'Zeigt eine Stichprobe der Antworten',
 	[keys.pollGroup]: 'Umfrage',
-	[keys.pollEnabled]: 'Umfrageergebnisse aktivieren',
 	[keys.pollResultsField]: 'Ergebnisfeld',
 	[keys.pollResultsFieldDescription]:
 		'Feld, dessen aggregierte Ergebnisse öffentlich sind. Verwende ein Auswahlfeld, niemals ein Freitext- oder personenbezogenes Feld.',
@@ -243,7 +242,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.responseMessage]: 'Nachricht',
 	[keys.responseRedirect]: 'Weiterleitung',
 	[keys.responseUrl]: 'URL',
-	[keys.buttonsGroup]: 'Schaltflächen',
 	[keys.buttonsSubmitLabel]: 'Beschriftung der Absenden-Schaltfläche',
 	[keys.buttonsNextLabel]: 'Beschriftung der Weiter-Schaltfläche',
 	[keys.buttonsPrevLabel]: 'Beschriftung der Zurück-Schaltfläche',
@@ -251,4 +249,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.formBack]: 'Zurück',
 	[keys.formNext]: 'Weiter',
 	[keys.formSubmit]: 'Absenden',
+	[keys.formMultistep]: 'Mehrstufig',
+	[keys.formPollEnabled]: 'Umfrage',
 }

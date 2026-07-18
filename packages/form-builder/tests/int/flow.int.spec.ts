@@ -76,6 +76,10 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 			booted.payload.create({
 				collection: 'forms',
 				data: {
+					// The reserved-id check is the flow field's own validate, which runs only when the
+					// Flow tab is active; the multistep flag opens it. (The `< 2 steps` and dangling-ref
+					// checks live in the beforeValidate hook, so those tests need no flag.)
+					multistep: true,
 					title: 'Sentinel-id flow',
 					fields: [
 						{ blockType: 'text', name: 'name', label: 'Name' },

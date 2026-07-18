@@ -15,9 +15,7 @@ const buildCollection = (fields?: FieldTypesConfig): CollectionConfig =>
 	})
 
 const resultsFieldOf = (collection: CollectionConfig) => {
-	const poll = collection.fields.find(
-		(field) => 'name' in field && field.name === 'poll'
-	) as Extract<Field, { type: 'group' }>
+	const poll = groupNamed(tabFields(collection), 'poll')
 	return poll.fields.find((field) => 'name' in field && field.name === 'resultsField') as Extract<
 		Field,
 		{ type: 'text' }
@@ -57,6 +55,20 @@ const tabFields = (collection: CollectionConfig): Field[] => {
 	return tabs.tabs.flatMap((tab) => tab.fields)
 }
 
+/** The `admin.condition` of the (presentational) tab that contains a field with the given name. */
+const tabConditionByField = (collection: CollectionConfig, fieldName: string): Condition => {
+	const tabs = collection.fields.find((field) => field.type === 'tabs')
+	if (tabs?.type !== 'tabs') {
+		throw new Error('missing tabs')
+	}
+	const tab = tabs.tabs.find((t) => t.fields.some((f) => 'name' in f && f.name === fieldName))
+	const condition = (tab?.admin as { condition?: Condition } | undefined)?.condition
+	if (typeof condition !== 'function') {
+		throw new Error(`missing admin.condition on the tab containing ${fieldName}`)
+	}
+	return condition
+}
+
 /**
  * Every `admin.condition` in the forms collection reads `siblingData`, so each must be gated by the
  * group it actually sits in. Reading the wrong scope is silent (the field just never shows) and is
@@ -89,24 +101,26 @@ describe('forms admin.condition scopes', () => {
 		expect(message({ type: 'message' }, { type: 'redirect' }, props)).toBe(false)
 	})
 
-	it('gates every conditional poll field on the poll group being enabled', () => {
-		const poll = groupNamed(collection.fields, 'poll')
-		for (const name of ['resultsField', 'resultsVisibility', 'closesAt', 'outcome']) {
-			const condition = conditionOf(poll.fields, name)
-			expect(condition({}, { enabled: true }, props)).toBe(true)
-			expect(condition({}, { enabled: false }, props)).toBe(false)
-			expect(condition({}, {}, props)).toBe(false)
-		}
+	it('gates the Flow and Poll tabs on the document-level flags', () => {
+		// A presentational tab's `admin.condition` reads the whole document as its 2nd argument, so
+		// the Flow tab keys off `multistep` and the Poll tab off `pollEnabled`, both at the root.
+		const flow = tabConditionByField(collection, 'flow')
+		expect(flow({}, { multistep: true }, props)).toBe(true)
+		expect(flow({}, { multistep: false }, props)).toBe(false)
+		expect(flow({}, {}, props)).toBe(false)
+
+		const poll = tabConditionByField(collection, 'poll')
+		expect(poll({}, { pollEnabled: true }, props)).toBe(true)
+		expect(poll({}, { pollEnabled: false }, props)).toBe(false)
+		expect(poll({}, {}, props)).toBe(false)
 	})
 
-	it('reads the poll group, not the document, for the poll enabled gate', () => {
-		const poll = groupNamed(collection.fields, 'poll')
-		const condition = conditionOf(poll.fields, 'closesAt')
-		// Every plausible wrong scope is present and says the opposite of the sibling group, so
-		// reading data.enabled, data.poll.enabled, or siblingData.poll.enabled fails both directions.
-		const wrong = (enabled: boolean) => ({ enabled, poll: { enabled } })
-		expect(condition(wrong(false), { enabled: true, poll: { enabled: false } }, props)).toBe(true)
-		expect(condition(wrong(true), { enabled: false, poll: { enabled: true } }, props)).toBe(false)
+	it('no longer gates individual poll fields on enabled (the Poll tab owns that gate)', () => {
+		const poll = groupNamed(tabFields(collection), 'poll')
+		for (const name of ['resultsField', 'resultsVisibility', 'closesAt', 'outcome']) {
+			const field = poll.fields.find((f) => 'name' in f && f.name === name)
+			expect((field?.admin as { condition?: unknown } | undefined)?.condition).toBeUndefined()
+		}
 	})
 })
 
@@ -140,14 +154,11 @@ describe('forms poll.resultsField', () => {
 		expect(clientComponentOf(field)?.clientProps?.types).toEqual(['select', 'athleteVote'])
 	})
 
-	it('stores a plain text name and stays gated on enabled', () => {
+	it('stores a plain text name with no condition of its own', () => {
 		const field = resultsFieldOf(buildCollection())
 		expect(field.type).toBe('text')
 		expect(typeof field.validate).toBe('function')
-		const condition = field.admin?.condition
-		expect(condition?.({}, { enabled: true }, {} as never)).toBe(true)
-		expect(condition?.({}, { enabled: false }, {} as never)).toBe(false)
-		expect(condition?.({}, {}, {} as never)).toBe(false)
+		expect(field.admin?.condition).toBeUndefined()
 	})
 })
 

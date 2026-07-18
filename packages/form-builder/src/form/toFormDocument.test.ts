@@ -19,20 +19,32 @@ describe('toFormDocument', () => {
 		expect(doc.response).toBeUndefined()
 	})
 
-	it('passes buttons through wholesale so host-added keys survive to the client', () => {
-		const buttons = { submitLabel: 'Send', submitIcon: 'arrow-right' }
-		const doc = toFormDocument({ id: 1, fields: [], buttons })
-		expect(doc.buttons).toBe(buttons)
-		expect(doc.buttons?.submitIcon).toBe('arrow-right')
+	it('reassembles buttons from the top-level label fields', () => {
+		const doc = toFormDocument({ id: 1, fields: [], submitLabel: 'Send', nextLabel: 'Continue' })
+		expect(doc.buttons).toEqual({ submitLabel: 'Send', nextLabel: 'Continue' })
 	})
 
-	it('coerces a null or omitted buttons to undefined', () => {
-		expect(toFormDocument({ id: 1, buttons: null }).buttons).toBeUndefined()
+	it('leaves buttons undefined when no non-empty label is set', () => {
+		expect(toFormDocument({ id: 1, submitLabel: null }).buttons).toBeUndefined()
+		expect(toFormDocument({ id: 1, submitLabel: '' }).buttons).toBeUndefined()
 		expect(toFormDocument({ id: 1 }).buttons).toBeUndefined()
 	})
 
-	// The asymmetry is a contract, not an accident: response and buttons are host-extensible
-	// visitor-facing groups, poll is an allowlist so server-only members cannot leak to the client.
+	it('coerces the top-level multistep and pollEnabled flags to strict booleans', () => {
+		expect(toFormDocument({ id: 1 })).toMatchObject({ multistep: false, pollEnabled: false })
+		expect(toFormDocument({ id: 1, multistep: true, pollEnabled: true })).toMatchObject({
+			multistep: true,
+			pollEnabled: true,
+		})
+		expect(toFormDocument({ id: 1, multistep: null, pollEnabled: null })).toMatchObject({
+			multistep: false,
+			pollEnabled: false,
+		})
+	})
+
+	// The asymmetry is a contract, not an accident: response is a host-extensible visitor-facing
+	// group cast wholesale; buttons and poll are allowlists so host extras and server-only members
+	// cannot leak to the client.
 	describe('unknown-key preservation', () => {
 		it('preserves unknown keys on response', () => {
 			const response = { type: 'message', message: 'Thanks', tone: 'celebratory' }
@@ -41,11 +53,13 @@ describe('toFormDocument', () => {
 			expect((doc.response as Record<string, unknown>)?.tone).toBe('celebratory')
 		})
 
-		it('preserves unknown keys on buttons', () => {
-			const buttons = { submitLabel: 'Send', submitIcon: 'arrow-right' }
-			const doc = toFormDocument({ id: 1, buttons })
-			expect(doc.buttons).toBe(buttons)
-			expect((doc.buttons as Record<string, unknown>)?.submitIcon).toBe('arrow-right')
+		it('drops unknown top-level keys from buttons, keeping only the three labels', () => {
+			const doc = toFormDocument({
+				id: 1,
+				submitLabel: 'Send',
+				submitIcon: 'arrow-right',
+			} as Parameters<typeof toFormDocument>[0])
+			expect(doc.buttons).toEqual({ submitLabel: 'Send' })
 		})
 
 		it('drops unknown keys on poll, including anything a host stored in sourceConfig', () => {

@@ -210,7 +210,8 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				],
 			},
 		],
-		poll: { enabled: true, resultsField: 'framework' },
+		pollEnabled: true,
+		poll: { resultsField: 'framework' },
 	})
 
 	const voteable = await payload.find({
@@ -230,6 +231,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				athletes: voteableIds,
 			},
 		],
-		poll: { enabled: true, resultsField: 'pick' },
+		pollEnabled: true,
+		poll: { resultsField: 'pick' },
 	})
 }

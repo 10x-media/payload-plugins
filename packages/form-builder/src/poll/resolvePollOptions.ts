@@ -36,8 +36,8 @@ const cacheOf = (req: PayloadRequest | undefined): OptionsCache | undefined => {
 export type ResolvePollOptionsArgs = {
 	payload: Payload
 	req?: PayloadRequest
-	/** A loaded forms document (its `poll` group drives resolution). */
-	form: { id: number | string; title?: string | null; poll?: unknown }
+	/** A loaded forms document; its top-level `pollEnabled` flag and `poll` config drive resolution. */
+	form: { id: number | string; title?: string | null; pollEnabled?: boolean | null; poll?: unknown }
 	/** Registry override for plugin-internal callers; defaults to the registry the plugin stashed on the config. */
 	sources?: PollOptionSourceRegistry
 }
@@ -57,7 +57,7 @@ export const resolvePollOptions = async (
 	const { payload, req, form, sources } = args
 	const poll = pollConfigOf(form.poll)
 	const optionSource = typeof poll?.optionSource === 'string' ? poll.optionSource : undefined
-	if (poll?.enabled !== true || !optionSource) {
+	if (form.pollEnabled !== true || !poll || !optionSource) {
 		return undefined
 	}
 	const source = (sources ?? pollOptionSourcesOf(payload)).get(optionSource)

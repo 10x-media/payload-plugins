@@ -102,7 +102,7 @@ export const resolveFormResultsRequest = async (
 			typeof poll?.resultsField === 'string' && poll.resultsField.length > 0
 				? poll.resultsField
 				: undefined
-		if (poll?.enabled === true && resultsField && (!field || field === resultsField)) {
+		if (form.pollEnabled === true && resultsField && (!field || field === resultsField)) {
 			const options: PollOption[] = await resolveEffectivePollOptions({
 				payload,
 				req,
@@ -114,7 +114,7 @@ export const resolveFormResultsRequest = async (
 		}
 	} else {
 		const poll = pollConfigOf(form.poll)
-		if (poll?.enabled !== true) {
+		if (form.pollEnabled !== true || !poll) {
 			return forbidden
 		}
 		if (poll.resultsVisibility === 'afterClose' && !isPollClosed(poll)) {

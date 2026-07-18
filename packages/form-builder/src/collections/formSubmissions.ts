@@ -7,7 +7,6 @@ import type { ConsentSourcesResolver } from '../consent/types'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
-import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import type { PollOptionSourceRegistry } from '../poll/registry'
@@ -144,14 +143,14 @@ const makeVotedCookieHook = (): CollectionAfterChangeHook => {
 			return doc
 		}
 		const stashed = req.context?.[POLL_CONTEXT_KEY]
-		let poll = pollConfigOf(stashed)
-		if (stashed === undefined) {
+		let pollEnabled = typeof stashed === 'boolean' ? stashed : undefined
+		if (pollEnabled === undefined) {
 			const form = await req.payload
 				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
 				.catch(() => null)
-			poll = form ? pollConfigOf(form.poll) : undefined
+			pollEnabled = form?.pollEnabled === true
 		}
-		if (poll?.enabled !== true) {
+		if (!pollEnabled) {
 			return doc
 		}
 		req.responseHeaders ??= new Headers()

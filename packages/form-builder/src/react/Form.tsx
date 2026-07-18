@@ -312,8 +312,10 @@ export const Form = ({
 		[form.fields, effectiveValues, registry, locale, translate]
 	)
 
-	// Multi-step is active only when a flow declares two or more steps; otherwise this is an ordinary single-step form.
-	const flow = form.flow && form.flow.steps.length >= 2 ? form.flow : undefined
+	// Multi-step is active only when the form is flagged `multistep` and its flow declares two or more
+	// steps. With the flag off the form renders as a single page even if flow data is still stored.
+	const flow =
+		form.multistep === true && form.flow && form.flow.steps.length >= 2 ? form.flow : undefined
 	const [currentStepId, setCurrentStepId] = useState<string | undefined>(() =>
 		flow ? firstStepId(flow) : undefined
 	)

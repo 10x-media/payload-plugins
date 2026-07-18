@@ -61,14 +61,15 @@ export const validateSubmission =
 			req,
 		})
 
-		// Stash the poll config (null = form has none) so the voted-cookie afterChange hook can
-		// skip a second form fetch on the same request.
+		// Stash whether the form is poll-enabled (its top-level `pollEnabled` flag) so the voted-cookie
+		// afterChange hook can skip a second form fetch on the same request.
 		const poll = pollConfigOf(form.poll)
-		req.context[POLL_CONTEXT_KEY] = poll ?? null
+		const pollEnabled = form.pollEnabled === true
+		req.context[POLL_CONTEXT_KEY] = pollEnabled
 
 		// Form-level lifecycle guard, before any field work: a closed poll accepts no submissions,
 		// regardless of what the client rendered.
-		if (poll?.enabled === true && isPollClosed(poll)) {
+		if (pollEnabled && isPollClosed(poll)) {
 			throw new APIError(asTranslate(req.i18n.t)(keys.pollClosed), 403)
 		}
 
@@ -85,9 +86,7 @@ export const validateSubmission =
 		// the check. Static authored polls are unaffected: their field validates against its own options
 		// through the normal field pipeline.
 		const resultsField =
-			poll?.enabled === true &&
-			typeof poll.resultsField === 'string' &&
-			poll.resultsField.length > 0
+			pollEnabled && typeof poll?.resultsField === 'string' && poll.resultsField.length > 0
 				? poll.resultsField
 				: undefined
 		const resultsInstance = resultsField

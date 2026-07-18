@@ -40,9 +40,15 @@ const athletes = definePollOptionSource<{ eventId?: string; winner?: string }>({
 })
 
 const pollSubfieldNames = (collection: CollectionConfig): (string | undefined)[] => {
-	const poll = collection.fields.find(
-		(field) => 'name' in field && field.name === 'poll'
-	) as Extract<Field, { type: 'group' }>
+	const tabs = collection.fields.find((f) => f.type === 'tabs')
+	const pollTab =
+		tabs?.type === 'tabs'
+			? tabs.tabs.find((t) => t.fields.some((f) => 'name' in f && f.name === 'poll'))
+			: undefined
+	const poll = pollTab?.fields.find((field) => 'name' in field && field.name === 'poll') as Extract<
+		Field,
+		{ type: 'group' }
+	>
 	return poll.fields.map((field) => ('name' in field ? field.name : undefined))
 }
 
@@ -71,8 +77,8 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			data: {
 				title: 'Race prediction',
 				fields: [{ blockType: 'select', name: 'winner', label: 'Winner', options: [] }],
+				pollEnabled: true,
 				poll: {
-					enabled: true,
 					resultsField: 'winner',
 					optionSource: 'athletes',
 					sourceConfig: { eventId: 'race-1' },
@@ -206,7 +212,8 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 					{ blockType: 'select', name: 'winner', label: 'Winner', options: [] },
 					{ blockType: 'text', name: 'note', label: 'Note' },
 				],
-				poll: { enabled: true, resultsField: 'winner', optionSource: 'athletes' },
+				pollEnabled: true,
+				poll: { resultsField: 'winner', optionSource: 'athletes' },
 			},
 		})
 		// The resultsField validate refuses a non-eligible field, so the misconfiguration is
@@ -214,7 +221,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		await booted.payload.db.updateOne({
 			collection: 'forms',
 			id: form.id,
-			data: { poll: { enabled: true, resultsField: 'note', optionSource: 'athletes' } },
+			data: { poll: { resultsField: 'note', optionSource: 'athletes' } },
 		})
 		const gated = await resolveFormResultsRequest({
 			payload: booted.payload,
@@ -300,7 +307,8 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 						options: [{ label: 'Ada', value: 'ada' }],
 					},
 				],
-				poll: { enabled: true, resultsField: 'winner' },
+				pollEnabled: true,
+				poll: { resultsField: 'winner' },
 			},
 		})
 		await expect(
@@ -426,7 +434,8 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 						options: [{ label: 'Ada', value: 'ada' }],
 					},
 				],
-				poll: { enabled: true, resultsField: 'winner' },
+				pollEnabled: true,
+				poll: { resultsField: 'winner' },
 			},
 		})
 		const res = await resolvePollOptionsRequest({

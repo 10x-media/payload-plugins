@@ -26,7 +26,7 @@ const Harness = ({ validateField }: { validateField: (name: string, value: unkno
 	return (
 		<FormContext.Provider
 			value={{
-				form: { id: 1, fields: [] },
+				form: { id: 1, fields: [], multistep: false, pollEnabled: false },
 				state,
 				dispatch,
 				validateField,

@@ -55,9 +55,15 @@ const athleteVote: AnyFormFieldDefinition = {
 const SWAPPED_WINNING_REF = '@10x-media/form-builder/client#FieldNameSelect'
 
 const winningValueField = (collection: CollectionConfig): Field | undefined => {
-	const poll = collection.fields.find(
-		(field) => 'name' in field && field.name === 'poll'
-	) as Extract<Field, { type: 'group' }>
+	const tabs = collection.fields.find((f) => f.type === 'tabs')
+	const pollTab =
+		tabs?.type === 'tabs'
+			? tabs.tabs.find((t) => t.fields.some((f) => 'name' in f && f.name === 'poll'))
+			: undefined
+	const poll = pollTab?.fields.find((field) => 'name' in field && field.name === 'poll') as Extract<
+		Field,
+		{ type: 'group' }
+	>
 	const outcome = poll.fields.find(
 		(field) => 'name' in field && field.name === 'outcome'
 	) as Extract<Field, { type: 'group' }>
@@ -111,7 +117,8 @@ describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
 			data: {
 				title: 'Best athlete',
 				fields: [{ blockType: 'athleteVote', name: 'pick', label: 'Pick', athletes: shortlist() }],
-				poll: { enabled: true, resultsField: 'pick' },
+				pollEnabled: true,
+				poll: { resultsField: 'pick' },
 			},
 		})
 

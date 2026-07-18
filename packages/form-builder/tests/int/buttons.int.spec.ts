@@ -4,15 +4,27 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { toFormDocument } from '../../src/form/toFormDocument'
 import { formBuilder } from '../../src/index'
 
-const buttonsGroupOf = (booted: BootedPayload): Extract<Field, { type: 'group' }> | undefined => {
-	const fields = booted.payload.collections.forms?.config.fields ?? []
+const formsFieldsOf = (booted: BootedPayload): Field[] =>
+	booted.payload.collections.forms?.config.fields ?? []
+
+const tabWith = (fields: Field[], fieldName: string) => {
 	const tabs = fields.find((f): f is Extract<Field, { type: 'tabs' }> => f.type === 'tabs')
-	return tabs?.tabs
-		.flatMap((tab) => ('fields' in tab ? tab.fields : []))
-		.find(
-			(f): f is Extract<Field, { type: 'group' }> =>
-				f.type === 'group' && 'name' in f && f.name === 'buttons'
-		)
+	return tabs?.tabs.find(
+		(tab) => 'fields' in tab && tab.fields.some((f) => 'name' in f && f.name === fieldName)
+	)
+}
+
+const flatten = (field: Field | undefined): Field[] =>
+	field && 'fields' in field && Array.isArray(field.fields) ? field.fields : field ? [field] : []
+
+// The three button labels no longer live in a group: `submit` (or its host-wrapping row) sits at the
+// bottom of the Fields tab, and prev/next in a row on the Flow tab. Flatten both to a single list.
+const buttonFieldsOf = (booted: BootedPayload): Field[] => {
+	const fields = formsFieldsOf(booted)
+	return [
+		...flatten(tabWith(fields, 'fields')?.fields.at(-1)),
+		...flatten(tabWith(fields, 'flow')?.fields.at(-1)),
+	]
 }
 
 const isLocalized = (field: Field | undefined): boolean =>
@@ -20,7 +32,7 @@ const isLocalized = (field: Field | undefined): boolean =>
 
 const localization = { locales: ['en', 'de'], defaultLocale: 'en' }
 
-describeForDb('form-builder buttons group (localized host)', { dbs: ['mongo'] }, (db) => {
+describeForDb('form-builder button labels (localized host)', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -36,15 +48,9 @@ describeForDb('form-builder buttons group (localized host)', { dbs: ['mongo'] },
 	})
 
 	it('localizes all three button label fields', () => {
-		const group = buttonsGroupOf(booted)
-		expect(group).toBeDefined()
-		// submitLabel sits at the group's top level; prevLabel/nextLabel are one level down,
-		// inside the row that lays them out side by side.
-		const flatFields = (group?.fields ?? []).flatMap((f) =>
-			'fields' in f && Array.isArray(f.fields) ? f.fields : [f]
-		)
+		const fields = buttonFieldsOf(booted)
 		for (const name of ['submitLabel', 'nextLabel', 'prevLabel']) {
-			const field = flatFields.find((f) => 'name' in f && f.name === name)
+			const field = fields.find((f) => 'name' in f && f.name === name)
 			expect(isLocalized(field)).toBe(true)
 		}
 	})
@@ -55,43 +61,39 @@ describeForDb('form-builder buttons group (localized host)', { dbs: ['mongo'] },
 			data: {
 				title: 'Buttons',
 				fields: [{ blockType: 'text', name: 'name', label: 'Name' }],
-				buttons: { submitLabel: 'Send', nextLabel: 'Continue', prevLabel: 'Previous' },
+				submitLabel: 'Send',
+				nextLabel: 'Continue',
+				prevLabel: 'Previous',
 			},
 		})
 		await booted.payload.update({
 			collection: 'forms',
 			id: form.id,
 			locale: 'de',
-			data: {
-				buttons: { submitLabel: 'Abschicken', nextLabel: 'Weiter', prevLabel: 'Zurück' },
-			},
+			data: { submitLabel: 'Abschicken', nextLabel: 'Weiter', prevLabel: 'Zurück' },
 		})
 		const de = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'de' })
 		const en = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'en' })
-		expect(de.buttons).toMatchObject({
+		expect(de).toMatchObject({
 			submitLabel: 'Abschicken',
 			nextLabel: 'Weiter',
 			prevLabel: 'Zurück',
 		})
-		expect(en.buttons).toMatchObject({
-			submitLabel: 'Send',
-			nextLabel: 'Continue',
-			prevLabel: 'Previous',
-		})
+		expect(en).toMatchObject({ submitLabel: 'Send', nextLabel: 'Continue', prevLabel: 'Previous' })
 	})
 })
 
-// Empty options: Mongo by default, both DBs under the matrix tier, proving the composed group
+// Empty options: Mongo by default, both DBs under the matrix tier, proving the composed submit slot
 // (row + host select) sanitizes, stores, and reads back identically cross-DB.
-describeForDb('form-builder buttons seam (host-extended group)', {}, (db) => {
+describeForDb('form-builder buttons seam (host-extended submit)', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			plugin: formBuilder({
 				buttons: {
-					fields: ({ defaultFields }) => [
-						{
+					fields: ({ defaultFields }) => ({
+						submit: {
 							type: 'row',
 							fields: [
 								defaultFields.submit,
@@ -105,9 +107,9 @@ describeForDb('form-builder buttons seam (host-extended group)', {}, (db) => {
 								},
 							],
 						},
-						defaultFields.next,
-						defaultFields.prev,
-					],
+						next: defaultFields.next,
+						prev: defaultFields.prev,
+					}),
 				},
 			}),
 			db,
@@ -118,34 +120,38 @@ describeForDb('form-builder buttons seam (host-extended group)', {}, (db) => {
 		await booted.stop()
 	})
 
-	it('boots with the composed group: row wrapping submit + icon, then next and prev', () => {
-		const group = buttonsGroupOf(booted)
-		expect(group?.fields).toHaveLength(3)
-		const [row, next, prev] = group?.fields ?? []
-		expect(row?.type).toBe('row')
+	it('boots with the composed submit slot on Fields and prev/next on Flow', () => {
+		const fields = formsFieldsOf(booted)
+		const submit = tabWith(fields, 'fields')?.fields.at(-1)
+		expect(submit?.type).toBe('row')
+		const submitNames = (submit && 'fields' in submit ? submit.fields : []).map((f) =>
+			'name' in f ? f.name : undefined
+		)
+		expect(submitNames).toEqual(['submitLabel', 'submitIcon'])
+		const row = tabWith(fields, 'flow')?.fields.at(-1)
 		const rowNames = (row && 'fields' in row ? row.fields : []).map((f) =>
 			'name' in f ? f.name : undefined
 		)
-		expect(rowNames).toEqual(['submitLabel', 'submitIcon'])
-		expect(next).toMatchObject({ name: 'nextLabel' })
-		expect(prev).toMatchObject({ name: 'prevLabel' })
+		expect(rowNames).toEqual(['prevLabel', 'nextLabel'])
 	})
 
-	it('persists the host-added field and hands it to the client via toFormDocument', async () => {
+	it('persists the host-added field at the top level; toFormDocument forwards only the labels', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',
 			data: {
 				title: 'Iconed submit',
 				fields: [{ blockType: 'text', name: 'name', label: 'Name' }],
-				buttons: { submitLabel: 'Send', submitIcon: 'arrow-right' },
+				submitLabel: 'Send',
+				submitIcon: 'arrow-right',
 			},
 		})
-		const stored = form.buttons as { submitLabel?: string; submitIcon?: string }
+		const stored = form as { submitLabel?: string; submitIcon?: string }
 		expect(stored.submitLabel).toBe('Send')
 		expect(stored.submitIcon).toBe('arrow-right')
 
 		const doc = toFormDocument(form as Parameters<typeof toFormDocument>[0])
 		expect(doc.buttons?.submitLabel).toBe('Send')
-		expect(doc.buttons?.submitIcon).toBe('arrow-right')
+		// The host-added top-level field is not auto-forwarded onto FormDocument.buttons (allowlist).
+		expect(doc.buttons?.submitIcon).toBeUndefined()
 	})
 })

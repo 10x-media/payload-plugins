@@ -14,6 +14,8 @@ beforeEach(() => {
 })
 
 const form = {
+	multistep: false,
+	pollEnabled: true,
 	id: 1,
 	fields: [
 		{

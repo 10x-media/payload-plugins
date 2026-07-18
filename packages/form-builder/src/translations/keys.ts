@@ -135,7 +135,6 @@ export const keys = {
 	resultsNoResponses: 'formBuilder:results.noResponses',
 	resultsTruncated: 'formBuilder:results.truncated',
 	pollGroup: 'formBuilder:poll.group',
-	pollEnabled: 'formBuilder:poll.enabled',
 	pollResultsField: 'formBuilder:poll.resultsField',
 	pollResultsFieldDescription: 'formBuilder:poll.resultsFieldDescription',
 	pollResultsVisibility: 'formBuilder:poll.resultsVisibility',
@@ -223,7 +222,6 @@ export const keys = {
 	responseMessage: 'formBuilder:response.message',
 	responseRedirect: 'formBuilder:response.redirect',
 	responseUrl: 'formBuilder:response.url',
-	buttonsGroup: 'formBuilder:buttons.group',
 	buttonsSubmitLabel: 'formBuilder:buttons.submitLabel',
 	buttonsNextLabel: 'formBuilder:buttons.nextLabel',
 	buttonsPrevLabel: 'formBuilder:buttons.prevLabel',
@@ -231,6 +229,8 @@ export const keys = {
 	formBack: 'formBuilder:form.back',
 	formNext: 'formBuilder:form.next',
 	formSubmit: 'formBuilder:form.submit',
+	formMultistep: 'formBuilder:form.multistep',
+	formPollEnabled: 'formBuilder:form.pollEnabled',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

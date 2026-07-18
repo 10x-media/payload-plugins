@@ -84,7 +84,7 @@ export const resolvePollOutcome = async (args: ResolvePollOutcomeArgs): Promise<
 		req,
 	})
 	const poll = pollConfigOf(form.poll)
-	if (poll?.enabled !== true) {
+	if (form.pollEnabled !== true || !poll) {
 		throw new Error(`Form ${String(formId)} is not poll-enabled; cannot record an outcome.`)
 	}
 	const winningValue =

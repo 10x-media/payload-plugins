@@ -146,7 +146,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.resultsNoResponses]: 'No responses yet',
 	[keys.resultsTruncated]: 'Showing a sample of responses',
 	[keys.pollGroup]: 'Poll',
-	[keys.pollEnabled]: 'Enable poll results',
 	[keys.pollResultsField]: 'Results field',
 	[keys.pollResultsFieldDescription]:
 		'Field whose aggregate results are public. Use a choice field, never a free-text or PII field.',
@@ -238,7 +237,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.responseMessage]: 'Message',
 	[keys.responseRedirect]: 'Redirect',
 	[keys.responseUrl]: 'URL',
-	[keys.buttonsGroup]: 'Buttons',
 	[keys.buttonsSubmitLabel]: 'Submit button label',
 	[keys.buttonsNextLabel]: 'Next button label',
 	[keys.buttonsPrevLabel]: 'Previous button label',
@@ -246,4 +244,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.formBack]: 'Back',
 	[keys.formNext]: 'Next',
 	[keys.formSubmit]: 'Submit',
+	[keys.formMultistep]: 'Multi-step',
+	[keys.formPollEnabled]: 'Poll',
 }

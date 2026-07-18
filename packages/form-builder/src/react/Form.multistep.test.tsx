@@ -18,6 +18,8 @@ const doc = (
 	id,
 	fields,
 	flow,
+	multistep: flow !== undefined,
+	pollEnabled: false,
 })
 
 const linearFields: FormFieldInstance[] = [
@@ -250,6 +252,19 @@ describe('Form multi-step flow', () => {
 		expect(screen.getByLabelText('Last')).toBeInTheDocument()
 		expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument()
 		expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+	})
+
+	it('renders a single page when multistep is false even though flow data exists', () => {
+		// The flag, not flow presence, drives multi-step. With it off, the stored flow is ignored and
+		// every field renders on one page; the flow data itself is never cleared or destroyed.
+		render(
+			<Form form={{ ...doc(linearFields, linearFlow), multistep: false }} onSubmit={vi.fn()} />
+		)
+		expect(screen.getByLabelText('First')).toBeInTheDocument()
+		expect(screen.getByLabelText('Last')).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
 	})
 
 	it('renders a nameless message assigned to step 2 by row id only on step 2 of a 3-step flow', async () => {

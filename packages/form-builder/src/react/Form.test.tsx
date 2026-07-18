@@ -9,7 +9,12 @@ afterEach(() => {
 	cleanup()
 })
 
-const doc = (fields: FormFieldInstance[], id: number | string = 1): FormDocument => ({ id, fields })
+const doc = (fields: FormFieldInstance[], id: number | string = 1): FormDocument => ({
+	id,
+	fields,
+	multistep: false,
+	pollEnabled: false,
+})
 
 describe('Form', () => {
 	it('hides a field until its visibleWhen condition is met', async () => {

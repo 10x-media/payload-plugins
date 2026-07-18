@@ -41,16 +41,17 @@ describe('buildPollOptionSourceFields', () => {
 		const fields = buildPollOptionSourceFields(resolvePollOptionSources({ athletes, teams }))
 		const select = fieldNamed(fields, 'optionSource')
 		expect(select.options?.map((option) => option.value)).toEqual(['athletes', 'teams'])
-		expect(conditionOf(select)({}, { enabled: true })).toBe(true)
-		expect(conditionOf(select)({}, { enabled: false })).toBe(false)
+		// optionSource carries no condition of its own; the Poll tab gates the whole group.
+		expect((select as { admin?: { condition?: unknown } }).admin?.condition).toBeUndefined()
 	})
 
-	it('gates sourceConfig on an enabled poll with a selected source', () => {
+	it('gates sourceConfig on a selected source', () => {
 		const fields = buildPollOptionSourceFields(resolvePollOptionSources({ athletes }))
 		const group = fieldNamed(fields, 'sourceConfig')
-		expect(conditionOf(group)({}, { enabled: true, optionSource: 'athletes' })).toBe(true)
-		expect(conditionOf(group)({}, { enabled: true })).toBe(false)
-		expect(conditionOf(group)({}, { enabled: false, optionSource: 'athletes' })).toBe(false)
+		expect(conditionOf(group)({}, { optionSource: 'athletes' })).toBe(true)
+		expect(conditionOf(group)({}, {})).toBe(false)
+		// The poll-enable flag no longer gates it (the Poll tab does); a selected source is enough.
+		expect(conditionOf(group)({}, { optionSource: 'athletes', enabled: false })).toBe(true)
 	})
 
 	it('shows a source config field only while its own type is selected', () => {

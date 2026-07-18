@@ -22,6 +22,28 @@ export type ToFormDocumentOptions = {
 }
 
 /**
+ * Reassemble the client button labels from the document's top-level `submitLabel`/`prevLabel`/
+ * `nextLabel` fields, keeping only non-empty strings (mirroring the client's own `storedLabel`
+ * fallback). Returns `undefined` when the author set no label, so the client uses its defaults.
+ */
+const buttonSettingsOf = (form: {
+	submitLabel?: string | null
+	prevLabel?: string | null
+	nextLabel?: string | null
+}): FormButtonSettings | undefined => {
+	const label = (value: unknown): string | undefined =>
+		typeof value === 'string' && value.length > 0 ? value : undefined
+	const settings: FormButtonSettings = {}
+	const submitLabel = label(form.submitLabel)
+	const prevLabel = label(form.prevLabel)
+	const nextLabel = label(form.nextLabel)
+	if (submitLabel !== undefined) settings.submitLabel = submitLabel
+	if (prevLabel !== undefined) settings.prevLabel = prevLabel
+	if (nextLabel !== undefined) settings.nextLabel = nextLabel
+	return Object.keys(settings).length > 0 ? settings : undefined
+}
+
+/**
  * Narrows a Payload-generated form document (from `getPayload().findByID()` or `fetch`) to
  * `FormDocument` without an unsafe `as` cast. Handles the small structural mismatches between
  * the auto-generated collection types and what `<Form>` expects:
@@ -29,16 +51,17 @@ export type ToFormDocumentOptions = {
  *   (nameless bare rows, e.g. message blocks, pass through with their row `id` intact)
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `response` may be null; coerced to `undefined`, otherwise passed through wholesale
- * - `buttons` may be null; passed through wholesale, so keys a host added to the buttons group
- *   via the plugin `buttons.fields` seam survive to the client untouched
+ * - the button labels (`submitLabel`/`prevLabel`/`nextLabel`) live at the document root now (there
+ *   is no `buttons` group); the non-empty ones are reassembled into `FormDocument.buttons`
  * - `title` may be null; coerced to `undefined`
+ * - `multistep`/`pollEnabled` are the two top-level form-type flags, coerced to strict booleans
  * - `poll` may be null; coerced to `undefined` (`resultsField`, `optionSource`, and
  *   `sourceConfig` are dropped: server-side only; `outcome` passes through `winningValue` only)
  *
- * Unknown keys survive on `response` and `buttons` but not on `poll`, which is deliberate rather
- * than incidental. `response` and `buttons` are visitor-facing groups a host is meant to extend
- * (`buttons.fields`, or `overrides.forms.fields`) and read back off `FormDocument` in custom
- * chrome, so they are cast wholesale. `poll` is plugin-owned config that is split between
+ * Unknown keys survive on `response` but not on `poll`, which is deliberate rather than incidental.
+ * `response` is a visitor-facing group a host is meant to extend (`overrides.forms.fields`) and read
+ * back off `FormDocument` in custom chrome, so it is cast wholesale. `poll` is plugin-owned config
+ * that is split between
  * client-safe lifecycle state and server-only members, so it is rebuilt from an allowlist: a
  * passthrough would ship whatever a host put in `sourceConfig` (domain config, ids, credentials)
  * to every anonymous visitor. Adding a client-visible poll member means naming it here.
@@ -56,13 +79,12 @@ export function toFormDocument(
 			message?: unknown
 			redirect?: { url?: string | null } | null
 		} | null
-		buttons?: {
-			submitLabel?: string | null
-			nextLabel?: string | null
-			prevLabel?: string | null
-			[key: string]: unknown
-		} | null
+		submitLabel?: string | null
+		prevLabel?: string | null
+		nextLabel?: string | null
 		title?: string | null
+		multistep?: boolean | null
+		pollEnabled?: boolean | null
 		poll?: {
 			enabled?: boolean | null
 			resultsField?: string | null
@@ -99,8 +121,10 @@ export function toFormDocument(
 		fields,
 		flow: form.flow as FormFlow | undefined,
 		response: (form.response as FormResponseSettings | null | undefined) ?? undefined,
-		buttons: (form.buttons as FormButtonSettings | null | undefined) ?? undefined,
+		buttons: buttonSettingsOf(form),
 		title: form.title ?? undefined,
+		multistep: form.multistep === true,
+		pollEnabled: form.pollEnabled === true,
 		poll,
 	}
 }

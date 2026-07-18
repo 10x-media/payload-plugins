@@ -17,6 +17,8 @@ const lexical = (text: string) => ({
 const doc = (fields: FormFieldInstance[], extra?: Partial<FormDocument>): FormDocument => ({
 	id: 1,
 	fields,
+	multistep: false,
+	pollEnabled: false,
 	...extra,
 })
 

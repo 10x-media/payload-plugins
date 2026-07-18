@@ -37,8 +37,9 @@ const options = [
 const baseDoc = (outcome?: Record<string, unknown>) => ({
 	id: 7,
 	title: 'Race',
+	pollEnabled: true,
 	fields: [{ blockType: 'select', name: 'winner', label: 'Winner', options }],
-	poll: { enabled: true, resultsField: 'winner', outcome },
+	poll: { resultsField: 'winner', outcome },
 })
 
 type HookArgs = Parameters<typeof pollOutcomeBeforeChange>[0]
@@ -60,9 +61,9 @@ describe('pollOutcomeBeforeChange', () => {
 	it('leaves data untouched when no winningValue is being written', async () => {
 		const noPoll = { title: 'Race' }
 		expect(await run(noPoll)).toBe(noPoll)
-		const noOutcome = { poll: { enabled: true } }
+		const noOutcome = { pollEnabled: true, poll: {} }
 		expect(await run(noOutcome)).toBe(noOutcome)
-		const noWinning = { poll: { enabled: true, outcome: { resolvedAt: '2020-01-01' } } }
+		const noWinning = { pollEnabled: true, poll: { outcome: { resolvedAt: '2020-01-01' } } }
 		expect(await run(noWinning)).toBe(noWinning)
 		expect((noWinning.poll.outcome as Record<string, unknown>).resolvedAt).toBe('2020-01-01')
 	})
@@ -101,13 +102,13 @@ describe('pollOutcomeBeforeChange', () => {
 	})
 
 	it('allows clearing even when the poll is disabled', async () => {
-		const data = { poll: { enabled: false, outcome: { winningValue: null } } }
+		const data = { pollEnabled: false, poll: { outcome: { winningValue: null } } }
 		await run(data, baseDoc({ winningValue: 'ada' }))
 		expect((data.poll.outcome as { resolvedAt?: unknown }).resolvedAt).toBeNull()
 	})
 
 	it('rejects a winner on a disabled poll', async () => {
-		const data = { poll: { enabled: false, outcome: { winningValue: 'ada' } } }
+		const data = { pollEnabled: false, poll: { outcome: { winningValue: 'ada' } } }
 		const errors = await errorsOf(run(data, baseDoc()))
 		expect(errors[0]?.path).toBe('poll.outcome.winningValue')
 		expect(errors[0]?.message).toBe(keys.validationWinningValueDisabled)
