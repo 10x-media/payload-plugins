@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { getFieldsRegistry } from '../../../plugin/registry'
 import type { IconAdapter } from '../../../types'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
+import { formatIconLabel } from '../shared/formatIconLabel'
 import { resolveIconValue } from '../shared/value'
 
 type IconCellProps = {
@@ -11,7 +12,7 @@ type IconCellProps = {
 	defaultLibrary?: string
 } & DefaultServerCellComponentProps
 
-/** List cell: the selected glyph plus its raw value, degrading to value-only for unavailable or removed libraries. */
+/** List cell: the selected glyph plus its formatted name, degrading to name-only for unavailable or removed libraries. */
 export const IconCell = (props: IconCellProps): ReactNode => {
 	const { cellData, payload } = props
 	if (typeof cellData !== 'string' || cellData === '') return null
@@ -32,7 +33,7 @@ export const IconCell = (props: IconCellProps): ReactNode => {
 	return (
 		<span className="tenx-icon-cell">
 			{Icon ? <Icon name={name} size={16} /> : null}
-			<span>{cellData}</span>
+			<span>{formatIconLabel(name)}</span>
 		</span>
 	)
 }
