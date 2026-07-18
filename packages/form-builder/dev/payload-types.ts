@@ -98,14 +98,14 @@ export interface Config {
   db: {
     defaultIDType: string;
   };
-  fallbackLocale: null;
+  fallbackLocale: false | 'en' | 'de' | ('en' | 'de' | null)[] | null;
   globals: {
     settings: Setting;
   };
   globalsSelect: {
     settings: SettingsSelect<false> | SettingsSelect<true>;
   };
-  locale: null;
+  locale: 'en' | 'de';
   widgets: {
     collections: CollectionsWidget;
   };
@@ -113,6 +113,7 @@ export interface Config {
   jobs: {
     tasks: {
       'form-builder-actions': TaskFormBuilderActions;
+      'form-builder-poll-close': TaskFormBuilderPollClose;
       inline: {
         input: unknown;
         output: unknown;
@@ -225,6 +226,8 @@ export interface Athlete {
 export interface Form {
   id: string;
   title: string;
+  multistep?: boolean | null;
+  pollEnabled?: boolean | null;
   fields?:
     | (
         | {
@@ -1904,6 +1907,7 @@ export interface Form {
   poll?: {
     enabled?: boolean | null;
     resultsField?: string | null;
+    type?: ('manual' | 'mostVoted' | 'source') | null;
     resultsVisibility?: ('afterVote' | 'afterClose') | null;
     closesAt?: string | null;
     outcome?: {
@@ -2031,7 +2035,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'form-builder-actions';
+        taskSlug: 'inline' | 'form-builder-actions' | 'form-builder-poll-close';
         taskID: string;
         input?:
           | {
@@ -2064,7 +2068,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'form-builder-actions') | null;
+  taskSlug?: ('inline' | 'form-builder-actions' | 'form-builder-poll-close') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -3678,6 +3682,13 @@ export interface Setting {
         id?: string | null;
       }[]
     | null;
+  departmentEmails?:
+    | {
+        label?: string | null;
+        email?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -3693,6 +3704,13 @@ export interface SettingsSelect<T extends boolean = true> {
         label?: T;
         statement?: T;
         page?: T;
+        id?: T;
+      };
+  departmentEmails?:
+    | T
+    | {
+        label?: T;
+        email?: T;
         id?: T;
       };
   updatedAt?: T;
@@ -3717,6 +3735,16 @@ export interface TaskFormBuilderActions {
   input: {
     formId: string;
     submissionId: string;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskForm-builder-poll-close".
+ */
+export interface TaskFormBuilderPollClose {
+  input: {
+    formId: string;
   };
   output?: unknown;
 }

@@ -9,8 +9,11 @@ import {
 	type AnyFormFieldDefinition,
 	type ConsentSourceEntry,
 	consentSourcesField,
+	type DepartmentEmailsResolver,
 	defineFormField,
+	departmentsField,
 	formBuilder,
+	resolveDepartmentOptions,
 } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
@@ -70,11 +73,12 @@ const athletes: CollectionConfig = {
 	],
 }
 
-// Where this app keeps its consent statements. Any collection or global works; a multi-tenant app
-// would place the field on its tenant document and scope the resolver below by req instead.
+// Where this app keeps its consent statements and department routing addresses. Any collection or
+// global works; a multi-tenant app would place these fields on its tenant document and scope the
+// resolvers below by req instead.
 const settings: GlobalConfig = {
 	slug: 'settings',
-	fields: [consentSourcesField({ relationTo: ['legal-pages', 'notices'] })],
+	fields: [consentSourcesField({ relationTo: ['legal-pages', 'notices'] }), departmentsField()],
 }
 
 type ConsentSourceRow = {
@@ -104,6 +108,21 @@ const consentSources = async ({ req }: { req: PayloadRequest }): Promise<Consent
 				: {}),
 			...(pageDoc?.slug ? { url: `/${page?.relationTo}/${pageDoc.slug}` } : {}),
 		}
+	})
+}
+
+/**
+ * Reads `departmentsField()` back at `locale: 'all'` so `resolveDepartmentOptions` can apply its
+ * current -> default -> next-available fallback per row, independent of Payload's own single-locale
+ * fallback (which does not apply to an `'all'` read).
+ */
+const departmentEmails: DepartmentEmailsResolver = async ({ req }) => {
+	const doc = await req.payload.findGlobal({ slug: 'settings', locale: 'all', depth: 0, req })
+	return resolveDepartmentOptions({
+		payload: req.payload,
+		req,
+		doc: doc as unknown as Record<string, unknown>,
+		field: 'departmentEmails',
 	})
 }
 
@@ -184,8 +203,11 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [users, formUploads, legalPages, notices, athletes],
+	// Alphabetical by slug: athletes, form-uploads, legal-pages, notices, users. The plugin registers
+	// its own `forms`/`form-submissions` collections separately.
+	collections: [athletes, formUploads, legalPages, notices, users],
 	globals: [settings],
+	localization: { locales: ['en', 'de'], defaultLocale: 'en', fallback: true },
 	plugins: [
 		formBuilder({
 			uploads: { collection: 'form-uploads' },
@@ -193,6 +215,7 @@ export default buildConfig({
 			// precise value/config generics is stored erased in the registry, so one cast per type.
 			fields: { athleteVote: athleteVote as AnyFormFieldDefinition },
 			consent: { sources: consentSources },
+			email: { departments: departmentEmails },
 		}),
 	],
 	telemetry: false,
