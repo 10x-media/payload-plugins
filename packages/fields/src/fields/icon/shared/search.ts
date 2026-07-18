@@ -3,13 +3,27 @@ import type { IconMeta } from '../../../types'
 type IndexEntry = { icon: IconMeta; name: string; nameTokens: string[]; tags: string[] }
 export type IconSearchIndex = IndexEntry[]
 
+/**
+ * Lowercase and treat dashes and whitespace as one separator, so a stored kebab name
+ * and a query typed with spaces normalize to the same string: an editor searching
+ * `align horizontal distribute center` matches `align-horizontal-distribute-center`.
+ */
+const normalize = (value: string): string =>
+	value
+		.toLowerCase()
+		.replace(/[-\s]+/g, ' ')
+		.trim()
+
 export const buildIconSearchIndex = (icons: IconMeta[]): IconSearchIndex =>
-	icons.map((icon) => ({
-		icon,
-		name: icon.name.toLowerCase(),
-		nameTokens: icon.name.toLowerCase().split('-'),
-		tags: icon.tags.map((tag) => tag.toLowerCase()),
-	}))
+	icons.map((icon) => {
+		const name = normalize(icon.name)
+		return {
+			icon,
+			name,
+			nameTokens: name.split(' ').filter(Boolean),
+			tags: icon.tags.map(normalize),
+		}
+	})
 
 const scoreToken = (entry: IndexEntry, token: string): number => {
 	if (entry.name === token) return 100
@@ -29,7 +43,7 @@ const scoreToken = (entry: IndexEntry, token: string): number => {
  * Length ties then break alphabetically to keep results stable.
  */
 export const searchIcons = (index: IconSearchIndex, query: string): IconMeta[] => {
-	const tokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean)
+	const tokens = normalize(query).split(' ').filter(Boolean)
 	if (tokens.length === 0) return index.map((entry) => entry.icon)
 	const scored: { icon: IconMeta; score: number }[] = []
 	for (const entry of index) {
