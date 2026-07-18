@@ -75,6 +75,13 @@ export type IconGlobalConfig = {
 	adapters?: IconAdapter[]
 	defaultLibrary?: string
 	resolveAvailable?: IconAvailabilityResolver
+	/**
+	 * Library slugs always offered for selection regardless of `resolveAvailable`,
+	 * so a shared library (e.g. brand icons) need not be repeated in every tenant's
+	 * resolver return. A per-field `alwaysAvailable` unions with this global set.
+	 * Slugs with no registered adapter are silently dropped.
+	 */
+	alwaysAvailable?: string[]
 }
 
 /** Plugin-level defaults for encryptedField(). Per-field options always win. */

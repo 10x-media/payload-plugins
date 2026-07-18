@@ -14,6 +14,11 @@ export type IconFieldOptions = {
 	defaultLibrary?: string
 	/** Restricts selection only; stored values keep rendering through any registered adapter. */
 	resolveAvailable?: IconAvailabilityResolver
+	/**
+	 * Library slugs always offered for selection regardless of `resolveAvailable`.
+	 * Unions with the plugin's global `alwaysAvailable`; unregistered slugs drop.
+	 */
+	alwaysAvailable?: string[]
 	/** Show a free-text input next to the trigger for typing `library:icon-name` directly. Default false. */
 	showTextInput?: boolean
 	overrides?: (args: { field: TextField }) => TextField
@@ -50,6 +55,7 @@ export const iconField = (options: IconFieldOptions = {}): TextField => {
 					path: '@10x-media/fields/rsc#IconFieldServer',
 					serverProps: {
 						adapters: options.adapters,
+						alwaysAvailable: options.alwaysAvailable,
 						defaultLibrary: options.defaultLibrary,
 						resolveAvailable: options.resolveAvailable,
 						showTextInput: options.showTextInput === true,

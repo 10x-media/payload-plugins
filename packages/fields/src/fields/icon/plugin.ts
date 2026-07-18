@@ -42,6 +42,7 @@ export const registerIcon = (config: Config, icon: IconGlobalConfig | undefined)
 	const registry = (config.custom[FIELDS_REGISTRY_KEY] ?? {}) as FieldsPluginRegistry
 	registry.icon = {
 		adapters: icon.adapters,
+		alwaysAvailable: icon.alwaysAvailable,
 		defaultLibrary,
 		resolveAvailable: icon.resolveAvailable,
 	}
@@ -56,6 +57,15 @@ export const registerIcon = (config: Config, icon: IconGlobalConfig | undefined)
 		config.admin.dependencies[`fields-icon-${adapter.slug}-Assets`] = {
 			path: adapter.Assets,
 			type: 'component',
+		}
+		// generate:importmap scans admin.dependencies, not registry strings, so the
+		// optional Nodes loader must be registered here too or a regeneration drops
+		// it and the drawer silently loses the bulk node-data fast path.
+		if (adapter.Nodes) {
+			config.admin.dependencies[`fields-icon-${adapter.slug}-Nodes`] = {
+				path: adapter.Nodes,
+				type: 'component',
+			}
 		}
 	}
 }

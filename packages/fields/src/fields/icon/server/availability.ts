@@ -14,6 +14,18 @@ const keyFor = (resolver: IconAvailabilityResolver): symbol => {
 }
 
 /**
+ * Merge rule for forced libraries: UNION. A per-field `alwaysAvailable` ADDS to
+ * the global one rather than replacing it, because forcing a library is additive
+ * (a field-level forced brand set should not erase a plugin-wide one, and vice
+ * versa). This differs from `resolveAvailable`, which replaces because a resolver
+ * is a single decision function where one must win.
+ */
+export const unionAlwaysAvailable = (
+	perField: string[] | undefined,
+	global: string[] | undefined
+): string[] => [...new Set([...(perField ?? []), ...(global ?? [])])]
+
+/**
  * Availability restricts SELECTION only; rendering stored values always works
  * through any registered adapter. Memoized per request per resolver, which is
  * safe because Field server components render one document per request.
@@ -23,9 +35,16 @@ const keyFor = (resolver: IconAvailabilityResolver): symbol => {
  * Availability gates selection, not data access, so all-registered is safe. The
  * catch lives inside the memo callback, so the rejection is never cached and a
  * later request retries.
+ *
+ * `alwaysAvailable` slugs stay selectable regardless of the resolver, unioned in
+ * after the memo so fields sharing a resolver can still force different libraries.
+ * The final registered-adapter filter both preserves adapter registration order
+ * and silently drops any forced slug with no registered adapter.
  */
 export const resolveAvailableLibraries = async (args: {
 	adapters: IconAdapter[]
+	/** Library slugs always offered for selection, even when the resolver omits them. */
+	alwaysAvailable?: string[]
 	data?: Record<string, unknown>
 	/** Field identifier for the failure log, e.g. `${collectionSlug}.${fieldName}`. */
 	fieldPath?: string
@@ -49,6 +68,6 @@ export const resolveAvailableLibraries = async (args: {
 			return allSlugs()
 		}
 	})
-	const allowed = new Set(resolved)
+	const allowed = new Set([...(args.alwaysAvailable ?? []), ...resolved])
 	return args.adapters.filter((adapter) => allowed.has(adapter.slug)).map((adapter) => adapter.slug)
 }

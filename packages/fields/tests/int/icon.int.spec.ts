@@ -8,6 +8,7 @@ import { iconField } from '../../src/fields/icon/server/iconField'
 import { iconLibraryField } from '../../src/fields/icon/server/iconLibraryField'
 import { getIconLibraryOptions } from '../../src/fields/icon/server/libraryOptions'
 import { fields } from '../../src/index'
+import type { IconAvailabilityResolver } from '../../src/types'
 
 describeForDb('icon field', {}, (db) => {
 	let booted: BootedPayload
@@ -21,6 +22,13 @@ describeForDb('icon field', {}, (db) => {
 						iconField(),
 						iconField({ name: 'restricted', defaultLibrary: 'radix' }),
 						iconLibraryField({ hasMany: true, name: 'libraries' }),
+					],
+				},
+				{
+					slug: 'tenants',
+					fields: [
+						{ name: 'name', type: 'text' },
+						iconLibraryField({ hasMany: true, name: 'enabledLibraries' }),
 					],
 				},
 			],
@@ -162,5 +170,30 @@ describeForDb('icon field', {}, (db) => {
 		expect(
 			await resolveAvailableLibraries({ adapters: registry.icon?.adapters ?? [], req })
 		).toEqual(['lucide', 'radix'])
+	})
+
+	it('unions a forced library with a resolver that reads a tenant', async () => {
+		const registry = booted.payload.config.custom?.['@10x-media/fields'] as {
+			icon?: { adapters?: ReturnType<typeof lucideAdapter>[] }
+		}
+		const adapters = registry.icon?.adapters ?? []
+		// The tenant enables only lucide; radix is forced through alwaysAvailable, so the
+		// resolved set is the tenant's library plus the forced one, in registration order.
+		const tenant = await booted.payload.create({
+			collection: 'tenants',
+			data: { enabledLibraries: ['lucide'], name: 'acme' },
+		})
+		const resolver: IconAvailabilityResolver = async ({ req: resolverReq }) => {
+			const doc = await resolverReq.payload.findByID({ collection: 'tenants', id: tenant.id })
+			return Array.isArray(doc.enabledLibraries) ? (doc.enabledLibraries as string[]) : []
+		}
+		const req = { payload: booted.payload } as PayloadRequest
+		const available = await resolveAvailableLibraries({
+			adapters,
+			alwaysAvailable: ['radix'],
+			req,
+			resolver,
+		})
+		expect(available).toEqual(['lucide', 'radix'])
 	})
 })

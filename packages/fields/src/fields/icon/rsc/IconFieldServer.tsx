@@ -4,12 +4,13 @@ import type { ReactNode } from 'react'
 import { getFieldsRegistry } from '../../../plugin/registry'
 import type { IconAdapter, IconAvailabilityResolver } from '../../../types'
 import { IconField } from '../client/IconFieldClient'
-import { resolveAvailableLibraries } from '../server/availability'
+import { resolveAvailableLibraries, unionAlwaysAvailable } from '../server/availability'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
 import { resolveStaticLabel } from './resolveStaticLabel'
 
 type IconFieldServerExtraProps = {
 	adapters?: IconAdapter[]
+	alwaysAvailable?: string[]
 	defaultLibrary?: string
 	resolveAvailable?: IconAvailabilityResolver
 	showTextInput?: boolean
@@ -42,9 +43,11 @@ export const IconFieldServer = async (props: ServerProps): Promise<ReactNode> =>
 	const defaultLibrary =
 		props.defaultLibrary ?? registryIcon?.defaultLibrary ?? adapters[0]?.slug ?? ''
 	const resolver = props.resolveAvailable ?? registryIcon?.resolveAvailable
+	const alwaysAvailable = unionAlwaysAvailable(props.alwaysAvailable, registryIcon?.alwaysAvailable)
 
 	const available = await resolveAvailableLibraries({
 		adapters,
+		alwaysAvailable,
 		data: data as Record<string, unknown> | undefined,
 		req,
 		resolver,

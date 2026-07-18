@@ -19,5 +19,7 @@ export type {
 	IconGlobalConfig,
 	IconManifest,
 	IconMeta,
+	IconNode,
+	IconNodeMap,
 	KeysConfig,
 } from '../types'
