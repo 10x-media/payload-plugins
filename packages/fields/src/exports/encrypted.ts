@@ -14,4 +14,7 @@ export type {
 	EncryptedProtection,
 	EncryptedSourceField,
 } from '../fields/encrypted/types'
+export { decryptAllData } from '../fields/encrypted/utils/decryptAllData'
+export { encryptExistingData } from '../fields/encrypted/utils/encryptExistingData'
+export { rotateEncryptedFields } from '../fields/encrypted/utils/rotateEncryptedFields'
 export type { DecryptFailurePolicy, EncryptedGlobalConfig, KeysConfig } from '../types'
