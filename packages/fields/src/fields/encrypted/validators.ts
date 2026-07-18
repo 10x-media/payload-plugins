@@ -64,8 +64,37 @@ export const makeEffectiveValidator = (source: EncryptedSourceField): PlaintextV
 	return (value, options) => stock(value, { ...options, ...(source as Record<string, unknown>) })
 }
 
-const isSealedString = (value: unknown): boolean =>
-	typeof value === 'string' && value.startsWith('pfe1.') && value.split('.').length === 5
+const WIRE_PREFIX = 'pfe1'
+const WIRE_SEGMENT = /^[A-Za-z0-9_-]+$/
+const IV_BYTES = 12
+const TAG_BYTES = 16
+
+/**
+ * Structural wire check kept in sync with crypto/wire.ts parseWire (prefix, 5
+ * base64url segments, IV/tag byte lengths). Deliberately duplicated so this
+ * module, which runs inside Payload's validate pass, never imports node:crypto;
+ * Buffer is a Node global and validate only runs server-side. A string merely
+ * shaped like `pfe1.a.b.c.d` must not be treated as sealed, or its plaintext
+ * validation would be skipped.
+ */
+const isSealedString = (value: unknown): boolean => {
+	if (typeof value !== 'string') {
+		return false
+	}
+	const segments = value.split('.')
+	if (segments.length !== 5 || segments[0] !== WIRE_PREFIX) {
+		return false
+	}
+	const [, keyId, iv, ct, tag] = segments as [string, string, string, string, string]
+	if (![keyId, iv, ct, tag].every((segment) => WIRE_SEGMENT.test(segment))) {
+		return false
+	}
+	return (
+		Buffer.from(iv, 'base64url').length === IV_BYTES &&
+		Buffer.from(tag, 'base64url').length === TAG_BYTES &&
+		Buffer.from(ct, 'base64url').length > 0
+	)
+}
 
 /**
  * The stored field's validate. Sealed values already passed plaintext

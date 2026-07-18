@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { EncryptedSourceField } from './types'
 import { makeComposedValidate, makeEffectiveValidator, type PlaintextValidator } from './validators'
 
-const SEALED = 'pfe1.k0.aaaa.bbbb.cccc'
+const SEALED = `pfe1.k0.${Buffer.alloc(12).toString('base64url')}.${Buffer.alloc(8).toString('base64url')}.${Buffer.alloc(16).toString('base64url')}`
 const options = {} as Parameters<ReturnType<typeof makeComposedValidate>>[1]
 
 describe('makeComposedValidate (Deviation 1: seal hook validates plaintext, composed validate skips sealed)', () => {

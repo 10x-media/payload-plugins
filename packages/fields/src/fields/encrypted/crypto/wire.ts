@@ -48,13 +48,6 @@ export class CorruptPlaintextError extends Error {
 	}
 }
 
-/**
- * Cheap shape check used on hot paths (hooks run per field per document).
- * A full parse only happens inside unseal.
- */
-export const isSealed = (value: unknown): value is string =>
-	typeof value === 'string' && value.startsWith(`${WIRE_PREFIX}.`) && value.split('.').length === 5
-
 export interface SealArgs {
 	aad: string
 	key: Buffer
@@ -122,6 +115,25 @@ export const parseWire = (value: string): ParsedWire => {
 		throw new MalformedCiphertextError('empty ciphertext')
 	}
 	return { ciphertext, iv, keyId, tag }
+}
+
+/**
+ * True only for a structurally valid wire string: prefix, 5 segments, base64url
+ * charset, and correct IV/tag byte lengths (a full parseWire, minus the GCM
+ * work). Validating the structure, not just the prefix and dot count, keeps a
+ * free-text secret literally shaped `pfe1.a.b.c.d` from being mistaken for
+ * ciphertext (which would skip its plaintext validation). Never throws.
+ */
+export const isSealed = (value: unknown): value is string => {
+	if (typeof value !== 'string') {
+		return false
+	}
+	try {
+		parseWire(value)
+		return true
+	} catch {
+		return false
+	}
 }
 
 /**

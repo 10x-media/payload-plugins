@@ -119,8 +119,11 @@ describe('format parsing', () => {
 		expect(() => parseWire(short)).toThrow(MalformedCiphertextError)
 	})
 
-	it('isSealed is a cheap prefix + shape check, not a parse', () => {
-		expect(isSealed('pfe1.k0.aa.bb.cc')).toBe(true)
+	it('isSealed validates full wire structure, not just the prefix and dot count', () => {
+		const structural = `pfe1.k0.${Buffer.alloc(12).toString('base64url')}.${Buffer.alloc(8).toString('base64url')}.${Buffer.alloc(16).toString('base64url')}`
+		expect(isSealed(structural)).toBe(true)
+		// Prefix + 5 dots but the IV/tag segments are too short: not real ciphertext.
+		expect(isSealed('pfe1.k0.aa.bb.cc')).toBe(false)
 		expect(isSealed('pfe1.k0.aa.bb')).toBe(false)
 		expect(isSealed('plaintext')).toBe(false)
 		expect(isSealed(42)).toBe(false)
