@@ -1,4 +1,5 @@
 import {
+	type CollectionAfterChangeHook,
 	type CollectionBeforeValidateHook,
 	type CollectionConfig,
 	type Field,
@@ -27,13 +28,15 @@ import { END_OF_FORM } from '../flow/types'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
+import { enqueuePollClose } from '../poll/closeJob'
 import { pollOutcomeBeforeChange } from '../poll/outcomeBeforeChange'
 import { buildDefaultOutcomeFields, type OutcomeFieldsOverride } from '../poll/outcomeFields'
+import { type PollTypeRegistry, resolvePollTypes } from '../poll/pollTypeRegistry'
 import type { PollOptionSourceRegistry } from '../poll/registry'
 import { resolvePollOptionsRequest } from '../poll/resolvePollOptionsRequest'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
 import { keys } from '../translations/keys'
-import { labelForKey } from '../translations/server'
+import { labelFor, labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { validateUrl } from '../validation/validateUrl'
 import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
@@ -123,6 +126,8 @@ type BuildFormsCollectionArgs = {
 	resultsAccess?: FormResultsAccess
 	/** Registered poll option sources (plugin option `poll.sources`); empty registry means no source fields. */
 	pollSourceRegistry?: PollOptionSourceRegistry
+	/** Registered poll outcome strategies (`poll.types`); drives the poll `type` select options. Defaults to the built-ins. */
+	pollTypeRegistry?: PollTypeRegistry
 	/** The plugin `poll.outcomeFields` seam; composes the outcome group from the two default fields. */
 	outcomeFields?: OutcomeFieldsOverride
 	/** The plugin `buttons` option; `fields` composes the buttons group from the localized defaults. */
@@ -146,11 +151,13 @@ export const buildFormsCollection = ({
 	uploadsCollectionSlug,
 	resultsAccess,
 	pollSourceRegistry,
+	pollTypeRegistry,
 	outcomeFields,
 	buttons,
 	fromAddresses,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
+	const pollTypes = pollTypeRegistry ?? resolvePollTypes()
 	const pollResultsTypes = pollEligibleTypes(registry)
 	const bareTypes = new Set(
 		[...registry.values()].filter((d) => d.bare === true).map((d) => d.type)
@@ -211,6 +218,20 @@ export const buildFormsCollection = ({
 		}
 		return data
 	}
+
+	// After every save, (re)schedule the poll's auto-close job when it applies (enabled + closesAt +
+	// unresolved + non-manual strategy + a job runner present). Best-effort and non-throwing, so it
+	// never affects the save; without a runner the resolve-on-read fallback in the results endpoint
+	// heals the outcome instead.
+	const pollCloseAfterChange: CollectionAfterChangeHook = async ({ doc, req }) => {
+		await enqueuePollClose({ payload: req.payload, form: doc, req })
+		return doc
+	}
+
+	// Select-option label from a strategy's `label`: a string is resolved like a field label (i18n key
+	// or literal), a per-locale record passes through unchanged.
+	const pollTypeOptionLabel = (label: string | Record<string, string>) =>
+		typeof label === 'string' ? labelFor(label) : label
 
 	const fieldsField: Field = {
 		name: 'fields',
@@ -393,6 +414,20 @@ export const buildFormsCollection = ({
 						},
 					},
 				},
+			},
+			// How the winning value(s) get decided. `manual` (default) leaves it to an admin; `mostVoted`
+			// and `source` auto-resolve on close (via the scheduled job or the results-read fallback). The
+			// options come from the registered `poll.types` strategies, so a host strategy appears here too.
+			{
+				name: 'type',
+				type: 'select',
+				defaultValue: 'manual',
+				label: labelForKey(keys.pollType),
+				admin: { isClearable: false },
+				options: [...pollTypes.values()].map((strategy) => ({
+					label: pollTypeOptionLabel(strategy.label),
+					value: strategy.type,
+				})),
 			},
 			{
 				name: 'resultsVisibility',
@@ -580,6 +615,7 @@ export const buildFormsCollection = ({
 			// beforeValidate normalizes conditions and flow; consumer hooks run after
 			beforeValidate: [beforeValidate, ...(overrides?.hooks?.beforeValidate ?? [])],
 			beforeChange: [pollOutcomeBeforeChange, ...(overrides?.hooks?.beforeChange ?? [])],
+			afterChange: [pollCloseAfterChange, ...(overrides?.hooks?.afterChange ?? [])],
 		},
 		endpoints: [
 			...defaultEndpoints,

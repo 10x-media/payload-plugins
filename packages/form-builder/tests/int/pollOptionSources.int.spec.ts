@@ -315,8 +315,11 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		expect(message).toBe('The winning value must be one of the poll options.')
 	})
 
-	it('resolves a single winner from the source when winningValues is omitted', async () => {
-		const form = await makeForm({ sourceConfig: { eventId: 'race-1', winner: 'grace' } })
+	it('resolves a single winner from the source strategy when winningValues is omitted', async () => {
+		const form = await makeForm({
+			type: 'source',
+			sourceConfig: { eventId: 'race-1', winner: 'grace' },
+		})
 		const recorded = await resolvePollOutcome({ payload: booted.payload, formId: form.id })
 		expect(recorded).toEqual(['grace'])
 		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
@@ -327,8 +330,11 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		expect(outcome?.resolvedAt).toBeTruthy()
 	})
 
-	it('resolves a tie from the source returning an array', async () => {
-		const form = await makeForm({ sourceConfig: { eventId: 'race-1', winners: ['ada', 'grace'] } })
+	it('resolves a tie from the source strategy returning an array', async () => {
+		const form = await makeForm({
+			type: 'source',
+			sourceConfig: { eventId: 'race-1', winners: ['ada', 'grace'] },
+		})
 		const recorded = await resolvePollOutcome({ payload: booted.payload, formId: form.id })
 		expect(recorded).toEqual(['ada', 'grace'])
 		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
@@ -339,31 +345,30 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		expect(outcome?.resolvedAt).toBeTruthy()
 	})
 
-	it('explains auto mode failures', async () => {
-		const undecided = await makeForm({ sourceConfig: { eventId: 'race-1' } })
-		await expect(
-			resolvePollOutcome({ payload: booted.payload, formId: undecided.id })
-		).rejects.toThrow(/not be decided yet/)
-
-		const sourceless = await booted.payload.create({
+	it('writes nothing when the source strategy cannot decide, and never under manual', async () => {
+		// type: source but the source has no recorded winner yet -> no write, no throw.
+		const undecided = await makeForm({ type: 'source', sourceConfig: { eventId: 'race-1' } })
+		expect(await resolvePollOutcome({ payload: booted.payload, formId: undecided.id })).toEqual([])
+		const undecidedDoc = await booted.payload.findByID({
 			collection: 'forms',
-			data: {
-				title: 'Static poll',
-				fields: [
-					{
-						blockType: 'select',
-						name: 'winner',
-						label: 'Winner',
-						options: [{ label: 'Ada', value: 'ada' }],
-					},
-				],
-				pollEnabled: true,
-				poll: { resultsField: 'winner' },
-			},
+			id: undecided.id,
+			depth: 0,
 		})
-		await expect(
-			resolvePollOutcome({ payload: booted.payload, formId: sourceless.id })
-		).rejects.toThrow(/no poll option source/)
+		expect(
+			(undecidedDoc.poll as { outcome?: { winningValues?: string[] } }).outcome?.winningValues ?? []
+		).toEqual([])
+
+		// The default `manual` strategy never auto-resolves, even with a source that could decide.
+		const manual = await makeForm({ sourceConfig: { eventId: 'race-1', winner: 'grace' } })
+		expect(await resolvePollOutcome({ payload: booted.payload, formId: manual.id })).toEqual([])
+		const manualDoc = await booted.payload.findByID({
+			collection: 'forms',
+			id: manual.id,
+			depth: 0,
+		})
+		expect(
+			(manualDoc.poll as { outcome?: { winningValues?: string[] } }).outcome?.winningValues ?? []
+		).toEqual([])
 	})
 
 	it('accepts an admin-path tie, stamps resolvedAt, and clears both together', async () => {

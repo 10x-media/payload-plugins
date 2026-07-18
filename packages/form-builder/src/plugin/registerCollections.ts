@@ -10,7 +10,9 @@ import { buildFormsCollection } from '../collections/forms'
 import type { ConsentSourcesResolver } from '../consent/types'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { registerPollCloseTask } from '../poll/closeJob'
 import type { OutcomeFieldsOverride } from '../poll/outcomeFields'
+import type { PollTypeRegistry } from '../poll/pollTypeRegistry'
 import type { PollOptionSourceRegistry } from '../poll/registry'
 import type { ResolvedSpamConfig } from '../spam/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -33,6 +35,7 @@ type RegisterCollectionsArgs = {
 	resultsAccess?: FormResultsAccess
 	votedCookie: boolean
 	pollSourceRegistry: PollOptionSourceRegistry
+	pollTypeRegistry: PollTypeRegistry
 	outcomeFields?: OutcomeFieldsOverride
 	buttons?: ButtonsOption
 	fromAddresses?: FromAddressesResolver
@@ -58,12 +61,14 @@ export const registerCollections = ({
 	resultsAccess,
 	votedCookie,
 	pollSourceRegistry,
+	pollTypeRegistry,
 	outcomeFields,
 	buttons,
 	fromAddresses,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
+	registerPollCloseTask(config)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
 
 	const uploadSlug = uploads === false ? undefined : uploads.collection
@@ -102,6 +107,7 @@ export const registerCollections = ({
 			uploadsCollectionSlug: uploadSlug,
 			resultsAccess,
 			pollSourceRegistry,
+			pollTypeRegistry,
 			outcomeFields,
 			buttons,
 			fromAddresses,

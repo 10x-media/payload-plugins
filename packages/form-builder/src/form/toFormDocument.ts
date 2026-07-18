@@ -86,7 +86,6 @@ export function toFormDocument(
 		multistep?: boolean | null
 		pollEnabled?: boolean | null
 		poll?: {
-			enabled?: boolean | null
 			resultsField?: string | null
 			resultsVisibility?: string | null
 			closesAt?: string | null
@@ -103,7 +102,6 @@ export function toFormDocument(
 		: []
 	const poll = form.poll
 		? {
-				enabled: form.poll.enabled ?? undefined,
 				resultsVisibility: (form.poll.resultsVisibility ?? undefined) as
 					| 'afterVote'
 					| 'afterClose'

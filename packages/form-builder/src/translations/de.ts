@@ -164,6 +164,10 @@ export const de: Record<TranslationKey, string> = {
 		'Befüllt die Auswahlmöglichkeiten des Ergebnisfeldes mit App-Daten anstelle manuell erstellter Optionen.',
 	[keys.pollSourceConfig]: 'Quelleinstellungen',
 	[keys.pollOutcome]: 'Ergebnis',
+	[keys.pollType]: 'Ergebnistyp',
+	[keys.pollTypeManual]: 'Manuell festlegen',
+	[keys.pollTypeMostVoted]: 'Meiste Stimmen',
+	[keys.pollTypeSource]: 'Aus Optionsquelle',
 	[keys.pollWinningValue]: 'Siegerwert',
 	[keys.pollWinningValueDescription]:
 		'Wähle die Gewinneroption, sobald das Ergebnis feststeht. Beim Speichern wird der Entscheidungszeitpunkt erfasst; leeren öffnet das Ergebnis wieder.',

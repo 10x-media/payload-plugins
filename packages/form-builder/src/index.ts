@@ -16,6 +16,8 @@ import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 import type { UploadsOption } from './plugin/uploadsCollection'
 import type { OutcomeFieldsOverride } from './poll/outcomeFields'
+import type { PollTypesConfig } from './poll/pollTypeRegistry'
+import { resolvePollTypes, stashPollTypes } from './poll/pollTypeRegistry'
 import type { PollOptionSourcesConfig } from './poll/registry'
 import { resolvePollOptionSources } from './poll/registry'
 import { stashPollOptionSources } from './poll/resolvePollOptions'
@@ -133,10 +135,16 @@ export type FormBuilderPluginOptions = {
 	 * (`winningValues`, `resolvedAt`) and returns the group's final field array verbatim, so a host
 	 * can swap `winningValues` for its own component (e.g. a relationship picker over the voteable
 	 * records). Membership validation runs server-side regardless, so a swap cannot bypass it.
+	 * `types` registers outcome strategies (`definePollType`) shown in the poll `type` select. The
+	 * built-ins `manual` (default, hand-picked), `mostVoted` (auto-resolves to the top choice(s) on
+	 * close), and `source` (delegates to the option source) are always registered; a host entry keyed
+	 * by (or carrying) a built-in slug replaces it. A closed poll whose strategy is not `manual`
+	 * auto-resolves via a scheduled job when a runner is present, or on the next results read otherwise.
 	 */
 	poll?: {
 		votedCookie?: boolean
 		sources?: PollOptionSourcesConfig
+		types?: PollTypesConfig
 		outcomeFields?: OutcomeFieldsOverride
 	}
 	/**
@@ -199,12 +207,14 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		)
 		const spam = resolveSpamConfig(options.spam)
 		const pollSourceRegistry = resolvePollOptionSources(options.poll?.sources)
+		const pollTypeRegistry = resolvePollTypes(options.poll?.types)
 		// Stashed on config.custom so the root-level resolvePollOptions, resolveEffectivePollOptions,
-		// and resolveConsentStatements helpers can reach these through `payload.config` at request
-		// time, without threading plugin state through the host's own server code. The field-type
-		// registry rides along so resolveEffectivePollOptions can look up a results field's
-		// definition (and its `resolveOptions`) from a bare `payload` instance.
+		// resolvePollOutcome, and resolveConsentStatements helpers can reach these through
+		// `payload.config` at request time, without threading plugin state through the host's own
+		// server code. The field-type registry rides along so resolveEffectivePollOptions can look up a
+		// results field's definition (and its `resolveOptions`) from a bare `payload` instance.
 		config.custom = stashPollOptionSources(config.custom, pollSourceRegistry)
+		config.custom = stashPollTypes(config.custom, pollTypeRegistry)
 		config.custom = stashFieldTypes(config.custom, registry)
 		if (consentSources) {
 			config.custom = stashConsentSources(config.custom, consentSources)
@@ -226,6 +236,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			resultsAccess: options.results?.access,
 			votedCookie: options.poll?.votedCookie === true,
 			pollSourceRegistry,
+			pollTypeRegistry,
 			outcomeFields: options.poll?.outcomeFields,
 			buttons: options.buttons,
 			fromAddresses,
@@ -354,6 +365,15 @@ export type {
 	FormResponseSettings,
 } from './form/types'
 export type { UploadsOption } from './plugin/uploadsCollection'
+export type { PollCloseTaskInput } from './poll/closeJob'
+export {
+	buildPollCloseTask,
+	enqueuePollClose,
+	POLL_CLOSE_TASK_SLUG,
+	registerPollCloseTask,
+	runPollClose,
+	shouldAutoResolvePoll,
+} from './poll/closeJob'
 export type {
 	AnyPollOptionSource,
 	PollOption,
@@ -361,14 +381,25 @@ export type {
 	PollOptionSource,
 } from './poll/definePollOptionSource'
 export { definePollOptionSource } from './poll/definePollOptionSource'
+export type { PollOutcomeStrategy, PollOutcomeStrategyArgs } from './poll/definePollType'
+export { definePollType } from './poll/definePollType'
 export type { ResolveEffectivePollOptionsArgs } from './poll/effectivePollOptions'
 export { resolveEffectivePollOptions } from './poll/effectivePollOptions'
+export { mostVotedStrategy, topBucketValues } from './poll/mostVoted'
 export type { DefaultOutcomeFields, OutcomeFieldsOverride } from './poll/outcomeFields'
 export {
 	buildDefaultOutcomeFields,
 	buildResolvedAtField,
 	buildWinningValuesField,
 } from './poll/outcomeFields'
+export type { PollTypeRegistry, PollTypesConfig } from './poll/pollTypeRegistry'
+export {
+	manualStrategy,
+	pollTypesOf,
+	resolvePollTypes,
+	sourceStrategy,
+	stashPollTypes,
+} from './poll/pollTypeRegistry'
 export type {
 	PollOptionSourceOption,
 	PollOptionSourceRegistry,

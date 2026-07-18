@@ -1,8 +1,10 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { FORMS_SLUG } from '../collections/forms'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
+import { type PollFormLike, shouldAutoResolvePoll } from '../poll/closeJob'
 import type { PollOption } from '../poll/definePollOptionSource'
 import { resolveEffectivePollOptions } from '../poll/effectivePollOptions'
+import { resolvePollOutcome } from '../poll/resolvePollOutcome'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateFormResponses, fieldHasOptions } from './aggregateResponses'
 import type { FieldAggregation } from './types'
@@ -85,6 +87,14 @@ export const resolveFormResultsRequest = async (
 		.catch(() => null)
 	if (!form) {
 		return { status: 404, body: { errors: [{ message: 'Not found' }] } }
+	}
+
+	// No-runner safety net: when a closed poll's `mostVoted`/`source` outcome was never auto-resolved
+	// (no wired job runner fired the close task), a results read heals it. Idempotent and gate-neutral,
+	// it runs on the already-loaded form via overrideAccess and writes only through the outcome hook, so
+	// it cannot relax the anonymous authorization below. A failure degrades silently to the normal path.
+	if (shouldAutoResolvePoll(form as PollFormLike)) {
+		await resolvePollOutcome({ payload, formId, req }).catch(() => undefined)
 	}
 
 	let fields: string[] | undefined

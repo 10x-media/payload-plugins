@@ -26,9 +26,10 @@ export type PollOptionSource<TConfig extends Record<string, unknown> = Record<st
 	/**
 	 * Optional outcome resolver: return the winning option value(s) from domain data (e.g. the
 	 * recorded race result), a `string[]` when the result is a tie, or `undefined` while the outcome
-	 * is not yet decidable. Enables auto mode on `resolvePollOutcome({ payload, formId })` with no
-	 * explicit `winningValues`; every returned value is validated against the poll's resolved options
-	 * before it is recorded, so each must be one of the values `resolve` yields.
+	 * is not yet decidable. Backs the built-in `source` poll type, so a form whose `poll.type` is
+	 * `source` auto-resolves through it (via the scheduled close job, a results-read, or an explicit
+	 * `resolvePollOutcome({ payload, formId })`); every returned value is validated against the poll's
+	 * resolved options before it is recorded, so each must be one of the values `resolve` yields.
 	 */
 	resolveOutcome?: (
 		args: PollOptionResolveArgs<TConfig>

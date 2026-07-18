@@ -160,6 +160,10 @@ export const en: Record<TranslationKey, string> = {
 		'Populate the results field choices from app data instead of hand-authored options.',
 	[keys.pollSourceConfig]: 'Source settings',
 	[keys.pollOutcome]: 'Outcome',
+	[keys.pollType]: 'Outcome type',
+	[keys.pollTypeManual]: 'Set manually',
+	[keys.pollTypeMostVoted]: 'Most voted',
+	[keys.pollTypeSource]: 'From option source',
 	[keys.pollWinningValue]: 'Winning values',
 	[keys.pollWinningValueDescription]:
 		'Pick the winning option once the outcome is decided, or several on a tie. Saving records the resolution time; clear them to reopen the outcome.',

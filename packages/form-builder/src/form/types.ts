@@ -28,7 +28,6 @@ export type FormButtonSettings = {
  * itself, so the client never needs it from the document.
  */
 export type FormPollSettings = {
-	enabled?: boolean
 	/** When anonymous callers may read aggregate results. Default 'afterVote'. */
 	resultsVisibility?: 'afterVote' | 'afterClose' | null
 	/** ISO date after which submissions are rejected and the poll renders as closed. */
