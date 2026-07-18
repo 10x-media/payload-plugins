@@ -79,7 +79,7 @@ export const icons: CollectionConfig = {
 						admin: {
 							...field.admin,
 							description:
-								'showTextInput makes the field editable, so you can type or paste a raw library:name (e.g. lucide:star) instead of only picking from the drawer.',
+								'Type or paste a raw library:name (e.g. lucide:star), or pick from the drawer.',
 							width: '50%',
 						},
 					}),
