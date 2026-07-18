@@ -503,7 +503,6 @@ export const buildFormsCollection = ({
 			name: 'title',
 			type: 'text',
 			label: labelForKey(keys.fieldTitle),
-			admin: { width: '50%' },
 			// Visitor-facing content, so it follows `localizeContent` like the response message and
 			// consent statement: hosts with localization get a per-locale title (and a locale-aware
 			// `useAsTitle`), hosts without it are unaffected since Payload strips the flag. `validate`
