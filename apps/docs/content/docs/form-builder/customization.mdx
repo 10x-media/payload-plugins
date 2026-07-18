@@ -151,14 +151,14 @@ To assemble the group from scratch instead of receiving the defaults, the indivi
 
 ## Poll outcome fields
 
-The forms `poll.outcome` group holds a poll's recorded winner. Its `winningValue` select is backed by the `GET /api/forms/:id/poll-options` endpoint (the poll's [effective options](/form-builder/polls#outcome)); `resolvedAt` is a server-stamped date locked against every caller write. Compose the group with the `poll.outcomeFields` option, which mirrors [`buttons.fields`](#form-level-buttons): it receives the two default fields and returns the group's final field array verbatim, so you can reorder, wrap, or swap the winner picker for a component of your own, for example a relationship select over the voteable records:
+The forms `poll.outcome` group holds a poll's recorded winners. Its `winningValues` multi-select is backed by the `GET /api/forms/:id/poll-options` endpoint (the poll's [effective options](/form-builder/polls#outcome)) and stores a set, so a tie records every winner; `resolvedAt` is a server-stamped date locked against every caller write. Compose the group with the `poll.outcomeFields` option, which mirrors [`buttons.fields`](#form-level-buttons): it receives the two default fields and returns the group's final field array verbatim, so you can reorder, wrap, or swap the winner picker for a component of your own, for example a relationship select over the voteable records:
 
 ```ts title="payload.config.ts"
 formBuilder({
   poll: {
     outcomeFields: ({ defaultFields }) => [
       {
-        ...defaultFields.winningValue,
+        ...defaultFields.winningValues,
         admin: {
           components: { Field: { path: './WinnerPicker#WinnerPicker' } },
         },

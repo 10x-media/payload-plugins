@@ -78,7 +78,7 @@ describeForDb('form-builder form-type tabs', { dbs: ['mongo'] }, (db) => {
 			await booted.payload.update({
 				collection: 'forms',
 				id: form.id,
-				data: { poll: { outcome: { winningValue: 'zorro' } } },
+				data: { poll: { outcome: { winningValues: ['zorro'] } } },
 				overrideAccess: true,
 			})
 			throw new Error('expected the outcome write to be rejected')
@@ -90,12 +90,13 @@ describeForDb('form-builder form-type tabs', { dbs: ['mongo'] }, (db) => {
 		const updated = await booted.payload.update({
 			collection: 'forms',
 			id: form.id,
-			data: { poll: { outcome: { winningValue: 'ada' } } },
+			data: { poll: { outcome: { winningValues: ['ada', 'grace'] } } },
 			overrideAccess: true,
 		})
-		const outcome = (updated.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
-			.outcome
-		expect(outcome?.winningValue).toBe('ada')
+		const outcome = (
+			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
+		).outcome
+		expect(outcome?.winningValues).toEqual(['ada', 'grace'])
 		expect(outcome?.resolvedAt).toBeTruthy()
 	})
 })

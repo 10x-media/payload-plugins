@@ -81,15 +81,15 @@ describe('toFormDocument', () => {
 			expect(Object.keys(doc.poll ?? {})).toEqual(['enabled', 'resultsVisibility', 'closesAt'])
 		})
 
-		it('drops unknown keys on poll.outcome, keeping winningValue alone', () => {
+		it('drops unknown keys on poll.outcome, keeping winningValues alone', () => {
 			const doc = toFormDocument({
 				id: 1,
 				poll: {
 					enabled: true,
-					outcome: { winningValue: 'ada', resolvedAt: '2026-07-01T00:00:00.000Z' },
+					outcome: { winningValues: ['ada'], resolvedAt: '2026-07-01T00:00:00.000Z' },
 				} as Parameters<typeof toFormDocument>[0]['poll'],
 			})
-			expect(doc.poll?.outcome).toEqual({ winningValue: 'ada' })
+			expect(doc.poll?.outcome).toEqual({ winningValues: ['ada'] })
 		})
 	})
 
@@ -134,18 +134,29 @@ describe('toFormDocument', () => {
 		})
 	})
 
-	it('passes through the outcome winningValue only, dropping empty or null values', () => {
+	it('passes through the outcome winningValues only, dropping empty or null entries', () => {
 		const withOutcome = toFormDocument({
 			id: 1,
-			poll: { enabled: true, outcome: { winningValue: 'ada' } },
+			poll: { enabled: true, outcome: { winningValues: ['ada'] } },
 		})
-		expect(withOutcome.poll?.outcome).toEqual({ winningValue: 'ada' })
+		expect(withOutcome.poll?.outcome).toEqual({ winningValues: ['ada'] })
+		const tie = toFormDocument({
+			id: 1,
+			poll: { enabled: true, outcome: { winningValues: ['ada', 'grace'] } },
+		})
+		expect(tie.poll?.outcome).toEqual({ winningValues: ['ada', 'grace'] })
 		expect(
-			toFormDocument({ id: 1, poll: { enabled: true, outcome: { winningValue: null } } }).poll
+			toFormDocument({
+				id: 1,
+				poll: { enabled: true, outcome: { winningValues: ['ada', '', null] } },
+			}).poll?.outcome
+		).toEqual({ winningValues: ['ada'] })
+		expect(
+			toFormDocument({ id: 1, poll: { enabled: true, outcome: { winningValues: [] } } }).poll
 				?.outcome
 		).toBeUndefined()
 		expect(
-			toFormDocument({ id: 1, poll: { enabled: true, outcome: { winningValue: '' } } }).poll
+			toFormDocument({ id: 1, poll: { enabled: true, outcome: { winningValues: null } } }).poll
 				?.outcome
 		).toBeUndefined()
 		expect(toFormDocument({ id: 1, poll: { enabled: true } }).poll?.outcome).toBeUndefined()

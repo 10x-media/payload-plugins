@@ -16,12 +16,17 @@ import { resolveValidationRules } from '../../src/validation/registry'
 
 const resolveCalls: PollOptionResolveArgs[] = []
 
-const athletes = definePollOptionSource<{ eventId?: string; winner?: string }>({
+const athletes = definePollOptionSource<{
+	eventId?: string
+	winner?: string
+	winners?: string[]
+}>({
 	type: 'athletes',
 	label: 'Athletes',
 	config: [
 		{ name: 'eventId', type: 'text' },
 		{ name: 'winner', type: 'text' },
+		{ name: 'winners', type: 'text', hasMany: true },
 	],
 	resolve: (args) => {
 		resolveCalls.push(args)
@@ -36,7 +41,10 @@ const athletes = definePollOptionSource<{ eventId?: string; winner?: string }>({
 			{ label: 'Grace', value: 'grace' },
 		]
 	},
-	resolveOutcome: ({ config }) => config.winner,
+	resolveOutcome: ({ config }) => {
+		const winners = Array.isArray(config.winners) ? config.winners : []
+		return winners.length > 0 ? winners : config.winner
+	},
 })
 
 const pollSubfieldNames = (collection: CollectionConfig): (string | undefined)[] => {
@@ -254,11 +262,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 
 	it('records the outcome via resolvePollOutcome and rejects non-poll forms', async () => {
 		const form = await makeForm()
-		await resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValue: 'ada' })
+		await resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValues: ['ada'] })
 		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
-		const outcome = (updated.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
-			.outcome
-		expect(outcome?.winningValue).toBe('ada')
+		const outcome = (
+			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
+		).outcome
+		expect(outcome?.winningValues).toEqual(['ada'])
 		expect(typeof outcome?.resolvedAt).toBe('string')
 
 		const plain = await booted.payload.create({
@@ -266,26 +275,67 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			data: { title: 'No poll', fields: [] },
 		})
 		await expect(
-			resolvePollOutcome({ payload: booted.payload, formId: plain.id, winningValue: 'ada' })
+			resolvePollOutcome({ payload: booted.payload, formId: plain.id, winningValues: ['ada'] })
 		).rejects.toThrow(/not poll-enabled/)
+	})
+
+	it('records a tie of several winners and stamps resolvedAt', async () => {
+		const form = await makeForm()
+		const recorded = await resolvePollOutcome({
+			payload: booted.payload,
+			formId: form.id,
+			winningValues: ['ada', 'grace'],
+		})
+		expect(recorded).toEqual(['ada', 'grace'])
+		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const outcome = (
+			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
+		).outcome
+		expect(outcome?.winningValues).toEqual(['ada', 'grace'])
+		expect(typeof outcome?.resolvedAt).toBe('string')
 	})
 
 	it('rejects an explicit outcome outside the resolved options', async () => {
 		const form = await makeForm()
 		const message = await fieldErrorOf(
-			resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValue: 'zorro' })
+			resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValues: ['zorro'] })
 		)
 		expect(message).toBe('The winning value must be one of the poll options.')
 	})
 
-	it('resolves the outcome from the source when winningValue is omitted', async () => {
+	it('rejects a tie when any winner is outside the resolved options', async () => {
+		const form = await makeForm()
+		const message = await fieldErrorOf(
+			resolvePollOutcome({
+				payload: booted.payload,
+				formId: form.id,
+				winningValues: ['ada', 'zorro'],
+			})
+		)
+		expect(message).toBe('The winning value must be one of the poll options.')
+	})
+
+	it('resolves a single winner from the source when winningValues is omitted', async () => {
 		const form = await makeForm({ sourceConfig: { eventId: 'race-1', winner: 'grace' } })
 		const recorded = await resolvePollOutcome({ payload: booted.payload, formId: form.id })
-		expect(recorded).toBe('grace')
+		expect(recorded).toEqual(['grace'])
 		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
-		const outcome = (updated.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
-			.outcome
-		expect(outcome?.winningValue).toBe('grace')
+		const outcome = (
+			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
+		).outcome
+		expect(outcome?.winningValues).toEqual(['grace'])
+		expect(outcome?.resolvedAt).toBeTruthy()
+	})
+
+	it('resolves a tie from the source returning an array', async () => {
+		const form = await makeForm({ sourceConfig: { eventId: 'race-1', winners: ['ada', 'grace'] } })
+		const recorded = await resolvePollOutcome({ payload: booted.payload, formId: form.id })
+		expect(recorded).toEqual(['ada', 'grace'])
+		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const outcome = (
+			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
+		).outcome
+		expect(outcome?.winningValues).toEqual(['ada', 'grace'])
 		expect(outcome?.resolvedAt).toBeTruthy()
 	})
 
@@ -316,32 +366,33 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		).rejects.toThrow(/no poll option source/)
 	})
 
-	it('accepts an admin-path winner, stamps resolvedAt, and clears both together', async () => {
+	it('accepts an admin-path tie, stamps resolvedAt, and clears both together', async () => {
 		const form = await makeForm()
 		const before = Date.now()
 		await booted.payload.update({
 			collection: 'forms',
 			id: form.id,
-			data: { poll: { outcome: { winningValue: 'ada' } } },
+			data: { poll: { outcome: { winningValues: ['ada', 'grace'] } } },
 			overrideAccess: false,
 		})
 		const recorded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
-		const outcome = (recorded.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
-			.outcome
-		expect(outcome?.winningValue).toBe('ada')
+		const outcome = (
+			recorded.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
+		).outcome
+		expect(outcome?.winningValues).toEqual(['ada', 'grace'])
 		expect(Date.parse(outcome?.resolvedAt ?? '')).toBeGreaterThanOrEqual(before)
 
 		await booted.payload.update({
 			collection: 'forms',
 			id: form.id,
-			data: { poll: { outcome: { winningValue: '' } } },
+			data: { poll: { outcome: { winningValues: [] } } },
 			overrideAccess: false,
 		})
 		const cleared = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
 		const clearedOutcome = (
-			cleared.poll as { outcome?: { winningValue?: string | null; resolvedAt?: string | null } }
+			cleared.poll as { outcome?: { winningValues?: string[] | null; resolvedAt?: string | null } }
 		).outcome
-		expect(clearedOutcome?.winningValue ?? null).toBeNull()
+		expect(clearedOutcome?.winningValues ?? []).toEqual([])
 		expect(clearedOutcome?.resolvedAt ?? null).toBeNull()
 	})
 
@@ -351,7 +402,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			booted.payload.update({
 				collection: 'forms',
 				id: form.id,
-				data: { poll: { outcome: { winningValue: 'zorro' } } },
+				data: { poll: { outcome: { winningValues: ['zorro'] } } },
 				overrideAccess: false,
 			})
 		)
@@ -360,23 +411,25 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 
 	it('keeps resolvedAt locked against direct writes', async () => {
 		const form = await makeForm()
-		await resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValue: 'ada' })
+		await resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValues: ['ada'] })
 		const recorded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
 		const stamp = (recorded.poll as { outcome?: { resolvedAt?: string } }).outcome?.resolvedAt
 		expect(stamp).toBeTruthy()
 
-		// Same winner, tampered stamp: the field access strips resolvedAt and the hook sees no
+		// Same winner set, tampered stamp: the field access strips resolvedAt and the hook sees no
 		// transition, so the stored stamp survives.
 		await booted.payload.update({
 			collection: 'forms',
 			id: form.id,
-			data: { poll: { outcome: { winningValue: 'ada', resolvedAt: '2000-01-01T00:00:00.000Z' } } },
+			data: {
+				poll: { outcome: { winningValues: ['ada'], resolvedAt: '2000-01-01T00:00:00.000Z' } },
+			},
 			overrideAccess: false,
 		})
 		const after = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
-		const outcome = (after.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
+		const outcome = (after.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } })
 			.outcome
-		expect(outcome?.winningValue).toBe('ada')
+		expect(outcome?.winningValues).toEqual(['ada'])
 		expect(outcome?.resolvedAt).toBe(stamp)
 
 		// A stamp write without touching the winner is ignored the same way.

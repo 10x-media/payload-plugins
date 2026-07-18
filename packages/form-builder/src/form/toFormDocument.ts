@@ -56,7 +56,7 @@ const buttonSettingsOf = (form: {
  * - `title` may be null; coerced to `undefined`
  * - `multistep`/`pollEnabled` are the two top-level form-type flags, coerced to strict booleans
  * - `poll` may be null; coerced to `undefined` (`resultsField`, `optionSource`, and
- *   `sourceConfig` are dropped: server-side only; `outcome` passes through `winningValue` only)
+ *   `sourceConfig` are dropped: server-side only; `outcome` passes through `winningValues` only)
  *
  * Unknown keys survive on `response` but not on `poll`, which is deliberate rather than incidental.
  * `response` is a visitor-facing group a host is meant to extend (`overrides.forms.fields`) and read
@@ -90,12 +90,17 @@ export function toFormDocument(
 			resultsField?: string | null
 			resultsVisibility?: string | null
 			closesAt?: string | null
-			outcome?: { winningValue?: string | null } | null
+			outcome?: { winningValues?: (string | null)[] | null } | null
 		} | null
 	},
 	options?: ToFormDocumentOptions
 ): FormDocument {
-	const winningValue = form.poll?.outcome?.winningValue
+	const rawWinningValues = form.poll?.outcome?.winningValues
+	const winningValues = Array.isArray(rawWinningValues)
+		? rawWinningValues.filter(
+				(value): value is string => typeof value === 'string' && value.length > 0
+			)
+		: []
 	const poll = form.poll
 		? {
 				enabled: form.poll.enabled ?? undefined,
@@ -104,9 +109,7 @@ export function toFormDocument(
 					| 'afterClose'
 					| undefined,
 				closesAt: form.poll.closesAt ?? undefined,
-				...(typeof winningValue === 'string' && winningValue.length > 0
-					? { outcome: { winningValue } }
-					: {}),
+				...(winningValues.length > 0 ? { outcome: { winningValues } } : {}),
 			}
 		: undefined
 	let fields = (form.fields ?? []) as FormFieldInstance[]

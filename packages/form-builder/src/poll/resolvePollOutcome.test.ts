@@ -16,6 +16,18 @@ const sources: PollOptionSourceRegistry = new Map([
 		}),
 	],
 	[
+		'tie',
+		definePollOptionSource({
+			type: 'tie',
+			label: 'Tie',
+			resolve: () => [
+				{ label: 'Ada', value: 'ada' },
+				{ label: 'Grace', value: 'grace' },
+			],
+			resolveOutcome: () => ['ada', 'grace'],
+		}),
+	],
+	[
 		'plain',
 		definePollOptionSource({
 			type: 'plain',
@@ -41,8 +53,8 @@ const payloadWith = (poll: unknown) => {
 describe('resolvePollOutcome', () => {
 	it('writes an explicit outcome with overrideAccess and leaves stamping to the hook', async () => {
 		const { payload, update } = payloadWith({ enabled: true, resultsField: 'winner' })
-		const recorded = await resolvePollOutcome({ payload, formId: 1, winningValue: 'ada' })
-		expect(recorded).toBe('ada')
+		const recorded = await resolvePollOutcome({ payload, formId: 1, winningValues: ['ada'] })
+		expect(recorded).toEqual(['ada'])
 		expect(update).toHaveBeenCalledOnce()
 		const args = update.mock.calls[0]?.[0] as {
 			collection: string
@@ -53,19 +65,39 @@ describe('resolvePollOutcome', () => {
 		expect(args.collection).toBe('forms')
 		expect(args.id).toBe(1)
 		expect(args.overrideAccess).toBe(true)
-		expect(args.data.poll.outcome).toEqual({ winningValue: 'ada' })
+		expect(args.data.poll.outcome).toEqual({ winningValues: ['ada'] })
 	})
 
-	it('resolves the winner via the source resolveOutcome when winningValue is omitted', async () => {
+	it('writes an explicit tie of several winners', async () => {
+		const { payload, update } = payloadWith({ enabled: true, resultsField: 'winner' })
+		const recorded = await resolvePollOutcome({
+			payload,
+			formId: 1,
+			winningValues: ['ada', 'grace'],
+		})
+		expect(recorded).toEqual(['ada', 'grace'])
+		const args = update.mock.calls[0]?.[0] as { data: { poll: { outcome: unknown } } }
+		expect(args.data.poll.outcome).toEqual({ winningValues: ['ada', 'grace'] })
+	})
+
+	it('resolves a single winner via the source resolveOutcome when winningValues is omitted', async () => {
 		const { payload, update } = payloadWith({
 			enabled: true,
 			optionSource: 'athletes',
 			sourceConfig: { winner: 'ada' },
 		})
 		const recorded = await resolvePollOutcome({ payload, formId: 1 })
-		expect(recorded).toBe('ada')
+		expect(recorded).toEqual(['ada'])
 		const args = update.mock.calls[0]?.[0] as { data: { poll: { outcome: unknown } } }
-		expect(args.data.poll.outcome).toEqual({ winningValue: 'ada' })
+		expect(args.data.poll.outcome).toEqual({ winningValues: ['ada'] })
+	})
+
+	it('resolves a tie via the source resolveOutcome returning an array', async () => {
+		const { payload, update } = payloadWith({ enabled: true, optionSource: 'tie' })
+		const recorded = await resolvePollOutcome({ payload, formId: 1 })
+		expect(recorded).toEqual(['ada', 'grace'])
+		const args = update.mock.calls[0]?.[0] as { data: { poll: { outcome: unknown } } }
+		expect(args.data.poll.outcome).toEqual({ winningValues: ['ada', 'grace'] })
 	})
 
 	it('explains auto-mode failures without writing', async () => {
@@ -94,17 +126,17 @@ describe('resolvePollOutcome', () => {
 
 	it('rejects a form that is not poll-enabled', async () => {
 		const { payload, update } = payloadWith({ enabled: false })
-		await expect(resolvePollOutcome({ payload, formId: 1, winningValue: 'ada' })).rejects.toThrow(
-			/not poll-enabled/
-		)
+		await expect(
+			resolvePollOutcome({ payload, formId: 1, winningValues: ['ada'] })
+		).rejects.toThrow(/not poll-enabled/)
 		expect(update).not.toHaveBeenCalled()
 	})
 
 	it('rejects a form without a poll group', async () => {
 		const { payload, update } = payloadWith(null)
-		await expect(resolvePollOutcome({ payload, formId: 1, winningValue: 'ada' })).rejects.toThrow(
-			/not poll-enabled/
-		)
+		await expect(
+			resolvePollOutcome({ payload, formId: 1, winningValues: ['ada'] })
+		).rejects.toThrow(/not poll-enabled/)
 		expect(update).not.toHaveBeenCalled()
 	})
 })

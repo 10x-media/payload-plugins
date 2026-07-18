@@ -39,6 +39,11 @@ export type EndpointOptionsSelectProps = {
 	descriptionKey?: TranslationKey
 	/** Mirrors ReactSelect's `isClearable`; defaults to true. */
 	isClearable?: boolean
+	/**
+	 * Render a multi-value select bound to a `string[]`, for a `hasMany` field (e.g. a poll outcome
+	 * with tied winners). Default false: a single-value select bound to a `string`.
+	 */
+	isMulti?: boolean
 }
 
 type FetchState =
@@ -55,7 +60,8 @@ type FetchState =
  * unsaved documents skip the fetch since the server cannot resolve options for them yet.
  */
 export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
-	const { path, setValue, value } = useField<string>({ path: props.path })
+	const isMulti = props.isMulti === true
+	const { path, setValue, value } = useField<string | string[]>({ path: props.path })
 	const label = toStaticLabel(props.field?.label ?? props.label)
 	const { t } = useTranslation()
 	const description = props.descriptionKey
@@ -97,13 +103,30 @@ export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
 		return () => controller.abort()
 	}, [apiRoute, collectionSlug, id, props.endpoint])
 
+	// A missing fetched option (or a failed fetch) must never silently drop a stored value, so every
+	// selected value the options don't cover is kept selectable by its own label.
+	const selectedValues: string[] = isMulti
+		? Array.isArray(value)
+			? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+			: []
+		: typeof value === 'string' && value.length > 0
+			? [value]
+			: []
 	const options: ReactSelectOption[] = state.status === 'loaded' ? state.options : []
-	const allOptions =
-		value && !options.some((option) => option.value === value)
-			? [...options, { label: value, value }]
-			: options
+	const missing = selectedValues
+		.filter((selected) => !options.some((option) => option.value === selected))
+		.map((selected) => ({ label: selected, value: selected }))
+	const allOptions = missing.length > 0 ? [...options, ...missing] : options
+	const selectedOptions = selectedValues
+		.map((selected) => allOptions.find((option) => option.value === selected))
+		.filter((option): option is ReactSelectOption => option !== undefined)
 
 	const handleChange = (selected: ReactSelectOption | ReactSelectOption[] | null) => {
+		if (isMulti) {
+			const chosen = Array.isArray(selected) ? selected : selected ? [selected] : []
+			setValue(chosen.map((option) => option.value as string))
+			return
+		}
 		const chosen = Array.isArray(selected) ? selected[0] : selected
 		setValue(chosen ? (chosen.value as string) : '')
 	}
@@ -113,7 +136,8 @@ export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
 			<FieldLabel label={label} path={path} />
 			<ReactSelect
 				options={allOptions}
-				value={allOptions.find((option) => option.value === value) ?? undefined}
+				value={isMulti ? selectedOptions : (selectedOptions[0] ?? undefined)}
+				isMulti={isMulti}
 				isClearable={props.isClearable !== false}
 				isLoading={state.status === 'loading'}
 				placeholder={state.status === 'loading' ? t(keys.endpointOptionsLoading) : undefined}

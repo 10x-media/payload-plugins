@@ -188,7 +188,7 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 		expect(res.status).toBe(404)
 	})
 
-	// winningValue carries no field-level access (admins edit it), so Payload's loggedIn default on
+	// winningValues carries no field-level access (admins edit it), so Payload's loggedIn default on
 	// the collection is what blocks anonymous writes. This boot has no access overrides, proving
 	// the unlock still rides that gate.
 	it('default access gates outcome writes to authenticated callers', async () => {
@@ -197,7 +197,7 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 			booted.payload.update({
 				collection: 'forms',
 				id: form.id,
-				data: { poll: { outcome: { winningValue: 'red' } } },
+				data: { poll: { outcome: { winningValues: ['red'] } } },
 				depth: 0,
 				overrideAccess: false,
 			})
@@ -206,13 +206,14 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 		const updated = await booted.payload.update({
 			collection: 'forms',
 			id: form.id,
-			data: { poll: { outcome: { winningValue: 'red' } } },
+			data: { poll: { outcome: { winningValues: ['red'] } } },
 			depth: 0,
 			overrideAccess: true,
 		})
-		const outcome = (updated.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
-			.outcome
-		expect(outcome?.winningValue).toBe('red')
+		const outcome = (
+			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
+		).outcome
+		expect(outcome?.winningValues).toEqual(['red'])
 		expect(outcome?.resolvedAt).toBeTruthy()
 	})
 })

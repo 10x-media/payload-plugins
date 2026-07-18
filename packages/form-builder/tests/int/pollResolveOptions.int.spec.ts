@@ -54,7 +54,7 @@ const athleteVote: AnyFormFieldDefinition = {
 /** A distinct client component ref, so the seam swap is observable on the built collection. */
 const SWAPPED_WINNING_REF = '@10x-media/form-builder/client#FieldNameSelect'
 
-const winningValueField = (collection: CollectionConfig): Field | undefined => {
+const winningValuesField = (collection: CollectionConfig): Field | undefined => {
 	const tabs = collection.fields.find((f) => f.type === 'tabs')
 	const pollTab =
 		tabs?.type === 'tabs'
@@ -67,7 +67,7 @@ const winningValueField = (collection: CollectionConfig): Field | undefined => {
 	const outcome = poll.fields.find(
 		(field) => 'name' in field && field.name === 'outcome'
 	) as Extract<Field, { type: 'group' }>
-	return outcome.fields.find((field) => 'name' in field && field.name === 'winningValue')
+	return outcome.fields.find((field) => 'name' in field && field.name === 'winningValues')
 }
 
 describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
@@ -84,7 +84,7 @@ describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
 					// mirrors forms.ts `halfWidth`: spreading a union-typed Field loses the discriminant.
 					outcomeFields: ({ defaultFields }) => [
 						{
-							...defaultFields.winningValue,
+							...defaultFields.winningValues,
 							admin: { components: { Field: { path: SWAPPED_WINNING_REF } } },
 						} as Field,
 						defaultFields.resolvedAt,
@@ -229,24 +229,24 @@ describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
 		])
 	})
 
-	it('swaps the winningValue component through the outcomeFields seam', () => {
+	it('swaps the winningValues component through the outcomeFields seam', () => {
 		const collection = booted.payload.collections.forms
 		if (!collection) {
 			throw new Error('forms collection missing')
 		}
-		const field = winningValueField(collection.config)
+		const field = winningValuesField(collection.config)
 		const path = (field as { admin?: { components?: { Field?: { path?: string } } } } | undefined)
 			?.admin?.components?.Field?.path
 		expect(path).toBe(SWAPPED_WINNING_REF)
 	})
 
-	it('still validates outcome membership when the winningValue component is swapped', async () => {
+	it('still validates outcome membership when the winningValues component is swapped', async () => {
 		const form = await makeVoteForm()
 		const message = await fieldErrorOf(
 			booted.payload.update({
 				collection: 'forms',
 				id: form.id,
-				data: { poll: { outcome: { winningValue: 'not-an-athlete' } } },
+				data: { poll: { outcome: { winningValues: ['not-an-athlete'] } } },
 				overrideAccess: false,
 			})
 		)
@@ -255,13 +255,14 @@ describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
 		await booted.payload.update({
 			collection: 'forms',
 			id: form.id,
-			data: { poll: { outcome: { winningValue: String(athleteIds[0]) } } },
+			data: { poll: { outcome: { winningValues: [String(athleteIds[0])] } } },
 			overrideAccess: false,
 		})
 		const recorded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
-		const outcome = (recorded.poll as { outcome?: { winningValue?: string; resolvedAt?: string } })
-			.outcome
-		expect(outcome?.winningValue).toBe(String(athleteIds[0]))
+		const outcome = (
+			recorded.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
+		).outcome
+		expect(outcome?.winningValues).toEqual([String(athleteIds[0])])
 		expect(typeof outcome?.resolvedAt).toBe('string')
 	})
 })

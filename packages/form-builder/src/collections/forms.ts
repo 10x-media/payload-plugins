@@ -412,15 +412,15 @@ export const buildFormsCollection = ({
 				admin: { date: { pickerAppearance: 'dayAndTime' } },
 			},
 			...buildPollOptionSourceFields(pollSourceRegistry ?? new Map()),
-			// `winningValue` is recorded either by an admin picking from the poll's effective options
-			// (served by `/:id/poll-options`) or by `resolvePollOutcome` (host domain logic); the
-			// `pollOutcomeBeforeChange` hook validates both paths and owns the `resolvedAt` stamp.
-			// `resolvedAt` itself stays fully locked: field-level create/update access blocks every
-			// non-override caller write (Payload silently drops the denied value rather than erroring)
-			// while the hook's stamp, applied after access filtering, still persists. The
-			// `poll.outcomeFields` seam receives both defaults and its return becomes the group's
-			// fields verbatim, so a host can swap `winningValue` for its own component; the hook still
-			// validates the stored value against the effective options, so no swap bypasses it.
+			// `winningValues` is recorded either by an admin picking from the poll's effective options
+			// (served by `/:id/poll-options`) or by `resolvePollOutcome` (host domain logic); more than
+			// one value records a tie. The `pollOutcomeBeforeChange` hook validates both paths and owns
+			// the `resolvedAt` stamp. `resolvedAt` itself stays fully locked: field-level create/update
+			// access blocks every non-override caller write (Payload silently drops the denied value
+			// rather than erroring) while the hook's stamp, applied after access filtering, still
+			// persists. The `poll.outcomeFields` seam receives both defaults and its return becomes the
+			// group's fields verbatim, so a host can swap `winningValues` for its own component; the hook
+			// still validates every stored value against the effective options, so no swap bypasses it.
 			// `hideGutter` stays: outcome is still a group nested inside the poll group.
 			{
 				name: 'outcome',
@@ -429,7 +429,7 @@ export const buildFormsCollection = ({
 				admin: { hideGutter: true },
 				fields: outcomeFields
 					? outcomeFields({ defaultFields: defaultOutcomeFields })
-					: [defaultOutcomeFields.winningValue, defaultOutcomeFields.resolvedAt],
+					: [defaultOutcomeFields.winningValues, defaultOutcomeFields.resolvedAt],
 			},
 		],
 	}

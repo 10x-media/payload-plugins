@@ -7,20 +7,31 @@ export type ResolvePollOutcomeArgs = {
 	payload: Payload
 	formId: number | string
 	/**
-	 * A stable option value, matching one of the poll's choice values (the host's contract with
-	 * `PollOption.value`). Omit to resolve the winner automatically via the poll's option source
-	 * `resolveOutcome`.
+	 * The winning set: stable option values, each matching one of the poll's choice values (the
+	 * host's contract with `PollOption.value`). Pass more than one for a tie. Omit to resolve the
+	 * winners automatically via the poll's option source `resolveOutcome`.
 	 */
-	winningValue?: string
+	winningValues?: string[]
 	req?: PayloadRequest
 }
 
-const resolveWinnerFromSource = async (args: {
+/** A source's `resolveOutcome` return narrowed to a winner set, or `undefined` when undecidable. */
+const normalizeSourceOutcome = (value: string | string[] | undefined): string[] | undefined => {
+	if (value === undefined) {
+		return undefined
+	}
+	const cleaned = (Array.isArray(value) ? value : [value]).filter(
+		(entry): entry is string => typeof entry === 'string' && entry.length > 0
+	)
+	return cleaned.length > 0 ? cleaned : undefined
+}
+
+const resolveWinnersFromSource = async (args: {
 	payload: Payload
 	form: { id: number | string; title?: unknown }
 	poll: PollConfigLike
 	req?: PayloadRequest
-}): Promise<string> => {
+}): Promise<string[]> => {
 	const { payload, form, poll, req } = args
 	const optionSource =
 		typeof poll.optionSource === 'string' && poll.optionSource.length > 0
@@ -28,7 +39,7 @@ const resolveWinnerFromSource = async (args: {
 			: undefined
 	if (!optionSource) {
 		throw new Error(
-			`Form ${String(form.id)} has no poll option source; pass winningValue explicitly or set poll.optionSource on the form.`
+			`Form ${String(form.id)} has no poll option source; pass winningValues explicitly or set poll.optionSource on the form.`
 		)
 	}
 	const source = pollOptionSourcesOf(payload).get(optionSource)
@@ -39,42 +50,45 @@ const resolveWinnerFromSource = async (args: {
 	}
 	if (!source.resolveOutcome) {
 		throw new Error(
-			`Poll option source "${optionSource}" does not implement resolveOutcome; add it to the source or pass winningValue explicitly.`
+			`Poll option source "${optionSource}" does not implement resolveOutcome; add it to the source or pass winningValues explicitly.`
 		)
 	}
 	const config =
 		poll.sourceConfig != null && typeof poll.sourceConfig === 'object'
 			? (poll.sourceConfig as Record<string, unknown>)
 			: {}
-	const winner = await source.resolveOutcome({
-		config,
-		form: { id: form.id, title: typeof form.title === 'string' ? form.title : undefined },
-		payload,
-		req,
-	})
-	if (winner === undefined) {
+	const winners = normalizeSourceOutcome(
+		await source.resolveOutcome({
+			config,
+			form: { id: form.id, title: typeof form.title === 'string' ? form.title : undefined },
+			payload,
+			req,
+		})
+	)
+	if (winners === undefined) {
 		throw new Error(
-			`Poll option source "${optionSource}" returned no outcome for form ${String(form.id)}; the result may not be decided yet. Try again later or pass winningValue explicitly.`
+			`Poll option source "${optionSource}" returned no outcome for form ${String(form.id)}; the result may not be decided yet. Try again later or pass winningValues explicitly.`
 		)
 	}
-	return winner
+	return winners
 }
 
 /**
  * Record a poll's final outcome server-side, in one of two modes:
- * - explicit: pass `winningValue` when host code already knows the winner;
- * - auto: omit it and the poll's configured option source resolves the winner from domain data via
+ * - explicit: pass `winningValues` when host code already knows the winner(s); more than one is a
+ *   tie, and an empty array clears the outcome;
+ * - auto: omit it and the poll's configured option source resolves the winners from domain data via
  *   its `resolveOutcome`. Throws when the poll has no option source, the source is unregistered or
- *   lacks `resolveOutcome`, or `resolveOutcome` returns `undefined` (outcome not yet decidable).
+ *   lacks `resolveOutcome`, or `resolveOutcome` yields no winner (outcome not yet decidable).
  *
  * The write runs through `payload.update` with `overrideAccess`, so the forms collection hook
- * validates the value against the poll's effective options in both modes and stamps
- * `poll.outcome.resolvedAt` (set or changed: now; re-recording the same winner keeps the original
- * stamp; admins picking a winner in the sidebar go through the same hook). Throws when the form
- * does not exist or is not poll-enabled. Returns the recorded winning value, which auto-mode
- * callers otherwise would not know.
+ * validates every value against the poll's effective options in both modes and stamps
+ * `poll.outcome.resolvedAt` (set or changed: now; re-recording the same set keeps the original
+ * stamp; admins picking winners in the sidebar go through the same hook). Throws when the form does
+ * not exist or is not poll-enabled. Returns the recorded winning set, which auto-mode callers
+ * otherwise would not know.
  */
-export const resolvePollOutcome = async (args: ResolvePollOutcomeArgs): Promise<string> => {
+export const resolvePollOutcome = async (args: ResolvePollOutcomeArgs): Promise<string[]> => {
 	const { payload, formId, req } = args
 	const form = await payload.findByID({
 		collection: FORMS_SLUG,
@@ -87,15 +101,15 @@ export const resolvePollOutcome = async (args: ResolvePollOutcomeArgs): Promise<
 	if (form.pollEnabled !== true || !poll) {
 		throw new Error(`Form ${String(formId)} is not poll-enabled; cannot record an outcome.`)
 	}
-	const winningValue =
-		args.winningValue ?? (await resolveWinnerFromSource({ payload, form, poll, req }))
+	const winningValues =
+		args.winningValues ?? (await resolveWinnersFromSource({ payload, form, poll, req }))
 	await payload.update({
 		collection: FORMS_SLUG,
 		id: formId,
-		data: { poll: { outcome: { winningValue } } },
+		data: { poll: { outcome: { winningValues } } },
 		depth: 0,
 		overrideAccess: true,
 		req,
 	})
-	return winningValue
+	return winningValues
 }

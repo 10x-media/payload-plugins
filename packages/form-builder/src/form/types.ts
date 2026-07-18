@@ -33,8 +33,8 @@ export type FormPollSettings = {
 	resultsVisibility?: 'afterVote' | 'afterClose' | null
 	/** ISO date after which submissions are rejected and the poll renders as closed. */
 	closesAt?: string | null
-	/** Present once the host recorded a final outcome via `resolvePollOutcome`; `<Poll>` renders the final state. */
-	outcome?: { winningValue?: string }
+	/** Present once the host recorded a final outcome via `resolvePollOutcome`; `<Poll>` renders the final state. A tie carries more than one value. */
+	outcome?: { winningValues?: string[] }
 }
 
 /**

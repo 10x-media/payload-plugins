@@ -6,22 +6,43 @@ import { asTranslate } from '../translations/server'
 import type { PollOption } from './definePollOptionSource'
 import { resolveEffectivePollOptions } from './effectivePollOptions'
 
-const WINNING_VALUE_PATH = 'poll.outcome.winningValue'
+const WINNING_VALUES_PATH = 'poll.outcome.winningValues'
 
-const normalizeWinning = (value: unknown): string | undefined =>
-	typeof value === 'string' && value.length > 0 ? value : undefined
+/** The winning set as a deduped array of non-empty strings, ready to store and to compare. */
+const normalizeWinning = (value: unknown): string[] => {
+	if (!Array.isArray(value)) {
+		return []
+	}
+	const seen = new Set<string>()
+	for (const entry of value) {
+		if (typeof entry === 'string' && entry.length > 0) {
+			seen.add(entry)
+		}
+	}
+	return [...seen]
+}
+
+/** Set equality on two already-deduped winner arrays: order-insensitive membership. */
+const sameWinners = (a: string[], b: string[]): boolean => {
+	if (a.length !== b.length) {
+		return false
+	}
+	const set = new Set(a)
+	return b.every((value) => set.has(value))
+}
 
 /**
  * Owns the poll outcome lifecycle for every create and update, admin and API alike. When the save
- * writes `poll.outcome.winningValue` it validates a set or changed winner against the poll's
+ * writes `poll.outcome.winningValues` it validates a set or changed winner set against the poll's
  * effective options (source-resolved or authored, over a merged view of the doc so partial updates
  * validate against stored config) and requires the poll to be enabled; clearing is always allowed.
+ * A tie is a set with more than one winner; every value must be a member of the effective options.
  *
- * It is also the single `resolvedAt` stamping point: stamped when the winner is set or changed,
- * cleared with the winner, untouched when the winner is unchanged. Callers can never write
- * `resolvedAt` themselves (field-level access strips it during the beforeValidate traversal,
- * before this hook runs), while values this hook sets survive to the database, so the stamp
- * always reflects the actual transition regardless of the write path.
+ * It is also the single `resolvedAt` stamping point: stamped when the winner set is set or changed,
+ * cleared with the set, untouched when the set is unchanged (order-insensitive). Callers can never
+ * write `resolvedAt` themselves (field-level access strips it during the beforeValidate traversal,
+ * before this hook runs), while values this hook sets survive to the database, so the stamp always
+ * reflects the actual transition regardless of the write path.
  */
 export const pollOutcomeBeforeChange: CollectionBeforeChangeHook = async ({
 	data,
@@ -36,18 +57,16 @@ export const pollOutcomeBeforeChange: CollectionBeforeChangeHook = async ({
 		incomingPoll?.outcome != null && typeof incomingPoll.outcome === 'object'
 			? (incomingPoll.outcome as Record<string, unknown>)
 			: undefined
-	if (!outcome || !('winningValue' in outcome)) {
+	if (!outcome || !('winningValues' in outcome)) {
 		return data
 	}
-	const next = normalizeWinning(outcome.winningValue)
-	if (next === undefined) {
-		outcome.winningValue = null
-	}
-	const previous = normalizeWinning(pollConfigOf(originalDoc?.poll)?.outcome?.winningValue)
-	if (next === previous) {
+	const next = normalizeWinning(outcome.winningValues)
+	outcome.winningValues = next
+	const previous = normalizeWinning(pollConfigOf(originalDoc?.poll)?.outcome?.winningValues)
+	if (sameWinners(next, previous)) {
 		return data
 	}
-	if (next === undefined) {
+	if (next.length === 0) {
 		outcome.resolvedAt = null
 		return data
 	}
@@ -55,7 +74,7 @@ export const pollOutcomeBeforeChange: CollectionBeforeChangeHook = async ({
 	const t = asTranslate(req.t)
 	const fail = (message: string): never => {
 		throw new ValidationError(
-			{ collection: FORMS_SLUG, errors: [{ path: WINNING_VALUE_PATH, message }] },
+			{ collection: FORMS_SLUG, errors: [{ path: WINNING_VALUES_PATH, message }] },
 			req.t
 		)
 	}
@@ -90,7 +109,8 @@ export const pollOutcomeBeforeChange: CollectionBeforeChangeHook = async ({
 	} catch {
 		return fail(t(keys.pollOptionsUnavailable))
 	}
-	if (!options.some((option) => option.value === next)) {
+	const allowed = new Set(options.map((option) => option.value))
+	if (!next.every((value) => allowed.has(value))) {
 		fail(t(keys.validationWinningValueUnknown))
 	}
 	outcome.resolvedAt = new Date().toISOString()

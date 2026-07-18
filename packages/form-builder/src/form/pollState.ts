@@ -6,7 +6,7 @@ export type PollConfigLike = {
 	closesAt?: string | null
 	optionSource?: string | null
 	sourceConfig?: Record<string, unknown> | null
-	outcome?: { winningValue?: string | null; resolvedAt?: string | null } | null
+	outcome?: { winningValues?: (string | null)[] | null; resolvedAt?: string | null } | null
 }
 
 /** Narrow a forms document's untyped `poll` member. */

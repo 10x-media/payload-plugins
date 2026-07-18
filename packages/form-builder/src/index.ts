@@ -130,8 +130,8 @@ export type FormBuilderPluginOptions = {
 	 * least one source registered, the forms poll group gains an `optionSource` select plus its
 	 * per-source `sourceConfig`, and submissions to a sourced poll only accept resolved values.
 	 * `outcomeFields` composes the poll `outcome` group: it receives the two default fields
-	 * (`winningValue`, `resolvedAt`) and returns the group's final field array verbatim, so a host
-	 * can swap `winningValue` for its own component (e.g. a relationship picker over the voteable
+	 * (`winningValues`, `resolvedAt`) and returns the group's final field array verbatim, so a host
+	 * can swap `winningValues` for its own component (e.g. a relationship picker over the voteable
 	 * records). Membership validation runs server-side regardless, so a swap cannot bypass it.
 	 */
 	poll?: {
@@ -367,7 +367,7 @@ export type { DefaultOutcomeFields, OutcomeFieldsOverride } from './poll/outcome
 export {
 	buildDefaultOutcomeFields,
 	buildResolvedAtField,
-	buildWinningValueField,
+	buildWinningValuesField,
 } from './poll/outcomeFields'
 export type {
 	PollOptionSourceOption,

@@ -134,13 +134,13 @@ An author adds an `athleteVote` field, marks a few athletes voteable, and picks 
 
 ## Outcome
 
-When the real-world result is decided ("which athlete won?"), record it one of two ways; both land in `poll.outcome.winningValue`, both are validated against the poll's current options (source-resolved, `resolveOptions`-backed, or authored), and both stamp `resolvedAt` server-side.
+When the real-world result is decided ("which athlete won?"), record it one of two ways; both land in `poll.outcome.winningValues` (a set, so a tie records every winner), both validate each value against the poll's current options (source-resolved, `resolveOptions`-backed, or authored), and both stamp `resolvedAt` server-side.
 
-**In the admin.** The outcome group's winning-value select loads the poll's effective options from the authenticated `GET /api/forms/:id/poll-options` endpoint, so an editor opens the form after the race and picks the winner; clearing the select reopens the outcome. `resolvedAt` itself stays locked (a beforeChange hook stamps it on every winner set, change, or clear; direct writes are dropped). The group is composable through the `poll.outcomeFields` seam, which hands you the two default fields (`winningValue`, `resolvedAt`) to reorder, wrap, or swap the winner picker for a component of your own (see [Customization](/form-builder/customization#poll-outcome-fields)); membership validation runs server-side regardless, so a swap cannot bypass it.
+**In the admin.** The outcome group's winning-values multi-select loads the poll's effective options from the authenticated `GET /api/forms/:id/poll-options` endpoint, so an editor opens the form after the race and picks the winner (or several on a tie); clearing the select reopens the outcome. `resolvedAt` itself stays locked (a beforeChange hook stamps it whenever the winner set is set, changed, or cleared; direct writes are dropped). The group is composable through the `poll.outcomeFields` seam, which hands you the two default fields (`winningValues`, `resolvedAt`) to reorder, wrap, or swap the winner picker for a component of your own (see [Customization](/form-builder/customization#poll-outcome-fields)); membership validation runs server-side regardless, so a swap cannot bypass it.
 
 The select is document-scoped, so it stays empty on a form that has never been saved: there is no id yet for the endpoint to resolve options against. This costs nothing in practice, since a poll only has a winner after it has run, but it does mean the winner cannot be set in the same breath as creating the form. Save first, then pick.
 
-**From domain logic.** Call `resolvePollOutcome` server-side, explicitly or in auto mode. Explicit mode passes the value; auto mode omits it and asks the poll's option source, which can implement `resolveOutcome` next to `resolve`:
+**From domain logic.** Call `resolvePollOutcome` server-side, explicitly or in auto mode. Explicit mode passes the winning set; auto mode omits it and asks the poll's option source, which can implement `resolveOutcome` next to `resolve`:
 
 ```ts title="payload.config.ts"
 const raceEntrants = definePollOptionSource({
@@ -159,7 +159,8 @@ const raceEntrants = definePollOptionSource({
       collection: 'race-results',
       where: { race: { equals: config.raceId } },
     })
-    // undefined = not decided yet; resolvePollOutcome throws a descriptive error
+    // undefined = not decided yet; resolvePollOutcome throws a descriptive error.
+    // Return a string for a single winner or a string[] for a tie.
     return docs[0] ? String(docs[0].winner) : undefined
   },
 })
@@ -168,11 +169,12 @@ const raceEntrants = definePollOptionSource({
 ```ts
 import { resolvePollOutcome } from '@10x-media/form-builder' // also on /rsc
 
-await resolvePollOutcome({ payload, formId, winningValue: 'entrant-42' }) // explicit
-const winner = await resolvePollOutcome({ payload, formId }) // auto, via resolveOutcome
+await resolvePollOutcome({ payload, formId, winningValues: ['entrant-42'] }) // explicit
+await resolvePollOutcome({ payload, formId, winningValues: ['entrant-42', 'entrant-7'] }) // a tie
+const winners = await resolvePollOutcome({ payload, formId }) // auto, via resolveOutcome
 ```
 
-Auto mode throws when the poll has no option source, the configured source type is not registered, the source lacks `resolveOutcome`, or the outcome is not yet decidable, so a cron that resolves polls fails loudly instead of guessing. Either way the call returns the recorded value, so a caller that let the source decide still learns the winner. A recorded outcome supersedes the rest of the lifecycle: `<Poll>` renders a final notice plus results with the winning bucket highlighted (`<FormResults winningValue>` underneath), regardless of voted or closed state.
+Auto mode throws when the poll has no option source, the configured source type is not registered, the source lacks `resolveOutcome`, or the outcome is not yet decidable, so a cron that resolves polls fails loudly instead of guessing. Either way the call returns the recorded set, so a caller that let the source decide still learns the winners. A recorded outcome supersedes the rest of the lifecycle: `<Poll>` renders a final notice plus results with every winning bucket highlighted (`<FormResults winningValues>` underneath), regardless of voted or closed state.
 
 Both paths validate against one set, `resolveEffectivePollOptions` (exported from the root and `/rsc`): source-resolved options when the poll has an `optionSource`, the results field type's own `resolveOptions` when it declares one, otherwise the field's authored options. It backs the admin select, the endpoint, and outcome validation alike, so what the admin offers and what the server accepts cannot drift. Call it directly to render a winner picker of your own.
 

@@ -1907,7 +1907,7 @@ export interface Form {
     resultsVisibility?: ('afterVote' | 'afterClose') | null;
     closesAt?: string | null;
     outcome?: {
-      winningValue?: string | null;
+      winningValues?: string[] | null;
       resolvedAt?: string | null;
     };
   };
@@ -3548,7 +3548,7 @@ export interface FormsSelect<T extends boolean = true> {
         outcome?:
           | T
           | {
-              winningValue?: T;
+              winningValues?: T;
               resolvedAt?: T;
             };
       };

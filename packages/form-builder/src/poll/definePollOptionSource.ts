@@ -1,6 +1,6 @@
 import type { Field, Payload, PayloadRequest } from 'payload'
 
-/** One selectable poll choice. `value` is the host's stable identifier contract: it is stored in submissions and later matched against `outcome.winningValue`, so it must never change once votes exist. */
+/** One selectable poll choice. `value` is the host's stable identifier contract: it is stored in submissions and later matched against `outcome.winningValues`, so it must never change once votes exist. */
 export type PollOption = { label: string; value: string }
 
 export type PollOptionResolveArgs<
@@ -24,15 +24,15 @@ export type PollOptionSource<TConfig extends Record<string, unknown> = Record<st
 	config?: Field[]
 	resolve: (args: PollOptionResolveArgs<TConfig>) => Promise<PollOption[]> | PollOption[]
 	/**
-	 * Optional outcome resolver: return the winning option value from domain data (e.g. the recorded
-	 * race result), or `undefined` while the outcome is not yet decidable. Enables auto mode on
-	 * `resolvePollOutcome({ payload, formId })` with no explicit `winningValue`; the returned value
-	 * is validated against the poll's resolved options before it is recorded, so it must be one of
-	 * the values `resolve` yields.
+	 * Optional outcome resolver: return the winning option value(s) from domain data (e.g. the
+	 * recorded race result), a `string[]` when the result is a tie, or `undefined` while the outcome
+	 * is not yet decidable. Enables auto mode on `resolvePollOutcome({ payload, formId })` with no
+	 * explicit `winningValues`; every returned value is validated against the poll's resolved options
+	 * before it is recorded, so each must be one of the values `resolve` yields.
 	 */
 	resolveOutcome?: (
 		args: PollOptionResolveArgs<TConfig>
-	) => Promise<string | undefined> | string | undefined
+	) => Promise<string | string[] | undefined> | string | string[] | undefined
 }
 
 /** Erased shape stored in the registry; config re-narrows per matched type at resolution. */

@@ -151,7 +151,7 @@ describe('Poll', () => {
 		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
 		const finalForm = {
 			...form,
-			poll: { enabled: true, outcome: { winningValue: 'red' } },
+			poll: { enabled: true, outcome: { winningValues: ['red'] } },
 		}
 		const { container } = render(
 			createElement(Poll, { form: finalForm, resultsField: 'colour', fetchResultsImpl })
@@ -164,6 +164,27 @@ describe('Poll', () => {
 		)
 	})
 
+	it('highlights every winner when the recorded outcome is a tie', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const tiedForm = {
+			...form,
+			poll: { enabled: true, outcome: { winningValues: ['red', 'blue'] } },
+		}
+		const { container } = render(
+			createElement(Poll, { form: tiedForm, resultsField: 'colour', fetchResultsImpl })
+		)
+		expect(within(container).getByText('Final result')).toBeInTheDocument()
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+		await waitFor(() =>
+			expect(container.querySelectorAll('.fb-results__bucket--winner')).toHaveLength(2)
+		)
+		const winners = [...container.querySelectorAll('.fb-results__bucket--winner')].map(
+			(node) => node.textContent ?? ''
+		)
+		expect(winners.some((entry) => entry.includes('Red'))).toBe(true)
+		expect(winners.some((entry) => entry.includes('Blue'))).toBe(true)
+	})
+
 	it('outcome supersedes the closed and afterClose states', async () => {
 		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
 		const finalClosedForm = {
@@ -172,7 +193,7 @@ describe('Poll', () => {
 				enabled: true,
 				resultsVisibility: 'afterClose' as const,
 				closesAt: new Date(Date.now() - 60_000).toISOString(),
-				outcome: { winningValue: 'red' },
+				outcome: { winningValues: ['red'] },
 			},
 		}
 		const { container } = render(

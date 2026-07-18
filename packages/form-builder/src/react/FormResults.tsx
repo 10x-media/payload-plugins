@@ -15,20 +15,20 @@ export type FormResultsProps = {
 	locale?: string
 	/** Show the raw count beside each option. Default true. */
 	showCounts?: boolean
-	/** The recorded outcome's stable option value; the matching bucket is highlighted as the winner. */
-	winningValue?: string
+	/** The recorded outcome's stable option values; every matching bucket is highlighted as a winner (a tie highlights more than one). */
+	winningValues?: string[]
 }
 
 const OneResult = ({
 	result,
 	t,
 	showCounts,
-	winningValue,
+	winningValues,
 }: {
 	result: FieldAggregation
 	t: RendererTranslate
 	showCounts: boolean
-	winningValue?: string
+	winningValues?: string[]
 }): ReactNode => {
 	if (result.total === 0) {
 		return (
@@ -43,7 +43,7 @@ const OneResult = ({
 			{result.label ? <h3 className="fb-results__label">{result.label}</h3> : null}
 			<ul className="fb-results__list">
 				{result.buckets.map((bucket) => {
-					const isWinner = winningValue != null && bucket.value === winningValue
+					const isWinner = winningValues?.includes(bucket.value) ?? false
 					return (
 						<li
 							key={bucket.value}
@@ -82,14 +82,14 @@ const OneResult = ({
  * Presentational results view for polls and survey summaries: per-option bars with percentages. Headless,
  * data resolved server-side via `aggregateFieldResponses`/`aggregateFormResponses` and passed in (it never
  * fetches). The option label, count, and percentage are real text (the accessible content); the bar fill
- * is `aria-hidden` visual sugar sized by inline width. With a `winningValue`, the matching bucket gets
- * the winner class and a translated badge (real text, so the outcome is accessible).
+ * is `aria-hidden` visual sugar sized by inline width. With `winningValues`, every matching bucket gets
+ * the winner class and a translated badge (real text, so the outcome is accessible); a tie highlights more than one.
  */
 export const FormResults = ({
 	results,
 	t,
 	showCounts = true,
-	winningValue,
+	winningValues,
 }: FormResultsProps): ReactNode => {
 	const translate: RendererTranslate = t ?? makeTranslate(en)
 	const list = Array.isArray(results) ? results : [results]
@@ -101,7 +101,7 @@ export const FormResults = ({
 					result={result}
 					t={translate}
 					showCounts={showCounts}
-					winningValue={winningValue}
+					winningValues={winningValues}
 				/>
 			))}
 		</div>
