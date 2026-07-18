@@ -12,7 +12,7 @@ import {
 	text,
 	textarea,
 } from 'payload/shared'
-import { stashKey, takePlaintext } from './plaintextStash'
+import { sealedArrayKey, takePlaintext } from './plaintextStash'
 import type { EncryptedSourceField, EncryptedSourceType } from './types'
 
 /**
@@ -115,40 +115,50 @@ const isSealedLocaleMap = (value: unknown): boolean => {
 }
 
 /**
+ * The stash key for a value that is a sealed single string or an all-sealed
+ * array, else undefined. Payload hands validate exactly the value the seal hook
+ * returned, so this recomputes the same key the hook stashed under.
+ */
+const sealedStashKey = (value: unknown): string | undefined => {
+	if (isSealedString(value)) {
+		return value as string
+	}
+	if (Array.isArray(value) && value.length > 0 && value.every(isSealedString)) {
+		return sealedArrayKey(value as string[])
+	}
+	return undefined
+}
+
+/**
  * The stored field's validate. The seal hook runs first (field beforeChange
- * hooks precede validate) and stashes the pre-seal plaintext on req.context, so
- * validation happens HERE, natively: this honors skipValidation (drafts) and
- * aggregates errors with the right path and req.t, which a throw from the hook
- * cannot. Order:
- *   1. stashed plaintext for this path -> validate the plaintext (fresh write);
- *   2. otherwise a sealed value/array/locale-map -> skip (already validated when
- *      first written, or a partial passthrough);
+ * hooks precede validate) and stashes the pre-seal plaintext on req.context
+ * keyed by the sealed value, so validation happens HERE, natively: this honors
+ * skipValidation (drafts) and aggregates errors with the right path and req.t,
+ * which a throw from the hook cannot. Order:
+ *   1. a sealed value/array whose plaintext is stashed -> validate the plaintext
+ *      (fresh write); no stash -> skip (resubmitted/already-sealed, or a mixed
+ *      passthrough array, already validated when first written);
+ *   2. a sealed locale=all map -> skip (per-locale validation deferred);
  *   3. otherwise validate the incoming value directly (admin form state that
  *      never ran the hook, null/undefined/required).
  */
-export const makeComposedValidate = (effective: PlaintextValidator, hasMany: boolean): Validate => {
-	const isSkippableSealed = (value: unknown): boolean => {
-		if (isSealedLocaleMap(value)) {
+export const makeComposedValidate = (effective: PlaintextValidator): Validate => {
+	return (value, options) => {
+		const opts = options as Record<string, unknown> & { req?: PayloadRequest }
+		const sealedKey = sealedStashKey(value)
+		if (sealedKey !== undefined) {
+			if (opts.req) {
+				const taken = takePlaintext(opts.req, sealedKey)
+				if (taken.found) {
+					return effective(
+						taken.plaintext,
+						opts as Record<string, unknown> & { req: PayloadRequest }
+					)
+				}
+			}
 			return true
 		}
-		if (hasMany) {
-			// Any sealed item means a passthrough/mixed array, not a fresh write.
-			return Array.isArray(value) && value.some(isSealedString)
-		}
-		return isSealedString(value)
-	}
-	return (value, options) => {
-		const opts = options as Record<string, unknown> & {
-			path?: readonly (number | string)[]
-			req?: PayloadRequest
-		}
-		if (opts.req) {
-			const taken = takePlaintext(opts.req, stashKey(opts.path))
-			if (taken.found) {
-				return effective(taken.plaintext, opts as Record<string, unknown> & { req: PayloadRequest })
-			}
-		}
-		if (value != null && isSkippableSealed(value)) {
+		if (value != null && isSealedLocaleMap(value)) {
 			return true
 		}
 		return effective(value, opts as Record<string, unknown> & { req: PayloadRequest })

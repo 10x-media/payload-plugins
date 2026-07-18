@@ -5,7 +5,7 @@ import { buildAad } from './crypto/aad'
 import { computeBidx } from './crypto/bidx'
 import { type KeyRing, resolveKeys } from './crypto/keys'
 import { isSealed, parseWire, seal, unseal } from './crypto/wire'
-import { clearPlaintext, stashKey, stashPlaintext } from './plaintextStash'
+import { sealedArrayKey, stashPlaintext } from './plaintextStash'
 import {
 	ENCRYPTED_CONTEXT_KEY,
 	type EncryptedContextMode,
@@ -117,19 +117,16 @@ const sealValueForLocale = (value: unknown, args: SealForLocaleArgs): unknown =>
 
 export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook => {
 	return async (args) => {
-		const { collection, global, path, req, siblingData, value } = args
-		const key = stashKey(path)
+		const { collection, global, req, siblingData, value } = args
 		const mode = contextMode(req.context as Record<string, unknown>)
 
 		// Utilities read ciphertext untouched.
 		if (mode === 'raw') {
-			clearPlaintext(req, key)
 			return value
 		}
 		// Removal path: store incoming plaintext without sealing, drop the now
 		// meaningless blind index.
 		if (mode === 'decrypt') {
-			clearPlaintext(req, key)
 			if (marker.queryable && marker.bidxName) {
 				siblingData[marker.bidxName] = null
 			}
@@ -141,7 +138,6 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		const activeKey = ring.dataKeys.get(ring.activeId) as Buffer
 
 		if (mode === 'rotate') {
-			clearPlaintext(req, key)
 			const candidates = readAadCandidates(marker, slug, req)
 			const writeAad = sealAad(marker, slug, req)
 			const rotateOne = (item: unknown): unknown => {
@@ -161,11 +157,9 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		}
 
 		if (value === undefined) {
-			clearPlaintext(req, key)
 			return undefined
 		}
 		if (value === null) {
-			clearPlaintext(req, key)
 			if (marker.queryable && marker.bidxName) {
 				siblingData[marker.bidxName] = null
 			}
@@ -178,7 +172,6 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		// validation and blind-index maintenance for bulk all-locales writes are
 		// deferred to per-locale writes (covered by Batch E int tests).
 		if (marker.localized && req.locale === 'all' && isLocaleMap(value)) {
-			clearPlaintext(req, key)
 			const sealedMap: Record<string, unknown> = {}
 			for (const [locale, localeValue] of Object.entries(value)) {
 				sealedMap[locale] = sealValueForLocale(localeValue, {
@@ -197,33 +190,34 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 
 		if (marker.hasMany) {
 			if (!Array.isArray(value)) {
-				clearPlaintext(req, key)
 				return value
 			}
 			// Seal PER ITEM so an already-sealed item (a passthrough from a prior
 			// read, e.g. a mixed array) is never wrapped in a second GCM layer.
-			// Any sealed item means this is not a fresh all-plaintext write, so its
-			// whole-array plaintext validation is deferred.
-			if (value.some(isSealed)) {
-				clearPlaintext(req, key)
-			} else {
-				stashPlaintext(req, key, value)
+			const sealedArray = value.map((item) => (isSealed(item) ? item : sealOne(item)))
+			// Stash the plaintext for the composed validate, keyed by the sealed
+			// output (unique per write), only for a fresh all-plaintext write. A
+			// mixed/passthrough array is not stashed; its already-sealed items were
+			// validated when first written, so their re-validation is deferred.
+			if (!value.some(isSealed)) {
+				stashPlaintext(req, sealedArrayKey(sealedArray), value)
 			}
-			return value.map((item) => (isSealed(item) ? item : sealOne(item)))
+			return sealedArray
 		}
 
 		// Single value already sealed: a resubmitted read or unchanged sibling;
-		// passthrough without re-sealing.
+		// passthrough without re-sealing (no plaintext to stash).
 		if (isSealed(value)) {
-			clearPlaintext(req, key)
 			return value
 		}
-		// Stash the plaintext for the composed validate; do not validate/throw here.
-		stashPlaintext(req, key, value)
+		// Stash the plaintext for the composed validate, keyed by the sealed value
+		// (unique per write); do not validate/throw here.
+		const sealed = sealOne(value)
+		stashPlaintext(req, sealed, value)
 		if (marker.queryable && marker.bidxName) {
 			siblingData[marker.bidxName] = computeBidx(value, ring.indexKey, marker.normalize)
 		}
-		return sealOne(value)
+		return sealed
 	}
 }
 

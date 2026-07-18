@@ -166,7 +166,7 @@ export const encryptedField = (
 			beforeChange: [...(sourceHooks?.beforeChange ?? []), makeBeforeChangeHook(marker)],
 		},
 		typescriptSchema: typescriptSchemaFor(source),
-		validate: makeComposedValidate(effective, hasMany),
+		validate: makeComposedValidate(effective),
 	}
 
 	if (overrides) {

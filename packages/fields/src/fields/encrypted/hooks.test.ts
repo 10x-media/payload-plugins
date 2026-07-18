@@ -4,6 +4,7 @@ import { resolveKeys } from './crypto/keys'
 import { isSealed, seal, unseal } from './crypto/wire'
 import { makeBeforeChangeHook, readAadCandidates, sealAad } from './hooks'
 import { ENCRYPTED_CONTEXT_KEY, type EncryptedFieldMarker } from './types'
+import { makeComposedValidate } from './validators'
 
 const SECRET = 'test-secret-not-for-prod'
 
@@ -158,13 +159,61 @@ describe('makeBeforeChangeHook seal behavior (real crypto)', () => {
 		expect(() => unseal(en, ring.dataKeys, ['users.note.de'])).toThrow()
 	})
 
-	it('stashes fresh plaintext and seals a single value (M2 hand-off to validate)', async () => {
+	it('stashes fresh plaintext keyed by the sealed value it produced (M2 hand-off to validate)', async () => {
 		const req = hookReq()
 		const out = await callSeal(sealMarker({ fieldName: 'ssn' }), 'secret', req).result
 		expect(isSealed(out)).toBe(true)
-		// The plaintext is stashed on req.context for the composed validate to read.
+		// Keyed by the unique sealed value, not the field path (bulk-write safe).
 		const stash = (req.context as Record<string, Record<string, unknown>>)
 			.__tenxFieldsEncryptedPlaintext
-		expect(stash?.ssn).toBe('secret')
+		expect(stash?.[out as string]).toBe('secret')
+	})
+})
+
+describe('plaintext stash is collision-free under concurrent bulk writes (shared req.context)', () => {
+	// Mirrors payload.update({ where, data }): docs.map + Promise.all with ONE req,
+	// so every document's field shares req.context. Each doc runs the field's
+	// beforeChange hook then its validate (Payload's per-field order). With a path
+	// key these collided; keying by the unique sealed value must not.
+	const runConcurrent = async (m: EncryptedFieldMarker, values: unknown[]) => {
+		const req = hookReq()
+		const validatedOwn: boolean[] = []
+		await Promise.all(
+			values.map(async (plaintext) => {
+				const sealed = await callSeal(m, plaintext, req).result
+				let seen: unknown
+				const validate = makeComposedValidate((v) => {
+					seen = v
+					return true
+				})
+				const result = validate(sealed as never, { req } as never)
+				// Every doc must validate its OWN plaintext: no bypass, no cross-doc.
+				validatedOwn.push(result === true && seen === plaintext)
+			})
+		)
+		return validatedOwn
+	}
+
+	it('every single-value document validates its own plaintext (no bypass, no cross-doc)', async () => {
+		const outcomes = await runConcurrent(sealMarker({ fieldName: 'ssn' }), [
+			'alice',
+			'bob',
+			'carol',
+			'dave',
+			'erin',
+		])
+		expect(outcomes).toHaveLength(5)
+		expect(outcomes.every(Boolean)).toBe(true)
+	})
+
+	it('every hasMany document validates its own plaintext array', async () => {
+		const outcomes = await runConcurrent(sealMarker({ fieldName: 'tags', hasMany: true }), [
+			['a1', 'a2'],
+			['b1', 'b2'],
+			['c1'],
+			['d1', 'd2', 'd3'],
+		])
+		expect(outcomes).toHaveLength(4)
+		expect(outcomes.every(Boolean)).toBe(true)
 	})
 })
