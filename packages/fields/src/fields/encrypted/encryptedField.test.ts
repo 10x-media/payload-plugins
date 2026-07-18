@@ -1,0 +1,153 @@
+import type { TextField } from 'payload'
+import { describe, expect, it } from 'vitest'
+import { encryptedField } from './encryptedField'
+import { getEncryptedMarker } from './types'
+
+describe('encryptedField factory shape', () => {
+	it('returns a single text-backed field for non-queryable config', () => {
+		const fields = encryptedField({ name: 'ssn', required: true, type: 'text' })
+		expect(fields).toHaveLength(1)
+		const stored = fields[0] as TextField
+		expect(stored.type).toBe('text')
+		expect(stored.name).toBe('ssn')
+		expect(stored.required).toBe(true)
+		expect(stored.hooks?.beforeChange).toHaveLength(1)
+		expect(stored.hooks?.afterRead).toHaveLength(1)
+		expect(typeof stored.validate).toBe('function')
+		expect(stored.typescriptSchema).toHaveLength(1)
+		expect(getEncryptedMarker(stored)?.sourceType).toBe('text')
+	})
+
+	it('appends a hidden indexed bidx sibling when queryable', () => {
+		const fields = encryptedField({ name: 'contact', type: 'email' }, { queryable: true })
+		expect(fields).toHaveLength(2)
+		const bidx = fields[1] as TextField
+		expect(bidx.name).toBe('contact_bidx')
+		expect(bidx.hidden).toBe(true)
+		expect(bidx.index).toBe(true)
+		expect(bidx.unique).toBeUndefined()
+		expect(getEncryptedMarker(fields[0] as TextField)?.bidxName).toBe('contact_bidx')
+		expect(getEncryptedMarker(fields[0] as TextField)?.normalize).toBe('email')
+	})
+
+	it('moves unique onto the bidx field (ciphertext uniqueness is meaningless)', () => {
+		const fields = encryptedField(
+			{ name: 'contact', type: 'email', unique: true },
+			{ queryable: true }
+		)
+		const stored = fields[0] as TextField
+		const bidx = fields[1] as TextField
+		expect(stored.unique).toBeUndefined()
+		expect(bidx.unique).toBe(true)
+	})
+
+	it('rejects unique without queryable', () => {
+		expect(() => encryptedField({ name: 'x', type: 'email', unique: true })).toThrow(/queryable/)
+	})
+
+	it('rejects queryable + hasMany', () => {
+		expect(() =>
+			encryptedField({ hasMany: true, name: 'tags', type: 'text' }, { queryable: true })
+		).toThrow(/hasMany/)
+	})
+
+	it('rejects queryable on non-scalar field types (M2: blind index requires a scalar)', () => {
+		expect(() => encryptedField({ name: 'when', type: 'date' }, { queryable: true })).toThrow(
+			/scalar/
+		)
+		expect(() =>
+			encryptedField({ name: 'tier', options: ['a', 'b'], type: 'select' }, { queryable: true })
+		).toThrow(/scalar/)
+		expect(() => encryptedField({ name: 'active', type: 'checkbox' }, { queryable: true })).toThrow(
+			/scalar/
+		)
+	})
+
+	it('allows queryable on text, email, and number', () => {
+		expect(encryptedField({ name: 'a', type: 'text' }, { queryable: true })).toHaveLength(2)
+		expect(encryptedField({ name: 'b', type: 'email' }, { queryable: true })).toHaveLength(2)
+		expect(encryptedField({ name: 'c', type: 'number' }, { queryable: true })).toHaveLength(2)
+	})
+
+	it('rejects protection none on richText', () => {
+		expect(() =>
+			encryptedField({ name: 'body', type: 'richText' }, { protection: 'none' })
+		).toThrow(/masked-only/)
+	})
+
+	it('preserves user hooks around ours (seal last on write, unseal first on read)', () => {
+		const userBeforeChange = () => undefined
+		const userAfterRead = () => undefined
+		const fields = encryptedField({
+			hooks: { afterRead: [userAfterRead], beforeChange: [userBeforeChange] },
+			name: 'ssn',
+			type: 'text',
+		})
+		const stored = fields[0] as TextField
+		expect(stored.hooks?.beforeChange?.[0]).toBe(userBeforeChange)
+		expect(stored.hooks?.beforeChange).toHaveLength(2)
+		expect(stored.hooks?.afterRead?.[1]).toBe(userAfterRead)
+		expect(stored.hooks?.afterRead).toHaveLength(2)
+	})
+
+	it('wires the ProtectedField dispatcher with serializable clientProps', () => {
+		const fields = encryptedField(
+			{ name: 'tier', options: ['a', { label: 'B', value: 'b' }], type: 'select' },
+			{ protection: 'none' }
+		)
+		const stored = fields[0] as TextField
+		const component = stored.admin?.components?.Field as {
+			clientProps: Record<string, unknown>
+			path: string
+		}
+		expect(component.path).toBe('@10x-media/fields/client#ProtectedField')
+		expect(component.clientProps.protection).toBe('none')
+		expect(component.clientProps.fieldPatch).toEqual({
+			admin: {},
+			options: [
+				{ label: 'a', value: 'a' },
+				{ label: 'B', value: 'b' },
+			],
+			type: 'select',
+		})
+		expect(stored.admin?.components?.Cell).toBeUndefined()
+	})
+
+	it('masked protection adds the ProtectedCell and defaults on', () => {
+		const fields = encryptedField({ name: 'ssn', type: 'text' })
+		const stored = fields[0] as TextField
+		const cell = stored.admin?.components?.Cell as { path: string }
+		expect(cell.path).toBe('@10x-media/fields/rsc#ProtectedCell')
+	})
+
+	it('strips index from the stored ciphertext column and drops richText editor', () => {
+		const fields = encryptedField({ index: true, name: 'ssn', type: 'text' })
+		expect((fields[0] as TextField).index).toBeUndefined()
+		const rich = encryptedField({ name: 'body', type: 'richText' })
+		expect('editor' in (rich[0] as Record<string, unknown>)).toBe(false)
+	})
+
+	it('rejects function option labels (clientProps must serialize)', () => {
+		expect(() =>
+			encryptedField({
+				name: 'tier',
+				options: [{ label: () => 'nope', value: 'x' } as never],
+				type: 'select',
+			})
+		).toThrow(/label/)
+	})
+
+	it('applies function-form overrides to the stored field', () => {
+		const fields = encryptedField(
+			{ name: 'ssn', type: 'text' },
+			{ overrides: ({ field }) => ({ ...field, admin: { ...field.admin, width: '50%' } }) }
+		)
+		expect((fields[0] as TextField).admin?.width).toBe('50%')
+	})
+
+	it('validates a custom KeysConfig at factory time', () => {
+		expect(() =>
+			encryptedField({ name: 'ssn', type: 'text' }, { keys: { active: 'k9', keys: { k1: 'x' } } })
+		).toThrow(/active key/)
+	})
+})
