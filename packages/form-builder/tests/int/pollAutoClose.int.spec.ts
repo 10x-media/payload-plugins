@@ -28,7 +28,9 @@ const bogus = definePollType({
 	resolveOutcome: () => ['nonexistent'],
 })
 
-describeForDb('form-builder poll auto-close', { dbs: ['mongo'] }, (db) => {
+// Runs on both DBs: the supersede path queries and deletes pending jobs by the JSON `input.formId`
+// subfield, which the Mongo and Postgres adapters translate differently, so it earns cross-DB coverage.
+describeForDb('form-builder poll auto-close', { dbs: ['mongo', 'postgres'] }, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
