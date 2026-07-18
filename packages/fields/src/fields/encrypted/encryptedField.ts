@@ -163,10 +163,7 @@ export const encryptedField = (
 		hooks: {
 			...sourceHooks,
 			afterRead: [makeAfterReadHook(marker), ...(sourceHooks?.afterRead ?? [])],
-			beforeChange: [
-				...(sourceHooks?.beforeChange ?? []),
-				makeBeforeChangeHook(marker, effective, source as unknown as Record<string, unknown>),
-			],
+			beforeChange: [...(sourceHooks?.beforeChange ?? []), makeBeforeChangeHook(marker)],
 		},
 		typescriptSchema: typescriptSchemaFor(source),
 		validate: makeComposedValidate(effective, hasMany),

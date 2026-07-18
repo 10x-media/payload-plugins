@@ -12,6 +12,7 @@ import {
 	text,
 	textarea,
 } from 'payload/shared'
+import { stashKey, takePlaintext } from './plaintextStash'
 import type { EncryptedSourceField, EncryptedSourceType } from './types'
 
 /**
@@ -96,25 +97,60 @@ const isSealedString = (value: unknown): boolean => {
 	)
 }
 
+/** A `{ [locale]: sealed }` map produced by a locale=all write (M3). */
+const isSealedLocaleMap = (value: unknown): boolean => {
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+		return false
+	}
+	const entries = Object.values(value as Record<string, unknown>)
+	if (entries.length === 0) {
+		return false
+	}
+	return entries.every(
+		(entry) =>
+			entry == null ||
+			isSealedString(entry) ||
+			(Array.isArray(entry) && entry.length > 0 && entry.some(isSealedString))
+	)
+}
+
 /**
- * The stored field's validate. Sealed values already passed plaintext
- * validation inside the seal hook (field beforeChange hooks run BEFORE
- * validate in Payload's traversal); unchanged fields on update arrive here
- * sealed from the merged document. Everything else (admin form state, null,
- * undefined/required, lazy-migration plaintext) delegates to the effective
- * validator.
+ * The stored field's validate. The seal hook runs first (field beforeChange
+ * hooks precede validate) and stashes the pre-seal plaintext on req.context, so
+ * validation happens HERE, natively: this honors skipValidation (drafts) and
+ * aggregates errors with the right path and req.t, which a throw from the hook
+ * cannot. Order:
+ *   1. stashed plaintext for this path -> validate the plaintext (fresh write);
+ *   2. otherwise a sealed value/array/locale-map -> skip (already validated when
+ *      first written, or a partial passthrough);
+ *   3. otherwise validate the incoming value directly (admin form state that
+ *      never ran the hook, null/undefined/required).
  */
 export const makeComposedValidate = (effective: PlaintextValidator, hasMany: boolean): Validate => {
-	const sealedShape = (value: unknown): boolean => {
+	const isSkippableSealed = (value: unknown): boolean => {
+		if (isSealedLocaleMap(value)) {
+			return true
+		}
 		if (hasMany) {
-			return Array.isArray(value) && value.length > 0 && value.every(isSealedString)
+			// Any sealed item means a passthrough/mixed array, not a fresh write.
+			return Array.isArray(value) && value.some(isSealedString)
 		}
 		return isSealedString(value)
 	}
 	return (value, options) => {
-		if (value != null && sealedShape(value)) {
+		const opts = options as Record<string, unknown> & {
+			path?: readonly (number | string)[]
+			req?: PayloadRequest
+		}
+		if (opts.req) {
+			const taken = takePlaintext(opts.req, stashKey(opts.path))
+			if (taken.found) {
+				return effective(taken.plaintext, opts as Record<string, unknown> & { req: PayloadRequest })
+			}
+		}
+		if (value != null && isSkippableSealed(value)) {
 			return true
 		}
-		return effective(value, options as Record<string, unknown> & { req: PayloadRequest })
+		return effective(value, opts as Record<string, unknown> & { req: PayloadRequest })
 	}
 }

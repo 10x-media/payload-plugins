@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
+import { stashPlaintext } from './plaintextStash'
 import type { EncryptedSourceField } from './types'
 import { makeComposedValidate, makeEffectiveValidator, type PlaintextValidator } from './validators'
 
@@ -29,12 +30,54 @@ describe('makeComposedValidate (Deviation 1: seal hook validates plaintext, comp
 		expect(validate(undefined, options)).toBe('required')
 	})
 
-	it('hasMany: skips only when every item is sealed; empty or mixed arrays delegate', () => {
+	it('hasMany: skips when any item is sealed (passthrough/mixed); fresh plaintext arrays delegate', () => {
 		const effective = vi.fn<PlaintextValidator>(() => 'delegated')
 		const validate = makeComposedValidate(effective, true)
 		expect(validate([SEALED, SEALED], options)).toBe(true)
-		expect(validate([SEALED, 'plaintext'], options)).toBe('delegated')
+		// Mixed [sealed, plaintext] is a passthrough (the sealed item was already
+		// validated); whole-array plaintext validation is deferred, not applied.
+		expect(validate([SEALED, 'plaintext'], options)).toBe(true)
+		expect(validate(['fresh1', 'fresh2'], options)).toBe('delegated')
 		expect(validate([], options)).toBe('delegated')
+	})
+
+	it('skips a sealed locale=all map (M3)', () => {
+		const effective = vi.fn<PlaintextValidator>(() => 'must not run')
+		const validate = makeComposedValidate(effective, false)
+		expect(validate({ de: SEALED, en: SEALED }, options)).toBe(true)
+		expect(effective).not.toHaveBeenCalled()
+	})
+})
+
+describe('makeComposedValidate stash flow (M1/M2: validate plaintext in the native validate pass)', () => {
+	it('validates the stashed pre-seal plaintext, not the sealed value it receives', () => {
+		const effective = vi.fn<PlaintextValidator>((value) => (value === 'good' ? true : 'bad'))
+		const validate = makeComposedValidate(effective, false)
+		const req = { context: {} } as unknown as PayloadRequest
+		stashPlaintext(req, 'ssn', 'good')
+		// `value` is the sealed ciphertext; the stashed plaintext must be validated.
+		expect(validate(SEALED, { path: ['ssn'], req } as never)).toBe(true)
+		expect(effective).toHaveBeenCalledWith('good', expect.anything())
+	})
+
+	it('surfaces the effective validator error string (aggregated by Payload, no hook throw)', () => {
+		const effective = vi.fn<PlaintextValidator>(() => 'invalid email')
+		const validate = makeComposedValidate(effective, false)
+		const req = { context: {} } as unknown as PayloadRequest
+		stashPlaintext(req, 'email', 'not-an-email')
+		expect(validate(SEALED, { path: ['email'], req } as never)).toBe('invalid email')
+	})
+
+	it('consumes the stash so a re-validate falls back to the sealed-skip path', () => {
+		const effective = vi.fn<PlaintextValidator>(() => 'bad')
+		const validate = makeComposedValidate(effective, false)
+		const req = { context: {} } as unknown as PayloadRequest
+		stashPlaintext(req, 'ssn', 'whatever')
+		validate(SEALED, { path: ['ssn'], req } as never)
+		effective.mockClear()
+		// Second pass: stash gone, value is sealed -> skip without calling effective.
+		expect(validate(SEALED, { path: ['ssn'], req } as never)).toBe(true)
+		expect(effective).not.toHaveBeenCalled()
 	})
 })
 
