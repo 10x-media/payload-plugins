@@ -52,10 +52,48 @@ describe('resolveKeys: custom KeysConfig', () => {
 		expect(first.dataKeys.get('kms')?.length).toBe(32)
 	})
 
-	it('derives the index key from the ACTIVE key material with the bidx info string', async () => {
+	it('derives the index key from the root secret (fallback), not the active data key (H2)', async () => {
 		const ring = await resolveKeys({ active: 'k1', keys: { k1: 'k1-secret-material' } }, SECRET)
 		expect(ring.indexKey.length).toBe(32)
 		expect(ring.indexKey.equals(ring.dataKeys.get('k1') as Buffer)).toBe(false)
+		// Same derivation as the default ring's index key: both come from the secret.
+		expect(ring.indexKey.toString('hex')).toBe(
+			'51763f29ad9fb674658f44ca197915a4a18026f417820f79a5710857656cffc1'
+		)
+	})
+
+	it('keeps the index key stable when the active data key changes (H2 blind-index integrity)', async () => {
+		const keys = { k1: 'old-key-material-v1', k2: 'new-key-material-v2' }
+		const before = await resolveKeys({ active: 'k1', keys }, SECRET)
+		const after = await resolveKeys({ active: 'k2', keys }, SECRET)
+		expect(after.activeId).toBe('k2')
+		expect(after.dataKeys.get('k2')?.equals(before.dataKeys.get('k2') as Buffer)).toBe(true)
+		// Rotating the active data key must NOT change the index key.
+		expect(after.indexKey.equals(before.indexKey)).toBe(true)
+	})
+
+	it('uses dedicated KeysConfig.indexKey material when provided (H2)', async () => {
+		const ring = await resolveKeys(
+			{
+				active: 'k1',
+				indexKey: 'dedicated-index-key-material',
+				keys: { k1: 'k1-secret-material' },
+			},
+			SECRET
+		)
+		expect(ring.indexKey.toString('hex')).toBe(
+			'a414f1825f41c915d6678a519ed178805462affeb2e9012ab9c03bbd78b41a18'
+		)
+		// Distinct from the secret-derived default so a rotation strategy can pin it.
+		expect(ring.indexKey.toString('hex')).not.toBe(
+			'51763f29ad9fb674658f44ca197915a4a18026f417820f79a5710857656cffc1'
+		)
+	})
+
+	it('rejects indexKey material below the minimum byte length (H2)', () => {
+		expect(() =>
+			validateKeysConfig({ active: 'k1', indexKey: 'short', keys: { k1: 'k1-secret-material' } })
+		).toThrow(InvalidKeysConfigError)
 	})
 
 	it('keeps every configured key decryptable while only active encrypts', async () => {

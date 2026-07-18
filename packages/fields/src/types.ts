@@ -53,6 +53,14 @@ export type IconAvailabilityResolver = (args: FieldsResolverArgs) => Promise<str
 /** Encryption key set. Values are raw key material or async providers (KMS/Vault). */
 export type KeysConfig = {
 	active: string
+	/**
+	 * Optional dedicated material for the blind-index (HMAC) key. Defaults to the
+	 * Payload secret. Kept independent of the data keys on purpose: rotating the
+	 * active data key must NOT change the index key, or every previously written
+	 * blind index silently stops matching. Change this only alongside a full
+	 * blind-index rebuild.
+	 */
+	indexKey?: string
 	keys: Record<string, string | (() => Promise<Uint8Array>)>
 }
 

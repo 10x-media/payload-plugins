@@ -41,7 +41,13 @@ export interface KeyRing {
 	activeId: string
 	/** 32-byte AES-256-GCM keys by key id; every configured key can decrypt. */
 	dataKeys: Map<string, Buffer>
-	/** HMAC key for blind indexes, derived from the active key's material. */
+	/**
+	 * HMAC key for blind indexes, derived from a STABLE root (a dedicated
+	 * `KeysConfig.indexKey`, else the Payload secret), NOT the active data key.
+	 * Decoupling it means rotating the active data key re-seals ciphertext while
+	 * the blind index stays byte-identical, so equality queries keep matching
+	 * rows written under the previous active key.
+	 */
 	indexKey: Buffer
 }
 
@@ -69,6 +75,17 @@ export const validateKeysConfig = (config: KeysConfig): void => {
 	if (!(config.active in config.keys)) {
 		throw new InvalidKeysConfigError(`active key '${config.active}' is not present in the keys map`)
 	}
+	if (config.indexKey !== undefined) {
+		if (typeof config.indexKey !== 'string') {
+			throw new InvalidKeysConfigError('indexKey must be a string of key material')
+		}
+		const bytes = materialByteLength(config.indexKey)
+		if (bytes < MIN_KEY_BYTES) {
+			throw new InvalidKeysConfigError(
+				`indexKey has ${bytes} bytes of material; provide at least ${MIN_KEY_BYTES} (recommend >= 32)`
+			)
+		}
+	}
 	for (const id of ids) {
 		if (!KEY_ID_PATTERN.test(id)) {
 			throw new InvalidKeysConfigError(
@@ -87,10 +104,9 @@ export const validateKeysConfig = (config: KeysConfig): void => {
 	}
 }
 
-const ringFromConfig = async (config: KeysConfig): Promise<KeyRing> => {
+const ringFromConfig = async (config: KeysConfig, fallbackSecret: string): Promise<KeyRing> => {
 	validateKeysConfig(config)
 	const dataKeys = new Map<string, Buffer>()
-	let activeMaterial: Uint8Array | string | undefined
 	for (const [id, material] of Object.entries(config.keys)) {
 		const fromProvider = typeof material === 'function'
 		const resolved = fromProvider ? await material() : material
@@ -113,14 +129,17 @@ const ringFromConfig = async (config: KeysConfig): Promise<KeyRing> => {
 			)
 		}
 		dataKeys.set(id, hkdf(resolved, INFO_DATA))
-		if (id === config.active) {
-			activeMaterial = resolved
-		}
 	}
-	if (activeMaterial === undefined) {
-		throw new InvalidKeysConfigError(`active key '${config.active}' resolved to no material`)
+	// The index key follows a STABLE root (dedicated indexKey material, else the
+	// Payload secret), never the active data key, so data-key rotation does not
+	// invalidate existing blind indexes (see KeyRing.indexKey).
+	const indexMaterial = config.indexKey ?? fallbackSecret
+	if (typeof indexMaterial !== 'string' || indexMaterial.length < MIN_KEY_BYTES) {
+		throw new InvalidKeysConfigError(
+			`blind-index key material has fewer than ${MIN_KEY_BYTES} bytes; set KeysConfig.indexKey (recommend >= 32) or provide a longer Payload secret`
+		)
 	}
-	return { activeId: config.active, dataKeys, indexKey: hkdf(activeMaterial, INFO_BIDX) }
+	return { activeId: config.active, dataKeys, indexKey: hkdf(indexMaterial, INFO_BIDX) }
 }
 
 const configRings = new WeakMap<KeysConfig, Promise<KeyRing>>()
@@ -138,7 +157,7 @@ export const resolveKeys = (
 	if (config) {
 		let ring = configRings.get(config)
 		if (!ring) {
-			ring = ringFromConfig(config).catch((error: unknown) => {
+			ring = ringFromConfig(config, fallbackSecret).catch((error: unknown) => {
 				configRings.delete(config)
 				throw error
 			})
