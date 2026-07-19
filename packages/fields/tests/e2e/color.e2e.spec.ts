@@ -1,0 +1,122 @@
+import AxeBuilder from '@axe-core/playwright'
+import { expect, type Locator, type Page, test } from '@playwright/test'
+
+const FIXTURES = {
+	collection: 'colors',
+	docTitle: 'Showcase',
+	basic: 'hexDefault',
+	basicSeedValue: '#7c3aed',
+	presetLabel: 'Global blue',
+	presetValue: '#1d4ed8',
+}
+
+const login = async (page: Page): Promise<void> => {
+	const res = await page.request.post('/api/users/login', {
+		data: { email: 'dev@10xmedia.de', password: 'password' },
+	})
+	expect(res.ok()).toBeTruthy()
+}
+
+const openShowcaseDoc = async (page: Page): Promise<void> => {
+	const res = await page.request.get(
+		`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
+	)
+	const { docs } = (await res.json()) as { docs: { id: string }[] }
+	const doc = docs[0]
+	if (!doc) throw new Error(`no ${FIXTURES.collection} doc titled ${FIXTURES.docTitle}`)
+	await page.goto(`/admin/collections/${FIXTURES.collection}/${doc.id}`)
+	await expect(page.locator(`#field-${FIXTURES.basic}`)).toBeVisible()
+}
+
+const swatchButton = (page: Page, name: string): Locator =>
+	page
+		.locator('.fields-color')
+		.filter({ has: page.locator(`#field-${name}`) })
+		.locator('.fields-color__swatch-button')
+
+const popover = (page: Page): Locator => page.locator('.fields-color__panel:visible')
+
+const saveDoc = async (page: Page): Promise<void> => {
+	const saved = page.waitForResponse(
+		(r) => r.url().includes(`/api/${FIXTURES.collection}`) && r.request().method() === 'PATCH'
+	)
+	await page.locator('#action-save').click()
+	expect((await saved).ok()).toBeTruthy()
+}
+
+test.describe('color field', () => {
+	test.beforeEach(async ({ page }) => {
+		await login(page)
+	})
+
+	test('picks a color from the saturation area, saves, and persists after reload', async ({
+		page,
+	}) => {
+		await openShowcaseDoc(page)
+		const input = page.locator(`#field-${FIXTURES.basic}`)
+		await expect(input).toHaveValue(FIXTURES.basicSeedValue)
+
+		await swatchButton(page, FIXTURES.basic).click()
+		await expect(popover(page)).toBeVisible()
+
+		const area = popover(page).locator('.fields-color__sv')
+		const box = await area.boundingBox()
+		if (!box) throw new Error('saturation area not visible')
+		await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.3)
+
+		await expect(input).not.toHaveValue(FIXTURES.basicSeedValue)
+		const picked = await input.inputValue()
+		expect(picked).toMatch(/^#[0-9a-f]{6,8}$/i)
+
+		await page.keyboard.press('Escape')
+		await saveDoc(page)
+		await page.reload()
+		await expect(page.locator(`#field-${FIXTURES.basic}`)).toHaveValue(picked)
+	})
+
+	test('accepts a typed css color and stores it in the configured format', async ({ page }) => {
+		await openShowcaseDoc(page)
+		const input = page.locator(`#field-${FIXTURES.basic}`)
+		await input.fill('rgb(255, 136, 0)')
+		await input.blur()
+		await expect(input).toHaveValue('#ff8800')
+		await saveDoc(page)
+		await page.reload()
+		await expect(page.locator(`#field-${FIXTURES.basic}`)).toHaveValue('#ff8800')
+	})
+
+	test('picks a preset from the popover', async ({ page }) => {
+		await openShowcaseDoc(page)
+		await swatchButton(page, FIXTURES.basic).click()
+		await expect(popover(page)).toBeVisible()
+		await popover(page)
+			.locator(`.fields-color__preset[aria-label="${FIXTURES.presetLabel}"]`)
+			.click()
+		await expect(page.locator(`#field-${FIXTURES.basic}`)).toHaveValue(FIXTURES.presetValue)
+		await saveDoc(page)
+	})
+
+	test('keyboard: enter opens the popover, escape closes it and restores trigger focus', async ({
+		page,
+	}) => {
+		await openShowcaseDoc(page)
+		const trigger = swatchButton(page, FIXTURES.basic)
+		await trigger.focus()
+		await page.keyboard.press('Enter')
+		await expect(popover(page)).toBeVisible()
+		await page.keyboard.press('Escape')
+		await expect(popover(page)).toBeHidden()
+		await expect(trigger).toBeFocused()
+	})
+
+	test('open popover has no serious or critical axe violations', async ({ page }) => {
+		await openShowcaseDoc(page)
+		await swatchButton(page, FIXTURES.basic).click()
+		await expect(popover(page)).toBeVisible()
+		const results = await new AxeBuilder({ page }).include('.fields-color__panel').analyze()
+		const blocking = results.violations.filter(
+			(v) => v.impact === 'serious' || v.impact === 'critical'
+		)
+		expect(blocking).toEqual([])
+	})
+})
