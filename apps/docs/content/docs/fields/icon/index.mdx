@@ -1,0 +1,43 @@
+---
+title: Icon field
+description: A searchable icon browser over pluggable icon libraries, storing a stable library:name reference.
+---
+
+```ts
+import { iconField } from '@10x-media/fields/icon'
+import { lucideAdapter } from '@10x-media/fields/icon/adapters/lucide'
+import { tablerAdapter } from '@10x-media/fields/icon/adapters/tabler'
+
+iconField({
+  name: 'icon',
+  adapters: [lucideAdapter(), tablerAdapter()],
+  defaultLibrary: 'lucide',
+})
+```
+
+The stored value is `'<library>:<icon-name>'`, for example `lucide:house`. A bare name without a library prefix is read as the default library, which keeps values portable when a field starts single-library and grows. Values validate against the active library's manifest, so a typo or a removed icon fails at save time, not at render time.
+
+## The browser
+
+The field row shows the selected icon and its name at the standard 40px height; browsing happens in a drawer. The drawer has a sticky header with search and (when more than one library is registered) a library switcher, a persistent category rail (All icons, Recent, then the library's categories), a virtualized labeled grid, and a result-count footer. Recent picks persist per editor via localStorage. The whole surface is keyboard-navigable: arrows move through the grid, Enter selects, Escape closes.
+
+Search runs on a manifest-based fuzzy index built lazily on first drawer open and cached; icon names and tags both match.
+
+## Options
+
+| Option | Default | Notes |
+|---|---|---|
+| `adapters` | plugin-registered | Inline adapters override the plugin set; see [Adapters](/fields/icon/adapters). |
+| `defaultLibrary` | first adapter | Library assumed for bare stored names. |
+| `resolveAvailable` | none | Restrict selectable libraries per request; see [Multi-tenancy](/fields/icon/multi-tenancy). |
+| `alwaysAvailable` | none | Slugs always offered for selection regardless of `resolveAvailable`; unions with the plugin's global set. |
+| `showTextInput` | `false` | Adds a free-text input beside the browse button for editors who know icon names; values still validate against the manifest. |
+| `overrides` | none | `({ field }) => field` escape hatch with explicit spreads. |
+
+`iconLibraryField()` is a companion select field whose options derive from the registered adapters at runtime, useful on a tenants collection to control which libraries each tenant may use.
+
+The list view cell renders the glyph beside the name.
+
+## Bundle behavior
+
+The field row loads only the selected icon, through a per-icon dynamic import. The manifest, the search index, and the icon library chunk load lazily on first drawer open, in the admin only. Your production frontend bundles contain exactly the icons you render; see [Frontend rendering](/fields/icon/frontend-rendering).

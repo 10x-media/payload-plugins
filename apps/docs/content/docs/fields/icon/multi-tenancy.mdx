@@ -1,0 +1,55 @@
+---
+title: Multi-tenancy
+description: Restrict which icon libraries each tenant can pick from, without ever breaking stored values.
+---
+
+Multi-tenant apps often sell icon libraries as plan features: every tenant gets Lucide, premium tenants add Tabler. The field supports that with one resolver and one hard rule.
+
+## The hard rule: selection is restricted, rendering never is
+
+`resolveAvailable` limits which libraries the browser offers. Stored values always render through any registered adapter, whether or not that library is currently selectable. A downgrade never breaks existing documents.
+
+## Restricting selection
+
+```ts
+iconField({
+  name: 'icon',
+  adapters: [lucideAdapter(), tablerAdapter()],
+  resolveAvailable: async ({ req, siblingData }) => {
+    const tenant = await req.payload.findByID({
+      collection: 'tenants',
+      id: siblingData?.tenant as string,
+    })
+    return tenant.enabledLibraries  // e.g. ['lucide']
+  },
+})
+```
+
+The resolver runs per request (memoized, so list views resolve once) and returns the selectable library slugs. The drawer offers only those; when exactly one remains, the library switcher disappears entirely. The plugin-level `icon.resolveAvailable` option applies the same restriction app-wide.
+
+To force a shared library (say a brand set) into every tenant's picker regardless of the resolver, list its slug in `alwaysAvailable` (per field, or globally on the plugin); the two sets union.
+
+## The tenants side
+
+`iconLibraryField()` is a ready-made select whose options derive from the registered adapters at runtime:
+
+```ts title="collections/Tenants.ts"
+import { iconLibraryField } from '@10x-media/fields/icon'
+
+fields: [
+  iconLibraryField({ name: 'enabledLibraries', hasMany: true }),
+]
+```
+
+Registering a new adapter in the plugin automatically adds it as an option; no enum to keep in sync.
+
+## When a stored value's library is disabled
+
+Suppose a tenant stored `tabler:home`, then dropped the Tabler plan:
+
+- The value keeps rendering everywhere: admin row, list cell, frontend.
+- The field row shows a subtle hint that the library is no longer available.
+- Opening the browser offers only the permitted libraries, making replacement a two-click operation.
+- Nothing throws, and saving other fields on the document does not disturb the value.
+
+The same degradation applies if you unregister an adapter entirely, except rendering then falls back to the [frontend fallback](/fields/icon/frontend-rendering#fallbacks) since no adapter can draw the glyph.

@@ -1,0 +1,67 @@
+---
+title: Frontend rendering
+description: Render stored icon values on your site, as a client component or a server component, with per-icon chunks.
+---
+
+A stored value like `lucide:house` needs a renderer on your frontend. `createIcon` builds one from the renderer adapters you use:
+
+```tsx title="components/Icon.tsx"
+import { createIcon } from '@10x-media/fields/icon/react'
+import { lucideRenderer } from '@10x-media/fields/icon/adapters/lucide'
+import { tablerRenderer } from '@10x-media/fields/icon/adapters/tabler'
+
+export const Icon = createIcon({ adapters: [lucideRenderer(), tablerRenderer()] })
+```
+
+Each adapter module ships two factories: `lucideAdapter()` (server-side, for `iconField`) and `lucideRenderer()` (frontend, for `createIcon`). Frontend rendering uses the `*Renderer` form.
+
+```tsx
+<Icon icon={page.icon} size={20} />                                    {/* decorative: rendered aria-hidden */}
+<Icon icon={user.badge} fallback={<span className="dot" />} label="Badge" />
+```
+
+Pass `label` for a meaningful icon (it sets `role="img"` and the accessible name); omit it for decoration and the icon renders `aria-hidden`. Register only the renderer adapters whose values you actually store; each one you leave out is a library that never enters your dependency graph.
+
+## Client vs server
+
+The package ships both renderers from `@10x-media/fields/icon/react`:
+
+- **`createIcon`** (client): renders through `React.lazy` and `Suspense`; each icon is its own chunk, fetched when first rendered. Good under interactivity-heavy trees.
+- **`createRscIcon`** (server): the per-icon import is awaited server-side and the SVG streams as markup, so an icon costs zero client JavaScript.
+
+```tsx title="app/page.tsx (RSC)"
+import { createRscIcon } from '@10x-media/fields/icon/react'
+import { lucideRenderer } from '@10x-media/fields/icon/adapters/lucide'
+
+const Icon = createRscIcon({ adapters: [lucideRenderer()] })
+
+export default async function Page() {
+  const page = await fetchPage()
+  return <h1><Icon icon={page.icon} size={24} /> {page.title}</h1>
+}
+```
+
+Prefer `createRscIcon` wherever the icon is static content; use `createIcon` inside client components or when the value changes without a navigation.
+
+## Bundle behavior by library
+
+Per-icon code-splitting uses each library's lazy path: Lucide through its own dynamic per-icon imports, Radix and Tabler through generated per-icon import maps. In every case, a production build contains only the icons your pages render, not the library's full set.
+
+## Fallbacks
+
+`fallback` renders when the value is empty, malformed, or names an icon the registered adapters cannot resolve (for example a library you stopped registering). Without a fallback the component renders nothing; it never throws on bad data.
+
+## Custom adapters
+
+A renderer adapter is just `{ slug, loadIcon }`, where `loadIcon(name)` resolves a component (or `null`):
+
+```tsx
+import type { IconRendererAdapter } from '@10x-media/fields/icon/react'
+
+const acmeRenderer = (): IconRendererAdapter => ({
+  slug: 'acme',
+  loadIcon: async (name) => (await import(`@acme/icons/${name}`)).default ?? null,
+})
+```
+
+Pass it to `createIcon` or `createRscIcon` like any first-party renderer. The [codegen](/fields/icon/codegen) import map gives you a ready name-to-module mapping to build `loadIcon` cleanly.

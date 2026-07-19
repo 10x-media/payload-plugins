@@ -1,0 +1,51 @@
+---
+title: Migration
+description: Adopt encryption on existing plaintext data, and remove it cleanly if you leave.
+---
+
+## Adopting on existing data
+
+Marking an existing populated field as encrypted changes writes immediately, but existing rows still hold plaintext, which would fail decryption on read. The `'passthrough'` failure policy makes adoption safe and gradual:
+
+```ts
+encryptedField(
+  { name: 'apiToken', type: 'text' },
+  { onDecryptFailure: 'passthrough' },
+)
+```
+
+With passthrough, a value that does not parse as ciphertext is returned as-is (legacy plaintext keeps reading), while every write encrypts. Documents therefore migrate lazily as they are saved.
+
+To finish the job eagerly, run the bulk encryptor, then drop the policy back to the default `'throw'`:
+
+```ts
+import { encryptExistingData } from '@10x-media/fields/encrypted'
+
+await encryptExistingData(payload, { collections: ['customers'], batchSize: 100 })
+```
+
+It walks documents in batches and encrypts any value not already in the wire format; it is idempotent and safe to re-run after interruption.
+
+`'passthrough'` is an adoption tool, not a resting state: while active, a corrupted ciphertext also passes through as garbage instead of throwing. Set it, migrate, unset it.
+
+<Callout type="warn">
+A `required` field cannot adopt encryption lazily under the default `'throw'` policy: reading a legacy plaintext row throws before you can re-save it, and `required` maps to `NOT NULL` on Postgres so the value cannot be cleared. Adopt required fields with `encryptExistingData` (or `'passthrough'` during the window).
+</Callout>
+
+## Removing encryption
+
+The reverse path exists and is just as explicit:
+
+```ts
+import { decryptAllData } from '@10x-media/fields/encrypted'
+
+await decryptAllData(payload, { collections: ['customers'] })
+```
+
+Run it while the field config (and keys) are still in place, verify the plaintext, then remove `encryptedField()` in favor of a plain field. Order matters: removing the field config first would leave unreadable ciphertext with nothing configured to decrypt it.
+
+Non-string plaintext is written back JSON-stringified, because the backing column is text. A `number`, `date`, `json`, or `point` field therefore holds a stringified value after decryption; swapping the field back to its native type is a schema migration you own.
+
+## Key rotation is not migration
+
+Swapping the active key requires no data migration and no downtime; see [key management](/fields/encrypted/key-management#rotation). The utilities on this page are only for entering or leaving encryption itself.

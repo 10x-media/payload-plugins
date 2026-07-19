@@ -1,0 +1,77 @@
+---
+title: Design rationale
+description: The threat model, the cryptographic choices, the wire format, and the trade-offs, so you can audit rather than trust.
+---
+
+Encryption features deserve scrutiny, not marketing. This page states exactly what the encrypted fields protect against, how, and where the edges are.
+
+## Threat model
+
+Field-level encryption at rest protects plaintext from parties who obtain your **stored data without your application's keys**:
+
+- database dumps, stolen backups, snapshots left on decommissioned volumes
+- direct database access (a leaked connection string, an over-privileged BI tool, a curious DBA)
+- cross-tenant reads through database-level mistakes, to the extent the data at rest is what leaks
+
+It does **not** protect against:
+
+- a compromised application server: the process holds (or can fetch) the keys and decrypts on every read
+- anyone your access control already authorizes: the API serves them plaintext by design
+- traffic interception: that is TLS's job
+- side channels in your own code: logging a decrypted value, indexing it into search, copying it to an unencrypted field
+
+If your threat is "the app gets popped", you need KMS-held keys with per-request decryption limits and auditing, well beyond field-level encryption. If your threat is "the database or its backups leak", this is the right tool.
+
+## Why AES-256-GCM
+
+GCM is authenticated encryption: every decryption verifies an authentication tag before returning a byte. A flipped bit, a truncated value, or a spliced ciphertext fails closed. Unauthenticated modes (CBC without a MAC) would decrypt tampered input into silently wrong plaintext, which for a field store is a data-integrity disaster. Each value uses a fresh random 12-byte IV; key plus IV pairs never repeat in practice, which is the GCM safety requirement (and the reason to [rotate keys](/fields/encrypted/limitations#key-and-iv-lifetime) on very high-write fields).
+
+## Why AAD binding
+
+GCM accepts additional authenticated data: bytes that are not encrypted but are covered by the authentication tag. Every value binds `collection.field` (plus the locale for localized fields) as AAD. Consequence: a ciphertext copied from `users.ssn` into `posts.summary` fails authentication instead of decrypting. Without AAD, an attacker with database write access could relocate ciphertexts to a field their role can read and let the application decrypt for them. This closes that confused-deputy path at the cryptographic layer rather than hoping access control catches it.
+
+The binding is deliberately field-level, and honesty about its edges matters:
+
+- The **document id is not bound**. Payload assigns the id after the encrypting hook runs on create, so binding it would break creation. A ciphertext copied between two rows of the same field therefore decrypts.
+- For **localized fields, the specific locale is not pinned on read**. Payload's fallback-locale hoisting and `locale=all` reads leave the hook unable to know which locale sealed a value, so it authenticates against each configured locale in turn. A value moved between locales of the same field decrypts.
+
+Cross-field and cross-collection relocation are the boundaries the AAD enforces; the same-field caveats are called out in [Limitations](/fields/encrypted/limitations#swap-resistance).
+
+## Why a blind index, not deterministic encryption
+
+Exact-match lookup over encrypted data needs a deterministic function of the plaintext. There are two ways to get one, and they are not equivalent.
+
+Deterministic encryption makes the **stored ciphertext itself** identical for equal plaintexts. That leaks equality directly on the data column, turns the ciphertext into a stable identifier anyone with read access can join on, and forecloses the fresh-IV randomization that makes GCM safe.
+
+A blind index instead keeps the encrypted value fully randomized (a fresh IV on every write) and puts the deterministic fingerprint in a **separate, opt-in sibling column under a separate key**. The leak is confined to a column you chose to add, the index value cannot be decrypted, and only `equals` / `in` / `unique` are offered, which is all a fingerprint can answer. That is the trade this package makes.
+
+## Why HKDF with domain separation
+
+All internal keys derive via HKDF-SHA256 with distinct info strings per purpose (`10x-fields/encrypted/v1/data`, `10x-fields/encrypted/v1/bidx`) over a fixed salt: the data-encryption key and the blind-index key are cryptographically unrelated even when both derive from one configured secret. Compromising index values therefore gains nothing against ciphertexts. The info strings are versioned and deliberately disjoint from anything else that derives from `PAYLOAD_SECRET`, so no other subsystem ever computes the same key bytes.
+
+Zero-config derives both the data root and the index root from `PAYLOAD_SECRET`, which makes that secret a single root of trust: its compromise exposes both. Explicit configuration supplies per-key data material and, optionally, a dedicated `keys.indexKey`, making the two roots fully independent.
+
+## Wire format
+
+```
+pfe1.<keyId>.<iv>.<ciphertext>.<tag>
+```
+
+Five dot-separated segments, base64url. `pfe1` versions the format itself: a future `pfe2` can change any parameter while old values remain readable during migration. `keyId` names the key that encrypted this value, which is what makes [rotation](/fields/encrypted/key-management#rotation) an online operation: reads use the embedded id, writes use the active key, and the two migrate independently. Values JSON-round-trip before encryption, so non-string types survive with their real shapes.
+
+The format is stored in a plain text column on every database adapter. No adapter-specific storage, no behavioral differences between Mongo and Postgres, both covered by the same test matrix.
+
+## Blind-index trade-offs
+
+Exact-match lookup over encrypted data requires determinism: equal plaintexts must produce equal index values. That determinism is also the leak: an attacker with database access learns which rows share a value and each value's frequency, even though they learn nothing about the value itself. The design mitigates what it can, a truncated (144-bit) HMAC under a dedicated key, so index values cannot be brute-forced into plaintext without that key and reveal nothing about the ciphertext, but frequency visibility is irreducible. The index key is not domain-separated per field either, so identical plaintexts share an index value across every queryable field. That is why blind indexing is opt-in per field and documented for high-entropy values only; see [Querying](/fields/encrypted/querying#limits).
+
+## When not to encrypt
+
+Encrypt the fields whose leak from a database dump would be the incident: tokens, secrets, government ids, medical notes, sensitive free text. Do not encrypt:
+
+- fields you sort, range-query, or substring-search: the database cannot do any of that over ciphertext
+- display fields on hot list views: per-row decryption cost with no confidentiality win worth it
+- low-entropy fields you also need to query: the blind index leaks their distribution
+- anything already public in your API responses: encryption at rest protects nothing the API hands out anyway
+
+A short list of genuinely sensitive encrypted fields beats a blanket policy every time.

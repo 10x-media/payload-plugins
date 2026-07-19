@@ -1,0 +1,42 @@
+---
+title: Encrypted fields
+description: Authenticated field-level encryption at rest for twelve Payload field types, with zero-config keys, rotation, and masked admin UX.
+---
+
+```ts
+import { encryptedField } from '@10x-media/fields/encrypted'
+
+fields: [
+  ...encryptedField({ name: 'apiToken', type: 'text' }),
+  ...encryptedField({ name: 'notes', type: 'textarea' }),
+  ...encryptedField({ name: 'contactEmail', type: 'email' }, { queryable: true }),
+]
+```
+
+`encryptedField(source, options?)` takes the field config you would have written as its first argument, and encryption options (`queryable`, `protection`, `keys`, `onDecryptFailure`, `overrides`) as its second. It returns an array (the stored field, plus a blind-index sibling when `queryable`), so spread it into `fields`.
+
+Values are encrypted with AES-256-GCM before they reach the database and decrypted on read. The database column holds an opaque versioned string on every adapter (Mongo and Postgres behave identically); your API and admin see plaintext, your database, backups, and dumps do not. With no configuration, keys derive from `PAYLOAD_SECRET`; production setups should configure [explicit keys](/fields/encrypted/key-management).
+
+## Supported field types
+
+`text`, `textarea`, `email`, `number`, `checkbox`, `date`, `select` and `radio` (including `hasMany`), `code`, `json`, `point`, and `richText` (Lexical). Values round-trip through JSON before encryption, so numbers stay numbers and dates stay dates in your API responses, and generated TypeScript types keep their real shapes via an emitted `typescriptSchema`.
+
+Some types trade queryability for confidentiality (encrypted `point` loses geo queries, encrypted `richText` loses sub-field queries); read [Limitations](/fields/encrypted/limitations) before choosing what to encrypt, and [Design rationale](/fields/encrypted/design-rationale) for when not to encrypt at all.
+
+## Admin UX
+
+`protection` (in the options argument) controls the edit view: `'masked'` (default) renders dots with a reveal toggle; `'none'` renders the native component with the value visible. List view cells are always masked with a lock badge regardless of `protection`; plaintext never renders in a table.
+
+```ts
+encryptedField({ name: 'internalNote', type: 'textarea' }, { protection: 'none' })
+```
+
+## Behavior guarantees
+
+- **Validation runs on plaintext.** Your `validate` (or the stock one for the type) sees the incoming plaintext value, so an encrypted email field still rejects a malformed email. Your hooks compose with the plugin's; nothing is swallowed.
+- **Null is null.** Clearing a field stores `null`, not an encrypted empty value.
+- **Tampering fails loudly.** GCM authentication plus additional authenticated data binding means a ciphertext moved between fields or collections fails to decrypt instead of decrypting into the wrong place. The binding stops at the field, though: read [Limitations](/fields/encrypted/limitations#swap-resistance) for the same-field caveats. The `onDecryptFailure` policy (`'throw'` default, `'null'`, `'passthrough'`, or a callback) decides what a failed read does; `'passthrough'` exists for [adopting encryption on existing plaintext](/fields/encrypted/migration).
+
+## Querying
+
+Encrypted columns are opaque, so `where` clauses cannot see into them. Opt-in blind indexing restores exact-match queries (`equals` / `in`) and `unique`: see [Querying](/fields/encrypted/querying).

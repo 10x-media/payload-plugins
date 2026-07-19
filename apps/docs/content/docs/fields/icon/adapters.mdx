@@ -1,0 +1,46 @@
+---
+title: Adapters
+description: First-party Lucide, Radix, and Tabler adapters, and the contract for defining your own.
+---
+
+An adapter connects one icon library to the field: a lazy manifest (names, tags, categories) for browsing and validation, and client components that render icons in the admin.
+
+## First-party adapters
+
+```ts
+import { lucideAdapter } from '@10x-media/fields/icon/adapters/lucide'
+import { radixAdapter } from '@10x-media/fields/icon/adapters/radix'
+import { tablerAdapter } from '@10x-media/fields/icon/adapters/tabler'
+```
+
+Each adapter has an optional peer dependency on its icon package (`lucide-react`, `@radix-ui/react-icons`, `@tabler/icons-react`); install the ones you use. Manifests are generated from the libraries' own metadata at this package's build time and ship as lazily imported modules, so registering an adapter adds nothing to any eager bundle.
+
+Register adapters globally through the plugin, or per field:
+
+```ts
+fields({ icon: { adapters: [lucideAdapter(), tablerAdapter()] } })
+
+iconField({ name: 'icon', adapters: [radixAdapter()] })  // this field: Radix only
+```
+
+## Defining an adapter
+
+`defineIconAdapter` pins the adapter contract version; you provide the rest:
+
+```ts
+import { defineIconAdapter } from '@10x-media/fields/icon'
+
+export const acmeIcons = defineIconAdapter({
+  slug: 'acme',
+  label: 'Acme Icons',
+  loadManifest: () => import('./generated/manifest').then((m) => m.manifest),
+  Icon: '@acme/payload-icons/client#AcmeAdapterIcon',
+  Assets: '@acme/payload-icons/client#AcmeAdapterAssets',
+})
+```
+
+- `slug` becomes the value prefix (`acme:rocket`) and must stay stable forever; it is stored data.
+- `loadManifest` is called on first drawer open, never eagerly, and resolves the generated `manifest`. Its shape is `{ icons: [{ name, tags, categories }], categories: string[] }`.
+- `Icon` and `Assets` are import-map component paths (the same string-path convention as every admin component). `Icon` renders one icon by name, lazily; `Assets` loads the manifest for the drawer. An optional `Nodes` path supplies bulk glyph data for fast inline-SVG drawer rendering; omit it for libraries the drawer renders through the per-icon `Icon` component (Radix does). The first-party adapters are the reference implementation for these components.
+
+Hand-writing a manifest for a large library is busywork; [codegen](/fields/icon/codegen) generates the manifest, and the per-icon import map those components load, from an icon set you describe.

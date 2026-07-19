@@ -1,0 +1,69 @@
+---
+title: Limitations
+description: What encrypted fields cannot do, stated plainly, so you can decide per field.
+---
+
+Encryption removes capabilities from the database on purpose. Every limitation below is inherent to encrypting at the field level, not an implementation gap. Read it as operator guidance: which fields to encrypt, which to index, and how to run them.
+
+## Querying and sorting
+
+- No `like`, `contains`, comparison operators, or sorting on encrypted fields. The database sees opaque strings.
+- Exact-match `equals` / `in` and `unique` work only with [`queryable: true`](/fields/encrypted/querying), which is available for `text`, `email`, and `number` fields, and inherits the blind-index caveats below.
+- Admin list-view search and filters that rely on substring matching skip encrypted fields.
+
+## Type-specific trade-offs
+
+- **`point`**: stored as ciphertext, so geo queries (`near`, `within`, `intersects`) are lost. Encrypt coordinates only when location is itself the secret.
+- **`richText`**: the Lexical JSON encrypts as one blob; sub-field queries and any server-side traversal of the content tree are lost. It is masked-only in the admin (the editor cannot run on an encrypted backing field), so the edit view shows read-only JSON and content is edited through the API.
+- **`select` / `radio`**: these cannot be blind-indexed (`queryable` accepts only scalar `text`/`email`/`number`), so an encrypted select or radio is simply unqueryable. Consider whether the selection is actually sensitive before encrypting it.
+
+## Swap resistance
+
+Authenticated encryption binds each ciphertext to its `collection.field` slot (see [design rationale](/fields/encrypted/design-rationale#why-aad-binding)), so a ciphertext relocated to a different field or a different collection fails to decrypt. The binding stops at the field:
+
+- **Same field, different row**: the document id is not part of the binding, so a ciphertext copied from one row into the same field of another row still decrypts. Binding the id is incompatible with Payload creating the id after the encrypting hook runs.
+- **Same field, different locale**: a localized field decrypts against any of its configured locales, so a value moved between locale columns of the same field still decrypts.
+
+Field-level encryption is not a defense against an attacker who already has database write access and stays within one field. Pair it with access control and database write restrictions.
+
+## Blind-index leakage
+
+A [blind index](/fields/encrypted/querying) is deterministic by necessity, which is a real information leak to anyone with database read access:
+
+- They see which rows share a value and each value's frequency (a histogram), even without learning any value.
+- An attacker who can insert a known plaintext (chosen-plaintext) can confirm whether that value already exists by matching index values.
+- An offline dictionary attack against the index becomes possible only if the index key itself leaks. By default the index key and the data keys both derive from `PAYLOAD_SECRET`, so a compromise of that secret breaks both; set a dedicated `keys.indexKey` to make the index key independent.
+
+Do not enable `queryable` on low-cardinality sensitive values (country, a small numeric enum, a birth year). Index only high-entropy values you must look up exactly.
+
+## Key and IV lifetime
+
+Each value is sealed with a fresh random 96-bit IV. Random IVs carry a birthday bound: keep encryptions under one key below roughly 2^32 (per NIST SP 800-38D) to keep IV-reuse probability negligible. In practice that is a large number, but on very high-write fields, rotate keys periodically ([rotation](/fields/encrypted/key-management#rotation)) rather than encrypting unbounded volumes under a single key.
+
+## Decrypt failures
+
+The default `onDecryptFailure` policy is `'throw'`. Because decryption happens in an `afterRead` hook, one unreadable value fails the entire `find` that touched it, not just that row. Choose the policy per field:
+
+- `'throw'` (default): safest for genuinely secret data; a corrupt or wrong-key value is a loud error, not a silent `null`.
+- `'null'`: the field reads as `null` on failure; the rest of the query succeeds. Use when availability matters more than surfacing corruption.
+- `'passthrough'`: the raw stored value is returned unchanged. This is the [adoption](/fields/encrypted/migration) mode; leaving it on in steady state also passes real corruption through as garbage.
+- a function `({ error, value, collection, field }) => unknown`: log and decide per failure.
+
+## Masked is visual only
+
+Masking is a client-side presentation choice. `afterRead` decrypts server-side, so an authorized admin's browser receives the plaintext regardless of masking; the dots stop casual on-screen display, not an authorized reader (or their network tab). Because the admin form round-trips plaintext, saving a document re-seals its encrypted fields with fresh IVs even when the content did not change, which records a new version on versioned collections.
+
+## Storage and API surface
+
+- The database column is text on every adapter; ciphertext is longer than plaintext (roughly 100 bytes of overhead plus base64url expansion). Size indexes and column expectations accordingly.
+- **GraphQL** exposes each encrypted field as `String`, its stored text type. The logical type is preserved only in generated TypeScript (via the emitted `typescriptSchema`); GraphQL-level filtering is subject to the same query limitations as REST and Local API.
+- Version and draft tables store ciphertext like the live table, so nothing leaks through drafts. Rotation utilities cover live documents; long version histories retain ciphertext under old keys until pruned, so keep retired keys configured for as long as you keep versions that used them, or prune versions first.
+- Removing encryption writes non-string plaintext back JSON-stringified; converting the field to its native type afterward is a [schema migration you own](/fields/encrypted/migration#removing-encryption).
+
+## Performance
+
+Encryption cost is per value and small (AES-GCM is hardware-accelerated), but decryption happens on every read of every encrypted value: a list view of 100 documents with 3 encrypted fields performs 300 decryptions. Keep encrypted fields off `useAsTitle` and out of hot list columns, and prefer `select` projections that exclude them where you do not need them.
+
+## What this is not
+
+Field-level encryption protects data at rest. It does not protect against a compromised application server (which holds the keys), does not replace access control (the API still serves plaintext to authorized readers), and does not encrypt in transit (TLS does). The [design rationale](/fields/encrypted/design-rationale) covers the threat model precisely.

@@ -1,0 +1,58 @@
+---
+title: Codegen
+description: Generate a manifest and per-icon import map for any icon set, for use in a custom adapter.
+---
+
+`@10x-media/fields/icon/codegen` generates the artifacts an [adapter](/fields/icon/adapters) needs: a manifest (names, tags, categories for browsing and validation) and, optionally, a per-icon import map (for lazy loading) and bulk glyph node-data (for fast drawer rendering). Run it at build time in your project and commit the output next to your adapter.
+
+```ts title="scripts/generate-acme-icons.ts"
+import { generateIconManifest } from '@10x-media/fields/icon/codegen'
+
+await generateIconManifest({
+  source: {
+    icons: [
+      { name: 'rocket', tags: ['launch', 'ship'], categories: ['brand'] },
+      { name: 'planet', tags: ['world'], categories: ['brand'] },
+    ],
+    importFor: (icon) => ({ module: `@acme/icons/${icon.name}` }),
+  },
+  outDir: './src/icons/acme',
+  regenCommand: 'pnpm generate:acme-icons',
+})
+```
+
+You describe the icon set as a `source`: either a built-in library name (`'lucide' | 'radix' | 'tabler'`) or a custom object with an `icons` array (each entry a `{ name, tags, categories }`), an optional `importFor` that maps an icon to its dynamic import, and optional `nodes` bulk glyph data.
+
+The run emits into `outDir`:
+
+- `manifest.ts` always, exporting a lazily importable `manifest`.
+- `imports.ts` when `importFor` is set, exporting an `iconImports` map of name to dynamic import.
+- `nodes.ts` when `nodes` is set, for inline-SVG drawer rendering (omit it for libraries the drawer renders through the per-icon `Icon` component, like Radix).
+
+Icon names are validated as kebab-case, de-duplicated, and sorted, so committed output is byte-stable across machines. `allowMissingCategories` lets a source that cannot fetch category metadata emit without categories (off by default, so a broken run fails loudly instead of dropping categories silently).
+
+Wire the output into an adapter and its client components:
+
+```ts title="src/icons/acme/adapter.ts"
+import { defineIconAdapter } from '@10x-media/fields/icon'
+
+export const acmeIconsAdapter = defineIconAdapter({
+  slug: 'acme',
+  label: 'Acme Icons',
+  loadManifest: () => import('./manifest').then((m) => m.manifest),
+  Icon: '@/icons/acme/client#AcmeAdapterIcon',
+  Assets: '@/icons/acme/client#AcmeAdapterAssets',
+})
+```
+
+The `Icon` component resolves a name through the generated `iconImports` map (a `React.lazy` per entry for the client, an awaited import for RSC).
+
+## In-house SVG sets
+
+For a custom set of SVG files, build the `icons` array yourself, deriving each `name` from a file (kebab-case) and `categories` from its folder, then pass it as the `source` with an `importFor` that points at your per-icon modules or a wrapper component. Codegen validates and emits; it does not crawl a directory for you.
+
+## Recipes
+
+- **Heroicons / Phosphor**: build the `icons` array from the package's icon list and point `importFor` at each icon's module. Each style variant (outline, solid) works best as its own adapter slug so stored values stay unambiguous.
+- **Full shadcn set**: shadcn projects standardize on Lucide, so the first-party `lucideAdapter()` already covers them; add codegen adapters only for the extra sets your design system pulls in.
+- **Regeneration**: re-run codegen when you bump the icon package. The manifest is data, so a new version adding icons is additive; removing icons turns stored values into [gracefully degraded ones](/fields/icon/multi-tenancy#when-a-stored-values-library-is-disabled) rather than errors.

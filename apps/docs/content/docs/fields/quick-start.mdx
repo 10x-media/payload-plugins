@@ -1,0 +1,76 @@
+---
+title: Quick start
+description: Install the package, add a field to a collection, and see it in the admin.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/fields
+```
+
+Icon fields render icons from icon packages you already use. Install the ones you want (each is an optional peer):
+
+```bash
+pnpm add lucide-react            # for the Lucide adapter
+pnpm add @radix-ui/react-icons   # for the Radix adapter
+pnpm add @tabler/icons-react     # for the Tabler adapter
+```
+
+## Add fields to a collection
+
+Factories return plain Payload field configs; drop them into any `fields` array:
+
+```ts title="collections/Brands.ts"
+import type { CollectionConfig } from 'payload'
+import { colorField } from '@10x-media/fields/color'
+import { iconField } from '@10x-media/fields/icon'
+import { lucideAdapter } from '@10x-media/fields/icon/adapters/lucide'
+import { encryptedField } from '@10x-media/fields/encrypted'
+
+export const Brands: CollectionConfig = {
+  slug: 'brands',
+  fields: [
+    { name: 'name', type: 'text', required: true },
+    colorField({ name: 'primaryColor', required: true }),
+    iconField({ name: 'icon', adapters: [lucideAdapter()] }),
+    ...encryptedField({ name: 'apiToken', type: 'text' }),
+  ],
+}
+```
+
+That is the whole integration for a single collection: the color field stores a hex string, the icon field stores `lucide:<name>`, and `apiToken` is encrypted at rest with a key derived from your `PAYLOAD_SECRET` (see [key management](/fields/encrypted/key-management) before production). `encryptedField` returns an array, so spread it; `colorField` and `iconField` return a single field.
+
+## Optional: the plugin for app-wide defaults
+
+Registering the plugin gives every field in the app shared defaults; per-field options still win:
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { fields } from '@10x-media/fields'
+import { lucideAdapter } from '@10x-media/fields/icon/adapters/lucide'
+import { tablerAdapter } from '@10x-media/fields/icon/adapters/tabler'
+
+export default buildConfig({
+  // ...
+  plugins: [
+    fields({
+      color: { presets: [{ key: 'brand', value: '#3b82f6', label: 'Brand' }] },
+      icon: { adapters: [lucideAdapter(), tablerAdapter()] },
+      encrypted: { keys: { active: 'k1', keys: { k1: process.env.FIELDS_KEY_K1 } } },
+    }),
+  ],
+})
+```
+
+After adding fields with custom admin components, regenerate your import map (`payload generate:importmap`) as with any plugin that ships admin UI.
+
+## Verify
+
+Open a document in the admin. The color row shows a swatch, a free-text input, and a format chip at the exact height of the text field above it; clicking the swatch opens the picker. The icon row opens a searchable browser. The encrypted field shows dots with a reveal toggle. Save, reload, and the values persist.
+
+## Next
+
+- [Color field](/fields/color): formats, presets, [linked presets](/fields/color/linked-mode) for tenant theming.
+- [Icon field](/fields/icon): [adapters](/fields/icon/adapters), [frontend rendering](/fields/icon/frontend-rendering), [multi-tenancy](/fields/icon/multi-tenancy).
+- [Encrypted fields](/fields/encrypted): read [key management](/fields/encrypted/key-management) and [limitations](/fields/encrypted/limitations) before shipping.
