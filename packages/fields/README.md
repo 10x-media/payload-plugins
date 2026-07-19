@@ -1,17 +1,19 @@
 # @10x-media/fields
 
-Reusable admin fields for Payload: color picker, icon picker, encrypted fields, and more.
+Reusable fields for Payload v3 that look and behave native: a full color picker in a constant-height row, a searchable icon picker over pluggable icon libraries, and encrypted fields with key rotation and opt-in exact-match querying. Built from `@payloadcms/ui` primitives on Payload design tokens, indistinguishable from Payload's own fields.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/fields?style=flat-square)](https://www.npmjs.com/package/@10x-media/fields)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Beta scaffold: this plugin currently returns the Payload config unchanged. Replace this note and the feature list below as you add behavior.
-
 ## Features
 
-- Replace with 3-6 one-line bullets covering what the plugin adds.
-- Typed translations with per-key overrides via `@10x-media/fields/i18n`.
+- **Color field**: saturation/hue/alpha picker, eyedropper, preset palettes (static or resolved from your data), any CSS color as input, one configured stored format (`hex`/`rgb`/`hsl`/`oklch`), and an opt-in linked mode that stores preset references so palette changes propagate everywhere.
+- **Icon field**: drawer browser with search, category rail, and keyboard navigation; Lucide, Radix, and Tabler adapters first-party; `defineIconAdapter()` plus codegen for any other library; per-icon lazy loading so no icon dataset ever enters an eager bundle; client and RSC frontend renderers.
+- **Encrypted fields**: AES-256-GCM with authenticated field binding, for twelve field types including `richText` and `point`; zero-config keys derived from `PAYLOAD_SECRET` or explicit multi-key config with async providers and online rotation; opt-in blind-index querying (`equals`/`in`/`unique`); masked admin UX with reveal toggle.
+- **Native by construction**: 40px rows, Payload tokens, full `admin` prop contract, typed translations (en, de), function-form `overrides` on every factory.
+- **Isolated bundles**: each family behind its own subpath export, isolation asserted on the built output in CI.
+- **Plugin optional**: every factory works standalone; the `fields()` plugin adds app-wide defaults that per-field options override.
 
 ## Quick start
 
@@ -20,13 +22,27 @@ pnpm add @10x-media/fields
 ```
 
 ```ts
-// payload.config.ts
-import { buildConfig } from 'payload'
-import { fields } from '@10x-media/fields'
+// collections/Brands.ts
+import { colorField } from '@10x-media/fields/color'
+import { iconField } from '@10x-media/fields/icon'
+import { lucideAdapter } from '@10x-media/fields/icon/adapters/lucide'
+import { encryptedField } from '@10x-media/fields/encrypted'
 
-export default buildConfig({
-  plugins: [fields({})],
-})
+fields: [
+  colorField({ name: 'primaryColor', required: true }),
+  iconField({ name: 'icon', adapters: [lucideAdapter()] }),
+  ...encryptedField({ name: 'apiToken', type: 'text' }),
+]
+```
+
+Render stored icons on your frontend:
+
+```tsx
+import { createIcon } from '@10x-media/fields/icon/react'
+import { lucideRenderer } from '@10x-media/fields/icon/adapters/lucide'
+
+const Icon = createIcon({ adapters: [lucideRenderer()] })
+// <Icon icon={doc.icon} size={20} />
 ```
 
 ## Documentation
@@ -35,8 +51,11 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/fields):
 
 - [Overview](https://docs.10xmedia.de/fields)
 - [Quick start](https://docs.10xmedia.de/fields/quick-start)
-
-Add the plugin's docs tree under `apps/docs/content/docs/fields/` and list its pages here. Long-form documentation lives on the docs site, not in this README.
+- [Color field](https://docs.10xmedia.de/fields/color)
+- [Icon field](https://docs.10xmedia.de/fields/icon)
+- [Encrypted fields](https://docs.10xmedia.de/fields/encrypted)
+- [Key management](https://docs.10xmedia.de/fields/encrypted/key-management)
+- [Building your own](https://docs.10xmedia.de/fields/building-your-own)
 
 ## License
 
