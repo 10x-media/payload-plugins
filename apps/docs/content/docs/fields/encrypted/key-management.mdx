@@ -12,14 +12,15 @@ The default is fine to start, but it couples data recoverability to `PAYLOAD_SEC
 ## Explicit keys
 
 ```ts title="payload.config.ts"
+const k1 = process.env.FIELDS_KEY_K1
+const k2 = process.env.FIELDS_KEY_K2
+if (!k1 || !k2) throw new Error('FIELDS_KEY_K1 and FIELDS_KEY_K2 are required')
+
 fields({
   encrypted: {
     keys: {
       active: 'k2',
-      keys: {
-        k1: process.env.FIELDS_KEY_K1,
-        k2: process.env.FIELDS_KEY_K2,
-      },
+      keys: { k1, k2 },
     },
   },
 })

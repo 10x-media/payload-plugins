@@ -42,6 +42,13 @@ Because the async preset resolver is memoized per request and shared across ever
 
 When a stored reference points at a preset that no longer exists (a tenant deleted a brand color), the sibling resolves to `linked.fallback` (default `null`), and the picker shows a missing-preset state prompting for a replacement. Nothing throws, and the stale reference stays queryable until an editor replaces it.
 
+## Limitations
+
+The resolved sibling is derived at read time from the stored reference on the same record, which has two edges worth knowing:
+
+- Reading a localized linked field with `locale=all` returns `null` for `${name}Resolved`. The sibling resolves one reference, not the per-locale map that `locale=all` returns, so per-locale resolved values are not represented. Read a single locale when you need the resolved value.
+- Selecting `${name}Resolved` without also selecting the main field returns `null`, because resolution reads the main field's stored reference from the same record. Co-select the main field (for example `select: { accent: true, accentResolved: true }`).
+
 ## When to use which mode
 
 Use linked mode when colors are governed (tenant brands, design tokens) and should update globally. Use default mode when a document's color is that document's own data. The two can coexist: linked fields still allow custom one-off values, which store as plain strings.

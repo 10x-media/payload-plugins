@@ -51,13 +51,16 @@ import { fields } from '@10x-media/fields'
 import { lucideAdapter } from '@10x-media/fields/icon/adapters/lucide'
 import { tablerAdapter } from '@10x-media/fields/icon/adapters/tabler'
 
+const k1 = process.env.FIELDS_KEY_K1
+if (!k1) throw new Error('FIELDS_KEY_K1 is required')
+
 export default buildConfig({
   // ...
   plugins: [
     fields({
       color: { presets: [{ key: 'brand', value: '#3b82f6', label: 'Brand' }] },
       icon: { adapters: [lucideAdapter(), tablerAdapter()] },
-      encrypted: { keys: { active: 'k1', keys: { k1: process.env.FIELDS_KEY_K1 } } },
+      encrypted: { keys: { active: 'k1', keys: { k1 } } },
     }),
   ],
 })
