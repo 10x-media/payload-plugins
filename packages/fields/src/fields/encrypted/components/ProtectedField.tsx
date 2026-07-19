@@ -89,7 +89,8 @@ const RichTextJsonView: React.FC<{ path: string } & Pick<ProtectedFieldProps, 'f
 		<div className="field-type tenx-protected-field">
 			<FieldLabel label={field.label} path={path} required={field.required} />
 			<p className="tenx-protected-field__notice">{t(keys.richTextApiOnly)}</p>
-			<pre className="tenx-protected-field__json">
+			{/* biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be keyboard-focusable for scroll access (WCAG 2.1.1) */}
+			<pre className="tenx-protected-field__json" tabIndex={0}>
 				{value == null ? '' : JSON.stringify(value, null, 2)}
 			</pre>
 		</div>

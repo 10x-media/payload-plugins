@@ -1,6 +1,6 @@
 'use client'
 
-import { SearchIcon, SelectInput, Tooltip } from '@payloadcms/ui'
+import { ReactSelect, SearchIcon, Tooltip } from '@payloadcms/ui'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations'
@@ -231,6 +231,12 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 		[manifest, t]
 	)
 
+	const libraryOptions = useMemo(
+		() => adapters.map((adapter) => ({ label: adapter.label, value: adapter.slug })),
+		[adapters]
+	)
+	const librarySelectId = `${slugPrefix}-library`
+
 	// The stored value points at a library that is no longer offered for selection; the
 	// full explanation lives here, the trigger only carries a compact marker.
 	const selectedUnavailable =
@@ -289,19 +295,18 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 						{/* adapters is the available-filtered set; the switcher shows only with 2+ libraries, fixed width beside the growing search */}
 						{adapters.length > 1 ? (
 							<div className="tenx-icon-drawer__switcher">
-								<SelectInput
+								<label className="tenx-icon-drawer__sr-only" htmlFor={librarySelectId}>
+									{t(keys.fieldIconLibraryLabel)}
+								</label>
+								<ReactSelect
+									inputId={librarySelectId}
 									isClearable={false}
-									name={`${slugPrefix}-library`}
 									onChange={(option) => {
 										const single = Array.isArray(option) ? option[0] : option
 										if (single && typeof single.value === 'string') onLibraryChange(single.value)
 									}}
-									options={adapters.map((adapter) => ({
-										label: adapter.label,
-										value: adapter.slug,
-									}))}
-									path={`${slugPrefix}-library`}
-									value={activeLibrary}
+									options={libraryOptions}
+									value={libraryOptions.find((option) => option.value === activeLibrary)}
 								/>
 							</div>
 						) : null}
