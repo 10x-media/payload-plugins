@@ -35,6 +35,7 @@ import { pollOutcomeBeforeChange } from '../poll/outcomeBeforeChange'
 import { buildDefaultOutcomeFields, type OutcomeFieldsOverride } from '../poll/outcomeFields'
 import { type PollTypeRegistry, resolvePollTypes } from '../poll/pollTypeRegistry'
 import type { PollOptionSourceRegistry } from '../poll/registry'
+import { resolvePollCloseRequest } from '../poll/resolvePollCloseRequest'
 import { resolvePollOptionsRequest } from '../poll/resolvePollOptionsRequest'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
 import { keys } from '../translations/keys'
@@ -196,6 +197,11 @@ export const buildFormsCollection = ({
 	const FIELD_NAME_SELECT_REF = '@10x-media/form-builder/client#FieldNameSelect'
 	const FLOW_STEPS_CELL_REF = '@10x-media/form-builder/client#FlowStepsCell'
 	const FIELD_COUNT_CELL_REF = '@10x-media/form-builder/client#FieldCountCell'
+	const CLOSE_POLL_BUTTON_REF = '@10x-media/form-builder/client#ClosePollButton'
+	// The `source` outcome strategy delegates to the poll's option source, so it is useless without one:
+	// offer it in the author-facing select only when option sources are registered. The strategy stays in
+	// the registry regardless, so `resolvePollOutcome` and host code can still address it.
+	const hasOptionSources = (pollSourceRegistry?.size ?? 0) > 0
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
 		if (data && Array.isArray(data.fields)) {
@@ -443,11 +449,13 @@ export const buildFormsCollection = ({
 				type: 'select',
 				defaultValue: 'manual',
 				label: labelForKey(keys.pollType),
-				admin: { isClearable: false },
-				options: [...pollTypes.values()].map((strategy) => ({
-					label: pollTypeOptionLabel(strategy.label),
-					value: strategy.type,
-				})),
+				admin: { isClearable: false, description: labelForKey(keys.pollTypeDescription) },
+				options: [...pollTypes.values()]
+					.filter((strategy) => strategy.type !== 'source' || hasOptionSources)
+					.map((strategy) => ({
+						label: pollTypeOptionLabel(strategy.label),
+						value: strategy.type,
+					})),
 			},
 			{
 				name: 'resultsVisibility',
@@ -465,6 +473,17 @@ export const buildFormsCollection = ({
 				type: 'date',
 				label: labelForKey(keys.pollClosesAt),
 				admin: { date: { pickerAppearance: 'dayAndTime' } },
+			},
+			// Manual close for a poll with no scheduled `closesAt`: the button POSTs to `/:id/close`, which
+			// stamps `closesAt` now and (for a non-manual strategy) resolves the winner. Hidden once a
+			// `closesAt` exists, since a scheduled poll closes on its own. `siblingData` here is the poll group.
+			{
+				name: 'closePoll',
+				type: 'ui',
+				admin: {
+					condition: (_data, siblingData) => !siblingData?.closesAt,
+					components: { Field: CLOSE_POLL_BUTTON_REF },
+				},
 			},
 			...buildPollOptionSourceFields(pollSourceRegistry ?? new Map()),
 			// `winningValues` is recorded either by an admin picking from the poll's effective options
@@ -572,6 +591,21 @@ export const buildFormsCollection = ({
 			method: 'get',
 			handler: async (req: PayloadRequest) => {
 				const { status, body } = await resolvePollOptionsRequest({
+					payload: req.payload,
+					formId: req.routeParams?.id as number | string | undefined,
+					isAuthed: Boolean(req.user),
+					req,
+				})
+				return Response.json(body, { status })
+			},
+		},
+		// Trusted admin action (authenticated only): close a poll now and resolve its outcome. A POST
+		// because it mutates; auth is `Boolean(req.user)` so an anonymous caller gets 403 from the helper.
+		{
+			path: '/:id/close',
+			method: 'post',
+			handler: async (req: PayloadRequest) => {
+				const { status, body } = await resolvePollCloseRequest({
 					payload: req.payload,
 					formId: req.routeParams?.id as number | string | undefined,
 					isAuthed: Boolean(req.user),

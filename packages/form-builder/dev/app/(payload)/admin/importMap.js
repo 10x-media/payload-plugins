@@ -1,6 +1,7 @@
 import { FormConditionField as FormConditionField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { EndpointOptionsSelect as EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { ByteSizeField as ByteSizeField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { ClosePollButton as ClosePollButton_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -37,6 +38,7 @@ export const importMap = {
   "@10x-media/form-builder/client#FormConditionField": FormConditionField_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#EndpointOptionsSelect": EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#ByteSizeField": ByteSizeField_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#ClosePollButton": ClosePollButton_bf8585411c882b493b730d03575f3f2f,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,

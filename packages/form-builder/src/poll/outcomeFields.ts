@@ -33,6 +33,12 @@ export const buildWinningValuesField = (): Field => ({
 	hasMany: true,
 	label: labelForKey(keys.pollWinningValue),
 	admin: {
+		// A mostVoted poll resolves its winner from the votes, so hand-picking one is meaningless: hide
+		// the field for that strategy. The stored value survives a save because Payload keeps a
+		// condition-hidden field's value in form state and resubmits it, and the outcome hook's
+		// early-return leaves winningValues untouched when a save omits it. The first Condition arg is
+		// the whole document (the field sits at poll.outcome.winningValues), so read poll.type off it.
+		condition: (data) => (data as { poll?: { type?: string } })?.poll?.type !== 'mostVoted',
 		components: {
 			Field: {
 				path: ENDPOINT_OPTIONS_SELECT_REF,
