@@ -23,6 +23,7 @@
 		"test:int": "tsx scripts/run.ts test:int",
 		"test:matrix": "tsx scripts/run.ts test:matrix",
 		"test:container": "tsx scripts/run.ts test:container",
+		"test:dist": "tsx scripts/run.ts test:dist",
 		"test:e2e": "tsx scripts/run.ts test:e2e",
 		"generate": "tsx scripts/run.ts generate",
 		"generate:types": "tsx scripts/run.ts generate:types",

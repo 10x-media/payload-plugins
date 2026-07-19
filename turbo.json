@@ -68,6 +68,11 @@
 			"outputs": ["playwright-report/**", "test-results/**"],
 			"cache": false
 		},
+		"test:dist": {
+			"dependsOn": ["build"],
+			"inputs": ["src/**", "tests/dist/**", "vitest.config.ts", "tsdown.config.ts"],
+			"outputs": []
+		},
 		"generate": {
 			"cache": false
 		},

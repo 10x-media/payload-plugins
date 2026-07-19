@@ -55,6 +55,8 @@ jobs:
       - run: pnpm exec turbo run build --filter='./packages/*'
       - name: Verify published dist output (directives, externals, exports, publint)
         run: pnpm check:dist
+      - name: Bundle isolation gates
+        run: pnpm exec turbo run test:dist
 
   test:
     runs-on: ubuntu-latest
