@@ -170,6 +170,16 @@ export const resolveKeys = (
 			new InvalidKeysConfigError('no keys configured and the Payload secret is empty')
 		)
 	}
+	// HKDF stretches any input to 32 bytes, so a short secret would silently derive
+	// a low-entropy key; hold the zero-config ring to the same floor as configured keys.
+	const secretBytes = materialByteLength(fallbackSecret)
+	if (secretBytes < MIN_KEY_BYTES) {
+		return Promise.reject(
+			new InvalidKeysConfigError(
+				`no keys configured and the Payload secret has ${secretBytes} bytes of material; it is too short to derive encryption keys. Lengthen PAYLOAD_SECRET to at least ${MIN_KEY_BYTES} bytes (recommend >= 32) or supply explicit keys`
+			)
+		)
+	}
 	let ring = defaultRings.get(fallbackSecret)
 	if (!ring) {
 		ring = Promise.resolve({

@@ -26,6 +26,15 @@ describe('resolveKeys: default ring', () => {
 	it('rejects an empty secret', async () => {
 		await expect(resolveKeys(undefined, '')).rejects.toBeInstanceOf(InvalidKeysConfigError)
 	})
+
+	it('rejects a secret below the minimum byte length', async () => {
+		await expect(resolveKeys(undefined, 'too-short')).rejects.toBeInstanceOf(InvalidKeysConfigError)
+	})
+
+	it('accepts a secret at the minimum byte length', async () => {
+		const ring = await resolveKeys(undefined, 'sixteen-byte-key')
+		expect(ring.dataKeys.get(DEFAULT_KEY_ID)?.length).toBe(32)
+	})
 })
 
 describe('resolveKeys: custom KeysConfig', () => {

@@ -36,7 +36,7 @@ export default defineConfig({
 			DEV_DB: process.env.DEV_DB ?? 'mongo',
 			DATABASE_URI_MONGO: `mongodb://localhost:${mongoPort}/fields_e2e?replicaSet=rs0&directConnection=true`,
 			DATABASE_URI_POSTGRES: `postgres://e2e:e2e@localhost:${pgPort}/fields_e2e`,
-			PAYLOAD_SECRET: 'e2e-secret',
+			PAYLOAD_SECRET: 'e2e-secret-not-for-prod',
 		},
 	},
 })
