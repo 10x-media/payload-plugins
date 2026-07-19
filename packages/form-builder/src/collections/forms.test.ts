@@ -124,6 +124,44 @@ describe('forms admin.condition scopes', () => {
 	})
 })
 
+describe('forms response.redirect.reference', () => {
+	it('omits the reference field when redirectRelationships is unset', () => {
+		const collection = buildCollection()
+		const redirect = groupNamed(groupNamed(tabFields(collection), 'response').fields, 'redirect')
+		expect(redirect.fields.some((field) => 'name' in field && field.name === 'reference')).toBe(
+			false
+		)
+		expect(redirect.fields.some((field) => 'name' in field && field.name === 'url')).toBe(true)
+	})
+
+	it('omits the reference field when redirectRelationships is an empty array', () => {
+		const collection = buildFormsCollection({
+			registry: resolveFieldTypes(buildDefaultFieldDefinitions(true)),
+			ruleRegistry: resolveValidationRules(defaultValidationRules),
+			redirectRelationships: [],
+		})
+		const redirect = groupNamed(groupNamed(tabFields(collection), 'response').fields, 'redirect')
+		expect(redirect.fields.some((field) => 'name' in field && field.name === 'reference')).toBe(
+			false
+		)
+	})
+
+	it('adds a polymorphic reference relationship field when redirectRelationships is set', () => {
+		const collection = buildFormsCollection({
+			registry: resolveFieldTypes(buildDefaultFieldDefinitions(true)),
+			ruleRegistry: resolveValidationRules(defaultValidationRules),
+			redirectRelationships: ['pages', 'articles'],
+		})
+		const redirect = groupNamed(groupNamed(tabFields(collection), 'response').fields, 'redirect')
+		const reference = redirect.fields.find(
+			(field) => 'name' in field && field.name === 'reference'
+		) as Extract<Field, { type: 'relationship' }> | undefined
+		expect(reference?.type).toBe('relationship')
+		expect(reference?.relationTo).toEqual(['pages', 'articles'])
+		expect(redirect.fields.some((field) => 'name' in field && field.name === 'url')).toBe(true)
+	})
+})
+
 describe('forms poll.resultsField', () => {
 	it('mounts FieldNameSelect with the poll-eligible types as clientProps', () => {
 		const field = resultsFieldOf(buildCollection())

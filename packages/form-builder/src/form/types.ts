@@ -7,7 +7,17 @@ export type FormResponseSettings = {
 	/** Rich text state serialized via `serializeBody`; shown instead of the plain `successMessage`. */
 	message?: unknown
 	/** Applies on the custom-`children` path too (part of submit handling); `message` only affects default rendering. */
-	redirect?: { url?: string | null } | null
+	redirect?: {
+		url?: string | null
+		/**
+		 * Present when the plugin's `redirectRelationships` option is set and the author picked an
+		 * internal document. Mirrors Payload's depth-0 polymorphic relationship shape (`value` is
+		 * the bare id, never populated): the HOST resolves this to a URL itself (e.g. by looking up
+		 * the referenced document's own route), since the plugin has no notion of the host's
+		 * routing, matching the model of Payload's native `plugin-form-builder` redirect relationship.
+		 */
+		reference?: { relationTo: string; value: number | string } | null
+	} | null
 }
 
 /**

@@ -50,7 +50,10 @@ const buttonSettingsOf = (form: {
  * - `fields` may be a typed blocks-union array or null; normalized to `FormFieldInstance[]`
  *   (nameless bare rows, e.g. message blocks, pass through with their row `id` intact)
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
- * - `response` may be null; coerced to `undefined`, otherwise passed through wholesale
+ * - `response` may be null; coerced to `undefined`, otherwise passed through wholesale, which
+ *   includes `response.redirect.reference` (present only when the plugin's `redirectRelationships`
+ *   option is set): read the form at `depth: 0` to get Payload's raw `{ relationTo, value }` pair
+ *   rather than a populated document, since the host is the one who resolves it to a URL
  * - the button labels (`submitLabel`/`prevLabel`/`nextLabel`) live at the document root now (there
  *   is no `buttons` group); the non-empty ones are reassembled into `FormDocument.buttons`
  * - `title` may be null; coerced to `undefined`
@@ -77,7 +80,10 @@ export function toFormDocument(
 		response?: {
 			type?: string | null
 			message?: unknown
-			redirect?: { url?: string | null } | null
+			redirect?: {
+				url?: string | null
+				reference?: { relationTo?: string | null; value?: number | string | null } | null
+			} | null
 		} | null
 		submitLabel?: string | null
 		prevLabel?: string | null

@@ -1,4 +1,4 @@
-import type { Config } from 'payload'
+import type { CollectionSlug, Config } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import type { FromAddressesResolver } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
@@ -41,6 +41,7 @@ type RegisterCollectionsArgs = {
 	buttons?: ButtonsOption
 	fromAddresses?: FromAddressesResolver
 	departments?: DepartmentEmailsResolver
+	redirectRelationships?: CollectionSlug[]
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
@@ -68,6 +69,7 @@ export const registerCollections = ({
 	buttons,
 	fromAddresses,
 	departments,
+	redirectRelationships,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	registerActionsTask(config, actionRegistry, richText)
@@ -115,6 +117,7 @@ export const registerCollections = ({
 			buttons,
 			fromAddresses,
 			departments,
+			redirectRelationships,
 			overrides: overrides?.forms,
 		}),
 	]

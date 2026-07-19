@@ -119,6 +119,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.actionConfigFrom]: 'Von',
 	[keys.actionConfigFromDescription]:
 		'Absenderadresse für diese Aktion. Leer lassen, um den Standard des E-Mail-Adapters zu verwenden.',
+	[keys.actionConfigCc]: 'Cc',
+	[keys.actionConfigBcc]: 'Bcc',
+	[keys.actionConfigReplyTo]: 'Antwort an',
 	[keys.validationFromUnknown]: 'Wähle eine der konfigurierten Absenderadressen',
 	[keys.validationFromUnavailable]:
 		'Absenderadressen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
@@ -262,6 +265,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.responseMessage]: 'Nachricht',
 	[keys.responseRedirect]: 'Weiterleitung',
 	[keys.responseUrl]: 'URL',
+	[keys.responseRedirectReference]: 'Dokument',
+	[keys.responseRedirectReferenceDescription]:
+		'Zu einem internen Dokument statt zu einer URL weiterleiten',
 	[keys.buttonsSubmitLabel]: 'Beschriftung der Absenden-Schaltfläche',
 	[keys.buttonsNextLabel]: 'Beschriftung der Weiter-Schaltfläche',
 	[keys.buttonsPrevLabel]: 'Beschriftung der Zurück-Schaltfläche',

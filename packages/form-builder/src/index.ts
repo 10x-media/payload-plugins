@@ -1,4 +1,4 @@
-import { type Config, definePlugin } from 'payload'
+import { type CollectionSlug, type Config, definePlugin } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import type { FromAddressesResolver } from './actions/fromAddresses'
@@ -118,6 +118,19 @@ export type FormBuilderPluginOptions = {
 	 * host-added sibling field is still stored but is read off the raw document, not `doc.buttons`.
 	 */
 	buttons?: ButtonsOption
+	/**
+	 * Collections whose documents `response.redirect` can reference (`response.redirect.reference`),
+	 * letting an author redirect a visitor to an internal document instead of a URL after a
+	 * successful submit. Absent (the default): no `reference` field exists at all, matching today's
+	 * URL-only redirect. Always polymorphic, even for a single slug (a `CollectionSlug[]` array, not
+	 * a bare `CollectionSlug`), so a host adding a second collection later never changes the stored
+	 * shape, the same precedent as `consentSourcesField()`'s `page` picker. The plugin never resolves
+	 * the reference to a URL itself (it has no notion of the host's routing); `toFormDocument` passes
+	 * the raw `{ relationTo, value }` pair through on `FormDocument.response.redirect.reference` for
+	 * the host to resolve. Mirrors the `redirectRelationships` option of Payload's native
+	 * `plugin-form-builder`.
+	 */
+	redirectRelationships?: CollectionSlug[]
 	/**
 	 * File uploads are bring-your-own. Default `false`: no upload collection is involved and the
 	 * built-in `file` field type is removed from the registry, so form authors cannot add a field
@@ -257,6 +270,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			buttons: options.buttons,
 			fromAddresses,
 			departments,
+			redirectRelationships: options.redirectRelationships,
 			overrides: options.overrides,
 		})
 		return config

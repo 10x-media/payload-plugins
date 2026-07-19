@@ -2,6 +2,7 @@ import {
 	type CollectionAfterChangeHook,
 	type CollectionBeforeValidateHook,
 	type CollectionConfig,
+	type CollectionSlug,
 	type Field,
 	type PayloadRequest,
 	type TextFieldSingleValidation,
@@ -163,6 +164,13 @@ type BuildFormsCollectionArgs = {
 	 * and the `/:id/departments` endpoint backing it is registered. Absent: `to` stays a plain field.
 	 */
 	departments?: DepartmentEmailsResolver
+	/**
+	 * The plugin `redirectRelationships` option. Non-empty: `response.redirect` gains a polymorphic
+	 * `reference` relationship field so an author can redirect to an internal document instead of
+	 * (or alongside) a URL. Absent or empty: no `reference` field exists, matching today's URL-only
+	 * redirect.
+	 */
+	redirectRelationships?: CollectionSlug[]
 	overrides?: CollectionOverrides
 }
 
@@ -182,6 +190,7 @@ export const buildFormsCollection = ({
 	buttons,
 	fromAddresses,
 	departments,
+	redirectRelationships,
 }: BuildFormsCollectionArgs): CollectionConfig => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const pollTypes = pollTypeRegistry ?? resolvePollTypes()
@@ -370,6 +379,25 @@ export const buildFormsCollection = ({
 		access: { read: isLoggedIn },
 	}
 
+	// Optional polymorphic reference to an internal document, for `response.redirect` to point at
+	// instead of (or alongside) a URL. Absent unless `redirectRelationships` is a non-empty array:
+	// always polymorphic even for one slug (the consent `page` field's precedent), so a host adding
+	// a second collection later never changes the stored shape. The plugin never resolves this to a
+	// URL itself; `toFormDocument` passes the raw `{ relationTo, value }` through for the host to
+	// resolve, since only the host knows its own routing.
+	const redirectReferenceField: Field[] =
+		redirectRelationships && redirectRelationships.length > 0
+			? [
+					{
+						name: 'reference',
+						type: 'relationship',
+						relationTo: redirectRelationships,
+						label: labelForKey(keys.responseRedirectReference),
+						admin: { description: labelForKey(keys.responseRedirectReferenceDescription) },
+					},
+				]
+			: []
+
 	// What the visitor sees after a successful submit. Publicly readable (unlike actions): the
 	// client renderer needs message/redirect. `type`/`url` are behavior, never localized;
 	// `message` is visitor-facing content and follows `localizeContent`.
@@ -415,6 +443,7 @@ export const buildFormsCollection = ({
 						label: labelForKey(keys.responseUrl),
 						validate: validateUrl,
 					},
+					...redirectReferenceField,
 				],
 			},
 		],

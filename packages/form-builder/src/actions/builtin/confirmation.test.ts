@@ -207,6 +207,88 @@ describe('confirmation', () => {
 		})
 	})
 
+	it('omits cc, bcc, and replyTo from sendEmail when unset', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: { toField: 'email', subject: 'Hi', body: 'body' },
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+		})
+	})
+
+	it('includes cc, bcc, and replyTo in sendEmail when configured', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: {
+					toField: 'email',
+					cc: 'cc@example.com',
+					bcc: 'bcc@example.com',
+					replyTo: 'reply@example.com',
+					subject: 'Hi',
+					body: 'body',
+				},
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+			cc: 'cc@example.com',
+			bcc: 'bcc@example.com',
+			replyTo: 'reply@example.com',
+		})
+	})
+
+	it('interpolates merge tags in cc, bcc, and replyTo', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: {
+					toField: 'email',
+					cc: '{{ccAddress}}',
+					bcc: '{{bccAddress}}',
+					replyTo: '{{replyAddress}}',
+					subject: 'Hi',
+					body: 'body',
+				},
+				values: [
+					{ field: 'email', value: 'user@example.com' },
+					{ field: 'ccAddress', value: 'cc@example.com' },
+					{ field: 'bccAddress', value: 'bcc@example.com' },
+					{ field: 'replyAddress', value: 'reply@example.com' },
+				],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+			cc: 'cc@example.com',
+			bcc: 'bcc@example.com',
+			replyTo: 'reply@example.com',
+		})
+	})
+
 	const bodyFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
 		definition.config?.find((field) => 'name' in field && field.name === 'body') as
 			| { editor?: unknown }
@@ -256,6 +338,24 @@ describe('confirmation', () => {
 			'formBuilder:action.config.toFieldDescription'
 		)
 		expect(field?.admin?.description).toBeUndefined()
+	})
+
+	const fieldNamed = (definition: ReturnType<typeof buildConfirmation>, name: string) =>
+		definition.config?.find((field) => 'name' in field && field.name === name)
+
+	it('adds plain, localized text fields for cc, bcc, and replyTo', () => {
+		for (const name of ['cc', 'bcc', 'replyTo']) {
+			const field = fieldNamed(buildConfirmation(true), name)
+			expect(field?.type).toBe('text')
+			expect((field as { localized?: boolean } | undefined)?.localized).toBe(true)
+		}
+	})
+
+	it('drops the localized flag on cc, bcc, and replyTo when localize is false', () => {
+		for (const name of ['cc', 'bcc', 'replyTo']) {
+			const field = fieldNamed(buildConfirmation(false), name)
+			expect((field as { localized?: boolean } | undefined)?.localized).toBeUndefined()
+		}
 	})
 })
 

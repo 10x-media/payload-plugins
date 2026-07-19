@@ -117,6 +117,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigFrom]: 'From',
 	[keys.actionConfigFromDescription]:
 		'Sender address for this action. Leave empty to use the email adapter default.',
+	[keys.actionConfigCc]: 'Cc',
+	[keys.actionConfigBcc]: 'Bcc',
+	[keys.actionConfigReplyTo]: 'Reply-to',
 	[keys.validationFromUnknown]: 'Choose one of the configured from addresses',
 	[keys.validationFromUnavailable]:
 		'From addresses are currently unavailable. Please try again later.',
@@ -255,6 +258,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.responseMessage]: 'Message',
 	[keys.responseRedirect]: 'Redirect',
 	[keys.responseUrl]: 'URL',
+	[keys.responseRedirectReference]: 'Document',
+	[keys.responseRedirectReferenceDescription]: 'Redirect to an internal document instead of a URL',
 	[keys.buttonsSubmitLabel]: 'Submit button label',
 	[keys.buttonsNextLabel]: 'Next button label',
 	[keys.buttonsPrevLabel]: 'Previous button label',
