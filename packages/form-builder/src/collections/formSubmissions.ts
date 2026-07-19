@@ -41,8 +41,9 @@ type BuildSubmissionsCollectionArgs = {
 	/** Registered poll option sources; submission validation resolves allowed values through them. */
 	pollSourceRegistry?: PollOptionSourceRegistry
 	/**
-	 * When `true`, shows the raw `values`, `descriptors`, and `consent` JSON fields in the admin UI.
-	 * Default `false`, because the `SubmissionAnswers` UI component already represents them fully.
+	 * When `true`, reveals the standalone `locale`, `values`, `descriptors`, `consent`, and `meta`
+	 * fields in the admin UI. Default `false`, because the `SubmissionAnswers` UI component already
+	 * represents them fully (locale and meta are folded into its Submission-details section).
 	 */
 	showRawFields?: boolean
 	overrides?: CollectionOverrides
@@ -202,11 +203,11 @@ export const buildSubmissionsCollection = ({
 				components: { Field: '@10x-media/form-builder/rsc#SubmissionAnswers' },
 			},
 		},
-		{ name: 'locale', type: 'text' },
+		{ name: 'locale', type: 'text', admin: { hidden: !showRawFields } },
 		{ name: 'values', type: 'json', admin: { hidden: !showRawFields } },
 		{ name: 'descriptors', type: 'json', admin: { hidden: !showRawFields } },
 		{ name: 'consent', type: 'json', admin: { hidden: !showRawFields } },
-		{ name: 'meta', type: 'json' },
+		{ name: 'meta', type: 'json', admin: { hidden: !showRawFields } },
 	]
 
 	return {

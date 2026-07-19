@@ -214,6 +214,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.submissionDetails]: 'Submission details',
 	[keys.submissionConsentAgreed]: 'Agreed',
 	[keys.submissionConsentDeclined]: 'Declined',
+	[keys.submissionMetaLocale]: 'Locale',
 	[keys.submissionMetaReceivedAt]: 'Received at',
 	[keys.submissionMetaIp]: 'IP address',
 	[keys.submissionMetaUserAgent]: 'User agent',

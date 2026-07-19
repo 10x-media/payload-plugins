@@ -220,6 +220,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.submissionDetails]: 'Details zur Übermittlung',
 	[keys.submissionConsentAgreed]: 'Zugestimmt',
 	[keys.submissionConsentDeclined]: 'Abgelehnt',
+	[keys.submissionMetaLocale]: 'Sprache',
 	[keys.submissionMetaReceivedAt]: 'Empfangen am',
 	[keys.submissionMetaIp]: 'IP-Adresse',
 	[keys.submissionMetaUserAgent]: 'User-Agent',

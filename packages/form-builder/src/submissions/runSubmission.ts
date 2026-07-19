@@ -17,7 +17,21 @@ import type {
 	SubmissionDescriptor,
 	SubmissionFieldError,
 	SubmissionValue,
+	SubmissionWidth,
 } from './types'
+
+const SUBMISSION_WIDTHS: ReadonlySet<string> = new Set<SubmissionWidth>([
+	'full',
+	'half',
+	'third',
+	'twoThirds',
+])
+
+/** The field instance's authored layout width, or undefined if unset/unrecognized (renders full). */
+export const widthOf = (instance: FormFieldInstance): SubmissionWidth | undefined =>
+	typeof instance.width === 'string' && SUBMISSION_WIDTHS.has(instance.width)
+		? (instance.width as SubmissionWidth)
+		: undefined
 
 const errorKeyFor = (code: FileRefError): string => {
 	if (code === 'mimeType') {
@@ -220,6 +234,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				field: instance.name,
 				label: instance.label ?? instance.name,
 				fieldType: instance.blockType,
+				...(widthOf(instance) ? { width: widthOf(instance) } : {}),
 			})
 			continue
 		}
@@ -280,6 +295,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 					field: instance.name,
 					label: instance.label ?? instance.name,
 					fieldType: instance.blockType,
+					...(widthOf(instance) ? { width: widthOf(instance) } : {}),
 				})
 				continue
 			}
@@ -288,6 +304,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				field: instance.name,
 				label: instance.label ?? instance.name,
 				fieldType: instance.blockType,
+				...(widthOf(instance) ? { width: widthOf(instance) } : {}),
 			})
 			continue
 		}
@@ -414,6 +431,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				field: instance.name,
 				label: instance.label ?? instance.name,
 				fieldType: instance.blockType,
+				...(widthOf(instance) ? { width: widthOf(instance) } : {}),
 				...(subFieldDescriptors.length > 0 ? { subFieldDescriptors } : {}),
 			})
 			continue
@@ -429,6 +447,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 			field: instance.name,
 			label: instance.label ?? instance.name,
 			fieldType: instance.blockType,
+			...(widthOf(instance) ? { width: widthOf(instance) } : {}),
 			...(optionLabels ? { optionLabels } : {}),
 		})
 	}

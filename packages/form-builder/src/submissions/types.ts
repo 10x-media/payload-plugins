@@ -3,12 +3,17 @@ import type { Where } from 'payload'
 /** A single answered field: the field's machine name and its typed value. */
 export type SubmissionValue = { field: string; value: unknown }
 
+/** The four layout widths a field can occupy, shared by the renderer grid and the admin answers view. */
+export type SubmissionWidth = 'full' | 'half' | 'third' | 'twoThirds'
+
 /** A localized, self-describing snapshot of an answered field, taken at submit time. */
 export type SubmissionDescriptor = {
 	field: string
 	label: string
 	fieldType: string
 	optionLabels?: Record<string, string>
+	/** The field's authored layout width; absent on old submissions and width-less field types (renders full). */
+	width?: SubmissionWidth
 	/** For repeater fields: one descriptor per sub-field, shared across all rows. */
 	subFieldDescriptors?: SubmissionDescriptor[]
 }

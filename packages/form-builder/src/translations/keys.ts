@@ -199,6 +199,7 @@ export const keys = {
 	submissionDetails: 'formBuilder:submission.details',
 	submissionConsentAgreed: 'formBuilder:submission.consentAgreed',
 	submissionConsentDeclined: 'formBuilder:submission.consentDeclined',
+	submissionMetaLocale: 'formBuilder:submission.meta.locale',
 	submissionMetaReceivedAt: 'formBuilder:submission.meta.receivedAt',
 	submissionMetaIp: 'formBuilder:submission.meta.ip',
 	submissionMetaUserAgent: 'formBuilder:submission.meta.userAgent',

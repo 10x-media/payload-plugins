@@ -83,9 +83,38 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 			{ field: 'fullName', value: 'Ada' },
 			{ field: 'email', value: 'ada@x.com' },
 		])
+		// The width shared field defaults to 'full', so real submissions snapshot it onto every descriptor.
 		expect(submission.descriptors).toEqual([
-			{ field: 'fullName', label: 'Full name', fieldType: 'text' },
-			{ field: 'email', label: 'Email', fieldType: 'email' },
+			{ field: 'fullName', label: 'Full name', fieldType: 'text', width: 'full' },
+			{ field: 'email', label: 'Email', fieldType: 'email', width: 'full' },
+		])
+	})
+
+	it('snapshots an authored field width onto its descriptor', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Contact',
+				fields: [
+					{ blockType: 'text', name: 'street', label: 'Street', width: 'twoThirds' },
+					{ blockType: 'text', name: 'zip', label: 'ZIP', width: 'third' },
+				],
+			},
+		})
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			depth: 0,
+			data: {
+				form: form.id,
+				values: [
+					{ field: 'street', value: 'Main' },
+					{ field: 'zip', value: '10115' },
+				],
+			},
+		})
+		expect(submission.descriptors).toEqual([
+			{ field: 'street', label: 'Street', fieldType: 'text', width: 'twoThirds' },
+			{ field: 'zip', label: 'ZIP', fieldType: 'text', width: 'third' },
 		])
 	})
 
