@@ -96,4 +96,46 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			payload.logger.info('Seeded icon showcase')
 		}
 	}
+
+	const encryptedCount = await payload.count({ collection: 'encrypted' })
+	if (encryptedCount.totalDocs === 0) {
+		await payload.create({
+			collection: 'encrypted',
+			data: {
+				apiSnippet: "const token = 'redacted'",
+				birthday: '1990-05-15T00:00:00.000Z',
+				channels: ['email', 'push'],
+				contactEmail: 'jane.doe@example.com',
+				fullName: 'Jane Doe',
+				isVip: true,
+				label: 'Jane Doe (seeded)',
+				lastKnownLocation: [13.405, 52.52],
+				metadata: { clearance: 'level-3', tags: ['pii'] },
+				notes: 'Visible input, encrypted at rest. Check the DB to verify.',
+				privateNotes: {
+					root: {
+						children: [
+							{
+								children: [{ text: 'Extremely private rich text.', type: 'text', version: 1 }],
+								direction: null,
+								format: '',
+								indent: 0,
+								type: 'paragraph',
+								version: 1,
+							},
+						],
+						direction: null,
+						format: '',
+						indent: 0,
+						type: 'root',
+						version: 1,
+					},
+				},
+				referral: 'friend',
+				salary: 98765.43,
+				tier: 'pro',
+			},
+		})
+		payload.logger.info('Seeded encrypted showcase document')
+	}
 }

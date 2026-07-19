@@ -11,6 +11,7 @@ import { radixAdapter } from '../src/exports/icon-adapters/radix'
 import { tablerAdapter } from '../src/exports/icon-adapters/tabler'
 import { fields } from '../src/index'
 import { colors } from './collections/colors'
+import { encrypted } from './collections/encrypted'
 import { icons } from './collections/icons'
 import { tenants } from './collections/tenants'
 import { startMemoryMongo } from './helpers/memoryDb'
@@ -50,7 +51,7 @@ export default buildConfig({
 	// Payload orders the admin sidebar by this array. Field-example collections
 	// (colors, icons) come first so a reviewer lands on them; infrastructure
 	// collections (tenants, users) sit at the bottom. Each group is alphabetical.
-	collections: [colors, icons, tenants, users],
+	collections: [colors, encrypted, icons, tenants, users],
 	i18n: { supportedLanguages: { de, en } },
 	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
 	plugins: [

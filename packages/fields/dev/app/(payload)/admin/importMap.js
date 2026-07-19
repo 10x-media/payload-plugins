@@ -1,5 +1,7 @@
 import { ColorCell as ColorCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ColorFieldServer as ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { ProtectedCell as ProtectedCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { ProtectedField as ProtectedField_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
 import { IconCell as IconCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { IconFieldServer as IconFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { IconLibrarySelectServer as IconLibrarySelectServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
@@ -20,6 +22,8 @@ import { SocialAdapterNodes as SocialAdapterNodes_1d64e85d6e2d4c232079878ca5845e
 export const importMap = {
   "@10x-media/fields/rsc#ColorCell": ColorCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#ColorFieldServer": ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12,
+  "@10x-media/fields/rsc#ProtectedCell": ProtectedCell_cf1583332d9c5fb967cd4249af29ce12,
+  "@10x-media/fields/client#ProtectedField": ProtectedField_02043ee4f38853ef8c4ef9fd50352514,
   "@10x-media/fields/rsc#IconCell": IconCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#IconFieldServer": IconFieldServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#IconLibrarySelectServer": IconLibrarySelectServer_cf1583332d9c5fb967cd4249af29ce12,
