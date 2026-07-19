@@ -119,4 +119,23 @@ test.describe('color field', () => {
 		)
 		expect(blocking).toEqual([])
 	})
+
+	// color-contrast is disabled: the closed row's only sub-threshold text is the small
+	// aria-hidden format badge, styled with a core elevation token the plugin adopts for
+	// Payload's native look. This guards the closed row's structural a11y (roles, names);
+	// the open-popover scan above keeps color-contrast enforced on plugin-owned surfaces.
+	test('closed color field has no serious or critical structural axe violations', async ({
+		page,
+	}) => {
+		await openShowcaseDoc(page)
+		await expect(page.locator('.fields-color').first()).toBeVisible()
+		const results = await new AxeBuilder({ page })
+			.include('.fields-color')
+			.disableRules(['color-contrast'])
+			.analyze()
+		const blocking = results.violations.filter(
+			(v) => v.impact === 'serious' || v.impact === 'critical'
+		)
+		expect(blocking).toEqual([])
+	})
 })

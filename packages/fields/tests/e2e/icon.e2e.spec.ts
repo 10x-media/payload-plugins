@@ -135,4 +135,23 @@ test.describe('icon field', () => {
 		)
 		expect(blocking).toEqual([])
 	})
+
+	// color-contrast is disabled: the closed control's only sub-threshold text is the
+	// empty-state placeholder, styled with a core elevation token the plugin adopts for
+	// Payload's native look. This guards the closed control's structural a11y (roles,
+	// names); the open-drawer scan above keeps color-contrast enforced on plugin surfaces.
+	test('closed icon field has no serious or critical structural axe violations', async ({
+		page,
+	}) => {
+		await openDoc(page, FIXTURES.multiDocTitle, FIXTURES.multi)
+		await expect(page.locator('.tenx-icon-field').first()).toBeVisible()
+		const results = await new AxeBuilder({ page })
+			.include('.tenx-icon-field')
+			.disableRules(['color-contrast'])
+			.analyze()
+		const blocking = results.violations.filter(
+			(v) => v.impact === 'serious' || v.impact === 'critical'
+		)
+		expect(blocking).toEqual([])
+	})
 })

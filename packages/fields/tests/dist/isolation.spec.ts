@@ -37,7 +37,7 @@ const sharedEntries = [
 const allFamilies: Family[] = ['color', 'icon', 'encrypted']
 
 /** Families whose engine has landed under dist/fields/<family>; grows as families ship. */
-const familiesWithSource: Family[] = ['color']
+const familiesWithSource: Family[] = allFamilies
 
 const familyPrefix = (family: Family): string => join(distDir, 'fields', family) + sep
 
