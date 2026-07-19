@@ -115,7 +115,7 @@ export const rotateEncryptedFields = async (
 						data: localePatch,
 						depth: 0,
 						id: doc.id as string | number,
-						locale,
+						locale: locale as never,
 						overrideAccess: true,
 					})
 				}

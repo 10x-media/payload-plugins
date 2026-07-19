@@ -20,7 +20,7 @@ export async function* pageThrough({
 	let page = 1
 	for (;;) {
 		const result = await payload.find({
-			collection,
+			collection: collection as never,
 			context: { [ENCRYPTED_CONTEXT_KEY]: 'raw' },
 			depth: 0,
 			limit: batchSize,
@@ -30,7 +30,7 @@ export async function* pageThrough({
 			sort: 'id',
 		})
 		if (result.docs.length > 0) {
-			yield result.docs as Record<string, unknown>[]
+			yield result.docs as unknown as Record<string, unknown>[]
 		}
 		if (!result.hasNextPage) {
 			return

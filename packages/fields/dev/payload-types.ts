@@ -68,6 +68,7 @@ export interface Config {
   blocks: {};
   collections: {
     colors: Color;
+    encrypted: Encrypted;
     icons: Icon;
     tenants: Tenant;
     users: User;
@@ -79,6 +80,7 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     colors: ColorsSelect<false> | ColorsSelect<true>;
+    encrypted: EncryptedSelect<false> | EncryptedSelect<true>;
     icons: IconsSelect<false> | IconsSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
@@ -145,6 +147,38 @@ export interface Color {
   linkedStaticResolved?: string | null;
   linkedTenant?: string | null;
   linkedTenantResolved?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "encrypted".
+ */
+export interface Encrypted {
+  id: string;
+  label: string;
+  fullName: string;
+  notes?: string;
+  contactEmail?: string;
+  contactEmail_bidx?: string | null;
+  salary?: number;
+  isVip?: boolean;
+  birthday?: string;
+  tier?: 'free' | 'pro' | 'enterprise';
+  channels?: ('email' | 'sms' | 'push')[];
+  referral?: 'friend' | 'ad' | 'search';
+  apiSnippet?: string;
+  metadata?: {
+    [k: string]: unknown;
+  };
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  lastKnownLocation?: [number, number];
+  privateNotes?: {
+    [k: string]: unknown;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -261,6 +295,10 @@ export interface PayloadLockedDocument {
         value: string | Color;
       } | null)
     | ({
+        relationTo: 'encrypted';
+        value: string | Encrypted;
+      } | null)
+    | ({
         relationTo: 'icons';
         value: string | Icon;
       } | null)
@@ -337,6 +375,29 @@ export interface ColorsSelect<T extends boolean = true> {
   linkedStaticResolved?: T;
   linkedTenant?: T;
   linkedTenantResolved?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "encrypted_select".
+ */
+export interface EncryptedSelect<T extends boolean = true> {
+  label?: T;
+  fullName?: T;
+  notes?: T;
+  contactEmail?: T;
+  contactEmail_bidx?: T;
+  salary?: T;
+  isVip?: T;
+  birthday?: T;
+  tier?: T;
+  channels?: T;
+  referral?: T;
+  apiSnippet?: T;
+  metadata?: T;
+  lastKnownLocation?: T;
+  privateNotes?: T;
   updatedAt?: T;
   createdAt?: T;
 }

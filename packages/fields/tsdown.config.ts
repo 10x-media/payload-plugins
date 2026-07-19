@@ -21,5 +21,9 @@ export default definePluginBuild({
 		{ from: 'src/fields/color/client/colorField.css', to: 'dist/fields/color/client' },
 		{ from: 'src/fields/color/server/colorCell.css', to: 'dist/fields/color/server' },
 		{ from: 'src/fields/icon/client/icon-field.css', to: 'dist/fields/icon/client' },
+		{
+			from: 'src/fields/encrypted/components/ProtectedField.css',
+			to: 'dist/fields/encrypted/components',
+		},
 	],
 })
