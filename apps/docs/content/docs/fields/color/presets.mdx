@@ -40,13 +40,18 @@ Resolvers are memoized per request, so a list view rendering fifty rows resolves
 
 ## Plugin-level defaults
 
-Presets passed to the plugin apply to every color field that does not define its own:
+Presets and the stored `format` passed to the plugin apply to every color field that does not define its own:
 
 ```ts
-fields({ color: { presets: [{ key: 'brand', value: '#3b82f6', label: 'Brand' }] } })
+fields({
+  color: {
+    format: 'oklch',
+    presets: [{ key: 'brand', value: '#3b82f6', label: 'Brand' }],
+  },
+})
 ```
 
-Per-field `presets` replace the plugin default entirely (no merging), keeping the resolution rule predictable. At the plugin level, a static `presets` array takes precedence over an async `resolvePresets`.
+Per-field `presets` replace the plugin default entirely (no merging), keeping the resolution rule predictable. At the plugin level, a static `presets` array takes precedence over an async `resolvePresets`. A field without its own `format` inherits `color.format`; per-field `format` always wins, and with neither set the stored format is `hex`.
 
 ## Custom heading
 

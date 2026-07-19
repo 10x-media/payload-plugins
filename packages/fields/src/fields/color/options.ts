@@ -43,6 +43,16 @@ export type ColorFieldClientOptions = {
 	linkedFallback: null | string
 }
 
+/**
+ * clientProps shape the factory hands to `ColorFieldServer`. `format` stays the
+ * field-level value (possibly unset) so the server can resolve the effective
+ * format against the plugin registry per request before handing the client a
+ * concrete `ColorFieldClientOptions`.
+ */
+export type ColorFieldServerOptions = Omit<ColorFieldClientOptions, 'format'> & {
+	format?: ColorFormat
+}
+
 /** Preset with its label resolved to a plain string, safe for clientProps. */
 export type ResolvedColorPreset = { key: string; label: string; value: string }
 

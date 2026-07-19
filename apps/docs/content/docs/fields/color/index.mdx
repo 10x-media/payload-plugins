@@ -32,7 +32,7 @@ OKLCH colors outside the sRGB gamut are gamut-mapped by chroma reduction rather 
 
 | Option | Default | Notes |
 |---|---|---|
-| `format` | `'hex'` | Stored format (`hex`/`rgb`/`hsl`/`oklch`). Conversion happens on input, not on read. |
+| `format` | plugin `color.format`, else `'hex'` | Stored format (`hex`/`rgb`/`hsl`/`oklch`). Conversion happens on input, not on read. |
 | `alpha` | `true` | `false` hides the slider and strips alpha from any pasted value. |
 | `presets` | none | Static array or async resolver; see [Presets](/fields/color/presets). |
 | `presetsLabel` | i18n "Presets" | Heading over the preset grid; any Payload static label. |

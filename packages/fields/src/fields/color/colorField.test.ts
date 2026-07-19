@@ -1,5 +1,6 @@
-import type { FieldHookArgs } from 'payload'
+import type { FieldHook, FieldHookArgs } from 'payload'
 import { describe, expect, it } from 'vitest'
+import type { ColorFormat } from '../../types'
 import { colorField } from './colorField'
 
 type ComponentsShape = {
@@ -9,6 +10,25 @@ type ComponentsShape = {
 
 const components = (field: { admin?: { components?: unknown } }): ComponentsShape =>
 	field.admin?.components as ComponentsShape
+
+/** Runs a beforeValidate hook with a request whose registry carries `registryFormat`. */
+const runHook = (
+	hook: FieldHook | undefined,
+	value: unknown,
+	registryFormat?: ColorFormat
+): unknown =>
+	hook?.({
+		req: {
+			payload: {
+				config: {
+					custom: registryFormat
+						? { '@10x-media/fields': { color: { format: registryFormat } } }
+						: {},
+				},
+			},
+		},
+		value,
+	} as unknown as FieldHookArgs)
 
 describe('colorField', () => {
 	it('returns a text field with defaults and rsc component paths', () => {
@@ -67,23 +87,34 @@ describe('colorField', () => {
 		const field = colorField({ format: 'rgb' })
 		const hook = field.hooks?.beforeValidate?.[0]
 		expect(hook).toBeDefined()
-		const normalized = await hook?.({ value: 'red' } as unknown as FieldHookArgs)
-		expect(normalized).toBe('rgb(255 0 0)')
-		const untouched = await hook?.({ value: 'not-a-color' } as unknown as FieldHookArgs)
-		expect(untouched).toBe('not-a-color')
+		expect(await runHook(hook, 'red')).toBe('rgb(255 0 0)')
+		expect(await runHook(hook, 'not-a-color')).toBe('not-a-color')
 	})
 
 	it('strips alpha during normalization when alpha is false', async () => {
 		const field = colorField({ alpha: false })
 		const hook = field.hooks?.beforeValidate?.[0]
-		const normalized = await hook?.({ value: '#ff000080' } as unknown as FieldHookArgs)
-		expect(normalized).toBe('#ff0000')
+		expect(await runHook(hook, '#ff000080')).toBe('#ff0000')
 	})
 
 	it('passes preset references through normalization untouched in linked mode', async () => {
 		const [main] = colorField({ linked: true })
 		const hook = main.hooks?.beforeValidate?.[0]
-		const out = await hook?.({ value: 'preset:brand' } as unknown as FieldHookArgs)
-		expect(out).toBe('preset:brand')
+		expect(await runHook(hook, 'preset:brand')).toBe('preset:brand')
+	})
+
+	it('normalizes to the plugin registry format when the field sets none', async () => {
+		const hook = colorField().hooks?.beforeValidate?.[0]
+		expect(await runHook(hook, 'red', 'oklch')).toBe('oklch(0.628 0.2577 29.23)')
+	})
+
+	it('lets a field-level format win over the plugin registry format', async () => {
+		const hook = colorField({ format: 'hex' }).hooks?.beforeValidate?.[0]
+		expect(await runHook(hook, 'red', 'oklch')).toBe('#ff0000')
+	})
+
+	it('defaults to hex when neither the field nor the plugin sets a format', async () => {
+		const hook = colorField().hooks?.beforeValidate?.[0]
+		expect(await runHook(hook, 'red')).toBe('#ff0000')
 	})
 })

@@ -6,12 +6,13 @@ import type { ColorFormat } from '../../types'
 import { formatColor, parseColor } from './engine'
 import {
 	COLOR_CUSTOM_KEY,
-	type ColorFieldClientOptions,
 	type ColorFieldCustom,
 	type ColorFieldOptions,
+	type ColorFieldServerOptions,
 	type ColorLinkedOptions,
 	PRESET_PREFIX,
 } from './options'
+import { resolveColorFormat } from './resolveFormat'
 import { resolvePresets } from './resolvePresets'
 
 const buildValidate =
@@ -30,14 +31,14 @@ const buildValidate =
 	}
 
 const buildNormalizeHook =
-	(opts: { alpha: boolean; format: ColorFormat; linked: boolean }): FieldHook =>
-	({ value }) => {
+	(opts: { alpha: boolean; format: ColorFormat | undefined; linked: boolean }): FieldHook =>
+	({ req, value }) => {
 		if (typeof value !== 'string' || value === '') return value
 		if (opts.linked && value.startsWith(PRESET_PREFIX)) return value
 		const parsed = parseColor(value)
 		// Unparseable input passes through so validate rejects it with a proper message
 		if (!parsed) return value
-		return formatColor(parsed, opts.format, { alpha: opts.alpha })
+		return formatColor(parsed, resolveColorFormat(opts.format, req), { alpha: opts.alpha })
 	}
 
 /**
@@ -56,7 +57,7 @@ export function colorField(options: ColorFieldOptions = {}): TextField | [TextFi
 		name = 'color',
 		alpha = true,
 		enableEyedropper = true,
-		format = 'hex',
+		format,
 		isClearable = true,
 		label,
 		linked: linkedOption = false,
@@ -71,7 +72,9 @@ export function colorField(options: ColorFieldOptions = {}): TextField | [TextFi
 	const linkedFallback = typeof linkedOption === 'object' ? (linkedOption.fallback ?? null) : null
 	const memoKey = Symbol(`colorField:${name}`)
 
-	const clientOptions: ColorFieldClientOptions = {
+	// format stays possibly-undefined here; ColorFieldServer resolves the effective
+	// format (field-level, else plugin registry, else hex) per request for the client.
+	const clientOptions: ColorFieldServerOptions = {
 		alpha,
 		enableEyedropper,
 		format,

@@ -4,12 +4,13 @@ import { asTranslate } from '../../../translations/server'
 import { ColorField } from '../client/ColorField'
 import {
 	COLOR_CUSTOM_KEY,
-	type ColorFieldClientOptions,
 	type ColorFieldCustom,
+	type ColorFieldServerOptions,
 	type ColorPresetsResolver,
 	type ColorPresetsSource,
 	type ResolvedColorPreset,
 } from '../options'
+import { resolveColorFormat } from '../resolveFormat'
 import { type NormalizedColorPreset, resolvePresets } from '../resolvePresets'
 
 // Standalone fields built outside colorField() (hand-written config) have no memoKey;
@@ -36,7 +37,7 @@ const resolveStaticLabel = (
 }
 
 type ColorFieldServerComponentProps = {
-	colorOptions: ColorFieldClientOptions
+	colorOptions: ColorFieldServerOptions
 } & TextFieldServerProps
 
 /**
@@ -81,7 +82,7 @@ export const ColorFieldServer = async (props: ColorFieldServerComponentProps) =>
 
 	return (
 		<ColorField
-			colorOptions={colorOptions}
+			colorOptions={{ ...colorOptions, format: resolveColorFormat(colorOptions.format, req) }}
 			field={clientField}
 			path={path}
 			permissions={permissions}
