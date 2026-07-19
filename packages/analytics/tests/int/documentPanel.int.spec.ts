@@ -108,6 +108,7 @@ describeForDb('document analytics endpoint', { dbs: ['mongo'] }, (db) => {
 			metrics: { pageviews?: number }
 			previousMetrics?: { pageviews?: number }
 			comparisonRange?: unknown
+			timezone?: string
 			points?: Array<{ date: string; value: number }>
 		}
 		expect(body.status).toBe('ok')
@@ -115,6 +116,22 @@ describeForDb('document analytics endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(body.comparisonRange).toBeDefined()
 		expect(body.previousMetrics?.pageviews).toBe(1)
 		expect(body.points?.some((p) => p.value > 0)).toBe(true)
+		// The panel buckets its trend client-side, so the endpoint hands back the reporting
+		// timezone it read in (default UTC here) for the axis to line up with the series.
+		expect(body.timezone).toBe('UTC')
+	})
+
+	it(`readForField reports the resolved reporting timezone on ${db}`, async () => {
+		const req = { payload: booted.payload } as unknown as PayloadRequest
+		const res = await readForField({
+			req,
+			collectionSlug: 'pages',
+			data: { id: pageId, slug: 'about' },
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(res.timezone).toBe('UTC')
 	})
 
 	it(`readForField omits comparison and series unless requested on ${db}`, async () => {

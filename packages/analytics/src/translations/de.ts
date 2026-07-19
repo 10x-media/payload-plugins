@@ -14,6 +14,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.metricConversions]: 'Conversions',
 	[keys.metricRevenue]: 'Umsatz',
 	[keys.stateNoData]: 'Noch keine Analysedaten',
+	[keys.stateNew]: 'Neu',
 	[keys.stateNotBound]: 'Analytics für diese Kollektion nicht konfiguriert',
 	[keys.stateNotConfigured]: 'Analytics-Anbieter verbinden',
 	[keys.stateUnavailable]: 'Für diese Datenquelle nicht verfügbar',

@@ -22,7 +22,7 @@ analytics({
 })
 ```
 
-- `path` maps a document to the pathname its analytics were recorded under. Return `null` when the document has no URL yet (unsaved, unpublished); fields then render an empty state instead of querying.
+- `path` maps a document to the pathname its analytics were recorded under. Return `null` when the document has no URL yet (unsaved, unpublished); fields then render a "New" state instead of querying.
 - `pathField` names a document field whose stored value is the path. It is a fallback, used only when `path` is absent or returns `null`. A binding must define at least one of the two (validated at startup).
 - `hostname` filters adapter queries to one site in multi-domain setups: a static string, or a resolver with the same signature as `path`. Omit it (or return `null`) to query across every domain the data source records.
 
@@ -122,4 +122,4 @@ payload generate:importmap
 
 Requested metrics the active adapter does not support are dropped from the read, with one server-side warning per field render naming the dropped metrics and the adapter. The supported remainder renders normally. Only when nothing survives does the field show its muted "not available" state.
 
-The other empty states are equally specific: no binding for the collection, no resolvable path for this document, and adapter not configured each render their own message rather than an error.
+A document with nothing to show yet renders a muted "New" badge: both a document with no resolvable path (unsaved or unbound) and a bound page that has not gathered a single tracked metric read as new. The configuration states stay specific messages rather than an error: no binding for the collection, no provider connected, and a data source that cannot answer per page.

@@ -6,6 +6,7 @@ import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
+import { AnalyticsEmptyState, isNewDocumentAnalytics } from './emptyState'
 import type { AnalyticsMetricLabel, AnalyticsMetricLabels } from './factories'
 import { formatMetricValue } from './format'
 import { type FieldReadStatus, readForField } from './readForDocument'
@@ -78,10 +79,17 @@ export const AnalyticsStatField = async (props: AnalyticsStatFieldProps) => {
 		now: new Date(),
 	})
 
+	if (isNewDocumentAnalytics(result)) {
+		return (
+			<div className="field-type">
+				<AnalyticsEmptyState isNew>{t(keys.stateNew)}</AnalyticsEmptyState>
+			</div>
+		)
+	}
 	if (result.status !== 'ok') {
 		return (
 			<div className="field-type" style={{ opacity: 0.6 }}>
-				{t(STATE_KEYS[result.status])}
+				<AnalyticsEmptyState isNew={false}>{t(STATE_KEYS[result.status])}</AnalyticsEmptyState>
 			</div>
 		)
 	}

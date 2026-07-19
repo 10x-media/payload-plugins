@@ -7,6 +7,7 @@ import { supportsGranularity } from '../core/granularity'
 import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
+import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { previousWindow } from '../widgets/comparison'
 import { fillDailySeries, type SeriesPoint } from '../widgets/readForWidgetSeries'
 
@@ -16,6 +17,8 @@ export interface FieldReadResult {
 	status: FieldReadStatus
 	adapterId: string
 	dateRange: DateRange
+	/** The reporting timezone the read resolved in; the trend axis buckets in it. */
+	timezone: string
 	metrics: Partial<Record<MetricKey, number>>
 	/** Requested metrics the adapter supports, in request order; the set actually read. */
 	supportedMetrics: MetricKey[]
@@ -63,15 +66,33 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 	const empty = { metrics: {}, supportedMetrics: [], droppedMetrics: [] }
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return { status: 'not-bound', adapterId: adapterId ?? '', dateRange, ...empty }
+		return {
+			status: 'not-bound',
+			adapterId: adapterId ?? '',
+			dateRange,
+			timezone: DEFAULT_TIMEZONE,
+			...empty,
+		}
 	}
 	const binding = runtime.bindings[collectionSlug]
 	if (!binding) {
-		return { status: 'not-bound', adapterId: adapterId ?? '', dateRange, ...empty }
+		return {
+			status: 'not-bound',
+			adapterId: adapterId ?? '',
+			dateRange,
+			timezone: DEFAULT_TIMEZONE,
+			...empty,
+		}
 	}
 	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
 	if (!ctx.ok) {
-		return { status: 'unavailable', adapterId: adapterId ?? '', dateRange, ...empty }
+		return {
+			status: 'unavailable',
+			adapterId: adapterId ?? '',
+			dateRange,
+			timezone: DEFAULT_TIMEZONE,
+			...empty,
+		}
 	}
 	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
 	dateRange = range ?? resolveTimeframe(timeframe, now, tz)
@@ -84,10 +105,10 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 		path = null
 	}
 	if (!path) {
-		return { status: 'no-path', adapterId: adapter.id, dateRange, ...empty }
+		return { status: 'no-path', adapterId: adapter.id, dateRange, timezone: tz, ...empty }
 	}
 	if (!adapter.isConfigured()) {
-		return { status: 'not-configured', adapterId: adapter.id, dateRange, ...empty }
+		return { status: 'not-configured', adapterId: adapter.id, dateRange, timezone: tz, ...empty }
 	}
 	const supportedMetrics = metrics.filter((m) => adapter.capabilities.metrics.has(m))
 	const droppedMetrics = metrics.filter((m) => !adapter.capabilities.metrics.has(m))
@@ -104,6 +125,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 			status: 'unavailable',
 			adapterId: adapter.id,
 			dateRange,
+			timezone: tz,
 			metrics: {},
 			supportedMetrics: [],
 			droppedMetrics: metrics,
@@ -138,6 +160,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 		status: 'ok',
 		adapterId: adapter.id,
 		dateRange,
+		timezone: tz,
 		metrics: result.totals ?? {},
 		supportedMetrics,
 		droppedMetrics,

@@ -12,6 +12,7 @@ import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { useTranslation } from '../translations/useTranslation'
 import { ComparisonDelta } from '../widgets/ComparisonDelta'
 import type { SeriesPoint } from '../widgets/readForWidgetSeries'
+import { AnalyticsEmptyState, isNewDocumentAnalytics } from './emptyState'
 import { formatMetricValue } from './format'
 import type { FieldReadStatus } from './readForDocument'
 
@@ -22,6 +23,8 @@ export interface PanelData {
 	supportedMetrics: MetricKey[]
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	comparisonRange?: { start: string; end: string } | null
+	/** Reporting timezone the read resolved in; the trend axis buckets in it. */
+	timezone?: string
 	points?: SeriesPoint[]
 }
 
@@ -124,7 +127,7 @@ export function AnalyticsPanelClient(props: AnalyticsPanelClientProps) {
 	const firstMetric = data.supportedMetrics[0]
 	const buckets =
 		data.points && data.points.length > 0 && firstMetric
-			? bucketSeries(data.points, timeframe, new Date()).map((b) => ({
+			? bucketSeries(data.points, timeframe, data.timezone).map((b) => ({
 					...b,
 					display: formatMetricValue(firstMetric, b.value, locale),
 				}))
@@ -152,8 +155,10 @@ export function AnalyticsPanelClient(props: AnalyticsPanelClientProps) {
 				</div>
 			</div>
 			<div style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
-				{data.status !== 'ok' ? (
-					<div style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEYS[data.status])}</div>
+				{isNewDocumentAnalytics(data) ? (
+					<AnalyticsEmptyState isNew>{t(keys.stateNew)}</AnalyticsEmptyState>
+				) : data.status !== 'ok' ? (
+					<AnalyticsEmptyState isNew={false}>{t(STATE_KEYS[data.status])}</AnalyticsEmptyState>
 				) : (
 					<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 						<div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>

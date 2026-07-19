@@ -51,8 +51,8 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 		? formatRangeCaption(customRange, locale)
 		: t(TIMEFRAME_KEYS[timeframe])
 	const buckets = customRange
-		? bucketByRange(result.points, customRange)
-		: bucketSeries(result.points, timeframe, new Date())
+		? bucketByRange(result.points, customRange, result.timezone)
+		: bucketSeries(result.points, timeframe, result.timezone)
 	const trendPoints = buckets.map((b) => ({
 		...b,
 		display: formatMetricValue(metric, b.value, locale),
