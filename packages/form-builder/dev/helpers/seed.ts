@@ -4,6 +4,13 @@ import type { Form, Setting } from '../payload-types'
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
 
+/**
+ * Fixed block row id for the Kitchen Sink message block, in the same UUID shape the admin generates
+ * for new block rows. A bare block must carry an explicit id to be flow-referenceable in the same
+ * `create` call (see `fieldKey`), so the flow's step assignment below can name it.
+ */
+const KS_MESSAGE_ID = '00000000-0000-4000-8000-0000000ac001'
+
 /** A field row from a form's `fields` blocks array, loosely typed for seed-time reshaping. */
 type FormFieldRow = {
 	id?: string | number | null
@@ -417,5 +424,76 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		// A relationship-backed mostVoted poll, left open so the dev frontend (and the e2e) can vote.
 		// The scheduled auto-close and resolve-on-read path is covered by the poll int and matrix suites.
 		poll: { resultsField: 'pick', type: 'mostVoted' },
+	})
+
+	await seedKitchenSink(payload)
+}
+
+/**
+ * A form exercising every conditionable field type plus a bare message block, with a condition of
+ * each leaf type pre-seeded so the admin's condition inputs mount on page load. The `adminFlow` e2e
+ * drives this to prove the WhereBuilder leaf inputs (notably `select` and `date`) render without a
+ * runtime error. Each field's `visibleWhen` (Advanced tab) and `validateWhen` (Validation tab) name
+ * a different-typed operand so that, across the fields, every leaf input is mounted at least once:
+ *
+ * - `ksText`   Advanced -> select leaf (the exact crash), Validation -> number leaf
+ * - `ksNumber` Advanced -> date leaf (the exact crash),   Validation -> checkbox leaf
+ * - `ksDate`   Advanced -> text leaf
+ *
+ * Multi-step so the Flow tab renders, with a seeded transition whose `when` mounts a number leaf, and
+ * poll-enabled so the Poll tab renders. Idempotent through `ensureForm` (keyed on title).
+ */
+const seedKitchenSink = async (payload: Payload): Promise<void> => {
+	await ensureForm(payload, 'Kitchen Sink', {
+		multistep: true,
+		pollEnabled: true,
+		fields: [
+			{
+				blockType: 'text',
+				name: 'ksText',
+				label: 'Text field',
+				visibleWhen: { or: [{ and: [{ ksSelect: { equals: 'a' } }] }] },
+				validateWhen: { or: [{ and: [{ ksNumber: { greater_than: 1 } }] }] },
+			},
+			{
+				blockType: 'number',
+				name: 'ksNumber',
+				label: 'Number field',
+				visibleWhen: { or: [{ and: [{ ksDate: { greater_than: '2020-01-01' } }] }] },
+				validateWhen: { or: [{ and: [{ ksCheck: { equals: true } }] }] },
+			},
+			{
+				blockType: 'date',
+				name: 'ksDate',
+				label: 'Date field',
+				visibleWhen: { or: [{ and: [{ ksText: { equals: 'hello' } }] }] },
+			},
+			{
+				blockType: 'select',
+				name: 'ksSelect',
+				label: 'Select field',
+				options: [
+					{ label: 'Option A', value: 'a' },
+					{ label: 'Option B', value: 'b' },
+					{ label: 'Option C', value: 'c' },
+				],
+			},
+			{ blockType: 'checkbox', name: 'ksCheck', label: 'Checkbox field' },
+			{ blockType: 'message', id: KS_MESSAGE_ID, content: statement('Kitchen sink notice') },
+		],
+		flow: {
+			steps: [
+				{
+					id: 'ksStep1',
+					title: 'Details',
+					fields: ['ksText', 'ksNumber', 'ksDate'],
+					transitions: [
+						{ when: { or: [{ and: [{ ksNumber: { greater_than: 10 } }] }] }, to: 'ksStep2' },
+					],
+				},
+				{ id: 'ksStep2', title: 'Preferences', fields: ['ksSelect', 'ksCheck', KS_MESSAGE_ID] },
+			],
+		},
+		poll: { resultsField: 'ksSelect' },
 	})
 }

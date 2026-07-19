@@ -52,18 +52,20 @@ export const operandFromRow = (
  * Build the minimal `*FieldClient` a Payload leaf condition input requires for a given operand. Casts
  * are localized to these four synths and nowhere else: `FieldBaseClient` requires only `name`, and each
  * leaf is `FieldBaseClient & Pick<…, 'type' | …>` where every picked member but `type` (and `select`'s
- * required `options`) is optional, so the literals are structurally complete. `dateClientField` omits
- * `admin.date`, so `DateCondition` falls back to its default date format. Each synth returns a single
- * concrete client type so leaf `field` props need no narrowing.
+ * required `options`) is optional, so the literals are structurally complete. Every synth carries an
+ * `admin: {}` because Payload's `Select` and `Date` leaf inputs read `field.admin.placeholder`
+ * unguarded and throw on a missing `admin`; the empty object also leaves `admin.date` unset, so
+ * `DateCondition` still falls back to its default date format. Each synth returns a single concrete
+ * client type so leaf `field` props need no narrowing.
  */
 export const textClientField = (operand: ConditionOperand): TextFieldClient =>
-	({ name: operand.name, label: operand.label, type: 'text' }) as TextFieldClient
+	({ name: operand.name, label: operand.label, type: 'text', admin: {} }) as TextFieldClient
 
 export const numberClientField = (operand: ConditionOperand): NumberFieldClient =>
-	({ name: operand.name, label: operand.label, type: 'number' }) as NumberFieldClient
+	({ name: operand.name, label: operand.label, type: 'number', admin: {} }) as NumberFieldClient
 
 export const dateClientField = (operand: ConditionOperand): DateFieldClient =>
-	({ name: operand.name, label: operand.label, type: 'date' }) as DateFieldClient
+	({ name: operand.name, label: operand.label, type: 'date', admin: {} }) as DateFieldClient
 
 export const selectClientField = (operand: ConditionOperand): SelectFieldClient =>
 	({
@@ -71,4 +73,5 @@ export const selectClientField = (operand: ConditionOperand): SelectFieldClient 
 		label: operand.label,
 		type: 'select',
 		options: operand.options ?? [],
+		admin: {},
 	}) as SelectFieldClient
