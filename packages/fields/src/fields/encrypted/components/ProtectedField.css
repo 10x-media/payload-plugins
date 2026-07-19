@@ -2,11 +2,14 @@
 	display: flex;
 	align-items: center;
 	gap: calc(var(--base) * 0.5);
-	height: calc(var(--base) * 2);
+	/* Literal 40px like the color and icon rows: --base shrinks to ~18.5px at <=1024px,
+	   so calc(--base * 2) would drift below Payload's 40px input height and misalign. */
+	height: 40px;
 	padding: 0 calc(var(--base) * 0.75);
 	border: 1px solid var(--theme-elevation-150);
 	border-radius: var(--style-radius-s);
 	background: var(--theme-input-bg);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
 }
 
 .tenx-protected-field__mask {

@@ -110,6 +110,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	// Libraries with a Nodes loader render the grid from bulk node-data; the grid
 	// waits for that data before showing cells, others (radix) render immediately.
 	const nodesPending = Boolean(NodesLoader) && !nodeMap
+	const loading = !manifest || nodesPending
 
 	const handleManifest = useCallback(
 		(loaded: IconManifest) => {
@@ -242,6 +243,14 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	const selectedUnavailable =
 		selected !== null && !adapters.some((adapter) => adapter.slug === selected.library)
 
+	// A listbox must own option children, so the grid only claims role="listbox" (with
+	// its keyboard nav and label) once cells exist. While loading it is an aria-busy
+	// container; when empty it is a plain container holding the "no icons" message.
+	const gridPopulated = !loading && visible.length > 0
+	const gridA11y: React.HTMLAttributes<HTMLDivElement> = gridPopulated
+		? { 'aria-label': t(keys.iconGrid), onKeyDown: handleGridKeyDown, role: 'listbox' }
+		: { 'aria-busy': loading || undefined }
+
 	return (
 		<div className="tenx-icon-drawer">
 			{/* Sibling loaders keyed distinctly per library: a shared key collides ("two children
@@ -311,14 +320,8 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 							</div>
 						) : null}
 					</div>
-					<div
-						aria-label={t(keys.iconGrid)}
-						className="tenx-icon-drawer__grid"
-						onKeyDown={handleGridKeyDown}
-						ref={gridRef}
-						role="listbox"
-					>
-						{!manifest || nodesPending ? (
+					<div className="tenx-icon-drawer__grid" ref={gridRef} {...gridA11y}>
+						{loading ? (
 							<div className="tenx-icon-drawer__loading">
 								{Array.from({ length: 24 }, (_, skeletonIndex) => (
 									// biome-ignore lint/suspicious/noArrayIndexKey: fixed-count static placeholders that never reorder
