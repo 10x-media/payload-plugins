@@ -54,9 +54,15 @@ describe('createIconValidate', () => {
 		expect(await validate('house', options())).toBe(true)
 	})
 
-	it('rejects an unregistered library, even unchanged', async () => {
-		const result = await validate('bogus:house', options({ previousValue: 'bogus:house' }))
-		expect(result).toContain('fields:invalidIconLibrary')
+	it('keeps an unchanged value saveable when its library is unregistered', async () => {
+		expect(await validate('bogus:house', options({ previousValue: 'bogus:house' }))).toBe(true)
+	})
+
+	it('rejects changing to an unregistered library', async () => {
+		expect(await validate('bogus:house', options({ previousValue: 'lucide:house' }))).toContain(
+			'fields:invalidIconLibrary'
+		)
+		expect(await validate('bogus:house', options())).toContain('fields:invalidIconLibrary')
 	})
 
 	it('rejects an unknown name on new input', async () => {

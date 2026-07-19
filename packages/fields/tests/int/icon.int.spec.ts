@@ -103,6 +103,33 @@ describeForDb('icon field', {}, (db) => {
 		).rejects.toThrow()
 	})
 
+	it('keeps a stored value saveable after its library is unregistered, but rejects changing to one', async () => {
+		const seeded = await booted.payload.create({
+			collection: 'icons',
+			data: { icon: 'lucide:house' },
+		})
+		// Raw-mutate to a value whose library is not in this app's registry (tabler is
+		// unregistered here), emulating a library dropped out from under stored data.
+		await booted.payload.db.updateOne({
+			collection: 'icons',
+			data: { icon: 'tabler:home' },
+			id: seeded.id,
+		})
+		const unchanged = await booted.payload.update({
+			collection: 'icons',
+			data: { icon: 'tabler:home' },
+			id: seeded.id,
+		})
+		expect(unchanged.icon).toBe('tabler:home')
+		await expect(
+			booted.payload.update({
+				collection: 'icons',
+				data: { icon: 'tabler:settings' },
+				id: seeded.id,
+			})
+		).rejects.toThrow()
+	})
+
 	it('respects a per-field defaultLibrary for bare values', async () => {
 		await expect(
 			booted.payload.create({

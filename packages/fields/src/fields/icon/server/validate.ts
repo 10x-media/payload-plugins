@@ -14,9 +14,9 @@ export type CreateIconValidateArgs = {
 }
 
 /**
- * Unregistered library: always an error. Unknown name in a known library:
- * error only for changed values, so stored docs stay saveable after an icon
- * set upgrade drops a glyph.
+ * Unregistered library or unknown name in a known library: error only for
+ * changed values, so a stored doc stays saveable after its library is dropped
+ * or an icon-set upgrade removes a glyph. Changing TO an unknown value errors.
  */
 export const createIconValidate =
 	(args: CreateIconValidateArgs): TextFieldValidation =>
@@ -32,10 +32,10 @@ export const createIconValidate =
 			const { library, name } = resolveIconValue(value, defaultLibrary)
 			const adapter = registered.find((candidate) => candidate.slug === library)
 			const t = asTranslate(options.req.t)
-			if (!adapter) {
-				return t(keys.invalidIconLibrary, { library })
-			}
 			if (value !== options.previousValue) {
+				if (!adapter) {
+					return t(keys.invalidIconLibrary, { library })
+				}
 				const names = await loadManifestNames(adapter)
 				if (!names.has(name)) {
 					return t(keys.invalidIconName, { library, name })
