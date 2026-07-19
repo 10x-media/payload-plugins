@@ -39,7 +39,6 @@ export const buildNextLabelField = (localize: boolean): Field => ({
 	name: 'nextLabel',
 	type: 'text',
 	label: labelForKey(keys.buttonsNextLabel),
-	admin: { description: labelForKey(keys.buttonsMultiStepDescription) },
 	...localizedIf(localize),
 })
 
@@ -48,7 +47,6 @@ export const buildPrevLabelField = (localize: boolean): Field => ({
 	name: 'prevLabel',
 	type: 'text',
 	label: labelForKey(keys.buttonsPrevLabel),
-	admin: { description: labelForKey(keys.buttonsMultiStepDescription) },
 	...localizedIf(localize),
 })
 

@@ -184,7 +184,7 @@ describe('buildToField', () => {
 			| undefined
 		expect(component?.path).toBe('@10x-media/form-builder/client#EndpointOptionsSelect')
 		expect(component?.clientProps?.endpoint).toBe('departments')
-		expect(component?.clientProps?.descriptionKey).toBe('formBuilder:action.config.toDescription')
+		expect(component?.clientProps?.descriptionKey).toBeUndefined()
 	})
 
 	it('carries a validate function', () => {

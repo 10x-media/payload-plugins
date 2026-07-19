@@ -71,12 +71,13 @@ describe('forms buttons fields', () => {
 		expect(rowFields[1]).toMatchObject({ name: 'nextLabel', admin: { width: '50%' } })
 	})
 
-	it('keeps the multi-step description on prev/next after the width merge', async () => {
+	it('gives prev/next the half-width admin and no leftover description', async () => {
 		const fields = await formsFieldsOf({})
 		const row = flowTabOf(fields)?.fields.at(-1)
 		const rowFields = (row && 'fields' in row ? row.fields : []) as FieldWithAdmin[]
 		for (const field of rowFields) {
-			expect(typeof field.admin?.description).toBe('function')
+			expect(field.admin?.width).toBe('50%')
+			expect(field.admin?.description).toBeUndefined()
 		}
 	})
 

@@ -107,8 +107,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfirmation]: 'Confirmation email',
 	[keys.actionSignedWebhook]: 'Signed webhook',
 	[keys.actionConfigTo]: 'To',
-	[keys.actionConfigToDescription]:
-		'The department this submission is routed to. Each locale keeps its own address.',
 	[keys.actionConfigSubject]: 'Subject',
 	[keys.actionConfigBody]: 'Body',
 	[keys.actionConfigBodyDescription]:
@@ -258,7 +256,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.buttonsSubmitLabel]: 'Submit button label',
 	[keys.buttonsNextLabel]: 'Next button label',
 	[keys.buttonsPrevLabel]: 'Previous button label',
-	[keys.buttonsMultiStepDescription]: 'Shown on multi-step forms only.',
 	[keys.formBack]: 'Back',
 	[keys.formNext]: 'Next',
 	[keys.formSubmit]: 'Submit',

@@ -109,8 +109,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.actionConfirmation]: 'Bestätigungs-E-Mail',
 	[keys.actionSignedWebhook]: 'Signierter Webhook',
 	[keys.actionConfigTo]: 'An',
-	[keys.actionConfigToDescription]:
-		'Die Abteilung, an die diese Einsendung geleitet wird. Jede Sprache behält ihre eigene Adresse.',
 	[keys.actionConfigSubject]: 'Betreff',
 	[keys.actionConfigBody]: 'Nachrichtentext',
 	[keys.actionConfigBodyDescription]:
@@ -264,7 +262,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.buttonsSubmitLabel]: 'Beschriftung der Absenden-Schaltfläche',
 	[keys.buttonsNextLabel]: 'Beschriftung der Weiter-Schaltfläche',
 	[keys.buttonsPrevLabel]: 'Beschriftung der Zurück-Schaltfläche',
-	[keys.buttonsMultiStepDescription]: 'Wird nur bei mehrstufigen Formularen angezeigt.',
 	[keys.formBack]: 'Zurück',
 	[keys.formNext]: 'Weiter',
 	[keys.formSubmit]: 'Absenden',

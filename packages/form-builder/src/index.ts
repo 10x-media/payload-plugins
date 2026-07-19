@@ -69,26 +69,27 @@ export type FormBuilderPluginOptions = {
 	 */
 	richText?: RichTextBodyOption
 	/**
-	 * Sender address for `emailTeam` and `confirmation`. Absent (default): no `from` field on
-	 * either action and every send uses the email adapter's default sender. With
-	 * `fromAddresses` set, both actions gain a `from` select whose options come from the
-	 * resolver, evaluated per request via a `req`-scoped endpoint. The intended use is
-	 * multi-tenant hosts where each tenant may only send from particular addresses (derive the
-	 * tenant from `req` and return only its allowed senders). Values are the literal string
-	 * `payload.sendEmail` accepts as `from` (e.g. `'Name <addr@x.com>'` or a plain address). The
-	 * choice is validated against the resolver at save time only; it is not re-checked when the
-	 * action actually sends (the config is admin-authored, not visitor-controlled).
-	 */
-	/**
-	 * `departments`, when set, turns the `emailTeam` action's `to` into a select whose options come
-	 * from the resolver, evaluated per request via a `req`-scoped `/:id/departments` endpoint. The
-	 * intended use: place `departmentsField()` on a document you own and read it back here with
-	 * `resolveDepartmentOptions`, which resolves each department's address for the requesting locale.
-	 * Because `to` is localized, each admin locale stores its own resolved address, so a submission's
-	 * locale selects the address it routes to (Payload-native, no per-send lookup). Multi-tenant hosts
-	 * scope which document they read by the tenant derived from `req`. Absent, `to` stays a plain
-	 * localized text field. Validated against the resolver at save time only; the config is
-	 * admin-authored, not visitor-controlled.
+	 * Email routing for the `emailTeam` and `confirmation` actions. Both sub-options are opt-in by the
+	 * presence of a resolver (not a `false`/`true`/object flag) and share a shape: a `req`-scoped
+	 * resolver, evaluated per request via an endpoint, whose choice is validated at save time only and
+	 * never re-checked when the action sends (the config is admin-authored, not visitor-controlled).
+	 *
+	 * `fromAddresses` gives both actions a `from` select whose options come from the resolver; absent,
+	 * neither action has a `from` field and every send uses the email adapter's default sender. The
+	 * intended use is multi-tenant hosts where each tenant may only send from particular addresses
+	 * (derive the tenant from `req`, return its allowed senders). Values are the literal string
+	 * `payload.sendEmail` accepts as `from` (e.g. `'Name <addr@x.com>'` or a plain address).
+	 *
+	 * `departments` turns the `emailTeam` `to` into a select whose options come from the resolver
+	 * (a `/:id/departments` endpoint); the intended use is to place `departmentsField()` on a document
+	 * you own and read it back with `resolveDepartmentOptions`, which resolves each department's address
+	 * for the requesting locale. Because `to` is localized, each admin locale stores its own resolved
+	 * address and a submission's locale selects the address it routes to (Payload-native, no per-send
+	 * lookup). Storing the resolved address, rather than a department id resolved live at send (consent's
+	 * model), is deliberate: the routing target a form was saved with stays audit-stable even if the
+	 * resolver's data later changes, so do not "fix" it into a live lookup. Multi-tenant hosts scope
+	 * which document they read by the tenant derived from `req`; absent, `to` stays a plain localized
+	 * text field.
 	 */
 	email?: { fromAddresses?: FromAddressesResolver; departments?: DepartmentEmailsResolver }
 	/**

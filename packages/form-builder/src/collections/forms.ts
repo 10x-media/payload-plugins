@@ -383,10 +383,11 @@ export const buildFormsCollection = ({
 
 	const defaultOutcomeFields = buildDefaultOutcomeFields()
 	const defaultButtonFields = buildDefaultButtonFields(localizeContent)
-	// Half-width copy of a default field for the prev/next row; preserves the field's own admin
-	// (e.g. the multi-step description) rather than replacing it. The cast is safe: `width` is a
-	// valid admin option on every field variant, but spreading a `Field`-typed value's `admin`
-	// back into a union-typed object literal loses the discriminant TS needs to check it structurally.
+	// Half-width copy of a default field for the prev/next row; merges width into whatever admin the
+	// field already carries (a host's `buttons.fields` override may add its own) rather than replacing
+	// it. The cast is safe: `width` is a valid admin option on every field variant, but spreading a
+	// `Field`-typed value's `admin` back into a union-typed object literal loses the discriminant TS
+	// needs to check it structurally.
 	const halfWidth = (field: Field): Field =>
 		({ ...field, admin: { ...field.admin, width: '50%' } }) as Field
 	// The three button-label fields sit at the document root now (no `buttons` group): `submit` at

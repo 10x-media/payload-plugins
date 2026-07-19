@@ -71,7 +71,6 @@ export const buildToField = (
 				path: TO_FIELD_REF,
 				clientProps: {
 					endpoint: 'departments',
-					descriptionKey: keys.actionConfigToDescription,
 				},
 			},
 		},

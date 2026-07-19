@@ -44,6 +44,21 @@ describe('buildFieldBlocks', () => {
 		])
 	})
 
+	it('gives every block a FieldBlockLabel row header keyed to its type label', () => {
+		for (const block of blocks) {
+			const label = block.admin?.components?.Label as
+				| { path?: string; clientProps?: { typeLabelKey?: string } }
+				| undefined
+			expect(label?.path).toBe('@10x-media/form-builder/client#FieldBlockLabel')
+			expect(typeof label?.clientProps?.typeLabelKey).toBe('string')
+		}
+		const text = blocks.find((block) => block.slug === 'text')
+		const textLabel = text?.admin?.components?.Label as
+			| { clientProps?: { typeLabelKey?: string } }
+			| undefined
+		expect(textLabel?.clientProps?.typeLabelKey).toBe('formBuilder:fieldType.text')
+	})
+
 	it('gives every non-bare block a single unnamed tabs field', () => {
 		for (const block of blocks.filter((b) => b.slug !== 'message')) {
 			expect(block.fields).toHaveLength(1)

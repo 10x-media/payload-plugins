@@ -3,6 +3,17 @@ title: Customization
 description: Collection overrides, submission admin UI options, and other plugin-level configuration.
 ---
 
+## Options API conventions
+
+Every option follows one of a few shapes, and knowing which saves you from fighting the API:
+
+- **Opt-in flags** take Payload's `false` / `true` / object form: omit or `false` disables, `true` enables with defaults, an object customizes. `spam`, `poll`, and `uploads` work this way.
+- **Resolver-gated features** are the sanctioned exception: they have no `true` and are enabled purely by supplying a `req`-scoped resolver. `consent.sources`, `email.fromAddresses`, `email.departments`, `poll.sources`, and `events` stay off until you pass the function, and passing it is the enable.
+- **Composition seams** hand you the built defaults and take your result back, so you extend rather than replace: `buttons.fields`, `poll.outcomeFields`, and each `overrides.*` `fields` receive the defaults for you to spread, wrap, reorder, or filter.
+- **Registry seams** key entries by slug and replace a matched entry wholesale: `fields`, `rules`, `actions`, and `poll.types`. To change one built-in and keep the rest, spread it from the exported defaults (see [Tweaking one built-in](#tweaking-one-built-in)).
+
+One deliberate divergence is worth calling out. Consent stores only a source's row `id` and resolves the statement live per request, so editing a source reaches every form at once. Department routing does the opposite: `email.departments` resolves each department's address at author time and freezes the resolved address into the form's `emailTeam` action. That is intentional: a submission must route to the address the form was saved with, so the target stays audit-stable even if the department's address later changes.
+
 ## Tweaking one built-in
 
 The registries behind [field types](/form-builder/fields#the-registry) and [validation rules](/form-builder/validation#custom-rules) replace a built-in wholesale when you pass an object under its type. To change one property of a built-in and keep the rest, spread it from the exported defaults: `defaultFieldDefinitionsByType` and `defaultValidationRulesByType` index the built-ins by `type` (the arrays `defaultFieldDefinitions` and `defaultValidationRules` are exported too).
