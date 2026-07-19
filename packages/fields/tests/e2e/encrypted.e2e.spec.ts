@@ -58,10 +58,14 @@ test.describe('encrypted field', () => {
 		const input = page.locator(`#field-${FIXTURES.maskedField}`)
 		await expect(input).toBeVisible()
 		await expect(input).toHaveValue(FIXTURES.maskedSeedValue)
+		// Reveal unmounts its trigger; focus must move to the revealed input, not <body> (WCAG 2.4.3)
+		await expect(input).toBeFocused()
 
 		await field.getByRole('button', { name: 'Conceal' }).click()
 		await expect(field.locator('.tenx-protected-field__mask')).toBeVisible()
 		await expect(page.locator(`#field-${FIXTURES.maskedField}`)).toHaveCount(0)
+		// Conceal unmounts its trigger; focus returns to the Reveal button
+		await expect(field.getByRole('button', { name: 'Reveal' })).toBeFocused()
 	})
 
 	test('edits a revealed value and round-trips through encryption', async ({ page }) => {
@@ -119,6 +123,28 @@ test.describe('encrypted field', () => {
 		await richText.getByRole('button', { name: 'Reveal' }).click()
 		await expect(richText.locator('.tenx-protected-field__json')).toBeVisible()
 		const results = await new AxeBuilder({ page }).include('.tenx-protected-field').analyze()
+		const blocking = results.violations.filter(
+			(v) => v.impact === 'serious' || v.impact === 'critical'
+		)
+		expect(blocking).toEqual([])
+	})
+
+	// A revealed non-richText field renders Payload's native TextField (a distinct markup
+	// path from the richText JSON view). color-contrast is disabled: the only sub-threshold
+	// text here is Payload's own field-description chrome, styled with core elevation tokens
+	// the plugin does not own. This guards the structural a11y (roles, names, focus) of the
+	// revealed native path; the richText scan above keeps color-contrast enforced.
+	test('revealed native encrypted field has no serious or critical structural axe violations', async ({
+		page,
+	}) => {
+		await openShowcaseDoc(page)
+		const field = protectedField(page, FIXTURES.maskedLabel)
+		await field.getByRole('button', { name: 'Reveal' }).click()
+		await expect(page.locator(`#field-${FIXTURES.maskedField}`)).toBeVisible()
+		const results = await new AxeBuilder({ page })
+			.include('.tenx-protected-field')
+			.disableRules(['color-contrast'])
+			.analyze()
 		const blocking = results.violations.filter(
 			(v) => v.impact === 'serious' || v.impact === 'critical'
 		)

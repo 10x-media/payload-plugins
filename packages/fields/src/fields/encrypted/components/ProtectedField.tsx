@@ -17,7 +17,7 @@ import {
 } from '@payloadcms/ui'
 import type { StaticLabel, TextFieldClientProps } from 'payload'
 import type React from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import type { EncryptedFieldPatch, EncryptedProtection } from '../types'
@@ -58,11 +58,12 @@ export interface ProtectedFieldProps extends TextFieldClientProps {
  * display-only span.
  */
 const MaskRow: React.FC<{
+	buttonRef: React.RefObject<HTMLButtonElement | null>
 	label: StaticLabel | undefined
 	onReveal: () => void
 	path: string
 	required?: boolean
-}> = ({ label, onReveal, path, required }) => {
+}> = ({ buttonRef, label, onReveal, path, required }) => {
 	const { t } = useTranslation()
 	return (
 		<div className="field-type tenx-protected-field">
@@ -71,7 +72,7 @@ const MaskRow: React.FC<{
 				<span aria-label={t(keys.encryptedValue)} className="tenx-protected-field__mask" role="img">
 					&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;
 				</span>
-				<Button buttonStyle="secondary" onClick={onReveal} size="small">
+				<Button buttonStyle="secondary" onClick={onReveal} ref={buttonRef} size="small">
 					{t(keys.reveal)}
 				</Button>
 			</div>
@@ -116,6 +117,29 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 	const { t } = useTranslation()
 	const [revealed, setRevealed] = useState(protection === 'none')
 
+	// Toggling revealed swaps the trigger out of the tree, so focus would fall to
+	// <body> (WCAG 2.4.3). Move it to the newly mounted control instead: the revealed
+	// native input, else the Conceal button (richText/code render no focusable input),
+	// and back to the Reveal button on conceal. Compare against the previous value so a
+	// StrictMode remount never steals focus on first render.
+	const revealButtonRef = useRef<HTMLButtonElement>(null)
+	const concealButtonRef = useRef<HTMLButtonElement>(null)
+	const revealedRef = useRef<HTMLDivElement>(null)
+	const prevRevealedRef = useRef(revealed)
+	useEffect(() => {
+		if (prevRevealedRef.current === revealed) return
+		prevRevealedRef.current = revealed
+		if (revealed) {
+			const input = revealedRef.current?.querySelector<HTMLElement>(
+				'input:not([type="hidden"]), textarea, select'
+			)
+			if (input) input.focus()
+			else concealButtonRef.current?.focus()
+		} else {
+			revealButtonRef.current?.focus()
+		}
+	}, [revealed])
+
 	const patchedField = useMemo(
 		() => ({
 			...field,
@@ -129,6 +153,7 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 		if (!revealed) {
 			return (
 				<MaskRow
+					buttonRef={revealButtonRef}
 					label={field.label}
 					onReveal={() => setRevealed(true)}
 					path={path}
@@ -137,9 +162,14 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 			)
 		}
 		return (
-			<div className="tenx-protected-field">
+			<div className="tenx-protected-field" ref={revealedRef}>
 				<div className="tenx-protected-field__toolbar">
-					<Button buttonStyle="pill" onClick={() => setRevealed(false)} size="small">
+					<Button
+						buttonStyle="pill"
+						onClick={() => setRevealed(false)}
+						ref={concealButtonRef}
+						size="small"
+					>
 						{t(keys.conceal)}
 					</Button>
 				</div>
@@ -151,6 +181,7 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 	if (!revealed) {
 		return (
 			<MaskRow
+				buttonRef={revealButtonRef}
 				label={field.label}
 				onReveal={() => setRevealed(true)}
 				path={path}
@@ -164,9 +195,14 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 		return <Native {...(props as unknown as Record<string, unknown>)} field={patchedField} />
 	}
 	return (
-		<div className="tenx-protected-field">
+		<div className="tenx-protected-field" ref={revealedRef}>
 			<div className="tenx-protected-field__toolbar">
-				<Button buttonStyle="pill" onClick={() => setRevealed(false)} size="small">
+				<Button
+					buttonStyle="pill"
+					onClick={() => setRevealed(false)}
+					ref={concealButtonRef}
+					size="small"
+				>
 					{t(keys.conceal)}
 				</Button>
 			</div>
