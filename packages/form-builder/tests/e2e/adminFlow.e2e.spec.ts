@@ -111,10 +111,16 @@ test.describe('Kitchen Sink admin', () => {
 		const step1 = page.locator('.fb-flow-step').first()
 		await step1.locator('.collapsible__toggle').first().click()
 
-		// TODO(T4): the step field list shows machine names today; once T4 lands label display, assert the
-		// human labels ('Text field', 'Number field', ...) here instead of the names.
-		await expect(step1.locator('.fb-flow-step__field-picker')).toContainText('ksText')
-		await expect(step1.locator('.fb-flow-step__field-picker')).toContainText('ksNumber')
+		// The step field list shows each field's configured label, not its machine name.
+		await expect(step1.locator('.fb-flow-step__field-picker')).toContainText('Text field')
+		await expect(step1.locator('.fb-flow-step__field-picker')).toContainText('Number field')
+
+		// Step 2 holds the bare message block: it shows a snippet of its content, not "Message".
+		const step2 = page.locator('.fb-flow-step').nth(1)
+		await step2.locator('.collapsible__toggle').first().click()
+		await expect(step2.locator('.fb-flow-step__field-picker')).toContainText('Select field')
+		await expect(step2.locator('.fb-flow-step__field-picker')).toContainText('Kitchen sink notice')
+		await expectNoRuntimeErrors(page, errors, 'flow tab / step field labels')
 
 		await step1.getByRole('button', { name: 'Add transition' }).click()
 		const transition = step1.locator('.fb-flow-transition').last()

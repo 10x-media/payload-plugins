@@ -13,6 +13,8 @@ export type FieldRow = {
 	name?: string
 	label?: string
 	options?: Option[]
+	/** A bare message block's richText body; see `messageSnippet`. */
+	content?: unknown
 	[key: string]: unknown
 }
 

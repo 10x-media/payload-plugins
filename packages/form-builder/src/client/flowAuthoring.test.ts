@@ -5,6 +5,7 @@ import {
 	END_OF_FORM,
 	fieldHolders,
 	flowFieldEntries,
+	messageSnippet,
 	nextFromSelectValue,
 	nextSelectOptions,
 	nextToSelectValue,
@@ -18,6 +19,11 @@ import {
 const step = (id: string, fields: string[], title?: string): FlowStep => ({ id, fields, title })
 
 const entry = (key: string, label = key) => ({ key, label })
+
+/** A minimal lexical richText document: one paragraph holding a single text node. */
+const lexicalText = (text: string) => ({
+	root: { children: [{ type: 'paragraph', children: [{ type: 'text', text }] }] },
+})
 
 describe('flowFieldEntries', () => {
 	const bareLabels = { message: 'Message' }
@@ -63,6 +69,57 @@ describe('flowFieldEntries', () => {
 	it('prefers the name for a legacy bare row that still carries one', () => {
 		const entries = flowFieldEntries([{ blockType: 'message', name: 'note', id: 'r1' }], bareLabels)
 		expect(entries).toEqual([entry('note')])
+	})
+
+	it('labels a named row with its configured label, preferred over the name', () => {
+		const entries = flowFieldEntries(
+			[{ blockType: 'text', name: 'fullName', label: 'Vollständiger Name', id: 'r1' }],
+			bareLabels
+		)
+		expect(entries).toEqual([entry('fullName', 'Vollständiger Name')])
+	})
+
+	it('falls back to the name when a named row has no label', () => {
+		const entries = flowFieldEntries([{ blockType: 'text', name: 'email', id: 'r1' }], bareLabels)
+		expect(entries).toEqual([entry('email')])
+	})
+
+	it('falls back to the name when a named row has a blank label', () => {
+		const entries = flowFieldEntries(
+			[{ blockType: 'text', name: 'email', label: '   ', id: 'r1' }],
+			bareLabels
+		)
+		expect(entries).toEqual([entry('email')])
+	})
+
+	it('labels a bare row with a snippet of its content when it has any', () => {
+		const entries = flowFieldEntries(
+			[{ blockType: 'message', id: 'r2', content: lexicalText('Kitchen sink notice') }],
+			bareLabels
+		)
+		expect(entries).toEqual([{ key: 'r2', label: 'Kitchen sink notice' }])
+	})
+
+	it('falls back to the type label when a bare row has no extractable content', () => {
+		const entries = flowFieldEntries(
+			[{ blockType: 'message', id: 'r1', content: lexicalText('   ') }],
+			bareLabels
+		)
+		expect(entries).toEqual([{ key: 'r1', label: 'Message' }])
+	})
+
+	it('prefers a snippet over the numbered type label, but only for the rows that have one', () => {
+		const entries = flowFieldEntries(
+			[
+				{ blockType: 'message', id: 'r1' },
+				{ blockType: 'message', id: 'r2', content: lexicalText('Please read this') },
+			],
+			bareLabels
+		)
+		expect(entries).toEqual([
+			{ key: 'r1', label: 'Message 1' },
+			{ key: 'r2', label: 'Please read this' },
+		])
 	})
 
 	it('skips nameless rows that are not a bare type and bare rows without an id', () => {
@@ -251,5 +308,67 @@ describe('next select value mapping', () => {
 	it('passes a step id through unchanged in both directions', () => {
 		expect(nextToSelectValue('step-1')).toBe('step-1')
 		expect(nextFromSelectValue('step-1')).toBe('step-1')
+	})
+})
+
+describe('messageSnippet', () => {
+	it('extracts the plain text of a single-paragraph lexical document', () => {
+		expect(messageSnippet(lexicalText('Kitchen sink notice'))).toBe('Kitchen sink notice')
+	})
+
+	it('joins multiple paragraphs with a single space', () => {
+		const content = {
+			root: {
+				children: [
+					{ type: 'paragraph', children: [{ type: 'text', text: 'First' }] },
+					{ type: 'paragraph', children: [{ type: 'text', text: 'Second' }] },
+				],
+			},
+		}
+		expect(messageSnippet(content)).toBe('First Second')
+	})
+
+	it('trims surrounding whitespace', () => {
+		expect(messageSnippet(lexicalText('  padded  '))).toBe('padded')
+	})
+
+	it('does not truncate content at exactly the length limit', () => {
+		expect(messageSnippet(lexicalText('A'.repeat(40)))).toBe('A'.repeat(40))
+	})
+
+	it('truncates longer content and appends an ellipsis', () => {
+		expect(messageSnippet(lexicalText('A'.repeat(50)))).toBe(`${'A'.repeat(40)}…`)
+	})
+
+	it('returns undefined when the document has no extractable text', () => {
+		expect(messageSnippet(lexicalText(''))).toBeUndefined()
+		expect(messageSnippet(lexicalText('   '))).toBeUndefined()
+		expect(messageSnippet({ root: { children: [] } })).toBeUndefined()
+	})
+
+	it('returns undefined for empty or non-lexical content', () => {
+		expect(messageSnippet(undefined)).toBeUndefined()
+		expect(messageSnippet(null)).toBeUndefined()
+		expect(messageSnippet('plain string')).toBeUndefined()
+		expect(messageSnippet(42)).toBeUndefined()
+		expect(messageSnippet({})).toBeUndefined()
+		expect(messageSnippet({ root: {} })).toBeUndefined()
+		expect(messageSnippet({ root: { children: 'not-an-array' } })).toBeUndefined()
+	})
+
+	it('ignores malformed nodes without throwing', () => {
+		const content = {
+			root: {
+				children: [
+					null,
+					42,
+					{
+						type: 'paragraph',
+						children: [null, { text: 5 }, { type: 'text', text: 'ok' }],
+					},
+				],
+			},
+		}
+		expect(messageSnippet(content)).toBe('ok')
 	})
 })

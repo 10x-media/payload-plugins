@@ -54,7 +54,13 @@ export type FlowBuilderProps = {
 /** The row facets the flow builder keys and labels by, projected for a stable JSON identity. */
 const extractFieldRows = (data: Record<string, unknown>): FieldRow[] => {
 	const rows = Array.isArray(data.fields) ? (data.fields as FieldRow[]) : []
-	return rows.map((row) => ({ blockType: row.blockType, name: row.name, id: row.id }))
+	return rows.map((row) => ({
+		blockType: row.blockType,
+		name: row.name,
+		id: row.id,
+		label: row.label,
+		content: row.content,
+	}))
 }
 
 type TransitionRowProps = {

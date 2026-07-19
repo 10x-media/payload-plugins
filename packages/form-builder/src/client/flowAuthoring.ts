@@ -52,11 +52,46 @@ export const nextSelectOptions = (args: {
 	...args.otherSteps,
 ]
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	value != null && typeof value === 'object' && !Array.isArray(value)
+
+/** Chars kept before truncating a `messageSnippet` result, plus a trailing ellipsis. */
+const MESSAGE_SNIPPET_LENGTH = 40
+
 /**
- * Project the form's field rows into flow entries. Named rows are keyed and labeled by their
- * trimmed name. Nameless rows of a bare type are keyed by their block row id and labeled with
- * the type's display label (numbered in form order when the type occurs more than once). Rows
- * with neither a usable name nor a bare-type row id are not addressable and are skipped.
+ * Short plain-text preview of a bare message block's richText content, for the flow step list.
+ * Reads only the shallow lexical shape (`root.children[].children[].text`), which is all a short
+ * authored message needs; a legacy Slate body or other non-lexical shape yields `undefined`, same
+ * as empty content, so the caller falls back to the block type's display label.
+ */
+export const messageSnippet = (content: unknown): string | undefined => {
+	const root = isRecord(content) ? content.root : undefined
+	const blockNodes = isRecord(root) && Array.isArray(root.children) ? root.children : []
+	const text = blockNodes
+		.map((block) => {
+			const leaves = isRecord(block) && Array.isArray(block.children) ? block.children : []
+			return leaves
+				.map((leaf) => (isRecord(leaf) && typeof leaf.text === 'string' ? leaf.text : ''))
+				.join('')
+		})
+		.join(' ')
+		.replace(/\s+/g, ' ')
+		.trim()
+	if (text.length === 0) {
+		return undefined
+	}
+	return text.length > MESSAGE_SNIPPET_LENGTH
+		? `${text.slice(0, MESSAGE_SNIPPET_LENGTH).trimEnd()}…`
+		: text
+}
+
+/**
+ * Project the form's field rows into flow entries. Named rows are keyed by their trimmed name and
+ * labeled with their configured `label`, falling back to the name when unset. Nameless rows of a
+ * bare type are keyed by their block row id and labeled with a snippet of their content when they
+ * have any (see `messageSnippet`), else the type's display label (numbered in form order when the
+ * type occurs more than once). Rows with neither a usable name nor a bare-type row id are not
+ * addressable and are skipped.
  */
 export const flowFieldEntries = (
 	rows: FieldRow[],
@@ -78,19 +113,18 @@ export const flowFieldEntries = (
 	for (const row of rows) {
 		const name = nameOf(row)
 		if (name.length > 0) {
-			entries.push({ key: name, label: name })
+			const label = typeof row.label === 'string' && row.label.trim().length > 0 ? row.label : name
+			entries.push({ key: name, label })
 			continue
 		}
 		if (!isBareRow(row)) {
 			continue
 		}
-		const label = bareTypeLabels[row.blockType] ?? row.blockType
+		const typeLabel = bareTypeLabels[row.blockType] ?? row.blockType
 		const n = (bareSeen.get(row.blockType) ?? 0) + 1
 		bareSeen.set(row.blockType, n)
-		entries.push({
-			key: String(row.id),
-			label: (bareTotals.get(row.blockType) ?? 0) > 1 ? `${label} ${n}` : label,
-		})
+		const fallback = (bareTotals.get(row.blockType) ?? 0) > 1 ? `${typeLabel} ${n}` : typeLabel
+		entries.push({ key: String(row.id), label: messageSnippet(row.content) ?? fallback })
 	}
 	return entries
 }
