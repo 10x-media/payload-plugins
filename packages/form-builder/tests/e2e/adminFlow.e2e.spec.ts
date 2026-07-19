@@ -153,7 +153,7 @@ test.describe('Kitchen Sink admin', () => {
 
 		// Poll (gated on pollEnabled) and Actions tabs render without error.
 		await page.getByRole('button', { name: 'Poll', exact: true }).click()
-		await expect(page.getByText('Results field')).toBeVisible()
+		await expect(page.getByText('Vote field')).toBeVisible()
 		await expectNoRuntimeErrors(page, errors, 'poll tab')
 
 		await page.getByRole('button', { name: 'Actions', exact: true }).click()

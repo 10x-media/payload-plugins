@@ -58,11 +58,18 @@ describe('form-builder poll close field config', () => {
 				typeof option === 'string' ? option : option.value
 			)
 		}
-		expect(optionValues(buildCollection(false))).toEqual(['manual', 'mostVoted'])
+		expect(optionValues(buildCollection(false))).toEqual(['mostVoted', 'manual'])
 		expect(optionValues(buildCollection(true))).toContain('source')
 	})
 
-	it('hides winningValues for a mostVoted poll only', () => {
+	it('defaults the outcome type to mostVoted so an enabled poll works with no winner to pick', () => {
+		const type = pollGroupFields(buildCollection(false)).find(
+			(f): f is SelectField => 'name' in f && f.name === 'type'
+		)
+		expect(type?.defaultValue).toBe('mostVoted')
+	})
+
+	it('shows winningValues for a manual poll only', () => {
 		const outcome = pollGroupFields(buildCollection(false)).find(
 			(f): f is Extract<Field, { type: 'group' }> => 'name' in f && f.name === 'outcome'
 		)
@@ -71,23 +78,21 @@ describe('form-builder poll close field config', () => {
 		if (typeof condition !== 'function') {
 			throw new Error('winningValues admin.condition missing')
 		}
-		expect(condition({ poll: { type: 'mostVoted' } }, {}, props)).toBe(false)
 		expect(condition({ poll: { type: 'manual' } }, {}, props)).toBe(true)
-		expect(condition({ poll: { type: 'source' } }, {}, props)).toBe(true)
-		expect(condition({}, {}, props)).toBe(true)
+		expect(condition({ poll: { type: 'mostVoted' } }, {}, props)).toBe(false)
+		expect(condition({ poll: { type: 'source' } }, {}, props)).toBe(false)
+		expect(condition({}, {}, props)).toBe(false)
 	})
 
-	it('shows the close button only when no closesAt is set', () => {
+	it('mounts the close/reopen button with no condition of its own (the button owns both states)', () => {
 		const closePoll = pollGroupFields(buildCollection(false)).find(
 			(f) => 'name' in f && f.name === 'closePoll'
 		)
 		expect(closePoll && 'type' in closePoll && closePoll.type).toBe('ui')
-		const condition = (closePoll?.admin as { condition?: Condition } | undefined)?.condition
-		if (typeof condition !== 'function') {
-			throw new Error('closePoll admin.condition missing')
-		}
-		expect(condition({}, {}, props)).toBe(true)
-		expect(condition({}, { closesAt: new Date().toISOString() }, props)).toBe(false)
+		expect((closePoll?.admin as { condition?: unknown } | undefined)?.condition).toBeUndefined()
+		expect(
+			(closePoll?.admin as { components?: { Field?: unknown } } | undefined)?.components?.Field
+		).toBe('@10x-media/form-builder/client#ClosePollButton')
 	})
 })
 

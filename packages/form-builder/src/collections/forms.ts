@@ -23,6 +23,7 @@ import { resolveConsentSourcesRequest } from '../consent/resolveConsentSourcesRe
 import type { ConsentSourcesResolver } from '../consent/types'
 import { type DepartmentEmailsResolver, resolveDepartmentsRequest } from '../email/departments'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
+import { fieldNamesOfType } from '../fields/fieldNamesOfType'
 import { localizedIf } from '../fields/localizedIf'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
@@ -39,7 +40,7 @@ import { resolvePollCloseRequest } from '../poll/resolvePollCloseRequest'
 import { resolvePollOptionsRequest } from '../poll/resolvePollOptionsRequest'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
 import { keys } from '../translations/keys'
-import { labelFor, labelForKey } from '../translations/server'
+import { asTranslate, labelFor, labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { validateUrl } from '../validation/validateUrl'
 import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
@@ -202,6 +203,13 @@ export const buildFormsCollection = ({
 	// offer it in the author-facing select only when option sources are registered. The strategy stays in
 	// the registry regardless, so `resolvePollOutcome` and host code can still address it.
 	const hasOptionSources = (pollSourceRegistry?.size ?? 0) > 0
+	// `mostVoted` leads the author-facing select because it is the default: an enabled poll works
+	// immediately, with no winner to hand-pick. Only the select order changes; the registry keeps its
+	// own order (host strategies stay after the built-ins).
+	const orderedPollTypes = [
+		...[...pollTypes.values()].filter((strategy) => strategy.type === 'mostVoted'),
+		...[...pollTypes.values()].filter((strategy) => strategy.type !== 'mostVoted'),
+	]
 
 	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
 		if (data && Array.isArray(data.fields)) {
@@ -246,6 +254,37 @@ export const buildFormsCollection = ({
 				)
 			}
 			data.flow = normalizedFlow
+			// A poll needs a field whose answers are the votes. With the poll enabled and no vote field
+			// chosen (and the outcome not coming from an option source), bind one: auto-fill the sole
+			// eligible field for a one-choice form, otherwise surface a clear error rather than storing a
+			// poll that can never aggregate. The optionSource/`source` exemption preserves domain-driven
+			// polls that have no on-form vote field. `buildValidateResultsField` still checks a set value;
+			// this is the enforcer for enabled polls.
+			if (data.pollEnabled === true) {
+				const poll =
+					data.poll != null && typeof data.poll === 'object'
+						? (data.poll as Record<string, unknown>)
+						: {}
+				const resultsField = typeof poll.resultsField === 'string' ? poll.resultsField.trim() : ''
+				const optionSource = typeof poll.optionSource === 'string' ? poll.optionSource.trim() : ''
+				const sourceDriven = optionSource.length > 0 || poll.type === 'source'
+				if (resultsField.length === 0 && !sourceDriven) {
+					const eligible = fieldNamesOfType(data.fields, pollResultsTypes)
+					if (eligible.length === 1) {
+						data.poll = { ...poll, resultsField: eligible[0] }
+					} else {
+						const messageKey =
+							eligible.length > 1 ? keys.pollVoteFieldChoose : keys.pollVoteFieldMissing
+						throw new ValidationError(
+							{
+								collection: FORMS_SLUG,
+								errors: [{ path: 'poll.resultsField', message: asTranslate(req.t)(messageKey) }],
+							},
+							req.t
+						)
+					}
+				}
+			}
 		}
 		return data
 	}
@@ -442,16 +481,17 @@ export const buildFormsCollection = ({
 					},
 				},
 			},
-			// How the winning value(s) get decided. `manual` (default) leaves it to an admin; `mostVoted`
-			// and `source` auto-resolve on close (via the scheduled job or the results-read fallback). The
-			// options come from the registered `poll.types` strategies, so a host strategy appears here too.
+			// How the winning value(s) get decided. `mostVoted` (default) and `source` auto-resolve on close
+			// (via the scheduled job or the results-read fallback); `manual` leaves it to an admin. Options
+			// come from the registered `poll.types` strategies, so a host strategy appears here too, with
+			// `mostVoted` first so an enabled poll works with no winner to hand-pick.
 			{
 				name: 'type',
 				type: 'select',
-				defaultValue: 'manual',
+				defaultValue: 'mostVoted',
 				label: labelForKey(keys.pollType),
 				admin: { isClearable: false, description: labelForKey(keys.pollTypeDescription) },
-				options: [...pollTypes.values()]
+				options: orderedPollTypes
 					.filter((strategy) => strategy.type !== 'source' || hasOptionSources)
 					.map((strategy) => ({
 						label: pollTypeOptionLabel(strategy.label),
@@ -475,14 +515,14 @@ export const buildFormsCollection = ({
 				label: labelForKey(keys.pollClosesAt),
 				admin: { date: { pickerAppearance: 'dayAndTime' } },
 			},
-			// Manual close for a poll with no scheduled `closesAt`: the button POSTs to `/:id/close`, which
-			// stamps `closesAt` now and (for a non-manual strategy) resolves the winner. Hidden once a
-			// `closesAt` exists, since a scheduled poll closes on its own. `siblingData` here is the poll group.
+			// Close / reopen the poll from the admin. The button toggles on the live `closesAt` and saves the
+			// whole document (persisting an unsaved winner alongside `closesAt`) rather than calling the close
+			// endpoint, so there is no DB-vs-form-state mismatch. Always mounted inside the (pollEnabled-gated)
+			// Poll tab now; the button owns both states, so it carries no `admin.condition` of its own.
 			{
 				name: 'closePoll',
 				type: 'ui',
 				admin: {
-					condition: (_data, siblingData) => !siblingData?.closesAt,
 					components: { Field: CLOSE_POLL_BUTTON_REF },
 				},
 			},

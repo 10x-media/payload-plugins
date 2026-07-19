@@ -330,10 +330,11 @@ const seedDemoContactSubmissions = async (payload: Payload, formId: string): Pro
  * Seed the dev Payload app: an admin user, the consent sources and department addresses and the
  * policy pages they reference, an `athletes` collection, plus demo forms the `(frontend)` pages
  * render and the e2e suite drives -- a multi-step contact form (a conditional field, a required
- * consent, required-field validation, localized in German), a single-choice poll with public
- * results, and a relationship-backed poll whose `athleteVote` field makes four of the seeded athletes
+ * consent, required-field validation, localized in German), a single-choice mostVoted poll with public
+ * results, a relationship-backed poll whose `athleteVote` field makes four of the seeded athletes
  * voteable (its `resolveOptions` sources the choices, the winner select, and the results labels from
- * those records) and which this seed also votes on and closes, demonstrating `mostVoted` auto-resolve.
+ * those records), and a manual poll whose winner a staff pick has already recorded (covering the
+ * hand-picked outcome path the mostVoted polls do not).
  * Idempotent (keyed on title, or on the presence of rows/docs for the global fields and submissions).
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
@@ -426,6 +427,27 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		poll: { resultsField: 'pick', type: 'mostVoted' },
 	})
 
+	// A manual poll whose winner staff recorded by hand: it exercises the manual outcome path (the winner
+	// select shows only for `type: 'manual'`, and the seeded `winningValues` finalize it), while the
+	// polls above cover the auto-resolve default. Not wired to a frontend page, so finalizing is fine.
+	await ensureForm(payload, 'Logo color (staff pick)', {
+		fields: [
+			{
+				blockType: 'select',
+				name: 'color',
+				label: 'New logo color',
+				required: true,
+				options: [
+					{ label: 'Indigo', value: 'indigo' },
+					{ label: 'Teal', value: 'teal' },
+					{ label: 'Amber', value: 'amber' },
+				],
+			},
+		],
+		pollEnabled: true,
+		poll: { type: 'manual', resultsField: 'color', outcome: { winningValues: ['teal'] } },
+	})
+
 	await seedKitchenSink(payload)
 }
 
@@ -494,6 +516,8 @@ const seedKitchenSink = async (payload: Payload): Promise<void> => {
 				{ id: 'ksStep2', title: 'Preferences', fields: ['ksSelect', 'ksCheck', KS_MESSAGE_ID] },
 			],
 		},
-		poll: { resultsField: 'ksSelect' },
+		// Zero-config poll: only `pollEnabled` is set. `poll.type` defaults to `mostVoted` and the
+		// beforeValidate hook auto-fills `poll.resultsField` with the form's sole choice field (ksSelect),
+		// so a working poll needs no hand-authored poll config.
 	})
 }

@@ -153,9 +153,11 @@ export const de: Record<TranslationKey, string> = {
 	[keys.resultsNoResponses]: 'Noch keine Antworten',
 	[keys.resultsTruncated]: 'Zeigt eine Stichprobe der Antworten',
 	[keys.pollGroup]: 'Umfrage',
-	[keys.pollResultsField]: 'Ergebnisfeld',
+	[keys.pollResultsField]: 'Abstimmungsfeld',
 	[keys.pollResultsFieldDescription]:
-		'Feld, dessen aggregierte Ergebnisse öffentlich sind. Verwende ein Auswahlfeld, niemals ein Freitext- oder personenbezogenes Feld.',
+		'Das Auswahlfeld, dessen Antworten als Stimmen gezählt werden. Wird automatisch gewählt, wenn dein Formular genau ein Auswahlfeld hat. Verwende ein Auswahlfeld, niemals ein Freitext- oder personenbezogenes Feld.',
+	[keys.pollVoteFieldChoose]: 'Wähle das Feld, dessen Antworten als Stimmen zählen.',
+	[keys.pollVoteFieldMissing]: 'Füge ein Auswahlfeld als Abstimmungsfrage hinzu.',
 	[keys.pollResultsVisibility]: 'Sichtbarkeit der Ergebnisse',
 	[keys.pollVisibilityAfterVote]: 'Nach der Abstimmung',
 	[keys.pollVisibilityAfterClose]: 'Nach Ende der Umfrage',
@@ -173,13 +175,14 @@ export const de: Record<TranslationKey, string> = {
 	[keys.pollTypeMostVoted]: 'Meistgewählte Option gewinnt',
 	[keys.pollTypeSource]: 'Gewinner aus der Optionsquelle',
 	[keys.pollCloseButton]: 'Umfrage jetzt beenden',
-	[keys.pollCloseHintManual]:
-		'Lege zuerst die Siegerwerte oben fest; beim Beenden wird das Ergebnis zum jetzigen Zeitpunkt erfasst.',
+	[keys.pollReopenButton]: 'Umfrage wieder öffnen',
+	[keys.pollCloseHintManual]: 'Beim Beenden wird der ausgewählte Gewinner als Ergebnis erfasst.',
 	[keys.pollCloseHintMostVoted]: 'Beim Beenden wird die meistgewählte Option zum Gewinner.',
 	[keys.pollCloseHintSource]: 'Beim Beenden wird der Gewinner aus der Optionsquelle ermittelt.',
+	[keys.pollReopenHint]:
+		'Beim Wiederöffnen wird der erfasste Gewinner entfernt und es kann erneut abgestimmt werden.',
+	[keys.pollCloseNeedsWinner]: 'Wähle zuerst einen Siegerwert.',
 	[keys.pollCloseManualNoWinner]: 'Lege einen Gewinner fest, bevor du die Umfrage beendest.',
-	[keys.pollCloseSuccess]: 'Umfrage beendet.',
-	[keys.pollCloseFailed]: 'Die Umfrage konnte nicht beendet werden. Bitte versuche es erneut.',
 	[keys.pollWinningValue]: 'Siegerwert',
 	[keys.pollWinningValueDescription]:
 		'Wähle die Gewinneroption, sobald das Ergebnis feststeht. Beim Speichern wird der Entscheidungszeitpunkt erfasst; leeren öffnet das Ergebnis wieder.',
