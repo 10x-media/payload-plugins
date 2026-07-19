@@ -471,6 +471,8 @@ export type {
 	SpamMetadataConfig,
 	SpamOption,
 } from './spam/types'
+export type { CreatedSubmission, CreateSubmissionArgs } from './submissions/createSubmission'
+export { createSubmission } from './submissions/createSubmission'
 export { hasVotedCookie, votedCookieName } from './submissions/votedCookie'
 export { captureFileRef } from './uploads/captureFileRef'
 export { formatBytes } from './uploads/formatBytes'

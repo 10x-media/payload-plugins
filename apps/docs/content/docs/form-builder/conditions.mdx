@@ -14,6 +14,8 @@ visibleWhen: { or: [{ and: [{ country: { equals: 'US' } }] }] }
 
 Conditions are authored in the admin with a native Payload-style condition builder on each field (field, operator, value; the same look as list filters). The builder stores a canonical `Where`, normalized and validated server-side. Because the format is serializable data, the renderer evaluates the identical structure client-side; there is no translation layer to drift.
 
+The value input renders correctly whatever the referenced field's type: a text or number input, a dropdown of the field's own options for `select`, and a date picker for `date`.
+
 ## `visibleWhen`: visibility gates everything
 
 When a field's `visibleWhen` evaluates false:

@@ -83,9 +83,9 @@ Set neither and all three stay on the project editor. Set only `editor` to move 
 
 ## Submission answers UI
 
-When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component that formats each value using its field type's `format` function, shows repeater rows with numbered headings, displays consent proofs with agreed/declined indicators and a timestamp, and includes submission metadata. This replaces the raw JSON fields as the primary view.
+When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component in place of the raw stored fields. Each answer renders as a native Payload field, the same `TextInput`/`FieldLabel` primitives Payload's own fields use, formatted through its field type's `format` function and laid out at its authored [width](/form-builder/rendering#layout-grid) so the admin view matches the widths editors configured on the form itself. Repeater rows render as numbered sub-sections; a file answer renders as a link to the stored upload; consent renders an Agreed/Declined `Pill` next to the source link and the capture timestamp. `locale` and the submission `meta` (received-at time, IP/user agent when captured, the spam signal) are folded into a single "Submission details" section at the bottom, rather than appearing as separate top-level fields.
 
-The raw `values`, `descriptors`, and `consent` JSON fields are hidden by default. They contain the same data as the formatted UI and are noisy alongside it. To show them (useful for debugging), set `showSubmissionRawFields`:
+The raw `locale`, `values`, `descriptors`, `consent`, and `meta` fields are hidden by default. They contain the same data as the formatted UI and are noisy alongside it. To show them (useful for debugging), set `showSubmissionRawFields`:
 
 ```ts title="payload.config.ts"
 formBuilder({
@@ -93,7 +93,7 @@ formBuilder({
 })
 ```
 
-With this option off (the default), the `answers` UI field is the only visible representation of a submission's content in the admin. The raw JSON fields still exist in the database and are returned by the API; only the admin display is affected.
+With this option off (the default), the `answers` UI field is the only visible representation of a submission's content in the admin. The raw fields still exist in the database and are returned by the API; only the admin display is affected.
 
 ## Form-level buttons
 
@@ -207,6 +207,8 @@ formBuilder({
 ```
 
 Keep the stored value a `PollOption.value` string whatever component renders it: `pollOutcomeBeforeChange` validates the winner against the poll's effective options server-side regardless of which field authored it, so a swap cannot bypass the membership check. Preserve `defaultFields.resolvedAt` (or rebuild the same field-level access lock) to keep the stamp tamper-proof. `buildWinningValuesField()`, `buildResolvedAtField()`, and `buildDefaultOutcomeFields()` are exported for assembling the group from scratch.
+
+`buildWinningValuesField()` also carries a condition that hides the field entirely for a `mostVoted` [poll type](/form-builder/polls#poll-types): that strategy sets the winner itself once the poll closes, so there is nothing for an editor to hand-pick. A swapped-in `Field` for that slot should read `poll.type` off the document and preserve the same hide, unless it deliberately wants a picker that stays visible regardless of strategy.
 
 ---
 

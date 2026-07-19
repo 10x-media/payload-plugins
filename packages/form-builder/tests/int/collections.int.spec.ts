@@ -1,6 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { formBuilder } from '../../src/index'
+import { createSubmission } from '../../src/submissions/createSubmission'
 
 describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -159,6 +160,53 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 			booted.payload.create({
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
+			})
+		).rejects.toThrow()
+	})
+
+	it('createSubmission runs the full submission pipeline', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Contact',
+				fields: [
+					{ blockType: 'text', name: 'fullName', label: 'Full name', required: true },
+					{ blockType: 'email', name: 'email', label: 'Email', required: true },
+				],
+			},
+		})
+		const submission = await createSubmission(booted.payload, {
+			form: form.id,
+			values: [
+				{ field: 'fullName', value: 'Ada' },
+				{ field: 'email', value: 'ada@x.com' },
+			],
+		})
+		// No req is threaded through here, the same anonymous-equivalent path the collection's own
+		// hooks force to 'complete' for any caller without an authenticated req.user.
+		expect(submission.status).toBe('complete')
+		expect(submission.values).toEqual([
+			{ field: 'fullName', value: 'Ada' },
+			{ field: 'email', value: 'ada@x.com' },
+		])
+		expect(submission.descriptors).toEqual([
+			{ field: 'fullName', label: 'Full name', fieldType: 'text', width: 'full' },
+			{ field: 'email', label: 'Email', fieldType: 'email', width: 'full' },
+		])
+	})
+
+	it('createSubmission still enforces server-side validation', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Contact',
+				fields: [{ blockType: 'email', name: 'email', label: 'Email', required: true }],
+			},
+		})
+		await expect(
+			createSubmission(booted.payload, {
+				form: form.id,
+				values: [{ field: 'email', value: 'not-an-email' }],
 			})
 		).rejects.toThrow()
 	})

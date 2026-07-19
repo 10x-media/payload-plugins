@@ -115,6 +115,28 @@ For simple styling without replacing markup, pass `submitButtonClassName`, `next
 
 The render prop types (`SubmitButtonRenderProps`, `NextButtonRenderProps`, `BackButtonRenderProps`) are exported from `@10x-media/form-builder/react`.
 
+## Submit contract
+
+A submission is `POST {apiRoute}/form-submissions` with a JSON body of `{ form, values }`, where `values` is an array of `{ field, value }` pairs (`SubmissionValue`, exported from `/types`). `<Form>`'s built-in transport above is one way to reach that endpoint, not the only one: every rule this page and [Validation](/form-builder/validation) describe (server-authoritative validation, spam checks, descriptor snapshotting, consent capture, post-submit action dispatch) runs in the `form-submissions` collection's own hooks, not in a route handler `<Form>` calls into. Three front doors reach the identical pipeline:
+
+- The browser `submitForm(input)` helper (`@10x-media/form-builder/react`), which `<Form>` calls internally.
+- A raw `fetch`/REST `POST` to `{apiRoute}/form-submissions` from any HTTP client.
+- Server code calling `payload.create({ collection: 'form-submissions', data: { form, values } })`, or the typed `createSubmission` helper that wraps the identical call:
+
+```ts
+import { createSubmission } from '@10x-media/form-builder'
+
+const submission = await createSubmission(payload, {
+  form: formId,
+  values: [{ field: 'email', value: 'ada@example.com' }],
+  req, // thread the incoming req when there is one
+})
+```
+
+`createSubmission` exists for parity, not new behavior: a script, a queued job, or another collection's hook gets a documented, typed entry point instead of hand-rolling the collection slug and body shape. Pass the incoming `req` when you have one so [spam metadata](/form-builder/spam) (client IP, user agent) and per-identity rate limiting see the real request; without one the submission still runs the full pipeline, just with no request to read those signals from.
+
+`form-submissions` access is `create: () => true` (anonymous submissions are the point of a public form), `read` is logged-in users only, and `update` is disabled entirely, so nothing about a submission is readable or editable through the API by the visitor who sent it. This mirrors Payload's own `@payloadcms/plugin-form-builder`: an open create endpoint backed entirely by collection hooks, not a custom controller in front of it.
+
 ## Renderers
 
 A renderer maps `FieldRendererProps` to markup for one field type. `defineFieldRenderer` pins the value type:

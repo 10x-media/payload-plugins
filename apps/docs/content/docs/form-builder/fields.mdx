@@ -13,6 +13,8 @@ Form fields are authored as Payload blocks: one block type per registered field 
 
 Each field block's **Field** tab lays the shared basics out in rows: name beside label, width beside placeholder, then description, with the required checkbox last. `width` is required with a `full` default, so every field carries an explicit value for the [layout grid](/form-builder/rendering#layout-grid). The rows are presentational only; stored data paths stay flat.
 
+A block's collapsed row header shows the field's own label once it has one, falling back to its translated type name, instead of Payload's default block-name placeholder that reads "Untitled" until filled in.
+
 A type leaves out the basics it never reads via `omitShared`, so an author is never offered a setting the renderer ignores. `checkbox`, `file`, `repeater`, and `date` have no placeholder (every browser ignores one on a date input); `calculation`, being derived and read-only, has neither placeholder nor required. An omission that empties a row drops the row, and a lone survivor spans it. `name` is never omittable: it is the key the answer is stored under.
 
 ## Content localization
@@ -107,4 +109,4 @@ To render a custom type on the frontend, register a matching renderer under the 
 
 Each submission stores typed values plus a localized descriptor snapshot taken at submit time, all validated server-side. The snapshot means a submission stays readable even after the form's fields change: the admin answers view formats each value with the field type's `format`, falling back to the snapshot when a field has been removed or renamed.
 
-Submissions live in the `form-submissions` collection: anonymous create (public forms must submit), read for logged-in users, update closed.
+Submissions live in the `form-submissions` collection: anonymous create (public forms must submit), read for logged-in users, update closed. See [Submit contract](/form-builder/rendering#submit-contract) for the full write path and the ways to reach it.

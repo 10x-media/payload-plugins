@@ -95,6 +95,7 @@ export type {
 	SubmissionDescriptor,
 	SubmissionFieldError,
 	SubmissionValue,
+	SubmissionWidth,
 } from '../submissions/types'
 export type { FileFieldConfig, FileRef, FileRefError } from '../uploads/types'
 export type {

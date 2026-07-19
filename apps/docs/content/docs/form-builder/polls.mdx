@@ -58,7 +58,7 @@ formBuilder({
 
 ## Poll lifecycle
 
-A poll is a form with its top-level **Poll** checkbox on (`pollEnabled` on `FormDocument` and the forms collection alike; there is no more nested `poll.enabled`). Turning it on reveals a **Poll** tab holding `resultsField`, `type`, `resultsVisibility` (`afterVote` | `afterClose`), and an optional `closesAt`. Once `closesAt` passes, the server rejects new submissions for that form (submission-time guard, not just UI) and `<Poll>` renders a closed notice plus the results. `type` decides how, or whether, the winner gets recorded once the poll closes; see [Outcome](#outcome).
+A poll is a form with its top-level **Poll** checkbox on (`pollEnabled` on `FormDocument` and the forms collection alike; there is no more nested `poll.enabled`). Turning it on reveals a **Poll** tab holding `resultsField`, `type`, `resultsVisibility` (`afterVote` | `afterClose`), and an optional `closesAt`. Once `closesAt` passes, the server rejects new submissions for that form (submission-time guard, not just UI) and `<Poll>` renders a closed notice plus the results. `type` decides how, or whether, the winner gets recorded once the poll closes; see [Outcome](#outcome). A poll with no `closesAt` scheduled can also be closed on demand from the admin; see [Closing manually](#closing-manually).
 
 ## Option sources
 
@@ -138,7 +138,7 @@ An author adds an `athleteVote` field, marks a few athletes voteable, and picks 
 
 When the real-world result is decided ("which athlete won?"), record it one of two ways; both land in `poll.outcome.winningValues` (a set, so a tie records every winner), both validate each value against the poll's current options (source-resolved, `resolveOptions`-backed, or authored), and both stamp `resolvedAt` server-side.
 
-**In the admin.** The outcome group's winning-values multi-select loads the poll's effective options from the authenticated `GET /api/forms/:id/poll-options` endpoint, so an editor opens the form after the race and picks the winner (or several on a tie); clearing the select reopens the outcome. `resolvedAt` itself stays locked (a beforeChange hook stamps it whenever the winner set is set, changed, or cleared; direct writes are dropped). The group is composable through the `poll.outcomeFields` seam, which hands you the two default fields (`winningValues`, `resolvedAt`) to reorder, wrap, or swap the winner picker for a component of your own (see [Customization](/form-builder/customization#poll-outcome-fields)); membership validation runs server-side regardless, so a swap cannot bypass it.
+**In the admin.** The outcome group's winning-values multi-select loads the poll's effective options from the authenticated `GET /api/forms/:id/poll-options` endpoint, so an editor opens the form after the race and picks the winner (or several on a tie); clearing the select reopens the outcome. `resolvedAt` itself stays locked (a beforeChange hook stamps it whenever the winner set is set, changed, or cleared; direct writes are dropped). The group is composable through the `poll.outcomeFields` seam, which hands you the two default fields (`winningValues`, `resolvedAt`) to reorder, wrap, or swap the winner picker for a component of your own (see [Customization](/form-builder/customization#poll-outcome-fields)); membership validation runs server-side regardless, so a swap cannot bypass it. For a `mostVoted` poll the multi-select is hidden entirely: that type manages its own outcome, set automatically when the poll closes, so there is nothing to hand-pick.
 
 The select is document-scoped, so it stays empty on a form that has never been saved: there is no id yet for the endpoint to resolve options against. This costs nothing in practice, since a poll only has a winner after it has run, but it does mean the winner cannot be set in the same breath as creating the form. Save first, then pick.
 
@@ -154,7 +154,7 @@ const winners = await resolvePollOutcome({ payload, formId }) // auto, via the p
 
 ### Poll types
 
-Three types ship, always registered, selected from the poll's `type` field (default `manual`):
+Three types ship, always registered, selected from the poll's `type` field (default `manual`), described as "How the winning option is decided when the poll closes." The select reads `Set the winner manually`, `Most-voted option wins`, and `Winner from the option source`; the last is hidden from the select until at least one poll option source is registered (the strategy itself stays addressable via `poll.types` regardless):
 
 | `type` | Resolves to |
 |---|---|
@@ -215,6 +215,10 @@ A poll with a `closesAt` and a non-`manual` type schedules its own resolution: o
 Without a runner (or if one missed the window), a closed, unresolved, non-`manual` poll also resolves opportunistically the next time its results are read, by an admin or through the public results endpoint alike: the read resolves first if needed, then serves the now-current results in the same request. The scheduled job and the read-time fallback share one gate (closed, unresolved, not `manual`), so either firing after the outcome is already recorded is a safe no-op.
 
 Both paths validate against one set, `resolveEffectivePollOptions` (exported from the root and `/rsc`): source-resolved options when the poll has an `optionSource`, the results field type's own `resolveOptions` when it declares one, otherwise the field's authored options. It backs the admin select, the endpoint, and outcome validation alike, so what the admin offers and what the server accepts cannot drift. Call it directly to render a winner picker of your own.
+
+### Closing manually
+
+A poll with no `closesAt` scheduled shows a **Close poll now** button in the Poll tab (once `closesAt` is set the poll closes on its own, so the button disappears). Clicking it posts to an authenticated `POST /api/forms/:id/close`, which stamps `closesAt` to the current time through the usual `payload.update` (so every closing side effect still runs) and then, for `mostVoted` or `source`, resolves the outcome the same way the scheduled job would. A `manual` poll must already have a winner recorded: closing refuses with an error asking you to set one first, so a poll can never end up closed with no result. Closing an already-closed poll is refused the same way, so the action is safe to click only once it matters.
 
 ## Rendering results
 
