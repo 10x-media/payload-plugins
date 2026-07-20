@@ -421,6 +421,7 @@ export const syncCallHistory = async ({
 	const history = await getCallHistory(rest, {
 		limit: 100,
 		...params,
+		...(sipgateUserId ? { sipgateUserId } : {}),
 	})
 	const entries = normalizeCallHistory(history)
 	let synced = 0

@@ -127,7 +127,7 @@ export const createSipgateOAuthSync = ({
 			}
 		}
 
-		if (type === 'call-logs') {
+		if (type === 'call-logs' || type === 'all') {
 			try {
 				const result = await syncCallHistoryOAuth({
 					payload: req.payload,

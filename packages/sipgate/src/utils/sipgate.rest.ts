@@ -80,9 +80,12 @@ export const getContacts = async (rest: SipgateRestFetch) => {
 
 export const getCallHistory = async (
 	rest: SipgateRestFetch,
-	params?: SipgateHistoryParams
+	params?: SipgateHistoryParams & { sipgateUserId?: string }
 ): Promise<NeoCallEvent[]> => {
-	return getNeoCallHistory(rest, params?.limit != null ? { limit: params.limit } : undefined)
+	return getNeoCallHistory(rest, {
+		...(params?.limit != null ? { limit: params.limit } : {}),
+		...(params?.sipgateUserId ? { sipgateUserId: params.sipgateUserId } : {}),
+	})
 }
 
 export type SipgateDialProps = {
