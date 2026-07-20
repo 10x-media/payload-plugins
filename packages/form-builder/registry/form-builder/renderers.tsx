@@ -9,6 +9,7 @@ import { emailField } from './fields/email-field'
 import { fileField } from './fields/file-field'
 import { messageField } from './fields/message-field'
 import { numberField } from './fields/number-field'
+import { countryField, stateField } from './fields/region-field'
 import { repeaterField } from './fields/repeater-field'
 import { selectField } from './fields/select-field'
 import { textField } from './fields/text-field'
@@ -28,4 +29,6 @@ export const shadcnRenderers: RenderersConfig = {
 	consent: consentField as FieldRenderer,
 	calculation: calculationField as FieldRenderer,
 	repeater: repeaterField as FieldRenderer,
+	country: countryField as FieldRenderer,
+	state: stateField as FieldRenderer,
 }

@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { defaultRenderers } from '@10x-media/form-builder/react'
 import { describe, expect, it } from 'vitest'
+import { shadcnRenderers } from './form-builder/renderers'
 
 const registryDir = dirname(fileURLToPath(import.meta.url))
 const registry = JSON.parse(readFileSync(resolve(registryDir, 'registry.json'), 'utf8')) as {
@@ -56,5 +58,13 @@ describe('registry.json', () => {
 		expect(block?.registryDependencies).toEqual(
 			expect.arrayContaining(['input', 'textarea', 'label'])
 		)
+	})
+})
+
+describe('registry renderer parity', () => {
+	it('ships a shadcn renderer for every built-in field type', () => {
+		// The registry copies are hand-maintained; assert they cover exactly the package's
+		// built-in renderer set so a new field type cannot ship without its shadcn renderer.
+		expect(Object.keys(shadcnRenderers).sort()).toEqual(Object.keys(defaultRenderers).sort())
 	})
 })
