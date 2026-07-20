@@ -331,6 +331,7 @@ export const sipgate = definePlugin<SipgatePluginOptions>({
 					access: options.access,
 					singleUserEmail: options.singleUser?.email,
 					sipgateUsersSlug,
+					sipgateChannelsSlug,
 					overrides: options.overrides?.sipgateDial,
 				})
 			)

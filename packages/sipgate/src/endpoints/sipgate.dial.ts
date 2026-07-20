@@ -8,6 +8,7 @@ type CreateSipgateDialOptions = {
 	access?: SipgateAccess
 	singleUserEmail?: string
 	sipgateUsersSlug?: string
+	sipgateChannelsSlug?: string
 	overrides?: Partial<Endpoint>
 }
 
@@ -16,12 +17,19 @@ export const createSipgateDial = ({
 	access,
 	singleUserEmail,
 	sipgateUsersSlug,
+	sipgateChannelsSlug,
 	overrides,
 }: CreateSipgateDialOptions): Endpoint => {
 	const defaultEndpoint: Endpoint = {
 		path: '/sipgate/dial',
 		method: 'post',
-		handler: createSipgateDialHandler({ credentials, access, singleUserEmail, sipgateUsersSlug }),
+		handler: createSipgateDialHandler({
+			credentials,
+			access,
+			singleUserEmail,
+			sipgateUsersSlug,
+			sipgateChannelsSlug,
+		}),
 	}
 	return deepMerge<Endpoint>(defaultEndpoint, overrides ?? {})
 }

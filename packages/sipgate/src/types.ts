@@ -58,7 +58,9 @@ export type SipgateCredentials = {
 	channelId?: string
 
 	/**
-	 * Outbound caller ID shown to the callee. Defaults to the device's assigned number if omitted.
+	 * Outbound caller ID shown to the callee. Must be a valid E.164 phone number
+	 * (with or without leading `+`). Never a device ID. When omitted, dial resolves
+	 * it from the request body or the selected channel's name.
 	 */
 	callerId?: string
 }
