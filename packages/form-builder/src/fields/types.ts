@@ -103,6 +103,12 @@ export type FormFieldDefinition<
 	validate?: FormFieldValidate<K, TConfig>
 	format?: FormFieldFormat<K, TConfig>
 	Field?: string
+	/**
+	 * Import-map ref for a custom block row Label, replacing the default `FieldBlockLabel` for this
+	 * type's add-field block. Receives the same `{ typeLabelKey }` clientProps. The `consent` type
+	 * uses this to resolve and show the referenced source's name.
+	 */
+	blockLabel?: string
 	/** Optional Standard Schema validator (Zod/Valibot/etc.), run by the engine after the intrinsic validator. */
 	schema?: StandardSchemaV1
 	icon?: string
@@ -166,6 +172,8 @@ export type AnyFormFieldDefinition = {
 	validate?: AnyFormFieldValidate
 	format?: AnyFormFieldFormat
 	Field?: string
+	/** See `FormFieldDefinition.blockLabel`: import-map ref for a custom block row Label. */
+	blockLabel?: string
 	schema?: StandardSchemaV1
 	icon?: string
 	group?: string

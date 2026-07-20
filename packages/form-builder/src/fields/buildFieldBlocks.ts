@@ -13,8 +13,11 @@ const FIELD_BLOCK_LABEL_REF = '@10x-media/form-builder/client#FieldBlockLabel'
  * Replace Payload's default `blockName` row header (which reads "Untitled" until filled) with the
  * field's own `label`, keyed to the type label as fallback. See `FieldBlockLabel`.
  */
-const blockLabelAdmin = (typeLabelKey: string): NonNullable<Block['admin']> => ({
-	components: { Label: { path: FIELD_BLOCK_LABEL_REF, clientProps: { typeLabelKey } } },
+const blockLabelAdmin = (
+	typeLabelKey: string,
+	ref: string = FIELD_BLOCK_LABEL_REF
+): NonNullable<Block['admin']> => ({
+	components: { Label: { path: ref, clientProps: { typeLabelKey } } },
 })
 
 /** Whether `fields` contains a field named `name`, descending into presentational rows. */
@@ -61,7 +64,7 @@ export const buildFieldBlocks = ({
 			blocks.push({
 				slug: definition.type,
 				labels: { singular: labelFor(definition.label), plural: labelFor(definition.label) },
-				admin: blockLabelAdmin(definition.label),
+				admin: blockLabelAdmin(definition.label, definition.blockLabel),
 				fields: typeConfig,
 			})
 			continue
@@ -70,7 +73,7 @@ export const buildFieldBlocks = ({
 		blocks.push({
 			slug: definition.type,
 			labels: { singular: labelFor(definition.label), plural: labelFor(definition.label) },
-			admin: blockLabelAdmin(definition.label),
+			admin: blockLabelAdmin(definition.label, definition.blockLabel),
 			fields: [
 				fieldBlockTabs({
 					conditionTypes,

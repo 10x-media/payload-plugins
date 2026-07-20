@@ -34,6 +34,7 @@ import { FlowBuilder as FlowBuilder_bf8585411c882b493b730d03575f3f2f } from '@10
 import { ClosePollButton as ClosePollButton_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { CondensedArray as CondensedArray_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { ConsentSourceRowLabel as ConsentSourceRowLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { ConsentBlockLabel as ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -74,5 +75,6 @@ export const importMap = {
   "@10x-media/form-builder/client#ClosePollButton": ClosePollButton_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#CondensedArray": CondensedArray_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#ConsentSourceRowLabel": ConsentSourceRowLabel_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#ConsentBlockLabel": ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }
