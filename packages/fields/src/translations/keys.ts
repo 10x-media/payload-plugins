@@ -37,8 +37,9 @@ export const keys = {
 	format: 'fields:format',
 	reveal: 'fields:reveal',
 	conceal: 'fields:conceal',
+	showValue: 'fields:showValue',
+	hideValue: 'fields:hideValue',
 	encryptedValue: 'fields:encryptedValue',
-	richTextApiOnly: 'fields:richTextApiOnly',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

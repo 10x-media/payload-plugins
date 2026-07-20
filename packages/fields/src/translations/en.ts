@@ -39,6 +39,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.format]: 'Format',
 	[keys.reveal]: 'Reveal',
 	[keys.conceal]: 'Conceal',
+	[keys.showValue]: 'Show value',
+	[keys.hideValue]: 'Hide value',
 	[keys.encryptedValue]: 'Encrypted value',
-	[keys.richTextApiOnly]: 'Encrypted rich text is edited via the API. This view is read-only.',
 }

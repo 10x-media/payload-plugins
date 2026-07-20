@@ -35,6 +35,12 @@ export type EncryptedProtection = 'masked' | 'none'
 
 export interface EncryptedFieldOptions {
 	keys?: KeysConfig
+	/**
+	 * Cosmetic number of dots shown while the field is concealed in the admin.
+	 * Decoupled from the real value length (unknown until reveal). Clamped to
+	 * [1, 64] at the factory; defaults to 8. Ignored by the checkbox facsimile.
+	 */
+	maskDots?: number
 	onDecryptFailure?: DecryptFailurePolicy
 	overrides?: (args: { field: TextField }) => TextField
 	protection?: EncryptedProtection

@@ -1,10 +1,19 @@
-import type { Field, TextField } from 'payload'
+import type { Field, RichTextField, TextField } from 'payload'
 import { validateKeysConfig } from './crypto/keys'
-import { makeAfterReadHook, makeBeforeChangeHook } from './hooks'
+import {
+	makeAfterReadHook,
+	makeBeforeChangeHook,
+	makeRichTextCiphertextHook,
+	makeRichTextDecryptHook,
+	makeRichTextSealHook,
+	makeRichTextValidate,
+} from './hooks'
+import { clampMaskDots } from './maskDots'
 import {
 	type EncryptedFieldMarker,
 	type EncryptedFieldOptions,
 	type EncryptedFieldPatch,
+	type EncryptedProtection,
 	type EncryptedSourceField,
 	type EncryptedSourceType,
 	FIELDS_CUSTOM_KEY,
@@ -63,16 +72,87 @@ const buildFieldPatch = (source: EncryptedSourceField): EncryptedFieldPatch => {
 }
 
 /**
+ * Emits the two-field pair for an encrypted richText source: a real, virtual
+ * (never persisted) richText field carrying the app's full editor for editing,
+ * synced by hooks to a hidden ciphertext text sibling that holds the data at
+ * rest. A `type:'text'` field cannot trigger Payload's richText schema/import-map
+ * pipeline, so a real richText field is required for full node parity; `virtual`
+ * keeps its plaintext out of both DB adapters (they skip virtual fields).
+ */
+const buildRichTextFields = (args: {
+	marker: EncryptedFieldMarker
+	protection: EncryptedProtection
+	source: RichTextField
+}): Field[] => {
+	const { marker, protection, source } = args
+	const storedName = `${source.name}_encrypted`
+	const sourceAdmin = source.admin ?? {}
+	const virtual: RichTextField = {
+		...source,
+		// editor is inherited from config.editor (or source.editor if pinned) so the
+		// app's complete node set mounts; readOnly:false is required or sanitize
+		// forces a virtual affectsData field readOnly.
+		admin: {
+			...sourceAdmin,
+			components: {
+				...sourceAdmin.components,
+				...(protection === 'masked'
+					? {
+							Field: {
+								path: '@10x-media/fields/rsc#ProtectedRichText',
+								serverProps: { protection },
+							},
+						}
+					: {}),
+			},
+			readOnly: false,
+		},
+		hooks: {
+			...source.hooks,
+			afterRead: [makeRichTextDecryptHook(marker, storedName), ...(source.hooks?.afterRead ?? [])],
+			beforeChange: [
+				...(source.hooks?.beforeChange ?? []),
+				makeRichTextSealHook(marker, storedName),
+			],
+		},
+		type: 'richText',
+		validate: makeRichTextValidate(),
+		virtual: true,
+	}
+	const ciphertext: TextField = {
+		name: storedName,
+		type: 'text',
+		// admin.hidden (not top-level hidden) keeps the value readable by the virtual
+		// field's decrypt hook; top-level hidden strips it early in afterRead and
+		// races the decrypt read.
+		admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+		custom: { [FIELDS_CUSTOM_KEY]: { encrypted: marker } },
+		hooks: { beforeChange: [makeRichTextCiphertextHook(marker)] },
+		...(marker.localized ? { localized: true } : {}),
+	}
+	return [virtual, ciphertext]
+}
+
+/**
  * Wraps a Payload field config (text, textarea, email, number, checkbox,
  * date, select, radio, code, json, point, richText) in transparent AES-256-GCM
  * encryption at rest. Returns `[storedField]`, or `[storedField, bidxField]`
- * when `queryable` adds a blind-index sibling; spread into `fields: [...]`.
+ * when `queryable` adds a blind-index sibling; richText returns
+ * `[virtualEditorField, ciphertextField]`. Spread into `fields: [...]`.
  */
 export const encryptedField = (
 	source: EncryptedSourceField,
 	options: EncryptedFieldOptions = {}
 ): Field[] => {
-	const { keys, onDecryptFailure, overrides, protection = 'masked', queryable = false } = options
+	const {
+		keys,
+		maskDots: maskDotsOption,
+		onDecryptFailure,
+		overrides,
+		protection = 'masked',
+		queryable = false,
+	} = options
+	const maskDots = clampMaskDots(maskDotsOption)
 	if (keys) {
 		validateKeysConfig(keys)
 	}
@@ -93,11 +173,6 @@ export const encryptedField = (
 			`@10x-media/fields: encryptedField '${source.name}': unique requires queryable: true (uniqueness is enforced on the blind index; every ciphertext is unique by construction)`
 		)
 	}
-	if (source.type === 'richText' && protection === 'none') {
-		throw new Error(
-			`@10x-media/fields: encryptedField '${source.name}': richText is masked-only in the admin (the editor cannot run on an encrypted backing field); edit via the API`
-		)
-	}
 
 	const marker: EncryptedFieldMarker = {
 		bidxName: queryable ? `${source.name}_bidx` : undefined,
@@ -110,6 +185,14 @@ export const encryptedField = (
 		queryable,
 		sourceType: source.type,
 	}
+
+	// richText returns a virtual editor field plus a hidden ciphertext sibling.
+	// `overrides` targets the scalar stored text column shape, so it does not apply
+	// to the richText editor field and is intentionally skipped here.
+	if (source.type === 'richText') {
+		return buildRichTextFields({ marker, protection, source })
+	}
+
 	const effective = makeEffectiveValidator(source)
 	const fieldPatch = buildFieldPatch(source)
 	// `source` is a union of 12 field types, so `source.admin` (and its
@@ -148,14 +231,19 @@ export const encryptedField = (
 		...(hasMany ? { hasMany: true } : {}),
 		admin: {
 			...sourceAdmin,
+			// A non-queryable encrypted field can only ever filter its ciphertext
+			// column (matching nothing), so keep it out of the list filter UI. A
+			// queryable field stays filterable; the where-rewrite maps it to the
+			// blind index.
+			...(queryable ? {} : { disableListFilter: true }),
 			components: {
 				...(sourceAdmin?.components ?? {}),
 				Field: {
-					clientProps: { componentKey: source.type, fieldPatch, protection },
+					clientProps: { componentKey: source.type, fieldPatch, maskDots, protection },
 					path: '@10x-media/fields/client#ProtectedField',
 				},
 				...(protection === 'masked'
-					? { Cell: { path: '@10x-media/fields/rsc#ProtectedCell' } }
+					? { Cell: { clientProps: { maskDots }, path: '@10x-media/fields/rsc#ProtectedCell' } }
 					: {}),
 			},
 		},
@@ -177,10 +265,17 @@ export const encryptedField = (
 		return [stored]
 	}
 
+	// admin.hidden (not top-level `hidden: true`) keeps the blind index in the
+	// flattened schema so Payload's query-path validation grants it read
+	// permission and the where-rewrite can target it; top-level hidden makes a
+	// rewritten `equals` query fail with a 403. The keyed hash is stripped from
+	// API responses by the plugin's collection afterRead (see withEncryptedQueryRewrite)
+	// so the index value never leaves the server; exposing it lets a reader see
+	// which rows share a value.
 	const bidx: TextField = {
 		name: marker.bidxName as string,
 		type: 'text',
-		hidden: true,
+		admin: { disableListColumn: true, disableListFilter: true, hidden: true },
 		index: true,
 		...(marker.localized ? { localized: true } : {}),
 		...(unique ? { unique: true } : {}),

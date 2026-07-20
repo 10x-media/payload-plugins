@@ -1,11 +1,9 @@
 'use client'
 import {
-	Button,
 	CheckboxField,
 	CodeField,
 	DateTimeField,
 	EmailField,
-	FieldLabel,
 	JSONField,
 	NumberField,
 	PointField,
@@ -13,14 +11,18 @@ import {
 	SelectField,
 	TextareaField,
 	TextField,
-	useField,
+	useFormFields,
 } from '@payloadcms/ui'
-import type { StaticLabel, TextFieldClientProps } from 'payload'
+import type { TextFieldClientProps } from 'payload'
 import type React from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { keys } from '../../../translations/keys'
-import { useTranslation } from '../../../translations/useTranslation'
+import { useMemo, useState } from 'react'
+import { clampMaskDots } from '../maskDots'
 import type { EncryptedFieldPatch, EncryptedProtection } from '../types'
+import { EncryptedInput } from './EncryptedInput'
+import { EncryptedTextarea } from './EncryptedTextarea'
+import type { EncryptedFieldConfig } from './placement'
+import { placementFor } from './placement'
+import { StructuralField } from './StructuralField'
 import './ProtectedField.css'
 
 /**
@@ -46,99 +48,47 @@ const NATIVE: Record<string, AnyFieldComponent> = {
 export interface ProtectedFieldProps extends TextFieldClientProps {
 	componentKey: string
 	fieldPatch: EncryptedFieldPatch
+	maskDots?: number
 	protection: EncryptedProtection
 }
 
 /**
- * Concealed display: a static mask plus a reveal toggle. Deliberately does NOT
- * call useField or bind to the field value. afterRead already placed plaintext
- * in form state; a concealed submit must resubmit that untouched plaintext. If
- * the mask string ever entered form state, the seal hook (guarded only by
- * isSealed) would seal the placeholder as the secret. The mask stays a
- * display-only span.
+ * A field with no stored content has nothing to conceal, so it renders unmasked
+ * (the plain native control). Captured once at mount, so characters typed into a
+ * field that started empty stay visible and the field never flips to masked
+ * mid-entry; a field that already holds content is masked until revealed.
  */
-const MaskRow: React.FC<{
-	buttonRef: React.RefObject<HTMLButtonElement | null>
-	label: StaticLabel | undefined
-	onReveal: () => void
-	path: string
-	required?: boolean
-}> = ({ buttonRef, label, onReveal, path, required }) => {
-	const { t } = useTranslation()
-	return (
-		<div className="field-type tenx-protected-field">
-			<FieldLabel label={label} path={path} required={required} />
-			<div className="tenx-protected-field__row">
-				<span aria-label={t(keys.encryptedValue)} className="tenx-protected-field__mask" role="img">
-					&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;
-				</span>
-				<Button buttonStyle="secondary" onClick={onReveal} ref={buttonRef} size="small">
-					{t(keys.reveal)}
-				</Button>
-			</div>
-		</div>
-	)
-}
-
-const RichTextJsonView: React.FC<{ path: string } & Pick<ProtectedFieldProps, 'field'>> = ({
-	field,
-	path,
-}) => {
-	const { t } = useTranslation()
-	const { value } = useField<unknown>({ path })
-	return (
-		<div className="field-type tenx-protected-field">
-			<FieldLabel label={field.label} path={path} required={field.required} />
-			<p className="tenx-protected-field__notice">{t(keys.richTextApiOnly)}</p>
-			{/* biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be keyboard-focusable for scroll access (WCAG 2.1.1) */}
-			<pre className="tenx-protected-field__json" tabIndex={0}>
-				{value == null ? '' : JSON.stringify(value, null, 2)}
-			</pre>
-		</div>
-	)
+const isEmptyValue = (value: unknown): boolean => {
+	if (value == null || value === '') {
+		return true
+	}
+	if (Array.isArray(value)) {
+		return value.length === 0 || value.every((item) => item == null)
+	}
+	return false
 }
 
 /**
- * Single admin dispatcher for encrypted fields. Concealed state renders a
- * masked row plus a reveal toggle; revealed (or protection 'none') renders the
- * true native component for the original type, with the serializable fieldPatch
- * restoring type-specific config (options, hasMany, date admin).
+ * Single admin dispatcher for scalar and structural encrypted fields (richText
+ * is its own virtual-editor field pair, wired to ProtectedRichText). Each type
+ * renders as its native variant with a fixed run of dots while concealed, and an
+ * inline eye toggle that swaps to the real editable native component on reveal.
+ * The fieldPatch restores type-specific config (options, hasMany, date admin) on
+ * the revealed component.
  *
  * Masking is visual-only by design. afterRead decrypts server-side, so the
- * field's form value is already plaintext regardless of the mask, and the mask
- * never binds to that value. Two accepted consequences: (a) the plaintext
- * reaches an authorized admin's browser, since that admin already has field
- * read access and masking only stops casual over-the-shoulder display; (b)
- * saving an unchanged document re-seals with a fresh IV (version churn),
- * because the form holds plaintext, not the stored ciphertext.
+ * field's form value is already plaintext regardless of the mask, and no masked
+ * facsimile binds to that value. Two accepted consequences: (a) the plaintext
+ * reaches an authorized admin's browser, since that admin already has field read
+ * access and masking only stops casual over-the-shoulder display; (b) saving an
+ * unchanged document re-seals with a fresh IV (version churn), because the form
+ * holds plaintext, not the stored ciphertext.
  */
 export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 	const { componentKey, field, fieldPatch, path, protection } = props
-	const { t } = useTranslation()
-	const [revealed, setRevealed] = useState(protection === 'none')
-
-	// Toggling revealed swaps the trigger out of the tree, so focus would fall to
-	// <body> (WCAG 2.4.3). Move it to the newly mounted control instead: the revealed
-	// native input, else the Conceal button (richText/code render no focusable input),
-	// and back to the Reveal button on conceal. Compare against the previous value so a
-	// StrictMode remount never steals focus on first render.
-	const revealButtonRef = useRef<HTMLButtonElement>(null)
-	const concealButtonRef = useRef<HTMLButtonElement>(null)
-	const revealedRef = useRef<HTMLDivElement>(null)
-	const prevRevealedRef = useRef(revealed)
-	useEffect(() => {
-		if (prevRevealedRef.current === revealed) return
-		prevRevealedRef.current = revealed
-		if (revealed) {
-			const input = revealedRef.current?.querySelector<HTMLElement>(
-				'input:not([type="hidden"]), textarea, select'
-			)
-			if (input) input.focus()
-			else concealButtonRef.current?.focus()
-		} else {
-			revealButtonRef.current?.focus()
-		}
-	}, [revealed])
+	const maskDots = clampMaskDots(props.maskDots)
+	const startedEmptyNow = useFormFields(([fields]) => isEmptyValue(fields?.[path]?.value))
+	const [startedEmpty] = useState(startedEmptyNow)
 
 	const patchedField = useMemo(
 		() => ({
@@ -149,64 +99,40 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 		[field, fieldPatch]
 	)
 
-	if (componentKey === 'richText') {
-		if (!revealed) {
-			return (
-				<MaskRow
-					buttonRef={revealButtonRef}
-					label={field.label}
-					onReveal={() => setRevealed(true)}
-					path={path}
-					required={field.required}
-				/>
-			)
-		}
-		return (
-			<div className="tenx-protected-field" ref={revealedRef}>
-				<div className="tenx-protected-field__toolbar">
-					<Button
-						buttonStyle="pill"
-						onClick={() => setRevealed(false)}
-						ref={concealButtonRef}
-						size="small"
-					>
-						{t(keys.conceal)}
-					</Button>
-				</div>
-				<RichTextJsonView field={field} path={path} />
-			</div>
-		)
+	const Native = NATIVE[componentKey] ?? (TextField as AnyFieldComponent)
+	const nativeProps = { ...(props as unknown as Record<string, unknown>), field: patchedField }
+
+	if (protection === 'none' || startedEmpty) {
+		return <Native {...nativeProps} />
 	}
 
-	if (!revealed) {
+	const faceField = patchedField as unknown as EncryptedFieldConfig
+	const hasMany = fieldPatch.hasMany === true
+	const placement = placementFor(componentKey, hasMany)
+
+	if (placement === 'attached') {
 		return (
-			<MaskRow
-				buttonRef={revealButtonRef}
-				label={field.label}
-				onReveal={() => setRevealed(true)}
+			<EncryptedInput
+				field={faceField}
+				kind={componentKey as 'email' | 'number' | 'text'}
+				maskDots={maskDots}
 				path={path}
-				required={field.required}
 			/>
 		)
 	}
 
-	const Native = NATIVE[componentKey] ?? (TextField as AnyFieldComponent)
-	if (protection === 'none') {
-		return <Native {...(props as unknown as Record<string, unknown>)} field={patchedField} />
+	if (placement === 'corner') {
+		return <EncryptedTextarea field={faceField} maskDots={maskDots} path={path} />
 	}
+
 	return (
-		<div className="tenx-protected-field" ref={revealedRef}>
-			<div className="tenx-protected-field__toolbar">
-				<Button
-					buttonStyle="pill"
-					onClick={() => setRevealed(false)}
-					ref={concealButtonRef}
-					size="small"
-				>
-					{t(keys.conceal)}
-				</Button>
-			</div>
-			<Native {...(props as unknown as Record<string, unknown>)} field={patchedField} />
-		</div>
+		<StructuralField
+			componentKey={componentKey}
+			field={faceField}
+			maskDots={maskDots}
+			Native={Native}
+			nativeProps={nativeProps}
+			path={path}
+		/>
 	)
 }

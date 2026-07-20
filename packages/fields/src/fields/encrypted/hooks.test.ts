@@ -2,7 +2,15 @@ import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { resolveKeys } from './crypto/keys'
 import { isSealed, seal, unseal } from './crypto/wire'
-import { makeBeforeChangeHook, readAadCandidates, sealAad } from './hooks'
+import {
+	makeBeforeChangeHook,
+	makeRichTextCiphertextHook,
+	makeRichTextDecryptHook,
+	makeRichTextSealHook,
+	makeRichTextValidate,
+	readAadCandidates,
+	sealAad,
+} from './hooks'
 import { ENCRYPTED_CONTEXT_KEY, type EncryptedFieldMarker } from './types'
 import { makeComposedValidate } from './validators'
 
@@ -167,6 +175,174 @@ describe('makeBeforeChangeHook seal behavior (real crypto)', () => {
 		const stash = (req.context as Record<string, Record<string, unknown>>)
 			.__tenxFieldsEncryptedPlaintext
 		expect(stash?.[out as string]).toBe('secret')
+	})
+})
+
+const richMarker = (localized = false): EncryptedFieldMarker =>
+	sealMarker({ fieldName: 'body', localized, sourceType: 'richText' })
+
+const STORED = 'body_encrypted'
+const EDITOR_STATE = {
+	root: { children: [{ children: [{ text: 'secret note', type: 'text' }], type: 'paragraph' }] },
+}
+
+const callRichSeal = (args: {
+	marker: EncryptedFieldMarker
+	req: PayloadRequest
+	siblingData?: Record<string, unknown>
+	value: unknown
+}) => {
+	const siblingData = args.siblingData ?? {}
+	const hook = makeRichTextSealHook(args.marker, STORED)
+	const result = hook({
+		collection: { slug: 'users' },
+		global: null,
+		req: args.req,
+		siblingData,
+		value: args.value,
+	} as unknown as Parameters<typeof hook>[0])
+	return { result, siblingData }
+}
+
+const callRichDecrypt = (
+	m: EncryptedFieldMarker,
+	siblingData: Record<string, unknown>,
+	req: PayloadRequest
+) => {
+	const hook = makeRichTextDecryptHook(m, STORED)
+	return hook({
+		collection: { slug: 'users' },
+		context: req.context,
+		global: null,
+		req,
+		siblingData,
+		value: undefined,
+	} as unknown as Parameters<typeof hook>[0])
+}
+
+describe('richText sync hooks (virtual editor field <-> ciphertext sibling)', () => {
+	it('seals into the ciphertext sibling and returns the plaintext unchanged', async () => {
+		const { result, siblingData } = callRichSeal({
+			marker: richMarker(),
+			req: hookReq(),
+			value: EDITOR_STATE,
+		})
+		// The virtual value is returned untouched (Payload drops it at the DB write).
+		expect(await result).toBe(EDITOR_STATE)
+		expect(isSealed(siblingData[STORED])).toBe(true)
+	})
+
+	it('round-trips: decrypt reads the ciphertext sibling back to the editor state', async () => {
+		const { result, siblingData } = callRichSeal({
+			marker: richMarker(),
+			req: hookReq(),
+			value: EDITOR_STATE,
+		})
+		await result
+		const decrypted = await callRichDecrypt(richMarker(), siblingData, hookReq())
+		expect(decrypted).toEqual(EDITOR_STATE)
+	})
+
+	it('leaves the existing ciphertext untouched when the virtual value is absent', async () => {
+		const { result, siblingData } = callRichSeal({
+			marker: richMarker(),
+			req: hookReq(),
+			siblingData: { [STORED]: 'preexisting-ciphertext' },
+			value: undefined,
+		})
+		expect(await result).toBeUndefined()
+		expect(siblingData[STORED]).toBe('preexisting-ciphertext')
+	})
+
+	it('clears the ciphertext sibling when the value is null', async () => {
+		const { result, siblingData } = callRichSeal({
+			marker: richMarker(),
+			req: hookReq(),
+			siblingData: { [STORED]: 'old' },
+			value: null,
+		})
+		expect(await result).toBeNull()
+		expect(siblingData[STORED]).toBeNull()
+	})
+
+	it('does not seal under utility context modes (rotate owns the ciphertext then)', async () => {
+		const req = hookReq()
+		;(req.context as Record<string, unknown>)[ENCRYPTED_CONTEXT_KEY] = 'rotate'
+		const { result, siblingData } = callRichSeal({ marker: richMarker(), req, value: EDITOR_STATE })
+		expect(await result).toBe(EDITOR_STATE)
+		expect(siblingData[STORED]).toBeUndefined()
+	})
+
+	it('decrypt passes through under utility context modes without touching the sibling', async () => {
+		const req = hookReq()
+		;(req.context as Record<string, unknown>)[ENCRYPTED_CONTEXT_KEY] = 'raw'
+		const siblingData = { [STORED]: 'raw-ciphertext' }
+		expect(await callRichDecrypt(richMarker(), siblingData, req)).toBeUndefined()
+	})
+
+	it('decrypt returns the raw ciphertext when the value is not sealed (passthrough policy)', async () => {
+		const marker: EncryptedFieldMarker = { ...richMarker(), onDecryptFailure: 'passthrough' }
+		const siblingData = { [STORED]: 'not-sealed' }
+		expect(await callRichDecrypt(marker, siblingData, hookReq())).toBe('not-sealed')
+	})
+})
+
+describe('richText ciphertext hook (rotate-only)', () => {
+	const callCipher = (value: unknown, req: PayloadRequest) => {
+		const hook = makeRichTextCiphertextHook(richMarker())
+		return hook({
+			collection: { slug: 'users' },
+			global: null,
+			req,
+			siblingData: {},
+			value,
+		} as unknown as Parameters<typeof hook>[0])
+	}
+
+	it('is a no-op in normal mode (the seal hook is the sole producer)', async () => {
+		expect(await callCipher('anything', hookReq())).toBeUndefined()
+	})
+
+	it('passes a value already on the active key through unchanged under rotate', async () => {
+		const ring = await resolveKeys(undefined, SECRET)
+		const sealed = seal({
+			aad: 'users.body',
+			key: ring.dataKeys.get(ring.activeId) as Buffer,
+			keyId: ring.activeId,
+			plaintext: EDITOR_STATE,
+		})
+		const req = hookReq()
+		;(req.context as Record<string, unknown>)[ENCRYPTED_CONTEXT_KEY] = 'rotate'
+		expect(await callCipher(sealed, req)).toBe(sealed)
+	})
+})
+
+describe('richText validate (delegates to the editor, guards utility flows)', () => {
+	const validate = makeRichTextValidate()
+
+	it('skips utility context modes so rotation never trips a required check', () => {
+		const options = { req: { context: { [ENCRYPTED_CONTEXT_KEY]: 'rotate' } } }
+		expect(validate(undefined, options as never)).toBe(true)
+	})
+
+	it('skips an absent value (partial write / utility patch)', () => {
+		expect(validate(undefined, { req: { context: {} } } as never)).toBe(true)
+	})
+
+	it('delegates to the editor validate with the plaintext value', () => {
+		let seen: unknown
+		const editor = {
+			validate: (value: unknown) => {
+				seen = value
+				return 'required'
+			},
+		}
+		expect(validate(EDITOR_STATE, { editor, req: { context: {} } } as never)).toBe('required')
+		expect(seen).toBe(EDITOR_STATE)
+	})
+
+	it('passes when no editor validate is present', () => {
+		expect(validate(EDITOR_STATE, { req: { context: {} } } as never)).toBe(true)
 	})
 })
 

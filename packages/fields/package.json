@@ -132,6 +132,7 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@payloadcms/richtext-lexical": "^3.83.0",
 		"@payloadcms/ui": "^3.83.0",
 		"@radix-ui/react-icons": "^1.3.0",
 		"@tabler/icons-react": "^3.0.0",
@@ -141,6 +142,9 @@
 		"react-dom": "^19.0.0"
 	},
 	"peerDependenciesMeta": {
+		"@payloadcms/richtext-lexical": {
+			"optional": true
+		},
 		"@radix-ui/react-icons": {
 			"optional": true
 		},
@@ -162,6 +166,7 @@
 		"@axe-core/playwright": "catalog:",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@radix-ui/react-icons": "catalog:",

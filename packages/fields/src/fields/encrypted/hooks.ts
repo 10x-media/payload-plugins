@@ -1,4 +1,4 @@
-import type { FieldHook, PayloadRequest, SanitizedConfig } from 'payload'
+import type { FieldHook, PayloadRequest, RichTextField, SanitizedConfig, Validate } from 'payload'
 import { getFieldsRegistry } from '../../plugin/registry'
 import type { DecryptFailurePolicy } from '../../types'
 import { buildAad } from './crypto/aad'
@@ -87,8 +87,16 @@ export const readAadCandidates = (
 	return ordered.map((code) => buildAad([slug, marker.fieldName, code]))
 }
 
-const contextMode = (context: Record<string, unknown>): EncryptedContextMode | undefined => {
-	const mode = context[ENCRYPTED_CONTEXT_KEY]
+/**
+ * The active utility mode from the request context, or undefined for a normal
+ * operation (including a missing context, which reads as normal). Reused by the
+ * response stripper so bulk utilities (which read in `raw` mode) still see the
+ * ciphertext and blind-index siblings, while a normal read strips them.
+ */
+export const contextMode = (
+	context: Record<string, unknown> | undefined
+): EncryptedContextMode | undefined => {
+	const mode = context?.[ENCRYPTED_CONTEXT_KEY]
 	return mode === 'decrypt' || mode === 'raw' || mode === 'rotate' ? mode : undefined
 }
 
@@ -248,6 +256,37 @@ const applyPolicy = ({ error, marker, policy, raw, slug }: ApplyPolicyArgs): unk
 	throw new DecryptFailedError({ cause: error, field: marker.fieldName, keyId, slug })
 }
 
+interface OpenSealedArgs {
+	candidates: string[]
+	marker: EncryptedFieldMarker
+	policy: DecryptFailurePolicy
+	ring: KeyRing
+	slug: string
+}
+
+/**
+ * Unseals one value, applying the decrypt-failure policy on a non-sealed item
+ * (plaintext at rest is pre-adoption data; passthrough is the lazy-migration
+ * mode) or a failed unseal. Shared by the scalar afterRead hook and the
+ * richText decrypt hook.
+ */
+const openSealed = (item: unknown, args: OpenSealedArgs): unknown => {
+	const { candidates, marker, policy, ring, slug } = args
+	if (!isSealed(item)) {
+		return applyPolicy({ error: new Error('value is not sealed'), marker, policy, raw: item, slug })
+	}
+	try {
+		return unseal(item, ring.dataKeys, candidates)
+	} catch (error) {
+		return applyPolicy({ error, marker, policy, raw: item, slug })
+	}
+}
+
+const resolvePolicy = (req: PayloadRequest, marker: EncryptedFieldMarker): DecryptFailurePolicy => {
+	const registry = getFieldsRegistry(req.payload.config)
+	return marker.onDecryptFailure ?? registry?.encrypted?.onDecryptFailure ?? 'throw'
+}
+
 export const makeAfterReadHook = (marker: EncryptedFieldMarker): FieldHook => {
 	return async (args) => {
 		const { collection, context, global, req, value } = args
@@ -257,30 +296,163 @@ export const makeAfterReadHook = (marker: EncryptedFieldMarker): FieldHook => {
 		if (contextMode(context)) {
 			return value
 		}
-		const registry = getFieldsRegistry(req.payload.config)
-		const policy: DecryptFailurePolicy =
-			marker.onDecryptFailure ?? registry?.encrypted?.onDecryptFailure ?? 'throw'
 		const slug = aadSlug(collection, global)
 		const ring = await ringForRequest(req, marker)
-		const candidates = readAadCandidates(marker, slug, req)
-		const openOne = (item: unknown): unknown => {
-			if (!isSealed(item)) {
-				// Plaintext at rest: pre-adoption data. Policy decides (passthrough
-				// is the lazy-migration mode).
-				return applyPolicy({
-					error: new Error('value is not sealed'),
-					marker,
-					policy,
-					raw: item,
-					slug,
-				})
-			}
-			try {
-				return unseal(item, ring.dataKeys, candidates)
-			} catch (error) {
-				return applyPolicy({ error, marker, policy, raw: item, slug })
-			}
+		const openArgs: OpenSealedArgs = {
+			candidates: readAadCandidates(marker, slug, req),
+			marker,
+			policy: resolvePolicy(req, marker),
+			ring,
+			slug,
 		}
+		const openOne = (item: unknown): unknown => openSealed(item, openArgs)
 		return marker.hasMany && Array.isArray(value) ? value.map(openOne) : openOne(value)
+	}
+}
+
+/**
+ * afterRead on the virtual richText field: decrypts the ciphertext sibling into
+ * a SerializedEditorState. The virtual field is never persisted, so its own
+ * value is always undefined and the ciphertext SIBLING is the source. The
+ * ciphertext field has no afterRead, so that sibling holds raw ciphertext for
+ * the whole phase, making this the single deterministic reader. Runs before the
+ * editor's own afterRead, which then populates upload/relationship nodes on the
+ * decrypted object.
+ */
+export const makeRichTextDecryptHook = (
+	marker: EncryptedFieldMarker,
+	storedName: string
+): FieldHook => {
+	return async (args) => {
+		const { collection, context, global, req, siblingData } = args
+		if (contextMode(context)) {
+			return args.value
+		}
+		const ciphertext = (siblingData as Record<string, unknown>)[storedName]
+		if (ciphertext === undefined || ciphertext === null) {
+			return ciphertext
+		}
+		const slug = aadSlug(collection, global)
+		const ring = await ringForRequest(req, marker)
+		return openSealed(ciphertext, {
+			candidates: readAadCandidates(marker, slug, req),
+			marker,
+			policy: resolvePolicy(req, marker),
+			ring,
+			slug,
+		})
+	}
+}
+
+/**
+ * beforeChange on the virtual richText field: seals the submitted
+ * SerializedEditorState into the ciphertext sibling and returns the plaintext
+ * unchanged (Payload drops it at the DB write since the field is virtual). The
+ * sole normal-mode writer of the ciphertext slot. Utility flows (rotate/decrypt/
+ * raw) pass through untouched; the ciphertext field's own hook handles rotation.
+ * An absent value (partial write) preserves the existing ciphertext.
+ */
+export const makeRichTextSealHook = (
+	marker: EncryptedFieldMarker,
+	storedName: string
+): FieldHook => {
+	return async (args) => {
+		const { collection, global, req, siblingData, value } = args
+		if (contextMode(req.context as Record<string, unknown>)) {
+			return value
+		}
+		if (value === undefined) {
+			return undefined
+		}
+		const sibling = siblingData as Record<string, unknown>
+		if (value === null) {
+			sibling[storedName] = null
+			return null
+		}
+		const slug = aadSlug(collection, global)
+		const ring = await ringForRequest(req, marker)
+		const activeKey = ring.dataKeys.get(ring.activeId) as Buffer
+		// locale=all write: value is a `{ [locale]: SerializedEditorState }` map.
+		// Seal each locale under its own locale AAD so the per-locale decrypt opens
+		// it, mirroring the scalar hook's locale-map handling.
+		if (marker.localized && req.locale === 'all' && isLocaleMap(value)) {
+			const sealedMap: Record<string, unknown> = {}
+			for (const [locale, localeValue] of Object.entries(value)) {
+				sealedMap[locale] =
+					localeValue == null || isSealed(localeValue)
+						? localeValue
+						: seal({
+								aad: buildAad([slug, marker.fieldName, locale]),
+								key: activeKey,
+								keyId: ring.activeId,
+								plaintext: localeValue,
+							})
+			}
+			sibling[storedName] = sealedMap
+			return value
+		}
+		sibling[storedName] = isSealed(value)
+			? value
+			: seal({
+					aad: sealAad(marker, slug, req),
+					key: activeKey,
+					keyId: ring.activeId,
+					plaintext: value,
+				})
+		return value
+	}
+}
+
+/**
+ * beforeChange on the hidden ciphertext field. A no-op in every mode except
+ * rotate (the virtual field's seal hook is the sole normal-mode producer of this
+ * slot). Under rotate it unseals with the stale key and reseals with the active
+ * key so rotateEncryptedFields round-trips, mirroring the scalar rotate branch.
+ */
+export const makeRichTextCiphertextHook = (marker: EncryptedFieldMarker): FieldHook => {
+	return async (args) => {
+		const { collection, global, req, value } = args
+		if (contextMode(req.context as Record<string, unknown>) !== 'rotate') {
+			return undefined
+		}
+		if (!isSealed(value)) {
+			return value
+		}
+		const ring = await ringForRequest(req, marker)
+		if (parseWire(value).keyId === ring.activeId) {
+			return value
+		}
+		const slug = aadSlug(collection, global)
+		const plaintext = unseal(value, ring.dataKeys, readAadCandidates(marker, slug, req))
+		const activeKey = ring.dataKeys.get(ring.activeId) as Buffer
+		return seal({
+			aad: sealAad(marker, slug, req),
+			key: activeKey,
+			keyId: ring.activeId,
+			plaintext,
+		})
+	}
+}
+
+/**
+ * Validate for the virtual richText field. Delegates to the editor's own
+ * validate (required + node-level validation) for full parity with a native
+ * richText field. Skips utility flows and absent values: rotate/decrypt patch
+ * only the ciphertext sibling, so the virtual value is undefined then, and a
+ * required check must not trip on that.
+ */
+export const makeRichTextValidate = (): Validate<unknown, unknown, unknown, RichTextField> => {
+	return (value, options) => {
+		if (contextMode(options.req.context as Record<string, unknown>)) {
+			return true
+		}
+		if (value === undefined) {
+			return true
+		}
+		const { editor } = options
+		if (!editor || typeof editor === 'function' || typeof editor.validate !== 'function') {
+			return true
+		}
+		return editor.validate(value, options)
 	}
 }

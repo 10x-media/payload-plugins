@@ -1,4 +1,4 @@
-import type { TextField } from 'payload'
+import type { RichTextField, TextField } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { encryptedField } from './encryptedField'
 import { getEncryptedMarker } from './types'
@@ -18,12 +18,21 @@ describe('encryptedField factory shape', () => {
 		expect(getEncryptedMarker(stored)?.sourceType).toBe('text')
 	})
 
-	it('appends a hidden indexed bidx sibling when queryable', () => {
+	it('appends an admin-hidden, queryable, response-stripped bidx sibling when queryable', () => {
 		const fields = encryptedField({ name: 'contact', type: 'email' }, { queryable: true })
 		expect(fields).toHaveLength(2)
 		const bidx = fields[1] as TextField
 		expect(bidx.name).toBe('contact_bidx')
-		expect(bidx.hidden).toBe(true)
+		// admin.hidden (not top-level hidden) keeps the field in the flattened
+		// schema so a rewritten `equals` query passes Payload's query-path validation.
+		expect(bidx.hidden).toBeUndefined()
+		expect(bidx.admin?.hidden).toBe(true)
+		expect(bidx.admin?.disableListFilter).toBe(true)
+		expect(bidx.admin?.disableListColumn).toBe(true)
+		// The keyed hash is stripped from responses by the plugin's collection
+		// afterRead (withEncryptedQueryRewrite), not a field hook, so the bidx
+		// stays queryable and carries no hooks of its own.
+		expect(bidx.hooks).toBeUndefined()
 		expect(bidx.index).toBe(true)
 		expect(bidx.unique).toBeUndefined()
 		expect(getEncryptedMarker(fields[0] as TextField)?.bidxName).toBe('contact_bidx')
@@ -69,10 +78,58 @@ describe('encryptedField factory shape', () => {
 		expect(encryptedField({ name: 'c', type: 'number' }, { queryable: true })).toHaveLength(2)
 	})
 
-	it('rejects protection none on richText', () => {
-		expect(() =>
-			encryptedField({ name: 'body', type: 'richText' }, { protection: 'none' })
-		).toThrow(/masked-only/)
+	it('returns a virtual editor field plus a hidden ciphertext sibling for richText', () => {
+		const fields = encryptedField({ name: 'body', required: true, type: 'richText' })
+		expect(fields).toHaveLength(2)
+		const editor = fields[0] as RichTextField
+		const cipher = fields[1] as TextField
+		expect(editor.type).toBe('richText')
+		expect(editor.name).toBe('body')
+		expect(editor.virtual).toBe(true)
+		// readOnly:false is required or sanitize forces a virtual affectsData field readOnly.
+		expect(editor.admin?.readOnly).toBe(false)
+		// editor is omitted so it inherits config.editor (full app parity).
+		expect('editor' in editor).toBe(false)
+		expect(editor.hooks?.afterRead).toHaveLength(1)
+		expect(editor.hooks?.beforeChange).toHaveLength(1)
+		expect(typeof editor.validate).toBe('function')
+		// The virtual editor field carries no marker; the marker lives on the sibling.
+		expect(getEncryptedMarker(editor as { custom?: Record<string, unknown> })).toBeUndefined()
+
+		expect(cipher.type).toBe('text')
+		expect(cipher.name).toBe('body_encrypted')
+		// admin.hidden (not top-level hidden) keeps the value readable by the decrypt hook.
+		expect(cipher.hidden).toBeUndefined()
+		expect(cipher.admin?.hidden).toBe(true)
+		expect(cipher.hooks?.afterRead).toBeUndefined()
+		expect(cipher.hooks?.beforeChange).toHaveLength(1)
+		const marker = getEncryptedMarker(cipher)
+		expect(marker?.sourceType).toBe('richText')
+		expect(marker?.fieldName).toBe('body')
+	})
+
+	it('masked richText overrides the editor Field with the ProtectedRichText RSC', () => {
+		const [editor] = encryptedField({ name: 'body', type: 'richText' }) as [RichTextField]
+		const component = editor.admin?.components?.Field as {
+			path: string
+			serverProps: { protection: string }
+		}
+		expect(component.path).toBe('@10x-media/fields/rsc#ProtectedRichText')
+		expect(component.serverProps.protection).toBe('masked')
+	})
+
+	it("protection 'none' richText renders the real editor directly (no Field override)", () => {
+		const [editor] = encryptedField({ name: 'body', type: 'richText' }, { protection: 'none' }) as [
+			RichTextField,
+		]
+		expect(editor.admin?.components?.Field).toBeUndefined()
+	})
+
+	it('mirrors localized onto the richText ciphertext sibling', () => {
+		const fields = encryptedField({ localized: true, name: 'body', type: 'richText' })
+		const cipher = fields[1] as TextField
+		expect(cipher.localized).toBe(true)
+		expect(getEncryptedMarker(cipher)?.localized).toBe(true)
 	})
 
 	it('preserves user hooks around ours (seal last on write, unseal first on read)', () => {
@@ -120,11 +177,9 @@ describe('encryptedField factory shape', () => {
 		expect(cell.path).toBe('@10x-media/fields/rsc#ProtectedCell')
 	})
 
-	it('strips index from the stored ciphertext column and drops richText editor', () => {
+	it('strips index from the stored ciphertext column', () => {
 		const fields = encryptedField({ index: true, name: 'ssn', type: 'text' })
 		expect((fields[0] as TextField).index).toBeUndefined()
-		const rich = encryptedField({ name: 'body', type: 'richText' })
-		expect('editor' in (rich[0] as Record<string, unknown>)).toBe(false)
 	})
 
 	it('rejects function option labels (clientProps must serialize)', () => {
