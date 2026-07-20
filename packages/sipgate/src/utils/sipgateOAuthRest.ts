@@ -52,7 +52,7 @@ export const buildSipgateRestOAuth = ({
 
 	return async (url, options) => {
 		const makeRequest = () =>
-			fetch(BASE_URL + url, {
+			fetch(url.startsWith('http') ? url : BASE_URL + url, {
 				...options,
 				headers: {
 					'Content-Type': 'application/json',

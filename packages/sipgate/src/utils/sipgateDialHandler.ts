@@ -2,7 +2,8 @@ import type { CollectionSlug, Payload, PayloadHandler, Where } from 'payload'
 import type { SipgateCredentials } from '../types'
 import type { SipgateAccess } from './access'
 import { checkAccess } from './access'
-import { buildSipgateRest, Dial } from './sipgate.rest'
+import { getCallerIdForChannel } from './sipgate.neo.rest'
+import { buildSipgateRest, Dial, type SipgateRestFetch } from './sipgate.rest'
 import { buildSipgateRestOAuth } from './sipgateOAuthRest'
 import { toSipgateE164 } from './toSipgateE164'
 
@@ -16,16 +17,18 @@ type CreateSipgateDialHandlerOptions = {
 
 /**
  * Resolves the outbound caller ID (must be E.164 digits for Neo `/calls`).
- * Never falls back to a device ID. Priority: body → credentials → channel name.
+ * Priority: body (if E.164) → credentials → /v3/phone-numbers for channel → channel name (if E.164).
  */
 const resolveCallerId = async ({
 	payload,
+	rest,
 	bodyCallerId,
 	credentialsCallerId,
 	channelId,
 	sipgateChannelsSlug,
 }: {
 	payload: Payload
+	rest?: SipgateRestFetch
 	bodyCallerId?: string
 	credentialsCallerId?: string
 	channelId?: string
@@ -36,6 +39,11 @@ const resolveCallerId = async ({
 
 	const fromCredentials = toSipgateE164(credentialsCallerId)
 	if (fromCredentials) return fromCredentials
+
+	if (rest && channelId) {
+		const fromPhoneNumbers = await getCallerIdForChannel(rest, channelId)
+		if (fromPhoneNumbers) return fromPhoneNumbers
+	}
 
 	if (!channelId || !sipgateChannelsSlug) return undefined
 
@@ -63,7 +71,6 @@ export const createSipgateDialHandler =
 		if (denied) return denied
 
 		if (!req.json) {
-			req.payload.logger.warn('[sipgate:dial] request has no JSON body')
 			return Response.json({ error: 'No body' }, { status: 400 })
 		}
 		const {
@@ -72,19 +79,7 @@ export const createSipgateDialHandler =
 			channelId: bodyChannelId,
 			callerId: bodyCallerId,
 		} = await req.json()
-		req.payload.logger.debug(
-			{
-				hasCallee: Boolean(rawCallee),
-				bodyDeviceId,
-				bodyChannelId,
-				hasCallerId: Boolean(bodyCallerId),
-				authType: credentials.authType,
-				userId: req.user?.id,
-			},
-			'[sipgate:dial] incoming dial request'
-		)
 		if (!rawCallee) {
-			req.payload.logger.warn('[sipgate:dial] callee missing')
 			return Response.json({ error: 'callee is required' }, { status: 400 })
 		}
 
@@ -139,8 +134,10 @@ export const createSipgateDialHandler =
 			return Response.json({ error: 'channelId not configured' }, { status: 500 })
 		}
 
+		const rest = buildSipgateRest(credentials)
 		const callerId = await resolveCallerId({
 			payload: req.payload,
+			rest,
 			bodyCallerId,
 			credentialsCallerId: credentials.callerId,
 			channelId,
@@ -150,13 +147,12 @@ export const createSipgateDialHandler =
 			return Response.json(
 				{
 					error:
-						'callerId must be a valid E.164 phone number. Set sipgateCredentials.callerId, pass callerId in the dial body, or ensure the selected channel has a phone number as its name.',
+						'callerId must be a valid E.164 phone number. Set sipgateCredentials.callerId, pass callerId in the dial body, or ensure the selected channel has a routed phone number.',
 				},
 				{ status: 400 }
 			)
 		}
 
-		const rest = buildSipgateRest(credentials)
 		const response = await Dial(rest, {
 			callee,
 			caller: deviceId,
@@ -210,10 +206,6 @@ const handleOAuth2Dial = async ({
 
 	const sipgateUser = result.docs[0] as Record<string, unknown> | undefined
 	if (!sipgateUser) {
-		req.payload.logger.warn(
-			{ userId: req.user.id, sipgateUsersSlug },
-			'[sipgate:dial] no sipgate user doc linked to payload user'
-		)
 		return Response.json(
 			{ error: 'No Sipgate account connected. Authenticate via OAuth first.' },
 			{ status: 400 }
@@ -224,15 +216,6 @@ const handleOAuth2Dial = async ({
 	const refreshToken = sipgateUser.refreshToken as string | undefined
 
 	if (!accessToken || !refreshToken) {
-		req.payload.logger.warn(
-			{
-				docId: sipgateUser.id,
-				hasAccessToken: Boolean(accessToken),
-				hasRefreshToken: Boolean(refreshToken),
-				needsReconnect: sipgateUser.needsReconnect,
-			},
-			'[sipgate:dial] oauth tokens missing on sipgate user doc'
-		)
 		return Response.json(
 			{ error: 'Sipgate OAuth tokens missing. Please reconnect.' },
 			{ status: 400 }
@@ -280,23 +263,16 @@ const handleOAuth2Dial = async ({
 	const channelId = bodyChannelId ?? (sipgateUser.defaultChannel as string | undefined)
 
 	if (!deviceId) {
-		req.payload.logger.warn(
-			{ docId: sipgateUser.id, defaultDevice: sipgateUser.defaultDevice },
-			'[sipgate:dial] no deviceId (body + defaultDevice both empty)'
-		)
 		return Response.json({ error: 'deviceId not configured' }, { status: 500 })
 	}
 
 	if (!channelId) {
-		req.payload.logger.warn(
-			{ docId: sipgateUser.id, defaultChannel: sipgateUser.defaultChannel },
-			'[sipgate:dial] no channelId (body + defaultChannel both empty)'
-		)
 		return Response.json({ error: 'channelId not configured' }, { status: 500 })
 	}
 
 	const callerId = await resolveCallerId({
 		payload: req.payload,
+		rest,
 		bodyCallerId,
 		credentialsCallerId: credentials.callerId,
 		channelId,
@@ -306,16 +282,11 @@ const handleOAuth2Dial = async ({
 		return Response.json(
 			{
 				error:
-					'callerId must be a valid E.164 phone number. Set sipgateCredentials.callerId, pass callerId in the dial body, or ensure the selected channel has a phone number as its name.',
+					'callerId must be a valid E.164 phone number. Set sipgateCredentials.callerId, pass callerId in the dial body, or ensure the selected channel has a routed phone number.',
 			},
 			{ status: 400 }
 		)
 	}
-
-	req.payload.logger.info(
-		{ callee, deviceId, channelId, callerId, realm },
-		'[sipgate:dial] posting to sipgate /calls (oauth2)'
-	)
 
 	const response = await Dial(rest, {
 		callee,
@@ -327,23 +298,7 @@ const handleOAuth2Dial = async ({
 
 	if (!response.ok) {
 		const text = await response.text()
-		req.payload.logger.error(
-			{
-				status: response.status,
-				statusText: response.statusText,
-				detail: text,
-				callee,
-				deviceId,
-				channelId,
-				callerId,
-			},
-			'[sipgate:dial] sipgate /calls returned non-2xx'
-		)
 		return Response.json({ error: 'Failed to dial', detail: text }, { status: response.status })
 	}
-	req.payload.logger.info(
-		{ callee, deviceId, channelId, callerId },
-		'[sipgate:dial] dial succeeded'
-	)
 	return Response.json({ success: true }, { status: 200 })
 }
