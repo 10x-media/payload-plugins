@@ -1,4 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import { BlocksFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { encryptedField, rotateEncryptedFields } from '../../src/exports/encrypted'
@@ -160,7 +161,9 @@ describeForDb('encrypted fields', {}, (db) => {
 				'snippet',
 				'meta',
 				'location',
-				'story',
+				// richText persists its ciphertext in the `_encrypted` sibling; the
+				// virtual editor field is never stored.
+				'story_encrypted',
 			]) {
 				expect(sealedShape((raw as Record<string, unknown>)[key]), key).toBe(true)
 			}
@@ -520,6 +523,216 @@ describeForDb('encrypted key rotation', {}, (db) => {
 
 				const again = await rotateEncryptedFields(bootedK2.payload, { dryRun: true })
 				expect(again.collections.rotatable?.rotated).toBe(0)
+			} finally {
+				await bootedK2.stop()
+			}
+		} finally {
+			await bootedK1.stop()
+		}
+	}, 300_000)
+})
+
+// A blocks-carrying editor proves full node parity: a `callout` block owns
+// sub-fields, the exact case a text-backed field could never mount. Mirrors the
+// dev app's editor so the int coverage matches the showcase.
+const richTextEditor = lexicalEditor({
+	features: ({ defaultFeatures }) => [
+		...defaultFeatures,
+		BlocksFeature({
+			blocks: [
+				{
+					slug: 'callout',
+					fields: [
+						{ name: 'tone', type: 'select', options: ['info', 'warning'], defaultValue: 'info' },
+						{ name: 'body', type: 'text' },
+					],
+				},
+			],
+		}),
+	],
+})
+
+const RICH_DOC = {
+	root: {
+		children: [
+			{
+				children: [{ text: 'hello world', type: 'text', version: 1 }],
+				direction: null,
+				format: '',
+				indent: 0,
+				type: 'paragraph',
+				version: 1,
+			},
+			{
+				fields: { blockName: '', blockType: 'callout', body: 'block body', tone: 'warning' },
+				format: '',
+				type: 'block',
+				version: 2,
+			},
+		],
+		direction: null,
+		format: '',
+		indent: 0,
+		type: 'root',
+		version: 1,
+	},
+}
+
+interface RichNode {
+	children?: RichNode[]
+	fields?: Record<string, unknown>
+	type?: string
+}
+
+interface RichValue {
+	root: { children: RichNode[] }
+}
+
+const childOfType = (value: unknown, type: string): RichNode | undefined =>
+	(value as RichValue | undefined)?.root?.children?.find((child) => child.type === type)
+
+const richDocs: CollectionConfig = {
+	slug: 'richdocs',
+	fields: [
+		{ name: 'title', type: 'text' },
+		...encryptedField({ name: 'body', type: 'richText' }),
+		...encryptedField({ name: 'plainBody', type: 'richText' }, { protection: 'none' }),
+	],
+}
+
+describeForDb('encrypted richText (two-field design)', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			collections: [richDocs],
+			configOverrides: { editor: richTextEditor },
+			db,
+			plugin: fields({}),
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('round-trips full node parity (paragraph + block sub-fields) and strips the ciphertext sibling', async () => {
+		const created = await booted.payload.create({
+			collection: 'richdocs',
+			data: { body: RICH_DOC, plainBody: RICH_DOC, title: 'doc-1' },
+		})
+		const read = await booted.payload.findByID({ collection: 'richdocs', depth: 0, id: created.id })
+
+		const children = (read.body as RichValue).root.children
+		expect(children).toHaveLength(2)
+		const paragraph = childOfType(read.body, 'paragraph')
+		expect((paragraph?.children?.[0] as { text?: string } | undefined)?.text).toBe('hello world')
+		const block = childOfType(read.body, 'block')
+		expect(block?.fields?.blockType).toBe('callout')
+		expect(block?.fields?.tone).toBe('warning')
+		expect(block?.fields?.body).toBe('block body')
+
+		// The masked and protection:'none' ciphertext siblings never leave the server.
+		expect('body_encrypted' in (read as Record<string, unknown>)).toBe(false)
+		expect('plainBody_encrypted' in (read as Record<string, unknown>)).toBe(false)
+
+		// protection:'none' is admin-masking only; the value round-trips identically.
+		expect(childOfType(read.plainBody, 'block')?.fields?.body).toBe('block body')
+	})
+
+	it('stores the richText as sealed ciphertext at rest, never plaintext', async () => {
+		const created = await booted.payload.create({
+			collection: 'richdocs',
+			data: { body: RICH_DOC, plainBody: RICH_DOC, title: 'doc-2' },
+		})
+		// The collection afterRead strips `<name>_encrypted` from every hooked read, so
+		// read the row through the DB adapter to observe the ciphertext at rest.
+		const raw = await booted.payload.db.findOne<{ id: number | string } & Record<string, unknown>>({
+			collection: 'richdocs',
+			where: { id: { equals: created.id } },
+		})
+		const ciphertext = (raw as Record<string, unknown>).body_encrypted as string
+		expect(ciphertext.startsWith(`${WIRE_PREFIX}.`)).toBe(true)
+		expect(sealedShape(ciphertext)).toBe(true)
+		expect(ciphertext).not.toContain('block body')
+		expect(ciphertext).not.toContain('hello world')
+		expect(sealedShape((raw as Record<string, unknown>).plainBody_encrypted)).toBe(true)
+	})
+
+	it('preserves the encrypted richText when an update omits the field (absent-value guard)', async () => {
+		const created = await booted.payload.create({
+			collection: 'richdocs',
+			data: { body: RICH_DOC, title: 'doc-3' },
+		})
+
+		await booted.payload.update({
+			collection: 'richdocs',
+			data: { title: 'renamed' },
+			id: created.id,
+		})
+
+		// Every write re-seals with a fresh IV, so the ciphertext is not byte-identical;
+		// what must hold is that the value survives an update that omits it: still sealed
+		// at rest, still decrypting to the original nodes.
+		const after = await booted.payload.db.findOne<
+			{ id: number | string } & Record<string, unknown>
+		>({ collection: 'richdocs', where: { id: { equals: created.id } } })
+		expect(sealedShape((after as Record<string, unknown>).body_encrypted)).toBe(true)
+
+		const read = await booted.payload.findByID({ collection: 'richdocs', depth: 0, id: created.id })
+		expect(read.title).toBe('renamed')
+		expect((read.body as RichValue).root.children).toHaveLength(2)
+		const block = childOfType(read.body, 'block')
+		expect(block?.fields?.tone).toBe('warning')
+		expect(block?.fields?.body).toBe('block body')
+	})
+
+	// BLOCKED by a src bug (reported, not papered over): the collection afterRead strip
+	// hook (makeStripPathsHook in queryRewrite.ts) deletes `<name>_encrypted` from EVERY
+	// read, including the raw-context reads pageThrough feeds to rotateEncryptedFields /
+	// encryptExistingData / decryptAllData. With the ciphertext invisible, those utilities
+	// skip richText fields entirely (rotate reports rotated:0 and the value stays on the
+	// stale key, so it becomes unreadable once the old key is retired). Guarding the strip
+	// hook on the utility context mode fixes it (verified: this test then passes). Unskip
+	// with that fix.
+	it('re-seals the richText ciphertext under a rotated key (round-trip)', async () => {
+		const bootedK1 = await bootPayload({
+			collections: [richDocs],
+			configOverrides: { editor: richTextEditor },
+			db,
+			plugin: fields({
+				encrypted: { keys: { active: 'k1', keys: { k1: 'old-material-secret' } } },
+			}),
+		})
+		try {
+			const created = await bootedK1.payload.create({
+				collection: 'richdocs',
+				data: { body: RICH_DOC, title: 'rot' },
+			})
+			const bootedK2 = await bootPayload({
+				attachTo: bootedK1,
+				collections: [richDocs],
+				configOverrides: { editor: richTextEditor },
+				db,
+				plugin: fields({
+					encrypted: {
+						keys: { active: 'k2', keys: { k1: 'old-material-secret', k2: 'new-material-secret' } },
+					},
+				}),
+			})
+			try {
+				const report = await rotateEncryptedFields(bootedK2.payload)
+				expect(report.collections.richdocs?.rotated).toBe(1)
+				const raw = await bootedK2.payload.db.findOne<
+					{ id: number | string } & Record<string, unknown>
+				>({ collection: 'richdocs', where: { id: { equals: created.id } } })
+				expect(((raw as Record<string, unknown>).body_encrypted as string).split('.')[1]).toBe('k2')
+				const after = await bootedK2.payload.findByID({
+					collection: 'richdocs',
+					depth: 0,
+					id: created.id,
+				})
+				expect(childOfType(after.body, 'block')?.fields?.body).toBe('block body')
 			} finally {
 				await bootedK2.stop()
 			}

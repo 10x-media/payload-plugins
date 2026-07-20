@@ -137,6 +137,23 @@ describe.skipIf(!hasDist)('dist bundle isolation', () => {
 		expect(offenders).toEqual([])
 	})
 
+	it('client barrel graph never imports the lexical editor package', () => {
+		// The richText reveal gate is client, but the editor loads through the app
+		// import map (server RSC delegation), never a static client import. A stray
+		// import here would ship the whole editor into the client bundle.
+		const offenders = [...importGraph('exports/client.js')].filter((file) =>
+			/@payloadcms\/richtext-lexical/.test(readFileSync(file, 'utf8'))
+		)
+		expect(offenders).toEqual([])
+	})
+
+	it('rsc barrel graph reaches the lexical rsc entry (server-only delegation)', () => {
+		const reached = [...importGraph('exports/rsc.js')].some((file) =>
+			/@payloadcms\/richtext-lexical\/rsc/.test(readFileSync(file, 'utf8'))
+		)
+		expect(reached).toBe(true)
+	})
+
 	it('frontend-safe color utils stay dependency-free of admin code', () => {
 		const offenders = [...importGraph('exports/color-utils.js')].filter(
 			(file) =>
