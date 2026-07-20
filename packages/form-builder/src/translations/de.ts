@@ -68,6 +68,30 @@ export const de: Record<TranslationKey, string> = {
 	[keys.ruleOneOfMessage]: 'Wähle einen zulässigen Wert',
 	[keys.ruleMatchesFieldMessage]: 'Stimmt nicht überein',
 	[keys.ruleNotAlreadySubmittedMessage]: 'Dieser Wert wurde bereits übermittelt',
+	[keys.ruleMinLengthDescription]:
+		'Schlägt fehl, wenn der eingegebene Text kürzer als die Mindestanzahl an Zeichen ist.',
+	[keys.ruleMaxLengthDescription]:
+		'Schlägt fehl, wenn der eingegebene Text länger als die maximale Anzahl an Zeichen ist.',
+	[keys.ruleMinDescription]: 'Schlägt fehl, wenn die eingegebene Zahl unter dem Minimum liegt.',
+	[keys.ruleMaxDescription]: 'Schlägt fehl, wenn die eingegebene Zahl über dem Maximum liegt.',
+	[keys.ruleMinDateDescription]:
+		'Schlägt fehl, wenn das gewählte Datum vor dem frühesten Datum liegt.',
+	[keys.ruleMaxDateDescription]:
+		'Schlägt fehl, wenn das gewählte Datum nach dem spätesten Datum liegt.',
+	[keys.rulePatternDescription]:
+		'Schlägt fehl, wenn der eingegebene Text nicht zum regulären Ausdruck passt.',
+	[keys.ruleEmailDescription]:
+		'Schlägt fehl, wenn der eingegebene Wert keine gültige E-Mail-Adresse ist.',
+	[keys.ruleUrlDescription]:
+		'Schlägt fehl, wenn der eingegebene Wert keine gültige http- oder https-URL ist.',
+	[keys.ruleOneOfDescription]:
+		'Schlägt fehl, wenn der eingegebene Wert keiner der von dir angegebenen zulässigen Werte ist.',
+	[keys.ruleMatchesFieldDescription]:
+		'Schlägt fehl, wenn der Wert dieses Feldes nicht dem gewählten Feld entspricht. Nutze es für E-Mail- oder Passwort-Bestätigung.',
+	[keys.ruleNotAlreadySubmittedDescription]:
+		'Schlägt fehl, wenn genau dieser Wert bereits an dieses Formular übermittelt wurde (serverseitig geprüft).',
+	[keys.ruleFieldTargetInvalid]:
+		'Das ausgewählte Feld existiert nicht mehr. Wähle ein gültiges Feld.',
 	[keys.ruleParamMin]: 'Minimum',
 	[keys.ruleParamMax]: 'Maximum',
 	[keys.ruleParamMinDate]: 'Frühestes Datum (JJJJ-MM-TT)',

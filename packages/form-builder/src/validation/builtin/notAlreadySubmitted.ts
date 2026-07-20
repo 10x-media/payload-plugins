@@ -12,6 +12,7 @@ const SCAN_LIMIT = 500
 export const notAlreadySubmittedRule = defineValidationRule<Record<string, never>, unknown>({
 	type: 'notAlreadySubmitted',
 	label: keys.ruleNotAlreadySubmitted,
+	description: keys.ruleNotAlreadySubmittedDescription,
 	client: false,
 	defaultMessage: keys.ruleNotAlreadySubmittedMessage,
 	validate: async ({ value, field, payload, req, formId, message }) => {

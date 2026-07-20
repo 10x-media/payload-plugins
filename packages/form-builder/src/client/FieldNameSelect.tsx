@@ -10,7 +10,7 @@ import {
 } from '@payloadcms/ui'
 import { reduceFieldsToValues } from 'payload/shared'
 import { useMemo } from 'react'
-import { fieldNamesOfType } from '../fields/fieldNamesOfType'
+import { fieldNames, fieldNamesOfType } from '../fields/fieldNamesOfType'
 import type { TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { FieldRow } from './synthesizeClientField'
@@ -21,8 +21,11 @@ export type FieldNameSelectProps = {
 	path?: string
 	field?: { label?: unknown; admin?: { description?: unknown } }
 	label?: unknown
-	/** Sibling `fields` blocks whose `blockType` is in this list populate the select's options. */
-	types: string[]
+	/**
+	 * Sibling `fields` blocks whose `blockType` is in this list populate the select's options. Omit to
+	 * offer every named field regardless of type (a general field-target picker).
+	 */
+	types?: string[]
 	/**
 	 * Field description as a translation key, resolved client-side. Payload drops `admin.description`
 	 * functions from client fields, so a translated description must travel as a key; a static
@@ -31,7 +34,7 @@ export type FieldNameSelectProps = {
 	descriptionKey?: TranslationKey
 }
 
-const optionsFromData = (data: Record<string, unknown>, types: string[]): ReactSelectOption[] => {
+const optionsFromData = (data: Record<string, unknown>, types?: string[]): ReactSelectOption[] => {
 	const rows = Array.isArray(data.fields) ? (data.fields as unknown[]) : []
 	const labels = new Map<string, string>()
 	for (const row of rows) {
@@ -43,7 +46,8 @@ const optionsFromData = (data: Record<string, unknown>, types: string[]): ReactS
 			labels.set(name.trim(), label)
 		}
 	}
-	return fieldNamesOfType(data.fields, types).map((name) => ({
+	const names = types ? fieldNamesOfType(data.fields, types) : fieldNames(data.fields)
+	return names.map((name) => ({
 		label: labels.get(name) ?? name,
 		value: name,
 	}))
@@ -52,8 +56,9 @@ const optionsFromData = (data: Record<string, unknown>, types: string[]): ReactS
 /**
  * The `Field` mounted on a text config field (e.g. an action's `toField`) that should be authored
  * by picking from the form's own fields rather than free-typing a name. Options come from the
- * sibling `fields` blocks array, filtered to `types`; the stored value is kept selectable even if
- * it no longer matches any field, so switching to this component never silently drops data.
+ * sibling `fields` blocks array, filtered to `types` when given (every named field otherwise); the
+ * stored value is kept selectable even if it no longer matches any field, so switching to this
+ * component never silently drops data.
  */
 export const FieldNameSelect = (props: FieldNameSelectProps) => {
 	const { path, setValue, value } = useField<string>({ path: props.path })

@@ -494,6 +494,8 @@ export { resolveFileRef } from './uploads/resolveFileRef'
 export type { FileFieldConfig, FileRef, FileRefError } from './uploads/types'
 export { defaultValidationRules, defaultValidationRulesByType } from './validation/builtin'
 export { defineValidationRule } from './validation/defineValidationRule'
+export type { FieldTargetParamOptions } from './validation/fieldTargetParam'
+export { fieldTargetParam } from './validation/fieldTargetParam'
 export type {
 	ValidationRuleOption,
 	ValidationRuleRegistry,

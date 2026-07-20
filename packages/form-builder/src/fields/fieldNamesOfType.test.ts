@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fieldNamesOfType } from './fieldNamesOfType'
+import { fieldNames, fieldNamesOfType } from './fieldNamesOfType'
 
 describe('fieldNamesOfType', () => {
 	it('returns trimmed names of matching block types only', () => {
@@ -35,5 +35,31 @@ describe('fieldNamesOfType', () => {
 		expect(fieldNamesOfType(undefined, ['email'])).toEqual([])
 		expect(fieldNamesOfType('not-an-array', ['email'])).toEqual([])
 		expect(fieldNamesOfType([null, 'garbage', 7, { name: 'x' }], ['email'])).toEqual([])
+	})
+})
+
+describe('fieldNames', () => {
+	it('returns all named fields regardless of block type', () => {
+		const fields = [
+			{ blockType: 'email', name: 'a' },
+			{ blockType: 'text', name: 'b' },
+			{ blockType: 'number', name: 'c' },
+		]
+		expect(fieldNames(fields)).toEqual(['a', 'b', 'c'])
+	})
+
+	it('trims names and drops nameless (bare) or non-string rows', () => {
+		const fields = [
+			{ blockType: 'text', name: ' a ' },
+			{ blockType: 'message' },
+			{ blockType: 'text', name: '' },
+			{ blockType: 'text', name: 7 },
+		]
+		expect(fieldNames(fields)).toEqual(['a'])
+	})
+
+	it('tolerates non-array input', () => {
+		expect(fieldNames(undefined)).toEqual([])
+		expect(fieldNames('not-an-array')).toEqual([])
 	})
 })

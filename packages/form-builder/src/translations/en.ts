@@ -67,6 +67,25 @@ export const en: Record<TranslationKey, string> = {
 	[keys.ruleOneOfMessage]: 'Choose an allowed value',
 	[keys.ruleMatchesFieldMessage]: 'Does not match',
 	[keys.ruleNotAlreadySubmittedMessage]: 'This value was already submitted',
+	[keys.ruleMinLengthDescription]:
+		'Fails when the entered text is shorter than the minimum number of characters.',
+	[keys.ruleMaxLengthDescription]:
+		'Fails when the entered text is longer than the maximum number of characters.',
+	[keys.ruleMinDescription]: 'Fails when the entered number is below the minimum.',
+	[keys.ruleMaxDescription]: 'Fails when the entered number is above the maximum.',
+	[keys.ruleMinDateDescription]: 'Fails when the chosen date is earlier than the minimum date.',
+	[keys.ruleMaxDateDescription]: 'Fails when the chosen date is later than the maximum date.',
+	[keys.rulePatternDescription]:
+		'Fails when the entered text does not match the regular expression.',
+	[keys.ruleEmailDescription]: 'Fails when the entered value is not a valid email address.',
+	[keys.ruleUrlDescription]: 'Fails when the entered value is not a valid http or https URL.',
+	[keys.ruleOneOfDescription]:
+		'Fails when the entered value is not one of the allowed values you list.',
+	[keys.ruleMatchesFieldDescription]:
+		"Fails when this field's value does not equal the chosen field. Use it for confirm-email or confirm-password.",
+	[keys.ruleNotAlreadySubmittedDescription]:
+		'Fails when this same value was already submitted to this form (checked on the server).',
+	[keys.ruleFieldTargetInvalid]: 'The selected field no longer exists. Choose a valid field.',
 	[keys.ruleParamMin]: 'Minimum',
 	[keys.ruleParamMax]: 'Maximum',
 	[keys.ruleParamMinDate]: 'Earliest date (YYYY-MM-DD)',

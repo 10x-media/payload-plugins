@@ -19,6 +19,7 @@ const tryRegExp = (pattern: string, flags?: string): RegExp | undefined => {
 export const patternRule = defineValidationRule<{ pattern: string; flags?: string }, string>({
 	type: 'pattern',
 	label: keys.rulePattern,
+	description: keys.rulePatternDescription,
 	appliesTo: ['text', 'textarea', 'email'],
 	params: [
 		{
