@@ -167,7 +167,7 @@ describe('forms poll.resultsField', () => {
 		const field = resultsFieldOf(buildCollection())
 		const component = clientComponentOf(field)
 		expect(component?.path).toBe('@10x-media/form-builder/client#FieldNameSelect')
-		expect(component?.clientProps?.types).toEqual(['select'])
+		expect(component?.clientProps?.types).toEqual(['select', 'country', 'state'])
 	})
 
 	it('threads the PII-warning description in as a translation key, not admin.description', () => {
@@ -189,7 +189,12 @@ describe('forms poll.resultsField', () => {
 			pollEligible: true,
 		}
 		const field = resultsFieldOf(buildCollection({ athleteVote }))
-		expect(clientComponentOf(field)?.clientProps?.types).toEqual(['select', 'athleteVote'])
+		expect(clientComponentOf(field)?.clientProps?.types).toEqual([
+			'select',
+			'country',
+			'state',
+			'athleteVote',
+		])
 	})
 
 	it('stores a plain text name with no condition of its own', () => {

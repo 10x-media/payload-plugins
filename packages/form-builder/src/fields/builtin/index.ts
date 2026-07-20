@@ -3,6 +3,7 @@ import type { AnyFormFieldDefinition } from '../types'
 import { calculationField } from './calculation'
 import { checkboxField } from './checkbox'
 import { consentField } from './consent'
+import { countryField } from './country'
 import { dateField } from './date'
 import { emailField } from './email'
 import { fileField } from './file'
@@ -10,6 +11,7 @@ import { buildMessageField } from './message'
 import { numberField } from './number'
 import { buildRepeaterField } from './repeater'
 import { buildSelectField } from './select'
+import { stateField } from './state'
 import { textField } from './text'
 import { textareaField } from './textarea'
 
@@ -30,6 +32,8 @@ export const buildDefaultFieldDefinitions = (
 	emailField as AnyFormFieldDefinition,
 	numberField as AnyFormFieldDefinition,
 	buildSelectField(localize) as AnyFormFieldDefinition,
+	countryField as AnyFormFieldDefinition,
+	stateField as AnyFormFieldDefinition,
 	checkboxField as AnyFormFieldDefinition,
 	calculationField as AnyFormFieldDefinition,
 	consentField as AnyFormFieldDefinition,

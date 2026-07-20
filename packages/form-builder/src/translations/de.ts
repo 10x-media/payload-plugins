@@ -12,6 +12,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldTypeEmail]: 'E-Mail',
 	[keys.fieldTypeNumber]: 'Zahl',
 	[keys.fieldTypeSelect]: 'Auswahl',
+	[keys.fieldTypeCountry]: 'Land',
+	[keys.fieldTypeState]: 'Bundesstaat',
 	[keys.fieldTypeCheckbox]: 'Checkbox',
 	[keys.fieldTypeDate]: 'Datum',
 	[keys.configOptions]: 'Optionen',
@@ -23,6 +25,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.validationNumber]: 'Gib eine gültige Zahl ein',
 	[keys.validationDate]: 'Gib ein gültiges Datum ein',
 	[keys.validationSelect]: 'Wähle eine gültige Option',
+	[keys.validationCountry]: 'Wähle ein gültiges Land',
+	[keys.validationState]: 'Wähle einen gültigen Bundesstaat',
 	[keys.validationRegexPattern]: 'Gib einen gültigen regulären Ausdruck ein',
 	[keys.validationRegexFlags]:
 		'Gib gültige Flags für reguläre Ausdrücke ein, zum Beispiel i oder gi',

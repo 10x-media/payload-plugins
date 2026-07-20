@@ -7,6 +7,7 @@ import { emailRenderer } from './email'
 import { fileRenderer } from './file'
 import { messageRenderer } from './message'
 import { numberRenderer } from './number'
+import { countryRenderer, stateRenderer } from './region'
 import { repeaterRenderer } from './repeater'
 import { selectRenderer } from './select'
 import { textRenderer } from './text'
@@ -17,6 +18,7 @@ export const defaultRenderers: Record<string, FieldRenderer> = {
 	calculation: calculationRenderer as FieldRenderer,
 	checkbox: checkboxRenderer as FieldRenderer,
 	consent: consentRenderer as FieldRenderer,
+	country: countryRenderer as FieldRenderer,
 	date: dateRenderer as FieldRenderer,
 	email: emailRenderer as FieldRenderer,
 	file: fileRenderer as FieldRenderer,
@@ -24,6 +26,7 @@ export const defaultRenderers: Record<string, FieldRenderer> = {
 	number: numberRenderer as FieldRenderer,
 	repeater: repeaterRenderer as FieldRenderer,
 	select: selectRenderer as FieldRenderer,
+	state: stateRenderer as FieldRenderer,
 	text: textRenderer as FieldRenderer,
 	textarea: textareaRenderer as FieldRenderer,
 }

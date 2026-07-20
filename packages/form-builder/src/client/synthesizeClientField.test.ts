@@ -31,6 +31,14 @@ describe('operandFromRow', () => {
 		expect(operand?.options).toEqual([{ label: 'US', value: 'us' }])
 	})
 
+	it('injects the fixed country/state set for types that author no options', () => {
+		const country = operandFromRow({ blockType: 'country', name: 'origin' }, { country: 'select' })
+		expect(country?.conditionType).toBe('select')
+		expect(country?.options).toContainEqual({ label: 'Germany', value: 'DE' })
+		const state = operandFromRow({ blockType: 'state', name: 'region' }, { state: 'select' })
+		expect(state?.options).toContainEqual({ label: 'California', value: 'CA' })
+	})
+
 	it('falls back to the name when label is absent', () => {
 		const operand = operandFromRow({ blockType: 'text', name: 'x' }, { text: 'text' })
 		expect(operand?.label).toBe('x')

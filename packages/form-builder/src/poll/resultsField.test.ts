@@ -15,16 +15,20 @@ const athleteVote: AnyFormFieldDefinition = {
 describe('pollEligibleTypes', () => {
 	it('collects only definitions declaring pollEligible', () => {
 		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true))
-		expect(pollEligibleTypes(registry)).toEqual(['select'])
+		expect(pollEligibleTypes(registry)).toEqual(['select', 'country', 'state'])
 	})
 
 	it('includes custom types that declare eligibility', () => {
 		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true), { athleteVote })
-		expect(pollEligibleTypes(registry)).toEqual(['select', 'athleteVote'])
+		expect(pollEligibleTypes(registry)).toEqual(['select', 'country', 'state', 'athleteVote'])
 	})
 
 	it('reflects removal of an eligible built-in', () => {
-		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true), { select: false })
+		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true), {
+			select: false,
+			country: false,
+			state: false,
+		})
 		expect(pollEligibleTypes(registry)).toEqual([])
 	})
 })

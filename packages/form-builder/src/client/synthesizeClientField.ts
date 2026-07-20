@@ -6,6 +6,7 @@ import type {
 	TextFieldClient,
 } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
+import { fixedFieldOptions } from '../fields/data/regions'
 
 /** A field row as stored in the form's `fields` blocks array (only the keys the builder reads). */
 export type FieldRow = {
@@ -46,7 +47,8 @@ export const operandFromRow = (
 		name,
 		label: typeof row.label === 'string' && row.label.length > 0 ? row.label : name,
 		conditionType,
-		options: Array.isArray(row.options) ? row.options : undefined,
+		// Country/state author no options but are `select`-typed conditions, so offer their fixed set.
+		options: Array.isArray(row.options) ? row.options : fixedFieldOptions(row.blockType),
 	}
 }
 

@@ -357,6 +357,20 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			{ blockType: 'text', name: 'fullName', label: 'Full name', required: true },
 			{ blockType: 'email', name: 'email', label: 'Email', required: true },
 			{
+				blockType: 'country',
+				name: 'country',
+				label: 'Country',
+				width: 'half',
+				placeholder: 'Select a country',
+			},
+			{
+				blockType: 'state',
+				name: 'state',
+				label: 'State',
+				width: 'half',
+				placeholder: 'Select a state',
+			},
+			{
 				blockType: 'select',
 				name: 'role',
 				label: 'Role',
@@ -376,7 +390,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		],
 		flow: {
 			steps: [
-				{ id: 'step1', fields: ['fullName', 'email'], next: 'step2' },
+				{ id: 'step1', fields: ['fullName', 'email', 'country', 'state'], next: 'step2' },
 				{ id: 'step2', fields: ['role', 'otherRole', 'terms', 'news'] },
 			],
 		},
