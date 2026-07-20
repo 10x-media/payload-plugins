@@ -264,6 +264,11 @@
 }
 .fb-condensed-array__remove {
 	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	/* Payload input height, so with the row's flex-end the button centers on the input, not the
+	 * taller label+input stack. */
+	height: 40px;
 }
 .fb-condensed-array__actions {
 	margin-block-start: 0.25rem;
