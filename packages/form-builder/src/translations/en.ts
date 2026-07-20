@@ -137,8 +137,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigFrom]: 'From',
 	[keys.actionConfigFromDescription]:
 		'Sender address for this action. Leave empty to use the email adapter default.',
-	[keys.actionConfigCc]: 'Cc',
-	[keys.actionConfigBcc]: 'Bcc',
+	[keys.actionConfigCc]: 'CC',
+	[keys.actionConfigBcc]: 'BCC',
 	[keys.actionConfigReplyTo]: 'Reply-to',
 	[keys.validationFromUnknown]: 'Choose one of the configured from addresses',
 	[keys.validationFromUnavailable]:

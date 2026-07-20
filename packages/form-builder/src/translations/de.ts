@@ -144,8 +144,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.actionConfigFrom]: 'Von',
 	[keys.actionConfigFromDescription]:
 		'Absenderadresse für diese Aktion. Leer lassen, um den Standard des E-Mail-Adapters zu verwenden.',
-	[keys.actionConfigCc]: 'Cc',
-	[keys.actionConfigBcc]: 'Bcc',
+	[keys.actionConfigCc]: 'CC',
+	[keys.actionConfigBcc]: 'BCC',
 	[keys.actionConfigReplyTo]: 'Antwort an',
 	[keys.validationFromUnknown]: 'Wähle eine der konfigurierten Absenderadressen',
 	[keys.validationFromUnavailable]:
