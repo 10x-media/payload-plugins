@@ -57,6 +57,8 @@ jobs:
         run: pnpm check:dist
       - name: Bundle isolation gates
         run: pnpm exec turbo run test:dist
+      - name: Registry parity (rebuild shadcn registry, fail if drifted from source)
+        run: pnpm check:registry
 
   test:
     runs-on: ubuntu-latest
