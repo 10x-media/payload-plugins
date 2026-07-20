@@ -86,7 +86,10 @@ export const consentSourcesField = (options: ConsentSourcesFieldOptions = {}): A
 			singular: labelForKey(keys.consentSourceSingular),
 			plural: labelForKey(keys.consentSourcePlural),
 		},
-		admin: { description: labelForKey(keys.consentSourcesFieldDescription) },
+		admin: {
+			description: labelForKey(keys.consentSourcesFieldDescription),
+			components: { RowLabel: '@10x-media/form-builder/client#ConsentSourceRowLabel' },
+		},
 		fields: [
 			{
 				name: 'name',
