@@ -96,7 +96,7 @@ const TransitionRow = ({
 	return (
 		<div className="fb-flow-transition">
 			<div className="fb-flow-transition__header">
-				<span className="fb-flow-transition__label">go to</span>
+				<span className="fb-flow-transition__label">{t(keys.flowGoTo)}</span>
 				<div className="fb-flow-transition__goto">
 					<ReactSelect
 						options={stepOptions}
@@ -134,7 +134,7 @@ const TransitionRow = ({
 					/>
 				</div>
 			</div>
-			<span className="fb-flow-transition__when-label">when</span>
+			<span className="fb-flow-transition__when-label">{t(keys.flowWhen)}</span>
 			<div className="fb-flow-transition__condition">
 				<ConditionBuilder
 					value={transition.when}
@@ -295,7 +295,7 @@ const StepCard = ({
 				<div className="fb-flow-step__row">
 					<FieldLabel label={t(keys.flowFields)} />
 					{entries.length === 0 ? (
-						<p className="fb-flow-step__hint">No fields defined on the form yet.</p>
+						<p className="fb-flow-step__hint">{t(keys.flowNoFields)}</p>
 					) : (
 						<div className="fb-flow-step__field-picker">
 							{entries.map((entry) => {
@@ -339,7 +339,7 @@ const StepCard = ({
 				<div className="fb-flow-step__transitions">
 					<div className="fb-flow-step__transitions-header">
 						<FieldLabel label={t(keys.flowConditionalTransitions)} />
-						<span className="fb-flow-step__hint">(first match wins)</span>
+						<span className="fb-flow-step__hint">{t(keys.flowFirstMatchWins)}</span>
 					</div>
 					{transitions.map((transition, tIndex) => {
 						const tKey = tKeys[tIndex]
@@ -367,7 +367,7 @@ const StepCard = ({
 						onClick={addTransition}
 						margin={false}
 					>
-						Add transition
+						{t(keys.flowAddTransition)}
 					</Button>
 				</div>
 			</div>
@@ -492,14 +492,12 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 		<div className="field-type fb-flow-builder">
 			<div className="blocks-field__header">
 				<div className="blocks-field__header-wrap">
-					<h3>{typeof label === 'string' ? label : 'Flow'}</h3>
+					<h3>{typeof label === 'string' ? label : t(keys.flowFallbackTitle)}</h3>
 				</div>
 			</div>
 			<p className="fb-flow-builder__description">{t(keys.flowDescription)}</p>
 			{steps.length === 0 ? (
-				<p className="fb-flow-builder__hint">
-					No steps defined. Add at least two steps to enable multi-page flow routing.
-				</p>
+				<p className="fb-flow-builder__hint">{t(keys.flowNoSteps)}</p>
 			) : (
 				<div className="fb-flow-builder__steps">
 					{steps.map((step, index) => {

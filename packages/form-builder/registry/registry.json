@@ -81,6 +81,11 @@
 					"path": "form-builder/fields/repeater-field.tsx",
 					"type": "registry:component",
 					"target": "components/form-builder/fields/repeater-field.tsx"
+				},
+				{
+					"path": "form-builder/fields/region-field.tsx",
+					"type": "registry:component",
+					"target": "components/form-builder/fields/region-field.tsx"
 				}
 			]
 		},
