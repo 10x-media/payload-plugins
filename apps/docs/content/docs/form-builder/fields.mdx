@@ -7,7 +7,7 @@ Form fields are authored as Payload blocks: one block type per registered field 
 
 ## Core field types
 
-`text`, `textarea`, `email`, `number`, `date`, `select`, `country`, `state`, `checkbox`, `file`, `consent`, `calculation`, `repeater`, and `message`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads) (the `file` type only exists once an uploads collection is [configured](/form-builder/uploads#bring-your-own-collection)), [Consent](/form-builder/consent) (likewise, only once [consent sources](/form-builder/consent#setting-it-up) are), [Calculations](/form-builder/calculations).
+`text`, `textarea`, `email`, `number`, `date`, `select`, `checkbox`, `file`, `consent`, `calculation`, `repeater`, and `message` ship as built-ins; `country` and `state` are [opt-in](#country-and-state). All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads) (the `file` type only exists once an uploads collection is [configured](/form-builder/uploads#bring-your-own-collection)), [Consent](/form-builder/consent) (likewise, only once [consent sources](/form-builder/consent#setting-it-up) are), [Calculations](/form-builder/calculations).
 
 ## Authoring layout
 
@@ -39,11 +39,13 @@ The `date` type stores an ISO `YYYY-MM-DD` string and renders as a native `<inpu
 
 Because the code, not the resolved name, is what's stored, the email action's `{{fieldName}}` merge tag and its `{{*}}` / `{{*:table}}` wildcards (see [Rich text bodies](/form-builder/actions#rich-text-bodies)) always render the code: neither goes through a field type's `format`. The admin submission view and the plugin's own [recall piping](/form-builder/recall-prefill#recall-piping) do go through it, so those two render the country or state name instead.
 
-Remove either through the [registry](#the-registry) like any other built-in:
+Both are opt-in: neither is registered by default, so add them through the [registry](#the-registry). Each definition is exported for this:
 
 ```ts title="payload.config.ts"
+import { formBuilder, countryField, stateField } from '@10x-media/form-builder'
+
 formBuilder({
-  fields: { country: false, state: false },
+  fields: { country: countryField, state: stateField },
 })
 ```
 
@@ -111,7 +113,7 @@ export default buildConfig({
 })
 ```
 
-`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings; `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)); `pollEligible`, marking the type choosable as a poll's [results field](/form-builder/polls#the-results-endpoint) (its instances must produce enumerable answers, via authored options, a [poll option source](/form-builder/polls#option-sources), or its own `resolveOptions`; built-in: `select`, `country`, `state`); `resolveOptions`, letting a `pollEligible` type source its poll choices from the configured instance itself (a `hasMany` relationship it holds, say) instead of from authored options or a source (see [custom eligible field types](/form-builder/polls#custom-eligible-field-types)); `omitShared`, leaving the shared basics your type never reads (`label`, `placeholder`, `description`, `width`, `required`) unauthored while keeping the rest of the chrome, as `checkbox` and `calculation` do (see [Authoring layout](#authoring-layout)); and `bare`, dropping the shared chrome so the block is your `config` alone, as the [message](#message) type does.
+`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings; `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)); `pollEligible`, marking the type choosable as a poll's [results field](/form-builder/polls#the-results-endpoint) (its instances must produce enumerable answers, via authored options, a [poll option source](/form-builder/polls#option-sources), or its own `resolveOptions`; built-in: `select`, plus `country`/`state` when [opted in](#country-and-state)); `resolveOptions`, letting a `pollEligible` type source its poll choices from the configured instance itself (a `hasMany` relationship it holds, say) instead of from authored options or a source (see [custom eligible field types](/form-builder/polls#custom-eligible-field-types)); `omitShared`, leaving the shared basics your type never reads (`label`, `placeholder`, `description`, `width`, `required`) unauthored while keeping the rest of the chrome, as `checkbox` and `calculation` do (see [Authoring layout](#authoring-layout)); and `bare`, dropping the shared chrome so the block is your `config` alone, as the [message](#message) type does.
 
 `bare` requires `value: 'none'`, and the plugin throws at boot otherwise: a bare instance is nameless, so a value-bearing one would have nowhere to store its answer and would silently drop it. Reach for it for display-only types; anything a visitor answers stays named.
 

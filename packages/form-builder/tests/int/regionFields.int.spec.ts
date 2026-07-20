@@ -2,7 +2,7 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { countryField } from '../../src/fields/builtin/country'
 import { stateField } from '../../src/fields/builtin/state'
-import { formBuilder } from '../../src/index'
+import { type AnyFormFieldDefinition, formBuilder } from '../../src/index'
 import type { SubmissionDescriptor, SubmissionValue } from '../../src/submissions/types'
 
 const t = (key: string) => key
@@ -11,7 +11,15 @@ describeForDb('form-builder country/state fields', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: formBuilder({}), db })
+		booted = await bootPayload({
+			plugin: formBuilder({
+				fields: {
+					country: countryField as AnyFormFieldDefinition,
+					state: stateField as AnyFormFieldDefinition,
+				},
+			}),
+			db,
+		})
 	})
 
 	afterAll(async () => {

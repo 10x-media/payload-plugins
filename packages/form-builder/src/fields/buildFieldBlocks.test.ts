@@ -34,8 +34,6 @@ describe('buildFieldBlocks', () => {
 			'email',
 			'number',
 			'select',
-			'country',
-			'state',
 			'checkbox',
 			'calculation',
 			'consent',

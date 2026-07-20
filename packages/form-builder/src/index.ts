@@ -382,7 +382,9 @@ export {
 	defaultFieldDefinitions,
 	defaultFieldDefinitionsByType,
 } from './fields/builtin'
+export { countryField } from './fields/builtin/country'
 export { fileMimeTypeOptions } from './fields/builtin/file'
+export { stateField } from './fields/builtin/state'
 export { defineFormField } from './fields/defineFormField'
 export { fieldKey } from './fields/fieldKey'
 export { localizedIf } from './fields/localizedIf'

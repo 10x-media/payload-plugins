@@ -1,6 +1,8 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { buildDefaultFieldDefinitions } from '../fields/builtin'
+import { countryField } from '../fields/builtin/country'
+import { stateField } from '../fields/builtin/state'
 import { resolveFieldTypes } from '../fields/registry'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { buildValidateResultsField, pollEligibleTypes } from './resultsField'
@@ -15,20 +17,24 @@ const athleteVote: AnyFormFieldDefinition = {
 describe('pollEligibleTypes', () => {
 	it('collects only definitions declaring pollEligible', () => {
 		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true))
-		expect(pollEligibleTypes(registry)).toEqual(['select', 'country', 'state'])
+		expect(pollEligibleTypes(registry)).toEqual(['select'])
 	})
 
 	it('includes custom types that declare eligibility', () => {
 		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true), { athleteVote })
-		expect(pollEligibleTypes(registry)).toEqual(['select', 'country', 'state', 'athleteVote'])
+		expect(pollEligibleTypes(registry)).toEqual(['select', 'athleteVote'])
+	})
+
+	it('includes the opt-in country and state types once registered', () => {
+		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true), {
+			country: countryField as AnyFormFieldDefinition,
+			state: stateField as AnyFormFieldDefinition,
+		})
+		expect(pollEligibleTypes(registry)).toEqual(['select', 'country', 'state'])
 	})
 
 	it('reflects removal of an eligible built-in', () => {
-		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true), {
-			select: false,
-			country: false,
-			state: false,
-		})
+		const registry = resolveFieldTypes(buildDefaultFieldDefinitions(true), { select: false })
 		expect(pollEligibleTypes(registry)).toEqual([])
 	})
 })

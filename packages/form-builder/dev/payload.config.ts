@@ -9,11 +9,13 @@ import {
 	type AnyFormFieldDefinition,
 	type ConsentSourceEntry,
 	consentSourcesField,
+	countryField,
 	type DepartmentEmailsResolver,
 	defineFormField,
 	departmentsField,
 	formBuilder,
 	resolveDepartmentOptions,
+	stateField,
 } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
@@ -213,7 +215,13 @@ export default buildConfig({
 			uploads: { collection: 'form-uploads' },
 			// Cast mirrors the built-ins (see `buildDefaultFieldDefinitions`): a definition authored with
 			// precise value/config generics is stored erased in the registry, so one cast per type.
-			fields: { athleteVote: athleteVote as AnyFormFieldDefinition },
+			// country and state are opt-in (not registered by default); adding them here demonstrates the
+			// opt-in path and keeps the seeded country/state blocks resolvable.
+			fields: {
+				athleteVote: athleteVote as AnyFormFieldDefinition,
+				country: countryField as AnyFormFieldDefinition,
+				state: stateField as AnyFormFieldDefinition,
+			},
 			consent: { sources: consentSources },
 			email: { departments: departmentEmails },
 		}),
