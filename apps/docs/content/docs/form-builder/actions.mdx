@@ -94,9 +94,9 @@ formBuilder({
 
 The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
 
-## Cc, bcc, and reply-to
+## CC, BCC, and reply-to
 
-`emailTeam` and `confirmation` both carry **Cc**, **Bcc**, and **Reply-to** fields alongside **To**/**Subject**. Each is localized like `subject` (a submission's own locale selects the stored value at send) and interpolated with the same [recall tokens](#rich-text-bodies) as the body (`{{field}}`, `{{field|fallback}}`). Pass more than one address as a plain comma-separated string; it is forwarded to `payload.sendEmail`, and from there to your nodemailer transport, exactly as typed.
+`emailTeam` and `confirmation` both carry **CC**, **BCC**, and **Reply-to** fields alongside **To**/**Subject**. Each is localized like `subject` (a submission's own locale selects the stored value at send) and interpolated with the same [recall tokens](#rich-text-bodies) as the body (`{{field}}`, `{{field|fallback}}`). Pass more than one address as a plain comma-separated string; it is forwarded to `payload.sendEmail`, and from there to your nodemailer transport, exactly as typed.
 
 ## From addresses
 
