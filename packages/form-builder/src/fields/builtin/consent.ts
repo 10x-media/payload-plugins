@@ -24,7 +24,7 @@ export const consentField = defineFormField<'boolean', ConsentConfig>({
 	type: 'consent',
 	label: keys.fieldTypeConsent,
 	value: 'boolean',
-	omitShared: ['label', 'placeholder'],
+	omitShared: ['label', 'placeholder', 'description'],
 	config: [
 		{
 			name: 'source',
