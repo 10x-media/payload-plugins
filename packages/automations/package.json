@@ -76,8 +76,8 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/ui": "^3.82.0",
-		"payload": "^3.82.0",
+		"@payloadcms/ui": "^3.83.0",
+		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
