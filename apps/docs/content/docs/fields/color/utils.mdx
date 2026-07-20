@@ -1,0 +1,52 @@
+---
+title: Color utilities
+description: The zero-dependency color engine behind the field, exported for frontend use.
+---
+
+`@10x-media/fields/color/utils` is the parser and converter the field itself runs, exported standalone. It has zero dependencies and no Payload imports, so it is safe in any bundle: server, client, worker.
+
+```ts
+import {
+  parseColor,
+  formatColor,
+  convertColor,
+  contrastRatio,
+  relativeLuminance,
+} from '@10x-media/fields/color/utils'
+```
+
+## Parse and format
+
+```ts
+const parsed = parseColor('rgb(59, 130, 246)')
+// { mode: 'rgb', r: 59, g: 130, b: 246, alpha: 1 }, or null for invalid input
+
+if (parsed) {
+  formatColor(parsed, 'hex')    // '#3b82f6'
+  formatColor(parsed, 'hsl')    // 'hsl(217 91% 60%)'
+  formatColor(parsed, 'oklch')  // 'oklch(0.623 0.214 259.1)'
+}
+
+convertColor('#3b82f6', 'rgb')  // 'rgb(59 130 246)' (parse + format in one step; null on bad input)
+```
+
+`parseColor` accepts everything the field's text input accepts: hex 3/4/6/8, `rgb()`/`rgba()`, `hsl()`/`hsla()`, `oklch()`, named colors, `transparent`. Invalid input returns `null`; nothing throws. Parsed colors carry a `mode` (`rgb` or `oklch`) and an `alpha` channel. Formatted output uses modern space-separated CSS syntax.
+
+Conversions from OKLCH map out-of-gamut colors into sRGB by reducing chroma, preserving hue and lightness, rather than clamping channels.
+
+## Contrast
+
+```ts
+contrastRatio('#0f172a', '#ffffff')  // ~18
+relativeLuminance('#3b82f6')         // ~0.24
+```
+
+Both accept a CSS string or a parsed color. `contrastRatio` implements the WCAG 2.x relative-luminance formula. A common frontend use, picking a readable text color for a stored background:
+
+```ts
+const textColor = contrastRatio(doc.accent, '#ffffff') >= 4.5 ? '#ffffff' : '#0f172a'
+```
+
+## Guarantees
+
+The engine is unit-tested against reference conversion vectors, and the field's server `validate` uses these exact functions. If `parseColor` accepts a value, the field accepts it; if it returns `null`, the field rejects it.

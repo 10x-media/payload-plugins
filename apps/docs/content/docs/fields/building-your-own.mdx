@@ -1,0 +1,64 @@
+---
+title: Building your own
+description: The conventions these fields follow, so custom fields you build sit next to them (and Payload's) without a seam.
+---
+
+Every field in this package follows one pattern. If you build custom fields for your own project or plugin, following the same rules gets you the same result: a field nobody can tell apart from a native one.
+
+## Anatomy of a field
+
+A complete field is seven things:
+
+1. **A factory** returning a real Payload field config (text-backed unless the data demands otherwise). Options are a curated object; the escape hatch is a function.
+2. **A client Field component** registered by string path via the import map, never by direct import in the config:
+
+```ts
+admin: {
+  components: {
+    Field: {
+      path: '@your-scope/your-pkg/client#YourField',
+      clientProps: { /* serializable options only */ },
+    },
+  },
+}
+```
+
+3. **A list Cell component** so the list view renders something meaningful.
+4. **Validation** that shares its parser with the client. One source of truth; client and server can never disagree.
+5. **Co-located CSS** using only Payload custom properties.
+6. **Typed i18n keys** for every UI string.
+7. **Tests** at each tier that matters: unit for pure logic, integration for persistence and hooks, e2e for UI-critical interactions.
+
+## Look native
+
+- Build from `@payloadcms/ui` primitives: `useField`, `FieldLabel`, `FieldError`, `FieldDescription` rendered through `RenderCustomComponent` so server-provided overrides win.
+- Reproduce the native wrapper structure: outer `div` with `fieldBaseClass`, your `field-type <name>` class, `.error` and `.read-only` state classes; inner `field-type__wrap`.
+- Input rows are exactly 40px. If your UI needs more room, put it in a popover or drawer; the row never grows.
+- Style with Payload tokens only: `--theme-elevation-*`, `--theme-error-*`, `--theme-input-bg`, `--style-radius-*`, `--base`. Dark mode then works for free. No `!important`, no z-index beyond Payload's scale.
+- Respect the standard admin props by default: `description`, `placeholder`, `className`, `readOnly`, `condition`, `width` (via `mergeFieldStyles`), `beforeInput`/`afterInput`, RTL. Combine `readOnly || disabled` at the leaf like native fields do.
+
+## Overrides: function and spread, never deepMerge
+
+Every factory exposes the same escape hatch:
+
+```ts
+colorField({
+  name: 'accent',
+  overrides: ({ field }) => ({
+    ...field,
+    admin: { ...field.admin, position: 'sidebar' },
+  }),
+})
+```
+
+The consumer receives the finished field and returns a new one with explicit spreads. Deep merging is banned: it hides which plugin-critical config survives an override. A function with spreads makes every replacement intentional and visible.
+
+## Keep bundles honest
+
+- Heavy assets (icon datasets, search indexes) load lazily, behind a dynamic `import()`, only when the UI that needs them opens.
+- Client components go through the `'use client'` barrel; server-only code (crypto, hooks) never enters it.
+- If your package has multiple field families, keep them on separate subpath exports and test the isolation on the built output.
+
+## Prove it
+
+Render your field directly next to native Payload fields in a dev app and compare: row height, focus ring, error state, read-only state, dark mode, RTL. This package's dev app does exactly that for every configuration of every field; it is the fastest way to catch a seam.

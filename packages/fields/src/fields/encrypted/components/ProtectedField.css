@@ -1,0 +1,180 @@
+/* Eyeball masking (all structural types, including the richText reveal gate). */
+
+.tenx-protected-field__eye-icon .stroke {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 0.75;
+	vector-effect: non-scaling-stroke;
+}
+
+.tenx-protected-field__eye {
+	cursor: pointer;
+	--btn-icon-size: var(--base);
+}
+
+/* Floating eye for corner (textarea) and label-row (structural) placements. */
+.tenx-protected-field__eye--floating {
+	color: var(--theme-elevation-500);
+}
+
+.tenx-protected-field__eye--floating:hover {
+	color: var(--theme-elevation-800);
+}
+
+/* Attached eye segment, mirroring Payload's API-key toggle button. Background is
+   the input's own --theme-input-bg (not an elevation step) so the segment reads
+   as part of the input; the only seam is the input's right border, which the
+   segment continues around its top, right, and bottom. Height is a literal 40px
+   to match the native input: Payload compiles its formInput mixin to literal px,
+   while var(--base) is rem-derived and shrinks below 1024px, so a base-derived
+   height renders ~37px next to a 40px input. The doubled class outranks Payload's
+   own `.btn { height: base(2) }`, which otherwise wins by cascade order. */
+.tenx-protected-field__eye.tenx-protected-field__eye--attached {
+	align-self: stretch;
+	height: 40px;
+	margin: 0 0 0 -1px;
+	padding: 0 calc(var(--base) / 2);
+	border: 1px solid var(--theme-elevation-150);
+	border-left: 0;
+	border-radius: var(--style-radius-s);
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+	background: var(--theme-input-bg);
+	box-shadow: none;
+	color: var(--theme-elevation-800);
+	transition: border-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+.tenx-protected-field__eye--attached:hover {
+	background: var(--theme-elevation-100);
+}
+
+/* Hover or focus lights the input and eye together, so the focus border never
+   cuts off at the seam. Payload shifts an input border to elevation-250 on hover
+   and elevation-400 on focus; mirror that onto the eye and drive both from the
+   row, so focusing either half highlights the whole control as one. */
+.tenx-protected-field__attached-row:hover input,
+.tenx-protected-field__attached-row:hover .tenx-protected-field__eye--attached {
+	border-color: var(--theme-elevation-250);
+}
+
+.tenx-protected-field__attached-row:focus-within input,
+.tenx-protected-field__attached-row:focus-within .tenx-protected-field__eye--attached {
+	border-color: var(--theme-elevation-400);
+}
+
+/* Attached placement: input row with the eye appended as a flex segment. */
+.tenx-protected-field__attached-row {
+	display: flex;
+	align-items: center;
+}
+
+.tenx-protected-field--attached .tenx-protected-field__attached-row input {
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
+}
+
+.tenx-protected-field__eye-wrap--attached {
+	display: flex;
+	align-self: stretch;
+}
+
+/* Corner placement: eye pinned to the top-right of the textarea wrap. */
+.tenx-protected-field--corner .field-type__wrap {
+	position: relative;
+}
+
+.tenx-protected-field__eye-wrap--corner {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	z-index: 1;
+}
+
+/* Label-row placement: eye pinned to the label line. The wrapper (not the
+   nested native face) is the direct child of .render-fields, so it must carry
+   the native field rhythm itself; the attached/corner types get it free because
+   their root IS a .field-type. --spacing-field collapses to 0 inside a row, so
+   row layouts stay correct. */
+.tenx-protected-field--label-row {
+	position: relative;
+	margin-bottom: var(--spacing-field);
+}
+
+.tenx-protected-field__eye-wrap--label-row {
+	position: absolute;
+	top: 0;
+	right: 0;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+}
+
+/* Reveal slot for the label-row types (structural + richText). The native
+   editor mounts on first reveal and then stays mounted; concealing only sets
+   display:none on this slot, so re-revealing never remounts. Remounting Lexical
+   or react-select is what caused the toggle flicker. */
+.tenx-protected-field__reveal-slot--hidden {
+	display: none;
+}
+
+/* Concealed dots. */
+.tenx-protected-field__dots {
+	color: var(--theme-elevation-500);
+	letter-spacing: 0.15em;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.tenx-protected-field__masked-input,
+.tenx-protected-field__masked-textarea {
+	color: var(--theme-elevation-500);
+	letter-spacing: 0.15em;
+	cursor: default;
+}
+
+.tenx-protected-field__masked-textarea {
+	resize: none;
+}
+
+/* Static select face: react-select's flex layout, which emotion supplies at
+   runtime, is recreated here since the face never mounts react-select. */
+.tenx-protected-field__face .rs__control {
+	display: flex;
+	align-items: center;
+}
+
+/* A 40px floor on both the concealed face control and the revealed react-select
+   control, so toggling a select never changes height. Payload's react-select is
+   height:auto (single-value ~40px, multi-value chips ~38px), so without the floor
+   a hasMany field shrinks 2px on reveal; the floor keeps both states on the 40px
+   input rhythm. */
+.tenx-protected-field--label-row .rs__control {
+	min-height: 40px;
+}
+
+.tenx-protected-field__face .rs__value-container {
+	display: flex;
+	align-items: center;
+	flex: 1 1 auto;
+	overflow: hidden;
+}
+
+.tenx-protected-field__face .rs__indicators {
+	display: flex;
+	align-items: center;
+	align-self: stretch;
+}
+
+/* Static code/json face: an editor-styled box of dot lines, no Monaco. */
+.tenx-protected-field__editor-box {
+	min-height: calc(var(--base) * 4);
+	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.75);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-elevation-50);
+	font-family: var(--font-mono);
+	color: var(--theme-elevation-500);
+	white-space: pre-wrap;
+	word-break: break-all;
+}

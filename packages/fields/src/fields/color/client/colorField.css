@@ -1,0 +1,411 @@
+.fields-color {
+	position: relative;
+}
+
+/* Mirrors Payload's formInput mixin (packages/ui/src/scss/vars.scss) so the composite
+   container reads as one native text input; focus rides :focus-within.
+   Dimensions are static px on purpose: Payload compiles scss base() to literal px
+   (native inputs stay 40px tall at every breakpoint), while the runtime --base var
+   is rem-based and shrinks with the responsive html font-size. Deriving from
+   var(--base) made this container 3px shorter than native inputs at <=1024px. */
+.fields-color__container {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	width: 100%;
+	height: 40px;
+	padding: 0 8px 0 6px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	color: var(--theme-elevation-800);
+	font-family: var(--font-body);
+	font-size: 1rem;
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+	transition-property: border, box-shadow, background-color;
+	transition-duration: 100ms, 100ms, 500ms;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+.fields-color__container:hover {
+	border-color: var(--theme-elevation-250);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+}
+
+.fields-color__container:focus-within {
+	border-color: var(--theme-elevation-400);
+	outline: 0;
+}
+
+html[data-theme="light"] .fields-color.error .fields-color__container {
+	background-color: var(--theme-error-50);
+	border-color: var(--theme-error-500);
+}
+
+html[data-theme="dark"] .fields-color.error .fields-color__container {
+	background-color: var(--theme-error-100);
+	border-color: var(--theme-error-400);
+}
+
+html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
+	border-color: var(--theme-error-500);
+}
+
+.fields-color.read-only .fields-color__container,
+.fields-color.read-only .fields-color__container:hover {
+	border-color: var(--theme-elevation-150);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-400);
+	box-shadow: none;
+}
+
+.fields-color__checker {
+	background-image: conic-gradient(
+		var(--theme-elevation-150) 0 25%,
+		transparent 0 50%,
+		var(--theme-elevation-150) 0 75%,
+		transparent 0
+	);
+	background-size: 8px 8px;
+}
+
+.fields-color__popup,
+.fields-color__popup .popup__trigger-wrap {
+	display: flex;
+	flex-shrink: 0;
+}
+
+/* Payload caps popup scroll containers at base*10 (200px) and portals popup content to body,
+   so the panel must be targeted via :has, not through the .popup root our className lands on */
+.popup__scroll-container:has(> .fields-color__panel) {
+	max-height: none;
+}
+
+.fields-color__swatch-button {
+	display: flex;
+	flex-shrink: 0;
+	padding: 0;
+	cursor: pointer;
+	border: 0;
+	background: transparent;
+}
+
+.fields-color__swatch-button--static {
+	cursor: default;
+}
+
+.fields-color__swatch {
+	position: relative;
+	display: block;
+	width: 26px;
+	height: 26px;
+	overflow: hidden;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+}
+
+.fields-color__swatch-button:hover .fields-color__swatch {
+	border-color: var(--theme-elevation-400);
+}
+
+.fields-color__swatch-button:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: 1px;
+	border-radius: var(--style-radius-s);
+}
+
+.fields-color__swatch-color {
+	position: absolute;
+	inset: 0;
+	display: block;
+}
+
+.fields-color__swatch-color[data-missing="true"] {
+	background: repeating-linear-gradient(45deg, var(--theme-error-500) 0 4px, transparent 4px 8px);
+}
+
+/* Read-only muting stops at the container chrome: the swatch fill must keep
+   showing the stored color exactly, so no muting may ever reach it */
+.fields-color.read-only .fields-color__swatch-color {
+	opacity: 1;
+	filter: none;
+}
+
+/* The sibling input's width: 100% basis would otherwise squeeze the chip to nothing;
+   the max-width keeps runaway labels ellipsizing instead of overflowing */
+.fields-color__chip {
+	display: flex;
+	flex-shrink: 0;
+	max-width: 60%;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 8px;
+	border-radius: var(--style-radius-s);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-700);
+	font-size: 0.85rem;
+	line-height: 1.2;
+}
+
+.fields-color__chip-swatch {
+	position: relative;
+	flex-shrink: 0;
+	width: 12px;
+	height: 12px;
+	overflow: hidden;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: 2px;
+}
+
+.fields-color__chip-color {
+	position: absolute;
+	inset: 0;
+	display: block;
+}
+
+.fields-color__chip-color[data-missing="true"] {
+	background: repeating-linear-gradient(45deg, var(--theme-error-500) 0 3px, transparent 3px 6px);
+}
+
+.fields-color__chip-label {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.fields-color__input {
+	flex: 1 1 auto;
+	width: 100%;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	line-height: 20px;
+	appearance: none;
+	-webkit-appearance: none;
+}
+
+.fields-color__input:focus {
+	outline: 0;
+}
+
+.fields-color__input::placeholder {
+	color: var(--theme-elevation-400);
+}
+
+.fields-color__badge {
+	flex-shrink: 0;
+	padding: 3px 6px;
+	border-radius: var(--style-radius-s);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-500);
+	font-size: 10px;
+	line-height: 1;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+/* Matches the native select's clear-indicator: bare icon, no button chrome */
+.fields-color__clear {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--theme-elevation-500);
+	cursor: pointer;
+}
+
+.fields-color__clear:hover {
+	color: var(--theme-elevation-800);
+}
+
+.fields-color__clear:focus-visible {
+	outline: var(--accessibility-outline);
+}
+
+.fields-color__panel {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	width: 260px;
+	padding: 5px;
+}
+
+.fields-color__sv {
+	position: relative;
+	height: 160px;
+	border-radius: var(--style-radius-s);
+	background-image:
+		linear-gradient(to top, #000, rgba(0, 0, 0, 0)),
+		linear-gradient(to right, #fff, rgba(255, 255, 255, 0));
+	cursor: crosshair;
+	touch-action: none;
+}
+
+.fields-color__sv:focus-visible {
+	outline: 2px solid var(--theme-elevation-400);
+	outline-offset: 2px;
+}
+
+.fields-color__sv-thumb {
+	position: absolute;
+	width: 12px;
+	height: 12px;
+	border: 2px solid #fff;
+	border-radius: 50%;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+}
+
+.fields-color__slider {
+	width: 100%;
+	height: 12px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	appearance: none;
+	-webkit-appearance: none;
+	background-size: 100% 100%;
+}
+
+.fields-color__slider--hue {
+	background-image: linear-gradient(
+		to right,
+		#f00,
+		#ff0 17%,
+		#0f0 33%,
+		#0ff 50%,
+		#00f 67%,
+		#f0f 83%,
+		#f00
+	);
+}
+
+.fields-color__slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	width: 16px;
+	height: 16px;
+	border: 1px solid var(--theme-elevation-400);
+	border-radius: 50%;
+	background: var(--theme-input-bg);
+	cursor: pointer;
+}
+
+.fields-color__slider::-moz-range-thumb {
+	width: 16px;
+	height: 16px;
+	border: 1px solid var(--theme-elevation-400);
+	border-radius: 50%;
+	background: var(--theme-input-bg);
+	cursor: pointer;
+}
+
+.fields-color__slider:focus-visible {
+	outline: 2px solid var(--theme-elevation-400);
+	outline-offset: 2px;
+}
+
+.fields-color__controls {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.fields-color__formats {
+	display: flex;
+	flex: 1 1 auto;
+	gap: 4px;
+}
+
+.fields-color__format {
+	flex: 1 1 0;
+	height: 28px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: transparent;
+	color: var(--theme-elevation-600);
+	font-size: 0.7rem;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.fields-color__format[aria-pressed="true"] {
+	background: var(--theme-elevation-150);
+	color: var(--theme-elevation-800);
+}
+
+.fields-color__eyedropper {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: transparent;
+	color: var(--theme-elevation-600);
+	cursor: pointer;
+}
+
+.fields-color__eyedropper:hover {
+	color: var(--theme-elevation-800);
+	border-color: var(--theme-elevation-250);
+}
+
+.fields-color__presets-label {
+	margin-bottom: 4px;
+	color: var(--theme-elevation-600);
+	font-size: 0.85rem;
+}
+
+.fields-color__missing {
+	margin: 0 0 4px;
+	color: var(--theme-error-500);
+	font-size: 0.75rem;
+}
+
+.fields-color__presets-grid {
+	display: grid;
+	grid-template-columns: repeat(8, 1fr);
+	gap: 4px;
+}
+
+.fields-color__preset {
+	position: relative;
+	overflow: hidden;
+	aspect-ratio: 1;
+	padding: 0;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	cursor: pointer;
+}
+
+.fields-color__preset > span {
+	position: absolute;
+	inset: 0;
+	display: block;
+}
+
+.fields-color__preset[aria-pressed="true"] {
+	outline: 2px solid var(--theme-elevation-800);
+	outline-offset: 1px;
+}
+
+.fields-color__sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}

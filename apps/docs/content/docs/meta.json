@@ -1,4 +1,13 @@
 {
 	"title": "Docs",
-	"pages": ["index", "concepts", "form-builder", "analytics", "jobs", "webhooks", "automations"]
+	"pages": [
+		"index",
+		"concepts",
+		"form-builder",
+		"analytics",
+		"fields",
+		"jobs",
+		"webhooks",
+		"automations"
+	]
 }

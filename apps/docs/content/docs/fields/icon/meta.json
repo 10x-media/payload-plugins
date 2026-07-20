@@ -1,0 +1,4 @@
+{
+	"title": "Icon",
+	"pages": ["index", "adapters", "frontend-rendering", "multi-tenancy", "codegen"]
+}

@@ -1,0 +1,58 @@
+---
+title: Presets
+description: Static preset palettes and async per-request preset resolvers.
+---
+
+Presets render as a labeled swatch grid in the picker popover. Picking one fills the field with the preset's value (or a reference to it in [linked mode](/fields/color/linked-mode)).
+
+## Static presets
+
+```ts
+colorField({
+  name: 'accent',
+  presets: [
+    '#0f172a',
+    { key: 'brand', value: '#3b82f6', label: 'Brand' },
+    { key: 'success', value: '#22c55e', label: { en: 'Success', de: 'Erfolg' } },
+  ],
+})
+```
+
+A bare string is shorthand for a preset whose key and value are both the CSS string. Object presets carry a stable `key` (required for linked mode) and an optional localizable `label`.
+
+## Async presets
+
+`presets` also accepts a resolver, for palettes that live in your data (a tenant's brand colors, a design-tokens global):
+
+```ts
+colorField({
+  name: 'accent',
+  presets: async ({ req }) => {
+    const { docs } = await req.payload.find({ collection: 'tenants', depth: 0, limit: 50 })
+    return docs.flatMap((tenant) =>
+      (tenant.brandColors ?? []).map((c) => ({ key: c.slug, value: c.color, label: c.name }))
+    )
+  },
+})
+```
+
+Resolvers are memoized per request, so a list view rendering fifty rows resolves the palette once, not fifty times. Because a single resolver result is shared across every document in a request, resolvers derive from `req`, not from a single document's data.
+
+## Plugin-level defaults
+
+Presets and the stored `format` passed to the plugin apply to every color field that does not define its own:
+
+```ts
+fields({
+  color: {
+    format: 'oklch',
+    presets: [{ key: 'brand', value: '#3b82f6', label: 'Brand' }],
+  },
+})
+```
+
+Per-field `presets` replace the plugin default entirely (no merging), keeping the resolution rule predictable. At the plugin level, a static `presets` array takes precedence over an async `resolvePresets`. A field without its own `format` inherits `color.format`; per-field `format` always wins, and with neither set the stored format is `hex`.
+
+## Custom heading
+
+`presetsLabel` replaces the default "Presets" heading and accepts any Payload static label (string or locale map).

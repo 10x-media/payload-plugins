@@ -10,6 +10,15 @@
 	],
 	"overrides": [
 		{
+			"includes": [
+				"**/src/fields/icon/adapters/*/generated/**",
+				"**/dev/icon-adapters/*/generated/**"
+			],
+			"formatter": { "enabled": false },
+			"linter": { "enabled": false },
+			"assist": { "enabled": false }
+		},
+		{
 			"includes": ["**/registry/**"],
 			"linter": {
 				"rules": {

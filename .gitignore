@@ -5,6 +5,8 @@ node_modules/
 
 # build
 dist/
+# dist isolation specs are source, not build output
+!**/tests/dist/
 .turbo/
 *.tsbuildinfo
 *.tgz

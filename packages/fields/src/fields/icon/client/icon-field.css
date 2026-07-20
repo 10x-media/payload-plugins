@@ -1,0 +1,524 @@
+/* Composite input mirrors Payload's formInput mixin (packages/ui/src/scss/vars.scss) so the
+   trigger reads as one native text input: glyph, label, marker and clear all live inside one
+   container and focus rides :focus-within. Sizes are literal px because Payload compiles scss
+   base() to px (native inputs stay 40px at every breakpoint) while the runtime --base var is
+   rem-based and shrinks below 1024px, which would leave this shorter than the inputs beside it. */
+.tenx-icon-field__control {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	height: 40px;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	color: var(--theme-elevation-800);
+	font-family: var(--font-body);
+	font-size: 1rem;
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+	transition-property: border, box-shadow, background-color;
+	transition-duration: 100ms, 100ms, 500ms;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+.tenx-icon-field__control:hover {
+	border-color: var(--theme-elevation-250);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+}
+
+.tenx-icon-field__control:focus-within {
+	border-color: var(--theme-elevation-400);
+	outline: 0;
+}
+
+html[data-theme="light"] .tenx-icon-field.error .tenx-icon-field__control {
+	background-color: var(--theme-error-50);
+	border-color: var(--theme-error-500);
+}
+
+html[data-theme="dark"] .tenx-icon-field.error .tenx-icon-field__control {
+	background-color: var(--theme-error-100);
+	border-color: var(--theme-error-400);
+}
+
+html[data-theme="dark"] .tenx-icon-field.error .tenx-icon-field__control:hover {
+	border-color: var(--theme-error-500);
+}
+
+/* Degradation: the stored value's library is gone. A subtle warning tint plus a compact
+   marker; the full explanation shows in the drawer banner, not in the trigger. */
+.tenx-icon-field__control--warning,
+.tenx-icon-field__control--warning:hover {
+	border-color: var(--theme-warning-250);
+}
+
+html[data-theme="light"] .tenx-icon-field__control--warning {
+	background-color: var(--theme-warning-50);
+}
+
+html[data-theme="dark"] .tenx-icon-field__control--warning {
+	background-color: var(--theme-warning-100);
+}
+
+.tenx-icon-field.read-only .tenx-icon-field__control,
+.tenx-icon-field.read-only .tenx-icon-field__control:hover {
+	border-color: var(--theme-elevation-150);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-400);
+	box-shadow: none;
+}
+
+/* Square region at the input's start: the 20px glyph is centered in a 1:1 box the height of
+   the input, giving equal padding on every side, and doubles as the drawer-open affordance. */
+.tenx-icon-field__glyph {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	aspect-ratio: 1;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+}
+
+.tenx-icon-field__glyph--empty {
+	color: var(--theme-elevation-300);
+}
+
+.tenx-icon-field__glyph:disabled {
+	cursor: default;
+}
+
+.tenx-icon-field__glyph:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: -2px;
+}
+
+/* Non-text mode: the whole area except the clear button opens the drawer. */
+.tenx-icon-field__open {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.tenx-icon-field__open:disabled {
+	cursor: default;
+}
+
+.tenx-icon-field__open:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: -2px;
+}
+
+.tenx-icon-field__value {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	padding-right: 8px;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* Text mode: the label area is a borderless input flexing inside the container. */
+.tenx-icon-field__value--input {
+	height: 100%;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	appearance: none;
+	-webkit-appearance: none;
+}
+
+.tenx-icon-field__value--input:focus {
+	outline: 0;
+}
+
+.tenx-icon-field__value--input::placeholder {
+	color: var(--theme-elevation-400);
+}
+
+.tenx-icon-field__placeholder {
+	color: var(--theme-elevation-400);
+}
+
+/* Compact degradation marker, right-aligned inside the input. */
+.tenx-icon-field__marker {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	padding: 0 6px;
+	color: var(--theme-warning-600);
+}
+
+/* Matches the native select's clear indicator: bare icon, no button chrome. */
+.tenx-icon-field__clear {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	padding: 0 8px;
+	border: 0;
+	background: transparent;
+	color: var(--theme-elevation-500);
+	cursor: pointer;
+}
+
+.tenx-icon-field__clear:hover {
+	color: var(--theme-elevation-800);
+}
+
+.tenx-icon-field__clear:focus-visible {
+	outline: var(--accessibility-outline);
+}
+
+.tenx-icon-field__sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.tenx-icon-placeholder {
+	display: inline-block;
+	width: 24px;
+	height: 24px;
+	background: var(--theme-elevation-100);
+	border-radius: var(--style-radius-s);
+}
+
+.tenx-icon-cell {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+}
+
+.tenx-icon-drawer {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	/* Cell geometry in one place. The cell box is a fixed square that must equal CELL_SIZE in
+	   IconDrawerContent (it drives the column count and the virtualizer row height); the outlined
+	   button is smaller and centered, so cell-inset is the gap from each cell-box edge to the
+	   button outline. The search row and banner align to the button outlines, insetting by
+	   cell-inset on both sides. */
+	--tenx-icon-cell-size: 64px;
+	--tenx-icon-cell-button-size: 56px;
+	--tenx-icon-cell-inset: calc(
+		(var(--tenx-icon-cell-size) - var(--tenx-icon-cell-button-size)) /
+		2
+	);
+}
+
+/* Payload's Drawer Gutter (.drawer__content-children) is overflow:auto and stacks
+   its title header above our content, so a full-height body overflows the Gutter
+   and adds a second scrollbar on top of the grid's own. Convert the Gutter to a
+   flex column so the native header stays fixed and our body flex-fills, leaving
+   the listbox grid as the sole scroller. Scoped to our modal class, same technique
+   as the color Popup :has() override. */
+.tenx-icon-drawer-modal .drawer__content-children {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.tenx-icon-drawer-modal .drawer__content-children > .tenx-icon-drawer {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: auto;
+}
+
+.tenx-icon-drawer-modal .drawer__header {
+	flex-shrink: 0;
+}
+
+/* Full degradation explanation shown when the stored value's library is unavailable. */
+.tenx-icon-drawer__banner {
+	flex-shrink: 0;
+	margin-bottom: calc(var(--base) * 0.5);
+	padding: calc(var(--base) * 0.4) calc(var(--base) * 0.6);
+	border: 1px solid var(--theme-warning-250);
+	border-radius: var(--style-radius-s);
+	color: var(--theme-warning-800);
+	font-size: 0.8rem;
+}
+
+html[data-theme="light"] .tenx-icon-drawer__banner {
+	background: var(--theme-warning-50);
+}
+
+html[data-theme="dark"] .tenx-icon-drawer__banner {
+	background: var(--theme-warning-100);
+}
+
+/* Right column beside the rail. --tenx-icon-grid-width (set inline from columns * CELL_SIZE) is
+   the cell-box span of a full row; aligned-width insets that to the button outlines so the
+   banner, the search + switcher row, and the visible grid share one left and one right edge. */
+.tenx-icon-drawer__main {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	min-width: 0;
+	min-height: 0;
+	--tenx-icon-aligned-width: calc(var(--tenx-icon-grid-width) - 2 * var(--tenx-icon-cell-inset));
+}
+
+/* Banner and search row align to the icon button OUTLINES, not the cell boxes: the outer cells
+   leave a cell-inset gap before the first button and after the last, so insetting these by that
+   gap lands their left and right edges exactly on the first and last button borders. Both are
+   children of __main, sharing its left origin and inheriting the width from it. */
+.tenx-icon-drawer__banner,
+.tenx-icon-drawer__header {
+	width: var(--tenx-icon-aligned-width);
+	max-width: 100%;
+	margin-left: var(--tenx-icon-cell-inset);
+}
+
+/* Search grows to fill the row; the switcher sits at the fixed-width right end so its right
+   edge is the row's right edge. Width and left inset come from the shared rule above. */
+.tenx-icon-drawer__header {
+	display: flex;
+	flex-direction: row;
+	flex-shrink: 0;
+	align-items: center;
+	gap: calc(var(--base) * 0.5);
+	padding-bottom: calc(var(--base) * 0.5);
+	background: var(--theme-bg);
+}
+
+/* Bordered control mirroring Payload's formInput: SearchIcon inside-left, borderless input
+   flexing beside it, focus riding :focus-within. Grows to fill the header row left of the
+   switcher (min-width: 0 lets it shrink below its content). Literal 40px per the field height
+   rule (Payload compiles base(2) to px; the --base var shrinks below 1024px). */
+.tenx-icon-drawer__search {
+	position: relative;
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	min-width: 0;
+	height: 40px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+	transition-property: border, box-shadow;
+	transition-duration: 100ms;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+.tenx-icon-drawer__search:hover {
+	border-color: var(--theme-elevation-250);
+}
+
+.tenx-icon-drawer__search:focus-within {
+	border-color: var(--theme-elevation-400);
+}
+
+/* Square affordance at the start, sized to the control height like Payload's search. */
+.tenx-icon-drawer__search-icon {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	aspect-ratio: 1;
+	color: var(--theme-elevation-400);
+	pointer-events: none;
+}
+
+.tenx-icon-drawer__search-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	height: 100%;
+	padding: 0 calc(var(--base) * 0.5) 0 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: inherit;
+	font-size: 1rem;
+	appearance: none;
+	-webkit-appearance: none;
+}
+
+.tenx-icon-drawer__search-input:focus {
+	outline: 0;
+}
+
+.tenx-icon-drawer__search-input::placeholder {
+	color: var(--theme-elevation-400);
+}
+
+.tenx-icon-drawer__switcher {
+	flex: 0 0 auto;
+	width: 220px;
+	max-width: 100%;
+}
+
+.tenx-icon-drawer__sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.tenx-icon-drawer__body {
+	display: flex;
+	flex-grow: 1;
+	gap: var(--base);
+	min-height: 0;
+}
+
+.tenx-icon-drawer__rail {
+	display: flex;
+	flex-direction: column;
+	flex-shrink: 0;
+	gap: 2px;
+	width: 200px;
+	overflow-y: auto;
+	padding-right: calc(var(--base) * 0.25);
+	border-right: 1px solid var(--theme-elevation-100);
+}
+
+.tenx-icon-drawer__rail-item {
+	padding: calc(var(--base) * 0.25) calc(var(--base) * 0.5);
+	background: transparent;
+	border: none;
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-600);
+	font-family: inherit;
+	font-size: 0.875rem;
+	text-align: left;
+	text-transform: capitalize;
+	cursor: pointer;
+}
+
+.tenx-icon-drawer__rail-item:hover {
+	background: var(--theme-elevation-50);
+}
+
+.tenx-icon-drawer__rail-item--active {
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-800);
+}
+
+.tenx-icon-drawer__grid {
+	flex-grow: 1;
+	min-width: 0;
+	overflow-y: auto;
+	/* Promote the scroller to its own compositor layer so the virtualizer's
+	   translateY rows repaint on the GPU during fast scrolls. */
+	transform: translateZ(0);
+}
+
+.tenx-icon-drawer__row {
+	display: flex;
+	justify-content: flex-start;
+}
+
+/* Fixed cell-size square: width and height both the cell size (the column-count divisor and
+   virtualizer row height in IconDrawerContent). Height keeps rows from overlapping or gapping;
+   fixing the width instead of growing it left-aligns every row, so a partial last row places its
+   cells under the same columns as the full rows above it. Containment is deliberately kept off
+   the cell: paint containment (and content-visibility) would clip the hover tooltip, which
+   overflows the cell upward; the glyph carries content-visibility instead. */
+.tenx-icon-drawer__cell {
+	display: flex;
+	flex: 0 0 var(--tenx-icon-cell-size);
+	align-items: center;
+	justify-content: center;
+	height: var(--tenx-icon-cell-size);
+}
+
+.tenx-icon-drawer__cell-button {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--tenx-icon-cell-button-size);
+	height: var(--tenx-icon-cell-button-size);
+	padding: 0;
+	background: transparent;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-800);
+	cursor: pointer;
+	transition:
+		border-color 100ms,
+		background-color 100ms;
+}
+
+/* Hover fades the outline (per the reference) and lifts the glyph with a faint fill. */
+.tenx-icon-drawer__cell-button:hover {
+	border-color: var(--theme-elevation-100);
+	background: var(--theme-elevation-50);
+}
+
+.tenx-icon-drawer__cell-button:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-offset);
+}
+
+/* Selected uses Payload's success accent (the colour of its focus ring) for a clear active cell. */
+.tenx-icon-drawer__cell-button--selected,
+.tenx-icon-drawer__cell-button--selected:hover {
+	border-color: var(--theme-success-500);
+	box-shadow: 0 0 0 1px var(--theme-success-500);
+}
+
+.tenx-icon-drawer__glyph {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	/* Skip painting glyphs scrolled just out of view (overscan rows); the fixed size
+	   keeps layout stable while the SVG paint is deferred. Safe here because the glyph
+	   never overflows, unlike the cell which hosts the tooltip. */
+	content-visibility: auto;
+}
+
+.tenx-icon-drawer__empty {
+	padding: var(--base);
+	color: var(--theme-elevation-500);
+}
+
+.tenx-icon-drawer__loading {
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) * 0.5);
+	padding: var(--base) 0;
+}
+
+.tenx-icon-drawer__footer {
+	position: sticky;
+	bottom: 0;
+	padding-top: calc(var(--base) * 0.5);
+	background: var(--theme-bg);
+	border-top: 1px solid var(--theme-elevation-100);
+	color: var(--theme-elevation-600);
+	font-size: 0.75rem;
+}

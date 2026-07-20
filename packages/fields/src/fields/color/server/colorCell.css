@@ -1,0 +1,32 @@
+.fields-color-cell {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.fields-color-cell__swatch {
+	position: relative;
+	width: 16px;
+	height: 16px;
+	overflow: hidden;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background-image: conic-gradient(
+		var(--theme-elevation-150) 0 25%,
+		transparent 0 50%,
+		var(--theme-elevation-150) 0 75%,
+		transparent 0
+	);
+	background-size: 8px 8px;
+}
+
+.fields-color-cell__swatch > span {
+	position: absolute;
+	inset: 0;
+	display: block;
+}
+
+.fields-color-cell__missing {
+	color: var(--theme-error-500);
+	font-size: 0.75rem;
+}

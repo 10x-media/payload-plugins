@@ -1,0 +1,56 @@
+---
+title: Querying
+description: Opt-in blind indexing restores exact-match queries and uniqueness on encrypted fields.
+---
+
+An encrypted column is opaque to the database, so by default no `where` clause can match it. For fields you must look up by exact value (an email, an external id), opt into a blind index in the options argument:
+
+```ts
+encryptedField(
+  { name: 'contactEmail', type: 'email', unique: true },
+  { queryable: true },
+)
+```
+
+`unique` is a field property (first argument); `queryable` is an encryption option (second argument). Blind indexing is available only for `text`, `email`, and `number` fields, the scalar types the index can key on.
+
+## How it works
+
+`queryable: true` adds a hidden sibling column `<name>_bidx` holding a truncated HMAC-SHA256 (144 bits, base64url) of the normalized plaintext, keyed by a dedicated index key derived separately from the encryption key, so index values are useless for decryption. The sibling is maintained in the same `beforeChange` that encrypts, so the two can never drift.
+
+Queries stay natural: a hook transparently rewrites the field's exact-match clauses (`equals`, `not_equals`, `in`, `not_in`, `exists`) to the index column:
+
+```ts
+await payload.find({
+  collection: 'customers',
+  where: { contactEmail: { equals: 'ada@example.com' } },  // rewritten to contactEmail_bidx
+})
+```
+
+`unique: true` is enforced on the index column, giving real uniqueness over encrypted values.
+
+## Supported operators
+
+Blind-index filtering answers exact match only: `equals`, `not_equals`, `in`, `not_in`, and `exists`. That is every operator a fingerprint can answer, and the rewrite maps each to the index column.
+
+Everything else is cryptographically impossible over a blind index: substring (`like`, `contains`), range and comparison (`greater_than`, `less_than`, and friends), geo (`near`), and sorting all need structure the fingerprint deliberately destroys. Rather than silently querying the opaque ciphertext column, which would read as a working filter while matching junk, an unsupported operator resolves to a guaranteed-empty match and logs a development warning. If you need those operators, the field should probably not be encrypted (see [when not to encrypt](/fields/encrypted/design-rationale#when-not-to-encrypt)).
+
+## In the admin list view
+
+Queryable fields are filterable from the list view's filter controls, not just the API: choose the field, pick an exact-match operator (`equals`, `in`, and friends), and the same rewrite runs the filter against the blind index. Your input is normalized and fingerprinted exactly as an API query would be, so the list filters by exact value without the plaintext or its hash ever appearing in the query string.
+
+Non-queryable encrypted fields are removed from the list-filter UI entirely: with no blind index they could only ever match their opaque ciphertext column. The blind-index hash itself is stripped from every API response, so the keyed fingerprint never leaves the server.
+
+## Normalization
+
+Plaintext is normalized before hashing: every value is trimmed of surrounding whitespace, and `email` values are additionally lowercased, so `Ada@Example.com` and `ada@example.com` share one index value. `text` and `number` stay case-sensitive, so `ACME` and `acme` are distinct index values. The rewrite applies the same normalization to your query values, so you filter with natural input either way.
+
+## Rotation and the index
+
+Because the index key is independent of the data keys and stays stable across data-key rotation, running [`rotateEncryptedFields`](/fields/encrypted/key-management#rotation) does not disturb existing blind indexes; equality queries keep matching throughout. The one operation that invalidates blind indexes is changing the index key material itself, which requires rebuilding them.
+
+## Limits
+
+- **Exact match only.** No `like`, `contains`, comparison, or sort; the index is a fingerprint, not an order-preserving value. See [Supported operators](#supported-operators) for the full set and how unsupported operators behave.
+- **Low-entropy values leak by frequency.** A blind index over a low-cardinality plaintext (a country code, a short numeric enum, a birth year) lets an attacker with database access bucket rows by value frequency. Blind-index fields should carry values from large spaces: emails, tokens, external ids.
+- **Index values are stable by design.** Equal plaintexts produce equal index values; that is exactly the property that makes lookup work, and the trade-off documented in [Design rationale](/fields/encrypted/design-rationale#blind-index-trade-offs). The index key is not domain-separated per field, so identical plaintexts share an index value across every queryable field, which is why you enable `queryable` only where you need it.

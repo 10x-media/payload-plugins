@@ -1,0 +1,65 @@
+---
+title: Key management
+description: Default key derivation, explicit multi-key configuration, async key providers, and rotation.
+---
+
+## Default: derived from PAYLOAD_SECRET
+
+With no configuration, encryption keys derive from `PAYLOAD_SECRET` via HKDF-SHA256 with purpose-specific info strings. This is deliberately a different derivation than anything Payload itself derives from the secret, so no other subsystem ever holds the same key bytes.
+
+The default is fine to start, but it couples data recoverability to `PAYLOAD_SECRET`: rotate the secret and encrypted data becomes unreadable. Configure explicit keys before production.
+
+## Explicit keys
+
+```ts title="payload.config.ts"
+const k1 = process.env.FIELDS_KEY_K1
+const k2 = process.env.FIELDS_KEY_K2
+if (!k1 || !k2) throw new Error('FIELDS_KEY_K1 and FIELDS_KEY_K2 are required')
+
+fields({
+  encrypted: {
+    keys: {
+      active: 'k2',
+      keys: { k1, k2 },
+    },
+  },
+})
+```
+
+Writes always encrypt with the `active` key. Reads select the key by the key id embedded in each stored value, so old rows encrypted under `k1` keep decrypting after `k2` becomes active. Key material is a high-entropy string used directly as HKDF input: at least 16 bytes, 32 or more recommended. Generate one with `openssl rand -base64 32`.
+
+A missing or malformed key configuration fails at startup with a clear error, not at the first read in production. Key ids are embedded in the stored wire format, so they are restricted to `[A-Za-z0-9_-]`.
+
+## Async key providers
+
+A key may be a function resolving to raw key bytes, for keys held in KMS, Vault, or any secret manager:
+
+```ts
+keys: {
+  active: 'kms-1',
+  keys: {
+    'kms-1': async () => fetchDataKeyBytesFromKms('alias/payload-fields'),
+  },
+},
+```
+
+A provider must resolve to a `Uint8Array` of key bytes (a string return is rejected, so a KMS handing back hex or base64 is decoded by your provider, never guessed). Providers resolve once at first use and the result is cached for the process lifetime.
+
+## The blind-index key
+
+The key behind [queryable](/fields/encrypted/querying) blind indexes is derived from a stable root, a dedicated `keys.indexKey` if you set one, otherwise the Payload secret, and never from the active data key. That decoupling is deliberate: rotating the active data key re-seals ciphertext while the blind index stays byte-identical, so equality queries keep matching rows written under the previous key. Set a dedicated `indexKey` only if you want the index key fully independent of the data keys; changing it later invalidates every existing blind index until they are rebuilt.
+
+## Rotation
+
+Adding a new active key re-encrypts nothing by itself; old rows stay valid under their embedded key id. To retire an old key, re-encrypt in bulk:
+
+```ts
+import { rotateEncryptedFields } from '@10x-media/fields/encrypted'
+
+await rotateEncryptedFields(payload, {
+  collections: ['customers'],  // omit to rotate every collection with encrypted fields
+  batchSize: 100,
+})
+```
+
+The utility walks documents in batches, decrypts with whichever key each value names, and re-encrypts with the active key. It is idempotent and resumable: values already under the active key are skipped. Writes go through the local API, so versioned collections record a new version per rotated document. Once it completes, remove the retired key from `keys` and old ciphertext can no longer be read by anyone holding only the new key.

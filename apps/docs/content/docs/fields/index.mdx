@@ -1,0 +1,50 @@
+---
+title: Fields
+description: Reusable Payload v3 fields that look and behave native. Color picker, icon picker, and encrypted fields in one package.
+---
+
+`@10x-media/fields` is a library of drop-in fields for Payload v3. Each field is built from `@payloadcms/ui` primitives on Payload design tokens: the same 40px input rows, the same label/error/description composition, the same `admin` prop contract (`description`, `placeholder`, `className`, `readOnly`, `condition`, `width`, component overrides, RTL). Rendered next to native fields, they are indistinguishable.
+
+```ts title="collections/Posts.ts"
+import { colorField } from '@10x-media/fields/color'
+import { iconField } from '@10x-media/fields/icon'
+import { encryptedField } from '@10x-media/fields/encrypted'
+
+fields: [
+  colorField({ name: 'accent' }),
+  iconField({ name: 'icon' }),
+  ...encryptedField({ name: 'apiToken', type: 'text' }),
+]
+```
+
+`encryptedField` returns an array (the stored field, plus a blind-index sibling when queryable), so spread it into `fields`. `colorField` and `iconField` return a single field.
+
+## Three field families
+
+<Cards>
+  <Card title="Color" href="/fields/color" description="A full picker in a constant-height row: saturation area, hue and alpha sliders, eyedropper, presets, any CSS color as input, one stored format." />
+  <Card title="Icon" href="/fields/icon" description="A searchable icon browser over pluggable libraries (Lucide, Radix, Tabler first-party), with per-icon lazy loading and frontend renderers." />
+  <Card title="Encrypted" href="/fields/encrypted" description="Authenticated field-level encryption at rest for twelve field types, with key rotation, opt-in exact-match querying, and masked admin UX." />
+</Cards>
+
+## One package, isolated bundles
+
+Every family lives behind its own subpath export (`/color`, `/icon`, `/encrypted`, plus `/color/utils`, `/icon/react`, `/icon/codegen`). Importing one family never pulls another into your bundle, icon datasets load lazily and only in the admin, and the encrypted machinery is server-only code that never enters a client bundle. These are tested invariants, enforced on the built output in CI.
+
+## Plugin optional
+
+Every factory works standalone with inline options. The `fields()` plugin is an optional layer for app-wide defaults (shared color presets, registered icon libraries, encryption keys) that individual fields inherit and can override:
+
+```ts title="payload.config.ts"
+import { fields } from '@10x-media/fields'
+import { lucideAdapter } from '@10x-media/fields/icon/adapters/lucide'
+
+plugins: [
+  fields({
+    color: { presets: ['#0f172a', '#3b82f6', '#22c55e'] },
+    icon: { adapters: [lucideAdapter()] },
+  }),
+]
+```
+
+Start with the [quick start](/fields/quick-start). Building your own field in the same style? See [Building your own](/fields/building-your-own).

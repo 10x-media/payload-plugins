@@ -1,0 +1,268 @@
+{
+	"name": "@10x-media/fields",
+	"version": "0.0.0",
+	"description": "Reusable admin fields for Payload: color picker, icon picker, encrypted fields, and more",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/10x-media/payload-plugins.git",
+		"directory": "packages/fields"
+	},
+	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/fields",
+	"bugs": "https://github.com/10x-media/payload-plugins/issues",
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin",
+		"fields",
+		"color-picker",
+		"icon-picker",
+		"encryption"
+	],
+	"author": "10x-media",
+	"engines": {
+		"node": ">=22.18.0"
+	},
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./types": {
+			"development": "./src/exports/types.ts",
+			"types": "./src/exports/types.ts",
+			"default": "./dist/exports/types.js"
+		},
+		"./client": {
+			"development": "./src/exports/client.ts",
+			"types": "./src/exports/client.ts",
+			"default": "./dist/exports/client.js"
+		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
+		},
+		"./i18n": {
+			"development": "./src/exports/i18n.ts",
+			"types": "./src/exports/i18n.ts",
+			"default": "./dist/exports/i18n.js"
+		},
+		"./color": {
+			"development": "./src/exports/color.ts",
+			"types": "./src/exports/color.ts",
+			"default": "./dist/exports/color.js"
+		},
+		"./color/utils": {
+			"development": "./src/exports/color-utils.ts",
+			"types": "./src/exports/color-utils.ts",
+			"default": "./dist/exports/color-utils.js"
+		},
+		"./icon": {
+			"development": "./src/exports/icon.ts",
+			"types": "./src/exports/icon.ts",
+			"default": "./dist/exports/icon.js"
+		},
+		"./icon/react": {
+			"development": "./src/exports/icon-react.ts",
+			"types": "./src/exports/icon-react.ts",
+			"default": "./dist/exports/icon-react.js"
+		},
+		"./icon/codegen": {
+			"development": "./src/exports/icon-codegen.ts",
+			"types": "./src/exports/icon-codegen.ts",
+			"default": "./dist/exports/icon-codegen.js"
+		},
+		"./icon/adapters/lucide": {
+			"development": "./src/exports/icon-adapters/lucide.ts",
+			"types": "./src/exports/icon-adapters/lucide.ts",
+			"default": "./dist/exports/icon-adapters/lucide.js"
+		},
+		"./icon/adapters/radix": {
+			"development": "./src/exports/icon-adapters/radix.ts",
+			"types": "./src/exports/icon-adapters/radix.ts",
+			"default": "./dist/exports/icon-adapters/radix.js"
+		},
+		"./icon/adapters/tabler": {
+			"development": "./src/exports/icon-adapters/tabler.ts",
+			"types": "./src/exports/icon-adapters/tabler.ts",
+			"default": "./dist/exports/icon-adapters/tabler.js"
+		},
+		"./encrypted": {
+			"development": "./src/exports/encrypted.ts",
+			"types": "./src/exports/encrypted.ts",
+			"default": "./dist/exports/encrypted.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"lint": "biome check src tests dev",
+		"lint:fix": "biome check --write src tests dev",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run",
+		"test:unit": "vitest run src",
+		"test:int": "vitest run tests/int",
+		"test:dist": "REQUIRE_DIST=1 vitest run --passWithNoTests=false tests/dist",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts",
+		"test:e2e": "bash scripts/e2e.sh",
+		"dev": "pnpm --filter @10x-media/fields-dev dev",
+		"start": "pnpm --filter @10x-media/fields-dev start",
+		"generate": "pnpm --filter @10x-media/fields-dev generate",
+		"generate:types": "pnpm --filter @10x-media/fields-dev generate:types",
+		"generate:importmap": "pnpm --filter @10x-media/fields-dev generate:importmap",
+		"generate:manifests": "tsx scripts/generateIconManifests.ts",
+		"generate:social": "tsx dev/scripts/generateSocialManifest.ts",
+		"migrate": "pnpm --filter @10x-media/fields-dev migrate",
+		"migrate:create": "pnpm --filter @10x-media/fields-dev migrate:create",
+		"migrate:down": "pnpm --filter @10x-media/fields-dev migrate:down",
+		"migrate:refresh": "pnpm --filter @10x-media/fields-dev migrate:refresh",
+		"migrate:reset": "pnpm --filter @10x-media/fields-dev migrate:reset",
+		"migrate:status": "pnpm --filter @10x-media/fields-dev migrate:status",
+		"migrate:fresh": "pnpm --filter @10x-media/fields-dev migrate:fresh",
+		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
+	},
+	"peerDependencies": {
+		"@payloadcms/richtext-lexical": "^3.83.0",
+		"@payloadcms/ui": "^3.83.0",
+		"@radix-ui/react-icons": "^1.3.0",
+		"@tabler/icons-react": "^3.0.0",
+		"lucide-react": ">=0.500.0",
+		"payload": "^3.83.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@payloadcms/richtext-lexical": {
+			"optional": true
+		},
+		"@radix-ui/react-icons": {
+			"optional": true
+		},
+		"@tabler/icons-react": {
+			"optional": true
+		},
+		"lucide-react": {
+			"optional": true
+		}
+	},
+	"dependencies": {
+		"@tanstack/react-virtual": "catalog:"
+	},
+	"devDependencies": {
+		"@10x-media/payload-test-harness": "workspace:*",
+		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
+		"@10x-media/vitest-config": "workspace:*",
+		"@axe-core/playwright": "catalog:",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"@playwright/test": "catalog:",
+		"@radix-ui/react-icons": "catalog:",
+		"@tabler/icons": "catalog:",
+		"@tabler/icons-react": "catalog:",
+		"@testing-library/react": "catalog:",
+		"@types/json-schema": "^7.0.15",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"axe-core": "catalog:",
+		"jsdom": "catalog:",
+		"lucide-react": "catalog:",
+		"lucide-static": "catalog:",
+		"payload": "catalog:",
+		"playwright": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tsdown": "catalog:",
+		"tsx": "^4.19.2",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js",
+				"default": "./dist/index.js"
+			},
+			"./types": {
+				"types": "./dist/exports/types.d.ts",
+				"import": "./dist/exports/types.js",
+				"default": "./dist/exports/types.js"
+			},
+			"./client": {
+				"types": "./dist/exports/client.d.ts",
+				"import": "./dist/exports/client.js",
+				"default": "./dist/exports/client.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
+			},
+			"./i18n": {
+				"types": "./dist/exports/i18n.d.ts",
+				"import": "./dist/exports/i18n.js",
+				"default": "./dist/exports/i18n.js"
+			},
+			"./color": {
+				"types": "./dist/exports/color.d.ts",
+				"import": "./dist/exports/color.js",
+				"default": "./dist/exports/color.js"
+			},
+			"./color/utils": {
+				"types": "./dist/exports/color-utils.d.ts",
+				"import": "./dist/exports/color-utils.js",
+				"default": "./dist/exports/color-utils.js"
+			},
+			"./icon": {
+				"types": "./dist/exports/icon.d.ts",
+				"import": "./dist/exports/icon.js",
+				"default": "./dist/exports/icon.js"
+			},
+			"./icon/react": {
+				"types": "./dist/exports/icon-react.d.ts",
+				"import": "./dist/exports/icon-react.js",
+				"default": "./dist/exports/icon-react.js"
+			},
+			"./icon/codegen": {
+				"types": "./dist/exports/icon-codegen.d.ts",
+				"import": "./dist/exports/icon-codegen.js",
+				"default": "./dist/exports/icon-codegen.js"
+			},
+			"./icon/adapters/lucide": {
+				"types": "./dist/exports/icon-adapters/lucide.d.ts",
+				"import": "./dist/exports/icon-adapters/lucide.js",
+				"default": "./dist/exports/icon-adapters/lucide.js"
+			},
+			"./icon/adapters/radix": {
+				"types": "./dist/exports/icon-adapters/radix.d.ts",
+				"import": "./dist/exports/icon-adapters/radix.js",
+				"default": "./dist/exports/icon-adapters/radix.js"
+			},
+			"./icon/adapters/tabler": {
+				"types": "./dist/exports/icon-adapters/tabler.d.ts",
+				"import": "./dist/exports/icon-adapters/tabler.js",
+				"default": "./dist/exports/icon-adapters/tabler.js"
+			},
+			"./encrypted": {
+				"types": "./dist/exports/encrypted.d.ts",
+				"import": "./dist/exports/encrypted.js",
+				"default": "./dist/exports/encrypted.js"
+			}
+		}
+	}
+}

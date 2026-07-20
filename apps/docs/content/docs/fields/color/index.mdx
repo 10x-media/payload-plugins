@@ -1,0 +1,48 @@
+---
+title: Color field
+description: A complete color picker in a constant-height row. Any CSS color in, one configured format stored.
+---
+
+```ts
+import { colorField } from '@10x-media/fields/color'
+
+colorField({
+  name: 'accent',
+  format: 'hex',        // stored format: 'hex' | 'rgb' | 'hsl' | 'oklch'
+  alpha: true,          // false hides the alpha slider and strips alpha on save
+  presets: ['#0f172a', '#3b82f6'],
+  enableEyedropper: true,
+  required: true,
+})
+```
+
+The field stores a CSS color string in the configured `format` (default `hex`) on a plain text column, so it stays directly queryable and works on every database adapter.
+
+## The row and the popover
+
+The field row is a constant 40px: swatch button (with a checkerboard under transparent colors), free-text input, and a format chip. Everything else lives in the popover: saturation/value area, hue slider, alpha slider (when `alpha` is on), format switcher, eyedropper (Chromium's EyeDropper API, feature-detected and hidden elsewhere), and the presets grid. Every control works with keyboard and touch. A clear affordance appears when the field is not `required` (unless `isClearable` is `false`).
+
+## Input handling
+
+The text input accepts any CSS color: 3/4/6/8-digit hex, `rgb()`/`rgba()`, `hsl()`/`hsla()`, `oklch()`, named colors, and `transparent`. Input is live-converted to the stored format. Server-side `validate` runs the same parser the client uses, so a value the admin accepts is a value the API accepts, and vice versa.
+
+OKLCH colors outside the sRGB gamut are gamut-mapped by chroma reduction rather than naively clamped, so a stored `oklch` value converted to hex stays perceptually close.
+
+## Options
+
+| Option | Default | Notes |
+|---|---|---|
+| `format` | plugin `color.format`, else `'hex'` | Stored format (`hex`/`rgb`/`hsl`/`oklch`). Conversion happens on input, not on read. |
+| `alpha` | `true` | `false` hides the slider and strips alpha from any pasted value. |
+| `presets` | none | Static array or async resolver; see [Presets](/fields/color/presets). |
+| `presetsLabel` | i18n "Presets" | Heading over the preset grid; any Payload static label. |
+| `linked` | `false` | Store preset references instead of resolved values; see [Linked mode](/fields/color/linked-mode). |
+| `isClearable` | `true` | `false` removes the inline clear control; required fields never render it. |
+| `enableEyedropper` | `true` | SVG icon, only rendered where the browser supports it. |
+| `overrides` | none | `({ field }) => field` escape hatch with explicit spreads. |
+
+The list view cell renders a swatch chip beside the value.
+
+## Frontend use
+
+The stored value is a plain CSS string; use it directly in styles. For parsing, conversion, and contrast math on your frontend, the zero-dependency engine behind the field is exported at [`/color/utils`](/fields/color/utils).

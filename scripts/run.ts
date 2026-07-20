@@ -72,6 +72,7 @@ const TURBO_TASKS = new Set([
 	'test:int',
 	'test:matrix',
 	'test:container',
+	'test:dist',
 ])
 
 const dirNames = (dir: string): string[] =>
