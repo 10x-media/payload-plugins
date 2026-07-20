@@ -45,14 +45,18 @@ export const createCallLogsCollection = ({
 					const phoneNumber =
 						data.callType === 'out' ? data.toNumber : (data.fromNumber ?? data.toNumber)
 					if (!phoneNumber) return data
-					const match = await resolveRelatedContact({
-						payload: req.payload,
-						contactCollections,
-						phoneNumberFields,
-						phoneNumber,
-					})
-					if (match) {
-						data.relatedContact = match
+					try {
+						const match = await resolveRelatedContact({
+							payload: req.payload,
+							contactCollections,
+							phoneNumberFields,
+							phoneNumber,
+						})
+						if (match) {
+							data.relatedContact = match
+						}
+					} catch {
+						// Contact match must never block call-log persistence.
 					}
 					return data
 				},

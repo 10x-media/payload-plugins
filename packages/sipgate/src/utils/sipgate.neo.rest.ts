@@ -42,9 +42,7 @@ export const getNeoCallHistory = async (
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err)
 				// Private-channel inboxes are owner-only; members get 403. Expected, not a hard failure.
-				if (message.includes('403')) {
-					console.debug(`[sipgate] Skipping channel ${channel.id} (no inbox access for this token)`)
-				} else {
+				if (!message.includes('403')) {
 					console.warn(`[sipgate] Skipping channel ${channel.id}:`, err)
 				}
 				return []

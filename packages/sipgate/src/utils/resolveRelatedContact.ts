@@ -1,4 +1,5 @@
 import type { CollectionSlug, Payload } from 'payload'
+import { flattenTopLevelFields } from 'payload'
 import { normalizePhoneVariants } from './normalizePhone'
 
 type ResolveRelatedContactOptions = {
@@ -14,6 +15,16 @@ type ContactHit = {
 	createdAt: string
 }
 
+const topLevelFieldNames = (payload: Payload, collection: CollectionSlug): Set<string> => {
+	const fields = payload.collections[collection]?.config?.fields
+	if (!fields) return new Set()
+	return new Set(
+		flattenTopLevelFields(fields)
+			.map((f) => ('name' in f ? f.name : undefined))
+			.filter((name): name is string => Boolean(name))
+	)
+}
+
 export const resolveRelatedContact = async ({
 	payload,
 	contactCollections,
@@ -24,23 +35,29 @@ export const resolveRelatedContact = async ({
 
 	const settled = await Promise.all(
 		contactCollections.map(async (collection): Promise<ContactHit | null> => {
-			const result = await payload.find({
-				collection,
-				where: {
-					or: phoneNumberFields.flatMap((field) =>
-						variants.map((v) => ({ [field]: { equals: v } }))
-					),
-				},
-				sort: '-createdAt',
-				limit: 1,
-				overrideAccess: true,
-			})
-			const doc = result.docs[0]
-			if (!doc) return null
-			return {
-				collection,
-				id: doc.id as string,
-				createdAt: (doc as unknown as Record<string, string>).createdAt ?? '',
+			try {
+				const available = topLevelFieldNames(payload, collection)
+				const fields = phoneNumberFields.filter((field) => available.has(field))
+				if (!fields.length) return null
+
+				const result = await payload.find({
+					collection,
+					where: {
+						or: fields.flatMap((field) => variants.map((v) => ({ [field]: { equals: v } }))),
+					},
+					sort: '-createdAt',
+					limit: 1,
+					overrideAccess: true,
+				})
+				const doc = result.docs[0]
+				if (!doc) return null
+				return {
+					collection,
+					id: doc.id as string,
+					createdAt: (doc as unknown as Record<string, string>).createdAt ?? '',
+				}
+			} catch {
+				return null
 			}
 		})
 	)
