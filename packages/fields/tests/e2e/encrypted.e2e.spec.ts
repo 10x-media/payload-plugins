@@ -190,9 +190,12 @@ test.describe('encrypted field', () => {
 		await input.focus()
 		const borderTop = (loc: Locator): Promise<string> =>
 			loc.evaluate((el) => getComputedStyle(el).borderTopColor)
-		// The eye picks up the input's focus border, so the highlight is one continuous
-		// border around the whole control instead of cutting off at the seam.
-		expect(await borderTop(eyeOf(field))).toBe(await borderTop(input))
+		// Once the focus border transition settles the eye matches the input, so the
+		// highlight is one continuous border with no seam. Poll past the 100ms transition
+		// rather than asserting on a single mid-animation frame.
+		await expect
+			.poll(async () => (await borderTop(eyeOf(field))) === (await borderTop(input)))
+			.toBe(true)
 	})
 
 	test('create route renders every encrypted field native, with no dots or eye', async ({
