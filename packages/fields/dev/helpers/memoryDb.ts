@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
 
 /**
@@ -20,6 +21,13 @@ const globalForMongo = globalThis as typeof globalThis & {
  * Idempotent per process: reloads reuse the one running mongod.
  */
 export const startMemoryMongo = async (): Promise<string> => {
+	// `next build` imports the config to collect page data but never opens a
+	// connection, so skip the real replica set during a production build. Several
+	// dev-app builds run concurrently under `turbo run test:dist` and would
+	// otherwise race on the shared mongodb-memory-server binary lock.
+	if (process.env.NEXT_PHASE === 'phase-production-build') {
+		return 'mongodb://127.0.0.1:27017/payload-build-placeholder'
+	}
 	if (!globalForMongo.__10xMediaDevMemoryMongo) {
 		globalForMongo.__10xMediaDevMemoryMongo = MongoMemoryReplSet.create({ replSet: { count: 1 } })
 

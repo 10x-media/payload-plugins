@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
 
 let replSet: MongoMemoryReplSet | undefined
@@ -10,6 +11,13 @@ let replSet: MongoMemoryReplSet | undefined
  * server is stopped when the Node process exits.
  */
 export const startMemoryMongo = async (): Promise<string> => {
+	// `next build` imports the config to collect page data but never opens a
+	// connection, so skip the real replica set during a production build. Several
+	// dev-app builds run concurrently under `turbo run test:dist` and would
+	// otherwise race on the shared mongodb-memory-server binary lock.
+	if (process.env.NEXT_PHASE === 'phase-production-build') {
+		return 'mongodb://127.0.0.1:27017/payload-build-placeholder'
+	}
 	replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } })
 
 	const stop = (): void => {
