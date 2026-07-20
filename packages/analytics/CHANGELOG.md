@@ -1,5 +1,61 @@
 # @10x-media/analytics
 
+## 0.1.0-beta.2
+
+### Minor Changes
+
+- Add period-over-period comparison to the metric and trend widgets.
+
+  When the active adapter declares `capabilities.comparison`, the widget read helpers also fetch (in parallel with the current window) the same count of whole reporting-timezone days immediately preceding the current window and return the previous value alongside the current one. The metric and trend widgets render a colored delta (up/down arrow with the percentage change) and a "vs. previous period" caption; metrics where lower is better (bounce rate) invert the coloring, and `allTime` never compares. The comparison is capability-gated, so adapters that cannot answer a second window omit it entirely and existing installs are unchanged; `widgets: { comparison: false }` skips the previous-window read.
+
+  The previous window aligns to whole days in the reporting timezone so day-stamped rollup stores never lose their first day to a mid-day window start, and every comparison string routes through the typed `keys.ts` translations so it is fully localizable.
+
+- Ship built-in German (`de`) translations alongside English. All admin strings (metrics, widgets, timeframes, provider fields, comparison captions) are covered; a project `translations` override still wins per key.
+
+- Interactive per-document analytics panel and an authenticated document read endpoint.
+
+  `analyticsTab` now renders an interactive panel by default: metric cards with period-over-period deltas (capability-gated, mirroring the widgets), a daily trend chart for the first metric, and a timeframe picker that refetches in place. Reads go through the new `GET /api/analytics/document` endpoint, which whitelists timeframes/metrics and enforces read access on the target document before answering, so analytics never leak for content the requester cannot see. Pass `interactive: false` for the previous static stats row. `readForField` (now exported from `/rsc` with `compare`, `series`, and `range` options) backs both paths.
+
+  Widget config select fields carry `isClearable: false` (required metric/timeframe and the always-present data source/window have no meaningful cleared state), select option labels ship as static locale maps so `filterOptions` results survive form-state serialization, and analytics display fields no longer surface as empty list-view columns.
+
+  The sync tier's `analytics-daily` collection is now hidden from the admin nav by default (it stays fully API-queryable); pass `sync: { hidden: false }` to surface it.
+
+  The plugin now installs its runtime before the app's own `onInit` runs, so consumer init code (seeding, warming, sync passes) can already read through the plugin; custom widget authors also get the exported `widgetCardStyle` / `widgetLabelStyle` chrome.
+
+- Fixes and improvements across widgets, caching, bindings, and the PostHog adapter.
+
+  Widget metric selects now list only metrics a configured adapter can actually serve, mirroring the capability gating that already hides whole widgets. On a PostHog-only install the metric picker no longer offers `bounceRate` or other unsupported metrics, and breakdown widgets narrow the picker by both metric and their dimension.
+
+  `cache.ttl` now overrides the adapter's `recommendedTtl`. Previously an adapter's recommendation always won, so setting `cache.ttl.aggregate` had no effect. An explicit value now wins; leave a value unset to keep each adapter's own recommendation.
+
+  Binding `hostname` is now applied as a query filter by adapters that support it: PostHog (`properties.$host`), GA4 (`hostName`), and Plausible (`event:hostname`). It previously only partitioned the cache key without filtering. Umami and the native engine still ignore it (native rollups are not yet keyed by hostname).
+
+  The PostHog adapter gains the `events` metric (total captured events, matching PostHog's own Events definition) and the `event` dimension (per-event-name breakdown). Requesting either switches the read off the `$pageview`-only filter; the pageview-family metrics stay pageview-scoped through conditional aggregation.
+
+  The dashboard trend chart no longer flashes at a wrong width on first paint: it measures its container before paint and defers rendering the line until measured, removing the initial-load resize jump.
+
+- **Breaking:** remove the unsupported `entries` and `exits` metric keys. No adapter ever implemented them and no widget surfaced real data for them, so they only widened the `MetricKey` union without a backing read path. Their translation keys (`metricEntries`, `metricExits`) are dropped as well; code referencing either key or the removed translation keys no longer compiles.
+
+- Add `reportingTimezone` so daily analytics boundaries can align to an IANA timezone instead of always UTC.
+
+  Day boundaries (timeframe windows, the daily series axis, native rollup buckets, and the surfacing cache key) now resolve through a reporting timezone that defaults to `'UTC'`. An install that does not set the option is unchanged.
+
+  `reportingTimezone` accepts a fixed string (single-site, or forcing one zone) or a resolver `({ req, scope }) => string | null`. The resolver receives the already-resolved scope, so per-tenant (look up by scope), per-user-account (`req.user`), and selector (cookie/preference) strategies are all expressible with one option. Invalid or unresolvable zones fall back to UTC with a warning.
+
+  Native rollups bucket into the resolved timezone's day at ingest. This keeps reads cheap and correct for a tenant's own zone, at the cost that changing the timezone does not re-bucket existing history, and a per-user selector cannot re-slice already-written native days (documented). External providers that accept a timezone are told the resolved zone: Umami via its `timezone` param, PostHog via `toStartOfDay(timestamp, '<zone>')`. GA4 and Plausible continue to bucket in their own account timezone.
+
+  Options considered: (1) a fixed string only, rejected because it cannot vary per tenant or user; (2) a resolver only, rejected because it forces single-site consumers to write a function for a constant; (3) the shipped `string | resolver` union, chosen because it mirrors the existing `scopeResolver` pattern and serves every named use case with one familiar, testable option. For bucketing, write-time (per the "go for B, no historical re-bucketing" decision) was chosen over read-time re-bucketing, which would have required storing finer-grained rollups.
+
+- Bucket the per-document trend chart in the reporting timezone, and show a "New" state for documents without analytics yet.
+
+  The comparison windows, cache keys, and daily series already resolved on reporting-timezone day boundaries, but the trend chart still bucketed and labelled on UTC days. Any reporting timezone east of UTC (whose day starts fall on the previous UTC calendar day) therefore shifted every axis label, and the weekly and monthly groupings, back by a day. The chart now buckets and labels in the reporting timezone the read resolved in; the read helpers return that zone and the panel carries it in its endpoint payload for client-side re-bucketing. The default stays UTC, so existing installs are unchanged.
+
+  A per-document analytics surface with nothing to show now reads as "New" rather than the flat "No analytics yet" line or a row of zeros captioned "No change vs. previous period". That covers both an unsaved or unbound document (no path resolves) and a saved page that has not gathered a single tracked metric yet. Genuine configuration states (not bound, no provider, unavailable) keep their message, since those are setup problems rather than new pages. The "New" label is localized (`keys.stateNew`, English and German) and the `analytics-empty-state` classes are stable hooks for overriding the look.
+
+### Patch Changes
+
+- Correct `payload` and `@payloadcms/ui` peer ranges to `^3.83.0`. The plugin uses `definePlugin`, which shipped in Payload 3.83.0, so 3.82.x installs satisfied the old range but failed at import.
+
 ## 0.1.0-beta.1
 
 ### Minor Changes
