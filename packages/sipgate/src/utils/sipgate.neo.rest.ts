@@ -1,20 +1,52 @@
 import type {
+	NeoCallEvent,
 	SipgateChannelEventsParams,
 	SipgateChannelEventsResponse,
 	SipgateChannelResponse,
 } from '../types'
 import type { SipgateRestFetch } from './sipgate.rest'
 
-export const getNeoCallHistory = async (rest: SipgateRestFetch, params?: { limit?: number }) => {
+type GetNeoCallHistoryOptions = {
+	limit?: number
+	/**
+	 * Sipgate user id (e.g. `w2`). When set, prefer channels this user owns
+	 * (private inbox events are owner-only). If they own none, fall back to
+	 * channels they are assigned to and skip 403s quietly.
+	 */
+	sipgateUserId?: string
+}
+
+export const getNeoCallHistory = async (
+	rest: SipgateRestFetch,
+	params?: GetNeoCallHistoryOptions
+): Promise<NeoCallEvent[]> => {
 	const channelsResponse = await getChannels(rest)
+	let channels = channelsResponse.items
+	if (params?.sipgateUserId) {
+		const owned = channelsResponse.items.filter((channel) => channel.owner === params.sipgateUserId)
+		channels =
+			owned.length > 0
+				? owned
+				: channelsResponse.items.filter((channel) =>
+						channel.users.some((u) => u.id === params.sipgateUserId)
+					)
+	}
+
+	const eventParams = params?.limit != null ? { limit: params.limit } : undefined
 
 	const allEvents = await Promise.all(
-		channelsResponse.items.map(async (channel) => {
+		channels.map(async (channel) => {
 			try {
-				const eventsResponse = await getChannelEvents(rest, channel.id, params)
+				const eventsResponse = await getChannelEvents(rest, channel.id, eventParams)
 				return eventsResponse.events.filter((event) => event.type === 'CALL')
 			} catch (err) {
-				console.warn(`[sipgate] Skipping channel ${channel.id}:`, err)
+				const message = err instanceof Error ? err.message : String(err)
+				// Private-channel inboxes are owner-only; members get 403. Expected, not a hard failure.
+				if (message.includes('403')) {
+					console.debug(`[sipgate] Skipping channel ${channel.id} (no inbox access for this token)`)
+				} else {
+					console.warn(`[sipgate] Skipping channel ${channel.id}:`, err)
+				}
 				return []
 			}
 		})
