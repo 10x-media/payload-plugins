@@ -28,7 +28,36 @@ return <ContactForm form={toFormDocument(doc)} />
 
 `toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes a second argument for injecting request-resolved data: `{ pollOptions }` for [source-resolved poll options](/form-builder/polls#option-sources) (from `resolvePollOptions`) and `{ consentStatements }` for [live consent statements](/form-builder/consent#rendering-the-statement) (from `resolveConsentStatements`), since a form stores only a source id and resolves the sentence per request.
 
-`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `multistep` and `pollEnabled` mirror the form's two admin checkboxes; `<Form>` reads `multistep` (via `flow`) for step navigation, and a poll page typically renders `<Poll>` instead of `<Form>` when `pollEnabled` is true. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, its `{{field}}` / `{{field||fallback}}` tokens interpolated against the submission's own formatted answers (option labels, Yes/No, localized dates) exactly like an [action body](/form-builder/actions#rich-text-bodies); type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too). `buttons` carries the form-level submit/next/prev labels (see label precedence below); a host-added button field needs merging into `toFormDocument`'s output by hand to reach the client, see [Customization](/form-builder/customization#form-level-buttons).
+`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `multistep` and `pollEnabled` mirror the form's two admin checkboxes; `<Form>` reads `multistep` (via `flow`) for step navigation, and a poll page typically renders `<Poll>` instead of `<Form>` when `pollEnabled` is true. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, its `{{field}}` / `{{field||fallback}}` tokens interpolated against the submission's own formatted answers (option labels, Yes/No, localized dates) exactly like an [action body](/form-builder/actions#rich-text-bodies); type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too; see [below](#redirecting-to-an-internal-document) for redirecting to an internal document instead). `buttons` carries the form-level submit/next/prev labels (see label precedence below); a host-added button field needs merging into `toFormDocument`'s output by hand to reach the client, see [Customization](/form-builder/customization#form-level-buttons).
+
+### Redirecting to an internal document
+
+Set the plugin's `redirectRelationships` option to let an author redirect to a document you manage instead of typing a URL:
+
+```ts title="payload.config.ts"
+formBuilder({ redirectRelationships: ['pages'] })
+```
+
+`response.redirect` then gains a polymorphic `reference` field alongside `url`. `<Form>` itself still only ever acts on `response.redirect.url` for its automatic post-submit navigation: the plugin has no notion of your routing, so `toFormDocument` passes `reference` straight through as Payload's own depth-0 `{ relationTo, value }` pair (never a populated document), for you to resolve. Resolve it before rendering and write the result into `response.redirect.url` so `<Form>`'s built-in redirect picks it up:
+
+```ts title="app/contact/page.tsx"
+import { toFormDocument } from '@10x-media/form-builder/rsc'
+import type { CollectionSlug } from 'payload'
+
+const raw = await payload.findByID({ collection: 'forms', id })
+const form = toFormDocument(raw)
+const reference = form.response?.redirect?.reference
+if (reference && form.response) {
+  const target = await payload.findByID({
+    collection: reference.relationTo as CollectionSlug,
+    id: reference.value,
+    depth: 0,
+  })
+  form.response.redirect = { url: `/${String(target.slug)}` } // your own routing
+}
+```
+
+Skipping `url` and navigating yourself from `onSuccess` instead works too, if you'd rather not mutate the document before render. Leave `redirectRelationships` unset (the default) and `response.redirect` stays URL-only, exactly as before.
 
 ### Progressive validation
 
