@@ -327,14 +327,41 @@ const seedDemoContactSubmissions = async (payload: Payload, formId: string): Pro
 }
 
 /**
+ * One submission to `Layout Showcase` that fills every field, so the submission admin's
+ * `SubmissionAnswers` view has a row exercising each layout width (`full`, `half`, `third`,
+ * `twoThirds`): the widths snapshot onto the answer descriptors and drive the view's grid.
+ */
+const seedLayoutShowcaseSubmission = async (payload: Payload, formId: string): Promise<void> => {
+	await payload.create({
+		collection: 'form-submissions',
+		locale: 'en',
+		data: {
+			form: formId,
+			values: [
+				{ field: 'fullWidth', value: 'Spans the whole row' },
+				{ field: 'halfLeft', value: 'Left half' },
+				{ field: 'halfRight', value: 'Right half' },
+				{ field: 'thirdOne', value: 'First third' },
+				{ field: 'thirdTwo', value: 'Second third' },
+				{ field: 'thirdThree', value: 'Third third' },
+				{ field: 'street', value: '742 Evergreen Terrace' },
+				{ field: 'houseNumber', value: 742 },
+			],
+		},
+	})
+	payload.logger.info('Seeded submission: Layout Showcase')
+}
+
+/**
  * Seed the dev Payload app: an admin user, the consent sources and department addresses and the
  * policy pages they reference, an `athletes` collection, plus demo forms the `(frontend)` pages
  * render and the e2e suite drives -- a multi-step contact form (a conditional field, a required
  * consent, required-field validation, localized in German), a single-choice mostVoted poll with public
  * results, a relationship-backed poll whose `athleteVote` field makes four of the seeded athletes
  * voteable (its `resolveOptions` sources the choices, the winner select, and the results labels from
- * those records), and a manual poll whose winner a staff pick has already recorded (covering the
- * hand-picked outcome path the mostVoted polls do not).
+ * those records), a manual poll whose winner a staff pick has already recorded (covering the
+ * hand-picked outcome path the mostVoted polls do not), and a `Layout Showcase` form whose fields
+ * span every layout width so its seeded submission demonstrates the admin view's width-aware grid.
  * Idempotent (keyed on title, or on the presence of rows/docs for the global fields and submissions).
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
@@ -461,6 +488,26 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		pollEnabled: true,
 		poll: { type: 'manual', resultsField: 'color', outcome: { winningValues: ['teal'] } },
 	})
+
+	// A dedicated form whose fields span every layout width, so its submission demonstrates the
+	// width-aware grid the `SubmissionAnswers` view renders: one `full`, a row of two `half`, a row of
+	// three `third`, then a `twoThirds` + `third` pair (the last a `number` to show width is not
+	// type-specific). No unrelated form carries width; this one exists to make the layout obvious.
+	const layoutShowcase = await ensureForm(payload, 'Layout Showcase', {
+		fields: [
+			{ blockType: 'text', name: 'fullWidth', label: 'Full width', width: 'full' },
+			{ blockType: 'text', name: 'halfLeft', label: 'Half (left)', width: 'half' },
+			{ blockType: 'text', name: 'halfRight', label: 'Half (right)', width: 'half' },
+			{ blockType: 'text', name: 'thirdOne', label: 'Third (1 of 3)', width: 'third' },
+			{ blockType: 'text', name: 'thirdTwo', label: 'Third (2 of 3)', width: 'third' },
+			{ blockType: 'text', name: 'thirdThree', label: 'Third (3 of 3)', width: 'third' },
+			{ blockType: 'text', name: 'street', label: 'Street', width: 'twoThirds' },
+			{ blockType: 'number', name: 'houseNumber', label: 'No.', width: 'third' },
+		],
+	})
+	if (layoutShowcase.created) {
+		await seedLayoutShowcaseSubmission(payload, String(layoutShowcase.doc.id))
+	}
 
 	await seedKitchenSink(payload)
 }
