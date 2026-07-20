@@ -7,14 +7,14 @@ Encryption removes capabilities from the database on purpose. Every limitation b
 
 ## Querying and sorting
 
-- No `like`, `contains`, comparison operators, or sorting on encrypted fields. The database sees opaque strings.
-- Exact-match `equals` / `in` and `unique` work only with [`queryable: true`](/fields/encrypted/querying), which is available for `text`, `email`, and `number` fields, and inherits the blind-index caveats below.
-- Admin list-view search and filters that rely on substring matching skip encrypted fields.
+- Exact match only, and only with [`queryable: true`](/fields/encrypted/querying): the supported operators are `equals`, `not_equals`, `in`, `not_in`, and `exists`, available for `text`, `email`, and `number` fields, and inheriting the blind-index caveats below. `unique` rides on the same index.
+- `like`, `contains`, range and comparison operators, `near`, and sorting are cryptographically impossible over a blind index. Rather than querying the opaque ciphertext, which would look like a working filter while matching junk, each resolves to a guaranteed-empty match and logs a development warning.
+- Non-queryable encrypted fields are removed from the admin list-filter UI entirely; with no blind index they could only ever match ciphertext. The blind-index hash is stripped from API responses, so the keyed fingerprint never leaves the server.
 
 ## Type-specific trade-offs
 
 - **`point`**: stored as ciphertext, so geo queries (`near`, `within`, `intersects`) are lost. Encrypt coordinates only when location is itself the secret.
-- **`richText`**: the Lexical JSON encrypts as one blob; sub-field queries and any server-side traversal of the content tree are lost. It is masked-only in the admin (the editor cannot run on an encrypted backing field), so the edit view shows read-only JSON and content is edited through the API.
+- **`richText`**: the Lexical JSON encrypts as one blob, so sub-field queries and any server-side traversal of the content tree are lost. The admin editor stays fully functional: on reveal it mounts the app's entire configured Lexical editor (every node type, including blocks, uploads, and relationships), edits in place, and re-encrypts on save. It is implemented as a real `virtual` richText field (never persisted) synced to a hidden encrypted `text` sibling that holds the ciphertext at rest. One consequence follows from that: rich-text content does not appear in Payload version diffs. The plaintext editor field is virtual and therefore unversioned, while the versioned column holds only opaque ciphertext, so a diff has nothing readable to compare. Adopting encrypted richText on a field that was already encrypted under an earlier version needs a [one-time column rename](/fields/encrypted/migration#upgrading-encrypted-richtext).
 - **`select` / `radio`**: these cannot be blind-indexed (`queryable` accepts only scalar `text`/`email`/`number`), so an encrypted select or radio is simply unqueryable. Consider whether the selection is actually sensitive before encrypting it.
 
 ## Swap resistance

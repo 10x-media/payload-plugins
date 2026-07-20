@@ -43,7 +43,7 @@ Exact-match lookup over encrypted data needs a deterministic function of the pla
 
 Deterministic encryption makes the **stored ciphertext itself** identical for equal plaintexts. That leaks equality directly on the data column, turns the ciphertext into a stable identifier anyone with read access can join on, and forecloses the fresh-IV randomization that makes GCM safe.
 
-A blind index instead keeps the encrypted value fully randomized (a fresh IV on every write) and puts the deterministic fingerprint in a **separate, opt-in sibling column under a separate key**. The leak is confined to a column you chose to add, the index value cannot be decrypted, and only `equals` / `in` / `unique` are offered, which is all a fingerprint can answer. That is the trade this package makes.
+A blind index instead keeps the encrypted value fully randomized (a fresh IV on every write) and puts the deterministic fingerprint in a **separate, opt-in sibling column under a separate key**. The leak is confined to a column you chose to add, the index value cannot be decrypted, and only exact-match operators (`equals`, `not_equals`, `in`, `not_in`, `exists`) plus `unique` are offered, which is all a fingerprint can answer. That is the trade this package makes.
 
 ## Why HKDF with domain separation
 

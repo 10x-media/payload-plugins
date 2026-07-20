@@ -32,6 +32,12 @@ It walks documents in batches and encrypts any value not already in the wire for
 A `required` field cannot adopt encryption lazily under the default `'throw'` policy: reading a legacy plaintext row throws before you can re-save it, and `required` maps to `NOT NULL` on Postgres so the value cannot be cleared. Adopt required fields with `encryptExistingData` (or `'passthrough'` during the window).
 </Callout>
 
+## Upgrading encrypted richText
+
+Encrypted `richText` stores its ciphertext in a `<name>_encrypted` column, alongside a virtual editor field kept under `<name>` that is never persisted. That split is what makes the field [fully editable in the admin](/fields/encrypted/limitations#type-specific-trade-offs) while the data at rest stays a single ciphertext blob. Earlier versions stored the ciphertext directly under `<name>`, so upgrading an existing encrypted richText field is a one-time column rename: move the stored ciphertext from `<name>` to `<name>_encrypted` before the upgraded config serves reads.
+
+No re-encryption is involved; the ciphertext bytes are unchanged, only the column they live in moves. On Postgres this is an `ALTER TABLE ... RENAME COLUMN`; on Mongo, rename the field on existing documents (a `$rename` update). Run it as a schema migration you own, while the collection is offline or before the new config reads the field. Fields other than `richText` are unaffected: their column name does not change across the upgrade.
+
 ## Removing encryption
 
 The reverse path exists and is just as explicit:
