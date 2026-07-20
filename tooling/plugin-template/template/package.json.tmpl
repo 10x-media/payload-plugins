@@ -13,7 +13,7 @@
 	"keywords": ["payload", "payloadcms", "plugin"],
 	"author": "10x-media",
 	"engines": {
-		"node": "^18.20.2 || >=20.9.0"
+		"node": ">=22.18.0"
 	},
 	"type": "module",
 	"sideEffects": false,
@@ -66,8 +66,8 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/ui": "^3.82.0",
-		"payload": "^3.82.0",
+		"@payloadcms/ui": "^3.83.0",
+		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
@@ -93,7 +93,6 @@
 	},
 	"publishConfig": {
 		"access": "public",
-		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",

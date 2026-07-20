@@ -122,9 +122,9 @@
 	"peerDependencies": {
 		"@google-analytics/data": "^6.0.0",
 		"@payloadcms/db-postgres": "^3.82.0",
-		"@payloadcms/ui": "^3.82.0",
+		"@payloadcms/ui": "^3.83.0",
 		"maxmind": "^4.3.24",
-		"payload": "^3.82.0",
+		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-datepicker": "^7.6.0",
 		"react-dom": "^19.0.0"
@@ -166,7 +166,6 @@
 	},
 	"publishConfig": {
 		"access": "public",
-		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
