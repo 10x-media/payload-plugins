@@ -39,11 +39,13 @@ export default buildConfig({
 | `analytics-breakdown-countries` | Countries. |
 | `analytics-realtime` | An "active now" count with a per-minute sparkline. |
 
-Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
+Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. The metric select lists only metrics the selected data source can serve (a breakdown widget also requires its dimension); a data source added at runtime falls back to the union of the configured adapters' metrics. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
 
 The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoint every 15 seconds and registers only when a realtime-capable adapter (the native engine today) is configured.
 
 Trend widgets render a real daily series for every provider that has one; where a provider has no per-day source for a metric (Umami's visitors, for example), the headline stays correct and the series is empty. Headline totals are range-correct: distinct metrics like visitors are never summed across days.
+
+The metric and trend widgets show a period-over-period comparison when the active adapter declares `capabilities.comparison`: the plugin reads the same count of whole reporting-timezone days immediately preceding the current window and renders a colored delta (an up/down arrow with the percentage change) and a "vs. previous period" caption. Metrics where lower is better (bounce rate) invert the coloring, and `allTime` never compares. The comparison is capability-gated, so adapters that cannot answer a second window simply omit it; set `widgets: { comparison: false }` to skip the previous-window read entirely. All comparison strings are typed translations, localizable through the [`translations` option](/analytics/i18n).
 
 Charts are dependency-free SVG and CSS, themed with Payload's design tokens. The series color reads `--analytics-chart-1`, overridable from your admin stylesheet.
 

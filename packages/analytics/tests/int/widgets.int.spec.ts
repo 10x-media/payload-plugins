@@ -3,9 +3,15 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 
+interface InspectedField {
+	name?: string
+	type?: string
+	options?: Array<{ value?: string }>
+}
+
 interface RegisteredWidget {
 	slug: string
-	fields?: Array<{ name?: string; type?: string; options?: Array<{ value?: string }> }>
+	fields?: InspectedField[]
 }
 
 // payload.config's widget types are deeply generic (TypedWidget); read them through a

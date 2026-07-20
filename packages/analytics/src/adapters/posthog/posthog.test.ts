@@ -93,12 +93,104 @@ describe('posthog adapter', () => {
 			q({ metrics: ['pageviews'], dimensions: ['page'] }),
 			{}
 		)
-		expect(body.query?.query).toContain('GROUP BY path')
+		expect(body.query?.query).toContain('properties.$pathname AS dim')
+		expect(body.query?.query).toContain('GROUP BY dim')
 		expect(result.rows).toEqual([
 			{ dimensions: { page: '/' }, metrics: { pageviews: 18043 } },
 			{ dimensions: { page: '/pricing' }, metrics: { pageviews: 7412 } },
 		])
 		expect(result.totals).toBeUndefined()
+	})
+
+	it('supports the events metric with all-event conditional aggregation', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[900]] })
+			})
+		)
+		const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['events'] }),
+			{}
+		)
+		const sql = body.query?.query ?? ''
+		// No blanket pageview filter, so total events include every captured event.
+		expect(sql).not.toContain("event = '$pageview'")
+		expect(sql).toContain('count() AS m0')
+		expect(result.totals).toEqual({ events: 900 })
+	})
+
+	it('scopes pageview-family metrics with conditional aggregates when events is also requested', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({
+					columns: ['m0', 'm1'],
+					types: ['UInt64', 'UInt64'],
+					results: [[120, 900]],
+				})
+			})
+		)
+		const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews', 'events'] }),
+			{}
+		)
+		const sql = body.query?.query ?? ''
+		expect(sql).not.toContain("WHERE event = '$pageview'")
+		expect(sql).toContain("countIf(event = '$pageview') AS m0")
+		expect(sql).toContain('count() AS m1')
+		expect(result.totals).toEqual({ pageviews: 120, events: 900 })
+	})
+
+	it('breaks down by event name', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({
+					columns: ['dim', 'm0'],
+					types: ['String', 'UInt64'],
+					results: [
+						['signup', 42],
+						['purchase', 11],
+					],
+				})
+			})
+		)
+		const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['events'], dimensions: ['event'] }),
+			{}
+		)
+		const sql = body.query?.query ?? ''
+		expect(sql).toContain('event AS dim')
+		expect(sql).toContain('GROUP BY dim')
+		expect(result.rows).toEqual([
+			{ dimensions: { event: 'signup' }, metrics: { events: 42 } },
+			{ dimensions: { event: 'purchase' }, metrics: { events: 11 } },
+		])
+	})
+
+	it('filters by hostname via properties.$host', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], hostname: 'a.example.com' }),
+			{}
+		)
+		expect(body.query?.query).toContain("properties.$host = 'a.example.com'")
+	})
+
+	it('exposes the events metric and event dimension in capabilities', () => {
+		const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
+		expect(caps.metrics.has('events')).toBe(true)
+		expect(caps.dimensions.has('event')).toBe(true)
 	})
 
 	it('escapes single quotes in the path literal (no HogQL injection)', async () => {
@@ -153,6 +245,44 @@ describe('posthog adapter', () => {
 			},
 		])
 		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, sessions: 15 })
+	})
+
+	it('buckets the day series in the query timezone when set', async () => {
+		let seriesSql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY day')) {
+					seriesSql = sql
+					return HttpResponse.json({ columns: ['day', 'm0'], types: [], results: [] })
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'day', timezone: 'Europe/Berlin' }),
+			{}
+		)
+		expect(seriesSql).toContain("toStartOfDay(timestamp, 'Europe/Berlin')")
+	})
+
+	it('buckets the day series explicitly in UTC by default (never the project timezone)', async () => {
+		let seriesSql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY day')) {
+					seriesSql = sql
+					return HttpResponse.json({ columns: ['day', 'm0'], types: [], results: [] })
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'day' }),
+			{}
+		)
+		expect(seriesSql).toContain("toStartOfDay(timestamp, 'UTC') AS day")
 	})
 
 	it('targets the configured host (EU / self-host)', async () => {

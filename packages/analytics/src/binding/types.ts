@@ -40,13 +40,15 @@ export type PathResolver<TSlug extends CollectionSlug = CollectionSlug> = (
 /**
  * Maps a document to the hostname its analytics were recorded under, for
  * multi-domain setups where one Payload instance serves several sites. The
- * resolved hostname is passed to the adapter alongside the path so queries
- * filter to that site's traffic. Runs on the server right before each
- * per-document adapter read, with the same `(doc, ctx)` as {@link PathResolver}.
- * Return null (or omit `hostname` entirely) to apply no hostname filter, which
- * queries across every domain the data source records. A static string works
- * for single-domain-per-collection setups; sync one-argument functions remain
- * supported.
+ * resolved hostname is passed to the adapter alongside the path; adapters that
+ * expose a host filter (PostHog `properties.$host`, GA4 `hostName`, Plausible
+ * `event:hostname`) narrow the query to that site's traffic, and the hostname
+ * always partitions the cache key. Adapters without a native host filter (umami,
+ * and the native engine, whose rollups are not yet keyed by hostname) ignore it.
+ * Runs on the server right before each per-document adapter read, with the same
+ * `(doc, ctx)` as {@link PathResolver}. Return null (or omit `hostname` entirely)
+ * to apply no hostname filter. A static string works for single-domain-per-collection
+ * setups; sync one-argument functions remain supported.
  */
 export type HostnameResolver<TSlug extends CollectionSlug = CollectionSlug> = (
 	doc: BindingDoc<TSlug>,

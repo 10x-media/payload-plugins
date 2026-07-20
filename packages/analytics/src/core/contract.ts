@@ -13,8 +13,6 @@ export type MetricKey =
 	| 'sessions'
 	| 'bounceRate'
 	| 'avgDuration'
-	| 'entries'
-	| 'exits'
 	| 'scrollDepth'
 	| 'events'
 	| 'conversions'
@@ -70,6 +68,12 @@ export interface AnalyticsQuery {
 	 * instances sharing an id never share cached results.
 	 */
 	scope?: string
+	/**
+	 * IANA reporting timezone the read's day boundaries are aligned to. Undefined
+	 * means UTC. Adapters that can bucket in a timezone apply it (PostHog, Umami);
+	 * others report in their own account timezone. Part of the cache key when set.
+	 */
+	timezone?: string
 }
 
 export interface AnalyticsRow {
@@ -123,6 +127,11 @@ export interface AdapterRegisterContext {
 	scoped: boolean
 	/** The plugin's scopeResolver bound for adapter use (e.g. ingest stamping). */
 	resolveScope: (req: PayloadRequest) => Promise<string | null>
+	/**
+	 * The plugin's reportingTimezone bound for adapter use (e.g. bucketing native
+	 * rollups at ingest). Resolves to `'UTC'` when no reportingTimezone is set.
+	 */
+	resolveTimezone: (req: PayloadRequest, scope?: string | null) => Promise<string>
 }
 
 export interface AnalyticsAdapter {

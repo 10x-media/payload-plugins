@@ -31,6 +31,12 @@ export interface StoredEvent {
 	props?: Record<string, unknown>
 	/** Set only in scoped installs; '' is the null scope. */
 	scope?: string
+	/**
+	 * Reporting timezone the rollup day bucket is computed in. In-memory only: stripped
+	 * before the event row is persisted (day bucketing happens at rollup time). Absent
+	 * means UTC.
+	 */
+	timezone?: string
 }
 
 export interface NormalizeArgs {
@@ -40,6 +46,7 @@ export interface NormalizeArgs {
 	salt: string
 	now: Date
 	scope?: string
+	timezone?: string
 }
 
 export async function normalizeEvent({
@@ -49,6 +56,7 @@ export async function normalizeEvent({
 	salt,
 	now,
 	scope,
+	timezone,
 }: NormalizeArgs): Promise<StoredEvent> {
 	const geo = await geoResolver(headers)
 	const ip = (
@@ -76,5 +84,6 @@ export async function normalizeEvent({
 		durationMs: raw.durationMs,
 		props: raw.props,
 		...(scope !== undefined ? { scope } : {}),
+		...(timezone !== undefined ? { timezone } : {}),
 	}
 }

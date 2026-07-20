@@ -4,7 +4,11 @@ import { source } from '@/lib/source'
 
 export default function Layout({ children }: { children: ReactNode }) {
 	return (
-		<DocsLayout tree={source.getPageTree()} nav={{ title: '10x-media plugins' }}>
+		<DocsLayout
+			tree={source.getPageTree()}
+			nav={{ title: '10x-media plugins' }}
+			githubUrl="https://github.com/10x-media/payload-plugins"
+		>
 			{children}
 		</DocsLayout>
 	)

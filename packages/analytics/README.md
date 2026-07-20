@@ -59,6 +59,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/analytics):
 - [Display fields](https://docs.10xmedia.de/analytics/display-fields)
 - [Dashboard widgets](https://docs.10xmedia.de/analytics/widgets)
 - [Caching and warming](https://docs.10xmedia.de/analytics/cache)
+- [Reporting timezone](https://docs.10xmedia.de/analytics/timezone)
 - [Sync tier](https://docs.10xmedia.de/analytics/sync)
 - [i18n](https://docs.10xmedia.de/analytics/i18n)
 

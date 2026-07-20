@@ -21,6 +21,17 @@ export type ScopeResolver = (args: {
 }) => string | null | Promise<string | null>
 
 /**
+ * Resolves the IANA reporting timezone a read's (or ingest's) day boundaries align
+ * to. Receives the request and its already-resolved scope, so per-tenant, per-user
+ * (`req.user`), and selector (cookie/preference) strategies are all expressible.
+ * Return `null` to fall back to UTC.
+ */
+export type TimezoneResolver = (args: {
+	req: PayloadRequest
+	scope: string | null
+}) => string | null | Promise<string | null>
+
+/**
  * Escape hatch replacing the provider-collection lookup: return the runtime
  * adapters for a scope yourself (any store, any shape). Results are layered onto
  * the static config adapters exactly like collection-resolved ones, but are not
@@ -74,6 +85,14 @@ export type AnalyticsPluginOptions = {
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver?: ScopeResolver
+	/**
+	 * IANA reporting timezone that day boundaries (timeframe windows, series axes,
+	 * native rollup buckets) align to. Defaults to UTC. A string forces one timezone
+	 * (the single-tenant / no-multi-tenancy case); a resolver derives it per request
+	 * from the scope, user, or a selector. Native rollups bucket at ingest in the
+	 * resolved timezone, so changing it does not re-bucket existing history.
+	 */
+	reportingTimezone?: string | TimezoneResolver
 	providers?: ProvidersOptions
 	/**
 	 * Id of one config adapter shared by every scope (the platform's own analytics,
@@ -101,6 +120,12 @@ export type AnalyticsPluginOptions = {
 				 * enables localization (Payload strips the flag otherwise).
 				 */
 				localizeText?: boolean
+				/**
+				 * Period-over-period comparison on the metric and trend widgets. On by
+				 * default for adapters that declare `capabilities.comparison`; set false
+				 * to skip the second (previous-window) read entirely.
+				 */
+				comparison?: boolean
 		  }
 	/**
 	 * Opt-in sync tier: a cron job that persists each provider's daily metrics into a
@@ -110,7 +135,14 @@ export type AnalyticsPluginOptions = {
 	 */
 	sync?:
 		| boolean
-		| { collectionSlug?: CollectionSlug; cron?: string; lookbackDays?: number; adapters?: string[] }
+		| {
+				collectionSlug?: CollectionSlug
+				cron?: string
+				lookbackDays?: number
+				adapters?: string[]
+				/** Surface the analytics-daily collection in the admin nav. Default false (hidden). */
+				hidden?: boolean
+		  }
 }
 
 export interface ResolvedOptions {
@@ -119,6 +151,8 @@ export interface ResolvedOptions {
 	scopeResolver: ScopeResolver
 	/** True when the app configured a scopeResolver (scoped install). */
 	scoped: boolean
+	/** Raw reportingTimezone option; normalized into a resolver at init. */
+	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
 	access: { platformRead: PlatformReadAccess }
 	providers: {
@@ -132,12 +166,17 @@ export interface ResolvedOptions {
 		resolve?: ProvidersResolve
 	}
 	bindings: Record<string, ResolvedBinding>
-	cache: { ttl: { aggregate: number; realtime: number }; warm: { enabled: boolean; cron: string } }
+	cache: {
+		/** Undefined when unset: adapter recommendedTtl is the fallback, an explicit value wins. */
+		ttl: { aggregate?: number; realtime?: number }
+		warm: { enabled: boolean; cron: string }
+	}
 	widgets: {
 		enabled: boolean
 		disabled: string[]
 		register: CustomWidgetDef[]
 		localizeText: boolean
+		comparison: boolean
 	}
 	sync: {
 		enabled: boolean
@@ -145,6 +184,8 @@ export interface ResolvedOptions {
 		cron: string
 		lookbackDays: number
 		adapters?: string[]
+		/** True hides the analytics-daily collection from the admin nav (default). */
+		hidden: boolean
 	}
 }
 
@@ -181,6 +222,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 					disabled: [] as string[],
 					register: [] as CustomWidgetDef[],
 					localizeText: false,
+					comparison: true,
 				}
 			: options.widgets === undefined || options.widgets === true
 				? {
@@ -188,12 +230,14 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 						disabled: [] as string[],
 						register: [] as CustomWidgetDef[],
 						localizeText: false,
+						comparison: true,
 					}
 				: {
 						enabled: true,
 						disabled: options.widgets.disabled ?? [],
 						register: options.widgets.register ?? [],
 						localizeText: options.widgets.localizeText ?? false,
+						comparison: options.widgets.comparison ?? true,
 					}
 	const warmOpt = options.cache?.warm
 	const warm =
@@ -226,6 +270,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 					collectionSlug: DEFAULT_SYNC_COLLECTION,
 					cron: DEFAULT_SYNC_CRON,
 					lookbackDays: DEFAULT_SYNC_LOOKBACK,
+					hidden: true,
 				}
 			: syncOpt && typeof syncOpt === 'object'
 				? {
@@ -234,26 +279,31 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 						cron: syncOpt.cron ?? DEFAULT_SYNC_CRON,
 						lookbackDays: syncOpt.lookbackDays ?? DEFAULT_SYNC_LOOKBACK,
 						adapters: syncOpt.adapters,
+						hidden: syncOpt.hidden ?? true,
 					}
 				: {
 						enabled: false,
 						collectionSlug: DEFAULT_SYNC_COLLECTION,
 						cron: DEFAULT_SYNC_CRON,
 						lookbackDays: DEFAULT_SYNC_LOOKBACK,
+						hidden: true,
 					}
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
 		scopeResolver: options.scopeResolver ?? (() => null),
 		scoped: options.scopeResolver !== undefined,
+		reportingTimezone: options.reportingTimezone,
 		platformAdapter: options.platformAdapter,
 		access: { platformRead: options.access?.platformRead ?? (({ req }) => Boolean(req.user)) },
 		providers,
 		bindings: resolveBindings(options.collections),
 		cache: {
+			// Left undefined when the app did not set them so the adapter's recommendedTtl
+			// applies as the default; an explicit value overrides the adapter recommendation.
 			ttl: {
-				aggregate: options.cache?.ttl?.aggregate ?? 3600,
-				realtime: options.cache?.ttl?.realtime ?? 300,
+				aggregate: options.cache?.ttl?.aggregate,
+				realtime: options.cache?.ttl?.realtime,
 			},
 			warm,
 		},

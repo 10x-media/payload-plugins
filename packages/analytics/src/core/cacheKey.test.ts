@@ -82,4 +82,17 @@ describe('buildCacheKey', () => {
 	it('encodes scope values so a delimiter cannot forge another key segment', () => {
 		expect(buildCacheKey('ga4', { ...base, scope: 'a|b' }).endsWith('|a%7Cb')).toBe(true)
 	})
+	it('keeps the key unchanged for an explicit UTC timezone', () => {
+		expect(buildCacheKey('ga4', { ...base, timezone: 'UTC' })).toBe(buildCacheKey('ga4', base))
+	})
+	it('partitions the key by a non-UTC timezone', () => {
+		const utc = buildCacheKey('ga4', base)
+		const berlin = buildCacheKey('ga4', { ...base, timezone: 'Europe/Berlin' })
+		expect(berlin).not.toBe(utc)
+		expect(berlin).toContain('Europe/Berlin')
+	})
+	it('orders the timezone segment before the scope segment', () => {
+		const key = buildCacheKey('ga4', { ...base, timezone: 'Europe/Berlin', scope: 'tenant-a' })
+		expect(key.endsWith('|Europe/Berlin|tenant-a')).toBe(true)
+	})
 })

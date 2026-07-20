@@ -136,6 +136,27 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				return out
 			}
 
+			const filterExprs: protos.google.analytics.data.v1beta.IFilterExpression[] = []
+			if (q.path) {
+				filterExprs.push({
+					filter: { fieldName: 'pagePath', stringFilter: { matchType: 'EXACT', value: q.path } },
+				})
+			}
+			if (q.hostname) {
+				filterExprs.push({
+					filter: {
+						fieldName: 'hostName',
+						stringFilter: { matchType: 'EXACT', value: q.hostname },
+					},
+				})
+			}
+			const dimensionFilter =
+				filterExprs.length === 0
+					? undefined
+					: filterExprs.length === 1
+						? filterExprs[0]
+						: { andGroup: { expressions: filterExprs } }
+
 			const baseRequest: protos.google.analytics.data.v1beta.IRunReportRequest = {
 				property: `properties/${config.propertyId}`,
 				dateRanges: [
@@ -145,16 +166,7 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 					},
 				],
 				metrics: providerMetrics.map((name) => ({ name })),
-				...(q.path
-					? {
-							dimensionFilter: {
-								filter: {
-									fieldName: 'pagePath',
-									stringFilter: { matchType: 'EXACT', value: q.path },
-								},
-							},
-						}
-					: {}),
+				...(dimensionFilter ? { dimensionFilter } : {}),
 			}
 
 			const client = await getClient()

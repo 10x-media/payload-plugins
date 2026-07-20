@@ -52,17 +52,18 @@ const reqWith = (adapters: AnalyticsAdapter[]): PayloadRequest => {
 		bindings: {},
 		engine: { read: async (adapter, query) => adapter.query(query, {}) },
 		ttl: { aggregate: 3600, realtime: 300 },
+		comparison: true,
 	})
 	return { payload } as PayloadRequest
 }
 
 describe('fillDailySeries', () => {
 	it('zero-fills the requested daily window in order', () => {
-		const points = fillDailySeries(
-			[{ timestamp: '2026-06-02T00:00:00.000Z', metrics: { pageviews: 5 } }],
-			{ start: new Date('2026-06-01T00:00:00.000Z'), end: NOW },
-			'pageviews'
-		)
+		const points = fillDailySeries({
+			rows: [{ timestamp: '2026-06-02T00:00:00.000Z', metrics: { pageviews: 5 } }],
+			dateRange: { start: new Date('2026-06-01T00:00:00.000Z'), end: NOW },
+			metric: 'pageviews',
+		})
 		expect(points).toEqual([
 			{ date: '2026-06-01T00:00:00.000Z', value: 0 },
 			{ date: '2026-06-02T00:00:00.000Z', value: 5 },
@@ -71,9 +72,27 @@ describe('fillDailySeries', () => {
 	})
 
 	it('caps an unbounded range to the most recent 366 days', () => {
-		const points = fillDailySeries([], { start: new Date(0), end: NOW }, 'pageviews')
+		const points = fillDailySeries({
+			rows: [],
+			dateRange: { start: new Date(0), end: NOW },
+			metric: 'pageviews',
+		})
 		expect(points).toHaveLength(366)
 		expect(points.at(-1)?.date).toBe('2026-06-03T00:00:00.000Z')
+	})
+
+	it('aligns the daily axis to a non-UTC reporting timezone', () => {
+		const points = fillDailySeries({
+			rows: [{ timestamp: '2026-06-16T22:00:00.000Z', metrics: { pageviews: 4 } }],
+			dateRange: {
+				start: new Date('2026-06-16T22:00:00.000Z'),
+				end: new Date('2026-06-17T21:00:00.000Z'),
+			},
+			metric: 'pageviews',
+			tz: 'Europe/Berlin',
+		})
+		// One Berlin day, its midnight is 22:00Z the previous UTC day.
+		expect(points).toEqual([{ date: '2026-06-16T22:00:00.000Z', value: 4 }])
 	})
 })
 
@@ -90,6 +109,29 @@ describe('readForWidgetSeries', () => {
 		expect(result.points).toHaveLength(7)
 		expect(result.points.at(-1)).toEqual({ date: '2026-06-03T00:00:00.000Z', value: 7 })
 		expect(result.points.at(-2)).toEqual({ date: '2026-06-02T00:00:00.000Z', value: 5 })
+	})
+
+	it('returns previous-window comparison data when the adapter supports it', async () => {
+		const result = await readForWidgetSeries({
+			req: reqWith([seriesAdapter({ capabilities: { ...baseCaps(), comparison: true } })]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(result.status).toBe('ok')
+		expect(result.comparisonRange).toBeDefined()
+		expect(result.previousTotal).toBe(12)
+	})
+
+	it('omits comparison data when the adapter does not support it', async () => {
+		const result = await readForWidgetSeries({
+			req: reqWith([seriesAdapter()]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(result.comparisonRange).toBeUndefined()
+		expect(result.previousTotal).toBeUndefined()
 	})
 
 	it('returns unavailable when the adapter cannot bucket by day', async () => {
