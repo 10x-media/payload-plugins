@@ -6,6 +6,7 @@ import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
 import type { ButtonsOption } from './collections/buttonFields'
+import type { ResponseOption } from './collections/redirectFields'
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import type { ConsentSourcesResolver } from './consent/types'
 import type { DepartmentEmailsResolver } from './email/departments'
@@ -118,6 +119,20 @@ export type FormBuilderPluginOptions = {
 	 * host-added sibling field is still stored but is read off the raw document, not `doc.buttons`.
 	 */
 	buttons?: ButtonsOption
+	/**
+	 * The success-response group. `redirect.fields` composes the fields inside the `response.redirect`
+	 * group, mirroring `buttons.fields`: it receives the default fields (the `url` text field, plus the
+	 * polymorphic `reference` relationship when `redirectRelationships` is set) and returns the group's
+	 * final field array, so a host can prepend a custom link field (the pattern most projects already
+	 * have), swap `url` for their own picker, reorder, or filter. Omit it and the group stays the
+	 * built-in `url` (+ optional `reference`), unchanged.
+	 *
+	 * The plugin's built-in redirect handling reads `redirect.url` (and `redirect.reference` when
+	 * configured); `toFormDocument` passes the whole `response` group through, so a host that replaces
+	 * `url` with their own link field owns resolving it to a destination in their frontend, the same as
+	 * the internal-reference case.
+	 */
+	response?: ResponseOption
 	/**
 	 * Collections whose documents `response.redirect` can reference (`response.redirect.reference`),
 	 * letting an author redirect a visitor to an internal document instead of a URL after a
@@ -268,6 +283,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			pollTypeRegistry,
 			outcomeFields: options.poll?.outcomeFields,
 			buttons: options.buttons,
+			response: options.response,
 			fromAddresses,
 			departments,
 			redirectRelationships: options.redirectRelationships,
@@ -339,6 +355,11 @@ export {
 	buildPrevLabelField,
 	buildSubmitLabelField,
 } from './collections/buttonFields'
+export type {
+	RedirectFieldsOverride,
+	RedirectOption,
+	ResponseOption,
+} from './collections/redirectFields'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { applyConsentStatements } from './consent/applyConsentStatements'

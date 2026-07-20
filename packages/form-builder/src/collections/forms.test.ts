@@ -162,6 +162,39 @@ describe('forms response.redirect.reference', () => {
 	})
 })
 
+describe('forms response.redirect.fields', () => {
+	const redirectOf = (collection: CollectionConfig) =>
+		groupNamed(groupNamed(tabFields(collection), 'response').fields, 'redirect')
+
+	it('keeps the default url field when no override is passed', () => {
+		const redirect = redirectOf(buildCollection())
+		expect(redirect.fields.some((field) => 'name' in field && field.name === 'url')).toBe(true)
+	})
+
+	it('composes the redirect group fields through the response.redirect.fields seam', () => {
+		let received: Field[] | undefined
+		const link: Field = { name: 'link', type: 'text' }
+		const collection = buildFormsCollection({
+			registry: resolveFieldTypes(buildDefaultFieldDefinitions(true)),
+			ruleRegistry: resolveValidationRules(defaultValidationRules),
+			response: {
+				redirect: {
+					fields: ({ defaultFields }) => {
+						received = defaultFields
+						return [link, ...defaultFields]
+					},
+				},
+			},
+		})
+		const redirect = redirectOf(collection)
+		// The seam is handed the built-in url field as a default...
+		expect(received?.some((field) => 'name' in field && field.name === 'url')).toBe(true)
+		// ...and its returned array (custom field prepended, defaults kept) is the group's fields.
+		expect(redirect.fields[0]).toMatchObject({ name: 'link' })
+		expect(redirect.fields.some((field) => 'name' in field && field.name === 'url')).toBe(true)
+	})
+})
+
 describe('forms poll.resultsField', () => {
 	it('mounts FieldNameSelect with the poll-eligible types as clientProps', () => {
 		const field = resultsFieldOf(buildCollection())

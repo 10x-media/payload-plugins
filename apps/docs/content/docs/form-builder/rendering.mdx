@@ -59,6 +59,8 @@ if (reference && form.response) {
 
 Skipping `url` and navigating yourself from `onSuccess` instead works too, if you'd rather not mutate the document before render. Leave `redirectRelationships` unset (the default) and `response.redirect` stays URL-only, exactly as before.
 
+To drop in a link field you already have (choose a URL or pick a linkable document) rather than the plain `url` text field, compose the group with the [`response.redirect.fields`](/form-builder/customization#redirect-response-fields) seam. A field you replace `url` with is yours to resolve to a destination, the same as `reference` above.
+
 ### Progressive validation
 
 Validation runs on blur, re-validates on change once a field is touched, then validates all visible fields on submit. Hidden fields ([`visibleWhen`](/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.

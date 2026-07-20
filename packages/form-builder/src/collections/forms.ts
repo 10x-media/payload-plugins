@@ -45,6 +45,7 @@ import { asTranslate, labelFor, labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { validateUrl } from '../validation/validateUrl'
 import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
+import type { ResponseOption } from './redirectFields'
 
 export const FORMS_SLUG = 'forms'
 
@@ -154,6 +155,8 @@ type BuildFormsCollectionArgs = {
 	outcomeFields?: OutcomeFieldsOverride
 	/** The plugin `buttons` option; `fields` composes the `{ submit, prev, next }` labels from the localized defaults. */
 	buttons?: ButtonsOption
+	/** The plugin `response` option; `redirect.fields` composes the `response.redirect` group from its default fields. */
+	response?: ResponseOption
 	/**
 	 * The plugin `email.fromAddresses` option. Present: both email actions gain a `from` select and
 	 * the `/:id/from-addresses` endpoint is registered. Absent: neither exists.
@@ -188,6 +191,7 @@ export const buildFormsCollection = ({
 	pollTypeRegistry,
 	outcomeFields,
 	buttons,
+	response,
 	fromAddresses,
 	departments,
 	redirectRelationships,
@@ -398,6 +402,23 @@ export const buildFormsCollection = ({
 				]
 			: []
 
+	// The redirect group's fields: the `url` text field plus the optional polymorphic `reference`.
+	// The `response.redirect.fields` seam composes them (mirroring `buttons.fields`), so a host can
+	// prepend a custom link field, swap `url` for their own picker, or filter; the default (no
+	// override) is the same `[url, ...reference]` as before. Built-in redirect handling still reads
+	// `redirect.url`/`redirect.reference`, so a host replacing `url` owns resolving their field to a
+	// destination in their frontend.
+	const urlField: Field = {
+		name: 'url',
+		type: 'text',
+		label: labelForKey(keys.responseUrl),
+		validate: validateUrl,
+	}
+	const defaultRedirectFields: Field[] = [urlField, ...redirectReferenceField]
+	const redirectFields = response?.redirect?.fields
+		? response.redirect.fields({ defaultFields: defaultRedirectFields })
+		: defaultRedirectFields
+
 	// What the visitor sees after a successful submit. Publicly readable (unlike actions): the
 	// client renderer needs message/redirect. `type`/`url` are behavior, never localized;
 	// `message` is visitor-facing content and follows `localizeContent`.
@@ -436,15 +457,7 @@ export const buildFormsCollection = ({
 					condition: (_data, siblingData) => siblingData?.type === 'redirect',
 					hideGutter: true,
 				},
-				fields: [
-					{
-						name: 'url',
-						type: 'text',
-						label: labelForKey(keys.responseUrl),
-						validate: validateUrl,
-					},
-					...redirectReferenceField,
-				],
+				fields: redirectFields,
 			},
 		],
 	}

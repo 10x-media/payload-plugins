@@ -7,6 +7,7 @@ import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
 import type { ButtonsOption } from '../collections/buttonFields'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
+import type { ResponseOption } from '../collections/redirectFields'
 import type { ConsentSourcesResolver } from '../consent/types'
 import type { DepartmentEmailsResolver } from '../email/departments'
 import type { FormEventSink } from '../events/types'
@@ -39,6 +40,7 @@ type RegisterCollectionsArgs = {
 	pollTypeRegistry: PollTypeRegistry
 	outcomeFields?: OutcomeFieldsOverride
 	buttons?: ButtonsOption
+	response?: ResponseOption
 	fromAddresses?: FromAddressesResolver
 	departments?: DepartmentEmailsResolver
 	redirectRelationships?: CollectionSlug[]
@@ -67,6 +69,7 @@ export const registerCollections = ({
 	pollTypeRegistry,
 	outcomeFields,
 	buttons,
+	response,
 	fromAddresses,
 	departments,
 	redirectRelationships,
@@ -115,6 +118,7 @@ export const registerCollections = ({
 			pollTypeRegistry,
 			outcomeFields,
 			buttons,
+			response,
 			fromAddresses,
 			departments,
 			redirectRelationships,
