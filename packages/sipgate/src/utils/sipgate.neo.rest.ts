@@ -101,3 +101,45 @@ export type NeoDialProps = {
 export const NeoDial = async (rest: SipgateRestFetch, props: NeoDialProps) => {
 	return rest('/calls', { method: 'POST', body: JSON.stringify(props) })
 }
+
+type SipgatePhoneNumberNode = {
+	e164Number?: string
+	routing?: { targetId?: string } | null
+	numbers?: SipgatePhoneNumberNode[]
+}
+
+const PHONE_NUMBERS_URL = 'https://api.sipgate.com/v3/phone-numbers'
+
+const collectChannelNumbers = (
+	items: SipgatePhoneNumberNode[],
+	channelId: string,
+	out: string[]
+) => {
+	for (const item of items) {
+		if (item.routing?.targetId === channelId && item.e164Number) {
+			out.push(item.e164Number.replace(/\D/g, ''))
+		}
+		if (item.numbers?.length) {
+			collectChannelNumbers(item.numbers, channelId, out)
+		}
+	}
+}
+
+/**
+ * Neo routes each phone number to exactly one channel (`routing.targetId`).
+ * Channel display names are often person names, not E.164 — use this for callerId.
+ */
+export const getCallerIdForChannel = async (
+	rest: SipgateRestFetch,
+	channelId: string
+): Promise<string | undefined> => {
+	const response = await rest(PHONE_NUMBERS_URL, { method: 'GET' })
+	if (!response.ok) return undefined
+	const json = (await response.json()) as
+		| SipgatePhoneNumberNode[]
+		| { items?: SipgatePhoneNumberNode[] }
+	const items = Array.isArray(json) ? json : (json.items ?? [])
+	const numbers: string[] = []
+	collectChannelNumbers(items, channelId, numbers)
+	return numbers[0]
+}

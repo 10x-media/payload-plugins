@@ -26,7 +26,7 @@ export const buildSipgateRest = (credentials: SipgateCredentials): SipgateRestFe
 	}
 	const auth = Buffer.from(`${tokenId}:${token}`).toString('base64')
 	return (url, options) =>
-		fetch(BASE_URL + url, {
+		fetch(url.startsWith('http') ? url : BASE_URL + url, {
 			...options,
 			headers: {
 				'Content-Type': 'application/json',

@@ -65,7 +65,6 @@ export const ClickToDialFieldClient = ({
 		closeModal(DRAWER_SLUG)
 		setDialState('dialing')
 		try {
-			const selectedChannel = channels.find((c) => c.id === selectedChannelId)
 			const res = await fetch('/api/sipgate/dial', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -73,7 +72,6 @@ export const ClickToDialFieldClient = ({
 					callee: value,
 					deviceId,
 					channelId: selectedChannelId,
-					callerId: selectedChannel?.name,
 				}),
 			})
 			if (!res.ok) throw new Error()
