@@ -2,6 +2,12 @@
 	"version": "0.0.1",
 	"configurations": [
 		{
+			"name": "fields",
+			"runtimeExecutable": "bash",
+			"runtimeArgs": ["-c", "PAYLOAD_SKIP_AUTOGEN=1 PORT=3104 pnpm dev fields"],
+			"port": 3104
+		},
+		{
 			"name": "automations",
 			"runtimeExecutable": "bash",
 			"runtimeArgs": ["-c", "PAYLOAD_SKIP_AUTOGEN=1 PORT=3100 pnpm dev automations"],

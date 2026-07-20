@@ -158,6 +158,7 @@ export interface Encrypted {
   id: string;
   label: string;
   fullName: string;
+  apiKey?: string;
   notes?: string;
   contactEmail?: string;
   contactEmail_bidx?: string | null;
@@ -176,9 +177,44 @@ export interface Encrypted {
    * @maxItems 2
    */
   lastKnownLocation?: [number, number];
+  /**
+   * richText field. Masked, the full editor mounts on reveal (blocks included).
+   */
   privateNotes?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
     [k: string]: unknown;
-  };
+  } | null;
+  privateNotes_encrypted?: string | null;
+  /**
+   * richText field. protection 'none': the full editor renders directly, encrypted at rest.
+   */
+  draftBody?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  draftBody_encrypted?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -385,6 +421,7 @@ export interface ColorsSelect<T extends boolean = true> {
 export interface EncryptedSelect<T extends boolean = true> {
   label?: T;
   fullName?: T;
+  apiKey?: T;
   notes?: T;
   contactEmail?: T;
   contactEmail_bidx?: T;
@@ -398,6 +435,9 @@ export interface EncryptedSelect<T extends boolean = true> {
   metadata?: T;
   lastKnownLocation?: T;
   privateNotes?: T;
+  privateNotes_encrypted?: T;
+  draftBody?: T;
+  draftBody_encrypted?: T;
   updatedAt?: T;
   createdAt?: T;
 }

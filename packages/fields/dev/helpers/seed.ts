@@ -102,10 +102,36 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		await payload.create({
 			collection: 'encrypted',
 			data: {
+				apiKey: '0123456789abcdef0123456789abcdef',
 				apiSnippet: "const token = 'redacted'",
 				birthday: '1990-05-15T00:00:00.000Z',
 				channels: ['email', 'push'],
 				contactEmail: 'jane.doe@example.com',
+				draftBody: {
+					root: {
+						children: [
+							{
+								children: [
+									{
+										text: 'Draft body, protection none, encrypted at rest.',
+										type: 'text',
+										version: 1,
+									},
+								],
+								direction: null,
+								format: '',
+								indent: 0,
+								type: 'paragraph',
+								version: 1,
+							},
+						],
+						direction: null,
+						format: '',
+						indent: 0,
+						type: 'root',
+						version: 1,
+					},
+				},
 				fullName: 'Jane Doe',
 				isVip: true,
 				label: 'Jane Doe (seeded)',

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { BlocksFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
 import { de } from '@payloadcms/translations/languages/de'
 import { en } from '@payloadcms/translations/languages/en'
 import { buildConfig, type CollectionConfig } from 'payload'
@@ -48,6 +49,25 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
+	// A blocks-carrying editor so the encrypted richText showcase can prove full
+	// node parity: the `callout` block has its own sub-fields, the exact case a
+	// text-backed field could never mount.
+	editor: lexicalEditor({
+		features: ({ defaultFeatures }) => [
+			...defaultFeatures,
+			BlocksFeature({
+				blocks: [
+					{
+						slug: 'callout',
+						fields: [
+							{ name: 'tone', type: 'select', options: ['info', 'warning'], defaultValue: 'info' },
+							{ name: 'body', type: 'text' },
+						],
+					},
+				],
+			}),
+		],
+	}),
 	// Payload orders the admin sidebar by this array. Field-example collections
 	// (colors, icons) come first so a reviewer lands on them; infrastructure
 	// collections (tenants, users) sit at the bottom. Each group is alphabetical.
