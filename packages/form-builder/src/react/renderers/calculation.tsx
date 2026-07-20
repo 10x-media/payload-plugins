@@ -6,7 +6,7 @@ import { FieldShell } from '../primitives/FieldShell'
 
 /** Read-only renderer for a calculation field: the value is derived, never user-editable, so it shows in an `<output>` rather than an input. */
 export const calculationRenderer = defineFieldRenderer<number | undefined>(
-	({ field, value, errors, warnings, required }) => {
+	({ field, value, errors, required }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		return (
@@ -16,7 +16,6 @@ export const calculationRenderer = defineFieldRenderer<number | undefined>(
 				description={typeof field.description === 'string' ? field.description : undefined}
 				required={required}
 				errors={errors}
-				warnings={warnings}
 				describedById={describedById}
 			>
 				<output id={id} className="fb-field__calc" aria-describedby={describedById}>

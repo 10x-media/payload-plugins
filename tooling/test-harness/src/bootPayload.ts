@@ -62,6 +62,42 @@ const startDb = async (db: SupportedDb, mode: TestDbMode): Promise<AnyDbHandle> 
 	return mode === 'container' ? startMongoContainer() : startMongo()
 }
 
+/** A Mongoose version model, exposed on the adapter as `payload.db.versions[slug]`. */
+type VersionModel = {
+	createCollection?: () => Promise<unknown>
+	ensureIndexes?: () => Promise<unknown>
+}
+
+/**
+ * Materialize every drafts/versioned collection's `_<slug>_versions` collection and its indexes up
+ * front, outside any transaction. Payload otherwise touches the version collection's catalog on the
+ * first versioned write (creating the collection, then its indexes) inside the multi-document
+ * transaction that every `create`/`update` opens, and MongoDB forbids catalog changes inside a
+ * transaction, so that first write fails on the memory replica set with a catalog-change /
+ * lock-timeout error. Creating the collection alone is not enough: the lazy index build is also a
+ * catalog change, so both must happen here. The mongoose adapter's own `ensureIndexes` pass at
+ * connect (which the harness enables) warms base collections but skips version models, so this
+ * closes that gap for the whole test suite, not just the spec that first hit it. Idempotent and
+ * best-effort: a collection that already exists (a reused DB via `attachTo`) is left as is.
+ */
+const warmVersionCollections = async (payload: Payload): Promise<void> => {
+	const versions = (payload.db as unknown as { versions?: Record<string, VersionModel> }).versions
+	if (!versions) {
+		return
+	}
+	await Promise.all(
+		Object.values(versions).map(async (model) => {
+			try {
+				await model.createCollection?.()
+			} catch {
+				// Already exists (a reused database): the collection now exists, which is what matters.
+			}
+			// Build the indexes too, so the first in-transaction write finds a settled catalog.
+			await model.ensureIndexes?.()
+		})
+	)
+}
+
 /**
  * `getPayload` caches instances by `key` (default `'default'`) in a process-global
  * map, so two keyless boots in one process return the same instance. Each boot gets
@@ -119,6 +155,10 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 
 	const key = `bootPayload-${bootSequence++}`
 	const payload = await getPayload({ config: buildConfig(baseConfig), key })
+
+	if (options.db !== 'postgres') {
+		await warmVersionCollections(payload)
+	}
 
 	if (options.seed) {
 		await options.seed(payload)

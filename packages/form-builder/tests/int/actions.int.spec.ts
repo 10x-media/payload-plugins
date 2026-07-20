@@ -207,4 +207,86 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 			html: 'From Ada & Bo',
 		})
 	})
+
+	it('threads emailTeam cc, bcc, and replyTo into sendEmail, interpolated', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		booted.payload.sendEmail = sendEmail as typeof booted.payload.sendEmail
+
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Cc/bcc/replyTo form',
+				fields: [{ blockType: 'text', name: 'name', label: 'Full name' }],
+				actions: [
+					{
+						blockType: 'emailTeam',
+						to: 'team@x.com',
+						cc: 'lead@x.com',
+						bcc: 'archive@x.com',
+						replyTo: 'no-reply-{{name}}@x.com',
+						subject: 'Alert',
+						body: '',
+					},
+				],
+			},
+		})
+
+		await booted.payload.create({
+			collection: 'form-submissions',
+			data: { form: form.id, values: [{ field: 'name', value: 'ada' }] },
+		})
+
+		await vi.waitFor(() => {
+			expect(sendEmail).toHaveBeenCalledOnce()
+		})
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'team@x.com',
+			subject: 'Alert',
+			html: '',
+			cc: 'lead@x.com',
+			bcc: 'archive@x.com',
+			replyTo: 'no-reply-ada@x.com',
+		})
+	})
+
+	it('threads confirmation cc, bcc, and replyTo into sendEmail', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		booted.payload.sendEmail = sendEmail as typeof booted.payload.sendEmail
+
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Confirmation cc/bcc/replyTo form',
+				fields: [{ blockType: 'email', name: 'email', label: 'Email' }],
+				actions: [
+					{
+						blockType: 'confirmation',
+						toField: 'email',
+						cc: 'lead@x.com',
+						bcc: 'archive@x.com',
+						replyTo: 'reply@x.com',
+						subject: 'Thanks',
+						body: '',
+					},
+				],
+			},
+		})
+
+		await booted.payload.create({
+			collection: 'form-submissions',
+			data: { form: form.id, values: [{ field: 'email', value: 'visitor@example.com' }] },
+		})
+
+		await vi.waitFor(() => {
+			expect(sendEmail).toHaveBeenCalledOnce()
+		})
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'visitor@example.com',
+			subject: 'Thanks',
+			html: '',
+			cc: 'lead@x.com',
+			bcc: 'archive@x.com',
+			replyTo: 'reply@x.com',
+		})
+	})
 })

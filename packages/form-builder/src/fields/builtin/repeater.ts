@@ -15,6 +15,7 @@ export const buildRepeaterField = (localize: boolean) =>
 		type: 'repeater',
 		label: keys.fieldTypeRepeater,
 		value: 'repeater',
+		omitShared: ['placeholder'],
 		config: [
 			{
 				name: 'minRows',

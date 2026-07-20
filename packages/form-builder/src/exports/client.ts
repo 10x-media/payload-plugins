@@ -1,6 +1,13 @@
 'use client'
 
 export { ByteSizeField } from '../client/ByteSizeField'
+export { ClosePollButton } from '../client/ClosePollButton'
+export { CondensedArray } from '../client/CondensedArray'
+export { EndpointOptionsSelect } from '../client/EndpointOptionsSelect'
+export { FieldBlockLabel } from '../client/FieldBlockLabel'
 export { FieldNameSelect } from '../client/FieldNameSelect'
 export { FlowBuilder } from '../client/FlowBuilder'
 export { FormConditionField } from '../client/FormConditionField'
+export { RuleDescription } from '../client/RuleDescription'
+export { FieldCountCell } from '../collections/cells/FieldCountCell'
+export { FlowStepsCell } from '../collections/cells/FlowStepsCell'

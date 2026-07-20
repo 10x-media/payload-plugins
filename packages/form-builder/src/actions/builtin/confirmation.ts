@@ -6,8 +6,17 @@ import { keys } from '../../translations/keys'
 import { asTranslate, labelFor } from '../../translations/server'
 import { resolverFor } from '../body/serializeBody'
 import { defineAction } from '../defineAction'
+import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
 
-type ConfirmationConfig = { toField?: string; subject?: string; body?: unknown }
+type ConfirmationConfig = {
+	toField?: string
+	from?: string
+	cc?: string
+	bcc?: string
+	replyTo?: string
+	subject?: string
+	body?: unknown
+}
 
 const TO_FIELD_REF = '@10x-media/form-builder/client#FieldNameSelect'
 
@@ -30,10 +39,20 @@ export const validateToField = (
 }
 
 /**
- * `subject` and `body` are email content and follow `localize`; `toField` is an identifier and never does.
- * `editor` overrides the body field's Lexical/richText editor (from the plugin's `richText.editor` option).
+ * `subject` and `body` are email content and follow `localize`; `toField` is an identifier and
+ * `from` an address, neither of which ever does. `cc`, `bcc`, and `replyTo` are addresses that
+ * follow `localize` (like `subject`), each interpolated the same way so `{{field}}` merge tags
+ * work; a comma-separated list is forwarded as-is, since `payload.sendEmail` (nodemailer) accepts
+ * one directly. `editor` overrides the body field's Lexical/richText editor (from the plugin's
+ * `richText.editor` option). `fromAddresses`, when given (the plugin's `email.fromAddresses`
+ * option), adds a `from` select sourced from the host resolver; absent, no `from` field exists and
+ * every send uses the email adapter's default sender.
  */
-export const buildConfirmation = (localize: boolean, editor?: RichTextField['editor']) =>
+export const buildConfirmation = (
+	localize: boolean,
+	editor?: RichTextField['editor'],
+	fromAddresses?: FromAddressesResolver
+) =>
 	defineAction<ConfirmationConfig>({
 		type: 'confirmation',
 		label: keys.actionConfirmation,
@@ -43,10 +62,36 @@ export const buildConfirmation = (localize: boolean, editor?: RichTextField['edi
 				type: 'text',
 				label: labelFor(keys.actionConfigToField),
 				admin: {
-					description: labelFor(keys.actionConfigToFieldDescription),
-					components: { Field: { path: TO_FIELD_REF, clientProps: { types: ['email'] } } },
+					components: {
+						Field: {
+							path: TO_FIELD_REF,
+							clientProps: {
+								types: ['email'],
+								descriptionKey: keys.actionConfigToFieldDescription,
+							},
+						},
+					},
 				},
 				validate: validateToField,
+			},
+			...(fromAddresses ? [buildFromField(fromAddresses)] : []),
+			{
+				name: 'cc',
+				type: 'text',
+				label: labelFor(keys.actionConfigCc),
+				...localizedIf(localize),
+			},
+			{
+				name: 'bcc',
+				type: 'text',
+				label: labelFor(keys.actionConfigBcc),
+				...localizedIf(localize),
+			},
+			{
+				name: 'replyTo',
+				type: 'text',
+				label: labelFor(keys.actionConfigReplyTo),
+				...localizedIf(localize),
 			},
 			{
 				name: 'subject',
@@ -84,7 +129,18 @@ export const buildConfirmation = (localize: boolean, editor?: RichTextField['edi
 			const subject = interpolate(config.subject ?? '', resolve)
 			const html = await renderBody(config.body)
 
-			await payload.sendEmail({ to, subject, html })
+			// `from` was validated at save time against `fromAddresses(req)`; not re-checked here
+			// (the job's `req` may differ from the authoring admin's, and the config is
+			// admin-authored, not visitor-controlled), so the stored value is forwarded verbatim.
+			await payload.sendEmail({
+				to,
+				subject,
+				html,
+				...(config.from ? { from: config.from } : {}),
+				...(config.cc ? { cc: interpolate(config.cc, resolve) } : {}),
+				...(config.bcc ? { bcc: interpolate(config.bcc, resolve) } : {}),
+				...(config.replyTo ? { replyTo: interpolate(config.replyTo, resolve) } : {}),
+			})
 		},
 	})
 

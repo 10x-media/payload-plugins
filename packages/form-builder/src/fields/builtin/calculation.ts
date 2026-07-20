@@ -97,10 +97,17 @@ export const validateExpression = (
 		: asTranslate(req.t)(keys.validationCalcExpressionInvalid)
 }
 
+/**
+ * A calculation is derived and read-only: it renders disabled with no text affordance (no
+ * `placeholder`), and it is never validated (`runSubmission` stores its computed value and skips
+ * `runValidation` entirely), so an authored `required` could never fire. Both are omitted rather
+ * than offered as settings that do nothing.
+ */
 export const calculationField = defineFormField<'number'>({
 	type: 'calculation',
 	label: keys.fieldTypeCalculation,
 	value: 'number',
+	omitShared: ['placeholder', 'required'],
 	config: [
 		{
 			name: 'expression',

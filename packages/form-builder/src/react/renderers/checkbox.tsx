@@ -6,7 +6,7 @@ import { Checkbox } from '../primitives/Checkbox'
 import { FieldShell } from '../primitives/FieldShell'
 
 export const checkboxRenderer = defineFieldRenderer<boolean>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		return (
@@ -16,7 +16,6 @@ export const checkboxRenderer = defineFieldRenderer<boolean>(
 				description={typeof field.description === 'string' ? field.description : undefined}
 				required={required}
 				errors={errors}
-				warnings={warnings}
 				describedById={describedById}
 			>
 				<Checkbox

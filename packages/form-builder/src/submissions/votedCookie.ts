@@ -1,7 +1,7 @@
 /**
- * `req.context` key under which `validateSubmission` stashes the loaded form's poll config
- * (`null` when the form has none) so the voted-cookie `afterChange` hook can skip a second
- * form fetch on the same request.
+ * `req.context` key under which `validateSubmission` stashes whether the loaded form is poll-enabled
+ * (its top-level `pollEnabled` flag) so the voted-cookie `afterChange` hook can skip a second form
+ * fetch on the same request.
  */
 export const POLL_CONTEXT_KEY = 'formBuilderPollConfig'
 

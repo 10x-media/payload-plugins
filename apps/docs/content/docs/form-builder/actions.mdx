@@ -24,19 +24,21 @@ export default buildConfig({
 })
 ```
 
-When the project editor is feature-rich (blocks, embeds, admin-only conveniences) and you want email authors on a minimal toolbar instead, `richText.editor` overrides the editor on both action body fields without touching the rest of the admin:
+When the project editor is feature-rich (blocks, embeds, admin-only conveniences) and you want email authors on a minimal toolbar instead, `richText.bodyEditor` overrides the editor on both action body fields and nothing else:
 
 ```ts title="payload.config.ts"
 import { FixedToolbarFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
 
 formBuilder({
   richText: {
-    editor: lexicalEditor({
+    bodyEditor: lexicalEditor({
       features: ({ defaultFeatures }) => [...defaultFeatures, FixedToolbarFeature()],
     }),
   },
 })
 ```
+
+Its sibling `richText.editor` is the default for *every* plugin rich text field, action bodies included; `bodyEditor` falls back to it when unset. Reach for `editor` to move the whole plugin off the project editor and `bodyEditor` to single out email bodies. See [rich text editors](/form-builder/customization#rich-text-editors).
 
 At send time the body is serialized to HTML. Author-typed text is HTML-escaped and supports recall tokens:
 
@@ -91,6 +93,57 @@ formBuilder({
 ```
 
 The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
+
+## CC, BCC, and reply-to
+
+`emailTeam` and `confirmation` both carry **CC**, **BCC**, and **Reply-to** fields alongside **To**/**Subject**. Each is localized like `subject` (a submission's own locale selects the stored value at send) and interpolated with the same [recall tokens](#rich-text-bodies) as the body (`{{field}}`, `{{field|fallback}}`). Pass more than one address as a plain comma-separated string; it is forwarded to `payload.sendEmail`, and from there to your nodemailer transport, exactly as typed.
+
+## From addresses
+
+By default `emailTeam` and `confirmation` send through your email adapter's default sender and neither action has a **From** field. Set `email.fromAddresses` to add one to both, backed by a resolver you supply:
+
+```ts title="payload.config.ts"
+formBuilder({
+  email: {
+    fromAddresses: async ({ req }) => {
+      const tenant = await tenantFromRequest(req)
+      return tenant.senders.map((sender) => ({ label: sender.label, value: sender.address }))
+    },
+  },
+})
+```
+
+The resolver runs per request against an authenticated endpoint, so a multi-tenant host can scope the address list to the tenant derived from `req` instead of exposing every tenant's senders to every editor. Each option's `value` is the literal string handed to `payload.sendEmail`'s `from` (`'Name <addr@example.com>'` or a bare address).
+
+The chosen `from` is validated against the resolver on save (an address outside the resolved set is a save error), but not re-checked when the action sends: the config is admin-authored, not visitor-controlled, so the stored value is trusted at send time. Leaving **From** empty keeps the adapter default, so adding the option changes nothing for forms that ignore it.
+
+Two costs come with the seam being server-resolved and failing closed:
+
+- **The select is empty until the form's first save.** It loads from a document-scoped endpoint, and an unsaved form has no id to resolve against, so the addresses appear once the form exists. Save the form, then pick the sender.
+- **A resolver that throws blocks saves.** Payload runs the validate on every save, not only when `from` changed, so while the resolver is down every save of a form whose email action has a **From** set is rejected, including edits that never touch the address. It surfaces as a translated "unavailable" save error rather than a raw stack, and a form with no **From** set still saves. This is the deliberate trade: failing open would persist a sender the host can no longer vouch for. A resolver that reaches a flaky upstream should cache or fall back internally instead of throwing.
+
+## Department routing
+
+By default `emailTeam`'s **To** is a plain address your editors type in themselves. Set `email.departments` to turn it into a select over addresses you manage instead, so an editor routes a form to "Sales" or "Support" without ever typing (or mistyping) an address:
+
+```ts title="payload.config.ts"
+import { departmentsField, formBuilder, resolveDepartmentOptions } from '@10x-media/form-builder'
+
+formBuilder({
+  email: {
+    departments: async ({ req }) => {
+      const settings = await req.payload.findGlobal({ slug: 'settings', depth: 0, locale: 'all', req })
+      return resolveDepartmentOptions({ payload: req.payload, req, doc: settings })
+    },
+  },
+})
+```
+
+`departmentsField()` is the array you place on any collection or global you own (a settings global, a tenant document) to hold the addresses: each row is a `label` and an `email`, both localized by default, rendered as condensed flat rows with no per-row collapsible, added and removed with their own buttons. `resolveDepartmentOptions` reads that array back (fetch it at `locale: 'all'` so every locale's addresses are available in one call) and resolves each row for the request's locale with a current-locale -> default-locale -> next-available-locale fallback, so the locale logic never has to be reimplemented per host. Multi-tenancy needs no plugin support: place the field on a tenant-scoped document and scope the resolver's read by the tenant derived from `req`, exactly like `email.fromAddresses`.
+
+With `email.departments` set, **To** becomes a select backed by an authenticated `GET /api/forms/:id/departments` endpoint, validated on save against the resolver's current options (fails closed, the same trade-off as `fromAddresses`: a resolver outage blocks saving a form whose email action has a **To** set, rather than persisting a routing target the host can no longer vouch for). Leave `email.departments` unset and **To** stays the plain text field it always was.
+
+Either way, **To** is localized: each admin locale stores its own address (or department choice), and a submission routes to the address stored for its own locale, exactly like the subject and body already do. This holds on the queued (job-runner) dispatch path too: the form is loaded at the submission's own stored locale, not the job runner's request locale, so a German visitor's submission still reaches the German department when the job that sends it runs with no locale of its own.
 
 ## Custom actions
 

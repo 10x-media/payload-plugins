@@ -9,7 +9,6 @@ export type FieldShellProps = {
 	description?: string
 	required?: boolean
 	errors?: string[]
-	warnings?: string[]
 	/** id used for aria-describedby on the control; the shell renders description + messages under it. */
 	describedById: string
 	children: ReactNode
@@ -17,7 +16,7 @@ export type FieldShellProps = {
 
 /**
  * Accessible wrapper for a single field: a `<label>` bound to the control, the control slot, an optional
- * description, and error/warning messages. The control inside must set `aria-describedby={describedById}`
+ * description, and error messages. The control inside must set `aria-describedby={describedById}`
  * and `aria-invalid` when errors exist; this shell renders the matching `id={describedById}` region.
  */
 export const FieldShell = ({
@@ -26,7 +25,6 @@ export const FieldShell = ({
 	description,
 	required,
 	errors = [],
-	warnings = [],
 	describedById,
 	children,
 }: FieldShellProps) => (
@@ -53,11 +51,6 @@ export const FieldShell = ({
 					))}
 				</div>
 			) : null}
-			{warnings.map((message) => (
-				<p key={message} className="fb-field__warning">
-					{message}
-				</p>
-			))}
 		</div>
 	</div>
 )

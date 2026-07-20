@@ -17,6 +17,23 @@ describe('interpolate', () => {
 	it('drops a missing token with no fallback', () => {
 		expect(interpolate('Hi {{missing}}!', resolve)).toBe('Hi !')
 	})
+	it('accepts a double-pipe fallback identically to single-pipe', () => {
+		expect(interpolate('Hi {{missing||friend}}', resolve)).toBe('Hi friend')
+		expect(interpolate('Hi {{empty||friend}}', resolve)).toBe('Hi friend')
+	})
+	it('uses the present value over the fallback, for both pipe forms', () => {
+		expect(interpolate('Hi {{name|friend}}', resolve)).toBe('Hi Ada')
+		expect(interpolate('Hi {{name||friend}}', resolve)).toBe('Hi Ada')
+	})
+	it('treats an empty double-pipe fallback the same as an empty single-pipe fallback', () => {
+		expect(interpolate('Hi {{missing|}}!', resolve)).toBe('Hi !')
+		expect(interpolate('Hi {{missing||}}!', resolve)).toBe('Hi !')
+	})
+	it('does not affect the no-pipe wildcard tokens used by serializeBody', () => {
+		const withWildcards = (name: string) => ({ '*': 'ALL', '*:table': 'TABLE' })[name] ?? ''
+		expect(interpolate('{{*}}', withWildcards)).toBe('ALL')
+		expect(interpolate('{{*:table}}', withWildcards)).toBe('TABLE')
+	})
 	it('replaces multiple tokens', () => {
 		expect(interpolate('{{name}} {{name}}', resolve)).toBe('Ada Ada')
 	})

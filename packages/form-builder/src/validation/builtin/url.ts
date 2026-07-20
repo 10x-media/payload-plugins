@@ -13,6 +13,7 @@ const isUrl = (value: string): boolean => {
 export const urlRule = defineValidationRule<Record<string, never>, string>({
 	type: 'url',
 	label: keys.ruleUrl,
+	description: keys.ruleUrlDescription,
 	appliesTo: ['text', 'textarea'],
 	defaultMessage: keys.ruleUrlMessage,
 	validate: ({ value, message }) =>

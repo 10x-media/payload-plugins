@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { de } from './de'
@@ -11,11 +11,32 @@ const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.turbo'])
 
-/** Files that enumerate every key by definition; they don't count as "usage". */
-const SELF_DEFINING_FILES = new Set([
-	join(packageRoot, 'src/translations/keys.ts'),
-	join(packageRoot, 'src/translations/en.ts'),
-])
+/**
+ * Excluded from the usage corpus wholesale, by directory rather than by naming the files in it.
+ *
+ * Every locale table here enumerates every key by construction, so letting a single one into the
+ * corpus makes this whole scan vacuous: it matches all 220 keys on its own and nothing is ever
+ * reported unused. Recognizing tables by name, or by their `Record<TranslationKey, string>`
+ * annotation, both leave that trapdoor open: a locale added under a different name, or written as
+ * `satisfies Record<...>`, `Readonly<Record<...>>`, or via a shared alias, quietly rejoins the
+ * corpus and re-blinds the scan with no test able to notice. Excluding the directory has no such
+ * mode. Nothing is lost: no file here consumes a `keys.X` reference (`server.ts`,
+ * `useTranslation.ts`, `makeTranslate.ts`, and `index.ts` all take keys as parameters), so a key
+ * used only from this directory is not a used key. Do not narrow this back to a file list.
+ */
+const TRANSLATIONS_DIR = join(packageRoot, 'src/translations')
+
+/**
+ * Whether `file` sits anywhere inside `TRANSLATIONS_DIR`, not just as a direct child. A locale
+ * table nested in a subdirectory (e.g. `src/translations/locales/fr.ts`) must stay excluded too;
+ * a same-directory check alone would let it rejoin the corpus and re-blind the scan. `relative`
+ * (rather than a string prefix) stays correct across platforms and doesn't false-positive on a
+ * sibling directory that merely shares the name as a prefix (`translations-extra/`).
+ */
+const isUnderTranslationsDir = (file: string): boolean => {
+	const rel = relative(TRANSLATIONS_DIR, file)
+	return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
 
 const collectSourceFiles = (dir: string, out: string[] = []): string[] => {
 	for (const entry of readdirSync(dir)) {
@@ -27,16 +48,26 @@ const collectSourceFiles = (dir: string, out: string[] = []): string[] => {
 			collectSourceFiles(full, out)
 			continue
 		}
-		if (
-			/\.(ts|tsx)$/.test(entry) &&
-			!entry.endsWith('.test.ts') &&
-			!entry.endsWith('.test.tsx') &&
-			!SELF_DEFINING_FILES.has(full)
-		) {
+		if (/\.(ts|tsx)$/.test(entry) && !entry.endsWith('.test.ts') && !entry.endsWith('.test.tsx')) {
 			out.push(full)
 		}
 	}
 	return out
+}
+
+/** Production files a key must be referenced from to count as used. */
+const usageFiles = (): string[] =>
+	[
+		...collectSourceFiles(join(packageRoot, 'src')),
+		...collectSourceFiles(join(packageRoot, 'registry', 'form-builder')),
+	].filter((file) => !isUnderTranslationsDir(file))
+
+/** The subset of `names` no production file references as `keys.<name>`. */
+const unusedKeyNames = (names: string[]): string[] => {
+	const combined = usageFiles()
+		.map((file) => readFileSync(file, 'utf8'))
+		.join('\n')
+	return names.filter((name) => !new RegExp(`\\bkeys\\.${name}\\b`).test(combined))
 }
 
 describe('form-builder translations', () => {
@@ -72,15 +103,37 @@ describe('form-builder translations', () => {
 	})
 
 	it('references every translation key from production code', () => {
-		const files = [
-			...collectSourceFiles(join(packageRoot, 'src')),
-			...collectSourceFiles(join(packageRoot, 'registry', 'form-builder')),
-		]
-		const combined = files.map((file) => readFileSync(file, 'utf8')).join('\n')
+		expect(unusedKeyNames(Object.keys(keys))).toEqual([])
+	})
 
-		const unused = Object.keys(keys).filter(
-			(name) => !new RegExp(`\\bkeys\\.${name}\\b`).test(combined)
+	it('scans a non-empty corpus holding no file from the translations directory', () => {
+		const scanned = usageFiles()
+		expect(scanned.length).toBeGreaterThan(0)
+		expect(scanned.filter(isUnderTranslationsDir)).toEqual([])
+		expect(scanned).toContain(join(packageRoot, 'src/index.ts'))
+	})
+
+	it('reports a key that production code never references', () => {
+		expect(unusedKeyNames(['keyNoProductionFileMentions'])).toEqual(['keyNoProductionFileMentions'])
+	})
+
+	it('excludes a locale table nested in a subdirectory, not only direct children', () => {
+		expect(isUnderTranslationsDir(join(TRANSLATIONS_DIR, 'locales', 'fr.ts'))).toBe(true)
+	})
+
+	it('does not exclude a sibling directory whose name merely starts with translations', () => {
+		expect(
+			isUnderTranslationsDir(join(dirname(TRANSLATIONS_DIR), 'translations-extra', 'fr.ts'))
+		).toBe(false)
+	})
+
+	// The corpus is only a real check if a locale table entering it would break the scan. Proves the
+	// vacuum the directory exclusion exists to prevent, without depending on how a table is written.
+	it('would be made vacuous by a single locale table in the corpus', () => {
+		const deTable = readFileSync(join(TRANSLATIONS_DIR, 'de.ts'), 'utf8')
+		const unusedAgainstTableAlone = Object.keys(keys).filter(
+			(name) => !new RegExp(`\\bkeys\\.${name}\\b`).test(deTable)
 		)
-		expect(unused).toEqual([])
+		expect(unusedAgainstTableAlone).toEqual([])
 	})
 })

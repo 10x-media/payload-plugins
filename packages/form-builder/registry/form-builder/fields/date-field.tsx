@@ -7,13 +7,12 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 export const dateField = defineFieldRenderer<string>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const invalid = errors.length > 0
 		const label = typeof field.label === 'string' ? field.label : undefined
 		const description = typeof field.description === 'string' ? field.description : undefined
-		const placeholder = typeof field.placeholder === 'string' ? field.placeholder : undefined
 
 		return (
 			<div className="grid gap-2">
@@ -32,7 +31,6 @@ export const dateField = defineFieldRenderer<string>(
 					name={name}
 					type="date"
 					value={value ?? ''}
-					placeholder={placeholder}
 					required={required}
 					disabled={disabled}
 					aria-invalid={invalid || undefined}
@@ -50,11 +48,6 @@ export const dateField = defineFieldRenderer<string>(
 							))}
 						</div>
 					) : null}
-					{warnings?.map((message) => (
-						<p key={message} className="text-amber-600">
-							{message}
-						</p>
-					))}
 				</div>
 			</div>
 		)

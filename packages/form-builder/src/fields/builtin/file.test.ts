@@ -46,12 +46,20 @@ describe('file field', () => {
 		}
 	})
 
-	it('mounts the ByteSizeField component on maxSize', () => {
+	it('mounts ByteSizeField on maxSize with the size-limit description as a translation key', () => {
 		const maxSize = fileField.config?.find(
 			(entry) => 'name' in entry && entry.name === 'maxSize'
 		) as NumberField
 		expect(maxSize.type).toBe('number')
-		expect(maxSize.admin?.components?.Field).toBe('@10x-media/form-builder/client#ByteSizeField')
-		expect(maxSize.admin?.description).toBeDefined()
+		const component = maxSize.admin?.components?.Field as
+			| { path?: string; clientProps?: { descriptionKey?: string } }
+			| undefined
+		expect(component?.path).toBe('@10x-media/form-builder/client#ByteSizeField')
+		// A custom Field component replaces Payload's whole default render, including the
+		// description slot, so admin.description would be silently inert here.
+		expect(component?.clientProps?.descriptionKey).toBe(
+			'formBuilder:file.config.maxSizeDescription'
+		)
+		expect(maxSize.admin?.description).toBeUndefined()
 	})
 })

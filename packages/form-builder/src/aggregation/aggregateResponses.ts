@@ -1,6 +1,8 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
+import { isNamedField, type NamedFormFieldInstance } from '../fields/fieldKey'
+import { instanceOptionsOf } from '../fields/instanceOptions'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateRowsForFields } from './aggregateRows'
 import type { AggregationRow, FieldAggregation, FieldMeta, SubmissionStatusFilter } from './types'
@@ -17,26 +19,26 @@ export type AggregateFormResponsesArgs = {
 	maxSubmissions?: number
 	/** Page size for the submission scan. Default 500. */
 	pageSize?: number
-}
-
-const optionsOf = (field: FormFieldInstance): { value: string; label: string }[] | undefined => {
-	if (!Array.isArray(field.options)) {
-		return undefined
-	}
-	const options = (field.options as Array<{ label?: string; value?: string }>)
-		.filter((option) => typeof option?.value === 'string')
-		.map((option) => ({ value: String(option.value), label: option.label ?? String(option.value) }))
-	return options.length > 0 ? options : undefined
+	/**
+	 * Source-resolved options by field name (an option-source poll's results field). They replace
+	 * the instance's authored options for bucket seeding, order, and labels, and mark the field
+	 * enumerable for the default field selection.
+	 */
+	resolvedOptions?: Record<string, { value: string; label: string }[]>
 }
 
 /** True when a field declares non-empty options (a choice field safe to aggregate publicly). */
-export const fieldHasOptions = (field: FormFieldInstance): boolean => optionsOf(field) !== undefined
+export const fieldHasOptions = (field: FormFieldInstance): boolean =>
+	instanceOptionsOf(field) !== undefined
 
-const metaFor = (field: FormFieldInstance): FieldMeta => ({
+const metaFor = (
+	field: NamedFormFieldInstance,
+	resolved?: { value: string; label: string }[]
+): FieldMeta => ({
 	field: field.name,
 	label: field.label ?? field.name,
 	fieldType: field.blockType,
-	options: optionsOf(field),
+	options: resolved && resolved.length > 0 ? resolved : instanceOptionsOf(field),
 })
 
 /**
@@ -56,6 +58,7 @@ export const aggregateFormResponses = async (
 		req,
 		maxSubmissions = 10000,
 		pageSize = 500,
+		resolvedOptions,
 	} = args
 	const form = await payload
 		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
@@ -65,12 +68,20 @@ export const aggregateFormResponses = async (
 	}
 	const instances = form.fields as FormFieldInstance[]
 	const selected = fields
-		? instances.filter((field) => fields.includes(field.name))
-		: instances.filter((field) => optionsOf(field) !== undefined)
+		? instances.filter(
+				(field): field is NamedFormFieldInstance =>
+					isNamedField(field) && fields.includes(field.name)
+			)
+		: instances.filter(
+				(field): field is NamedFormFieldInstance =>
+					isNamedField(field) &&
+					(instanceOptionsOf(field) !== undefined ||
+						(resolvedOptions?.[field.name]?.length ?? 0) > 0)
+			)
 	if (selected.length === 0) {
 		return []
 	}
-	const metas = selected.map(metaFor)
+	const metas = selected.map((field) => metaFor(field, resolvedOptions?.[field.name]))
 
 	const statusWhere = status === 'all' ? [] : [{ status: { equals: status } }]
 	const where = { and: [{ form: { equals: formId } }, ...statusWhere] }

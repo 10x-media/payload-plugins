@@ -3,11 +3,10 @@ import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
-import type { ConsentSourceRegistry } from '../consent/registry'
+import type { ConsentSourcesResolver } from '../consent/types'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
-import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import type { PollOptionSourceRegistry } from '../poll/registry'
@@ -25,7 +24,8 @@ export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 type BuildSubmissionsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry: ConsentSourceRegistry
+	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
+	consentSources?: ConsentSourcesResolver
 	actionRegistry?: ActionRegistry
 	events?: FormEventSink
 	/** Whether a job runner is likely present; gates the queued vs bounded-inline dispatch path. */
@@ -41,8 +41,9 @@ type BuildSubmissionsCollectionArgs = {
 	/** Registered poll option sources; submission validation resolves allowed values through them. */
 	pollSourceRegistry?: PollOptionSourceRegistry
 	/**
-	 * When `true`, shows the raw `values`, `descriptors`, and `consent` JSON fields in the admin UI.
-	 * Default `false` — they are fully represented by the `SubmissionAnswers` UI component.
+	 * When `true`, reveals the standalone `locale`, `values`, `descriptors`, `consent`, and `meta`
+	 * fields in the admin UI. Default `false`, because the `SubmissionAnswers` UI component already
+	 * represents them fully (locale and meta are folded into its Submission-details section).
 	 */
 	showRawFields?: boolean
 	overrides?: CollectionOverrides
@@ -143,14 +144,14 @@ const makeVotedCookieHook = (): CollectionAfterChangeHook => {
 			return doc
 		}
 		const stashed = req.context?.[POLL_CONTEXT_KEY]
-		let poll = pollConfigOf(stashed)
-		if (stashed === undefined) {
+		let pollEnabled = typeof stashed === 'boolean' ? stashed : undefined
+		if (pollEnabled === undefined) {
 			const form = await req.payload
 				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
 				.catch(() => null)
-			poll = form ? pollConfigOf(form.poll) : undefined
+			pollEnabled = form?.pollEnabled === true
 		}
-		if (poll?.enabled !== true) {
+		if (!pollEnabled) {
 			return doc
 		}
 		req.responseHeaders ??= new Headers()
@@ -165,7 +166,7 @@ const makeVotedCookieHook = (): CollectionAfterChangeHook => {
 export const buildSubmissionsCollection = ({
 	registry,
 	ruleRegistry,
-	consentRegistry,
+	consentSources,
 	actionRegistry = new Map(),
 	events,
 	hasRunner = false,
@@ -187,6 +188,9 @@ export const buildSubmissionsCollection = ({
 				{ label: labelForKey(keys.statusComplete), value: 'complete' },
 				{ label: labelForKey(keys.statusPartial), value: 'partial' },
 			],
+			// Not clearable: aggregation counts `status: complete` submissions, so a cleared status
+			// would drop the submission out of every poll result with nothing in the UI saying so.
+			admin: { isClearable: false },
 			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
 			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
 			access: { create: isLoggedIn, update: isLoggedIn },
@@ -199,11 +203,11 @@ export const buildSubmissionsCollection = ({
 				components: { Field: '@10x-media/form-builder/rsc#SubmissionAnswers' },
 			},
 		},
-		{ name: 'locale', type: 'text' },
+		{ name: 'locale', type: 'text', admin: { hidden: !showRawFields } },
 		{ name: 'values', type: 'json', admin: { hidden: !showRawFields } },
 		{ name: 'descriptors', type: 'json', admin: { hidden: !showRawFields } },
 		{ name: 'consent', type: 'json', admin: { hidden: !showRawFields } },
-		{ name: 'meta', type: 'json' },
+		{ name: 'meta', type: 'json', admin: { hidden: !showRawFields } },
 	]
 
 	return {
@@ -214,7 +218,11 @@ export const buildSubmissionsCollection = ({
 			plural: labelForKey(keys.collectionSubmissionPlural),
 			...(overrides?.labels ?? {}),
 		},
-		admin: { group: 'Forms', ...(overrides?.admin ?? {}) },
+		admin: {
+			group: 'Forms',
+			defaultColumns: ['form', 'status', 'locale', 'createdAt'],
+			...(overrides?.admin ?? {}),
+		},
 		access: {
 			create: () => true,
 			read: isLoggedIn,
@@ -231,7 +239,7 @@ export const buildSubmissionsCollection = ({
 				validateSubmission({
 					registry,
 					ruleRegistry,
-					consentRegistry,
+					consentSources,
 					uploadSlug,
 					pollSourceRegistry,
 				}),

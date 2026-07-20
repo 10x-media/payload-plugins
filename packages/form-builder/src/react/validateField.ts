@@ -14,17 +14,17 @@ export type ValidateFieldInput = {
 	t: Translate
 }
 
-export type ValidateFieldResult = { errors: string[]; warnings: string[] }
+export type ValidateFieldResult = { errors: string[] }
 
 /**
  * Run client-side validation for one field, reusing the shared engine in `mode: 'client'` (server-only
- * rules are skipped, no `req`/`payload`). Splits issues into blocking errors and advisory warnings.
+ * rules are skipped, no `req`/`payload`). Every returned message is a blocking error.
  */
 export const validateFieldValue = async (
 	input: ValidateFieldInput
 ): Promise<ValidateFieldResult> => {
 	const { field, value, registry, ruleRegistry, answers, locale, t } = input
-	const { errors: issues } = await runValidation({
+	const { errors } = await runValidation({
 		field,
 		fieldDefinition: registry.get(field.blockType),
 		value,
@@ -37,8 +37,5 @@ export const validateFieldValue = async (
 		event: 'onChange',
 		mode: 'client',
 	})
-	return {
-		errors: issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message),
-		warnings: issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.message),
-	}
+	return { errors }
 }

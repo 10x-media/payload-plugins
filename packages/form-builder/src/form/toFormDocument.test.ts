@@ -2,38 +2,115 @@ import { describe, expect, it } from 'vitest'
 import { toFormDocument } from './toFormDocument'
 
 describe('toFormDocument', () => {
-	it('coerces a null response and display to undefined', () => {
-		const doc = toFormDocument({ id: 1, fields: [], response: null, display: null })
+	it('coerces a null response to undefined', () => {
+		const doc = toFormDocument({ id: 1, fields: [], response: null })
 		expect(doc.response).toBeUndefined()
-		expect(doc.display).toBeUndefined()
 	})
 
-	it('passes through display settings', () => {
-		const doc = toFormDocument({
-			id: 1,
-			fields: [],
-			display: { showTitle: true, title: 'Contact us', intro: { root: {} } },
-		})
-		expect(doc.display).toEqual({ showTitle: true, title: 'Contact us', intro: { root: {} } })
+	it('passes the title through, null- and omission-coerced to undefined', () => {
+		expect(toFormDocument({ id: 1, title: 'Contact us' }).title).toBe('Contact us')
+		expect(toFormDocument({ id: 1, title: null }).title).toBeUndefined()
+		expect(toFormDocument({ id: 1 }).title).toBeUndefined()
 	})
 
-	it('defaults fields to an empty array and leaves display/response undefined when omitted', () => {
+	it('defaults fields to an empty array and leaves response undefined when omitted', () => {
 		const doc = toFormDocument({ id: 1 })
 		expect(doc.fields).toEqual([])
-		expect(doc.display).toBeUndefined()
 		expect(doc.response).toBeUndefined()
+	})
+
+	it('reassembles buttons from the top-level label fields', () => {
+		const doc = toFormDocument({ id: 1, fields: [], submitLabel: 'Send', nextLabel: 'Continue' })
+		expect(doc.buttons).toEqual({ submitLabel: 'Send', nextLabel: 'Continue' })
+	})
+
+	it('leaves buttons undefined when no non-empty label is set', () => {
+		expect(toFormDocument({ id: 1, submitLabel: null }).buttons).toBeUndefined()
+		expect(toFormDocument({ id: 1, submitLabel: '' }).buttons).toBeUndefined()
+		expect(toFormDocument({ id: 1 }).buttons).toBeUndefined()
+	})
+
+	it('coerces the top-level multistep and pollEnabled flags to strict booleans', () => {
+		expect(toFormDocument({ id: 1 })).toMatchObject({ multistep: false, pollEnabled: false })
+		expect(toFormDocument({ id: 1, multistep: true, pollEnabled: true })).toMatchObject({
+			multistep: true,
+			pollEnabled: true,
+		})
+		expect(toFormDocument({ id: 1, multistep: null, pollEnabled: null })).toMatchObject({
+			multistep: false,
+			pollEnabled: false,
+		})
+	})
+
+	// The asymmetry is a contract, not an accident: response is a host-extensible visitor-facing
+	// group cast wholesale; buttons and poll are allowlists so host extras and server-only members
+	// cannot leak to the client.
+	describe('unknown-key preservation', () => {
+		it('preserves unknown keys on response', () => {
+			const response = { type: 'message', message: 'Thanks', tone: 'celebratory' }
+			const doc = toFormDocument({ id: 1, response })
+			expect(doc.response).toBe(response)
+			expect((doc.response as Record<string, unknown>)?.tone).toBe('celebratory')
+		})
+
+		it('drops unknown top-level keys from buttons, keeping only the three labels', () => {
+			const doc = toFormDocument({
+				id: 1,
+				submitLabel: 'Send',
+				submitIcon: 'arrow-right',
+			} as Parameters<typeof toFormDocument>[0])
+			expect(doc.buttons).toEqual({ submitLabel: 'Send' })
+		})
+
+		it('drops unknown keys on poll, including anything a host stored in sourceConfig', () => {
+			const doc = toFormDocument({
+				id: 1,
+				poll: {
+					resultsField: 'colour',
+					optionSource: 'catalogue',
+					sourceConfig: { apiKey: 'secret', tenantId: 'acme' },
+					internalNote: 'not for visitors',
+				} as Parameters<typeof toFormDocument>[0]['poll'],
+			})
+			expect(doc.poll).toEqual({
+				resultsVisibility: undefined,
+				closesAt: undefined,
+			})
+			expect(Object.keys(doc.poll ?? {})).toEqual(['resultsVisibility', 'closesAt'])
+		})
+
+		it('drops unknown keys on poll.outcome, keeping winningValues alone', () => {
+			const doc = toFormDocument({
+				id: 1,
+				poll: {
+					outcome: { winningValues: ['ada'], resolvedAt: '2026-07-01T00:00:00.000Z' },
+				} as Parameters<typeof toFormDocument>[0]['poll'],
+			})
+			expect(doc.poll?.outcome).toEqual({ winningValues: ['ada'] })
+		})
+	})
+
+	it('passes a nameless bare row through with its block row id intact', () => {
+		const doc = toFormDocument({
+			id: 1,
+			fields: [
+				{ blockType: 'text', name: 'first' },
+				{ blockType: 'message', id: 'row-note', content: { root: { children: [] } } },
+			],
+		})
+		expect(doc.fields).toHaveLength(2)
+		expect(doc.fields[1]).toMatchObject({ blockType: 'message', id: 'row-note' })
+		expect(doc.fields[1]?.name).toBeUndefined()
 	})
 
 	it('passes through poll lifecycle settings and drops the server-only resultsField', () => {
 		const poll = {
-			enabled: true,
 			resultsVisibility: 'afterClose',
 			closesAt: '2026-07-01T00:00:00.000Z',
 			resultsField: 'colour',
 		}
 		const doc = toFormDocument({ id: 1, fields: [], poll })
 		expect(doc.poll).toEqual({
-			enabled: true,
 			resultsVisibility: 'afterClose',
 			closesAt: '2026-07-01T00:00:00.000Z',
 		})
@@ -43,30 +120,38 @@ describe('toFormDocument', () => {
 		expect(toFormDocument({ id: 1, poll: null }).poll).toBeUndefined()
 		const doc = toFormDocument({
 			id: 1,
-			poll: { enabled: null, resultsVisibility: null, closesAt: null },
+			poll: { resultsVisibility: null, closesAt: null },
 		})
 		expect(doc.poll).toEqual({
-			enabled: undefined,
 			resultsVisibility: undefined,
 			closesAt: undefined,
 		})
 	})
 
-	it('passes through the outcome winningValue only, dropping empty or null values', () => {
+	it('passes through the outcome winningValues only, dropping empty or null entries', () => {
 		const withOutcome = toFormDocument({
 			id: 1,
-			poll: { enabled: true, outcome: { winningValue: 'ada' } },
+			poll: { outcome: { winningValues: ['ada'] } },
 		})
-		expect(withOutcome.poll?.outcome).toEqual({ winningValue: 'ada' })
+		expect(withOutcome.poll?.outcome).toEqual({ winningValues: ['ada'] })
+		const tie = toFormDocument({
+			id: 1,
+			poll: { outcome: { winningValues: ['ada', 'grace'] } },
+		})
+		expect(tie.poll?.outcome).toEqual({ winningValues: ['ada', 'grace'] })
 		expect(
-			toFormDocument({ id: 1, poll: { enabled: true, outcome: { winningValue: null } } }).poll
-				?.outcome
+			toFormDocument({
+				id: 1,
+				poll: { outcome: { winningValues: ['ada', '', null] } },
+			}).poll?.outcome
+		).toEqual({ winningValues: ['ada'] })
+		expect(
+			toFormDocument({ id: 1, poll: { outcome: { winningValues: [] } } }).poll?.outcome
 		).toBeUndefined()
 		expect(
-			toFormDocument({ id: 1, poll: { enabled: true, outcome: { winningValue: '' } } }).poll
-				?.outcome
+			toFormDocument({ id: 1, poll: { outcome: { winningValues: null } } }).poll?.outcome
 		).toBeUndefined()
-		expect(toFormDocument({ id: 1, poll: { enabled: true } }).poll?.outcome).toBeUndefined()
+		expect(toFormDocument({ id: 1, poll: {} }).poll?.outcome).toBeUndefined()
 	})
 
 	it('injects pollOptions into the resultsField-named instance', () => {
@@ -78,10 +163,7 @@ describe('toFormDocument', () => {
 			{ label: 'Ada', value: 'ada' },
 			{ label: 'Grace', value: 'grace' },
 		]
-		const doc = toFormDocument(
-			{ id: 1, fields, poll: { enabled: true, resultsField: 'winner' } },
-			{ pollOptions }
-		)
+		const doc = toFormDocument({ id: 1, fields, poll: { resultsField: 'winner' } }, { pollOptions })
 		expect(doc.fields[1]?.options).toEqual(pollOptions)
 		expect(doc.fields[0]).toBe(fields[0])
 		expect(fields[1]?.options).toEqual([{ label: 'Old', value: 'old' }])
@@ -91,7 +173,7 @@ describe('toFormDocument', () => {
 		const fields = [
 			{ blockType: 'select', name: 'winner', options: [{ label: 'Old', value: 'old' }] },
 		]
-		const doc = toFormDocument({ id: 1, fields, poll: { enabled: true, resultsField: 'winner' } })
+		const doc = toFormDocument({ id: 1, fields, poll: { resultsField: 'winner' } })
 		expect(doc.fields[0]?.options).toEqual([{ label: 'Old', value: 'old' }])
 	})
 })

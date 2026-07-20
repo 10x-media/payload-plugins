@@ -3,7 +3,7 @@ import { isPollClosed, pollConfigOf } from './pollState'
 
 describe('pollConfigOf', () => {
 	it('returns the poll object when present', () => {
-		expect(pollConfigOf({ enabled: true })).toEqual({ enabled: true })
+		expect(pollConfigOf({ resultsField: 'winner' })).toEqual({ resultsField: 'winner' })
 	})
 
 	it('returns undefined for a missing or null poll', () => {

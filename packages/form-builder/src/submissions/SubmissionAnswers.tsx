@@ -122,6 +122,7 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 				label: descriptor.label,
 				value: formatted || '—',
 				multiline: descriptor.fieldType === 'textarea',
+				...(descriptor.width ? { width: descriptor.width } : {}),
 			})
 		}
 	}
@@ -131,7 +132,7 @@ export const SubmissionAnswers = ({ data, req }: UIFieldServerProps) => {
 		at: formatDate(entry.at, locale),
 	}))
 
-	const metaItems: MetaItem[] = []
+	const metaItems: MetaItem[] = [{ label: t(keys.submissionMetaLocale), value: locale }]
 	if (meta) {
 		if (meta.at)
 			metaItems.push({

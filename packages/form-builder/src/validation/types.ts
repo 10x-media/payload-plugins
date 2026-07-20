@@ -1,13 +1,8 @@
 import type { Field, Payload, PayloadRequest } from 'payload'
 import type { FormFieldInstance } from '../submissions/types'
 
-export type ValidationSeverity = 'error' | 'warning'
-
-/** A rule outcome: pass, a plain error string, or an explicit message + severity. */
-export type ValidationRuleResult =
-	| true
-	| string
-	| { message: string; severity?: ValidationSeverity }
+/** A rule outcome: pass (`true`) or a blocking error message. */
+export type ValidationRuleResult = true | string
 
 /** Resolves this rule instance's message (custom override or localized default) with `{var}` interpolation. */
 export type MessageFn = (vars?: Record<string, unknown>) => string
@@ -47,7 +42,7 @@ export type ValidationRuleValidate<
 
 /**
  * A validation rule type, authored once. `params` is a Payload `Field[]` rendered in the per-field
- * constraint list; `validate` returns `true | string | { message, severity }`. `client` defaults from
+ * constraint list; `validate` returns `true | string`. `client` defaults from
  * whether the rule is pure (a rule that is async or uses `req`/`payload` must set `client: false`).
  */
 export type ValidationRuleDefinition<
@@ -64,8 +59,6 @@ export type ValidationRuleDefinition<
 	defaultMessage: string
 	/** Runs client-side too. Defaults to `true`; set `false` for async or `req`/`payload`-using rules. */
 	client?: boolean
-	/** Default severity when `validate` returns a bare string. Defaults to `error`. */
-	severity?: ValidationSeverity
 	validate: ValidationRuleValidate<TParams, TValue, TData>
 }
 
@@ -94,6 +87,5 @@ export type AnyValidationRuleDefinition = {
 	params?: Field[]
 	defaultMessage: string
 	client?: boolean
-	severity?: ValidationSeverity
 	validate: AnyValidationRuleValidate
 }

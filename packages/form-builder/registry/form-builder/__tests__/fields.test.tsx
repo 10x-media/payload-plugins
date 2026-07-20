@@ -161,7 +161,7 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 						blockType: 'consent',
 						name: 'terms',
 						statement: 'I agree to the terms',
-						sourceConfig: { label: 'Privacy Policy', url: 'https://example.com/privacy' },
+						link: { label: 'Privacy Policy', url: 'https://example.com/privacy' },
 					},
 					value: false,
 					onChange,
@@ -176,7 +176,7 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		expect(onChange).toHaveBeenCalledWith(true)
 	})
 
-	it('consent: prefers consentLinks over sourceConfig when both are present', () => {
+	it('consent: renders no link when the resolved link has a url but no label', () => {
 		const { container } = render(
 			createElement(
 				consentField,
@@ -185,16 +185,145 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 						blockType: 'consent',
 						name: 'terms',
 						statement: 'I agree',
-						sourceConfig: { label: 'Fallback', url: 'https://example.com/fallback' },
-						consentLinks: [{ label: 'Terms of Service', url: 'https://example.com/tos' }],
+						link: { url: 'https://example.com/tos' },
 					},
 				})
 			)
 		)
-		expect(within(container).queryByRole('link', { name: 'Fallback' })).toBeNull()
-		expect(within(container).getByRole('link', { name: 'Terms of Service' })).toHaveAttribute(
-			'href',
-			'https://example.com/tos'
+		expect(within(container).queryByRole('link')).toBeNull()
+	})
+
+	it('consent: routes the link href through sanitizeUrl', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: {
+						blockType: 'consent',
+						name: 'terms',
+						statement: 'I agree',
+						link: { label: 'Policy', url: `${'java'}script:alert(1)` },
+					},
+				})
+			)
+		)
+		expect(within(container).getByRole('link', { name: 'Policy' })).toHaveAttribute('href', '#')
+	})
+
+	it('consent: marks a required statement, like every other labelled field', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: { blockType: 'consent', name: 'terms', statement: 'I agree to the terms' },
+					required: true,
+				})
+			)
+		)
+		expect(container.textContent).toContain('I agree to the terms *')
+	})
+
+	it('consent: renders no dangling marker when there is no statement', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: { blockType: 'consent', name: 'terms' },
+					required: true,
+				})
+			)
+		)
+		expect(container.textContent).not.toContain('*')
+	})
+
+	it('consent: names the checkbox by its machine name when no statement resolved, never leaving it unnamed', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({ field: { blockType: 'consent', name: 'f' }, name: 'f' })
+			)
+		)
+		expect(within(container).getByRole('checkbox')).toHaveAttribute('aria-label', 'f')
+	})
+
+	it('consent: renders a rich text statement with an inline link and a plain-text aria-label', () => {
+		const statement = {
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						children: [
+							{ type: 'text', text: 'I agree to the ' },
+							{
+								type: 'link',
+								fields: { url: 'https://example.com/privacy', newTab: true },
+								children: [{ type: 'text', text: 'Privacy Policy' }],
+							},
+							{ type: 'text', text: '.' },
+						],
+					},
+				],
+			},
+		}
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: { blockType: 'consent', name: 'terms', statement },
+				})
+			)
+		)
+		const link = within(container).getByRole('link', { name: 'Privacy Policy' })
+		expect(link).toHaveAttribute('href', 'https://example.com/privacy')
+		expect(within(container).getByRole('checkbox')).toHaveAttribute(
+			'aria-label',
+			'I agree to the Privacy Policy.'
+		)
+	})
+
+	it('consent: escapes a script injection attempt inside a rich text statement', () => {
+		const statement = {
+			root: {
+				type: 'root',
+				children: [
+					{ type: 'paragraph', children: [{ type: 'text', text: '<script>alert(1)</script>' }] },
+				],
+			},
+		}
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: { blockType: 'consent', name: 'terms', statement },
+				})
+			)
+		)
+		expect(container.querySelector('script')).toBeNull()
+		expect(within(container).getByText('<script>alert(1)</script>')).toBeInTheDocument()
+	})
+
+	it('consent: never renders a legacy string statement as HTML, even when it looks like markup', () => {
+		const { container } = render(
+			createElement(
+				consentField,
+				baseProps<boolean>({
+					field: {
+						blockType: 'consent',
+						name: 'terms',
+						statement: '<b>Bold</b> and <script>alert(1)</script>',
+					},
+				})
+			)
+		)
+		expect(container.querySelector('script')).toBeNull()
+		expect(container.querySelector('b')).toBeNull()
+		expect(
+			within(container).getByText('<b>Bold</b> and <script>alert(1)</script>')
+		).toBeInTheDocument()
+		expect(within(container).getByRole('checkbox')).toHaveAttribute(
+			'aria-label',
+			'<b>Bold</b> and <script>alert(1)</script>'
 		)
 	})
 
@@ -221,7 +350,7 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 		}
 		const { container } = render(
 			<Form
-				form={{ id: 1, fields: [{ blockType: 'message', name: 'note', content }] }}
+				form={{ id: 1, fields: [{ blockType: 'message', id: 'row-note', content }] }}
 				onSubmit={vi.fn()}
 				renderers={{ message: messageField }}
 			/>
@@ -252,7 +381,7 @@ describe('shadcn field renderers (aliased to native shims)', () => {
 								right: { type: 'lit', value: 2 },
 							},
 						},
-						{ blockType: 'message', name: 'note', content },
+						{ blockType: 'message', id: 'row-note', content },
 					],
 				}}
 				onSubmit={vi.fn()}

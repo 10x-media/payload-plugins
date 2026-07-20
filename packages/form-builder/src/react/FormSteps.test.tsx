@@ -21,7 +21,13 @@ const flow: FormFlow = {
 	],
 }
 
-const doc = (withFlow?: FormFlow): FormDocument => ({ id: 1, fields, flow: withFlow })
+const doc = (withFlow?: FormFlow): FormDocument => ({
+	id: 1,
+	fields,
+	flow: withFlow,
+	multistep: Boolean(withFlow),
+	pollEnabled: false,
+})
 
 describe('FormSteps', () => {
 	it('renders nothing when the form has no flow', () => {

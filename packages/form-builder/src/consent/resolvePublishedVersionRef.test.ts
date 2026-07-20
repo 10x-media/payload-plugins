@@ -1,25 +1,30 @@
+import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import { resolvePublishedVersionRef } from './resolvePublishedVersionRef'
 
 const makePayload = (findVersions: ReturnType<typeof vi.fn>) => ({ findVersions }) as never
 
 describe('resolvePublishedVersionRef', () => {
-	it('returns versionId and updatedAt for the newest published version', async () => {
+	it('returns the newest published version document id', async () => {
 		const findVersions = vi.fn().mockResolvedValue({
 			docs: [{ id: 'v-abc', updatedAt: '2024-01-01T00:00:00.000Z' }],
 		})
-		const result = await resolvePublishedVersionRef(makePayload(findVersions), {
+		const result = await resolvePublishedVersionRef({
+			payload: makePayload(findVersions),
 			collection: 'pages',
 			id: 'doc-1',
 		})
-		expect(result).toEqual({ versionId: 'v-abc', updatedAt: '2024-01-01T00:00:00.000Z' })
+		expect(result).toBe('v-abc')
 	})
 
-	it('passes the correct query to findVersions', async () => {
+	it('threads req into findVersions so a version written in the same transaction is visible', async () => {
 		const findVersions = vi.fn().mockResolvedValue({ docs: [] })
-		await resolvePublishedVersionRef(makePayload(findVersions), {
+		const req = { transactionID: 'tx-1' } as unknown as PayloadRequest
+		await resolvePublishedVersionRef({
+			payload: makePayload(findVersions),
 			collection: 'policies',
 			id: 42,
+			req,
 		})
 		expect(findVersions).toHaveBeenCalledWith({
 			collection: 'policies',
@@ -29,44 +34,51 @@ describe('resolvePublishedVersionRef', () => {
 			sort: '-updatedAt',
 			limit: 1,
 			depth: 0,
+			req,
 		})
 	})
 
-	it('returns null when docs array is empty', async () => {
+	it('returns null when nothing is published', async () => {
 		const findVersions = vi.fn().mockResolvedValue({ docs: [] })
-		const result = await resolvePublishedVersionRef(makePayload(findVersions), {
-			collection: 'pages',
-			id: 'doc-1',
-		})
-		expect(result).toBeNull()
+		expect(
+			await resolvePublishedVersionRef({
+				payload: makePayload(findVersions),
+				collection: 'pages',
+				id: 'doc-1',
+			})
+		).toBeNull()
 	})
 
 	it('returns null when result has no docs property', async () => {
 		const findVersions = vi.fn().mockResolvedValue({})
-		const result = await resolvePublishedVersionRef(makePayload(findVersions), {
-			collection: 'pages',
-			id: 'doc-1',
-		})
-		expect(result).toBeNull()
+		expect(
+			await resolvePublishedVersionRef({
+				payload: makePayload(findVersions),
+				collection: 'pages',
+				id: 'doc-1',
+			})
+		).toBeNull()
 	})
 
 	it('returns null when findVersions throws', async () => {
 		const findVersions = vi.fn().mockRejectedValue(new Error('collection not versioned'))
-		const result = await resolvePublishedVersionRef(makePayload(findVersions), {
-			collection: 'non-versioned',
-			id: 'doc-1',
-		})
-		expect(result).toBeNull()
+		expect(
+			await resolvePublishedVersionRef({
+				payload: makePayload(findVersions),
+				collection: 'non-versioned',
+				id: 'doc-1',
+			})
+		).toBeNull()
 	})
 
-	it('coerces numeric id to string in return value', async () => {
-		const findVersions = vi.fn().mockResolvedValue({
-			docs: [{ id: 99, updatedAt: '2024-06-01T12:00:00.000Z' }],
-		})
-		const result = await resolvePublishedVersionRef(makePayload(findVersions), {
-			collection: 'pages',
-			id: 'doc-1',
-		})
-		expect(result).toEqual({ versionId: '99', updatedAt: '2024-06-01T12:00:00.000Z' })
+	it('coerces a numeric version id to a string', async () => {
+		const findVersions = vi.fn().mockResolvedValue({ docs: [{ id: 99 }] })
+		expect(
+			await resolvePublishedVersionRef({
+				payload: makePayload(findVersions),
+				collection: 'pages',
+				id: 'doc-1',
+			})
+		).toBe('99')
 	})
 })

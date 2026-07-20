@@ -7,23 +7,47 @@ Form fields are authored as Payload blocks: one block type per registered field 
 
 ## Core field types
 
-`text`, `textarea`, `email`, `number`, `date`, `select`, `checkbox`, `file`, `consent`, `calculation`, `repeater`, and `message`. All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads) (the `file` type only exists once an uploads collection is [configured](/form-builder/uploads#bring-your-own-collection)), [Consent](/form-builder/consent), [Calculations](/form-builder/calculations).
+`text`, `textarea`, `email`, `number`, `date`, `select`, `checkbox`, `file`, `consent`, `calculation`, `repeater`, and `message` ship as built-ins; `country` and `state` are [opt-in](#country-and-state). All are built through the same `defineFormField` primitive as custom types, so nothing about them is privileged. `file`, `consent`, and `calculation` have their own pages: [Uploads](/form-builder/uploads) (the `file` type only exists once an uploads collection is [configured](/form-builder/uploads#bring-your-own-collection)), [Consent](/form-builder/consent) (likewise, only once [consent sources](/form-builder/consent#setting-it-up) are), [Calculations](/form-builder/calculations).
 
 ## Authoring layout
 
 Each field block's **Field** tab lays the shared basics out in rows: name beside label, width beside placeholder, then description, with the required checkbox last. `width` is required with a `full` default, so every field carries an explicit value for the [layout grid](/form-builder/rendering#layout-grid). The rows are presentational only; stored data paths stay flat.
 
+A block's collapsed row header shows the field's own label once it has one, falling back to its translated type name, instead of Payload's default block-name placeholder that reads "Untitled" until filled in.
+
+A type leaves out the basics it never reads via `omitShared`, so an author is never offered a setting the renderer ignores. `checkbox`, `file`, `repeater`, and `date` have no placeholder (every browser ignores one on a date input); `calculation`, being derived and read-only, has neither placeholder nor required. An omission that empties a row drops the row, and a lone survivor spans it. `name` is never omittable: it is the key the answer is stored under.
+
 ## Content localization
 
-Content-bearing authoring fields (labels, placeholders, descriptions, select option labels, consent statements, repeater add labels, message content) are `localized: true` by default, so on a host with Payload `localization` configured, editors translate form content per locale out of the box. Payload strips the flag on hosts without localization, so the default is safe everywhere. Opt out with the plugin option `localizeContent: false` (see [i18n](/form-builder/i18n#content-vs-ui-strings) for the content-versus-UI-strings distinction and [Customization](/form-builder/customization#tweaking-one-built-in) for the interplay with spread-overrides).
+Content-bearing authoring fields (labels, placeholders, descriptions, select option labels, repeater add labels, message content) are `localized: true` by default, so on a host with Payload `localization` configured, editors translate form content per locale out of the box. Payload strips the flag on hosts without localization, so the default is safe everywhere. Opt out with the plugin option `localizeContent: false` (see [i18n](/form-builder/i18n#content-vs-ui-strings) for the content-versus-UI-strings distinction and [Customization](/form-builder/customization#tweaking-one-built-in) for the interplay with spread-overrides).
 
 ## Message
 
-The `message` type is display-only rich text rendered inline between fields: section headings, explanatory copy, legal notices. Its value kind is `'none'`: it is never validated and never written to submissions (its `name` exists only for block identity and [conditions](/form-builder/conditions) targeting, so a message can appear and disappear with `visibleWhen` like any field). Recall tokens in the content resolve against the current answers, calc values included.
+The `message` type is display-only rich text rendered inline between fields: section headings, explanatory copy, legal notices. Its value kind is `'none'`: it is never validated and never written to submissions. Its `content` is authored with the [plugin's rich text editor](/form-builder/customization#rich-text-editors) and follows [content localization](#content-localization); recall tokens in it resolve against the current answers, calc values included.
+
+Message is a **bare** block: the block is its `content` field alone. No name, label, width, placeholder, description, required flag, or validation rules, since none of them carry meaning for copy that holds no value. Nor a `visibleWhen`, so a message cannot be conditionally shown: when copy has to react to an answer, put each variant on its own [flow step](/form-builder/multi-step), or register a display-only [custom type](#defining-a-field-type) (`value: 'none'` without `bare`), which keeps the shared chrome and with it the condition.
+
+Being nameless, a message instance is identified by the block row id Payload assigns it. Everywhere a field is addressed by key, the key is its name if it has one, else its row id, so flow step assignment works for bare blocks the same as for named fields (the flow builder lists them under their type label, numbered when repeated). Bare blocks are excluded from repeater `subFields`, whose row plumbing is name-keyed.
 
 ## Date
 
 The `date` type stores an ISO `YYYY-MM-DD` string and renders as a native `<input type="date">`. The intrinsic validator rejects anything that is not a real calendar date (`2026-02-30` fails, not just malformed strings). Range constraints attach as the `minDate` / `maxDate` [validation rules](/form-builder/validation#built-in-rules).
+
+## Country and state
+
+`country` and `state` are fixed-option pickers: unlike `select`, the author never authors the choices, so neither carries a `config` at all. `country` offers every ISO 3166-1 alpha-2 country; `state` is scoped US-only (the 50 states plus DC), matching native Payload's own `state` block. Both store the code (`US`, `CA`) and `format` resolves it to the English name, and both are [poll-eligible](/form-builder/polls#the-results-endpoint) via `resolveOptions`, exposing the same fixed set as poll choices despite authoring no options of their own.
+
+Because the code, not the resolved name, is what's stored, the email action's `{{fieldName}}` merge tag and its `{{*}}` / `{{*:table}}` wildcards (see [Rich text bodies](/form-builder/actions#rich-text-bodies)) always render the code: neither goes through a field type's `format`. The admin submission view and the plugin's own [recall piping](/form-builder/recall-prefill#recall-piping) do go through it, so those two render the country or state name instead.
+
+Both are opt-in: neither is registered by default, so add them through the [registry](#the-registry). Each definition is exported for this:
+
+```ts title="payload.config.ts"
+import { formBuilder, countryField, stateField } from '@10x-media/form-builder'
+
+formBuilder({
+  fields: { country: countryField, state: stateField },
+})
+```
 
 ## Repeater
 
@@ -89,7 +113,9 @@ export default buildConfig({
 })
 ```
 
-`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Two optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings, and `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)).
+`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings; `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)); `pollEligible`, marking the type choosable as a poll's [results field](/form-builder/polls#the-results-endpoint) (its instances must produce enumerable answers, via authored options, a [poll option source](/form-builder/polls#option-sources), or its own `resolveOptions`; built-in: `select`, plus `country`/`state` when [opted in](#country-and-state)); `resolveOptions`, letting a `pollEligible` type source its poll choices from the configured instance itself (a `hasMany` relationship it holds, say) instead of from authored options or a source (see [custom eligible field types](/form-builder/polls#custom-eligible-field-types)); `omitShared`, leaving the shared basics your type never reads (`label`, `placeholder`, `description`, `width`, `required`) unauthored while keeping the rest of the chrome, as `checkbox` and `calculation` do (see [Authoring layout](#authoring-layout)); and `bare`, dropping the shared chrome so the block is your `config` alone, as the [message](#message) type does.
+
+`bare` requires `value: 'none'`, and the plugin throws at boot otherwise: a bare instance is nameless, so a value-bearing one would have nowhere to store its answer and would silently drop it. Reach for it for display-only types; anything a visitor answers stays named.
 
 Field definitions use precise generics, so cast each registry entry to `FieldTypeOption` at the registry boundary (the erased type the registry stores), exactly as the built-ins do.
 
@@ -99,4 +125,4 @@ To render a custom type on the frontend, register a matching renderer under the 
 
 Each submission stores typed values plus a localized descriptor snapshot taken at submit time, all validated server-side. The snapshot means a submission stays readable even after the form's fields change: the admin answers view formats each value with the field type's `format`, falling back to the snapshot when a field has been removed or renamed.
 
-Submissions live in the `form-submissions` collection: anonymous create (public forms must submit), read for logged-in users, update closed.
+Submissions live in the `form-submissions` collection: anonymous create (public forms must submit), read for logged-in users, update closed. See [Submit contract](/form-builder/rendering#submit-contract) for the full write path and the ways to reach it.

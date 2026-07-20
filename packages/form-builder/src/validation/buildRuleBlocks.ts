@@ -1,12 +1,18 @@
-import type { Block } from 'payload'
+import type { Block, Field } from 'payload'
 import { keys } from '../translations/keys'
 import { labelFor } from '../translations/server'
 import type { ValidationRuleRegistry } from './registry'
 
-/** Each rule block appends its own `message` and `severity` fields, so a rule param of either name would collide and be silently dropped by Payload. */
-const RESERVED_PARAM_NAMES = new Set(['message', 'severity'])
+const RULE_DESCRIPTION_REF = '@10x-media/form-builder/client#RuleDescription'
 
-/** One block per rule applicable to `fieldType` (gated by `appliesTo`): the rule params, then a message override and severity. */
+/** Each rule block appends its own `message` field, so a rule param of that name would collide and be silently dropped by Payload. */
+const RESERVED_PARAM_NAMES = new Set(['message'])
+
+/**
+ * One block per rule applicable to `fieldType` (gated by `appliesTo`): a leading plain-language
+ * description (when the rule sets one), the rule params, then a message override. The description is
+ * a `ui` field mounting `RuleDescription`, because Payload `Block`s have no native description slot.
+ */
 export const buildRuleBlocks = (registry: ValidationRuleRegistry, fieldType: string): Block[] => {
 	const blocks: Block[] = []
 	for (const rule of registry.values()) {
@@ -16,26 +22,33 @@ export const buildRuleBlocks = (registry: ValidationRuleRegistry, fieldType: str
 		for (const param of rule.params ?? []) {
 			if ('name' in param && RESERVED_PARAM_NAMES.has(param.name)) {
 				throw new Error(
-					`form-builder: validation rule "${rule.type}" declares a reserved param name "${param.name}". The names "message" and "severity" are reserved for the constraint-list UI.`
+					`form-builder: validation rule "${rule.type}" declares a reserved param name "${param.name}". The name "message" is reserved for the constraint-list UI.`
 				)
 			}
 		}
+		const descriptionField: Field[] = rule.description
+			? [
+					{
+						name: `${rule.type}Description`,
+						type: 'ui',
+						admin: {
+							components: {
+								Field: {
+									path: RULE_DESCRIPTION_REF,
+									clientProps: { descriptionKey: rule.description },
+								},
+							},
+						},
+					},
+				]
+			: []
 		blocks.push({
 			slug: rule.type,
 			labels: { singular: labelFor(rule.label), plural: labelFor(rule.label) },
 			fields: [
+				...descriptionField,
 				...(rule.params ?? []),
 				{ name: 'message', type: 'text', label: labelFor(keys.validationMessageLabel) },
-				{
-					name: 'severity',
-					type: 'select',
-					defaultValue: 'error',
-					label: labelFor(keys.validationSeverityLabel),
-					options: [
-						{ label: labelFor(keys.validationSeverityError), value: 'error' },
-						{ label: labelFor(keys.validationSeverityWarning), value: 'warning' },
-					],
-				},
 			],
 		})
 	}

@@ -49,8 +49,8 @@ const writeVoted = (key: string): void => {
  * `<FormResults>`. Lifecycle comes from `form.poll`: past `closesAt` the poll is closed (a translated
  * notice plus results, which the endpoint serves for any visibility once closed); a voted-but-open
  * `afterClose` poll shows a translated wait notice instead of fetching (the endpoint would refuse). A
- * recorded `outcome.winningValue` (via `resolvePollOutcome`) supersedes everything: a translated final
- * notice plus results with the winning bucket highlighted. A
+ * recorded `outcome.winningValues` (via `resolvePollOutcome`) supersedes everything: a translated final
+ * notice plus results with every winning bucket highlighted (a tie highlights more than one). A
  * per-browser localStorage flag (`storageKey`) skips straight to results on revisit; `hasVoted: true`
  * (e.g. from the server-set voted cookie) marks voted regardless of localStorage. The guard is UX, not
  * integrity (bypassable): server-enforced
@@ -68,8 +68,8 @@ export const Poll = ({
 	const key = storageKey ?? `fb-poll-${formProps.form.id}`
 	const poll = formProps.form.poll
 	const closed = isPollClosed(poll)
-	const winningValue = poll?.outcome?.winningValue
-	const finalized = typeof winningValue === 'string' && winningValue.length > 0
+	const winningValues = poll?.outcome?.winningValues
+	const finalized = Array.isArray(winningValues) && winningValues.length > 0
 	const resultsAwaitClose = !closed && !finalized && poll?.resultsVisibility === 'afterClose'
 	const [voted, setVoted] = useState(false)
 	const [results, setResults] = useState<FieldAggregation[] | null>(null)
@@ -113,7 +113,7 @@ export const Poll = ({
 				{results ? (
 					<FormResults
 						results={results}
-						winningValue={winningValue}
+						winningValues={winningValues}
 						t={formProps.t}
 						locale={formProps.locale}
 					/>

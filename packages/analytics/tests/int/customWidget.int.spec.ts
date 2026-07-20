@@ -46,8 +46,8 @@ describeForDb('custom widget registration', { dbs: ['mongo'] }, (db) => {
 		})
 	})
 	afterAll(async () => {
-		await supported.stop()
-		await gatedOut.stop()
+		await supported?.stop()
+		await gatedOut?.stop()
 	})
 
 	it('registers a custom widget whose requires the native adapter satisfies', () => {

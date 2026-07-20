@@ -13,7 +13,7 @@ type RepeaterRow = Record<string, unknown>
 
 /**
  * Wraps a sub-field renderer as a proper component so hooks keep stable identity per row/field.
- * Reads errors/warnings for the composite path `field[row].subField` from form state so server-side
+ * Reads errors for the composite path `field[row].subField` from form state so server-side
  * validation surfaces inline next to the sub-field, overriding the static values the parent passes.
  */
 const SubFieldWrapper = ({
@@ -23,12 +23,11 @@ const SubFieldWrapper = ({
 }: { renderer: FieldRenderer } & Parameters<FieldRenderer>[0]) => {
 	const { state } = useFormContext()
 	const errors = (state.errors as Record<string, string[]>)?.[name] ?? []
-	const warnings = (state.warnings as Record<string, string[]>)?.[name] ?? []
-	return renderer({ ...props, name, errors, warnings })
+	return renderer({ ...props, name, errors })
 }
 
 export const repeaterField = defineFieldRenderer<RepeaterRow[]>(
-	({ field, id: rootId, value, onChange, onBlur, errors, warnings, required, locale, t }) => {
+	({ field, id: rootId, value, onChange, onBlur, errors, required, locale, t }) => {
 		const { rendererRegistry } = useFormContext()
 		const addId = useId()
 		const invalid = errors.length > 0
@@ -106,7 +105,6 @@ export const repeaterField = defineFieldRenderer<RepeaterRow[]>(
 											onBlur,
 											// SubFieldWrapper overrides these from form state; passed here to satisfy the type
 											errors: [],
-											warnings: [],
 											required: subField.required ?? false,
 											disabled: false,
 											locale,
@@ -140,11 +138,6 @@ export const repeaterField = defineFieldRenderer<RepeaterRow[]>(
 							))}
 						</div>
 					) : null}
-					{warnings?.map((message) => (
-						<p key={message} className="text-amber-600">
-							{message}
-						</p>
-					))}
 				</div>
 			</div>
 		)

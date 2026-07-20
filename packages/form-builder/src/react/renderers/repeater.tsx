@@ -1,6 +1,7 @@
 'use client'
 
 import { createElement, useId } from 'react'
+import { isNamedField } from '../../fields/fieldKey'
 import type { FormFieldInstance } from '../../submissions/types'
 import { keys } from '../../translations/keys'
 import type { FieldRenderer } from '../contract'
@@ -13,7 +14,7 @@ type RepeaterRow = Record<string, unknown>
 
 /**
  * Thin wrapper so each sub-field renderer is a proper React component (has stable hook identity
- * per row/field). Reads errors and warnings for the composite path `field[row].subField` from
+ * per row/field). Reads errors for the composite path `field[row].subField` from
  * form state so server-side validation errors are surfaced inline next to the sub-field input,
  * overriding any static values passed by the parent.
  */
@@ -24,18 +25,19 @@ const SubFieldWrapper = ({
 }: { renderer: FieldRenderer } & Parameters<FieldRenderer>[0]) => {
 	const { state } = useFormContext()
 	const errors = (state.errors as Record<string, string[]>)?.[name] ?? []
-	const warnings = (state.warnings as Record<string, string[]>)?.[name] ?? []
-	return renderer({ ...props, name, errors, warnings })
+	return renderer({ ...props, name, errors })
 }
 
 export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
-	({ field, id: rootId, errors, warnings, required, t, locale }) => {
+	({ field, name, id: rootId, errors, required, t, locale }) => {
 		const { rendererRegistry } = useFormContext()
-		const { value, setValue, onBlur } = useField<RepeaterRow[]>(field.name)
+		const { value, setValue, onBlur } = useField<RepeaterRow[]>(name)
 		const addId = useId()
 
 		const rows = Array.isArray(value) ? value : []
-		const subFields = Array.isArray(field.subFields) ? (field.subFields as FormFieldInstance[]) : []
+		const subFields = (
+			Array.isArray(field.subFields) ? (field.subFields as FormFieldInstance[]) : []
+		).filter(isNamedField)
 		const maxRows = typeof field.maxRows === 'number' ? field.maxRows : undefined
 		const minRows = typeof field.minRows === 'number' ? field.minRows : 0
 		const addLabel =
@@ -65,7 +67,6 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 				description={typeof field.description === 'string' ? field.description : undefined}
 				required={required}
 				errors={errors}
-				warnings={warnings}
 				describedById={`${rootId}-desc`}
 			>
 				<div className="fb-repeater">
@@ -92,7 +93,7 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 										const renderer = rendererRegistry.get(subField.blockType)
 										if (!renderer) return null
 										const subId = `${rootId}-${rowIndex}-${subField.name}`
-										const compositeName = `${field.name}[${rowIndex}].${subField.name}`
+										const compositeName = `${name}[${rowIndex}].${subField.name}`
 										return (
 											<div key={subField.name} className="fb-repeater__sub-field">
 												{createElement(SubFieldWrapper, {
@@ -105,7 +106,6 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 													onBlur,
 													// SubFieldWrapper overrides these from form state; passed here to satisfy the type
 													errors: [],
-													warnings: [],
 													required: subField.required ?? false,
 													disabled: false,
 													locale,

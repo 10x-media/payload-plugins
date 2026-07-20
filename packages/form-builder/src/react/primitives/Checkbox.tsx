@@ -10,6 +10,8 @@ export type CheckboxProps = {
 	disabled?: boolean
 	invalid?: boolean
 	describedById?: string
+	/** Overrides the accessible name (e.g. when the visible label is rich HTML with a plain-text equivalent). */
+	ariaLabel?: string
 }
 
 export const Checkbox = ({
@@ -22,6 +24,7 @@ export const Checkbox = ({
 	disabled,
 	invalid,
 	describedById,
+	ariaLabel,
 }: CheckboxProps) => (
 	<input
 		type="checkbox"
@@ -33,6 +36,7 @@ export const Checkbox = ({
 		disabled={disabled}
 		aria-invalid={invalid || undefined}
 		aria-describedby={describedById}
+		aria-label={ariaLabel}
 		onChange={(e) => onChange(e.target.checked)}
 		onBlur={onBlur}
 	/>

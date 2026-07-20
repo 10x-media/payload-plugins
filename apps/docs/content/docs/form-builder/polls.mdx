@@ -40,9 +40,11 @@ Anonymous voters cannot read raw submissions, so public results are served as ag
 GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
 ```
 
-Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted. Anonymous callers are served only when the form's `poll.enabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured.
+Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted; for a poll-enabled form the results field's effective options (source-resolved, `resolveOptions`-backed, or authored) are injected too, so a sourced poll renders labels in the admin rather than raw stored values (best-effort: a resolve failure there degrades to raw values rather than blocking the trusted read). Anonymous callers are served only when the form's `pollEnabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured. A poll with an [option source](#option-sources) is enumerable through its resolved options instead: the endpoint resolves the source server-side, seeds buckets in resolved order with the source's labels, forbids results while resolution is empty, and fails closed with a 503 when resolution fails.
 
-Set `poll.resultsField` to a choice field, never free text or PII.
+`poll.resultsField`, labelled **Vote field** in the admin, is authored as a select listing the form's eligible fields: named instances of field types that declare `pollEligible` (built-in: `select`, plus `country`/`state` when [opted in](/form-builder/fields#country-and-state)). Server validation enforces the same rule, so a free-text or PII field can never be stored while the poll is enabled; see [Poll lifecycle](#poll-lifecycle) for how enabling a poll binds this field for you.
+
+Every results read also opportunistically resolves a closed, unresolved, non-`manual` poll before serving, admin or public reads alike; see [Scheduled auto-close](#scheduled-auto-close).
 
 On multi-tenant hosts, add the `results.access` plugin option: it runs for anonymous requests after the form is loaded and before anything is served, so you can compare the form's tenant against the request's and refuse cross-tenant reads. Authenticated callers bypass it:
 
@@ -56,7 +58,11 @@ formBuilder({
 
 ## Poll lifecycle
 
-The forms sidebar carries a `poll` group: `enabled`, `resultsField`, `resultsVisibility` (`afterVote` | `afterClose`), and an optional `closesAt`. Once `closesAt` passes, the server rejects new submissions for that form (submission-time guard, not just UI) and `<Poll>` renders a closed notice plus the results.
+A poll is a form with its top-level **Poll** checkbox on (`pollEnabled` on `FormDocument` and the forms collection alike; there is no more nested `poll.enabled`). Turning it on reveals a **Poll** tab holding the **Vote field** (`resultsField`), `type`, `resultsVisibility` (`afterVote` | `afterClose`), and an optional `closesAt`.
+
+Enabling a poll also binds its vote field on save. With none chosen yet, a form with exactly one poll-eligible named field (a `select` instance, an opted-in `country` or `state`, or your own [`pollEligible`](#custom-eligible-field-types) type) auto-selects it; several such fields ask you to pick one ("Choose which field's answers count as votes."); none at all refuses the save ("Add a choice field to use as the poll question."). A poll driven by an [option source](#option-sources) or the `source` outcome type is exempt, since it has no on-form vote field to bind.
+
+Once `closesAt` passes, the server rejects new submissions for that form (submission-time guard, not just UI) and `<Poll>` renders a closed notice plus the results. `type` decides how, or whether, the winner gets recorded once the poll closes, defaulting to `mostVoted` so a freshly enabled poll resolves itself with nothing to configure; see [Outcome](#outcome). The Poll tab always carries a button to close, and later reopen, the poll on demand; see [Closing and reopening](#closing-and-reopening).
 
 ## Option sources
 
@@ -93,19 +99,135 @@ const pollOptions = await resolvePollOptions({ payload, form })
 return <Poll form={toFormDocument(form, { pollOptions })} resultsField="choice" />
 ```
 
-At submission time the server resolves the source again and accepts only the resolved values (fail closed), so a stale or forged option can never be recorded.
+At submission time the server resolves the source again and accepts only the resolved values (fail closed), so a stale or forged option can never be recorded. The [results endpoint](#the-results-endpoint) does the same for anonymous reads, so a sourced poll serves public results end to end without ever storing options on the form.
+
+### Custom eligible field types
+
+The eligibility rule extends to your own field types. Declare `pollEligible` on the [definition](/form-builder/fields#defining-a-field-type) and the type appears in the vote-field select alongside the built-in `select` and any opted-in `country` or `state`. Its instances still have to yield enumerable answers, and a custom type has two ways to do that.
+
+The direct one is `resolveOptions`: the type sources its own choices from the instance the author configured, so the options live in the field itself rather than in a separate source. A vote field holding a `hasMany` relationship to the records being voted on turns the selected ids into options:
+
+```ts title="payload.config.ts"
+import { defineFormField, type FieldTypeOption } from '@10x-media/form-builder'
+
+const athleteVote = defineFormField<'text'>({
+  type: 'athleteVote',
+  label: 'Athlete vote',
+  value: 'text',
+  pollEligible: true,
+  config: [
+    { name: 'athletes', type: 'relationship', relationTo: 'athletes', hasMany: true, required: true },
+  ],
+  resolveOptions: async ({ instance, payload, req }) => {
+    const ids = (Array.isArray(instance.athletes) ? instance.athletes : []).filter(Boolean)
+    if (ids.length === 0) return []
+    const { docs } = await payload.find({
+      collection: 'athletes',
+      where: { id: { in: ids } },
+      depth: 0,
+      req,
+    })
+    return docs.map((doc) => ({ value: String(doc.id), label: doc.name }))
+  },
+})
+
+formBuilder({ fields: { athleteVote: athleteVote as FieldTypeOption } })
+```
+
+An author adds an `athleteVote` field, marks a few athletes voteable, and picks it as the results field. That one resolution backs everything: submissions accept only the resolved ids, the public voting UI and the admin winner select offer exactly those athletes, and results are labelled from the same records. No option source is involved; the field is self-sourcing.
+
+`resolveOptions` is consulted after an `optionSource` and before the instance's authored `options`, so the other way is to pair `pollEligible` with a shared [option source](#option-sources) when several field types should draw from one domain query instead of each carrying its own.
 
 ## Outcome
 
-When the real-world result is decided, record it from host domain logic with `resolvePollOutcome`:
+When the real-world result is decided ("which athlete won?"), record it one of two ways; both land in `poll.outcome.winningValues` (a set, so a tie records every winner), both validate each value against the poll's current options (source-resolved, `resolveOptions`-backed, or authored), and both stamp `resolvedAt` server-side.
+
+**In the admin.** The outcome group's winning-values multi-select loads the poll's effective options from the authenticated `GET /api/forms/:id/poll-options` endpoint, so an editor opens the form after the race and picks the winner (or several on a tie); clearing the select reopens the outcome. `resolvedAt` itself stays locked (a beforeChange hook stamps it whenever the winner set is set, changed, or cleared; direct writes are dropped). The group is composable through the `poll.outcomeFields` seam, which hands you the two default fields (`winningValues`, `resolvedAt`) to reorder, wrap, or swap the winner picker for a component of your own (see [Customization](/form-builder/customization#poll-outcome-fields)); membership validation runs server-side regardless, so a swap cannot bypass it. The multi-select shows only for a `manual` poll; it is hidden entirely for every auto-resolving type — `mostVoted`, `source`, and any host [`definePollType`](#poll-types) strategy alike — since each of those sets its own outcome when the poll closes, leaving nothing to hand-pick.
+
+The select is document-scoped, so it stays empty on a form that has never been saved: there is no id yet for the endpoint to resolve options against. This costs nothing in practice, since a poll only has a winner after it has run, but it does mean the winner cannot be set in the same breath as creating the form. Save first, then pick.
+
+**From domain logic, or automatically by type.** Call `resolvePollOutcome` server-side, explicitly or in auto mode. Explicit mode passes the winning set; auto mode omits it and runs the poll's `type` strategy, registered via `definePollType` and selected per form with the poll's `type` field:
 
 ```ts
 import { resolvePollOutcome } from '@10x-media/form-builder' // also on /rsc
 
-await resolvePollOutcome({ payload, formId, winningValue: 'entrant-42' })
+await resolvePollOutcome({ payload, formId, winningValues: ['entrant-42'] }) // explicit
+await resolvePollOutcome({ payload, formId, winningValues: ['entrant-42', 'entrant-7'] }) // a tie
+const winners = await resolvePollOutcome({ payload, formId }) // auto, via the poll's `type`
 ```
 
-It writes `poll.outcome.winningValue` and stamps `resolvedAt`. The outcome fields are read-only in the admin with field-level access that blocks every non-override write, so this server-side call is the only write path. A recorded outcome supersedes the rest of the lifecycle: `<Poll>` renders a final notice plus results with the winning bucket highlighted (`<FormResults winningValue>` underneath), regardless of voted or closed state.
+### Poll types
+
+Three types ship, always registered, selected from the poll's `type` field (default `mostVoted`, so a freshly enabled poll resolves itself), described as "How the winning option is decided when the poll closes." The select reads `Most-voted option wins`, `Set the winner manually`, and `Winner from the option source` — `mostVoted` leads the list since it is the default — with the last hidden until at least one poll option source is registered (the strategy itself stays addressable via `poll.types` regardless):
+
+| `type` | Resolves to |
+|---|---|
+| `mostVoted` | Whichever choice(s) received the most votes, a tie recording every co-winner. Declines to decide with no responses yet, or when the results aggregation was truncated (a capped sample cannot be trusted to name the true winner). |
+| `manual` | Nothing, ever; an admin always sets the winner by hand. |
+| `source` | Whatever the poll's option source's own `resolveOutcome` returns, next to `resolve`: |
+
+```ts title="payload.config.ts"
+const raceEntrants = definePollOptionSource({
+  type: 'raceEntrants',
+  label: 'Race entrants',
+  config: [{ name: 'raceId', type: 'text', required: true }],
+  resolve: async ({ config, payload }) => {
+    const { docs } = await payload.find({
+      collection: 'entrants',
+      where: { race: { equals: config.raceId } },
+    })
+    return docs.map((doc) => ({ label: doc.name, value: String(doc.id) }))
+  },
+  resolveOutcome: async ({ config, payload }) => {
+    const { docs } = await payload.find({
+      collection: 'race-results',
+      where: { race: { equals: config.raceId } },
+    })
+    // undefined = not decided yet.
+    // Return a string for a single winner or a string[] for a tie.
+    return docs[0] ? String(docs[0].winner) : undefined
+  },
+})
+```
+
+Register a strategy of your own with the plugin `poll.types` option (a strategy keyed to a built-in's type replaces it):
+
+```ts title="payload.config.ts"
+import { definePollType, formBuilder } from '@10x-media/form-builder'
+
+const judgesPick = definePollType({
+  type: 'judgesPick',
+  label: 'Judges decide',
+  resolveOutcome: async ({ payload, form }) => {
+    const { docs } = await payload.find({
+      collection: 'judge-scores',
+      where: { form: { equals: form.id } },
+    })
+    return docs[0] ? [String(docs[0].winner)] : undefined
+  },
+})
+
+formBuilder({ poll: { types: { judgesPick } } })
+```
+
+`resolveOutcome` returns the winning value set, or `undefined` when the outcome is not yet decidable so nothing is written. Auto mode never throws for an undecided result, a poll with no matching strategy, or a source with no `resolveOutcome`; it throws only when the form itself does not exist or is not poll-enabled, so a scheduled job or a read can call it repeatedly and safely no-op until there is an answer. Either way the call returns the recorded set, so a caller that let the strategy decide still learns the winners. A recorded outcome supersedes the rest of the lifecycle: `<Poll>` renders a final notice plus results with every winning bucket highlighted (`<FormResults winningValues>` underneath), regardless of voted or closed state.
+
+### Scheduled auto-close
+
+A poll with a `closesAt` and a non-`manual` type schedules its own resolution: on every save, the plugin (re)enqueues a native Payload job (`waitUntil: closesAt`) that runs the `type` strategy the moment the poll closes, deleting any previously scheduled job for the same form first so the newest `closesAt` always wins. This needs a wired job runner, `config.jobs.autoRun`, a worker process, or a serverless cron hitting Payload's run-jobs endpoint, to actually process the job once it comes due.
+
+Without a runner (or if one missed the window), a closed, unresolved, non-`manual` poll also resolves opportunistically the next time its results are read, by an admin or through the public results endpoint alike: the read resolves first if needed, then serves the now-current results in the same request. The scheduled job and the read-time fallback share one gate (closed, unresolved, not `manual`), so either firing after the outcome is already recorded is a safe no-op.
+
+Both paths validate against one set, `resolveEffectivePollOptions` (exported from the root and `/rsc`): source-resolved options when the poll has an `optionSource`, the results field type's own `resolveOptions` when it declares one, otherwise the field's authored options. It backs the admin select, the endpoint, and outcome validation alike, so what the admin offers and what the server accepts cannot drift. Call it directly to render a winner picker of your own.
+
+### Closing and reopening
+
+The Poll tab always carries one button, toggling between **Close poll now** and **Reopen poll** depending on whether `closesAt` currently holds any value at all — a past date, a still-future scheduled one, or one the button itself just set. Clicking it saves the whole document (through the admin's own submit, the same as saving any other change) with an override of the live `poll` group, rather than calling a dedicated endpoint:
+
+- **Close** stamps `closesAt` to now. Because the save carries whatever else the admin has open in the form, a `manual` poll's winner, even one picked in the same sitting and never separately saved, persists together with the close in one request. A `manual` poll needs that winner picked before **Close** enables at all (the hint reads "Select a winning value first." until then); `mostVoted` and `source` stay enabled with no winner picked, since [the usual poll-close machinery](#scheduled-auto-close) resolves them once the save's `afterChange` hook runs.
+- **Reopen** appears once `closesAt` holds a value, and clears it together with `poll.outcome.winningValues` in the same save, un-deciding the poll (any type, `manual` included) so voting, and later re-resolution, can start again.
+
+An authenticated `POST /api/forms/:id/close` endpoint backs the identical close semantics for a programmatic caller (a cron, a script): it refuses an already-closed poll and a `manual` poll with no winner recorded, then resolves the outcome itself for `mostVoted`/`source`. The admin button no longer calls this endpoint; saving the document directly means a manual winner just picked never risks needing a separate save first.
 
 ## Rendering results
 

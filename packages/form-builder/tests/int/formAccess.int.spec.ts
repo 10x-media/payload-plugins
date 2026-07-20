@@ -48,7 +48,7 @@ describeForDb('form-builder access: actions field', { dbs: ['mongo'] }, (db) => 
 			id: formId,
 			overrideAccess: false,
 		})
-		// Public form rendering needs fields/flow — they must be present.
+		// Public form rendering needs fields/flow, so they must survive for anonymous callers.
 		expect(Array.isArray(form.fields)).toBe(true)
 		// Action config (which may include secrets) is stripped for anonymous callers.
 		// Payload returns [] (not undefined) for a blocks field with read access denied.

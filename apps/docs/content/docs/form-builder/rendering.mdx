@@ -17,7 +17,7 @@ import { Form } from '@10x-media/form-builder/react'
 />
 ```
 
-`form` is a `FormDocument` (`{ id, fields, flow?, response?, display?, poll? }`). Payload's generated types do not line up exactly (nullable groups, opaque JSON `flow`), so narrow the fetched document with `toFormDocument` instead of casting:
+`form` is a `FormDocument` (`{ id, fields, flow?, response?, buttons?, title?, multistep, pollEnabled, poll? }`). Payload's generated types do not line up exactly (nullable groups, opaque JSON `flow`), so narrow the fetched document with `toFormDocument` instead of casting:
 
 ```tsx title="app/contact/page.tsx"
 import { toFormDocument } from '@10x-media/form-builder/rsc'
@@ -26,9 +26,40 @@ const doc = await payload.findByID({ collection: 'forms', id })
 return <ContactForm form={toFormDocument(doc)} />
 ```
 
-`toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes `{ pollOptions }` as a second argument to inject [source-resolved poll options](/form-builder/polls#option-sources).
+`toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes a second argument for injecting request-resolved data: `{ pollOptions }` for [source-resolved poll options](/form-builder/polls#option-sources) (from `resolvePollOptions`) and `{ consentStatements }` for [live consent statements](/form-builder/consent#rendering-the-statement) (from `resolveConsentStatements`), since a form stores only a source id and resolves the sentence per request.
 
-Two `FormDocument` groups drive rendering beyond the fields. `display` renders above the fields: an optional title (`showTitle` gates it; `fb-form__title`) and a rich text `intro` (`fb-form__intro`), both supporting recall tokens. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too), and `submitLabel` feeds the submit button (see label precedence below).
+`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `multistep` and `pollEnabled` mirror the form's two admin checkboxes; `<Form>` reads `multistep` (via `flow`) for step navigation, and a poll page typically renders `<Poll>` instead of `<Form>` when `pollEnabled` is true. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, its `{{field}}` / `{{field||fallback}}` tokens interpolated against the submission's own formatted answers (option labels, Yes/No, localized dates) exactly like an [action body](/form-builder/actions#rich-text-bodies); type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too; see [below](#redirecting-to-an-internal-document) for redirecting to an internal document instead). `buttons` carries the form-level submit/next/prev labels (see label precedence below); a host-added button field needs merging into `toFormDocument`'s output by hand to reach the client, see [Customization](/form-builder/customization#form-level-buttons).
+
+### Redirecting to an internal document
+
+Set the plugin's `redirectRelationships` option to let an author redirect to a document you manage instead of typing a URL:
+
+```ts title="payload.config.ts"
+formBuilder({ redirectRelationships: ['pages'] })
+```
+
+`response.redirect` then gains a polymorphic `reference` field alongside `url`. `<Form>` itself still only ever acts on `response.redirect.url` for its automatic post-submit navigation: the plugin has no notion of your routing, so `toFormDocument` passes `reference` straight through as Payload's own depth-0 `{ relationTo, value }` pair (never a populated document), for you to resolve. Resolve it before rendering and write the result into `response.redirect.url` so `<Form>`'s built-in redirect picks it up:
+
+```ts title="app/contact/page.tsx"
+import { toFormDocument } from '@10x-media/form-builder/rsc'
+import type { CollectionSlug } from 'payload'
+
+const raw = await payload.findByID({ collection: 'forms', id })
+const form = toFormDocument(raw)
+const reference = form.response?.redirect?.reference
+if (reference && form.response) {
+  const target = await payload.findByID({
+    collection: reference.relationTo as CollectionSlug,
+    id: reference.value,
+    depth: 0,
+  })
+  form.response.redirect = { url: `/${String(target.slug)}` } // your own routing
+}
+```
+
+Skipping `url` and navigating yourself from `onSuccess` instead works too, if you'd rather not mutate the document before render. Leave `redirectRelationships` unset (the default) and `response.redirect` stays URL-only, exactly as before.
+
+To drop in a link field you already have (choose a URL or pick a linkable document) rather than the plain `url` text field, compose the group with the [`response.redirect.fields`](/form-builder/customization#redirect-response-fields) seam. A field you replace `url` with is yours to resolve to a destination, the same as `reference` above.
 
 ### Progressive validation
 
@@ -65,7 +96,7 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
 | `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
 | `className` | `string` | none | Extra CSS classes on the root `<form>` element (and the post-submit success node). |
-| `submitLabel`, `nextLabel`, `backLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit resolves prop, then the form's `response.submitLabel`, then the translated default. |
+| `submitLabel`, `nextLabel`, `prevLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit, next, and prev each resolve prop, then the form's `buttons` value, then the translated default. |
 | `submitButtonClassName` | `string` | none | CSS class on the default submit button. Ignored when `renderSubmit` is provided. |
 | `nextButtonClassName` | `string` | none | CSS class on the default Next button (multi-step). Ignored when `renderNext` is provided. |
 | `backButtonClassName` | `string` | none | CSS class on the default Back button (multi-step). Ignored when `renderBack` is provided. |
@@ -82,7 +113,7 @@ A repeater field with `minRows` starts pre-seeded with that many empty rows, mat
 
 ### Form chrome and markup
 
-The chrome below the fields is a `.fb-form__controls` wrapper containing the default buttons, each with a stable class: `fb-form__back`, `fb-form__next`, `fb-form__submit`. The root form is `fb-form-root`; the post-submit node is `fb-form__success`, a submit failure renders in `fb-form__submit-error`, and the display group renders `fb-form__title` / `fb-form__intro`. The chrome itself is the exported `<FormControls>` component (below), so custom layouts get the identical behavior.
+The chrome below the fields is a `.fb-form__controls` wrapper containing the default buttons, each with a stable class: `fb-form__back`, `fb-form__next`, `fb-form__submit`. The root form is `fb-form-root`; the post-submit node is `fb-form__success`, and a submit failure renders in `fb-form__submit-error`. The chrome itself is the exported `<FormControls>` component (below), so custom layouts get the identical behavior.
 
 ### Custom buttons
 
@@ -115,6 +146,28 @@ For simple styling without replacing markup, pass `submitButtonClassName`, `next
 
 The render prop types (`SubmitButtonRenderProps`, `NextButtonRenderProps`, `BackButtonRenderProps`) are exported from `@10x-media/form-builder/react`.
 
+## Submit contract
+
+A submission is `POST {apiRoute}/form-submissions` with a JSON body of `{ form, values }`, where `values` is an array of `{ field, value }` pairs (`SubmissionValue`, exported from `/types`). `<Form>`'s built-in transport above is one way to reach that endpoint, not the only one: every rule this page and [Validation](/form-builder/validation) describe (server-authoritative validation, spam checks, descriptor snapshotting, consent capture, post-submit action dispatch) runs in the `form-submissions` collection's own hooks, not in a route handler `<Form>` calls into. Three front doors reach the identical pipeline:
+
+- The browser `submitForm(input)` helper (`@10x-media/form-builder/react`), which `<Form>` calls internally.
+- A raw `fetch`/REST `POST` to `{apiRoute}/form-submissions` from any HTTP client.
+- Server code calling `payload.create({ collection: 'form-submissions', data: { form, values } })`, or the typed `createSubmission` helper that wraps the identical call:
+
+```ts
+import { createSubmission } from '@10x-media/form-builder'
+
+const submission = await createSubmission(payload, {
+  form: formId,
+  values: [{ field: 'email', value: 'ada@example.com' }],
+  req, // thread the incoming req when there is one
+})
+```
+
+`createSubmission` exists for parity, not new behavior: a script, a queued job, or another collection's hook gets a documented, typed entry point instead of hand-rolling the collection slug and body shape. Pass the incoming `req` when you have one so [spam metadata](/form-builder/spam) (client IP, user agent) and per-identity rate limiting see the real request; without one the submission still runs the full pipeline, just with no request to read those signals from.
+
+`form-submissions` access is `create: () => true` (anonymous submissions are the point of a public form), `read` is logged-in users only, and `update` is disabled entirely, so nothing about a submission is readable or editable through the API by the visitor who sent it. This mirrors Payload's own `@payloadcms/plugin-form-builder`: an open create endpoint backed entirely by collection hooks, not a custom controller in front of it.
+
 ## Renderers
 
 A renderer maps `FieldRendererProps` to markup for one field type. `defineFieldRenderer` pins the value type:
@@ -138,7 +191,7 @@ const myText = defineFieldRenderer<string>(
 )
 ```
 
-`FieldRendererProps<TValue>` carries the field instance, a stable `id`, the machine `name`, `value`, `onChange`/`onBlur`, `errors`/`warnings`, `required`, `disabled`, `locale`, and a `t` translator.
+`FieldRendererProps<TValue>` carries the field instance, a stable `id`, the machine `name`, `value`, `onChange`/`onBlur`, `errors`, `required`, `disabled`, `locale`, and a `t` translator.
 
 `resolveRenderers` merges the defaults with overrides using the [opt-in convention](/concepts#the-opt-in-convention):
 
@@ -156,7 +209,7 @@ Pass the result (or just the overrides object) to `<Form renderers={...}>`.
 
 ## Primitives
 
-Unstyled, accessible control primitives for building custom renderers: `Input`, `Textarea`, `Select`, `Checkbox`, and `FieldShell`. `FieldShell` renders the label, the control slot, and the description/error/warning region with correct `aria-describedby`, `role="alert"`, and `aria-invalid` wiring; the built-in renderers are exactly these primitives composed.
+Unstyled, accessible control primitives for building custom renderers: `Input`, `Textarea`, `Select`, `Checkbox`, and `FieldShell`. `FieldShell` renders the label, the control slot, and the description/error region with correct `aria-describedby`, `role="alert"`, and `aria-invalid` wiring; the built-in renderers are exactly these primitives composed.
 
 If you write renderers from scratch instead, uphold the a11y contract: a programmatically associated label, `aria-invalid` only when invalid, `aria-describedby` pointing at an error region with `role="alert"` and `aria-atomic`, an `aria-hidden` required indicator, and native `required` on the control.
 
@@ -201,9 +254,9 @@ function NameField() {
 </Form>
 ```
 
-`<FormControls>` is the same chrome the default layout renders: back on non-first steps, next on non-terminal steps, submit on the terminal step, with labels resolved from context (props, `response.submitLabel`, translated defaults). It accepts the same per-button `className` and `render*` overrides as `<Form>`, so a custom layout keeps the built-in step logic and double-submit guard instead of hand-wiring buttons. `<FormSteps>` composes the same way for [step progress](/form-builder/multi-step#formsteps-progress-indicator).
+`<FormControls>` is the same chrome the default layout renders: back on non-first steps, next on non-terminal steps, submit on the terminal step, with labels resolved from context (props, the form's `buttons` labels, translated defaults). It accepts the same per-button `className` and `render*` overrides as `<Form>`, so a custom layout keeps the built-in step logic and double-submit guard instead of hand-wiring buttons. `<FormSteps>` composes the same way for [step progress](/form-builder/multi-step#formsteps-progress-indicator).
 
-- `useField(name)` returns `value`, `errors`, `warnings`, `touched`, `setValue`, `onBlur`.
-- `useFormState()` returns the whole `FormState`: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, `submitError`.
+- `useField(name)` returns `value`, `errors`, `touched`, `setValue`, `onBlur`.
+- `useFormState()` returns the whole `FormState`: `values`, `errors`, `touched`, `submitting`, `submitted`, `submitAttempted`, `submitError`.
 - `useFormStep()` drives [multi-step UIs](/form-builder/multi-step#useformstep-for-custom-step-uis).
-- `useFormContext()` returns the full controller context the focused hooks read from: `state`, `dispatch`, `validateField`, `locale`, `step`, `rendererRegistry`, the resolved chrome `labels`, the active translator `t`, and `effectiveValues` (answers overlaid with derived calc values). Reach for it when building renderer-like components (a custom repeater looking up sub-renderers, chrome that needs the resolved labels); the focused hooks stay the ergonomic default.
+- `useFormContext()` returns the full controller context the focused hooks read from: the rendered `form` document itself, `state`, `dispatch`, `validateField`, `locale`, `step`, `rendererRegistry`, the resolved chrome `labels`, the active translator `t`, and `effectiveValues` (answers overlaid with derived calc values). Reach for it when building renderer-like components (a custom repeater looking up sub-renderers, chrome that needs the resolved labels, a custom button reading [host-added `buttons` keys](/form-builder/customization#form-level-buttons) off `form`); the focused hooks stay the ergonomic default.

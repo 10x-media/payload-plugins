@@ -1,198 +1,476 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import type { CollectionConfig, Field, GlobalConfig, PayloadRequest } from 'payload'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { consentSourcesField } from '../../src/consent/consentSourcesField'
+import { resolveConsentStatements } from '../../src/consent/resolveConsentStatements'
+import type { ConsentSourceEntry, ConsentSourcesResolver } from '../../src/consent/types'
 import { formBuilder } from '../../src/index'
 
-describeForDb('form-builder consent capture', { dbs: ['mongo'] }, (db) => {
-	let booted: BootedPayload
+const statement = (text: string) => ({
+	root: {
+		type: 'root',
+		children: [{ type: 'paragraph', children: [{ type: 'text', text }] }],
+	},
+})
 
-	beforeAll(async () => {
-		booted = await bootPayload({ plugin: formBuilder({}), db })
+/** Drafts on: a published version exists to pin a proof to. */
+const pages: CollectionConfig = {
+	slug: 'pages',
+	versions: { drafts: true },
+	fields: [
+		{ name: 'title', type: 'text' },
+		{ name: 'slug', type: 'text' },
+	],
+}
+
+/** Versions on, drafts off: version rows exist but carry no `_status`, so nothing is publishable. */
+const notices: CollectionConfig = {
+	slug: 'notices',
+	versions: true,
+	fields: [{ name: 'title', type: 'text' }],
+}
+
+/** No versions at all. */
+const leaflets: CollectionConfig = {
+	slug: 'leaflets',
+	fields: [{ name: 'title', type: 'text' }],
+}
+
+const settings: GlobalConfig = {
+	slug: 'settings',
+	fields: [consentSourcesField({ relationTo: ['pages', 'notices', 'leaflets'] }) as Field],
+}
+
+type SettingsRow = {
+	id?: string | number | null
+	name?: string | null
+	statement?: unknown
+	page?: { relationTo: string; value: unknown } | null
+}
+
+let resolverFails = false
+
+/**
+ * A host resolver of the intended shape: read the placed field back, map rows to entries. A
+ * multi-tenant host would scope the read by the tenant it derives from `req`; this reads a global,
+ * which is enough to prove the seam receives the real per-request `req` and its locale. `url` is
+ * derived from each row's own auto-assigned `id`, the stable per-row identifier this app's fixture
+ * routing keys off (a real host would derive its own public route instead).
+ */
+const sources: ConsentSourcesResolver = async ({ req }) => {
+	if (resolverFails) {
+		throw new Error('tenant lookup down')
+	}
+	const doc = await req.payload.findGlobal({
+		slug: 'settings',
+		depth: 0,
+		locale: req.locale as never,
+		req,
 	})
-
-	afterAll(async () => {
-		await booted.stop()
+	const rows = ((doc as { consentSources?: SettingsRow[] }).consentSources ?? []) as SettingsRow[]
+	return rows.map((row): ConsentSourceEntry => {
+		const page = row.page
+		return {
+			id: String(row.id),
+			...(row.name ? { name: row.name } : {}),
+			...(row.statement != null ? { statement: row.statement } : {}),
+			...(page ? { page: { relationTo: page.relationTo, id: page.value as number | string } } : {}),
+			url: `https://example.com/${String(row.id)}`,
+		}
 	})
+}
 
-	it('stores a consent proof when a required consent field is agreed', async () => {
-		const form = await booted.payload.create({
-			collection: 'forms',
-			data: {
-				title: 'Terms',
-				fields: [
-					{
-						blockType: 'consent',
-						name: 'terms',
-						label: 'I agree to the terms',
-						source: 'static',
-						sourceConfig: {
-							label: 'Terms of Service',
-							url: 'https://example.com/terms',
-						},
-					},
-				],
-			},
-		})
+describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
+	describe('with consent.sources configured', () => {
+		let booted: BootedPayload
+		let pageId: number | string
+		let noticeId: number | string
+		let leafletId: number | string
+		let privacySourceId: string
+		let termsSourceId: string
+		let marketingSourceId: string
 
-		const submission = await booted.payload.create({
-			collection: 'form-submissions',
-			depth: 0,
-			data: {
-				form: form.id,
-				values: [{ field: 'terms', value: true }],
-			},
-		})
-
-		expect(Array.isArray(submission.consent)).toBe(true)
-		const proof = (submission.consent as unknown[])[0] as Record<string, unknown>
-		expect(proof.field).toBe('terms')
-		expect(proof.agreed).toBe(true)
-		expect(proof.ref).toBe('https://example.com/terms')
-		expect(typeof proof.at).toBe('string')
-	})
-
-	it('rejects a submission when a required consent field is not agreed', async () => {
-		const form = await booted.payload.create({
-			collection: 'forms',
-			data: {
-				title: 'Terms',
-				fields: [
-					{
-						blockType: 'consent',
-						name: 'terms',
-						label: 'I agree to the terms',
-						source: 'static',
-						sourceConfig: {
-							label: 'Terms of Service',
-							url: 'https://example.com/terms',
-						},
-					},
-				],
-			},
-		})
-
-		await expect(
-			booted.payload.create({
-				collection: 'form-submissions',
-				data: {
-					form: form.id,
-					values: [{ field: 'terms', value: false }],
+		beforeAll(async () => {
+			resolverFails = false
+			booted = await bootPayload({
+				plugin: formBuilder({ consent: { sources } }),
+				db,
+				collections: [pages, notices, leaflets],
+				configOverrides: {
+					globals: [settings],
+					localization: { locales: ['en', 'de'], defaultLocale: 'en' },
 				},
 			})
-		).rejects.toThrow()
-	})
 
-	it('rejects when a required consent field is missing from the submission', async () => {
-		const form = await booted.payload.create({
-			collection: 'forms',
-			data: {
-				title: 'Terms',
-				fields: [
-					{
-						blockType: 'consent',
-						name: 'terms',
-						label: 'I agree to the terms',
-						source: 'static',
-						sourceConfig: { label: 'Terms', url: 'https://example.com/terms' },
-					},
-				],
-			},
-		})
-
-		await expect(
-			booted.payload.create({
-				collection: 'form-submissions',
-				data: { form: form.id, values: [] },
+			const page = await booted.payload.create({
+				collection: 'pages',
+				data: { title: 'Privacy Policy', slug: 'privacy', _status: 'published' },
 			})
-		).rejects.toThrow()
+			pageId = page.id
+			const notice = await booted.payload.create({
+				collection: 'notices',
+				data: { title: 'Terms' },
+			})
+			noticeId = notice.id
+			const leaflet = await booted.payload.create({
+				collection: 'leaflets',
+				data: { title: 'Marketing' },
+			})
+			leafletId = leaflet.id
+
+			const rows = [
+				{
+					name: 'Privacy policy',
+					statement: statement('I agree to the privacy policy'),
+					page: { relationTo: 'pages', value: pageId },
+				},
+				{
+					name: 'Terms',
+					statement: statement('I accept the terms'),
+					page: { relationTo: 'notices', value: noticeId },
+				},
+				{
+					name: 'Marketing',
+					statement: statement('Send me email'),
+					page: { relationTo: 'leaflets', value: leafletId },
+				},
+			]
+			await booted.payload.updateGlobal({ slug: 'settings', data: { consentSources: rows } })
+			// The array itself is not localized, only its statement and name are, so the German pass
+			// must address the existing rows by id. Re-sending id-less rows would replace them, taking
+			// the English values with them. The same read also captures each row's auto-assigned id,
+			// which the tests below reference as a consent field's `source`.
+			const seeded = await booted.payload.findGlobal({ slug: 'settings', depth: 0 })
+			const savedRows = (seeded as { consentSources?: SettingsRow[] }).consentSources ?? []
+			const byName = (name: string) => String(savedRows.find((row) => row.name === name)?.id)
+			privacySourceId = byName('Privacy policy')
+			termsSourceId = byName('Terms')
+			marketingSourceId = byName('Marketing')
+
+			const german = ['Ich stimme der Datenschutzerklärung zu', 'AGB', 'Werbung']
+			await booted.payload.updateGlobal({
+				slug: 'settings',
+				locale: 'de',
+				data: {
+					consentSources: savedRows.map((row, index) => ({
+						...row,
+						statement: statement(german[index] ?? ''),
+					})),
+				},
+			})
+		})
+
+		afterAll(async () => {
+			resolverFails = false
+			await booted.stop()
+		})
+
+		const flatten = (fields: Field[]): Field[] =>
+			fields.flatMap((field) => {
+				if (field.type === 'row') return flatten(field.fields)
+				if (field.type === 'tabs') return field.tabs.flatMap((tab) => flatten(tab.fields))
+				return [field]
+			})
+
+		const consentBlockFields = (): Field[] => {
+			const forms = booted.payload.collections.forms?.config.fields ?? []
+			const blocksField = flatten(forms).find(
+				(f): f is Extract<Field, { type: 'blocks' }> =>
+					f.type === 'blocks' && 'name' in f && f.name === 'fields'
+			)
+			return flatten(blocksField?.blocks.find((b) => b.slug === 'consent')?.fields ?? [])
+		}
+
+		const makeForm = (source: string, required = true) =>
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: `Consent by ${source}`,
+					fields: [{ blockType: 'consent', name: 'terms', source, required }],
+				},
+			})
+
+		const proofOf = (submission: Record<string, unknown>) =>
+			(submission.consent as Record<string, unknown>[])[0] as Record<string, unknown>
+
+		const endpoint = () => {
+			const endpoints = booted.payload.collections.forms?.config.endpoints as
+				| Array<{ path: string; handler: (req: PayloadRequest) => Promise<Response> }>
+				| undefined
+			return endpoints?.find((e) => e.path === '/:id/consent-sources')
+		}
+
+		const callEndpoint = async (over: Record<string, unknown>) =>
+			endpoint()?.handler({
+				payload: booted.payload,
+				context: {},
+				routeParams: {},
+				...over,
+			} as unknown as PayloadRequest)
+
+		it('registers the consent block as a source reference alone', () => {
+			const names = consentBlockFields()
+				.filter((f) => 'name' in f)
+				.map((f) => (f as { name: string }).name)
+			expect(names).toContain('source')
+			expect(names).toContain('required')
+			for (const gone of ['statement', 'sourceConfig', 'optional', 'label', 'placeholder']) {
+				expect(names).not.toContain(gone)
+			}
+		})
+
+		it('refuses an anonymous request to the consent-sources endpoint', async () => {
+			const response = await callEndpoint({ user: undefined })
+			expect(response?.status).toBe(403)
+		})
+
+		it('serves the host sources as options to an authenticated caller', async () => {
+			const form = await makeForm(privacySourceId)
+			const response = await callEndpoint({
+				user: { id: 1, collection: 'users' },
+				routeParams: { id: form.id },
+			})
+			expect(response?.status).toBe(200)
+			expect(await response?.json()).toEqual({
+				options: [
+					{ label: 'Privacy policy', value: privacySourceId },
+					{ label: 'Terms', value: termsSourceId },
+					{ label: 'Marketing', value: marketingSourceId },
+				],
+			})
+		})
+
+		it('fails closed with a 503 when the host resolver throws', async () => {
+			const form = await makeForm(privacySourceId)
+			resolverFails = true
+			try {
+				const response = await callEndpoint({
+					user: { id: 1, collection: 'users' },
+					routeParams: { id: form.id },
+				})
+				expect(response?.status).toBe(503)
+			} finally {
+				resolverFails = false
+			}
+		})
+
+		it('stores an id-based proof pinned to the published version when drafts are on', async () => {
+			const form = await makeForm(privacySourceId)
+			const submission = await booted.payload.create({
+				collection: 'form-submissions',
+				depth: 0,
+				data: { form: form.id, values: [{ field: 'terms', value: true }] },
+			})
+			const proof = proofOf(submission)
+			expect(proof.field).toBe('terms')
+			expect(proof.agreed).toBe(true)
+			expect(proof.source).toBe(privacySourceId)
+			expect(proof.page).toEqual({ relationTo: 'pages', id: pageId })
+			expect(typeof proof.at).toBe('string')
+
+			const versions = await booted.payload.findVersions({
+				collection: 'pages',
+				where: { parent: { equals: pageId } },
+				depth: 0,
+			})
+			expect(versions.docs.map((doc) => String(doc.id))).toContain(proof.versionRef)
+		})
+
+		it('never stores the statement text, so a policy edit cannot rewrite past proofs', async () => {
+			const form = await makeForm(privacySourceId)
+			const submission = await booted.payload.create({
+				collection: 'form-submissions',
+				depth: 0,
+				data: { form: form.id, values: [{ field: 'terms', value: true }] },
+			})
+			expect(proofOf(submission).statement).toBeUndefined()
+		})
+
+		it('records no versionRef for a versioned page whose collection has drafts off', async () => {
+			const form = await makeForm(termsSourceId)
+			const submission = await booted.payload.create({
+				collection: 'form-submissions',
+				depth: 0,
+				data: { form: form.id, values: [{ field: 'terms', value: true }] },
+			})
+			const proof = proofOf(submission)
+			expect(proof.page).toEqual({ relationTo: 'notices', id: noticeId })
+			expect(proof.versionRef).toBeUndefined()
+		})
+
+		it('records no versionRef for a page whose collection has no versions', async () => {
+			const form = await makeForm(marketingSourceId)
+			const submission = await booted.payload.create({
+				collection: 'form-submissions',
+				depth: 0,
+				data: { form: form.id, values: [{ field: 'terms', value: true }] },
+			})
+			const proof = proofOf(submission)
+			expect(proof.page).toEqual({ relationTo: 'leaflets', id: leafletId })
+			expect(proof.versionRef).toBeUndefined()
+		})
+
+		it('keeps a proof resolvable after the policy page is renamed and re-slugged', async () => {
+			const form = await makeForm(privacySourceId)
+			const submission = await booted.payload.create({
+				collection: 'form-submissions',
+				depth: 0,
+				data: { form: form.id, values: [{ field: 'terms', value: true }] },
+			})
+			const proof = proofOf(submission)
+
+			await booted.payload.update({
+				collection: 'pages',
+				id: pageId,
+				data: { title: 'Data Protection Notice', slug: 'data-protection', _status: 'published' },
+			})
+
+			const page = proof.page as { relationTo: string; id: number | string }
+			const resolved = await booted.payload.findByID({
+				collection: page.relationTo as 'pages',
+				id: page.id,
+				depth: 0,
+			})
+			expect(resolved.title).toBe('Data Protection Notice')
+			const stored = await booted.payload.findByID({
+				collection: 'form-submissions',
+				id: submission.id,
+				depth: 0,
+			})
+			expect((stored.consent as Record<string, unknown>[])[0]).toEqual(proof)
+		})
+
+		it('rejects a required consent that is refused, and one that is simply absent', async () => {
+			const form = await makeForm(privacySourceId)
+			await expect(
+				booted.payload.create({
+					collection: 'form-submissions',
+					data: { form: form.id, values: [{ field: 'terms', value: false }] },
+				})
+			).rejects.toThrow()
+			await expect(
+				booted.payload.create({
+					collection: 'form-submissions',
+					data: { form: form.id, values: [] },
+				})
+			).rejects.toThrow()
+		})
+
+		it('stores an agreed:false proof for a consent field that is not required', async () => {
+			const form = await makeForm(marketingSourceId, false)
+			const submission = await booted.payload.create({
+				collection: 'form-submissions',
+				depth: 0,
+				data: { form: form.id, values: [{ field: 'terms', value: false }] },
+			})
+			const proof = proofOf(submission)
+			expect(proof.agreed).toBe(false)
+			expect(proof.source).toBe(marketingSourceId)
+		})
+
+		it('rejects the submission when the host resolver is down, rather than proving nothing', async () => {
+			const form = await makeForm(privacySourceId)
+			resolverFails = true
+			try {
+				await expect(
+					booted.payload.create({
+						collection: 'form-submissions',
+						data: { form: form.id, values: [{ field: 'terms', value: true }] },
+					})
+				).rejects.toThrow()
+			} finally {
+				resolverFails = false
+			}
+		})
+
+		it('resolves the live statement and link for the request locale', async () => {
+			const form = await makeForm(privacySourceId)
+			const loaded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+
+			const en = await resolveConsentStatements({
+				payload: booted.payload,
+				req: { payload: booted.payload, context: {}, locale: 'en' } as unknown as PayloadRequest,
+				form: loaded as never,
+			})
+			expect(en.terms?.link).toEqual({
+				label: 'Privacy policy',
+				url: `https://example.com/${privacySourceId}`,
+			})
+			expect(JSON.stringify(en.terms?.statement)).toContain('I agree to the privacy policy')
+
+			const de = await resolveConsentStatements({
+				payload: booted.payload,
+				req: { payload: booted.payload, context: {}, locale: 'de' } as unknown as PayloadRequest,
+				form: loaded as never,
+			})
+			expect(JSON.stringify(de.terms?.statement)).toContain(
+				'Ich stimme der Datenschutzerklärung zu'
+			)
+		})
+
+		it('reflects an edited statement immediately, with no form to re-save', async () => {
+			const form = await makeForm(marketingSourceId)
+			const loaded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+			const req = () =>
+				({ payload: booted.payload, context: {}, locale: 'en' }) as unknown as PayloadRequest
+
+			const before = await resolveConsentStatements({
+				payload: booted.payload,
+				req: req(),
+				form: loaded as never,
+			})
+			expect(JSON.stringify(before.terms?.statement)).toContain('Send me email')
+
+			const current = await booted.payload.findGlobal({ slug: 'settings', depth: 0 })
+			const rows = (current as { consentSources?: SettingsRow[] }).consentSources ?? []
+			await booted.payload.updateGlobal({
+				slug: 'settings',
+				data: {
+					consentSources: rows.map((row) =>
+						String(row.id) === marketingSourceId
+							? { ...row, statement: statement('Send me the newsletter') }
+							: row
+					),
+				},
+			})
+
+			const after = await resolveConsentStatements({
+				payload: booted.payload,
+				req: req(),
+				form: loaded as never,
+			})
+			expect(JSON.stringify(after.terms?.statement)).toContain('Send me the newsletter')
+		})
 	})
 
-	it('stores agreed:false proof for an optional consent field not agreed', async () => {
-		const form = await booted.payload.create({
-			collection: 'forms',
-			data: {
-				title: 'Marketing',
-				fields: [
-					{
-						blockType: 'consent',
-						name: 'marketing',
-						label: 'I accept marketing emails',
-						optional: true,
-						source: 'static',
-						sourceConfig: {
-							label: 'Marketing policy',
-							url: 'https://example.com/marketing',
-						},
-					},
-				],
-			},
+	describe('with consent.sources absent', () => {
+		let booted: BootedPayload
+
+		beforeAll(async () => {
+			booted = await bootPayload({ plugin: formBuilder({}), db })
 		})
 
-		const submission = await booted.payload.create({
-			collection: 'form-submissions',
-			depth: 0,
-			data: {
-				form: form.id,
-				values: [{ field: 'marketing', value: false }],
-			},
+		afterAll(async () => {
+			await booted.stop()
 		})
 
-		expect(Array.isArray(submission.consent)).toBe(true)
-		const proof = (submission.consent as unknown[])[0] as Record<string, unknown>
-		expect(proof.field).toBe('marketing')
-		expect(proof.agreed).toBe(false)
-		expect(typeof proof.at).toBe('string')
-	})
-
-	it('captures proofs for multiple consent fields in a single submission', async () => {
-		const form = await booted.payload.create({
-			collection: 'forms',
-			data: {
-				title: 'Multi-consent',
-				fields: [
-					{
-						blockType: 'consent',
-						name: 'terms',
-						label: 'I agree to the terms',
-						source: 'static',
-						sourceConfig: { label: 'Terms', url: 'https://example.com/terms' },
-					},
-					{
-						blockType: 'consent',
-						name: 'marketing',
-						label: 'I accept marketing emails',
-						optional: true,
-						source: 'static',
-						sourceConfig: { label: 'Marketing', url: 'https://example.com/marketing' },
-					},
-				],
-			},
+		it('registers no consent field type, so an author cannot add one with nothing to reference', () => {
+			const forms = booted.payload.collections.forms?.config.fields ?? []
+			const tabs = forms.find((f): f is Extract<Field, { type: 'tabs' }> => f.type === 'tabs')
+			const blocksField = tabs?.tabs
+				.flatMap((tab) => tab.fields)
+				.find(
+					(f): f is Extract<Field, { type: 'blocks' }> =>
+						f.type === 'blocks' && 'name' in f && f.name === 'fields'
+				)
+			expect(blocksField?.blocks.some((b) => b.slug === 'consent')).toBe(false)
 		})
 
-		const submission = await booted.payload.create({
-			collection: 'form-submissions',
-			depth: 0,
-			data: {
-				form: form.id,
-				values: [
-					{ field: 'terms', value: true },
-					{ field: 'marketing', value: false },
-				],
-			},
+		it('registers no consent-sources endpoint', () => {
+			const endpoints = booted.payload.collections.forms?.config.endpoints
+			expect(
+				Array.isArray(endpoints) && endpoints.some((e) => e.path === '/:id/consent-sources')
+			).toBe(false)
 		})
-
-		expect(Array.isArray(submission.consent)).toBe(true)
-		const proofs = submission.consent as unknown[]
-		expect(proofs).toHaveLength(2)
-
-		const termsProof = proofs.find(
-			(p) => (p as Record<string, unknown>).field === 'terms'
-		) as Record<string, unknown>
-		expect(termsProof.agreed).toBe(true)
-		expect(termsProof.ref).toBe('https://example.com/terms')
-
-		const marketingProof = proofs.find(
-			(p) => (p as Record<string, unknown>).field === 'marketing'
-		) as Record<string, unknown>
-		expect(marketingProof.agreed).toBe(false)
 	})
 })

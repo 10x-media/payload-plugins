@@ -58,14 +58,16 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 
 	it('rejects a submission once closesAt has passed', async () => {
 		const form = await makeForm({
-			poll: { enabled: true, resultsField: 'colour', closesAt: past() },
+			pollEnabled: true,
+			poll: { resultsField: 'colour', closesAt: past() },
 		})
 		await expect(vote(form.id)).rejects.toThrow(/closed/i)
 	})
 
 	it('accepts a submission while the poll is still open', async () => {
 		const form = await makeForm({
-			poll: { enabled: true, resultsField: 'colour', closesAt: future() },
+			pollEnabled: true,
+			poll: { resultsField: 'colour', closesAt: future() },
 		})
 		const submission = await vote(form.id)
 		expect(submission.id).toBeDefined()
@@ -73,14 +75,15 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 
 	it('ignores a past closesAt when the poll is not enabled', async () => {
 		const form = await makeForm({
-			poll: { enabled: false, resultsField: 'colour', closesAt: past() },
+			pollEnabled: false,
+			poll: { resultsField: 'colour', closesAt: past() },
 		})
 		const submission = await vote(form.id)
 		expect(submission.id).toBeDefined()
 	})
 
 	it('sets the httpOnly voted cookie on a poll submission create', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
 		const req = await createLocalReq({}, booted.payload)
 		await vote(form.id, { req })
 		const cookie = req.responseHeaders?.get('set-cookie')
@@ -97,7 +100,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 	})
 
 	it('access seam: allows an anonymous read when the host grants it', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
 		await vote(form.id)
 		const req = await createLocalReq({}, booted.payload)
 		const res = await resolveFormResultsRequest({
@@ -113,7 +116,8 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 	it('access seam: forbids an anonymous read when the host denies it', async () => {
 		const form = await makeForm({
 			title: DENY_TITLE,
-			poll: { enabled: true, resultsField: 'colour' },
+			pollEnabled: true,
+			poll: { resultsField: 'colour' },
 		})
 		const req = await createLocalReq({}, booted.payload)
 		const res = await resolveFormResultsRequest({
@@ -129,7 +133,8 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 	it('access seam: authed callers bypass the seam', async () => {
 		const form = await makeForm({
 			title: DENY_TITLE,
-			poll: { enabled: true, resultsField: 'colour' },
+			pollEnabled: true,
+			poll: { resultsField: 'colour' },
 		})
 		const req = await createLocalReq({}, booted.payload)
 		const res = await resolveFormResultsRequest({
@@ -143,7 +148,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 	})
 
 	it('access seam: fails closed for an anonymous read without a req', async () => {
-		const form = await makeForm({ poll: { enabled: true, resultsField: 'colour' } })
+		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
 		const res = await resolveFormResultsRequest({
 			payload: booted.payload,
 			formId: form.id,
