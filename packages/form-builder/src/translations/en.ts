@@ -140,6 +140,10 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionConfigCc]: 'CC',
 	[keys.actionConfigBcc]: 'BCC',
 	[keys.actionConfigReplyTo]: 'Reply-to',
+	[keys.recipientsGroupDepartments]: 'Departments',
+	[keys.recipientsGroupFields]: 'Form fields',
+	[keys.validationRecipientInvalid]: 'Enter a valid email address.',
+	[keys.validationRecipientUnknownField]: 'References a field that no longer exists.',
 	[keys.validationFromUnknown]: 'Choose one of the configured from addresses',
 	[keys.validationFromUnavailable]:
 		'From addresses are currently unavailable. Please try again later.',
