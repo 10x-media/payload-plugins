@@ -19,10 +19,8 @@ export type FieldRendererProps<TValue = unknown> = {
 	value: TValue | undefined
 	onChange: (value: TValue) => void
 	onBlur: () => void
-	/** Blocking error messages for this field (already filtered to error severity). */
+	/** Blocking error messages for this field. */
 	errors: string[]
-	/** Advisory messages (warning severity). */
-	warnings?: string[]
 	required: boolean
 	disabled?: boolean
 	locale: string

@@ -47,7 +47,7 @@ const linkOf = (raw: unknown): ConsentLink | undefined => {
  * the source key, so a form rendered without that step shows no statement rather than a stale one.
  */
 export const consentRenderer = defineFieldRenderer<boolean>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 
@@ -65,7 +65,6 @@ export const consentRenderer = defineFieldRenderer<boolean>(
 				description={typeof field.description === 'string' ? field.description : undefined}
 				required={required}
 				errors={errors}
-				warnings={warnings}
 				describedById={describedById}
 			>
 				{html ? (

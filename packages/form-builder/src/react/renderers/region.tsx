@@ -14,7 +14,7 @@ import { Select, type SelectOption } from '../primitives/Select'
  */
 const regionRenderer = (options: SelectOption[]) =>
 	defineFieldRenderer<string>(
-		({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+		({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 			const id = useId()
 			const describedById = `${id}-desc`
 			return (
@@ -24,7 +24,6 @@ const regionRenderer = (options: SelectOption[]) =>
 					description={typeof field.description === 'string' ? field.description : undefined}
 					required={required}
 					errors={errors}
-					warnings={warnings}
 					describedById={describedById}
 				>
 					<Select

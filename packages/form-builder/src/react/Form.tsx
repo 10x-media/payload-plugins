@@ -155,7 +155,7 @@ type FieldHostProps = {
 
 const FieldHost = ({ field, renderer, locale, t }: FieldHostProps) => {
 	const id = useId()
-	const { value, errors, warnings, setValue, onBlur } = useField(field.name)
+	const { value, errors, setValue, onBlur } = useField(field.name)
 	return createElement(renderer, {
 		field,
 		id,
@@ -164,7 +164,6 @@ const FieldHost = ({ field, renderer, locale, t }: FieldHostProps) => {
 		onChange: setValue,
 		onBlur,
 		errors,
-		warnings,
 		required: Boolean(field.required),
 		locale,
 		t,
@@ -184,7 +183,6 @@ const CalcFieldHost = ({ field, renderer, value, locale, t }: CalcFieldHostProps
 		onChange: () => {},
 		onBlur: () => {},
 		errors: [],
-		warnings: [],
 		required: false,
 		disabled: true,
 		locale,
@@ -208,7 +206,6 @@ const StaticFieldHost = ({ field, renderer, locale, t }: StaticFieldHostProps) =
 		onChange: () => {},
 		onBlur: () => {},
 		errors: [],
-		warnings: [],
 		required: false,
 		locale,
 		t,
@@ -344,7 +341,7 @@ export const Form = ({
 			const answers = { ...effectiveValues, [name]: value }
 			// Mirror the server: a field whose `validateWhen` is unmet is not validated; clear any stale error.
 			if (!evaluateCondition(field.validateWhen, answers)) {
-				rawDispatch({ type: 'SET_FIELD_ISSUES', name, errors: [], warnings: [] })
+				rawDispatch({ type: 'SET_FIELD_ISSUES', name, errors: [] })
 				return
 			}
 			void validateFieldValue({
@@ -355,8 +352,8 @@ export const Form = ({
 				answers,
 				locale,
 				t: translate,
-			}).then(({ errors, warnings }) => {
-				rawDispatch({ type: 'SET_FIELD_ISSUES', name, errors, warnings })
+			}).then(({ errors }) => {
+				rawDispatch({ type: 'SET_FIELD_ISSUES', name, errors })
 				const [firstError] = errors
 				if (firstError !== undefined) {
 					emitFormEvent(sinkRef.current, formIdRef.current, {
@@ -426,7 +423,6 @@ export const Form = ({
 				type: 'SET_FIELD_ISSUES',
 				name: result.field.name,
 				errors: result.errors,
-				warnings: result.warnings,
 			})
 			if (result.errors.length > 0) {
 				hasError = true
@@ -510,7 +506,6 @@ export const Form = ({
 				}))
 		)
 		const errors: FieldErrors = {}
-		const warnings: FieldErrors = {}
 		for (const result of results) {
 			if (result.errors.length > 0) {
 				errors[result.field.name] = result.errors
@@ -522,9 +517,6 @@ export const Form = ({
 						message: firstError,
 					})
 				}
-			}
-			if (result.warnings.length > 0) {
-				warnings[result.field.name] = result.warnings
 			}
 		}
 
@@ -556,12 +548,11 @@ export const Form = ({
 					})
 					const compositeKey = `${field.name}[${rowIndex}].${subField.name}`
 					if (subResult.errors.length > 0) errors[compositeKey] = subResult.errors
-					if (subResult.warnings.length > 0) warnings[compositeKey] = subResult.warnings
 				}
 			}
 		}
 
-		rawDispatch({ type: 'SET_ALL_ISSUES', errors, warnings })
+		rawDispatch({ type: 'SET_ALL_ISSUES', errors })
 		if (Object.keys(errors).length > 0) {
 			submittingRef.current = false
 			return
@@ -605,7 +596,7 @@ export const Form = ({
 			}
 		} else {
 			if (result.fieldErrors) {
-				rawDispatch({ type: 'SET_ALL_ISSUES', errors: result.fieldErrors, warnings: {} })
+				rawDispatch({ type: 'SET_ALL_ISSUES', errors: result.fieldErrors })
 			}
 			const message = result.message ?? 'Submission failed'
 			rawDispatch({ type: 'SUBMIT_ERROR', message })

@@ -19,22 +19,12 @@ describe('buildRuleBlocks', () => {
 		expect(slugs).toContain('matchesField')
 		expect(slugs).toContain('notAlreadySubmitted')
 	})
-	it('gives each rule block its params plus message and severity', () => {
+	it('gives each rule block its params plus a message override', () => {
 		const minLength = buildRuleBlocks(registry, 'text').find((block) => block.slug === 'minLength')
 		const names = (minLength?.fields ?? []).map((field) =>
 			'name' in field ? field.name : undefined
 		)
-		expect(names).toEqual(['min', 'message', 'severity'])
-	})
-	it('defaults severity to error and refuses to let it be cleared', () => {
-		for (const block of buildRuleBlocks(registry, 'text')) {
-			const severity = block.fields.find((field) => 'name' in field && field.name === 'severity')
-			expect(severity).toMatchObject({
-				type: 'select',
-				defaultValue: 'error',
-				admin: { isClearable: false },
-			})
-		}
+		expect(names).toEqual(['min', 'message'])
 	})
 	it('throws when a custom rule declares a reserved param name', () => {
 		const bad = buildRuleRegistry([
@@ -42,7 +32,7 @@ describe('buildRuleBlocks', () => {
 				type: 'bad',
 				label: 'Bad',
 				defaultMessage: 'm',
-				params: [{ name: 'severity', type: 'text' }],
+				params: [{ name: 'message', type: 'text' }],
 				validate: () => true,
 			}) as AnyValidationRuleDefinition,
 		])

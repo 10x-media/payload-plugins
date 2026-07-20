@@ -6,7 +6,6 @@ import { useFormContext } from './FormContext'
 export type UseFieldResult<TValue = unknown> = {
 	value: TValue | undefined
 	errors: string[]
-	warnings: string[]
 	touched: boolean
 	setValue: (value: TValue) => void
 	/** Mark touched and validate now (call on blur). */
@@ -38,7 +37,6 @@ export const useField = <TValue = unknown>(name: string): UseFieldResult<TValue>
 	return {
 		value,
 		errors: showIssues ? (state.errors[name] ?? []) : [],
-		warnings: showIssues ? (state.warnings[name] ?? []) : [],
 		touched,
 		setValue,
 		onBlur,

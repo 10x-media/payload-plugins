@@ -148,8 +148,7 @@ export type RunSubmissionResult = {
  * value for it is ignored), and a visible field whose `validateWhen` is false stores its value but skips
  * validation. A visible calc field stores its derived value and is never validated. Display-only field
  * types (value kind 'none', e.g. message) and nameless (bare) rows are skipped in both passes: never
- * validated, never stored, and a client-sent value under their name is dropped. Only `error` severity
- * blocks; warnings are computed but not surfaced server-side (the renderer surfaces them).
+ * validated, never stored, and a client-sent value under their name is dropped.
  */
 export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmissionResult> => {
 	const {
@@ -256,10 +255,9 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				payload,
 				formId,
 			})
-			const blocking = issues.filter((issue) => issue.severity === 'error')
-			if (blocking.length > 0) {
-				for (const issue of blocking) {
-					errors.push({ path: instance.name, message: issue.message })
+			if (issues.length > 0) {
+				for (const message of issues) {
+					errors.push({ path: instance.name, message })
 				}
 				continue
 			}
@@ -366,8 +364,8 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 							payload,
 							formId,
 						})
-						for (const issue of subErrors.filter((e) => e.severity === 'error')) {
-							errors.push({ path: subPath, message: issue.message })
+						for (const message of subErrors) {
+							errors.push({ path: subPath, message })
 						}
 					}
 

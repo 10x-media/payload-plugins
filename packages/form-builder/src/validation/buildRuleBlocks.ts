@@ -3,10 +3,10 @@ import { keys } from '../translations/keys'
 import { labelFor } from '../translations/server'
 import type { ValidationRuleRegistry } from './registry'
 
-/** Each rule block appends its own `message` and `severity` fields, so a rule param of either name would collide and be silently dropped by Payload. */
-const RESERVED_PARAM_NAMES = new Set(['message', 'severity'])
+/** Each rule block appends its own `message` field, so a rule param of that name would collide and be silently dropped by Payload. */
+const RESERVED_PARAM_NAMES = new Set(['message'])
 
-/** One block per rule applicable to `fieldType` (gated by `appliesTo`): the rule params, then a message override and severity. */
+/** One block per rule applicable to `fieldType` (gated by `appliesTo`): the rule params, then a message override. */
 export const buildRuleBlocks = (registry: ValidationRuleRegistry, fieldType: string): Block[] => {
 	const blocks: Block[] = []
 	for (const rule of registry.values()) {
@@ -16,7 +16,7 @@ export const buildRuleBlocks = (registry: ValidationRuleRegistry, fieldType: str
 		for (const param of rule.params ?? []) {
 			if ('name' in param && RESERVED_PARAM_NAMES.has(param.name)) {
 				throw new Error(
-					`form-builder: validation rule "${rule.type}" declares a reserved param name "${param.name}". The names "message" and "severity" are reserved for the constraint-list UI.`
+					`form-builder: validation rule "${rule.type}" declares a reserved param name "${param.name}". The name "message" is reserved for the constraint-list UI.`
 				)
 			}
 		}
@@ -26,19 +26,6 @@ export const buildRuleBlocks = (registry: ValidationRuleRegistry, fieldType: str
 			fields: [
 				...(rule.params ?? []),
 				{ name: 'message', type: 'text', label: labelFor(keys.validationMessageLabel) },
-				{
-					name: 'severity',
-					type: 'select',
-					defaultValue: 'error',
-					label: labelFor(keys.validationSeverityLabel),
-					// Not clearable: `runValidation` reads a cleared severity as "unset" and falls back to
-					// the rule's own default, so an empty select would still behave as some severity.
-					admin: { isClearable: false },
-					options: [
-						{ label: labelFor(keys.validationSeverityError), value: 'error' },
-						{ label: labelFor(keys.validationSeverityWarning), value: 'warning' },
-					],
-				},
 			],
 		})
 	}

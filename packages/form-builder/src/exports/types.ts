@@ -107,5 +107,4 @@ export type {
 	AnyValidationRuleDefinition,
 	ValidationRuleDefinition,
 	ValidationRuleResult,
-	ValidationSeverity,
 } from '../validation/types'

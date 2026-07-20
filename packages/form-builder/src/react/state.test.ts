@@ -15,19 +15,17 @@ describe('formReducer', () => {
 		expect(next.touched.a).toBe(true)
 	})
 
-	it('SET_FIELD_ISSUES stores errors + warnings for a field', () => {
+	it('SET_FIELD_ISSUES stores errors for a field', () => {
 		const next = formReducer(base, {
 			type: 'SET_FIELD_ISSUES',
 			name: 'a',
 			errors: ['bad'],
-			warnings: ['warn'],
 		})
 		expect(next.errors.a).toEqual(['bad'])
-		expect(next.warnings.a).toEqual(['warn'])
 	})
 
-	it('SET_ALL_ISSUES replaces the whole error/warning maps and marks submitAttempted', () => {
-		const next = formReducer(base, { type: 'SET_ALL_ISSUES', errors: { a: ['x'] }, warnings: {} })
+	it('SET_ALL_ISSUES replaces the whole error map and marks submitAttempted', () => {
+		const next = formReducer(base, { type: 'SET_ALL_ISSUES', errors: { a: ['x'] } })
 		expect(next.errors).toEqual({ a: ['x'] })
 		expect(next.submitAttempted).toBe(true)
 	})
@@ -48,7 +46,6 @@ describe('formReducer', () => {
 			type: 'SET_FIELD_ISSUES',
 			name: 'a',
 			errors: ['bad'],
-			warnings: [],
 		})
 		const cleared = formReducer(withErr, { type: 'SET_VALUE', name: 'a', value: 'x' })
 		expect(cleared.errors.a ?? []).toEqual([])

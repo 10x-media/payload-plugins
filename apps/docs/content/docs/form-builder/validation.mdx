@@ -9,7 +9,7 @@ Validation is declarative and server-authoritative. Editors attach rules to fiel
 
 `minLength`, `maxLength`, `min`, `max`, `minDate`, `maxDate`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`. `minDate` / `maxDate` apply to [date fields](/form-builder/fields#date) and compare ISO `YYYY-MM-DD` strings against the configured bound. Two are special: `matchesField` is cross-field, validating one answer against another (confirm-email style), and `notAlreadySubmitted` is async and server-only, because it queries existing submissions.
 
-Every rule instance can override its message (with `{var}` interpolation for rule parameters) and its severity: an `error` blocks submission, a `warning` is advisory and does not.
+Every rule instance can override its message (with `{var}` interpolation for rule parameters).
 
 `pattern` takes two params: `pattern`, the regular expression source, and an optional `flags` (`i`, `g`, `m`, and the rest), applied as `new RegExp(pattern, flags)`. Write the source alone, without delimiters: `^[a-z0-9-]+$`, not `/^[a-z0-9-]+$/i`.
 
@@ -41,7 +41,7 @@ formBuilder({
 
 The `rules` option follows the same [opt-in convention](/concepts#the-opt-in-convention) as field types, and entries are cast to `ValidationRuleOption` at the registry boundary for the same erased-generics reason.
 
-Beyond the required pieces, a definition can set `appliesTo` (field type slugs the rule can attach to; omit for all), `params` (a Payload `Field[]` for the rule's per-instance configuration in the admin), and a default `severity`. Mark anything async or touching `payload`/`req` with `client: false`: the renderer skips it, the server still runs it.
+Beyond the required pieces, a definition can set `appliesTo` (field type slugs the rule can attach to; omit for all) and `params` (a Payload `Field[]` for the rule's per-instance configuration in the admin). Mark anything async or touching `payload`/`req` with `client: false`: the renderer skips it, the server still runs it.
 
 ## Standard Schema
 

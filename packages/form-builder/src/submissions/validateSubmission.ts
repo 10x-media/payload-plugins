@@ -32,7 +32,7 @@ export type ValidateSubmissionArgs = {
  * Server-authoritative submission validation. On create it loads the referenced form, re-runs every
  * field's required check, intrinsic validator, and declarative rules through `runSubmission`, threading
  * `req`/`payload` so server-only async rules can hit the DB, and throws a Payload `ValidationError` with
- * per-field paths on any error-severity failure. The client is never trusted.
+ * per-field paths on any failure. The client is never trusted.
  * Consent fields are captured into `result.consent` (array of proofs, one per visible consent field),
  * built from the host's sources re-resolved here rather than from anything the form or client carries.
  */

@@ -48,7 +48,7 @@ const linkOf = (raw: unknown): ConsentLink | undefined => {
  * key, so a form rendered without that step shows no statement rather than a stale one.
  */
 export const consentField = defineFieldRenderer<boolean>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const invalid = errors.length > 0
@@ -119,11 +119,6 @@ export const consentField = defineFieldRenderer<boolean>(
 							))}
 						</div>
 					) : null}
-					{warnings?.map((message) => (
-						<p key={message} className="text-amber-600">
-							{message}
-						</p>
-					))}
 				</div>
 			</div>
 		)

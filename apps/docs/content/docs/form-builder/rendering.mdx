@@ -189,7 +189,7 @@ const myText = defineFieldRenderer<string>(
 )
 ```
 
-`FieldRendererProps<TValue>` carries the field instance, a stable `id`, the machine `name`, `value`, `onChange`/`onBlur`, `errors`/`warnings`, `required`, `disabled`, `locale`, and a `t` translator.
+`FieldRendererProps<TValue>` carries the field instance, a stable `id`, the machine `name`, `value`, `onChange`/`onBlur`, `errors`, `required`, `disabled`, `locale`, and a `t` translator.
 
 `resolveRenderers` merges the defaults with overrides using the [opt-in convention](/concepts#the-opt-in-convention):
 
@@ -207,7 +207,7 @@ Pass the result (or just the overrides object) to `<Form renderers={...}>`.
 
 ## Primitives
 
-Unstyled, accessible control primitives for building custom renderers: `Input`, `Textarea`, `Select`, `Checkbox`, and `FieldShell`. `FieldShell` renders the label, the control slot, and the description/error/warning region with correct `aria-describedby`, `role="alert"`, and `aria-invalid` wiring; the built-in renderers are exactly these primitives composed.
+Unstyled, accessible control primitives for building custom renderers: `Input`, `Textarea`, `Select`, `Checkbox`, and `FieldShell`. `FieldShell` renders the label, the control slot, and the description/error region with correct `aria-describedby`, `role="alert"`, and `aria-invalid` wiring; the built-in renderers are exactly these primitives composed.
 
 If you write renderers from scratch instead, uphold the a11y contract: a programmatically associated label, `aria-invalid` only when invalid, `aria-describedby` pointing at an error region with `role="alert"` and `aria-atomic`, an `aria-hidden` required indicator, and native `required` on the control.
 
@@ -254,7 +254,7 @@ function NameField() {
 
 `<FormControls>` is the same chrome the default layout renders: back on non-first steps, next on non-terminal steps, submit on the terminal step, with labels resolved from context (props, the form's `buttons` labels, translated defaults). It accepts the same per-button `className` and `render*` overrides as `<Form>`, so a custom layout keeps the built-in step logic and double-submit guard instead of hand-wiring buttons. `<FormSteps>` composes the same way for [step progress](/form-builder/multi-step#formsteps-progress-indicator).
 
-- `useField(name)` returns `value`, `errors`, `warnings`, `touched`, `setValue`, `onBlur`.
-- `useFormState()` returns the whole `FormState`: `values`, `errors`, `warnings`, `touched`, `submitting`, `submitted`, `submitAttempted`, `submitError`.
+- `useField(name)` returns `value`, `errors`, `touched`, `setValue`, `onBlur`.
+- `useFormState()` returns the whole `FormState`: `values`, `errors`, `touched`, `submitting`, `submitted`, `submitAttempted`, `submitError`.
 - `useFormStep()` drives [multi-step UIs](/form-builder/multi-step#useformstep-for-custom-step-uis).
 - `useFormContext()` returns the full controller context the focused hooks read from: the rendered `form` document itself, `state`, `dispatch`, `validateField`, `locale`, `step`, `rendererRegistry`, the resolved chrome `labels`, the active translator `t`, and `effectiveValues` (answers overlaid with derived calc values). Reach for it when building renderer-like components (a custom repeater looking up sub-renderers, chrome that needs the resolved labels, a custom button reading [host-added `buttons` keys](/form-builder/customization#form-level-buttons) off `form`); the focused hooks stay the ergonomic default.

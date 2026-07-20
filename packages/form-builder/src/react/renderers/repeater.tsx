@@ -14,7 +14,7 @@ type RepeaterRow = Record<string, unknown>
 
 /**
  * Thin wrapper so each sub-field renderer is a proper React component (has stable hook identity
- * per row/field). Reads errors and warnings for the composite path `field[row].subField` from
+ * per row/field). Reads errors for the composite path `field[row].subField` from
  * form state so server-side validation errors are surfaced inline next to the sub-field input,
  * overriding any static values passed by the parent.
  */
@@ -25,12 +25,11 @@ const SubFieldWrapper = ({
 }: { renderer: FieldRenderer } & Parameters<FieldRenderer>[0]) => {
 	const { state } = useFormContext()
 	const errors = (state.errors as Record<string, string[]>)?.[name] ?? []
-	const warnings = (state.warnings as Record<string, string[]>)?.[name] ?? []
-	return renderer({ ...props, name, errors, warnings })
+	return renderer({ ...props, name, errors })
 }
 
 export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
-	({ field, name, id: rootId, errors, warnings, required, t, locale }) => {
+	({ field, name, id: rootId, errors, required, t, locale }) => {
 		const { rendererRegistry } = useFormContext()
 		const { value, setValue, onBlur } = useField<RepeaterRow[]>(name)
 		const addId = useId()
@@ -68,7 +67,6 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 				description={typeof field.description === 'string' ? field.description : undefined}
 				required={required}
 				errors={errors}
-				warnings={warnings}
 				describedById={`${rootId}-desc`}
 			>
 				<div className="fb-repeater">
@@ -108,7 +106,6 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 													onBlur,
 													// SubFieldWrapper overrides these from form state; passed here to satisfy the type
 													errors: [],
-													warnings: [],
 													required: subField.required ?? false,
 													disabled: false,
 													locale,

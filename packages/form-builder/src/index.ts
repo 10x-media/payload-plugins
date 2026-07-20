@@ -503,6 +503,5 @@ export type {
 	AnyValidationRuleDefinition,
 	ValidationRuleDefinition,
 	ValidationRuleResult,
-	ValidationSeverity,
 } from './validation/types'
 export type { FormBuilderPluginOptions as PluginOptions }

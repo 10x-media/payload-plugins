@@ -35,7 +35,7 @@ export type FormControlLabels = {
 export type FormContextValue = {
 	/** The document rendered by this `<Form>`. Custom chrome reads host-added `buttons` keys from here. */
 	form: FormDocument
-	/** Current form state: values, errors, warnings, touched, submitting, submitted, submitError. */
+	/** Current form state: values, errors, touched, submitting, submitted, submitError. */
 	state: FormState
 	/**
 	 * Dispatch a `FormAction` (see `./state` for the action union). Custom field layouts
