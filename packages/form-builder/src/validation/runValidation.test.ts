@@ -59,14 +59,30 @@ const run = (field: FormFieldInstance, value: unknown, answers: Record<string, u
 describe('runValidation', () => {
 	it('reports required on an empty required field', async () => {
 		const result = await run({ blockType: 'text', name: 'a', required: true }, '')
-		expect(result.errors).toEqual([
-			{ message: 'formBuilder:validation.required', severity: 'error' },
-		])
+		expect(result.errors).toEqual(['formBuilder:validation.required'])
 	})
 
 	it('runs the field intrinsic validator (email shape)', async () => {
 		const result = await run({ blockType: 'email', name: 'e' }, 'nope')
-		expect(result.errors).toEqual([{ message: 'formBuilder:validation.email', severity: 'error' }])
+		expect(result.errors).toEqual(['formBuilder:validation.email'])
+	})
+
+	// `false` is a present value, so the required guard above never fires for a checked-then-unchecked
+	// box; only the checkbox's intrinsic validator rejects it. Guards both sides: this same engine
+	// runs on the client (validateFieldValue) and the server (runSubmission).
+	it('rejects a required checkbox submitted as an explicit false', async () => {
+		const result = await run({ blockType: 'checkbox', name: 'terms', required: true }, false)
+		expect(result.errors).toEqual(['formBuilder:validation.required'])
+	})
+
+	it('accepts a required checkbox submitted as true', async () => {
+		const result = await run({ blockType: 'checkbox', name: 'terms', required: true }, true)
+		expect(result.errors).toEqual([])
+	})
+
+	it('accepts an optional checkbox submitted as false', async () => {
+		const result = await run({ blockType: 'checkbox', name: 'news' }, false)
+		expect(result.errors).toEqual([])
 	})
 
 	it('runs a declarative rule instance with a custom message', async () => {
@@ -76,7 +92,7 @@ describe('runValidation', () => {
 			validations: [{ blockType: 'minLength', min: 3, message: 'Too short: {min}' }],
 		}
 		const result = await run(field, 'ab')
-		expect(result.errors).toEqual([{ message: 'Too short: 3', severity: 'error' }])
+		expect(result.errors).toEqual(['Too short: 3'])
 	})
 
 	it('falls back to the localized default message when no override is set', async () => {
@@ -86,21 +102,7 @@ describe('runValidation', () => {
 			validations: [{ blockType: 'minLength', min: 3 }],
 		}
 		const result = await run(field, 'ab')
-		expect(result.errors).toEqual([
-			{ message: 'formBuilder:rule.minLength.message', severity: 'error' },
-		])
-	})
-
-	it('honors a rule instance severity of warning', async () => {
-		const field: FormFieldInstance = {
-			blockType: 'text',
-			name: 'a',
-			validations: [{ blockType: 'minLength', min: 3, severity: 'warning' }],
-		}
-		const result = await run(field, 'ab')
-		expect(result.errors).toEqual([
-			{ message: 'formBuilder:rule.minLength.message', severity: 'warning' },
-		])
+		expect(result.errors).toEqual(['formBuilder:rule.minLength.message'])
 	})
 
 	it('skips server-only rules in client mode', async () => {
@@ -134,9 +136,7 @@ describe('runValidation', () => {
 		const ok = await run(field, 'secret', { password: 'secret', confirm: 'secret' })
 		expect(ok.errors).toEqual([])
 		const bad = await run(field, 'secret', { password: 'other', confirm: 'secret' })
-		expect(bad.errors).toEqual([
-			{ message: 'formBuilder:rule.matchesField.message', severity: 'error' },
-		])
+		expect(bad.errors).toEqual(['formBuilder:rule.matchesField.message'])
 	})
 
 	it('skips validation entirely for an optional empty field', async () => {
@@ -227,16 +227,14 @@ describe('runValidation', () => {
 		expect(result.errors).toEqual([])
 	})
 
-	it('does not interpolate reserved instance keys into custom messages', async () => {
+	it('does not interpolate the reserved message key into custom messages', async () => {
 		const field: FormFieldInstance = {
 			blockType: 'text',
 			name: 'a',
-			validations: [
-				{ blockType: 'minLength', min: 3, message: 'min {min} sev {severity}', severity: 'error' },
-			],
+			validations: [{ blockType: 'minLength', min: 3, message: 'min {min} msg {message}' }],
 		}
 		const result = await run(field, 'ab')
-		expect(result.errors).toEqual([{ message: 'min 3 sev {severity}', severity: 'error' }])
+		expect(result.errors).toEqual(['min 3 msg {message}'])
 	})
 
 	it('runs a field-definition Standard Schema and maps its issues', async () => {
@@ -263,6 +261,6 @@ describe('runValidation', () => {
 			event: 'submit',
 			mode: 'server',
 		})
-		expect(result.errors).toEqual([{ message: 'must start with x', severity: 'error' }])
+		expect(result.errors).toEqual(['must start with x'])
 	})
 })

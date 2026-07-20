@@ -26,13 +26,14 @@ const Harness = ({ validateField }: { validateField: (name: string, value: unkno
 	return (
 		<FormContext.Provider
 			value={{
+				form: { id: 1, fields: [], multistep: false, pollEnabled: false },
 				state,
 				dispatch,
 				validateField,
 				locale: 'en',
 				step,
 				rendererRegistry: emptyRegistry,
-				labels: { back: 'Back', next: 'Next', submit: 'Submit' },
+				labels: { prev: 'Back', next: 'Next', submit: 'Submit' },
 				t: (key) => key,
 			}}
 		>

@@ -5,6 +5,7 @@ import { defineValidationRule } from '../defineValidationRule'
 export const maxRule = defineValidationRule<{ max: number }, number>({
 	type: 'max',
 	label: keys.ruleMax,
+	description: keys.ruleMaxDescription,
 	appliesTo: ['number'],
 	params: [{ name: 'max', type: 'number', required: true, label: labelFor(keys.ruleParamMax) }],
 	defaultMessage: keys.ruleMaxMessage,

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createElement, useReducer } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fieldKey } from '../../fields/fieldKey'
 import type { FormFieldInstance } from '../../submissions/types'
 import type { FieldRendererProps } from '../contract'
 import { FormContext, type FormStepInfo } from '../FormContext'
@@ -56,26 +57,27 @@ const Harness = ({
 }) => {
 	const [state, dispatch] = useReducer(
 		formReducer,
-		initialFormState({ [fieldDef.name]: initialValue })
+		initialFormState({ [fieldKey(fieldDef)]: initialValue })
 	)
 	const validateField = vi.fn()
 	return (
 		<FormContext.Provider
 			value={{
+				form: { id: 1, fields: [], multistep: false, pollEnabled: false },
 				state,
 				dispatch,
 				validateField,
 				locale: 'en',
 				step,
 				rendererRegistry,
-				labels: { back: 'Back', next: 'Next', submit: 'Submit' },
+				labels: { prev: 'Back', next: 'Next', submit: 'Submit' },
 				t: (key) => key,
 			}}
 		>
 			{createElement(RepeaterField, {
 				field: fieldDef,
 				id: 'rep',
-				name: fieldDef.name,
+				name: fieldKey(fieldDef),
 				value: initialValue as never,
 				onChange: () => {},
 				onBlur: () => {},

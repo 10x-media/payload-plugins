@@ -6,7 +6,7 @@ import { FieldShell } from '../primitives/FieldShell'
 import { Textarea } from '../primitives/Textarea'
 
 export const textareaRenderer = defineFieldRenderer<string>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		return (
@@ -16,7 +16,6 @@ export const textareaRenderer = defineFieldRenderer<string>(
 				description={typeof field.description === 'string' ? field.description : undefined}
 				required={required}
 				errors={errors}
-				warnings={warnings}
 				describedById={describedById}
 			>
 				<Textarea

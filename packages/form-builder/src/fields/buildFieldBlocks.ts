@@ -1,13 +1,21 @@
 import type { Block, Field, TabsField } from 'payload'
 import { buildConditionTypeMap } from '../conditions/conditionType'
-import { buildConsentSourceConfig } from '../consent/buildConsentSourceConfig'
-import type { ConsentSourceRegistry } from '../consent/registry'
 import { keys } from '../translations/keys'
 import { labelFor } from '../translations/server'
 import { buildRuleBlocks } from '../validation/buildRuleBlocks'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import type { FieldTypeRegistry } from './registry'
 import { fieldBlockTabs } from './sharedConfig'
+
+const FIELD_BLOCK_LABEL_REF = '@10x-media/form-builder/client#FieldBlockLabel'
+
+/**
+ * Replace Payload's default `blockName` row header (which reads "Untitled" until filled) with the
+ * field's own `label`, keyed to the type label as fallback. See `FieldBlockLabel`.
+ */
+const blockLabelAdmin = (typeLabelKey: string): NonNullable<Block['admin']> => ({
+	components: { Label: { path: FIELD_BLOCK_LABEL_REF, clientProps: { typeLabelKey } } },
+})
 
 /** Whether `fields` contains a field named `name`, descending into presentational rows. */
 const hasNameField = (fields: Field[]): boolean =>
@@ -26,44 +34,43 @@ const fieldTabOf = (block: Block): Field[] | undefined => {
 
 /**
  * One add-field block per registered type: tabs holding shared config, type config, and
- * validations. `localize` controls whether the shared content fields carry `localized: true`;
- * per-type config fields carry their own flag from the registry definitions.
+ * validations. Bare definitions (e.g. `message`) skip all of that: their block is the
+ * definition's `config` alone, no name/shared basics/tabs. `localize` controls whether the
+ * shared content fields carry `localized: true`; per-type config fields carry their own flag
+ * from the registry definitions.
  */
 type BuildFieldBlocksArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry?: ConsentSourceRegistry
 	localize?: boolean
 }
 
 export const buildFieldBlocks = ({
 	registry,
 	ruleRegistry,
-	consentRegistry,
 	localize = true,
 }: BuildFieldBlocksArgs): Block[] => {
 	const conditionTypes = buildConditionTypeMap(registry)
 	const blocks: Block[] = []
+	const bareSlugs = new Set<string>()
 	for (const definition of registry.values()) {
-		let typeConfig: Field[] = definition.config ?? []
+		const typeConfig: Field[] = definition.config ?? []
 
-		// Inject dynamic source select + conditional sourceConfig group for the consent field.
-		// consent.ts intentionally omits source/sourceConfig; the live registry drives the
-		// select options and per-source field visibility (admin.condition).
-		if (definition.type === 'consent' && consentRegistry) {
-			// statement is first; optional is last; source/sourceConfig go in between.
-			const statement = typeConfig.find((f) => (f as { name?: string }).name === 'statement')
-			const optional = typeConfig.find((f) => (f as { name?: string }).name === 'optional')
-			typeConfig = [
-				...(statement ? [statement] : []),
-				...buildConsentSourceConfig(consentRegistry),
-				...(optional ? [optional] : []),
-			]
+		if (definition.bare === true) {
+			bareSlugs.add(definition.type)
+			blocks.push({
+				slug: definition.type,
+				labels: { singular: labelFor(definition.label), plural: labelFor(definition.label) },
+				admin: blockLabelAdmin(definition.label),
+				fields: typeConfig,
+			})
+			continue
 		}
 
 		blocks.push({
 			slug: definition.type,
 			labels: { singular: labelFor(definition.label), plural: labelFor(definition.label) },
+			admin: blockLabelAdmin(definition.label),
 			fields: [
 				fieldBlockTabs({
 					conditionTypes,
@@ -75,6 +82,7 @@ export const buildFieldBlocks = ({
 						blocks: buildRuleBlocks(ruleRegistry, definition.type),
 					},
 					localize,
+					omitShared: definition.omitShared,
 				}),
 			],
 		})
@@ -83,13 +91,14 @@ export const buildFieldBlocks = ({
 	// Second pass: inject subFields into the repeater block using all non-repeater blocks.
 	// Done after the main loop so every sibling block is already built.
 	// Repeater-in-repeater is not supported in v1; the repeater block is excluded from subFields.
+	// Bare blocks are excluded too: repeater row plumbing (values, composite error paths) is name-keyed.
 	const repeaterBlock = blocks.find((b) => b.slug === 'repeater')
 	if (repeaterBlock) {
 		const subFieldsField: Field = {
 			name: 'subFields',
 			type: 'blocks',
 			label: labelFor(keys.configSubFields),
-			blocks: blocks.filter((b) => b.slug !== 'repeater'),
+			blocks: blocks.filter((b) => b.slug !== 'repeater' && !bareSlugs.has(b.slug)),
 		}
 		const fieldTabFields = fieldTabOf(repeaterBlock)
 		;(fieldTabFields ?? (repeaterBlock.fields as Field[])).push(subFieldsField)

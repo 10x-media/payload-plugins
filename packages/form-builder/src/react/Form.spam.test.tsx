@@ -10,6 +10,8 @@ afterEach(() => {
 const doc = (id: number | string = 1): FormDocument => ({
 	id,
 	fields: [{ blockType: 'text', name: 'name', label: 'Name' }] as FormFieldInstance[],
+	multistep: false,
+	pollEnabled: false,
 })
 
 const submittedValues = (

@@ -6,17 +6,30 @@ export type FormResponseSettings = {
 	type?: 'message' | 'redirect' | null
 	/** Rich text state serialized via `serializeBody`; shown instead of the plain `successMessage`. */
 	message?: unknown
-	/** Applies on the custom-`children` path too (part of submit handling); `message`/`submitLabel` only affect default rendering. */
-	redirect?: { url?: string | null } | null
-	submitLabel?: string | null
+	/** Applies on the custom-`children` path too (part of submit handling); `message` only affects default rendering. */
+	redirect?: {
+		url?: string | null
+		/**
+		 * Present when the plugin's `redirectRelationships` option is set and the author picked an
+		 * internal document. Mirrors Payload's depth-0 polymorphic relationship shape (`value` is
+		 * the bare id, never populated): the HOST resolves this to a URL itself (e.g. by looking up
+		 * the referenced document's own route), since the plugin has no notion of the host's
+		 * routing, matching the model of Payload's native `plugin-form-builder` redirect relationship.
+		 */
+		reference?: { relationTo: string; value: number | string } | null
+	} | null
 }
 
-/** Serializable per-form display settings: what the visitor sees above the fields, before submit. */
-export type FormDisplaySettings = {
-	showTitle?: boolean
-	title?: string
-	/** Rich text state serialized via `serializeBody`; rendered above the fields when non-empty. */
-	intro?: unknown
+/**
+ * Serializable per-form button labels. `toFormDocument` reassembles these from the document's
+ * top-level `submitLabel`/`prevLabel`/`nextLabel` fields (there is no longer a `buttons` group).
+ * The index signature lets custom chrome read any extra label a host threads on itself.
+ */
+export type FormButtonSettings = {
+	submitLabel?: string | null
+	nextLabel?: string | null
+	prevLabel?: string | null
+	[key: string]: unknown
 }
 
 /**
@@ -25,13 +38,12 @@ export type FormDisplaySettings = {
  * itself, so the client never needs it from the document.
  */
 export type FormPollSettings = {
-	enabled?: boolean
 	/** When anonymous callers may read aggregate results. Default 'afterVote'. */
 	resultsVisibility?: 'afterVote' | 'afterClose' | null
 	/** ISO date after which submissions are rejected and the poll renders as closed. */
 	closesAt?: string | null
-	/** Present once the host recorded a final outcome via `resolvePollOutcome`; `<Poll>` renders the final state. */
-	outcome?: { winningValue?: string }
+	/** Present once the host recorded a final outcome via `resolvePollOutcome`; `<Poll>` renders the final state. A tie carries more than one value. */
+	outcome?: { winningValues?: string[] }
 }
 
 /**
@@ -44,6 +56,13 @@ export type FormDocument = {
 	fields: FormFieldInstance[]
 	flow?: FormFlow
 	response?: FormResponseSettings
-	display?: FormDisplaySettings
+	/** Button labels (and any host-added button settings). Label precedence: `<Form>` prop, then this, then the translated default. */
+	buttons?: FormButtonSettings
+	/** The form's admin title (the collection's `useAsTitle` field). Render it, or not: the host decides. */
+	title?: string
+	/** Whether the form uses multi-step (flow) navigation. Drives client step rendering; flow data may still exist when false. */
+	multistep: boolean
+	/** Whether this form is a poll. Gates poll rendering and results; the poll config lives under `poll`. */
+	pollEnabled: boolean
 	poll?: FormPollSettings
 }

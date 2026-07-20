@@ -48,6 +48,28 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 		await booted.stop()
 	})
 
+	it('localizes the form title', () => {
+		expect(isLocalized(namedField(formsFields(booted), 'title'))).toBe(true)
+	})
+
+	it('requires the title in the default locale but lets other locales fall back', async () => {
+		await expect(
+			booted.payload.create({ collection: 'forms', data: { fields: [] } })
+		).rejects.toThrow()
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: { title: 'Present', fields: [] },
+		})
+		// A non-default-locale write may omit the title; it falls back to the default-locale value.
+		const updated = await booted.payload.update({
+			collection: 'forms',
+			id: form.id,
+			locale: 'de',
+			data: { fields: [] },
+		})
+		expect(updated.id).toBe(form.id)
+	})
+
 	it('localizes the shared content fields on field blocks', () => {
 		const textBlock = blockOf(formsFields(booted), 'fields', 'text')
 		expect(textBlock).toBeDefined()
@@ -69,16 +91,8 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 		expect(isLocalized(namedField(optionFields, 'value'))).toBe(false)
 	})
 
-	it('localizes the consent statement and static source label but not the url', () => {
-		const consentBlock = blockOf(formsFields(booted), 'fields', 'consent')
-		const fields = consentBlock?.fields ?? []
-		expect(isLocalized(namedField(fields, 'statement'))).toBe(true)
-		const sourceConfig = namedField(fields, 'sourceConfig')
-		const sourceFields = sourceConfig && 'fields' in sourceConfig ? sourceConfig.fields : []
-		expect(isLocalized(namedField(sourceFields, 'label'))).toBe(true)
-		expect(isLocalized(namedField(sourceFields, 'url'))).toBe(false)
-		expect(isLocalized(namedField(sourceFields, 'version'))).toBe(false)
-	})
+	// Consent carries no localized content of its own: the statement lives on the host's placed
+	// `consentSourcesField()`, whose own `localized` option covers it (see its unit tests).
 
 	it('localizes the repeater add label but not the row bounds', () => {
 		const repeaterBlock = blockOf(formsFields(booted), 'fields', 'repeater')
@@ -88,15 +102,20 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 		expect(isLocalized(namedField(fields, 'maxRows'))).toBe(false)
 	})
 
-	it('localizes action subjects and bodies but not addresses or secrets', () => {
+	it('localizes action subjects, bodies, and the team "to" but not identifiers or secrets', () => {
 		const fields = formsFields(booted)
 		for (const slug of ['emailTeam', 'confirmation']) {
 			const block = blockOf(fields, 'actions', slug)
 			expect(isLocalized(namedField(block?.fields ?? [], 'subject'))).toBe(true)
 			expect(isLocalized(namedField(block?.fields ?? [], 'body'))).toBe(true)
 		}
+		// The team `to` is a routing target: localized so each locale keeps its own address and a
+		// submission's locale selects the address it routes to. The confirmation `toField` names a
+		// form field (an identifier), so it stays non-localized, as do webhook addresses and secrets.
 		const emailTeamBlock = blockOf(fields, 'actions', 'emailTeam')
-		expect(isLocalized(namedField(emailTeamBlock?.fields ?? [], 'to'))).toBe(false)
+		expect(isLocalized(namedField(emailTeamBlock?.fields ?? [], 'to'))).toBe(true)
+		const confirmationBlock = blockOf(fields, 'actions', 'confirmation')
+		expect(isLocalized(namedField(confirmationBlock?.fields ?? [], 'toField'))).toBe(false)
 		const webhookBlock = blockOf(fields, 'actions', 'signedWebhook')
 		expect(isLocalized(namedField(webhookBlock?.fields ?? [], 'url'))).toBe(false)
 	})
@@ -120,10 +139,18 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 				fields: [{ id: rows[0]?.id, blockType: 'text', name: 'fullName', label: 'Voller Name' }],
 			},
 		})
+		await booted.payload.update({
+			collection: 'forms',
+			id: form.id,
+			locale: 'de',
+			data: { title: 'Kontakt' },
+		})
 		const de = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'de' })
 		const en = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'en' })
 		expect((de.fields as Array<{ label: string }>)[0]?.label).toBe('Voller Name')
 		expect((en.fields as Array<{ label: string }>)[0]?.label).toBe('Full name')
+		expect(de.title).toBe('Kontakt')
+		expect(en.title).toBe('Contact')
 	})
 })
 
@@ -142,6 +169,7 @@ describeForDb(
 		})
 
 		it('payload strips the localized flag when the host has no localization', () => {
+			expect(isLocalized(namedField(formsFields(booted), 'title'))).toBe(false)
 			const textBlock = blockOf(formsFields(booted), 'fields', 'text')
 			const label = namedField(textBlock?.fields ?? [], 'label')
 			expect(label).toBeDefined()

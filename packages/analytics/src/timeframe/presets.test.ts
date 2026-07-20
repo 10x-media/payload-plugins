@@ -52,4 +52,15 @@ describe('resolveTimeframe', () => {
 		expect(TIMEFRAME_PRESETS).toContain('last30days')
 		expect(TIMEFRAME_PRESETS).toHaveLength(8)
 	})
+
+	it('aligns "today" to the reporting timezone day when given', () => {
+		// 14:30Z is still the same calendar day in Berlin, but its start is local midnight (22:00Z prior).
+		const { start } = resolveTimeframe('today', now, 'Europe/Berlin')
+		expect(start.toISOString()).toBe('2026-06-16T22:00:00.000Z')
+	})
+
+	it('starts the month in the reporting timezone', () => {
+		const { start } = resolveTimeframe('thisMonth', now, 'Europe/Berlin')
+		expect(start.toISOString()).toBe('2026-05-31T22:00:00.000Z')
+	})
 })

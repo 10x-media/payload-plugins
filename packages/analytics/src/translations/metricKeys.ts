@@ -11,8 +11,6 @@ export const METRIC_KEYS: Record<MetricKey, TranslationKey> = {
 	events: keys.metricEvents,
 	avgDuration: keys.metricAvgDuration,
 	bounceRate: keys.metricBounceRate,
-	entries: keys.metricEntries,
-	exits: keys.metricExits,
 	scrollDepth: keys.metricScrollDepth,
 	conversions: keys.metricConversions,
 	revenue: keys.metricRevenue,

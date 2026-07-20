@@ -11,6 +11,8 @@ afterEach(() => {
 const doc = (fields: FormFieldInstance[], overrides: Partial<FormDocument> = {}): FormDocument => ({
 	id: 1,
 	fields,
+	multistep: overrides.flow !== undefined,
+	pollEnabled: false,
 	...overrides,
 })
 

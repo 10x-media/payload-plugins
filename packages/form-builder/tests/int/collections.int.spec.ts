@@ -1,6 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { formBuilder } from '../../src/index'
+import { createSubmission } from '../../src/submissions/createSubmission'
 
 describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -24,6 +25,19 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('registers the form-submissions collection', () => {
 		expect(booted.payload.collections['form-submissions']).toBeDefined()
+	})
+
+	it('defaults submission status to complete and refuses to let it be cleared', () => {
+		// Aggregation counts `status: complete`, so a cleared status would silently drop the
+		// submission out of every poll result.
+		const status = booted.payload.collections['form-submissions']?.config.fields.find(
+			(field) => 'name' in field && field.name === 'status'
+		)
+		expect(status).toMatchObject({
+			type: 'select',
+			defaultValue: 'complete',
+			admin: { isClearable: false },
+		})
 	})
 
 	it('stores a form with a fields blocks array', async () => {
@@ -70,9 +84,38 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 			{ field: 'fullName', value: 'Ada' },
 			{ field: 'email', value: 'ada@x.com' },
 		])
+		// The width shared field defaults to 'full', so real submissions snapshot it onto every descriptor.
 		expect(submission.descriptors).toEqual([
-			{ field: 'fullName', label: 'Full name', fieldType: 'text' },
-			{ field: 'email', label: 'Email', fieldType: 'email' },
+			{ field: 'fullName', label: 'Full name', fieldType: 'text', width: 'full' },
+			{ field: 'email', label: 'Email', fieldType: 'email', width: 'full' },
+		])
+	})
+
+	it('snapshots an authored field width onto its descriptor', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Contact',
+				fields: [
+					{ blockType: 'text', name: 'street', label: 'Street', width: 'twoThirds' },
+					{ blockType: 'text', name: 'zip', label: 'ZIP', width: 'third' },
+				],
+			},
+		})
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			depth: 0,
+			data: {
+				form: form.id,
+				values: [
+					{ field: 'street', value: 'Main' },
+					{ field: 'zip', value: '10115' },
+				],
+			},
+		})
+		expect(submission.descriptors).toEqual([
+			{ field: 'street', label: 'Street', fieldType: 'text', width: 'twoThirds' },
+			{ field: 'zip', label: 'ZIP', fieldType: 'text', width: 'third' },
 		])
 	})
 
@@ -117,6 +160,53 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 			booted.payload.create({
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
+			})
+		).rejects.toThrow()
+	})
+
+	it('createSubmission runs the full submission pipeline', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Contact',
+				fields: [
+					{ blockType: 'text', name: 'fullName', label: 'Full name', required: true },
+					{ blockType: 'email', name: 'email', label: 'Email', required: true },
+				],
+			},
+		})
+		const submission = await createSubmission(booted.payload, {
+			form: form.id,
+			values: [
+				{ field: 'fullName', value: 'Ada' },
+				{ field: 'email', value: 'ada@x.com' },
+			],
+		})
+		// No req is threaded through here, the same anonymous-equivalent path the collection's own
+		// hooks force to 'complete' for any caller without an authenticated req.user.
+		expect(submission.status).toBe('complete')
+		expect(submission.values).toEqual([
+			{ field: 'fullName', value: 'Ada' },
+			{ field: 'email', value: 'ada@x.com' },
+		])
+		expect(submission.descriptors).toEqual([
+			{ field: 'fullName', label: 'Full name', fieldType: 'text', width: 'full' },
+			{ field: 'email', label: 'Email', fieldType: 'email', width: 'full' },
+		])
+	})
+
+	it('createSubmission still enforces server-side validation', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Contact',
+				fields: [{ blockType: 'email', name: 'email', label: 'Email', required: true }],
+			},
+		})
+		await expect(
+			createSubmission(booted.payload, {
+				form: form.id,
+				values: [{ field: 'email', value: 'not-an-email' }],
 			})
 		).rejects.toThrow()
 	})

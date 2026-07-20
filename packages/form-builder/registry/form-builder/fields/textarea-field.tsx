@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 export const textareaField = defineFieldRenderer<string>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const invalid = errors.length > 0
@@ -49,11 +49,6 @@ export const textareaField = defineFieldRenderer<string>(
 							))}
 						</div>
 					) : null}
-					{warnings?.map((message) => (
-						<p key={message} className="text-amber-600">
-							{message}
-						</p>
-					))}
 				</div>
 			</div>
 		)

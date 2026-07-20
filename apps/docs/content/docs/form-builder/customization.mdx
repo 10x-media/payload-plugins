@@ -3,6 +3,17 @@ title: Customization
 description: Collection overrides, submission admin UI options, and other plugin-level configuration.
 ---
 
+## Options API conventions
+
+Every option follows one of a few shapes, and knowing which saves you from fighting the API:
+
+- **Opt-in flags** take Payload's `false` / `true` / object form: omit or `false` disables, `true` enables with defaults, an object customizes. `spam`, `poll`, and `uploads` work this way.
+- **Resolver-gated features** are the sanctioned exception: they have no `true` and are enabled purely by supplying a `req`-scoped resolver. `consent.sources`, `email.fromAddresses`, `email.departments`, `poll.sources`, and `events` stay off until you pass the function, and passing it is the enable.
+- **Composition seams** hand you the built defaults and take your result back, so you extend rather than replace: `buttons.fields`, `poll.outcomeFields`, `response.redirect.fields`, and each `overrides.*` `fields` receive the defaults for you to spread, wrap, reorder, or filter.
+- **Registry seams** key entries by slug and replace a matched entry wholesale: `fields`, `rules`, `actions`, and `poll.types`. To change one built-in and keep the rest, spread it from the exported defaults (see [Tweaking one built-in](#tweaking-one-built-in)).
+
+One deliberate divergence is worth calling out. Consent stores only a source's row `id` and resolves the statement live per request, so editing a source reaches every form at once. Department routing does the opposite: `email.departments` resolves each department's address at author time and freezes the resolved address into the form's `emailTeam` action. That is intentional: a submission must route to the address the form was saved with, so the target stays audit-stable even if the department's address later changes.
+
 ## Tweaking one built-in
 
 The registries behind [field types](/form-builder/fields#the-registry) and [validation rules](/form-builder/validation#custom-rules) replace a built-in wholesale when you pass an object under its type. To change one property of a built-in and keep the rest, spread it from the exported defaults: `defaultFieldDefinitionsByType` and `defaultValidationRulesByType` index the built-ins by `type` (the arrays `defaultFieldDefinitions` and `defaultValidationRules` are exported too).
@@ -29,7 +40,7 @@ The same pattern works for rules via `defaultValidationRulesByType` under the `r
 
 ### Spread-overrides and `localizeContent`
 
-The prebuilt default exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`, `defaultConsentSources`) are built with [content localization](/form-builder/fields#content-localization) on, so their content-bearing config fields carry `localized: true`. On a host running `localizeContent: false`, spreading one of them silently reintroduces the flag for that one type. Derive overrides from the builder functions instead, passing the same flag you gave the plugin:
+The prebuilt default exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`) are built with [content localization](/form-builder/fields#content-localization) on, so their content-bearing config fields carry `localized: true`. On a host running `localizeContent: false`, spreading one of them silently reintroduces the flag for that one type. Derive overrides from the builder functions instead, passing the same flag you gave the plugin:
 
 ```ts title="payload.config.ts"
 import { buildDefaultFieldDefinitions, formBuilder, type FieldTypeOption } from '@10x-media/form-builder'
@@ -44,13 +55,37 @@ formBuilder({
 })
 ```
 
-`buildDefaultActionDefinitions(localize)` and `buildDefaultConsentSources(localize)` are the equivalent builders for actions and consent sources. With the default `localizeContent: true` the prebuilt exports are exactly the builder output, so the shorter spread recipe above stays correct.
+`buildDefaultActionDefinitions(localize)` is the equivalent builder for actions. With the default `localizeContent: true` the prebuilt exports are exactly the builder output, so the shorter spread recipe above stays correct. Consent statements are not affected either way: they live on your own [consent sources field](/form-builder/consent#setting-it-up), which carries its own `localized` option.
+
+## Rich text editors
+
+The plugin authors rich text in three places: [message](/form-builder/fields#message) content, the response message, and [action bodies](/form-builder/actions#rich-text-bodies). None of them set an editor of their own, so all three inherit your config's `editor`, which is why the config must set one. [Consent statements](/form-builder/consent) are a fourth, but they live on a field you place yourself, so `consentSourcesField({ editor })` is what redirects those.
+
+Two options redirect that:
+
+| Option | Scope |
+|---|---|
+| `richText.editor` | The default editor for every plugin rich text field |
+| `richText.bodyEditor` | The action body fields only; falls back to `editor` |
+
+```ts title="payload.config.ts"
+formBuilder({
+  richText: {
+    // Every plugin rich text field, instead of the project editor
+    editor: formCopyEditor,
+    // ...except action bodies, which get their own
+    bodyEditor: emailBodyEditor,
+  },
+})
+```
+
+Set neither and all three stay on the project editor. Set only `editor` to move the whole plugin, bodies included, onto one editor. Set only `bodyEditor` to single out email bodies and leave the rest on the project editor. The split exists because a form's on-page copy and an email's body land in different renderers: the features a consent statement wants are rarely the ones that survive an email client.
 
 ## Submission answers UI
 
-When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component that formats each value using its field type's `format` function, shows repeater rows with numbered headings, displays consent proofs with agreed/declined indicators and a timestamp, and includes submission metadata. This replaces the raw JSON fields as the primary view.
+When you open a `form-submissions` document in the admin, the plugin renders a `SubmissionAnswers` component in place of the raw stored fields. Each answer renders as a native Payload field, the same `TextInput`/`FieldLabel` primitives Payload's own fields use, formatted through its field type's `format` function and laid out at its authored [width](/form-builder/rendering#layout-grid) so the admin view matches the widths editors configured on the form itself. Repeater rows render as numbered sub-sections; a file answer renders as a link to the stored upload; consent renders an Agreed/Declined `Pill` next to the source link and the capture timestamp. `locale` and the submission `meta` (received-at time, IP/user agent when captured, the spam signal) are folded into a single "Submission details" section at the bottom, rather than appearing as separate top-level fields.
 
-The raw `values`, `descriptors`, and `consent` JSON fields are hidden by default. They contain the same data as the formatted UI and are noisy alongside it. To show them (useful for debugging), set `showSubmissionRawFields`:
+The raw `locale`, `values`, `descriptors`, `consent`, and `meta` fields are hidden by default. They contain the same data as the formatted UI and are noisy alongside it. To show them (useful for debugging), set `showSubmissionRawFields`:
 
 ```ts title="payload.config.ts"
 formBuilder({
@@ -58,7 +93,140 @@ formBuilder({
 })
 ```
 
-With this option off (the default), the `answers` UI field is the only visible representation of a submission's content in the admin. The raw JSON fields still exist in the database and are returned by the API; only the admin display is affected.
+With this option off (the default), the `answers` UI field is the only visible representation of a submission's content in the admin. The raw fields still exist in the database and are returned by the API; only the admin display is affected.
+
+## Form-level buttons
+
+Every form carries three localized button-label fields at the document root, not in a group: `submitLabel` at the bottom of the Fields tab, and `nextLabel` / `prevLabel` in a row at the bottom of the Flow tab (shown once the flow has at least one step). The rendered chrome resolves each label as `<Form>` prop, then the stored value, then the translated default.
+
+Each slot is composable independently through the plugin's `buttons.fields` option: it receives the three default fields and returns a field for each slot, `submit` / `prev` / `next`, not an array. Wrap a default in a row with your own field, reorder within that row, or replace a default outright. Here the submit label gets an accompanying icon select:
+
+```ts title="payload.config.ts"
+formBuilder({
+  buttons: {
+    fields: ({ defaultFields }) => ({
+      submit: {
+        type: 'row',
+        fields: [
+          defaultFields.submit,
+          {
+            name: 'submitIcon',
+            type: 'select',
+            options: [
+              { label: 'Arrow right', value: 'arrow-right' },
+              { label: 'Paper plane', value: 'paper-plane' },
+            ],
+          },
+        ],
+      },
+      prev: defaultFields.prev,
+      next: defaultFields.next,
+    }),
+  },
+})
+```
+
+A field added this way is stored on the form document (`submitIcon` beside `submitLabel`), but it does not automatically reach the client. `buttons`, like `poll`, is a deliberately narrow allowlist on `toFormDocument` (unlike `response`, which is cast through wholesale), so admin-only config, or a poll source's secrets, can never leak to an anonymous visitor. Surface a host-added button field yourself by reading it off the raw fetched document and merging it into `toFormDocument`'s output before handing it to `<Form>`:
+
+```tsx title="app/contact/page.tsx"
+import { toFormDocument } from '@10x-media/form-builder/rsc'
+
+const raw = await payload.findByID({ collection: 'forms', id })
+const doc = toFormDocument(raw)
+doc.buttons = { ...doc.buttons, submitIcon: raw.submitIcon }
+```
+
+Then read it back from the form context in a custom button renderer:
+
+```tsx title="submit-with-icon.tsx"
+'use client'
+
+import {
+  Form,
+  type FormDocument,
+  type SubmitButtonRenderProps,
+  useFormContext,
+} from '@10x-media/form-builder/react'
+
+const icons: Record<string, string> = { 'arrow-right': '→', 'paper-plane': '✈' }
+
+const SubmitWithIcon = ({ label, submitting }: SubmitButtonRenderProps) => {
+  const { form } = useFormContext()
+  const icon = typeof form.buttons?.submitIcon === 'string' ? form.buttons.submitIcon : undefined
+  return (
+    <button type="submit" disabled={submitting}>
+      {icon ? <span aria-hidden>{icons[icon]}</span> : null}
+      {label}
+    </button>
+  )
+}
+
+export const ContactForm = ({ form }: { form: FormDocument }) => (
+  <Form form={form} renderSubmit={(props) => <SubmitWithIcon {...props} />} />
+)
+```
+
+`renderNext` and `renderBack` compose identically.
+
+To assemble a slot from scratch instead of receiving the default, the individual builders are exported: `buildSubmitLabelField(localize)`, `buildNextLabelField(localize)`, and `buildPrevLabelField(localize)`, plus `buildDefaultButtonFields(localize)` returning all three keyed `submit`/`next`/`prev`, exactly what `buttons.fields` is handed as `defaultFields`.
+
+## List view
+
+The `forms` list favors compact, localized summaries over Payload's defaults: the Fields column shows a count ("6 Fields") instead of listing every block type, and the Flow column shows a step count ("2 steps", or `—` with no flow) instead of raw JSON. Both cells read from the plugin's own translations.
+
+The default column sets are curated rather than "every field": `forms` shows Title, Fields, Flow, Poll, and Updated At; `form-submissions` shows Form, Status, Locale, and Created At. Both are ordinary `admin.defaultColumns` and go through the standard [collection overrides](#collection-overrides) seam like anything else:
+
+```ts title="payload.config.ts"
+formBuilder({
+  overrides: {
+    forms: {
+      admin: { defaultColumns: ['title', 'pollEnabled', 'updatedAt'] },
+    },
+  },
+})
+```
+
+## Poll outcome fields
+
+The forms `poll.outcome` group holds a poll's recorded winners. Its `winningValues` multi-select is backed by the `GET /api/forms/:id/poll-options` endpoint (the poll's [effective options](/form-builder/polls#outcome)) and stores a set, so a tie records every winner; `resolvedAt` is a server-stamped date locked against every caller write. Compose the group with the `poll.outcomeFields` option, which mirrors [`buttons.fields`](#form-level-buttons): it receives the two default fields and returns the group's final field array verbatim, so you can reorder, wrap, or swap the winner picker for a component of your own, for example a relationship select over the voteable records:
+
+```ts title="payload.config.ts"
+formBuilder({
+  poll: {
+    outcomeFields: ({ defaultFields }) => [
+      {
+        ...defaultFields.winningValues,
+        admin: {
+          components: { Field: { path: './WinnerPicker#WinnerPicker' } },
+        },
+      },
+      defaultFields.resolvedAt,
+    ],
+  },
+})
+```
+
+Keep the stored value a `PollOption.value` string whatever component renders it: `pollOutcomeBeforeChange` validates the winner against the poll's effective options server-side regardless of which field authored it, so a swap cannot bypass the membership check. Preserve `defaultFields.resolvedAt` (or rebuild the same field-level access lock) to keep the stamp tamper-proof. `buildWinningValuesField()`, `buildResolvedAtField()`, and `buildDefaultOutcomeFields()` are exported for assembling the group from scratch.
+
+`buildWinningValuesField()` also carries a condition that shows the field only for a `manual` [poll type](/form-builder/polls#poll-types), hiding it for `mostVoted`, `source`, and any host strategy alike: each of those sets the winner itself once the poll closes, so there is nothing for an editor to hand-pick. A swapped-in `Field` for that slot should read `poll.type` off the document and preserve the same hide, unless it deliberately wants a picker that stays visible regardless of strategy.
+
+## Redirect response fields
+
+When an author sets the [response](/form-builder/rendering#the-form-document) to **Redirect**, the `response.redirect` group holds where to send the visitor: a `url` text field, plus a polymorphic `reference` relationship when [`redirectRelationships`](/form-builder/rendering#redirecting-to-an-internal-document) is set. Most projects already have a custom link field (choose a URL or pick a linkable document, like the rich-text link element), and the `response.redirect.fields` option lets you drop it in as a one-liner. It mirrors [`buttons.fields`](#form-level-buttons) and [`poll.outcomeFields`](#poll-outcome-fields): you receive the default fields and return the group's final field array, so prepend your own link group, swap `url` for your picker, reorder, or filter:
+
+```ts title="payload.config.ts"
+formBuilder({
+  response: {
+    redirect: {
+      fields: ({ defaultFields }) => [myLinkGroup, ...defaultFields],
+    },
+  },
+})
+```
+
+Omit the option and the group stays the built-in `url` (plus `reference` when configured), unchanged.
+
+The plugin's built-in redirect handling reads `redirect.url` and `redirect.reference`; `toFormDocument` passes the whole `response` group through, so anything you add here reaches the client on `form.response.redirect`. If you **replace** `url` with your own link field, your frontend owns resolving that field to a destination and writing it into `response.redirect.url` before render (or navigating from `onSuccess`), exactly as with the [internal-reference case](/form-builder/rendering#redirecting-to-an-internal-document). `<Form>`'s automatic post-submit navigation only ever acts on `response.redirect.url`.
 
 ---
 

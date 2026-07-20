@@ -19,7 +19,17 @@ describe('analytics factory', () => {
 		const out = analytics({ adapters: [memoryAdapter()] })(fakeConfig()) as Config
 		expect(out.i18n?.translations).toBeDefined()
 	})
-	it('applies the translations option', () => {
+	it('registers German translations out of the box', () => {
+		const out = analytics({ adapters: [memoryAdapter()] })(fakeConfig()) as Config
+		const i18n = out.i18n?.translations as Record<string, Record<string, Record<string, string>>>
+		expect(i18n.de?.analytics?.metricPageviews).toBe('Seitenaufrufe')
+		expect(i18n.de?.analytics?.comparisonVsPrevious).toBe('vs. vorheriger Zeitraum')
+		expect(i18n.de?.analytics?.comparisonIncrease).toBe('Gestiegen')
+		expect(i18n.de?.analytics?.comparisonDecrease).toBe('Gesunken')
+		expect(i18n.de?.analytics?.comparisonNoChange).toBe('Keine Änderung')
+	})
+
+	it('applies the translations option and a project override wins over the built-in', () => {
 		const out = analytics({
 			adapters: [memoryAdapter()],
 			translations: { de: { [keys.pluginName]: 'Analytik' } },
@@ -27,6 +37,8 @@ describe('analytics factory', () => {
 		const i18n = out.i18n?.translations as Record<string, Record<string, Record<string, string>>>
 		expect(i18n.de?.analytics?.pluginName).toBe('Analytik')
 		expect(i18n.en?.analytics?.pluginName).toBe('Analytics')
+		// Built-in German keys not overridden remain intact.
+		expect(i18n.de?.analytics?.metricPageviews).toBe('Seitenaufrufe')
 	})
 	it('throws when no adapters are supplied', () => {
 		expect(() => analytics({ adapters: [] })(fakeConfig())).toThrow(/at least one adapter/i)

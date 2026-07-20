@@ -1,15 +1,25 @@
 ---
 title: Validation
-description: Per-field rules, custom rule types, severities, and the Standard Schema escape hatch.
+description: Per-field rules, custom rule types, field-target pickers, and the Standard Schema escape hatch.
 ---
 
 Validation is declarative and server-authoritative. Editors attach rules to fields as blocks in the admin; one engine runs them on the server for every submission, and the renderer runs the same client-safe rules for immediate feedback. A submission is never stored on the client's word.
 
 ## Built-in rules
 
-`minLength`, `maxLength`, `min`, `max`, `minDate`, `maxDate`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`. `minDate` / `maxDate` apply to [date fields](/form-builder/fields#date) and compare ISO `YYYY-MM-DD` strings against the configured bound. Two are special: `matchesField` is cross-field, validating one answer against another (confirm-email style), and `notAlreadySubmitted` is async and server-only, because it queries existing submissions.
+`minLength`, `maxLength`, `min`, `max`, `minDate`, `maxDate`, `pattern`, `email`, `url`, `oneOf`, `matchesField`, and `notAlreadySubmitted`. `minDate` / `maxDate` apply to [date fields](/form-builder/fields#date) and compare ISO `YYYY-MM-DD` strings against the configured bound. Two are special: `matchesField` is cross-field — you pick the field to compare against and it fails when the two answers differ (confirm-email or confirm-password style) — and `notAlreadySubmitted` is async and server-only, because it queries existing submissions.
 
-Every rule instance can override its message (with `{var}` interpolation for rule parameters) and its severity: an `error` blocks submission, a `warning` is advisory and does not.
+Each rule's config block opens with a short, localized description of what makes it fail, so an editor never has to infer a rule's mechanics from its name.
+
+Every rule instance can override its message (with `{var}` interpolation for rule parameters).
+
+`pattern` takes two params: `pattern`, the regular expression source, and an optional `flags` (`i`, `g`, `m`, and the rest), applied as `new RegExp(pattern, flags)`. Write the source alone, without delimiters: `^[a-z0-9-]+$`, not `/^[a-z0-9-]+$/i`.
+
+### Rule params are checked at authoring time
+
+Both `pattern` params validate as the editor saves, so an expression that cannot compile is a save error rather than a rule that quietly never fires (`minDate` / `maxDate` guard their bounds the same way). `pattern` is compiled against its sibling `flags`, since flags decide validity; a bad flag is reported on the `flags` field alone, so one typo raises one error.
+
+At submit time an uncompilable regex still fails open, passing the value rather than rejecting it. That is the safety net for rules stored before these guards existed: a bad expression that predates them must not suddenly start rejecting every visitor's answer. The authoring guard is what stops new ones from being written.
 
 ## Custom rules
 
@@ -33,7 +43,26 @@ formBuilder({
 
 The `rules` option follows the same [opt-in convention](/concepts#the-opt-in-convention) as field types, and entries are cast to `ValidationRuleOption` at the registry boundary for the same erased-generics reason.
 
-Beyond the required pieces, a definition can set `appliesTo` (field type slugs the rule can attach to; omit for all), `params` (a Payload `Field[]` for the rule's per-instance configuration in the admin), and a default `severity`. Mark anything async or touching `payload`/`req` with `client: false`: the renderer skips it, the server still runs it.
+Beyond the required pieces, a definition can set `appliesTo` (field type slugs the rule can attach to; omit for all), `params` (a Payload `Field[]` for the rule's per-instance configuration in the admin), and `description` (a plain-language, localizable string shown at the top of the rule's config block). Mark anything async or touching `payload`/`req` with `client: false`: the renderer skips it, the server still runs it.
+
+### Targeting another field
+
+A param that points at another field on the same form (like `matchesField`'s target) should store a field name but be authored by picking, not typing. `fieldTargetParam(name, opts?)` builds exactly that: a text param mounting the field-name picker whose save-time `validate` rejects a name that no longer resolves to a field, so a reference left dangling by a removed field is a save error, not a silently dead rule.
+
+```ts
+import { defineValidationRule, fieldTargetParam } from '@10x-media/form-builder'
+
+defineValidationRule<{ field: string }, unknown>({
+  type: 'sameAs',
+  label: 'Same as field',
+  params: [fieldTargetParam('field', { types: ['text', 'email'] })],
+  defaultMessage: 'Does not match',
+  validate: ({ value, params, siblingData, message }) =>
+    value === siblingData[params.field] ? true : message(),
+})
+```
+
+`opts.types` restricts the picker and the save-time check to those field types (omit for every field); `opts.required` defaults to `true`; `opts.label` and `opts.description` set the field's label and helper text.
 
 ## Standard Schema
 

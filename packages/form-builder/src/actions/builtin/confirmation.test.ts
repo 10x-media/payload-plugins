@@ -163,6 +163,132 @@ describe('confirmation', () => {
 		).rejects.toThrow()
 	})
 
+	it('omits from from sendEmail when config.from is unset', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: { toField: 'email', subject: 'Hi', body: 'body' },
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+		})
+	})
+
+	it('includes from in sendEmail when config.from is set', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: {
+					toField: 'email',
+					from: 'Support <support@example.com>',
+					subject: 'Hi',
+					body: 'body',
+				},
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+			from: 'Support <support@example.com>',
+		})
+	})
+
+	it('omits cc, bcc, and replyTo from sendEmail when unset', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: { toField: 'email', subject: 'Hi', body: 'body' },
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+		})
+	})
+
+	it('includes cc, bcc, and replyTo in sendEmail when configured', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: {
+					toField: 'email',
+					cc: 'cc@example.com',
+					bcc: 'bcc@example.com',
+					replyTo: 'reply@example.com',
+					subject: 'Hi',
+					body: 'body',
+				},
+				values: [{ field: 'email', value: 'user@example.com' }],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+			cc: 'cc@example.com',
+			bcc: 'bcc@example.com',
+			replyTo: 'reply@example.com',
+		})
+	})
+
+	it('interpolates merge tags in cc, bcc, and replyTo', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof confirmation.run>[0]['payload']
+
+		await confirmation.run(
+			baseArgs({
+				config: {
+					toField: 'email',
+					cc: '{{ccAddress}}',
+					bcc: '{{bccAddress}}',
+					replyTo: '{{replyAddress}}',
+					subject: 'Hi',
+					body: 'body',
+				},
+				values: [
+					{ field: 'email', value: 'user@example.com' },
+					{ field: 'ccAddress', value: 'cc@example.com' },
+					{ field: 'bccAddress', value: 'bcc@example.com' },
+					{ field: 'replyAddress', value: 'reply@example.com' },
+				],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'user@example.com',
+			subject: 'Hi',
+			html: 'body',
+			cc: 'cc@example.com',
+			bcc: 'bcc@example.com',
+			replyTo: 'reply@example.com',
+		})
+	})
+
 	const bodyFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
 		definition.config?.find((field) => 'name' in field && field.name === 'body') as
 			| { editor?: unknown }
@@ -175,6 +301,61 @@ describe('confirmation', () => {
 	it('spreads a custom editor onto the body field when given', () => {
 		const editor = { fake: 'editor' } as never
 		expect(bodyFieldOf(buildConfirmation(true, editor))?.editor).toBe(editor)
+	})
+
+	const fromFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
+		definition.config?.find((field) => 'name' in field && field.name === 'from')
+
+	it('omits the from field when no fromAddresses resolver is given', () => {
+		expect(fromFieldOf(buildConfirmation(true))).toBeUndefined()
+	})
+
+	it('adds a from field backed by the from-addresses endpoint when a resolver is given', () => {
+		const field = fromFieldOf(buildConfirmation(true, undefined, () => []))
+		expect(field?.type).toBe('text')
+		expect(typeof (field as { validate?: unknown })?.validate).toBe('function')
+		const component = (field as { admin?: { components?: { Field?: unknown } } })?.admin?.components
+			?.Field as { path?: string; clientProps?: { endpoint?: string } } | undefined
+		expect(component?.path).toBe('@10x-media/form-builder/client#EndpointOptionsSelect')
+		expect(component?.clientProps?.endpoint).toBe('from-addresses')
+	})
+
+	const toFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
+		definition.config?.find((field) => 'name' in field && field.name === 'toField') as
+			| { admin?: { components?: { Field?: unknown }; description?: unknown } }
+			| undefined
+
+	it('mounts FieldNameSelect on toField with the PII-warning description as a translation key', () => {
+		const field = toFieldOf(buildConfirmation(true))
+		const component = field?.admin?.components?.Field as
+			| { path?: string; clientProps?: { types?: string[]; descriptionKey?: string } }
+			| undefined
+		expect(component?.path).toBe('@10x-media/form-builder/client#FieldNameSelect')
+		expect(component?.clientProps?.types).toEqual(['email'])
+		// A custom Field component replaces Payload's whole default render, including the
+		// description slot, so admin.description would be silently inert here.
+		expect(component?.clientProps?.descriptionKey).toBe(
+			'formBuilder:action.config.toFieldDescription'
+		)
+		expect(field?.admin?.description).toBeUndefined()
+	})
+
+	const fieldNamed = (definition: ReturnType<typeof buildConfirmation>, name: string) =>
+		definition.config?.find((field) => 'name' in field && field.name === name)
+
+	it('adds plain, localized text fields for cc, bcc, and replyTo', () => {
+		for (const name of ['cc', 'bcc', 'replyTo']) {
+			const field = fieldNamed(buildConfirmation(true), name)
+			expect(field?.type).toBe('text')
+			expect((field as { localized?: boolean } | undefined)?.localized).toBe(true)
+		}
+	})
+
+	it('drops the localized flag on cc, bcc, and replyTo when localize is false', () => {
+		for (const name of ['cc', 'bcc', 'replyTo']) {
+			const field = fieldNamed(buildConfirmation(false), name)
+			expect((field as { localized?: boolean } | undefined)?.localized).toBeUndefined()
+		}
 	})
 })
 

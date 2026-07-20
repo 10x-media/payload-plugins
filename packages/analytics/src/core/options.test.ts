@@ -34,10 +34,18 @@ describe('resolveOptions widgets.localizeText', () => {
 })
 
 describe('resolveOptions', () => {
-	it('fills cache TTL defaults', () => {
+	it('leaves cache TTL unset so the adapter recommendedTtl applies', () => {
 		const r = resolveOptions({ adapters: [memoryAdapter()] })
-		expect(r.cache.ttl.aggregate).toBeGreaterThan(0)
-		expect(r.cache.ttl.realtime).toBeGreaterThan(0)
+		expect(r.cache.ttl.aggregate).toBeUndefined()
+		expect(r.cache.ttl.realtime).toBeUndefined()
+	})
+	it('keeps an explicit cache TTL override', () => {
+		const r = resolveOptions({
+			adapters: [memoryAdapter()],
+			cache: { ttl: { aggregate: 1800, realtime: 30 } },
+		})
+		expect(r.cache.ttl.aggregate).toBe(1800)
+		expect(r.cache.ttl.realtime).toBe(30)
 	})
 	it('throws when no adapters are supplied', () => {
 		expect(() => resolveOptions({ adapters: [] })).toThrow(/at least one adapter/i)
@@ -175,6 +183,7 @@ describe('resolveOptions sync', () => {
 			collectionSlug: 'analytics-daily',
 			cron: '0 */6 * * *',
 			lookbackDays: 3,
+			hidden: true,
 		})
 	})
 	it('enables sync with defaults when sync is true', () => {
@@ -183,6 +192,7 @@ describe('resolveOptions sync', () => {
 			collectionSlug: 'analytics-daily',
 			cron: '0 */6 * * *',
 			lookbackDays: 3,
+			hidden: true,
 		})
 	})
 	it('keeps sync disabled when sync is false', () => {
@@ -197,6 +207,7 @@ describe('resolveOptions sync', () => {
 			cron: '0 0 * * *',
 			lookbackDays: 3,
 			adapters: ['plausible'],
+			hidden: true,
 		})
 	})
 	it('overrides slug and lookbackDays from an object option', () => {
@@ -206,6 +217,10 @@ describe('resolveOptions sync', () => {
 		}).sync
 		expect(sync.collectionSlug).toBe('metrics')
 		expect(sync.lookbackDays).toBe(7)
+	})
+	it('hides the sync collection by default and surfaces it on request', () => {
+		expect(resolveOptions({ adapters, sync: true }).sync.hidden).toBe(true)
+		expect(resolveOptions({ adapters, sync: { hidden: false } }).sync.hidden).toBe(false)
 	})
 })
 

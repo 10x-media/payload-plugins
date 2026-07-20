@@ -18,16 +18,25 @@ import type { ChangeEvent } from 'react'
 import { useMemo, useRef, useState } from 'react'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
 import type { FlowStep, FlowTransition, FormFlow } from '../flow/types'
-import { keys } from '../translations/keys'
+import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { resolveMessage } from '../validation/message'
 import { ConditionBuilder } from './ConditionBuilder'
 import {
 	assignFieldToStep,
+	type FlowFieldEntry,
+	type FlowSelectOption,
 	fieldHolders,
+	flowFieldEntries,
+	nextFromSelectValue,
+	nextSelectOptions,
+	nextToSelectValue,
+	otherStepSelectOptions,
 	removeFieldFromStep,
+	removeStepCascade,
 	stepLabel,
-	unassignedFields,
+	stepSelectOptions,
+	unassignedEntries,
 } from './flowAuthoring'
 import type { FieldRow } from './synthesizeClientField'
 import { toStaticLabel } from './toStaticLabel'
@@ -38,18 +47,25 @@ export type FlowBuilderProps = {
 	field?: { label?: unknown }
 	label?: unknown
 	conditionTypes: Record<string, ConditionFieldType>
+	/** Bare (nameless) block slugs to their display label: an i18n key or a literal. */
+	bareTypeLabels?: Record<string, string>
 }
 
-const extractFieldNames = (data: Record<string, unknown>): string[] => {
+/** The row facets the flow builder keys and labels by, projected for a stable JSON identity. */
+const extractFieldRows = (data: Record<string, unknown>): FieldRow[] => {
 	const rows = Array.isArray(data.fields) ? (data.fields as FieldRow[]) : []
-	return rows
-		.map((row) => (typeof row.name === 'string' ? row.name.trim() : null))
-		.filter((name): name is string => name !== null && name.length > 0)
+	return rows.map((row) => ({
+		blockType: row.blockType,
+		name: row.name,
+		id: row.id,
+		label: row.label,
+		content: row.content,
+	}))
 }
 
 type TransitionRowProps = {
 	transition: FlowTransition
-	stepOptions: ReactSelectOption[]
+	stepOptions: FlowSelectOption[]
 	conditionTypes: Record<string, ConditionFieldType>
 	isFirst: boolean
 	isLast: boolean
@@ -70,6 +86,8 @@ const TransitionRow = ({
 	onMoveUp,
 	onMoveDown,
 }: TransitionRowProps) => {
+	const { t } = useTranslation()
+
 	const handleGotoChange = (selected: ReactSelectOption | ReactSelectOption[]) => {
 		const chosen = Array.isArray(selected) ? selected[0] : selected
 		if (chosen) onChange({ ...transition, to: chosen.value as string })
@@ -83,7 +101,7 @@ const TransitionRow = ({
 					<ReactSelect
 						options={stepOptions}
 						value={stepOptions.find((o) => o.value === transition.to) ?? undefined}
-						placeholder="Select step…"
+						placeholder={t(keys.flowSelectStepPlaceholder)}
 						isClearable={false}
 						onChange={handleGotoChange}
 					/>
@@ -94,7 +112,7 @@ const TransitionRow = ({
 						className="fb-flow__move-btn"
 						onClick={onMoveUp}
 						disabled={isFirst}
-						aria-label="Move transition up"
+						aria-label={t(keys.flowMoveTransitionUp)}
 					>
 						↑
 					</button>
@@ -103,7 +121,7 @@ const TransitionRow = ({
 						className="fb-flow__move-btn"
 						onClick={onMoveDown}
 						disabled={isLast}
-						aria-label="Move transition down"
+						aria-label={t(keys.flowMoveTransitionDown)}
 					>
 						↓
 					</button>
@@ -112,7 +130,7 @@ const TransitionRow = ({
 						icon="x"
 						onClick={onRemove}
 						margin={false}
-						aria-label="Remove transition"
+						aria-label={t(keys.flowRemoveTransition)}
 					/>
 				</div>
 			</div>
@@ -133,15 +151,15 @@ type StepCardProps = {
 	stepKey: string
 	stepIndex: number
 	stepCount: number
-	otherStepOptions: ReactSelectOption[]
+	otherStepOptions: FlowSelectOption[]
 	holders: Map<string, number>
 	stepLabels: string[]
-	fieldNames: string[]
+	entries: FlowFieldEntry[]
 	conditionTypes: Record<string, ConditionFieldType>
 	isExpanded: boolean
 	onToggle: () => void
 	onChange: (next: FlowStep) => void
-	onToggleField: (name: string, checked: boolean) => void
+	onToggleField: (key: string, checked: boolean) => void
 	onRemove: () => void
 	onMoveUp: () => void
 	onMoveDown: () => void
@@ -157,7 +175,7 @@ const StepCard = ({
 	otherStepOptions,
 	holders,
 	stepLabels,
-	fieldNames,
+	entries,
 	conditionTypes,
 	isExpanded,
 	onToggle,
@@ -171,10 +189,11 @@ const StepCard = ({
 }: StepCardProps) => {
 	const { t } = useTranslation()
 
-	const nextOptions: ReactSelectOption[] = [
-		{ label: t(keys.flowNextTerminal), value: '' },
-		...otherStepOptions,
-	]
+	const nextOptions = nextSelectOptions({
+		sequentialLabel: t(keys.flowNextSequential),
+		terminalLabel: t(keys.flowNextTerminal),
+		otherSteps: otherStepOptions,
+	})
 
 	const transitions = step.transitions ?? []
 
@@ -187,7 +206,7 @@ const StepCard = ({
 	const tKeys = tKeysRef.current
 
 	const addTransition = () => {
-		const firstOtherStep = otherStepOptions[0]?.value as string | undefined
+		const firstOtherStep = otherStepOptions[0]?.value
 		if (firstOtherStep === undefined) return
 		tKeysRef.current = [...tKeys, crypto.randomUUID()]
 		onChange({
@@ -221,8 +240,7 @@ const StepCard = ({
 
 	const handleNextChange = (selected: ReactSelectOption | ReactSelectOption[]) => {
 		const chosen = Array.isArray(selected) ? selected[0] : selected
-		const next = (chosen?.value as string | undefined) || undefined
-		onChange({ ...step, next })
+		if (chosen) onChange({ ...step, next: nextFromSelectValue(chosen.value as string) })
 	}
 
 	const title = step.title?.trim() ?? ''
@@ -248,8 +266,8 @@ const StepCard = ({
 					verticalAlign="bottom"
 				>
 					<PopupList.ButtonGroup>
-						<PopupList.Button onClick={onAddAbove}>Add above</PopupList.Button>
-						<PopupList.Button onClick={onAddBelow}>Add below</PopupList.Button>
+						<PopupList.Button onClick={onAddAbove}>{t(keys.flowAddAbove)}</PopupList.Button>
+						<PopupList.Button onClick={onAddBelow}>{t(keys.flowAddBelow)}</PopupList.Button>
 						<PopupList.Button onClick={onMoveUp} disabled={stepIndex === 0}>
 							Move up
 						</PopupList.Button>
@@ -267,32 +285,31 @@ const StepCard = ({
 			<div className="fb-flow-step__body">
 				<TextInput
 					path={`fb-flow-step-${stepKey}-title`}
-					label="Title"
+					label={t(keys.flowStepTitleLabel)}
 					value={step.title ?? ''}
-					placeholder="Optional display title"
 					onChange={(e: ChangeEvent<HTMLInputElement>) =>
 						onChange({ ...step, title: e.target.value.length > 0 ? e.target.value : undefined })
 					}
 				/>
 
 				<div className="fb-flow-step__row">
-					<FieldLabel label="Fields" />
-					{fieldNames.length === 0 ? (
+					<FieldLabel label={t(keys.flowFields)} />
+					{entries.length === 0 ? (
 						<p className="fb-flow-step__hint">No fields defined on the form yet.</p>
 					) : (
 						<div className="fb-flow-step__field-picker">
-							{fieldNames.map((name) => {
-								const holder = holders.get(name)
+							{entries.map((entry) => {
+								const holder = holders.get(entry.key)
 								const inOtherStep = holder !== undefined && holder !== stepIndex
 								return (
-									<div key={name} className="fb-flow-step__field-option">
+									<div key={entry.key} className="fb-flow-step__field-option">
 										<CheckboxInput
-											label={name}
-											checked={step.fields.includes(name) || inOtherStep}
+											label={entry.label}
+											checked={step.fields.includes(entry.key) || inOtherStep}
 											readOnly={inOtherStep}
 											onToggle={(e) => {
 												if (inOtherStep) return
-												onToggleField(name, e.target.checked)
+												onToggleField(entry.key, e.target.checked)
 											}}
 										/>
 										{inOtherStep ? (
@@ -310,14 +327,10 @@ const StepCard = ({
 				</div>
 
 				<div className="fb-flow-step__row">
-					<FieldLabel label="Default next" />
+					<FieldLabel label={t(keys.flowDefaultNext)} />
 					<ReactSelect
 						options={nextOptions}
-						value={
-							step.next
-								? (nextOptions.find((o) => o.value === step.next) ?? undefined)
-								: (nextOptions[0] ?? undefined)
-						}
+						value={nextOptions.find((o) => o.value === nextToSelectValue(step.next)) ?? undefined}
 						isClearable={false}
 						onChange={handleNextChange}
 					/>
@@ -325,7 +338,7 @@ const StepCard = ({
 
 				<div className="fb-flow-step__transitions">
 					<div className="fb-flow-step__transitions-header">
-						<FieldLabel label="Conditional transitions" />
+						<FieldLabel label={t(keys.flowConditionalTransitions)} />
 						<span className="fb-flow-step__hint">(first match wins)</span>
 					</div>
 					{transitions.map((transition, tIndex) => {
@@ -368,19 +381,31 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 	const label = toStaticLabel(props.field?.label ?? props.label)
 	const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
-	const fieldNamesJson = useFormFields(([fields]) =>
-		JSON.stringify(extractFieldNames(reduceFieldsToValues(fields, true) as Record<string, unknown>))
+	const fieldRowsJson = useFormFields(([fields]) =>
+		JSON.stringify(extractFieldRows(reduceFieldsToValues(fields, true) as Record<string, unknown>))
 	)
-	const fieldNames = useMemo(() => JSON.parse(fieldNamesJson) as string[], [fieldNamesJson])
+	// Registry labels may be host-registered keys or literals; Payload's `t` returns unknown keys unchanged.
+	const translatedBareLabels = useMemo(
+		() =>
+			Object.fromEntries(
+				Object.entries(props.bareTypeLabels ?? {}).map(([type, label]) => [
+					type,
+					t(label as TranslationKey),
+				])
+			),
+		[props.bareTypeLabels, t]
+	)
+	const entries = useMemo(
+		() => flowFieldEntries(JSON.parse(fieldRowsJson) as FieldRow[], translatedBareLabels),
+		[fieldRowsJson, translatedBareLabels]
+	)
 
 	const steps = value?.steps ?? []
 	const fallbackTitle = t(keys.flowStepFallbackTitle)
 	const stepLabels = steps.map((step, index) => stepLabel(step, index, fallbackTitle))
-	const stepOptions: ReactSelectOption[] = steps
-		.map((step, index) => ({ label: stepLabels[index] ?? '', value: step.id }))
-		.filter((option) => (option.value as string).length > 0)
+	const stepOptions = stepSelectOptions(steps, stepLabels)
 	const holders = fieldHolders(steps)
-	const unassigned = unassignedFields(fieldNames, steps)
+	const unassigned = unassignedEntries(entries, steps)
 
 	// Stable per-step React keys, independent of step ids. Reorder/insert/remove reconcile by
 	// identity so focused inputs and each step's expand state stay with their step instead of
@@ -424,23 +449,23 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 		)
 	}
 
-	const toggleField = (stepIndex: number, name: string, checked: boolean) => {
+	const toggleField = (stepIndex: number, key: string, checked: boolean) => {
 		const nextSteps = checked
-			? assignFieldToStep(steps, stepIndex, name)
-			: removeFieldFromStep(steps, stepIndex, name)
+			? assignFieldToStep(steps, stepIndex, key)
+			: removeFieldFromStep(steps, stepIndex, key)
 		emit(nextSteps, stepKeys)
 	}
 
-	const assignUnassignedField = (name: string, stepId: string) => {
+	const assignUnassignedField = (key: string, stepId: string) => {
 		const targetIndex = steps.findIndex((s) => s.id === stepId)
 		if (targetIndex === -1) return
-		emit(assignFieldToStep(steps, targetIndex, name), stepKeys)
+		emit(assignFieldToStep(steps, targetIndex, key), stepKeys)
 	}
 
 	const removeStep = (index: number) => {
 		const removedKey = stepKeys[index]
 		emit(
-			steps.filter((_, i) => i !== index),
+			removeStepCascade(steps, index),
 			stepKeys.filter((_, i) => i !== index)
 		)
 		if (removedKey !== undefined) {
@@ -480,7 +505,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 					{steps.map((step, index) => {
 						const key = stepKeys[index]
 						if (key === undefined) return null
-						const otherStepOptions = stepOptions.filter((option) => option.value !== step.id)
+						const otherStepOptions = otherStepSelectOptions(stepOptions, step.id)
 						return (
 							<StepCard
 								key={key}
@@ -491,12 +516,12 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 								otherStepOptions={otherStepOptions}
 								holders={holders}
 								stepLabels={stepLabels}
-								fieldNames={fieldNames}
+								entries={entries}
 								conditionTypes={props.conditionTypes}
 								isExpanded={expandedKeys.has(key)}
 								onToggle={() => toggleExpanded(key)}
 								onChange={(next) => updateStep(index, next)}
-								onToggleField={(name, checked) => toggleField(index, name, checked)}
+								onToggleField={(fieldKey, checked) => toggleField(index, fieldKey, checked)}
 								onRemove={() => removeStep(index)}
 								onMoveUp={() => moveStep(index, index - 1)}
 								onMoveDown={() => moveStep(index, index + 1)}
@@ -511,9 +536,9 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 				<div className="fb-flow-unassigned">
 					<FieldLabel label={t(keys.flowUnassigned)} />
 					<div className="fb-flow-unassigned__rows">
-						{unassigned.map((name) => (
-							<div key={name} className="fb-flow-unassigned__row">
-								<span className="fb-flow-unassigned__name">{name}</span>
+						{unassigned.map((entry) => (
+							<div key={entry.key} className="fb-flow-unassigned__row">
+								<span className="fb-flow-unassigned__name">{entry.label}</span>
 								<div className="fb-flow-unassigned__select">
 									<ReactSelect
 										options={stepOptions}
@@ -521,7 +546,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 										isClearable={false}
 										onChange={(selected: ReactSelectOption | ReactSelectOption[]) => {
 											const chosen = Array.isArray(selected) ? selected[0] : selected
-											if (chosen) assignUnassignedField(name, chosen.value as string)
+											if (chosen) assignUnassignedField(entry.key, chosen.value as string)
 										}}
 									/>
 								</div>

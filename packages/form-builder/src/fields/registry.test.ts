@@ -58,4 +58,27 @@ describe('resolveFieldTypes', () => {
 		expect(registry.get('a')?.label).toBe('A2')
 		expect(registry.get('a')?.type).toBe('a')
 	})
+
+	it('throws at boot when a bare definition is not display-only', () => {
+		const banner = defineFormField<'text'>({
+			type: 'banner',
+			label: 'Banner',
+			value: 'text',
+			bare: true,
+		}) as AnyFormFieldDefinition
+		expect(() => resolveFieldTypes(defaults, { banner })).toThrow(
+			"form-builder: bare field types must be display-only (value: 'none'); 'banner' declares value 'text'"
+		)
+		expect(() => resolveFieldTypes([...defaults, banner])).toThrow(/bare field types/)
+	})
+
+	it('accepts a bare display-only definition', () => {
+		const banner = defineFormField<'none'>({
+			type: 'banner',
+			label: 'Banner',
+			value: 'none',
+			bare: true,
+		}) as AnyFormFieldDefinition
+		expect(resolveFieldTypes(defaults, { banner }).get('banner')?.bare).toBe(true)
+	})
 })

@@ -6,6 +6,7 @@ import { validateDateBound } from './validateDateBound'
 export const maxDateRule = defineValidationRule<{ max: string }, string>({
 	type: 'maxDate',
 	label: keys.ruleMaxDate,
+	description: keys.ruleMaxDateDescription,
 	appliesTo: ['date'],
 	params: [
 		{

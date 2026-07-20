@@ -5,17 +5,15 @@ import { buildRegistry } from '../fields/registry'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { defaultValidationRules } from '../validation/builtin'
 import { buildRuleRegistry } from '../validation/registry'
-import { runSubmission } from './runSubmission'
+import { runSubmission, widthOf } from './runSubmission'
 import type { FormFieldInstance } from './types'
 
 const registry = buildRegistry(defaultFieldDefinitions)
 const ruleRegistry = buildRuleRegistry(defaultValidationRules)
-const consentRegistry = new Map()
 const t = (key: string) => key
 const base = {
 	registry,
 	ruleRegistry,
-	consentRegistry,
 	locale: 'en',
 	t,
 	operation: 'create' as const,
@@ -152,7 +150,7 @@ describe('runSubmission', () => {
 	})
 
 	it('rejects a required consent submitted as the string "false"', async () => {
-		const fields: FormFieldInstance[] = [{ blockType: 'consent', name: 'terms', label: 'I agree' }]
+		const fields: FormFieldInstance[] = [{ blockType: 'consent', name: 'terms', required: true }]
 		const result = await runSubmission({
 			...base,
 			fields,
@@ -160,6 +158,46 @@ describe('runSubmission', () => {
 		})
 		expect(result.errors).toHaveLength(1)
 		expect(result.errors[0]?.path).toBe('terms')
+	})
+
+	// `false` is a present value, so the engine's required guard never fires on it; the checkbox's
+	// intrinsic validator is what stops a client posting an explicit refusal to a required box.
+	it('rejects a required checkbox submitted as false', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'checkbox', name: 'terms', label: 'I agree', required: true },
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'terms', value: false }],
+		})
+		expect(result.errors).toEqual([{ path: 'terms', message: 'formBuilder:validation.required' }])
+	})
+
+	it('accepts a required checkbox submitted as true', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'checkbox', name: 'terms', label: 'I agree', required: true },
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'terms', value: true }],
+		})
+		expect(result.errors).toEqual([])
+		expect(result.values).toEqual([{ field: 'terms', value: true }])
+	})
+
+	it('stores an optional checkbox left unchecked', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'checkbox', name: 'news', label: 'Newsletter' },
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'news', value: false }],
+		})
+		expect(result.errors).toEqual([])
+		expect(result.values).toEqual([{ field: 'news', value: false }])
 	})
 
 	it('enforces a declarative minLength rule with the coerced value', async () => {
@@ -567,6 +605,96 @@ describe('runSubmission', () => {
 			>
 			expect(rows[0]).toEqual({ note: 'keep' })
 			expect(rows[0]).not.toHaveProperty('info')
+		})
+	})
+
+	describe('descriptor width', () => {
+		it('threads a valid width onto the field descriptor', async () => {
+			const fields: FormFieldInstance[] = [
+				{ blockType: 'text', name: 'a', label: 'A', width: 'half' },
+				{ blockType: 'text', name: 'b', label: 'B', width: 'twoThirds' },
+			]
+			const result = await runSubmission({
+				...base,
+				fields,
+				values: [
+					{ field: 'a', value: 'x' },
+					{ field: 'b', value: 'y' },
+				],
+			})
+			expect(result.descriptors).toEqual([
+				{ field: 'a', label: 'A', fieldType: 'text', width: 'half' },
+				{ field: 'b', label: 'B', fieldType: 'text', width: 'twoThirds' },
+			])
+		})
+
+		it('omits width from the descriptor when the field carries none (old forms stay width-less)', async () => {
+			const fields: FormFieldInstance[] = [{ blockType: 'text', name: 'a', label: 'A' }]
+			const result = await runSubmission({ ...base, fields, values: [{ field: 'a', value: 'x' }] })
+			expect(result.descriptors).toEqual([{ field: 'a', label: 'A', fieldType: 'text' }])
+			expect(result.descriptors[0]).not.toHaveProperty('width')
+		})
+
+		it('drops an unrecognized width value rather than snapshotting it', async () => {
+			const fields: FormFieldInstance[] = [
+				{ blockType: 'text', name: 'a', label: 'A', width: 'quarter' },
+			]
+			const result = await runSubmission({ ...base, fields, values: [{ field: 'a', value: 'x' }] })
+			expect(result.descriptors[0]).not.toHaveProperty('width')
+		})
+
+		it('threads width onto calc, file, and repeater descriptors but never onto repeater sub-fields', async () => {
+			const doc = { id: 'up1', filename: 'r.pdf', mimeType: 'application/pdf', filesize: 100 }
+			const findByID = vi.fn().mockResolvedValue(doc)
+			const payload = { findByID } as unknown as Payload
+			const fields: FormFieldInstance[] = [
+				{
+					blockType: 'calculation',
+					name: 'total',
+					label: 'Total',
+					width: 'third',
+					expression: { type: 'lit', value: 2 },
+				},
+				{ blockType: 'file', name: 'resume', label: 'Resume', width: 'half' },
+				{
+					blockType: 'repeater',
+					name: 'items',
+					label: 'Items',
+					width: 'twoThirds',
+					subFields: [{ blockType: 'text', name: 'note', label: 'Note', width: 'half' }],
+				},
+			]
+			const result = await runSubmission({
+				...base,
+				fields,
+				values: [
+					{ field: 'resume', value: 'up1' },
+					{ field: 'items', value: [{ note: 'hi' }] },
+				],
+				payload,
+				uploadSlug: 'app-uploads',
+			})
+			const byField = new Map(result.descriptors.map((d) => [d.field, d]))
+			expect(byField.get('total')?.width).toBe('third')
+			expect(byField.get('resume')?.width).toBe('half')
+			const items = byField.get('items')
+			expect(items?.width).toBe('twoThirds')
+			expect(items?.subFieldDescriptors?.[0]).not.toHaveProperty('width')
+		})
+	})
+
+	describe('widthOf', () => {
+		it('returns the width for each of the four valid tokens', () => {
+			expect(widthOf({ blockType: 'text', width: 'full' })).toBe('full')
+			expect(widthOf({ blockType: 'text', width: 'half' })).toBe('half')
+			expect(widthOf({ blockType: 'text', width: 'third' })).toBe('third')
+			expect(widthOf({ blockType: 'text', width: 'twoThirds' })).toBe('twoThirds')
+		})
+
+		it('returns undefined for a missing or invalid width', () => {
+			expect(widthOf({ blockType: 'text' })).toBeUndefined()
+			expect(widthOf({ blockType: 'text', width: 'quarter' })).toBeUndefined()
+			expect(widthOf({ blockType: 'text', width: 42 })).toBeUndefined()
 		})
 	})
 })

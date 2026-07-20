@@ -15,15 +15,23 @@ export type SyncMetric = (typeof METRIC_FIELDS)[number]
 
 /**
  * The sync tier's queryable collection: one row per (source, date) of a provider's daily
- * metrics. Unlike the native collections it is visible and readable; writes are locked to
- * the sync job (which uses overrideAccess). The unique (source, date) index makes re-syncs
- * idempotent and is cross-DB clean (both key columns are required, so NOT NULL on Postgres,
- * which would otherwise treat repeated rows as distinct). Metric fields are nullable so a
- * provider that omits a metric is distinguishable from a real zero.
+ * metrics. It is read-only and machine-written (writes are locked to the sync job, which
+ * uses overrideAccess), and hidden from the admin nav by default because it is a query
+ * substrate for custom reporting rather than something to browse and edit; pass
+ * `sync: { hidden: false }` to surface it. `admin.hidden` only hides the nav entry, so
+ * the collection stays fully queryable through the REST/local API either way. The unique
+ * (source, date) index makes re-syncs idempotent and is cross-DB clean (both key columns
+ * are required, so NOT NULL on Postgres, which would otherwise treat repeated rows as
+ * distinct). Metric fields are nullable so a provider that omits a metric is
+ * distinguishable from a real zero.
  */
-export const syncCollection = (slug: string): CollectionConfig => ({
+export const syncCollection = (slug: string, hidden = true): CollectionConfig => ({
 	slug,
-	admin: { useAsTitle: 'source', defaultColumns: ['source', 'date', 'pageviews', 'visitors'] },
+	admin: {
+		hidden,
+		useAsTitle: 'source',
+		defaultColumns: ['source', 'date', 'pageviews', 'visitors'],
+	},
 	access: {
 		read: ({ req }) => Boolean(req.user),
 		create: () => false,

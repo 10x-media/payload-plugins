@@ -23,13 +23,77 @@ describe('flow engine', () => {
 	it('resolveNextStepId follows the first matching transition', () => {
 		expect(resolveNextStepId(flow, 'a', { plan: 'pro' })).toBe('pro')
 	})
-	it('resolveNextStepId falls back to the default next when no transition matches', () => {
+	it('resolveNextStepId falls back to the explicit next when no transition matches', () => {
 		expect(resolveNextStepId(flow, 'a', { plan: 'free' })).toBe('basic')
+		expect(isTerminalStepId(flow, 'a', { plan: 'free' })).toBe(false)
 	})
-	it('a step with no next and no matching transition is terminal', () => {
+	it('a step without next falls through to the next step in array order', () => {
+		const sequential: FormFlow = {
+			steps: [
+				{ id: 'one', fields: ['name'] },
+				{ id: 'two', fields: ['x'] },
+				{ id: 'three', fields: ['email'] },
+			],
+		}
+		expect(resolveNextStepId(sequential, 'one', {})).toBe('two')
+		expect(resolveNextStepId(sequential, 'two', {})).toBe('three')
+		expect(isTerminalStepId(sequential, 'two', {})).toBe(false)
+	})
+	it('the last step without next is terminal', () => {
 		expect(resolveNextStepId(flow, 'done', {})).toBeUndefined()
 		expect(isTerminalStepId(flow, 'done', {})).toBe(true)
-		expect(isTerminalStepId(flow, 'a', { plan: 'free' })).toBe(false)
+	})
+	it('next: null ends the form regardless of position', () => {
+		const earlyEnd: FormFlow = {
+			steps: [
+				{ id: 'one', fields: ['name'], next: null },
+				{ id: 'two', fields: ['email'] },
+			],
+		}
+		expect(resolveNextStepId(earlyEnd, 'one', {})).toBeUndefined()
+		expect(isTerminalStepId(earlyEnd, 'one', {})).toBe(true)
+	})
+	it('a matching transition wins over next: null and over fall-through', () => {
+		const branching: FormFlow = {
+			steps: [
+				{
+					id: 'one',
+					fields: ['name'],
+					transitions: [{ when: { name: { equals: 'jump' } }, to: 'three' }],
+					next: null,
+				},
+				{
+					id: 'two',
+					fields: ['x'],
+					transitions: [{ when: { x: { equals: 'jump' } }, to: 'one' }],
+				},
+				{ id: 'three', fields: ['email'] },
+			],
+		}
+		expect(resolveNextStepId(branching, 'one', { name: 'jump' })).toBe('three')
+		expect(resolveNextStepId(branching, 'one', {})).toBeUndefined()
+		expect(resolveNextStepId(branching, 'two', { x: 'jump' })).toBe('one')
+		expect(resolveNextStepId(branching, 'two', {})).toBe('three')
+	})
+	it('the last step is terminal when none of its transitions match', () => {
+		const withTransitions: FormFlow = {
+			steps: [
+				{ id: 'a', fields: ['name'] },
+				{
+					id: 'b',
+					fields: ['email'],
+					transitions: [{ when: { name: { equals: 'zzz' } }, to: 'a' }],
+				},
+			],
+		}
+		expect(resolveNextStepId(withTransitions, 'b', { name: 'Ada' })).toBeUndefined()
+		expect(isTerminalStepId(withTransitions, 'b', { name: 'Ada' })).toBe(true)
+		// A matching transition still routes backwards off the last step.
+		expect(resolveNextStepId(withTransitions, 'b', { name: 'zzz' })).toBe('a')
+	})
+	it('an unknown current step id resolves to terminal', () => {
+		expect(resolveNextStepId(flow, 'missing', {})).toBeUndefined()
+		expect(isTerminalStepId(flow, 'missing', {})).toBe(true)
 	})
 	it('stepFieldNames returns the step field list', () => {
 		expect(stepFieldNames(flow, 'a')).toEqual(['name'])

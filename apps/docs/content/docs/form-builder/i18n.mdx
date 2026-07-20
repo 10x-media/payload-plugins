@@ -7,7 +7,7 @@ description: Override or localize the Form Builder admin strings, and translate 
 
 Two separate systems localize two separate things:
 
-- **Content** is what editors author on a form document: labels, placeholders, option labels, consent statements, the response message. It is stored data, localized through Payload's own `localization` on the `forms` collection. Content fields are [localized by default](/form-builder/fields#content-localization); the plugin option `localizeContent: false` opts a project out.
+- **Content** is what editors author on a form document: labels, placeholders, option labels, the response message. It is stored data, localized through Payload's own `localization` on the `forms` collection. Content fields are [localized by default](/form-builder/fields#content-localization); the plugin option `localizeContent: false` opts a project out.
 - **UI strings** are the plugin's own words: admin authoring labels and frontend renderer strings ("Add row", validation messages, poll notices). These are typed translations, overridden via the `translations` option (admin) and the `t` prop (frontend), below.
 
 ## Admin strings

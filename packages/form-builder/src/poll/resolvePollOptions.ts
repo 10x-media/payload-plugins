@@ -1,29 +1,20 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { pollConfigOf } from '../form/pollState'
+import { customStateOf, stashCustomState } from '../plugin/customState'
 import type { PollOption } from './definePollOptionSource'
 import type { PollOptionSourceRegistry } from './registry'
 
-/** Root key under `config.custom` where the plugin stashes runtime state for root-level helpers. */
-const CUSTOM_KEY = '@10x-media/form-builder'
+type PollCustomState = { pollOptionSources: PollOptionSourceRegistry }
 
 /** Store the resolved registry on the config so `resolvePollOptions` can find it via `payload.config`. */
 export const stashPollOptionSources = (
 	custom: Record<string, unknown> | undefined,
 	registry: PollOptionSourceRegistry
-): Record<string, unknown> => {
-	const existing =
-		custom?.[CUSTOM_KEY] != null && typeof custom[CUSTOM_KEY] === 'object'
-			? (custom[CUSTOM_KEY] as Record<string, unknown>)
-			: {}
-	return { ...(custom ?? {}), [CUSTOM_KEY]: { ...existing, pollOptionSources: registry } }
-}
+): Record<string, unknown> =>
+	stashCustomState<PollCustomState>(custom, { pollOptionSources: registry })
 
-export const pollOptionSourcesOf = (payload: Payload): PollOptionSourceRegistry => {
-	const custom = payload.config.custom?.[CUSTOM_KEY] as
-		| { pollOptionSources?: PollOptionSourceRegistry }
-		| undefined
-	return custom?.pollOptionSources ?? new Map()
-}
+export const pollOptionSourcesOf = (payload: Payload): PollOptionSourceRegistry =>
+	customStateOf<PollCustomState>(payload).pollOptionSources ?? new Map()
 
 const CACHE_KEY = 'formBuilderPollOptionsCache'
 
@@ -45,8 +36,8 @@ const cacheOf = (req: PayloadRequest | undefined): OptionsCache | undefined => {
 export type ResolvePollOptionsArgs = {
 	payload: Payload
 	req?: PayloadRequest
-	/** A loaded forms document (its `poll` group drives resolution). */
-	form: { id: number | string; title?: string | null; poll?: unknown }
+	/** A loaded forms document; its top-level `pollEnabled` flag and `poll` config drive resolution. */
+	form: { id: number | string; title?: string | null; pollEnabled?: boolean | null; poll?: unknown }
 	/** Registry override for plugin-internal callers; defaults to the registry the plugin stashed on the config. */
 	sources?: PollOptionSourceRegistry
 }
@@ -66,7 +57,7 @@ export const resolvePollOptions = async (
 	const { payload, req, form, sources } = args
 	const poll = pollConfigOf(form.poll)
 	const optionSource = typeof poll?.optionSource === 'string' ? poll.optionSource : undefined
-	if (poll?.enabled !== true || !optionSource) {
+	if (form.pollEnabled !== true || !poll || !optionSource) {
 		return undefined
 	}
 	const source = (sources ?? pollOptionSourcesOf(payload)).get(optionSource)

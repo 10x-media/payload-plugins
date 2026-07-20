@@ -62,7 +62,7 @@ export const readForWidgetRealtime = async (
 		return empty('unavailable', adapter.id)
 	}
 
-	const ttlSeconds = adapter.capabilities.recommendedTtl.realtime || runtime.ttl.realtime
+	const ttlSeconds = runtime.ttl.realtime ?? adapter.capabilities.recommendedTtl.realtime
 	const bucket = Math.floor(now.getTime() / 1000 / Math.max(1, ttlSeconds))
 	const scopeKey = ctx.queryScope === undefined ? '' : `:${encodeURIComponent(ctx.queryScope)}`
 	const key = `rt:${adapter.id}:${metric}:${windowMinutes}:${bucket}${scopeKey}`

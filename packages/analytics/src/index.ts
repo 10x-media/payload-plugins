@@ -2,6 +2,7 @@ import { type Config, definePlugin, type PayloadRequest } from 'payload'
 
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
+import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
@@ -16,6 +17,7 @@ import { kvCacheStore } from './surfacing/cacheStore'
 import { createEngine } from './surfacing/engine'
 import { syncCollection } from './sync/collection'
 import { syncTask } from './sync/syncTask'
+import { DEFAULT_TIMEZONE, isValidTimeZone } from './timeframe/tz'
 import { registerWidgets } from './widgets/registerWidgets'
 
 declare module 'payload' {
@@ -67,8 +69,26 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			]
 		}
 		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
+		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {
+			const opt = resolved.reportingTimezone
+			if (opt === undefined) {
+				return DEFAULT_TIMEZONE
+			}
+			try {
+				const tz =
+					typeof opt === 'string'
+						? opt
+						: await opt({ req, scope: scope !== undefined ? scope : await resolveScope(req) })
+				return tz && isValidTimeZone(tz) ? tz : DEFAULT_TIMEZONE
+			} catch (err) {
+				req.payload?.logger?.warn?.(
+					`analytics: reportingTimezone resolution failed, falling back to UTC: ${String(err)}`
+				)
+				return DEFAULT_TIMEZONE
+			}
+		}
 		for (const adapter of resolved.adapters) {
-			adapter.register?.(config, { scoped: resolved.scoped, resolveScope })
+			adapter.register?.(config, { scoped: resolved.scoped, resolveScope, resolveTimezone })
 		}
 		if (
 			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function')
@@ -76,6 +96,12 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			config.endpoints = [
 				...(config.endpoints ?? []),
 				{ method: 'get', path: REALTIME_PATH, handler: makeRealtimeHandler() },
+			]
+		}
+		if (Object.keys(resolved.bindings).length > 0) {
+			config.endpoints = [
+				...(config.endpoints ?? []),
+				{ method: 'get', path: DOCUMENT_PATH, handler: makeDocumentHandler() },
 			]
 		}
 		if (resolved.widgets.enabled) {
@@ -96,7 +122,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		if (resolved.sync.enabled) {
 			config.collections = [
 				...(config.collections ?? []),
-				syncCollection(resolved.sync.collectionSlug),
+				syncCollection(resolved.sync.collectionSlug, resolved.sync.hidden),
 			]
 			config.jobs = {
 				...config.jobs,
@@ -112,8 +138,9 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			}
 		}
 		const prevOnInit = config.onInit
+		// The runtime is installed before the app's own onInit runs so consumer init code
+		// (seeding, cache warming, sync passes) can already read through the plugin.
 		config.onInit = async (payload) => {
-			await prevOnInit?.(payload)
 			const engine = createEngine({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },
@@ -123,12 +150,15 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				registry,
 				resolveRegistry,
 				resolveScope,
+				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
 				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,
+				comparison: resolved.widgets.comparison,
 			})
+			await prevOnInit?.(payload)
 		}
 		return config
 	},
@@ -150,6 +180,7 @@ export type {
 	ProvidersOptions,
 	ProvidersResolve,
 	ScopeResolver,
+	TimezoneResolver,
 } from './core/options'
 export type {
 	AnalyticsFieldsOptions,

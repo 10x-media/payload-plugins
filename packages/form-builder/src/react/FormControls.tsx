@@ -26,7 +26,7 @@ export type BackButtonRenderProps = {
 
 export type FormControlsProps = {
 	/** Override the context-resolved back label for this instance. */
-	backLabel?: string
+	prevLabel?: string
 	/** Override the context-resolved next label for this instance. */
 	nextLabel?: string
 	/** Override the context-resolved submit label for this instance. */
@@ -52,11 +52,11 @@ export type FormControlsProps = {
  * the terminal step (a single-step form is first and terminal, so it gets only submit). Driven
  * entirely by the form context, so it composes into custom `children` layouts exactly like the
  * default field loop's chrome. Labels resolve from context (`<Form>` props, the form's
- * `response.submitLabel`, translated defaults) unless overridden per button here. Must render
+ * `buttons` labels, translated defaults) unless overridden per button here. Must render
  * inside `<Form>`, within its `<form>` element so the submit button submits.
  */
 export const FormControls = ({
-	backLabel,
+	prevLabel,
 	nextLabel,
 	submitLabel,
 	className,
@@ -69,7 +69,7 @@ export const FormControls = ({
 }: FormControlsProps) => {
 	const { state, step, labels } = useFormContext()
 	const submitting = state.submitting
-	const back = backLabel ?? labels.back
+	const back = prevLabel ?? labels.prev
 	const next = nextLabel ?? labels.next
 	const submit = submitLabel ?? labels.submit
 	return (

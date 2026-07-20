@@ -6,6 +6,7 @@ import { validateDateBound } from './validateDateBound'
 export const minDateRule = defineValidationRule<{ min: string }, string>({
 	type: 'minDate',
 	label: keys.ruleMinDate,
+	description: keys.ruleMinDateDescription,
 	appliesTo: ['date'],
 	params: [
 		{

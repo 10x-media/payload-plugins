@@ -44,8 +44,23 @@ describe('buildFieldBlocks', () => {
 		])
 	})
 
-	it('gives every block a single unnamed tabs field', () => {
+	it('gives every block a FieldBlockLabel row header keyed to its type label', () => {
 		for (const block of blocks) {
+			const label = block.admin?.components?.Label as
+				| { path?: string; clientProps?: { typeLabelKey?: string } }
+				| undefined
+			expect(label?.path).toBe('@10x-media/form-builder/client#FieldBlockLabel')
+			expect(typeof label?.clientProps?.typeLabelKey).toBe('string')
+		}
+		const text = blocks.find((block) => block.slug === 'text')
+		const textLabel = text?.admin?.components?.Label as
+			| { clientProps?: { typeLabelKey?: string } }
+			| undefined
+		expect(textLabel?.clientProps?.typeLabelKey).toBe('formBuilder:fieldType.text')
+	})
+
+	it('gives every non-bare block a single unnamed tabs field', () => {
+		for (const block of blocks.filter((b) => b.slug !== 'message')) {
 			expect(block.fields).toHaveLength(1)
 			const tabs = tabsOf(block)
 			expect(tabs?.tabs).toHaveLength(3)
@@ -53,6 +68,15 @@ describe('buildFieldBlocks', () => {
 				expect('name' in tab && tab.name).toBeFalsy()
 			}
 		}
+	})
+
+	it('builds a bare block as the definition config alone: one richText content field, no tabs, no name', () => {
+		const message = blocks.find((block) => block.slug === 'message')
+		expect(message?.fields).toHaveLength(1)
+		expect(tabsOf(message)).toBeUndefined()
+		const [content] = message?.fields ?? []
+		expect(content).toMatchObject({ name: 'content', type: 'richText' })
+		expect(flatten(message?.fields ?? []).map(fieldName)).toEqual(['content'])
 	})
 
 	it('puts shared config then type config in the Field tab', () => {
@@ -88,6 +112,47 @@ describe('buildFieldBlocks', () => {
 		expect(widthPlaceholderRow.fields.map(fieldName)).toEqual(['width', 'placeholder'])
 	})
 
+	it.each([
+		'checkbox',
+		'calculation',
+		'file',
+		'repeater',
+		'date',
+	])('leaves placeholder unauthorable on %s, which never renders one', (slug) => {
+		const block = blocks.find((b) => b.slug === slug)
+		expect(flatTabFields(block, 0).map(fieldName)).not.toContain('placeholder')
+	})
+
+	// The calc value is server-derived and skips runValidation entirely, so a required box could never fire.
+	it('leaves required unauthorable on calculation, and authorable everywhere else', () => {
+		const calculation = blocks.find((block) => block.slug === 'calculation')
+		expect(flatTabFields(calculation, 0).map(fieldName)).not.toContain('required')
+		for (const block of blocks.filter((b) => !['calculation', 'message'].includes(b.slug))) {
+			expect(flatTabFields(block, 0).map(fieldName)).toContain('required')
+		}
+	})
+
+	it('keeps every type-independent shared field on a type that omits placeholder', () => {
+		const checkbox = blocks.find((block) => block.slug === 'checkbox')
+		expect(flatTabFields(checkbox, 0).map(fieldName)).toEqual([
+			'name',
+			'label',
+			'width',
+			'description',
+			'required',
+		])
+	})
+
+	it('lets width span its row on a type that omits placeholder', () => {
+		const checkbox = blocks.find((block) => block.slug === 'checkbox')
+		const [, widthRow] = tabFields(checkbox, 0)
+		if (widthRow?.type !== 'row') {
+			throw new Error('expected a row field')
+		}
+		expect(widthRow.fields.map(fieldName)).toEqual(['width'])
+		expect(widthRow.fields[0]?.admin).not.toHaveProperty('width')
+	})
+
 	it('makes the width select required and not clearable', () => {
 		const text = blocks.find((block) => block.slug === 'text')
 		const width = flatTabFields(text, 0).find((f) => 'name' in f && f.name === 'width')
@@ -120,7 +185,7 @@ describe('buildFieldBlocks', () => {
 		expect('localized' in (labelOf(unlocalized) ?? {})).toBe(false)
 	})
 
-	it('appends subFields to the repeater Field tab, excluding the repeater itself', () => {
+	it('appends subFields to the repeater Field tab, excluding the repeater itself and bare blocks', () => {
 		const repeater = blocks.find((block) => block.slug === 'repeater')
 		const fieldTab = tabFields(repeater, 0)
 		const subFields = fieldTab.find((f) => 'name' in f && f.name === 'subFields')
@@ -128,6 +193,7 @@ describe('buildFieldBlocks', () => {
 		expect(subFields).toMatchObject({ type: 'blocks' })
 		const subBlocks = (subFields as { blocks: Block[] }).blocks
 		expect(subBlocks.map((b) => b.slug)).not.toContain('repeater')
-		expect(subBlocks.length).toBe(blocks.length - 1)
+		expect(subBlocks.map((b) => b.slug)).not.toContain('message')
+		expect(subBlocks.length).toBe(blocks.length - 2)
 	})
 })

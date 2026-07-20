@@ -7,6 +7,7 @@ import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
+import { ComparisonDelta } from './ComparisonDelta'
 import { cardStyle, labelStyle } from './cardChrome'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
@@ -50,8 +51,8 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 		? formatRangeCaption(customRange, locale)
 		: t(TIMEFRAME_KEYS[timeframe])
 	const buckets = customRange
-		? bucketByRange(result.points, customRange)
-		: bucketSeries(result.points, timeframe, new Date())
+		? bucketByRange(result.points, customRange, result.timezone)
+		: bucketSeries(result.points, timeframe, result.timezone)
 	const trendPoints = buckets.map((b) => ({
 		...b,
 		display: formatMetricValue(metric, b.value, locale),
@@ -71,6 +72,15 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 			</span>
 			<TrendChart buckets={trendPoints} ariaLabel={`${title} ${caption}`} minHeight={180} />
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
+			{result.comparisonRange ? (
+				<ComparisonDelta
+					current={result.total}
+					previous={result.previousTotal}
+					metric={metric}
+					locale={locale}
+					t={t}
+				/>
+			) : null}
 			{result.clamped ? (
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
 					{t(keys.stateClamped)}

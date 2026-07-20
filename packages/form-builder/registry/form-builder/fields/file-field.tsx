@@ -13,7 +13,7 @@ const typesOf = (mimeTypes: unknown): string[] => {
 }
 
 export const fileField = defineFieldRenderer<string | number>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const label = typeof field.label === 'string' ? field.label : undefined
@@ -126,11 +126,6 @@ export const fileField = defineFieldRenderer<string | number>(
 							))}
 						</div>
 					) : null}
-					{warnings?.map((message) => (
-						<p key={message} className="text-amber-600">
-							{message}
-						</p>
-					))}
 				</div>
 			</div>
 		)

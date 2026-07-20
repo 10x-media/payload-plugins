@@ -1,72 +1,124 @@
 ---
 title: Consent
-description: Checkbox consent with compliance defaults and proof stored by reference.
+description: Checkbox consent referencing statements you own, with proof stored by document id and version.
 ---
 
-The `consent` field captures affirmative, checkbox-based consent with a compliance baseline built in: unchecked by default, required to submit unless marked optional, and proof stored as a reference to the policy, never as copied policy text.
+Consent is a reference, not a copy. You keep your statements in one place, forms point at them by id, and what the visitor reads is resolved per request. So a form author picks a source and nothing else: no wording to paste, no URL, no version number to type. Correcting a sentence corrects every form using it, with nothing to re-save.
+
+The proof stored on each submission is id-based: which source, which document, and, where drafts are enabled, which published version. Never the policy text, so editing a policy cannot rewrite history, and never a URL or slug, so renaming or re-routing a page leaves past proofs intact.
+
+## Setting it up
+
+Two steps, both yours. First, place the exported field wherever the statements belong. Any collection or global works: a settings global, a legal-pages parent, a tenant document.
 
 ```ts
-// In a form's fields blocks:
-{
-  blockType: 'consent',
-  name: 'terms',
-  statement: 'I have read and agree to the Privacy Policy',
-  source: 'static',
-  sourceConfig: {
-    label: 'Privacy Policy',
-    url: 'https://example.com/privacy',
-  },
-  optional: false,
+import { consentSourcesField } from '@10x-media/form-builder'
+
+export const settings: GlobalConfig = {
+  slug: 'settings',
+  fields: [consentSourcesField({ relationTo: ['legal-pages', 'notices'] })],
 }
 ```
 
-Set `optional: true` for marketing opt-ins and similar non-required consent. Keep terms-of-service consent separate and required.
-
-## Sources
-
-The `source` decides how the policy link resolves. `static` (the default) is a fixed URL and label from `sourceConfig`; no server step, the renderer reads it directly. `pageReference` resolves the policy URL at display time from a Payload document (`relationTo`, `docId`, and optionally `urlField` in `sourceConfig`), the right choice when the policy is content whose URL can change. Anything else is a custom source via `defineConsentSource`:
+Then tell the plugin how to read it back:
 
 ```ts
-import { defineConsentSource } from '@10x-media/form-builder'
-
-const mySource = defineConsentSource({
-  type: 'mySource',
-  label: 'My policy source',
-  resolve: async ({ config, payload, locale }) => ({
-    links: [{ label: config.label as string, url: config.url as string }],
-  }),
+formBuilder({
+  consent: {
+    sources: async ({ req }) => {
+      const settings = await req.payload.findGlobal({
+        slug: 'settings',
+        depth: 1,
+        locale: req.locale,
+        req,
+      })
+      return (settings.consentSources ?? []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        statement: row.statement,
+        // `page` is an id, so proofs survive a rename; `url` is your routing, only you know it.
+        ...(row.page && {
+          page: { relationTo: row.page.relationTo, id: row.page.value.id },
+          url: `/${row.page.relationTo}/${row.page.value.slug}`,
+        }),
+      }))
+    },
+  },
 })
-
-formBuilder({ consentSources: { mySource } })
 ```
 
-The `consentSources` option follows the [opt-in convention](/concepts#the-opt-in-convention).
+Without `consent.sources`, the `consent` field type is not registered at all: a consent field with no statement to reference has nothing to say and nothing to prove. (An explicit `fields.consent` definition of your own still wins, as ever.)
 
-## Proof by reference
+### The row
 
-At submit, each consent field produces a `ConsentProof` stored on the submission's `consent` array:
+Each row is a `name`, the `statement`, and optionally a `page`:
+
+- **The row's own `id`**, Payload's auto-assigned array-row id, is the stable reference: forms store it and proofs record it. Nothing you author, so a rename or a reorder never orphans either.
+- **`name`** is shown when picking the source on a form, and it is the text of the policy link rendered beside the statement. A source with a link `url` but no `name` renders no link, since a link needs a human name to click.
+- **`statement`** is the sentence beside the checkbox, authored as rich text with your project's editor. Put the policy link inline. Pass `editor` to `consentSourcesField` to override it.
+- **`page`**, labeled "Statement source" in the admin, is the document the statement covers, and is what makes the proof provable. Always a polymorphic relationship, even when `relationTo` names one collection, because a proof needs the collection recorded alongside the id. Omit `relationTo` entirely and there is no page picker: statements only, and proofs with no page or version. Set it when you want a submission to save a reference to your policy.
+
+Only the array itself and `page` carry a description in the admin; `name` and `statement` are self-explanatory enough not to need one. `statement` and `name` are localized by default (`localized: false` opts out).
+
+### Multi-tenancy
+
+There is nothing to configure. Place the field on your tenant-scoped document and scope the read by the tenant you derive from `req`. A tenant's authors then only see their own sources in the picker, and their visitors only ever agree to their own statements. The same holds with plain Payload, no tenants at all: the resolver is just a read.
+
+## Rendering the statement
+
+The form document carries only a source id, so resolve the statements server-side and hand them to `toFormDocument`:
 
 ```ts
-// { agreed: true, ref: 'https://example.com/privacy', versionRef?: '...', at: '<ISO-8601>' }
+import { resolveConsentStatements } from '@10x-media/form-builder/rsc'
+import { createLocalReq, getPayload } from 'payload'
+
+const payload = await getPayload({ config })
+const form = await payload.findByID({ collection: 'forms', id, depth: 0 })
+const req = await createLocalReq({}, payload)
+const consentStatements = await resolveConsentStatements({ payload, req, form })
+
+// Client:
+<Form form={toFormDocument(form, { consentStatements })} />
 ```
 
-`ref` is the policy URL resolved at submit time (not page load), `at` is the submission timestamp. Policy text is never stored, so a policy edit does not silently rewrite past proofs.
+`createLocalReq` is what gives the resolver a real `req` outside a route handler. Skip this step and consent fields render with no statement rather than a stale one, which is the point: there is no copy anywhere to go stale.
+
+The renderer shows the statement next to the unchecked checkbox (rich text through the same escaping, URL-sanitizing pipeline as action bodies), the `url` as a policy link beside it, and takes the checkbox's accessible name from the statement flattened to its visible words. That flattening helper is exported as `textOfBody` (root and `./react`) for custom renderers.
+
+The statement renders as a sibling of the checkbox rather than wrapping it in a `<label>`, which is what makes an inline link safe: anchors are not labelable elements, so a link inside a `<label>` would toggle the checkbox when clicked.
+
+## Requiring it
+
+`required` on the field is what makes a consent mandatory, and it is enforced server-side: a `false` value is a present value, so the engine's shared required guard never fires on it and the field's own validator rejects an explicit refusal. Leave it off for marketing opt-ins and similar. Keep terms-of-service consent separate and required.
+
+## Proof
+
+Each consent field produces a `ConsentProof` on the submission's `consent` array, `source` holding the row id it referenced:
+
+```ts
+// {
+//   agreed: true,
+//   source: '64f3a9c1...',
+//   page: { relationTo: 'legal-pages', id: '507f...' },
+//   versionRef: '65a1...',
+//   at: '<ISO-8601>',
+// }
+```
+
+The source is re-resolved server-side at submit, so the proof reflects what the statement said then, not what the client rendered or claimed. A refusal is recorded, never dropped. If the resolver is down, the submission is rejected rather than recording an agreement the server cannot vouch for.
 
 ### Version capture
 
-Set `captureVersion: true` in `sourceConfig` for sources that support it (`pageReference` today). The proof then records which published version of the policy document the user agreed to, via `resolvePublishedVersionRef`. If drafts/versions are off for that collection, `versionRef` is omitted.
+`versionRef` is the published version document's own id, and appears only when the page's collection has **drafts** enabled. It needs no configuration: the plugin detects drafts per collection at submit.
 
-## Rendering
+| Page's collection | `versionRef` |
+| --- | --- |
+| `versions: { drafts: true }` | The published version's id, or absent while nothing is published |
+| `versions: true` (no drafts) | Absent |
+| No versions | Absent |
 
-The `consent` renderer ships in `defaultRenderers`: the statement as the label, the unchecked checkbox, and the policy links (opening in a new tab with `rel="noopener noreferrer"`).
+Versions without drafts get no `versionRef` because there is no published/draft distinction to pin to: `_status` only exists under drafts, so recording a version reference there would be inventing one. Absent means absent.
 
-For the `pageReference` and custom sources, resolve links server-side before rendering so the visitor sees them without a client round trip:
+## Endpoint
 
-```ts
-import { resolveConsentLinks } from '@10x-media/form-builder'
-
-const resolved = await resolveConsentLinks(field, { registry, payload, locale: 'en' })
-// Embed resolved.links on the field as `consentLinks` before passing the form to <Form>.
-```
-
-The `static` source needs none of this; the renderer falls back to `sourceConfig` directly.
+The source picker is backed by `GET /api/forms/:id/consent-sources`, registered only when `consent.sources` is set. It is authenticated (403 otherwise), scoped to the request, and fails closed with a 503 when the resolver throws. Like the other document-scoped selects, it stays empty until the form's first save: it needs a document id to resolve against.

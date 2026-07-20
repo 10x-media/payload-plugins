@@ -19,10 +19,12 @@ export const isValidCalendarDate = (value: string): boolean => {
 	)
 }
 
+/** `placeholder` is omitted: browsers ignore it on `<input type="date">`, which renders its own picker. */
 export const dateField = defineFormField<'date'>({
 	type: 'date',
 	label: keys.fieldTypeDate,
 	value: 'date',
+	omitShared: ['placeholder'],
 	validate: ({ value, t }) => {
 		if (value == null || value === '') {
 			return true

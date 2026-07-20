@@ -9,7 +9,12 @@ afterEach(() => {
 	cleanup()
 })
 
-const doc = (fields: FormFieldInstance[], id: number | string = 1): FormDocument => ({ id, fields })
+const doc = (fields: FormFieldInstance[], id: number | string = 1): FormDocument => ({
+	id,
+	fields,
+	multistep: false,
+	pollEnabled: false,
+})
 
 describe('Form', () => {
 	it('hides a field until its visibleWhen condition is met', async () => {
@@ -57,6 +62,57 @@ describe('Form', () => {
 			values: [{ field: 'name', value: 'Ada' }],
 		})
 		expect(onSuccess).toHaveBeenCalledWith('1')
+	})
+
+	const responseMessageForm = (fields: FormFieldInstance[]): FormDocument => ({
+		...doc(fields),
+		response: {
+			type: 'message',
+			message: {
+				root: {
+					type: 'root',
+					children: [{ type: 'paragraph', children: [{ type: 'text', text: 'Hi {{role||n/a}}' }] }],
+				},
+			},
+		},
+	})
+
+	it('renders the response message with the formatted option label, not the raw value', async () => {
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '1' })
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'select',
+				name: 'role',
+				label: 'Role',
+				options: [
+					{ label: 'Administrator', value: 'admin' },
+					{ label: 'Member', value: 'member' },
+				],
+			},
+		]
+		render(<Form form={responseMessageForm(fields)} onSubmit={onSubmit} />)
+
+		fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'admin' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+		expect(await screen.findByRole('status')).toHaveTextContent('Hi Administrator')
+	})
+
+	it('renders the double-pipe fallback in the response message when the field is unanswered', async () => {
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '2' })
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'select',
+				name: 'role',
+				label: 'Role',
+				options: [{ label: 'Administrator', value: 'admin' }],
+			},
+		]
+		render(<Form form={responseMessageForm(fields)} onSubmit={onSubmit} />)
+
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+		expect(await screen.findByRole('status')).toHaveTextContent('Hi n/a')
 	})
 
 	it('surfaces a per-field error returned by the submit handler', async () => {

@@ -8,18 +8,18 @@ export type FormResultsProps = {
 	t?: (key: string) => string
 	locale?: string
 	showCounts?: boolean
-	/** The recorded outcome's stable option value; the matching bucket is highlighted as the winner. */
-	winningValue?: string
+	/** The recorded outcome's stable option values; every matching bucket is highlighted as a winner (a tie highlights more than one). */
+	winningValues?: string[]
 }
 
 function OneResult({
 	result,
 	showCounts,
-	winningValue,
+	winningValues,
 }: {
 	result: FieldAggregation
 	showCounts: boolean
-	winningValue?: string
+	winningValues?: string[]
 }): ReactNode {
 	if (result.total === 0) {
 		return (
@@ -34,7 +34,7 @@ function OneResult({
 			{result.label ? <h3 className="mb-2 font-medium">{result.label}</h3> : null}
 			<ul className="grid list-none gap-2 p-0">
 				{result.buckets.map((bucket) => {
-					const isWinner = winningValue != null && bucket.value === winningValue
+					const isWinner = winningValues?.includes(bucket.value) ?? false
 					return (
 						<li
 							key={bucket.value}
@@ -71,7 +71,7 @@ function OneResult({
 }
 
 /** shadcn-styled poll/survey results: per-option bars with percentages. Data resolved server-side and passed in. */
-export function FormResults({ results, showCounts = true, winningValue }: FormResultsProps) {
+export function FormResults({ results, showCounts = true, winningValues }: FormResultsProps) {
 	const list = Array.isArray(results) ? results : [results]
 	return (
 		<div className="fb-results">
@@ -80,7 +80,7 @@ export function FormResults({ results, showCounts = true, winningValue }: FormRe
 					key={result.field}
 					result={result}
 					showCounts={showCounts}
-					winningValue={winningValue}
+					winningValues={winningValues}
 				/>
 			))}
 		</div>

@@ -1,13 +1,18 @@
 'use client'
 
+export { sanitizeUrl } from '../actions/body/converters'
 export type { BodyContext } from '../actions/body/serializeBody'
 export { serializeBody } from '../actions/body/serializeBody'
+export { textOfBody } from '../actions/body/textOfBody'
 export type { AggregationBucket, FieldAggregation } from '../aggregation/types'
 export { computeCalcFields } from '../calc/computeCalcFields'
 export { evaluateCalc } from '../calc/evaluate'
 export type { CalcExpression } from '../calc/types'
 export { evaluateCondition } from '../conditions/evaluate'
+export type { ConsentStatement, ConsentStatements } from '../consent/resolveConsentStatements'
+export { fieldKey } from '../fields/fieldKey'
 export { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
+export type { ToFormDocumentOptions } from '../form/toFormDocument'
 export { toFormDocument } from '../form/toFormDocument'
 export type { PrefillOptions } from '../prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from '../prefill/valuesFromSearchParams'
@@ -25,7 +30,7 @@ export { cn } from '../react/cn'
 export type { FieldRenderer, FieldRendererProps, RendererTranslate } from '../react/contract'
 export { defineFieldRenderer } from '../react/contract'
 export type {
-	FormDisplaySettings,
+	FormButtonSettings,
 	FormDocument,
 	FormPollSettings,
 	FormProps,

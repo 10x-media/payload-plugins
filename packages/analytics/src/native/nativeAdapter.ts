@@ -56,7 +56,7 @@ const baseCapabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
 	realtime: true,
 	realtimeWindowMinutes: 60,
-	comparison: false,
+	comparison: true,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics,
@@ -116,11 +116,10 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				{
 					method: 'post',
 					path: options.ingestPath ?? '/analytics/ingest',
-					handler: makeIngestHandler(
-						geoResolver,
-						() => buffer,
-						scoped ? context?.resolveScope : undefined
-					),
+					handler: makeIngestHandler(geoResolver, () => buffer, {
+						scope: scoped ? context?.resolveScope : undefined,
+						timezone: context?.resolveTimezone,
+					}),
 				},
 			]
 			if (options.retentionDays && options.retentionDays > 0) {
@@ -130,8 +129,9 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				}
 			}
 			const prevOnInit = config.onInit
+			// payloadRef is set before the app's own onInit so consumer init code can
+			// already query the native adapter.
 			config.onInit = async (p) => {
-				await prevOnInit?.(p)
 				payloadRef = p
 				if (options.buffer) {
 					const cfg = options.buffer === true ? {} : options.buffer
@@ -144,6 +144,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 						},
 					})
 				}
+				await prevOnInit?.(p)
 			}
 		},
 		async query(q: AnalyticsQuery): Promise<AnalyticsResult> {
@@ -177,7 +178,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			if (!dim) {
 				if (q.granularity === 'day') {
 					return {
-						rows: seriesFromRollups(totalsDocs, q.metrics),
+						rows: seriesFromRollups(totalsDocs, q.metrics, q.timezone),
 						totals,
 						meta: { provider: 'native', fetchedAt },
 					}

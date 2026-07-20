@@ -6,6 +6,7 @@ import type {
 	TextFieldClient,
 } from 'payload'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
+import { fixedFieldOptions } from '../fields/data/regions'
 
 /** A field row as stored in the form's `fields` blocks array (only the keys the builder reads). */
 export type FieldRow = {
@@ -13,6 +14,8 @@ export type FieldRow = {
 	name?: string
 	label?: string
 	options?: Option[]
+	/** A bare message block's richText body; see `messageSnippet`. */
+	content?: unknown
 	[key: string]: unknown
 }
 
@@ -44,7 +47,8 @@ export const operandFromRow = (
 		name,
 		label: typeof row.label === 'string' && row.label.length > 0 ? row.label : name,
 		conditionType,
-		options: Array.isArray(row.options) ? row.options : undefined,
+		// Country/state author no options but are `select`-typed conditions, so offer their fixed set.
+		options: Array.isArray(row.options) ? row.options : fixedFieldOptions(row.blockType),
 	}
 }
 
@@ -52,18 +56,20 @@ export const operandFromRow = (
  * Build the minimal `*FieldClient` a Payload leaf condition input requires for a given operand. Casts
  * are localized to these four synths and nowhere else: `FieldBaseClient` requires only `name`, and each
  * leaf is `FieldBaseClient & Pick<…, 'type' | …>` where every picked member but `type` (and `select`'s
- * required `options`) is optional, so the literals are structurally complete. `dateClientField` omits
- * `admin.date`, so `DateCondition` falls back to its default date format. Each synth returns a single
- * concrete client type so leaf `field` props need no narrowing.
+ * required `options`) is optional, so the literals are structurally complete. Every synth carries an
+ * `admin: {}` because Payload's `Select` and `Date` leaf inputs read `field.admin.placeholder`
+ * unguarded and throw on a missing `admin`; the empty object also leaves `admin.date` unset, so
+ * `DateCondition` still falls back to its default date format. Each synth returns a single concrete
+ * client type so leaf `field` props need no narrowing.
  */
 export const textClientField = (operand: ConditionOperand): TextFieldClient =>
-	({ name: operand.name, label: operand.label, type: 'text' }) as TextFieldClient
+	({ name: operand.name, label: operand.label, type: 'text', admin: {} }) as TextFieldClient
 
 export const numberClientField = (operand: ConditionOperand): NumberFieldClient =>
-	({ name: operand.name, label: operand.label, type: 'number' }) as NumberFieldClient
+	({ name: operand.name, label: operand.label, type: 'number', admin: {} }) as NumberFieldClient
 
 export const dateClientField = (operand: ConditionOperand): DateFieldClient =>
-	({ name: operand.name, label: operand.label, type: 'date' }) as DateFieldClient
+	({ name: operand.name, label: operand.label, type: 'date', admin: {} }) as DateFieldClient
 
 export const selectClientField = (operand: ConditionOperand): SelectFieldClient =>
 	({
@@ -71,4 +77,5 @@ export const selectClientField = (operand: ConditionOperand): SelectFieldClient 
 		label: operand.label,
 		type: 'select',
 		options: operand.options ?? [],
+		admin: {},
 	}) as SelectFieldClient

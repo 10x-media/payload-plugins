@@ -1,13 +1,14 @@
 import { APIError, type CollectionBeforeValidateHook, ValidationError } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
-import type { ConsentSourceRegistry } from '../consent/registry'
+import { resolveConsentEntries } from '../consent/resolveConsentEntries'
+import type { ConsentSourceEntry, ConsentSourcesResolver } from '../consent/types'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
 import { applyPollOptions } from '../poll/applyPollOptions'
 import type { PollOption } from '../poll/definePollOptionSource'
+import { resolveEffectivePollOptions } from '../poll/effectivePollOptions'
 import type { PollOptionSourceRegistry } from '../poll/registry'
-import { resolvePollOptions } from '../poll/resolvePollOptions'
 import { IDENTITY_CONTEXT_KEY } from '../spam/constants'
 import { keys } from '../translations/keys'
 import { asFieldTranslate, asTranslate } from '../translations/server'
@@ -19,7 +20,8 @@ import { POLL_CONTEXT_KEY } from './votedCookie'
 export type ValidateSubmissionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
-	consentRegistry: ConsentSourceRegistry
+	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
+	consentSources?: ConsentSourcesResolver
 	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
 	uploadSlug?: string
 	/** Registered poll option sources; a form's configured `optionSource` resolves through this at validation time. */
@@ -30,14 +32,15 @@ export type ValidateSubmissionArgs = {
  * Server-authoritative submission validation. On create it loads the referenced form, re-runs every
  * field's required check, intrinsic validator, and declarative rules through `runSubmission`, threading
  * `req`/`payload` so server-only async rules can hit the DB, and throws a Payload `ValidationError` with
- * per-field paths on any error-severity failure. The client is never trusted.
- * Consent fields are captured into `result.consent` (array of proofs, one per visible consent field).
+ * per-field paths on any failure. The client is never trusted.
+ * Consent fields are captured into `result.consent` (array of proofs, one per visible consent field),
+ * built from the host's sources re-resolved here rather than from anything the form or client carries.
  */
 export const validateSubmission =
 	({
 		registry,
 		ruleRegistry,
-		consentRegistry,
+		consentSources,
 		uploadSlug,
 		pollSourceRegistry,
 	}: ValidateSubmissionArgs): CollectionBeforeValidateHook =>
@@ -58,14 +61,15 @@ export const validateSubmission =
 			req,
 		})
 
-		// Stash the poll config (null = form has none) so the voted-cookie afterChange hook can
-		// skip a second form fetch on the same request.
+		// Stash whether the form is poll-enabled (its top-level `pollEnabled` flag) so the voted-cookie
+		// afterChange hook can skip a second form fetch on the same request.
 		const poll = pollConfigOf(form.poll)
-		req.context[POLL_CONTEXT_KEY] = poll ?? null
+		const pollEnabled = form.pollEnabled === true
+		req.context[POLL_CONTEXT_KEY] = pollEnabled
 
 		// Form-level lifecycle guard, before any field work: a closed poll accepts no submissions,
 		// regardless of what the client rendered.
-		if (poll?.enabled === true && isPollClosed(poll)) {
+		if (pollEnabled && isPollClosed(poll)) {
 			throw new APIError(asTranslate(req.i18n.t)(keys.pollClosed), 403)
 		}
 
@@ -74,40 +78,49 @@ export const validateSubmission =
 		const locale = req.locale ?? 'en'
 		const t = asFieldTranslate(req.i18n.t)
 
-		// With an option source configured, the source's resolved values are the only accepted
-		// answers for the results field: options are injected into the field instance (so the
-		// select's membership check and the stored option labels use them) and membership is also
-		// enforced directly, so an empty resolution or a non-select results field still fails
-		// closed. A resolve failure rejects the whole submission rather than skipping the check.
-		if (poll?.enabled === true && typeof poll.optionSource === 'string' && poll.optionSource) {
+		// With a resolved choice set for the results field (a poll `optionSource`, or the field type's
+		// own `resolveOptions`) the resolved values are the only accepted answers: options are injected
+		// into the field instance (so the select's membership check and the stored option labels use
+		// them) and membership is also enforced directly, so an empty resolution or a non-select results
+		// field still fails closed. A resolve failure rejects the whole submission rather than skipping
+		// the check. Static authored polls are unaffected: their field validates against its own options
+		// through the normal field pipeline.
+		const resultsField =
+			pollEnabled && typeof poll?.resultsField === 'string' && poll.resultsField.length > 0
+				? poll.resultsField
+				: undefined
+		const resultsInstance = resultsField
+			? fields.find((instance) => instance.name === resultsField)
+			: undefined
+		const usesResolver =
+			(typeof poll?.optionSource === 'string' && poll.optionSource.length > 0) ||
+			Boolean(resultsInstance && registry.get(resultsInstance.blockType)?.resolveOptions)
+		if (resultsField && usesResolver) {
 			let resolved: PollOption[]
 			try {
-				resolved =
-					(await resolvePollOptions({
-						payload: req.payload,
-						req,
-						form,
-						sources: pollSourceRegistry ?? new Map(),
-					})) ?? []
+				resolved = await resolveEffectivePollOptions({
+					payload: req.payload,
+					req,
+					form,
+					sources: pollSourceRegistry ?? new Map(),
+					fieldTypes: registry,
+				})
 			} catch {
 				throw new APIError(asTranslate(req.i18n.t)(keys.pollOptionsUnavailable), 503)
 			}
-			const resultsField = typeof poll.resultsField === 'string' ? poll.resultsField : undefined
 			fields = applyPollOptions(fields, resultsField, resolved)
-			if (resultsField) {
-				const answer = incoming.find((entry) => entry.field === resultsField)?.value
-				const isAnswered = answer != null && answer !== ''
-				if (isAnswered && !resolved.some((option) => option.value === answer)) {
-					throw new ValidationError(
-						{
-							collection: FORM_SUBMISSIONS_SLUG,
-							errors: [
-								{ path: resultsField, message: asTranslate(req.i18n.t)(keys.validationSelect) },
-							],
-						},
-						req.t
-					)
-				}
+			const answer = incoming.find((entry) => entry.field === resultsField)?.value
+			const isAnswered = answer != null && answer !== ''
+			if (isAnswered && !resolved.some((option) => option.value === answer)) {
+				throw new ValidationError(
+					{
+						collection: FORM_SUBMISSIONS_SLUG,
+						errors: [
+							{ path: resultsField, message: asTranslate(req.i18n.t)(keys.validationSelect) },
+						],
+					},
+					req.t
+				)
 			}
 		}
 		const expectedOwner =
@@ -115,12 +128,29 @@ export const validateSubmission =
 				? (req.context[IDENTITY_CONTEXT_KEY] as string)
 				: undefined
 
+		// Every consent proof is built from the source as it reads right now, not from anything the
+		// form or the client carries, so a resolver failure rejects the submission rather than
+		// recording an agreement to a statement the server cannot vouch for.
+		let consentEntries: ConsentSourceEntry[] = []
+		if (consentSources && fields.some((field) => field.blockType === 'consent')) {
+			try {
+				consentEntries = await resolveConsentEntries({
+					payload: req.payload,
+					req,
+					form,
+					sources: consentSources,
+				})
+			} catch {
+				throw new APIError(asTranslate(req.i18n.t)(keys.consentSourcesUnavailable), 503)
+			}
+		}
+
 		const result = await runSubmission({
 			fields,
 			values: incoming,
 			registry,
 			ruleRegistry,
-			consentRegistry,
+			consentEntries,
 			locale,
 			t,
 			operation: 'create',

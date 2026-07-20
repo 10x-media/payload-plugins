@@ -9,7 +9,9 @@ const lexical = (text: string) => ({
 	},
 })
 
-describeForDb('form-builder message field + response settings', { dbs: ['mongo'] }, (db) => {
+// Empty options: runs on Mongo by default and on both DBs under the matrix tier (DB_MATRIX),
+// proving the row-id trust boundary and id-keyed flow normalization cross-DB.
+describeForDb('form-builder message field + response settings', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -20,7 +22,7 @@ describeForDb('form-builder message field + response settings', { dbs: ['mongo']
 		await booted.stop()
 	})
 
-	it('round-trips a message-type response with rich text and submit label', async () => {
+	it('round-trips a message-type response with rich text', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',
 			data: {
@@ -29,18 +31,15 @@ describeForDb('form-builder message field + response settings', { dbs: ['mongo']
 				response: {
 					type: 'message',
 					message: lexical('Thanks!'),
-					submitLabel: 'Send',
 				},
 			},
 		})
 		const response = form.response as {
 			type?: string
 			message?: unknown
-			submitLabel?: string
 		}
 		expect(response.type).toBe('message')
 		expect(response.message).toMatchObject(lexical('Thanks!'))
-		expect(response.submitLabel).toBe('Send')
 	})
 
 	it('round-trips a redirect-type response and validates the URL', async () => {
@@ -70,22 +69,46 @@ describeForDb('form-builder message field + response settings', { dbs: ['mongo']
 		).rejects.toThrow()
 	})
 
-	it('authors a message field block and stores its content', async () => {
+	it('authors a nameless message block and stores its content with the row id intact', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',
 			data: {
 				title: 'Message block',
 				fields: [
 					{ blockType: 'text', name: 'first', label: 'First' },
-					{ blockType: 'message', name: 'note', content: lexical('Read me') },
+					{ blockType: 'message', id: 'msg-row-1', content: lexical('Read me') },
 					{ blockType: 'text', name: 'last', label: 'Last' },
 				],
 			},
 		})
-		const note = (form.fields as { blockType: string; content?: unknown }[]).find(
+		const note = (form.fields as { blockType: string; id?: string; content?: unknown }[]).find(
 			(f) => f.blockType === 'message'
 		)
 		expect(note?.content).toMatchObject(lexical('Read me'))
+		expect(note?.id).toBe('msg-row-1')
+	})
+
+	it('normalizes a flow that assigns a bare message by its row id', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Flow with bare message',
+				fields: [
+					{ blockType: 'text', name: 'first', label: 'First' },
+					{ blockType: 'message', id: 'msg-row-2', content: lexical('Step two note') },
+					{ blockType: 'text', name: 'last', label: 'Last' },
+				],
+				flow: {
+					steps: [
+						{ id: 's1', fields: ['first'], next: 's2' },
+						{ id: 's2', fields: ['msg-row-2', 'last'] },
+					],
+				},
+			},
+		})
+		const flow = form.flow as { steps: { id: string; fields: string[] }[] }
+		expect(flow.steps[0]?.fields).toEqual(['first'])
+		expect(flow.steps[1]?.fields).toEqual(['msg-row-2', 'last'])
 	})
 
 	it('a submission stores only the surrounding answers: no message key, no validation', async () => {
@@ -97,8 +120,7 @@ describeForDb('form-builder message field + response settings', { dbs: ['mongo']
 					{ blockType: 'text', name: 'first', label: 'First' },
 					{
 						blockType: 'message',
-						name: 'note',
-						required: true,
+						id: 'msg-row-3',
 						content: lexical('Between'),
 					},
 					{ blockType: 'text', name: 'last', label: 'Last' },
@@ -112,7 +134,8 @@ describeForDb('form-builder message field + response settings', { dbs: ['mongo']
 				form: form.id,
 				values: [
 					{ field: 'first', value: 'a' },
-					{ field: 'note', value: 'client-injected' },
+					{ field: 'msg-row-3', value: 'client-injected' },
+					{ field: 'note', value: 'stray' },
 					{ field: 'last', value: 'b' },
 				],
 			},

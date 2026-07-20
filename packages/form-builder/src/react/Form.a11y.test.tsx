@@ -19,7 +19,12 @@ const axeViolations = async (node: Element) => {
 	return results.violations.map((violation) => violation.id)
 }
 
-const doc = (fields: FormFieldInstance[]): FormDocument => ({ id: 1, fields })
+const doc = (fields: FormFieldInstance[]): FormDocument => ({
+	id: 1,
+	fields,
+	multistep: false,
+	pollEnabled: false,
+})
 
 describe('Form accessibility (axe)', () => {
 	it('a representative single-step form has no structural violations', async () => {
@@ -62,32 +67,69 @@ describe('Form accessibility (axe)', () => {
 					{
 						blockType: 'consent',
 						name: 'terms',
-						label: 'I agree to the terms',
-						source: 'static',
-						sourceConfig: { label: 'Terms of Service', url: 'https://example.com/terms' },
+						source: 'terms-of-service',
+						statement: 'I agree to the terms',
+						link: { label: 'Terms of Service', url: 'https://example.com/terms' },
 					} as FormFieldInstance,
 				])}
 			/>
 		)
 		expect(await axeViolations(container)).toEqual([])
+		expect(screen.getByRole('checkbox')).toHaveAccessibleName('I agree to the terms')
 	})
 
-	it('a consent field with a blank statement falls back to the field label (still labelled)', async () => {
+	// A form rendered without resolveConsentStatements has no statement to show. The field is
+	// misconfigured either way, but it must not degrade into an unlabelled control.
+	it('a consent field with no resolved statement is still a labelled control', async () => {
+		const { container } = render(
+			<Form
+				form={doc([
+					{ blockType: 'consent', name: 'terms', source: 'terms-of-service' } as FormFieldInstance,
+				])}
+			/>
+		)
+		expect(await axeViolations(container)).toEqual([])
+		expect(screen.getByRole('checkbox')).toHaveAccessibleName('terms')
+	})
+
+	it('a consent field with a rich text statement containing an inline link has no structural violations', async () => {
+		const statement = {
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						children: [
+							{ type: 'text', text: 'I agree to the ' },
+							{
+								type: 'link',
+								fields: { url: 'https://example.com/privacy', newTab: true },
+								children: [{ type: 'text', text: 'Privacy Policy' }],
+							},
+							{ type: 'text', text: '.' },
+						],
+					},
+				],
+			},
+		}
 		const { container } = render(
 			<Form
 				form={doc([
 					{
 						blockType: 'consent',
 						name: 'terms',
-						label: 'I agree to the terms',
-						statement: '',
-						source: 'static',
-						sourceConfig: { label: 'Terms of Service', url: 'https://example.com/terms' },
+						source: 'privacy',
+						statement,
 					} as FormFieldInstance,
 				])}
 			/>
 		)
 		expect(await axeViolations(container)).toEqual([])
-		expect(screen.getByText('I agree to the terms')).toBeTruthy()
+		const checkbox = screen.getByRole('checkbox')
+		expect(checkbox).toHaveAccessibleName('I agree to the Privacy Policy.')
+		expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
+			'href',
+			'https://example.com/privacy'
+		)
 	})
 })

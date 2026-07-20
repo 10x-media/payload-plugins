@@ -26,6 +26,8 @@ const flow: FormFlow = {
 const doc = (overrides?: Partial<FormDocument>): FormDocument => ({
 	id: 1,
 	fields,
+	multistep: overrides?.flow !== undefined,
+	pollEnabled: false,
 	...overrides,
 })
 
@@ -42,12 +44,9 @@ describe('FormControls', () => {
 		expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
 	})
 
-	it("defaults the submit label to the form's response.submitLabel", () => {
+	it("defaults the submit label to the form's buttons.submitLabel", () => {
 		render(
-			<Form
-				form={doc({ response: { type: 'message', submitLabel: 'Send it' } })}
-				onSubmit={vi.fn()}
-			>
+			<Form form={doc({ buttons: { submitLabel: 'Send it' } })} onSubmit={vi.fn()}>
 				<FormControls />
 			</Form>
 		)
@@ -56,11 +55,7 @@ describe('FormControls', () => {
 
 	it('prefers the Form submitLabel prop over the stored value', () => {
 		render(
-			<Form
-				form={doc({ response: { type: 'message', submitLabel: 'Send it' } })}
-				onSubmit={vi.fn()}
-				submitLabel="Go"
-			>
+			<Form form={doc({ buttons: { submitLabel: 'Send it' } })} onSubmit={vi.fn()} submitLabel="Go">
 				<FormControls />
 			</Form>
 		)
@@ -70,7 +65,7 @@ describe('FormControls', () => {
 	it('per-button props override the context labels', async () => {
 		render(
 			<Form form={doc({ flow })} onSubmit={vi.fn()}>
-				<FormControls backLabel="Previous" nextLabel="Continue" submitLabel="Finish" />
+				<FormControls prevLabel="Previous" nextLabel="Continue" submitLabel="Finish" />
 			</Form>
 		)
 		fireEvent.click(screen.getByRole('button', { name: 'Continue' }))

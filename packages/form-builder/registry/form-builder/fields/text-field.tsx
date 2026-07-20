@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 export const textField = defineFieldRenderer<string>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const invalid = errors.length > 0
@@ -50,11 +50,6 @@ export const textField = defineFieldRenderer<string>(
 							))}
 						</div>
 					) : null}
-					{warnings?.map((message) => (
-						<p key={message} className="text-amber-600">
-							{message}
-						</p>
-					))}
 				</div>
 			</div>
 		)

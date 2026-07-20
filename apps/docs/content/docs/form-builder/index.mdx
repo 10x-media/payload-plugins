@@ -21,7 +21,7 @@ Editors compose forms from [fields](/form-builder/fields) authored as Payload bl
 ### Authoring
 
 - [Fields](/form-builder/fields): twelve built-in block types, plus your own through `defineFormField`.
-- [Validation](/form-builder/validation): declarative rules with custom messages, warning-versus-error severities, cross-field and async server-only rules, and a [Standard Schema](https://standardschema.dev) escape hatch.
+- [Validation](/form-builder/validation): declarative rules with custom messages, cross-field and async server-only rules, and a [Standard Schema](https://standardschema.dev) escape hatch.
 - [Conditional logic](/form-builder/conditions): expressed in Payload's own `Where` shape, evaluated by one isomorphic engine on client and server.
 - [Multi-step flows](/form-builder/multi-step): a serializable step graph with conditional branching, authored by step titles with exclusive field assignment.
 
@@ -49,7 +49,13 @@ The client is never trusted. Conditions, validation rules, calculations, consent
 
 ## Extending and configuring the plugin
 
-Both plugin-managed collections (`forms`, `form-submissions`) accept an `overrides` option that uses explicit spreads. The submission admin view renders a formatted `SubmissionAnswers` component by default; raw JSON fields are hidden unless you set `showSubmissionRawFields: true`. See [Customization](/form-builder/customization) for the full API.
+Both plugin-managed collections (`forms`, `form-submissions`) accept an `overrides` option that uses explicit spreads. The submission admin view renders a formatted `SubmissionAnswers` component by default; the raw stored fields are hidden unless you set `showSubmissionRawFields: true`. See [Customization](/form-builder/customization) for the full API.
+
+## Comparing to `@payloadcms/plugin-form-builder`
+
+This plugin is a superset of Payload's own [`@payloadcms/plugin-form-builder`](https://payloadcms.com/docs/plugins/form-builder). Both center on the same core idea, a `forms` collection editors author paired with a `form-submissions` collection under a public-create, logged-in-read access model (see [Submit contract](/form-builder/rendering#submit-contract)), but this plugin builds substantially more on top: a headless [frontend renderer](/form-builder/rendering) instead of bring-your-own, [conditional logic](/form-builder/conditions) and [multi-step flows](/form-builder/multi-step) evaluated by one client/server engine, a declarative [validation-rule framework](/form-builder/validation) beyond a bare required check, [polls](/form-builder/polls) with extensible outcome strategies and scheduled auto-close, [consent](/form-builder/consent) resolved live against sources you own, [spam protection](/form-builder/spam) (honeypot, rate limiting, pluggable captcha), department-routed and multi-tenant-aware email, and [typed translations](/form-builder/i18n) with English and German built in.
+
+One thing this plugin deliberately leaves out: **payment**. Native ships a `payment` field, `priceConditions` (a base price adjusted by other answers), and a `handlePayment` scaffold for wiring a processor. This plugin has no equivalent: the position is that form building, submissions, and notification are the scope, and commerce belongs in a dedicated payments or checkout layer, not folded into a forms plugin. A [`calculation`](/form-builder/calculations) field's expression engine can still derive a price number from other answers when a form only needs to show or record one; charging for it stays out of scope.
 
 ## When to use it
 

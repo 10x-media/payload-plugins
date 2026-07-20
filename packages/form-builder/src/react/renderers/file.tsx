@@ -22,7 +22,7 @@ const typesOf = (mimeTypes: unknown): string[] => {
  * control and surfaces upload errors. Single file (v1); the upload posts to the default `/api` route.
  */
 export const fileRenderer = defineFieldRenderer<string | number>(
-	({ field, name, value, onChange, onBlur, errors, warnings, required, disabled, t }) => {
+	({ field, name, value, onChange, onBlur, errors, required, disabled, t }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const [uploading, setUploading] = useState(false)
@@ -89,7 +89,6 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 				description={typeof field.description === 'string' ? field.description : undefined}
 				required={required}
 				errors={allErrors}
-				warnings={warnings}
 				describedById={describedById}
 			>
 				<input

@@ -1,4 +1,4 @@
-import type { Config, Payload, PayloadRequest, TaskConfig } from 'payload'
+import type { Config, Payload, PayloadRequest, TaskConfig, TypedLocale } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
 import type { Translate } from '../fields/types'
@@ -36,18 +36,6 @@ export const runActionsForSubmission = async (args: {
 	richText?: RichTextBodyOption
 }): Promise<void> => {
 	const { input, registry, payload, req, richText } = args
-	const form = await payload
-		.findByID({
-			collection: FORMS_SLUG,
-			id: input.formId,
-			depth: 0,
-			overrideAccess: true,
-			req,
-		})
-		.catch(() => null)
-	if (!form) {
-		return
-	}
 	const submission = await payload
 		.findByID({
 			collection: FORM_SUBMISSIONS_SLUG,
@@ -61,7 +49,29 @@ export const runActionsForSubmission = async (args: {
 		return
 	}
 
+	// The submission's own stored locale (set from req.locale at submit) is authoritative, so the form
+	// is loaded at it. A localized action config, notably the emailTeam `to`, then resolves to the
+	// submission's locale even on the queued path, where the job runner's req may carry a different
+	// (or no) locale than the visitor who submitted.
 	const locale = typeof submission.locale === 'string' ? submission.locale : (req?.locale ?? 'en')
+
+	const form = await payload
+		.findByID({
+			collection: FORMS_SLUG,
+			id: input.formId,
+			depth: 0,
+			overrideAccess: true,
+			// Cast: the stored locale is a plain string; a host's concrete locale union is unknowable from
+			// the plugin, and an unrecognized code just falls back on read, so this narrows (zero runtime
+			// delta) to satisfy a host whose `findByID` locale is a real union.
+			locale: locale as TypedLocale,
+			req,
+		})
+		.catch(() => null)
+	if (!form) {
+		return
+	}
+
 	const t: Translate = asFieldTranslate(req?.i18n?.t ?? ((key: string) => key))
 
 	await runActions({

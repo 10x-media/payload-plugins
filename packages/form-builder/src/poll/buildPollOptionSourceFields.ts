@@ -40,7 +40,6 @@ export const buildPollOptionSourceFields = (registry: PollOptionSourceRegistry):
 			label: labelForKey(keys.pollOptionSource),
 			admin: {
 				description: labelForKey(keys.pollOptionSourceDescription),
-				condition: (_data, siblingData) => Boolean(siblingData?.enabled),
 			},
 			options: sources.map((source) => ({ label: labelFor(source.label), value: source.type })),
 		},
@@ -49,8 +48,7 @@ export const buildPollOptionSourceFields = (registry: PollOptionSourceRegistry):
 			type: 'group',
 			label: labelForKey(keys.pollSourceConfig),
 			admin: {
-				condition: (_data, siblingData) =>
-					Boolean(siblingData?.enabled && siblingData?.optionSource),
+				condition: (_data, siblingData) => Boolean(siblingData?.optionSource),
 			},
 			fields:
 				sourceConfigFields.length > 0

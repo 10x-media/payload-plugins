@@ -56,6 +56,26 @@ describe('plausible adapter', () => {
 		expect(result.meta.provider).toBe('plausible')
 	})
 
+	it('adds an event:hostname filter when a hostname is provided', async () => {
+		let captured: { filters?: unknown } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({
+					results: [{ metrics: [1, 1, 1], dimensions: [] }],
+					meta: {},
+					query: {},
+				})
+			})
+		)
+		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
+		await adapter.query(q({ path: '/pricing', hostname: 'a.example.com' }), {})
+		expect(captured.filters).toEqual([
+			['is', 'event:page', ['/pricing']],
+			['is', 'event:hostname', ['a.example.com']],
+		])
+	})
+
 	it('maps a page-dimension breakdown to rows', async () => {
 		server.use(
 			http.post('https://plausible.io/api/v2/query', () =>

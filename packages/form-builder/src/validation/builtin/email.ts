@@ -6,6 +6,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const emailRule = defineValidationRule<Record<string, never>, string>({
 	type: 'email',
 	label: keys.ruleEmail,
+	description: keys.ruleEmailDescription,
 	appliesTo: ['text', 'textarea', 'email'],
 	defaultMessage: keys.ruleEmailMessage,
 	validate: ({ value, message }) =>

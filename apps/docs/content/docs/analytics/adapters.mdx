@@ -28,7 +28,7 @@ Every surface is gated by it:
 - A [display field](/analytics/display-fields) drops unsupported metrics from its request and renders the rest.
 - A custom range that exceeds a provider's `maxLookbackDays` is narrowed to the provider maximum, visibly.
 
-Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `entries`, `exits`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
+Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
 
 An unconfigured adapter (missing credentials) degrades to an empty state and makes no network calls.
 
@@ -86,7 +86,7 @@ import { posthog } from '@10x-media/analytics/adapters/posthog'
 posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY! })
 ```
 
-Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default. Metrics: pageviews, visitors, visits, sessions. The `page` dimension returns a top-pages breakdown.
+Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown) and `event` (per-event-name breakdown). A binding `hostname` filters on `properties.$host`.
 
 ## Testing: memoryAdapter
 

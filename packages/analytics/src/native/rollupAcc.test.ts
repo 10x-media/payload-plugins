@@ -54,4 +54,20 @@ describe('seriesFromRollups', () => {
 		)
 		expect(rows).toEqual([{ timestamp: '2026-06-01T00:00:00.000Z', metrics: { pageviews: 5 } }])
 	})
+
+	it('keeps timezone-bucketed periods aligned to that zone day', () => {
+		// Periods are already Berlin-local midnights (22:00Z); flooring in Berlin is idempotent.
+		const rows = seriesFromRollups(
+			[
+				doc({ period: '2026-07-13T22:00:00.000Z', pageviews: 2 }),
+				doc({ period: '2026-07-14T22:00:00.000Z', pageviews: 5 }),
+			],
+			['pageviews'],
+			'Europe/Berlin'
+		)
+		expect(rows).toEqual([
+			{ timestamp: '2026-07-13T22:00:00.000Z', metrics: { pageviews: 2 } },
+			{ timestamp: '2026-07-14T22:00:00.000Z', metrics: { pageviews: 5 } },
+		])
+	})
 })

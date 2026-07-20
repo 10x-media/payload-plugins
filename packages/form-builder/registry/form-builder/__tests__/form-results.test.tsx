@@ -42,14 +42,23 @@ describe('shadcn FormResults', () => {
 	})
 
 	it('highlights the winning bucket with class and a badge', () => {
-		const { container } = render(createElement(FormResults, { results: agg, winningValue: 'red' }))
+		const { container } = render(
+			createElement(FormResults, { results: agg, winningValues: ['red'] })
+		)
 		const winner = container.querySelector('.fb-results__bucket--winner')
 		expect(winner).not.toBeNull()
 		expect(winner?.textContent).toContain('Red')
 		expect(winner?.textContent).toContain('Winner')
 	})
 
-	it('marks no winner without a winningValue', () => {
+	it('highlights every bucket in a tie', () => {
+		const { container } = render(
+			createElement(FormResults, { results: agg, winningValues: ['red', 'blue'] })
+		)
+		expect(container.querySelectorAll('.fb-results__bucket--winner')).toHaveLength(2)
+	})
+
+	it('marks no winner without winningValues', () => {
 		const { container } = render(createElement(FormResults, { results: agg }))
 		expect(container.querySelector('.fb-results__bucket--winner')).toBeNull()
 	})

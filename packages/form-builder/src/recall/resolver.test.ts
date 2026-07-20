@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import type { FormFieldInstance } from '../submissions/types'
-import { buildRecallResolver, optionLabelsFor } from './resolver'
+import { buildRecallResolver, descriptorsFor, optionLabelsFor } from './resolver'
 
 const registry = new Map<string, AnyFormFieldDefinition>([
 	['text', { type: 'text', label: 't', value: 'text' }],
@@ -67,6 +67,23 @@ describe('buildRecallResolver', () => {
 			t: (k) => k,
 		})
 		expect(r('tags')).toBe('a, b')
+	})
+})
+
+describe('descriptorsFor', () => {
+	it('builds a label and fieldType per named field', () => {
+		expect(descriptorsFor(fields)).toEqual([
+			{ field: 'first', label: 'First', fieldType: 'text' },
+			{ field: 'plan', label: 'Plan', fieldType: 'select' },
+		])
+	})
+	it('falls back to the field name when no label is authored', () => {
+		expect(descriptorsFor([{ blockType: 'text', name: 'first' }])).toEqual([
+			{ field: 'first', label: 'first', fieldType: 'text' },
+		])
+	})
+	it('skips nameless (bare) fields', () => {
+		expect(descriptorsFor([{ blockType: 'message' }])).toEqual([])
 	})
 })
 

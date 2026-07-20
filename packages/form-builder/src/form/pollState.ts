@@ -1,12 +1,13 @@
 /** Poll settings as loaded from a forms document (server) or a `FormDocument` (client). */
 export type PollConfigLike = {
-	enabled?: boolean | null
 	resultsField?: string | null
 	resultsVisibility?: string | null
 	closesAt?: string | null
+	/** The outcome-resolution strategy slug (`poll.types` registry). Absent is treated as `manual`. */
+	type?: string | null
 	optionSource?: string | null
 	sourceConfig?: Record<string, unknown> | null
-	outcome?: { winningValue?: string | null; resolvedAt?: string | null } | null
+	outcome?: { winningValues?: (string | null)[] | null; resolvedAt?: string | null } | null
 }
 
 /** Narrow a forms document's untyped `poll` member. */

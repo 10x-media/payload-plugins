@@ -5,6 +5,7 @@ import { defineValidationRule } from '../defineValidationRule'
 export const maxLengthRule = defineValidationRule<{ max: number }, string>({
 	type: 'maxLength',
 	label: keys.ruleMaxLength,
+	description: keys.ruleMaxLengthDescription,
 	appliesTo: ['text', 'textarea', 'email'],
 	params: [
 		{ name: 'max', type: 'number', required: true, min: 0, label: labelFor(keys.ruleParamMax) },

@@ -33,7 +33,9 @@ The in-admin condition and flow builders ship their own styles; no admin setup i
 
 ## Author a form
 
-In the admin, create a `forms` document: give it a title, then add fields as blocks in the **Fields** tab (a text field `name`, an email field `email`, a textarea `message`). The tabs beside it cover the rest: **Display** (an optional title and intro shown above the fields), **Flow** (multi-step), **Actions** (post-submit), and **Response** (the success message, or a redirect, and the submit button label). Each field block is tabbed too: **Field** holds the basics and type config, **Validation** the rules, **Advanced** the visibility condition and hidden flag.
+In the admin, create a `forms` document: give it a title, then two checkboxes, **Multi-step** and **Poll**, decide which tabs join **Fields**: **Flow** (the step builder) only when Multi-step is on, **Poll** (poll configuration) only when Poll is on. Leave both off for an ordinary single-page form. Add fields as blocks in the **Fields** tab (a text field `name`, an email field `email`, a textarea `message`); the submit button's label sits at the bottom of that same tab, and, once Multi-step is on, the previous/next labels sit at the bottom of the **Flow** tab. **Actions** (post-submit) and **Response** (the success message, or a redirect) round out the tabs. Each field block is tabbed too: **Field** holds the basics and type config, **Validation** the rules, **Advanced** the visibility condition and hidden flag.
+
+The title is the document's own, for finding the form in the admin, required in your project's default locale (following your project's localization, if any) so other locales fall back to it. The plugin never renders it: [`<Form>`](/form-builder/rendering) draws the fields and nothing above them, and `form.title` is there for your page to render or ignore.
 
 ## Render it
 

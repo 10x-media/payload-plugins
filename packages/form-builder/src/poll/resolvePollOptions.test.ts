@@ -40,12 +40,12 @@ describe('resolvePollOptions', () => {
 	it('returns undefined when the poll is disabled or has no optionSource', async () => {
 		const payload = payloadWith({})
 		expect(
-			await resolvePollOptions({ payload, form: { id: 1, poll: { enabled: true } } })
+			await resolvePollOptions({ payload, form: { id: 1, pollEnabled: true, poll: {} } })
 		).toBeUndefined()
 		expect(
 			await resolvePollOptions({
 				payload,
-				form: { id: 1, poll: { enabled: false, optionSource: 'athletes' } },
+				form: { id: 1, pollEnabled: false, poll: { optionSource: 'athletes' } },
 			})
 		).toBeUndefined()
 		expect(await resolvePollOptions({ payload, form: { id: 1 } })).toBeUndefined()
@@ -59,7 +59,8 @@ describe('resolvePollOptions', () => {
 		const form = {
 			id: 7,
 			title: 'Race',
-			poll: { enabled: true, optionSource: 'athletes', sourceConfig: { eventId: 'e1' } },
+			pollEnabled: true,
+			poll: { optionSource: 'athletes', sourceConfig: { eventId: 'e1' } },
 		}
 		const out = await resolvePollOptions({ payload, form })
 		expect(out).toEqual(options)
@@ -76,7 +77,7 @@ describe('resolvePollOptions', () => {
 		const payload = payloadWith({})
 		const out = await resolvePollOptions({
 			payload,
-			form: { id: 1, poll: { enabled: true, optionSource: 'athletes' } },
+			form: { id: 1, pollEnabled: true, poll: { optionSource: 'athletes' } },
 			sources: resolvePollOptionSources({ athletes: source }),
 		})
 		expect(out).toEqual(options)
@@ -88,7 +89,7 @@ describe('resolvePollOptions', () => {
 		await expect(
 			resolvePollOptions({
 				payload,
-				form: { id: 1, poll: { enabled: true, optionSource: 'ghost' } },
+				form: { id: 1, pollEnabled: true, poll: { optionSource: 'ghost' } },
 			})
 		).rejects.toThrow(/not registered/)
 	})
@@ -99,7 +100,7 @@ describe('resolvePollOptions', () => {
 			stashPollOptionSources({}, resolvePollOptionSources({ athletes: source }))
 		)
 		const req = { context: {} } as unknown as PayloadRequest
-		const form = { id: 7, poll: { enabled: true, optionSource: 'athletes' } }
+		const form = { id: 7, pollEnabled: true, poll: { optionSource: 'athletes' } }
 		const first = await resolvePollOptions({ payload, req, form })
 		const second = await resolvePollOptions({ payload, req, form })
 		expect(resolve).toHaveBeenCalledOnce()

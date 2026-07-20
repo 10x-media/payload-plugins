@@ -1,45 +1,50 @@
 import { keys } from '../../translations/keys'
-import { labelFor } from '../../translations/server'
+import { labelForKey } from '../../translations/server'
 import { defineFormField } from '../defineFormField'
-import { localizedIf } from '../localizedIf'
 
-type ConsentConfig = {
-	statement?: string
-	source?: string
-	sourceConfig?: Record<string, unknown>
-	optional?: boolean
-}
+type ConsentConfig = { source?: string; required?: boolean }
+
+const SOURCE_FIELD_REF = '@10x-media/form-builder/client#EndpointOptionsSelect'
 
 /**
- * Base consent field definition. `source` select and `sourceConfig` group are injected
- * by `buildFieldBlocks` from the live `consentRegistry`, so only the selected source's
- * fields are visible in the admin UI via `admin.condition`. The `statement` is
- * author-facing content and follows `localize`.
+ * Consent is a reference, so the field is a reference: the author picks a source and nothing else.
+ * The statement, the policy page, and its version all live with the source (see
+ * `consentSourcesField`), so there is no wording to copy per form, no URL to paste, and no version
+ * to type; correcting a statement corrects every form pointing at it. `label` and `placeholder` are
+ * dropped for the same reason: the statement is the visible text and the checkbox's accessible name.
+ *
+ * Registered only when the plugin's `consent.sources` resolver is set, since a consent field with
+ * no source to reference has nothing to say and nothing to prove.
+ *
+ * The intrinsic validator owns `required`: the engine's shared required guard only fires on an
+ * empty value, and `false` (the coerced state of both an unchecked box and an absent answer) is a
+ * present one, so without this a required consent would accept an explicit refusal.
  */
-export const buildConsentField = (localize: boolean) =>
-	defineFormField<'boolean', ConsentConfig>({
-		type: 'consent',
-		label: keys.fieldTypeConsent,
-		value: 'boolean',
-		config: [
-			{
-				name: 'statement',
-				type: 'text',
-				label: labelFor(keys.consentConfigStatement),
-				...localizedIf(localize),
+export const consentField = defineFormField<'boolean', ConsentConfig>({
+	type: 'consent',
+	label: keys.fieldTypeConsent,
+	value: 'boolean',
+	omitShared: ['label', 'placeholder'],
+	config: [
+		{
+			name: 'source',
+			type: 'text',
+			label: labelForKey(keys.consentConfigSource),
+			admin: {
+				components: {
+					Field: {
+						path: SOURCE_FIELD_REF,
+						clientProps: {
+							endpoint: 'consent-sources',
+							descriptionKey: keys.consentConfigSourceDescription,
+							isClearable: false,
+						},
+					},
+				},
 			},
-			// source select and sourceConfig group are injected by buildFieldBlocks at plugin boot
-			// so the options reflect the live consentRegistry rather than this static list.
-			{ name: 'optional', type: 'checkbox', label: labelFor(keys.consentConfigOptional) },
-		],
-		validate: ({ value, config, t }) => {
-			const optional = (config as ConsentConfig).optional === true
-			if (!optional && value !== true) {
-				return t(keys.validationRequired)
-			}
-			return true
 		},
-		format: ({ value, t }) => t(value === true ? keys.formatYes : keys.formatNo),
-	})
-
-export const consentField = buildConsentField(true)
+	],
+	validate: ({ value, config, t }) =>
+		config.required === true && value !== true ? t(keys.validationRequired) : true,
+	format: ({ value, t }) => t(value === true ? keys.formatYes : keys.formatNo),
+})

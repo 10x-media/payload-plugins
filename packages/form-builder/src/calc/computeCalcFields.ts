@@ -1,3 +1,4 @@
+import { isNamedField } from '../fields/fieldKey'
 import type { FormFieldInstance } from '../submissions/types'
 import { evaluateCalc } from './evaluate'
 import type { CalcExpression } from './types'
@@ -22,7 +23,7 @@ export const computeCalcFields = (
 	let next = answers
 	for (const field of fields) {
 		const expr = calcExpressionOf(field)
-		if (expr) {
+		if (expr && isNamedField(field)) {
 			next = { ...next, [field.name]: evaluateCalc(expr, next) }
 		}
 	}

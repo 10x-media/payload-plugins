@@ -1,15 +1,28 @@
-import type { Payload } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
+
+export type ResolvePublishedVersionRefArgs = {
+	payload: Payload
+	collection: string
+	id: number | string
+	/** Threaded into `findVersions` so a version written earlier in the same transaction is visible. */
+	req?: PayloadRequest
+}
 
 /**
- * Returns the latest published version of a doc, or null when versions/drafts are off or nothing
- * is published. Never throws.
+ * The id of a document's latest published version, or null when nothing is published.
+ *
+ * Drafts-only, and deliberately not a versions check: `_status` exists only where
+ * `versions.drafts` is on (Payload adds the base version fields inside that branch when
+ * sanitizing), so on a collection with plain versions and no drafts this query matches nothing and
+ * returns null, which is indistinguishable from having no versions at all. Callers must decide the
+ * difference themselves with `hasDraftsEnabled` rather than reading null as "no versions" (see
+ * `captureConsent`). Never throws.
  */
 export const resolvePublishedVersionRef = async (
-	payload: Payload,
-	args: { collection: string; id: string | number }
-): Promise<{ versionId: string; updatedAt: string } | null> => {
+	args: ResolvePublishedVersionRefArgs
+): Promise<string | null> => {
 	try {
-		const result = await payload.findVersions({
+		const result = await args.payload.findVersions({
 			collection: args.collection as never,
 			where: {
 				and: [{ parent: { equals: args.id } }, { 'version._status': { equals: 'published' } }],
@@ -17,12 +30,10 @@ export const resolvePublishedVersionRef = async (
 			sort: '-updatedAt',
 			limit: 1,
 			depth: 0,
+			req: args.req,
 		})
 		const doc = result?.docs?.[0]
-		if (!doc) {
-			return null
-		}
-		return { versionId: String(doc.id), updatedAt: String(doc.updatedAt) }
+		return doc ? String(doc.id) : null
 	} catch {
 		return null
 	}

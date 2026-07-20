@@ -5,6 +5,7 @@ import { defineValidationRule } from '../defineValidationRule'
 export const oneOfRule = defineValidationRule<{ values?: { value: string }[] }, string>({
 	type: 'oneOf',
 	label: keys.ruleOneOf,
+	description: keys.ruleOneOfDescription,
 	appliesTo: ['text', 'textarea', 'select'],
 	params: [
 		{

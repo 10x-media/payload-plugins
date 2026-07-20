@@ -7,7 +7,12 @@ afterEach(() => {
 	cleanup()
 })
 
-const doc = (fields: FormFieldInstance[], id: number | string = 1): FormDocument => ({ id, fields })
+const doc = (fields: FormFieldInstance[], id: number | string = 1): FormDocument => ({
+	id,
+	fields,
+	multistep: false,
+	pollEnabled: false,
+})
 
 describe('Form initialValues prefill', () => {
 	it('seeds a text field value from initialValues', async () => {

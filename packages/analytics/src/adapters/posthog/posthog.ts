@@ -30,17 +30,36 @@ export interface PosthogConfig {
 
 const US_CLOUD = 'https://us.posthog.com'
 
-// visits and sessions share the distinct-session expression and are deduped before
-// the SELECT, then read back by the expression's position.
-const METRIC_SQL: Partial<Record<MetricKey, string>> = {
+// Pageview-scoped expressions, used when the read filters the WHERE to `$pageview`.
+// visits and sessions share the distinct-session expression and are deduped before the
+// SELECT, then read back by the expression's position.
+const METRIC_SQL_PAGEVIEW: Partial<Record<MetricKey, string>> = {
 	pageviews: 'count()',
 	visitors: 'count(DISTINCT person_id)',
 	visits: 'count(DISTINCT properties.$session_id)',
 	sessions: 'count(DISTINCT properties.$session_id)',
 }
 
-const posthogMetrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_SQL) as MetricKey[])
-const posthogDimensions: ReadonlySet<DimensionKey> = new Set<DimensionKey>(['page'])
+// All-event expressions, used when `events` (total captured events, matching PostHog's own
+// Events definition) or an `event`-name breakdown is requested. The WHERE is not filtered to
+// `$pageview`, so the pageview-family metrics scope themselves with conditional aggregates.
+const METRIC_SQL_ALL: Partial<Record<MetricKey, string>> = {
+	pageviews: "countIf(event = '$pageview')",
+	visitors: "count(DISTINCT if(event = '$pageview', person_id, NULL))",
+	visits: "count(DISTINCT if(event = '$pageview', properties.$session_id, NULL))",
+	sessions: "count(DISTINCT if(event = '$pageview', properties.$session_id, NULL))",
+	events: 'count()',
+}
+
+const DIMENSION_SQL: Partial<Record<DimensionKey, string>> = {
+	page: 'properties.$pathname',
+	event: 'event',
+}
+
+const posthogMetrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_SQL_ALL) as MetricKey[])
+const posthogDimensions: ReadonlySet<DimensionKey> = new Set(
+	Object.keys(DIMENSION_SQL) as DimensionKey[]
+)
 
 // The Query API has no parameter binding, so values are inlined as quoted literals.
 // Escape backslashes first, then single quotes, so a crafted path cannot break out.
@@ -81,17 +100,26 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		isConfigured: () => Boolean(config.projectId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
-			const wanted = q.metrics.filter((m) => METRIC_SQL[m])
-			const exprs = [...new Set(wanted.map((m) => METRIC_SQL[m] as string))]
-			const wantsPageBreakdown = (q.dimensions ?? []).includes('page')
+			const breakdownDim = (q.dimensions ?? []).find((d) => DIMENSION_SQL[d])
+			// A total-events metric or an event-name breakdown must scan every event, not
+			// just pageviews; those reads switch to conditional aggregation.
+			const scanAllEvents = q.metrics.includes('events') || breakdownDim === 'event'
+			const metricSql = scanAllEvents ? METRIC_SQL_ALL : METRIC_SQL_PAGEVIEW
+			const wanted = q.metrics.filter((m) => metricSql[m])
+			const exprs = [...new Set(wanted.map((m) => metricSql[m] as string))]
 
 			const where = [
-				"event = '$pageview'",
 				`timestamp >= toDateTime(${sqlDateTimeLiteral(q.dateRange.start)})`,
 				`timestamp <= toDateTime(${sqlDateTimeLiteral(q.dateRange.end)})`,
 			]
+			if (!scanAllEvents) {
+				where.unshift("event = '$pageview'")
+			}
 			if (q.path) {
 				where.push(`properties.$pathname = ${sqlString(q.path)}`)
+			}
+			if (q.hostname) {
+				where.push(`properties.$host = ${sqlString(q.hostname)}`)
 			}
 			if (config.scopeProperty && q.scope !== undefined) {
 				// Bracket property access with escaped literals: neither the configured
@@ -112,7 +140,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			const readRow = (row: unknown[], offset: number): Partial<Record<MetricKey, number>> => {
 				const out: Partial<Record<MetricKey, number>> = {}
 				for (const m of wanted) {
-					const idx = exprs.indexOf(METRIC_SQL[m] as string)
+					const idx = exprs.indexOf(metricSql[m] as string)
 					out[m] = Number(row[offset + idx] ?? 0)
 				}
 				return out
@@ -126,8 +154,14 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				return row ? readRow(row, 0) : {}
 			}
 
-			if (q.granularity === 'day' && !wantsPageBreakdown) {
-				const seriesSql = `SELECT toStartOfDay(timestamp) AS day, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY day ORDER BY day`
+			if (q.granularity === 'day' && !breakdownDim) {
+				// HogQL buckets in the timezone argument when given; without it PostHog falls back
+				// to the project's own timezone, so the resolved reporting timezone (UTC included)
+				// is always passed to keep day buckets deterministic across projects. The window
+				// literals stay UTC instants (already aligned to the reporting-timezone day
+				// boundary by the caller).
+				const dayExpr = `toStartOfDay(timestamp, ${sqlString(q.timezone ?? 'UTC')})`
+				const seriesSql = `SELECT ${dayExpr} AS day, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY day ORDER BY day`
 				const [seriesData, totals] = await Promise.all([runSql(seriesSql), fetchTotals()])
 				const rows: AnalyticsRow[] = []
 				for (const row of seriesData.results) {
@@ -139,11 +173,12 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				return { rows, totals, meta: { provider: 'posthog', fetchedAt } }
 			}
 
-			if (wantsPageBreakdown) {
-				const sql = `SELECT properties.$pathname AS path, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY path ORDER BY m0 DESC LIMIT ${q.limit ?? 100}`
+			if (breakdownDim) {
+				const dimSql = DIMENSION_SQL[breakdownDim] as string
+				const sql = `SELECT ${dimSql} AS dim, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY dim ORDER BY m0 DESC LIMIT ${q.limit ?? 100}`
 				const data = await runSql(sql)
 				const rows: AnalyticsRow[] = data.results.map((row) => ({
-					dimensions: { page: String(row[0] ?? '') },
+					dimensions: { [breakdownDim]: String(row[0] ?? '') },
 					metrics: readRow(row, 1),
 				}))
 				return { rows, totals: undefined, meta: { provider: 'posthog', fetchedAt } }

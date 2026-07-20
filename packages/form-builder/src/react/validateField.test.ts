@@ -35,4 +35,34 @@ describe('validateFieldValue', () => {
 		})
 		expect(errors).toEqual([])
 	})
+
+	// The client registry is the same defaultFieldDefinitions the server uses, so the checkbox's
+	// intrinsic required check reaches the visitor rather than only failing at submit.
+	it('flags a required checkbox the visitor checked and then unchecked', async () => {
+		const field: FormFieldInstance = { blockType: 'checkbox', name: 'terms', required: true }
+		const { errors } = await validateFieldValue({
+			field,
+			value: false,
+			registry,
+			ruleRegistry,
+			answers: { terms: false },
+			locale: 'en',
+			t,
+		})
+		expect(errors).toEqual(['formBuilder:validation.required'])
+	})
+
+	it('passes a required checkbox the visitor checked', async () => {
+		const field: FormFieldInstance = { blockType: 'checkbox', name: 'terms', required: true }
+		const { errors } = await validateFieldValue({
+			field,
+			value: true,
+			registry,
+			ruleRegistry,
+			answers: { terms: true },
+			locale: 'en',
+			t,
+		})
+		expect(errors).toEqual([])
+	})
 })

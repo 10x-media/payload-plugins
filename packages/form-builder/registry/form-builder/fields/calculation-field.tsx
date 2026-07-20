@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 /** Read-only renderer for a calculation field: the value is derived, never user-editable, so it
  * shows in an `<output>` rather than an input. */
 export const calculationField = defineFieldRenderer<number | undefined>(
-	({ field, value, errors, warnings, required }) => {
+	({ field, value, errors, required }) => {
 		const id = useId()
 		const describedById = `${id}-desc`
 		const label = typeof field.label === 'string' ? field.label : undefined
@@ -41,11 +41,6 @@ export const calculationField = defineFieldRenderer<number | undefined>(
 							))}
 						</div>
 					) : null}
-					{warnings?.map((message) => (
-						<p key={message} className="text-amber-600">
-							{message}
-						</p>
-					))}
 				</div>
 			</div>
 		)

@@ -56,6 +56,24 @@ describe('computeRollupDeltas', () => {
 		expect(deltas.some((d) => d.key.dimension === 'country')).toBe(false)
 	})
 
+	it('buckets into the reporting-timezone day at ingest', () => {
+		// 23:30Z on 2026-01-10 is 00:30 on the 11th in Berlin, so the rollup day is the 11th (local
+		// midnight = 2026-01-10T23:00:00Z in CET).
+		const deltas = computeRollupDeltas(
+			ev({ timestamp: new Date('2026-01-10T23:30:00Z'), timezone: 'Europe/Berlin' })
+		)
+		for (const d of deltas) {
+			expect(d.key.period.toISOString()).toBe('2026-01-10T23:00:00.000Z')
+		}
+	})
+
+	it('falls back to the UTC day when no timezone is set', () => {
+		const deltas = computeRollupDeltas(ev({ timestamp: new Date('2026-01-10T23:30:00Z') }))
+		for (const d of deltas) {
+			expect(d.key.period.toISOString()).toBe('2026-01-10T00:00:00.000Z')
+		}
+	})
+
 	it('emits device and source buckets when present', () => {
 		const deltas = computeRollupDeltas({
 			timestamp: new Date('2026-06-01T10:00:00.000Z'),
