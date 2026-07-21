@@ -11,6 +11,10 @@ export type DepartmentOption = { label: string; value: string }
  * admin select. Mirrors {@link FromAddressesResolver}. {@link resolveDepartmentOptions} builds this
  * from a `departmentsField()`-bearing document with the reusable locale fallback, so a host does not
  * reimplement it.
+ *
+ * Do not thread the save's `req` into a `find({ locale: 'all' })` from within a form's save
+ * validation: it flips `req.locale` to `all` and corrupts the localized write of the document being
+ * saved. Read the settings document without the save's `req` (already-committed data, no transaction).
  */
 export type DepartmentEmailsResolver = (args: {
 	req: PayloadRequest

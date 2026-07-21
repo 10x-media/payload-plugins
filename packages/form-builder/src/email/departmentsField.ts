@@ -47,6 +47,10 @@ export type DepartmentsFieldOptions = {
  *   },
  * })
  * ```
+ *
+ * The read above omits the save's `req` on purpose: threading it into a `locale: 'all'` read from
+ * within a form's save validation flips `req.locale` to `all` and corrupts the localized write of the
+ * document being saved. It reads already-committed data, so no transaction (`req`) is needed.
  */
 export const departmentsField = (options: DepartmentsFieldOptions = {}): ArrayField => {
 	const localize = options.localized !== false
