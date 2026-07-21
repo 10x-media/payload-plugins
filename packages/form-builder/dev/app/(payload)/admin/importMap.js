@@ -4,6 +4,7 @@ import { FieldNameSelect as FieldNameSelect_bf8585411c882b493b730d03575f3f2f } f
 import { FormConditionField as FormConditionField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FieldBlockLabel as FieldBlockLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { EndpointOptionsSelect as EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { ConsentBlockLabel as ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { ByteSizeField as ByteSizeField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -32,10 +33,9 @@ import { FieldCountCell as FieldCountCell_bf8585411c882b493b730d03575f3f2f } fro
 import { FlowStepsCell as FlowStepsCell_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FlowBuilder as FlowBuilder_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { ClosePollButton as ClosePollButton_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
-import { CondensedArray as CondensedArray_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
-import { ConsentSourceRowLabel as ConsentSourceRowLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
-import { ConsentBlockLabel as ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RecipientsSelect as RecipientsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { ConsentSourceRowLabel as ConsentSourceRowLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { CondensedArray as CondensedArray_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -46,6 +46,7 @@ export const importMap = {
   "@10x-media/form-builder/client#FormConditionField": FormConditionField_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FieldBlockLabel": FieldBlockLabel_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#EndpointOptionsSelect": EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#ConsentBlockLabel": ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#ByteSizeField": ByteSizeField_bf8585411c882b493b730d03575f3f2f,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -74,9 +75,8 @@ export const importMap = {
   "@10x-media/form-builder/client#FlowStepsCell": FlowStepsCell_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FlowBuilder": FlowBuilder_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#ClosePollButton": ClosePollButton_bf8585411c882b493b730d03575f3f2f,
-  "@10x-media/form-builder/client#CondensedArray": CondensedArray_bf8585411c882b493b730d03575f3f2f,
-  "@10x-media/form-builder/client#ConsentSourceRowLabel": ConsentSourceRowLabel_bf8585411c882b493b730d03575f3f2f,
-  "@10x-media/form-builder/client#ConsentBlockLabel": ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#RecipientsSelect": RecipientsSelect_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#ConsentSourceRowLabel": ConsentSourceRowLabel_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#CondensedArray": CondensedArray_bf8585411c882b493b730d03575f3f2f,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

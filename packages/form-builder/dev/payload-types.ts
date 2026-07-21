@@ -67,13 +67,13 @@ export interface Config {
   };
   blocks: {};
   collections: {
-    users: User;
+    athletes: Athlete;
     'form-uploads': FormUpload;
     'legal-pages': LegalPage;
     notices: Notice;
-    athletes: Athlete;
-    forms: Form;
+    users: User;
     'form-submissions': FormSubmission;
+    forms: Form;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -82,13 +82,13 @@ export interface Config {
   };
   collectionsJoins: {};
   collectionsSelect: {
-    users: UsersSelect<false> | UsersSelect<true>;
+    athletes: AthletesSelect<false> | AthletesSelect<true>;
     'form-uploads': FormUploadsSelect<false> | FormUploadsSelect<true>;
     'legal-pages': LegalPagesSelect<false> | LegalPagesSelect<true>;
     notices: NoticesSelect<false> | NoticesSelect<true>;
-    athletes: AthletesSelect<false> | AthletesSelect<true>;
-    forms: FormsSelect<false> | FormsSelect<true>;
+    users: UsersSelect<false> | UsersSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
+    forms: FormsSelect<false> | FormsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -98,7 +98,7 @@ export interface Config {
   db: {
     defaultIDType: string;
   };
-  fallbackLocale: false | 'en' | 'de' | ('en' | 'de' | null)[] | null;
+  fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'de') | ('en' | 'de')[];
   globals: {
     settings: Setting;
   };
@@ -142,28 +142,15 @@ export interface UserAuthOperations {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "users".
+ * via the `definition` "athletes".
  */
-export interface User {
+export interface Athlete {
   id: string;
+  name: string;
+  discipline?: string | null;
+  country?: string | null;
   updatedAt: string;
   createdAt: string;
-  email: string;
-  resetPasswordToken?: string | null;
-  resetPasswordExpiration?: string | null;
-  salt?: string | null;
-  hash?: string | null;
-  loginAttempts?: number | null;
-  lockUntil?: string | null;
-  sessions?:
-    | {
-        id: string;
-        createdAt?: string | null;
-        expiresAt: string;
-      }[]
-    | null;
-  password?: string | null;
-  collection: 'users';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -209,13 +196,74 @@ export interface Notice {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "athletes".
+ * via the `definition` "users".
  */
-export interface Athlete {
+export interface User {
   id: string;
-  name: string;
-  discipline?: string | null;
-  country?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  email: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpiration?: string | null;
+  salt?: string | null;
+  hash?: string | null;
+  loginAttempts?: number | null;
+  lockUntil?: string | null;
+  sessions?:
+    | {
+        id: string;
+        createdAt?: string | null;
+        expiresAt: string;
+      }[]
+    | null;
+  password?: string | null;
+  collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "form-submissions".
+ */
+export interface FormSubmission {
+  id: string;
+  form: string | Form;
+  status?: ('complete' | 'partial') | null;
+  locale?: string | null;
+  values?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  descriptors?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  consent?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  meta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -225,7 +273,7 @@ export interface Athlete {
  */
 export interface Form {
   id: string;
-  title: string;
+  title?: string | null;
   multistep?: boolean | null;
   pollEnabled?: boolean | null;
   fields?:
@@ -242,7 +290,6 @@ export interface Form {
                   | {
                       min: number;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'minLength';
@@ -250,7 +297,6 @@ export interface Form {
                   | {
                       max: number;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'maxLength';
@@ -259,21 +305,18 @@ export interface Form {
                       pattern: string;
                       flags?: string | null;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'pattern';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'email';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'url';
@@ -286,7 +329,6 @@ export interface Form {
                           }[]
                         | null;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'oneOf';
@@ -294,14 +336,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -343,7 +383,6 @@ export interface Form {
                   | {
                       min: number;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'minLength';
@@ -351,7 +390,6 @@ export interface Form {
                   | {
                       max: number;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'maxLength';
@@ -360,21 +398,18 @@ export interface Form {
                       pattern: string;
                       flags?: string | null;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'pattern';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'email';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'url';
@@ -387,7 +422,6 @@ export interface Form {
                           }[]
                         | null;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'oneOf';
@@ -395,14 +429,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -444,7 +476,6 @@ export interface Form {
                   | {
                       min: number;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'minLength';
@@ -452,7 +483,6 @@ export interface Form {
                   | {
                       max: number;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'maxLength';
@@ -461,14 +491,12 @@ export interface Form {
                       pattern: string;
                       flags?: string | null;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'pattern';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'email';
@@ -476,14 +504,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -525,7 +551,6 @@ export interface Form {
                   | {
                       min: number;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'min';
@@ -533,7 +558,6 @@ export interface Form {
                   | {
                       max: number;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'max';
@@ -541,14 +565,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -602,7 +624,6 @@ export interface Form {
                           }[]
                         | null;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'oneOf';
@@ -610,14 +631,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -658,14 +677,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -709,14 +726,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -749,7 +764,6 @@ export interface Form {
         | {
             name: string;
             width: 'full' | 'half' | 'third' | 'twoThirds';
-            description?: string | null;
             required?: boolean | null;
             source?: string | null;
             validations?:
@@ -757,14 +771,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -826,14 +838,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -886,7 +896,6 @@ export interface Form {
                             | {
                                 min: number;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'minLength';
@@ -894,7 +903,6 @@ export interface Form {
                             | {
                                 max: number;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'maxLength';
@@ -903,21 +911,18 @@ export interface Form {
                                 pattern: string;
                                 flags?: string | null;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'pattern';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'email';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'url';
@@ -930,7 +935,6 @@ export interface Form {
                                     }[]
                                   | null;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'oneOf';
@@ -938,14 +942,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -987,7 +989,6 @@ export interface Form {
                             | {
                                 min: number;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'minLength';
@@ -995,7 +996,6 @@ export interface Form {
                             | {
                                 max: number;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'maxLength';
@@ -1004,21 +1004,18 @@ export interface Form {
                                 pattern: string;
                                 flags?: string | null;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'pattern';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'email';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'url';
@@ -1031,7 +1028,6 @@ export interface Form {
                                     }[]
                                   | null;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'oneOf';
@@ -1039,14 +1035,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1088,7 +1082,6 @@ export interface Form {
                             | {
                                 min: number;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'minLength';
@@ -1096,7 +1089,6 @@ export interface Form {
                             | {
                                 max: number;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'maxLength';
@@ -1105,14 +1097,12 @@ export interface Form {
                                 pattern: string;
                                 flags?: string | null;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'pattern';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'email';
@@ -1120,14 +1110,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1169,7 +1157,6 @@ export interface Form {
                             | {
                                 min: number;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'min';
@@ -1177,7 +1164,6 @@ export interface Form {
                             | {
                                 max: number;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'max';
@@ -1185,14 +1171,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1246,7 +1230,6 @@ export interface Form {
                                     }[]
                                   | null;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'oneOf';
@@ -1254,14 +1237,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1302,14 +1283,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1353,14 +1332,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1393,7 +1370,6 @@ export interface Form {
                   | {
                       name: string;
                       width: 'full' | 'half' | 'third' | 'twoThirds';
-                      description?: string | null;
                       required?: boolean | null;
                       source?: string | null;
                       validations?:
@@ -1401,14 +1377,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1470,14 +1444,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1518,7 +1490,6 @@ export interface Form {
                             | {
                                 min: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'minDate';
@@ -1526,7 +1497,6 @@ export interface Form {
                             | {
                                 max: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'maxDate';
@@ -1534,14 +1504,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1587,14 +1555,12 @@ export interface Form {
                             | {
                                 field: string;
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'matchesField';
                               }
                             | {
                                 message?: string | null;
-                                severity?: ('error' | 'warning') | null;
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'notAlreadySubmitted';
@@ -1624,6 +1590,100 @@ export interface Form {
                       blockName?: string | null;
                       blockType: 'athleteVote';
                     }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      placeholder?: string | null;
+                      description?: string | null;
+                      required?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'country';
+                    }
+                  | {
+                      name: string;
+                      label?: string | null;
+                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      placeholder?: string | null;
+                      description?: string | null;
+                      required?: boolean | null;
+                      validations?:
+                        | (
+                            | {
+                                field: string;
+                                message?: string | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'matchesField';
+                              }
+                            | {
+                                message?: string | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'notAlreadySubmitted';
+                              }
+                          )[]
+                        | null;
+                      validateWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      visibleWhen?:
+                        | {
+                            [k: string]: unknown;
+                          }
+                        | unknown[]
+                        | string
+                        | number
+                        | boolean
+                        | null;
+                      hidden?: boolean | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'state';
+                    }
                 )[]
               | null;
             validations?:
@@ -1631,14 +1691,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -1679,7 +1737,6 @@ export interface Form {
                   | {
                       min: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'minDate';
@@ -1687,7 +1744,6 @@ export interface Form {
                   | {
                       max: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'maxDate';
@@ -1695,14 +1751,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -1768,14 +1822,12 @@ export interface Form {
                   | {
                       field: string;
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'matchesField';
                     }
                   | {
                       message?: string | null;
-                      severity?: ('error' | 'warning') | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'notAlreadySubmitted';
@@ -1805,13 +1857,103 @@ export interface Form {
             blockName?: string | null;
             blockType: 'athleteVote';
           }
+        | {
+            name: string;
+            label?: string | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
+            placeholder?: string | null;
+            description?: string | null;
+            required?: boolean | null;
+            validations?:
+              | (
+                  | {
+                      field: string;
+                      message?: string | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'matchesField';
+                    }
+                  | {
+                      message?: string | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'notAlreadySubmitted';
+                    }
+                )[]
+              | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'country';
+          }
+        | {
+            name: string;
+            label?: string | null;
+            width: 'full' | 'half' | 'third' | 'twoThirds';
+            placeholder?: string | null;
+            description?: string | null;
+            required?: boolean | null;
+            validations?:
+              | (
+                  | {
+                      field: string;
+                      message?: string | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'matchesField';
+                    }
+                  | {
+                      message?: string | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'notAlreadySubmitted';
+                    }
+                )[]
+              | null;
+            validateWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            visibleWhen?:
+              | {
+                  [k: string]: unknown;
+                }
+              | unknown[]
+              | string
+              | number
+              | boolean
+              | null;
+            hidden?: boolean | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'state';
+          }
       )[]
     | null;
-  buttons?: {
-    submitLabel?: string | null;
-    prevLabel?: string | null;
-    nextLabel?: string | null;
-  };
+  submitLabel?: string | null;
   flow?: {
     steps: {
       id: string;
@@ -1828,10 +1970,25 @@ export interface Form {
       [k: string]: unknown;
     }[];
   };
+  prevLabel?: string | null;
+  nextLabel?: string | null;
+  poll?: {
+    resultsField?: string | null;
+    type?: ('mostVoted' | 'manual') | null;
+    resultsVisibility?: ('afterVote' | 'afterClose') | null;
+    closesAt?: string | null;
+    outcome?: {
+      winningValues?: string[] | null;
+      resolvedAt?: string | null;
+    };
+  };
   actions?:
     | (
         | {
-            to?: string | null;
+            to?: string[] | null;
+            replyTo?: string[] | null;
+            cc?: string[] | null;
+            bcc?: string[] | null;
             subject?: string | null;
             body?: {
               root: {
@@ -1854,6 +2011,9 @@ export interface Form {
           }
         | {
             toField?: string | null;
+            replyTo?: string[] | null;
+            cc?: string[] | null;
+            bcc?: string[] | null;
             subject?: string | null;
             body?: {
               root: {
@@ -1904,65 +2064,6 @@ export interface Form {
       url?: string | null;
     };
   };
-  poll?: {
-    enabled?: boolean | null;
-    resultsField?: string | null;
-    type?: ('manual' | 'mostVoted' | 'source') | null;
-    resultsVisibility?: ('afterVote' | 'afterClose') | null;
-    closesAt?: string | null;
-    outcome?: {
-      winningValues?: string[] | null;
-      resolvedAt?: string | null;
-    };
-  };
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "form-submissions".
- */
-export interface FormSubmission {
-  id: string;
-  form: string | Form;
-  status?: ('complete' | 'partial') | null;
-  locale?: string | null;
-  values?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  descriptors?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  consent?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  meta?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2083,8 +2184,8 @@ export interface PayloadLockedDocument {
   id: string;
   document?:
     | ({
-        relationTo: 'users';
-        value: string | User;
+        relationTo: 'athletes';
+        value: string | Athlete;
       } | null)
     | ({
         relationTo: 'form-uploads';
@@ -2099,16 +2200,16 @@ export interface PayloadLockedDocument {
         value: string | Notice;
       } | null)
     | ({
-        relationTo: 'athletes';
-        value: string | Athlete;
-      } | null)
-    | ({
-        relationTo: 'forms';
-        value: string | Form;
+        relationTo: 'users';
+        value: string | User;
       } | null)
     | ({
         relationTo: 'form-submissions';
         value: string | FormSubmission;
+      } | null)
+    | ({
+        relationTo: 'forms';
+        value: string | Form;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -2154,25 +2255,14 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "users_select".
+ * via the `definition` "athletes_select".
  */
-export interface UsersSelect<T extends boolean = true> {
+export interface AthletesSelect<T extends boolean = true> {
+  name?: T;
+  discipline?: T;
+  country?: T;
   updatedAt?: T;
   createdAt?: T;
-  email?: T;
-  resetPasswordToken?: T;
-  resetPasswordExpiration?: T;
-  salt?: T;
-  hash?: T;
-  loginAttempts?: T;
-  lockUntil?: T;
-  sessions?:
-    | T
-    | {
-        id?: T;
-        createdAt?: T;
-        expiresAt?: T;
-      };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2215,12 +2305,38 @@ export interface NoticesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "athletes_select".
+ * via the `definition` "users_select".
  */
-export interface AthletesSelect<T extends boolean = true> {
-  name?: T;
-  discipline?: T;
-  country?: T;
+export interface UsersSelect<T extends boolean = true> {
+  updatedAt?: T;
+  createdAt?: T;
+  email?: T;
+  resetPasswordToken?: T;
+  resetPasswordExpiration?: T;
+  salt?: T;
+  hash?: T;
+  loginAttempts?: T;
+  lockUntil?: T;
+  sessions?:
+    | T
+    | {
+        id?: T;
+        createdAt?: T;
+        expiresAt?: T;
+      };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "form-submissions_select".
+ */
+export interface FormSubmissionsSelect<T extends boolean = true> {
+  form?: T;
+  status?: T;
+  locale?: T;
+  values?: T;
+  descriptors?: T;
+  consent?: T;
+  meta?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2230,6 +2346,8 @@ export interface AthletesSelect<T extends boolean = true> {
  */
 export interface FormsSelect<T extends boolean = true> {
   title?: T;
+  multistep?: T;
+  pollEnabled?: T;
   fields?:
     | T
     | {
@@ -2250,7 +2368,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           min?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2259,7 +2376,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           max?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2269,7 +2385,6 @@ export interface FormsSelect<T extends boolean = true> {
                           pattern?: T;
                           flags?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2277,7 +2392,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2285,7 +2399,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2299,7 +2412,6 @@ export interface FormsSelect<T extends boolean = true> {
                                 id?: T;
                               };
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2308,7 +2420,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2316,7 +2427,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2344,7 +2454,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           min?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2353,7 +2462,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           max?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2363,7 +2471,6 @@ export interface FormsSelect<T extends boolean = true> {
                           pattern?: T;
                           flags?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2371,7 +2478,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2379,7 +2485,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2393,7 +2498,6 @@ export interface FormsSelect<T extends boolean = true> {
                                 id?: T;
                               };
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2402,7 +2506,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2410,7 +2513,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2438,7 +2540,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           min?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2447,7 +2548,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           max?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2457,7 +2557,6 @@ export interface FormsSelect<T extends boolean = true> {
                           pattern?: T;
                           flags?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2465,7 +2564,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2474,7 +2572,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2482,7 +2579,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2510,7 +2606,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           min?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2519,7 +2614,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           max?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2528,7 +2622,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2536,7 +2629,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2576,7 +2668,6 @@ export interface FormsSelect<T extends boolean = true> {
                                 id?: T;
                               };
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2585,7 +2676,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2593,7 +2683,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2620,7 +2709,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2628,7 +2716,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2656,7 +2743,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2664,7 +2750,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2680,7 +2765,6 @@ export interface FormsSelect<T extends boolean = true> {
           | {
               name?: T;
               width?: T;
-              description?: T;
               required?: T;
               source?: T;
               validations?:
@@ -2691,7 +2775,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2699,7 +2782,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2729,7 +2811,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2737,7 +2818,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -2779,7 +2859,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       min?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2788,7 +2867,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       max?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2798,7 +2876,6 @@ export interface FormsSelect<T extends boolean = true> {
                                       pattern?: T;
                                       flags?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2806,7 +2883,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2814,7 +2890,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2828,7 +2903,6 @@ export interface FormsSelect<T extends boolean = true> {
                                             id?: T;
                                           };
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2837,7 +2911,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2845,7 +2918,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2873,7 +2945,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       min?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2882,7 +2953,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       max?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2892,7 +2962,6 @@ export interface FormsSelect<T extends boolean = true> {
                                       pattern?: T;
                                       flags?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2900,7 +2969,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2908,7 +2976,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2922,7 +2989,6 @@ export interface FormsSelect<T extends boolean = true> {
                                             id?: T;
                                           };
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2931,7 +2997,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2939,7 +3004,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2967,7 +3031,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       min?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2976,7 +3039,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       max?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2986,7 +3048,6 @@ export interface FormsSelect<T extends boolean = true> {
                                       pattern?: T;
                                       flags?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -2994,7 +3055,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3003,7 +3063,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3011,7 +3070,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3039,7 +3097,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       min?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3048,7 +3105,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       max?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3057,7 +3113,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3065,7 +3120,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3105,7 +3159,6 @@ export interface FormsSelect<T extends boolean = true> {
                                             id?: T;
                                           };
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3114,7 +3167,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3122,7 +3174,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3149,7 +3200,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3157,7 +3207,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3185,7 +3234,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3193,7 +3241,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3209,7 +3256,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           name?: T;
                           width?: T;
-                          description?: T;
                           required?: T;
                           source?: T;
                           validations?:
@@ -3220,7 +3266,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3228,7 +3273,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3258,7 +3302,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3266,7 +3309,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3293,7 +3335,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       min?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3302,7 +3343,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       max?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3311,7 +3351,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3319,7 +3358,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3348,7 +3386,6 @@ export interface FormsSelect<T extends boolean = true> {
                                   | {
                                       field?: T;
                                       message?: T;
-                                      severity?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3356,7 +3393,74 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       message?: T;
-                                      severity?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    country?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          required?: T;
+                          validations?:
+                            | T
+                            | {
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                              };
+                          validateWhen?: T;
+                          visibleWhen?: T;
+                          hidden?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    state?:
+                      | T
+                      | {
+                          name?: T;
+                          label?: T;
+                          width?: T;
+                          placeholder?: T;
+                          description?: T;
+                          required?: T;
+                          validations?:
+                            | T
+                            | {
+                                matchesField?:
+                                  | T
+                                  | {
+                                      field?: T;
+                                      message?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                notAlreadySubmitted?:
+                                  | T
+                                  | {
+                                      message?: T;
                                       id?: T;
                                       blockName?: T;
                                     };
@@ -3376,7 +3480,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3384,7 +3487,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3411,7 +3513,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           min?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3420,7 +3521,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           max?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3429,7 +3529,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3437,7 +3536,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3473,7 +3571,6 @@ export interface FormsSelect<T extends boolean = true> {
                       | {
                           field?: T;
                           message?: T;
-                          severity?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3481,7 +3578,74 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           message?: T;
-                          severity?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                  };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
+              id?: T;
+              blockName?: T;
+            };
+        country?:
+          | T
+          | {
+              name?: T;
+              label?: T;
+              width?: T;
+              placeholder?: T;
+              description?: T;
+              required?: T;
+              validations?:
+                | T
+                | {
+                    matchesField?:
+                      | T
+                      | {
+                          field?: T;
+                          message?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    notAlreadySubmitted?:
+                      | T
+                      | {
+                          message?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                  };
+              validateWhen?: T;
+              visibleWhen?: T;
+              hidden?: T;
+              id?: T;
+              blockName?: T;
+            };
+        state?:
+          | T
+          | {
+              name?: T;
+              label?: T;
+              width?: T;
+              placeholder?: T;
+              description?: T;
+              required?: T;
+              validations?:
+                | T
+                | {
+                    matchesField?:
+                      | T
+                      | {
+                          field?: T;
+                          message?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    notAlreadySubmitted?:
+                      | T
+                      | {
+                          message?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3493,14 +3657,24 @@ export interface FormsSelect<T extends boolean = true> {
               blockName?: T;
             };
       };
-  buttons?:
+  submitLabel?: T;
+  flow?: T;
+  prevLabel?: T;
+  nextLabel?: T;
+  poll?:
     | T
     | {
-        submitLabel?: T;
-        prevLabel?: T;
-        nextLabel?: T;
+        resultsField?: T;
+        type?: T;
+        resultsVisibility?: T;
+        closesAt?: T;
+        outcome?:
+          | T
+          | {
+              winningValues?: T;
+              resolvedAt?: T;
+            };
       };
-  flow?: T;
   actions?:
     | T
     | {
@@ -3508,6 +3682,9 @@ export interface FormsSelect<T extends boolean = true> {
           | T
           | {
               to?: T;
+              replyTo?: T;
+              cc?: T;
+              bcc?: T;
               subject?: T;
               body?: T;
               id?: T;
@@ -3517,6 +3694,9 @@ export interface FormsSelect<T extends boolean = true> {
           | T
           | {
               toField?: T;
+              replyTo?: T;
+              cc?: T;
+              bcc?: T;
               subject?: T;
               body?: T;
               id?: T;
@@ -3542,35 +3722,6 @@ export interface FormsSelect<T extends boolean = true> {
               url?: T;
             };
       };
-  poll?:
-    | T
-    | {
-        enabled?: T;
-        resultsField?: T;
-        resultsVisibility?: T;
-        closesAt?: T;
-        outcome?:
-          | T
-          | {
-              winningValues?: T;
-              resolvedAt?: T;
-            };
-      };
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "form-submissions_select".
- */
-export interface FormSubmissionsSelect<T extends boolean = true> {
-  form?: T;
-  status?: T;
-  locale?: T;
-  values?: T;
-  descriptors?: T;
-  consent?: T;
-  meta?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3653,8 +3804,7 @@ export interface Setting {
   id: string;
   consentSources?:
     | {
-        key: string;
-        label?: string | null;
+        name?: string | null;
         statement?: {
           root: {
             type: string;
@@ -3700,8 +3850,7 @@ export interface SettingsSelect<T extends boolean = true> {
   consentSources?:
     | T
     | {
-        key?: T;
-        label?: T;
+        name?: T;
         statement?: T;
         page?: T;
         id?: T;
