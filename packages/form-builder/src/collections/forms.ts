@@ -1,5 +1,6 @@
 import {
 	type CollectionAfterChangeHook,
+	type CollectionAfterReadHook,
 	type CollectionBeforeValidateHook,
 	type CollectionConfig,
 	type CollectionSlug,
@@ -21,6 +22,7 @@ import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
 import { resolveConsentSourcesRequest } from '../consent/resolveConsentSourcesRequest'
+import { resolveConsentStatements } from '../consent/resolveConsentStatements'
 import type { ConsentSourcesResolver } from '../consent/types'
 import { type DepartmentEmailsResolver, resolveDepartmentsRequest } from '../email/departments'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
@@ -651,6 +653,31 @@ export const buildFormsCollection = ({
 		},
 	]
 
+	// When `consent.sources` is set, resolve the visitor-facing consent statements onto every read of
+	// a form doc (REST, local API, relationship population), so a client/modal fetch renders consent,
+	// not only the RSC path that calls `resolveConsentStatements` itself. Fails open: a resolver outage
+	// must never break form/admin/relationship reads, and the renderer already tolerates a missing
+	// statement. `resolveConsentStatements` returns `{}` without calling the resolver when the form has
+	// no consent fields, and entries are cached per request+form, so the cost stays bounded.
+	const consentAfterRead: CollectionAfterReadHook | undefined = consentSources
+		? async ({ doc, req }) => {
+				try {
+					const statements = await resolveConsentStatements({
+						payload: req.payload,
+						req,
+						form: doc,
+						sources: consentSources,
+					})
+					if (Object.keys(statements).length > 0) {
+						;(doc as Record<string, unknown>).consentStatements = statements
+					}
+				} catch (error) {
+					req.payload.logger?.warn(`form-builder consent afterRead: ${String(error)}`)
+				}
+				return doc
+			}
+		: undefined
+
 	const defaultEndpoints: CollectionConfig['endpoints'] = [
 		{
 			path: '/:id/results',
@@ -775,6 +802,10 @@ export const buildFormsCollection = ({
 			beforeValidate: [beforeValidate, ...(overrides?.hooks?.beforeValidate ?? [])],
 			beforeChange: [pollOutcomeBeforeChange, ...(overrides?.hooks?.beforeChange ?? [])],
 			afterChange: [pollCloseAfterChange, ...(overrides?.hooks?.afterChange ?? [])],
+			afterRead: [
+				...(consentAfterRead ? [consentAfterRead] : []),
+				...(overrides?.hooks?.afterRead ?? []),
+			],
 		},
 		endpoints: [
 			...defaultEndpoints,

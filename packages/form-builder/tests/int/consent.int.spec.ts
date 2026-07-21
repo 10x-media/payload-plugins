@@ -219,6 +219,17 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			}
 		})
 
+		it('resolves consentStatements onto a fetched form doc, so consent renders on any read path', async () => {
+			const form = await makeForm(privacySourceId)
+			const fetched = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+			const statements = (
+				fetched as { consentStatements?: Record<string, { statement?: unknown }> }
+			).consentStatements
+			expect(statements).toBeDefined()
+			expect(Object.keys(statements ?? {})).toContain('terms')
+			expect(statements?.terms?.statement).toBeDefined()
+		})
+
 		it('refuses an anonymous request to the consent-sources endpoint', async () => {
 			const response = await callEndpoint({ user: undefined })
 			expect(response?.status).toBe(403)

@@ -97,6 +97,12 @@ export function toFormDocument(
 			closesAt?: string | null
 			outcome?: { winningValues?: (string | null)[] | null } | null
 		} | null
+		/**
+		 * Consent statements resolved onto the doc by the plugin's forms `afterRead` hook (when
+		 * `consent.sources` is set), so consent renders on any fetch path (modal/client, not just RSC).
+		 * An explicit `options.consentStatements` takes precedence when both are present.
+		 */
+		consentStatements?: ConsentStatements
 	},
 	options?: ToFormDocumentOptions
 ): FormDocument {
@@ -120,8 +126,9 @@ export function toFormDocument(
 	if (options?.pollOptions) {
 		fields = applyPollOptions(fields, form.poll?.resultsField, options.pollOptions)
 	}
-	if (options?.consentStatements) {
-		fields = applyConsentStatements(fields, options.consentStatements)
+	const consentStatements = options?.consentStatements ?? form.consentStatements
+	if (consentStatements) {
+		fields = applyConsentStatements(fields, consentStatements)
 	}
 	return {
 		id: form.id,
