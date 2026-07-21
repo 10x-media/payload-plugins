@@ -29,10 +29,18 @@ export const createWildixDevicesCollection = ({
 		},
 		fields: [
 			{
-				name: 'contact',
+				name: 'wildixId',
 				type: 'text',
 				required: true,
 				unique: true,
+				admin: {
+					description: labelForKey(keys.wildixDevicesDescWildixId),
+					readOnly: true,
+				},
+			},
+			{
+				name: 'contact',
+				type: 'text',
 				admin: { description: labelForKey(keys.wildixDevicesDescContact) },
 			},
 			{

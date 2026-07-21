@@ -2,10 +2,10 @@ import { deepMerge, type Endpoint } from 'payload'
 import type { WildixCredentials } from '../types'
 import type { WildixAccess } from '../utils/access'
 import { checkAccess } from '../utils/access'
-import { buildWdaClient, buildWmsClient } from '../utils/wildixClient'
+import { buildWmsClient } from '../utils/wildixClient'
 import {
 	type SyncResult,
-	syncCallHistory,
+	syncCallHistoryPbx,
 	syncChannels,
 	syncDevices,
 	syncUsers,
@@ -52,7 +52,7 @@ export const createWildixSync = ({
 			if (type === 'devices' || type === 'all') {
 				results.devices = await syncDevices({
 					payload,
-					client,
+					credentials,
 					wildixDevicesSlug,
 					wildixUsersSlug,
 					prune: true,
@@ -67,13 +67,12 @@ export const createWildixSync = ({
 					prune: true,
 				})
 			}
-			if (type === 'call-logs') {
-				const wda = buildWdaClient(credentials)
-				results['call-logs'] = await syncCallHistory({
+			if (type === 'call-logs' || type === 'all') {
+				results['call-logs'] = await syncCallHistoryPbx({
 					payload,
-					wda,
+					credentials,
+					wildixUsersSlug,
 					callLogsSlug,
-					company: credentials.company,
 				})
 			}
 

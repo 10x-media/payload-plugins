@@ -18,6 +18,7 @@ export const keys = {
 
 	wildixDevicesSingular: 'wildix:wildixDevicesSingular',
 	wildixDevicesPlural: 'wildix:wildixDevicesPlural',
+	wildixDevicesDescWildixId: 'wildix:wildixDevicesDescWildixId',
 	wildixDevicesDescContact: 'wildix:wildixDevicesDescContact',
 	wildixDevicesDescUserAgent: 'wildix:wildixDevicesDescUserAgent',
 	wildixDevicesDescWildixUserId: 'wildix:wildixDevicesDescWildixUserId',

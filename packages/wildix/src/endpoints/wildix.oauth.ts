@@ -187,7 +187,8 @@ export const createWildixOAuthCallback = ({
 		try {
 			await syncDevices({
 				payload: req.payload,
-				client: tempClient,
+				credentials,
+				token: tokens.access_token,
 				wildixDevicesSlug,
 				wildixUsersSlug,
 				scopeToUserId: colleague.id,

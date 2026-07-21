@@ -1,23 +1,29 @@
 import {
-	type CallRecord,
-	QueryUserCallsCommand,
-	type WdaHistoryClient,
-} from '@wildix/wda-history-client'
-import {
 	GetPbxCallGroupsCommand,
 	GetPbxColleaguesCommand,
-	ListUserDevicesCommand,
 	type PbxCallGroup,
 	type PbxColleague,
-	type UserDevice,
 	type WmsApiClient,
 } from '@wildix/wms-api-client'
 import type { CollectionSlug, Payload } from 'payload'
-import type { CallStatus, CallType, WildixCredentials } from '../types'
+import type { WildixCredentials } from '../types'
 import { createOrUpdateCallLog } from './callLog'
 import { upsertByField } from './upsertByField'
-import { buildWdaClient, buildWmsClient } from './wildixClient'
+import { buildWmsClient } from './wildixClient'
 import { buildRefreshingTokenProvider } from './wildixOAuthClient'
+import {
+	fetchPbxCallHistory,
+	fetchUserCallHistory,
+	normalizePbxCallHistory,
+	type PbxCallHistoryRecord,
+} from './wildixPbxHistory'
+import {
+	fetchPbxDevices,
+	fetchPbxSipRegistrations,
+	type NormalizedPbxDevice,
+	normalizePbxDevice,
+	normalizePbxSipRegistrations,
+} from './wildixPbxRest'
 
 export type SyncResult = { synced: number; errors: number; deleted: number }
 
@@ -86,79 +92,100 @@ export const syncUsers = async ({
 
 type SyncDevicesOptions = {
 	payload: Payload
-	client: WmsApiClient
+	credentials: WildixCredentials
 	wildixDevicesSlug: string
 	wildixUsersSlug: string
 	prune?: boolean
-	/** When set, only syncs devices for this specific Wildix user id. Disables prune. */
+	/** When set, only syncs devices assigned to this Wildix user id. Disables prune. */
 	scopeToUserId?: string
+	/** OAuth2 access token override; falls back to the static apiKey when absent. */
+	token?: string
 }
 
-/** Upserts devices for all (or one scoped) Wildix user via ListUserDevices, keyed by SIP contact. */
+type LinkedUser = { id: string; wildixId?: string }
+
+/** Upserts hardware (`/Devices/`) and softphones (`/PBX/Users/Sip/Registrations`), keyed by wildixId. */
 export const syncDevices = async ({
 	payload,
-	client,
+	credentials,
 	wildixDevicesSlug,
 	wildixUsersSlug,
 	prune,
 	scopeToUserId,
+	token,
 }: SyncDevicesOptions): Promise<SyncResult> => {
 	const usersResult = await payload.find({
 		collection: wildixUsersSlug as CollectionSlug,
-		where: scopeToUserId ? { wildixId: { equals: scopeToUserId } } : undefined,
 		limit: 1000,
 		depth: 0,
 		overrideAccess: true,
 	})
 
-	const seen = new Set<string>()
-	let synced = 0
-	let errors = 0
-	let deleted = 0
-
+	const userByExtension = new Map<string, LinkedUser>()
+	let scopeExtension: string | undefined
 	for (const _user of usersResult.docs) {
 		const user = _user as unknown as Record<string, unknown>
-		const wildixId = user.wildixId as string | undefined
 		const extension = user.extension as string | undefined
-		const payloadDocId = user.id as string
-		if (!wildixId || !extension) {
-			errors++
-			continue
-		}
+		const wildixId = user.wildixId as string | undefined
+		if (extension) userByExtension.set(extension, { id: user.id as string, wildixId })
+		if (scopeToUserId && wildixId === scopeToUserId) scopeExtension = extension
+	}
 
-		let devices: UserDevice[]
-		let activeContact: string | undefined
+	if (scopeToUserId && !scopeExtension) return { synced: 0, errors: 0, deleted: 0 }
+
+	const devices: NormalizedPbxDevice[] = []
+	let errors = 0
+
+	try {
+		const hardware = await fetchPbxDevices({ credentials, token })
+		for (const record of hardware) {
+			const device = normalizePbxDevice(record)
+			if (device) devices.push(device)
+		}
+	} catch {
+		errors++
+	}
+
+	try {
+		const registrations = await fetchPbxSipRegistrations({
+			credentials,
+			token,
+			extensions: scopeExtension,
+		})
+		devices.push(...normalizePbxSipRegistrations(registrations))
+	} catch {
+		errors++
+	}
+
+	const seen = new Set<string>()
+	let synced = 0
+	let deleted = 0
+
+	for (const device of devices) {
+		if (scopeExtension && device.extension !== scopeExtension) continue
+		if (seen.has(device.wildixId)) continue
+		seen.add(device.wildixId)
+
+		const linked = device.extension ? userByExtension.get(device.extension) : undefined
 		try {
-			const response = await client.send(new ListUserDevicesCommand({ user: extension }))
-			devices = response.devices ?? []
-			activeContact = response.activeDevice?.contact
+			await upsertByField({
+				payload,
+				collection: wildixDevicesSlug,
+				uniqueField: 'wildixId',
+				uniqueValue: device.wildixId,
+				data: {
+					wildixId: device.wildixId,
+					contact: device.contact,
+					userAgent: device.userAgent,
+					online: device.online,
+					isActiveDevice: device.online,
+					wildixUserId: linked?.wildixId,
+					wildixUser: linked?.id,
+				},
+			})
+			synced++
 		} catch {
 			errors++
-			continue
-		}
-
-		for (const device of devices) {
-			if (!device.contact || seen.has(device.contact)) continue
-			seen.add(device.contact)
-			try {
-				await upsertByField({
-					payload,
-					collection: wildixDevicesSlug,
-					uniqueField: 'contact',
-					uniqueValue: device.contact,
-					data: {
-						contact: device.contact,
-						userAgent: device.userAgent,
-						online: device.active,
-						isActiveDevice: device.contact === activeContact,
-						wildixUserId: wildixId,
-						wildixUser: payloadDocId,
-					},
-				})
-				synced++
-			} catch {
-				errors++
-			}
 		}
 	}
 
@@ -166,7 +193,7 @@ export const syncDevices = async ({
 		deleted += await pruneOrphans({
 			payload,
 			collection: wildixDevicesSlug,
-			uniqueField: 'contact',
+			uniqueField: 'wildixId',
 			seen,
 			onError: () => {
 				errors++
@@ -265,86 +292,92 @@ export const syncChannels = async ({
 	return { synced, errors, deleted }
 }
 
-const CALL_DIRECTION_MAP: Record<string, CallType> = {
-	INBOUND: 'in',
-	OUTBOUND: 'out',
-	INTERNAL: 'out',
-}
-
-const CALL_STATUS_MAP: Record<string, CallStatus> = {
-	COMPLETED: 'completed',
-	MISSED: 'missed',
-}
-
-type NormalizedCallLog = {
-	callId: string
-	callType: CallType
-	callStatus: CallStatus
-	callDuration: number
-	fromNumber: string
-	toNumber: string
-	startedAt: Date
-}
-
-export function normalizeCallHistory(calls: CallRecord[]): NormalizedCallLog[] {
-	return calls.flatMap((call) => {
-		const callType = call.direction ? CALL_DIRECTION_MAP[call.direction] : undefined
-		if (!callType) return []
-		const callStatus = call.callStatus
-			? (CALL_STATUS_MAP[call.callStatus] ?? 'completed')
-			: 'completed'
-		return [
-			{
-				callId: call.id,
-				callType,
-				callStatus,
-				callDuration: call.talkTime ?? call.duration ?? 0,
-				fromNumber: call.caller?.phone ?? '',
-				toNumber: call.callee?.phone ?? call.destination ?? '',
-				startedAt: new Date(call.startTime),
-			},
-		]
-	})
-}
-
-type SyncCallHistoryOptions = {
+type SyncCallHistoryPbxOptions = {
 	payload: Payload
-	wda: WdaHistoryClient
+	credentials: WildixCredentials
+	wildixUsersSlug: string
 	callLogsSlug: string
-	company?: string
-	/** PBX user id to scope the query and tag each log with. */
-	userId?: string
+	/** Max records per user extension. @default 100 */
 	limit?: number
 }
 
-export const syncCallHistory = async ({
+/**
+ * Syncs call logs via WMS admin CallHistory (`/api/v1/User/{extension}/CallHistory/`),
+ * falling back to the org-wide `/api/v1/PBX/CallHistory/` when no user has an extension
+ * yet. Uses the static apiKey token, so no company id is required.
+ */
+export const syncCallHistoryPbx = async ({
 	payload,
-	wda,
+	credentials,
+	wildixUsersSlug,
 	callLogsSlug,
-	company,
-	userId,
 	limit,
-}: SyncCallHistoryOptions): Promise<SyncResult> => {
-	const response = await wda.send(
-		new QueryUserCallsCommand({
-			company,
-			user: userId,
-			limit: limit ?? 100,
-		})
-	)
-	const entries = normalizeCallHistory(response.calls ?? [])
+}: SyncCallHistoryPbxOptions): Promise<SyncResult> => {
+	const usersResult = await payload.find({
+		collection: wildixUsersSlug as CollectionSlug,
+		limit: 1000,
+		depth: 0,
+		overrideAccess: true,
+	})
+
 	let synced = 0
 	let errors = 0
+	const seenCallIds = new Set<string>()
+	let usersWithExtension = 0
 
-	for (const entry of entries) {
+	for (const _user of usersResult.docs) {
+		const user = _user as unknown as Record<string, unknown>
+		const extension = user.extension as string | undefined
+		const wildixId = user.wildixId as string | undefined
+		if (!extension) continue
+		usersWithExtension++
+
+		let records: PbxCallHistoryRecord[]
 		try {
-			await createOrUpdateCallLog(payload, callLogsSlug, {
-				...entry,
-				...(userId ? { wildixUserId: userId } : {}),
+			records = await fetchUserCallHistory({
+				credentials,
+				extension,
+				count: limit ?? 100,
 			})
-			synced++
 		} catch {
 			errors++
+			continue
+		}
+
+		const entries = normalizePbxCallHistory(records, extension)
+		for (const entry of entries) {
+			if (seenCallIds.has(entry.callId)) continue
+			seenCallIds.add(entry.callId)
+			try {
+				await createOrUpdateCallLog(payload, callLogsSlug, {
+					...entry,
+					...(wildixId ? { wildixUserId: wildixId } : {}),
+				})
+				synced++
+			} catch {
+				errors++
+			}
+		}
+	}
+
+	// No users have extensions yet (e.g. before the first user sync): fall back to
+	// the org-wide history so the Sync Call History button still fills logs.
+	if (usersWithExtension === 0) {
+		let records: PbxCallHistoryRecord[]
+		try {
+			records = await fetchPbxCallHistory({ credentials, count: limit ?? 100 })
+		} catch {
+			return { synced, errors: errors + 1, deleted: 0 }
+		}
+		for (const entry of normalizePbxCallHistory(records)) {
+			if (seenCallIds.has(entry.callId)) continue
+			seenCallIds.add(entry.callId)
+			try {
+				await createOrUpdateCallLog(payload, callLogsSlug, entry)
+				synced++
+			} catch {
+				errors++
+			}
 		}
 	}
 
@@ -359,7 +392,10 @@ type SyncCallHistoryOAuthOptions = {
 	limit?: number
 }
 
-/** Iterates every connected Wildix user and syncs their call history with their own token. */
+/**
+ * Iterates every connected Wildix user and syncs their call history from the WMS
+ * User CallHistory endpoint using that user's own OAuth2 access token.
+ */
 export const syncCallHistoryOAuth = async ({
 	payload,
 	credentials,
@@ -377,26 +413,42 @@ export const syncCallHistoryOAuth = async ({
 
 	let synced = 0
 	let errors = 0
+	const seenCallIds = new Set<string>()
 
 	for (const _doc of connectedUsers.docs) {
 		const doc = _doc as unknown as Record<string, unknown>
+		const extension = doc.extension as string | undefined
+		const wildixId = doc.wildixId as string | undefined
+		if (!extension) continue
 		const provider = tokenProviderForUser({ payload, credentials, wildixUsersSlug, doc })
 		if (!provider) continue
-		const wildixId = doc.wildixId as string
+
+		let records: PbxCallHistoryRecord[]
 		try {
-			const wda = buildWdaClient(credentials, provider)
-			const result = await syncCallHistory({
-				payload,
-				wda,
-				callLogsSlug,
-				company: credentials.company,
-				userId: wildixId,
-				limit,
+			const token = await provider.token()
+			records = await fetchUserCallHistory({
+				credentials,
+				token,
+				extension,
+				count: limit ?? 100,
 			})
-			synced += result.synced
-			errors += result.errors
 		} catch {
 			errors++
+			continue
+		}
+
+		for (const entry of normalizePbxCallHistory(records, extension)) {
+			if (seenCallIds.has(entry.callId)) continue
+			seenCallIds.add(entry.callId)
+			try {
+				await createOrUpdateCallLog(payload, callLogsSlug, {
+					...entry,
+					...(wildixId ? { wildixUserId: wildixId } : {}),
+				})
+				synced++
+			} catch {
+				errors++
+			}
 		}
 	}
 
@@ -505,7 +557,7 @@ export const createWildixOnInit =
 		await syncUsers({ payload, client, wildixUsersSlug: 'wildix-users', prune: true })
 		await syncDevices({
 			payload,
-			client,
+			credentials,
 			wildixDevicesSlug: 'wildix-devices',
 			wildixUsersSlug: 'wildix-users',
 			prune: true,

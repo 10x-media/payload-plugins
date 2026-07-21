@@ -56,7 +56,7 @@ export type WildixPluginOptions = {
 	phoneNumberFields?: string[]
 
 	/**
-	 * Whether to sync call logs from the Wildix WDA history API.
+	 * Whether to sync call logs from the Wildix WMS CallHistory endpoints.
 	 */
 	syncCallLogs?: boolean
 
@@ -389,6 +389,7 @@ export const wildix = definePlugin<WildixPluginOptions>({
 				config.jobs.tasks.push(
 					buildSyncCallHistoryTask({
 						callLogsSlug,
+						wildixUsersSlug,
 						credentials: options.wildixCredentials,
 					})
 				)

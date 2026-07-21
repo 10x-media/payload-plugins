@@ -18,7 +18,9 @@ export const de: Record<TranslationKey, string> = {
 
 	[keys.wildixDevicesSingular]: 'Wildix-Gerät',
 	[keys.wildixDevicesPlural]: 'Wildix-Geräte',
-	[keys.wildixDevicesDescContact]: 'SIP-Kontakt-URI zur Identifikation des Geräts.',
+	[keys.wildixDevicesDescWildixId]: 'Wildix PBX-Geräte-ID. Dient als stabiler Sync-Schlüssel.',
+	[keys.wildixDevicesDescContact]:
+		'Gerätekennung (MAC-Adresse oder ersatzweise die PBX-Geräte-ID).',
 	[keys.wildixDevicesDescUserAgent]:
 		'Geräte-User-Agent (Telefonmodell, WebRTC-Client, Mobile-App).',
 	[keys.wildixDevicesDescWildixUserId]: 'Wildix PBX-Benutzer-ID, der dieses Gerät gehört.',

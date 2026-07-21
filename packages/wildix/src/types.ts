@@ -45,12 +45,14 @@ export type WildixCredentials = {
 
 	/**
 	 * Company id for WDA server-to-server history queries, e.g. `it_w123123`.
-	 * Required for call log sync in `apiKey` mode.
+	 * Unused by call-log sync, which now runs against the WMS CallHistory endpoints.
+	 * Kept for backwards compatibility with existing configs.
 	 */
 	company?: string
 
 	/**
 	 * WDA (Wildix Data Analytics) environment for the history client.
+	 * Unused by call-log sync since it moved to WMS CallHistory. Kept for compatibility.
 	 * @default 'prod'
 	 */
 	wdaEnv?: 'stage' | 'stable' | 'prod'

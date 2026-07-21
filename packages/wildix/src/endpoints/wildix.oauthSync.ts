@@ -68,9 +68,11 @@ export const createWildixOAuthSync = ({
 
 			if (type === 'devices' || type === 'all') {
 				try {
+					const token = await provider.token()
 					const result = await syncDevices({
 						payload: req.payload,
-						client,
+						credentials,
+						token,
 						wildixDevicesSlug,
 						wildixUsersSlug,
 						scopeToUserId: wildixId,
@@ -99,7 +101,7 @@ export const createWildixOAuthSync = ({
 			}
 		}
 
-		if (type === 'call-logs') {
+		if (type === 'call-logs' || type === 'all') {
 			try {
 				totals['call-logs'] = await syncCallHistoryOAuth({
 					payload: req.payload,

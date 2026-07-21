@@ -1,0 +1,65 @@
+---
+title: Quick start
+description: Install @10x-media/wildix and connect a Wildix PBX with an API key or OAuth2.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/wildix
+```
+
+## API key mode
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { wildix } from '@10x-media/wildix'
+
+export default buildConfig({
+  plugins: [
+    wildix({
+      wildixCredentials: {
+        authType: 'apiKey',
+        pbxHost: process.env.WILDIX_PBX_HOST!, // mycompany.wildixin.com
+        apiKey: process.env.WILDIX_API_KEY!,
+      },
+      syncCallLogs: true,
+      contactCollections: ['contacts'],
+      phoneNumberFields: ['phoneNumber'],
+      enableCallActivityWidget: true,
+      enableLiveCallFloatingWindow: true,
+    }),
+  ],
+})
+```
+
+```bash title=".env"
+WILDIX_PBX_HOST=mycompany.wildixin.com
+WILDIX_API_KEY=access_...
+```
+
+Open the admin, open **Wildix Users**, and hit **Sync**. Then sync devices and call logs. Softphones appear even when the hardware Devices inventory is empty.
+
+## OAuth2 mode
+
+`webhookUrl` is required. It builds the OAuth `redirect_uri` as `${webhookUrl}/api/wildix/oauth/callback`.
+
+```ts
+wildix({
+  webhookUrl: process.env.SITE_URL!,
+  payloadUsersSlug: 'users',
+  wildixCredentials: {
+    authType: 'oauth2',
+    pbxHost: process.env.WILDIX_PBX_HOST!,
+    clientId: process.env.WILDIX_CLIENT_ID!,
+    clientSecret: process.env.WILDIX_CLIENT_SECRET!,
+  },
+  syncCallLogs: true,
+})
+```
+
+Register that redirect URI on the OAuth2 app in WMS Settings → PBX → Integrations. Users connect from their Payload user document.
+
+## Webhooks (optional)
+
+Point a WMS webhook integration at `POST {serverURL}/api/wildix/webhooks` and set `webhookSecret` so the plugin verifies `x-signature`.

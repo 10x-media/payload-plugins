@@ -1,0 +1,38 @@
+---
+title: Sync
+description: How Wildix users, devices, call groups, and call logs are pulled from the WMS admin REST API.
+---
+
+Sync is driven by admin list-menu buttons and `POST /api/wildix/sync` with a JSON body `{ "type": "users" | "devices" | "channels" | "call-logs" | "all" }`. OAuth mode uses the same path and scopes per connected user when relevant.
+
+## Users
+
+Colleagues from the WMS PBX colleagues API land in `wildix-users`, keyed by `wildixId`. Sync users before devices so extension linking works.
+
+## Devices
+
+`wildix-devices` merges two sources, both keyed by `wildixId`:
+
+| Source | Endpoint | `wildixId` | `contact` |
+|---|---|---|---|
+| Hardware | `GET /api/v1/Devices/` | PBX device id | MAC, or id if no MAC |
+| Softphones | `GET /api/v1/PBX/Users/Sip/Registrations` | `sip:{extension}:{instance}` | SIP contact URI |
+
+Softphone `contact` is what click-to-dial sends as `deviceId`. Many PBXs return an empty hardware list and only live WebRTC / Zero Distance / x-bees registrations. Offline softphones are not invented when no SIP registration exists.
+
+## Call groups
+
+Call queues map into `wildix-channels` with member extensions linked to `wildix-users` when possible.
+
+## Call logs
+
+History comes from WMS CallHistory (not WDA):
+
+1. For each synced user with an extension: `GET /api/v1/User/{extension}/CallHistory/`
+2. If no users have extensions yet: one org-wide `GET /api/v1/PBX/CallHistory/`
+
+OAuth sync uses each user's access token against the same User CallHistory path. Enable with `syncCallLogs: true` (registers a Payload job as well). `type: "all"` includes call logs. Per-user fetch errors increment `errors` in the sync result instead of 500ing the endpoint.
+
+Optional `relatedContact` on `call-logs` resolves when `contactCollections` and `phoneNumberFields` are configured: outbound matches `toNumber`, inbound matches `fromNumber`, using phone-number variants (E.164, digits, `00…`).
+
+`company` and `wdaEnv` on credentials are unused by call-log sync and remain only for backwards-compatible configs.

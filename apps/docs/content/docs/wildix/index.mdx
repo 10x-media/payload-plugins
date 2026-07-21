@@ -1,0 +1,39 @@
+---
+title: Wildix
+description: Wildix Unified Communications for Payload v3. Sync, dial, call logs, and live call UI against the WMS admin REST API.
+---
+
+`@10x-media/wildix` is the Wildix sibling of [`@10x-media/sipgate`](https://www.npmjs.com/package/@10x-media/sipgate): click-to-dial, live call control, user/device/queue sync, and call history for Payload v3 admin apps.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { wildix } from '@10x-media/wildix'
+
+export default buildConfig({
+  plugins: [
+    wildix({
+      wildixCredentials: {
+        authType: 'apiKey',
+        pbxHost: process.env.WILDIX_PBX_HOST!,
+        apiKey: process.env.WILDIX_API_KEY!,
+      },
+      syncCallLogs: true,
+      contactCollections: ['contacts'],
+      phoneNumberFields: ['phoneNumber'],
+    }),
+  ],
+})
+```
+
+## The pieces
+
+- **Collections**: `wildix-users`, `wildix-devices`, `wildix-channels`, and `call-logs`, filled from WMS via Sync buttons or `POST /api/wildix/sync`.
+- **Devices**: hardware from `GET /api/v1/Devices/` merged with softphones from `GET /api/v1/PBX/Users/Sip/Registrations`. Softphone `contact` values are SIP URIs used as dial `deviceId`.
+- **Call logs**: WMS CallHistory (per-extension, with org-wide fallback). Optional `relatedContact` matching against your own collections.
+- **Live call**: dial / RTCM endpoints, webhook HMAC, call activity widget, and floating window (opt-in).
+
+Auth is either a shared API key or per-user OAuth2 against the PBX. There is no IVR responder; call flows stay in the Wildix Dialplan / Voice Agents.
+
+## Next
+
+[Quick start](/wildix/quick-start), then [Sync](/wildix/sync).

@@ -1,13 +1,13 @@
 import type { TaskConfig } from 'payload'
 import type { WildixCredentials } from '../types'
-import { buildWdaClient } from '../utils/wildixClient'
-import { syncCallHistory, syncCallHistoryOAuth } from '../utils/wildixSyncHandlers'
+import { syncCallHistoryOAuth, syncCallHistoryPbx } from '../utils/wildixSyncHandlers'
 
 export const SYNC_CALL_HISTORY_TASK = 'wildixSyncCallHistory'
 export const SYNC_CALL_HISTORY_TASK_OAUTH = 'wildixSyncCallHistoryOAuth'
 
 export type SyncCallHistoryTaskDeps = {
 	callLogsSlug: string
+	wildixUsersSlug: string
 	credentials: WildixCredentials
 }
 
@@ -25,12 +25,11 @@ export const buildSyncCallHistoryTask = (deps: SyncCallHistoryTaskDeps): TaskCon
 		inputSchema: [{ name: 'limit', type: 'number' }],
 		handler: async ({ input, req }) => {
 			const { limit } = input as { limit?: number }
-			const wda = buildWdaClient(deps.credentials)
-			const result = await syncCallHistory({
+			const result = await syncCallHistoryPbx({
 				payload: req.payload,
-				wda,
+				credentials: deps.credentials,
+				wildixUsersSlug: deps.wildixUsersSlug,
 				callLogsSlug: deps.callLogsSlug,
-				company: deps.credentials.company,
 				limit: limit ?? 100,
 			})
 			return { output: { synced: result.synced, errors: result.errors } }

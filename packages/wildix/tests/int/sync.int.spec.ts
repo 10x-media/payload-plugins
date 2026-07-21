@@ -1,43 +1,22 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type {
-	ListUserDevicesCommand as ListUserDevicesCommandType,
-	PbxCallGroup,
-	PbxColleague,
-	WmsApiClient,
-} from '@wildix/wms-api-client'
-import {
-	GetPbxCallGroupsCommand,
-	GetPbxColleaguesCommand,
-	ListUserDevicesCommand,
-} from '@wildix/wms-api-client'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import type { PbxCallGroup, PbxColleague, WmsApiClient } from '@wildix/wms-api-client'
+import { GetPbxCallGroupsCommand, GetPbxColleaguesCommand } from '@wildix/wms-api-client'
+import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 import { wildix } from '../../src/index'
+import type { WildixCredentials } from '../../src/types'
+import type { PbxDeviceRecord, PbxSipRegistrationsByExtension } from '../../src/utils/wildixPbxRest'
 import { syncChannels, syncDevices, syncUsers } from '../../src/utils/wildixSyncHandlers'
 
 type MockFixtures = {
 	colleagues?: Partial<PbxColleague>[]
-	devicesByExtension?: Record<string, { contact: string; userAgent: string; active: boolean }[]>
-	activeDeviceByExtension?: Record<string, string>
 	callGroups?: Partial<PbxCallGroup>[]
 }
 
 /** Duck-types a WmsApiClient by pattern-matching on the command class sent to it. */
-const buildMockWmsClient = ({
-	colleagues = [],
-	devicesByExtension = {},
-	activeDeviceByExtension = {},
-	callGroups = [],
-}: MockFixtures): WmsApiClient => {
+const buildMockWmsClient = ({ colleagues = [], callGroups = [] }: MockFixtures): WmsApiClient => {
 	const send = async (command: unknown) => {
 		if (command instanceof GetPbxColleaguesCommand) {
 			return { type: 'result', result: { records: colleagues, total: colleagues.length } }
-		}
-		if (command instanceof ListUserDevicesCommand) {
-			const { user } = (command as ListUserDevicesCommandType).input
-			const devices = devicesByExtension[user as string] ?? []
-			const activeContact = activeDeviceByExtension[user as string]
-			const activeDevice = devices.find((d) => d.contact === activeContact)
-			return { devices, activeDevice }
 		}
 		if (command instanceof GetPbxCallGroupsCommand) {
 			return { type: 'result', result: { records: callGroups, total: callGroups.length } }
@@ -48,6 +27,30 @@ const buildMockWmsClient = ({
 	}
 	return { send } as unknown as WmsApiClient
 }
+
+const testCredentials: WildixCredentials = {
+	authType: 'apiKey',
+	apiKey: 'test-key',
+	pbxHost: 'pbx.test',
+}
+
+type MockDevicesFetchOptions = {
+	hardware?: PbxDeviceRecord[]
+	sip?: PbxSipRegistrationsByExtension
+}
+
+/** Stubs Devices + SIP Registrations endpoints based on the request URL. */
+const mockDevicesFetch = ({ hardware = [], sip = {} }: MockDevicesFetchOptions) =>
+	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+		const url = String(input)
+		const body = url.includes('/Sip/Registrations')
+			? { type: 'result', result: sip }
+			: { type: 'result', result: { records: hardware } }
+		return new Response(JSON.stringify(body), {
+			status: 200,
+			headers: { 'content-type': 'application/json' },
+		})
+	})
 
 describeForDb('syncUsers', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -95,39 +98,40 @@ describeForDb('syncDevices', { dbs: ['mongo'] }, (db) => {
 		booted = await bootPayload({ plugin: wildix({}), db })
 	})
 
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	afterAll(async () => {
 		await booted.stop()
 	})
 
-	it('upserts devices keyed by contact, marks the active device, and prunes orphans', async () => {
+	it('upserts the device inventory keyed by wildixId, links users by extension, and prunes orphans', async () => {
 		const { payload } = booted
 		const usersSlug = 'wildix-users'
 		const devicesSlug = 'wildix-devices'
 
-		await payload.create({
+		const user = await payload.create({
 			collection: usersSlug,
 			data: { wildixId: 'w0', email: 'w0@test.com', extension: '100' },
 			overrideAccess: true,
 		})
 		await payload.create({
 			collection: devicesSlug,
-			data: { contact: 'orphan-contact', userAgent: 'Old Phone', online: false },
+			data: { wildixId: 'orphan-99', contact: 'orphan-mac', userAgent: 'Old Phone', online: false },
 			overrideAccess: true,
 		})
 
-		const client = buildMockWmsClient({
-			devicesByExtension: {
-				'100': [
-					{ contact: 'sip:100@desk', userAgent: 'Yealink T54W', active: true },
-					{ contact: 'sip:100@mobile', userAgent: 'x-bees Mobile', active: false },
-				],
-			},
-			activeDeviceByExtension: { '100': 'sip:100@desk' },
+		mockDevicesFetch({
+			hardware: [
+				{ id: 1, mac: 'aa1100', model: 'Yealink T54W', user: '100', state: 'on' },
+				{ id: 2, mac: 'bb2200', model: 'x-bees Mobile', user: '100', state: 'off' },
+			],
 		})
 
 		const result = await syncDevices({
 			payload,
-			client,
+			credentials: testCredentials,
 			wildixDevicesSlug: devicesSlug,
 			wildixUsersSlug: usersSlug,
 			prune: true,
@@ -139,19 +143,76 @@ describeForDb('syncDevices', { dbs: ['mongo'] }, (db) => {
 			overrideAccess: true,
 			depth: 0,
 		})
-		const byContact = new Map(
+		const byWildixId = new Map(
 			remaining.docs.map((d) => {
 				const doc = d as unknown as Record<string, unknown>
-				return [doc.contact as string, doc]
+				return [doc.wildixId as string, doc]
 			})
 		)
 
-		expect(byContact.has('orphan-contact')).toBe(false)
-		expect(byContact.get('sip:100@desk')).toMatchObject({ isActiveDevice: true })
-		expect(byContact.get('sip:100@mobile')).toMatchObject({ isActiveDevice: false })
+		expect(byWildixId.has('orphan-99')).toBe(false)
+		expect(byWildixId.get('1')).toMatchObject({
+			contact: 'aa1100',
+			online: true,
+			isActiveDevice: true,
+			wildixUserId: 'w0',
+			wildixUser: user.id,
+		})
+		expect(byWildixId.get('2')).toMatchObject({ online: false, isActiveDevice: false })
 	})
 
-	it('skips prune and only syncs the given user when scopeToUserId is set', async () => {
+	it('merges SIP softphone registrations with hardware inventory', async () => {
+		const { payload } = booted
+		const usersSlug = 'wildix-users'
+		const devicesSlug = 'wildix-devices'
+
+		await payload.create({
+			collection: usersSlug,
+			data: { wildixId: 'w-soft', email: 'soft@test.com', extension: '204' },
+			overrideAccess: true,
+		})
+
+		mockDevicesFetch({
+			hardware: [{ id: 9, mac: 'hwmac', model: 'Desk', user: '204', state: 'on' }],
+			sip: {
+				'204': {
+					registrations: [
+						{
+							online: '1',
+							contact: 'sip:204@1.2.3.4:5060;transport=ws',
+							instance: '<urn:uuid:abc>',
+							useragent: 'Wildix Zero Distance',
+						},
+					],
+				},
+			},
+		})
+
+		const result = await syncDevices({
+			payload,
+			credentials: testCredentials,
+			wildixDevicesSlug: devicesSlug,
+			wildixUsersSlug: usersSlug,
+			prune: false,
+		})
+		expect(result.synced).toBeGreaterThanOrEqual(2)
+
+		const soft = await payload.find({
+			collection: devicesSlug,
+			where: { wildixId: { equals: 'sip:204:urn:uuid:abc' } },
+			overrideAccess: true,
+			depth: 0,
+		})
+		expect(soft.totalDocs).toBe(1)
+		expect(soft.docs[0]).toMatchObject({
+			contact: 'sip:204@1.2.3.4:5060;transport=ws',
+			userAgent: 'Wildix Zero Distance',
+			online: true,
+			wildixUserId: 'w-soft',
+		})
+	})
+
+	it('skips prune and only syncs the scoped user’s devices when scopeToUserId is set', async () => {
 		const { payload } = booted
 		const usersSlug = 'wildix-users'
 		const devicesSlug = 'wildix-devices'
@@ -162,13 +223,16 @@ describeForDb('syncDevices', { dbs: ['mongo'] }, (db) => {
 			overrideAccess: true,
 		})
 
-		const client = buildMockWmsClient({
-			devicesByExtension: { '102': [{ contact: 'sip:102@desk', userAgent: 'Desk', active: true }] },
+		mockDevicesFetch({
+			hardware: [
+				{ id: 10, mac: 'ext100mac', user: '100', state: 'on' },
+				{ id: 11, mac: 'ext102mac', user: '102', state: 'on' },
+			],
 		})
 
 		const result = await syncDevices({
 			payload,
-			client,
+			credentials: testCredentials,
 			wildixDevicesSlug: devicesSlug,
 			wildixUsersSlug: usersSlug,
 			prune: true,
@@ -176,13 +240,21 @@ describeForDb('syncDevices', { dbs: ['mongo'] }, (db) => {
 		})
 		expect(result.synced).toBe(1)
 
-		const remaining = await payload.find({
+		const scoped = await payload.find({
 			collection: devicesSlug,
-			where: { contact: { equals: 'sip:100@desk' } },
+			where: { wildixId: { equals: '11' } },
 			overrideAccess: true,
 			depth: 0,
 		})
-		expect(remaining.totalDocs).toBe(1)
+		expect(scoped.totalDocs).toBe(1)
+
+		const unscoped = await payload.find({
+			collection: devicesSlug,
+			where: { wildixId: { equals: '10' } },
+			overrideAccess: true,
+			depth: 0,
+		})
+		expect(unscoped.totalDocs).toBe(0)
 	})
 })
 

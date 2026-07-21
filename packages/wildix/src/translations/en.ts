@@ -22,7 +22,9 @@ export const en: Record<TranslationKey, string> = {
 
 	[keys.wildixDevicesSingular]: 'Wildix Device',
 	[keys.wildixDevicesPlural]: 'Wildix Devices',
-	[keys.wildixDevicesDescContact]: 'SIP contact URI identifying the device.',
+	[keys.wildixDevicesDescWildixId]: 'Wildix PBX device id. Used as the stable sync key.',
+	[keys.wildixDevicesDescContact]:
+		'Device identifier (MAC address, or the PBX device id as a fallback).',
 	[keys.wildixDevicesDescUserAgent]: 'Device user agent (phone model, WebRTC client, mobile app).',
 	[keys.wildixDevicesDescWildixUserId]: 'Wildix PBX user id owning this device.',
 	[keys.wildixDevicesDescWildixUser]: 'Linked Wildix user document.',
