@@ -11,12 +11,12 @@ export type FormResponseSettings = {
 		url?: string | null
 		/**
 		 * Present when the plugin's `redirectRelationships` option is set and the author picked an
-		 * internal document. Mirrors Payload's depth-0 polymorphic relationship shape (`value` is
-		 * the bare id, never populated): the HOST resolves this to a URL itself (e.g. by looking up
-		 * the referenced document's own route), since the plugin has no notion of the host's
-		 * routing, matching the model of Payload's native `plugin-form-builder` redirect relationship.
+		 * internal document. At `depth: 0` this is Payload's raw `{ relationTo, value }` id pair; at
+		 * `depth > 0` (or via the generated `Form` type) `value` is a populated document, which is why
+		 * it widens to `object`. Resolve it to a URL host-side (write `redirect.url`) or by passing
+		 * `resolveRedirect` to `toFormDocument`, since the routing is the host's knowledge.
 		 */
-		reference?: { relationTo: string; value: number | string } | null
+		reference?: { relationTo: string; value: number | string | object } | null
 	} | null
 }
 

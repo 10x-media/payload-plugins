@@ -27,7 +27,10 @@ export type RepeaterItem = {
 export type ConsentItem = {
 	field: string
 	agreed: boolean
-	ref?: string
+	/** The consent source's name at submit time (see `ConsentProof.name`). */
+	name?: string
+	/** The plain-text snapshot of the wording agreed to (see `ConsentProof.statementText`). */
+	statementText?: string
 	versionRef?: string
 	at: string
 }
@@ -203,18 +206,18 @@ export const SubmissionAnswersClient = ({ answers, repeaters, consent, meta, lab
 										<Pill pillStyle={entry.agreed ? 'success' : 'error'} size="small" rounded>
 											{entry.agreed ? labels.agreed : labels.declined}
 										</Pill>
-										{entry.ref ? (
-											<a
-												href={entry.ref}
-												target="_blank"
-												rel="noreferrer"
-												style={{ fontSize: '0.8rem', color: 'var(--theme-text)' }}
-											>
-												{entry.ref}
+										{entry.name ? (
+											<span style={{ fontSize: '0.8rem', color: 'var(--theme-text)' }}>
+												{entry.name}
 												{entry.versionRef ? ` (v${entry.versionRef})` : ''}
-											</a>
+											</span>
 										) : null}
 									</div>
+									{entry.statementText ? (
+										<span style={{ fontSize: '0.8rem', color: 'var(--theme-elevation-600)' }}>
+											{entry.statementText}
+										</span>
+									) : null}
 									<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-500)' }}>
 										{entry.at}
 									</span>

@@ -1,4 +1,5 @@
-import type { PayloadRequest, RichTextField } from 'payload'
+import type { Field, PayloadRequest, RichTextField } from 'payload'
+import type { DepartmentEmailsResolver } from '../../email/departments'
 import { fieldNamesOfType } from '../../fields/fieldNamesOfType'
 import { localizedIf } from '../../fields/localizedIf'
 import { interpolate } from '../../recall/interpolate'
@@ -6,14 +7,15 @@ import { keys } from '../../translations/keys'
 import { asTranslate, labelFor } from '../../translations/server'
 import { resolverFor } from '../body/serializeBody'
 import { defineAction } from '../defineAction'
+import { buildRecipientField, type RecipientsConfig, resolveRecipients } from '../emailRecipients'
 import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
 
 type ConfirmationConfig = {
 	toField?: string
 	from?: string
-	cc?: string
-	bcc?: string
-	replyTo?: string
+	cc?: string[]
+	bcc?: string[]
+	replyTo?: string[]
 	subject?: string
 	body?: unknown
 }
@@ -39,59 +41,48 @@ export const validateToField = (
 }
 
 /**
- * `subject` and `body` are email content and follow `localize`; `toField` is an identifier and
- * `from` an address, neither of which ever does. `cc`, `bcc`, and `replyTo` are addresses that
- * follow `localize` (like `subject`), each interpolated the same way so `{{field}}` merge tags
- * work; a comma-separated list is forwarded as-is, since `payload.sendEmail` (nodemailer) accepts
- * one directly. `editor` overrides the body field's Lexical/richText editor (from the plugin's
- * `richText.editor` option). `fromAddresses`, when given (the plugin's `email.fromAddresses`
- * option), adds a `from` select sourced from the host resolver; absent, no `from` field exists and
- * every send uses the email adapter's default sender.
+ * `toField` names the form's own email field the confirmation is sent to (a `FieldNameSelect`, not a
+ * recipient list). `replyTo`, `cc`, and `bcc` are recipient lists (`RecipientsSelect`, `string[]`):
+ * literal emails, picked department addresses (when `departments` is set), or `{{field}}` tokens
+ * resolved from the submission at send. `from` is a single address, added only when `fromAddresses`
+ * is set. `subject`/`body` are content; `editor` overrides the body editor; `recipients` narrows the
+ * recipient fields' behavior. Content and recipient fields carry `localized: true` when `localize`.
  */
+// biome-ignore lint/complexity/useMaxParams: positional args thread plugin options (localize, editor, fromAddresses, departments, recipients)
 export const buildConfirmation = (
 	localize: boolean,
 	editor?: RichTextField['editor'],
-	fromAddresses?: FromAddressesResolver
-) =>
-	defineAction<ConfirmationConfig>({
+	fromAddresses?: FromAddressesResolver,
+	departments?: DepartmentEmailsResolver,
+	recipients?: RecipientsConfig
+) => {
+	const endpoint = departments ? 'departments' : undefined
+	const recip = (name: string, labelKey: string) =>
+		buildRecipientField(name, labelKey, localize, { endpoint, recipients, width: '50%' })
+	const toField: Field = {
+		name: 'toField',
+		type: 'text',
+		label: labelFor(keys.actionConfigToField),
+		admin: {
+			width: '50%',
+			components: {
+				Field: {
+					path: TO_FIELD_REF,
+					clientProps: { types: ['email'], descriptionKey: keys.actionConfigToFieldDescription },
+				},
+			},
+		},
+		validate: validateToField,
+	}
+	return defineAction<ConfirmationConfig>({
 		type: 'confirmation',
 		label: keys.actionConfirmation,
 		config: [
-			{
-				name: 'toField',
-				type: 'text',
-				label: labelFor(keys.actionConfigToField),
-				admin: {
-					components: {
-						Field: {
-							path: TO_FIELD_REF,
-							clientProps: {
-								types: ['email'],
-								descriptionKey: keys.actionConfigToFieldDescription,
-							},
-						},
-					},
-				},
-				validate: validateToField,
-			},
+			{ type: 'row', fields: [toField, recip('replyTo', keys.actionConfigReplyTo)] },
 			...(fromAddresses ? [buildFromField(fromAddresses)] : []),
 			{
-				name: 'cc',
-				type: 'text',
-				label: labelFor(keys.actionConfigCc),
-				...localizedIf(localize),
-			},
-			{
-				name: 'bcc',
-				type: 'text',
-				label: labelFor(keys.actionConfigBcc),
-				...localizedIf(localize),
-			},
-			{
-				name: 'replyTo',
-				type: 'text',
-				label: labelFor(keys.actionConfigReplyTo),
-				...localizedIf(localize),
+				type: 'row',
+				fields: [recip('cc', keys.actionConfigCc), recip('bcc', keys.actionConfigBcc)],
 			},
 			{
 				name: 'subject',
@@ -128,6 +119,9 @@ export const buildConfirmation = (
 
 			const subject = interpolate(config.subject ?? '', resolve)
 			const html = await renderBody(config.body)
+			const cc = resolveRecipients(config.cc, resolve)
+			const bcc = resolveRecipients(config.bcc, resolve)
+			const replyTo = resolveRecipients(config.replyTo, resolve)
 
 			// `from` was validated at save time against `fromAddresses(req)`; not re-checked here
 			// (the job's `req` may differ from the authoring admin's, and the config is
@@ -137,11 +131,12 @@ export const buildConfirmation = (
 				subject,
 				html,
 				...(config.from ? { from: config.from } : {}),
-				...(config.cc ? { cc: interpolate(config.cc, resolve) } : {}),
-				...(config.bcc ? { bcc: interpolate(config.bcc, resolve) } : {}),
-				...(config.replyTo ? { replyTo: interpolate(config.replyTo, resolve) } : {}),
+				...(cc ? { cc } : {}),
+				...(bcc ? { bcc } : {}),
+				...(replyTo ? { replyTo } : {}),
 			})
 		},
 	})
+}
 
 export const confirmation = buildConfirmation(true)

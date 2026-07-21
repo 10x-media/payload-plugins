@@ -42,6 +42,70 @@ describe('toFormDocument', () => {
 		})
 	})
 
+	describe('consent statements', () => {
+		it('applies consentStatements carried on the form doc when no option is passed', () => {
+			const doc = toFormDocument({
+				id: 1,
+				fields: [{ blockType: 'consent', name: 'terms', source: 's1' }],
+				consentStatements: {
+					terms: { statement: { root: {} }, link: { label: 'Privacy', url: '/p' } },
+				},
+			})
+			const consent = doc.fields.find((f) => f.name === 'terms') as Record<string, unknown>
+			expect(consent.statement).toEqual({ root: {} })
+			expect(consent.link).toEqual({ label: 'Privacy', url: '/p' })
+		})
+
+		it('prefers an explicit consentStatements option over the doc-carried one', () => {
+			const doc = toFormDocument(
+				{
+					id: 1,
+					fields: [{ blockType: 'consent', name: 'terms', source: 's1' }],
+					consentStatements: { terms: { statement: 'DOC' } },
+				},
+				{ consentStatements: { terms: { statement: 'OPT' } } }
+			)
+			const consent = doc.fields.find((f) => f.name === 'terms') as Record<string, unknown>
+			expect(consent.statement).toBe('OPT')
+		})
+	})
+
+	describe('redirect reference', () => {
+		it('passes a populated (Doc) redirect reference through unchanged', () => {
+			const reference = { relationTo: 'pages', value: { id: 'p1', slug: 'about' } }
+			const doc = toFormDocument({ id: 1, response: { type: 'redirect', redirect: { reference } } })
+			expect((doc.response?.redirect as { reference?: unknown })?.reference).toEqual(reference)
+		})
+
+		it('fills redirect.url from resolveRedirect only when url is empty and type is redirect', () => {
+			const resolveRedirect = (ref: { value: unknown }) =>
+				`/x/${(ref.value as { slug: string }).slug}`
+			const filled = toFormDocument(
+				{
+					id: 1,
+					response: {
+						type: 'redirect',
+						redirect: { reference: { relationTo: 'pages', value: { slug: 'about' } } },
+					},
+				},
+				{ resolveRedirect }
+			)
+			expect((filled.response?.redirect as { url?: string })?.url).toBe('/x/about')
+
+			const kept = toFormDocument(
+				{
+					id: 1,
+					response: {
+						type: 'redirect',
+						redirect: { url: '/set', reference: { relationTo: 'pages', value: { slug: 'about' } } },
+					},
+				},
+				{ resolveRedirect }
+			)
+			expect((kept.response?.redirect as { url?: string })?.url).toBe('/set')
+		})
+	})
+
 	// The asymmetry is a contract, not an accident: response is a host-extensible visitor-facing
 	// group cast wholesale; buttons and poll are allowlists so host extras and server-only members
 	// cannot leak to the client.

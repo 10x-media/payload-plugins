@@ -24,7 +24,8 @@ export const consentField = defineFormField<'boolean', ConsentConfig>({
 	type: 'consent',
 	label: keys.fieldTypeConsent,
 	value: 'boolean',
-	omitShared: ['label', 'placeholder'],
+	omitShared: ['label', 'placeholder', 'description'],
+	blockLabel: '@10x-media/form-builder/client#ConsentBlockLabel',
 	config: [
 		{
 			name: 'source',

@@ -33,7 +33,7 @@ const departments = async ({ req }: { req: PayloadRequest }): Promise<Department
 }
 
 type Row = { id: string }
-type Block = { id: string; to?: string }
+type Block = { id: string; to?: string[] }
 
 describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -133,11 +133,16 @@ describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db)
 	it('accepts an emailTeam "to" that is a known department for the acting locale', async () => {
 		const form = await makeForm('sales@example.com')
 		const actions = form.actions as Block[]
-		expect(actions[0]?.to).toBe('sales@example.com')
+		expect(actions[0]?.to).toEqual(['sales@example.com'])
 	})
 
-	it('rejects an emailTeam "to" outside the resolved departments', async () => {
-		await expect(makeForm('unknown@example.com')).rejects.toThrow()
+	it('accepts an emailTeam "to" outside the departments (free email entry)', async () => {
+		const form = await makeForm('anyone@example.com')
+		expect((form.actions as Block[])[0]?.to).toEqual(['anyone@example.com'])
+	})
+
+	it('rejects an emailTeam "to" that is neither an email nor a field token', async () => {
+		await expect(makeForm('not-an-email')).rejects.toThrow()
 	})
 
 	it('routes a de-locale submission to the de "to", independent of the run request locale', async () => {
@@ -176,8 +181,8 @@ describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db)
 			locale: 'de',
 			depth: 0,
 		})
-		expect((en.actions as Block[])[0]?.to).toBe('sales@example.com')
-		expect((de.actions as Block[])[0]?.to).toBe('vertrieb@example.de')
+		expect((en.actions as Block[])[0]?.to).toEqual(['sales@example.com'])
+		expect((de.actions as Block[])[0]?.to).toEqual(['vertrieb@example.de'])
 
 		const sendEmail = vi.fn().mockResolvedValue(undefined)
 		booted.payload.sendEmail = sendEmail as unknown as typeof booted.payload.sendEmail
@@ -224,7 +229,7 @@ describeForDb('form-builder email.departments absent', { dbs: ['mongo'] }, (db) 
 		await booted.stop()
 	})
 
-	it('registers no departments endpoint and keeps "to" a plain text field', () => {
+	it('registers no departments endpoint; the to recipient field offers no preset options', () => {
 		const endpoints = booted.payload.collections.forms?.config.endpoints
 		expect(
 			Array.isArray(endpoints) && endpoints.some((endpoint) => endpoint.path === '/:id/departments')
@@ -236,13 +241,26 @@ describeForDb('form-builder email.departments absent', { dbs: ['mongo'] }, (db) 
 			| undefined
 		const tabFields = tabsField?.tabs.flatMap((tab) => tab.fields) ?? []
 		const actionsField = tabFields.find((field) => field.name === 'actions') as
-			| { blocks?: Array<{ slug: string; fields: Array<{ name?: string; admin?: unknown }> }> }
+			| {
+					blocks?: Array<{
+						slug: string
+						fields: Array<{
+							type?: string
+							name?: string
+							fields?: Array<{ name?: string; admin?: unknown }>
+						}>
+					}>
+			  }
 			| undefined
 		const emailTeamBlock = actionsField?.blocks?.find((b) => b.slug === 'emailTeam')
-		const toField = emailTeamBlock?.fields.find((f) => f.name === 'to') as
+		const flat = (emailTeamBlock?.fields ?? []).flatMap((f) =>
+			f.type === 'row' && f.fields ? f.fields : [f]
+		)
+		// `to` is always a RecipientsSelect now; absent departments it simply carries no endpoint option.
+		const toField = flat.find((f) => f.name === 'to') as
 			| { admin?: { components?: unknown } }
 			| undefined
 		expect(toField).toBeDefined()
-		expect(toField?.admin?.components).toBeUndefined()
+		expect(toField?.admin?.components).toBeDefined()
 	})
 })

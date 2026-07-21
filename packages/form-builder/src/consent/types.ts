@@ -37,6 +37,10 @@ export type ConsentSourceEntry = {
  * cookie, or auth context) and return only that tenant's sources, so one tenant's statements are
  * never selectable, resolvable, or provable under another's. Read under `req.locale` so the
  * statement the visitor agrees to is the one they were shown.
+ *
+ * Do not thread the save's `req` into a `find({ locale: 'all' })` from within a form's save
+ * validation: it flips `req.locale` to `all` and corrupts the localized write of the document being
+ * saved. Read the settings document without the save's `req` (already-committed data, no transaction).
  */
 export type ConsentSourcesResolver = (args: {
 	req: PayloadRequest

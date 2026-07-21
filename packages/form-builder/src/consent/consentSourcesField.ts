@@ -57,6 +57,10 @@ export type ConsentSourcesFieldOptions = {
  *   },
  * })
  * ```
+ *
+ * A resolver reading its settings document must not thread the save's `req` into a `locale: 'all'`
+ * read from within a form's save validation: that flips `req.locale` to `all` and corrupts the
+ * localized write of the document being saved. It reads already-committed data, so no `req` is needed.
  */
 export const consentSourcesField = (options: ConsentSourcesFieldOptions = {}): ArrayField => {
 	const localize = options.localized !== false
@@ -86,7 +90,10 @@ export const consentSourcesField = (options: ConsentSourcesFieldOptions = {}): A
 			singular: labelForKey(keys.consentSourceSingular),
 			plural: labelForKey(keys.consentSourcePlural),
 		},
-		admin: { description: labelForKey(keys.consentSourcesFieldDescription) },
+		admin: {
+			description: labelForKey(keys.consentSourcesFieldDescription),
+			components: { RowLabel: '@10x-media/form-builder/client#ConsentSourceRowLabel' },
+		},
 		fields: [
 			{
 				name: 'name',

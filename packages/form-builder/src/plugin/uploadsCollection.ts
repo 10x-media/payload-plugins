@@ -5,8 +5,26 @@ import { buildUploadOwnerStamp, buildUploadRateLimit } from '../spam/uploadHooks
 /**
  * Uploads are bring-your-own: `false` (the default) disables file fields entirely, an object points
  * at a host-owned upload collection (created by the app with its storage adapter of choice).
+ * `mimeTypes` optionally constrains the file field's MIME picker for hosts that enforce types by other
+ * means than the collection's own `upload.mimeTypes` (which is read automatically when this is absent).
  */
-export type UploadsOption = false | { collection: string }
+export type UploadsOption = false | { collection: string; mimeTypes?: string[] }
+
+/**
+ * The MIME types the file field's picker should offer: the host upload collection's own
+ * `upload.mimeTypes`, or undefined (no constraint, so the picker keeps its full list). Read at
+ * plugin-factory time, before the field registry freezes; `attachUploadsCollection` runs too late.
+ */
+export const readUploadCollectionMimeTypes = (
+	config: Config,
+	slug: string
+): string[] | undefined => {
+	const target = config.collections?.find((collection) => collection.slug === slug)
+	const upload = target?.upload
+	return typeof upload === 'object' && Array.isArray(upload.mimeTypes)
+		? upload.mimeTypes
+		: undefined
+}
 
 /** Descends presentational rows only: an `owner` field nested in a group/tabs/collapsible is not detected, so a top-level one gets appended alongside it. */
 const hasFieldNamed = (fields: Field[], name: string): boolean =>

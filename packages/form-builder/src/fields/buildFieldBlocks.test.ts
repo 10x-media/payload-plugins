@@ -44,12 +44,16 @@ describe('buildFieldBlocks', () => {
 		])
 	})
 
-	it('gives every block a FieldBlockLabel row header keyed to its type label', () => {
+	it('gives each block a row header keyed to its type label, using the type-defined blockLabel override where set', () => {
 		for (const block of blocks) {
 			const label = block.admin?.components?.Label as
 				| { path?: string; clientProps?: { typeLabelKey?: string } }
 				| undefined
-			expect(label?.path).toBe('@10x-media/form-builder/client#FieldBlockLabel')
+			const expectedPath =
+				block.slug === 'consent'
+					? '@10x-media/form-builder/client#ConsentBlockLabel'
+					: '@10x-media/form-builder/client#FieldBlockLabel'
+			expect(label?.path).toBe(expectedPath)
 			expect(typeof label?.clientProps?.typeLabelKey).toBe('string')
 		}
 		const text = blocks.find((block) => block.slug === 'text')

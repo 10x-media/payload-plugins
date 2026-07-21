@@ -19,8 +19,8 @@ describe('consentField', () => {
 		])
 	})
 
-	it('drops the shared label and placeholder, since the statement is the visible text', () => {
-		expect(consentField.omitShared).toEqual(['label', 'placeholder'])
+	it('drops the shared label, placeholder, and description, since the statement is the visible text', () => {
+		expect(consentField.omitShared).toEqual(['label', 'placeholder', 'description'])
 	})
 
 	it('renders the source through the consent-sources endpoint select', () => {

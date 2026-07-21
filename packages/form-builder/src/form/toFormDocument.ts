@@ -19,6 +19,17 @@ export type ToFormDocumentOptions = {
 	 * consent fields render with no statement at all.
 	 */
 	consentStatements?: ConsentStatements
+	/**
+	 * Resolve an internal redirect `reference` to a same-site URL. Called only when
+	 * `response.type === 'redirect'`, a `reference` is present, and no `redirect.url` is set. Keep it
+	 * sync: operate on the already-loaded (populated) reference, since resolving a Doc to a URL is host
+	 * routing knowledge the plugin cannot supply. The result is written to `redirect.url`, so `<Form>`
+	 * navigates with no client change.
+	 */
+	resolveRedirect?: (reference: {
+		relationTo: string
+		value: number | string | object
+	}) => string | null | undefined
 }
 
 /**
@@ -52,8 +63,8 @@ const buttonSettingsOf = (form: {
  * - `flow` is stored as opaque JSON; typed as `FormFlow | undefined`
  * - `response` may be null; coerced to `undefined`, otherwise passed through wholesale, which
  *   includes `response.redirect.reference` (present only when the plugin's `redirectRelationships`
- *   option is set): read the form at `depth: 0` to get Payload's raw `{ relationTo, value }` pair
- *   rather than a populated document, since the host is the one who resolves it to a URL
+ *   option is set): `value` may be a bare id (`depth: 0`) or a populated document, and the host
+ *   resolves it to a URL either by writing `redirect.url` or by passing `options.resolveRedirect`
  * - the button labels (`submitLabel`/`prevLabel`/`nextLabel`) live at the document root now (there
  *   is no `buttons` group); the non-empty ones are reassembled into `FormDocument.buttons`
  * - `title` may be null; coerced to `undefined`
@@ -82,7 +93,7 @@ export function toFormDocument(
 			message?: unknown
 			redirect?: {
 				url?: string | null
-				reference?: { relationTo?: string | null; value?: number | string | null } | null
+				reference?: { relationTo?: string | null; value?: number | string | object | null } | null
 			} | null
 		} | null
 		submitLabel?: string | null
@@ -97,6 +108,12 @@ export function toFormDocument(
 			closesAt?: string | null
 			outcome?: { winningValues?: (string | null)[] | null } | null
 		} | null
+		/**
+		 * Consent statements resolved onto the doc by the plugin's forms `afterRead` hook (when
+		 * `consent.sources` is set), so consent renders on any fetch path (modal/client, not just RSC).
+		 * An explicit `options.consentStatements` takes precedence when both are present.
+		 */
+		consentStatements?: ConsentStatements
 	},
 	options?: ToFormDocumentOptions
 ): FormDocument {
@@ -120,14 +137,29 @@ export function toFormDocument(
 	if (options?.pollOptions) {
 		fields = applyPollOptions(fields, form.poll?.resultsField, options.pollOptions)
 	}
-	if (options?.consentStatements) {
-		fields = applyConsentStatements(fields, options.consentStatements)
+	const consentStatements = options?.consentStatements ?? form.consentStatements
+	if (consentStatements) {
+		fields = applyConsentStatements(fields, consentStatements)
+	}
+	let response = (form.response as FormResponseSettings | null | undefined) ?? undefined
+	// A host that passes `resolveRedirect` gets internal references turned into `redirect.url` (all
+	// `<Form>` navigates by), but only when the author set no explicit url. Non-mutating: clone the group.
+	if (
+		options?.resolveRedirect &&
+		response?.type === 'redirect' &&
+		response.redirect?.reference &&
+		!response.redirect.url
+	) {
+		const url = options.resolveRedirect(response.redirect.reference)
+		if (url) {
+			response = { ...response, redirect: { ...response.redirect, url } }
+		}
 	}
 	return {
 		id: form.id,
 		fields,
 		flow: form.flow as FormFlow | undefined,
-		response: (form.response as FormResponseSettings | null | undefined) ?? undefined,
+		response,
 		buttons: buttonSettingsOf(form),
 		title: form.title ?? undefined,
 		multistep: form.multistep === true,

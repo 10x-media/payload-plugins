@@ -1,5 +1,6 @@
 import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
+import { mimeAllowed } from '../../uploads/resolveFileRef'
 import type { FileRef } from '../../uploads/types'
 import { defineFormField } from '../defineFormField'
 
@@ -52,35 +53,45 @@ export const fileMimeTypeOptions = [
  * so the client renderer knows where to POST; the server never trusts it at submit time (plugin config
  * stays the source of truth). Named `uploadsCollection` because `collection` is a mongoose-reserved
  * schema pathname.
+ *
+ * `allowedMimeTypes` (the host upload collection's `upload.mimeTypes`, threaded from the plugin
+ * factory) constrains the picker's MIME options to what the collection actually accepts; omitted
+ * keeps the full list. Admin-time only: the collection and `captureFileRef` remain authoritative.
  */
-export const fileField = defineFormField<'file', FileConfig>({
-	type: 'file',
-	label: keys.fieldTypeFile,
-	value: 'file',
-	omitShared: ['placeholder'],
-	config: [
-		{ name: 'uploadsCollection', type: 'text', admin: { hidden: true } },
-		{
-			name: 'mimeTypes',
-			type: 'select',
-			hasMany: true,
-			options: fileMimeTypeOptions,
-			label: labelFor(keys.fileConfigMimeTypes),
-		},
-		{
-			name: 'maxSize',
-			type: 'number',
-			min: 0,
-			label: labelFor(keys.fileConfigMaxSize),
-			admin: {
-				components: {
-					Field: {
-						path: MAX_SIZE_REF,
-						clientProps: { descriptionKey: keys.fileConfigMaxSizeDescription },
+export const buildFileField = (allowedMimeTypes?: string[]) =>
+	defineFormField<'file', FileConfig>({
+		type: 'file',
+		label: keys.fieldTypeFile,
+		value: 'file',
+		omitShared: ['placeholder'],
+		config: [
+			{ name: 'uploadsCollection', type: 'text', admin: { hidden: true } },
+			{
+				name: 'mimeTypes',
+				type: 'select',
+				hasMany: true,
+				options: fileMimeTypeOptions.filter((option) =>
+					mimeAllowed(option.value, allowedMimeTypes)
+				),
+				label: labelFor(keys.fileConfigMimeTypes),
+			},
+			{
+				name: 'maxSize',
+				type: 'number',
+				min: 0,
+				label: labelFor(keys.fileConfigMaxSize),
+				admin: {
+					components: {
+						Field: {
+							path: MAX_SIZE_REF,
+							clientProps: { descriptionKey: keys.fileConfigMaxSizeDescription },
+						},
 					},
 				},
 			},
-		},
-	],
-	format: ({ value }) => (isFileRef(value) ? value.filename : ''),
-})
+		],
+		format: ({ value }) => (isFileRef(value) ? value.filename : ''),
+	})
+
+/** The file field with the full MIME option list, for consumers spreading a default definition. */
+export const fileField = buildFileField()

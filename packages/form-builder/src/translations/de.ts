@@ -147,12 +147,13 @@ export const de: Record<TranslationKey, string> = {
 	[keys.actionConfigCc]: 'CC',
 	[keys.actionConfigBcc]: 'BCC',
 	[keys.actionConfigReplyTo]: 'Antwort an',
+	[keys.recipientsGroupDepartments]: 'Abteilungen',
+	[keys.recipientsGroupFields]: 'Formularfelder',
+	[keys.validationRecipientInvalid]: 'Gib eine gültige E-Mail-Adresse ein.',
+	[keys.validationRecipientUnknownField]: 'Verweist auf ein nicht mehr vorhandenes Feld.',
 	[keys.validationFromUnknown]: 'Wähle eine der konfigurierten Absenderadressen',
 	[keys.validationFromUnavailable]:
 		'Absenderadressen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
-	[keys.validationToUnknown]: 'Wähle eine der konfigurierten Abteilungen',
-	[keys.validationToUnavailable]:
-		'Abteilungen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigUrlDescription]:
 		'Der Endpunkt, der für jede Übermittlung einen signierten JSON-POST erhält.',

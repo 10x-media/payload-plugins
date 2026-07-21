@@ -9,7 +9,7 @@ import {
 	useFormFields,
 } from '@payloadcms/ui'
 import { reduceFieldsToValues } from 'payload/shared'
-import { useMemo } from 'react'
+import { type CSSProperties, useMemo } from 'react'
 import { fieldNames, fieldNamesOfType } from '../fields/fieldNamesOfType'
 import type { TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -19,7 +19,7 @@ import { toStaticLabel } from './toStaticLabel'
 /** Props: standard JSON/text field client props plus the `types` allow-list we pass via clientProps. */
 export type FieldNameSelectProps = {
 	path?: string
-	field?: { label?: unknown; admin?: { description?: unknown } }
+	field?: { label?: unknown; admin?: { description?: unknown; width?: string } }
 	label?: unknown
 	/**
 	 * Sibling `fields` blocks whose `blockType` is in this list populate the select's options. Omit to
@@ -83,8 +83,12 @@ export const FieldNameSelect = (props: FieldNameSelectProps) => {
 		setValue(chosen ? (chosen.value as string) : '')
 	}
 
+	const fieldStyle = props.field?.admin?.width
+		? ({ '--field-width': props.field.admin.width } as CSSProperties)
+		: undefined
+
 	return (
-		<div className="field-type" style={{ marginBlockEnd: '1rem' }}>
+		<div className="field-type" style={{ marginBlockEnd: '1rem', ...fieldStyle }}>
 			<FieldLabel label={label} path={path} />
 			<ReactSelect
 				options={allOptions}

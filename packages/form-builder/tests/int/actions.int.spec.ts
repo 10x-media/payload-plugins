@@ -34,7 +34,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		expect(form.actions).toHaveLength(1)
 		const action = form.actions[0] as Record<string, unknown>
 		expect(action.blockType).toBe('emailTeam')
-		expect(action.to).toBe('team@x.com')
+		expect(action.to).toEqual(['team@x.com'])
 	})
 
 	it('stores multiple action blocks of different types', async () => {

@@ -10,7 +10,8 @@ type UploadDoc = {
 
 export type ResolveFileRefResult = { ok: true; ref: FileRef } | { ok: false; code: FileRefError }
 
-const mimeAllowed = (mimeType: string, allow: string[] | undefined): boolean => {
+/** Whether `mimeType` matches an `allow` list of exact strings or trailing-`*` prefix wildcards; empty allows all. */
+export const mimeAllowed = (mimeType: string, allow: string[] | undefined): boolean => {
 	if (!allow || allow.length === 0) {
 		return true
 	}

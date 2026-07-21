@@ -1,12 +1,14 @@
 import { type CollectionSlug, type Config, definePlugin } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
 import { buildDefaultActionDefinitions } from './actions/builtin'
+import type { RecipientsConfig } from './actions/emailRecipients'
 import type { FromAddressesResolver } from './actions/fromAddresses'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
 import type { ButtonsOption } from './collections/buttonFields'
 import type { ResponseOption } from './collections/redirectFields'
+import type { ConsentSnapshotMode } from './consent/captureConsent'
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import type { ConsentSourcesResolver } from './consent/types'
 import type { DepartmentEmailsResolver } from './email/departments'
@@ -16,7 +18,7 @@ import { type FieldTypesConfig, resolveFieldTypes, stashFieldTypes } from './fie
 import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
-import type { UploadsOption } from './plugin/uploadsCollection'
+import { readUploadCollectionMimeTypes, type UploadsOption } from './plugin/uploadsCollection'
 import type { OutcomeFieldsOverride } from './poll/outcomeFields'
 import type { PollTypesConfig } from './poll/pollTypeRegistry'
 import { resolvePollTypes, stashPollTypes } from './poll/pollTypeRegistry'
@@ -89,10 +91,15 @@ export type FormBuilderPluginOptions = {
 	 * lookup). Storing the resolved address, rather than a department id resolved live at send (consent's
 	 * model), is deliberate: the routing target a form was saved with stays audit-stable even if the
 	 * resolver's data later changes, so do not "fix" it into a live lookup. Multi-tenant hosts scope
-	 * which document they read by the tenant derived from `req`; absent, `to` stays a plain localized
-	 * text field.
+	 * which document they read by the tenant derived from `req`; absent, the recipient fields simply
+	 * offer no preset department options (still free-typed emails and field tokens).
 	 */
-	email?: { fromAddresses?: FromAddressesResolver; departments?: DepartmentEmailsResolver }
+	email?: {
+		fromAddresses?: FromAddressesResolver
+		departments?: DepartmentEmailsResolver
+		/** Narrows the recipient fields' behavior (free-typed emails, field tokens). See {@link RecipientsConfig}. */
+		recipients?: RecipientsConfig
+	}
 	/**
 	 * Where the consent statements a form can reference come from. Absent (the default): no sources,
 	 * so the built-in `consent` field type is not registered at all and authors cannot add a consent
@@ -107,7 +114,16 @@ export type FormBuilderPluginOptions = {
 	 * `resolveConsentStatements`) and the proof is rebuilt from the source at submit, so neither is
 	 * ever a copy the client could stale or forge.
 	 */
-	consent?: { sources: ConsentSourcesResolver }
+	consent?: {
+		sources: ConsentSourcesResolver
+		/**
+		 * What each submission snapshots of the agreed consent wording, for a versioned audit trail.
+		 * `'both'` (default) stores a `statementHash`, the plain `statementText`, and the source name;
+		 * `'hash'` keeps only the tamper-evident hash; `'text'` only the readable text; `false` keeps the
+		 * lean id-only proof. The proof stays id-based regardless; this only adds the wording snapshot.
+		 */
+		snapshot?: ConsentSnapshotMode
+	}
 	/**
 	 * Form-level button labels: `submitLabel` at the bottom of the Fields tab, `prevLabel` and
 	 * `nextLabel` in a row at the bottom of the Flow tab (shown once the flow has a step). The
@@ -223,6 +239,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const localizeContent = options.localizeContent !== false
 		const uploads = options.uploads ?? false
+		// The file field's MIME picker is constrained to what the host upload collection accepts: the
+		// explicit `uploads.mimeTypes` override, else the collection's own `upload.mimeTypes`. Read here,
+		// before the field registry freezes below (attachUploadsCollection runs too late).
+		const uploadMimeTypes =
+			uploads === false
+				? undefined
+				: (uploads.mimeTypes ?? readUploadCollectionMimeTypes(config, uploads.collection))
 		const consentSources = options.consent?.sources
 		// A built-in with nowhere to point never enters the registry, so an author is never offered a
 		// field that cannot work: file without an uploads collection has nowhere to store anything,
@@ -230,7 +253,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		// `fields.consent` definition remains a developer choice.
 		const defaultFieldDefinitions = buildDefaultFieldDefinitions(
 			localizeContent,
-			options.richText?.editor
+			options.richText?.editor,
+			uploadMimeTypes
 		).filter(
 			(definition) =>
 				(uploads !== false || definition.type !== 'file') &&
@@ -245,7 +269,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 				localizeContent,
 				options.richText?.bodyEditor ?? options.richText?.editor,
 				fromAddresses,
-				departments
+				departments,
+				options.email?.recipients
 			),
 			options.actions
 		)
@@ -269,6 +294,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			registry,
 			ruleRegistry,
 			consentSources,
+			consentSnapshot: options.consent?.snapshot ?? 'both',
 			actionRegistry,
 			richText: options.richText,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
@@ -363,7 +389,7 @@ export type {
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { applyConsentStatements } from './consent/applyConsentStatements'
-export type { ConsentProof } from './consent/captureConsent'
+export type { ConsentProof, ConsentSnapshotMode } from './consent/captureConsent'
 export { captureConsent } from './consent/captureConsent'
 export type { ConsentSourcesFieldOptions } from './consent/consentSourcesField'
 export { consentSourcesField } from './consent/consentSourcesField'

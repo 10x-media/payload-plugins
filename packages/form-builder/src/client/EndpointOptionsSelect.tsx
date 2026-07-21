@@ -9,7 +9,7 @@ import {
 	useDocumentInfo,
 	useField,
 } from '@payloadcms/ui'
-import { useEffect, useState } from 'react'
+import { type CSSProperties, useEffect, useState } from 'react'
 import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import {
@@ -23,7 +23,7 @@ import { toStaticLabel } from './toStaticLabel'
 export type EndpointOptionsSelectProps = {
 	/** The field path within the document (Payload-injected, not the endpoint path). */
 	path?: string
-	field?: { label?: unknown; admin?: { description?: unknown } }
+	field?: { label?: unknown; admin?: { description?: unknown; width?: string } }
 	label?: unknown
 	/**
 	 * Endpoint subpath under the current document's collection API route; `'poll-options'` fetches
@@ -131,8 +131,12 @@ export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
 		setValue(chosen ? (chosen.value as string) : '')
 	}
 
+	const fieldStyle = props.field?.admin?.width
+		? ({ '--field-width': props.field.admin.width } as CSSProperties)
+		: undefined
+
 	return (
-		<div className="field-type" style={{ marginBlockEnd: '1rem' }}>
+		<div className="field-type" style={{ marginBlockEnd: '1rem', ...fieldStyle }}>
 			<FieldLabel label={label} path={path} />
 			<ReactSelect
 				options={allOptions}

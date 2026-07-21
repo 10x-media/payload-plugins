@@ -219,6 +219,17 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			}
 		})
 
+		it('resolves consentStatements onto a fetched form doc, so consent renders on any read path', async () => {
+			const form = await makeForm(privacySourceId)
+			const fetched = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+			const statements = (
+				fetched as { consentStatements?: Record<string, { statement?: unknown }> }
+			).consentStatements
+			expect(statements).toBeDefined()
+			expect(Object.keys(statements ?? {})).toContain('terms')
+			expect(statements?.terms?.statement).toBeDefined()
+		})
+
 		it('refuses an anonymous request to the consent-sources endpoint', async () => {
 			const response = await callEndpoint({ user: undefined })
 			expect(response?.status).toBe(403)
@@ -276,14 +287,20 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			expect(versions.docs.map((doc) => String(doc.id))).toContain(proof.versionRef)
 		})
 
-		it('never stores the statement text, so a policy edit cannot rewrite past proofs', async () => {
+		it('snapshots the agreed wording (name, text, hash) onto the submission, never a raw statement', async () => {
 			const form = await makeForm(privacySourceId)
 			const submission = await booted.payload.create({
 				collection: 'form-submissions',
 				depth: 0,
 				data: { form: form.id, values: [{ field: 'terms', value: true }] },
 			})
-			expect(proofOf(submission).statement).toBeUndefined()
+			const proof = proofOf(submission)
+			// The wording is snapshotted for the audit trail, so it survives a later edit to the source,
+			// but never under the raw `statement` key the client could otherwise forge.
+			expect(proof.statement).toBeUndefined()
+			expect(proof.name).toBe('Privacy policy')
+			expect(proof.statementText).toBe('I agree to the privacy policy')
+			expect(proof.statementHash).toMatch(/^[a-f0-9]{64}$/)
 		})
 
 		it('records no versionRef for a versioned page whose collection has drafts off', async () => {
