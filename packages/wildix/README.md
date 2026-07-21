@@ -107,6 +107,8 @@ Many cloud PBXs have an empty hardware inventory and only softphone (WebRTC / Ze
 
 Call history uses the WMS CallHistory endpoints (not WDA). With `syncCallLogs: true`, the plugin registers a Payload job and the Sync Call Logs button. Per-user history is preferred when `wildix-users` have extensions; otherwise it falls back to org-wide history. Failures are counted per user and returned in the sync result (no 500 from a single bad extension).
 
+A `wildix-users` `extension` is the internal party on a call, so it doubles as the link between a call log and its owning user: on outbound calls the extension is the log's `fromNumber` (and on inbound calls the `toNumber`). To find the Wildix user behind a call log, look up `wildix-users` where `extension` equals the log's `fromNumber` (fallback `toNumber`).
+
 `company` / `wdaEnv` on `wildixCredentials` are kept for config compatibility but are unused by call-log sync.
 
 ### Contact matching on call logs
@@ -135,7 +137,9 @@ wildix({
 })
 ```
 
-Dial uses the WMS Call Control API and an optional SIP `deviceId` (`contact` on `wildix-devices`). Webhooks (`POST /api/wildix/webhooks`) drive the active-call store; set `webhookSecret` so `x-signature` HMAC is verified.
+Dial tries the WMS Call Control `make-call` action with an optional SIP `deviceId` (`contact` on `wildix-devices`). On PBXs without Call Control v2 (the `/api/v2/call-control/*` routes 404), dial falls back to the AMI `Originate` action, dialing a `Local/{extension}@{dialplan}` channel toward the callee. In-call actions (answer, hold, transfer, hangup) require Call Control and return a clear "not available on this PBX" error where it is absent. Webhooks (`POST /api/wildix/webhooks`) drive the active-call store; set `webhookSecret` so `x-signature` HMAC is verified.
+
+The Contact Match UI pulls its directory from `GET /api/wildix/contacts`, which reads the PBX phonebook (`GET /api/v1/Contacts/`) and emits one `{ name, phone }` per non-empty number field (phone, office, mobile, home, home_mobile, extension), cached for one hour. See [`docs/wms-api-research.md`](./docs/wms-api-research.md) for the full endpoint matrix and SDK coverage.
 
 ## Startup sync
 

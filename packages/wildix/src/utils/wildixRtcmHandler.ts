@@ -13,6 +13,7 @@ import type { WildixAccess } from './access'
 import { checkAccess } from './access'
 import { createActiveCallStore } from './activeCall'
 import { resolveWildixClient } from './resolveWildixClient'
+import { isRouteMissingError } from './wildixErrors'
 
 export type WildixRtcmAction =
 	| 'answer'
@@ -117,6 +118,20 @@ export const wildixRtcmHandler =
 			}
 		} catch (err) {
 			const detail = err instanceof Error ? err.message : String(err)
+			if (isRouteMissingError(err)) {
+				req.payload.logger.error(
+					{ detail, action, callId },
+					'[wildix:rtcm] call control unavailable on this PBX'
+				)
+				return Response.json(
+					{
+						error: `Failed to ${action}`,
+						detail:
+							'Call Control is not available on this PBX (the /api/v2/call-control routes are disabled). In-call actions (answer, hold, transfer, hangup) require it.',
+					},
+					{ status: 502 }
+				)
+			}
 			req.payload.logger.error({ detail, action, callId }, '[wildix:rtcm] call control failed')
 			return Response.json({ error: `Failed to ${action}`, detail }, { status: 502 })
 		}

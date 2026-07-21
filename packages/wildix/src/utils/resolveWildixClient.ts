@@ -4,7 +4,12 @@ import type { WildixCredentials } from '../types'
 import { buildWmsClient } from './wildixClient'
 import { tokenProviderForUser } from './wildixSyncHandlers'
 
-export type ResolvedClient = { client: WmsApiClient; userExtension?: string }
+export type ResolvedClient = {
+	client: WmsApiClient
+	userExtension?: string
+	/** Dialplan (context) of the linked user, used for the Originate dial fallback. */
+	dialplan?: string
+}
 
 type ResolveOptions = {
 	req: PayloadRequest
@@ -47,9 +52,10 @@ export const resolveWildixClient = async (
 	const { req, credentials, wildixUsersSlug } = options
 	const doc = await findLinkedUser(options)
 	const userExtension = doc?.extension as string | undefined
+	const dialplan = doc?.dialplan as string | undefined
 
 	if (credentials.authType !== 'oauth2') {
-		return { client: buildWmsClient(credentials), userExtension }
+		return { client: buildWmsClient(credentials), userExtension, dialplan }
 	}
 
 	if (!wildixUsersSlug || !doc) {
@@ -61,5 +67,27 @@ export const resolveWildixClient = async (
 		return { error: Response.json({ error: 'No Wildix account connected' }, { status: 403 }) }
 	}
 
-	return { client: buildWmsClient(credentials, provider), userExtension }
+	return { client: buildWmsClient(credentials, provider), userExtension, dialplan }
+}
+
+/**
+ * Resolves the Bearer token for a raw PBX REST call. In API-key mode this is
+ * `undefined` (callers fall back to the static key); in OAuth2 mode it is the
+ * linked user's refreshing access token.
+ */
+export const resolveWildixToken = async (
+	options: ResolveOptions
+): Promise<{ token?: string } | { error: Response }> => {
+	const { req, credentials, wildixUsersSlug } = options
+	if (credentials.authType !== 'oauth2') return {}
+
+	const doc = await findLinkedUser(options)
+	if (!wildixUsersSlug || !doc) {
+		return { error: Response.json({ error: 'No Wildix account connected' }, { status: 403 }) }
+	}
+	const provider = tokenProviderForUser({ payload: req.payload, credentials, wildixUsersSlug, doc })
+	if (!provider) {
+		return { error: Response.json({ error: 'No Wildix account connected' }, { status: 403 }) }
+	}
+	return { token: await provider.token() }
 }

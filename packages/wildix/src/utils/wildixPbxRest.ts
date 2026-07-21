@@ -204,3 +204,94 @@ export const normalizePbxSipRegistrations = (
 	}
 	return devices
 }
+
+export type PbxContactRecord = {
+	id?: string
+	name?: string
+	extension?: string
+	phone?: string
+	office?: string
+	mobile?: string
+	home?: string
+	home_mobile?: string
+}
+
+export type NormalizedContact = { name: string; phone: string }
+
+type FetchContactsOptions = {
+	credentials: WildixCredentials
+	token?: string
+	/** Page size per request; the endpoint reports `result.total` for paging. */
+	pageSize?: number
+	/** Hard cap on records fetched, to bound very large phonebooks. */
+	max?: number
+}
+
+type PbxContactsResponse = {
+	type?: string
+	result?: { total?: number; records?: PbxContactRecord[] }
+	reason?: string
+}
+
+/**
+ * Phonebook contacts. `GET /api/v1/Contacts/` (no SDK command in this version).
+ * Pages through `result.total` and returns the raw records.
+ */
+export const fetchPbxContacts = async ({
+	credentials,
+	token,
+	pageSize = 200,
+	max = 5000,
+}: FetchContactsOptions): Promise<PbxContactRecord[]> => {
+	const base = buildPbxBaseUrl(credentials)
+	const bearer = resolvePbxToken(credentials, token)
+	const records: PbxContactRecord[] = []
+	let start = 0
+	let total = Number.POSITIVE_INFINITY
+	while (start < total && records.length < max) {
+		const params = new URLSearchParams({ count: String(pageSize), start: String(start) })
+		const response = await fetch(`${base}/api/v1/Contacts/?${params}`, {
+			headers: { Authorization: `Bearer ${bearer}`, Accept: 'application/json' },
+		})
+		const body = (await response.json()) as PbxContactsResponse
+		if (!response.ok) {
+			throw new Error(
+				`Wildix PBX contacts failed: ${response.status} ${body.reason ?? JSON.stringify(body)}`
+			)
+		}
+		const page = body.result?.records ?? []
+		records.push(...page)
+		total = body.result?.total ?? records.length
+		if (page.length === 0) break
+		start += page.length
+	}
+	return records
+}
+
+const CONTACT_NUMBER_FIELDS = [
+	'phone',
+	'office',
+	'mobile',
+	'home',
+	'home_mobile',
+	'extension',
+] as const satisfies readonly (keyof PbxContactRecord)[]
+
+/**
+ * Expands contact records into `{ name, phone }` entries, one per non-empty
+ * number field, de-duplicated by phone number so a Contact Match lookup is
+ * unambiguous.
+ */
+export const normalizePbxContacts = (records: PbxContactRecord[]): NormalizedContact[] => {
+	const byPhone = new Map<string, NormalizedContact>()
+	for (const record of records) {
+		const name = record.name?.trim()
+		if (!name) continue
+		for (const field of CONTACT_NUMBER_FIELDS) {
+			const phone = record[field]?.trim()
+			if (!phone) continue
+			if (!byPhone.has(phone)) byPhone.set(phone, { name, phone })
+		}
+	}
+	return [...byPhone.values()]
+}

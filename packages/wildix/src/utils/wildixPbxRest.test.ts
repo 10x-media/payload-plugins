@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+	normalizePbxContacts,
 	normalizePbxDevice,
 	normalizePbxSipRegistration,
 	normalizePbxSipRegistrations,
@@ -93,5 +94,42 @@ describe('normalizePbxSipRegistrations', () => {
 		})
 		expect(devices).toHaveLength(2)
 		expect(devices.map((d) => d.extension).sort()).toEqual(['201', '204'])
+	})
+})
+
+describe('normalizePbxContacts', () => {
+	it('emits one entry per non-empty number field', () => {
+		const contacts = normalizePbxContacts([
+			{
+				id: '96675',
+				name: 'Administrative',
+				extension: '201',
+				office: '+596596490005',
+				phone: '',
+				mobile: '',
+			},
+		])
+		expect(contacts).toEqual([
+			{ name: 'Administrative', phone: '+596596490005' },
+			{ name: 'Administrative', phone: '201' },
+		])
+	})
+
+	it('skips records without a name', () => {
+		expect(normalizePbxContacts([{ phone: '123' }])).toEqual([])
+	})
+
+	it('de-duplicates by phone number, keeping the first name', () => {
+		const contacts = normalizePbxContacts([
+			{ name: 'First', phone: '100' },
+			{ name: 'Second', mobile: '100' },
+		])
+		expect(contacts).toEqual([{ name: 'First', phone: '100' }])
+	})
+
+	it('ignores whitespace-only number fields', () => {
+		expect(normalizePbxContacts([{ name: 'X', phone: '   ', office: '200' }])).toEqual([
+			{ name: 'X', phone: '200' },
+		])
 	})
 })

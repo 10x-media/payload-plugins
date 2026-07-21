@@ -1,0 +1,23 @@
+---
+title: Dial & call control
+description: Click-to-dial with an Originate fallback, in-call actions, and the phonebook behind the Contact Match UI.
+---
+
+## Dial
+
+`POST /api/wildix/dial` with `{ "callee": "...", "deviceId"?: "..." }`:
+
+1. **Primary**: WMS Call Control `make-call`, ringing the resolved user's device (or the SIP `deviceId`, a `contact` from `wildix-devices`) then bridging to the callee. Response `{ success: true, via: "make-call" }`.
+2. **Fallback**: if Call Control v2 is absent (the `/api/v2/call-control/*` routes 404), dial falls back to the AMI `Originate` action, dialing `Local/{extension}@{dialplan}` toward the callee. The dialplan (context) comes from the linked `wildix-users` doc, defaulting to `users`. Response `{ success: true, via: "originate" }`.
+
+Only a route-missing 404 triggers the fallback; other errors return a `502` with detail.
+
+## In-call actions (RTCM)
+
+`POST /api/wildix/rtcm` (answer, hold, hangup, transfer, attendantTransfer, dtmf) uses the WMS Call Control commands and requires Call Control v2. On PBXs without it, these return a `502` with a clear "Call Control is not available on this PBX" message. `Originate` covers dialing only, not mid-call control.
+
+## Contacts / Contact Match UI
+
+`GET /api/wildix/contacts` reads the PBX phonebook via `GET /api/v1/Contacts/` (paginated; no SDK command exists for this). It emits one `{ name, phone }` per non-empty number field (`phone`, `office`, `mobile`, `home`, `home_mobile`, `extension`), de-duplicated by number, cached in the KV store for one hour.
+
+See the plugin's `docs/wms-api-research.md` for the full SDK-vs-raw-REST matrix and verified endpoint results.
