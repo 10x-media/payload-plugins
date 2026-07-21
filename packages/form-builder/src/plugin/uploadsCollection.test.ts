@@ -1,7 +1,7 @@
 import type { CollectionConfig, Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 import type { ResolvedSpamConfig } from '../spam/types'
-import { attachUploadsCollection } from './uploadsCollection'
+import { attachUploadsCollection, readUploadCollectionMimeTypes } from './uploadsCollection'
 
 const spam = (): ResolvedSpamConfig => ({
 	honeypot: false,
@@ -99,5 +99,22 @@ describe('attachUploadsCollection', () => {
 		const config = configWith(other, media())
 		attachUploadsCollection({ config, slug: 'media', spam: false })
 		expect(config.collections?.[0]).toBe(other)
+	})
+})
+
+describe('readUploadCollectionMimeTypes', () => {
+	it('reads the upload collection mimeTypes', () => {
+		const config = configWith(media({ upload: { mimeTypes: ['image/png', 'application/pdf'] } }))
+		expect(readUploadCollectionMimeTypes(config, 'media')).toEqual(['image/png', 'application/pdf'])
+	})
+
+	it('returns undefined when upload is boolean, carries no mimeTypes, or the slug is missing', () => {
+		expect(
+			readUploadCollectionMimeTypes(configWith(media({ upload: true })), 'media')
+		).toBeUndefined()
+		expect(
+			readUploadCollectionMimeTypes(configWith(media({ upload: {} })), 'media')
+		).toBeUndefined()
+		expect(readUploadCollectionMimeTypes(configWith(media()), 'other')).toBeUndefined()
 	})
 })

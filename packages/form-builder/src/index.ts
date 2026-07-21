@@ -18,7 +18,7 @@ import { type FieldTypesConfig, resolveFieldTypes, stashFieldTypes } from './fie
 import type { CollectionOverrides } from './plugin/collectionOverrides'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
-import type { UploadsOption } from './plugin/uploadsCollection'
+import { readUploadCollectionMimeTypes, type UploadsOption } from './plugin/uploadsCollection'
 import type { OutcomeFieldsOverride } from './poll/outcomeFields'
 import type { PollTypesConfig } from './poll/pollTypeRegistry'
 import { resolvePollTypes, stashPollTypes } from './poll/pollTypeRegistry'
@@ -239,6 +239,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const localizeContent = options.localizeContent !== false
 		const uploads = options.uploads ?? false
+		// The file field's MIME picker is constrained to what the host upload collection accepts: the
+		// explicit `uploads.mimeTypes` override, else the collection's own `upload.mimeTypes`. Read here,
+		// before the field registry freezes below (attachUploadsCollection runs too late).
+		const uploadMimeTypes =
+			uploads === false
+				? undefined
+				: (uploads.mimeTypes ?? readUploadCollectionMimeTypes(config, uploads.collection))
 		const consentSources = options.consent?.sources
 		// A built-in with nowhere to point never enters the registry, so an author is never offered a
 		// field that cannot work: file without an uploads collection has nowhere to store anything,
@@ -246,7 +253,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		// `fields.consent` definition remains a developer choice.
 		const defaultFieldDefinitions = buildDefaultFieldDefinitions(
 			localizeContent,
-			options.richText?.editor
+			options.richText?.editor,
+			uploadMimeTypes
 		).filter(
 			(definition) =>
 				(uploads !== false || definition.type !== 'file') &&

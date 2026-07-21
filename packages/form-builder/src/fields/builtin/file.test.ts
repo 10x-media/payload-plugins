@@ -1,6 +1,6 @@
 import type { NumberField, SelectField } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { fileField, fileMimeTypeOptions } from './file'
+import { buildFileField, fileField, fileMimeTypeOptions } from './file'
 
 const fmt = (value: unknown) =>
 	fileField.format?.({ value: value as never, config: {}, locale: 'en', t: (k) => k })
@@ -33,11 +33,31 @@ describe('file field', () => {
 		) as SelectField
 		expect(mimeTypes.type).toBe('select')
 		expect(mimeTypes.hasMany).toBe(true)
-		expect(mimeTypes.options).toBe(fileMimeTypeOptions)
+		expect(mimeTypes.options).toEqual(fileMimeTypeOptions)
 		const values = fileMimeTypeOptions.map((option) => option.value)
 		expect(values).toContain('image/*')
 		expect(values).toContain('application/pdf')
 		expect(new Set(values).size).toBe(values.length)
+	})
+
+	const mimeOptionValues = (definition: ReturnType<typeof buildFileField>) => {
+		const field = definition.config?.find(
+			(entry) => 'name' in entry && entry.name === 'mimeTypes'
+		) as SelectField
+		return (field.options as { value: string }[]).map((option) => option.value)
+	}
+
+	it('constrains the mimeTypes picker to the host collection mimeTypes, dropping svg/av/wildcards', () => {
+		const values = mimeOptionValues(buildFileField(['image/png', 'image/jpeg', 'application/pdf']))
+		expect(values).toContain('image/png')
+		expect(values).toContain('application/pdf')
+		expect(values).not.toContain('image/svg+xml')
+		expect(values).not.toContain('image/*')
+		expect(values).not.toContain('audio/*')
+	})
+
+	it('keeps the full option list when the host declares no mimeTypes', () => {
+		expect(mimeOptionValues(buildFileField())).toEqual(fileMimeTypeOptions.map((o) => o.value))
 	})
 
 	it('keeps every mimeTypes option value within the 63-byte postgres enum label limit', () => {

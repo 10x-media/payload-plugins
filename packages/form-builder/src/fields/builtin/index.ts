@@ -5,7 +5,7 @@ import { checkboxField } from './checkbox'
 import { consentField } from './consent'
 import { dateField } from './date'
 import { emailField } from './email'
-import { fileField } from './file'
+import { buildFileField } from './file'
 import { buildMessageField } from './message'
 import { numberField } from './number'
 import { buildRepeaterField } from './repeater'
@@ -23,7 +23,8 @@ import { textareaField } from './textarea'
  */
 export const buildDefaultFieldDefinitions = (
 	localize: boolean,
-	editor?: RichTextField['editor']
+	editor?: RichTextField['editor'],
+	uploadMimeTypes?: string[]
 ): AnyFormFieldDefinition[] => [
 	textField as AnyFormFieldDefinition,
 	textareaField as AnyFormFieldDefinition,
@@ -33,7 +34,7 @@ export const buildDefaultFieldDefinitions = (
 	checkboxField as AnyFormFieldDefinition,
 	calculationField as AnyFormFieldDefinition,
 	consentField as AnyFormFieldDefinition,
-	fileField as AnyFormFieldDefinition,
+	buildFileField(uploadMimeTypes) as AnyFormFieldDefinition,
 	buildRepeaterField(localize) as AnyFormFieldDefinition,
 	dateField as AnyFormFieldDefinition,
 	buildMessageField(localize, editor) as AnyFormFieldDefinition,
