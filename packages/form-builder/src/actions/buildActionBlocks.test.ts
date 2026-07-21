@@ -11,9 +11,10 @@ describe('buildActionBlocks', () => {
 		expect(blocks.map((b) => b.slug)).toEqual(['emailTeam', 'confirmation', 'signedWebhook'])
 	})
 
-	it('sets block fields from definition.config', () => {
+	it('sets block fields from definition.config (recipient fields nest in rows)', () => {
 		const emailBlock = blocks.find((b) => b.slug === 'emailTeam')
-		const names = emailBlock?.fields.map((f) => ('name' in f ? f.name : undefined))
+		const flat = (emailBlock?.fields ?? []).flatMap((f) => (f.type === 'row' ? f.fields : [f]))
+		const names = flat.map((f) => ('name' in f ? f.name : undefined))
 		expect(names).toContain('to')
 		expect(names).toContain('subject')
 		expect(names).toContain('body')

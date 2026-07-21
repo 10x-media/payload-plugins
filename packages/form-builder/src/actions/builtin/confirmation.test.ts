@@ -320,16 +320,27 @@ describe('confirmation', () => {
 		expect(component?.clientProps?.endpoint).toBe('from-addresses')
 	})
 
-	const toFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
-		definition.config?.find((field) => 'name' in field && field.name === 'toField') as
-			| { admin?: { components?: { Field?: unknown }; description?: unknown } }
-			| undefined
+	// toField and the recipient fields live inside presentational rows; flatten to read them by name.
+	const flatFields = (definition: ReturnType<typeof buildConfirmation>) =>
+		(definition.config ?? []).flatMap((field) => (field.type === 'row' ? field.fields : [field]))
+	const fieldNamed = (definition: ReturnType<typeof buildConfirmation>, name: string) =>
+		flatFields(definition).find((field) => 'name' in field && field.name === name)
 
-	it('mounts FieldNameSelect on toField with the PII-warning description as a translation key', () => {
-		const field = toFieldOf(buildConfirmation(true))
-		const component = field?.admin?.components?.Field as
-			| { path?: string; clientProps?: { types?: string[]; descriptionKey?: string } }
+	const RECIPIENTS_REF = '@10x-media/form-builder/client#RecipientsSelect'
+
+	it('mounts FieldNameSelect on toField (50% width) with the PII-warning description as a translation key', () => {
+		const field = fieldNamed(buildConfirmation(true), 'toField') as
+			| {
+					admin?: {
+						width?: string
+						description?: unknown
+						components?: {
+							Field?: { path?: string; clientProps?: { types?: string[]; descriptionKey?: string } }
+						}
+					}
+			  }
 			| undefined
+		const component = field?.admin?.components?.Field
 		expect(component?.path).toBe('@10x-media/form-builder/client#FieldNameSelect')
 		expect(component?.clientProps?.types).toEqual(['email'])
 		// A custom Field component replaces Payload's whole default render, including the
@@ -338,24 +349,43 @@ describe('confirmation', () => {
 			'formBuilder:action.config.toFieldDescription'
 		)
 		expect(field?.admin?.description).toBeUndefined()
+		expect(field?.admin?.width).toBe('50%')
 	})
 
-	const fieldNamed = (definition: ReturnType<typeof buildConfirmation>, name: string) =>
-		definition.config?.find((field) => 'name' in field && field.name === name)
-
-	it('adds plain, localized text fields for cc, bcc, and replyTo', () => {
+	it('makes cc, bcc, and replyTo recipient fields (text hasMany, RecipientsSelect, 50% width)', () => {
 		for (const name of ['cc', 'bcc', 'replyTo']) {
-			const field = fieldNamed(buildConfirmation(true), name)
+			const field = fieldNamed(buildConfirmation(true), name) as
+				| {
+						type?: string
+						hasMany?: boolean
+						localized?: boolean
+						admin?: { width?: string; components?: { Field?: { path?: string } } }
+				  }
+				| undefined
 			expect(field?.type).toBe('text')
-			expect((field as { localized?: boolean } | undefined)?.localized).toBe(true)
+			expect(field?.hasMany).toBe(true)
+			expect(field?.localized).toBe(true)
+			expect(field?.admin?.width).toBe('50%')
+			expect(field?.admin?.components?.Field?.path).toBe(RECIPIENTS_REF)
 		}
 	})
 
 	it('drops the localized flag on cc, bcc, and replyTo when localize is false', () => {
 		for (const name of ['cc', 'bcc', 'replyTo']) {
-			const field = fieldNamed(buildConfirmation(false), name)
-			expect((field as { localized?: boolean } | undefined)?.localized).toBeUndefined()
+			const field = fieldNamed(buildConfirmation(false), name) as
+				| { localized?: boolean }
+				| undefined
+			expect(field?.localized).toBeUndefined()
 		}
+	})
+
+	it('pairs toField+replyTo and cc+bcc on rows', () => {
+		const rows = (buildConfirmation(true).config ?? []).filter(
+			(field): field is Extract<typeof field, { type: 'row' }> => field.type === 'row'
+		)
+		const rowNames = rows.map((row) => row.fields.map((f) => ('name' in f ? f.name : undefined)))
+		expect(rowNames).toContainEqual(['toField', 'replyTo'])
+		expect(rowNames).toContainEqual(['cc', 'bcc'])
 	})
 })
 

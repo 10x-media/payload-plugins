@@ -134,8 +134,6 @@ export const keys = {
 	validationRecipientUnknownField: 'formBuilder:validation.recipient.unknownField',
 	validationFromUnknown: 'formBuilder:validation.fromUnknown',
 	validationFromUnavailable: 'formBuilder:validation.fromUnavailable',
-	validationToUnknown: 'formBuilder:validation.toUnknown',
-	validationToUnavailable: 'formBuilder:validation.toUnavailable',
 	actionConfigUrl: 'formBuilder:action.config.url',
 	actionConfigUrlDescription: 'formBuilder:action.config.urlDescription',
 	actionConfigSecret: 'formBuilder:action.config.secret',

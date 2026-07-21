@@ -1,70 +1,57 @@
-import type { RichTextField, TextField } from 'payload'
+import type { RichTextField } from 'payload'
 import type { DepartmentEmailsResolver } from '../../email/departments'
-import { buildToField } from '../../email/departments'
 import { localizedIf } from '../../fields/localizedIf'
 import { interpolate } from '../../recall/interpolate'
 import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
 import { resolverFor } from '../body/serializeBody'
 import { defineAction } from '../defineAction'
+import { buildRecipientField, type RecipientsConfig, resolveRecipients } from '../emailRecipients'
 import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
 
 type EmailTeamConfig = {
-	to?: string
+	to?: string[]
 	from?: string
-	cc?: string
-	bcc?: string
-	replyTo?: string
+	cc?: string[]
+	bcc?: string[]
+	replyTo?: string[]
 	subject?: string
 	body?: unknown
 }
 
 /**
- * `subject` and `body` are email content and follow `localize`; `from` is an address that never
- * does. `to` is localized (following `localize`): a submission's locale selects the stored `to` at
- * send, so a German submission routes to the German address. `cc`, `bcc`, and `replyTo` follow the
- * same localized-address posture as `to`, each interpolated the same as `subject` so `{{field}}`
- * merge tags work; a comma-separated list is forwarded as-is, since `payload.sendEmail`
- * (nodemailer) accepts one directly. `editor` overrides the body field's Lexical/richText editor
- * (from the plugin's `richText.editor` option). `fromAddresses`, when given (the plugin's
- * `email.fromAddresses` option), adds a `from` select sourced from the host resolver; absent, no
- * `from` field exists and every send uses the email adapter's default sender. `departments`, when
- * given (the plugin's `email.departments` option), turns `to` into a select whose options are the
- * host's resolved departments; absent, `to` stays a plain (localized) text field.
+ * `to`, `replyTo`, `cc`, and `bcc` are recipient lists (`RecipientsSelect`, stored as `string[]`):
+ * each entry is a literal email, a picked department address (when `departments` is set its options
+ * back the select), or a `{{field}}` token resolved from the submission at send. `from` is a single
+ * address that never localizes, added only when `fromAddresses` is set. `subject` and `body` are email
+ * content; `editor` overrides the body's richText editor. `recipients` narrows the recipient fields'
+ * behavior (free-typed emails, field tokens). Content and recipient fields carry `localized: true`
+ * when `localize` is true. At send, every recipient list is interpolated, empties dropped, and joined
+ * into the comma-separated string `payload.sendEmail` (nodemailer) accepts.
  */
-// biome-ignore lint/complexity/useMaxParams: positional args mirror the fromAddresses threading (localize, editor, fromAddresses, departments)
+// biome-ignore lint/complexity/useMaxParams: positional args thread plugin options (localize, editor, fromAddresses, departments, recipients)
 export const buildEmailTeam = (
 	localize: boolean,
 	editor?: RichTextField['editor'],
 	fromAddresses?: FromAddressesResolver,
-	departments?: DepartmentEmailsResolver
+	departments?: DepartmentEmailsResolver,
+	recipients?: RecipientsConfig
 ) => {
-	const toField: TextField = departments
-		? buildToField(departments, localize)
-		: { name: 'to', type: 'text', label: labelFor(keys.actionConfigTo), ...localizedIf(localize) }
+	const endpoint = departments ? 'departments' : undefined
+	const recip = (name: string, labelKey: string) =>
+		buildRecipientField(name, labelKey, localize, { endpoint, recipients, width: '50%' })
 	return defineAction<EmailTeamConfig>({
 		type: 'emailTeam',
 		label: keys.actionEmailTeam,
 		config: [
-			toField,
+			{
+				type: 'row',
+				fields: [recip('to', keys.actionConfigTo), recip('replyTo', keys.actionConfigReplyTo)],
+			},
 			...(fromAddresses ? [buildFromField(fromAddresses)] : []),
 			{
-				name: 'cc',
-				type: 'text',
-				label: labelFor(keys.actionConfigCc),
-				...localizedIf(localize),
-			},
-			{
-				name: 'bcc',
-				type: 'text',
-				label: labelFor(keys.actionConfigBcc),
-				...localizedIf(localize),
-			},
-			{
-				name: 'replyTo',
-				type: 'text',
-				label: labelFor(keys.actionConfigReplyTo),
-				...localizedIf(localize),
+				type: 'row',
+				fields: [recip('cc', keys.actionConfigCc), recip('bcc', keys.actionConfigBcc)],
 			},
 			{
 				name: 'subject',
@@ -84,29 +71,32 @@ export const buildEmailTeam = (
 		run: async (args) => {
 			const { config, values, payload, renderBody } = args
 
-			if (!config.to) {
+			const resolve = resolverFor(values)
+			const to = resolveRecipients(config.to, resolve)
+			if (!to) {
 				throw new Error('emailTeam: missing "to" address')
 			}
-
 			if (typeof payload.sendEmail !== 'function') {
 				throw new Error('emailTeam: no email adapter configured')
 			}
 
-			const resolve = resolverFor(values)
 			const subject = interpolate(config.subject ?? '', resolve)
 			const html = await renderBody(config.body)
+			const cc = resolveRecipients(config.cc, resolve)
+			const bcc = resolveRecipients(config.bcc, resolve)
+			const replyTo = resolveRecipients(config.replyTo, resolve)
 
 			// `from` was validated at save time against `fromAddresses(req)`; not re-checked here
 			// (the job's `req` may differ from the authoring admin's, and the config is
 			// admin-authored, not visitor-controlled), so the stored value is forwarded verbatim.
 			await payload.sendEmail({
-				to: config.to,
+				to,
 				subject,
 				html,
 				...(config.from ? { from: config.from } : {}),
-				...(config.cc ? { cc: interpolate(config.cc, resolve) } : {}),
-				...(config.bcc ? { bcc: interpolate(config.bcc, resolve) } : {}),
-				...(config.replyTo ? { replyTo: interpolate(config.replyTo, resolve) } : {}),
+				...(cc ? { cc } : {}),
+				...(bcc ? { bcc } : {}),
+				...(replyTo ? { replyTo } : {}),
 			})
 		},
 	})

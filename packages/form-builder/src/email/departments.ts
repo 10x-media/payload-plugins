@@ -1,81 +1,20 @@
-import type { Payload, PayloadRequest, TextField } from 'payload'
-import { localizedIf } from '../fields/localizedIf'
-import { keys } from '../translations/keys'
-import { asTranslate, labelFor } from '../translations/server'
+import type { Payload, PayloadRequest } from 'payload'
 
-/** One selectable department for the `emailTeam` action; `value` is the email address routed to. */
+/** One selectable department for the `emailTeam` recipients; `value` is the email address routed to. */
 export type DepartmentOption = { label: string; value: string }
 
 /**
- * Host seam resolving the selectable departments for `emailTeam`'s `to` (plugin option
+ * Host seam resolving the selectable departments for `emailTeam`'s recipient fields (plugin option
  * `email.departments`). Req-scoped, so multi-tenant hosts derive tenant scoping from `req` (host
  * header, cookie, or auth context) and return only that tenant's departments. `value` is the literal
- * string `payload.sendEmail` accepts as `to` (an email address); `label` is how the department is
- * named in the admin select. Mirrors {@link FromAddressesResolver}. {@link resolveDepartmentOptions}
- * builds this from a `departmentsField()`-bearing document with the reusable locale fallback, so a
- * host does not reimplement it.
+ * string `payload.sendEmail` accepts (an email address); `label` is how the department is named in the
+ * admin select. Mirrors {@link FromAddressesResolver}. {@link resolveDepartmentOptions} builds this
+ * from a `departmentsField()`-bearing document with the reusable locale fallback, so a host does not
+ * reimplement it.
  */
 export type DepartmentEmailsResolver = (args: {
 	req: PayloadRequest
 }) => Promise<DepartmentOption[]> | DepartmentOption[]
-
-const TO_FIELD_REF = '@10x-media/form-builder/client#EndpointOptionsSelect'
-
-/**
- * Validate for the `to` field, closed over the host resolver (mirrors `validateFromField`): unset is
- * fine, otherwise the value must be one of the resolver's options for this request. A throwing
- * resolver fails closed with a translated message rather than surfacing a raw error on save.
- *
- * Payload runs this on every save, not only when `to` changed, so while the resolver is down no form
- * carrying an email-team action with a `to` set can be saved at all, including edits that never touch
- * the address. That is the deliberate trade: failing open would persist a routing target the host can
- * no longer vouch for. A resolver reaching a flaky upstream should cache or fall back internally
- * rather than throw.
- */
-export const validateToField =
-	(resolver: DepartmentEmailsResolver) =>
-	async (value: unknown, { req }: { req: PayloadRequest }): Promise<string | true> => {
-		if (typeof value !== 'string' || value.length === 0) {
-			return true
-		}
-		let options: DepartmentOption[]
-		try {
-			options = await resolver({ req })
-		} catch {
-			return asTranslate(req.t)(keys.validationToUnavailable)
-		}
-		return options.some((option) => option.value === value)
-			? true
-			: asTranslate(req.t)(keys.validationToUnknown)
-	}
-
-/**
- * The `emailTeam` `to` select when `email.departments` is set: an `EndpointOptionsSelect` backed by
- * the forms collection's `/:id/departments` endpoint (registered only then). Localized (following
- * `localizeContent`), so each admin locale stores its own resolved department address and the
- * submission's locale selects the stored `to` at send. Mirrors `buildFromField`; the route's document
- * id goes unused server-side (the option set is request-scoped, not per-form).
- */
-export const buildToField = (
-	resolver: DepartmentEmailsResolver,
-	localizeContent: boolean
-): TextField => ({
-	name: 'to',
-	type: 'text',
-	label: labelFor(keys.actionConfigTo),
-	validate: validateToField(resolver),
-	...localizedIf(localizeContent),
-	admin: {
-		components: {
-			Field: {
-				path: TO_FIELD_REF,
-				clientProps: {
-					endpoint: 'departments',
-				},
-			},
-		},
-	},
-})
 
 export type ResolveDepartmentsRequestArgs = {
 	/** Whether the caller is authenticated (an admin/user). */
@@ -90,10 +29,10 @@ export type ResolveDepartmentsRequestResult = {
 }
 
 /**
- * Authorize and resolve the `GET /:id/departments` request backing the `to` select: authenticated
+ * Authorize and resolve the `GET /:id/departments` request backing the recipient selects: authenticated
  * callers get the host resolver's current options for this request; anonymous callers are always
- * refused. The route id is unused (see `buildToField`). Statuses mirror `resolveFromAddressesRequest`:
- * 403 unauthenticated, 503 when the resolver throws (fail closed).
+ * refused. The route id is unused (the option set is request-scoped, not per-form). Statuses mirror
+ * `resolveFromAddressesRequest`: 403 unauthenticated, 503 when the resolver throws (fail closed).
  */
 export const resolveDepartmentsRequest = async (
 	args: ResolveDepartmentsRequestArgs
@@ -163,9 +102,9 @@ export type ResolveDepartmentOptionsArgs = {
 }
 
 /**
- * Build the `emailTeam` `to` options from a `departmentsField()`-bearing document (a settings global,
- * a tenants row, wherever the host placed it), fetched at `locale: 'all'`. Each row's `label` and
- * `email` are resolved for `req.locale` via the current -> default -> next-available chain (see
+ * Build the `emailTeam` recipient options from a `departmentsField()`-bearing document (a settings
+ * global, a tenants row, wherever the host placed it), fetched at `locale: 'all'`. Each row's `label`
+ * and `email` are resolved for `req.locale` via the current -> default -> next-available chain (see
  * {@link pickLocaleValue}), reading `defaultLocale`/`localeCodes` from `payload.config.localization`
  * (a bare string is used as-is when localization is disabled). Rows with no resolvable email are
  * dropped; a row's label is resolved independently of its email and falls back to the email when

@@ -147,8 +147,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.validationFromUnknown]: 'Choose one of the configured from addresses',
 	[keys.validationFromUnavailable]:
 		'From addresses are currently unavailable. Please try again later.',
-	[keys.validationToUnknown]: 'Choose one of the configured departments',
-	[keys.validationToUnavailable]: 'Departments are currently unavailable. Please try again later.',
 	[keys.actionConfigUrl]: 'URL',
 	[keys.actionConfigUrlDescription]:
 		'The endpoint that receives a signed JSON POST for each submission.',

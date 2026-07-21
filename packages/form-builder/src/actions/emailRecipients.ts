@@ -1,8 +1,9 @@
-import type { PayloadRequest } from 'payload'
+import type { PayloadRequest, TextField } from 'payload'
 import { fieldNames, fieldNamesOfType } from '../fields/fieldNamesOfType'
+import { localizedIf } from '../fields/localizedIf'
 import { interpolate } from '../recall/interpolate'
 import { keys } from '../translations/keys'
-import { asTranslate } from '../translations/server'
+import { asTranslate, labelFor } from '../translations/server'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const TOKEN_RE = /^\{\{\s*([\w.-]+)\s*\}\}$/
@@ -69,3 +70,51 @@ export const validateRecipients =
 		}
 		return true
 	}
+
+/** Host-configurable behavior for the recipient fields (plugin option `email.recipients`). */
+export type RecipientsConfig = {
+	/** Allow free-typed emails (default true). */
+	allowCustom?: boolean
+	/** Offer the form's own fields as recipient tokens (default true). */
+	fieldTokens?: boolean
+	/** Field types eligible as tokens (default `['email']`). */
+	tokenFieldTypes?: string[]
+}
+
+const RECIPIENTS_FIELD_REF = '@10x-media/form-builder/client#RecipientsSelect'
+
+/**
+ * A `text hasMany` field rendered by `RecipientsSelect`, used for every email address list. `endpoint`
+ * (when set) supplies preset options (e.g. the host's departments); `recipients` narrows the field's
+ * behavior; `width` sets `admin.width` so a pair can share a row.
+ */
+// biome-ignore lint/complexity/useMaxParams: the field identity (name, label, localize) plus its grouped options is the minimal surface
+export const buildRecipientField = (
+	name: string,
+	labelKey: string,
+	localize: boolean,
+	opts: { endpoint?: string; recipients?: RecipientsConfig; width?: string } = {}
+): TextField => ({
+	name,
+	type: 'text',
+	hasMany: true,
+	label: labelFor(labelKey),
+	validate: validateRecipients(opts.recipients?.tokenFieldTypes ?? ['email']),
+	...localizedIf(localize),
+	admin: {
+		...(opts.width ? { width: opts.width } : {}),
+		components: {
+			Field: {
+				path: RECIPIENTS_FIELD_REF,
+				clientProps: {
+					...(opts.endpoint ? { endpoint: opts.endpoint } : {}),
+					...(opts.recipients?.allowCustom === false ? { allowCustom: false } : {}),
+					...(opts.recipients?.fieldTokens === false ? { fieldTokens: false } : {}),
+					...(opts.recipients?.tokenFieldTypes
+						? { tokenFieldTypes: opts.recipients.tokenFieldTypes }
+						: {}),
+				},
+			},
+		},
+	},
+})

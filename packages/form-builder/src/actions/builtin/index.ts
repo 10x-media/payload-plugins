@@ -1,6 +1,7 @@
 import type { RichTextField } from 'payload'
 import type { DepartmentEmailsResolver } from '../../email/departments'
 import type { AnyActionDefinition } from '../defineAction'
+import type { RecipientsConfig } from '../emailRecipients'
 import type { FromAddressesResolver } from '../fromAddresses'
 import { buildConfirmation } from './confirmation'
 import { buildEmailTeam } from './emailTeam'
@@ -15,15 +16,28 @@ import { signedWebhook } from './signedWebhook'
  * given (the plugin's `email.departments` option), turns the `emailTeam` `to` into a select over the
  * host's resolved departments. `signedWebhook` has no content fields and is shared static.
  */
-// biome-ignore lint/complexity/useMaxParams: positional args thread the plugin editor and email resolvers (localize, editor, fromAddresses, departments)
+// biome-ignore lint/complexity/useMaxParams: positional args thread the plugin editor and email options (localize, editor, fromAddresses, departments, recipients)
 export const buildDefaultActionDefinitions = (
 	localize: boolean,
 	editor?: RichTextField['editor'],
 	fromAddresses?: FromAddressesResolver,
-	departments?: DepartmentEmailsResolver
+	departments?: DepartmentEmailsResolver,
+	recipients?: RecipientsConfig
 ): Record<string, AnyActionDefinition> => ({
-	emailTeam: buildEmailTeam(localize, editor, fromAddresses, departments) as AnyActionDefinition,
-	confirmation: buildConfirmation(localize, editor, fromAddresses) as AnyActionDefinition,
+	emailTeam: buildEmailTeam(
+		localize,
+		editor,
+		fromAddresses,
+		departments,
+		recipients
+	) as AnyActionDefinition,
+	confirmation: buildConfirmation(
+		localize,
+		editor,
+		fromAddresses,
+		departments,
+		recipients
+	) as AnyActionDefinition,
 	signedWebhook: signedWebhook as AnyActionDefinition,
 })
 

@@ -735,7 +735,7 @@ export const buildFormsCollection = ({
 				]
 			: []),
 		// Same request-scoped, id-unused shape as from-addresses: registered doc-scoped only so the
-		// admin `to` select can reuse EndpointOptionsSelect unmodified (see buildToField).
+		// recipient selects can fetch it (see RecipientsSelect / buildRecipientField).
 		...(departments
 			? [
 					{

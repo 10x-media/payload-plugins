@@ -1,6 +1,7 @@
 import { type CollectionSlug, type Config, definePlugin } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
 import { buildDefaultActionDefinitions } from './actions/builtin'
+import type { RecipientsConfig } from './actions/emailRecipients'
 import type { FromAddressesResolver } from './actions/fromAddresses'
 import type { ActionsConfig } from './actions/registry'
 import { resolveActions } from './actions/registry'
@@ -89,10 +90,15 @@ export type FormBuilderPluginOptions = {
 	 * lookup). Storing the resolved address, rather than a department id resolved live at send (consent's
 	 * model), is deliberate: the routing target a form was saved with stays audit-stable even if the
 	 * resolver's data later changes, so do not "fix" it into a live lookup. Multi-tenant hosts scope
-	 * which document they read by the tenant derived from `req`; absent, `to` stays a plain localized
-	 * text field.
+	 * which document they read by the tenant derived from `req`; absent, the recipient fields simply
+	 * offer no preset department options (still free-typed emails and field tokens).
 	 */
-	email?: { fromAddresses?: FromAddressesResolver; departments?: DepartmentEmailsResolver }
+	email?: {
+		fromAddresses?: FromAddressesResolver
+		departments?: DepartmentEmailsResolver
+		/** Narrows the recipient fields' behavior (free-typed emails, field tokens). See {@link RecipientsConfig}. */
+		recipients?: RecipientsConfig
+	}
 	/**
 	 * Where the consent statements a form can reference come from. Absent (the default): no sources,
 	 * so the built-in `consent` field type is not registered at all and authors cannot add a consent
@@ -245,7 +251,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 				localizeContent,
 				options.richText?.bodyEditor ?? options.richText?.editor,
 				fromAddresses,
-				departments
+				departments,
+				options.email?.recipients
 			),
 			options.actions
 		)
