@@ -8,6 +8,7 @@ import { resolveActions } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
 import type { ButtonsOption } from './collections/buttonFields'
 import type { ResponseOption } from './collections/redirectFields'
+import type { ConsentSnapshotMode } from './consent/captureConsent'
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import type { ConsentSourcesResolver } from './consent/types'
 import type { DepartmentEmailsResolver } from './email/departments'
@@ -113,7 +114,16 @@ export type FormBuilderPluginOptions = {
 	 * `resolveConsentStatements`) and the proof is rebuilt from the source at submit, so neither is
 	 * ever a copy the client could stale or forge.
 	 */
-	consent?: { sources: ConsentSourcesResolver }
+	consent?: {
+		sources: ConsentSourcesResolver
+		/**
+		 * What each submission snapshots of the agreed consent wording, for a versioned audit trail.
+		 * `'both'` (default) stores a `statementHash`, the plain `statementText`, and the source name;
+		 * `'hash'` keeps only the tamper-evident hash; `'text'` only the readable text; `false` keeps the
+		 * lean id-only proof. The proof stays id-based regardless; this only adds the wording snapshot.
+		 */
+		snapshot?: ConsentSnapshotMode
+	}
 	/**
 	 * Form-level button labels: `submitLabel` at the bottom of the Fields tab, `prevLabel` and
 	 * `nextLabel` in a row at the bottom of the Flow tab (shown once the flow has a step). The
@@ -276,6 +286,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			registry,
 			ruleRegistry,
 			consentSources,
+			consentSnapshot: options.consent?.snapshot ?? 'both',
 			actionRegistry,
 			richText: options.richText,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
@@ -370,7 +381,7 @@ export type {
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { applyConsentStatements } from './consent/applyConsentStatements'
-export type { ConsentProof } from './consent/captureConsent'
+export type { ConsentProof, ConsentSnapshotMode } from './consent/captureConsent'
 export { captureConsent } from './consent/captureConsent'
 export type { ConsentSourcesFieldOptions } from './consent/consentSourcesField'
 export { consentSourcesField } from './consent/consentSourcesField'

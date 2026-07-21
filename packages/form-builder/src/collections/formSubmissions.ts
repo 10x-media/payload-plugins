@@ -3,6 +3,7 @@ import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
+import type { ConsentSnapshotMode } from '../consent/captureConsent'
 import type { ConsentSourcesResolver } from '../consent/types'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
@@ -26,6 +27,8 @@ type BuildSubmissionsCollectionArgs = {
 	ruleRegistry: ValidationRuleRegistry
 	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
 	consentSources?: ConsentSourcesResolver
+	/** What each consent proof snapshots of the agreed wording (plugin option `consent.snapshot`). */
+	consentSnapshot?: ConsentSnapshotMode
 	actionRegistry?: ActionRegistry
 	events?: FormEventSink
 	/** Whether a job runner is likely present; gates the queued vs bounded-inline dispatch path. */
@@ -167,6 +170,7 @@ export const buildSubmissionsCollection = ({
 	registry,
 	ruleRegistry,
 	consentSources,
+	consentSnapshot,
 	actionRegistry = new Map(),
 	events,
 	hasRunner = false,
@@ -240,6 +244,7 @@ export const buildSubmissionsCollection = ({
 					registry,
 					ruleRegistry,
 					consentSources,
+					consentSnapshot,
 					uploadSlug,
 					pollSourceRegistry,
 				}),

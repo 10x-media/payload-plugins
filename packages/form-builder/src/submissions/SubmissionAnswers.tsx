@@ -18,7 +18,10 @@ const registry = buildRegistry(defaultFieldDefinitions)
 type ConsentEntry = {
 	field: string
 	agreed: boolean
-	ref?: string
+	/** The consent source's name at submit time (see `ConsentProof.name`). */
+	name?: string
+	/** The plain-text snapshot of the wording agreed to (see `ConsentProof.statementText`). */
+	statementText?: string
 	versionRef?: string
 	at: string
 }

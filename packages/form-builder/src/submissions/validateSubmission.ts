@@ -1,6 +1,7 @@
 import { APIError, type CollectionBeforeValidateHook, ValidationError } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
+import type { ConsentSnapshotMode } from '../consent/captureConsent'
 import { resolveConsentEntries } from '../consent/resolveConsentEntries'
 import type { ConsentSourceEntry, ConsentSourcesResolver } from '../consent/types'
 import type { FieldTypeRegistry } from '../fields/registry'
@@ -22,6 +23,8 @@ export type ValidateSubmissionArgs = {
 	ruleRegistry: ValidationRuleRegistry
 	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
 	consentSources?: ConsentSourcesResolver
+	/** What each consent proof snapshots of the agreed wording (plugin option `consent.snapshot`). */
+	consentSnapshot?: ConsentSnapshotMode
 	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
 	uploadSlug?: string
 	/** Registered poll option sources; a form's configured `optionSource` resolves through this at validation time. */
@@ -41,6 +44,7 @@ export const validateSubmission =
 		registry,
 		ruleRegistry,
 		consentSources,
+		consentSnapshot,
 		uploadSlug,
 		pollSourceRegistry,
 	}: ValidateSubmissionArgs): CollectionBeforeValidateHook =>
@@ -151,6 +155,7 @@ export const validateSubmission =
 			registry,
 			ruleRegistry,
 			consentEntries,
+			consentSnapshot,
 			locale,
 			t,
 			operation: 'create',

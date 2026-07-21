@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { FormFieldInstance } from '../submissions/types'
-import { captureConsent } from './captureConsent'
+import { type ConsentSnapshotMode, captureConsent } from './captureConsent'
 import type { ConsentSourceEntry } from './types'
 
 const NOW = '2024-05-05T10:00:00.000Z'
@@ -46,6 +46,7 @@ describe('captureConsent', () => {
 		expect(proof).toEqual({
 			agreed: true,
 			source: 'privacy',
+			name: 'Privacy',
 			page: { relationTo: 'pages', id: 'page-1' },
 			versionRef: 'v-9',
 			at: NOW,
@@ -64,6 +65,7 @@ describe('captureConsent', () => {
 		expect(proof).toEqual({
 			agreed: true,
 			source: 'notice',
+			name: 'Notice',
 			page: { relationTo: 'notices', id: 7 },
 			at: NOW,
 		})
@@ -118,7 +120,7 @@ describe('captureConsent', () => {
 			payload: makePayload({ pages: { drafts: true } }),
 			now: NOW,
 		})
-		expect(proof).toEqual({ agreed: false, source: 'marketing', at: NOW })
+		expect(proof).toEqual({ agreed: false, source: 'marketing', name: 'Marketing', at: NOW })
 	})
 
 	it('records a refusal rather than dropping the proof', async () => {
@@ -155,15 +157,52 @@ describe('captureConsent', () => {
 		expect(proof).toEqual({ agreed: true, source: 'deleted', at: NOW })
 	})
 
-	it('never stores the statement text, so a policy edit cannot rewrite past proofs', async () => {
-		const proof = await captureConsent({
-			field: field('privacy'),
-			agreed: true,
-			entries: [{ ...privacy, statement: { root: { children: [] } } }],
-			payload: makePayload({ pages: { drafts: true } }),
-			now: NOW,
+	describe('wording snapshot', () => {
+		const withStatement: ConsentSourceEntry = {
+			...privacy,
+			statement: { root: { children: [{ children: [{ text: 'I agree' }] }] } },
+		}
+		const capture = (snapshot?: ConsentSnapshotMode, agreed = true) =>
+			captureConsent({
+				field: field('privacy'),
+				agreed,
+				entries: [withStatement],
+				payload: makePayload({ pages: { drafts: false } }),
+				now: NOW,
+				snapshot,
+			})
+
+		it('snapshots the hash, text, and source name by default (both)', async () => {
+			const proof = await capture()
+			expect(proof.name).toBe('Privacy')
+			expect(proof.statementText).toBe('I agree')
+			expect(proof.statementHash).toMatch(/^[a-f0-9]{64}$/)
 		})
-		expect(proof).not.toHaveProperty('statement')
+
+		it('captures the snapshot even on a refusal', async () => {
+			const proof = await capture('both', false)
+			expect(proof.agreed).toBe(false)
+			expect(proof.statementHash).toBeDefined()
+			expect(proof.statementText).toBe('I agree')
+		})
+
+		it('hash mode omits the text; text mode omits the hash; false omits both', async () => {
+			const hash = await capture('hash')
+			expect(hash.statementHash).toBeDefined()
+			expect(hash.statementText).toBeUndefined()
+			const text = await capture('text')
+			expect(text.statementText).toBe('I agree')
+			expect(text.statementHash).toBeUndefined()
+			const off = await capture(false)
+			expect(off.statementHash).toBeUndefined()
+			expect(off.statementText).toBeUndefined()
+			expect(off.name).toBeUndefined()
+		})
+
+		it('stores the wording under statementText/Hash, never a raw `statement` key', async () => {
+			const proof = await capture()
+			expect(proof).not.toHaveProperty('statement')
+		})
 	})
 
 	it('records no versionRef when the page names a collection the config does not have', async () => {

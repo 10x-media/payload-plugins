@@ -8,6 +8,7 @@ import type { ButtonsOption } from '../collections/buttonFields'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
 import type { ResponseOption } from '../collections/redirectFields'
+import type { ConsentSnapshotMode } from '../consent/captureConsent'
 import type { ConsentSourcesResolver } from '../consent/types'
 import type { DepartmentEmailsResolver } from '../email/departments'
 import type { FormEventSink } from '../events/types'
@@ -26,6 +27,7 @@ type RegisterCollectionsArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
 	consentSources?: ConsentSourcesResolver
+	consentSnapshot?: ConsentSnapshotMode
 	actionRegistry: ActionRegistry
 	richText?: RichTextBodyOption
 	hasJobsPlugin: boolean
@@ -55,6 +57,7 @@ export const registerCollections = ({
 	registry,
 	ruleRegistry,
 	consentSources,
+	consentSnapshot,
 	actionRegistry,
 	richText,
 	hasJobsPlugin,
@@ -94,6 +97,7 @@ export const registerCollections = ({
 			registry,
 			ruleRegistry,
 			consentSources,
+			consentSnapshot,
 			actionRegistry,
 			richText,
 			events,

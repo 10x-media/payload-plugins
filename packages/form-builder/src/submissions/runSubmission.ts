@@ -1,7 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
-import type { ConsentProof } from '../consent/captureConsent'
+import type { ConsentProof, ConsentSnapshotMode } from '../consent/captureConsent'
 import { captureConsent } from '../consent/captureConsent'
 import type { ConsentSourceEntry } from '../consent/types'
 import { isNamedField } from '../fields/fieldKey'
@@ -115,6 +115,8 @@ export type RunSubmissionInput = {
 	 * resolver and how a failure surfaces) and read here to build each consent proof.
 	 */
 	consentEntries?: ConsentSourceEntry[]
+	/** What each consent proof snapshots of the agreed wording (plugin option `consent.snapshot`). */
+	consentSnapshot?: ConsentSnapshotMode
 	locale: string
 	t: Translate
 	operation: 'create' | 'update'
@@ -157,6 +159,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		registry,
 		ruleRegistry,
 		consentEntries,
+		consentSnapshot,
 		locale,
 		t,
 		operation,
@@ -315,6 +318,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 				payload,
 				req,
 				now,
+				snapshot: consentSnapshot,
 			})
 			consentProofs.push({ field: instance.name, ...proof })
 			continue
