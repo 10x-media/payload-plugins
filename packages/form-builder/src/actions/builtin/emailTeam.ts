@@ -39,7 +39,12 @@ export const buildEmailTeam = (
 ) => {
 	const endpoint = departments ? 'departments' : undefined
 	const recip = (name: string, labelKey: string) =>
-		buildRecipientField(name, labelKey, localize, { endpoint, recipients, width: '50%' })
+		buildRecipientField(name, labelKey, localize, {
+			endpoint,
+			recipients,
+			width: '50%',
+			departments,
+		})
 	return defineAction<EmailTeamConfig>({
 		type: 'emailTeam',
 		label: keys.actionEmailTeam,

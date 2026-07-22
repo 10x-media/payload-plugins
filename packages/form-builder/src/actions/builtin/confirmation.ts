@@ -58,7 +58,12 @@ export const buildConfirmation = (
 ) => {
 	const endpoint = departments ? 'departments' : undefined
 	const recip = (name: string, labelKey: string) =>
-		buildRecipientField(name, labelKey, localize, { endpoint, recipients, width: '50%' })
+		buildRecipientField(name, labelKey, localize, {
+			endpoint,
+			recipients,
+			width: '50%',
+			departments,
+		})
 	const toField: Field = {
 		name: 'toField',
 		type: 'text',
