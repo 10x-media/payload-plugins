@@ -132,6 +132,8 @@ export const keys = {
 	recipientsGroupFields: 'formBuilder:recipients.group.fields',
 	validationRecipientInvalid: 'formBuilder:validation.recipient.invalid',
 	validationRecipientUnknownField: 'formBuilder:validation.recipient.unknownField',
+	validationRecipientNotAllowed: 'formBuilder:validation.recipient.notAllowed',
+	validationRecipientOptionsUnavailable: 'formBuilder:validation.recipient.optionsUnavailable',
 	validationFromUnknown: 'formBuilder:validation.fromUnknown',
 	validationFromUnavailable: 'formBuilder:validation.fromUnavailable',
 	actionConfigUrl: 'formBuilder:action.config.url',

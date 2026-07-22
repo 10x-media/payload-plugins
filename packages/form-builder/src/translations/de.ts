@@ -151,6 +151,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.recipientsGroupFields]: 'Formularfelder',
 	[keys.validationRecipientInvalid]: 'Gib eine gültige E-Mail-Adresse ein.',
 	[keys.validationRecipientUnknownField]: 'Verweist auf ein nicht mehr vorhandenes Feld.',
+	[keys.validationRecipientNotAllowed]: 'Dieser Empfänger steht nicht auf der zulässigen Liste.',
+	[keys.validationRecipientOptionsUnavailable]:
+		'Empfängeroptionen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
 	[keys.validationFromUnknown]: 'Wähle eine der konfigurierten Absenderadressen',
 	[keys.validationFromUnavailable]:
 		'Absenderadressen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',

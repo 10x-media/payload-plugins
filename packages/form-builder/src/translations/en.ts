@@ -144,6 +144,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.recipientsGroupFields]: 'Form fields',
 	[keys.validationRecipientInvalid]: 'Enter a valid email address.',
 	[keys.validationRecipientUnknownField]: 'References a field that no longer exists.',
+	[keys.validationRecipientNotAllowed]: 'This recipient is not in the allowed list.',
+	[keys.validationRecipientOptionsUnavailable]:
+		'Recipient options are currently unavailable. Please try again later.',
 	[keys.validationFromUnknown]: 'Choose one of the configured from addresses',
 	[keys.validationFromUnavailable]:
 		'From addresses are currently unavailable. Please try again later.',
