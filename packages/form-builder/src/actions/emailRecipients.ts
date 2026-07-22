@@ -118,24 +118,25 @@ const DEPARTMENT_ALLOWED_CACHE = 'formBuilderDepartmentAllowedSet'
 
 /**
  * The department option values as a lowercased Set, memoized on `req.context` so every recipient
- * field validated in one save shares a single `departments` call (Payload runs each field's validate
- * on every save). Lowercased because email delivery ignores case, matching the client dedupe.
+ * field validated in one save shares a single `departments` call. Payload validates the fields
+ * concurrently, so the in-flight promise is cached synchronously (not the resolved value) to avoid a
+ * resolve-per-field race. Lowercased because email delivery ignores case, matching the client dedupe.
  */
-const resolveDepartmentAllowed = async (
+const resolveDepartmentAllowed = (
 	req: PayloadRequest,
 	departments: DepartmentEmailsResolver
 ): Promise<Set<string>> => {
 	const cached = req.context?.[DEPARTMENT_ALLOWED_CACHE]
-	if (cached instanceof Set) {
-		return cached as Set<string>
+	if (cached instanceof Promise) {
+		return cached as Promise<Set<string>>
 	}
-	const resolved = new Set(
-		(await departments({ req })).map((option) => option.value.trim().toLowerCase())
-	)
+	const promise = Promise.resolve()
+		.then(() => departments({ req }))
+		.then((options) => new Set(options.map((option) => option.value.trim().toLowerCase())))
 	if (req.context) {
-		req.context[DEPARTMENT_ALLOWED_CACHE] = resolved
+		req.context[DEPARTMENT_ALLOWED_CACHE] = promise
 	}
-	return resolved
+	return promise
 }
 
 /**
