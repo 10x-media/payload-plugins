@@ -16,12 +16,12 @@ export type ConsentStatements = Record<string, ConsentStatement>
 export type ResolveConsentStatementsArgs = {
 	payload: Payload
 	req: PayloadRequest
-	/** A loaded forms document; its consent fields' `source` ids drive resolution. */
+	/** A loaded forms document; its consent fields' `source` ids drive resolution. The whole doc is forwarded to the resolver. */
 	form: {
 		id: number | string
 		title?: string | null
 		fields?: { blockType: string; name?: string; [key: string]: unknown }[] | null
-	}
+	} & Record<string, unknown>
 	/** Resolver override for plugin-internal callers; defaults to the one the plugin stashed on the config. */
 	sources?: ConsentSourcesResolver
 }

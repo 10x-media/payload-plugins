@@ -44,5 +44,11 @@ export type ConsentSourceEntry = {
  */
 export type ConsentSourcesResolver = (args: {
 	req: PayloadRequest
-	form: { id: number | string; title?: string }
+	/**
+	 * The whole form document being read (id, title, and every other field). Derive multi-tenant
+	 * scoping from a field on it (e.g. `form.tenant`) rather than reading the form back: reading the
+	 * same `forms` collection from within this resolver re-enters the form's afterRead hook. Treat
+	 * `form` as read-only.
+	 */
+	form: { id: number | string; title?: string | null } & Record<string, unknown>
 }) => ConsentSourceEntry[] | Promise<ConsentSourceEntry[]>

@@ -34,8 +34,8 @@ const cacheOf = (req: PayloadRequest): EntriesCache | undefined => {
 export type ResolveConsentEntriesArgs = {
 	payload: Payload
 	req: PayloadRequest
-	/** The form whose consent fields are being resolved; handed to the resolver for per-form scoping. */
-	form: { id: number | string; title?: string | null }
+	/** The whole form being resolved; forwarded to the resolver so it can scope by any field (e.g. tenant). */
+	form: { id: number | string; title?: string | null } & Record<string, unknown>
 	/** Resolver override for plugin-internal callers; defaults to the one the plugin stashed on the config. */
 	sources?: ConsentSourcesResolver
 }
@@ -61,10 +61,7 @@ export const resolveConsentEntries = async (
 	if (cached) {
 		return cached
 	}
-	const entries = await resolver({
-		req,
-		form: { id: form.id, title: typeof form.title === 'string' ? form.title : undefined },
-	})
+	const entries = await resolver({ req, form })
 	cache?.set(cacheKey, entries)
 	return entries
 }
