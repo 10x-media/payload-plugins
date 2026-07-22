@@ -1,4 +1,5 @@
 import type { PayloadRequest, TextField } from 'payload'
+import type { DepartmentEmailsResolver } from '../email/departments'
 import { fieldNames, fieldNamesOfType } from '../fields/fieldNamesOfType'
 import { localizedIf } from '../fields/localizedIf'
 import { interpolate } from '../recall/interpolate'
@@ -39,33 +40,63 @@ export const resolveRecipients = (value: unknown, resolve: (name: string) => str
 
 /**
  * Field `validate` for a recipient list: unset is fine; otherwise every entry must be a valid email
- * or a `{{field}}` token naming an existing field of an allowed token type (`tokenFieldTypes`, or any
- * named field when empty). Reads the form's `fields` off `data`, like the confirmation `toField`.
+ * or a `{{field}}` token naming an existing field of an allowed token type. When `allowCustom` is
+ * false, a non-token entry must additionally be a member of the resolved options (`resolveAllowed`,
+ * e.g. the department addresses), matching the client constraint on the server. Fails closed if the
+ * options resolver throws (mirroring the `from` field). Reads the form's `fields` off `data`. Like
+ * `from`, Payload runs this on every save, so the resolver is consulted each save under
+ * `allowCustom: false`; `buildRecipientField` memoizes it per request so all recipient fields share one call.
  */
 export const validateRecipients =
-	(tokenFieldTypes?: string[]) =>
-	(value: unknown, { data, req }: { data?: unknown; req: PayloadRequest }): string | true => {
+	(opts: {
+		tokenFieldTypes?: string[]
+		allowCustom?: boolean
+		resolveAllowed?: (req: PayloadRequest) => Set<string> | Promise<Set<string>>
+	}) =>
+	async (
+		value: unknown,
+		{ data, req }: { data?: unknown; req: PayloadRequest }
+	): Promise<string | true> => {
 		const list = toList(value)
 		if (list.length === 0) {
 			return true
 		}
 		const fields =
 			data && typeof data === 'object' ? (data as Record<string, unknown>).fields : undefined
-		const allowed = new Set(
+		const { tokenFieldTypes, allowCustom, resolveAllowed } = opts
+		const allowedFields = new Set(
 			tokenFieldTypes && tokenFieldTypes.length > 0
 				? fieldNamesOfType(fields, tokenFieldTypes)
 				: fieldNames(fields)
 		)
+		// Only resolve the membership set when it is actually enforced (allowCustom explicitly false),
+		// so the default (free-typed) path pays no resolver cost. Compare case-insensitively, matching
+		// the client's dedupe, since email delivery ignores case.
+		let allowedValues: Set<string> | undefined
+		if (allowCustom === false) {
+			if (resolveAllowed) {
+				try {
+					allowedValues = await resolveAllowed(req)
+				} catch {
+					return asTranslate(req.t)(keys.validationRecipientOptionsUnavailable)
+				}
+			} else {
+				allowedValues = new Set()
+			}
+		}
 		for (const entry of list) {
 			const token = parseFieldToken(entry)
 			if (token) {
-				if (!allowed.has(token)) {
+				if (!allowedFields.has(token)) {
 					return asTranslate(req.t)(keys.validationRecipientUnknownField)
 				}
 				continue
 			}
 			if (!isPlausibleEmail(entry)) {
 				return asTranslate(req.t)(keys.validationRecipientInvalid)
+			}
+			if (allowCustom === false && !allowedValues?.has(entry.trim().toLowerCase())) {
+				return asTranslate(req.t)(keys.validationRecipientNotAllowed)
 			}
 		}
 		return true
@@ -83,38 +114,78 @@ export type RecipientsConfig = {
 
 const RECIPIENTS_FIELD_REF = '@10x-media/form-builder/client#RecipientsSelect'
 
+const DEPARTMENT_ALLOWED_CACHE = 'formBuilderDepartmentAllowedSet'
+
+/**
+ * The department option values as a lowercased Set, memoized on `req.context` so every recipient
+ * field validated in one save shares a single `departments` call (Payload runs each field's validate
+ * on every save). Lowercased because email delivery ignores case, matching the client dedupe.
+ */
+const resolveDepartmentAllowed = async (
+	req: PayloadRequest,
+	departments: DepartmentEmailsResolver
+): Promise<Set<string>> => {
+	const cached = req.context?.[DEPARTMENT_ALLOWED_CACHE]
+	if (cached instanceof Set) {
+		return cached as Set<string>
+	}
+	const resolved = new Set(
+		(await departments({ req })).map((option) => option.value.trim().toLowerCase())
+	)
+	if (req.context) {
+		req.context[DEPARTMENT_ALLOWED_CACHE] = resolved
+	}
+	return resolved
+}
+
 /**
  * A `text hasMany` field rendered by `RecipientsSelect`, used for every email address list. `endpoint`
  * (when set) supplies preset options (e.g. the host's departments); `recipients` narrows the field's
- * behavior; `width` sets `admin.width` so a pair can share a row.
+ * behavior; `width` sets `admin.width` so a pair can share a row; `departments` (when set) backs
+ * server-side `allowCustom: false` enforcement with the resolved option values.
  */
 // biome-ignore lint/complexity/useMaxParams: the field identity (name, label, localize) plus its grouped options is the minimal surface
 export const buildRecipientField = (
 	name: string,
 	labelKey: string,
 	localize: boolean,
-	opts: { endpoint?: string; recipients?: RecipientsConfig; width?: string } = {}
-): TextField => ({
-	name,
-	type: 'text',
-	hasMany: true,
-	label: labelFor(labelKey),
-	validate: validateRecipients(opts.recipients?.tokenFieldTypes ?? ['email']),
-	...localizedIf(localize),
-	admin: {
-		...(opts.width ? { width: opts.width } : {}),
-		components: {
-			Field: {
-				path: RECIPIENTS_FIELD_REF,
-				clientProps: {
-					...(opts.endpoint ? { endpoint: opts.endpoint } : {}),
-					...(opts.recipients?.allowCustom === false ? { allowCustom: false } : {}),
-					...(opts.recipients?.fieldTokens === false ? { fieldTokens: false } : {}),
-					...(opts.recipients?.tokenFieldTypes
-						? { tokenFieldTypes: opts.recipients.tokenFieldTypes }
-						: {}),
+	opts: {
+		endpoint?: string
+		recipients?: RecipientsConfig
+		width?: string
+		departments?: DepartmentEmailsResolver
+	} = {}
+): TextField => {
+	const { departments } = opts
+	const resolveAllowed = departments
+		? (req: PayloadRequest) => resolveDepartmentAllowed(req, departments)
+		: undefined
+	return {
+		name,
+		type: 'text',
+		hasMany: true,
+		label: labelFor(labelKey),
+		validate: validateRecipients({
+			tokenFieldTypes: opts.recipients?.tokenFieldTypes ?? ['email'],
+			allowCustom: opts.recipients?.allowCustom,
+			resolveAllowed,
+		}),
+		...localizedIf(localize),
+		admin: {
+			...(opts.width ? { width: opts.width } : {}),
+			components: {
+				Field: {
+					path: RECIPIENTS_FIELD_REF,
+					clientProps: {
+						...(opts.endpoint ? { endpoint: opts.endpoint } : {}),
+						...(opts.recipients?.allowCustom === false ? { allowCustom: false } : {}),
+						...(opts.recipients?.fieldTokens === false ? { fieldTokens: false } : {}),
+						...(opts.recipients?.tokenFieldTypes
+							? { tokenFieldTypes: opts.recipients.tokenFieldTypes }
+							: {}),
+					},
 				},
 			},
 		},
-	},
-})
+	}
+}
