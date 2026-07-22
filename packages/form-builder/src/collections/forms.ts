@@ -51,6 +51,9 @@ import type { ResponseOption } from './redirectFields'
 
 export const FORMS_SLUG = 'forms'
 
+/** `req.context` key under which `consentAfterRead` tracks the form ids it is currently resolving, to break re-entrant reads. */
+const CONSENT_AFTER_READ_GUARD = 'formBuilderConsentAfterReadInFlight'
+
 /**
  * Require the title in the default locale (and on hosts without localization), but let it be empty in
  * other locales so a localized form falls back to the default-locale title rather than forcing a
@@ -661,6 +664,22 @@ export const buildFormsCollection = ({
 	// no consent fields, and entries are cached per request+form, so the cost stays bounded.
 	const consentAfterRead: CollectionAfterReadHook | undefined = consentSources
 		? async ({ doc, req }) => {
+				const id = (doc as { id?: unknown }).id
+				const key = id == null ? undefined : String(id)
+				// Re-entrance guard: a host resolver that reads this same form back (threading req) would
+				// otherwise re-enter this hook and recurse. Payload runs collection afterRead concurrently
+				// across list docs on one shared req.context, so this must be a per-id Set (a boolean would
+				// make sibling docs skip), mutated in place and never reassigned after fan-out. Mirrors
+				// @payloadcms/plugin-search's syncDocAsSearchIndex guard.
+				if (key !== undefined && req.context) {
+					const inFlight =
+						(req.context[CONSENT_AFTER_READ_GUARD] as Set<string> | undefined) ?? new Set<string>()
+					if (inFlight.has(key)) {
+						return doc
+					}
+					inFlight.add(key)
+					req.context[CONSENT_AFTER_READ_GUARD] = inFlight
+				}
 				try {
 					const statements = await resolveConsentStatements({
 						payload: req.payload,
@@ -673,6 +692,10 @@ export const buildFormsCollection = ({
 					}
 				} catch (error) {
 					req.payload.logger?.warn(`form-builder consent afterRead: ${String(error)}`)
+				} finally {
+					if (key !== undefined && req.context) {
+						;(req.context[CONSENT_AFTER_READ_GUARD] as Set<string> | undefined)?.delete(key)
+					}
 				}
 				return doc
 			}

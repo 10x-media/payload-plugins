@@ -490,4 +490,63 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			).toBe(false)
 		})
 	})
+
+	describe('with a resolver that reads the form back', () => {
+		let booted: BootedPayload
+		let calls = 0
+		const readBackSources: ConsentSourcesResolver = async ({ req, form }) => {
+			calls++
+			// A resolver that (unnecessarily) reads the same forms collection back, threading req.
+			// Without the guard this re-enters afterRead and recurses to a stack/heap blow-up.
+			await req.payload.findByID({ collection: 'forms', id: form.id, depth: 0, req })
+			return [{ id: 'privacy', name: 'Privacy', statement: statement('I agree') }]
+		}
+
+		beforeAll(async () => {
+			calls = 0
+			booted = await bootPayload({
+				plugin: formBuilder({ consent: { sources: readBackSources } }),
+				db,
+			})
+		})
+
+		afterAll(async () => {
+			await booted.stop()
+		})
+
+		const makeConsentForm = (title: string) =>
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title,
+					fields: [{ blockType: 'consent', name: 'terms', source: 'privacy', required: true }],
+				},
+			})
+
+		it('resolves statements without recursing when the resolver reads the form back', async () => {
+			const form = await makeConsentForm('read-back')
+			calls = 0
+			const fetched = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+			const statements = (fetched as { consentStatements?: Record<string, unknown> })
+				.consentStatements
+			expect(statements?.terms).toBeDefined()
+			// One outer read invokes the resolver once; its nested read-back is skipped by the guard.
+			expect(calls).toBe(1)
+		})
+
+		it('resolves statements for every doc in a list read (per-id guard, not a shared boolean)', async () => {
+			await makeConsentForm('list-a')
+			await makeConsentForm('list-b')
+			const list = await booted.payload.find({ collection: 'forms', depth: 0, limit: 50 })
+			const consentForms = list.docs.filter((doc) =>
+				(doc as { fields?: { blockType: string }[] }).fields?.some((f) => f.blockType === 'consent')
+			)
+			expect(consentForms.length).toBeGreaterThanOrEqual(2)
+			for (const doc of consentForms) {
+				expect(
+					(doc as { consentStatements?: Record<string, unknown> }).consentStatements?.terms
+				).toBeDefined()
+			}
+		})
+	})
 })
