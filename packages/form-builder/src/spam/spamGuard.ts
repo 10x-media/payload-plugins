@@ -3,7 +3,7 @@ import type { SubmissionValue } from '../submissions/types'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { firstHop } from './clientIp'
-import { IDENTITY_CONTEXT_KEY } from './constants'
+import { HONEYPOT_VALUE_KEY, IDENTITY_CONTEXT_KEY } from './constants'
 import { extractReservedValues, isHoneypotTripped } from './reserved'
 import type { ResolvedSpamConfig } from './types'
 
@@ -68,12 +68,15 @@ export const buildSpamGuard =
 			rateLimitState = 'enforced'
 		}
 
-		const honeypotField = spam.honeypot === false ? null : spam.honeypot.fieldName
+		// The decoy rides a fixed reserved key (not its cosmetic DOM name), so a real field sharing that
+		// name is never stripped or mistaken for the honeypot. `spam.honeypot.fieldName` is now only the
+		// client's DOM-input name hint and no longer participates in server matching.
+		const honeypotKey = spam.honeypot === false ? null : HONEYPOT_VALUE_KEY
 		const values = (data.values as SubmissionValue[] | undefined) ?? []
-		const { cleaned, honeypot, captchaToken } = extractReservedValues(values, honeypotField)
+		const { cleaned, honeypot, captchaToken } = extractReservedValues(values, honeypotKey)
 		data.values = cleaned
 
-		if (!authenticated && honeypotField !== null && isHoneypotTripped(honeypot)) {
+		if (!authenticated && honeypotKey !== null && isHoneypotTripped(honeypot)) {
 			throw new APIError(t(keys.spamRejected), 400)
 		}
 

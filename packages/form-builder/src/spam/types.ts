@@ -55,7 +55,11 @@ export type SpamMetadataConfig = {
 }
 
 export type SpamConfig = {
-	/** Honeypot decoy. Default on. `false` disables. */
+	/**
+	 * Honeypot decoy. Default on. `false` disables. `fieldName` is accepted for backward compatibility
+	 * but no longer participates in server matching: the decoy is submitted under a fixed reserved key,
+	 * so it never collides with a real field, and its DOM input name is set on the client via `<Form honeypot>`.
+	 */
 	honeypot?: false | { fieldName?: string }
 	/** Per-identity rate limit on submission create. Default on (60s window, max 5). `false` disables. */
 	rateLimit?: false | RateLimitConfig
