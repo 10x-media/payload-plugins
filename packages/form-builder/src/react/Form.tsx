@@ -252,6 +252,7 @@ export const Form = ({
 	const startedRef = useRef(false)
 	const submittedRef = useRef(false)
 	const submittingRef = useRef(false)
+	const advancingRef = useRef(false)
 	const flowRef = useRef(flow)
 	flowRef.current = flow
 
@@ -324,55 +325,107 @@ export const Form = ({
 		.map((key) => visible.find((field) => fieldKey(field) === key))
 		.filter((field): field is FormFieldInstance => Boolean(field))
 
-	const goNext = async () => {
-		if (!flow || !currentStepId) {
-			return
-		}
-		const results = await Promise.all(
-			stepVisible
-				.filter((field) => !calcExpressionOf(field))
-				.filter((field) => registry.get(field.blockType)?.value !== 'none')
-				.filter(isNamedField)
-				.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
-				.map(async (field) => ({
-					field,
-					...(await validateFieldValue({
-						field,
-						value: effectiveValues[field.name],
+	// Validate the sub-fields of the given repeaters, one pass per visible row, returning composite-key
+	// errors (`fieldName[rowIndex].subFieldName`). Shared by submit and step navigation so both mirror
+	// the server's per-row pass and neither lets an invalid required sub-field slip through.
+	const validateRepeaterSubFields = async (
+		repeaters: FormFieldInstance[]
+	): Promise<FieldErrors> => {
+		const errors: FieldErrors = {}
+		for (const field of repeaters.filter(
+			(f): f is NamedFormFieldInstance => f.blockType === 'repeater' && isNamedField(f)
+		)) {
+			const rows = Array.isArray(effectiveValues[field.name])
+				? (effectiveValues[field.name] as Array<Record<string, unknown>>)
+				: []
+			const subFields = (
+				Array.isArray(field.subFields) ? (field.subFields as FormFieldInstance[]) : []
+			).filter(isNamedField)
+			for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+				const row = rows[rowIndex] ?? {}
+				for (const subField of subFields) {
+					if (!evaluateCondition(subField.visibleWhen, row)) continue
+					if (!evaluateCondition(subField.validateWhen, row)) continue
+					const subResult = await validateFieldValue({
+						field: subField,
+						value: row[subField.name],
 						registry,
 						ruleRegistry,
-						answers: effectiveValues,
+						answers: row,
 						locale,
 						t: translate,
-					})),
-				}))
-		)
-		let hasError = false
-		for (const result of results) {
-			rawDispatch({ type: 'TOUCH', name: result.field.name })
-			rawDispatch({
-				type: 'SET_FIELD_ISSUES',
-				name: result.field.name,
-				errors: result.errors,
-			})
-			if (result.errors.length > 0) {
-				hasError = true
+					})
+					const compositeKey = `${field.name}[${rowIndex}].${subField.name}`
+					if (subResult.errors.length > 0) errors[compositeKey] = subResult.errors
+				}
 			}
 		}
-		if (hasError) {
+		return errors
+	}
+
+	const goNext = async () => {
+		// Re-entrancy guard: a double-click during async validation must not push the same step onto
+		// history twice (which would need two Back presses to undo).
+		if (!flow || !currentStepId || advancingRef.current) {
 			return
 		}
-		const next = resolveNextStepId(flow, currentStepId, effectiveValues)
-		if (!next) {
-			return
+		advancingRef.current = true
+		try {
+			const results = await Promise.all(
+				stepVisible
+					.filter((field) => !calcExpressionOf(field))
+					.filter((field) => registry.get(field.blockType)?.value !== 'none')
+					.filter(isNamedField)
+					.filter((field) => evaluateCondition(field.validateWhen, effectiveValues))
+					.map(async (field) => ({
+						field,
+						...(await validateFieldValue({
+							field,
+							value: effectiveValues[field.name],
+							registry,
+							ruleRegistry,
+							answers: effectiveValues,
+							locale,
+							t: translate,
+						})),
+					}))
+			)
+			let hasError = false
+			for (const result of results) {
+				rawDispatch({ type: 'TOUCH', name: result.field.name })
+				rawDispatch({
+					type: 'SET_FIELD_ISSUES',
+					name: result.field.name,
+					errors: result.errors,
+				})
+				if (result.errors.length > 0) {
+					hasError = true
+				}
+			}
+			// Mirror submit: validate the step's repeater sub-fields too, so a required sub-field can't be
+			// skipped past on a non-terminal step (errors surface inline via the composite key).
+			const repeaterErrors = await validateRepeaterSubFields(stepVisible)
+			for (const [compositeKey, errs] of Object.entries(repeaterErrors)) {
+				rawDispatch({ type: 'SET_FIELD_ISSUES', name: compositeKey, errors: errs })
+				hasError = true
+			}
+			if (hasError) {
+				return
+			}
+			const next = resolveNextStepId(flow, currentStepId, effectiveValues)
+			if (!next) {
+				return
+			}
+			emitFormEvent(sinkRef.current, formIdRef.current, {
+				type: 'step.completed',
+				stepId: currentStepId,
+			})
+			setHistory((prev) => [...prev, currentStepId])
+			setCurrentStepId(next)
+			emitFormEvent(sinkRef.current, formIdRef.current, { type: 'step.viewed', stepId: next })
+		} finally {
+			advancingRef.current = false
 		}
-		emitFormEvent(sinkRef.current, formIdRef.current, {
-			type: 'step.completed',
-			stepId: currentStepId,
-		})
-		setHistory((prev) => [...prev, currentStepId])
-		setCurrentStepId(next)
-		emitFormEvent(sinkRef.current, formIdRef.current, { type: 'step.viewed', stepId: next })
 	}
 
 	const goBack = () => {
@@ -451,37 +504,9 @@ export const Form = ({
 			}
 		}
 
-		// Validate sub-fields within each visible repeater, mirroring the server's per-row pass.
-		// Errors are stored under the composite key `fieldName[rowIndex].subFieldName` so the
-		// repeater renderer can look them up from form state and display them inline.
-		for (const field of visible.filter(
-			(f): f is NamedFormFieldInstance => f.blockType === 'repeater' && isNamedField(f)
-		)) {
-			const rows = Array.isArray(effectiveValues[field.name])
-				? (effectiveValues[field.name] as Array<Record<string, unknown>>)
-				: []
-			const subFields = (
-				Array.isArray(field.subFields) ? (field.subFields as FormFieldInstance[]) : []
-			).filter(isNamedField)
-			for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-				const row = rows[rowIndex] ?? {}
-				for (const subField of subFields) {
-					if (!evaluateCondition(subField.visibleWhen, row)) continue
-					if (!evaluateCondition(subField.validateWhen, row)) continue
-					const subResult = await validateFieldValue({
-						field: subField,
-						value: row[subField.name],
-						registry,
-						ruleRegistry,
-						answers: row,
-						locale,
-						t: translate,
-					})
-					const compositeKey = `${field.name}[${rowIndex}].${subField.name}`
-					if (subResult.errors.length > 0) errors[compositeKey] = subResult.errors
-				}
-			}
-		}
+		// Validate sub-fields within each visible repeater (composite keys `fieldName[rowIndex].subFieldName`),
+		// mirroring the server's per-row pass, so the repeater renderer surfaces them inline.
+		Object.assign(errors, await validateRepeaterSubFields(visible))
 
 		rawDispatch({ type: 'SET_ALL_ISSUES', errors })
 		if (Object.keys(errors).length > 0) {
