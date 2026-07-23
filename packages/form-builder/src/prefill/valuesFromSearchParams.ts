@@ -1,6 +1,7 @@
 import { isNamedField } from '../fields/fieldKey'
 import type { FieldTypeRegistry } from '../fields/registry'
 import type { FormFieldValueKind } from '../fields/types'
+import { isTruthyString } from '../submissions/coerceBoolean'
 import type { FormFieldInstance } from '../submissions/types'
 
 export type PrefillOptions = {
@@ -12,8 +13,6 @@ export type PrefillOptions = {
 	deny?: string[]
 }
 
-const TRUTHY = new Set(['true', '1', 'on', 'yes'])
-
 const coerce = (kind: FormFieldValueKind, raw: string, all: string[]): unknown => {
 	switch (kind) {
 		case 'number': {
@@ -21,7 +20,7 @@ const coerce = (kind: FormFieldValueKind, raw: string, all: string[]): unknown =
 			return Number.isNaN(n) ? undefined : n
 		}
 		case 'boolean':
-			return TRUTHY.has(raw.toLowerCase())
+			return isTruthyString(raw)
 		case 'text[]':
 			return all
 		default:

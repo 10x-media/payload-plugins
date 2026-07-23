@@ -160,6 +160,27 @@ describe('runSubmission', () => {
 		expect(result.errors[0]?.path).toBe('terms')
 	})
 
+	it('coerces an unrecognized checkbox string to false, never a truthy value', async () => {
+		const fields: FormFieldInstance[] = [{ blockType: 'checkbox', name: 'agree', label: 'Agree' }]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'agree', value: 'maybe' }],
+		})
+		expect(result.values).toEqual([{ field: 'agree', value: false }])
+	})
+
+	it('rejects a required consent submitted as an unrecognized string, not treating it as agreement', async () => {
+		const fields: FormFieldInstance[] = [{ blockType: 'consent', name: 'terms', required: true }]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'terms', value: 'maybe' }],
+		})
+		expect(result.errors).toHaveLength(1)
+		expect(result.errors[0]?.path).toBe('terms')
+	})
+
 	// `false` is a present value, so the engine's required guard never fires on it; the checkbox's
 	// intrinsic validator is what stops a client posting an explicit refusal to a required box.
 	it('rejects a required checkbox submitted as false', async () => {
