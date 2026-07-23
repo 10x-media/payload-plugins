@@ -37,13 +37,15 @@ export type SerializeBodyArgs = {
  * off to a renderer like react-email). `editor` is the default Lexical/richText editor for every
  * plugin-authored richText field: message content, consent statement, the response message, and
  * the action body fields. `bodyEditor` overrides the action body fields specifically (emailTeam
- * and confirmation), falling back to `editor` when absent.
+ * and confirmation), and `responseEditor` overrides the success `response` message field; both fall
+ * back to `editor` when absent.
  */
 export type RichTextBodyOption = {
 	converters?: Record<string, BodyConverter>
 	serialize?: (args: SerializeBodyArgs) => Promise<string> | string
 	editor?: RichTextField['editor']
 	bodyEditor?: RichTextField['editor']
+	responseEditor?: RichTextField['editor']
 }
 
 /** Recall resolver over submission values: field name to stringified value, `''` when absent. */

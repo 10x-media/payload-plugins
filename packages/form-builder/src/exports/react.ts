@@ -1,5 +1,6 @@
 'use client'
 
+export type { BodyConverter, BodyConverterArgs, BodyRender } from '../actions/body/converters'
 export { sanitizeUrl } from '../actions/body/converters'
 export type { BodyContext } from '../actions/body/serializeBody'
 export { serializeBody } from '../actions/body/serializeBody'
@@ -36,6 +37,8 @@ export type {
 	FormPollSettings,
 	FormProps,
 	FormResponseSettings,
+	FormSuccessResponse,
+	FormSuccessResult,
 } from '../react/Form'
 export { Form } from '../react/Form'
 export type {

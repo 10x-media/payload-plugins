@@ -2,6 +2,7 @@
 
 import {
 	type FormEvent as ReactFormEvent,
+	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
 	useCallback,
 	useEffect,
@@ -10,6 +11,7 @@ import {
 	useRef,
 	useState,
 } from 'react'
+import type { BodyConverter } from '../actions/body/converters'
 import { serializeBody } from '../actions/body/serializeBody'
 import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
@@ -75,6 +77,17 @@ export type {
 // `from './Form'` imports keep working unchanged.
 export type { FormButtonSettings, FormDocument, FormPollSettings, FormResponseSettings }
 
+/**
+ * The success response passed to `onSuccess`, recall-resolved and (for a message) serialized with the
+ * form's active converters, so a host can render or toast the resolved response without re-deriving it.
+ */
+export type FormSuccessResponse =
+	| { type: 'message'; html?: string }
+	| { type: 'redirect'; url?: string }
+
+/** The second argument to `onSuccess`: the resolved success response (an object, so it can grow). */
+export type FormSuccessResult = { response?: FormSuccessResponse }
+
 export type FormProps = {
 	form: FormDocument
 	fieldTypes?: AnyFormFieldDefinition[]
@@ -82,8 +95,24 @@ export type FormProps = {
 	renderers?: RenderersConfig
 	apiRoute?: string
 	onSubmit?: SubmitHandler
-	onSuccess?: (submissionId?: string) => void
+	/**
+	 * Called after a successful submission with the submission id and the resolved success response
+	 * (recall-applied, serialized with `converters`), so a host can toast or render it. Fires in both
+	 * `successBehavior` modes and on the custom-`children` path.
+	 */
+	onSuccess?: (submissionId?: string, result?: FormSuccessResult) => void
 	onError?: (message: string) => void
+	/**
+	 * Custom Lexical block converters (e.g. host `icon`/`badge` blocks) spread over the defaults for the
+	 * client serializer, so those blocks survive in the success message and in the `onSuccess` response.
+	 */
+	converters?: Record<string, BodyConverter>
+	/**
+	 * What happens on a successful submit. `'replace'` (default) swaps the form for the success screen;
+	 * `'reset'` clears the fields in place and shows no success screen, so a host can toast via `onSuccess`
+	 * and keep the form usable.
+	 */
+	successBehavior?: 'replace' | 'reset'
 	events?: FormEventSink
 	t?: RendererTranslate
 	locale?: string
@@ -152,6 +181,8 @@ export const Form = ({
 	onSubmit,
 	onSuccess,
 	onError,
+	converters,
+	successBehavior = 'replace',
 	events,
 	t,
 	locale = 'en',
@@ -321,11 +352,39 @@ export const Form = ({
 	const formattedValues = (): SubmissionValue[] =>
 		answerableFields().map((field) => ({ field: field.name, value: recall(field.name) }))
 
+	/**
+	 * The recall-resolved success response: a redirect's url, or the response message serialized with
+	 * the active `converters` (so host blocks survive). Shared by the success screen and the value
+	 * handed to `onSuccess`, so both stay identical.
+	 */
+	const resolveSuccessResponse = (): FormSuccessResponse | undefined => {
+		const response = form.response
+		if (response?.type === 'redirect') {
+			return { type: 'redirect', url: response.redirect?.url ?? undefined }
+		}
+		const message =
+			response?.type === 'message' || response?.type == null ? response?.message : undefined
+		if (!message) {
+			return undefined
+		}
+		return {
+			type: 'message',
+			html: serializeBody(message, {
+				values: formattedValues(),
+				descriptors: descriptorsFor(answerableFields()),
+				converters,
+			}),
+		}
+	}
+
 	// Steps address fields by key: machine names for named fields, block row ids for bare blocks.
+	// `step.fields` is membership only; render order follows `form.fields` (the order of `visible`),
+	// so a step shows its fields in the form's field order, not the flow-builder entry order.
 	const stepKeys = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
-	const stepVisible: FormFieldInstance[] = stepKeys
-		.map((key) => visible.find((field) => fieldKey(field) === key))
-		.filter((field): field is FormFieldInstance => Boolean(field))
+	const stepKeySet = new Set(stepKeys)
+	const stepVisible: FormFieldInstance[] = visible.filter((field) =>
+		stepKeySet.has(fieldKey(field))
+	)
 
 	// Validate the sub-fields of the given repeaters, one pass per visible row, returning composite-key
 	// errors (`fieldName[rowIndex].subFieldName`). Shared by submit and step navigation so both mirror
@@ -533,15 +592,34 @@ export const Form = ({
 			: await submitForm({ formId: form.id, values, apiRoute })
 		submittingRef.current = false
 		if (result.ok) {
+			// A submission happened, so the unmount effect must not emit `form.abandoned`, in either mode.
 			submittedRef.current = true
-			rawDispatch({ type: 'SUBMIT_SUCCESS' })
 			emitFormEvent(sinkRef.current, formIdRef.current, {
 				type: 'submission.created',
 				submissionId: result.submissionId,
 			})
-			onSuccess?.(result.submissionId)
-			if (activePresentation.dismissOnSuccess) {
-				handleClose()
+			// Resolve the response before a reset clears the answers the recall reads from.
+			onSuccess?.(result.submissionId, { response: resolveSuccessResponse() })
+			if (successBehavior === 'reset') {
+				// Reset in place: the host handles feedback (e.g. a toast via onSuccess); no success screen.
+				rawDispatch({
+					type: 'RESET',
+					values: { ...seedFieldValues(form.fields), ...(initialValues ?? {}) },
+				})
+				// The reducer holds only values/errors; flow position and the lifecycle `started` ref live
+				// outside it. Reset them too so a multi-step form returns to its first step (not stranded on
+				// the terminal one) and a fresh fill re-emits `form.started`. `submittedRef` stays set: a
+				// submission did happen, so the unmount guard must not report the completed form abandoned.
+				if (flow) {
+					setCurrentStepId(firstStepId(flow))
+					setHistory([])
+				}
+				startedRef.current = false
+			} else {
+				rawDispatch({ type: 'SUBMIT_SUCCESS' })
+				if (activePresentation.dismissOnSuccess) {
+					handleClose()
+				}
 			}
 			const redirectUrl =
 				form.response?.type === 'redirect' ? form.response.redirect?.url : undefined
@@ -562,6 +640,34 @@ export const Form = ({
 			rawDispatch({ type: 'SUBMIT_ERROR', message })
 			onError?.(message)
 		}
+	}
+
+	// On a multi-step form, suppress implicit Enter-submit so a lone text input on a non-terminal step
+	// cannot submit the whole form on Enter; only the explicit Submit control does. A textarea (Enter =
+	// newline) and buttons/submit controls (Enter = activation) are exempt. Single-step forms keep the
+	// native Enter-to-submit behavior. The `<form>` is the plugin's even in children mode, so this is the
+	// only place a host could get this guard.
+	const handleKeyDown = (event: ReactKeyboardEvent<HTMLFormElement>) => {
+		if (!flow || event.key !== 'Enter') {
+			return
+		}
+		const target = event.target
+		// Exempt controls whose own Enter handling matters: textarea (newline), select (confirm choice),
+		// and buttons/submit inputs (activation). A single-line text input is what implicitly submits.
+		if (
+			target instanceof HTMLTextAreaElement ||
+			target instanceof HTMLSelectElement ||
+			target instanceof HTMLButtonElement
+		) {
+			return
+		}
+		if (
+			target instanceof HTMLInputElement &&
+			(target.type === 'submit' || target.type === 'button')
+		) {
+			return
+		}
+		event.preventDefault()
 	}
 
 	const step: FormStepInfo = flow
@@ -603,6 +709,7 @@ export const Form = ({
 		effectiveValues,
 		recall,
 		renderedFields,
+		converters,
 	}
 
 	const PresentationWrapper = activePresentation.Wrapper
@@ -629,6 +736,7 @@ export const Form = ({
 						className={cn('fb-form-root', className)}
 						noValidate
 						onSubmit={handleSubmit}
+						onKeyDown={handleKeyDown}
 						data-fb-presentation={activePresentation.name}
 						data-fb-density={activePresentation.density}
 					>
@@ -641,16 +749,8 @@ export const Form = ({
 	}
 
 	if (state.submitted) {
-		const responseMessage =
-			form.response?.type === 'message' || form.response?.type == null
-				? form.response?.message
-				: undefined
-		const responseHtml = responseMessage
-			? serializeBody(responseMessage, {
-					values: formattedValues(),
-					descriptors: descriptorsFor(answerableFields()),
-				})
-			: undefined
+		const successResponse = resolveSuccessResponse()
+		const responseHtml = successResponse?.type === 'message' ? successResponse.html : undefined
 		return (
 			<FormContext.Provider value={contextValue}>
 				{wrap(
@@ -686,6 +786,7 @@ export const Form = ({
 					className={cn('fb-form-root', className)}
 					noValidate
 					onSubmit={handleSubmit}
+					onKeyDown={handleKeyDown}
 					data-fb-presentation={activePresentation.name}
 					data-fb-density={activePresentation.density}
 				>

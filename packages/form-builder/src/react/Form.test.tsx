@@ -61,7 +61,7 @@ describe('Form', () => {
 			formId: 7,
 			values: [{ field: 'name', value: 'Ada' }],
 		})
-		expect(onSuccess).toHaveBeenCalledWith('1')
+		expect(onSuccess).toHaveBeenCalledWith('1', expect.anything())
 	})
 
 	const responseMessageForm = (fields: FormFieldInstance[]): FormDocument => ({

@@ -107,14 +107,15 @@ export const Poll = ({
 		}
 	}, [hasVoted, key, loadResults, closed, resultsAwaitClose, finalized])
 
-	const handleSuccess = useCallback(
-		(submissionId?: string) => {
+	const handleSuccess = useCallback<NonNullable<FormProps['onSuccess']>>(
+		(submissionId, result) => {
 			writeVoted(key)
 			setVoted(true)
 			if (!resultsAwaitClose) {
 				void loadResults()
 			}
-			onSuccess?.(submissionId)
+			// Forward the resolved success response so a Poll host gets the same onSuccess payload as a Form host.
+			onSuccess?.(submissionId, result)
 		},
 		[key, loadResults, onSuccess, resultsAwaitClose]
 	)

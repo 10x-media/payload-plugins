@@ -2,6 +2,7 @@
 
 import type { Dispatch } from 'react'
 import { createContext, useContext } from 'react'
+import type { BodyConverter } from '../actions/body/converters'
 import type { FormFlow } from '../flow/types'
 import type { FormDocument } from '../form/types'
 import type { RecallResolver } from '../recall/resolver'
@@ -63,6 +64,8 @@ export type FormContextValue = {
 	recall?: RecallResolver
 	/** The exact visible field list the default loop renders (post hidden/calc filter). Consumed by `<FormFields>`. */
 	renderedFields?: FormFieldInstance[]
+	/** The `<Form>` `converters` prop, so client rich-text serialization (e.g. the `message` renderer) honors host blocks. */
+	converters?: Record<string, BodyConverter>
 }
 
 export const FormContext = createContext<FormContextValue | null>(null)

@@ -21,6 +21,7 @@ export type FormAction =
 	| { type: 'SUBMIT_START' }
 	| { type: 'SUBMIT_SUCCESS' }
 	| { type: 'SUBMIT_ERROR'; message: string }
+	| { type: 'RESET'; values: Record<string, unknown> }
 
 /**
  * Per-field defaults for the reducer's initial state. Nameless (bare) blocks carry no value and
@@ -79,6 +80,8 @@ export const formReducer = (state: FormState, action: FormAction): FormState => 
 			return { ...state, submitting: false, submitted: true }
 		case 'SUBMIT_ERROR':
 			return { ...state, submitting: false, submitError: action.message }
+		case 'RESET':
+			return initialFormState(action.values)
 		default:
 			return state
 	}

@@ -53,7 +53,8 @@ export type FormBuilderPluginOptions = {
 	 * Customize how the plugin's rich text is authored and rendered. `editor` is the default
 	 * Lexical/richText editor for every plugin richText field (message content, consent
 	 * statement, response message, action bodies); `bodyEditor` overrides the action body
-	 * fields specifically, falling back to `editor`. `converters` spread over the default
+	 * fields and `responseEditor` overrides the success response message field, each falling
+	 * back to `editor`. `converters` spread over the default
 	 * Lexical node converters; `serialize` replaces the whole action-body pipeline (e.g. to
 	 * target chat or plain-text channels instead of email HTML). A custom `serialize` receives
 	 * the submitted `form` (id/title) and `req`, enabling per-tenant lookups or handing the raw
