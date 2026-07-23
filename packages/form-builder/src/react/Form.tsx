@@ -159,8 +159,8 @@ export const Form = ({
 	submitLabel,
 	nextLabel,
 	prevLabel,
-	closeLabel = 'Close',
-	successMessage = 'Thank you.',
+	closeLabel,
+	successMessage,
 	presentation,
 	presentations,
 	onClose,
@@ -198,6 +198,8 @@ export const Form = ({
 		[form.fields]
 	)
 	const translate = useMemo<RendererTranslate>(() => t ?? makeTranslate(en), [t])
+	const resolvedCloseLabel = closeLabel ?? translate(keys.formClose)
+	const resolvedSuccessMessage = successMessage ?? translate(keys.formSuccess)
 	const docButtons: FormButtonSettings | undefined = form.buttons
 	const labels = useMemo(
 		() => ({
@@ -556,7 +558,7 @@ export const Form = ({
 			if (result.fieldErrors) {
 				rawDispatch({ type: 'SET_ALL_ISSUES', errors: result.fieldErrors })
 			}
-			const message = result.message ?? 'Submission failed'
+			const message = result.message ?? translate(keys.formSubmitFailed)
 			rawDispatch({ type: 'SUBMIT_ERROR', message })
 			onError?.(message)
 		}
@@ -611,7 +613,7 @@ export const Form = ({
 				open
 				onClose={handleClose}
 				title={title}
-				closeLabel={closeLabel}
+				closeLabel={resolvedCloseLabel}
 			>
 				{content}
 			</PresentationWrapper>
@@ -669,7 +671,7 @@ export const Form = ({
 							data-fb-presentation={activePresentation.name}
 							data-fb-density={activePresentation.density}
 						>
-							{interpolate(successMessage, recall)}
+							{interpolate(resolvedSuccessMessage, recall)}
 						</p>
 					)
 				)}

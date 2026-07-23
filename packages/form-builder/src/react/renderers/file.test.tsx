@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/re
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { en } from '../../translations/en'
+import { keys } from '../../translations/keys'
 import { makeTranslate } from '../../translations/makeTranslate'
 import type { FieldRendererProps } from '../contract'
 import { fileRenderer } from './file'
@@ -94,9 +95,32 @@ describe('file renderer', () => {
 	})
 
 	it('shows an attached indicator when the field already holds a value (recall/prefill)', () => {
-		const { container } = render(createElement(fileRenderer, props({ value: 'existing-id' })))
+		const { container } = render(
+			createElement(fileRenderer, props({ value: 'existing-id', t: makeTranslate(en) }))
+		)
 		expect(within(container).getByText('Uploaded file')).toBeInTheDocument()
-		expect(within(container).getByRole('button', { name: /remove/i })).toBeInTheDocument()
+		expect(within(container).getByRole('button', { name: 'Remove' })).toBeInTheDocument()
+	})
+
+	it('localizes the attached indicator and remove control through t', () => {
+		const t = (key: string): string =>
+			({ [keys.fileUploaded]: 'ATTACHED', [keys.fileRemove]: 'DETACH' })[key] ?? key
+		const { container } = render(createElement(fileRenderer, props({ value: 'existing-id', t })))
+		expect(within(container).getByText('ATTACHED')).toBeInTheDocument()
+		expect(within(container).getByRole('button', { name: 'DETACH' })).toBeInTheDocument()
+	})
+
+	it('localizes the in-flight uploading status through t', async () => {
+		let release: (value: Response) => void = () => {}
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => new Promise<Response>((resolve) => (release = resolve)))
+		)
+		const { container } = render(createElement(fileRenderer, props({ t: makeTranslate(en) })))
+		const input = container.querySelector('input[type="file"]') as HTMLInputElement
+		fireEvent.change(input, { target: { files: [pdf()] } })
+		await waitFor(() => expect(within(container).getByText('Uploading')).toBeInTheDocument())
+		release({ ok: true, json: async () => ({ doc: { id: 'up1' } }) } as unknown as Response)
 	})
 
 	it('shows a hint with accepted types and the max size when configured', () => {
