@@ -5,19 +5,14 @@ import {
 	type CollectionConfig,
 	type CollectionSlug,
 	type Field,
-	type PayloadRequest,
 	type TextFieldSingleValidation,
 	ValidationError,
 } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { FromAddressesResolver } from '../actions/fromAddresses'
-import { resolveFromAddressesRequest } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
-import {
-	type FormResultsAccess,
-	resolveFormResultsRequest,
-} from '../aggregation/resolveResultsRequest'
+import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
 import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import {
@@ -26,10 +21,9 @@ import {
 	normalizeFormConditions,
 	normalizeWhere,
 } from '../conditions/normalizeConditions'
-import { resolveConsentSourcesRequest } from '../consent/resolveConsentSourcesRequest'
 import { resolveConsentStatements } from '../consent/resolveConsentStatements'
 import type { ConsentSourcesResolver } from '../consent/types'
-import { type DepartmentEmailsResolver, resolveDepartmentsRequest } from '../email/departments'
+import type { DepartmentEmailsResolver } from '../email/departments'
 import { buildFieldBlocks } from '../fields/buildFieldBlocks'
 import { fieldNamesOfType } from '../fields/fieldNamesOfType'
 import { localizedIf } from '../fields/localizedIf'
@@ -44,14 +38,13 @@ import { pollOutcomeBeforeChange } from '../poll/outcomeBeforeChange'
 import { buildDefaultOutcomeFields, type OutcomeFieldsOverride } from '../poll/outcomeFields'
 import { type PollTypeRegistry, resolvePollTypes } from '../poll/pollTypeRegistry'
 import type { PollOptionSourceRegistry } from '../poll/registry'
-import { resolvePollCloseRequest } from '../poll/resolvePollCloseRequest'
-import { resolvePollOptionsRequest } from '../poll/resolvePollOptionsRequest'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey, resolveDefinitionLabel } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { validateUrl } from '../validation/validateUrl'
 import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
+import { buildFormsEndpoints } from './formsEndpoints'
 import type { ResponseOption } from './redirectFields'
 
 export const FORMS_SLUG = 'forms'
@@ -707,108 +700,13 @@ export const buildFormsCollection = ({
 			}
 		: undefined
 
-	const defaultEndpoints: CollectionConfig['endpoints'] = [
-		{
-			path: '/:id/results',
-			method: 'get',
-			handler: async (req: PayloadRequest) => {
-				const field = typeof req.query?.field === 'string' ? req.query.field : undefined
-				const { status, body } = await resolveFormResultsRequest({
-					payload: req.payload,
-					formId: req.routeParams?.id as number | string | undefined,
-					field,
-					isAuthed: Boolean(req.user),
-					req,
-					access: resultsAccess,
-					eligibleTypes: pollResultsTypes,
-				})
-				return Response.json(body, { status })
-			},
-		},
-		{
-			path: '/:id/poll-options',
-			method: 'get',
-			handler: async (req: PayloadRequest) => {
-				const { status, body } = await resolvePollOptionsRequest({
-					payload: req.payload,
-					formId: req.routeParams?.id as number | string | undefined,
-					isAuthed: Boolean(req.user),
-					req,
-				})
-				return Response.json(body, { status })
-			},
-		},
-		// Trusted admin action (authenticated only): close a poll now and resolve its outcome. A POST
-		// because it mutates; auth is `Boolean(req.user)` so an anonymous caller gets 403 from the helper.
-		{
-			path: '/:id/close',
-			method: 'post',
-			handler: async (req: PayloadRequest) => {
-				const { status, body } = await resolvePollCloseRequest({
-					payload: req.payload,
-					formId: req.routeParams?.id as number | string | undefined,
-					isAuthed: Boolean(req.user),
-					req,
-				})
-				return Response.json(body, { status })
-			},
-		},
-		...(consentSources
-			? [
-					{
-						path: '/:id/consent-sources',
-						method: 'get' as const,
-						handler: async (req: PayloadRequest) => {
-							const { status, body } = await resolveConsentSourcesRequest({
-								payload: req.payload,
-								formId: req.routeParams?.id as number | string | undefined,
-								isAuthed: Boolean(req.user),
-								req,
-								resolver: consentSources,
-							})
-							return Response.json(body, { status })
-						},
-					},
-				]
-			: []),
-		// The route id is unused: the from-addresses set is request-scoped (e.g. per tenant), not
-		// per-form. Registered as a doc-scoped route only so the admin field can reuse
-		// EndpointOptionsSelect unmodified (see buildFromField).
-		...(fromAddresses
-			? [
-					{
-						path: '/:id/from-addresses',
-						method: 'get' as const,
-						handler: async (req: PayloadRequest) => {
-							const { status, body } = await resolveFromAddressesRequest({
-								isAuthed: Boolean(req.user),
-								req,
-								resolver: fromAddresses,
-							})
-							return Response.json(body, { status })
-						},
-					},
-				]
-			: []),
-		// Same request-scoped, id-unused shape as from-addresses: registered doc-scoped only so the
-		// recipient selects can fetch it (see RecipientsSelect / buildRecipientField).
-		...(departments
-			? [
-					{
-						path: '/:id/departments',
-						method: 'get' as const,
-						handler: async (req: PayloadRequest) => {
-							const { status, body } = await resolveDepartmentsRequest({
-								isAuthed: Boolean(req.user),
-								req,
-								resolver: departments,
-							})
-							return Response.json(body, { status })
-						},
-					},
-				]
-			: []),
-	]
+	const defaultEndpoints = buildFormsEndpoints({
+		resultsAccess,
+		pollResultsTypes,
+		consentSources,
+		fromAddresses,
+		departments,
+	})
 
 	return {
 		...(overrides ?? {}),
