@@ -1,3 +1,4 @@
+import { applyRegistryConfig, type RegistryConfig } from '../plugin/applyRegistryConfig'
 import type { AnyPollOptionSource } from './definePollOptionSource'
 
 export type PollOptionSourceRegistry = Map<string, AnyPollOptionSource>
@@ -5,7 +6,7 @@ export type PollOptionSourceRegistry = Map<string, AnyPollOptionSource>
 /** `false` removes a source, `true` keeps it (no-op: there are no built-ins), a definition adds or replaces one. */
 export type PollOptionSourceOption = boolean | AnyPollOptionSource
 
-export type PollOptionSourcesConfig = Record<string, PollOptionSourceOption>
+export type PollOptionSourcesConfig = RegistryConfig<AnyPollOptionSource>
 
 /**
  * Resolve the active poll option-source registry from a consumer map. Unlike the consent and
@@ -14,18 +15,4 @@ export type PollOptionSourcesConfig = Record<string, PollOptionSourceOption>
  */
 export const resolvePollOptionSources = (
 	config: PollOptionSourcesConfig = {}
-): PollOptionSourceRegistry => {
-	const registry: PollOptionSourceRegistry = new Map()
-	for (const [type, option] of Object.entries(config)) {
-		if (option === false) {
-			registry.delete(type)
-		} else if (option === true) {
-			// keep the default; no-op because no built-in poll option sources exist
-		} else {
-			// Force the definition's type to the config key so the authored select value (derived from
-			// `type`) and the execution lookup (by map key) agree. Mirrors the sibling registries.
-			registry.set(type, { ...option, type })
-		}
-	}
-	return registry
-}
+): PollOptionSourceRegistry => applyRegistryConfig(new Map<string, AnyPollOptionSource>(), config)

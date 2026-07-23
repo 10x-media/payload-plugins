@@ -1,6 +1,4 @@
-import type { CalcExpression } from './types'
-
-const MAX_DEPTH = 64
+import { type CalcExpression, MAX_DEPTH } from './types'
 
 const toNumber = (value: unknown): number => {
 	if (typeof value === 'number') {

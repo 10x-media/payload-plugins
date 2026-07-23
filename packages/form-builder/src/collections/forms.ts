@@ -48,7 +48,7 @@ import { resolvePollCloseRequest } from '../poll/resolvePollCloseRequest'
 import { resolvePollOptionsRequest } from '../poll/resolvePollOptionsRequest'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
 import { keys } from '../translations/keys'
-import { asTranslate, labelFor, labelForKey } from '../translations/server'
+import { asTranslate, labelForKey, resolveDefinitionLabel } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { validateUrl } from '../validation/validateUrl'
 import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
@@ -327,11 +327,6 @@ export const buildFormsCollection = ({
 		return doc
 	}
 
-	// Select-option label from a strategy's `label`: a string is resolved like a field label (i18n key
-	// or literal), a per-locale record passes through unchanged.
-	const pollTypeOptionLabel = (label: string | Record<string, string>) =>
-		typeof label === 'string' ? labelFor(label) : label
-
 	const fieldsField: Field = {
 		name: 'fields',
 		type: 'blocks',
@@ -552,7 +547,7 @@ export const buildFormsCollection = ({
 				options: orderedPollTypes
 					.filter((strategy) => strategy.type !== 'source' || hasOptionSources)
 					.map((strategy) => ({
-						label: pollTypeOptionLabel(strategy.label),
+						label: resolveDefinitionLabel(strategy.label),
 						value: strategy.type,
 					})),
 			},

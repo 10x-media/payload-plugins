@@ -6,6 +6,9 @@ export type CalcOp = (typeof CALC_OPS)[number]
 export const CALC_FNS = ['min', 'max', 'round', 'abs', 'ceil', 'floor'] as const
 export type CalcFn = (typeof CALC_FNS)[number]
 
+/** Recursion guard shared by `normalizeCalc` (parse) and `evaluate` (walk) so both bound depth identically. */
+export const MAX_DEPTH = 64
+
 /** A serializable, safe-by-construction calculation expression. No strings are parsed; the evaluator tree-walks this closed node set (never `eval`). */
 export type CalcExpression =
 	| { type: 'lit'; value: number }

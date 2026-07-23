@@ -1,3 +1,4 @@
+import { applyRegistryConfig, type RegistryConfig } from '../plugin/applyRegistryConfig'
 import type { AnyValidationRuleDefinition } from './types'
 
 export type ValidationRuleRegistry = Map<string, AnyValidationRuleDefinition>
@@ -5,7 +6,7 @@ export type ValidationRuleRegistry = Map<string, AnyValidationRuleDefinition>
 /** Per-rule opt-in: `false` removes a built-in, `true` keeps it, an object adds a new rule or replaces one. */
 export type ValidationRuleOption = boolean | AnyValidationRuleDefinition
 
-export type ValidationRulesConfig = Record<string, ValidationRuleOption>
+export type ValidationRulesConfig = RegistryConfig<AnyValidationRuleDefinition>
 
 export const buildRuleRegistry = (rules: AnyValidationRuleDefinition[]): ValidationRuleRegistry => {
 	const registry: ValidationRuleRegistry = new Map()
@@ -19,16 +20,4 @@ export const buildRuleRegistry = (rules: AnyValidationRuleDefinition[]): Validat
 export const resolveValidationRules = (
 	defaults: AnyValidationRuleDefinition[],
 	config: ValidationRulesConfig = {}
-): ValidationRuleRegistry => {
-	const registry = buildRuleRegistry(defaults)
-	for (const [type, option] of Object.entries(config)) {
-		if (option === false) {
-			registry.delete(type)
-		} else if (option === true) {
-			// keep the default; a no-op when no default exists for this key
-		} else {
-			registry.set(type, { ...option, type })
-		}
-	}
-	return registry
-}
+): ValidationRuleRegistry => applyRegistryConfig(buildRuleRegistry(defaults), config)

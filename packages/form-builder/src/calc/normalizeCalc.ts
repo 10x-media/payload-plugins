@@ -1,6 +1,11 @@
-import { CALC_FNS, CALC_OPS, type CalcExpression, type CalcFn, type CalcOp } from './types'
-
-const MAX_DEPTH = 64
+import {
+	CALC_FNS,
+	CALC_OPS,
+	type CalcExpression,
+	type CalcFn,
+	type CalcOp,
+	MAX_DEPTH,
+} from './types'
 
 const isOp = (v: unknown): v is CalcOp => (CALC_OPS as readonly unknown[]).includes(v)
 const isFn = (v: unknown): v is CalcFn => (CALC_FNS as readonly unknown[]).includes(v)
