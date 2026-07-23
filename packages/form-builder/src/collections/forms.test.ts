@@ -1,5 +1,6 @@
 import type { CollectionConfig, Condition, Field, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
+import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import type { FromAddressOption } from '../actions/fromAddresses'
 import { buildDefaultFieldDefinitions } from '../fields/builtin'
 import { type FieldTypesConfig, resolveFieldTypes } from '../fields/registry'
@@ -86,6 +87,25 @@ describe('forms admin.condition scopes', () => {
 		expect(message({}, { type: 'redirect' }, props)).toBe(false)
 		expect(redirect({}, { type: 'redirect' }, props)).toBe(true)
 		expect(redirect({}, { type: 'message' }, props)).toBe(false)
+	})
+
+	it('sets the response message editor from richText.responseEditor, falling back to editor', () => {
+		const editor = { name: 'plugin-editor' } as never
+		const responseEditor = { name: 'response-editor' } as never
+		const build = (richText?: RichTextBodyOption) =>
+			buildFormsCollection({
+				registry: resolveFieldTypes(buildDefaultFieldDefinitions(true)),
+				ruleRegistry: resolveValidationRules(defaultValidationRules),
+				richText,
+			})
+		const messageEditor = (col: CollectionConfig) => {
+			const response = groupNamed(tabFields(col), 'response')
+			const message = response.fields.find((f) => 'name' in f && f.name === 'message')
+			return (message as { editor?: unknown } | undefined)?.editor
+		}
+		expect(messageEditor(build({ editor, responseEditor }))).toBe(responseEditor)
+		expect(messageEditor(build({ editor }))).toBe(editor)
+		expect(messageEditor(build())).toBeUndefined()
 	})
 
 	it('treats an unset response.type as message, matching the client fallback', () => {

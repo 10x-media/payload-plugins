@@ -146,7 +146,7 @@ type BuildFormsCollectionArgs = {
 	consentResolveOnRead?: boolean
 	actionRegistry?: ActionRegistry
 	localizeContent?: boolean
-	/** The plugin `richText` option; `editor` overrides the response message's richText editor. */
+	/** The plugin `richText` option; `responseEditor ?? editor` sets the response message field's editor. */
 	richText?: RichTextBodyOption
 	/** The host-owned uploads collection slug from plugin config; absent when uploads are disabled. */
 	uploadsCollectionSlug?: string
@@ -213,6 +213,9 @@ export const buildFormsCollection = ({
 	const bareTypeLabels = Object.fromEntries(
 		[...registry.values()].filter((d) => d.bare === true).map((d) => [d.type, d.label])
 	)
+	// The success `response` message field's editor: `richText.responseEditor` overrides the plugin-wide
+	// `richText.editor` for this field alone (mirroring `bodyEditor` for action bodies).
+	const responseEditor = richText?.responseEditor ?? richText?.editor
 	const FLOW_BUILDER_REF = '@10x-media/form-builder/client#FlowBuilder'
 	const FIELD_NAME_SELECT_REF = '@10x-media/form-builder/client#FieldNameSelect'
 	const FLOW_STEPS_CELL_REF = '@10x-media/form-builder/client#FlowStepsCell'
@@ -453,7 +456,7 @@ export const buildFormsCollection = ({
 				label: labelForKey(keys.responseMessage),
 				// Unset type (docs predating this field) means 'message', matching the client fallback.
 				admin: { condition: (_data, siblingData) => siblingData?.type !== 'redirect' },
-				...(richText?.editor ? { editor: richText.editor } : {}),
+				...(responseEditor ? { editor: responseEditor } : {}),
 				...localizedIf(localizeContent),
 			},
 			{
