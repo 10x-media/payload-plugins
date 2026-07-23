@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useMemo } from 'react'
+import { useMemo } from 'react'
 import { sanitizeUrl } from '../../actions/body/converters'
 import { serializeBody } from '../../actions/body/serializeBody'
 import { textOfBody } from '../../actions/body/textOfBody'
@@ -47,8 +47,7 @@ const linkOf = (raw: unknown): ConsentLink | undefined => {
  * the source key, so a form rendered without that step shows no statement rather than a stale one.
  */
 export const consentRenderer = defineFieldRenderer<boolean>(
-	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
-		const id = useId()
+	({ field, id, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const describedById = `${id}-desc`
 
 		// The checkbox's accessible name is always plain text, regardless of the statement's shape,

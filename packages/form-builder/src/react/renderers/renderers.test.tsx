@@ -29,6 +29,26 @@ const baseProps = <T,>(overrides: Partial<FieldRendererProps<T>>): FieldRenderer
 })
 
 describe('built-in field renderers', () => {
+	it('honor the passed id prop for the control and its describedby, never self-minting one', () => {
+		const cases = [
+			[textRenderer, { blockType: 'text', name: 'f', label: 'F' }],
+			[emailRenderer, { blockType: 'email', name: 'f', label: 'F' }],
+			[numberRenderer, { blockType: 'number', name: 'f', label: 'F' }],
+			[dateRenderer, { blockType: 'date', name: 'f', label: 'F' }],
+			[textareaRenderer, { blockType: 'textarea', name: 'f', label: 'F' }],
+			[checkboxRenderer, { blockType: 'checkbox', name: 'f', label: 'F' }],
+			[selectRenderer, { blockType: 'select', name: 'f', label: 'F', options: [] }],
+		] as const
+		for (const [renderer, field] of cases) {
+			// A colon-bearing useId() value (e.g. `:r0:`) would never be queryable as `#passed-id`.
+			const { container } = render(createElement(renderer, baseProps({ id: 'passed-id', field })))
+			const control = container.querySelector('#passed-id')
+			expect(control, `${field.blockType} uses the passed id`).not.toBeNull()
+			expect(control?.getAttribute('aria-describedby')).toBe('passed-id-desc')
+			cleanup()
+		}
+	})
+
 	it('text: reflects value, fires onChange, shows error with aria-invalid', () => {
 		const onChange = vi.fn()
 		const { container } = render(

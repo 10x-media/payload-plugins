@@ -1,6 +1,6 @@
 'use client'
 
-import { type ChangeEvent, useId, useState } from 'react'
+import { type ChangeEvent, useState } from 'react'
 import { keys } from '../../translations/keys'
 import { formatBytes } from '../../uploads/formatBytes'
 import { resolveMessage } from '../../validation/message'
@@ -22,8 +22,7 @@ const typesOf = (mimeTypes: unknown): string[] => {
  * control and surfaces upload errors. Single file (v1); the upload posts to the default `/api` route.
  */
 export const fileRenderer = defineFieldRenderer<string | number>(
-	({ field, name, value, onChange, onBlur, errors, required, disabled, t }) => {
-		const id = useId()
+	({ field, id, name, value, onChange, onBlur, errors, required, disabled, t }) => {
 		const describedById = `${id}-desc`
 		const [uploading, setUploading] = useState(false)
 		const [filename, setFilename] = useState<string | undefined>(undefined)

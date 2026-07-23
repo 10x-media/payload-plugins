@@ -1,13 +1,11 @@
 'use client'
 
-import { useId } from 'react'
 import { defineFieldRenderer } from '../contract'
 import { FieldShell } from '../primitives/FieldShell'
 
 /** Read-only renderer for a calculation field: the value is derived, never user-editable, so it shows in an `<output>` rather than an input. */
 export const calculationRenderer = defineFieldRenderer<number | undefined>(
-	({ field, value, errors, required }) => {
-		const id = useId()
+	({ field, id, value, errors, required }) => {
 		const describedById = `${id}-desc`
 		return (
 			<FieldShell

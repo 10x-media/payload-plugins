@@ -1,6 +1,5 @@
 'use client'
 
-import { useId } from 'react'
 import { COUNTRIES, US_STATES } from '../../fields/data/regions'
 import { defineFieldRenderer } from '../contract'
 import { FieldShell } from '../primitives/FieldShell'
@@ -14,8 +13,7 @@ import { Select, type SelectOption } from '../primitives/Select'
  */
 const regionRenderer = (options: SelectOption[]) =>
 	defineFieldRenderer<string>(
-		({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
-			const id = useId()
+		({ field, id, name, value, onChange, onBlur, errors, required, disabled }) => {
 			const describedById = `${id}-desc`
 			return (
 				<FieldShell

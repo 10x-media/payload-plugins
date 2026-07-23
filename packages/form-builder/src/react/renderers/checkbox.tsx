@@ -1,13 +1,11 @@
 'use client'
 
-import { useId } from 'react'
 import { defineFieldRenderer } from '../contract'
 import { Checkbox } from '../primitives/Checkbox'
 import { FieldShell } from '../primitives/FieldShell'
 
 export const checkboxRenderer = defineFieldRenderer<boolean>(
-	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
-		const id = useId()
+	({ field, id, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const describedById = `${id}-desc`
 		return (
 			<FieldShell

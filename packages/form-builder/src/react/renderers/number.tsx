@@ -1,13 +1,11 @@
 'use client'
 
-import { useId } from 'react'
 import { defineFieldRenderer } from '../contract'
 import { FieldShell } from '../primitives/FieldShell'
 import { Input } from '../primitives/Input'
 
 export const numberRenderer = defineFieldRenderer<number | undefined>(
-	({ field, name, value, onChange, onBlur, errors, required, disabled }) => {
-		const id = useId()
+	({ field, id, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const describedById = `${id}-desc`
 		return (
 			<FieldShell
