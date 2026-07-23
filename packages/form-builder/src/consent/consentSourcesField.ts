@@ -58,6 +58,10 @@ export type ConsentSourcesFieldOptions = {
  * })
  * ```
  *
+ * The resolver receives the whole form document, so derive tenant scoping from a field on it rather
+ * than reading the form back: reading the `forms` collection from the resolver re-enters this form's
+ * afterRead hook (the plugin guards against the resulting recursion, but the read is still wasted).
+ *
  * A resolver reading its settings document must not thread the save's `req` into a `locale: 'all'`
  * read from within a form's save validation: that flips `req.locale` to `all` and corrupts the
  * localized write of the document being saved. It reads already-committed data, so no `req` is needed.

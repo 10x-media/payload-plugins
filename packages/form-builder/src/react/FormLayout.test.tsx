@@ -26,4 +26,21 @@ describe('FormLayout', () => {
 	it('defaults width to full when none given', () => {
 		expect(widthProps(undefined)).toEqual({ 'data-width': 'full' })
 	})
+
+	it('merges a custom className onto the container', () => {
+		const { container } = render(<FormLayout className="my-fields">x</FormLayout>)
+		const el = container.querySelector('.fb-form')
+		expect(el).toHaveClass('fb-form', 'fb-form--grid', 'my-fields')
+	})
+
+	it('merges a custom className when the grid is disabled', () => {
+		const { container } = render(
+			<FormLayout enabled={false} className="my-fields">
+				x
+			</FormLayout>
+		)
+		const el = container.querySelector('.fb-form')
+		expect(el).toHaveClass('fb-form', 'my-fields')
+		expect(el).not.toHaveClass('fb-form--grid')
+	})
 })

@@ -44,5 +44,13 @@ export type ConsentSourceEntry = {
  */
 export type ConsentSourcesResolver = (args: {
 	req: PayloadRequest
-	form: { id: number | string; title?: string }
+	/**
+	 * The form document being read: `id`, `title`, and (at runtime) every other field. Derive
+	 * multi-tenant scoping from a field on it, casting for non-standard fields (e.g.
+	 * `(form as { tenant?: string }).tenant`), rather than reading the form back: reading the same
+	 * `forms` collection from within this resolver re-enters the form's afterRead hook. The type is
+	 * kept index-signature-free so a generated `Form` interface assigns without a cast. Treat `form`
+	 * as read-only.
+	 */
+	form: { id: number | string; title?: string | null }
 }) => ConsentSourceEntry[] | Promise<ConsentSourceEntry[]>

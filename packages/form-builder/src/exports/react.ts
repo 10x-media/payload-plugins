@@ -51,6 +51,8 @@ export type {
 	SubmitButtonRenderProps,
 } from '../react/FormControls'
 export { FormControls } from '../react/FormControls'
+export type { FormFieldsProps } from '../react/FormFields'
+export { FormFields } from '../react/FormFields'
 export type { FieldWidth, FormLayoutProps } from '../react/FormLayout'
 export { FormLayout, widthProps } from '../react/FormLayout'
 export type { FormResultsProps } from '../react/FormResults'

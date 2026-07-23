@@ -1,5 +1,5 @@
 import type { PayloadRequest } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
 	isFieldToken,
 	isPlausibleEmail,
@@ -45,15 +45,55 @@ describe('resolveRecipients', () => {
 describe('validateRecipients', () => {
 	const req = { t: (key: string) => key } as unknown as PayloadRequest
 	const data = { fields: [{ blockType: 'email', name: 'email', label: 'Email' }] }
-	const validate = validateRecipients(['email'])
 
-	it('passes emails and known tokens; rejects bad emails and unknown tokens', () => {
-		expect(validate(['a@b.com', '{{email}}'], { data, req })).toBe(true)
-		expect(validate([], { data, req })).toBe(true)
-		expect(validate(undefined, { data, req })).toBe(true)
-		expect(validate(['nope'], { data, req })).toBe('formBuilder:validation.recipient.invalid')
-		expect(validate(['{{missing}}'], { data, req })).toBe(
+	it('passes emails and known tokens; rejects bad emails and unknown tokens', async () => {
+		const validate = validateRecipients({ tokenFieldTypes: ['email'] })
+		expect(await validate(['a@b.com', '{{email}}'], { data, req })).toBe(true)
+		expect(await validate([], { data, req })).toBe(true)
+		expect(await validate(undefined, { data, req })).toBe(true)
+		expect(await validate(['nope'], { data, req })).toBe('formBuilder:validation.recipient.invalid')
+		expect(await validate(['{{missing}}'], { data, req })).toBe(
 			'formBuilder:validation.recipient.unknownField'
+		)
+	})
+
+	it('does not invoke the options resolver when allowCustom is not false', async () => {
+		const resolveAllowed = vi.fn()
+		const validate = validateRecipients({ tokenFieldTypes: ['email'], resolveAllowed })
+		expect(await validate(['anyone@x.com'], { data, req })).toBe(true)
+		expect(resolveAllowed).not.toHaveBeenCalled()
+	})
+
+	it('with allowCustom false, accepts a listed member and a token, rejects an off-list email', async () => {
+		const resolveAllowed = () => new Set(['sales@x.com'])
+		const validate = validateRecipients({
+			tokenFieldTypes: ['email'],
+			allowCustom: false,
+			resolveAllowed,
+		})
+		expect(await validate(['sales@x.com'], { data, req })).toBe(true)
+		expect(await validate(['SALES@X.COM'], { data, req })).toBe(true)
+		expect(await validate(['{{email}}'], { data, req })).toBe(true)
+		expect(await validate(['stranger@x.com'], { data, req })).toBe(
+			'formBuilder:validation.recipient.notAllowed'
+		)
+	})
+
+	it('with allowCustom false and no resolver, allows only tokens', async () => {
+		const validate = validateRecipients({ tokenFieldTypes: ['email'], allowCustom: false })
+		expect(await validate(['{{email}}'], { data, req })).toBe(true)
+		expect(await validate(['anyone@x.com'], { data, req })).toBe(
+			'formBuilder:validation.recipient.notAllowed'
+		)
+	})
+
+	it('with allowCustom false, fails closed when the resolver throws', async () => {
+		const resolveAllowed = () => {
+			throw new Error('departments down')
+		}
+		const validate = validateRecipients({ allowCustom: false, resolveAllowed })
+		expect(await validate(['sales@x.com'], { data, req })).toBe(
+			'formBuilder:validation.recipient.optionsUnavailable'
 		)
 	})
 })

@@ -1,12 +1,10 @@
 'use client'
 
 import {
-	createElement,
 	type FormEvent as ReactFormEvent,
 	type ReactNode,
 	useCallback,
 	useEffect,
-	useId,
 	useMemo,
 	useReducer,
 	useRef,
@@ -39,7 +37,7 @@ import { keys } from '../translations/keys'
 import { makeTranslate } from '../translations/makeTranslate'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import { cn } from './cn'
-import type { FieldRenderer, RendererTranslate } from './contract'
+import type { RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
 import { FormContext, type FormContextValue, type FormStepInfo } from './FormContext'
 import {
@@ -48,12 +46,11 @@ import {
 	type NextButtonRenderProps,
 	type SubmitButtonRenderProps,
 } from './FormControls'
-import { type FieldWidth, FormLayout, widthProps } from './FormLayout'
+import { FormFields } from './FormFields'
 import { Honeypot } from './Honeypot'
 import { defaultPresentations } from './presentation/presentations'
 import { type PresentationsConfig, resolvePresentations } from './presentation/registry'
 import type { FormPresentation } from './presentation/types'
-import { applyRecall } from './recall'
 import { type RenderersConfig, resolveRenderers } from './registry'
 import { defaultRenderers } from './renderers'
 import { buildFieldTypeRegistry, buildValidationRuleRegistry, visibleFields } from './resolveForm'
@@ -65,7 +62,6 @@ import {
 	seedFieldValues,
 } from './state'
 import { type SubmitFormResult, type SubmitHandler, submitForm } from './submitForm'
-import { useField } from './useField'
 import { validateFieldValue } from './validateField'
 
 export type {
@@ -121,6 +117,8 @@ export type FormProps = {
 	captchaToken?: string
 	/** Custom layout: render fields with `useField`/`useFormState` instead of the auto-rendered field loop. */
 	children?: ReactNode
+	/** Chrome rendered inside the form, above the fields, in default mode (e.g. `<FormSteps />`). */
+	header?: ReactNode
 	/** Additional CSS class names applied to the root `<form>` element (and the success node). */
 	className?: string
 	/** Replace the default submit button entirely. Receives the resolved label and submitting state. */
@@ -143,74 +141,6 @@ const isEmpty = (value: unknown): boolean =>
 /** A stored button label counts only when it is a non-empty string; anything else falls through. */
 const storedLabel = (value: unknown): string | undefined =>
 	typeof value === 'string' && value.length > 0 ? value : undefined
-
-const FIELD_WIDTHS = new Set<string>(['full', 'half', 'third', 'twoThirds'])
-
-type FieldHostProps = {
-	field: NamedFormFieldInstance
-	renderer: FieldRenderer
-	locale: string
-	t: RendererTranslate
-}
-
-const FieldHost = ({ field, renderer, locale, t }: FieldHostProps) => {
-	const id = useId()
-	const { value, errors, setValue, onBlur } = useField(field.name)
-	return createElement(renderer, {
-		field,
-		id,
-		name: field.name,
-		value,
-		onChange: setValue,
-		onBlur,
-		errors,
-		required: Boolean(field.required),
-		locale,
-		t,
-	})
-}
-
-type CalcFieldHostProps = FieldHostProps & { value: unknown }
-
-/** Hosts a derived (calc) field: read-only, value supplied from `effectiveValues`, never bound via `useField`. */
-const CalcFieldHost = ({ field, renderer, value, locale, t }: CalcFieldHostProps) => {
-	const id = useId()
-	return createElement(renderer, {
-		field,
-		id,
-		name: field.name,
-		value,
-		onChange: () => {},
-		onBlur: () => {},
-		errors: [],
-		required: false,
-		disabled: true,
-		locale,
-		t,
-	})
-}
-
-type StaticFieldHostProps = Omit<FieldHostProps, 'field'> & { field: FormFieldInstance }
-
-/**
- * Hosts a nameless (bare) display block, e.g. a message: no `useField` binding at all. The
- * renderer reads only the instance and the form context; `name` is the row key for consistency.
- */
-const StaticFieldHost = ({ field, renderer, locale, t }: StaticFieldHostProps) => {
-	const id = useId()
-	return createElement(renderer, {
-		field,
-		id,
-		name: fieldKey(field),
-		value: undefined,
-		onChange: () => {},
-		onBlur: () => {},
-		errors: [],
-		required: false,
-		locale,
-		t,
-	})
-}
 
 /** The headless form controller: state, progressive client validation, conditional visibility, submission, events. */
 export const Form = ({
@@ -239,6 +169,7 @@ export const Form = ({
 	honeypot,
 	captchaToken,
 	children,
+	header,
 	className,
 	renderSubmit,
 	renderNext,
@@ -626,6 +557,10 @@ export const Form = ({
 				goBack: () => {},
 			}
 
+	const renderedFields = (flow ? stepVisible : visible).filter(
+		(field) => field.hidden !== true && field.calcDisplay !== false
+	)
+
 	const contextValue: FormContextValue = {
 		form,
 		state,
@@ -637,6 +572,8 @@ export const Form = ({
 		labels,
 		t: translate,
 		effectiveValues,
+		recall,
+		renderedFields,
 	}
 
 	const PresentationWrapper = activePresentation.Wrapper
@@ -713,10 +650,6 @@ export const Form = ({
 		)
 	}
 
-	const rendered = (flow ? stepVisible : visible).filter(
-		(field) => field.hidden !== true && field.calcDisplay !== false
-	)
-
 	return (
 		<FormContext.Provider value={contextValue}>
 			{wrap(
@@ -728,46 +661,8 @@ export const Form = ({
 					data-fb-density={activePresentation.density}
 				>
 					{honeypotName ? <Honeypot name={honeypotName} inputRef={honeypotRef} /> : null}
-					<FormLayout enabled={layout !== false}>
-						{rendered.map((field) => {
-							const renderer = rendererRegistry.get(field.blockType)
-							if (!renderer) {
-								return null
-							}
-							const width: FieldWidth | undefined =
-								typeof field.width === 'string' && FIELD_WIDTHS.has(field.width)
-									? (field.width as FieldWidth)
-									: undefined
-							const recalledField = applyRecall(field, recall)
-							return (
-								<div key={fieldKey(field)} {...widthProps(width)}>
-									{!isNamedField(recalledField) ? (
-										<StaticFieldHost
-											field={recalledField}
-											renderer={renderer}
-											locale={locale}
-											t={translate}
-										/>
-									) : calcExpressionOf(recalledField) ? (
-										<CalcFieldHost
-											field={recalledField}
-											renderer={renderer}
-											value={effectiveValues[recalledField.name]}
-											locale={locale}
-											t={translate}
-										/>
-									) : (
-										<FieldHost
-											field={recalledField}
-											renderer={renderer}
-											locale={locale}
-											t={translate}
-										/>
-									)}
-								</div>
-							)
-						})}
-					</FormLayout>
+					{header}
+					<FormFields layout={layout} />
 					{state.submitError ? (
 						<p role="alert" className="fb-form__submit-error">
 							{state.submitError}
