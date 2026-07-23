@@ -85,7 +85,10 @@ const evaluateOperator = (operator: Operator, answer: unknown, value: unknown): 
 		case 'not_in':
 			return isNil(answer) || !toList(value).some((entry) => valuesEqual(answer, entry))
 		case 'exists': {
-			const present = !isNil(answer) && answer !== ''
+			// Empty string and empty array both count as absent, so a repeater with no rows and an
+			// unfilled text field are treated the same by a presence check.
+			const present =
+				!isNil(answer) && answer !== '' && !(Array.isArray(answer) && answer.length === 0)
 			return value === true || value === 'true' ? present : !present
 		}
 		case 'greater_than':
