@@ -89,6 +89,19 @@ describe('Poll', () => {
 		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
 	})
 
+	it('surfaces an error instead of empty results when the load fails', async () => {
+		const fetchResultsImpl = vi
+			.fn()
+			.mockResolvedValue({ ok: false, message: 'boom' } as FetchResultsResult)
+		const { container } = render(
+			createElement(Poll, { form, resultsField: 'colour', hasVoted: true, fetchResultsImpl })
+		)
+		await waitFor(() => expect(within(container).getByRole('alert')).toBeInTheDocument())
+		// A failed load must not read as a zero-count result set ("no votes yet").
+		expect(within(container).getByRole('alert')).toHaveTextContent('Results could not be loaded.')
+		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
+	})
+
 	it('falls back to localStorage when hasVoted is false (cookie absent)', async () => {
 		window.localStorage.setItem('fb-poll-1', '1')
 		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())

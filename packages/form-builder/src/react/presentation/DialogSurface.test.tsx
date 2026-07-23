@@ -47,6 +47,33 @@ describe('DialogSurface', () => {
 		expect(onClose).toHaveBeenCalledTimes(1)
 	})
 
+	it('closes exactly once when the backdrop is clicked (no double onClose)', () => {
+		const onClose = vi.fn()
+		const { container } = render(
+			createElement(DialogSurface, { open: true, onClose, label: 'Test' }, null)
+		)
+		const backdrop = container.querySelector('[data-fb-backdrop]') as HTMLElement
+		// A real backdrop click is a pointerdown (useDismiss) followed by a click; only one should close.
+		fireEvent.pointerDown(backdrop)
+		fireEvent.click(backdrop)
+		expect(onClose).toHaveBeenCalledTimes(1)
+	})
+
+	it('does not close on a backdrop click when closeOnOutsideClick is false', () => {
+		const onClose = vi.fn()
+		const { container } = render(
+			createElement(
+				DialogSurface,
+				{ open: true, onClose, label: 'Test', closeOnOutsideClick: false },
+				null
+			)
+		)
+		const backdrop = container.querySelector('[data-fb-backdrop]') as HTMLElement
+		fireEvent.pointerDown(backdrop)
+		fireEvent.click(backdrop)
+		expect(onClose).not.toHaveBeenCalled()
+	})
+
 	it('pressing Escape calls onClose', () => {
 		const onClose = vi.fn()
 		render(

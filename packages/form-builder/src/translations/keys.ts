@@ -194,6 +194,7 @@ export const keys = {
 	endpointOptionsError: 'formBuilder:endpointOptions.error',
 	pollOptionsUnavailable: 'formBuilder:poll.optionsUnavailable',
 	pollFinalResult: 'formBuilder:poll.finalResult',
+	pollResultsError: 'formBuilder:poll.resultsError',
 	resultsWinner: 'formBuilder:results.winner',
 	validationFileMissing: 'formBuilder:validation.file.missing',
 	validationFileMimeType: 'formBuilder:validation.file.mimeType',

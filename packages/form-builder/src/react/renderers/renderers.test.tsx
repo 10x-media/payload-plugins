@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { FieldRendererProps } from '../contract'
+import type { FormFieldInstance } from '../../submissions/types'
+import type { FieldRenderer, FieldRendererProps } from '../contract'
 import { checkboxRenderer } from './checkbox'
 import { dateRenderer } from './date'
 import { emailRenderer } from './email'
@@ -29,6 +30,26 @@ const baseProps = <T,>(overrides: Partial<FieldRendererProps<T>>): FieldRenderer
 })
 
 describe('built-in field renderers', () => {
+	it('honor the passed id prop for the control and its describedby, never self-minting one', () => {
+		const cases: Array<[FieldRenderer, FormFieldInstance]> = [
+			[textRenderer as FieldRenderer, { blockType: 'text', name: 'f', label: 'F' }],
+			[emailRenderer as FieldRenderer, { blockType: 'email', name: 'f', label: 'F' }],
+			[numberRenderer as FieldRenderer, { blockType: 'number', name: 'f', label: 'F' }],
+			[dateRenderer as FieldRenderer, { blockType: 'date', name: 'f', label: 'F' }],
+			[textareaRenderer as FieldRenderer, { blockType: 'textarea', name: 'f', label: 'F' }],
+			[checkboxRenderer as FieldRenderer, { blockType: 'checkbox', name: 'f', label: 'F' }],
+			[selectRenderer as FieldRenderer, { blockType: 'select', name: 'f', label: 'F', options: [] }],
+		]
+		for (const [renderer, field] of cases) {
+			// A colon-bearing useId() value (e.g. `:r0:`) would never be queryable as `#passed-id`.
+			const { container } = render(createElement(renderer, baseProps({ id: 'passed-id', field })))
+			const control = container.querySelector('#passed-id')
+			expect(control, `${field.blockType} uses the passed id`).not.toBeNull()
+			expect(control?.getAttribute('aria-describedby')).toBe('passed-id-desc')
+			cleanup()
+		}
+	})
+
 	it('text: reflects value, fires onChange, shows error with aria-invalid', () => {
 		const onChange = vi.fn()
 		const { container } = render(

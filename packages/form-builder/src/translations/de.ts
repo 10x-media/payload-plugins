@@ -226,6 +226,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.pollOptionsUnavailable]:
 		'Umfrageoptionen sind derzeit nicht verfügbar. Bitte versuche es später erneut.',
 	[keys.pollFinalResult]: 'Endergebnis',
+	[keys.pollResultsError]: 'Ergebnisse konnten nicht geladen werden.',
 	[keys.resultsWinner]: 'Gewinner',
 	[keys.validationFileMissing]: 'Datei hochladen',
 	[keys.validationFileMimeType]: 'Dateityp nicht erlaubt',
