@@ -56,13 +56,28 @@ describe('buildSpamGuard', () => {
 		await expect(run(guard, { form: 'f1', values: [] })).rejects.toMatchObject({ status: 429 })
 	})
 
-	it('fails open when identity is null (no rate-limit call)', async () => {
+	it('fails open when identity is null, but records it on meta.spam so it is not silent', async () => {
 		const limiter = { check: vi.fn(async () => ({ ok: false, remaining: 0, resetAt: 0 })) }
 		const guard = buildSpamGuard(
 			cfg({ identify: () => null, rateLimit: { window: 1, max: 1, limiter } })
 		)
-		await expect(run(guard, { form: 'f1', values: [] })).resolves.toBeTruthy()
+		const out = (await run(guard, { form: 'f1', values: [] })) as {
+			meta?: { spam?: { rateLimit?: string } }
+		}
 		expect(limiter.check).not.toHaveBeenCalled()
+		expect(out.meta?.spam?.rateLimit).toBe('skipped-no-identity')
+	})
+
+	it('records the enforced and disabled rate-limit states on meta.spam', async () => {
+		const enforced = (await run(buildSpamGuard(cfg()), { form: 'f1', values: [] })) as {
+			meta?: { spam?: { rateLimit?: string } }
+		}
+		expect(enforced.meta?.spam?.rateLimit).toBe('enforced')
+		const disabled = (await run(buildSpamGuard(cfg({ rateLimit: false })), {
+			form: 'f1',
+			values: [],
+		})) as { meta?: { spam?: { rateLimit?: string } } }
+		expect(disabled.meta?.spam?.rateLimit).toBe('disabled')
 	})
 
 	it('rejects when a captcha is configured but the token is missing or invalid', async () => {

@@ -1,4 +1,4 @@
-import { APIError, type CollectionBeforeValidateHook } from 'payload'
+import { APIError, type CollectionBeforeValidateHook, type PayloadRequest } from 'payload'
 import type { SubmissionValue } from '../submissions/types'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
@@ -6,6 +6,19 @@ import { firstHop } from './clientIp'
 import { IDENTITY_CONTEXT_KEY } from './constants'
 import { extractReservedValues, isHoneypotTripped } from './reserved'
 import type { ResolvedSpamConfig } from './types'
+
+let warnedRateLimitSkipped = false
+
+/** Warn once per process when rate limiting is configured but skipped for lack of a request identity. */
+const warnRateLimitSkippedOnce = (req: PayloadRequest): void => {
+	if (warnedRateLimitSkipped) {
+		return
+	}
+	warnedRateLimitSkipped = true
+	req.payload.logger?.warn(
+		'@10x-media/form-builder: submission rate limiting is configured but skipped for a request with no resolvable identity (no user and no client IP). Set spam.ipHeader for your proxy or provide a custom spam.identify.'
+	)
+}
 
 /**
  * Submissions spam guard, prepended before `validateSubmission` in `beforeValidate` so it rejects before
@@ -33,7 +46,15 @@ export const buildSpamGuard =
 			req.context[IDENTITY_CONTEXT_KEY] = identity
 		}
 
-		if (spam.rateLimit !== false && identity != null) {
+		let rateLimitState: 'enforced' | 'skipped-no-identity' | 'disabled'
+		if (spam.rateLimit === false) {
+			rateLimitState = 'disabled'
+		} else if (identity == null) {
+			// Fail open (an unidentifiable submitter cannot be keyed) but never silently: record it on
+			// meta.spam and warn once, so a deployment with no proxy or a misconfigured ipHeader is visible.
+			rateLimitState = 'skipped-no-identity'
+			warnRateLimitSkippedOnce(req)
+		} else {
 			const formKey = data.form != null ? String(data.form) : 'unknown'
 			const { ok } = await spam.rateLimit.limiter.check({
 				key: `submissions:${formKey}:${identity}`,
@@ -44,6 +65,7 @@ export const buildSpamGuard =
 			if (!ok) {
 				throw new APIError(t(keys.spamRateLimited), 429)
 			}
+			rateLimitState = 'enforced'
 		}
 
 		const honeypotField = spam.honeypot === false ? null : spam.honeypot.fieldName
@@ -68,7 +90,7 @@ export const buildSpamGuard =
 
 		const serverMeta: Record<string, unknown> = {
 			at: new Date().toISOString(),
-			spam: { captcha: captchaChecked ? 'passed' : 'skipped' },
+			spam: { captcha: captchaChecked ? 'passed' : 'skipped', rateLimit: rateLimitState },
 		}
 		if (spam.metadata.ip) {
 			const ip = firstHop(req.headers, spam.ipHeader)
