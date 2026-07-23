@@ -2,6 +2,7 @@
 
 import {
 	type FormEvent as ReactFormEvent,
+	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
 	useCallback,
 	useEffect,
@@ -322,10 +323,11 @@ export const Form = ({
 		answerableFields().map((field) => ({ field: field.name, value: recall(field.name) }))
 
 	// Steps address fields by key: machine names for named fields, block row ids for bare blocks.
+	// `step.fields` is membership only; render order follows `form.fields` (the order of `visible`),
+	// so a step shows its fields in the form's field order, not the flow-builder entry order.
 	const stepKeys = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
-	const stepVisible: FormFieldInstance[] = stepKeys
-		.map((key) => visible.find((field) => fieldKey(field) === key))
-		.filter((field): field is FormFieldInstance => Boolean(field))
+	const stepKeySet = new Set(stepKeys)
+	const stepVisible: FormFieldInstance[] = visible.filter((field) => stepKeySet.has(fieldKey(field)))
 
 	// Validate the sub-fields of the given repeaters, one pass per visible row, returning composite-key
 	// errors (`fieldName[rowIndex].subFieldName`). Shared by submit and step navigation so both mirror
@@ -564,6 +566,25 @@ export const Form = ({
 		}
 	}
 
+	// On a multi-step form, suppress implicit Enter-submit so a lone text input on a non-terminal step
+	// cannot submit the whole form on Enter; only the explicit Submit control does. A textarea (Enter =
+	// newline) and buttons/submit controls (Enter = activation) are exempt. Single-step forms keep the
+	// native Enter-to-submit behavior. The `<form>` is the plugin's even in children mode, so this is the
+	// only place a host could get this guard.
+	const handleKeyDown = (event: ReactKeyboardEvent<HTMLFormElement>) => {
+		if (!flow || event.key !== 'Enter') {
+			return
+		}
+		const target = event.target
+		if (target instanceof HTMLTextAreaElement || target instanceof HTMLButtonElement) {
+			return
+		}
+		if (target instanceof HTMLInputElement && (target.type === 'submit' || target.type === 'button')) {
+			return
+		}
+		event.preventDefault()
+	}
+
 	const step: FormStepInfo = flow
 		? {
 				flow,
@@ -629,6 +650,7 @@ export const Form = ({
 						className={cn('fb-form-root', className)}
 						noValidate
 						onSubmit={handleSubmit}
+						onKeyDown={handleKeyDown}
 						data-fb-presentation={activePresentation.name}
 						data-fb-density={activePresentation.density}
 					>
@@ -686,6 +708,7 @@ export const Form = ({
 					className={cn('fb-form-root', className)}
 					noValidate
 					onSubmit={handleSubmit}
+					onKeyDown={handleKeyDown}
 					data-fb-presentation={activePresentation.name}
 					data-fb-density={activePresentation.density}
 				>

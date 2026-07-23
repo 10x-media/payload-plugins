@@ -60,6 +60,51 @@ const branchingFlow: FormFlow = {
 }
 
 describe('Form multi-step flow', () => {
+	it('renders a step in form.fields order, using step.fields only for membership', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'a', label: 'A' },
+			{ blockType: 'text', name: 'b', label: 'B' },
+			{ blockType: 'text', name: 'c', label: 'C' },
+		]
+		// Step 1 lists its members out of the form's order; the render order must still be A, B, C.
+		const flow: FormFlow = {
+			steps: [
+				{ id: 's1', fields: ['c', 'a', 'b'], next: 's2' },
+				{ id: 's2', fields: [] },
+			],
+		}
+		const { container } = render(<Form form={doc(fields, flow)} onSubmit={vi.fn()} />)
+		const labels = [...container.querySelectorAll('label')]
+			.map((el) => el.textContent?.trim())
+			.filter((text) => text === 'A' || text === 'B' || text === 'C')
+		expect(labels).toEqual(['A', 'B', 'C'])
+	})
+
+	it('suppresses implicit Enter-submit on a multi-step form, but not textarea or single-step', () => {
+		// jsdom does not simulate implicit form submission on Enter, so assert the guard directly:
+		// fireEvent returns false when a handler called preventDefault on the cancelable event.
+		const withTextarea: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'first', label: 'First' },
+			{ blockType: 'textarea', name: 'note', label: 'Note' },
+		]
+		const flow: FormFlow = {
+			steps: [
+				{ id: 's1', fields: ['first', 'note'], next: 's2' },
+				{ id: 's2', fields: [] },
+			],
+		}
+		const { unmount } = render(<Form form={doc(withTextarea, flow)} onSubmit={vi.fn()} />)
+		// Enter in a text input on a multi-step form is prevented (no implicit submit).
+		expect(fireEvent.keyDown(screen.getByLabelText('First'), { key: 'Enter' })).toBe(false)
+		// Enter in a textarea is left alone (newline).
+		expect(fireEvent.keyDown(screen.getByLabelText('Note'), { key: 'Enter' })).toBe(true)
+		unmount()
+		cleanup()
+		// A single-step form (no flow) keeps native Enter behavior.
+		render(<Form form={doc(withTextarea)} onSubmit={vi.fn()} />)
+		expect(fireEvent.keyDown(screen.getByLabelText('First'), { key: 'Enter' })).toBe(true)
+	})
+
 	it('renders a fieldless step as a navigable page rather than a dead end', async () => {
 		// A step keeps its place when every field it named is deleted from the form; the visitor gets
 		// navigation only, and must still be able to pass through it in both directions.
