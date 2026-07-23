@@ -549,4 +549,34 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 			}
 		})
 	})
+
+	describe('with resolveOnRead disabled', () => {
+		let booted: BootedPayload
+		const staticSources: ConsentSourcesResolver = async () => [
+			{ id: 'privacy', name: 'Privacy', statement: statement('I agree') },
+		]
+
+		beforeAll(async () => {
+			booted = await bootPayload({
+				plugin: formBuilder({ consent: { sources: staticSources, resolveOnRead: false } }),
+				db,
+			})
+		})
+
+		afterAll(async () => {
+			await booted.stop()
+		})
+
+		it('skips the per-read afterRead resolution, leaving consentStatements off the doc', async () => {
+			const form = await booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'no-read-resolve',
+					fields: [{ blockType: 'consent', name: 'terms', source: 'privacy', required: true }],
+				},
+			})
+			const fetched = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+			expect((fetched as { consentStatements?: unknown }).consentStatements).toBeUndefined()
+		})
+	})
 })

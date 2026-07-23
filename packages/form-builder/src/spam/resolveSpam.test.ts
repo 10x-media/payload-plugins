@@ -14,6 +14,15 @@ describe('resolveSpamConfig', () => {
 		expect(resolved.captcha).toBeUndefined()
 		expect(resolved.metadata).toEqual({ ip: false, ua: false })
 		expect(resolved.ipHeader).toBe('x-forwarded-for')
+		expect(resolved.uploadOwnership).toBe('lenient')
+	})
+
+	it('honors an explicit strict upload-ownership mode', () => {
+		const resolved = resolveSpamConfig({ uploadOwnership: 'strict' })
+		if (resolved === false) {
+			throw new Error('expected resolved config')
+		}
+		expect(resolved.uploadOwnership).toBe('strict')
 	})
 
 	it('spam: false disables the whole subsystem', () => {

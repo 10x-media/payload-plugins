@@ -247,6 +247,7 @@ export const buildSubmissionsCollection = ({
 					consentSnapshot,
 					uploadSlug,
 					pollSourceRegistry,
+					strictUploadOwnership: spam ? spam.uploadOwnership === 'strict' : false,
 				}),
 				...(overrides?.hooks?.beforeValidate ?? []),
 			],

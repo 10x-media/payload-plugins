@@ -23,6 +23,7 @@ const cfg = (over: Partial<ResolvedSpamConfig> = {}): ResolvedSpamConfig => ({
 	identify: () => 'ip:8.8.8.8',
 	ipHeader: 'x-forwarded-for',
 	metadata: { ip: false, ua: false },
+	uploadOwnership: 'lenient',
 	...over,
 })
 

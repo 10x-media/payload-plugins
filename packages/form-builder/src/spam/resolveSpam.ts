@@ -50,5 +50,6 @@ export const resolveSpamConfig = (option: SpamOption | undefined): ResolvedSpamC
 		identify: cfg.identify ?? defaultIdentify(ipHeader),
 		ipHeader,
 		metadata: { ip: cfg.metadata?.ip ?? false, ua: cfg.metadata?.ua ?? false },
+		uploadOwnership: cfg.uploadOwnership ?? 'lenient',
 	}
 }

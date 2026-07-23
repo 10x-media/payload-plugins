@@ -15,6 +15,7 @@ const spam = (): ResolvedSpamConfig => ({
 	identify: () => 'ip:8.8.8.8',
 	ipHeader: 'x-forwarded-for',
 	metadata: { ip: false, ua: false },
+	uploadOwnership: 'lenient',
 })
 
 const media = (over: Partial<CollectionConfig> = {}): CollectionConfig => ({

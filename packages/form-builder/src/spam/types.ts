@@ -69,6 +69,15 @@ export type SpamConfig = {
 	captcha?: CaptchaProvider
 	/** Identity resolution for rate-limiting, upload ownership, and (future) poll dedup. Default: user id, else trusted IP header. */
 	identify?: IdentifyFn
+	/**
+	 * How strictly a submitted file's upload-ownership is enforced. `'lenient'` (default) only rejects a
+	 * stamped upload when the submitter is identified and does not match, and passes an owned upload
+	 * through when the submitter cannot be identified (fail-open, consistent with rate-limiting).
+	 * `'strict'` also rejects a stamped upload whenever the submitter cannot be identified, so a
+	 * deployment that always identifies requests (a proxy setting the trusted IP header, or a custom
+	 * `identify`) never lets an unverifiable claim capture an owned upload.
+	 */
+	uploadOwnership?: 'lenient' | 'strict'
 	/** Header read for the client IP (proxy-dependent, best-effort). Default 'x-forwarded-for'. */
 	ipHeader?: string
 	/** Opt-in capture of client metadata onto the submission `meta`. Off by default. */
@@ -88,4 +97,5 @@ export type ResolvedSpamConfig = {
 	identify: IdentifyFn
 	ipHeader: string
 	metadata: { ip: boolean; ua: boolean }
+	uploadOwnership: 'lenient' | 'strict'
 }

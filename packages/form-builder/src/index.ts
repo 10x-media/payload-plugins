@@ -80,6 +80,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			ruleRegistry,
 			consentSources,
 			consentSnapshot: options.consent?.snapshot ?? 'both',
+			consentResolveOnRead: options.consent?.resolveOnRead,
 			actionRegistry,
 			richText: options.richText,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
