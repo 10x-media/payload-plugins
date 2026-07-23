@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { createElement, useReducer } from 'react'
+import { createElement, useReducer, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fieldKey } from '../../fields/fieldKey'
 import type { FormFieldInstance } from '../../submissions/types'
-import type { FieldRendererProps } from '../contract'
+import type { FieldRenderer, FieldRendererProps } from '../contract'
 import { FormContext, type FormStepInfo } from '../FormContext'
 import type { RendererRegistry } from '../registry'
 import { formReducer, initialFormState } from '../state'
@@ -14,6 +14,17 @@ type RepeaterRow = Record<string, unknown>
 
 // Wraps repeaterRenderer as a proper React component so hooks work inside the context.
 const RepeaterField = (props: FieldRendererProps<RepeaterRow[]>) => repeaterRenderer(props)
+
+// A stateful sub-renderer whose count lives in local React state (not props), to prove a surviving
+// row keeps its own instance (and state) when a sibling row is removed.
+const CounterRenderer: FieldRenderer = () => {
+	const [n, setN] = useState(0)
+	return createElement(
+		'button',
+		{ type: 'button', 'aria-label': `counter ${n}`, onClick: () => setN((v) => v + 1) },
+		`n=${n}`
+	)
+}
 
 afterEach(() => {
 	cleanup()
@@ -50,15 +61,17 @@ const Harness = ({
 	fieldDef = field,
 	initialValue = [],
 	rendererRegistry = makeRegistry(),
+	initialErrors = {},
 }: {
 	fieldDef?: FormFieldInstance
 	initialValue?: unknown[]
 	rendererRegistry?: RendererRegistry
+	initialErrors?: Record<string, string[]>
 }) => {
-	const [state, dispatch] = useReducer(
-		formReducer,
-		initialFormState({ [fieldKey(fieldDef)]: initialValue })
-	)
+	const [state, dispatch] = useReducer(formReducer, {
+		...initialFormState({ [fieldKey(fieldDef)]: initialValue }),
+		errors: initialErrors,
+	})
 	const validateField = vi.fn()
 	return (
 		<FormContext.Provider
@@ -148,5 +161,49 @@ describe('repeaterRenderer', () => {
 		}
 		render(<Harness fieldDef={f} initialValue={[{ x: 'hi' }]} />)
 		expect(screen.queryByRole('textbox')).toBeNull()
+	})
+
+	it('clears a sub-field composite error when that sub-field is edited', () => {
+		render(
+			<Harness
+				initialValue={[{ firstName: '' }]}
+				initialErrors={{ 'members[0].firstName': ['Fix me'] }}
+			/>
+		)
+		expect(screen.getByText('Fix me')).toBeInTheDocument()
+		const [firstInput] = screen.getAllByRole('textbox')
+		if (firstInput) fireEvent.change(firstInput, { target: { value: 'Jo' } })
+		expect(screen.queryByText('Fix me')).toBeNull()
+	})
+
+	it('keeps a stateful sub-renderer state on surviving rows when a middle row is removed', () => {
+		const f: FormFieldInstance = {
+			...field,
+			subFields: [{ blockType: 'counter', name: 'c', label: 'C' }],
+		}
+		render(
+			<Harness
+				fieldDef={f}
+				initialValue={[{}, {}, {}]}
+				rendererRegistry={makeRegistry({ counter: CounterRenderer as never })}
+			/>
+		)
+		const counters = () => screen.getAllByRole('button', { name: /^counter/ })
+		const click = (el?: HTMLElement) => {
+			if (el) fireEvent.click(el)
+		}
+		click(counters()[0])
+		click(counters()[0])
+		for (let i = 0; i < 3; i++) click(counters()[2])
+		expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
+			'counter 2',
+			'counter 0',
+			'counter 3',
+		])
+		const removes = screen.getAllByRole('button', { name: /formBuilder:repeater\.removeRow/i })
+		click(removes[1])
+		// With stable row keys the survivors keep their instances; index keys would strand row 2's state
+		// onto the removed row's instance, collapsing this to ['counter 2', 'counter 0'].
+		expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual(['counter 2', 'counter 3'])
 	})
 })
