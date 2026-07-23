@@ -29,6 +29,8 @@ export type ValidateSubmissionArgs = {
 	uploadSlug?: string
 	/** Registered poll option sources; a form's configured `optionSource` resolves through this at validation time. */
 	pollSourceRegistry?: PollOptionSourceRegistry
+	/** Plugin `spam.uploadOwnership: 'strict'`: reject an owned upload when the submitter is unidentifiable. */
+	strictUploadOwnership?: boolean
 }
 
 /**
@@ -47,6 +49,7 @@ export const validateSubmission =
 		consentSnapshot,
 		uploadSlug,
 		pollSourceRegistry,
+		strictUploadOwnership,
 	}: ValidateSubmissionArgs): CollectionBeforeValidateHook =>
 	async ({ data, operation, req }) => {
 		if (operation !== 'create' || !data) {
@@ -164,6 +167,7 @@ export const validateSubmission =
 			formId: formId as number | string,
 			uploadSlug,
 			expectedOwner,
+			strictUploadOwnership,
 		})
 
 		if (result.errors.length > 0) {

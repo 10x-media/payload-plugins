@@ -142,6 +142,8 @@ type BuildFormsCollectionArgs = {
 	 * consent field's source select is registered. Absent: neither it nor the consent field type exists.
 	 */
 	consentSources?: ConsentSourcesResolver
+	/** Plugin `consent.resolveOnRead` (default true); `false` skips the per-read consent afterRead hook. */
+	consentResolveOnRead?: boolean
 	actionRegistry?: ActionRegistry
 	localizeContent?: boolean
 	/** The plugin `richText` option; `editor` overrides the response message's richText editor. */
@@ -185,6 +187,7 @@ export const buildFormsCollection = ({
 	registry,
 	ruleRegistry,
 	consentSources,
+	consentResolveOnRead,
 	actionRegistry = new Map(),
 	localizeContent = true,
 	richText,
@@ -661,44 +664,46 @@ export const buildFormsCollection = ({
 	// must never break form/admin/relationship reads, and the renderer already tolerates a missing
 	// statement. `resolveConsentStatements` returns `{}` without calling the resolver when the form has
 	// no consent fields, and entries are cached per request+form, so the cost stays bounded.
-	const consentAfterRead: CollectionAfterReadHook | undefined = consentSources
-		? async ({ doc, req }) => {
-				const id = (doc as { id?: unknown }).id
-				const key = id == null ? undefined : String(id)
-				// Re-entrance guard: a host resolver that reads this same form back (threading req) would
-				// otherwise re-enter this hook and recurse. Payload runs collection afterRead concurrently
-				// across list docs on one shared req.context, so this must be a per-id Set (a boolean would
-				// make sibling docs skip), mutated in place and never reassigned after fan-out. Mirrors
-				// @payloadcms/plugin-search's syncDocAsSearchIndex guard.
-				if (key !== undefined && req.context) {
-					const inFlight =
-						(req.context[CONSENT_AFTER_READ_GUARD] as Set<string> | undefined) ?? new Set<string>()
-					if (inFlight.has(key)) {
-						return doc
-					}
-					inFlight.add(key)
-					req.context[CONSENT_AFTER_READ_GUARD] = inFlight
-				}
-				try {
-					const statements = await resolveConsentStatements({
-						payload: req.payload,
-						req,
-						form: doc,
-						sources: consentSources,
-					})
-					if (Object.keys(statements).length > 0) {
-						;(doc as Record<string, unknown>).consentStatements = statements
-					}
-				} catch (error) {
-					req.payload.logger?.warn(`form-builder consent afterRead: ${String(error)}`)
-				} finally {
+	const consentAfterRead: CollectionAfterReadHook | undefined =
+		consentSources && consentResolveOnRead !== false
+			? async ({ doc, req }) => {
+					const id = (doc as { id?: unknown }).id
+					const key = id == null ? undefined : String(id)
+					// Re-entrance guard: a host resolver that reads this same form back (threading req) would
+					// otherwise re-enter this hook and recurse. Payload runs collection afterRead concurrently
+					// across list docs on one shared req.context, so this must be a per-id Set (a boolean would
+					// make sibling docs skip), mutated in place and never reassigned after fan-out. Mirrors
+					// @payloadcms/plugin-search's syncDocAsSearchIndex guard.
 					if (key !== undefined && req.context) {
-						;(req.context[CONSENT_AFTER_READ_GUARD] as Set<string> | undefined)?.delete(key)
+						const inFlight =
+							(req.context[CONSENT_AFTER_READ_GUARD] as Set<string> | undefined) ??
+							new Set<string>()
+						if (inFlight.has(key)) {
+							return doc
+						}
+						inFlight.add(key)
+						req.context[CONSENT_AFTER_READ_GUARD] = inFlight
 					}
+					try {
+						const statements = await resolveConsentStatements({
+							payload: req.payload,
+							req,
+							form: doc,
+							sources: consentSources,
+						})
+						if (Object.keys(statements).length > 0) {
+							;(doc as Record<string, unknown>).consentStatements = statements
+						}
+					} catch (error) {
+						req.payload.logger?.warn(`form-builder consent afterRead: ${String(error)}`)
+					} finally {
+						if (key !== undefined && req.context) {
+							;(req.context[CONSENT_AFTER_READ_GUARD] as Set<string> | undefined)?.delete(key)
+						}
+					}
+					return doc
 				}
-				return doc
-			}
-		: undefined
+			: undefined
 
 	const defaultEndpoints = buildFormsEndpoints({
 		resultsAccess,

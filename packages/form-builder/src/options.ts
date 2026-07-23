@@ -112,6 +112,15 @@ export type FormBuilderPluginOptions = {
 		 * lean id-only proof. The proof stays id-based regardless; this only adds the wording snapshot.
 		 */
 		snapshot?: ConsentSnapshotMode
+		/**
+		 * Whether to resolve each form's consent statements on every read via an afterRead hook (the
+		 * default, `true`). It attaches `consentStatements` to the form doc so a host can render the
+		 * wording without a second call, at the cost of one source lookup per form read (N on a list).
+		 * Set `false` to skip that hook and resolve statements yourself with the exported
+		 * `resolveConsentStatements` when you render a form; submit-time proof capture is unaffected either
+		 * way (it always re-resolves from the source).
+		 */
+		resolveOnRead?: boolean
 	}
 	/**
 	 * Form-level button labels: `submitLabel` at the bottom of the Fields tab, `prevLabel` and

@@ -125,6 +125,8 @@ export type RunSubmissionInput = {
 	uploadSlug?: string
 	/** Resolved request identity, verified against an upload's `owner` stamp when a file field is captured. */
 	expectedOwner?: string
+	/** Plugin `spam.uploadOwnership: 'strict'`: reject an owned upload when the submitter is unidentifiable. */
+	strictUploadOwnership?: boolean
 }
 
 export type RunSubmissionResult = {
@@ -163,6 +165,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		formId,
 		uploadSlug,
 		expectedOwner,
+		strictUploadOwnership,
 	} = input
 	const incoming = new Map(values.map((entry) => [entry.field, entry.value]))
 
@@ -281,6 +284,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 					config: fileConfig,
 					req,
 					expectedOwner,
+					strict: strictUploadOwnership,
 				})
 				if (!captured.ok) {
 					errors.push({ path: instance.name, message: t(errorKeyFor(captured.code)) })
@@ -390,6 +394,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 							config: fileFieldConfigOf(subField),
 							req,
 							expectedOwner,
+							strict: strictUploadOwnership,
 						})
 						if (!captured.ok) {
 							errors.push({ path: subPath, message: t(errorKeyFor(captured.code)) })

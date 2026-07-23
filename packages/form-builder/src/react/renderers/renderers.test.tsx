@@ -38,7 +38,10 @@ describe('built-in field renderers', () => {
 			[dateRenderer as FieldRenderer, { blockType: 'date', name: 'f', label: 'F' }],
 			[textareaRenderer as FieldRenderer, { blockType: 'textarea', name: 'f', label: 'F' }],
 			[checkboxRenderer as FieldRenderer, { blockType: 'checkbox', name: 'f', label: 'F' }],
-			[selectRenderer as FieldRenderer, { blockType: 'select', name: 'f', label: 'F', options: [] }],
+			[
+				selectRenderer as FieldRenderer,
+				{ blockType: 'select', name: 'f', label: 'F', options: [] },
+			],
 		]
 		for (const [renderer, field] of cases) {
 			// A colon-bearing useId() value (e.g. `:r0:`) would never be queryable as `#passed-id`.

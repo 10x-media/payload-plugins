@@ -28,6 +28,8 @@ type RegisterCollectionsArgs = {
 	ruleRegistry: ValidationRuleRegistry
 	consentSources?: ConsentSourcesResolver
 	consentSnapshot?: ConsentSnapshotMode
+	/** Plugin `consent.resolveOnRead` (default true); false skips the per-read consent afterRead hook. */
+	consentResolveOnRead?: boolean
 	actionRegistry: ActionRegistry
 	richText?: RichTextBodyOption
 	hasJobsPlugin: boolean
@@ -58,6 +60,7 @@ export const registerCollections = ({
 	ruleRegistry,
 	consentSources,
 	consentSnapshot,
+	consentResolveOnRead,
 	actionRegistry,
 	richText,
 	hasJobsPlugin,
@@ -113,6 +116,7 @@ export const registerCollections = ({
 			registry,
 			ruleRegistry,
 			consentSources,
+			consentResolveOnRead,
 			actionRegistry,
 			localizeContent,
 			richText,

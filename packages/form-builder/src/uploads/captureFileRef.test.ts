@@ -72,4 +72,22 @@ describe('captureFileRef', () => {
 		const result = await captureFileRef({ payload, ...base })
 		expect(result).toEqual({ ok: false, code: 'missing' })
 	})
+
+	it('strict: rejects a stamped upload when the submitter is unidentifiable', async () => {
+		const { payload } = payloadReturning(uploadDoc({ owner: 'user-2' }))
+		const result = await captureFileRef({ payload, ...base, strict: true })
+		expect(result).toEqual({ ok: false, code: 'missing' })
+	})
+
+	it('strict: still passes an owner-matching upload', async () => {
+		const { payload } = payloadReturning(uploadDoc({ owner: 'user-1' }))
+		const result = await captureFileRef({ payload, ...base, expectedOwner: 'user-1', strict: true })
+		expect(result.ok).toBe(true)
+	})
+
+	it('strict: still passes an unstamped upload (nothing to verify against)', async () => {
+		const { payload } = payloadReturning(uploadDoc())
+		const result = await captureFileRef({ payload, ...base, strict: true })
+		expect(result.ok).toBe(true)
+	})
 })
