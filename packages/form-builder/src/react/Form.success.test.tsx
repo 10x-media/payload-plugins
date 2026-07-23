@@ -25,7 +25,9 @@ const oneField: FormFieldInstance[] = [{ blockType: 'text', name: 'first', label
 describe('Form success handling', () => {
 	it('passes the recall-resolved response html to onSuccess', async () => {
 		const onSuccess = vi.fn()
-		const form = doc(oneField, { response: { type: 'message', message: lexical('Thanks {{first}}') } })
+		const form = doc(oneField, {
+			response: { type: 'message', message: lexical('Thanks {{first}}') },
+		})
 		render(
 			<Form
 				form={form}
@@ -48,7 +50,9 @@ describe('Form success handling', () => {
 		const form = doc(oneField, {
 			response: { type: 'redirect', redirect: { url: 'https://example.com/thanks' } },
 		})
-		render(<Form form={form} onSubmit={vi.fn().mockResolvedValue({ ok: true })} onSuccess={onSuccess} />)
+		render(
+			<Form form={form} onSubmit={vi.fn().mockResolvedValue({ ok: true })} onSuccess={onSuccess} />
+		)
 		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
 		await waitFor(() => expect(onSuccess).toHaveBeenCalled())
