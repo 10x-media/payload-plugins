@@ -252,23 +252,23 @@ describe('emailTeam', () => {
 			| undefined
 
 	it('omits editor from the body field by default', () => {
-		expect(bodyFieldOf(buildEmailTeam(true))?.editor).toBeUndefined()
+		expect(bodyFieldOf(buildEmailTeam({ localize: true }))?.editor).toBeUndefined()
 	})
 
 	it('spreads a custom editor onto the body field when given', () => {
 		const editor = { fake: 'editor' } as never
-		expect(bodyFieldOf(buildEmailTeam(true, editor))?.editor).toBe(editor)
+		expect(bodyFieldOf(buildEmailTeam({ localize: true, editor }))?.editor).toBe(editor)
 	})
 
 	const fromFieldOf = (definition: ReturnType<typeof buildEmailTeam>) =>
 		definition.config?.find((field) => 'name' in field && field.name === 'from')
 
 	it('omits the from field when no fromAddresses resolver is given', () => {
-		expect(fromFieldOf(buildEmailTeam(true))).toBeUndefined()
+		expect(fromFieldOf(buildEmailTeam({ localize: true }))).toBeUndefined()
 	})
 
 	it('adds a from field backed by the from-addresses endpoint when a resolver is given', () => {
-		const field = fromFieldOf(buildEmailTeam(true, undefined, () => []))
+		const field = fromFieldOf(buildEmailTeam({ localize: true, fromAddresses: () => [] }))
 		expect(field?.type).toBe('text')
 		expect(typeof (field as { validate?: unknown })?.validate).toBe('function')
 		const component = (field as { admin?: { components?: { Field?: unknown } } })?.admin?.components
@@ -297,7 +297,7 @@ describe('emailTeam', () => {
 
 	it('makes to, replyTo, cc, and bcc recipient fields (text hasMany, RecipientsSelect, 50% width)', () => {
 		for (const name of ['to', 'replyTo', 'cc', 'bcc']) {
-			const field = fieldNamed(buildEmailTeam(true), name) as RecipField | undefined
+			const field = fieldNamed(buildEmailTeam({ localize: true }), name) as RecipField | undefined
 			expect(field?.type).toBe('text')
 			expect(field?.hasMany).toBe(true)
 			expect(field?.localized).toBe(true)
@@ -309,13 +309,13 @@ describe('emailTeam', () => {
 
 	it('drops the localized flag on the recipient fields when localize is false', () => {
 		for (const name of ['to', 'replyTo', 'cc', 'bcc']) {
-			const field = fieldNamed(buildEmailTeam(false), name) as RecipField | undefined
+			const field = fieldNamed(buildEmailTeam({ localize: false }), name) as RecipField | undefined
 			expect(field?.localized).toBeUndefined()
 		}
 	})
 
 	it('pairs to+replyTo and cc+bcc on rows', () => {
-		const rows = (buildEmailTeam(true).config ?? []).filter(
+		const rows = (buildEmailTeam({ localize: true }).config ?? []).filter(
 			(field): field is Extract<typeof field, { type: 'row' }> => field.type === 'row'
 		)
 		const rowNames = rows.map((row) => row.fields.map((f) => ('name' in f ? f.name : undefined)))
@@ -324,12 +324,11 @@ describe('emailTeam', () => {
 	})
 
 	it('gives the recipient fields the departments endpoint only when a resolver is given', () => {
-		const withDepts = fieldNamed(
-			buildEmailTeam(true, undefined, undefined, () => []),
-			'to'
-		) as RecipField | undefined
+		const withDepts = fieldNamed(buildEmailTeam({ localize: true, departments: () => [] }), 'to') as
+			| RecipField
+			| undefined
 		expect(withDepts?.admin?.components?.Field?.clientProps?.endpoint).toBe('departments')
-		const without = fieldNamed(buildEmailTeam(true), 'to') as RecipField | undefined
+		const without = fieldNamed(buildEmailTeam({ localize: true }), 'to') as RecipField | undefined
 		expect(without?.admin?.components?.Field?.clientProps?.endpoint).toBeUndefined()
 	})
 })

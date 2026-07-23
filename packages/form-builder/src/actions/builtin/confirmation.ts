@@ -1,29 +1,11 @@
-import type { Field, PayloadRequest, RichTextField } from 'payload'
-import type { DepartmentEmailsResolver } from '../../email/departments'
+import type { Field, PayloadRequest } from 'payload'
 import { fieldNamesOfType } from '../../fields/fieldNamesOfType'
-import { localizedIf } from '../../fields/localizedIf'
-import { interpolate } from '../../recall/interpolate'
 import { keys } from '../../translations/keys'
 import { asTranslate, labelFor } from '../../translations/server'
-import { resolverFor } from '../body/serializeBody'
-import { defineAction } from '../defineAction'
-import {
-	buildRecipientField,
-	firstAddress,
-	type RecipientsConfig,
-	resolveRecipients,
-} from '../emailRecipients'
-import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
+import { firstAddress } from '../emailRecipients'
+import { buildEmailAction, type EmailActionConfig, type EmailActionOptions } from './emailAction'
 
-type ConfirmationConfig = {
-	toField?: string
-	from?: string
-	cc?: string[]
-	bcc?: string[]
-	replyTo?: string[]
-	subject?: string
-	body?: unknown
-}
+type ConfirmationConfig = EmailActionConfig & { toField?: string }
 
 const TO_FIELD_REF = '@10x-media/form-builder/client#FieldNameSelect'
 
@@ -46,29 +28,13 @@ export const validateToField = (
 }
 
 /**
- * `toField` names the form's own email field the confirmation is sent to (a `FieldNameSelect`, not a
- * recipient list). `replyTo`, `cc`, and `bcc` are recipient lists (`RecipientsSelect`, `string[]`):
- * literal emails, picked department addresses (when `departments` is set), or `{{field}}` tokens
- * resolved from the submission at send. `from` is a single address, added only when `fromAddresses`
- * is set. `subject`/`body` are content; `editor` overrides the body editor; `recipients` narrows the
- * recipient fields' behavior. Content and recipient fields carry `localized: true` when `localize`.
+ * The `confirmation` action: its target is `toField`, naming the form's own email field the
+ * confirmation is sent to (a `FieldNameSelect`, not a recipient list). The resolved address is
+ * sanitized to a single one (dropping CR/LF header injection and any smuggled extra addresses); an
+ * unset field or an unresolvable value is a silent skip. Everything else (from/cc/bcc/replyTo,
+ * subject, body, localization) is the shared email-action skeleton.
  */
-// biome-ignore lint/complexity/useMaxParams: positional args thread plugin options (localize, editor, fromAddresses, departments, recipients)
-export const buildConfirmation = (
-	localize: boolean,
-	editor?: RichTextField['editor'],
-	fromAddresses?: FromAddressesResolver,
-	departments?: DepartmentEmailsResolver,
-	recipients?: RecipientsConfig
-) => {
-	const endpoint = departments ? 'departments' : undefined
-	const recip = (name: string, labelKey: string) =>
-		buildRecipientField(name, labelKey, localize, {
-			endpoint,
-			recipients,
-			width: '50%',
-			departments,
-		})
+export const buildConfirmation = (options: EmailActionOptions) => {
 	const toField: Field = {
 		name: 'toField',
 		type: 'text',
@@ -84,71 +50,14 @@ export const buildConfirmation = (
 		},
 		validate: validateToField,
 	}
-	return defineAction<ConfirmationConfig>({
+	return buildEmailAction<ConfirmationConfig>(options, {
 		type: 'confirmation',
 		label: keys.actionConfirmation,
-		config: [
-			{ type: 'row', fields: [toField, recip('replyTo', keys.actionConfigReplyTo)] },
-			...(fromAddresses ? [buildFromField(fromAddresses)] : []),
-			{
-				type: 'row',
-				fields: [recip('cc', keys.actionConfigCc), recip('bcc', keys.actionConfigBcc)],
-			},
-			{
-				name: 'subject',
-				type: 'text',
-				label: labelFor(keys.actionConfigSubject),
-				...localizedIf(localize),
-			},
-			{
-				name: 'body',
-				type: 'richText',
-				label: labelFor(keys.actionConfigBody),
-				admin: { description: labelFor(keys.actionConfigBodyDescription) },
-				...localizedIf(localize),
-				...(editor ? { editor } : {}),
-			},
-		],
-		run: async (args) => {
-			const { config, values, payload, renderBody } = args
-
-			if (!config.toField) {
-				return
-			}
-
-			const resolve = resolverFor(values)
-			// Sanitize the visitor-resolved recipient to a single address (drops CR/LF header injection
-			// and any extra addresses a crafted field value could smuggle in).
-			const to = firstAddress(resolve(config.toField))
-
-			if (!to) {
-				return
-			}
-
-			if (typeof payload.sendEmail !== 'function') {
-				throw new Error('confirmation: no email adapter configured')
-			}
-
-			const subject = interpolate(config.subject ?? '', resolve)
-			const html = await renderBody(config.body)
-			const cc = resolveRecipients(config.cc, resolve)
-			const bcc = resolveRecipients(config.bcc, resolve)
-			const replyTo = resolveRecipients(config.replyTo, resolve)
-
-			// `from` was validated at save time against `fromAddresses(req)`; not re-checked here
-			// (the job's `req` may differ from the authoring admin's, and the config is
-			// admin-authored, not visitor-controlled), so the stored value is forwarded verbatim.
-			await payload.sendEmail({
-				to,
-				subject,
-				html,
-				...(config.from ? { from: config.from } : {}),
-				...(cc ? { cc } : {}),
-				...(bcc ? { bcc } : {}),
-				...(replyTo ? { replyTo } : {}),
-			})
-		},
+		target: () => toField,
+		resolveTo: (config, resolve) =>
+			config.toField ? firstAddress(resolve(config.toField)) : undefined,
+		onMissingTo: 'skip',
 	})
 }
 
-export const confirmation = buildConfirmation(true)
+export const confirmation = buildConfirmation({ localize: true })
