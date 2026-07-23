@@ -1,5 +1,78 @@
 # @10x-media/form-builder
 
+## 0.1.0-beta.7
+
+### Minor Changes
+
+- Composition seam, consent re-entrance safety, and server-side recipient enforcement.
+
+  - **`<FormFields>` + `<Form header>`.** The standard field loop is now an exported `<FormFields>`
+    component, so a custom `children` layout can compose `<Form><FormSteps /><FormFields />
+<FormControls /></Form>` without reimplementing visibility, calc, recall, and step filtering. For
+    the common case, `<Form header={<FormSteps />} />` places chrome above the fields while keeping all
+    default behavior. `recall` is now available on the form context.
+  - **Consent resolver receives the whole form document.** A multi-tenant `consent.sources` resolver
+    derives its tenant from a field on the provided doc instead of reading the form back. The consent
+    `afterRead` hook now guards against resolver re-entrance (a per-id `Set` on `req.context`), so a
+    resolver that does read the form back can no longer recurse.
+  - **`email.recipients.allowCustom: false` is enforced on the server.** When set, a non-token
+    recipient must be one of the resolved department options, validated at save and fail-closed
+    (mirroring the `from` field). The default (`allowCustom` true) is unchanged.
+
+- Two new controls for consent reads and upload ownership.
+
+  - **`consent.resolveOnRead`** (default `true`) gates the afterRead hook that resolves each form's consent statements on every read. Set it `false` to skip that per-read source lookup (N queries on a list view) and resolve statements yourself with the exported `resolveConsentStatements` when you render a form. Submit-time proof capture is unaffected either way, since it always re-resolves from the source.
+  - **`spam.uploadOwnership`** (default `'lenient'`) controls how strictly a submitted file's upload ownership is enforced. `'strict'` additionally rejects a stamped upload whenever the submitter cannot be identified, so a deployment that always identifies requests (a trusted proxy header, or a custom `identify`) never lets an unverifiable claim capture an owned upload. `'lenient'` keeps the current fail-open behavior for unidentifiable submitters.
+
+### Patch Changes
+
+- Consolidate the built-in email actions. `emailTeam` and `confirmation` were ~80% identical (the same recipient fields, subject/body config, from-field insertion, and send logic) duplicated across two files, each built through a five-positional-argument builder that needed a `useMaxParams` lint suppression. Both now share one `buildEmailAction` skeleton and one `EmailActionOptions` object; each action supplies only what differs (its `to` target and whether a missing recipient throws or is skipped). Behavior is unchanged, verified by both actions' full existing test suites passing against the shared implementation.
+
+- Condition and flow correctness.
+
+  - `file` and `repeater` fields now offer a presence-only condition (exists / does not exist) in the builder, instead of the text/select operators they cannot actually satisfy (a `FileRef` object or a row array only stringifies). A presence check also treats an empty repeater as absent.
+  - Flow transition `when` clauses are laundered the same way field conditions are: a transition referencing a field that was later deleted is dropped, rather than persisting as an always-true route that force-navigates the visitor. Valid transition conditions are canonicalized to the same OR-of-ANDs shape as field conditions.
+
+- Correctness and security hardening from an internal audit.
+
+  - **Registry key forced** on custom `actions` and `poll.sources`: a definition registered under a key that differs from its `type` no longer silently never runs.
+  - **Recipient injection closed**: a resolved `{{field}}` recipient is sanitized to a single address, dropping CR/LF header injection and any extra addresses a crafted submission value could smuggle in.
+  - **`email.recipients.fieldTokens: false`** is now enforced on the server, not just the client.
+  - **Consent integrity**: prefill and submit-time boolean coercion share one truthy allow-list, so a stray string value (e.g. from a non-React client) is never read as consent.
+  - **Cross-tenant leak closed**: the consent-sources and poll-options endpoints load the form under the caller's own read access (no `overrideAccess`), so an authenticated user cannot enumerate another tenant's form.
+  - **Rate-limit skip surfaced**: when the request identity is null the limiter still fails open, but the skip is recorded on `meta.spam.rateLimit` and warned once instead of being silent.
+  - **Honeypot collision fixed**: the decoy is submitted under a fixed reserved key, so a real field sharing the decoy's DOM input name (e.g. `website`) is never stripped or mistaken for the honeypot.
+  - **Action failures logged**: a failed post-submit email or webhook is logged per action instead of being swallowed while the submission looks fully successful.
+
+- DX and robustness cleanup from the package audit.
+
+  - **Renderers honor the passed `id` prop.** Eleven built-in field renderers minted their own `useId()` and ignored the `id` the render host already generates and passes, so each field ran two id hooks and the documented contract prop was dead. They now use the passed `id` (the host stays the single source; a custom host can control it). `repeater` and `message` already conformed.
+  - **The overlay backdrop no longer fires `onClose` twice.** A backdrop click was handled both by the backdrop's own `onClick` and by the surface's outside-pointerdown dismiss, so it closed twice; the backdrop's handler also ignored `closeOnOutsideClick: false`. The backdrop is now purely presentational and dismissal is owned solely by the dismiss hook, which respects the flag.
+  - **Polls surface a results-load failure.** A failed results fetch was stored as an empty array and rendered as a zero-count "no votes yet" table. It now shows a localized error instead of masking the failure.
+  - **`captureFileRef` gains unit coverage** for its ownership match/mismatch, unidentified-submitter fail-open, unstamped-upload passthrough, and failed-load cases.
+  - **The consent proof documents its time-of-check/time-of-use window** (wording is read at form load but re-resolved at submit) so the intended behavior is not mistaken for a bug.
+
+- Split the two largest source files for maintainability, with no behavior change.
+
+  - The `FormBuilderPluginOptions` type (nearly 200 lines of the plugin's public option surface, with its doc comments) moves out of `index.ts` into a dedicated `src/options.ts`, leaving `index.ts` focused on the plugin factory and the public barrel. The type is still exported under the same name (and its `PluginOptions` alias).
+  - The forms collection's built-in endpoints (poll results/options/close, plus the optional consent-sources, from-addresses, and departments endpoints) move out of `buildFormsCollection` into `buildFormsEndpoints`, so the collection builder stays focused on field and hook composition.
+
+  `index.ts` drops from ~558 to ~346 lines and `forms.ts` from ~845 to ~743; the moved code is unchanged and every existing unit, integration, and cross-DB test passes against it.
+
+- Localize the last hard-coded English strings in the public form renderer. The file field's attached-file indicator, in-flight "Uploading" status, upload-failure fallback, and remove control, plus the form's close-control label, success message, and submit-failure fallback, now resolve through the same `t` the rest of the renderer already uses (bundled `en`/`de`, host-overridable per locale) instead of baked-in English. A German (or any) `t` now localizes them; behavior under the default English `t` is unchanged.
+
+- Consolidate the registry and constant plumbing.
+
+  - The field-type, validation-rule, action, poll-source, and poll-type registries all resolved their opt-in override map (`false` removes, `true` keeps, a definition adds/replaces with `type` forced to the key) with their own copy of the same loop. That loop now lives in one shared `applyRegistryConfig` helper, so the merge semantics are defined once instead of five times.
+  - Definition `label` contracts are aligned: actions and poll option sources now accept a per-locale `Record<string, string>` label in addition to a string key/literal, matching poll types. All three resolve through one shared `resolveDefinitionLabel` helper. Widening only, so existing string labels are unaffected.
+  - The email-format regex (duplicated between the `email` field type and the `email` validation rule) and the calc recursion-depth guard (duplicated between the calc parser and evaluator) are each a single shared constant now, so the pair can no longer drift.
+
+- Repeater correctness fixes.
+
+  - Multi-step forms now validate a step's repeater sub-fields on **Next**, so an invalid required sub-field can no longer be skipped past; it surfaces inline, mirroring submit and the server. `goNext` also gains a re-entrancy guard so a double-click cannot push the same step onto history twice.
+  - Editing a repeater sub-field clears its stale server-side error immediately, instead of leaving it shown until the next submit.
+  - Repeater rows carry a stable React key, so removing a middle row no longer strands a stateful sub-renderer's local state (e.g. the file renderer's filename) onto the wrong row.
+
 ## 0.1.0-beta.6
 
 ### Minor Changes
