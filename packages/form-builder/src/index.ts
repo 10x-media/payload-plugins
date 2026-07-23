@@ -49,7 +49,7 @@ export type FormBuilderPluginOptions = {
 	 * content single-locale even on localized hosts. Spread-overrides of the prebuilt default
 	 * exports (`defaultFieldDefinitionsByType`, `defaultActionDefinitions`) carry `localized`
 	 * flags from the default-true set; when opting out, derive overrides from
-	 * `buildDefaultFieldDefinitions(false)` / `buildDefaultActionDefinitions(false)` instead.
+	 * `buildDefaultFieldDefinitions(false)` / `buildDefaultActionDefinitions({ localize: false })` instead.
 	 * Consent statements are unaffected either way: they live on the host's own
 	 * `consentSourcesField()`, which carries its own `localized` option.
 	 */
@@ -265,13 +265,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		const fromAddresses = options.email?.fromAddresses
 		const departments = options.email?.departments
 		const actionRegistry = resolveActions(
-			buildDefaultActionDefinitions(
-				localizeContent,
-				options.richText?.bodyEditor ?? options.richText?.editor,
+			buildDefaultActionDefinitions({
+				localize: localizeContent,
+				editor: options.richText?.bodyEditor ?? options.richText?.editor,
 				fromAddresses,
 				departments,
-				options.email?.recipients
-			),
+				recipients: options.email?.recipients,
+			}),
 			options.actions
 		)
 		const spam = resolveSpamConfig(options.spam)

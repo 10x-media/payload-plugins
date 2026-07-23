@@ -295,23 +295,23 @@ describe('confirmation', () => {
 			| undefined
 
 	it('omits editor from the body field by default', () => {
-		expect(bodyFieldOf(buildConfirmation(true))?.editor).toBeUndefined()
+		expect(bodyFieldOf(buildConfirmation({ localize: true }))?.editor).toBeUndefined()
 	})
 
 	it('spreads a custom editor onto the body field when given', () => {
 		const editor = { fake: 'editor' } as never
-		expect(bodyFieldOf(buildConfirmation(true, editor))?.editor).toBe(editor)
+		expect(bodyFieldOf(buildConfirmation({ localize: true, editor }))?.editor).toBe(editor)
 	})
 
 	const fromFieldOf = (definition: ReturnType<typeof buildConfirmation>) =>
 		definition.config?.find((field) => 'name' in field && field.name === 'from')
 
 	it('omits the from field when no fromAddresses resolver is given', () => {
-		expect(fromFieldOf(buildConfirmation(true))).toBeUndefined()
+		expect(fromFieldOf(buildConfirmation({ localize: true }))).toBeUndefined()
 	})
 
 	it('adds a from field backed by the from-addresses endpoint when a resolver is given', () => {
-		const field = fromFieldOf(buildConfirmation(true, undefined, () => []))
+		const field = fromFieldOf(buildConfirmation({ localize: true, fromAddresses: () => [] }))
 		expect(field?.type).toBe('text')
 		expect(typeof (field as { validate?: unknown })?.validate).toBe('function')
 		const component = (field as { admin?: { components?: { Field?: unknown } } })?.admin?.components
@@ -329,7 +329,7 @@ describe('confirmation', () => {
 	const RECIPIENTS_REF = '@10x-media/form-builder/client#RecipientsSelect'
 
 	it('mounts FieldNameSelect on toField (50% width) with the PII-warning description as a translation key', () => {
-		const field = fieldNamed(buildConfirmation(true), 'toField') as
+		const field = fieldNamed(buildConfirmation({ localize: true }), 'toField') as
 			| {
 					admin?: {
 						width?: string
@@ -354,7 +354,7 @@ describe('confirmation', () => {
 
 	it('makes cc, bcc, and replyTo recipient fields (text hasMany, RecipientsSelect, 50% width)', () => {
 		for (const name of ['cc', 'bcc', 'replyTo']) {
-			const field = fieldNamed(buildConfirmation(true), name) as
+			const field = fieldNamed(buildConfirmation({ localize: true }), name) as
 				| {
 						type?: string
 						hasMany?: boolean
@@ -372,7 +372,7 @@ describe('confirmation', () => {
 
 	it('drops the localized flag on cc, bcc, and replyTo when localize is false', () => {
 		for (const name of ['cc', 'bcc', 'replyTo']) {
-			const field = fieldNamed(buildConfirmation(false), name) as
+			const field = fieldNamed(buildConfirmation({ localize: false }), name) as
 				| { localized?: boolean }
 				| undefined
 			expect(field?.localized).toBeUndefined()
@@ -380,7 +380,7 @@ describe('confirmation', () => {
 	})
 
 	it('pairs toField+replyTo and cc+bcc on rows', () => {
-		const rows = (buildConfirmation(true).config ?? []).filter(
+		const rows = (buildConfirmation({ localize: true }).config ?? []).filter(
 			(field): field is Extract<typeof field, { type: 'row' }> => field.type === 'row'
 		)
 		const rowNames = rows.map((row) => row.fields.map((f) => ('name' in f ? f.name : undefined)))

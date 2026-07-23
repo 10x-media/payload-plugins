@@ -202,9 +202,7 @@ describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db)
 		})
 		sendEmail.mockClear()
 
-		const registry = resolveActions(
-			buildDefaultActionDefinitions(true, undefined, undefined, departments)
-		)
+		const registry = resolveActions(buildDefaultActionDefinitions({ localize: true, departments }))
 		await runActionsForSubmission({
 			input: { formId: form.id, submissionId: submission.id },
 			registry,
