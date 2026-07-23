@@ -60,7 +60,10 @@ export const DialogSurface = ({
 	}
 
 	return createElement('div', { 'data-fb-overlay': surface ?? '' }, [
-		createElement(Backdrop, { key: 'backdrop', onClick: onClose }),
+		// No onClick here: useDismiss already closes on an outside pointerdown (the backdrop is outside
+		// the dialog ref), so wiring onClose here too would fire it twice per click and would ignore
+		// closeOnOutsideClick. The backdrop stays purely presentational.
+		createElement(Backdrop, { key: 'backdrop' }),
 		createElement(
 			'div',
 			{
