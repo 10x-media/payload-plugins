@@ -23,7 +23,10 @@ export const resolveActions = (
 		} else if (option === true) {
 			// keep the default; no-op when no default exists for this key
 		} else {
-			registry.set(type, option)
+			// Force the definition's type to the config key so the authored block slug (derived from
+			// `type`) and the execution lookup (by map key) agree; otherwise the action silently never
+			// runs. Mirrors the field-type, validation-rule, and poll-type registries.
+			registry.set(type, { ...option, type })
 		}
 	}
 	return registry

@@ -16,8 +16,14 @@ describe('resolvePollOptionSources', () => {
 
 	it('adds a definition under its config key', () => {
 		const registry = resolvePollOptionSources({ athletes })
-		expect(registry.get('athletes')).toBe(athletes)
+		expect(registry.get('athletes')).toMatchObject(athletes)
 		expect(registry.size).toBe(1)
+	})
+
+	it('forces the definition type to the config key, so authoring and lookup agree', () => {
+		const custom = definePollOptionSource({ type: 'wrong', label: 'X', resolve: () => [] })
+		const registry = resolvePollOptionSources({ correct: custom })
+		expect(registry.get('correct')?.type).toBe('correct')
 	})
 
 	it('treats true and false as no-ops against the empty default set', () => {
