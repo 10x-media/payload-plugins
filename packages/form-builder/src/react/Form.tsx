@@ -11,6 +11,7 @@ import {
 	useRef,
 	useState,
 } from 'react'
+import type { BodyConverter } from '../actions/body/converters'
 import { serializeBody } from '../actions/body/serializeBody'
 import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
 import { evaluateCondition } from '../conditions/evaluate'
@@ -76,6 +77,17 @@ export type {
 // `from './Form'` imports keep working unchanged.
 export type { FormButtonSettings, FormDocument, FormPollSettings, FormResponseSettings }
 
+/**
+ * The success response passed to `onSuccess`, recall-resolved and (for a message) serialized with the
+ * form's active converters, so a host can render or toast the resolved response without re-deriving it.
+ */
+export type FormSuccessResponse =
+	| { type: 'message'; html?: string }
+	| { type: 'redirect'; url?: string }
+
+/** The second argument to `onSuccess`: the resolved success response (an object, so it can grow). */
+export type FormSuccessResult = { response?: FormSuccessResponse }
+
 export type FormProps = {
 	form: FormDocument
 	fieldTypes?: AnyFormFieldDefinition[]
@@ -83,8 +95,24 @@ export type FormProps = {
 	renderers?: RenderersConfig
 	apiRoute?: string
 	onSubmit?: SubmitHandler
-	onSuccess?: (submissionId?: string) => void
+	/**
+	 * Called after a successful submission with the submission id and the resolved success response
+	 * (recall-applied, serialized with `converters`), so a host can toast or render it. Fires in both
+	 * `successBehavior` modes and on the custom-`children` path.
+	 */
+	onSuccess?: (submissionId?: string, result?: FormSuccessResult) => void
 	onError?: (message: string) => void
+	/**
+	 * Custom Lexical block converters (e.g. host `icon`/`badge` blocks) spread over the defaults for the
+	 * client serializer, so those blocks survive in the success message and in the `onSuccess` response.
+	 */
+	converters?: Record<string, BodyConverter>
+	/**
+	 * What happens on a successful submit. `'replace'` (default) swaps the form for the success screen;
+	 * `'reset'` clears the fields in place and shows no success screen, so a host can toast via `onSuccess`
+	 * and keep the form usable.
+	 */
+	successBehavior?: 'replace' | 'reset'
 	events?: FormEventSink
 	t?: RendererTranslate
 	locale?: string
@@ -153,6 +181,8 @@ export const Form = ({
 	onSubmit,
 	onSuccess,
 	onError,
+	converters,
+	successBehavior = 'replace',
 	events,
 	t,
 	locale = 'en',
@@ -321,6 +351,31 @@ export const Form = ({
 	 */
 	const formattedValues = (): SubmissionValue[] =>
 		answerableFields().map((field) => ({ field: field.name, value: recall(field.name) }))
+
+	/**
+	 * The recall-resolved success response: a redirect's url, or the response message serialized with
+	 * the active `converters` (so host blocks survive). Shared by the success screen and the value
+	 * handed to `onSuccess`, so both stay identical.
+	 */
+	const resolveSuccessResponse = (): FormSuccessResponse | undefined => {
+		const response = form.response
+		if (response?.type === 'redirect') {
+			return { type: 'redirect', url: response.redirect?.url ?? undefined }
+		}
+		const message =
+			response?.type === 'message' || response?.type == null ? response?.message : undefined
+		if (!message) {
+			return undefined
+		}
+		return {
+			type: 'message',
+			html: serializeBody(message, {
+				values: formattedValues(),
+				descriptors: descriptorsFor(answerableFields()),
+				converters,
+			}),
+		}
+	}
 
 	// Steps address fields by key: machine names for named fields, block row ids for bare blocks.
 	// `step.fields` is membership only; render order follows `form.fields` (the order of `visible`),
@@ -535,15 +590,25 @@ export const Form = ({
 			: await submitForm({ formId: form.id, values, apiRoute })
 		submittingRef.current = false
 		if (result.ok) {
+			// A submission happened, so the unmount effect must not emit `form.abandoned`, in either mode.
 			submittedRef.current = true
-			rawDispatch({ type: 'SUBMIT_SUCCESS' })
 			emitFormEvent(sinkRef.current, formIdRef.current, {
 				type: 'submission.created',
 				submissionId: result.submissionId,
 			})
-			onSuccess?.(result.submissionId)
-			if (activePresentation.dismissOnSuccess) {
-				handleClose()
+			// Resolve the response before a reset clears the answers the recall reads from.
+			onSuccess?.(result.submissionId, { response: resolveSuccessResponse() })
+			if (successBehavior === 'reset') {
+				// Reset in place: the host handles feedback (e.g. a toast via onSuccess); no success screen.
+				rawDispatch({
+					type: 'RESET',
+					values: { ...seedFieldValues(form.fields), ...(initialValues ?? {}) },
+				})
+			} else {
+				rawDispatch({ type: 'SUBMIT_SUCCESS' })
+				if (activePresentation.dismissOnSuccess) {
+					handleClose()
+				}
 			}
 			const redirectUrl =
 				form.response?.type === 'redirect' ? form.response.redirect?.url : undefined
@@ -663,16 +728,8 @@ export const Form = ({
 	}
 
 	if (state.submitted) {
-		const responseMessage =
-			form.response?.type === 'message' || form.response?.type == null
-				? form.response?.message
-				: undefined
-		const responseHtml = responseMessage
-			? serializeBody(responseMessage, {
-					values: formattedValues(),
-					descriptors: descriptorsFor(answerableFields()),
-				})
-			: undefined
+		const successResponse = resolveSuccessResponse()
+		const responseHtml = successResponse?.type === 'message' ? successResponse.html : undefined
 		return (
 			<FormContext.Provider value={contextValue}>
 				{wrap(
