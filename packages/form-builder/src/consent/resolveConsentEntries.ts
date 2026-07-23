@@ -34,8 +34,8 @@ const cacheOf = (req: PayloadRequest): EntriesCache | undefined => {
 export type ResolveConsentEntriesArgs = {
 	payload: Payload
 	req: PayloadRequest
-	/** The whole form being resolved; forwarded to the resolver so it can scope by any field (e.g. tenant). */
-	form: { id: number | string; title?: string | null } & Record<string, unknown>
+	/** The whole form being resolved; forwarded to the resolver, which casts for non-standard fields (e.g. tenant). */
+	form: { id: number | string; title?: string | null }
 	/** Resolver override for plugin-internal callers; defaults to the one the plugin stashed on the config. */
 	sources?: ConsentSourcesResolver
 }

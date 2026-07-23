@@ -81,16 +81,11 @@ describe('resolveConsentEntries', () => {
 	it('forwards the whole form document to the resolver, not just id and title', async () => {
 		const sources = vi.fn().mockResolvedValue(entries)
 		const req = makeReq()
-		await resolveConsentEntries({
-			payload: payloadWith({}),
-			req,
-			form: { id: 'form-1', title: 'Contact', tenant: 'acme' },
-			sources,
-		})
-		expect(sources).toHaveBeenCalledWith({
-			req,
-			form: { id: 'form-1', title: 'Contact', tenant: 'acme' },
-		})
+		// A variable (not an inline literal) so the extra `tenant` field is not excess-property-checked;
+		// the resolver reads non-standard fields off the whole doc at runtime and casts for their types.
+		const form = { id: 'form-1', title: 'Contact', tenant: 'acme' }
+		await resolveConsentEntries({ payload: payloadWith({}), req, form, sources })
+		expect(sources).toHaveBeenCalledWith({ req, form })
 	})
 
 	it('forwards a null title now that the whole doc passes through', async () => {
