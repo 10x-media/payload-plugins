@@ -28,13 +28,24 @@ const toList = (value: unknown): string[] =>
 			: []
 
 /**
+ * The first plausible email in a resolved value, or empty. A recipient entry names a single address,
+ * so this drops anything past a separator or CR/LF that a `{{field}}` token might interpolate from
+ * visitor input, closing SMTP header injection and extra-recipient injection.
+ */
+export const firstAddress = (value: string): string =>
+	value
+		.split(/[,;\n\r]+/)
+		.map((part) => part.trim())
+		.find(isPlausibleEmail) ?? ''
+
+/**
  * Resolve a stored recipient value (a `string[]`, or a legacy single string) to the comma-separated
  * list `payload.sendEmail` accepts: each entry is interpolated (a `{{field}}` token resolves from the
- * submission, a plain email passes through), trimmed, empties dropped, joined with `, `.
+ * submission, a plain email passes through), sanitized to a single address, empties dropped, joined.
  */
 export const resolveRecipients = (value: unknown, resolve: (name: string) => string): string =>
 	toList(value)
-		.map((entry) => interpolate(entry, resolve).trim())
+		.map((entry) => firstAddress(interpolate(entry, resolve)))
 		.filter((entry) => entry.length > 0)
 		.join(', ')
 

@@ -7,7 +7,12 @@ import { keys } from '../../translations/keys'
 import { asTranslate, labelFor } from '../../translations/server'
 import { resolverFor } from '../body/serializeBody'
 import { defineAction } from '../defineAction'
-import { buildRecipientField, type RecipientsConfig, resolveRecipients } from '../emailRecipients'
+import {
+	buildRecipientField,
+	firstAddress,
+	type RecipientsConfig,
+	resolveRecipients,
+} from '../emailRecipients'
 import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
 
 type ConfirmationConfig = {
@@ -112,7 +117,9 @@ export const buildConfirmation = (
 			}
 
 			const resolve = resolverFor(values)
-			const to = resolve(config.toField)
+			// Sanitize the visitor-resolved recipient to a single address (drops CR/LF header injection
+			// and any extra addresses a crafted field value could smuggle in).
+			const to = firstAddress(resolve(config.toField))
 
 			if (!to) {
 				return
