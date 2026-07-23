@@ -20,7 +20,12 @@ import {
 } from '../aggregation/resolveResultsRequest'
 import { normalizeCalc } from '../calc/normalizeCalc'
 import { buildConditionTypeMap } from '../conditions/conditionType'
-import { type FieldRow, normalizeFormConditions } from '../conditions/normalizeConditions'
+import {
+	buildOperandTypes,
+	type FieldRow,
+	normalizeFormConditions,
+	normalizeWhere,
+} from '../conditions/normalizeConditions'
 import { resolveConsentSourcesRequest } from '../consent/resolveConsentSourcesRequest'
 import { resolveConsentStatements } from '../consent/resolveConsentStatements'
 import type { ConsentSourcesResolver } from '../consent/types'
@@ -254,7 +259,13 @@ export const buildFormsCollection = ({
 					return bareTypes.has(field.blockType) && field.id != null ? String(field.id) : undefined
 				})
 				.filter((key): key is string => key !== undefined)
-			const normalizedFlow = normalizeFlow(data.flow, fieldKeys)
+			// Launder flow transition `when` clauses with the same operand-type rules as field conditions,
+			// so a transition referencing a deleted field is dropped, not left as a route that always
+			// matches at navigation time and force-routes the visitor.
+			const operandTypes = buildOperandTypes(normalized, conditionTypes)
+			const normalizedFlow = normalizeFlow(data.flow, fieldKeys, (w) =>
+				normalizeWhere(w, operandTypes)
+			)
 			// A flow the author built but that collapses to fewer than two valid steps would
 			// otherwise vanish silently. Surface it instead of discarding their work.
 			if (providedFlowStepCount(data.flow) > 0 && normalizedFlow === undefined) {

@@ -34,7 +34,11 @@ const isValidConstraint = (
 	return Boolean(operator && (conditionOperators[type] as readonly string[]).includes(operator))
 }
 
-const normalizeOne = (
+/**
+ * Canonicalize a `Where` to OR-of-ANDs and strip constraints whose operand field is unknown or whose
+ * operator is invalid for that field's condition type. Returns undefined when nothing valid remains.
+ */
+export const normalizeWhere = (
 	raw: unknown,
 	operandTypes: Map<string, ConditionFieldType>
 ): Where | undefined => {
@@ -61,23 +65,34 @@ const normalizeOne = (
  * to OR-of-ANDs and strips constraints whose operand field is missing or whose operator is invalid for
  * that field's condition type, so stored conditions always match what `evaluateCondition` can run.
  */
-export const normalizeFormConditions = (
+/**
+ * The operand-name -> condition-type map for a form's fields. A field is a valid condition operand
+ * only when it has a name and its block type has a condition type (display-only types are excluded),
+ * so a constraint referencing anything else is stripped, matching the client operand list.
+ */
+export const buildOperandTypes = (
 	fields: FieldRow[],
 	conditionTypes: Record<string, ConditionFieldType>
-): FieldRow[] => {
+): Map<string, ConditionFieldType> => {
 	const operandTypes = new Map<string, ConditionFieldType>()
 	for (const row of fields) {
 		const name = typeof row.name === 'string' ? row.name.trim() : ''
-		// A type absent from the map is not conditionable (display-only, e.g. message): constraints
-		// referencing it are stripped, matching the client operand list.
 		const conditionType = conditionTypes[row.blockType]
 		if (name.length > 0 && conditionType) {
 			operandTypes.set(name, conditionType)
 		}
 	}
+	return operandTypes
+}
+
+export const normalizeFormConditions = (
+	fields: FieldRow[],
+	conditionTypes: Record<string, ConditionFieldType>
+): FieldRow[] => {
+	const operandTypes = buildOperandTypes(fields, conditionTypes)
 	return fields.map((row) => {
-		const visibleWhen = normalizeOne(row.visibleWhen, operandTypes)
-		const validateWhen = normalizeOne(row.validateWhen, operandTypes)
+		const visibleWhen = normalizeWhere(row.visibleWhen, operandTypes)
+		const validateWhen = normalizeWhere(row.validateWhen, operandTypes)
 		return { ...row, visibleWhen, validateWhen }
 	})
 }
