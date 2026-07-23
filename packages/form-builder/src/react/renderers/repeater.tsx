@@ -1,6 +1,6 @@
 'use client'
 
-import { createElement, useId } from 'react'
+import { createElement, useId, useRef } from 'react'
 import { isNamedField } from '../../fields/fieldKey'
 import type { FormFieldInstance } from '../../submissions/types'
 import { keys } from '../../translations/keys'
@@ -11,6 +11,10 @@ import { FieldShell } from '../primitives/FieldShell'
 import { useField } from '../useField'
 
 type RepeaterRow = Record<string, unknown>
+
+/** Process-wide counter for stable per-row React keys (rows are plain objects with no id of their own). */
+let rowKeySeq = 0
+const nextRowKey = () => `fbrow-${rowKeySeq++}`
 
 /**
  * Thin wrapper so each sub-field renderer is a proper React component (has stable hook identity
@@ -30,11 +34,20 @@ const SubFieldWrapper = ({
 
 export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 	({ field, name, id: rootId, errors, required, t, locale }) => {
-		const { rendererRegistry } = useFormContext()
+		const { rendererRegistry, dispatch } = useFormContext()
 		const { value, setValue, onBlur } = useField<RepeaterRow[]>(name)
 		const addId = useId()
+		const rowKeysRef = useRef<string[]>([])
 
 		const rows = Array.isArray(value) ? value : []
+		// One stable key per row so removing a middle row does not re-index survivors onto each other's
+		// React instances (which would strand a stateful sub-renderer's local state, e.g. the file
+		// renderer's filename). Reconciled to the row count each render; add/remove keep keys aligned.
+		if (rowKeysRef.current.length !== rows.length) {
+			const next = rowKeysRef.current.slice(0, rows.length)
+			while (next.length < rows.length) next.push(nextRowKey())
+			rowKeysRef.current = next
+		}
 		const subFields = (
 			Array.isArray(field.subFields) ? (field.subFields as FormFieldInstance[]) : []
 		).filter(isNamedField)
@@ -47,17 +60,22 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 
 		const addRow = () => {
 			if (maxRows != null && rows.length >= maxRows) return
+			rowKeysRef.current = [...rowKeysRef.current, nextRowKey()]
 			setValue([...rows, {}])
 			onBlur()
 		}
 
 		const removeRow = (index: number) => {
+			rowKeysRef.current = rowKeysRef.current.filter((_, i) => i !== index)
 			setValue(rows.filter((_, i) => i !== index))
 			onBlur()
 		}
 
 		const updateRow = (index: number, fieldName: string, fieldValue: unknown) => {
 			setValue(rows.map((row, i) => (i === index ? { ...row, [fieldName]: fieldValue } : row)))
+			// SET_VALUE clears only the repeater field's own error key, not composite sub-field keys, so a
+			// stale server-side error for this sub-field would linger until the next submit. Clear it now.
+			dispatch({ type: 'SET_FIELD_ISSUES', name: `${name}[${index}].${fieldName}`, errors: [] })
 		}
 
 		return (
@@ -73,8 +91,7 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 					{rows.map((row, rowIndex) => {
 						const rowLabel = t(keys.repeaterRow).replace('{n}', String(rowIndex + 1))
 						return (
-							// biome-ignore lint/suspicious/noArrayIndexKey: repeater rows have no stable ID; index key is intentional
-							<fieldset key={rowIndex} className="fb-repeater__row">
+							<fieldset key={rowKeysRef.current[rowIndex]} className="fb-repeater__row">
 								<legend className="fb-repeater__row-legend">
 									{rowLabel}
 									{rows.length > minRows && (
