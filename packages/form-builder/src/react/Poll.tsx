@@ -73,6 +73,7 @@ export const Poll = ({
 	const resultsAwaitClose = !closed && !finalized && poll?.resultsVisibility === 'afterClose'
 	const [voted, setVoted] = useState(false)
 	const [results, setResults] = useState<FieldAggregation[] | null>(null)
+	const [loadFailed, setLoadFailed] = useState(false)
 	const translate = useMemo(() => formProps.t ?? makeTranslate(en), [formProps.t])
 
 	const loadResults = useCallback(async () => {
@@ -81,8 +82,20 @@ export const Poll = ({
 			field: resultsField,
 			apiRoute,
 		})
-		setResults(result.ok ? result.results : [])
+		// A failed load surfaces as an error, not an empty result set: `[]` would read as "no votes yet".
+		if (result.ok) {
+			setResults(result.results)
+			setLoadFailed(false)
+		} else {
+			setLoadFailed(true)
+		}
 	}, [fetchResultsImpl, formProps.form.id, resultsField, apiRoute])
+
+	const resultsError = (
+		<p className="fb-poll__error" role="alert">
+			{translate(keys.pollResultsError)}
+		</p>
+	)
 
 	useEffect(() => {
 		const already = hasVoted === true || readVoted(key)
@@ -110,7 +123,9 @@ export const Poll = ({
 		return (
 			<div className="fb-poll fb-poll--final">
 				<p className="fb-poll__final">{translate(keys.pollFinalResult)}</p>
-				{results ? (
+				{loadFailed ? (
+					resultsError
+				) : results ? (
 					<FormResults
 						results={results}
 						winningValues={winningValues}
@@ -126,7 +141,9 @@ export const Poll = ({
 		return (
 			<div className="fb-poll fb-poll--closed">
 				<p className="fb-poll__closed">{translate(keys.pollClosed)}</p>
-				{results ? (
+				{loadFailed ? (
+					resultsError
+				) : results ? (
 					<FormResults results={results} t={formProps.t} locale={formProps.locale} />
 				) : null}
 			</div>
@@ -136,6 +153,9 @@ export const Poll = ({
 	if (voted) {
 		if (resultsAwaitClose) {
 			return <p className="fb-poll__await-close">{translate(keys.pollResultsAfterClose)}</p>
+		}
+		if (loadFailed) {
+			return resultsError
 		}
 		return results ? (
 			<FormResults results={results} t={formProps.t} locale={formProps.locale} />

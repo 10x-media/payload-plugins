@@ -35,6 +35,13 @@ export type ConsentProof = {
  * lean id-only proof. The snapshot is captured in every branch, including a refusal and a page-less
  * source.
  *
+ * Time-of-check/time-of-use: a visitor reads the wording resolved when the form loaded, but the
+ * snapshot here is re-resolved from the source at submit. If the source text changed in that window,
+ * the proof records the submit-time wording, not the exact bytes rendered earlier. This is
+ * deliberate, the server's live view is authoritative and the window is one visitor session; a form
+ * that must freeze the exact wording agreed to should version the source (drafts give a `versionRef`
+ * pinning the published version, below).
+ *
  * `versionRef` is recorded only when the page's collection has drafts enabled, and then it is the
  * published version document's own id. Versions without drafts get no `versionRef`, because there
  * is no published/draft distinction to pin to: `_status` only exists under drafts, so a

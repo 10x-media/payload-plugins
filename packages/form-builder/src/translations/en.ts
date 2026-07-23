@@ -215,6 +215,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.endpointOptionsError]: 'Options could not be loaded.',
 	[keys.pollOptionsUnavailable]: 'Poll options are currently unavailable. Please try again later.',
 	[keys.pollFinalResult]: 'Final result',
+	[keys.pollResultsError]: 'Results could not be loaded.',
 	[keys.resultsWinner]: 'Winner',
 	[keys.validationFileMissing]: 'Upload a file',
 	[keys.validationFileMimeType]: 'File type not allowed',
