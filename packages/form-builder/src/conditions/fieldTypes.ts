@@ -4,8 +4,10 @@ import type { FormFieldValueKind } from '../fields/types'
 /**
  * The condition input families the builder supports. A deliberate subset of Payload's field-condition
  * types, restricted to the operators `evaluateCondition` implements (no geo/relationship in v1).
+ * `presence` is for values that only support an existence check (a file upload, a repeater), never a
+ * scalar comparison.
  */
-export type ConditionFieldType = 'text' | 'number' | 'select' | 'checkbox' | 'date'
+export type ConditionFieldType = 'text' | 'number' | 'select' | 'checkbox' | 'date' | 'presence'
 
 const EQUALITY: Operator[] = ['equals', 'not_equals']
 const MEMBERSHIP: Operator[] = ['in', 'not_in']
@@ -20,6 +22,7 @@ export const conditionOperators: Record<ConditionFieldType, Operator[]> = {
 	select: [...EQUALITY, ...MEMBERSHIP, ...EXISTS],
 	checkbox: [...EQUALITY, ...EXISTS],
 	date: [...EQUALITY, ...ORDER, ...EXISTS],
+	presence: [...EXISTS],
 }
 
 /** Default condition input for a stored value kind; a field type may override via its `conditionType`. */
@@ -33,6 +36,11 @@ export const defaultConditionType = (value: FormFieldValueKind): ConditionFieldT
 			return 'date'
 		case 'text[]':
 			return 'select'
+		case 'file':
+		case 'repeater':
+			// Non-scalar values: a FileRef object or a row array cannot be compared with text/select
+			// operators (they only stringify), so offer presence-only checks.
+			return 'presence'
 		default:
 			return 'text'
 	}

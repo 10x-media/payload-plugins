@@ -35,12 +35,15 @@ describe('condition field-type catalog', () => {
 		expect(defaultConditionType('boolean')).toBe('checkbox')
 		expect(defaultConditionType('date')).toBe('date')
 		expect(defaultConditionType('text[]')).toBe('select')
+		expect(defaultConditionType('file')).toBe('presence')
+		expect(defaultConditionType('repeater')).toBe('presence')
 	})
 
 	it('numbers support ordering, text supports matching, checkbox is equality-only', () => {
 		expect(conditionOperators.number).toContain('greater_than')
 		expect(conditionOperators.text).toContain('contains')
 		expect(conditionOperators.checkbox).toEqual(['equals', 'not_equals', 'exists'])
+		expect(conditionOperators.presence).toEqual(['exists'])
 	})
 
 	it('labels operators via Payload operators namespace', () => {

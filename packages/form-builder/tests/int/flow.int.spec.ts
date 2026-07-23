@@ -52,7 +52,8 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 		const transitions = stepA.transitions as Array<Record<string, unknown>>
 		expect(transitions).toHaveLength(1)
 		expect(transitions[0]?.to).toBe('step-b')
-		expect(transitions[0]?.when).toEqual({ name: { equals: 'skip' } })
+		// Transition `when` is now laundered + canonicalized to OR-of-ANDs, like a field condition.
+		expect(transitions[0]?.when).toEqual({ or: [{ and: [{ name: { equals: 'skip' } }] }] })
 		const stepB = steps[1] as Record<string, unknown>
 		expect(stepB.id).toBe('step-b')
 		expect(stepB.fields).toEqual(['email'])

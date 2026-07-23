@@ -18,8 +18,16 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
  * per step off `useFormStep()`, so an empty step is not necessarily an empty page, and dropping
  * one would strand the `next` and transition targets that point at it. The visitor gets a page with
  * only navigation on it, which is visible to the author in the flow builder and recoverable there.
+ *
+ * When `normalizeWhen` is provided, each transition's `when` is laundered through it (the same field
+ * condition normalization); a transition whose `when` strips to nothing (an operand field was deleted)
+ * is dropped rather than kept as an always-true route that would force navigation.
  */
-export const normalizeFlow = (raw: unknown, fieldKeys: string[]): FormFlow | undefined => {
+export const normalizeFlow = (
+	raw: unknown,
+	fieldKeys: string[],
+	normalizeWhen?: (raw: unknown) => Where | undefined
+): FormFlow | undefined => {
 	if (!isRecord(raw) || !Array.isArray(raw.steps)) {
 		return undefined
 	}
@@ -58,7 +66,11 @@ export const normalizeFlow = (raw: unknown, fieldKeys: string[]): FormFlow | und
 					knownIds.has(t.to as string) &&
 					isRecord(t.when)
 			)
-			.map((t) => ({ when: t.when as Where, to: t.to as string }))
+			.map((t) => ({
+				when: normalizeWhen ? normalizeWhen(t.when) : (t.when as Where),
+				to: t.to as string,
+			}))
+			.filter((t): t is { when: Where; to: string } => t.when !== undefined)
 
 		const next =
 			s.next === null

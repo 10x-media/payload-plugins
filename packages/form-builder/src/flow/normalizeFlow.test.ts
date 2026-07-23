@@ -1,3 +1,4 @@
+import type { Where } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { normalizeFlow } from './normalizeFlow'
 
@@ -139,5 +140,47 @@ describe('normalizeFlow', () => {
 		expect(flow?.steps[0]?.next).toBeNull()
 		expect(flow?.steps[1] ? 'next' in flow.steps[1] : undefined).toBe(false)
 		expect(flow?.steps[2]?.next).toBe('a')
+	})
+
+	it('launders transition when clauses and drops a transition that strips to nothing', () => {
+		// Simulates the operand-type laundering: a `when` naming a deleted field strips to undefined.
+		const normalizeWhen = (raw: unknown): Where | undefined =>
+			raw && typeof raw === 'object' && 'deleted' in raw ? undefined : (raw as Where)
+		const flow = normalizeFlow(
+			{
+				steps: [
+					{
+						id: 'a',
+						fields: ['name'],
+						transitions: [
+							{ to: 'b', when: { deleted: { equals: 'x' } } },
+							{ to: 'c', when: { name: { equals: 'x' } } },
+						],
+					},
+					{ id: 'b', fields: ['email'] },
+					{ id: 'c', fields: ['y'] },
+				],
+			},
+			fieldNames,
+			normalizeWhen
+		)
+		expect(flow?.steps[0]?.transitions).toEqual([{ to: 'c', when: { name: { equals: 'x' } } }])
+	})
+
+	it('keeps raw transition when clauses when no normalizer is passed (backward compatible)', () => {
+		const flow = normalizeFlow(
+			{
+				steps: [
+					{
+						id: 'a',
+						fields: ['name'],
+						transitions: [{ to: 'b', when: { name: { equals: 'x' } } }],
+					},
+					{ id: 'b', fields: ['email'] },
+				],
+			},
+			fieldNames
+		)
+		expect(flow?.steps[0]?.transitions).toEqual([{ to: 'b', when: { name: { equals: 'x' } } }])
 	})
 })

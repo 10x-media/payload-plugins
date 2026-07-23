@@ -43,6 +43,9 @@ describe('evaluateCondition', () => {
 		expect(evaluateCondition(cond('a', 'exists', true), {})).toBe(false)
 		expect(evaluateCondition(cond('a', 'exists', false), {})).toBe(true)
 		expect(evaluateCondition(cond('b', 'exists', true), { b: false })).toBe(true)
+		// An empty array (a repeater with no rows) counts as absent, a non-empty one as present.
+		expect(evaluateCondition(cond('c', 'exists', true), { c: [] })).toBe(false)
+		expect(evaluateCondition(cond('c', 'exists', true), { c: [{}] })).toBe(true)
 	})
 
 	it('numeric ordering (and date strings)', () => {
