@@ -24,6 +24,10 @@ export const notAlreadySubmittedRule = defineValidationRule<Record<string, never
 			where: { form: { equals: formId } },
 			limit: SCAN_LIMIT,
 			depth: 0,
+			// Trusted internal dedup read: scan every prior submission of this form regardless of the
+			// submitter's own access. This is the local-API default made explicit, matching the sibling
+			// resolvePollOutcome/aggregateResponses reads; the `form` filter keeps it single-tenant.
+			overrideAccess: true,
 			req,
 		})
 		const clash = result.docs.some((doc) => {

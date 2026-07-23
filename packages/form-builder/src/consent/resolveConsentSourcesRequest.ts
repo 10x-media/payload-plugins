@@ -37,8 +37,11 @@ export const resolveConsentSourcesRequest = async (
 	if (formId == null) {
 		return { status: 400, body: { errors: [{ message: 'Missing form id' }] } }
 	}
+	// Load under the caller's own read access (no overrideAccess): a tenant-scoped `forms.access.read`
+	// then refuses a cross-tenant form id (null -> 404), so an authed user can never enumerate another
+	// tenant's consent source labels/ids.
 	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, req })
 		.catch(() => null)
 	if (!form) {
 		return { status: 404, body: { errors: [{ message: 'Not found' }] } }

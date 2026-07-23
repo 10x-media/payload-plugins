@@ -40,6 +40,18 @@ describe('resolveRecipients', () => {
 		expect(resolveRecipients(undefined, resolve)).toBe('')
 		expect(resolveRecipients([], resolve)).toBe('')
 	})
+
+	it('sanitizes each resolved entry to one address: drops header injection and extra recipients', () => {
+		const inject = (name: string) =>
+			name === 'multi'
+				? 'a@b.com, attacker@evil.com'
+				: name === 'crlf'
+					? 'a@b.com\r\nBcc: x@y.com'
+					: ''
+		expect(resolveRecipients(['{{multi}}'], inject)).toBe('a@b.com')
+		expect(resolveRecipients(['{{crlf}}'], inject)).toBe('a@b.com')
+		expect(resolveRecipients(['team@x.com', '{{multi}}'], inject)).toBe('team@x.com, a@b.com')
+	})
 })
 
 describe('validateRecipients', () => {
@@ -94,6 +106,14 @@ describe('validateRecipients', () => {
 		const validate = validateRecipients({ allowCustom: false, resolveAllowed })
 		expect(await validate(['sales@x.com'], { data, req })).toBe(
 			'formBuilder:validation.recipient.optionsUnavailable'
+		)
+	})
+
+	it('with fieldTokens false, rejects a {{field}} token but still accepts an email', async () => {
+		const validate = validateRecipients({ tokenFieldTypes: ['email'], fieldTokens: false })
+		expect(await validate(['a@b.com'], { data, req })).toBe(true)
+		expect(await validate(['{{email}}'], { data, req })).toBe(
+			'formBuilder:validation.recipient.notAllowed'
 		)
 	})
 })

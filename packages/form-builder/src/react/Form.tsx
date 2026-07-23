@@ -30,7 +30,7 @@ import {
 } from '../presentations/defaults'
 import { interpolate } from '../recall/interpolate'
 import { buildRecallResolver, descriptorsFor } from '../recall/resolver'
-import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
+import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD, HONEYPOT_VALUE_KEY } from '../spam/constants'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
@@ -493,7 +493,9 @@ export const Form = ({
 		if (honeypotName) {
 			const decoy = honeypotRef.current?.value ?? ''
 			if (decoy !== '') {
-				values.push({ field: honeypotName, value: decoy })
+				// Submit the decoy under a reserved key, not its cosmetic DOM name, so a real field sharing
+				// that name is never stripped or mistaken for the honeypot on the server.
+				values.push({ field: HONEYPOT_VALUE_KEY, value: decoy })
 			}
 		}
 		if (captchaToken) {

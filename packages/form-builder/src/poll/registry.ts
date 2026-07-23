@@ -22,7 +22,9 @@ export const resolvePollOptionSources = (
 		} else if (option === true) {
 			// keep the default; no-op because no built-in poll option sources exist
 		} else {
-			registry.set(type, option)
+			// Force the definition's type to the config key so the authored select value (derived from
+			// `type`) and the execution lookup (by map key) agree. Mirrors the sibling registries.
+			registry.set(type, { ...option, type })
 		}
 	}
 	return registry

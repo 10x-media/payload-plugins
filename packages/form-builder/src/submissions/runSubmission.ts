@@ -12,6 +12,7 @@ import { captureFileRef } from '../uploads/captureFileRef'
 import type { FileFieldConfig, FileRefError } from '../uploads/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { runValidation } from '../validation/runValidation'
+import { isTruthyString } from './coerceBoolean'
 import type {
 	FormFieldInstance,
 	SubmissionDescriptor,
@@ -69,17 +70,11 @@ const coerce = (kind: string, value: unknown): unknown => {
 		return Number.isNaN(next) ? value : next
 	}
 	if (kind === 'boolean') {
-		// A genuine boolean from the renderer passes through; a raw client string is parsed strictly so that
-		// "false"/"0"/"off"/"no"/"" are not silently truthy (this matters for the required-consent check).
+		// A genuine boolean from the renderer passes through; a raw client string is parsed against the
+		// shared truthy allow-list (also used by prefill), so only affirmative tokens read as true. The
+		// server is the trust boundary for consent: a stray string must never count as agreement.
 		if (typeof value === 'string') {
-			const normalized = value.trim().toLowerCase()
-			return !(
-				normalized === '' ||
-				normalized === 'false' ||
-				normalized === '0' ||
-				normalized === 'off' ||
-				normalized === 'no'
-			)
+			return isTruthyString(value)
 		}
 		return Boolean(value)
 	}

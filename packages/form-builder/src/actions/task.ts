@@ -6,7 +6,7 @@ import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types
 import { asFieldTranslate } from '../translations/server'
 import type { RichTextBodyOption } from './body/serializeBody'
 import type { ActionRegistry } from './registry'
-import type { ActionInstance } from './runActions'
+import type { ActionInstance, ActionResult } from './runActions'
 import { runActions } from './runActions'
 
 export const ACTIONS_TASK_SLUG = 'form-builder-actions'
@@ -34,7 +34,7 @@ export const runActionsForSubmission = async (args: {
 	payload: Payload
 	req?: PayloadRequest
 	richText?: RichTextBodyOption
-}): Promise<void> => {
+}): Promise<ActionResult[]> => {
 	const { input, registry, payload, req, richText } = args
 	const submission = await payload
 		.findByID({
@@ -46,7 +46,7 @@ export const runActionsForSubmission = async (args: {
 		})
 		.catch(() => null)
 	if (!submission) {
-		return
+		return []
 	}
 
 	// The submission's own stored locale (set from req.locale at submit) is authoritative, so the form
@@ -69,12 +69,12 @@ export const runActionsForSubmission = async (args: {
 		})
 		.catch(() => null)
 	if (!form) {
-		return
+		return []
 	}
 
 	const t: Translate = asFieldTranslate(req?.i18n?.t ?? ((key: string) => key))
 
-	await runActions({
+	const results = await runActions({
 		actions: asActions(form.actions),
 		registry,
 		richText,
@@ -87,6 +87,16 @@ export const runActionsForSubmission = async (args: {
 		locale,
 		t,
 	})
+	// A failed action (SMTP down, webhook non-2xx, missing adapter) is isolated per action; surface it
+	// so a silently undelivered email/webhook is visible instead of the submission looking successful.
+	for (const result of results) {
+		if (!result.ok) {
+			payload.logger?.error(
+				`@10x-media/form-builder: action "${result.type}" failed for submission ${String(submission.id)}: ${result.error ?? 'unknown error'}`
+			)
+		}
+	}
+	return results
 }
 
 /** Native Payload jobs task that runs a submission's post-submit actions out of band. */

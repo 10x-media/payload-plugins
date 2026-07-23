@@ -20,7 +20,7 @@ const submittedValues = (
 	(onSubmit.mock.calls[0]?.[0] as { values: Array<{ field: string; value: unknown }> }).values
 
 describe('Form spam wiring', () => {
-	it('renders a hidden honeypot decoy by default and submits its value when filled', async () => {
+	it('submits the filled decoy under a reserved key while keeping the cosmetic DOM name', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true })
 		const { container } = render(<Form form={doc()} onSubmit={onSubmit} />)
 		const decoy = container.querySelector('input[name="website"]') as HTMLInputElement | null
@@ -29,7 +29,8 @@ describe('Form spam wiring', () => {
 		fireEvent.change(decoy as HTMLInputElement, { target: { value: 'bot' } })
 		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 		await waitFor(() => expect(onSubmit).toHaveBeenCalled())
-		expect(submittedValues(onSubmit)).toContainEqual({ field: 'website', value: 'bot' })
+		expect(submittedValues(onSubmit)).toContainEqual({ field: '__fb_hp', value: 'bot' })
+		expect(submittedValues(onSubmit).map((v) => v.field)).not.toContain('website')
 	})
 
 	it('does not append the decoy when it is left empty (a real user)', async () => {

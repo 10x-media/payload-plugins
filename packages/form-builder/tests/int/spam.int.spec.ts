@@ -30,7 +30,7 @@ describeForDb('form-builder spam guard', { dbs: ['mongo'] }, (db) => {
 				form: form.id,
 				values: [
 					{ field: 'name', value: 'Jo' },
-					{ field: 'website', value: '' },
+					{ field: '__fb_hp', value: '' },
 				],
 			},
 		})
@@ -44,7 +44,7 @@ describeForDb('form-builder spam guard', { dbs: ['mongo'] }, (db) => {
 		await expect(
 			booted.payload.create({
 				collection: 'form-submissions',
-				data: { form: form.id, values: [{ field: 'website', value: 'spam' }] },
+				data: { form: form.id, values: [{ field: '__fb_hp', value: 'spam' }] },
 			})
 		).rejects.toThrow()
 	})

@@ -49,6 +49,12 @@ describe('resolveConsentSourcesRequest', () => {
 		expect(resolver).toHaveBeenCalledWith({ req, form: { id: 'form-1', title: 'Contact' } })
 	})
 
+	it('loads the form under the caller access (no overrideAccess), so a cross-tenant read is refused', async () => {
+		const findByID = vi.fn().mockResolvedValue({ id: 'form-1', title: 'Contact' })
+		await resolveConsentSourcesRequest(args({ payload: makePayload(findByID) }))
+		expect(findByID).toHaveBeenCalledWith(expect.not.objectContaining({ overrideAccess: true }))
+	})
+
 	it('400s without a form id', async () => {
 		expect((await resolveConsentSourcesRequest(args({ formId: undefined }))).status).toBe(400)
 	})

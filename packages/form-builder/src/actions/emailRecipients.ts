@@ -28,13 +28,24 @@ const toList = (value: unknown): string[] =>
 			: []
 
 /**
+ * The first plausible email in a resolved value, or empty. A recipient entry names a single address,
+ * so this drops anything past a separator or CR/LF that a `{{field}}` token might interpolate from
+ * visitor input, closing SMTP header injection and extra-recipient injection.
+ */
+export const firstAddress = (value: string): string =>
+	value
+		.split(/[,;\n\r]+/)
+		.map((part) => part.trim())
+		.find(isPlausibleEmail) ?? ''
+
+/**
  * Resolve a stored recipient value (a `string[]`, or a legacy single string) to the comma-separated
  * list `payload.sendEmail` accepts: each entry is interpolated (a `{{field}}` token resolves from the
- * submission, a plain email passes through), trimmed, empties dropped, joined with `, `.
+ * submission, a plain email passes through), sanitized to a single address, empties dropped, joined.
  */
 export const resolveRecipients = (value: unknown, resolve: (name: string) => string): string =>
 	toList(value)
-		.map((entry) => interpolate(entry, resolve).trim())
+		.map((entry) => firstAddress(interpolate(entry, resolve)))
 		.filter((entry) => entry.length > 0)
 		.join(', ')
 
@@ -51,6 +62,7 @@ export const validateRecipients =
 	(opts: {
 		tokenFieldTypes?: string[]
 		allowCustom?: boolean
+		fieldTokens?: boolean
 		resolveAllowed?: (req: PayloadRequest) => Set<string> | Promise<Set<string>>
 	}) =>
 	async (
@@ -63,7 +75,7 @@ export const validateRecipients =
 		}
 		const fields =
 			data && typeof data === 'object' ? (data as Record<string, unknown>).fields : undefined
-		const { tokenFieldTypes, allowCustom, resolveAllowed } = opts
+		const { tokenFieldTypes, allowCustom, fieldTokens, resolveAllowed } = opts
 		const allowedFields = new Set(
 			tokenFieldTypes && tokenFieldTypes.length > 0
 				? fieldNamesOfType(fields, tokenFieldTypes)
@@ -87,6 +99,10 @@ export const validateRecipients =
 		for (const entry of list) {
 			const token = parseFieldToken(entry)
 			if (token) {
+				// `fieldTokens: false` disables recipient tokens; enforce it on the server, not just the client.
+				if (fieldTokens === false) {
+					return asTranslate(req.t)(keys.validationRecipientNotAllowed)
+				}
 				if (!allowedFields.has(token)) {
 					return asTranslate(req.t)(keys.validationRecipientUnknownField)
 				}
@@ -169,6 +185,7 @@ export const buildRecipientField = (
 		validate: validateRecipients({
 			tokenFieldTypes: opts.recipients?.tokenFieldTypes ?? ['email'],
 			allowCustom: opts.recipients?.allowCustom,
+			fieldTokens: opts.recipients?.fieldTokens,
 			resolveAllowed,
 		}),
 		...localizedIf(localize),

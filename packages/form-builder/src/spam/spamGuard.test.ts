@@ -1,6 +1,6 @@
 import { APIError, type PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { CAPTCHA_TOKEN_KEY, IDENTITY_CONTEXT_KEY } from './constants'
+import { CAPTCHA_TOKEN_KEY, HONEYPOT_VALUE_KEY, IDENTITY_CONTEXT_KEY } from './constants'
 import { buildSpamGuard } from './spamGuard'
 import type { ResolvedSpamConfig } from './types'
 
@@ -44,11 +44,20 @@ describe('buildSpamGuard', () => {
 		expect(req.context[IDENTITY_CONTEXT_KEY]).toBe('ip:1.2.3.4')
 	})
 
-	it('rejects when the honeypot is filled (generic message, no distinguishing detail)', async () => {
+	it('rejects when the decoy is filled (submitted under the reserved key)', async () => {
 		const guard = buildSpamGuard(cfg())
 		await expect(
-			run(guard, { form: 'f1', values: [{ field: 'website', value: 'bot' }] })
+			run(guard, { form: 'f1', values: [{ field: HONEYPOT_VALUE_KEY, value: 'bot' }] })
 		).rejects.toBeInstanceOf(APIError)
+	})
+
+	it('keeps a real field sharing the decoy DOM name, never stripping or tripping it', async () => {
+		const guard = buildSpamGuard(cfg())
+		const out = (await run(guard, {
+			form: 'f1',
+			values: [{ field: 'website', value: 'my site' }],
+		})) as { values?: unknown }
+		expect(out.values).toEqual([{ field: 'website', value: 'my site' }])
 	})
 
 	it('throws 429 when the limiter blocks', async () => {
@@ -56,13 +65,28 @@ describe('buildSpamGuard', () => {
 		await expect(run(guard, { form: 'f1', values: [] })).rejects.toMatchObject({ status: 429 })
 	})
 
-	it('fails open when identity is null (no rate-limit call)', async () => {
+	it('fails open when identity is null, but records it on meta.spam so it is not silent', async () => {
 		const limiter = { check: vi.fn(async () => ({ ok: false, remaining: 0, resetAt: 0 })) }
 		const guard = buildSpamGuard(
 			cfg({ identify: () => null, rateLimit: { window: 1, max: 1, limiter } })
 		)
-		await expect(run(guard, { form: 'f1', values: [] })).resolves.toBeTruthy()
+		const out = (await run(guard, { form: 'f1', values: [] })) as {
+			meta?: { spam?: { rateLimit?: string } }
+		}
 		expect(limiter.check).not.toHaveBeenCalled()
+		expect(out.meta?.spam?.rateLimit).toBe('skipped-no-identity')
+	})
+
+	it('records the enforced and disabled rate-limit states on meta.spam', async () => {
+		const enforced = (await run(buildSpamGuard(cfg()), { form: 'f1', values: [] })) as {
+			meta?: { spam?: { rateLimit?: string } }
+		}
+		expect(enforced.meta?.spam?.rateLimit).toBe('enforced')
+		const disabled = (await run(buildSpamGuard(cfg({ rateLimit: false })), {
+			form: 'f1',
+			values: [],
+		})) as { meta?: { spam?: { rateLimit?: string } } }
+		expect(disabled.meta?.spam?.rateLimit).toBe('disabled')
 	})
 
 	it('rejects when a captcha is configured but the token is missing or invalid', async () => {
@@ -94,7 +118,7 @@ describe('buildSpamGuard', () => {
 		const guard = buildSpamGuard(cfg({ captcha }))
 		const out = (await run(
 			guard,
-			{ form: 'f1', values: [{ field: 'website', value: 'x' }] },
+			{ form: 'f1', values: [{ field: HONEYPOT_VALUE_KEY, value: 'x' }] },
 			req
 		)) as { meta?: { spam?: { captcha?: string } } }
 		expect(out.meta?.spam?.captcha).toBe('skipped')
