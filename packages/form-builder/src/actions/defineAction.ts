@@ -23,7 +23,8 @@ export type ActionRunArgs<TConfig extends Record<string, unknown> = Record<strin
  */
 export type ActionDefinition<TConfig extends Record<string, unknown> = Record<string, unknown>> = {
 	type: string
-	label: string
+	/** i18n-key or literal (resolved like a field label), or a per-locale record. */
+	label: string | Record<string, string>
 	config?: Field[]
 	run: (args: ActionRunArgs<TConfig>) => Promise<void> | void
 }

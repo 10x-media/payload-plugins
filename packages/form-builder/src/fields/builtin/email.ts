@@ -1,7 +1,6 @@
 import { keys } from '../../translations/keys'
+import { EMAIL_PATTERN } from '../../validation/emailPattern'
 import { defineFormField } from '../defineFormField'
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export const emailField = defineFormField<'text'>({
 	type: 'email',

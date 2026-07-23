@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { applyRegistryConfig } from '../plugin/applyRegistryConfig'
 import { customStateOf, stashCustomState } from '../plugin/customState'
 import { keys } from '../translations/keys'
 import { definePollType, type PollOutcomeStrategy } from './definePollType'
@@ -90,9 +91,10 @@ export const resolvePollTypes = (config?: PollTypesConfig): PollTypeRegistry => 
 			registry.set(strategy.type, strategy)
 		}
 	} else if (config) {
-		for (const [type, strategy] of Object.entries(config)) {
-			registry.set(type, { ...strategy, type })
-		}
+		// A keyed record shares the sibling registries' merge (the key forces `type`). There are no
+		// boolean toggles here because the three built-ins are always registered, so those branches
+		// are inert for this always-strategy config.
+		applyRegistryConfig(registry, config)
 	}
 	return registry
 }

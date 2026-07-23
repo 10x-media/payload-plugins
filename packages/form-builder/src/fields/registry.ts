@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { applyRegistryConfig, type RegistryConfig } from '../plugin/applyRegistryConfig'
 import { customStateOf, stashCustomState } from '../plugin/customState'
 import type { AnyFormFieldDefinition } from './types'
 
@@ -7,7 +8,7 @@ export type FieldTypeRegistry = Map<string, AnyFormFieldDefinition>
 /** Per-type opt-in: `false` removes a built-in, `true` keeps it, an object adds a new type or replaces one. */
 export type FieldTypeOption = boolean | AnyFormFieldDefinition
 
-export type FieldTypesConfig = Record<string, FieldTypeOption>
+export type FieldTypesConfig = RegistryConfig<AnyFormFieldDefinition>
 
 export const buildRegistry = (definitions: AnyFormFieldDefinition[]): FieldTypeRegistry => {
 	const registry: FieldTypeRegistry = new Map()
@@ -40,16 +41,7 @@ export const resolveFieldTypes = (
 	defaults: AnyFormFieldDefinition[],
 	config: FieldTypesConfig = {}
 ): FieldTypeRegistry => {
-	const registry = buildRegistry(defaults)
-	for (const [type, option] of Object.entries(config)) {
-		if (option === false) {
-			registry.delete(type)
-		} else if (option === true) {
-			// keep the default; a no-op when no default exists for this key
-		} else {
-			registry.set(type, { ...option, type })
-		}
-	}
+	const registry = applyRegistryConfig(buildRegistry(defaults), config)
 	for (const definition of registry.values()) {
 		assertBareContract(definition)
 	}

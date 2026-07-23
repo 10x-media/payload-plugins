@@ -1,7 +1,6 @@
 import { keys } from '../../translations/keys'
 import { defineValidationRule } from '../defineValidationRule'
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { EMAIL_PATTERN } from '../emailPattern'
 
 export const emailRule = defineValidationRule<Record<string, never>, string>({
 	type: 'email',

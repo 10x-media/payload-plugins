@@ -1,6 +1,6 @@
 import type { Field } from 'payload'
 import { keys } from '../translations/keys'
-import { labelFor, labelForKey } from '../translations/server'
+import { labelForKey, resolveDefinitionLabel } from '../translations/server'
 import type { PollOptionSourceRegistry } from './registry'
 
 /**
@@ -41,7 +41,10 @@ export const buildPollOptionSourceFields = (registry: PollOptionSourceRegistry):
 			admin: {
 				description: labelForKey(keys.pollOptionSourceDescription),
 			},
-			options: sources.map((source) => ({ label: labelFor(source.label), value: source.type })),
+			options: sources.map((source) => ({
+				label: resolveDefinitionLabel(source.label),
+				value: source.type,
+			})),
 		},
 		{
 			name: 'sourceConfig',

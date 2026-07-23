@@ -35,3 +35,13 @@ export const labelFor =
 	(key: string): LabelFunction =>
 	({ t }) =>
 		asTranslate(t)(key as TranslationKey)
+
+/**
+ * Turn a registry definition's `label` into a value Payload accepts for a field/block `label`. A
+ * string resolves per request like a field label (an i18n key or a literal) via `labelFor`; a
+ * per-locale record passes through unchanged. Shared by the action, poll-source, and poll-type
+ * registries so every definition label honors one contract.
+ */
+export const resolveDefinitionLabel = (
+	label: string | Record<string, string>
+): LabelFunction | Record<string, string> => (typeof label === 'string' ? labelFor(label) : label)
