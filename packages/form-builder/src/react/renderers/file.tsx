@@ -49,7 +49,7 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 		const allErrors = localError ? [...errors, localError] : errors
 		// Show the just-uploaded filename, or a generic indicator when the field already holds an id (recall/prefill): the filename is not part of the client value.
 		const hasValue = value !== undefined && value !== null && value !== ''
-		const displayName = filename ?? (hasValue ? 'Uploaded file' : undefined)
+		const displayName = filename ?? (hasValue ? t(keys.fileUploaded) : undefined)
 
 		const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
 			const selected = event.target.files?.[0]
@@ -72,7 +72,7 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 				setFilename(selected.name)
 				onChange(result.id)
 			} else {
-				setLocalError(result.message ?? 'Upload failed')
+				setLocalError(result.message ?? t(keys.fileUploadFailed))
 			}
 		}
 
@@ -107,7 +107,7 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 				{hints.length > 0 ? <p className="fb-field__file-hint">{hints.join(' · ')}</p> : null}
 				{uploading ? (
 					<p className="fb-field__file-status" aria-live="polite">
-						Uploading
+						{t(keys.fileUploading)}
 					</p>
 				) : null}
 				{displayName ? (
@@ -119,7 +119,7 @@ export const fileRenderer = defineFieldRenderer<string | number>(
 							onClick={clear}
 							disabled={disabled}
 						>
-							Remove
+							{t(keys.fileRemove)}
 						</button>
 					</p>
 				) : null}
