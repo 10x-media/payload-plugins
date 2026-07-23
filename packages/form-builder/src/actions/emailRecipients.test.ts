@@ -108,4 +108,12 @@ describe('validateRecipients', () => {
 			'formBuilder:validation.recipient.optionsUnavailable'
 		)
 	})
+
+	it('with fieldTokens false, rejects a {{field}} token but still accepts an email', async () => {
+		const validate = validateRecipients({ tokenFieldTypes: ['email'], fieldTokens: false })
+		expect(await validate(['a@b.com'], { data, req })).toBe(true)
+		expect(await validate(['{{email}}'], { data, req })).toBe(
+			'formBuilder:validation.recipient.notAllowed'
+		)
+	})
 })

@@ -62,6 +62,7 @@ export const validateRecipients =
 	(opts: {
 		tokenFieldTypes?: string[]
 		allowCustom?: boolean
+		fieldTokens?: boolean
 		resolveAllowed?: (req: PayloadRequest) => Set<string> | Promise<Set<string>>
 	}) =>
 	async (
@@ -74,7 +75,7 @@ export const validateRecipients =
 		}
 		const fields =
 			data && typeof data === 'object' ? (data as Record<string, unknown>).fields : undefined
-		const { tokenFieldTypes, allowCustom, resolveAllowed } = opts
+		const { tokenFieldTypes, allowCustom, fieldTokens, resolveAllowed } = opts
 		const allowedFields = new Set(
 			tokenFieldTypes && tokenFieldTypes.length > 0
 				? fieldNamesOfType(fields, tokenFieldTypes)
@@ -98,6 +99,10 @@ export const validateRecipients =
 		for (const entry of list) {
 			const token = parseFieldToken(entry)
 			if (token) {
+				// `fieldTokens: false` disables recipient tokens; enforce it on the server, not just the client.
+				if (fieldTokens === false) {
+					return asTranslate(req.t)(keys.validationRecipientNotAllowed)
+				}
 				if (!allowedFields.has(token)) {
 					return asTranslate(req.t)(keys.validationRecipientUnknownField)
 				}
@@ -180,6 +185,7 @@ export const buildRecipientField = (
 		validate: validateRecipients({
 			tokenFieldTypes: opts.recipients?.tokenFieldTypes ?? ['email'],
 			allowCustom: opts.recipients?.allowCustom,
+			fieldTokens: opts.recipients?.fieldTokens,
 			resolveAllowed,
 		}),
 		...localizedIf(localize),
