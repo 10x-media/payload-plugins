@@ -69,6 +69,37 @@ describe('Poll', () => {
 		expect(window.localStorage.getItem('fb-poll-1')).not.toBeNull()
 	})
 
+	it('forwards the resolved success response to a Poll host onSuccess', async () => {
+		const onSuccess = vi.fn()
+		const formWithResponse = {
+			...form,
+			response: {
+				type: 'message' as const,
+				message: {
+					root: {
+						type: 'root',
+						children: [{ type: 'paragraph', children: [{ type: 'text', text: 'Voted!' }] }],
+					},
+				},
+			},
+		}
+		const { container } = render(
+			createElement(Poll, {
+				form: formWithResponse,
+				resultsField: 'colour',
+				onSubmit: vi.fn().mockResolvedValue({ ok: true, submissionId: '9' }),
+				fetchResultsImpl: vi.fn().mockResolvedValue(resultsOk()),
+				onSuccess,
+			})
+		)
+		fireEvent.change(within(container).getByRole('combobox'), { target: { value: 'red' } })
+		fireEvent.click(within(container).getByRole('button', { name: /submit|vote/i }))
+		await waitFor(() => expect(onSuccess).toHaveBeenCalled())
+		const [id, result] = onSuccess.mock.calls[0] ?? []
+		expect(id).toBe('9')
+		expect(result?.response?.html).toContain('Voted!')
+	})
+
 	it('shows results immediately (skips the form) when already voted', async () => {
 		window.localStorage.setItem('fb-poll-1', '1')
 		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())

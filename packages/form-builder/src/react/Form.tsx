@@ -382,7 +382,9 @@ export const Form = ({
 	// so a step shows its fields in the form's field order, not the flow-builder entry order.
 	const stepKeys = flow && currentStepId ? stepFieldNames(flow, currentStepId) : []
 	const stepKeySet = new Set(stepKeys)
-	const stepVisible: FormFieldInstance[] = visible.filter((field) => stepKeySet.has(fieldKey(field)))
+	const stepVisible: FormFieldInstance[] = visible.filter((field) =>
+		stepKeySet.has(fieldKey(field))
+	)
 
 	// Validate the sub-fields of the given repeaters, one pass per visible row, returning composite-key
 	// errors (`fieldName[rowIndex].subFieldName`). Shared by submit and step navigation so both mirror
@@ -604,6 +606,15 @@ export const Form = ({
 					type: 'RESET',
 					values: { ...seedFieldValues(form.fields), ...(initialValues ?? {}) },
 				})
+				// The reducer holds only values/errors; flow position and the lifecycle `started` ref live
+				// outside it. Reset them too so a multi-step form returns to its first step (not stranded on
+				// the terminal one) and a fresh fill re-emits `form.started`. `submittedRef` stays set: a
+				// submission did happen, so the unmount guard must not report the completed form abandoned.
+				if (flow) {
+					setCurrentStepId(firstStepId(flow))
+					setHistory([])
+				}
+				startedRef.current = false
 			} else {
 				rawDispatch({ type: 'SUBMIT_SUCCESS' })
 				if (activePresentation.dismissOnSuccess) {
@@ -641,10 +652,19 @@ export const Form = ({
 			return
 		}
 		const target = event.target
-		if (target instanceof HTMLTextAreaElement || target instanceof HTMLButtonElement) {
+		// Exempt controls whose own Enter handling matters: textarea (newline), select (confirm choice),
+		// and buttons/submit inputs (activation). A single-line text input is what implicitly submits.
+		if (
+			target instanceof HTMLTextAreaElement ||
+			target instanceof HTMLSelectElement ||
+			target instanceof HTMLButtonElement
+		) {
 			return
 		}
-		if (target instanceof HTMLInputElement && (target.type === 'submit' || target.type === 'button')) {
+		if (
+			target instanceof HTMLInputElement &&
+			(target.type === 'submit' || target.type === 'button')
+		) {
 			return
 		}
 		event.preventDefault()
@@ -689,6 +709,7 @@ export const Form = ({
 		effectiveValues,
 		recall,
 		renderedFields,
+		converters,
 	}
 
 	const PresentationWrapper = activePresentation.Wrapper

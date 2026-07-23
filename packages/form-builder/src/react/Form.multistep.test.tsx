@@ -105,6 +105,26 @@ describe('Form multi-step flow', () => {
 		expect(fireEvent.keyDown(screen.getByLabelText('First'), { key: 'Enter' })).toBe(true)
 	})
 
+	it('returns to the first step (cleared) after a reset-mode success', async () => {
+		render(
+			<Form
+				form={doc(linearFields, linearFlow)}
+				onSubmit={vi.fn().mockResolvedValue({ ok: true })}
+				successBehavior="reset"
+			/>
+		)
+		fireEvent.change(screen.getByLabelText('First'), { target: { value: 'a' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		fireEvent.change(await screen.findByLabelText('Last'), { target: { value: 'b' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+		// Reset must return to step 1 (not strand the visitor on the terminal step), with fields cleared.
+		expect(await screen.findByLabelText('First')).toHaveValue('')
+		expect(screen.queryByLabelText('Last')).toBeNull()
+		expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+		expect(screen.queryByRole('status')).toBeNull()
+	})
+
 	it('renders a fieldless step as a navigable page rather than a dead end', async () => {
 		// A step keeps its place when every field it named is deleted from the form; the visitor gets
 		// navigation only, and must still be able to pass through it in both directions.

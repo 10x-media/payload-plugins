@@ -1,6 +1,7 @@
 import { cleanup, render } from '@testing-library/react'
 import { createElement, useReducer } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { BodyConverter } from '../../actions/body/converters'
 import { fieldKey } from '../../fields/fieldKey'
 import type { FormFieldInstance } from '../../submissions/types'
 import type { FieldRendererProps } from '../contract'
@@ -48,10 +49,12 @@ const Harness = ({
 	field,
 	values,
 	effectiveValues,
+	converters,
 }: {
 	field: FormFieldInstance
 	values: Record<string, unknown>
 	effectiveValues?: Record<string, unknown>
+	converters?: Record<string, BodyConverter>
 }) => {
 	const [state, dispatch] = useReducer(formReducer, initialFormState(values))
 	return (
@@ -67,6 +70,7 @@ const Harness = ({
 				labels: { prev: 'Back', next: 'Next', submit: 'Submit' },
 				t: (key) => key,
 				effectiveValues,
+				converters,
 			}}
 		>
 			{createElement(messageRenderer, rendererProps(field))}
@@ -84,6 +88,22 @@ describe('messageRenderer', () => {
 		const { container } = render(<Harness field={field} values={{}} />)
 		const node = container.querySelector('.fb-field__message')
 		expect(node?.innerHTML).toBe('<p><strong>Read this first</strong></p>')
+	})
+
+	it('honors host block converters supplied on the form context', () => {
+		const field: FormFieldInstance = {
+			blockType: 'message',
+			id: 'row-1',
+			content: { root: { type: 'root', children: [{ type: 'badge', label: 'NEW' }] } },
+		}
+		const converters: Record<string, BodyConverter> = {
+			badge: ({ node }) => `<b class="badge">${String(node.label)}</b>`,
+		}
+		const { container } = render(<Harness field={field} values={{}} converters={converters} />)
+		// Without the host converter the unknown `badge` block would serialize to nothing.
+		expect(container.querySelector('.fb-field__message')?.innerHTML).toContain(
+			'<b class="badge">NEW</b>'
+		)
 	})
 
 	it('interpolates recall tokens from the current answers, HTML-escaped', () => {

@@ -14,12 +14,13 @@ import { FormContext } from '../FormContext'
 export const messageRenderer = defineFieldRenderer(({ field }) => {
 	const context = useContext(FormContext)
 	const values = context?.effectiveValues ?? context?.state.values
+	const converters = context?.converters
 	const html = useMemo(() => {
 		const answered: SubmissionValue[] = Object.entries(values ?? {})
 			.filter(([, value]) => value != null && value !== '')
 			.map(([name, value]) => ({ field: name, value }))
-		return serializeBody(field.content, { values: answered, descriptors: [] })
-	}, [field.content, values])
+		return serializeBody(field.content, { values: answered, descriptors: [], converters })
+	}, [field.content, values, converters])
 	if (html === '') {
 		return null
 	}
