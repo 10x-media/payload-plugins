@@ -176,7 +176,7 @@ export const createWildixOAuthCallback = ({
 							relationTo: usersCollection as unknown as 'users',
 							value: payloadUserId,
 						},
-					},
+					} as Record<string, unknown>,
 					overrideAccess: true,
 				})
 			}

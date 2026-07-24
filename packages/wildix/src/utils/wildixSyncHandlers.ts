@@ -489,7 +489,7 @@ export const tokenProviderForUser = ({
 					accessToken: tokens.access_token,
 					refreshToken: tokens.refresh_token,
 					tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-				},
+				} as Record<string, unknown>,
 				overrideAccess: true,
 			})
 		},

@@ -52,7 +52,8 @@ export const buildSyncCallHistoryTask = (deps: SyncCallHistoryTaskDeps): TaskCon
  */
 export const buildSyncCallHistoryTaskOAuth = (deps: SyncCallHistoryTaskOAuthDeps): TaskConfig =>
 	({
-		slug: SYNC_CALL_HISTORY_TASK_OAUTH,
+		// biome-ignore lint/suspicious/noExplicitAny: task slug is plugin-defined, not in the generated TaskType union
+		slug: SYNC_CALL_HISTORY_TASK_OAUTH as any,
 		retries: 2,
 		inputSchema: [
 			{ name: 'limit', type: 'number' },
