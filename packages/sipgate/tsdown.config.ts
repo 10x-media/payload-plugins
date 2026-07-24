@@ -1,6 +1,6 @@
-import { defineConfig } from 'tsdown'
+import { definePluginBuild } from '@10x-media/tsdown-config/tsdown.shared'
 
-export default defineConfig({
+export default definePluginBuild({
 	entry: {
 		index: 'src/index.ts',
 		'exports/types': 'src/exports/types.ts',
@@ -18,10 +18,4 @@ export default defineConfig({
 		'ui/SipgateOAuthButton': 'src/ui/SipgateOAuthButton.tsx',
 		'ui/SipgateOAuthButtonClient': 'src/ui/SipgateOAuthButtonClient.tsx',
 	},
-	format: 'esm',
-	dts: true,
-	clean: true,
-	treeshake: true,
-	sourcemap: true,
-	fixedExtension: false,
 })
