@@ -30,6 +30,7 @@ export type FormAction =
 	| { type: 'SET_FIELD_ISSUES'; name: string; errors: string[] }
 	| { type: 'SET_ALL_ISSUES'; errors: FieldErrors; steps: string[] }
 	| { type: 'MARK_STEP_ATTEMPTED'; stepId: string }
+	| { type: 'REMOVE_REPEATER_ROW'; name: string; index: number }
 	| { type: 'SUBMIT_START' }
 	| { type: 'SUBMIT_SUCCESS' }
 	| { type: 'SUBMIT_ERROR'; message: string }
@@ -64,6 +65,42 @@ export const initialFormState = (values: Record<string, unknown>): FormState => 
 	attemptedSteps: new Set(),
 })
 
+/**
+ * Re-key composite entries (`name[i].sub`) after repeater row `removed` is deleted: drop the removed
+ * index and shift every higher index down by one, so surviving rows keep their own errors/touched
+ * flags instead of inheriting a deleted or shifted neighbour's. Matches on the `name[<int>]` prefix,
+ * so it is agnostic to the sub-key shape after `]` and needs no sub-field list. Returns the same
+ * reference when nothing changed, so an unrelated dispatch does not churn state identity.
+ */
+const reindexRepeaterKeys = <T>(
+	map: Record<string, T>,
+	name: string,
+	removed: number
+): Record<string, T> => {
+	const prefix = `${name}[`
+	let changed = false
+	const next: Record<string, T> = {}
+	for (const [key, value] of Object.entries(map)) {
+		if (!key.startsWith(prefix)) {
+			next[key] = value
+			continue
+		}
+		const close = key.indexOf(']', prefix.length)
+		const idx = close === -1 ? Number.NaN : Number(key.slice(prefix.length, close))
+		if (!Number.isInteger(idx) || idx < removed) {
+			next[key] = value
+			continue
+		}
+		if (idx === removed) {
+			changed = true
+			continue
+		}
+		next[`${name}[${idx - 1}]${key.slice(close + 1)}`] = value
+		changed = true
+	}
+	return changed ? next : map
+}
+
 /** Changing a value clears that field's prior errors (re-validated by the caller). */
 export const formReducer = (state: FormState, action: FormAction): FormState => {
 	switch (action.type) {
@@ -94,6 +131,15 @@ export const formReducer = (state: FormState, action: FormAction): FormState => 
 			return state.attemptedSteps.has(action.stepId)
 				? state
 				: { ...state, attemptedSteps: new Set([...state.attemptedSteps, action.stepId]) }
+		case 'REMOVE_REPEATER_ROW':
+			// The row value is removed by the field's own SET_VALUE; this shifts the composite issue keys
+			// (`name[i].sub`) that a plain value array cannot carry, so a deleted row's errors never strand
+			// on a survivor or linger unreachably.
+			return {
+				...state,
+				errors: reindexRepeaterKeys(state.errors, action.name, action.index),
+				touched: reindexRepeaterKeys(state.touched, action.name, action.index),
+			}
 		case 'SUBMIT_START':
 			return { ...state, submitting: true, submitError: undefined }
 		case 'SUBMIT_SUCCESS':

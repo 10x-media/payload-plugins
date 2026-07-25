@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { de } from './de'
 import { en } from './en'
-import { translations } from './index'
+import { bundles, translations } from './index'
 import { keys } from './keys'
 
 const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
@@ -98,8 +98,18 @@ describe('form-builder translations', () => {
 	})
 
 	it('nests strings under the formBuilder namespace', () => {
-		expect(translations.en.formBuilder).toBeDefined()
-		expect(translations.de.formBuilder).toBeDefined()
+		expect(translations.en?.formBuilder).toBeDefined()
+		expect(translations.de?.formBuilder).toBeDefined()
+	})
+
+	it('ships a complete bundle for every registered locale (a host fallback cannot leak a key)', () => {
+		const allKeys = Object.values(keys)
+		expect(Object.keys(bundles).length).toBeGreaterThan(0)
+		for (const [locale, bundle] of Object.entries(bundles)) {
+			for (const key of allKeys) {
+				expect(typeof bundle[key], `${locale} missing ${key}`).toBe('string')
+			}
+		}
 	})
 
 	it('references every translation key from production code', () => {
