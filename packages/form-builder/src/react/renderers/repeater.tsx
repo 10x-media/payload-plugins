@@ -67,6 +67,9 @@ export const repeaterRenderer = defineFieldRenderer<RepeaterRow[]>(
 
 		const removeRow = (index: number) => {
 			rowKeysRef.current = rowKeysRef.current.filter((_, i) => i !== index)
+			// setValue removes the row value; SET_VALUE cannot reach the composite sub-field issue keys
+			// (`name[i].sub`), so reindex them separately or a deleted row's errors strand on a survivor.
+			dispatch({ type: 'REMOVE_REPEATER_ROW', name, index })
 			setValue(rows.filter((_, i) => i !== index))
 			onBlur()
 		}

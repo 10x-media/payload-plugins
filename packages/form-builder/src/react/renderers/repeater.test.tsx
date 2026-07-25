@@ -176,6 +176,33 @@ describe('repeaterRenderer', () => {
 		expect(screen.queryByText('Fix me')).toBeNull()
 	})
 
+	it('re-attributes a surviving row composite error to its new index when a middle row is removed', () => {
+		render(
+			<Harness
+				initialValue={[{}, {}, {}]}
+				initialErrors={{
+					'members[0].firstName': ['first bad'],
+					'members[2].lastName': ['third bad'],
+				}}
+			/>
+		)
+		// All three seeded errors render before removal.
+		expect(screen.getByText('first bad')).toBeInTheDocument()
+		expect(screen.getByText('third bad')).toBeInTheDocument()
+
+		const removes = screen.getAllByRole('button', { name: /formBuilder:repeater\.removeRow/i })
+		expect(removes).toHaveLength(3)
+		if (removes[1]) fireEvent.click(removes[1])
+
+		// Row 0 is untouched; the row that was index 2 is now index 1 and keeps its error (shifted from
+		// members[2] to members[1]) rather than orphaning it at a now-missing index.
+		expect(screen.getAllByRole('button', { name: /formBuilder:repeater\.removeRow/i })).toHaveLength(
+			2
+		)
+		expect(screen.getByText('first bad')).toBeInTheDocument()
+		expect(screen.queryAllByText('third bad')).toHaveLength(1)
+	})
+
 	it('keeps a stateful sub-renderer state on surviving rows when a middle row is removed', () => {
 		const f: FormFieldInstance = {
 			...field,
