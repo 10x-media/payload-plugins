@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import axe from 'axe-core'
 import { afterEach, describe, expect, it } from 'vitest'
+import type { FormFlow } from '../flow/types'
 import type { FormFieldInstance } from '../submissions/types'
 import { Form, type FormDocument } from './Form'
 
@@ -131,5 +132,29 @@ describe('Form accessibility (axe)', () => {
 			'href',
 			'https://example.com/privacy'
 		)
+	})
+
+	it('a multi-step form in its blocked-advance state has no structural violations', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'first', label: 'First', required: true },
+			{ blockType: 'text', name: 'last', label: 'Last' },
+		]
+		const flow: FormFlow = {
+			steps: [
+				{ id: 's1', fields: ['first'], next: 's2' },
+				{ id: 's2', fields: ['last'] },
+			],
+		}
+		const { container } = render(
+			<Form
+				form={{ id: 1, fields, flow, multistep: true, pollEnabled: false }}
+				onSubmit={async () => ({ ok: true })}
+			/>
+		)
+		// A blocked advance renders the new markup: the step live region, the focusable step group, the
+		// step-level alert, and the per-field alert. All of it must stay structurally accessible.
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		await screen.findByText('This field is required')
+		expect(await axeViolations(container)).toEqual([])
 	})
 })

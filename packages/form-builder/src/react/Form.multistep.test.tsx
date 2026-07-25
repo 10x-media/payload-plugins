@@ -80,9 +80,10 @@ describe('Form multi-step flow', () => {
 		expect(labels).toEqual(['A', 'B', 'C'])
 	})
 
-	it('suppresses implicit Enter-submit on a multi-step form, but not textarea or single-step', () => {
-		// jsdom does not simulate implicit form submission on Enter, so assert the guard directly:
-		// fireEvent returns false when a handler called preventDefault on the cancelable event.
+	it('suppresses native Enter-submit on a non-terminal step, but not textarea or single-step', () => {
+		// Enter also advances a non-terminal step (see Form.multistep.validation.test.tsx); here assert only
+		// the native-submit suppression contract. jsdom does not simulate implicit submission, so check it
+		// directly: fireEvent returns false when a handler called preventDefault on the cancelable event.
 		const withTextarea: FormFieldInstance[] = [
 			{ blockType: 'text', name: 'first', label: 'First' },
 			{ blockType: 'textarea', name: 'note', label: 'Note' },
@@ -94,7 +95,7 @@ describe('Form multi-step flow', () => {
 			],
 		}
 		const { unmount } = render(<Form form={doc(withTextarea, flow)} onSubmit={vi.fn()} />)
-		// Enter in a text input on a multi-step form is prevented (no implicit submit).
+		// Enter in a text input on a non-terminal step is prevented (no implicit submit; it advances instead).
 		expect(fireEvent.keyDown(screen.getByLabelText('First'), { key: 'Enter' })).toBe(false)
 		// Enter in a textarea is left alone (newline).
 		expect(fireEvent.keyDown(screen.getByLabelText('Note'), { key: 'Enter' })).toBe(true)
@@ -191,7 +192,7 @@ describe('Form multi-step flow', () => {
 		]
 		render(<Form form={doc(requiredFields, linearFlow)} onSubmit={onSubmit} />)
 		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-		expect(await screen.findByRole('alert')).toHaveTextContent('This field is required')
+		expect(await screen.findByText('This field is required')).toBeInTheDocument()
 		expect(screen.queryByLabelText('Last')).not.toBeInTheDocument()
 		expect(onSubmit).not.toHaveBeenCalled()
 	})

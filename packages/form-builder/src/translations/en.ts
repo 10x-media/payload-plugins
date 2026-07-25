@@ -308,6 +308,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.formClose]: 'Close',
 	[keys.formSuccess]: 'Thank you.',
 	[keys.formSubmitFailed]: 'Submission failed',
+	[keys.formStepStatus]: 'Step {current} of {total}',
+	[keys.formStepInvalid]: 'Please correct the highlighted fields to continue.',
 	[keys.cellStepCountOne]: '{{count}} step',
 	[keys.cellStepCountOther]: '{{count}} steps',
 	[keys.cellFieldCountOne]: '{{count}} Field',

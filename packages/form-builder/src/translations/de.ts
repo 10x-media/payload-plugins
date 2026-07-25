@@ -321,6 +321,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.formClose]: 'Schließen',
 	[keys.formSuccess]: 'Vielen Dank.',
 	[keys.formSubmitFailed]: 'Übermittlung fehlgeschlagen',
+	[keys.formStepStatus]: 'Schritt {current} von {total}',
+	[keys.formStepInvalid]: 'Bitte korrigieren Sie die markierten Felder, um fortzufahren.',
 	[keys.cellStepCountOne]: '{{count}} Schritt',
 	[keys.cellStepCountOther]: '{{count}} Schritte',
 	[keys.cellFieldCountOne]: '{{count}} Feld',

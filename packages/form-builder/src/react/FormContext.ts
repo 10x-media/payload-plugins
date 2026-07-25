@@ -66,6 +66,8 @@ export type FormContextValue = {
 	renderedFields?: FormFieldInstance[]
 	/** The `<Form>` `converters` prop, so client rich-text serialization (e.g. the `message` renderer) honors host blocks. */
 	converters?: Record<string, BodyConverter>
+	/** Maps a field key to the id of the step it belongs to (or the default step), for per-step error reveal. */
+	stepIdOfField?: (fieldKey: string) => string
 }
 
 export const FormContext = createContext<FormContextValue | null>(null)
