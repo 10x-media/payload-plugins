@@ -4,6 +4,19 @@ import type { TranslationKey } from './keys'
 
 export type { TranslationKey } from './keys'
 export { keys } from './keys'
+export { en } from './en'
+export { de } from './de'
+
+/** A complete flat map of every typed key to its string, for one locale. */
+export type TranslationBundle = Record<TranslationKey, string>
+
+/**
+ * Every locale bundle this plugin ships, keyed by locale code. The single source both the nested
+ * Payload `translations` map and the `/react` + `/i18n` bundle exports derive from: register a new
+ * locale here once and it flows to both. A host bridging its own translator can fall back through a
+ * complete bundle (`makeTranslate(locale)`), so a visitor's locale never silently resolves to English.
+ */
+export const bundles: Record<string, TranslationBundle> = { en, de }
 
 /** Per-locale string overrides keyed by this plugin's typed translation keys. */
 export type TranslationsOption = {
@@ -32,8 +45,6 @@ export const toNested = (flat: {
 	return out
 }
 
-/** Per-locale messages merged into `config.i18n.translations`. */
-export const translations = {
-	en: toNested(en),
-	de: toNested(de),
-}
+/** Per-locale messages merged into `config.i18n.translations`, derived from `bundles`. */
+export const translations: Record<string, Record<string, Record<string, string>>> =
+	Object.fromEntries(Object.entries(bundles).map(([locale, bundle]) => [locale, toNested(bundle)]))
