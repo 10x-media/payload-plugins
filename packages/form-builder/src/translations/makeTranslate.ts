@@ -13,6 +13,7 @@ import { bundles } from './index'
  * maps still work). Unknown keys fall back to the key itself so nothing crashes on an incomplete map.
  */
 export const makeTranslate = (localeOrMap: string | Record<string, string>): RendererTranslate => {
-	const map = typeof localeOrMap === 'string' ? (bundles[localeOrMap] ?? en) : localeOrMap
+	const map: Record<string, string> =
+		typeof localeOrMap === 'string' ? (bundles[localeOrMap] ?? en) : localeOrMap
 	return (key) => map[key] ?? key
 }
