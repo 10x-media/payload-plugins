@@ -26,7 +26,7 @@ formBuilder({
 })
 ```
 
-`@10x-media/form-builder/i18n` exports `keys`, the built-in `translations` (`en` and `de`), and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile. Merge semantics and app-level overrides are shared across plugins: see [Translations](/concepts/translations).
+`@10x-media/form-builder/i18n` exports `keys`, the built-in `translations` map, the flat `en` / `de` / `bundles` locale tables, `clientRuntimeKeys`, and the `TranslationKey` / `TranslationBundle` / `TranslationsOption` types. A typo'd key fails to compile. Merge semantics and app-level overrides are shared across plugins: see [Translations](/concepts/translations).
 
 ## Frontend strings
 
@@ -34,4 +34,28 @@ The renderer is independent of the admin i18n: `<Form>` takes a `t` translator a
 
 ```tsx
 <Form form={form} locale="de" t={(key) => myMessages[key] ?? key} />
+```
+
+### Falling back to the shipped bundles
+
+`<Form>` and `<Poll>` resolve their own chrome (the submit / next / back labels, the failure banner, poll notices) and the client-side validation messages through `t`. A host that bridges `t` to its own i18n only sees the keys it references directly, so keys it never mirrors (the chrome, when you correctly pass no label props) fall through. With a `?? key`-to-English fallback that leak is silent: a German visitor sees English with no error. Fall back to the plugin's own complete bundle instead, and English cannot leak:
+
+```tsx
+import { makeTranslate } from '@10x-media/form-builder/react'
+
+// Your overrides first, the shipped bundle for the locale next (never the raw key).
+const fallback = makeTranslate(locale) // 'de' -> German, a locale we do not ship -> English
+;<Form form={form} locale={locale} t={(key) => myOverrides[key] ?? fallback(key)} />
+```
+
+`makeTranslate(locale)` resolves the shipped bundle for that locale, falling back to English only for a locale the plugin does not ship. Pass a map for full control (`makeTranslate(bundles[locale] ?? en)`). `@10x-media/form-builder/react` and `/i18n` export `en`, `de`, `bundles` (`Record<string, TranslationBundle>`), and the `TranslationBundle` type for this.
+
+### Asserting mirror coverage
+
+To fully own the frontend strings rather than fall back, `clientRuntimeKeys` lists every key the visitor runtime resolves, so a test can assert your mirror is complete instead of discovering a gap in production:
+
+```ts
+import { clientRuntimeKeys } from '@10x-media/form-builder/react'
+
+for (const key of clientRuntimeKeys) expect(myMessages[key]).toBeDefined()
 ```
