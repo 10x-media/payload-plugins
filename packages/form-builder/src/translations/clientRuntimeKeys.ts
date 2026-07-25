@@ -1,5 +1,5 @@
-import { keys } from './keys'
 import type { TranslationKey } from './keys'
+import { keys } from './keys'
 
 /**
  * The typed keys the visitor-facing runtime (`<Form>`, `<Poll>`, `<FormResults>`, and the field

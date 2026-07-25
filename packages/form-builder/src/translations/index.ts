@@ -2,10 +2,10 @@ import { de } from './de'
 import { en } from './en'
 import type { TranslationKey } from './keys'
 
+export { de } from './de'
+export { en } from './en'
 export type { TranslationKey } from './keys'
 export { keys } from './keys'
-export { en } from './en'
-export { de } from './de'
 
 /** A complete flat map of every typed key to its string, for one locale. */
 export type TranslationBundle = Record<TranslationKey, string>
@@ -46,5 +46,9 @@ export const toNested = (flat: {
 }
 
 /** Per-locale messages merged into `config.i18n.translations`, derived from `bundles`. */
-export const translations: Record<string, Record<string, Record<string, string>>> =
-	Object.fromEntries(Object.entries(bundles).map(([locale, bundle]) => [locale, toNested(bundle)]))
+export const translations: Record<
+	string,
+	Record<string, Record<string, string>>
+> = Object.fromEntries(
+	Object.entries(bundles).map(([locale, bundle]) => [locale, toNested(bundle)])
+)

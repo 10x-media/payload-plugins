@@ -196,9 +196,9 @@ describe('repeaterRenderer', () => {
 
 		// Row 0 is untouched; the row that was index 2 is now index 1 and keeps its error (shifted from
 		// members[2] to members[1]) rather than orphaning it at a now-missing index.
-		expect(screen.getAllByRole('button', { name: /formBuilder:repeater\.removeRow/i })).toHaveLength(
-			2
-		)
+		expect(
+			screen.getAllByRole('button', { name: /formBuilder:repeater\.removeRow/i })
+		).toHaveLength(2)
 		expect(screen.getByText('first bad')).toBeInTheDocument()
 		expect(screen.queryAllByText('third bad')).toHaveLength(1)
 	})
