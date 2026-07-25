@@ -1,6 +1,7 @@
 'use client'
 
 import {
+	type CSSProperties,
 	type FormEvent as ReactFormEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
@@ -20,6 +21,7 @@ import type { FormEventSink } from '../events/types'
 import { fieldKey, isNamedField, type NamedFormFieldInstance } from '../fields/fieldKey'
 import type { AnyFormFieldDefinition } from '../fields/types'
 import { firstStepId, isTerminalStepId, resolveNextStepId, stepFieldNames } from '../flow/engine'
+import type { FormFlow } from '../flow/types'
 import type {
 	FormButtonSettings,
 	FormDocument,
@@ -37,6 +39,7 @@ import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
 import { makeTranslate } from '../translations/makeTranslate'
+import { resolveMessage } from '../validation/message'
 import type { AnyValidationRuleDefinition } from '../validation/types'
 import { cn } from './cn'
 import type { RendererTranslate } from './contract'
@@ -57,6 +60,7 @@ import { type RenderersConfig, resolveRenderers } from './registry'
 import { defaultRenderers } from './renderers'
 import { buildFieldTypeRegistry, buildValidationRuleRegistry, visibleFields } from './resolveForm'
 import {
+	DEFAULT_STEP_ID,
 	type FieldErrors,
 	type FormAction,
 	formReducer,
@@ -166,6 +170,37 @@ export type FormProps = {
 
 const isEmpty = (value: unknown): boolean =>
 	value == null || value === '' || (Array.isArray(value) && value.length === 0)
+
+/** Visually hidden but screen-reader-announced, for the "Step X of Y" live region (no host CSS required). */
+const SR_ONLY: CSSProperties = {
+	position: 'absolute',
+	width: 1,
+	height: 1,
+	padding: 0,
+	margin: -1,
+	overflow: 'hidden',
+	clip: 'rect(0, 0, 0, 0)',
+	whiteSpace: 'nowrap',
+	border: 0,
+}
+
+/** The base field name of an error key: the part before a repeater composite suffix (`name[0].sub`). */
+const baseFieldKey = (key: string): string => {
+	const bracket = key.indexOf('[')
+	return bracket === -1 ? key : key.slice(0, bracket)
+}
+
+/** The id of the first flow step (in order) that owns an errored field, or undefined when none does. */
+const firstStepWithError = (flow: FormFlow, errors: FieldErrors): string | undefined => {
+	const errored = new Set(Object.keys(errors).map(baseFieldKey))
+	return flow.steps.find((flowStep) => flowStep.fields.some((key) => errored.has(key)))?.id
+}
+
+/** The first focusable element under `root` that a step transition should land on (skips hidden/honeypot). */
+const focusFirstIn = (root: HTMLElement | null, selector: string): void => {
+	const target = root?.querySelector<HTMLElement>(selector)
+	target?.focus()
+}
 
 /** A stored button label counts only when it is a non-empty string; anything else falls through. */
 const storedLabel = (value: unknown): string | undefined =>
@@ -288,6 +323,35 @@ export const Form = ({
 	const advancingRef = useRef(false)
 	const flowRef = useRef(flow)
 	flowRef.current = flow
+
+	// Per-step error reveal: a field maps to the id of the flow step whose `fields` include it, else the
+	// default step (single-step forms, or a field assigned to no step), so a single-step form collapses to
+	// one step and today's behavior.
+	const stepIdOfField = useMemo(() => {
+		const map = new Map<string, string>()
+		if (flow) {
+			for (const flowStep of flow.steps) {
+				for (const key of flowStep.fields) {
+					map.set(key, flowStep.id)
+				}
+			}
+		}
+		return (fieldKey: string): string => map.get(fieldKey) ?? DEFAULT_STEP_ID
+	}, [flow])
+	const allStepIds = useMemo(
+		() => (flow ? flow.steps.map((flowStep) => flowStep.id) : [DEFAULT_STEP_ID]),
+		[flow]
+	)
+
+	// Focus management for step transitions and blocked advances/submits. A pending request is performed
+	// by an effect after the render it triggers, so focus lands on the DOM that reflects the new state.
+	const formRef = useRef<HTMLFormElement>(null)
+	const pendingFocusRef = useRef<'stepStart' | 'firstInvalid' | null>(null)
+	const [focusNonce, setFocusNonce] = useState(0)
+	const requestFocus = (intent: 'stepStart' | 'firstInvalid') => {
+		pendingFocusRef.current = intent
+		setFocusNonce((nonce) => nonce + 1)
+	}
 
 	const dispatch = useCallback((action: FormAction) => {
 		if (action.type === 'SET_VALUE' && !startedRef.current) {
@@ -471,6 +535,9 @@ export const Form = ({
 				hasError = true
 			}
 			if (hasError) {
+				// Mark this step attempted so its fields reveal their errors, then focus the first invalid one.
+				rawDispatch({ type: 'MARK_STEP_ATTEMPTED', stepId: currentStepId })
+				requestFocus('firstInvalid')
 				return
 			}
 			const next = resolveNextStepId(flow, currentStepId, effectiveValues)
@@ -483,6 +550,7 @@ export const Form = ({
 			})
 			setHistory((prev) => [...prev, currentStepId])
 			setCurrentStepId(next)
+			requestFocus('stepStart')
 			emitFormEvent(sinkRef.current, formIdRef.current, { type: 'step.viewed', stepId: next })
 		} finally {
 			advancingRef.current = false
@@ -496,8 +564,47 @@ export const Form = ({
 		}
 		setHistory((entries) => entries.slice(0, -1))
 		setCurrentStepId(prev)
+		requestFocus('stepStart')
 		emitFormEvent(sinkRef.current, formIdRef.current, { type: 'step.viewed', stepId: prev })
 	}
+
+	// Jump to an earlier step (from the terminal Submit when an earlier step is invalid), rebuilding the
+	// Back stack as the flow's linear path up to it so Back still works.
+	const navigateToStep = (stepId: string) => {
+		if (!flow || stepId === currentStepId) {
+			return
+		}
+		const idx = flow.steps.findIndex((flowStep) => flowStep.id === stepId)
+		if (idx < 0) {
+			return
+		}
+		setHistory(flow.steps.slice(0, idx).map((flowStep) => flowStep.id))
+		setCurrentStepId(stepId)
+		emitFormEvent(sinkRef.current, formIdRef.current, { type: 'step.viewed', stepId })
+	}
+
+	// Perform a pending focus request after the render it triggered, so it lands on the DOM that reflects
+	// the new state (a changed step, or freshly revealed errors). Null on mount, so the first render never
+	// steals focus. currentStepId and focusNonce are intentional re-run triggers: a blocked advance keeps
+	// the same step, so the nonce forces a fresh run; the body reads only refs, hence the ignore.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: currentStepId/focusNonce are re-run triggers, not read in the body
+	useEffect(() => {
+		const intent = pendingFocusRef.current
+		if (!intent) {
+			return
+		}
+		pendingFocusRef.current = null
+		if (intent === 'firstInvalid') {
+			focusFirstIn(formRef.current, '[aria-invalid="true"]')
+			return
+		}
+		const region = formRef.current?.querySelector<HTMLElement>('[data-fb-step-region]')
+		if (region) {
+			region.focus()
+		} else {
+			focusFirstIn(formRef.current, 'input:not([type="hidden"]), select, textarea')
+		}
+	}, [currentStepId, focusNonce])
 
 	useEffect(() => {
 		emitFormEvent(sinkRef.current, formIdRef.current, { type: 'form.viewed' })
@@ -569,9 +676,21 @@ export const Form = ({
 		// mirroring the server's per-row pass, so the repeater renderer surfaces them inline.
 		Object.assign(errors, await validateRepeaterSubFields(visible))
 
-		rawDispatch({ type: 'SET_ALL_ISSUES', errors })
-		if (Object.keys(errors).length > 0) {
+		const hasErrors = Object.keys(errors).length > 0
+		// A terminal submit validates every step, so every step is attempted (its errors may now reveal);
+		// a valid submit clears stale errors without marking anything.
+		rawDispatch({ type: 'SET_ALL_ISSUES', errors, steps: hasErrors ? allStepIds : [] })
+		if (hasErrors) {
 			submittingRef.current = false
+			// On a multi-step form, route to the first step that owns an invalid field rather than failing in
+			// place on the terminal step, then focus its first invalid field.
+			if (flow && currentStepId) {
+				const target = firstStepWithError(flow, errors)
+				if (target) {
+					navigateToStep(target)
+				}
+			}
+			requestFocus('firstInvalid')
 			return
 		}
 		rawDispatch({ type: 'SUBMIT_START' })
@@ -634,7 +753,7 @@ export const Form = ({
 			}
 		} else {
 			if (result.fieldErrors) {
-				rawDispatch({ type: 'SET_ALL_ISSUES', errors: result.fieldErrors })
+				rawDispatch({ type: 'SET_ALL_ISSUES', errors: result.fieldErrors, steps: allStepIds })
 			}
 			const message = result.message ?? translate(keys.formSubmitFailed)
 			rawDispatch({ type: 'SUBMIT_ERROR', message })
@@ -642,18 +761,19 @@ export const Form = ({
 		}
 	}
 
-	// On a multi-step form, suppress implicit Enter-submit so a lone text input on a non-terminal step
-	// cannot submit the whole form on Enter; only the explicit Submit control does. A textarea (Enter =
-	// newline) and buttons/submit controls (Enter = activation) are exempt. Single-step forms keep the
-	// native Enter-to-submit behavior. The `<form>` is the plugin's even in children mode, so this is the
-	// only place a host could get this guard.
+	const isTerminalStep =
+		flow && currentStepId ? isTerminalStepId(flow, currentStepId, effectiveValues) : true
+
+	// Enter on a multi-step form: on a non-terminal step, advance like Next (validate, then advance or
+	// reveal + focus); on the terminal step, fall through to native submit (guarded by `submittingRef`).
+	// A textarea (Enter = newline), select (confirm), and buttons/submit inputs (activation) are exempt.
+	// Single-step forms keep native Enter-to-submit. The `<form>` is the plugin's even in children mode,
+	// so this is the only place a host could get this behavior.
 	const handleKeyDown = (event: ReactKeyboardEvent<HTMLFormElement>) => {
 		if (!flow || event.key !== 'Enter') {
 			return
 		}
 		const target = event.target
-		// Exempt controls whose own Enter handling matters: textarea (newline), select (confirm choice),
-		// and buttons/submit inputs (activation). A single-line text input is what implicitly submits.
 		if (
 			target instanceof HTMLTextAreaElement ||
 			target instanceof HTMLSelectElement ||
@@ -667,7 +787,10 @@ export const Form = ({
 		) {
 			return
 		}
-		event.preventDefault()
+		if (!isTerminalStep) {
+			event.preventDefault()
+			void goNext()
+		}
 	}
 
 	const step: FormStepInfo = flow
@@ -677,7 +800,7 @@ export const Form = ({
 				stepIndex: flow.steps.findIndex((s) => s.id === currentStepId),
 				stepCount: flow.steps.length,
 				isFirst: history.length === 0,
-				isTerminal: currentStepId ? isTerminalStepId(flow, currentStepId, effectiveValues) : true,
+				isTerminal: isTerminalStep,
 				goNext: () => {
 					void goNext()
 				},
@@ -691,6 +814,22 @@ export const Form = ({
 				goNext: () => {},
 				goBack: () => {},
 			}
+
+	// The "Step X of Y" announcement (aria-live + the step region's accessible name).
+	const stepStatusText = flow
+		? resolveMessage(translate(keys.formStepStatus), {
+				current: String(step.stepIndex + 1),
+				total: String(step.stepCount),
+			})
+		: ''
+	// Whether the current step has been attempted and still has a revealed error (drives the step-level alert).
+	const currentStepHasError =
+		flow != null &&
+		currentStepId != null &&
+		state.attemptedSteps.has(currentStepId) &&
+		Object.entries(state.errors).some(
+			([key, errs]) => errs.length > 0 && stepIdOfField(baseFieldKey(key)) === currentStepId
+		)
 
 	const renderedFields = (flow ? stepVisible : visible).filter(
 		(field) => field.hidden !== true && field.calcDisplay !== false
@@ -710,6 +849,7 @@ export const Form = ({
 		recall,
 		renderedFields,
 		converters,
+		stepIdOfField,
 	}
 
 	const PresentationWrapper = activePresentation.Wrapper
@@ -733,6 +873,7 @@ export const Form = ({
 			<FormContext.Provider value={contextValue}>
 				{wrap(
 					<form
+						ref={formRef}
 						className={cn('fb-form-root', className)}
 						noValidate
 						onSubmit={handleSubmit}
@@ -783,6 +924,7 @@ export const Form = ({
 		<FormContext.Provider value={contextValue}>
 			{wrap(
 				<form
+					ref={formRef}
 					className={cn('fb-form-root', className)}
 					noValidate
 					onSubmit={handleSubmit}
@@ -792,7 +934,27 @@ export const Form = ({
 				>
 					{honeypotName ? <Honeypot name={honeypotName} inputRef={honeypotRef} /> : null}
 					{header}
-					<FormFields layout={layout} />
+					{flow ? (
+						<>
+							{/* Announces "Step X of Y" politely on each step change. A bare aria-live region, not
+							    role=status, so the single status role stays with the form's success outcome. */}
+							<div aria-live="polite" aria-atomic="true" style={SR_ONLY}>
+								{stepStatusText}
+							</div>
+							{/* Focus lands here on a step change (the region's start), so keyboard/SR users move with it.
+							    A plain focusable container, not a named group; the aria-live region above does the announcing. */}
+							<div data-fb-step-region tabIndex={-1} className="fb-form__step">
+								<FormFields layout={layout} />
+							</div>
+							{currentStepHasError ? (
+								<p role="alert" className="fb-form__step-error">
+									{translate(keys.formStepInvalid)}
+								</p>
+							) : null}
+						</>
+					) : (
+						<FormFields layout={layout} />
+					)}
 					{state.submitError ? (
 						<p role="alert" className="fb-form__submit-error">
 							{state.submitError}

@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react'
 import { useFormContext } from './FormContext'
+import { DEFAULT_STEP_ID } from './state'
 
 export type UseFieldResult<TValue = unknown> = {
 	value: TValue | undefined
@@ -14,19 +15,23 @@ export type UseFieldResult<TValue = unknown> = {
 
 /** Bind one field by name to the form controller: its value, issues, and change/blur handlers. */
 export const useField = <TValue = unknown>(name: string): UseFieldResult<TValue> => {
-	const { state, dispatch, validateField } = useFormContext()
+	const { state, dispatch, validateField, stepIdOfField } = useFormContext()
 	const touched = state.touched[name] ?? false
-	const showIssues = touched || state.submitAttempted
+	// Reveal is a function of this field's own step, never a single global flag: the field's error shows
+	// once it is touched, or once the step it belongs to has been attempted (a blocked advance or submit).
+	const stepAttempted = state.attemptedSteps.has(stepIdOfField?.(name) ?? DEFAULT_STEP_ID)
+	const showIssues = touched || stepAttempted
 	const value = state.values[name] as TValue | undefined
 
 	const setValue = useCallback(
 		(next: TValue) => {
 			dispatch({ type: 'SET_VALUE', name, value: next })
-			if (touched || state.submitAttempted) {
+			// Re-validate on change only once the error is already revealed; never reveal an untouched field mid-typing.
+			if (showIssues) {
 				validateField(name, next)
 			}
 		},
-		[dispatch, name, touched, state.submitAttempted, validateField]
+		[dispatch, name, showIssues, validateField]
 	)
 
 	const onBlur = useCallback(() => {

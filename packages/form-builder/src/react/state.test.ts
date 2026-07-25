@@ -24,10 +24,37 @@ describe('formReducer', () => {
 		expect(next.errors.a).toEqual(['bad'])
 	})
 
-	it('SET_ALL_ISSUES replaces the whole error map and marks submitAttempted', () => {
-		const next = formReducer(base, { type: 'SET_ALL_ISSUES', errors: { a: ['x'] } })
+	it('SET_ALL_ISSUES replaces the error map and records the attempted steps (never a global flag)', () => {
+		const next = formReducer(base, {
+			type: 'SET_ALL_ISSUES',
+			errors: { a: ['x'] },
+			steps: ['s1', 's2'],
+		})
 		expect(next.errors).toEqual({ a: ['x'] })
-		expect(next.submitAttempted).toBe(true)
+		expect([...next.attemptedSteps]).toEqual(['s1', 's2'])
+	})
+
+	it('SET_ALL_ISSUES with no steps clears errors without attempting a new step', () => {
+		const attempted = formReducer(base, {
+			type: 'SET_ALL_ISSUES',
+			errors: { a: ['x'] },
+			steps: ['s1'],
+		})
+		const cleared = formReducer(attempted, { type: 'SET_ALL_ISSUES', errors: {}, steps: [] })
+		expect(cleared.errors).toEqual({})
+		expect([...cleared.attemptedSteps]).toEqual(['s1'])
+	})
+
+	it('MARK_STEP_ATTEMPTED adds one step and is idempotent', () => {
+		const once = formReducer(base, { type: 'MARK_STEP_ATTEMPTED', stepId: 's1' })
+		expect([...once.attemptedSteps]).toEqual(['s1'])
+		expect(formReducer(once, { type: 'MARK_STEP_ATTEMPTED', stepId: 's1' })).toBe(once)
+	})
+
+	it('RESET clears the attempted steps', () => {
+		const attempted = formReducer(base, { type: 'MARK_STEP_ATTEMPTED', stepId: 's1' })
+		const reset = formReducer(attempted, { type: 'RESET', values: { a: '' } })
+		expect([...reset.attemptedSteps]).toEqual([])
 	})
 
 	it('SUBMIT_START / SUBMIT_SUCCESS / SUBMIT_ERROR move the submit lifecycle', () => {

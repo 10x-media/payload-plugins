@@ -286,6 +286,8 @@ export const keys = {
 	formClose: 'formBuilder:form.close',
 	formSuccess: 'formBuilder:form.success',
 	formSubmitFailed: 'formBuilder:form.submitFailed',
+	formStepStatus: 'formBuilder:form.stepStatus',
+	formStepInvalid: 'formBuilder:form.stepInvalid',
 	cellStepCountOne: 'formBuilder:cell.stepCount.one',
 	cellStepCountOther: 'formBuilder:cell.stepCount.other',
 	cellFieldCountOne: 'formBuilder:cell.fieldCount.one',

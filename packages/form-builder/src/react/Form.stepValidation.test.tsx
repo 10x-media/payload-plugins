@@ -32,7 +32,7 @@ describe('Form step navigation with a repeater', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Add person' }))
 		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 		// goNext validates the step's repeater sub-fields: the empty required email surfaces an error...
-		await screen.findByRole('alert')
+		await screen.findAllByRole('alert')
 		// ...and the step does not advance (no Back control appears; the repeater step is still shown).
 		expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
 		expect(screen.getByRole('button', { name: 'Add person' })).toBeInTheDocument()
