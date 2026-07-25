@@ -77,6 +77,42 @@ describe('formReducer', () => {
 		const cleared = formReducer(withErr, { type: 'SET_VALUE', name: 'a', value: 'x' })
 		expect(cleared.errors.a ?? []).toEqual([])
 	})
+
+	it('REMOVE_REPEATER_ROW drops the removed row composite keys and shifts higher ones down', () => {
+		const start: FormState = {
+			...initialFormState({ crew: [{}, {}, {}] }),
+			errors: { 'crew[0].name': ['a'], 'crew[2].name': ['c'], other: ['x'] },
+			touched: { 'crew[0].name': true, 'crew[2].name': true },
+		}
+		const next = formReducer(start, { type: 'REMOVE_REPEATER_ROW', name: 'crew', index: 1 })
+		expect(next.errors).toEqual({ 'crew[0].name': ['a'], 'crew[1].name': ['c'], other: ['x'] })
+		expect(next.touched).toEqual({ 'crew[0].name': true, 'crew[1].name': true })
+	})
+
+	it('REMOVE_REPEATER_ROW removing the last row clears its keys with nothing shifted', () => {
+		const start: FormState = {
+			...initialFormState({ crew: [{}, {}] }),
+			errors: { 'crew[0].name': ['a'], 'crew[1].name': ['b'] },
+		}
+		const next = formReducer(start, { type: 'REMOVE_REPEATER_ROW', name: 'crew', index: 1 })
+		expect(next.errors).toEqual({ 'crew[0].name': ['a'] })
+	})
+
+	it('REMOVE_REPEATER_ROW leaves a different repeater and its own lower rows untouched', () => {
+		const start: FormState = {
+			...initialFormState({ crew: [{}, {}], guests: [{}, {}] }),
+			errors: { 'crew[0].name': ['keep'], 'crew[1].name': ['drop'], 'guests[1].name': ['other'] },
+		}
+		const next = formReducer(start, { type: 'REMOVE_REPEATER_ROW', name: 'crew', index: 1 })
+		expect(next.errors).toEqual({ 'crew[0].name': ['keep'], 'guests[1].name': ['other'] })
+	})
+
+	it('REMOVE_REPEATER_ROW returns the same error/touched references when nothing matches', () => {
+		const start = initialFormState({ crew: [{}] })
+		const next = formReducer(start, { type: 'REMOVE_REPEATER_ROW', name: 'nope', index: 0 })
+		expect(next.errors).toBe(start.errors)
+		expect(next.touched).toBe(start.touched)
+	})
 })
 
 describe('seedFieldValues', () => {
