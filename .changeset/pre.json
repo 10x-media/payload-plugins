@@ -78,6 +78,7 @@
 		"form-builder-feedback",
 		"form-builder-file-extraction",
 		"form-builder-i18n-defaults",
+		"form-builder-multistep-validation",
 		"form-builder-registry-consolidation",
 		"form-builder-repeater-correctness",
 		"form-builder-standard-schema-dep",
