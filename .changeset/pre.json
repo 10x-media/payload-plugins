@@ -64,6 +64,7 @@
 		"fb-honeypot-autofill",
 		"fb-i18n-bundles-repeater-reindex",
 		"fb-paddle-feedback",
+		"fb-recipient-sources-persist",
 		"fb-repeater-field",
 		"fb-round-three",
 		"fb-submission-status",
