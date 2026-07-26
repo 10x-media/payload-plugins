@@ -103,6 +103,7 @@ const makeAfterChange =
 				payload,
 				req,
 				hasRunner: args.hasRunner,
+				persistSubmissions: form?.persistSubmissions as boolean | undefined,
 				richText: args.richText,
 			})
 

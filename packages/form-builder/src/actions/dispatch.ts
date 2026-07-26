@@ -16,6 +16,8 @@ export type DispatchActionsArgs = {
 	req?: PayloadRequest
 	/** Whether a job runner is likely present (queued path); otherwise the bounded-inline fallback runs. */
 	hasRunner: boolean
+	/** The owning form's `persistSubmissions`; when explicitly `false`, run the completion even with no actions so the row is pruned. */
+	persistSubmissions?: boolean
 	deadlineMs?: number
 	richText?: RichTextBodyOption
 }
@@ -38,7 +40,9 @@ const deadline = (ms: number): Promise<void> =>
 export const dispatchActions = async (args: DispatchActionsArgs): Promise<void> => {
 	const { payload, registry, req, formId, submissionId } = args
 	const actions = args.actions ?? []
-	if (actions.length === 0) {
+	// Nothing to run and nothing to prune: skip. An action-less form that opted out of persistence still
+	// runs the completion below, so `runActionsForSubmission` can delete the row out of band.
+	if (actions.length === 0 && args.persistSubmissions !== false) {
 		return
 	}
 

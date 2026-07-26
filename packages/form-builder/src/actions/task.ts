@@ -109,6 +109,21 @@ export const runActionsForSubmission = async (args: {
 			)
 		}
 	}
+	// A form can opt out of storing submissions (a pure signup that only POSTs to a provider): prune the
+	// row after the whole action pass, regardless of individual action success (every action already got
+	// the values). Best-effort: a delete failure is logged, never thrown. Uploads referenced in the values
+	// are host-owned and not cascaded (documented).
+	if (form.persistSubmissions === false) {
+		await payload
+			.delete({ collection: FORM_SUBMISSIONS_SLUG, id: submission.id, overrideAccess: true, req })
+			.catch((error) => {
+				payload.logger?.error(
+					`@10x-media/form-builder: failed to prune submission ${String(submission.id)}: ${
+						error instanceof Error ? error.message : String(error)
+					}`
+				)
+			})
+	}
 	return results
 }
 
