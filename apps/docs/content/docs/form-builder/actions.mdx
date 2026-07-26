@@ -145,6 +145,50 @@ With `email.departments` set, **To** becomes a select backed by an authenticated
 
 Either way, **To** is localized: each admin locale stores its own address (or department choice), and a submission routes to the address stored for its own locale, exactly like the subject and body already do. This holds on the queued (job-runner) dispatch path too: the form is loaded at the submission's own stored locale, not the job runner's request locale, so a German visitor's submission still reaches the German department when the job that sends it runs with no locale of its own.
 
+## Recipient sources
+
+Beyond typed addresses, department picks, and `{{field}}` tokens, a recipient field can offer **sources**: recipients the plugin resolves on the server at send time, so the address never has to reach the browser. The motivating case is a single contact form, reused across every profile page, that emails the person the page is about, while the same form on an ordinary page still goes to its configured recipients.
+
+Register sources under `email.recipientSources`. Each has a namespaced `value` (stored in the recipient list, so it cannot collide with an address), a `label` (a string or a per-locale record, shown in the recipient field), and a `resolve` returning zero or more addresses:
+
+```ts title="payload.config.ts"
+formBuilder({
+  email: {
+    recipientSources: {
+      pageContact: {
+        value: 'context:pageContact',
+        label: { en: 'The person this page is about', de: 'Die Person, um die es auf dieser Seite geht' },
+        resolve: async ({ context, payload }) => {
+          if (!context) return []
+          const doc = await payload.findByID({
+            collection: context.relationTo, id: context.value, depth: 0, overrideAccess: true,
+          })
+          return typeof doc?.email === 'string' && doc.email ? [doc.email] : []
+        },
+      },
+    },
+  },
+})
+```
+
+A registered source appears in every recipient field (**To**, **Cc**, **Bcc**, **Reply-To**) as its own option group, reading as a recipient rather than as configuration. It resolves alongside statically configured recipients rather than replacing them; a source resolving to `[]` is dropped and the others kept; and every resolved address passes through the same single-address sanitizer as a `{{field}}` token, so a source cannot inject headers or extra recipients. If every recipient resolves empty, the send is skipped rather than sent with an empty **To**; a resolver that throws fails that action loudly.
+
+### Form context
+
+`resolve` receives a **form context**: a verified `{ relationTo, value }` reference to the document a form was rendered for, or `null` when it had none. It is how a source knows which profile to look up without the address ever entering the page.
+
+The rendering surface mints a signed reference and hands it to `<Form>`:
+
+```tsx title="app/[person]/page.tsx (server component)"
+import { signFormContext } from '@10x-media/form-builder/rsc'
+
+const context = signFormContext({ payload, relationTo: 'people', value: person.id })
+// ...pass through to the client form:
+<FormRenderer form={form} context={context} />
+```
+
+The token is **signed, not encrypted** (with `payload.secret` by default, and a one-day expiry you can override with `expiresIn`): the reference is not a secret, since the id is already in the URL, and the address never enters the token. Signing only stops the browser from rewriting the recipient. On submit the plugin verifies the signature and expiry, stores the verified `{ relationTo, value }` on the submission (a legible audit record of which document it came through), and hands it to every source's `resolve`. A missing context is normal; an invalid one is rejected, so a tampered reference cannot quietly degrade into a send to the static recipients. The context is never an answer: it does not appear in `values`, the answers view, or `{{*}}` body output.
+
 ## Custom actions
 
 ```ts title="payload.config.ts"
@@ -171,11 +215,17 @@ const slackNotify = defineAction({
 formBuilder({ actions: { slackNotify, confirmation: false } })
 ```
 
-`config` becomes the block's authoring fields in the form editor. `run` receives the form, submission id, `values`, `descriptors`, the stored `config`, `payload`, `req`, `locale`, a translate helper, and `renderBody`, an async function that serializes a rich text (or legacy string) body config into channel-ready HTML through the same pipeline the built-in emails use, honoring the plugin's [`richText` option](#custom-nodes-and-non-html-channels). Give a custom action a `richText` config field and call `renderBody(config.body)` to get the built-in templating for free. The `actions` option follows the [opt-in convention](/concepts#the-opt-in-convention).
+`config` becomes the block's authoring fields in the form editor. `run` receives the form, submission id, `values`, `descriptors`, the verified form `context` (or `null`), the stored `config`, `payload`, `req`, `locale`, a translate helper, and `renderBody`, an async function that serializes a rich text (or legacy string) body config into channel-ready HTML through the same pipeline the built-in emails use, honoring the plugin's [`richText` option](#custom-nodes-and-non-html-channels). Give a custom action a `richText` config field and call `renderBody(config.body)` to get the built-in templating for free. The `actions` option follows the [opt-in convention](/concepts#the-opt-in-convention).
+
+A custom action's `type` is registered as a Payload block whose slug is that type. Because Payload resolves blocks globally by slug, a `type` that matches one of your own content-block slugs would merge the two definitions and pollute the stored action. The plugin throws a clear error at boot if it detects such a collision, so pick an action `type` that no content block shares.
 
 ## Run model
 
 Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most five seconds for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission.
+
+## Pruning submissions
+
+Every form stores each submission by default. Uncheck **Store submissions** on a form (the `persistSubmissions` flag) and the plugin deletes the submission once its actions have run, for a pure signup form whose only job is to POST to a provider and leave no stored row. Deletion happens once, after the whole action pass, regardless of whether an individual action failed (every action still received the values first), so a failing action never strands the row. A pruned submission never appears in the submissions list or in poll and analytics counts, by intent. Pruning does not cascade to files: a non-persist form with a `file` field leaves its uploaded file in the uploads collection (newsletter signups have none). If the job runner is down, the submission is retained until the job eventually runs, never dropped unprocessed.
 
 ## Signed webhook verification
 
