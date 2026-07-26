@@ -1,4 +1,5 @@
 import { type Config, definePlugin } from 'payload'
+import { assertNoActionBlockCollision } from './actions/assertNoBlockCollision'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import { resolveActions } from './actions/registry'
 import { stashConsentSources } from './consent/resolveConsentEntries'
@@ -60,6 +61,9 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			}),
 			options.actions
 		)
+		// Fail fast if a custom action type collides with a host block slug (Payload resolves blocks
+		// globally by slug, which would silently merge the content block's fields into saved actions).
+		assertNoActionBlockCollision(config, actionRegistry)
 		const spam = resolveSpamConfig(options.spam)
 		const pollSourceRegistry = resolvePollOptionSources(options.poll?.sources)
 		const pollTypeRegistry = resolvePollTypes(options.poll?.types)
