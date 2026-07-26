@@ -39,8 +39,16 @@ export type RecipientsSelectProps = {
 	fieldTokens?: boolean
 	/** Field types eligible as tokens (default `['email']`). */
 	tokenFieldTypes?: string[]
+	/** Registered recipient sources, offered as their own option group (labels resolved for the admin locale). */
+	sources?: { value: string; label: string | Record<string, string> }[]
 	descriptionKey?: TranslationKey
 }
+
+/** A source label is a plain string or a per-locale record; resolve it for the admin UI language. */
+const resolveSourceLabel = (label: string | Record<string, string>, language: string): string =>
+	typeof label === 'string'
+		? label
+		: (label[language] ?? label.en ?? Object.values(label)[0] ?? '')
 
 type FetchState =
 	| { status: 'error' | 'idle' | 'loading' }
@@ -83,7 +91,15 @@ export const RecipientsSelect = (props: RecipientsSelectProps) => {
 		showError,
 		value,
 	} = useField<string[] | string>({ path: props.path })
-	const { t } = useTranslation()
+	const { t, i18n } = useTranslation()
+	const sourceOptions: ReactSelectOption[] = useMemo(
+		() =>
+			(props.sources ?? []).map((source) => ({
+				value: source.value,
+				label: resolveSourceLabel(source.label, i18n.language),
+			})),
+		[props.sources, i18n.language]
+	)
 	const label = toStaticLabel(props.field?.label ?? props.label)
 	const description = props.descriptionKey
 		? t(props.descriptionKey)
@@ -139,11 +155,11 @@ export const RecipientsSelect = (props: RecipientsSelectProps) => {
 
 	const byValue = useMemo(() => {
 		const map = new Map<string, ReactSelectOption>()
-		for (const option of [...presetOptions, ...tokenOptions]) {
+		for (const option of [...presetOptions, ...tokenOptions, ...sourceOptions]) {
 			map.set(option.value as string, option)
 		}
 		return map
-	}, [presetOptions, tokenOptions])
+	}, [presetOptions, tokenOptions, sourceOptions])
 
 	const selected = stored.map((entry) => byValue.get(entry) ?? { label: entry, value: entry })
 
@@ -155,8 +171,11 @@ export const RecipientsSelect = (props: RecipientsSelectProps) => {
 		if (tokenOptions.length > 0) {
 			groups.push({ label: t(keys.recipientsGroupFields), options: tokenOptions })
 		}
+		if (sourceOptions.length > 0) {
+			groups.push({ label: t(keys.recipientsGroupSources), options: sourceOptions })
+		}
 		return groups
-	}, [presetOptions, tokenOptions, t])
+	}, [presetOptions, tokenOptions, sourceOptions, t])
 
 	const handleChange = (selection: ReactSelectOption | ReactSelectOption[] | null) => {
 		if (readOnly) {
