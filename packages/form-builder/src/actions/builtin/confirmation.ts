@@ -54,8 +54,9 @@ export const buildConfirmation = (options: EmailActionOptions) => {
 		type: 'confirmation',
 		label: keys.actionConfirmation,
 		target: () => toField,
-		resolveTo: (config, resolve) =>
-			config.toField ? firstAddress(resolve(config.toField)) : undefined,
+		resolveTo: ({ config, resolve }) =>
+			config.toField ? firstAddress(resolve(config.toField)) : '',
+		hasTarget: (config) => Boolean(config.toField),
 		onMissingTo: 'skip',
 	})
 }

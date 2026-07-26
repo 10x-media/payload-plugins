@@ -6,8 +6,14 @@ import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
 import { resolverFor } from '../body/serializeBody'
 import { type ActionDefinition, defineAction } from '../defineAction'
-import { buildRecipientField, type RecipientsConfig, resolveRecipients } from '../emailRecipients'
+import { buildRecipientField, type RecipientsConfig, resolveRecipientEntries } from '../emailRecipients'
 import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
+import {
+	type RecipientResolveArgs,
+	type RecipientSource,
+	type RecipientSourceRegistry,
+	sourcesByValue,
+} from '../recipientSources'
 
 /** The plugin-derived options every built-in email action is built from (was five positional args). */
 export type EmailActionOptions = {
@@ -16,6 +22,8 @@ export type EmailActionOptions = {
 	fromAddresses?: FromAddressesResolver
 	departments?: DepartmentEmailsResolver
 	recipients?: RecipientsConfig
+	/** Server-resolved recipient sources offered in every recipient list (plugin option `email.recipientSources`). */
+	recipientSources?: RecipientSourceRegistry
 }
 
 /** The config fields shared by every built-in email action (each action adds its own `to` target). */
@@ -33,15 +41,28 @@ type RecipientFieldBuilder = (name: string, labelKey: string) => Field
 
 type Resolver = ReturnType<typeof resolverFor>
 
+/** What `resolveTo` needs to compute the primary target, including server-resolved sources. */
+type ResolveToArgs<TConfig extends EmailActionConfig> = {
+	config: TConfig
+	resolve: Resolver
+	sources: Map<string, RecipientSource>
+	sourceArgs: RecipientResolveArgs
+}
+
 /** What distinguishes one email action from another: identity, its primary target, and how it resolves/guards that target. */
 type EmailActionSpec<TConfig extends EmailActionConfig> = {
 	type: string
 	label: string
 	/** The first cell of the opening row (paired with `replyTo`): a recipient list, or an email-field select. */
 	target: (recip: RecipientFieldBuilder) => Field
-	/** Resolve the primary `to` from the stored config, or `undefined` when there is no recipient. */
-	resolveTo: (config: TConfig, resolve: Resolver) => string | undefined
-	/** With no resolved `to`, `emailTeam` treats it as a misconfiguration (`throw`), `confirmation` as a silent skip. */
+	/** Resolve the primary `to` to a comma-joined address string, or `''` when nothing resolves. */
+	resolveTo: (args: ResolveToArgs<TConfig>) => Promise<string> | string
+	/**
+	 * Whether the author configured any target at all. A configured target that resolves empty (e.g. a
+	 * source returned `[]`) is a normal skip; only a target the author never set is a misconfiguration.
+	 */
+	hasTarget: (config: TConfig) => boolean
+	/** With no target authored, `emailTeam` treats it as a misconfiguration (`throw`), `confirmation` as a silent skip. */
 	onMissingTo: 'throw' | 'skip'
 }
 
@@ -94,29 +115,47 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 				...(editor ? { editor } : {}),
 			},
 		],
-		run: async ({ config, values, payload, renderBody }) => {
+		run: async (args) => {
+			const { config, values } = args
 			const resolve = resolverFor(values)
-			const to = spec.resolveTo(config, resolve)
+			const sources = sourcesByValue(options.recipientSources)
+			const sourceArgs: RecipientResolveArgs = {
+				context: args.context,
+				values,
+				descriptors: args.descriptors,
+				form: args.form,
+				submissionId: args.submissionId,
+				payload: args.payload,
+				req: args.req,
+				locale: args.locale,
+			}
+			const to = await spec.resolveTo({ config, resolve, sources, sourceArgs })
 			if (!to) {
-				if (spec.onMissingTo === 'throw') {
+				// Nothing to send to. A target the author never configured is a misconfiguration (emailTeam
+				// throws); a configured target that resolved empty (e.g. a source returned []) is a normal skip.
+				if (!spec.hasTarget(config) && spec.onMissingTo === 'throw') {
 					throw new Error(`${spec.type}: missing "to" address`)
 				}
 				return
 			}
-			if (typeof payload.sendEmail !== 'function') {
+			if (typeof args.payload.sendEmail !== 'function') {
 				throw new Error(`${spec.type}: no email adapter configured`)
 			}
 
 			const subject = interpolate(config.subject ?? '', resolve)
-			const html = await renderBody(config.body)
-			const cc = resolveRecipients(config.cc, resolve)
-			const bcc = resolveRecipients(config.bcc, resolve)
-			const replyTo = resolveRecipients(config.replyTo, resolve)
+			const html = await args.renderBody(config.body)
+			const cc = (await resolveRecipientEntries(config.cc, { resolve, sources, sourceArgs })).join(', ')
+			const bcc = (await resolveRecipientEntries(config.bcc, { resolve, sources, sourceArgs })).join(
+				', '
+			)
+			const replyTo = (
+				await resolveRecipientEntries(config.replyTo, { resolve, sources, sourceArgs })
+			).join(', ')
 
 			// `from` was validated at save time against `fromAddresses(req)`; not re-checked here
 			// (the job's `req` may differ from the authoring admin's, and the config is admin-authored,
 			// not visitor-controlled), so the stored value is forwarded verbatim.
-			await payload.sendEmail({
+			await args.payload.sendEmail({
 				to,
 				subject,
 				html,

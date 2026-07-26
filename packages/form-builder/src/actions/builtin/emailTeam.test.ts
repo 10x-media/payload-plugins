@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SubmissionValue } from '../../submissions/types'
 import { makeRenderBody } from '../body/serializeBody'
 import type { ActionRunArgs } from '../defineAction'
+import type { RecipientSource } from '../recipientSources'
 import { buildEmailTeam, emailTeam } from './emailTeam'
 
 const form = { id: 'form-1', title: 'Test Form' }
@@ -17,6 +18,7 @@ const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {
 		locale,
 		t,
 		descriptors: [],
+		context: null,
 		renderBody: makeRenderBody({ values, descriptors: [], form }),
 		req: undefined,
 		...overrides,
@@ -330,5 +332,83 @@ describe('emailTeam', () => {
 		expect(withDepts?.admin?.components?.Field?.clientProps?.endpoint).toBe('departments')
 		const without = fieldNamed(buildEmailTeam({ localize: true }), 'to') as RecipField | undefined
 		expect(without?.admin?.components?.Field?.clientProps?.endpoint).toBeUndefined()
+	})
+})
+
+describe('emailTeam recipient sources', () => {
+	const payloadWith = (sendEmail: ReturnType<typeof vi.fn>) =>
+		({ sendEmail }) as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+	const teamWith = (resolve: RecipientSource['resolve']) =>
+		buildEmailTeam({
+			localize: true,
+			recipientSources: { s: { value: 'src:x', label: 'X', resolve } },
+		})
+
+	it('resolves a source alongside statically configured recipients', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		await teamWith(async () => ['person@x.com']).run(
+			baseArgs({
+				config: { to: ['team@x.com', 'src:x'], subject: 'S', body: 'B' },
+				payload: payloadWith(sendEmail),
+				context: { relationTo: 'people', value: 1 },
+			})
+		)
+		expect(sendEmail).toHaveBeenCalledWith(
+			expect.objectContaining({ to: 'team@x.com, person@x.com' })
+		)
+	})
+
+	it('drops a source that resolves to [] but keeps the other recipients', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		await teamWith(async () => []).run(
+			baseArgs({
+				config: { to: ['team@x.com', 'src:x'], subject: 'S', body: 'B' },
+				payload: payloadWith(sendEmail),
+			})
+		)
+		expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'team@x.com' }))
+	})
+
+	it('skips the send when every recipient resolves empty', async () => {
+		const sendEmail = vi.fn()
+		await teamWith(async () => []).run(
+			baseArgs({
+				config: { to: ['src:x'], subject: 'S', body: 'B' },
+				payload: payloadWith(sendEmail),
+			})
+		)
+		expect(sendEmail).not.toHaveBeenCalled()
+	})
+
+	it('fails loudly when a source resolver throws', async () => {
+		const sendEmail = vi.fn()
+		await expect(
+			teamWith(() => {
+				throw new Error('boom')
+			}).run(
+				baseArgs({
+					config: { to: ['src:x'], subject: 'S', body: 'B' },
+					payload: payloadWith(sendEmail),
+				})
+			)
+		).rejects.toThrow('boom')
+		expect(sendEmail).not.toHaveBeenCalled()
+	})
+
+	it('passes the verified context to the resolver', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const seen: unknown[] = []
+		await teamWith(async ({ context }) => {
+			seen.push(context)
+			return context ? ['c@x.com'] : []
+		}).run(
+			baseArgs({
+				config: { to: ['src:x'], subject: 'S', body: 'B' },
+				payload: payloadWith(sendEmail),
+				context: { relationTo: 'people', value: 7 },
+			})
+		)
+		expect(seen[0]).toEqual({ relationTo: 'people', value: 7 })
+		expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'c@x.com' }))
 	})
 })
