@@ -174,6 +174,8 @@ export type {
 } from './collections/redirectFields'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
+export type { FormContextReference } from './context/formContext'
+export { signFormContext, verifyFormContext } from './context/formContext'
 export { applyConsentStatements } from './consent/applyConsentStatements'
 export type { ConsentProof, ConsentSnapshotMode } from './consent/captureConsent'
 export { captureConsent } from './consent/captureConsent'

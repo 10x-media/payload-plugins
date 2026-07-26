@@ -1,4 +1,6 @@
 export { resolveConsentStatements } from '../consent/resolveConsentStatements'
+export type { FormContextReference } from '../context/formContext'
+export { signFormContext, verifyFormContext } from '../context/formContext'
 export { isPollClosed } from '../form/pollState'
 export { toFormDocument } from '../form/toFormDocument'
 export { resolveEffectivePollOptions } from '../poll/effectivePollOptions'
