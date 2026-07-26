@@ -74,9 +74,9 @@ describe('resolveRecipientEntries', () => {
 
 	it('resolves a registered source to its addresses, each through firstAddress', async () => {
 		const sources = source('src:x', async () => ['a@x.com, evil@z.com\r\nBcc: y@z.com'])
-		expect(await resolveRecipientEntries(['src:x'], { resolve, sources, sourceArgs: args })).toEqual([
-			'a@x.com',
-		])
+		expect(
+			await resolveRecipientEntries(['src:x'], { resolve, sources, sourceArgs: args })
+		).toEqual(['a@x.com'])
 	})
 
 	it('splices a source alongside static addresses and field tokens', async () => {
@@ -93,7 +93,11 @@ describe('resolveRecipientEntries', () => {
 	it('drops a source that resolves to [] and keeps the rest', async () => {
 		const sources = source('src:empty', async () => [])
 		expect(
-			await resolveRecipientEntries(['a@b.com', 'src:empty'], { resolve, sources, sourceArgs: args })
+			await resolveRecipientEntries(['a@b.com', 'src:empty'], {
+				resolve,
+				sources,
+				sourceArgs: args,
+			})
 		).toEqual(['a@b.com'])
 	})
 
@@ -134,6 +138,30 @@ describe('validateRecipients', () => {
 		const validate = validateRecipients({ tokenFieldTypes: ['email'], resolveAllowed })
 		expect(await validate(['anyone@x.com'], { data, req })).toBe(true)
 		expect(resolveAllowed).not.toHaveBeenCalled()
+	})
+
+	it('accepts a registered source value even with allowCustom false', async () => {
+		const validate = validateRecipients({
+			allowCustom: false,
+			resolveAllowed: () => new Set(),
+			sourceValues: new Set(['context:pageContact']),
+		})
+		expect(await validate(['context:pageContact'], { data, req })).toBe(true)
+	})
+
+	it('rejects a source-looking value that is not registered', async () => {
+		const validate = validateRecipients({ sourceValues: new Set(['context:pageContact']) })
+		expect(await validate(['context:unknown'], { data, req })).toBe(
+			'formBuilder:validation.recipient.invalid'
+		)
+	})
+
+	it('matches a source by exact value before any token or field logic', async () => {
+		const validate = validateRecipients({
+			tokenFieldTypes: ['email'],
+			sourceValues: new Set(['context:pageContact']),
+		})
+		expect(await validate(['context:pageContact', '{{email}}'], { data, req })).toBe(true)
 	})
 
 	it('with allowCustom false, accepts a listed member and a token, rejects an off-list email', async () => {

@@ -5,7 +5,11 @@ import { localizedIf } from '../fields/localizedIf'
 import { interpolate } from '../recall/interpolate'
 import { keys } from '../translations/keys'
 import { asTranslate, labelFor } from '../translations/server'
-import type { RecipientResolveArgs, RecipientSource } from './recipientSources'
+import type {
+	RecipientResolveArgs,
+	RecipientSource,
+	RecipientSourceRegistry,
+} from './recipientSources'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const TOKEN_RE = /^\{\{\s*([\w.-]+)\s*\}\}$/
@@ -103,6 +107,8 @@ export const validateRecipients =
 		allowCustom?: boolean
 		fieldTokens?: boolean
 		resolveAllowed?: (req: PayloadRequest) => Set<string> | Promise<Set<string>>
+		/** Stored values of registered recipient sources; a member is a valid recipient by itself. */
+		sourceValues?: Set<string>
 	}) =>
 	async (
 		value: unknown,
@@ -136,6 +142,11 @@ export const validateRecipients =
 			}
 		}
 		for (const entry of list) {
+			// A registered source value is a valid recipient on its own: checked first, so a same-named form
+			// field cannot shadow it and `allowCustom: false` cannot block it (it is not a custom address).
+			if (opts.sourceValues?.has(entry)) {
+				continue
+			}
 			const token = parseFieldToken(entry)
 			if (token) {
 				// `fieldTokens: false` disables recipient tokens; enforce it on the server, not just the client.
@@ -210,12 +221,15 @@ export const buildRecipientField = (
 		recipients?: RecipientsConfig
 		width?: string
 		departments?: DepartmentEmailsResolver
+		sources?: RecipientSourceRegistry
 	} = {}
 ): TextField => {
 	const { departments } = opts
 	const resolveAllowed = departments
 		? (req: PayloadRequest) => resolveDepartmentAllowed(req, departments)
 		: undefined
+	const sourceList = Object.values(opts.sources ?? {})
+	const sourceValues = sourceList.length > 0 ? new Set(sourceList.map((s) => s.value)) : undefined
 	return {
 		name,
 		type: 'text',
@@ -226,6 +240,7 @@ export const buildRecipientField = (
 			allowCustom: opts.recipients?.allowCustom,
 			fieldTokens: opts.recipients?.fieldTokens,
 			resolveAllowed,
+			sourceValues,
 		}),
 		...localizedIf(localize),
 		admin: {
@@ -239,6 +254,9 @@ export const buildRecipientField = (
 						...(opts.recipients?.fieldTokens === false ? { fieldTokens: false } : {}),
 						...(opts.recipients?.tokenFieldTypes
 							? { tokenFieldTypes: opts.recipients.tokenFieldTypes }
+							: {}),
+						...(sourceList.length > 0
+							? { sources: sourceList.map((s) => ({ value: s.value, label: s.label })) }
 							: {}),
 					},
 				},

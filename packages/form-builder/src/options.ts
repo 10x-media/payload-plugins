@@ -2,6 +2,7 @@ import type { CollectionSlug } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
 import type { RecipientsConfig } from './actions/emailRecipients'
 import type { FromAddressesResolver } from './actions/fromAddresses'
+import type { RecipientSourceRegistry } from './actions/recipientSources'
 import type { ActionsConfig } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
 import type { ButtonsOption } from './collections/buttonFields'
@@ -89,6 +90,12 @@ export type FormBuilderPluginOptions = {
 		departments?: DepartmentEmailsResolver
 		/** Narrows the recipient fields' behavior (free-typed emails, field tokens). See {@link RecipientsConfig}. */
 		recipients?: RecipientsConfig
+		/**
+		 * Server-resolved recipients, offered in every recipient field as their own option group and
+		 * resolved to addresses at send time. Each source's `value` is a namespaced string (so it cannot
+		 * collide with an address); its `resolve` receives the verified form context. See {@link RecipientSource}.
+		 */
+		recipientSources?: RecipientSourceRegistry
 	}
 	/**
 	 * Where the consent statements a form can reference come from. Absent (the default): no sources,

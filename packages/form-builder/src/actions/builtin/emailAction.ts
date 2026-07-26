@@ -6,7 +6,11 @@ import { keys } from '../../translations/keys'
 import { labelFor } from '../../translations/server'
 import { resolverFor } from '../body/serializeBody'
 import { type ActionDefinition, defineAction } from '../defineAction'
-import { buildRecipientField, type RecipientsConfig, resolveRecipientEntries } from '../emailRecipients'
+import {
+	buildRecipientField,
+	type RecipientsConfig,
+	resolveRecipientEntries,
+} from '../emailRecipients'
 import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
 import {
 	type RecipientResolveArgs,
@@ -78,7 +82,7 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 	options: EmailActionOptions,
 	spec: EmailActionSpec<TConfig>
 ): ActionDefinition<TConfig> => {
-	const { localize, editor, fromAddresses, departments, recipients } = options
+	const { localize, editor, fromAddresses, departments, recipients, recipientSources } = options
 	const endpoint = departments ? 'departments' : undefined
 	const recip: RecipientFieldBuilder = (name, labelKey) =>
 		buildRecipientField(name, labelKey, localize, {
@@ -86,6 +90,7 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 			recipients,
 			width: '50%',
 			departments,
+			sources: recipientSources,
 		})
 	return defineAction<TConfig>({
 		type: spec.type,
@@ -144,10 +149,12 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 
 			const subject = interpolate(config.subject ?? '', resolve)
 			const html = await args.renderBody(config.body)
-			const cc = (await resolveRecipientEntries(config.cc, { resolve, sources, sourceArgs })).join(', ')
-			const bcc = (await resolveRecipientEntries(config.bcc, { resolve, sources, sourceArgs })).join(
+			const cc = (await resolveRecipientEntries(config.cc, { resolve, sources, sourceArgs })).join(
 				', '
 			)
+			const bcc = (
+				await resolveRecipientEntries(config.bcc, { resolve, sources, sourceArgs })
+			).join(', ')
 			const replyTo = (
 				await resolveRecipientEntries(config.replyTo, { resolve, sources, sourceArgs })
 			).join(', ')

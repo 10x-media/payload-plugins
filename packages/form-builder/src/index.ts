@@ -56,6 +56,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 				fromAddresses,
 				departments,
 				recipients: options.email?.recipients,
+				recipientSources: options.email?.recipientSources,
 			}),
 			options.actions
 		)
@@ -124,6 +125,11 @@ export { buildDefaultActionDefinitions, defaultActionDefinitions } from './actio
 export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
 export { defineAction } from './actions/defineAction'
 export type { FromAddressesResolver, FromAddressOption } from './actions/fromAddresses'
+export type {
+	RecipientResolveArgs,
+	RecipientSource,
+	RecipientSourceRegistry,
+} from './actions/recipientSources'
 export type { ActionOption, ActionRegistry, ActionsConfig } from './actions/registry'
 export { resolveActions } from './actions/registry'
 export type { ActionResult } from './actions/runActions'
@@ -174,8 +180,6 @@ export type {
 } from './collections/redirectFields'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
-export type { FormContextReference } from './context/formContext'
-export { signFormContext, verifyFormContext } from './context/formContext'
 export { applyConsentStatements } from './consent/applyConsentStatements'
 export type { ConsentProof, ConsentSnapshotMode } from './consent/captureConsent'
 export { captureConsent } from './consent/captureConsent'
@@ -202,6 +206,8 @@ export type {
 	ConsentSourcePage,
 	ConsentSourcesResolver,
 } from './consent/types'
+export type { FormContextReference } from './context/formContext'
+export { signFormContext, verifyFormContext } from './context/formContext'
 export type {
 	DepartmentEmailsResolver,
 	DepartmentOption,
