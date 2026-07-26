@@ -30,9 +30,9 @@ describe('verifyContext', () => {
 	})
 
 	it('rejects an invalid context rather than silently dropping it', async () => {
-		await expect(run({ values: [{ field: CONTEXT_KEY, value: 'v1.bad.sig' }] })).rejects.toBeInstanceOf(
-			APIError
-		)
+		await expect(
+			run({ values: [{ field: CONTEXT_KEY, value: 'v1.bad.sig' }] })
+		).rejects.toBeInstanceOf(APIError)
 	})
 
 	it('is a no-op when no context is present (a form on an ordinary page)', async () => {

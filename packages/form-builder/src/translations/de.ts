@@ -247,7 +247,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.spamRateLimited]: 'Du hast zu viele Anfragen gesendet. Bitte versuche es später erneut.',
 	[keys.spamRejected]: 'Deine Übermittlung konnte nicht verarbeitet werden.',
 	[keys.spamCaptchaFailed]: 'Captcha-Überprüfung fehlgeschlagen. Bitte versuche es erneut.',
-	[keys.contextInvalid]: 'Dieses Formular konnte nicht verifiziert werden. Bitte lade die Seite neu und versuche es erneut.',
+	[keys.contextInvalid]:
+		'Dieses Formular konnte nicht verifiziert werden. Bitte lade die Seite neu und versuche es erneut.',
 	[keys.collectionFormSingular]: 'Formular',
 	[keys.collectionFormPlural]: 'Formulare',
 	[keys.collectionSubmissionSingular]: 'Übermittlung',

@@ -59,7 +59,11 @@ describe('runActionsForSubmission', () => {
 			delete: del,
 			logger: { error: vi.fn() },
 		} as unknown as Payload
-		await runActionsForSubmission({ input: { formId: 'f1', submissionId: 's1' }, registry: new Map(), payload })
+		await runActionsForSubmission({
+			input: { formId: 'f1', submissionId: 's1' },
+			registry: new Map(),
+			payload,
+		})
 		expect(del).toHaveBeenCalledWith(
 			expect.objectContaining({ collection: 'form-submissions', id: 's1', overrideAccess: true })
 		)
@@ -72,7 +76,11 @@ describe('runActionsForSubmission', () => {
 			delete: del,
 			logger: { error: vi.fn() },
 		} as unknown as Payload
-		await runActionsForSubmission({ input: { formId: 'f1', submissionId: 's1' }, registry: new Map(), payload })
+		await runActionsForSubmission({
+			input: { formId: 'f1', submissionId: 's1' },
+			registry: new Map(),
+			payload,
+		})
 		expect(del).not.toHaveBeenCalled()
 	})
 

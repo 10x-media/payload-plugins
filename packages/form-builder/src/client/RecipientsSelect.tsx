@@ -46,9 +46,7 @@ export type RecipientsSelectProps = {
 
 /** A source label is a plain string or a per-locale record; resolve it for the admin UI language. */
 const resolveSourceLabel = (label: string | Record<string, string>, language: string): string =>
-	typeof label === 'string'
-		? label
-		: (label[language] ?? label.en ?? Object.values(label)[0] ?? '')
+	typeof label === 'string' ? label : (label[language] ?? label.en ?? Object.values(label)[0] ?? '')
 
 type FetchState =
 	| { status: 'error' | 'idle' | 'loading' }

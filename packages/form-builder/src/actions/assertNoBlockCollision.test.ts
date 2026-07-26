@@ -18,7 +18,10 @@ describe('assertNoActionBlockCollision', () => {
 
 	it('does not throw when no action type matches a host block slug', () => {
 		expect(() =>
-			assertNoActionBlockCollision(withBlocks(['hero', 'cta']), registry(['newsletter', 'emailTeam']))
+			assertNoActionBlockCollision(
+				withBlocks(['hero', 'cta']),
+				registry(['newsletter', 'emailTeam'])
+			)
 		).not.toThrow()
 	})
 

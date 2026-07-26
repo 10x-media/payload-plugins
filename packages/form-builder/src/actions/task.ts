@@ -28,7 +28,10 @@ const asDescriptors = (value: unknown): SubmissionDescriptor[] =>
 const asContext = (value: unknown): FormContextReference | null => {
 	if (value && typeof value === 'object') {
 		const { relationTo, value: reference } = value as Record<string, unknown>
-		if (typeof relationTo === 'string' && (typeof reference === 'string' || typeof reference === 'number')) {
+		if (
+			typeof relationTo === 'string' &&
+			(typeof reference === 'string' || typeof reference === 'number')
+		) {
 			return { relationTo, value: reference }
 		}
 	}
