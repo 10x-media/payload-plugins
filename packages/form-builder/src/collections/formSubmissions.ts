@@ -221,7 +221,9 @@ export const buildSubmissionsCollection = ({
 			name: 'context',
 			type: 'group',
 			label: labelForKey(keys.submissionContext),
-			admin: { readOnly: true, condition: (data) => Boolean(data?.context) },
+			// A Payload group always materializes as an object, so gate on a populated `relationTo`
+			// (not the group itself) to show it only for submissions made through a signed context.
+			admin: { readOnly: true, condition: (data) => Boolean(data?.context?.relationTo) },
 			fields: [
 				{ name: 'relationTo', type: 'text' },
 				{ name: 'value', type: 'text' },
