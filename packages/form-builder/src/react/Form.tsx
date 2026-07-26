@@ -34,7 +34,12 @@ import {
 } from '../presentations/defaults'
 import { interpolate } from '../recall/interpolate'
 import { buildRecallResolver, descriptorsFor } from '../recall/resolver'
-import { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD, HONEYPOT_VALUE_KEY } from '../spam/constants'
+import {
+	CAPTCHA_TOKEN_KEY,
+	CONTEXT_KEY,
+	DEFAULT_HONEYPOT_FIELD,
+	HONEYPOT_VALUE_KEY,
+} from '../spam/constants'
 import type { FormFieldInstance, SubmissionValue } from '../submissions/types'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
@@ -148,6 +153,12 @@ export type FormProps = {
 	honeypot?: false | { name?: string }
 	/** A token from your captcha widget; verified server-side when a captcha provider is configured. */
 	captchaToken?: string
+	/**
+	 * A signed form-context token from `signFormContext` (server/RSC), tying this render to a document
+	 * (e.g. the profile page it is on). Carried alongside the answers, verified server-side, and
+	 * available to `email.recipientSources`; it is never stored as an answer.
+	 */
+	context?: string
 	/** Custom layout: render fields with `useField`/`useFormState` instead of the auto-rendered field loop. */
 	children?: ReactNode
 	/** Chrome rendered inside the form, above the fields, in default mode (e.g. `<FormSteps />`). */
@@ -234,6 +245,7 @@ export const Form = ({
 	initialValues,
 	honeypot,
 	captchaToken,
+	context,
 	children,
 	header,
 	className,
@@ -705,6 +717,11 @@ export const Form = ({
 		}
 		if (captchaToken) {
 			values.push({ field: CAPTCHA_TOKEN_KEY, value: captchaToken })
+		}
+		if (context) {
+			// Rides under a reserved key like the captcha token: verified and stored separately server-side,
+			// never merged into the answers.
+			values.push({ field: CONTEXT_KEY, value: context })
 		}
 		const result: SubmitFormResult = onSubmit
 			? await onSubmit({ formId: form.id, values })
