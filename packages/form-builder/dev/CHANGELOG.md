@@ -1,5 +1,12 @@
 # @10x-media/form-builder-dev
 
+## 0.0.1-beta.11
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.11
+
 ## 0.0.1-beta.10
 
 ### Patch Changes

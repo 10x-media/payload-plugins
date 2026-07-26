@@ -1,5 +1,16 @@
 # @10x-media/form-builder
 
+## 0.1.0-beta.11
+
+### Minor Changes
+
+- Server-resolved recipients with a signed form context, opt-out submission storage, and an action-block collision guard.
+
+  - **Recipient sources.** A new `email.recipientSources` option registers recipients the plugin resolves server-side at send time, offered in every recipient field (**To**/**Cc**/**Bcc**/**Reply-To**) as their own option group. A source's namespaced `value` cannot collide with an address, its `resolve` returns zero or more addresses (each sanitized to one, so a source cannot inject headers), an empty resolve is dropped, and a send with every recipient empty is skipped rather than sent with an empty **To**. This lets one reusable form email "the person this page is about" without an address ever reaching the browser.
+  - **Signed form context.** `signFormContext({ payload, relationTo, value })` (exported from `/rsc` and root) mints a signed, expiring reference to the document a form was rendered for; `<Form context={token} />` carries it, the plugin verifies it on submit (rejecting a tampered or expired one rather than dropping it), stores the verified `{ relationTo, value }` on the submission, and hands it to each source's `resolve`. The reference is signed, not encrypted (the id is already public); it never appears in the answers, the admin answers view, or `{{*}}` body output.
+  - **`persistSubmissions`.** A per-form "Store submissions" flag (default on). Unchecked, the plugin deletes the submission after its actions run, for a pure signup form that only POSTs to a provider. Deletion is once, after the whole action pass, regardless of individual action success; pruning does not cascade to uploaded files (documented).
+  - **Action-block collision guard.** The plugin now throws a clear error at boot if a registered action `type` collides with a host Payload block slug (which Payload would otherwise silently merge), instead of corrupting the stored action shape. Action block slugs are unchanged, so existing actions keep working.
+
 ## 0.1.0-beta.10
 
 ### Minor Changes
