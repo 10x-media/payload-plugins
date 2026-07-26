@@ -157,4 +157,35 @@ describe('dispatchActions', () => {
 			expect(ran).toEqual(['recorder'])
 		})
 	})
+
+	describe('no actions', () => {
+		it('returns early when a persisting form has no actions', async () => {
+			const queue = vi.fn()
+			const payload = { jobs: { queue } } as never
+			await dispatchActions({
+				actions: [],
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry: new Map(),
+				payload,
+				hasRunner: true,
+			})
+			expect(queue).not.toHaveBeenCalled()
+		})
+
+		it('runs the completion for an action-less form that opts out of persistence (to prune)', async () => {
+			const queue = vi.fn().mockResolvedValue(undefined)
+			const payload = { jobs: { queue } } as never
+			await dispatchActions({
+				actions: [],
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry: new Map(),
+				payload,
+				hasRunner: true,
+				persistSubmissions: false,
+			})
+			expect(queue).toHaveBeenCalledOnce()
+		})
+	})
 })

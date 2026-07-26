@@ -638,6 +638,15 @@ export const buildFormsCollection = ({
 				},
 			],
 		},
+		// Storage flag, server-only: when unchecked, the plugin deletes the submission after its actions
+		// run (pruning a pure signup form's row). Default checked, so unchecking it is the opt-out.
+		{
+			name: 'persistSubmissions',
+			type: 'checkbox',
+			defaultValue: true,
+			label: labelForKey(keys.formPersistSubmissions),
+			admin: { width: '50%' },
+		},
 		// Unnamed tabs are presentational: their fields stay at the document root. An unnamed tab's
 		// `admin.condition` receives the whole document as its 2nd arg, so the Flow and Poll tabs gate
 		// on the root-level flags. The poll group nests its config under `form.poll` as before.

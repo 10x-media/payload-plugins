@@ -14,6 +14,7 @@ import type { PollOptionSourceRegistry } from '../poll/registry'
 import { buildSpamGuard } from '../spam/spamGuard'
 import type { ResolvedSpamConfig } from '../spam/types'
 import { validateSubmission } from '../submissions/validateSubmission'
+import { verifyContext } from '../submissions/verifyContext'
 import { POLL_CONTEXT_KEY, votedCookieName } from '../submissions/votedCookie'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
@@ -102,6 +103,7 @@ const makeAfterChange =
 				payload,
 				req,
 				hasRunner: args.hasRunner,
+				persistSubmissions: form?.persistSubmissions as boolean | undefined,
 				richText: args.richText,
 			})
 
@@ -212,6 +214,21 @@ export const buildSubmissionsCollection = ({
 		{ name: 'descriptors', type: 'json', admin: { hidden: !showRawFields } },
 		{ name: 'consent', type: 'json', admin: { hidden: !showRawFields } },
 		{ name: 'meta', type: 'json', admin: { hidden: !showRawFields } },
+		// The verified reference to the document this form was rendered for (see verifyContext). Only forms
+		// rendered with a signed context carry one, so the group is shown only when present. Readable, so it
+		// is a legible audit record of which document a submission came through.
+		{
+			name: 'context',
+			type: 'group',
+			label: labelForKey(keys.submissionContext),
+			// A Payload group always materializes as an object, so gate on a populated `relationTo`
+			// (not the group itself) to show it only for submissions made through a signed context.
+			admin: { readOnly: true, condition: (data) => Boolean(data?.context?.relationTo) },
+			fields: [
+				{ name: 'relationTo', type: 'text' },
+				{ name: 'value', type: 'text' },
+			],
+		},
 	]
 
 	return {
@@ -240,6 +257,9 @@ export const buildSubmissionsCollection = ({
 			// Consumer beforeValidate hooks are appended after so they run on already-validated data.
 			beforeValidate: [
 				...(spam ? [buildSpamGuard(spam)] : []),
+				// Verify + store the signed form context before validation stores the answers, and independently
+				// of spam so it runs even with spam off.
+				verifyContext(),
 				validateSubmission({
 					registry,
 					ruleRegistry,

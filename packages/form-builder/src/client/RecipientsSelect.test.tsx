@@ -32,7 +32,7 @@ vi.mock('@payloadcms/ui', () => ({
 }))
 vi.mock('payload/shared', () => ({ reduceFieldsToValues: () => ({ fields: [] }) }))
 vi.mock('../translations/useTranslation', () => ({
-	useTranslation: () => ({ t: (k: string) => k }),
+	useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }))
 
 afterEach(() => {
@@ -71,6 +71,36 @@ describe('RecipientsSelect', () => {
 		render(<RecipientsSelect path="to" field={{ label: 'To' }} allowCustom={false} />)
 		expect(captured.props.isCreatable).toBe(false)
 		expect(captured.props.filterOption(null, 'a@b.com')).toBe(false)
+	})
+
+	it('offers registered sources as their own group and resolves a stored source label', () => {
+		fieldState.current = { ...fieldState.current, value: ['context:pageContact'] }
+		render(
+			<RecipientsSelect
+				path="to"
+				field={{ label: 'To' }}
+				sources={[{ value: 'context:pageContact', label: { en: 'The person', de: 'Die Person' } }]}
+			/>
+		)
+		const groups = captured.props.options as { label: string; options: { value: string }[] }[]
+		const sourceGroup = groups.find((g) => g.options.some((o) => o.value === 'context:pageContact'))
+		expect(sourceGroup?.options[0]).toEqual({ value: 'context:pageContact', label: 'The person' })
+		expect(captured.props.value).toEqual([{ value: 'context:pageContact', label: 'The person' }])
+	})
+
+	it('accepts a source value on change even when allowCustom is false', () => {
+		const setValue = vi.fn()
+		fieldState.current = { ...fieldState.current, value: [], setValue }
+		render(
+			<RecipientsSelect
+				path="to"
+				field={{ label: 'To' }}
+				allowCustom={false}
+				sources={[{ value: 'context:pageContact', label: 'The person' }]}
+			/>
+		)
+		captured.props.onChange([{ value: 'context:pageContact' }])
+		expect(setValue).toHaveBeenCalledWith(['context:pageContact'])
 	})
 
 	it('applies --field-width from admin.width', () => {

@@ -51,6 +51,24 @@ describe('Form spam wiring', () => {
 		expect(submittedValues(onSubmit)).toContainEqual({ field: '__fb_captcha', value: 'tok' })
 	})
 
+	it('appends a signed context token under a reserved key when provided', async () => {
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true })
+		render(<Form form={doc()} onSubmit={onSubmit} context="v1.body.sig" />)
+		fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Jo' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+		await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+		expect(submittedValues(onSubmit)).toContainEqual({ field: '__fb_ctx', value: 'v1.body.sig' })
+	})
+
+	it('appends no context entry when the form has none', async () => {
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true })
+		render(<Form form={doc()} onSubmit={onSubmit} />)
+		fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Jo' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+		await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+		expect(submittedValues(onSubmit).map((v) => v.field)).not.toContain('__fb_ctx')
+	})
+
 	it('renders no decoy when honeypot is false', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true })
 		const { container } = render(<Form form={doc()} onSubmit={onSubmit} honeypot={false} />)

@@ -18,6 +18,7 @@ const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {
 		locale,
 		t,
 		descriptors: [],
+		context: null,
 		renderBody: makeRenderBody({ values, descriptors: [], form }),
 		req: undefined,
 		...overrides,

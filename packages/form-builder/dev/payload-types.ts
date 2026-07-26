@@ -264,6 +264,10 @@ export interface FormSubmission {
     | number
     | boolean
     | null;
+  context?: {
+    relationTo?: string | null;
+    value?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -276,6 +280,7 @@ export interface Form {
   title?: string | null;
   multistep?: boolean | null;
   pollEnabled?: boolean | null;
+  persistSubmissions?: boolean | null;
   fields?:
     | (
         | {
@@ -2337,6 +2342,12 @@ export interface FormSubmissionsSelect<T extends boolean = true> {
   descriptors?: T;
   consent?: T;
   meta?: T;
+  context?:
+    | T
+    | {
+        relationTo?: T;
+        value?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2348,6 +2359,7 @@ export interface FormsSelect<T extends boolean = true> {
   title?: T;
   multistep?: T;
   pollEnabled?: T;
+  persistSubmissions?: T;
   fields?:
     | T
     | {

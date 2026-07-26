@@ -1,4 +1,5 @@
 import { type Config, definePlugin } from 'payload'
+import { assertNoActionBlockCollision } from './actions/assertNoBlockCollision'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import { resolveActions } from './actions/registry'
 import { stashConsentSources } from './consent/resolveConsentEntries'
@@ -56,9 +57,13 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 				fromAddresses,
 				departments,
 				recipients: options.email?.recipients,
+				recipientSources: options.email?.recipientSources,
 			}),
 			options.actions
 		)
+		// Fail fast if a custom action type collides with a host block slug (Payload resolves blocks
+		// globally by slug, which would silently merge the content block's fields into saved actions).
+		assertNoActionBlockCollision(config, actionRegistry)
 		const spam = resolveSpamConfig(options.spam)
 		const pollSourceRegistry = resolvePollOptionSources(options.poll?.sources)
 		const pollTypeRegistry = resolvePollTypes(options.poll?.types)
@@ -124,6 +129,11 @@ export { buildDefaultActionDefinitions, defaultActionDefinitions } from './actio
 export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
 export { defineAction } from './actions/defineAction'
 export type { FromAddressesResolver, FromAddressOption } from './actions/fromAddresses'
+export type {
+	RecipientResolveArgs,
+	RecipientSource,
+	RecipientSourceRegistry,
+} from './actions/recipientSources'
 export type { ActionOption, ActionRegistry, ActionsConfig } from './actions/registry'
 export { resolveActions } from './actions/registry'
 export type { ActionResult } from './actions/runActions'
@@ -200,6 +210,8 @@ export type {
 	ConsentSourcePage,
 	ConsentSourcesResolver,
 } from './consent/types'
+export type { FormContextReference } from './context/formContext'
+export { signFormContext, verifyFormContext } from './context/formContext'
 export type {
 	DepartmentEmailsResolver,
 	DepartmentOption,

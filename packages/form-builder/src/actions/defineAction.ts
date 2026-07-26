@@ -1,4 +1,5 @@
 import type { Field, Payload, PayloadRequest } from 'payload'
+import type { FormContextReference } from '../context/formContext'
 import type { Translate } from '../fields/types'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 
@@ -8,6 +9,8 @@ export type ActionRunArgs<TConfig extends Record<string, unknown> = Record<strin
 	submissionId: number | string
 	values: SubmissionValue[]
 	descriptors: SubmissionDescriptor[]
+	/** The verified form-context reference the submission was made through, or null when it had none. */
+	context: FormContextReference | null
 	config: TConfig
 	payload: Payload
 	req?: PayloadRequest
