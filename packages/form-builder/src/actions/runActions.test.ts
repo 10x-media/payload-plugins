@@ -7,6 +7,7 @@ const makeMockCtx = () => ({
 	submissionId: 'sub-1' as string,
 	values: [] as never[],
 	descriptors: [] as never[],
+	context: null,
 	payload: {} as never,
 	locale: 'en',
 	t: (key: string) => key,

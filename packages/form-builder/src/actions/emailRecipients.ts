@@ -5,6 +5,7 @@ import { localizedIf } from '../fields/localizedIf'
 import { interpolate } from '../recall/interpolate'
 import { keys } from '../translations/keys'
 import { asTranslate, labelFor } from '../translations/server'
+import type { RecipientResolveArgs, RecipientSource } from './recipientSources'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const TOKEN_RE = /^\{\{\s*([\w.-]+)\s*\}\}$/
@@ -48,6 +49,44 @@ export const resolveRecipients = (value: unknown, resolve: (name: string) => str
 		.map((entry) => firstAddress(interpolate(entry, resolve)))
 		.filter((entry) => entry.length > 0)
 		.join(', ')
+
+/**
+ * Async recipient resolution for the email actions, extending `resolveRecipients` with server-resolved
+ * sources. A registered source value calls its `resolve` (each returned address reduced to one by
+ * `firstAddress`, so a source cannot inject headers or extra recipients either); a `{{token}}`/plain
+ * email resolves exactly as before. Returns a clean address list (`[]` when nothing resolves) so the
+ * caller can skip an empty send. A thrown resolver propagates, failing the action loudly rather than
+ * sending to a shortened list.
+ */
+export const resolveRecipientEntries = async (
+	value: unknown,
+	opts: {
+		resolve: (name: string) => string
+		sources?: Map<string, RecipientSource>
+		sourceArgs?: RecipientResolveArgs
+	}
+): Promise<string[]> => {
+	const out: string[] = []
+	for (const entry of toList(value)) {
+		const source = opts.sources?.get(entry)
+		if (source) {
+			// A source only resolves with the run-time args; there are none at authoring/validation time.
+			const resolved = opts.sourceArgs ? await source.resolve(opts.sourceArgs) : []
+			for (const address of resolved) {
+				const clean = firstAddress(address)
+				if (clean) {
+					out.push(clean)
+				}
+			}
+			continue
+		}
+		const clean = firstAddress(interpolate(entry, opts.resolve))
+		if (clean) {
+			out.push(clean)
+		}
+	}
+	return out
+}
 
 /**
  * Field `validate` for a recipient list: unset is fine; otherwise every entry must be a valid email

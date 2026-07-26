@@ -1,12 +1,14 @@
-import type { PayloadRequest } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import {
 	isFieldToken,
 	isPlausibleEmail,
 	parseFieldToken,
+	resolveRecipientEntries,
 	resolveRecipients,
 	validateRecipients,
 } from './emailRecipients'
+import type { RecipientResolveArgs, RecipientSource } from './recipientSources'
 
 describe('isPlausibleEmail', () => {
 	it('accepts a normal address, rejects junk', () => {
@@ -51,6 +53,64 @@ describe('resolveRecipients', () => {
 		expect(resolveRecipients(['{{multi}}'], inject)).toBe('a@b.com')
 		expect(resolveRecipients(['{{crlf}}'], inject)).toBe('a@b.com')
 		expect(resolveRecipients(['team@x.com', '{{multi}}'], inject)).toBe('team@x.com, a@b.com')
+	})
+})
+
+describe('resolveRecipientEntries', () => {
+	const resolve = (name: string) => (name === 'email' ? 'user@site.com' : '')
+	const args: RecipientResolveArgs = {
+		context: null,
+		values: [],
+		descriptors: [],
+		form: { id: 1 },
+		submissionId: 1,
+		payload: {} as Payload,
+		locale: 'en',
+	}
+	const source = (
+		value: string,
+		resolveFn: RecipientSource['resolve']
+	): Map<string, RecipientSource> => new Map([[value, { value, label: 'X', resolve: resolveFn }]])
+
+	it('resolves a registered source to its addresses, each through firstAddress', async () => {
+		const sources = source('src:x', async () => ['a@x.com, evil@z.com\r\nBcc: y@z.com'])
+		expect(await resolveRecipientEntries(['src:x'], { resolve, sources, sourceArgs: args })).toEqual([
+			'a@x.com',
+		])
+	})
+
+	it('splices a source alongside static addresses and field tokens', async () => {
+		const sources = source('context:pageContact', async () => ['person@x.com'])
+		expect(
+			await resolveRecipientEntries(['team@x.com', 'context:pageContact', '{{email}}'], {
+				resolve,
+				sources,
+				sourceArgs: args,
+			})
+		).toEqual(['team@x.com', 'person@x.com', 'user@site.com'])
+	})
+
+	it('drops a source that resolves to [] and keeps the rest', async () => {
+		const sources = source('src:empty', async () => [])
+		expect(
+			await resolveRecipientEntries(['a@b.com', 'src:empty'], { resolve, sources, sourceArgs: args })
+		).toEqual(['a@b.com'])
+	})
+
+	it('propagates a throwing resolver so the action fails loudly', async () => {
+		const sources = source('src:boom', () => {
+			throw new Error('nope')
+		})
+		await expect(
+			resolveRecipientEntries(['src:boom'], { resolve, sources, sourceArgs: args })
+		).rejects.toThrow('nope')
+	})
+
+	it('treats a registered value as a source, never a token or address', async () => {
+		const sources = source('context:pageContact', async () => ['person@x.com'])
+		expect(
+			await resolveRecipientEntries(['context:pageContact'], { resolve, sources, sourceArgs: args })
+		).toEqual(['person@x.com'])
 	})
 })
 

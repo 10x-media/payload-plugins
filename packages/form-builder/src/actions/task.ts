@@ -1,6 +1,7 @@
 import type { Config, Payload, PayloadRequest, TaskConfig, TypedLocale } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
+import type { FormContextReference } from '../context/formContext'
 import type { Translate } from '../fields/types'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 import { asFieldTranslate } from '../translations/server'
@@ -22,6 +23,17 @@ const asValues = (value: unknown): SubmissionValue[] =>
 
 const asDescriptors = (value: unknown): SubmissionDescriptor[] =>
 	Array.isArray(value) ? (value as SubmissionDescriptor[]) : []
+
+/** The verified `{ relationTo, value }` stored on a submission, or null when it carried no context. */
+const asContext = (value: unknown): FormContextReference | null => {
+	if (value && typeof value === 'object') {
+		const { relationTo, value: reference } = value as Record<string, unknown>
+		if (typeof relationTo === 'string' && (typeof reference === 'string' || typeof reference === 'number')) {
+			return { relationTo, value: reference }
+		}
+	}
+	return null
+}
 
 /**
  * Load the form and submission by id and run the form's actions through the shared, failure-isolating
@@ -82,6 +94,7 @@ export const runActionsForSubmission = async (args: {
 		submissionId: submission.id,
 		values: asValues(submission.values),
 		descriptors: asDescriptors(submission.descriptors),
+		context: asContext(submission.context),
 		payload,
 		req,
 		locale,
