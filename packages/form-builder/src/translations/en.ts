@@ -86,7 +86,7 @@ export const en: Record<TranslationKey, string> = {
 		'Fails when the entered text is longer than the maximum number of characters.',
 	[keys.ruleMinDescription]: 'Fails when the entered number is below the minimum.',
 	[keys.ruleMaxDescription]: 'Fails when the entered number is above the maximum.',
-	[keys.ruleIntegerDescription]: 'The answer must be a whole number.',
+	[keys.ruleIntegerDescription]: 'Fails when the entered number is not a whole number.',
 	[keys.ruleMinDateDescription]: 'Fails when the chosen date is earlier than the minimum date.',
 	[keys.ruleMaxDateDescription]: 'Fails when the chosen date is later than the maximum date.',
 	[keys.rulePatternDescription]:

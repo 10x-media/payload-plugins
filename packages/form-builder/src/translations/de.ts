@@ -87,7 +87,7 @@ export const de: Record<TranslationKey, string> = {
 		'Schlägt fehl, wenn der eingegebene Text länger als die maximale Anzahl an Zeichen ist.',
 	[keys.ruleMinDescription]: 'Schlägt fehl, wenn die eingegebene Zahl unter dem Minimum liegt.',
 	[keys.ruleMaxDescription]: 'Schlägt fehl, wenn die eingegebene Zahl über dem Maximum liegt.',
-	[keys.ruleIntegerDescription]: 'Die Antwort muss eine ganze Zahl sein.',
+	[keys.ruleIntegerDescription]: 'Schlägt fehl, wenn die eingegebene Zahl keine ganze Zahl ist.',
 	[keys.ruleMinDateDescription]:
 		'Schlägt fehl, wenn das gewählte Datum vor dem frühesten Datum liegt.',
 	[keys.ruleMaxDateDescription]:
