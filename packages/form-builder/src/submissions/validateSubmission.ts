@@ -170,7 +170,9 @@ export const validateSubmission =
 			const resolved = await resolveCalcContext({
 				fields,
 				sources: calcSources ?? {},
-				form: form as { id: number | string } & Record<string, unknown>,
+				// Double cast: a host's generated Form interface has no index signature, so the direct
+				// cast fails under a consumer tsconfig even though the shape is a plain document.
+				form: form as unknown as { id: number | string } & Record<string, unknown>,
 				payload: req.payload,
 				req,
 			})

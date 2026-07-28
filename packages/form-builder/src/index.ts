@@ -37,6 +37,14 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			sources: new Set(Object.keys(calcSources)),
 			functions: new Set(Object.keys(calcFunctions)),
 		}
+		// Serializable source metadata for the builder UI: key, label, and implemented modes. The
+		// resolver functions themselves never leave the server.
+		const calcSourceMeta = Object.entries(calcSources).map(([key, source]) => ({
+			key,
+			label: source.label,
+			scalar: typeof source.resolve === 'function',
+			weights: typeof source.resolveWeights === 'function',
+		}))
 		// The file field's MIME picker is constrained to what the host upload collection accepts: the
 		// explicit `uploads.mimeTypes` override, else the collection's own `upload.mimeTypes`. Read here,
 		// before the field registry freezes below (attachUploadsCollection runs too late).
@@ -53,7 +61,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			localizeContent,
 			options.richText?.editor,
 			uploadMimeTypes,
-			calcAllowed
+			calcAllowed,
+			calcSourceMeta
 		).filter(
 			(definition) =>
 				(uploads !== false || definition.type !== 'file') &&
@@ -184,6 +193,8 @@ export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
 export type { CalcResolved } from './calc/evaluate'
 export { calcWeightKey, evaluateCalc } from './calc/evaluate'
 export { formatCalc } from './calc/formatCalc'
+export type { CalcDisplayConfig } from './calc/formatCalcValue'
+export { formatCalcValue } from './calc/formatCalcValue'
 export type { CalcAllowed } from './calc/normalizeCalc'
 export { normalizeCalc } from './calc/normalizeCalc'
 export type {

@@ -70,18 +70,33 @@ vi.mock('@payloadcms/ui', () => ({
 			data-placeholder={typeof placeholder === 'string' ? placeholder : undefined}
 			value={value?.value ?? ''}
 			onChange={(event) => {
+				const flat = options.flatMap(
+					// biome-ignore lint/suspicious/noExplicitAny: test double
+					(option: any) => (option.options ? option.options : [option])
+				)
 				// biome-ignore lint/suspicious/noExplicitAny: test double
-				const chosen = options.find((option: any) => String(option.value) === event.target.value)
+				const chosen = flat.find((option: any) => String(option.value) === event.target.value)
 				onChange(chosen ?? null)
 			}}
 		>
 			<option value="" />
 			{/* biome-ignore lint/suspicious/noExplicitAny: test double */}
-			{options.map((option: any) => (
-				<option key={option.value} value={option.value}>
-					{option.label}
-				</option>
-			))}
+			{options.map((option: any) =>
+				option.options ? (
+					<optgroup key={option.label} label={option.label}>
+						{/* biome-ignore lint/suspicious/noExplicitAny: test double */}
+						{option.options.map((grouped: any) => (
+							<option key={grouped.value} value={grouped.value}>
+								{grouped.label}
+							</option>
+						))}
+					</optgroup>
+				) : (
+					<option key={option.value} value={option.value}>
+						{option.label}
+					</option>
+				)
+			)}
 		</select>
 	),
 }))
@@ -570,5 +585,119 @@ describe('CalcExpressionBuilder', () => {
 		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
 		const root = container.querySelector('.field-type') as HTMLElement
 		expect(root.classList.contains('error')).toBe(true)
+	})
+})
+
+describe('CalcExpressionBuilder sources', () => {
+	const demoSources = [
+		{
+			key: 'serviceFee',
+			label: { en: 'Service fee', de: 'Servicegebühr' },
+			scalar: true,
+			weights: false,
+		},
+		{ key: 'partnerDiscount', label: 'Partner discount', scalar: true, weights: true },
+	]
+
+	it('offers scalar sources in the Start with picker under a group and seeds a source node', () => {
+		const setValue = setField(undefined)
+		const { container } = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} sources={demoSources} />
+		)
+		const seed = container.querySelector('select.fb-calc-builder__seed') as HTMLSelectElement
+		const group = seed.querySelector('optgroup') as HTMLOptGroupElement
+		expect(group.getAttribute('label')).toBe(keys.calcBuilderSourcesGroup)
+		const grouped = Array.from(group.querySelectorAll('option')).map((option) => option.value)
+		expect(grouped).toEqual(['source:serviceFee', 'source:partnerDiscount'])
+		fireEvent.change(seed, { target: { value: 'source:serviceFee' } })
+		expect(setValue).toHaveBeenCalledWith({ type: 'source', source: 'serviceFee' })
+	})
+
+	it('loads a source operand: resolved label, kind select value, preview, and chain save shape', () => {
+		const setValue = setField({ type: 'source', source: 'serviceFee' })
+		const { container } = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} sources={demoSources} />
+		)
+		expect(container.querySelector('.fb-calc-operand__source')?.textContent).toBe('Service fee')
+		const kind = container.querySelector('select.fb-calc-operand__kind') as HTMLSelectElement
+		expect(kind.value).toBe('source:serviceFee')
+		const preview = container.querySelector('.fb-calc-builder__preview') as HTMLElement
+		expect(preview.textContent).toBe('Service fee')
+		fireEvent.click(screen.getByText(keys.calcBuilderAddStep))
+		expect(setValue).toHaveBeenCalledWith({
+			type: 'op',
+			op: '*',
+			left: { type: 'source', source: 'serviceFee' },
+			right: { type: 'ref', field: '' },
+		})
+	})
+
+	it('offers sources in the leaf kind select and switches kinds both ways', () => {
+		const setValue = setField({ type: 'lit', value: 2 })
+		const first = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} sources={demoSources} />
+		)
+		const kind = first.container.querySelector('select.fb-calc-operand__kind') as HTMLSelectElement
+		fireEvent.change(kind, { target: { value: 'source:serviceFee' } })
+		expect(setValue).toHaveBeenCalledWith({ type: 'source', source: 'serviceFee' })
+		cleanup()
+
+		const setValue2 = setField({ type: 'source', source: 'serviceFee' })
+		const { container } = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} sources={demoSources} />
+		)
+		const kind2 = container.querySelector('select.fb-calc-operand__kind') as HTMLSelectElement
+		fireEvent.change(kind2, { target: { value: 'ref' } })
+		expect(setValue2).toHaveBeenCalledWith({ type: 'ref', field: '' })
+	})
+
+	it('switches weight values between Manual and a source, preserving inline weights', () => {
+		const setValue = setField({ type: 'weight', field: 'size', weights: { s: 2 } })
+		const first = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} sources={demoSources} />
+		)
+		const values = first.container.querySelector(
+			'select.fb-calc-operand__weight-values'
+		) as HTMLSelectElement
+		expect(values.value).toBe('manual')
+		expect(first.container.querySelectorAll('input.fb-calc-operand__weight')).toHaveLength(2)
+		fireEvent.change(values, { target: { value: 'source:partnerDiscount' } })
+		expect(setValue).toHaveBeenCalledWith({
+			type: 'weight',
+			field: 'size',
+			weights: { s: 2 },
+			source: 'partnerDiscount',
+		})
+		cleanup()
+
+		const setValue2 = setField({
+			type: 'weight',
+			field: 'size',
+			weights: { s: 2 },
+			source: 'partnerDiscount',
+		})
+		const { container } = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} sources={demoSources} />
+		)
+		expect(screen.getByText(keys.calcBuilderWeightsFromSource)).toBeTruthy()
+		expect(container.querySelectorAll('input.fb-calc-operand__weight')).toHaveLength(0)
+		const values2 = container.querySelector(
+			'select.fb-calc-operand__weight-values'
+		) as HTMLSelectElement
+		expect(values2.value).toBe('source:partnerDiscount')
+		fireEvent.change(values2, { target: { value: 'manual' } })
+		expect(setValue2).toHaveBeenCalledWith({ type: 'weight', field: 'size', weights: { s: 2 } })
+	})
+
+	it('hides the weight values select when no source offers weights', () => {
+		setField({ type: 'weight', field: 'size', weights: {} })
+		const { container } = render(
+			<CalcExpressionBuilder
+				path="fields.4.expression"
+				field={{}}
+				sources={[demoSources[0] as (typeof demoSources)[number]]}
+			/>
+		)
+		expect(container.querySelector('select.fb-calc-operand__weight-values')).toBeNull()
 	})
 })

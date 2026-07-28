@@ -122,6 +122,12 @@ export type FormProps = {
 	 * and keep the form usable.
 	 */
 	successBehavior?: 'replace' | 'reset'
+	/**
+	 * Client halves of the plugin's registered `calc.functions` (same keys), used for the live calc
+	 * preview only; the server always recomputes authoritatively at submit with the registry's own
+	 * functions.
+	 */
+	calcFunctions?: Record<string, (args: number[]) => number>
 	events?: FormEventSink
 	t?: RendererTranslate
 	locale?: string
@@ -229,6 +235,7 @@ export const Form = ({
 	onError,
 	converters,
 	successBehavior = 'replace',
+	calcFunctions,
 	events,
 	t,
 	locale = 'en',
@@ -302,11 +309,29 @@ export const Form = ({
 	)
 
 	// Authoritative values for derived (calc) fields, recomputed from user answers on every change. The
-	// server recomputes these too at submit; the client copy drives the live calc renderer, recall, and submit.
+	// server recomputes these too at submit; the client copy drives the live calc renderer, recall, and
+	// submit. Server-resolved source values ride the document (`calcResolved`); custom function halves
+	// come from the `calcFunctions` prop (functions never serialize).
 	const effectiveValues = useMemo(
-		() => computeCalcFields(form.fields, state.values),
-		[form.fields, state.values]
+		() =>
+			computeCalcFields(form.fields, state.values, {
+				...(form.calcResolved ?? {}),
+				...(calcFunctions ? { functions: calcFunctions } : {}),
+			}),
+		[form.fields, state.values, form.calcResolved, calcFunctions]
 	)
+
+	// The calc fields' slice of effectiveValues, exposed on context for composed frontends.
+	const calcValues = useMemo(() => {
+		const values: Record<string, number> = {}
+		for (const field of form.fields) {
+			if (calcExpressionOf(field) && isNamedField(field)) {
+				const computed = effectiveValues[field.name]
+				values[field.name] = typeof computed === 'number' ? computed : 0
+			}
+		}
+		return values
+	}, [form.fields, effectiveValues])
 
 	const recall = useMemo(
 		() =>
@@ -863,6 +888,7 @@ export const Form = ({
 		labels,
 		t: translate,
 		effectiveValues,
+		calcValues,
 		recall,
 		renderedFields,
 		converters,

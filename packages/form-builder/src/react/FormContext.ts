@@ -60,6 +60,13 @@ export type FormContextValue = {
 	t: RendererTranslate
 	/** Calc-authoritative answers: `state.values` overlaid with derived calc values. Consumers fall back to `state.values` when absent. */
 	effectiveValues?: Record<string, unknown>
+	/**
+	 * Live computed values of the calculation fields only (name -> number), derived from the same
+	 * memo as `effectiveValues`. Composed frontends read running totals from here (or via
+	 * `useCalcValues`) without recomputing expressions. Optional like `effectiveValues` so
+	 * hand-built context values (tests, harnesses) stay assignable.
+	 */
+	calcValues?: Record<string, number>
 	/** Recall resolver for token interpolation, exposed so `<FormFields>` and custom layouts can format values. */
 	recall?: RecallResolver
 	/** The exact visible field list the default loop renders (post hidden/calc filter). Consumed by `<FormFields>`. */

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	buildCalculationField,
 	buildValidateExpression,
+	type CalcSourceClientMeta,
 	calculationField,
 	validateExpression,
 } from './calculation'
@@ -77,6 +78,48 @@ describe('calculationField expression config', () => {
 			'@10x-media/form-builder/client#CalcExpressionBuilder'
 		)
 		expect(expressionField?.admin?.description).toBeUndefined()
+	})
+
+	it('threads source metadata and custom function names to the builder as clientProps', () => {
+		const sources = [
+			{ key: 'serviceFee', label: 'Service fee', scalar: true, weights: false },
+		] satisfies CalcSourceClientMeta[]
+		const built = buildCalculationField(
+			{ sources: new Set(['serviceFee']), functions: new Set(['double']) },
+			{ sources }
+		)
+		const expression = (built.config as FieldWithJSONShape[]).find(
+			(field) => field.name === 'expression'
+		)
+		expect(expression?.admin?.components?.Field).toEqual({
+			path: '@10x-media/form-builder/client#CalcExpressionBuilder',
+			clientProps: { sources, functions: ['double'] },
+		})
+	})
+
+	it('offers display config fields after calcDisplay', () => {
+		const names = (calculationField.config as { name: string }[]).map((field) => field.name)
+		expect(names).toEqual(['expression', 'calcDisplay', 'decimals', 'prefix', 'suffix'])
+		const decimals = (
+			calculationField.config as { name: string; min?: number; max?: number }[]
+		).find((field) => field.name === 'decimals')
+		expect(decimals?.min).toBe(0)
+		expect(decimals?.max).toBe(6)
+	})
+
+	it('formats stored values with the display config', () => {
+		const t = (key: string): string => key
+		const format = calculationField.format as (args: {
+			value: unknown
+			config: Record<string, unknown>
+			locale: string
+			t: (key: string) => string
+		}) => string
+		expect(format({ value: 12.5, config: { decimals: 2, prefix: 'EUR ' }, locale: 'en', t })).toBe(
+			'EUR 12.50'
+		)
+		expect(format({ value: null, config: {}, locale: 'en', t })).toBe('')
+		expect(format({ value: 7, config: {}, locale: 'en', t })).toBe('7')
 	})
 })
 

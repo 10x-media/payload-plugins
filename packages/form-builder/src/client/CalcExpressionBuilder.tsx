@@ -19,9 +19,11 @@ import {
 	CALC_OPS,
 	type CalcExpression,
 	type CalcFn,
+	type CalcFnName,
 	type CalcOp,
 	isCalcFn,
 } from '../calc/types'
+import type { CalcSourceClientMeta } from '../fields/builtin/calculation'
 import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { FieldRow } from './synthesizeClientField'
@@ -32,6 +34,10 @@ export type CalcExpressionBuilderProps = {
 	path?: string
 	field?: { label?: unknown }
 	readOnly?: boolean
+	/** Registered calc-source metadata (key, label, modes), threaded as clientProps by `buildCalculationField`. */
+	sources?: CalcSourceClientMeta[]
+	/** Registered custom calc function names, so client-side normalization accepts what the server accepts. */
+	functions?: string[]
 }
 
 /**
@@ -44,9 +50,10 @@ export type CalcChainStep = { op: CalcOp; operand: CalcOperand }
 export type CalcOperand =
 	| { kind: 'ref'; field: string }
 	| { kind: 'lit'; value: number }
-	| { kind: 'weight'; field: string; weights: Record<string, number> }
+	| { kind: 'weight'; field: string; weights?: Record<string, number>; source?: string }
+	| { kind: 'source'; source: string }
 	| { kind: 'group'; chain: CalcChain }
-	| { kind: 'fn'; fn: CalcFn; args: CalcChain[] }
+	| { kind: 'fn'; fn: CalcFnName; args: CalcChain[] }
 	| { kind: 'neg'; operand: CalcOperand }
 
 /** Kinds a leaf operand card can switch between in place; containers come from Start with, loading, or JSON. */
@@ -86,21 +93,19 @@ const astToOperand = (node: CalcExpression): CalcOperand => {
 			return { kind: 'ref', field: node.field }
 		case 'lit':
 			return { kind: 'lit', value: node.value }
-		// Extension grammar (source nodes, sourced weights, custom fns) cannot reach this converter
-		// yet: the builder loads through the no-extensions `normalizeCalc(value)` below, which rejects
-		// it. The `source` fallback and the casts are type-level only until the builder learns sources.
 		case 'source':
-			return { kind: 'lit', value: 0 }
+			return { kind: 'source', source: node.source }
 		case 'weight':
-			return { kind: 'weight', field: node.field, weights: node.weights ?? {} }
+			return {
+				kind: 'weight',
+				field: node.field,
+				...(node.weights !== undefined ? { weights: node.weights } : {}),
+				...(node.source !== undefined ? { source: node.source } : {}),
+			}
 		case 'neg':
 			return { kind: 'neg', operand: astToOperand(node.operand) }
 		case 'fn':
-			return {
-				kind: 'fn',
-				fn: node.fn as CalcFn,
-				args: node.args.map((arg) => toChain(arg, false)),
-			}
+			return { kind: 'fn', fn: node.fn, args: node.args.map((arg) => toChain(arg, false)) }
 		case 'op':
 			return { kind: 'group', chain: toChain(node, false) }
 	}
@@ -142,7 +147,14 @@ const operandToAst = (operand: CalcOperand): CalcExpression => {
 		case 'lit':
 			return { type: 'lit', value: operand.value }
 		case 'weight':
-			return { type: 'weight', field: operand.field, weights: operand.weights }
+			return {
+				type: 'weight',
+				field: operand.field,
+				...(operand.weights !== undefined ? { weights: operand.weights } : {}),
+				...(operand.source !== undefined ? { source: operand.source } : {}),
+			}
+		case 'source':
+			return { type: 'source', source: operand.source }
 		case 'neg':
 			return { type: 'neg', operand: operandToAst(operand.operand) }
 		case 'fn':
@@ -293,11 +305,39 @@ type BuilderCtx = {
 	t: (key: TranslationKey) => string
 	siblings: Siblings
 	readOnly: boolean
+	/** Resolves a calc source key to its admin-locale display label (raw key when unregistered). */
+	sourceLabelOf: (key: string) => string
+	/** Scalar-capable sources as select options (`source:`-prefixed values). */
+	scalarSourceOptions: ChoiceOption[]
+	/** Weights-capable sources as select options (`source:`-prefixed values). */
+	weightSourceOptions: ChoiceOption[]
+	/** Registered custom calc function names, offered by the fn select after the built-ins. */
+	customFnOptions: ChoiceOption[]
 }
 
 const OP_OPTIONS: ChoiceOption[] = CALC_OPS.map((op) => ({ label: op, value: op }))
 const FN_OPTIONS: ChoiceOption[] = CALC_FNS.map((fn) => ({ label: fn, value: fn }))
 const UNARY_OPTIONS: ChoiceOption[] = UNARY_FNS.map((fn) => ({ label: fn, value: fn }))
+
+/** Source entries share kind/start selects with the fixed kinds, namespaced to avoid key collisions. */
+const SOURCE_PREFIX = 'source:'
+const sourceOptionValue = (key: string): string => `${SOURCE_PREFIX}${key}`
+const sourceKeyOf = (value: string): string | undefined =>
+	value.startsWith(SOURCE_PREFIX) ? value.slice(SOURCE_PREFIX.length) : undefined
+
+/** A source label is a plain string or a per-locale record; resolve it for the admin UI language. */
+const resolveSourceLabel = (label: string | Record<string, string>, language: string): string =>
+	typeof label === 'string' ? label : (label[language] ?? label.en ?? Object.values(label)[0] ?? '')
+
+type SelectOptionOrGroup = ChoiceOption | { label: string; options: ChoiceOption[] }
+
+/** Fixed kinds stay flat; sources join as a labeled group when any exist (react-select mixes both). */
+const withSourceGroup = (
+	base: ChoiceOption[],
+	sourceOptions: ChoiceOption[],
+	groupLabel: string
+): SelectOptionOrGroup[] =>
+	sourceOptions.length > 0 ? [...base, { label: groupLabel, options: sourceOptions }] : base
 
 type OperandCardProps = {
 	operand: CalcOperand
@@ -324,6 +364,7 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 	}
 
 	if (operand.kind === 'fn') {
+		const fnOptions = withStored([...FN_OPTIONS, ...ctx.customFnOptions], operand.fn)
 		return (
 			<div className="fb-calc-operand fb-calc-operand--fn">
 				<div className="fb-calc-operand__header">
@@ -333,14 +374,14 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 					<ReactSelect
 						className="fb-calc-operand__fn"
 						inputId={`${idPrefix}-fn`}
-						options={FN_OPTIONS}
-						value={FN_OPTIONS.find((option) => option.value === operand.fn)}
+						options={fnOptions}
+						value={fnOptions.find((option) => option.value === operand.fn)}
 						isClearable={false}
 						disabled={readOnly}
 						onChange={(selected) => {
 							const chosen = singleOption(selected)
 							if (chosen) {
-								onChange({ ...operand, fn: chosen.value as CalcFn })
+								onChange({ ...operand, fn: String(chosen.value) })
 							}
 						}}
 					/>
@@ -423,6 +464,13 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 		{ label: t(keys.calcBuilderNumber), value: 'lit' },
 		{ label: t(keys.calcBuilderWeights), value: 'weight' },
 	]
+	const kindValue = operand.kind === 'source' ? sourceOptionValue(operand.source) : operand.kind
+	const kindSourceOptions =
+		operand.kind === 'source' &&
+		!ctx.scalarSourceOptions.some((option) => option.value === sourceOptionValue(operand.source))
+			? [...ctx.scalarSourceOptions, { label: operand.source, value: kindValue }]
+			: ctx.scalarSourceOptions
+	const kindFlat = [...leafKindOptions, ...kindSourceOptions]
 	const refOptions = operand.kind === 'ref' ? withStored(siblings.numeric, operand.field) : []
 	const choiceOptions =
 		operand.kind === 'weight'
@@ -433,6 +481,17 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 			: []
 	const choice =
 		operand.kind === 'weight' ? siblings.choices.find((c) => c.name === operand.field) : undefined
+	const weightSource = operand.kind === 'weight' ? operand.source : undefined
+	const weightValuesOptions: ChoiceOption[] = [
+		{ label: t(keys.calcBuilderWeightManual), value: 'manual' },
+		...(weightSource !== undefined &&
+		!ctx.weightSourceOptions.some((option) => option.value === sourceOptionValue(weightSource))
+			? [
+					...ctx.weightSourceOptions,
+					{ label: weightSource, value: sourceOptionValue(weightSource) },
+				]
+			: ctx.weightSourceOptions),
+	]
 
 	return (
 		<div className="fb-calc-operand">
@@ -443,17 +502,32 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 				<ReactSelect
 					className="fb-calc-operand__kind"
 					inputId={`${idPrefix}-kind`}
-					options={leafKindOptions}
-					value={leafKindOptions.find((option) => option.value === operand.kind)}
+					options={
+						withSourceGroup(
+							leafKindOptions,
+							kindSourceOptions,
+							t(keys.calcBuilderSourcesGroup)
+						) as ReactSelectOption[]
+					}
+					value={kindFlat.find((option) => option.value === kindValue)}
 					isClearable={false}
 					disabled={readOnly}
 					onChange={(selected) => {
 						const chosen = singleOption(selected)
-						if (chosen && chosen.value !== operand.kind) {
-							onChange(seedOperand(chosen.value as LeafKind))
+						if (!chosen || chosen.value === kindValue) {
+							return
 						}
+						const sourceKey = sourceKeyOf(String(chosen.value))
+						onChange(
+							sourceKey !== undefined
+								? { kind: 'source', source: sourceKey }
+								: seedOperand(chosen.value as LeafKind)
+						)
 					}}
 				/>
+				{operand.kind === 'source' ? (
+					<span className="fb-calc-operand__source">{ctx.sourceLabelOf(operand.source)}</span>
+				) : null}
 				{operand.kind === 'ref' ? (
 					refOptions.length === 0 ? (
 						<p className="fb-calc-hint">{t(keys.calcBuilderNoNumericFields)}</p>
@@ -508,7 +582,13 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 									const chosen = singleOption(selected)
 									const field = chosen ? String(chosen.value) : ''
 									if (field !== operand.field) {
-										onChange({ kind: 'weight', field, weights: {} })
+										// Inline weights are per-option and reset with the field; a source keeps
+										// resolving (its resolver receives the newly chosen field).
+										onChange(
+											operand.source !== undefined
+												? { kind: 'weight', field, source: operand.source }
+												: { kind: 'weight', field, weights: {} }
+										)
 									}
 								}}
 							/>
@@ -516,7 +596,51 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 					)
 				) : null}
 			</div>
-			{operand.kind === 'weight' && choice ? (
+			{operand.kind === 'weight' && ctx.weightSourceOptions.length > 0 ? (
+				<div className="fb-calc-operand__weight-values-row">
+					<label className="fb-calc-operand__weight-values-label" htmlFor={`${idPrefix}-wv`}>
+						{t(keys.calcBuilderWeightValues)}
+					</label>
+					<ReactSelect
+						className="fb-calc-operand__weight-values"
+						inputId={`${idPrefix}-wv`}
+						options={weightValuesOptions}
+						value={weightValuesOptions.find(
+							(option) =>
+								option.value ===
+								(operand.source !== undefined ? sourceOptionValue(operand.source) : 'manual')
+						)}
+						isClearable={false}
+						disabled={readOnly}
+						onChange={(selected) => {
+							const chosen = singleOption(selected)
+							if (!chosen) {
+								return
+							}
+							const sourceKey = sourceKeyOf(String(chosen.value))
+							if (sourceKey === undefined) {
+								if (operand.source !== undefined) {
+									// Back to Manual: drop the source, keep any inline weights (they were
+									// preserved untouched while sourced) so the author's numbers return.
+									onChange({
+										kind: 'weight',
+										field: operand.field,
+										weights: operand.weights ?? {},
+									})
+								}
+								return
+							}
+							if (sourceKey !== operand.source) {
+								onChange({ ...operand, source: sourceKey })
+							}
+						}}
+					/>
+				</div>
+			) : null}
+			{operand.kind === 'weight' && operand.source !== undefined ? (
+				<p className="fb-calc-hint">{t(keys.calcBuilderWeightsFromSource)}</p>
+			) : null}
+			{operand.kind === 'weight' && operand.source === undefined && choice ? (
 				<div className="fb-calc-operand__weights">
 					{choice.options.map((option) => (
 						<div key={option.value} className="fb-calc-operand__weight-row">
@@ -530,11 +654,11 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 								className="fb-calc-operand__weight"
 								id={`${idPrefix}-weight-${option.value}`}
 								disabled={readOnly}
-								value={operand.weights[option.value]}
+								value={operand.weights?.[option.value]}
 								onCommit={(value) =>
 									onChange({
 										...operand,
-										weights: { ...operand.weights, [option.value]: value },
+										weights: { ...(operand.weights ?? {}), [option.value]: value },
 									})
 								}
 							/>
@@ -681,11 +805,36 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 		showError,
 		value,
 	} = useField<unknown>({ path: props.path })
-	const { t } = useTranslation()
+	const { t, i18n } = useTranslation()
 	const label = toStaticLabel(props.field?.label)
 	const readOnly = props.readOnly === true || disabled === true
 
-	const expression = useMemo(() => normalizeCalc(value), [value])
+	const sources = useMemo(() => props.sources ?? [], [props.sources])
+	// Mirrors the server-side allowed sets, so the builder accepts exactly the expressions
+	// `buildValidateExpression` accepts (a sourced expression must not read as "stored invalid").
+	const allowed = useMemo(
+		() => ({
+			sources: new Set(sources.map((source) => source.key)),
+			functions: new Set(props.functions ?? []),
+		}),
+		[sources, props.functions]
+	)
+	const sourceLabelOf = (key: string): string => {
+		const meta = sources.find((source) => source.key === key)
+		return meta ? resolveSourceLabel(meta.label, i18n.language) : key
+	}
+	const scalarSourceOptions: ChoiceOption[] = sources
+		.filter((source) => source.scalar)
+		.map((source) => ({ label: sourceLabelOf(source.key), value: sourceOptionValue(source.key) }))
+	const weightSourceOptions: ChoiceOption[] = sources
+		.filter((source) => source.weights)
+		.map((source) => ({ label: sourceLabelOf(source.key), value: sourceOptionValue(source.key) }))
+	const customFnOptions: ChoiceOption[] = (props.functions ?? []).map((fn) => ({
+		label: fn,
+		value: fn,
+	}))
+
+	const expression = useMemo(() => normalizeCalc(value, allowed), [value, allowed])
 	const chain = useMemo(() => (expression ? astToChain(expression) : undefined), [expression])
 	const storedInvalid = expression === undefined && value != null && value !== ''
 
@@ -748,7 +897,15 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	const labelOf = (field: string) => (field.trim() === '' ? '?' : (siblings.labels[field] ?? field))
 
 	const idBase = `calc-${path.replace(/\./g, '__')}`
-	const ctx: BuilderCtx = { t, siblings, readOnly }
+	const ctx: BuilderCtx = {
+		t,
+		siblings,
+		readOnly,
+		sourceLabelOf,
+		scalarSourceOptions,
+		weightSourceOptions,
+		customFnOptions,
+	}
 
 	return (
 		<div
@@ -813,14 +970,26 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 						<ReactSelect
 							className="fb-calc-builder__seed"
 							inputId={`${idBase}-seed`}
-							options={startOptions}
+							options={
+								withSourceGroup(
+									startOptions,
+									scalarSourceOptions,
+									t(keys.calcBuilderSourcesGroup)
+								) as ReactSelectOption[]
+							}
 							disabled={readOnly}
 							placeholder={t(keys.calcBuilderStartWith)}
 							onChange={(selected) => {
 								const chosen = singleOption(selected)
-								if (chosen && !readOnly) {
-									setValue(seedAst(chosen.value as StartKind))
+								if (!chosen || readOnly) {
+									return
 								}
+								const sourceKey = sourceKeyOf(String(chosen.value))
+								setValue(
+									sourceKey !== undefined
+										? { type: 'source', source: sourceKey }
+										: seedAst(chosen.value as StartKind)
+								)
 							}}
 						/>
 						<ul className="fb-calc-builder__kinds">
@@ -834,7 +1003,7 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 					</div>
 				)}
 				<p className="fb-calc-builder__preview" aria-live="polite">
-					{expression ? formatCalc(expression, labelOf) : ''}
+					{expression ? formatCalc(expression, labelOf, sourceLabelOf) : ''}
 				</p>
 			</div>
 		</div>

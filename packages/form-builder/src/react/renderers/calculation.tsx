@@ -1,5 +1,6 @@
 'use client'
 
+import { formatCalcValue } from '../../calc/formatCalcValue'
 import { defineFieldRenderer } from '../contract'
 import { FieldShell } from '../primitives/FieldShell'
 
@@ -17,7 +18,13 @@ export const calculationRenderer = defineFieldRenderer<number | undefined>(
 				describedById={describedById}
 			>
 				<output id={id} className="fb-field__calc" aria-describedby={describedById}>
-					{value == null ? '' : String(value)}
+					{value == null
+						? ''
+						: formatCalcValue(value, {
+								decimals: field.decimals,
+								prefix: field.prefix,
+								suffix: field.suffix,
+							})}
 				</output>
 			</FieldShell>
 		)

@@ -158,6 +158,14 @@ export const de: Record<TranslationKey, string> = {
 	[keys.calcBuilderNoChoiceFields]: 'Füge zuerst ein Auswahlfeld hinzu',
 	[keys.calcBuilderStoredInvalid]:
 		'Der gespeicherte Ausdruck ist ungültig und wird beim Bearbeiten ersetzt.',
+	[keys.calcBuilderSourcesGroup]: 'Aus deiner App',
+	[keys.calcBuilderWeightValues]: 'Werte',
+	[keys.calcBuilderWeightManual]: 'Manuell eingegeben',
+	[keys.calcBuilderWeightsFromSource]:
+		'Werte werden beim Rendern und Absenden aus deiner App aufgelöst.',
+	[keys.calcConfigDecimals]: 'Nachkommastellen',
+	[keys.calcConfigPrefix]: 'Präfix',
+	[keys.calcConfigSuffix]: 'Suffix',
 	[keys.calcBuilderStartWith]: 'Beginnen mit',
 	[keys.calcBuilderAddStep]: 'Schritt hinzufügen',
 	[keys.calcBuilderThenApply]: 'Dann anwenden',

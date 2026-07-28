@@ -582,6 +582,20 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					],
 				},
 			},
+			{
+				blockType: 'calculation',
+				name: 'grandTotal',
+				label: 'Grand total',
+				width: 'half',
+				expression: {
+					type: 'op',
+					op: '+',
+					left: { type: 'ref', field: 'total' },
+					right: { type: 'source', source: 'serviceFee' },
+				},
+				decimals: 2,
+				prefix: 'EUR ',
+			},
 		],
 	})
 

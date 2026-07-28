@@ -11,6 +11,7 @@ import {
 	consentSourcesField,
 	countryField,
 	type DepartmentEmailsResolver,
+	defineCalcSource,
 	defineFormField,
 	departmentsField,
 	formBuilder,
@@ -224,6 +225,16 @@ export default buildConfig({
 			},
 			consent: { sources: consentSources },
 			email: { departments: departmentEmails },
+			// Demonstrates calc value sources: a flat fee resolved on the server, referenced by the
+			// Project Quote form's grand total (see the seed).
+			calc: {
+				sources: {
+					serviceFee: defineCalcSource({
+						label: { en: 'Service fee', de: 'Servicegebühr' },
+						resolve: () => 25,
+					}),
+				},
+			},
 		}),
 	],
 	telemetry: false,

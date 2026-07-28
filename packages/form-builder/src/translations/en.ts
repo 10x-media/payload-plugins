@@ -150,6 +150,14 @@ export const en: Record<TranslationKey, string> = {
 	[keys.calcBuilderNoChoiceFields]: 'Add a select field first',
 	[keys.calcBuilderStoredInvalid]:
 		'The stored expression is invalid and will be replaced when you edit.',
+	[keys.calcBuilderSourcesGroup]: 'From your app',
+	[keys.calcBuilderWeightValues]: 'Values',
+	[keys.calcBuilderWeightManual]: 'Entered manually',
+	[keys.calcBuilderWeightsFromSource]:
+		'Values resolve from your app when the form renders and submits.',
+	[keys.calcConfigDecimals]: 'Decimal places',
+	[keys.calcConfigPrefix]: 'Prefix',
+	[keys.calcConfigSuffix]: 'Suffix',
 	[keys.calcBuilderStartWith]: 'Start with',
 	[keys.calcBuilderAddStep]: 'Add step',
 	[keys.calcBuilderThenApply]: 'Then apply',

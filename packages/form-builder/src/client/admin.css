@@ -485,6 +485,34 @@
 .fb-calc-fn__add {
 	align-self: flex-start;
 }
+.fb-calc-operand__source {
+	flex: 1 1 auto;
+	min-width: 0;
+	line-height: 40px;
+	font-size: 0.875rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fb-calc-operand__weight-values-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fb-calc-operand__weight-values-label {
+	flex: 0 0 90px;
+	min-width: 0;
+	line-height: 40px;
+	font-size: 0.875rem;
+	color: var(--theme-elevation-600);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.fb-calc-operand__weight-values-row > .fb-calc-operand__weight-values {
+	flex: 0 0 200px;
+	min-width: 0;
+}
 .fb-calc-operand__weights {
 	display: flex;
 	flex-direction: column;

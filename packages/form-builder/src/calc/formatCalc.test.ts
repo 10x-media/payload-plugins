@@ -133,3 +133,28 @@ describe('formatCalc', () => {
 		expect(formatCalc(expr, labelOf)).toBe('−(−5)')
 	})
 })
+
+describe('formatCalc source labels', () => {
+	const labelOf = (field: string) => field.toUpperCase()
+
+	it('renders the raw source key when no resolver is given', () => {
+		const expr: CalcExpression = { type: 'source', source: 'serviceFee' }
+		expect(formatCalc(expr, labelOf)).toBe('serviceFee')
+	})
+
+	it('resolves source labels through the third argument, including nested nodes', () => {
+		const sourceLabel = (key: string) => (key === 'serviceFee' ? 'Service fee' : key)
+		const expr: CalcExpression = {
+			type: 'op',
+			op: '+',
+			left: { type: 'ref', field: 'a' },
+			right: { type: 'source', source: 'serviceFee' },
+		}
+		expect(formatCalc(expr, labelOf, sourceLabel)).toBe('A + Service fee')
+	})
+
+	it('keeps a sourced weight rendering as weights(FieldLabel)', () => {
+		const expr: CalcExpression = { type: 'weight', field: 'size', source: 'partner' }
+		expect(formatCalc(expr, labelOf, (key) => `label:${key}`)).toBe('weights(SIZE)')
+	})
+})
