@@ -345,4 +345,10 @@ export const en: Record<TranslationKey, string> = {
 	[keys.departmentEmail]: 'Email',
 	[keys.departmentAddRow]: 'Add email',
 	[keys.departmentRemoveRow]: 'Remove email',
+	[keys.flowStepIdEmpty]: 'Flow: every step must have a non-empty ID',
+	[keys.flowStepIdReserved]: 'Flow: step ID "{id}" is reserved',
+	[keys.flowDuplicateStepIds]: 'Flow: duplicate step IDs found',
+	[keys.flowUnknownNext]: 'Flow: step "{id}" references unknown next step "{next}"',
+	[keys.flowUnknownTransition]: 'Flow: step "{id}" has a transition to unknown step "{to}"',
+	[keys.flowNeedsTwoSteps]: 'A flow needs at least two steps. Add another step or remove the flow.',
 }

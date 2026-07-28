@@ -5,6 +5,7 @@ import {
 	type CollectionConfig,
 	type CollectionSlug,
 	type Field,
+	type PayloadRequest,
 	type TextFieldSingleValidation,
 	ValidationError,
 } from 'payload'
@@ -79,30 +80,34 @@ const validateFormTitle: TextFieldSingleValidation = (value, { req }) => {
  * references, so the unknown-target checks mainly protect partial API updates that send `flow`
  * without `fields`.
  */
-const validateFlow = (raw: unknown): string | true => {
+const validateFlow = (
+	raw: unknown,
+	{ req }: { data?: unknown; req: PayloadRequest }
+): string | true => {
 	if (raw === null || raw === undefined) return true
 	const r = raw as Record<string, unknown>
 	if (!Array.isArray(r.steps)) return true
 	const steps = r.steps as Array<Record<string, unknown>>
+	const t = asTranslate(req.t)
 	const emptyIdStep = steps.find((s) => typeof s?.id !== 'string' || s.id.length === 0)
-	if (emptyIdStep) return 'Flow: every step must have a non-empty ID'
+	if (emptyIdStep) return t(keys.flowStepIdEmpty)
 	if (steps.some((s) => s.id === END_OF_FORM)) {
-		return `Flow: step ID "${END_OF_FORM}" is reserved`
+		return t(keys.flowStepIdReserved).replace('{id}', END_OF_FORM)
 	}
 	const ids = steps.map((s) => s.id as string)
 	if (new Set(ids).size !== ids.length) {
-		return 'Flow: duplicate step IDs found'
+		return t(keys.flowDuplicateStepIds)
 	}
 	const idSet = new Set(ids)
 	for (const step of steps) {
 		const id = step.id as string
 		if (typeof step.next === 'string' && step.next.length > 0 && !idSet.has(step.next)) {
-			return `Flow: step "${id}" references unknown next step "${step.next}"`
+			return t(keys.flowUnknownNext).replace('{id}', id).replace('{next}', step.next)
 		}
 		if (Array.isArray(step.transitions)) {
-			for (const t of step.transitions as Array<Record<string, unknown>>) {
-				if (typeof t?.to === 'string' && t.to.length > 0 && !idSet.has(t.to)) {
-					return `Flow: step "${id}" has a transition to unknown step "${t.to}"`
+			for (const trans of step.transitions as Array<Record<string, unknown>>) {
+				if (typeof trans?.to === 'string' && trans.to.length > 0 && !idSet.has(trans.to)) {
+					return t(keys.flowUnknownTransition).replace('{id}', id).replace('{to}', trans.to)
 				}
 			}
 		}
@@ -278,7 +283,7 @@ export const buildFormsCollection = ({
 						errors: [
 							{
 								path: 'flow',
-								message: 'A flow needs at least two steps. Add another step or remove the flow.',
+								message: asTranslate(req.t)(keys.flowNeedsTwoSteps),
 							},
 						],
 					},

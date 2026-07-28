@@ -360,4 +360,13 @@ export const de: Record<TranslationKey, string> = {
 	[keys.departmentEmail]: 'E-Mail',
 	[keys.departmentAddRow]: 'E-Mail hinzufügen',
 	[keys.departmentRemoveRow]: 'E-Mail entfernen',
+	[keys.flowStepIdEmpty]: 'Ablauf: Jeder Schritt braucht eine nicht-leere ID',
+	[keys.flowStepIdReserved]: 'Ablauf: Die Schritt-ID "{id}" ist reserviert',
+	[keys.flowDuplicateStepIds]: 'Ablauf: Doppelte Schritt-IDs gefunden',
+	[keys.flowUnknownNext]:
+		'Ablauf: Schritt "{id}" verweist auf unbekannten nächsten Schritt "{next}"',
+	[keys.flowUnknownTransition]:
+		'Ablauf: Schritt "{id}" hat einen Übergang zu unbekanntem Schritt "{to}"',
+	[keys.flowNeedsTwoSteps]:
+		'Ein Ablauf braucht mindestens zwei Schritte. Fügen Sie einen Schritt hinzu oder entfernen Sie den Ablauf.',
 }
