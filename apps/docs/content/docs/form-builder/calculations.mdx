@@ -45,19 +45,18 @@ const scoreQ1: CalcExpression = {
 
 ## Authoring in the admin
 
-The `expression` config field renders a visual builder: pick a node kind from a select, fill in its inputs, and the tree grows underneath. Node kinds map onto the AST above:
+The `expression` config field renders a visual builder that reads left to right, the way the calculation is spoken: a first value, then one step per operation, then an optional finishing function. An empty expression starts with a **Start with** picker naming what each value kind is for:
 
 | Builder label | Node | What it offers |
 |---|---|---|
-| Answer | `ref` | A select of the fields this calculation may reference: `number` fields, plus earlier `calculation` fields (see [forward references](#forward-references) below). |
+| Field | `ref` | A select of the fields this calculation may reference: `number` fields, plus earlier `calculation` fields (see [forward references](#forward-references) below). |
 | Number | `lit` | A plain numeric input. |
-| Math | `op` | An operator select (`+ - * / %`) over two child nodes, each independently editable. |
-| Function | `fn` | A function select (`min`, `max`, `round`, `abs`, `ceil`, `floor`) over one or more argument nodes, with add/remove buttons for `min`/`max`'s variadic args. |
-| Weighted answers | `weight` | A `select` field to score, then a number input per one of its options, mapping each answer to a weight. |
+| Weighted field | `weight` | A `select` field to score, then a number input per one of its options, turning the chosen option into a number you define. |
+| Function | `fn` | A function select (`min`, `max`, `round`, `abs`, `ceil`, `floor`) over one or more arguments, each its own chain, with add/remove buttons for `min`/`max`'s variadic args. |
 
-Switching a node's kind never silently discards work: Math takes the current node as its left operand, Function as its first argument, so nesting one Math node inside another is a sequence of kind switches and field picks rather than hand-written JSON. A live preview above the actions renders the current tree as an infix expression and updates on every edit.
+**Add step** appends an operation row (`+ - * / %` plus a value); steps apply in order to the running result, and the live preview renders the parenthesized reading on every edit, marking an unfilled slot with `?`. **Then apply** wraps the finished chain in a single-argument function (`round`, `abs`, `ceil`, `floor`). Each row removes with its trailing button; removing the first row promotes the next, and a remove control is only rendered where removal is genuinely possible.
 
-An order total with tax, built as Math (`*`) → \[Math (`*`) → Answer `price`, Answer `quantity`\] and Number `1.19`, reads back as `price × quantity × 1.19` in the preview:
+An order total with tax, built as Field `price`, then `× ` Field `quantity`, then `× ` Number `1.19`, reads back as `price × quantity × 1.19` in the preview and stores:
 
 ```ts
 import type { CalcExpression } from '@10x-media/form-builder'
@@ -75,7 +74,7 @@ const total: CalcExpression = {
 }
 ```
 
-A quiz score, built as Weighted answers over a `q1` select field, with a weight typed in next to each of its options (`a` → 10, `b` → 0, `c` → 5):
+A quiz score, built as Weighted field over a `q1` select, with a weight typed in next to each of its options (`a` → 10, `b` → 0, `c` → 5):
 
 ```ts
 const scoreQ1: CalcExpression = {
@@ -85,7 +84,7 @@ const scoreQ1: CalcExpression = {
 }
 ```
 
-**Edit as JSON** switches the same field to a raw JSON textarea, seeded from the current tree, for anyone who would rather type the AST directly or paste one in. A well-formed draft live-commits as you type, so leaving JSON mode is not the only way to apply an edit; the button's own label just flips to **Visual editor** and, on click, re-validates the draft once more before switching views. The stored `expression` is the identical `CalcExpression` JSON either way: the two editors are two views onto the same field, not two storage formats, so a form built visually opens correctly in JSON mode and vice versa.
+The builder is a view onto the stored `CalcExpression` JSON, not a separate format: an expression written through the API (or seeded programmatically) opens in the builder as the equivalent chain, with right-nested math rendered as a group.
 
 Validity is still enforced on save server-side: an expression that does not normalize into a well-formed tree is rejected with a field error, so a broken calculation cannot reach the public form, regardless of which editor produced it.
 
