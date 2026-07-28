@@ -31,6 +31,9 @@ export const formatCalc = (expr: CalcExpression, labelOf: (field: string) => str
 			return `${wrap(expr.left, labelOf)} ${OP_GLYPHS[expr.op]} ${wrap(expr.right, labelOf)}`
 		case 'fn':
 			return `${expr.fn}(${expr.args.map((arg) => formatCalc(arg, labelOf)).join(', ')})`
+		case 'source':
+			// The raw registry key; label resolution is the display layer's concern.
+			return expr.source
 		case 'weight':
 			return `weights(${labelOf(expr.field)})`
 	}

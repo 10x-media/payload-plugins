@@ -1,3 +1,4 @@
+import type { CalcResolved } from '../calc/evaluate'
 import type { FormFlow } from '../flow/types'
 import type { FormFieldInstance } from '../submissions/types'
 
@@ -65,4 +66,10 @@ export type FormDocument = {
 	/** Whether this form is a poll. Gates poll rendering and results; the poll config lives under `poll`. */
 	pollEnabled: boolean
 	poll?: FormPollSettings
+	/**
+	 * Server-resolved calc source values, stamped by the plugin's forms afterRead hook when calc
+	 * sources are registered and the form's expressions use them. Only `sources`/`weights` ever ride
+	 * the document (`functions` cannot serialize; the client supplies those itself).
+	 */
+	calcResolved?: CalcResolved
 }

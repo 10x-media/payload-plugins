@@ -1,6 +1,11 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { calculationField, validateExpression } from './calculation'
+import {
+	buildCalculationField,
+	buildValidateExpression,
+	calculationField,
+	validateExpression,
+} from './calculation'
 
 const req = { t: (key: string) => key } as unknown as PayloadRequest
 
@@ -72,5 +77,49 @@ describe('calculationField expression config', () => {
 			'@10x-media/form-builder/client#CalcExpressionBuilder'
 		)
 		expect(expressionField?.admin?.description).toBeUndefined()
+	})
+})
+
+describe('buildValidateExpression with allowed extensions', () => {
+	const allowed = { sources: new Set(['taxRate']), functions: new Set(['double']) }
+	const validate = buildValidateExpression(allowed)
+
+	it('accepts source nodes and custom fns in the allowed sets', () => {
+		expect(validate({ type: 'source', source: 'taxRate' }, { req })).toBe(true)
+		expect(validate({ type: 'fn', fn: 'double', args: [{ type: 'lit', value: 1 }] }, { req })).toBe(
+			true
+		)
+	})
+
+	it('still rejects unregistered keys', () => {
+		expect(validate({ type: 'source', source: 'unknown' }, { req })).toBe(
+			'formBuilder:validation.calcExpressionInvalid'
+		)
+	})
+
+	it('the no-extensions validateExpression rejects source nodes', () => {
+		expect(validateExpression({ type: 'source', source: 'taxRate' }, { req })).toBe(
+			'formBuilder:validation.calcExpressionInvalid'
+		)
+	})
+})
+
+describe('buildCalculationField', () => {
+	it('threads the allowed sets into the expression validate', () => {
+		const field = buildCalculationField({ sources: new Set(['taxRate']), functions: new Set() })
+		const expression = (field.config as FieldWithJSONShape[]).find(
+			(entry) => entry.name === 'expression'
+		) as { validate?: (value: unknown, args: { req: PayloadRequest }) => string | true }
+		expect(expression?.validate?.({ type: 'source', source: 'taxRate' }, { req })).toBe(true)
+	})
+
+	it('the no-extensions calculationField equals buildCalculationField()', () => {
+		expect(calculationField.type).toBe('calculation')
+		const expression = (buildCalculationField().config as FieldWithJSONShape[]).find(
+			(entry) => entry.name === 'expression'
+		) as { validate?: (value: unknown, args: { req: PayloadRequest }) => string | true }
+		expect(expression?.validate?.({ type: 'source', source: 'taxRate' }, { req })).toBe(
+			'formBuilder:validation.calcExpressionInvalid'
+		)
 	})
 })

@@ -14,7 +14,14 @@ import { reduceFieldsToValues } from 'payload/shared'
 import { useMemo, useState } from 'react'
 import { formatCalc } from '../calc/formatCalc'
 import { normalizeCalc } from '../calc/normalizeCalc'
-import { CALC_FNS, CALC_OPS, type CalcExpression, type CalcFn, type CalcOp } from '../calc/types'
+import {
+	CALC_FNS,
+	CALC_OPS,
+	type CalcExpression,
+	type CalcFn,
+	type CalcOp,
+	isCalcFn,
+} from '../calc/types'
 import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { FieldRow } from './synthesizeClientField'
@@ -79,12 +86,21 @@ const astToOperand = (node: CalcExpression): CalcOperand => {
 			return { kind: 'ref', field: node.field }
 		case 'lit':
 			return { kind: 'lit', value: node.value }
+		// Extension grammar (source nodes, sourced weights, custom fns) cannot reach this converter
+		// yet: the builder loads through the no-extensions `normalizeCalc(value)` below, which rejects
+		// it. The `source` fallback and the casts are type-level only until the builder learns sources.
+		case 'source':
+			return { kind: 'lit', value: 0 }
 		case 'weight':
-			return { kind: 'weight', field: node.field, weights: node.weights }
+			return { kind: 'weight', field: node.field, weights: node.weights ?? {} }
 		case 'neg':
 			return { kind: 'neg', operand: astToOperand(node.operand) }
 		case 'fn':
-			return { kind: 'fn', fn: node.fn, args: node.args.map((arg) => toChain(arg, false)) }
+			return {
+				kind: 'fn',
+				fn: node.fn as CalcFn,
+				args: node.args.map((arg) => toChain(arg, false)),
+			}
 		case 'op':
 			return { kind: 'group', chain: toChain(node, false) }
 	}
@@ -97,6 +113,7 @@ const toChain = (expr: CalcExpression, allowFinish: boolean): CalcChain => {
 		expr.type === 'fn' &&
 		expr.args.length === 1 &&
 		arg !== undefined &&
+		isCalcFn(expr.fn) &&
 		(UNARY_FNS as readonly CalcFn[]).includes(expr.fn)
 	) {
 		return { ...toChain(arg, false), finish: expr.fn }

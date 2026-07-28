@@ -4,6 +4,8 @@ import type { FromAddressesResolver } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
 import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
+import type { CalcAllowed } from '../calc/normalizeCalc'
+import type { CalcFunction, CalcSource } from '../calc/registry'
 import type { ButtonsOption } from '../collections/buttonFields'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
@@ -28,6 +30,12 @@ type RegisterCollectionsArgs = {
 	config: Config
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	/** Registered calc extension names; gates which expressions the forms beforeValidate accepts. */
+	calcAllowed?: CalcAllowed
+	/** Registered calc sources (plugin option `calc.sources`); resolved on form reads and at submit. */
+	calcSources?: Record<string, CalcSource>
+	/** Registered calc functions (plugin option `calc.functions`); threaded into submit-time evaluation. */
+	calcFunctions?: Record<string, CalcFunction>
 	consentSources?: ConsentSourcesResolver
 	consentSnapshot?: ConsentSnapshotMode
 	/** Plugin `consent.resolveOnRead` (default true); false skips the per-read consent afterRead hook. */
@@ -63,6 +71,9 @@ export const registerCollections = ({
 	config,
 	registry,
 	ruleRegistry,
+	calcAllowed,
+	calcSources,
+	calcFunctions,
 	consentSources,
 	consentSnapshot,
 	consentResolveOnRead,
@@ -106,6 +117,8 @@ export const registerCollections = ({
 		buildFormsCollection({
 			registry,
 			ruleRegistry,
+			calcAllowed,
+			calcSources,
 			consentSources,
 			consentResolveOnRead,
 			actionRegistry,
@@ -128,6 +141,8 @@ export const registerCollections = ({
 		buildSubmissionsCollection({
 			registry,
 			ruleRegistry,
+			calcSources,
+			calcFunctions,
 			consentSources,
 			consentSnapshot,
 			actionRegistry,

@@ -5,6 +5,7 @@ import type { FromAddressesResolver } from './actions/fromAddresses'
 import type { RecipientSourceRegistry } from './actions/recipientSources'
 import type { ActionsConfig } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
+import type { CalcFunction, CalcSource } from './calc/registry'
 import type { ButtonsOption } from './collections/buttonFields'
 import type { ResponseOption } from './collections/redirectFields'
 import type { SettingsOption } from './collections/settingsFields'
@@ -51,6 +52,16 @@ export type FormBuilderPluginOptions = {
 	rules?: ValidationRulesConfig
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	actions?: ActionsConfig
+	/**
+	 * Calculation extensions. `sources` registers named value resolvers the calculation field can
+	 * reference: `resolve` supplies one number per render/submission (a tax rate, a member
+	 * discount), `resolveWeights` supplies per-option numbers for a chosen field (a product's
+	 * price per selectable product). Values resolve server-side, ride the form document for the
+	 * client's live preview, and re-resolve at submit, so the client never supplies them.
+	 * `functions` registers extra calculation functions; client-side live preview additionally
+	 * needs the same map passed to the Form component.
+	 */
+	calc?: { sources?: Record<string, CalcSource>; functions?: Record<string, CalcFunction> }
 	/**
 	 * Customize how the plugin's rich text is authored and rendered. `editor` is the default
 	 * Lexical/richText editor for every plugin richText field (message content, consent

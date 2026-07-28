@@ -3,6 +3,7 @@ import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
+import type { CalcFunction, CalcSource } from '../calc/registry'
 import type { ConsentSnapshotMode } from '../consent/captureConsent'
 import type { ConsentSourcesResolver } from '../consent/types'
 import { resolveEventSink } from '../events/resolveEventSink'
@@ -28,6 +29,10 @@ export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 type BuildSubmissionsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	/** Registered calc sources; submission validation re-resolves them fresh (a failure rejects the submission). */
+	calcSources?: Record<string, CalcSource>
+	/** Registered calc functions; threaded into submit-time calc evaluation. */
+	calcFunctions?: Record<string, CalcFunction>
 	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
 	consentSources?: ConsentSourcesResolver
 	/** What each consent proof snapshots of the agreed wording (plugin option `consent.snapshot`). */
@@ -162,6 +167,8 @@ const makeVotedCookieHook = (): CollectionAfterChangeHook => {
 export const buildSubmissionsCollection = ({
 	registry,
 	ruleRegistry,
+	calcSources,
+	calcFunctions,
 	consentSources,
 	consentSnapshot,
 	actionRegistry = new Map(),
@@ -255,6 +262,8 @@ export const buildSubmissionsCollection = ({
 				validateSubmission({
 					registry,
 					ruleRegistry,
+					calcSources,
+					calcFunctions,
 					consentSources,
 					consentSnapshot,
 					uploadSlug,

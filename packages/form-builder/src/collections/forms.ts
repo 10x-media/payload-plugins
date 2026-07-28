@@ -14,7 +14,9 @@ import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { FromAddressesResolver } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
 import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
-import { normalizeCalc } from '../calc/normalizeCalc'
+import { type CalcAllowed, normalizeCalc } from '../calc/normalizeCalc'
+import type { CalcSource } from '../calc/registry'
+import { calcUsesSources, resolveCalcContext } from '../calc/resolveCalcContext'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import {
 	buildOperandTypes,
@@ -40,6 +42,7 @@ import { buildDefaultOutcomeFields, type OutcomeFieldsOverride } from '../poll/o
 import { type PollTypeRegistry, resolvePollTypes } from '../poll/pollTypeRegistry'
 import type { PollOptionSourceRegistry } from '../poll/registry'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
+import type { FormFieldInstance } from '../submissions/types'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey, resolveDefinitionLabel } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -53,6 +56,9 @@ export const FORMS_SLUG = 'forms'
 
 /** `req.context` key under which `consentAfterRead` tracks the form ids it is currently resolving, to break re-entrant reads. */
 const CONSENT_AFTER_READ_GUARD = 'formBuilderConsentAfterReadInFlight'
+
+/** `req.context` key under which `calcAfterRead` tracks the form ids it is currently resolving, to break re-entrant reads. */
+const CALC_AFTER_READ_GUARD = 'formBuilderCalcAfterReadInFlight'
 
 /**
  * Require the title in the default locale (and on hosts without localization), but let it be empty in
@@ -143,6 +149,10 @@ const stampFileCollections = (rows: FieldRow[], slug: string): void => {
 type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	/** Registered calc extension names; expressions referencing anything else are dropped on save. */
+	calcAllowed?: CalcAllowed
+	/** Registered calc sources; when a form's expressions use any, an afterRead hook stamps `doc.calcResolved`. */
+	calcSources?: Record<string, CalcSource>
 	/**
 	 * The plugin `consent.sources` option. Present: the `/:id/consent-sources` endpoint backing the
 	 * consent field's source select is registered. Absent: neither it nor the consent field type exists.
@@ -200,6 +210,8 @@ export const buildFormsCollection = ({
 	overrides,
 	registry,
 	ruleRegistry,
+	calcAllowed,
+	calcSources,
 	consentSources,
 	consentResolveOnRead,
 	actionRegistry = new Map(),
@@ -279,7 +291,7 @@ export const buildFormsCollection = ({
 			)
 			for (const field of normalized) {
 				if ('expression' in field) {
-					field.expression = normalizeCalc(field.expression)
+					field.expression = normalizeCalc(field.expression, calcAllowed)
 				}
 			}
 			if (uploadsCollectionSlug) {
@@ -731,6 +743,53 @@ export const buildFormsCollection = ({
 				}
 			: undefined
 
+	// When calc sources are registered, resolve the values a form's expressions reference onto every
+	// read of its doc, stamped as `doc.calcResolved` (`toFormDocument` passes it through), so the
+	// client's live preview computes with real values. Fails open: a resolver outage must never break
+	// form/admin/relationship reads; the preview degrades to 0 and submit re-resolves loudly.
+	const calcAfterRead: CollectionAfterReadHook | undefined =
+		calcSources && Object.keys(calcSources).length > 0
+			? async ({ doc, req }) => {
+					const fields = Array.isArray((doc as { fields?: unknown }).fields)
+						? ((doc as { fields: unknown[] }).fields as FormFieldInstance[])
+						: []
+					if (!calcUsesSources(fields)) {
+						return doc
+					}
+					const id = (doc as { id?: unknown }).id
+					const key = id == null ? undefined : String(id)
+					// Re-entrance guard: a host resolver that reads this same form back (threading req) would
+					// otherwise re-enter this hook and recurse. Per-id Set, mutated in place, exactly like
+					// `consentAfterRead` above (afterRead fans out concurrently over one shared req.context).
+					if (key !== undefined && req.context) {
+						const inFlight =
+							(req.context[CALC_AFTER_READ_GUARD] as Set<string> | undefined) ?? new Set<string>()
+						if (inFlight.has(key)) {
+							return doc
+						}
+						inFlight.add(key)
+						req.context[CALC_AFTER_READ_GUARD] = inFlight
+					}
+					try {
+						const resolved = await resolveCalcContext({
+							fields,
+							sources: calcSources,
+							form: doc as { id: number | string } & Record<string, unknown>,
+							payload: req.payload,
+							req,
+						})
+						;(doc as Record<string, unknown>).calcResolved = resolved
+					} catch (error) {
+						req.payload.logger?.warn(`form-builder calc afterRead: ${String(error)}`)
+					} finally {
+						if (key !== undefined && req.context) {
+							;(req.context[CALC_AFTER_READ_GUARD] as Set<string> | undefined)?.delete(key)
+						}
+					}
+					return doc
+				}
+			: undefined
+
 	const defaultEndpoints = buildFormsEndpoints({
 		resultsAccess,
 		pollResultsTypes,
@@ -763,6 +822,7 @@ export const buildFormsCollection = ({
 			afterChange: [pollCloseAfterChange, ...(overrides?.hooks?.afterChange ?? [])],
 			afterRead: [
 				...(consentAfterRead ? [consentAfterRead] : []),
+				...(calcAfterRead ? [calcAfterRead] : []),
 				...(overrides?.hooks?.afterRead ?? []),
 			],
 		},

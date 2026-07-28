@@ -2,6 +2,7 @@ import { type Config, definePlugin } from 'payload'
 import { assertNoActionBlockCollision } from './actions/assertNoBlockCollision'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import { resolveActions } from './actions/registry'
+import { assertNoCalcFunctionCollision } from './calc/registry'
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { resolveFieldTypes, stashFieldTypes } from './fields/registry'
@@ -25,6 +26,17 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const localizeContent = options.localizeContent !== false
 		const uploads = options.uploads ?? false
+		const calcSources = options.calc?.sources ?? {}
+		const calcFunctions = options.calc?.functions ?? {}
+		// Fail fast: the evaluator resolves built-ins first, so a colliding custom function could never run.
+		assertNoCalcFunctionCollision(calcFunctions)
+		// The allowed extension names, threaded into every normalizeCalc gate (the calculation field's
+		// validate and the forms beforeValidate) so a stored expression can only ever reference a
+		// registered source or function.
+		const calcAllowed = {
+			sources: new Set(Object.keys(calcSources)),
+			functions: new Set(Object.keys(calcFunctions)),
+		}
 		// The file field's MIME picker is constrained to what the host upload collection accepts: the
 		// explicit `uploads.mimeTypes` override, else the collection's own `upload.mimeTypes`. Read here,
 		// before the field registry freezes below (attachUploadsCollection runs too late).
@@ -40,7 +52,8 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		const defaultFieldDefinitions = buildDefaultFieldDefinitions(
 			localizeContent,
 			options.richText?.editor,
-			uploadMimeTypes
+			uploadMimeTypes,
+			calcAllowed
 		).filter(
 			(definition) =>
 				(uploads !== false || definition.type !== 'file') &&
@@ -83,6 +96,9 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			config,
 			registry,
 			ruleRegistry,
+			calcAllowed,
+			calcSources,
+			calcFunctions,
 			consentSources,
 			consentSnapshot: options.consent?.snapshot ?? 'both',
 			consentResolveOnRead: options.consent?.resolveOnRead,
@@ -165,8 +181,20 @@ export type {
 	SubmissionStatusFilter,
 } from './aggregation/types'
 export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
-export { evaluateCalc } from './calc/evaluate'
+export type { CalcResolved } from './calc/evaluate'
+export { calcWeightKey, evaluateCalc } from './calc/evaluate'
+export { formatCalc } from './calc/formatCalc'
+export type { CalcAllowed } from './calc/normalizeCalc'
 export { normalizeCalc } from './calc/normalizeCalc'
+export type {
+	CalcFunction,
+	CalcSource,
+	CalcSourceResolveArgs,
+	CalcWeightResolveArgs,
+} from './calc/registry'
+export { defineCalcFunction, defineCalcSource } from './calc/registry'
+export type { ResolveCalcContextArgs } from './calc/resolveCalcContext'
+export { calcUsesSources, resolveCalcContext } from './calc/resolveCalcContext'
 export type { CalcExpression } from './calc/types'
 export type {
 	ButtonFieldsOverride,
