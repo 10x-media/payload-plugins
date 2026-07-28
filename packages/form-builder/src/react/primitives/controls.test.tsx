@@ -181,6 +181,26 @@ describe('Checkbox', () => {
 		)
 		expect(screen.getByRole('checkbox')).toHaveAttribute('aria-describedby', 'c1-desc')
 	})
+
+	it('sets role="switch" and the fb-switch class when variant="switch"', () => {
+		render(<Checkbox id="c1" name="agree" checked={false} onChange={vi.fn()} variant="switch" />)
+		const control = screen.getByRole('switch')
+		expect(control).toHaveClass('fb-switch')
+	})
+
+	it('sets neither role="switch" nor the fb-switch class when variant is omitted', () => {
+		render(<Checkbox id="c1" name="agree" checked={false} onChange={vi.fn()} />)
+		const control = screen.getByRole('checkbox')
+		expect(control).not.toHaveAttribute('role', 'switch')
+		expect(control).not.toHaveClass('fb-switch')
+	})
+
+	it('sets neither role="switch" nor the fb-switch class when variant="checkbox"', () => {
+		render(<Checkbox id="c1" name="agree" checked={false} onChange={vi.fn()} variant="checkbox" />)
+		const control = screen.getByRole('checkbox')
+		expect(control).not.toHaveAttribute('role', 'switch')
+		expect(control).not.toHaveClass('fb-switch')
+	})
 })
 
 describe('ChoiceGroup', () => {

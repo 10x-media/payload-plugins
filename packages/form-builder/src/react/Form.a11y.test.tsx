@@ -76,6 +76,19 @@ describe('Form accessibility (axe)', () => {
 		expect(await axeViolations(container)).toEqual([])
 	})
 
+	it('the checkbox field switch display has no structural violations', async () => {
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'checkbox',
+				name: 'notifications',
+				label: 'Enable notifications',
+				display: 'switch',
+			} as FormFieldInstance,
+		]
+		const { container } = render(<Form form={doc(fields)} />)
+		expect(await axeViolations(container)).toEqual([])
+	})
+
 	it('the post-submit error state has no structural violations', async () => {
 		const { container } = render(
 			<Form
