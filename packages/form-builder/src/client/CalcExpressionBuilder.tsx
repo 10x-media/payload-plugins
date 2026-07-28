@@ -507,7 +507,10 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	const siblings = useMemo(() => JSON.parse(siblingsJson) as Siblings, [siblingsJson])
 
 	const [jsonMode, setJsonMode] = useState(false)
-	const [jsonDraft, setJsonDraft] = useState('')
+	// `null` until the first edit: the textarea then derives its content from the live expression at
+	// render time, so JSON mode can never open on (or regress to) a stale or empty snapshot no
+	// matter when the field value arrives.
+	const [jsonDraft, setJsonDraft] = useState<string | null>(null)
 	const [jsonError, setJsonError] = useState(false)
 
 	const kindOptions: ChoiceOption[] = [
@@ -560,17 +563,19 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 		}
 	}
 
+	// A stored value that fails normalization (legacy/foreign data) serializes raw, so JSON mode
+	// never silently clobbers it.
+	const serializeCurrent = () =>
+		JSON.stringify(expression ?? (value === undefined || value === '' ? null : value), null, 2)
+
 	const toggleJson = () => {
 		if (!jsonMode) {
-			// A stored value that fails normalization (legacy/foreign data) seeds the draft raw, so
-			// opening JSON mode never silently clobbers it.
-			const source = expression ?? (value === undefined || value === '' ? null : value)
-			setJsonDraft(JSON.stringify(source, null, 2))
+			setJsonDraft(null)
 			setJsonError(false)
 			setJsonMode(true)
 			return
 		}
-		const { ok, parsed } = parseDraft(jsonDraft)
+		const { ok, parsed } = parseDraft(jsonDraft ?? serializeCurrent())
 		if (!ok) {
 			setJsonError(true)
 			return
@@ -617,8 +622,8 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 					<>
 						<textarea
 							className="fb-calc-builder__json-input"
-							aria-label={t(keys.calcBuilderJsonMode)}
-							value={jsonDraft}
+							aria-label={t(keys.calcBuilderJsonLabel)}
+							value={jsonDraft ?? serializeCurrent()}
 							rows={10}
 							disabled={readOnly}
 							onChange={(event) => handleJsonChange(event.target.value)}

@@ -259,6 +259,38 @@ describe('CalcExpressionBuilder', () => {
 		expect(container.querySelector('textarea')).toBeNull()
 	})
 
+	it('seeds the JSON draft from the current expression when the value arrives after first render', () => {
+		setField(undefined)
+		const { container, rerender } = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} />
+		)
+		fieldState.current = { ...fieldState.current, value: opTree }
+		rerender(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
+		expect(textarea.value).toBe(JSON.stringify(opTree, null, 2))
+	})
+
+	it('keeps the JSON textarea in sync when the value arrives while JSON mode is open', () => {
+		setField(undefined)
+		const { container, rerender } = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} />
+		)
+		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
+		fieldState.current = { ...fieldState.current, value: opTree }
+		rerender(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
+		expect(textarea.value).toBe(JSON.stringify(opTree, null, 2))
+	})
+
+	it('gives the JSON textarea an accessible name', () => {
+		setField({ type: 'lit', value: 2 })
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
+		const textarea = screen.getByLabelText(keys.calcBuilderJsonLabel) as HTMLTextAreaElement
+		expect(textarea.tagName).toBe('TEXTAREA')
+	})
+
 	it('seeds the JSON draft from the raw value when it fails normalization', () => {
 		setField({ type: 'bogus', anything: 1 })
 		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)

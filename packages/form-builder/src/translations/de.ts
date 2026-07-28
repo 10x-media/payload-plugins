@@ -161,6 +161,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.calcBuilderNegate]: 'Negation',
 	[keys.calcBuilderNoNumericFields]: 'Füge zuerst ein Zahlenfeld hinzu',
 	[keys.calcBuilderNoChoiceFields]: 'Füge zuerst ein Auswahlfeld hinzu',
+	[keys.calcBuilderJsonLabel]: 'Ausdrucks-JSON',
 	[keys.presentationPage]: 'Seite',
 	[keys.presentationModal]: 'Modal',
 	[keys.presentationDrawer]: 'Seitenpanel',

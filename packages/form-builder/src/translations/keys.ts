@@ -143,6 +143,7 @@ export const keys = {
 	calcBuilderNegate: 'formBuilder:calcBuilder.negate',
 	calcBuilderNoNumericFields: 'formBuilder:calcBuilder.noNumericFields',
 	calcBuilderNoChoiceFields: 'formBuilder:calcBuilder.noChoiceFields',
+	calcBuilderJsonLabel: 'formBuilder:calcBuilder.jsonLabel',
 	presentationPage: 'formBuilder:presentation.page',
 	presentationModal: 'formBuilder:presentation.modal',
 	presentationDrawer: 'formBuilder:presentation.drawer',

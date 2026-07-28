@@ -153,6 +153,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.calcBuilderNegate]: 'Negate',
 	[keys.calcBuilderNoNumericFields]: 'Add a number field first',
 	[keys.calcBuilderNoChoiceFields]: 'Add a select field first',
+	[keys.calcBuilderJsonLabel]: 'Expression JSON',
 	[keys.presentationPage]: 'Page',
 	[keys.presentationModal]: 'Modal',
 	[keys.presentationDrawer]: 'Drawer',
