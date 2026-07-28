@@ -68,8 +68,8 @@ export type FormDocument = {
 	poll?: FormPollSettings
 	/**
 	 * Server-resolved calc source values, stamped by the plugin's forms afterRead hook when calc
-	 * sources are registered and the form's expressions use them. Only `sources`/`weights` ever ride
-	 * the document (`functions` cannot serialize; the client supplies those itself).
+	 * sources are registered and the form's expressions use them. Only `sources`/`weights` can ride
+	 * the document, hence the Pick (`functions` cannot serialize; the client supplies those itself).
 	 */
-	calcResolved?: CalcResolved
+	calcResolved?: Pick<CalcResolved, 'sources' | 'weights'>
 }

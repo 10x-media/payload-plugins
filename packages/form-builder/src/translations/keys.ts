@@ -155,6 +155,7 @@ export const keys = {
 	calcBuilderNumberDescription: 'formBuilder:calcBuilder.numberDescription',
 	calcBuilderWeightsDescription: 'formBuilder:calcBuilder.weightsDescription',
 	calcBuilderFunctionDescription: 'formBuilder:calcBuilder.functionDescription',
+	calcSourcesUnavailable: 'formBuilder:calc.sourcesUnavailable',
 	presentationPage: 'formBuilder:presentation.page',
 	presentationModal: 'formBuilder:presentation.modal',
 	presentationDrawer: 'formBuilder:presentation.drawer',

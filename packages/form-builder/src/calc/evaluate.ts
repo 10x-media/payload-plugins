@@ -13,7 +13,12 @@ export type CalcResolved = {
 	functions?: Record<string, (args: number[]) => number>
 }
 
-/** The `CalcResolved.weights` key for a sourced weight node: source key + space + field name. */
+/**
+ * The `CalcResolved.weights` key for a sourced weight node: source key + space + field name.
+ * Unambiguous because registered source keys can never contain a space
+ * (`assertValidCalcSourceKeys` enforces `[\w.-]` at boot), so the first space always ends the
+ * source segment.
+ */
 export const calcWeightKey = (source: string, field: string): string => `${source} ${field}`
 
 const toNumber = (value: unknown): number => {

@@ -175,6 +175,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.calcBuilderWeightsDescription]:
 		'Wandelt die gewählte Option eines Auswahlfelds in eine Zahl um, die du pro Option festlegst.',
 	[keys.calcBuilderFunctionDescription]: 'min, max und weitere Funktionen',
+	[keys.calcSourcesUnavailable]:
+		'Berechnungswerte sind vorübergehend nicht verfügbar. Bitte versuche es erneut.',
 	[keys.presentationPage]: 'Seite',
 	[keys.presentationModal]: 'Modal',
 	[keys.presentationDrawer]: 'Seitenpanel',

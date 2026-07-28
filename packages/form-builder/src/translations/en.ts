@@ -167,6 +167,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.calcBuilderWeightsDescription]:
 		"Turns a choice field's selected option into a number you define per option.",
 	[keys.calcBuilderFunctionDescription]: 'min, max and other functions',
+	[keys.calcSourcesUnavailable]:
+		'Calculation values are temporarily unavailable. Please try again.',
 	[keys.presentationPage]: 'Page',
 	[keys.presentationModal]: 'Modal',
 	[keys.presentationDrawer]: 'Drawer',

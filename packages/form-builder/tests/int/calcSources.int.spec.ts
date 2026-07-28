@@ -167,11 +167,12 @@ describeForDb('form-builder calc sources', { dbs: ['mongo'] }, (db) => {
 		const read = await booted.payload.findByID({ collection: 'forms', id: form.id })
 		expect(read.id).toBe(form.id)
 		expect((read as { calcResolved?: unknown }).calcResolved).toBeUndefined()
+		// The outage surfaces as a translated 503, never a generic 500 leaking the resolver error.
 		await expect(
 			booted.payload.create({
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
 			})
-		).rejects.toThrow('pricing backend down')
+		).rejects.toMatchObject({ status: 503 })
 	})
 })

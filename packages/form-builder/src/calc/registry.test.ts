@@ -1,7 +1,12 @@
 import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { formBuilder } from '../index'
-import { assertNoCalcFunctionCollision, defineCalcFunction, defineCalcSource } from './registry'
+import {
+	assertNoCalcFunctionCollision,
+	assertValidCalcSourceKeys,
+	defineCalcFunction,
+	defineCalcSource,
+} from './registry'
 
 describe('defineCalcSource / defineCalcFunction', () => {
 	it('are identity helpers', () => {
@@ -30,11 +35,36 @@ describe('assertNoCalcFunctionCollision', () => {
 	})
 })
 
+describe('assertValidCalcSourceKeys', () => {
+	it('throws on a key containing a space (the weight-map key separator)', () => {
+		expect(() =>
+			assertValidCalcSourceKeys({
+				'tax rate': defineCalcSource({ label: 'Tax', resolve: () => 0 }),
+			})
+		).toThrow(/tax rate/)
+	})
+
+	it('passes word characters, dots, and dashes', () => {
+		expect(() =>
+			assertValidCalcSourceKeys({
+				'tax-rate.v2_x': defineCalcSource({ label: 'Tax', resolve: () => 0 }),
+			})
+		).not.toThrow()
+	})
+})
+
 describe('formBuilder boot collision', () => {
 	it('throws at plugin apply when a calc function collides with a built-in', () => {
 		const plugin = formBuilder({
 			calc: { functions: { min: defineCalcFunction({ label: 'Min', apply: () => 0 }) } },
 		})
 		expect(() => plugin({ collections: [] } as unknown as Config)).toThrow(/min/)
+	})
+
+	it('throws at plugin apply on a calc source key with a space', () => {
+		const plugin = formBuilder({
+			calc: { sources: { 'tax rate': defineCalcSource({ label: 'Tax', resolve: () => 0 }) } },
+		})
+		expect(() => plugin({ collections: [] } as unknown as Config)).toThrow(/tax rate/)
 	})
 })

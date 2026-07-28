@@ -60,6 +60,10 @@ export type FormBuilderPluginOptions = {
 	 * client's live preview, and re-resolve at submit, so the client never supplies them.
 	 * `functions` registers extra calculation functions; client-side live preview additionally
 	 * needs the same map passed to the Form component.
+	 *
+	 * Resolvers receive an unauthenticated visitor `req` on public reads and submits: never feed
+	 * data derived from it into access-escalated queries, and gate per-user-sensitive numbers on
+	 * `req.user`, because resolved values are embedded on every readable form document.
 	 */
 	calc?: { sources?: Record<string, CalcSource>; functions?: Record<string, CalcFunction> }
 	/**

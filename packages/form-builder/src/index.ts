@@ -2,7 +2,7 @@ import { type Config, definePlugin } from 'payload'
 import { assertNoActionBlockCollision } from './actions/assertNoBlockCollision'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import { resolveActions } from './actions/registry'
-import { assertNoCalcFunctionCollision } from './calc/registry'
+import { assertNoCalcFunctionCollision, assertValidCalcSourceKeys } from './calc/registry'
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { resolveFieldTypes, stashFieldTypes } from './fields/registry'
@@ -28,8 +28,10 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		const uploads = options.uploads ?? false
 		const calcSources = options.calc?.sources ?? {}
 		const calcFunctions = options.calc?.functions ?? {}
-		// Fail fast: the evaluator resolves built-ins first, so a colliding custom function could never run.
+		// Fail fast: the evaluator resolves built-ins first, so a colliding custom function could never
+		// run; a source key with a space would make the weight-map key (`calcWeightKey`) ambiguous.
 		assertNoCalcFunctionCollision(calcFunctions)
+		assertValidCalcSourceKeys(calcSources)
 		// The allowed extension names, threaded into every normalizeCalc gate (the calculation field's
 		// validate and the forms beforeValidate) so a stored expression can only ever reference a
 		// registered source or function.

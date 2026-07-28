@@ -118,9 +118,9 @@ export function toFormDocument(
 		/**
 		 * Calc source values resolved onto the doc by the plugin's forms `afterRead` hook (when calc
 		 * sources are registered and used); passed through so the client's live preview computes with
-		 * real values.
+		 * real values. `functions` can never ride a document, hence the Pick.
 		 */
-		calcResolved?: CalcResolved
+		calcResolved?: Pick<CalcResolved, 'sources' | 'weights'>
 	},
 	options?: ToFormDocumentOptions
 ): FormDocument {

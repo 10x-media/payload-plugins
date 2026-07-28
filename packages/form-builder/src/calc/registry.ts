@@ -4,6 +4,11 @@ import { CALC_FNS } from './types'
 export type CalcSourceResolveArgs = {
 	form: { id: number | string } & Record<string, unknown>
 	payload: Payload
+	/**
+	 * On public form reads and submits this is an unauthenticated visitor request: never feed data
+	 * derived from it into access-escalated queries, and gate any per-user-sensitive number on
+	 * `req.user` (resolved values are embedded on every readable form document).
+	 */
 	req?: PayloadRequest
 }
 
@@ -50,6 +55,23 @@ export const assertNoCalcFunctionCollision = (functions: Record<string, CalcFunc
 		if ((CALC_FNS as readonly string[]).includes(key)) {
 			throw new Error(
 				`@10x-media/form-builder: calculation function "${key}" collides with the built-in function "${key}". Rename the custom function.`
+			)
+		}
+	}
+}
+
+const CALC_SOURCE_KEY_PATTERN = /^[\w.-]+$/
+
+/**
+ * Fail fast at boot on a calc source key outside `[\w.-]`. Resolved weight maps are keyed
+ * `source + ' ' + field` (`calcWeightKey`), so the separator char must never appear in a source
+ * key or two different (source, field) pairs could collide on one map.
+ */
+export const assertValidCalcSourceKeys = (sources: Record<string, CalcSource>): void => {
+	for (const key of Object.keys(sources)) {
+		if (!CALC_SOURCE_KEY_PATTERN.test(key)) {
+			throw new Error(
+				`@10x-media/form-builder: calculation source key "${key}" is invalid. Use only letters, digits, "_", "." or "-".`
 			)
 		}
 	}

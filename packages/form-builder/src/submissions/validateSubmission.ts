@@ -163,19 +163,31 @@ export const validateSubmission =
 		}
 
 		// Calc extension values re-resolve fresh here, never trusting the render-time embedding, and a
-		// resolver failure THROWS: a calc total is money math, so an outage must reject the submission
-		// rather than silently evaluating to 0 (the render path fails open instead; see `calcAfterRead`).
+		// resolver failure rejects the submission: a calc total is money math, so an outage must not
+		// silently evaluate to 0 (the render path fails open instead; see `calcAfterRead`). Surfaced as
+		// a translated 503 (the consent-sources precedent above), with the cause logged server-side
+		// rather than leaked to the anonymous caller.
 		let calcResolved: CalcResolved | undefined
 		if (fields.some((instance) => calcExpressionOf(instance) !== undefined)) {
-			const resolved = await resolveCalcContext({
-				fields,
-				sources: calcSources ?? {},
-				// Double cast: a host's generated Form interface has no index signature, so the direct
-				// cast fails under a consumer tsconfig even though the shape is a plain document.
-				form: form as unknown as { id: number | string } & Record<string, unknown>,
-				payload: req.payload,
-				req,
-			})
+			let resolved: CalcResolved
+			try {
+				resolved = await resolveCalcContext({
+					fields,
+					sources: calcSources ?? {},
+					// Double cast: a host's generated Form interface has no index signature, so the direct
+					// cast fails under a consumer tsconfig even though the shape is a plain document.
+					form: form as unknown as { id: number | string } & Record<string, unknown>,
+					payload: req.payload,
+					req,
+				})
+			} catch (error) {
+				req.payload.logger?.error(
+					`@10x-media/form-builder: calc source resolution failed for form ${String(formId)}: ${
+						error instanceof Error ? error.message : String(error)
+					}`
+				)
+				throw new APIError(asTranslate(req.i18n.t)(keys.calcSourcesUnavailable), 503)
+			}
 			const functions =
 				calcFunctions && Object.keys(calcFunctions).length > 0
 					? Object.fromEntries(
