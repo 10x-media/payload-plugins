@@ -26,7 +26,7 @@ export const FormAttachments: CollectionConfig = {
 }
 ```
 
-The collection is yours: storage adapter (S3 and friends or `staticDir`), access control, extra fields, admin placement all stay in your hands. The plugin wires its own concerns into it at boot:
+The collection is yours: storage adapter (S3 and friends or `staticDir`), access control, extra fields, admin placement all stay in your hands, including where it sits in the admin nav relative to `forms` and `form-submissions`. The plugin wires its own concerns into it at boot:
 
 - **Validation:** a missing collection, or one without an `upload` config, throws a descriptive error at startup, so a typo'd slug can never silently disable enforcement.
 - **Ownership:** a hidden `owner` text field is appended for [ownership scoping](/form-builder/spam#upload-ownership), unless you already define a field named `owner` (then yours is reused and must stay a text-compatible identity slot).

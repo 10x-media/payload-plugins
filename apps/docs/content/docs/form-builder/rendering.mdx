@@ -61,6 +61,18 @@ Skipping `url` and navigating yourself from `onSuccess` instead works too, if yo
 
 To drop in a link field you already have (choose a URL or pick a linkable document) rather than the plain `url` text field, compose the group with the [`response.redirect.fields`](/form-builder/customization#redirect-response-fields) seam. A field you replace `url` with is yours to resolve to a destination, the same as `reference` above.
 
+Appending a field alongside the defaults is the common case, since `reference` and `url` still cover most redirects:
+
+```ts title="payload.config.ts"
+formBuilder({
+  response: {
+    redirect: {
+      fields: ({ defaultFields }) => [...defaultFields, { name: 'anchor', type: 'text' }],
+    },
+  },
+})
+```
+
 ### Progressive validation
 
 Validation runs on blur, re-validates on change once a field is touched, then validates all visible fields on submit. Hidden fields ([`visibleWhen`](/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.

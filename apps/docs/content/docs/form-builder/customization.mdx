@@ -9,7 +9,7 @@ Every option follows one of a few shapes, and knowing which saves you from fight
 
 - **Opt-in flags** take Payload's `false` / `true` / object form: omit or `false` disables, `true` enables with defaults, an object customizes. `spam`, `poll`, and `uploads` work this way.
 - **Resolver-gated features** are the sanctioned exception: they have no `true` and are enabled purely by supplying a `req`-scoped resolver. `consent.sources`, `email.fromAddresses`, `email.departments`, `poll.sources`, and `events` stay off until you pass the function, and passing it is the enable.
-- **Composition seams** hand you the built defaults and take your result back, so you extend rather than replace: `buttons.fields`, `poll.outcomeFields`, `response.redirect.fields`, and each `overrides.*` `fields` receive the defaults for you to spread, wrap, reorder, or filter.
+- **Composition seams** hand you the built defaults and take your result back, so you extend rather than replace: `buttons.fields`, `settings.fields`, `poll.outcomeFields`, `response.redirect.fields`, and each `overrides.*` `fields` receive the defaults for you to spread, wrap, reorder, or filter.
 - **Registry seams** key entries by slug and replace a matched entry wholesale: `fields`, `rules`, `actions`, and `poll.types`. To change one built-in and keep the rest, spread it from the exported defaults (see [Tweaking one built-in](#tweaking-one-built-in)).
 
 One deliberate divergence is worth calling out. Consent stores only a source's row `id` and resolves the statement live per request, so editing a source reaches every form at once. Department routing does the opposite: `email.departments` resolves each department's address at author time and freezes the resolved address into the form's `emailTeam` action. That is intentional: a submission must route to the address the form was saved with, so the target stays audit-stable even if the department's address later changes.
@@ -169,6 +169,30 @@ export const ContactForm = ({ form }: { form: FormDocument }) => (
 `renderNext` and `renderBack` compose identically.
 
 To assemble a slot from scratch instead of receiving the default, the individual builders are exported: `buildSubmitLabelField(localize)`, `buildNextLabelField(localize)`, and `buildPrevLabelField(localize)`, plus `buildDefaultButtonFields(localize)` returning all three keyed `submit`/`next`/`prev`, exactly what `buttons.fields` is handed as `defaultFields`.
+
+## Form-level settings
+
+Every form carries three behavior flags at the document root: `multistep`, `pollEnabled`, and `persistSubmissions` (default checked), rendered as sidebar checkboxes. The plugin's `settings.fields` option composes them, mirroring [`buttons.fields`](#form-level-buttons): it receives the three defaults keyed `multistep` / `pollEnabled` / `persistSubmissions` and returns the final field array placed verbatim at the collection root, so you can relocate a flag out of the sidebar, wrap it with a host field, reorder, or drop one.
+
+Here `persistSubmissions` moves into the main area next to a host-added retention flag:
+
+```ts title="payload.config.ts"
+formBuilder({
+  settings: {
+    fields: ({ defaultFields }) => {
+      const { admin: _sidebar, ...persistSubmissions } = defaultFields.persistSubmissions
+      return [
+        defaultFields.multistep,
+        defaultFields.pollEnabled,
+        persistSubmissions, // now rendered in the main area, not the sidebar
+        { name: 'anonymizeOnPrune', type: 'checkbox', label: 'Anonymize instead of deleting' },
+      ]
+    },
+  },
+})
+```
+
+Omit the option and the three flags stay exactly where they are today: sidebar checkboxes, in that order. `buildDefaultSettingsFields()` is exported for assembling the trio from scratch.
 
 ## List view
 

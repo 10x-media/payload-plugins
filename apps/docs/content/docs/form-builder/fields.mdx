@@ -11,7 +11,7 @@ Form fields are authored as Payload blocks: one block type per registered field 
 
 ## Authoring layout
 
-Each field block's **Field** tab lays the shared basics out in rows: name beside label, width beside placeholder, then description, with the required checkbox last. `width` is required with a `full` default, so every field carries an explicit value for the [layout grid](/form-builder/rendering#layout-grid). The rows are presentational only; stored data paths stay flat.
+Each field block's **Field** tab lays the shared basics out in rows: name beside label, width beside placeholder, then description, with the required checkbox last. `width` is optional and defaults to `full`; an instance that never sets it (older data, a programmatic write) renders full-width the same as one that sets it explicitly, since both the admin select and the renderer's [`widthProps`](/form-builder/rendering#layout-grid) fall back to `full`. The rows are presentational only; stored data paths stay flat.
 
 A block's collapsed row header shows the field's own label once it has one, falling back to its translated type name, instead of Payload's default block-name placeholder that reads "Untitled" until filled in.
 
@@ -20,6 +20,22 @@ A type leaves out the basics it never reads via `omitShared`, so an author is ne
 ## Content localization
 
 Content-bearing authoring fields (labels, placeholders, descriptions, select option labels, repeater add labels, message content) are `localized: true` by default, so on a host with Payload `localization` configured, editors translate form content per locale out of the box. Payload strips the flag on hosts without localization, so the default is safe everywhere. Opt out with the plugin option `localizeContent: false` (see [i18n](/form-builder/i18n#content-vs-ui-strings) for the content-versus-UI-strings distinction and [Customization](/form-builder/customization#tweaking-one-built-in) for the interplay with spread-overrides).
+
+## Select
+
+Options are authored as `{ label?, value }` pairs; `label` is optional, so an author can add an option and fill in the label later. Everywhere a select answer is rendered, an option with no label falls back to its `value`: the renderer, `format`, results labelling, and the admin submission view alike.
+
+`display` picks how the choices render, defaulting to `dropdown`:
+
+- `dropdown`: the built-in `<Select>` primitive, unchanged.
+- `radio`: a native `role="radiogroup"` of radio inputs.
+- `buttons`: the same radio semantics, styled as a segmented control.
+
+`radio` and `buttons` share the `ChoiceGroup` primitive (exported from `@10x-media/form-builder/react`), which puts `aria-invalid` on each radio input rather than the group `div`, so [terminal-submit focus routing](/form-builder/multi-step) can still land on an invalid field.
+
+## Checkbox
+
+`display` picks the control's appearance, defaulting to `checkbox`: `checkbox` is a plain box, `switch` renders the same `Checkbox` primitive with a toggle look. Either way the value is still a boolean and the `required` semantics are unchanged (checked, then unchecked, is still a present answer that a required checkbox rejects).
 
 ## Message
 
@@ -113,7 +129,7 @@ export default buildConfig({
 })
 ```
 
-`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings; `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)); `pollEligible`, marking the type choosable as a poll's [results field](/form-builder/polls#the-results-endpoint) (its instances must produce enumerable answers, via authored options, a [poll option source](/form-builder/polls#option-sources), or its own `resolveOptions`; built-in: `select`, plus `country`/`state` when [opted in](#country-and-state)); `resolveOptions`, letting a `pollEligible` type source its poll choices from the configured instance itself (a `hasMany` relationship it holds, say) instead of from authored options or a source (see [custom eligible field types](/form-builder/polls#custom-eligible-field-types)); `omitShared`, leaving the shared basics your type never reads (`label`, `placeholder`, `description`, `width`, `required`) unauthored while keeping the rest of the chrome, as `checkbox` and `calculation` do (see [Authoring layout](#authoring-layout)); and `bare`, dropping the shared chrome so the block is your `config` alone, as the [message](#message) type does.
+`value` is the value kind (`'text'`, `'number'`, `'boolean'`, and so on) and drives the `TValue` that `validate` and `format` receive. `validate` runs on the server for every submission, and on the client for UX when the renderer knows the type. `format` turns a stored value into display text; the admin answers view, [recall tokens](/form-builder/recall-prefill), and results all use it. Optional extras: `config`, a Payload `Field[]` rendered in the add-field drawer so your type gets admin-authorable settings; `schema`, a [Standard Schema](https://standardschema.dev) validator (see [Validation](/form-builder/validation#standard-schema)); `pollEligible`, marking the type choosable as a poll's [results field](/form-builder/polls#the-results-endpoint) (its instances must produce enumerable answers, via authored options, a [poll option source](/form-builder/polls#option-sources), or its own `resolveOptions`; built-in: `select`, plus `country`/`state` when [opted in](#country-and-state)); `resolveOptions`, letting a `pollEligible` type source its poll choices from the configured instance itself (a `hasMany` relationship it holds, say) instead of from authored options or a source (see [custom eligible field types](/form-builder/polls#custom-eligible-field-types)); `omitShared`, leaving the shared basics your type never reads (`label`, `placeholder`, `description`, `width`, `required`) unauthored while keeping the rest of the chrome, as `checkbox` and `calculation` do (see [Authoring layout](#authoring-layout)); `advancedConfig`, a `Field[]` appended to the Advanced tab after `visibleWhen`/`hidden`, for settings that belong there rather than on the Field tab (`text` and `email` use it for an `autocomplete` text field, forwarded to the rendered input's `autocomplete` attribute for browser autofill); and `bare`, dropping the shared chrome so the block is your `config` alone, as the [message](#message) type does.
 
 `bare` requires `value: 'none'`, and the plugin throws at boot otherwise: a bare instance is nameless, so a value-bearing one would have nowhere to store its answer and would silently drop it. Reach for it for display-only types; anything a visitor answers stays named.
 

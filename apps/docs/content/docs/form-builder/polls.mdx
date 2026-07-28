@@ -56,6 +56,46 @@ formBuilder({
 })
 ```
 
+## Vote store
+
+By default, a poll's results are not read by scanning submissions. Every submission that reaches `complete` for a poll-enabled form bumps a row in a hidden `form-poll-votes` collection: one counter per `(form, field, value)`, plus a shared respondents counter per `(form, field)`. Results reads then sum those counters directly, an `O(options)` lookup instead of a submission scan, so a poll's results never truncate and never slow down as submissions pile up.
+
+**Privacy.** A tally row carries no per-voter data, only a value and a running count. Pair `poll.votes` (on by default) with the form's `persistSubmissions: false` and a poll can count votes while storing zero per-visitor information: nothing links a count back to who cast it, because nothing about the voter was ever kept.
+
+**Permanence.** Votes are counted, never uncounted. Deleting a submission in the admin, editing one, or a `persistSubmissions: false` prune after actions run, none of them decrement the tally: once a vote is counted it stays counted. This is what lets a persist-off poll keep an accurate count with no submissions on disk to recount from.
+
+**Healing drift.** Because the tally is append-only and separate from submissions, it can theoretically drift from what the submissions collection holds (a direct database edit, a restore from backup). `recountPollVotes({ payload, formId })` rebuilds a form's tally from scratch: it scans the form's submissions, deletes the existing tally rows for the results field, and replays the scan into fresh rows. It throws rather than write a knowingly partial count when the scan itself would be truncated (more than 100,000 submissions).
+
+That scan-and-replace shape makes `recountPollVotes` unsafe on a `persistSubmissions: false` poll: with submissions pruned, the scan finds nothing to replay, so the delete step wipes the tally down to zero instead of leaving it alone. The tally is the only record of a persist-off poll's votes, so recounting one erases its history rather than healing it; only call it for a poll that keeps its submissions.
+
+**Turning it off.** `poll.votes: false` removes the hidden collection entirely and restores scan-based results (the submission scan `aggregateFieldResponses` already described in [Aggregating](#aggregating)). With the store off, a poll has no counters that outlive its submissions, so the server refuses to save a poll-enabled form with `persistSubmissions: false`: nothing would be left to count. Turn the store back on, or keep submissions persisted, to lift the guard.
+
+**Survey reads still scan.** The tally only backs a *poll's own* results field, read on its own: the authenticated all-fields survey aggregation (`aggregateFormResponses` with no `field`, or an admin reading every enumerable field at once) always scans submissions, tally or not, since it has no notion of "the poll field" to special-case. For a `persistSubmissions: false` poll this means the two views diverge on purpose: the survey-style aggregation shows fewer submissions, or none, once pruning has run, while [`<Poll>`](#poll) and the [results endpoint](#the-results-endpoint) reading that field by name show the true, permanent tally. Read poll results through the poll's own results read, not the general survey aggregation, when submissions are not persisted.
+
+**Reading the store directly.** A vote's count is spread across up to `VOTE_SHARDS` (8) rows per `(form, field, value)`, so that concurrent votes for the same popular option do not serialize on one document. A reader going straight to the `form-poll-votes` collection (rather than through `aggregateFromVotes`, which already does this) must sum `count` across every row sharing a `(form, field, value)`, not just read one row. The reserved `value: ''` (exported as `RESPONDENTS_VALUE`) holds the field's total respondent count, also sharded, and is never a real answer since an empty value is never counted as a vote. `POLL_VOTES_SLUG`, `RESPONDENTS_VALUE`, `VOTE_SHARDS`, `aggregateFromVotes`, and `recountPollVotes` are all exported from the root.
+
+```ts
+import { aggregateFromVotes, recountPollVotes, resolveEffectivePollOptions } from '@10x-media/form-builder'
+
+// Tally-backed results for one field, zero-seeded from its resolved options.
+const form = await payload.findByID({ collection: 'forms', id: formId, depth: 0 })
+const options = await resolveEffectivePollOptions({ payload, form })
+const results = await aggregateFromVotes({ payload, formId, field: 'colour', options })
+
+// Rebuild a form's tally from its stored submissions after out-of-band drift.
+await recountPollVotes({ payload, formId })
+```
+
+`poll.votes` also takes an object to reach the hidden collection's `overrides` (the same `CollectionOverrides` shape as [collection overrides](/form-builder/customization#collection-overrides)); its `indexes` stay fixed, since the unique compound index is load-bearing for the atomic upsert-increment behind every vote bump.
+
+```ts title="payload.config.ts"
+formBuilder({
+  poll: {
+    votes: false, // scan-based results; a poll form must keep persistSubmissions on
+  },
+})
+```
+
 ## Poll lifecycle
 
 A poll is a form with its top-level **Poll** checkbox on (`pollEnabled` on `FormDocument` and the forms collection alike; there is no more nested `poll.enabled`). Turning it on reveals a **Poll** tab holding the **Vote field** (`resultsField`), `type`, `resultsVisibility` (`afterVote` | `afterClose`), and an optional `closesAt`.

@@ -45,11 +45,53 @@ const scoreQ1: CalcExpression = {
 
 ## Authoring in the admin
 
-Expressions are authored in the field's JSON config field. The field describes the node shapes inline and ships a JSON schema for the admin's Monaco editor, so authors get autocomplete and inline diagnostics while typing. Validity is enforced on save: an expression that does not normalize into a well-formed tree is rejected with a field error, so a broken calculation cannot reach the public form.
+The `expression` config field renders a visual builder: pick a node kind from a select, fill in its inputs, and the tree grows underneath. Node kinds map onto the AST above:
 
-<Callout type="info">
-A visual expression builder is planned; expressions are authored as data today.
-</Callout>
+| Builder label | Node | What it offers |
+|---|---|---|
+| Answer | `ref` | A select of the fields this calculation may reference: `number` fields, plus earlier `calculation` fields (see [forward references](#forward-references) below). |
+| Number | `lit` | A plain numeric input. |
+| Math | `op` | An operator select (`+ - * / %`) over two child nodes, each independently editable. |
+| Function | `fn` | A function select (`min`, `max`, `round`, `abs`, `ceil`, `floor`) over one or more argument nodes, with add/remove buttons for `min`/`max`'s variadic args. |
+| Weighted answers | `weight` | A `select` field to score, then a number input per one of its options, mapping each answer to a weight. |
+
+Switching a node's kind never silently discards work: Math takes the current node as its left operand, Function as its first argument, so nesting one Math node inside another is a sequence of kind switches and field picks rather than hand-written JSON. A live preview above the actions renders the current tree as an infix expression and updates on every edit.
+
+An order total with tax, built as Math (`*`) → \[Math (`*`) → Answer `price`, Answer `quantity`\] and Number `1.19`, reads back as `price × quantity × 1.19` in the preview:
+
+```ts
+import type { CalcExpression } from '@10x-media/form-builder'
+
+const total: CalcExpression = {
+  type: 'op',
+  op: '*',
+  left: {
+    type: 'op',
+    op: '*',
+    left: { type: 'ref', field: 'price' },
+    right: { type: 'ref', field: 'quantity' },
+  },
+  right: { type: 'lit', value: 1.19 },
+}
+```
+
+A quiz score, built as Weighted answers over a `q1` select field, with a weight typed in next to each of its options (`a` → 10, `b` → 0, `c` → 5):
+
+```ts
+const scoreQ1: CalcExpression = {
+  type: 'weight',
+  field: 'q1',
+  weights: { a: 10, b: 0, c: 5 },
+}
+```
+
+**Edit as JSON** switches the same field to a raw JSON textarea, seeded from the current tree, for anyone who would rather type the AST directly or paste one in. A well-formed draft live-commits as you type, so leaving JSON mode is not the only way to apply an edit; the button's own label just flips to **Visual editor** and, on click, re-validates the draft once more before switching views. The stored `expression` is the identical `CalcExpression` JSON either way: the two editors are two views onto the same field, not two storage formats, so a form built visually opens correctly in JSON mode and vice versa.
+
+Validity is still enforced on save server-side: an expression that does not normalize into a well-formed tree is rejected with a field error, so a broken calculation cannot reach the public form, regardless of which editor produced it.
+
+### Forward references
+
+A calculation can reference a `number` field declared anywhere on the form, but another `calculation` field only if it is declared *earlier* in the fields list. The engine folds calculations in declaration order, so a forward or self reference would always evaluate to `0`; the builder's Answer picker enforces this by only offering earlier calculations, not later ones, keeping the authoring UI honest about what will actually compute.
 
 ## Totality and safety
 
