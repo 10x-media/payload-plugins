@@ -18,6 +18,8 @@ export type FieldShellProps = {
  * Accessible wrapper for a single field: a `<label>` bound to the control, the control slot, an optional
  * description, and error messages. The control inside must set `aria-describedby={describedById}`
  * and `aria-invalid` when errors exist; this shell renders the matching `id={describedById}` region.
+ * The label carries `id={`${id}-label`}`, so a control with no single element to `htmlFor` (a native
+ * radiogroup, say) can still name itself via `aria-labelledby`.
  */
 export const FieldShell = ({
 	id,
@@ -30,7 +32,7 @@ export const FieldShell = ({
 }: FieldShellProps) => (
 	<div className="fb-field" data-invalid={errors.length > 0 ? '' : undefined}>
 		{label ? (
-			<label className="fb-field__label" htmlFor={id}>
+			<label className="fb-field__label" htmlFor={id} id={`${id}-label`}>
 				{label}
 				{required ? (
 					<span className="fb-field__required" aria-hidden="true">
