@@ -87,7 +87,6 @@
 .fb-choice--buttons {
 	flex-direction: row;
 	flex-wrap: wrap;
-	gap: 0.5rem;
 }
 .fb-choice--buttons .fb-choice__option {
 	position: relative;
@@ -112,6 +111,10 @@
 .fb-choice--buttons .fb-choice__option:has(input:focus-visible) {
 	outline: 2px solid var(--fb-choice-focus, currentColor);
 	outline-offset: 2px;
+}
+.fb-choice--buttons .fb-choice__option:has(input:disabled) {
+	cursor: not-allowed;
+	opacity: var(--fb-choice-disabled-opacity, 0.5);
 }
 
 /* Poll / survey results: per-option bars. The text carries the meaning; the bar is decorative. */

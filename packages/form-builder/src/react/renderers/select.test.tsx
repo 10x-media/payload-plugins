@@ -168,6 +168,28 @@ describe('select renderer radio display', () => {
 		)
 		expect(screen.getByRole('radiogroup')).not.toHaveAttribute('aria-labelledby')
 	})
+
+	it('sets aria-invalid on every radio, not the group, when the field has errors', () => {
+		render(createElement(selectRenderer, radioProps({ errors: ['Choose a valid option'] })))
+		expect(screen.getByRole('radiogroup')).not.toHaveAttribute('aria-invalid')
+		for (const radio of screen.getAllByRole('radio')) {
+			expect(radio).toHaveAttribute('aria-invalid', 'true')
+		}
+	})
+
+	it('omits aria-invalid on the radios when the field has no errors', () => {
+		render(createElement(selectRenderer, radioProps()))
+		for (const radio of screen.getAllByRole('radio')) {
+			expect(radio).not.toHaveAttribute('aria-invalid')
+		}
+	})
+
+	it('labels the group with a plain span, not a label[for] pointing at a nonexistent id', () => {
+		render(createElement(selectRenderer, radioProps()))
+		const caption = screen.getByText('Plan')
+		expect(caption.tagName).toBe('SPAN')
+		expect(caption).not.toHaveAttribute('for')
+	})
 })
 
 describe('select renderer buttons display', () => {
@@ -217,5 +239,28 @@ describe('select renderer buttons display', () => {
 		expect(screen.getByRole('radio', { name: 'Pro' })).toBeChecked()
 		fireEvent.click(screen.getByRole('radio', { name: 'Free' }))
 		expect(received).toBe('free')
+	})
+
+	it('sets aria-invalid on every radio when the field has errors', () => {
+		render(
+			createElement(
+				selectRenderer,
+				props({
+					field: {
+						blockType: 'select',
+						name: 'plan',
+						display: 'buttons',
+						options: [
+							{ label: 'Free', value: 'free' },
+							{ label: 'Pro', value: 'pro' },
+						],
+					},
+					errors: ['Choose a valid option'],
+				})
+			)
+		)
+		for (const radio of screen.getAllByRole('radio')) {
+			expect(radio).toHaveAttribute('aria-invalid', 'true')
+		}
 	})
 })

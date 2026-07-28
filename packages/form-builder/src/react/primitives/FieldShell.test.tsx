@@ -26,4 +26,29 @@ describe('FieldShell', () => {
 		expect(alert).toHaveTextContent('Required')
 		expect(alert.closest('#f1-desc')).not.toBeNull()
 	})
+
+	it('renders a plain span carrying the label id when group is true, not a label[for]', () => {
+		render(
+			<FieldShell id="f1" label="Plan" describedById="f1-desc" group>
+				<div role="radiogroup" aria-labelledby="f1-label" aria-describedby="f1-desc" />
+			</FieldShell>
+		)
+		const caption = screen.getByText('Plan')
+		expect(caption.tagName).toBe('SPAN')
+		expect(caption).not.toHaveAttribute('for')
+		expect(caption).toHaveAttribute('id', 'f1-label')
+		expect(screen.getByRole('radiogroup')).toHaveAccessibleName('Plan')
+	})
+
+	it('still renders a label[for] bound to the control id when group is false (default)', () => {
+		render(
+			<FieldShell id="f1" label="Email" describedById="f1-desc">
+				<input id="f1" aria-describedby="f1-desc" />
+			</FieldShell>
+		)
+		const caption = screen.getByText('Email')
+		expect(caption.tagName).toBe('LABEL')
+		expect(caption).toHaveAttribute('for', 'f1')
+		expect(caption).toHaveAttribute('id', 'f1-label')
+	})
 })

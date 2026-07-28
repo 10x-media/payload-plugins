@@ -203,6 +203,54 @@ describe('Terminal Submit routes to the first invalid step', () => {
 		await waitFor(() => expect(document.activeElement).toBe(byLabel('First')))
 		expect(onSubmit).not.toHaveBeenCalled()
 	})
+
+	it('focuses a radio-display select field on the routed-back step, not just dropdown selects', async () => {
+		// Same shape as above, but the field the terminal submit must route back to and focus is a
+		// select rendered as a radiogroup: only the individual radio inputs carry aria-invalid, so
+		// the focus routing (`[aria-invalid="true"]`) must land on one of them, not the group div.
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'select',
+				name: 'first',
+				label: 'First',
+				required: true,
+				display: 'radio',
+				validateWhen: { plan: { equals: 'pro' } },
+				options: [
+					{ label: 'A', value: 'a' },
+					{ label: 'B', value: 'b' },
+				],
+			},
+			{
+				blockType: 'select',
+				name: 'plan',
+				label: 'Plan',
+				options: [
+					{ label: 'Free', value: 'free' },
+					{ label: 'Pro', value: 'pro' },
+				],
+			},
+			{ blockType: 'text', name: 'notes', label: 'Notes' },
+		]
+		const flow: FormFlow = {
+			steps: [
+				{ id: 's1', fields: ['first'], next: 's2' },
+				{ id: 's2', fields: ['plan'], next: 's3' },
+				{ id: 's3', fields: ['notes'] },
+			],
+		}
+		const onSubmit = ok()
+		render(<Form form={doc(fields, flow)} onSubmit={onSubmit} />)
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		fireEvent.change(await findByLabel('Plan'), { target: { value: 'pro' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		fireEvent.click(await screen.findByRole('button', { name: 'Submit' }))
+		await screen.findByRole('radiogroup')
+		expect(queryByLabel('Notes')).toBeNull()
+		await waitFor(() => expect(document.activeElement).toHaveAttribute('aria-invalid', 'true'))
+		expect(screen.getAllByRole('radio')).toContain(document.activeElement)
+		expect(onSubmit).not.toHaveBeenCalled()
+	})
 })
 
 describe('Focus and accessibility on step transitions', () => {
