@@ -114,4 +114,22 @@ describe('formatCalc', () => {
 		expect(formatCalc(build('*'), labelOf)).toBe('1 × 2')
 		expect(formatCalc(build('/'), labelOf)).toBe('1 ÷ 2')
 	})
+
+	it('maps the modulo glyph', () => {
+		const expr: CalcExpression = {
+			type: 'op',
+			op: '%',
+			left: { type: 'ref', field: 'a' },
+			right: { type: 'ref', field: 'b' },
+		}
+		expect(formatCalc(expr, labelOf)).toBe('A % B')
+	})
+
+	it('parenthesizes a nested negation instead of gluing the minus signs', () => {
+		const expr: CalcExpression = {
+			type: 'neg',
+			operand: { type: 'neg', operand: { type: 'lit', value: 5 } },
+		}
+		expect(formatCalc(expr, labelOf)).toBe('−(−5)')
+	})
 })

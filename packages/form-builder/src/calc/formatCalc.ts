@@ -8,9 +8,13 @@ const OP_GLYPHS: Record<CalcOp, string> = {
 	'%': '%',
 }
 
-const wrap = (child: CalcExpression, labelOf: (field: string) => string): string => {
+const wrap = (
+	child: CalcExpression,
+	labelOf: (field: string) => string,
+	wrapTypes: readonly CalcExpression['type'][] = ['op']
+): string => {
 	const formatted = formatCalc(child, labelOf)
-	return child.type === 'op' ? `(${formatted})` : formatted
+	return wrapTypes.includes(child.type) ? `(${formatted})` : formatted
 }
 
 /** Renders a CalcExpression as a human-readable one-line string for the visual expression builder's live preview. */
@@ -21,7 +25,8 @@ export const formatCalc = (expr: CalcExpression, labelOf: (field: string) => str
 		case 'ref':
 			return labelOf(expr.field)
 		case 'neg':
-			return `−${wrap(expr.operand, labelOf)}`
+			// Parenthesize a nested `neg` operand too, otherwise "-(-5)" glues into the ambiguous "--5".
+			return `−${wrap(expr.operand, labelOf, ['op', 'neg'])}`
 		case 'op':
 			return `${wrap(expr.left, labelOf)} ${OP_GLYPHS[expr.op]} ${wrap(expr.right, labelOf)}`
 		case 'fn':
