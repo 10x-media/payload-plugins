@@ -140,6 +140,7 @@ const operandToAst = (operand: CalcOperand): CalcExpression => {
 	}
 }
 
+/** Folds first + steps only. `finish` is root-only by design: nested chains (groups, fn args) never carry one, so it is deliberately ignored here. */
 const chainBodyToAst = (chain: CalcChain): CalcExpression =>
 	chain.steps.reduce<CalcExpression>(
 		(left, step) => ({ type: 'op', op: step.op, left, right: operandToAst(step.operand) }),
@@ -740,7 +741,9 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 		}
 	}
 
-	const labelOf = (field: string) => siblings.labels[field] ?? field
+	// An unfilled slot (blank ref) previews as "?" so a partial chain reads "Price × ?" instead of
+	// trailing off; formatCalc itself stays pure.
+	const labelOf = (field: string) => (field.trim() === '' ? '?' : (siblings.labels[field] ?? field))
 
 	/** `null` is a valid JSON parse, so failure needs a flag rather than a sentinel value. */
 	const parseDraft = (text: string): { ok: boolean; parsed: unknown } => {

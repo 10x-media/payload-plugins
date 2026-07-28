@@ -178,6 +178,34 @@ describe('chain mapping', () => {
 		}
 	})
 
+	it('round-trips adversarial shapes structurally', () => {
+		const negInRight: CalcExpression = {
+			type: 'op',
+			op: '-',
+			left: { type: 'ref', field: 'price' },
+			right: { type: 'neg', operand: { type: 'ref', field: 'qty' } },
+		}
+		const roundTwoArgs: CalcExpression = {
+			type: 'fn',
+			fn: 'round',
+			args: [
+				{ type: 'lit', value: 1 },
+				{ type: 'lit', value: 2 },
+			],
+		}
+		const fnWithNestedArg: CalcExpression = {
+			type: 'fn',
+			fn: 'max',
+			args: [rightNested, { type: 'lit', value: 0 }],
+		}
+		for (const expr of [negInRight, roundTwoArgs, fnWithNestedArg]) {
+			expect(chainToAst(astToChain(expr))).toEqual(expr)
+		}
+		// A 2-arg round is not unary application; it must stay an fn operand, never a finisher.
+		expect(astToChain(roundTwoArgs).finish).toBeUndefined()
+		expect(astToChain(roundTwoArgs).first.kind).toBe('fn')
+	})
+
 	it('loads a wrapping unary fn as finish but keeps variadic fns as operands', () => {
 		const wrapped = astToChain(quoteTotal)
 		expect(wrapped.finish).toBe('round')
@@ -454,6 +482,18 @@ describe('CalcExpressionBuilder', () => {
 		const empty = container.querySelector('.fb-calc-builder__preview') as HTMLElement
 		expect(empty).toBeTruthy()
 		expect(empty.textContent).toBe('')
+	})
+
+	it('previews unfilled slots as a question mark', () => {
+		setField({
+			type: 'op',
+			op: '*',
+			left: { type: 'ref', field: 'price' },
+			right: { type: 'ref', field: '' },
+		})
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const preview = container.querySelector('.fb-calc-builder__preview') as HTMLElement
+		expect(preview.textContent).toBe('Price × ?')
 	})
 
 	it('rejects invalid JSON with an inline error and applies valid JSON', () => {
