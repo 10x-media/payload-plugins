@@ -99,6 +99,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			pollSourceRegistry,
 			pollTypeRegistry,
 			outcomeFields: options.poll?.outcomeFields,
+			pollVotes: options.poll?.votes === false ? false : (options.poll?.votes ?? {}),
 			buttons: options.buttons,
 			settings: options.settings,
 			response: options.response,
@@ -309,6 +310,7 @@ export type { ResolvePollOptionsArgs } from './poll/resolvePollOptions'
 export { resolvePollOptions } from './poll/resolvePollOptions'
 export type { ResolvePollOutcomeArgs } from './poll/resolvePollOutcome'
 export { resolvePollOutcome } from './poll/resolvePollOutcome'
+export { POLL_VOTES_SLUG, RESPONDENTS_VALUE } from './poll/votes/votesCollection'
 export type { PrefillOptions } from './prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from './prefill/valuesFromSearchParams'
 export { DEFAULT_PRESENTATION_NAME, defaultPresentationDescriptors } from './presentations/defaults'

@@ -289,6 +289,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.collectionFormPlural]: 'Formulare',
 	[keys.collectionSubmissionSingular]: 'Übermittlung',
 	[keys.collectionSubmissionPlural]: 'Übermittlungen',
+	[keys.collectionPollVoteSingular]: 'Umfragestimme',
+	[keys.collectionPollVotePlural]: 'Umfragestimmen',
 	[keys.submissionContext]: 'Kontext',
 	[keys.statusComplete]: 'Vollständig',
 	[keys.statusPartial]: 'Unvollständig',

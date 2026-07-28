@@ -217,6 +217,14 @@ export type FormBuilderPluginOptions = {
 		sources?: PollOptionSourcesConfig
 		types?: PollTypesConfig
 		outcomeFields?: OutcomeFieldsOverride
+		/**
+		 * Poll vote tally store (default on). Votes are counted into an append-only hidden
+		 * collection of aggregate rows at submit time, so results reads are O(options), never
+		 * truncate, and survive `persistSubmissions: false`. `false` restores scan-based results
+		 * (and then a persist-off poll is rejected at save). `overrides` opens the tally
+		 * collection (slug stays `form-poll-votes`).
+		 */
+		votes?: false | { overrides?: CollectionOverrides }
 	}
 	/**
 	 * When `true`, the raw `values`, `descriptors`, and `consent` JSON fields are visible in the

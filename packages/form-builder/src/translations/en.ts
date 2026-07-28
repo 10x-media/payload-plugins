@@ -276,6 +276,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.collectionFormPlural]: 'Forms',
 	[keys.collectionSubmissionSingular]: 'Submission',
 	[keys.collectionSubmissionPlural]: 'Submissions',
+	[keys.collectionPollVoteSingular]: 'Poll vote',
+	[keys.collectionPollVotePlural]: 'Poll votes',
 	[keys.submissionContext]: 'Context',
 	[keys.statusComplete]: 'Complete',
 	[keys.statusPartial]: 'Partial',

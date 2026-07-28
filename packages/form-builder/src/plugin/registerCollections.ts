@@ -18,6 +18,7 @@ import { registerPollCloseTask } from '../poll/closeJob'
 import type { OutcomeFieldsOverride } from '../poll/outcomeFields'
 import type { PollTypeRegistry } from '../poll/pollTypeRegistry'
 import type { PollOptionSourceRegistry } from '../poll/registry'
+import { buildPollVotesCollection } from '../poll/votes/votesCollection'
 import type { ResolvedSpamConfig } from '../spam/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import type { CollectionOverrides } from './collectionOverrides'
@@ -44,6 +45,8 @@ type RegisterCollectionsArgs = {
 	pollSourceRegistry: PollOptionSourceRegistry
 	pollTypeRegistry: PollTypeRegistry
 	outcomeFields?: OutcomeFieldsOverride
+	/** Resolved `poll.votes` option; `false` skips registering the hidden tally collection. */
+	pollVotes: false | { overrides?: CollectionOverrides }
 	buttons?: ButtonsOption
 	settings?: SettingsOption
 	response?: ResponseOption
@@ -76,6 +79,7 @@ export const registerCollections = ({
 	pollSourceRegistry,
 	pollTypeRegistry,
 	outcomeFields,
+	pollVotes,
 	buttons,
 	settings,
 	response,
@@ -135,5 +139,6 @@ export const registerCollections = ({
 			showRawFields: showSubmissionRawFields,
 			overrides: overrides?.formSubmissions,
 		}),
+		...(pollVotes === false ? [] : [buildPollVotesCollection({ overrides: pollVotes.overrides })]),
 	]
 }

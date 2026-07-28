@@ -254,6 +254,8 @@ export const keys = {
 	collectionFormPlural: 'formBuilder:collection.form.plural',
 	collectionSubmissionSingular: 'formBuilder:collection.submission.singular',
 	collectionSubmissionPlural: 'formBuilder:collection.submission.plural',
+	collectionPollVoteSingular: 'formBuilder:collection.pollVote.singular',
+	collectionPollVotePlural: 'formBuilder:collection.pollVote.plural',
 	submissionContext: 'formBuilder:submission.context',
 	statusComplete: 'formBuilder:status.complete',
 	statusPartial: 'formBuilder:status.partial',
