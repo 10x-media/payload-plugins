@@ -1,5 +1,6 @@
 import type { AnyValidationRuleDefinition } from '../types'
 import { emailRule } from './email'
+import { integerRule } from './integer'
 import { matchesFieldRule } from './matchesField'
 import { maxRule } from './max'
 import { maxDateRule } from './maxDate'
@@ -19,6 +20,7 @@ export const defaultValidationRules: AnyValidationRuleDefinition[] = [
 	maxLengthRule as AnyValidationRuleDefinition,
 	minRule as AnyValidationRuleDefinition,
 	maxRule as AnyValidationRuleDefinition,
+	integerRule as AnyValidationRuleDefinition,
 	minDateRule as AnyValidationRuleDefinition,
 	maxDateRule as AnyValidationRuleDefinition,
 	patternRule as AnyValidationRuleDefinition,

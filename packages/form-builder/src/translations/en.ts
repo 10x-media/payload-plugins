@@ -58,6 +58,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.ruleMaxLength]: 'Maximum length',
 	[keys.ruleMin]: 'Minimum',
 	[keys.ruleMax]: 'Maximum',
+	[keys.ruleInteger]: 'Whole number',
 	[keys.ruleMinDate]: 'Earliest date',
 	[keys.ruleMaxDate]: 'Latest date',
 	[keys.rulePattern]: 'Pattern',
@@ -70,6 +71,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.ruleMaxLengthMessage]: 'Must be at most {max} characters',
 	[keys.ruleMinMessage]: 'Must be at least {min}',
 	[keys.ruleMaxMessage]: 'Must be at most {max}',
+	[keys.ruleIntegerMessage]: 'Enter a whole number',
 	[keys.ruleMinDateMessage]: 'Must be on or after {min}',
 	[keys.ruleMaxDateMessage]: 'Must be on or before {max}',
 	[keys.rulePatternMessage]: 'Invalid format',
@@ -84,6 +86,7 @@ export const en: Record<TranslationKey, string> = {
 		'Fails when the entered text is longer than the maximum number of characters.',
 	[keys.ruleMinDescription]: 'Fails when the entered number is below the minimum.',
 	[keys.ruleMaxDescription]: 'Fails when the entered number is above the maximum.',
+	[keys.ruleIntegerDescription]: 'The answer must be a whole number.',
 	[keys.ruleMinDateDescription]: 'Fails when the chosen date is earlier than the minimum date.',
 	[keys.ruleMaxDateDescription]: 'Fails when the chosen date is later than the maximum date.',
 	[keys.rulePatternDescription]:
