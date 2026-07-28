@@ -1,4 +1,5 @@
 import { keys } from '../../translations/keys'
+import { labelFor } from '../../translations/server'
 import { EMAIL_PATTERN } from '../../validation/emailPattern'
 import { defineFormField } from '../defineFormField'
 
@@ -6,6 +7,14 @@ export const emailField = defineFormField<'text'>({
 	type: 'email',
 	label: keys.fieldTypeEmail,
 	value: 'text',
+	advancedConfig: [
+		{
+			name: 'autocomplete',
+			type: 'text',
+			label: labelFor(keys.configAutocomplete),
+			admin: { description: labelFor(keys.configAutocompleteDescription) },
+		},
+	],
 	validate: ({ value, t }) => {
 		if (value == null || value === '') {
 			return true

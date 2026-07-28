@@ -141,6 +141,8 @@ type FieldBlockTabsArgs = {
 	localize?: boolean
 	/** See `FormFieldDefinition.omitShared`: shared basics this type never uses, left unauthored. */
 	omitShared?: readonly OmittableSharedField[]
+	/** See `FormFieldDefinition.advancedConfig`: extra fields appended to the Advanced tab. */
+	advancedConfig?: Field[]
 }
 
 export const fieldBlockTabs = ({
@@ -149,6 +151,7 @@ export const fieldBlockTabs = ({
 	validations,
 	localize = true,
 	omitShared,
+	advancedConfig,
 }: FieldBlockTabsArgs): Field => ({
 	type: 'tabs',
 	tabs: [
@@ -167,7 +170,13 @@ export const fieldBlockTabs = ({
 			label: labelFor(keys.tabAdvanced),
 			fields: [
 				conditionField('visibleWhen', keys.configVisibleWhen, conditionTypes),
-				{ name: 'hidden', type: 'checkbox', label: labelFor(keys.configHidden) },
+				{
+					name: 'hidden',
+					type: 'checkbox',
+					label: labelFor(keys.configHidden),
+					admin: { description: labelFor(keys.configHiddenDescription) },
+				},
+				...(advancedConfig ?? []),
 			],
 		},
 	],

@@ -171,8 +171,23 @@ describe('buildFieldBlocks', () => {
 	})
 
 	it('puts visibleWhen and hidden in the Advanced tab', () => {
+		const number = blocks.find((block) => block.slug === 'number')
+		expect(tabFields(number, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden'])
+	})
+
+	it('appends autocomplete to the text Advanced tab, after visibleWhen and hidden', () => {
 		const text = blocks.find((block) => block.slug === 'text')
-		expect(tabFields(text, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden'])
+		expect(tabFields(text, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden', 'autocomplete'])
+	})
+
+	it('appends autocomplete to the email Advanced tab', () => {
+		const email = blocks.find((block) => block.slug === 'email')
+		expect(tabFields(email, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden', 'autocomplete'])
+	})
+
+	it('leaves types without advancedConfig without an autocomplete field', () => {
+		const number = blocks.find((block) => block.slug === 'number')
+		expect(tabFields(number, 2).map(fieldName)).not.toContain('autocomplete')
 	})
 
 	it('localizes the shared label field by default and not when localize is false', () => {

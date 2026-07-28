@@ -86,6 +86,7 @@ export const buildFieldBlocks = ({
 					},
 					localize,
 					omitShared: definition.omitShared,
+					advancedConfig: definition.advancedConfig,
 				}),
 			],
 		})

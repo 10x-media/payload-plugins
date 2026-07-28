@@ -128,6 +128,11 @@ export const de: Record<TranslationKey, string> = {
 	[keys.conditionTrue]: 'Wahr',
 	[keys.conditionFalse]: 'Falsch',
 	[keys.configHidden]: 'Ausgeblendet (wird erfasst, aber nicht angezeigt)',
+	[keys.configHiddenDescription]:
+		'Versteckte Felder werden weiterhin validiert. Mit einer Sichtbarkeitsbedingung kombinieren, um die Validierung zu überspringen.',
+	[keys.configAutocomplete]: 'Autocomplete',
+	[keys.configAutocompleteDescription]:
+		'Hinweis für das automatische Ausfüllen, z. B. "email" oder "given-name".',
 	[keys.tabFields]: 'Felder',
 	[keys.tabFlow]: 'Ablauf',
 	[keys.tabActions]: 'Aktionen',

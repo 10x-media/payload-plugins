@@ -121,6 +121,10 @@ export const en: Record<TranslationKey, string> = {
 	[keys.conditionTrue]: 'True',
 	[keys.conditionFalse]: 'False',
 	[keys.configHidden]: 'Hidden (capture without showing)',
+	[keys.configHiddenDescription]:
+		'Hidden fields are still validated. Pair with a visibility condition to skip validation.',
+	[keys.configAutocomplete]: 'Autocomplete',
+	[keys.configAutocompleteDescription]: 'Browser autofill hint, e.g. "email" or "given-name".',
 	[keys.tabFields]: 'Fields',
 	[keys.tabFlow]: 'Flow',
 	[keys.tabActions]: 'Actions',

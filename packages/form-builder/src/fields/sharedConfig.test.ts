@@ -1,4 +1,4 @@
-import type { Field, RowField, SelectField, TabsField } from 'payload'
+import type { CheckboxField, Field, RowField, SelectField, TabsField } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { fieldBlockTabs, sharedFieldConfig } from './sharedConfig'
 import type { OmittableSharedField } from './types'
@@ -249,5 +249,28 @@ describe('fieldBlockTabs', () => {
 		const tabs = buildTabs()
 		const hidden = tabFields(tabs, 2).find((f) => 'name' in f && f.name === 'hidden')
 		expect(hidden).toMatchObject({ name: 'hidden', type: 'checkbox' })
+	})
+
+	it('gives hidden a localized description clarifying it is still validated', () => {
+		const tabs = buildTabs()
+		const hidden = tabFields(tabs, 2).find(
+			(f): f is CheckboxField => 'name' in f && f.name === 'hidden'
+		)
+		expect(typeof hidden?.admin?.description).toBe('function')
+	})
+
+	it('leaves the Advanced tab at visibleWhen and hidden when no advancedConfig is given', () => {
+		const tabs = buildTabs()
+		expect(tabFields(tabs, 2).map(nameOf)).toEqual(['visibleWhen', 'hidden'])
+	})
+
+	it('appends advancedConfig to the Advanced tab after visibleWhen and hidden', () => {
+		const tabs = fieldBlockTabs({
+			conditionTypes: sampleConditionTypes,
+			typeConfig: [],
+			validations: { name: 'validations', type: 'blocks', blocks: [] },
+			advancedConfig: [{ name: 'autocomplete', type: 'text' }],
+		}) as TabsField
+		expect(tabFields(tabs, 2).map(nameOf)).toEqual(['visibleWhen', 'hidden', 'autocomplete'])
 	})
 })
