@@ -50,6 +50,8 @@ export type ResolvePollCloseRequestArgs = {
 	formId: number | string | undefined
 	/** Whether the caller is authenticated (an admin/user). */
 	isAuthed: boolean
+	/** Whether the hidden tally store backs the outcome aggregation (see `resolvePollOutcome`). */
+	pollVotesEnabled?: boolean
 	req: PayloadRequest
 }
 
@@ -70,7 +72,7 @@ export type ResolvePollCloseRequestResult = {
 export const resolvePollCloseRequest = async (
 	args: ResolvePollCloseRequestArgs
 ): Promise<ResolvePollCloseRequestResult> => {
-	const { payload, formId, isAuthed, req } = args
+	const { payload, formId, isAuthed, pollVotesEnabled, req } = args
 	if (!isAuthed) {
 		return { status: 403, body: { errors: [{ message: 'Forbidden' }] } }
 	}
@@ -107,7 +109,7 @@ export const resolvePollCloseRequest = async (
 	})
 
 	const winningValues = plan.resolveOutcome
-		? await resolvePollOutcome({ payload, formId, req })
+		? await resolvePollOutcome({ payload, formId, pollVotesEnabled, req })
 		: winnersOf(pollConfigOf(form.poll) ?? {})
 	return { status: 200, body: { closesAt, winningValues } }
 }

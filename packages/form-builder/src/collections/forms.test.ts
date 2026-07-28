@@ -359,3 +359,52 @@ describe('forms /:id/from-addresses endpoint', () => {
 		expect(response.status).toBe(503)
 	})
 })
+
+describe('forms beforeValidate persist-off guard', () => {
+	const hookOf = (pollVotesEnabled?: boolean) => {
+		const collection = buildFormsCollection({
+			registry: resolveFieldTypes(buildDefaultFieldDefinitions(true)),
+			ruleRegistry: resolveValidationRules(defaultValidationRules),
+			pollVotesEnabled,
+		})
+		const hook = collection.hooks?.beforeValidate?.[0]
+		if (!hook) {
+			throw new Error('missing beforeValidate hook')
+		}
+		return hook
+	}
+	const req = { t: (key: string) => key } as unknown as PayloadRequest
+	const data = {
+		pollEnabled: true,
+		persistSubmissions: false,
+		fields: [],
+		poll: { resultsField: 'color' },
+	}
+	const run = (hook: ReturnType<typeof hookOf>, overrides?: Record<string, unknown>) =>
+		hook({ data: { ...data, ...overrides }, req } as never)
+
+	it('refuses a poll form that disables persistSubmissions while the vote store is off', () => {
+		let thrown: unknown
+		try {
+			run(hookOf(false))
+		} catch (error) {
+			thrown = error
+		}
+		expect(thrown).toMatchObject({
+			data: {
+				errors: [
+					{ path: 'persistSubmissions', message: 'formBuilder:poll.needsPersistedSubmissions' },
+				],
+			},
+		})
+	})
+
+	it('allows persist-off polls when the vote store carries the counts', () => {
+		expect(run(hookOf(true))).toBeTruthy()
+	})
+
+	it('leaves persisting poll forms and non-poll persist-off forms alone', () => {
+		expect(run(hookOf(false), { persistSubmissions: true })).toBeTruthy()
+		expect(run(hookOf(false), { pollEnabled: false })).toBeTruthy()
+	})
+})

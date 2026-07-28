@@ -5,6 +5,7 @@ import { type PollFormLike, shouldAutoResolvePoll } from '../poll/closeJob'
 import type { PollOption } from '../poll/definePollOptionSource'
 import { resolveEffectivePollOptions } from '../poll/effectivePollOptions'
 import { resolvePollOutcome } from '../poll/resolvePollOutcome'
+import { aggregateFromVotes } from '../poll/votes/aggregateFromVotes'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateFormResponses, fieldHasOptions } from './aggregateResponses'
 import type { FieldAggregation } from './types'
@@ -40,6 +41,12 @@ export type ResolveResultsRequestArgs = {
 	 * answers as leftover result buckets.
 	 */
 	eligibleTypes?: readonly string[]
+	/**
+	 * Whether the hidden tally store backs poll reads. When true, the poll results field is served
+	 * from `aggregateFromVotes` (anonymous reads, and an authed read naming exactly that field)
+	 * instead of the submission scan; every authorization gate stays identical either way.
+	 */
+	pollVotesEnabled?: boolean
 }
 
 export type ResolveResultsRequestResult = {
@@ -60,6 +67,15 @@ const unavailable: ResolveResultsRequestResult = {
 	body: { errors: [{ message: 'Poll options unavailable' }] },
 }
 
+/** Scan-shape parity for a tally-served field: label from the live instance, else the field name. */
+const tallyMetaOf = (
+	instance: FormFieldInstance | undefined,
+	field: string
+): { label: string; fieldType?: string } => ({
+	label: typeof instance?.label === 'string' && instance.label.length > 0 ? instance.label : field,
+	fieldType: instance?.blockType,
+})
+
 /**
  * Authorize and resolve a poll/survey results request. Authed callers may aggregate any field (or all
  * enumerable fields) and bypass the `access` seam; for a poll-enabled form they also get the results
@@ -78,7 +94,7 @@ const unavailable: ResolveResultsRequestResult = {
 export const resolveFormResultsRequest = async (
 	args: ResolveResultsRequestArgs
 ): Promise<ResolveResultsRequestResult> => {
-	const { payload, formId, field, isAuthed, req, access, eligibleTypes } = args
+	const { payload, formId, field, isAuthed, req, access, eligibleTypes, pollVotesEnabled } = args
 	if (formId == null) {
 		return { status: 400, body: { errors: [{ message: 'Missing form id' }] } }
 	}
@@ -94,7 +110,7 @@ export const resolveFormResultsRequest = async (
 	// it runs on the already-loaded form via overrideAccess and writes only through the outcome hook, so
 	// it cannot relax the anonymous authorization below. A failure degrades silently to the normal path.
 	if (shouldAutoResolvePoll(form as PollFormLike)) {
-		await resolvePollOutcome({ payload, formId, req }).catch(() => undefined)
+		await resolvePollOutcome({ payload, formId, req, pollVotesEnabled }).catch(() => undefined)
 	}
 
 	let fields: string[] | undefined
@@ -120,6 +136,21 @@ export const resolveFormResultsRequest = async (
 			}).catch(() => [])
 			if (options.length > 0) {
 				resolvedOptions = { [resultsField]: options }
+			}
+			// Only the explicit single-field poll read switches to the tally store; an all-fields
+			// (or multi-field) read keeps the scan, which is the only source for non-poll fields.
+			if (pollVotesEnabled === true && field === resultsField) {
+				const instances = Array.isArray(form.fields) ? (form.fields as FormFieldInstance[]) : []
+				const instance = instances.find((entry) => entry.name === resultsField)
+				const aggregation = await aggregateFromVotes({
+					payload,
+					formId,
+					field: resultsField,
+					meta: tallyMetaOf(instance, resultsField),
+					options: resolvedOptions?.[resultsField] ?? [],
+					req,
+				})
+				return { status: 200, body: { results: [aggregation] } }
 			}
 		}
 	} else {
@@ -173,6 +204,17 @@ export const resolveFormResultsRequest = async (
 		}
 		if (options.length === 0) {
 			return forbidden
+		}
+		if (pollVotesEnabled === true) {
+			const aggregation = await aggregateFromVotes({
+				payload,
+				formId,
+				field: publicField,
+				meta: tallyMetaOf(instance, publicField),
+				options,
+				req,
+			})
+			return { status: 200, body: { results: [aggregation] } }
 		}
 		resolvedOptions = { [publicField]: options }
 		fields = [publicField]

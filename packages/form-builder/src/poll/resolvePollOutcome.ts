@@ -4,7 +4,9 @@ import type { FieldAggregation } from '../aggregation/types'
 import { FORMS_SLUG } from '../collections/forms'
 import { pollConfigOf } from '../form/pollState'
 import type { PollOutcomeStrategyArgs } from './definePollType'
+import { resolveEffectivePollOptions } from './effectivePollOptions'
 import { pollTypesOf } from './pollTypeRegistry'
+import { aggregateFromVotes } from './votes/aggregateFromVotes'
 
 export type ResolvePollOutcomeArgs = {
 	payload: Payload
@@ -15,6 +17,12 @@ export type ResolvePollOutcomeArgs = {
 	 * the outcome. Omit to auto-resolve via the poll's selected outcome strategy (`poll.type`).
 	 */
 	winningValues?: string[]
+	/**
+	 * Whether the hidden tally store backs the auto-resolve aggregation (`mostVoted` and any host
+	 * strategy that calls `aggregate()`). False keeps the submission scan, so persist-off forms
+	 * only resolve correctly with the store enabled.
+	 */
+	pollVotesEnabled?: boolean
 	req?: PayloadRequest
 }
 
@@ -45,7 +53,7 @@ const cleanWinners = (value: string[] | undefined): string[] =>
  * auto mode did not decide).
  */
 export const resolvePollOutcome = async (args: ResolvePollOutcomeArgs): Promise<string[]> => {
-	const { payload, formId, req } = args
+	const { payload, formId, pollVotesEnabled, req } = args
 	const form = await payload.findByID({
 		collection: FORMS_SLUG,
 		id: formId,
@@ -75,9 +83,22 @@ export const resolvePollOutcome = async (args: ResolvePollOutcomeArgs): Promise<
 					typeof poll.resultsField === 'string' && poll.resultsField.length > 0
 						? poll.resultsField
 						: undefined
-				aggregated = resultsField
-					? await aggregateFieldResponses({ payload, formId, field: resultsField, req })
-					: null
+				if (!resultsField) {
+					aggregated = null
+				} else if (pollVotesEnabled === true) {
+					// Best-effort options: a source/resolver failure degrades to raw tally values
+					// (the outcome hook still validates winners against the effective options).
+					const options = await resolveEffectivePollOptions({ payload, req, form }).catch(() => [])
+					aggregated = await aggregateFromVotes({
+						payload,
+						formId,
+						field: resultsField,
+						options,
+						req,
+					})
+				} else {
+					aggregated = await aggregateFieldResponses({ payload, formId, field: resultsField, req })
+				}
 			}
 			return aggregated
 		}

@@ -158,6 +158,12 @@ type BuildFormsCollectionArgs = {
 	uploadsCollectionSlug?: string
 	/** Host seam gating anonymous results reads (plugin option `results.access`). */
 	resultsAccess?: FormResultsAccess
+	/**
+	 * Whether the hidden tally store is registered (`poll.votes !== false`). Threads into the poll
+	 * endpoints (tally-backed reads) and, when false, forbids poll forms from disabling
+	 * `persistSubmissions`: with neither store nor submissions there would be nothing to count.
+	 */
+	pollVotesEnabled?: boolean
 	/** Registered poll option sources (plugin option `poll.sources`); empty registry means no source fields. */
 	pollSourceRegistry?: PollOptionSourceRegistry
 	/** Registered poll outcome strategies (`poll.types`); drives the poll `type` select options. Defaults to the built-ins. */
@@ -201,6 +207,7 @@ export const buildFormsCollection = ({
 	richText,
 	uploadsCollectionSlug,
 	resultsAccess,
+	pollVotesEnabled = false,
 	pollSourceRegistry,
 	pollTypeRegistry,
 	outcomeFields,
@@ -298,6 +305,22 @@ export const buildFormsCollection = ({
 			// polls that have no on-form vote field. `buildValidateResultsField` still checks a set value;
 			// this is the enforcer for enabled polls.
 			if (data.pollEnabled === true) {
+				// Without the tally store, pruned submissions would erase every vote: a poll form may
+				// only turn `persistSubmissions` off while the store is registered to carry the counts.
+				if (!pollVotesEnabled && data.persistSubmissions === false) {
+					throw new ValidationError(
+						{
+							collection: FORMS_SLUG,
+							errors: [
+								{
+									path: 'persistSubmissions',
+									message: asTranslate(req.t)(keys.pollNeedsPersistedSubmissions),
+								},
+							],
+						},
+						req.t
+					)
+				}
 				const poll =
 					data.poll != null && typeof data.poll === 'object'
 						? (data.poll as Record<string, unknown>)
@@ -705,6 +728,7 @@ export const buildFormsCollection = ({
 	const defaultEndpoints = buildFormsEndpoints({
 		resultsAccess,
 		pollResultsTypes,
+		pollVotesEnabled,
 		consentSources,
 		fromAddresses,
 		departments,

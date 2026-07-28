@@ -88,8 +88,9 @@ export const registerCollections = ({
 	redirectRelationships,
 	overrides,
 }: RegisterCollectionsArgs): void => {
+	const pollVotesEnabled = pollVotes !== false
 	registerActionsTask(config, actionRegistry, richText)
-	registerPollCloseTask(config)
+	registerPollCloseTask(config, pollVotesEnabled)
 	const hasRunner = Boolean(config.jobs?.autoRun) || hasJobsPlugin
 
 	const uploadSlug = uploads === false ? undefined : uploads.collection
@@ -112,6 +113,7 @@ export const registerCollections = ({
 			richText,
 			uploadsCollectionSlug: uploadSlug,
 			resultsAccess,
+			pollVotesEnabled,
 			pollSourceRegistry,
 			pollTypeRegistry,
 			outcomeFields,

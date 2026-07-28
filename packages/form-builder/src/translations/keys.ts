@@ -197,6 +197,7 @@ export const keys = {
 	pollResultsFieldDescription: 'formBuilder:poll.resultsFieldDescription',
 	pollVoteFieldChoose: 'formBuilder:poll.voteFieldChoose',
 	pollVoteFieldMissing: 'formBuilder:poll.voteFieldMissing',
+	pollNeedsPersistedSubmissions: 'formBuilder:poll.needsPersistedSubmissions',
 	pollResultsVisibility: 'formBuilder:poll.resultsVisibility',
 	pollVisibilityAfterVote: 'formBuilder:poll.visibility.afterVote',
 	pollVisibilityAfterClose: 'formBuilder:poll.visibility.afterClose',

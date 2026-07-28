@@ -227,6 +227,8 @@ export const de: Record<TranslationKey, string> = {
 		'Das Auswahlfeld, dessen Antworten als Stimmen gezählt werden. Wird automatisch gewählt, wenn dein Formular genau ein Auswahlfeld hat. Verwende ein Auswahlfeld, niemals ein Freitext- oder personenbezogenes Feld.',
 	[keys.pollVoteFieldChoose]: 'Wähle das Feld, dessen Antworten als Stimmen zählen.',
 	[keys.pollVoteFieldMissing]: 'Füge ein Auswahlfeld als Abstimmungsfrage hinzu.',
+	[keys.pollNeedsPersistedSubmissions]:
+		'Umfragen benötigen gespeicherte Übermittlungen, solange der Stimmenspeicher deaktiviert ist.',
 	[keys.pollResultsVisibility]: 'Sichtbarkeit der Ergebnisse',
 	[keys.pollVisibilityAfterVote]: 'Nach der Abstimmung',
 	[keys.pollVisibilityAfterClose]: 'Nach Ende der Umfrage',

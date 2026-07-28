@@ -217,6 +217,8 @@ export const en: Record<TranslationKey, string> = {
 		'The choice field whose answers are counted as votes. Auto-selected when your form has one choice field. Use a choice field, never a free-text or PII field.',
 	[keys.pollVoteFieldChoose]: "Choose which field's answers count as votes.",
 	[keys.pollVoteFieldMissing]: 'Add a choice field to use as the poll question.',
+	[keys.pollNeedsPersistedSubmissions]:
+		'Polls need stored submissions while the vote store is disabled.',
 	[keys.pollResultsVisibility]: 'Results visibility',
 	[keys.pollVisibilityAfterVote]: 'After voting',
 	[keys.pollVisibilityAfterClose]: 'After the poll closes',

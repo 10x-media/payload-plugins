@@ -15,6 +15,8 @@ type FormsEndpointDeps = {
 	resultsAccess?: FormResultsAccess
 	/** The poll-eligible field-type names; the `/:id/results` endpoint restricts reads to these. */
 	pollResultsTypes: string[]
+	/** Whether the hidden tally store backs poll reads and the close endpoint's outcome aggregation. */
+	pollVotesEnabled: boolean
 	/** The plugin `consent.sources` option; present registers the `/:id/consent-sources` endpoint. */
 	consentSources?: ConsentSourcesResolver
 	/** The plugin `email.fromAddresses` option; present registers the `/:id/from-addresses` endpoint. */
@@ -33,6 +35,7 @@ type FormsEndpointDeps = {
 export const buildFormsEndpoints = ({
 	resultsAccess,
 	pollResultsTypes,
+	pollVotesEnabled,
 	consentSources,
 	fromAddresses,
 	departments,
@@ -50,6 +53,7 @@ export const buildFormsEndpoints = ({
 				req,
 				access: resultsAccess,
 				eligibleTypes: pollResultsTypes,
+				pollVotesEnabled,
 			})
 			return Response.json(body, { status })
 		},
@@ -77,6 +81,7 @@ export const buildFormsEndpoints = ({
 				payload: req.payload,
 				formId: req.routeParams?.id as number | string | undefined,
 				isAuthed: Boolean(req.user),
+				pollVotesEnabled,
 				req,
 			})
 			return Response.json(body, { status })
