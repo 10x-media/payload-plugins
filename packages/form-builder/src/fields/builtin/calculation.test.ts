@@ -71,26 +71,25 @@ describe('calculationField expression config', () => {
 		expect(JSON.stringify(generated)).not.toContain('$ref')
 	})
 
-	it('renders a description that keeps JSON braces intact through Payload-style t()', () => {
+	it('renders the description through Payload-style t()', () => {
 		const translations: Record<string, string> = {
 			[keys.configExpressionDescription]: en[keys.configExpressionDescription],
 		}
-		// Mirrors Payload's real t(): only interpolates {{double curly}} vars, and only when
-		// called with a vars object. labelFor never passes vars, so single-brace JSON is untouched.
-		const fakeT = (key: string, vars?: Record<string, unknown>): string => {
-			let value = translations[key] ?? key
-			if (vars) {
-				value = value.replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
-					const v = vars[name.trim()]
-					return v !== undefined && v !== null ? String(v) : match
-				})
-			}
-			return value
-		}
+		const fakeT = (key: string): string => translations[key] ?? key
 
 		const rendered = expressionField?.admin?.description?.({ t: fakeT })
 		expect(rendered).toBe(en[keys.configExpressionDescription])
-		expect(rendered).toContain('{"type":"op"')
-		expect(rendered).toContain('"value":10}}')
+	})
+
+	it('mounts the visual expression builder with the description key', () => {
+		const admin = expressionField?.admin as
+			| { components?: { Field?: { path?: string; clientProps?: Record<string, unknown> } } }
+			| undefined
+		expect(admin?.components?.Field?.path).toBe(
+			'@10x-media/form-builder/client#CalcExpressionBuilder'
+		)
+		expect(admin?.components?.Field?.clientProps).toEqual({
+			descriptionKey: keys.configExpressionDescription,
+		})
 	})
 })

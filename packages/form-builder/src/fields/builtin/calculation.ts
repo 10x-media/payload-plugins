@@ -113,7 +113,15 @@ export const calculationField = defineFormField<'number'>({
 			name: 'expression',
 			type: 'json',
 			label: labelFor(keys.configExpression),
-			admin: { description: labelFor(keys.configExpressionDescription) },
+			admin: {
+				description: labelFor(keys.configExpressionDescription),
+				components: {
+					Field: {
+						path: '@10x-media/form-builder/client#CalcExpressionBuilder',
+						clientProps: { descriptionKey: keys.configExpressionDescription },
+					},
+				},
+			},
 			jsonSchema: calcExpressionSchema,
 			// generate:types embeds jsonSchema.schema into the config-level schema, where its
 			// document-root-relative $refs cannot resolve; hand type generation a flat shape instead.

@@ -1,6 +1,7 @@
 'use client'
 
 export { ByteSizeField } from '../client/ByteSizeField'
+export { CalcExpressionBuilder } from '../client/CalcExpressionBuilder'
 export { ClosePollButton } from '../client/ClosePollButton'
 export { CondensedArray } from '../client/CondensedArray'
 export { ConsentBlockLabel } from '../client/ConsentBlockLabel'
