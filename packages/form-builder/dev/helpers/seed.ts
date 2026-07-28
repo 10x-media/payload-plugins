@@ -516,8 +516,20 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	// the order here is load-bearing.
 	await ensureForm(payload, 'Project Quote', {
 		fields: [
-			{ blockType: 'number', name: 'hours', label: 'Estimated hours', required: true, width: 'half' },
-			{ blockType: 'number', name: 'rate', label: 'Hourly rate (EUR)', required: true, width: 'half' },
+			{
+				blockType: 'number',
+				name: 'hours',
+				label: 'Estimated hours',
+				required: true,
+				width: 'half',
+			},
+			{
+				blockType: 'number',
+				name: 'rate',
+				label: 'Hourly rate (EUR)',
+				required: true,
+				width: 'half',
+			},
 			{
 				blockType: 'select',
 				name: 'priority',
