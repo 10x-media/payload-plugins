@@ -80,15 +80,14 @@ const baseSharedFieldConfig = (localize: boolean): Field[] => [
 			{
 				name: 'width',
 				type: 'select',
-				required: true,
 				defaultValue: 'full',
 				label: labelFor(keys.configWidth),
 				admin: { width: '50%', isClearable: false },
 				options: [
-					{ label: 'Full', value: 'full' },
-					{ label: 'Half', value: 'half' },
-					{ label: 'Third', value: 'third' },
-					{ label: 'Two thirds', value: 'twoThirds' },
+					{ label: labelFor(keys.widthFull), value: 'full' },
+					{ label: labelFor(keys.widthHalf), value: 'half' },
+					{ label: labelFor(keys.widthThird), value: 'third' },
+					{ label: labelFor(keys.widthTwoThirds), value: 'twoThirds' },
 				],
 			},
 			{

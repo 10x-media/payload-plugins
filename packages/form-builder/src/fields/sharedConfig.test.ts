@@ -1,4 +1,4 @@
-import type { Field, TabsField } from 'payload'
+import type { Field, RowField, SelectField, TabsField } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { fieldBlockTabs, sharedFieldConfig } from './sharedConfig'
 import type { OmittableSharedField } from './types'
@@ -68,11 +68,27 @@ describe('sharedFieldConfig', () => {
 		expect(name && 'required' in name && name.required).toBe(true)
 	})
 
-	it('makes width required and not clearable', () => {
+	it('makes width optional, not clearable, defaulting to full', () => {
 		const width = findNamed(sharedFieldConfig(), 'width')
-		expect(width && 'required' in width && width.required).toBe(true)
+		expect(width && 'required' in width ? width.required : undefined).toBeUndefined()
 		expect(width?.admin && 'isClearable' in width.admin && width.admin.isClearable).toBe(false)
 		expect(width && 'defaultValue' in width && width.defaultValue).toBe('full')
+	})
+
+	it('width is optional with a full default and localized option labels', () => {
+		const fields = sharedFieldConfig(true)
+		const widthRow = fields.find(
+			(field) => field.type === 'row' && field.fields.some((f) => 'name' in f && f.name === 'width')
+		)
+		const width = (widthRow as RowField).fields.find(
+			(f): f is SelectField => 'name' in f && f.name === 'width'
+		)
+		expect(width?.required).toBeUndefined()
+		expect(width?.defaultValue).toBe('full')
+		expect(width?.admin?.isClearable).toBe(false)
+		for (const option of width?.options ?? []) {
+			expect(typeof option === 'object' && typeof option.label === 'function').toBe(true)
+		}
 	})
 
 	it('localizes content fields by default and never identifiers or flags', () => {

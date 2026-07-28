@@ -157,10 +157,10 @@ describe('buildFieldBlocks', () => {
 		expect(widthRow.fields[0]?.admin).not.toHaveProperty('width')
 	})
 
-	it('makes the width select required and not clearable', () => {
+	it('makes the width select optional and not clearable', () => {
 		const text = blocks.find((block) => block.slug === 'text')
 		const width = flatTabFields(text, 0).find((f) => 'name' in f && f.name === 'width')
-		expect(width && 'required' in width && width.required).toBe(true)
+		expect(width && 'required' in width ? width.required : undefined).toBeUndefined()
 		expect(width?.admin && 'isClearable' in width.admin && width.admin.isClearable).toBe(false)
 	})
 
