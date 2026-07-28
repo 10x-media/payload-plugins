@@ -57,11 +57,12 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 			data: { form: formId, values: [{ field: 'vote', value }] },
 		})
 
-	// Two transactions racing to $inc-upsert the exact same tally document can hit Mongo's
-	// WriteConflict (code 112, labelled TransientTransactionError): the loser's whole transaction
-	// aborts, since bumpPollVote's session-joined write cannot retry a transaction that Mongo has
-	// already killed. Per MongoDB's own contract, retrying the *whole* operation is the caller's
-	// job; Postgres never hits this (its ON CONFLICT DO UPDATE serializes via a row lock instead).
+	// Sharded tallies (VOTE_SHARDS) make same-document transactional writes rare, but two
+	// transactions can still pick the same shard: Mongo then aborts one (WriteConflict, labelled
+	// TransientTransactionError) and the losing submission rolls back whole, so counts stay
+	// consistent either way. This minimal retry (transient-only, max 2 attempts) mirrors what a
+	// real client does: the visitor's browser resubmits the failed vote. Postgres never needs it
+	// (ON CONFLICT DO UPDATE serializes via a row lock instead of aborting).
 	const isTransientConflict = (error: unknown): boolean =>
 		Array.isArray((error as { errorLabels?: unknown })?.errorLabels) &&
 		(error as { errorLabels: string[] }).errorLabels.includes('TransientTransactionError')
@@ -87,15 +88,18 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 		return docs as VoteRow[]
 	}
 
-	const countOf = (rows: VoteRow[], value: string): number | undefined =>
-		rows.find((row) => row.value === value)?.count as number | undefined
+	// Tally rows are sharded, so any per-value assertion must sum across the value's shard rows.
+	const sumByValue = (rows: VoteRow[], value: string): number =>
+		rows
+			.filter((row) => row.value === value)
+			.reduce((sum, row) => sum + (typeof row.count === 'number' ? row.count : 0), 0)
 
 	it('counts a completed submission into tally rows including respondents', async () => {
 		const form = await makeForm()
 		await vote(form.id, 'a')
 		const rows = await tallyRows(form.id)
-		expect(countOf(rows, 'a')).toBe(1)
-		expect(countOf(rows, RESPONDENTS_VALUE)).toBe(1)
+		expect(sumByValue(rows, 'a')).toBe(1)
+		expect(sumByValue(rows, RESPONDENTS_VALUE)).toBe(1)
 	})
 
 	it('does not double count a re-saved complete submission', async () => {
@@ -107,8 +111,8 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 			data: { locale: 'de' },
 		})
 		const rows = await tallyRows(form.id)
-		expect(countOf(rows, 'a')).toBe(1)
-		expect(countOf(rows, RESPONDENTS_VALUE)).toBe(1)
+		expect(sumByValue(rows, 'a')).toBe(1)
+		expect(sumByValue(rows, RESPONDENTS_VALUE)).toBe(1)
 	})
 
 	it('counts an update transitioning partial to complete once', async () => {
@@ -129,8 +133,8 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 			data: { status: 'complete' },
 		})
 		const rows = await tallyRows(form.id)
-		expect(countOf(rows, 'a')).toBe(1)
-		expect(countOf(rows, RESPONDENTS_VALUE)).toBe(1)
+		expect(sumByValue(rows, 'a')).toBe(1)
+		expect(sumByValue(rows, RESPONDENTS_VALUE)).toBe(1)
 	})
 
 	it('keeps votes when the submission is pruned', async () => {
@@ -142,8 +146,8 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 		expect(found).toBeNull()
 
 		const rows = await tallyRows(form.id)
-		expect(countOf(rows, 'a')).toBe(1)
-		expect(countOf(rows, RESPONDENTS_VALUE)).toBe(1)
+		expect(sumByValue(rows, 'a')).toBe(1)
+		expect(sumByValue(rows, RESPONDENTS_VALUE)).toBe(1)
 	})
 
 	it('keeps votes when a submission is deleted by an admin', async () => {
@@ -151,8 +155,8 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 		const submission = await vote(form.id, 'a')
 		await booted.payload.delete({ collection: 'form-submissions', id: submission.id })
 		const rows = await tallyRows(form.id)
-		expect(countOf(rows, 'a')).toBe(1)
-		expect(countOf(rows, RESPONDENTS_VALUE)).toBe(1)
+		expect(sumByValue(rows, 'a')).toBe(1)
+		expect(sumByValue(rows, RESPONDENTS_VALUE)).toBe(1)
 	})
 
 	it('serves results from tallies with zero-seeded buckets and exact totals', async () => {
@@ -209,20 +213,28 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 			data: { count: 999 },
 			overrideAccess: true,
 		})
-		expect(countOf(await tallyRows(form.id), 'a')).toBe(999)
+		// The two bumps may sit on one or two shard rows; only one row was drifted to 999.
+		const drifted = sumByValue(before, 'a') - (row.count as number) + 999
+		expect(sumByValue(await tallyRows(form.id), 'a')).toBe(drifted)
 
 		await recountPollVotes({ payload: booted.payload, formId: form.id })
 		const after = await tallyRows(form.id)
-		expect(countOf(after, 'a')).toBe(2)
-		expect(countOf(after, RESPONDENTS_VALUE)).toBe(2)
+		expect(sumByValue(after, 'a')).toBe(2)
+		expect(sumByValue(after, RESPONDENTS_VALUE)).toBe(2)
 	})
 
-	it('two concurrent submissions both count', async () => {
+	it('concurrent submissions all count across shard rows', async () => {
 		const form = await makeForm()
-		await Promise.all([voteRetrying(form.id, 'a'), voteRetrying(form.id, 'a')])
+		await Promise.all([
+			voteRetrying(form.id, 'a'),
+			voteRetrying(form.id, 'a'),
+			voteRetrying(form.id, 'b'),
+			voteRetrying(form.id, 'a'),
+		])
 		const rows = await tallyRows(form.id)
-		expect(countOf(rows, 'a')).toBe(2)
-		expect(countOf(rows, RESPONDENTS_VALUE)).toBe(2)
+		expect(sumByValue(rows, 'a')).toBe(3)
+		expect(sumByValue(rows, 'b')).toBe(1)
+		expect(sumByValue(rows, RESPONDENTS_VALUE)).toBe(4)
 	})
 })
 

@@ -1,7 +1,12 @@
 import type { Field } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { isLoggedIn } from '../../plugin/access'
-import { buildPollVotesCollection, POLL_VOTES_SLUG, RESPONDENTS_VALUE } from './votesCollection'
+import {
+	buildPollVotesCollection,
+	POLL_VOTES_SLUG,
+	RESPONDENTS_VALUE,
+	VOTE_SHARDS,
+} from './votesCollection'
 
 const fieldNamed = (fields: Field[], name: string) =>
 	fields.find((field) => 'name' in field && field.name === name)
@@ -18,7 +23,7 @@ describe('buildPollVotesCollection', () => {
 		expect(collection.admin?.hidden).toBe(true)
 	})
 
-	it('defines form, field, value, and count fields', () => {
+	it('defines form, field, value, shard, and count fields', () => {
 		const collection = buildPollVotesCollection({})
 		const form = fieldNamed(collection.fields, 'form')
 		expect(form?.type).toBe('text')
@@ -32,15 +37,26 @@ describe('buildPollVotesCollection', () => {
 		const value = fieldNamed(collection.fields, 'value')
 		expect(value?.type).toBe('text')
 
+		const shard = fieldNamed(collection.fields, 'shard')
+		expect(shard?.type).toBe('number')
+		expect((shard as Extract<Field, { type: 'number' }>)?.required).toBe(true)
+		expect((shard as Extract<Field, { type: 'number' }>)?.defaultValue).toBe(0)
+
 		const count = fieldNamed(collection.fields, 'count')
 		expect(count?.type).toBe('number')
 		expect((count as Extract<Field, { type: 'number' }>)?.required).toBe(true)
 		expect((count as Extract<Field, { type: 'number' }>)?.defaultValue).toBe(0)
 	})
 
-	it('has a unique compound index over form, field, value', () => {
+	it('has a unique compound index over form, field, value, shard', () => {
 		const collection = buildPollVotesCollection({})
-		expect(collection.indexes).toEqual([{ fields: ['form', 'field', 'value'], unique: true }])
+		expect(collection.indexes).toEqual([
+			{ fields: ['form', 'field', 'value', 'shard'], unique: true },
+		])
+	})
+
+	it('exports the shard count', () => {
+		expect(VOTE_SHARDS).toBe(8)
 	})
 
 	it('gates reads behind isLoggedIn', () => {

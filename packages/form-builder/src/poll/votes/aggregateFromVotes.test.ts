@@ -98,6 +98,22 @@ describe('aggregateFromVotes', () => {
 		expect(result.buckets[1]?.percentage).toBe(57.1)
 	})
 
+	it('sums counts across shard rows for the same value and for respondents', async () => {
+		find.mockResolvedValue({
+			docs: [
+				row('red', 2),
+				row('red', 3),
+				row('blue', 1),
+				row(RESPONDENTS_VALUE, 4),
+				row(RESPONDENTS_VALUE, 2),
+			],
+		})
+		const result = await aggregateFromVotes({ payload, formId: 'f1', field: 'color', options })
+		expect(result.total).toBe(6)
+		expect(result.buckets[0]).toMatchObject({ value: 'red', count: 5 })
+		expect(result.buckets[1]).toMatchObject({ value: 'blue', count: 1 })
+	})
+
 	it('is never truncated', async () => {
 		find.mockResolvedValue({ docs: [row('red', 99999), row(RESPONDENTS_VALUE, 99999)] })
 		const result = await aggregateFromVotes({ payload, formId: 'f1', field: 'color', options })

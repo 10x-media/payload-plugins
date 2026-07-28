@@ -1,5 +1,5 @@
 import type { Payload } from 'payload'
-import { POLL_VOTES_SLUG } from './votesCollection'
+import { POLL_VOTES_SLUG, VOTE_SHARDS } from './votesCollection'
 
 const PG_TABLE_KEY = 'form_poll_votes'
 
@@ -30,12 +30,18 @@ type PgDb = {
  * Atomically bumps one (form, field, value) tally by `by` in a single upsert-increment
  * statement (Mongo `$inc` + upsert, Postgres `INSERT ... ON CONFLICT DO UPDATE`); the unique
  * compound index makes concurrent bumps for the same key safe without read-modify-write races.
+ * The shard column is internal: transactional Mongo bumps pick a random shard in
+ * [0, VOTE_SHARDS) so concurrent transactions rarely write the same document (see VOTE_SHARDS);
+ * Postgres and non-transactional Mongo always bump shard 0. Readers sum across shards.
  *
  * When `transactionID` names an open Payload transaction, the write joins it: a bump failure
  * thrown from the submission hook rolls back the submission create (no undercount), and an
- * aborted create rolls back the joined bump (no overcount). Without a transaction (e.g. Mongo
- * with transactions disabled) the write lands on the root handle immediately; a later recount
- * from stored submissions is the healer for any drift that window allows.
+ * aborted create rolls back the joined bump (no overcount). Residual risk on transactional
+ * Mongo: two concurrent bumps that land on the same shard still abort one transaction
+ * (WriteConflict, labelled TransientTransactionError); the losing submission rolls back whole,
+ * so counts stay consistent and the client can safely resubmit. Without a transaction (e.g.
+ * Mongo with transactions disabled) the write lands on the root handle immediately; a later
+ * recount from stored submissions is the healer for any drift that window allows.
  */
 // biome-ignore lint/complexity/useMaxParams: write primitive signature (payload, key, by, transactionID)
 export async function bumpPollVote(
@@ -49,17 +55,19 @@ export async function bumpPollVote(
 		const model = db.collections[POLL_VOTES_SLUG]
 		if (!model) throw new Error(`form-builder: mongoose collection "${POLL_VOTES_SLUG}" not found`)
 		const session = transactionID !== undefined ? db.sessions?.[transactionID] : undefined
-		const update = { $inc: { count: by }, $setOnInsert: key }
+		const shard = session ? Math.floor(Math.random() * VOTE_SHARDS) : 0
+		const shardedKey = { ...key, shard }
+		const update = { $inc: { count: by }, $setOnInsert: shardedKey }
 		const options = session ? { upsert: true, session } : { upsert: true }
 		try {
-			await model.collection.updateOne(key, update, options)
+			await model.collection.updateOne(shardedKey, update, options)
 		} catch (error) {
 			// Concurrent first inserts for a new key can race the upsert into E11000; outside a
 			// transaction the row now exists, so one retry takes the $inc branch. Inside a
 			// transaction the error propagates and Payload's rollback/retry semantics apply.
 			const duplicate = (error as { code?: unknown } | null)?.code === 11000
 			if (session || !duplicate) throw error
-			await model.collection.updateOne(key, update, options)
+			await model.collection.updateOne(shardedKey, update, options)
 		}
 		return
 	}
@@ -72,9 +80,9 @@ export async function bumpPollVote(
 	const txn = transactionID !== undefined ? db.sessions?.[transactionID]?.db : undefined
 	await (txn ?? db.drizzle)
 		.insert(table)
-		.values({ ...key, count: by })
+		.values({ ...key, shard: 0, count: by })
 		.onConflictDoUpdate({
-			target: [table.form, table.field, table.value],
+			target: [table.form, table.field, table.value, table.shard],
 			set: { count: sql`${table.count} + ${by}` },
 		})
 }

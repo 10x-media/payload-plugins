@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { bumpPollVote } from './bumpPollVote'
-import { POLL_VOTES_SLUG } from './votesCollection'
+import { POLL_VOTES_SLUG, VOTE_SHARDS } from './votesCollection'
 
 vi.mock('@payloadcms/db-postgres', () => ({
 	sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ sql: strings, values }),
@@ -41,6 +41,7 @@ const pgTable = {
 	form: { column: 'form' },
 	field: { column: 'field' },
 	value: { column: 'value' },
+	shard: { column: 'shard' },
 	count: { column: 'count' },
 }
 
@@ -65,18 +66,36 @@ describe('bumpPollVote', () => {
 		vi.clearAllMocks()
 	})
 
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	describe('mongoose', () => {
-		it('upserts with $inc and $setOnInsert joined to the matching session', async () => {
+		it('upserts a random shard row with $inc and $setOnInsert joined to the matching session', async () => {
+			vi.spyOn(Math, 'random').mockReturnValue(0.5)
 			const session = { id: 'client-session' }
 			const { payload, updateOne } = makeMongoPayload({ sessions: { 'txn-1': session } })
 
 			await bumpPollVote(payload, key, 2, 'txn-1')
 
 			expect(updateOne).toHaveBeenCalledWith(
-				key,
-				{ $inc: { count: 2 }, $setOnInsert: key },
+				{ ...key, shard: 4 },
+				{ $inc: { count: 2 }, $setOnInsert: { ...key, shard: 4 } },
 				{ upsert: true, session }
 			)
+		})
+
+		it('keeps the session-path shard within [0, VOTE_SHARDS)', async () => {
+			const session = {}
+			const { payload, updateOne } = makeMongoPayload({ sessions: { 'txn-1': session } })
+
+			vi.spyOn(Math, 'random').mockReturnValue(0)
+			await bumpPollVote(payload, key, 1, 'txn-1')
+			expect(updateOne.mock.calls[0]?.[0]).toEqual({ ...key, shard: 0 })
+
+			vi.spyOn(Math, 'random').mockReturnValue(0.999999)
+			await bumpPollVote(payload, key, 1, 'txn-1')
+			expect(updateOne.mock.calls[1]?.[0]).toEqual({ ...key, shard: VOTE_SHARDS - 1 })
 		})
 
 		it('joins the session when the transaction id is numeric', async () => {
@@ -85,35 +104,44 @@ describe('bumpPollVote', () => {
 
 			await bumpPollVote(payload, key, 1, 7)
 
-			expect(updateOne).toHaveBeenCalledWith(key, expect.anything(), {
-				upsert: true,
-				session,
-			})
+			expect(updateOne).toHaveBeenCalledWith(
+				{ ...key, shard: expect.any(Number) },
+				expect.anything(),
+				{ upsert: true, session }
+			)
 		})
 
-		it('omits session when no transaction id is given', async () => {
+		it('uses shard 0 and omits session when no transaction id is given', async () => {
 			const { payload, updateOne } = makeMongoPayload({ sessions: { 'txn-1': {} } })
 
 			await bumpPollVote(payload, key, 1)
 
-			expect(updateOne).toHaveBeenCalledWith(key, expect.anything(), { upsert: true })
+			expect(updateOne).toHaveBeenCalledWith(
+				{ ...key, shard: 0 },
+				{ $inc: { count: 1 }, $setOnInsert: { ...key, shard: 0 } },
+				{ upsert: true }
+			)
 			expect(updateOne.mock.calls[0]?.[2]).not.toHaveProperty('session')
 		})
 
-		it('omits session when the transaction id has no session', async () => {
+		it('uses shard 0 and omits session when the transaction id has no session', async () => {
 			const { payload, updateOne } = makeMongoPayload({ sessions: {} })
 
 			await bumpPollVote(payload, key, 1, 'unknown-txn')
 
-			expect(updateOne).toHaveBeenCalledWith(key, expect.anything(), { upsert: true })
+			expect(updateOne).toHaveBeenCalledWith({ ...key, shard: 0 }, expect.anything(), {
+				upsert: true,
+			})
 		})
 
-		it('omits session when the adapter has no sessions map', async () => {
+		it('uses shard 0 and omits session when the adapter has no sessions map', async () => {
 			const { payload, updateOne } = makeMongoPayload()
 
 			await bumpPollVote(payload, key, 1, 'txn-1')
 
-			expect(updateOne).toHaveBeenCalledWith(key, expect.anything(), { upsert: true })
+			expect(updateOne).toHaveBeenCalledWith({ ...key, shard: 0 }, expect.anything(), {
+				upsert: true,
+			})
 		})
 
 		it('retries once and resolves when a first-insert race duplicates the key without a session', async () => {
@@ -126,8 +154,8 @@ describe('bumpPollVote', () => {
 
 			expect(updateOne).toHaveBeenCalledTimes(2)
 			expect(updateOne.mock.calls[1]).toEqual([
-				key,
-				{ $inc: { count: 1 }, $setOnInsert: key },
+				{ ...key, shard: 0 },
+				{ $inc: { count: 1 }, $setOnInsert: { ...key, shard: 0 } },
 				{ upsert: true },
 			])
 		})
@@ -157,7 +185,7 @@ describe('bumpPollVote', () => {
 	})
 
 	describe('postgres', () => {
-		it('inserts on the transaction drizzle with onConflictDoUpdate increment', async () => {
+		it('inserts shard 0 on the transaction drizzle with onConflictDoUpdate increment', async () => {
 			const txn = makeInsertChain()
 			const { payload, root } = makePgPayload({
 				sessions: { 'txn-1': { db: { insert: txn.insert } } },
@@ -167,9 +195,9 @@ describe('bumpPollVote', () => {
 
 			expect(root.insert).not.toHaveBeenCalled()
 			expect(txn.insert).toHaveBeenCalledWith(pgTable)
-			expect(txn.values).toHaveBeenCalledWith({ ...key, count: 3 })
+			expect(txn.values).toHaveBeenCalledWith({ ...key, shard: 0, count: 3 })
 			expect(txn.onConflictDoUpdate).toHaveBeenCalledWith({
-				target: [pgTable.form, pgTable.field, pgTable.value],
+				target: [pgTable.form, pgTable.field, pgTable.value, pgTable.shard],
 				set: { count: expect.objectContaining({ values: [pgTable.count, 3] }) },
 			})
 		})
@@ -190,7 +218,7 @@ describe('bumpPollVote', () => {
 			await bumpPollVote(payload, key, 1)
 
 			expect(root.insert).toHaveBeenCalledWith(pgTable)
-			expect(root.values).toHaveBeenCalledWith({ ...key, count: 1 })
+			expect(root.values).toHaveBeenCalledWith({ ...key, shard: 0, count: 1 })
 		})
 
 		it('falls back to the root drizzle for an unknown transaction id', async () => {
