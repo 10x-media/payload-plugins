@@ -13,8 +13,9 @@ const RECOUNT_MAX_SUBMISSIONS = 100_000
  * changes, or backfill after enabling a poll late). Scans first and refuses a truncated
  * aggregation, then deletes the form's tally rows for the results field and replays the scan
  * into fresh rows, so the store is never left holding a knowingly partial count. Writes join
- * the request's transaction when one is open. For persist-off forms the tally is the source of
- * truth and there is nothing to rebuild.
+ * the request's transaction when one is open. Refuses a form with `persistSubmissions` off:
+ * its submissions are pruned, so the tally store is the only record of its votes and a rebuild
+ * would wipe them.
  */
 export const recountPollVotes = async (args: {
 	payload: Payload
@@ -32,6 +33,11 @@ export const recountPollVotes = async (args: {
 			: undefined
 	if (!resultsField) {
 		return
+	}
+	if (form?.persistSubmissions === false) {
+		throw new Error(
+			`form-builder: recountPollVotes cannot rebuild form "${String(formId)}": it does not persist submissions, so the tally store is the only record of its votes.`
+		)
 	}
 	const aggregation = await aggregateFieldResponses({
 		payload,

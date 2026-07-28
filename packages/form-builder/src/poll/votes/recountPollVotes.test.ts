@@ -107,6 +107,21 @@ describe('recountPollVotes', () => {
 		expect(values).not.toContain('green')
 	})
 
+	it('refuses a persist-off form before any mutation: the tally store is the only vote record', async () => {
+		findByID.mockResolvedValue({
+			id: 'f1',
+			pollEnabled: true,
+			persistSubmissions: false,
+			poll: { resultsField: 'color' },
+		})
+		await expect(recountPollVotes({ payload, formId: 'f1' })).rejects.toThrow(
+			/does not persist submissions/
+		)
+		expect(aggregateFieldResponses).not.toHaveBeenCalled()
+		expect(deleteMock).not.toHaveBeenCalled()
+		expect(bumpPollVote).not.toHaveBeenCalled()
+	})
+
 	it('refuses a truncated scan before touching the store, naming the cap', async () => {
 		aggregateFieldResponses.mockResolvedValue(
 			aggregation(100_000, [{ value: 'red', count: 100_000 }], true)
