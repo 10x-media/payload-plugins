@@ -2,7 +2,6 @@
 
 import {
 	Button,
-	FieldDescription,
 	FieldError,
 	FieldLabel,
 	ReactSelect,
@@ -24,10 +23,8 @@ import './admin.css'
 
 export type CalcExpressionBuilderProps = {
 	path?: string
-	field?: { label?: unknown; admin?: { description?: unknown } }
+	field?: { label?: unknown }
 	readOnly?: boolean
-	/** Field description as a translation key; `admin.description` functions are dropped from client fields. */
-	descriptionKey?: TranslationKey
 }
 
 /**
@@ -75,8 +72,6 @@ const seedAst = (kind: StartKind): CalcExpression => {
 			return { type: 'fn', fn: 'min', args: [{ type: 'lit', value: 0 }] }
 	}
 }
-
-const emptyChain = (): CalcChain => ({ first: seedOperand('ref'), steps: [] })
 
 const astToOperand = (node: CalcExpression): CalcOperand => {
 	switch (node.type) {
@@ -221,9 +216,6 @@ const withStored = (options: ChoiceOption[], stored: string): ChoiceOption[] =>
 		? [...options, { label: stored, value: stored }]
 		: options
 
-const sameExpression = (a: CalcExpression | undefined, b: CalcExpression | undefined): boolean =>
-	JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
-
 type NumberInputProps = {
 	value: number | undefined
 	onCommit: (value: number) => void
@@ -307,7 +299,6 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 				<ChainEditor
 					chain={operand.chain}
 					onChange={(chain) => onChange({ ...operand, chain })}
-					onEmptied={() => onChange({ ...operand, chain: emptyChain() })}
 					ctx={ctx}
 					idPrefix={`${idPrefix}-g`}
 				/>
@@ -348,12 +339,6 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 										onChange({
 											...operand,
 											args: operand.args.map((a, i) => (i === index ? next : a)),
-										})
-									}
-									onEmptied={() =>
-										onChange({
-											...operand,
-											args: operand.args.map((a, i) => (i === index ? emptyChain() : a)),
 										})
 									}
 									ctx={ctx}
@@ -547,20 +532,26 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 type ChainEditorProps = {
 	chain: CalcChain
 	onChange: (next: CalcChain) => void
-	/** Called when the chain's only row is removed: the root clears the expression, nested slots reseed. */
-	onEmptied: () => void
+	/** Root only: called when the only row is removed, clearing the expression back to Start with. */
+	onEmptied?: () => void
+	/**
+	 * Honest-affordance rule: an X must actually remove. The root's only-row X clears the whole
+	 * expression, so it stays; a nested chain's only row (fn arg, group) would merely reseed, so
+	 * its X is not rendered at all.
+	 */
+	isRoot?: boolean
 	ctx: BuilderCtx
 	idPrefix: string
 }
 
-const ChainEditor = ({ chain, onChange, onEmptied, ctx, idPrefix }: ChainEditorProps) => {
+const ChainEditor = ({ chain, onChange, onEmptied, isRoot, ctx, idPrefix }: ChainEditorProps) => {
 	const { t, readOnly } = ctx
 
 	const removeRow = (row: number) => {
 		if (row === 0) {
 			const [promoted, ...rest] = chain.steps
 			if (!promoted) {
-				onEmptied()
+				onEmptied?.()
 				return
 			}
 			onChange({ ...chain, first: promoted.operand, steps: rest })
@@ -623,16 +614,18 @@ const ChainEditor = ({ chain, onChange, onEmptied, ctx, idPrefix }: ChainEditorP
 							idPrefix={`${idPrefix}-r${index}`}
 						/>
 					</div>
-					<div className="fb-calc-row__remove">
-						<Button
-							buttonStyle="icon-label"
-							icon="x"
-							aria-label={t(keys.calcBuilderRemove)}
-							margin={false}
-							disabled={readOnly}
-							onClick={() => removeRow(index)}
-						/>
-					</div>
+					{rows.length > 1 || isRoot ? (
+						<div className="fb-calc-row__remove">
+							<Button
+								buttonStyle="icon-label"
+								icon="x"
+								aria-label={t(keys.calcBuilderRemove)}
+								margin={false}
+								disabled={readOnly}
+								onClick={() => removeRow(index)}
+							/>
+						</div>
+					) : null}
 				</div>
 			))}
 			<div className="fb-calc-chain__add">
@@ -658,13 +651,13 @@ const ChainEditor = ({ chain, onChange, onEmptied, ctx, idPrefix }: ChainEditorP
 }
 
 /**
- * Visual editor for the calculation field's `expression` AST, presented as a left-to-right chain
- * (storage shape unchanged; `validateExpression` stays the server gate) with an "Edit as JSON"
- * escape hatch that round-trips through `normalizeCalc`.
+ * Visual editor for the calculation field's `expression` AST, presented as a left-to-right chain.
+ * Storage shape is unchanged and `validateExpression` stays the server gate; the AST remains
+ * authorable via the API.
  */
 export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	const {
-		customComponents: { Description, Error: ErrorComponent, Label } = {},
+		customComponents: { Error: ErrorComponent, Label } = {},
 		disabled,
 		path,
 		setValue,
@@ -673,13 +666,11 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	} = useField<unknown>({ path: props.path })
 	const { t } = useTranslation()
 	const label = toStaticLabel(props.field?.label)
-	const description = props.descriptionKey
-		? t(props.descriptionKey)
-		: toStaticLabel(props.field?.admin?.description)
 	const readOnly = props.readOnly === true || disabled === true
 
 	const expression = useMemo(() => normalizeCalc(value), [value])
 	const chain = useMemo(() => (expression ? astToChain(expression) : undefined), [expression])
+	const storedInvalid = expression === undefined && value != null && value !== ''
 
 	// The expression path is `fields.<row>.expression`; that row is the calculation block being
 	// edited, so it bounds which calculation siblings are referenceable (see siblingsFromData).
@@ -693,13 +684,6 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 		JSON.stringify(siblingsFromData(reduceFieldsToValues(fields, true), selfIndex))
 	)
 	const siblings = useMemo(() => JSON.parse(siblingsJson) as Siblings, [siblingsJson])
-
-	const [jsonMode, setJsonMode] = useState(false)
-	// `null` until the first edit: the textarea then derives its content from the live expression at
-	// render time, so JSON mode can never open on (or regress to) a stale or empty snapshot no
-	// matter when the field value arrives.
-	const [jsonDraft, setJsonDraft] = useState<string | null>(null)
-	const [jsonError, setJsonError] = useState(false)
 
 	const startOptions: ChoiceOption[] = [
 		{ label: t(keys.calcBuilderAnswer), value: 'ref' },
@@ -746,75 +730,6 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	// trailing off; formatCalc itself stays pure.
 	const labelOf = (field: string) => (field.trim() === '' ? '?' : (siblings.labels[field] ?? field))
 
-	/** `null` is a valid JSON parse, so failure needs a flag rather than a sentinel value. */
-	const parseDraft = (text: string): { ok: boolean; parsed: unknown } => {
-		try {
-			return { ok: true, parsed: JSON.parse(text) }
-		} catch {
-			return { ok: false, parsed: undefined }
-		}
-	}
-
-	// A stored value that fails normalization (legacy/foreign data) serializes raw, so JSON mode
-	// never silently clobbers it.
-	const serializeCurrent = () =>
-		JSON.stringify(expression ?? (value === undefined || value === '' ? null : value), null, 2)
-
-	// Live-commits the draft whenever it is a well-formed expression, so a JSON edit is never lost
-	// when the document is saved without leaving JSON mode; the toggle stays the final apply gate.
-	const handleJsonChange = (text: string) => {
-		setJsonDraft(text)
-		const { ok, parsed } = parseDraft(text)
-		if (!ok) {
-			setJsonError(true)
-			return
-		}
-		if (parsed === null) {
-			setJsonError(false)
-			return
-		}
-		const normalized = normalizeCalc(parsed)
-		if (!normalized) {
-			setJsonError(true)
-			return
-		}
-		setJsonError(false)
-		if (!sameExpression(normalized, expression)) {
-			setValue(normalized)
-		}
-	}
-
-	const toggleJson = () => {
-		if (!jsonMode) {
-			setJsonDraft(null)
-			setJsonError(false)
-			setJsonMode(true)
-			return
-		}
-		const { ok, parsed } = parseDraft(jsonDraft ?? serializeCurrent())
-		if (!ok) {
-			setJsonError(true)
-			return
-		}
-		// An explicit null clears the expression, matching the server gate (unset is valid).
-		if (parsed === null) {
-			if (expression !== undefined || (value != null && value !== '')) {
-				setValue(null)
-			}
-			setJsonMode(false)
-			return
-		}
-		const normalized = normalizeCalc(parsed)
-		if (!normalized) {
-			setJsonError(true)
-			return
-		}
-		if (!sameExpression(normalized, expression)) {
-			setValue(normalized)
-		}
-		setJsonMode(false)
-	}
-
 	const idBase = `calc-${path.replace(/\./g, '__')}`
 	const ctx: BuilderCtx = { t, siblings, readOnly }
 
@@ -834,34 +749,22 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 					CustomComponent={ErrorComponent}
 					Fallback={<FieldError path={path} showError={showError} />}
 				/>
-				{jsonMode ? (
-					<>
-						<textarea
-							className="fb-calc-builder__json-input"
-							aria-label={t(keys.calcBuilderJsonLabel)}
-							value={jsonDraft ?? serializeCurrent()}
-							rows={10}
-							disabled={readOnly}
-							onChange={(event) => handleJsonChange(event.target.value)}
-						/>
-						{jsonError ? (
-							<p className="fb-calc-builder__json-error" role="alert">
-								{t(keys.calcBuilderJsonInvalid)}
-							</p>
-						) : null}
-					</>
-				) : chain ? (
+				{chain ? (
 					<>
 						<ChainEditor
 							chain={chain}
 							onChange={commitChain}
 							onEmptied={clear}
+							isRoot
 							ctx={ctx}
 							idPrefix={idBase}
 						/>
 						<div className="fb-calc-finish">
-							<div className="fb-calc-row__op-spacer" aria-hidden="true" />
-							<label className="fb-calc-finish__label" htmlFor={`${idBase}-finish`}>
+							<label
+								className="fb-calc-finish__label"
+								htmlFor={`${idBase}-finish`}
+								title={t(keys.calcBuilderThenApply)}
+							>
 								{t(keys.calcBuilderThenApply)}
 							</label>
 							<ReactSelect
@@ -883,6 +786,9 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 					</>
 				) : (
 					<div className="fb-calc-builder__empty">
+						{storedInvalid ? (
+							<p className="fb-calc-builder__warning">{t(keys.calcBuilderStoredInvalid)}</p>
+						) : null}
 						<p className="fb-calc-builder__hint">{t(keys.calcBuilderAddExpression)}</p>
 						<label className="fb-visually-hidden" htmlFor={`${idBase}-seed`}>
 							{t(keys.calcBuilderStartWith)}
@@ -913,22 +819,7 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 				<p className="fb-calc-builder__preview" aria-live="polite">
 					{expression ? formatCalc(expression, labelOf) : ''}
 				</p>
-				<div className="fb-calc-builder__actions">
-					<Button
-						buttonStyle="pill"
-						size="small"
-						margin={false}
-						disabled={readOnly}
-						onClick={toggleJson}
-					>
-						{jsonMode ? t(keys.calcBuilderVisualMode) : t(keys.calcBuilderJsonMode)}
-					</Button>
-				</div>
 			</div>
-			<RenderCustomComponent
-				CustomComponent={Description}
-				Fallback={<FieldDescription description={description} path={path} />}
-			/>
 		</div>
 	)
 }

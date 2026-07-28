@@ -315,36 +315,14 @@
 .fb-calc-builder__actions {
 	align-self: flex-start;
 }
-.fb-calc-builder__json-input {
-	width: 100%;
-	min-height: 160px;
-	padding: 10px 15px;
-	font-family: var(--font-mono);
+.fb-calc-builder__warning {
+	color: var(--theme-elevation-400);
 	font-size: 0.8125rem;
-	color: var(--theme-elevation-800);
-	background: var(--theme-input-bg);
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	resize: vertical;
-	transition:
-		border-color 100ms ease,
-		background-color 100ms ease,
-		box-shadow 100ms ease;
-}
-.fb-calc-builder__json-input:hover {
-	border-color: var(--theme-elevation-250);
-}
-.fb-calc-builder__json-input:focus {
-	border-color: var(--theme-elevation-400);
-	outline: none;
-}
-.fb-calc-builder__json-error {
-	color: var(--theme-error-500);
-	font-size: 0.875rem;
 	margin: 0;
 }
 .fb-calc-builder__kinds {
 	margin: 0;
+	margin-inline-start: 0.75rem;
 	padding-inline-start: 1rem;
 	color: var(--theme-elevation-400);
 	font-size: 0.8125rem;
@@ -530,13 +508,20 @@
 }
 .fb-calc-finish {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: 0.5rem;
 }
+/* The wording occupies column 1 (the 90px op column), centered on the 40px control line, so the
+ * select below aligns exactly with the operand column's kind selects. */
 .fb-calc-finish__label {
+	flex: 0 0 90px;
+	min-width: 0;
+	line-height: 40px;
 	font-size: 0.875rem;
 	color: var(--theme-elevation-600);
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .fb-calc-finish__select {
 	flex: 0 0 200px;

@@ -284,7 +284,18 @@ describe('CalcExpressionBuilder', () => {
 		expect((rows[0] as HTMLElement).classList.contains('fb-calc-row--divided')).toBe(false)
 		expect(rows[1]?.querySelector('.fb-calc-row__op-spacer')).toBeNull()
 		expect((rows[1] as HTMLElement).classList.contains('fb-calc-row--divided')).toBe(true)
-		expect(container.querySelector('.fb-calc-finish > .fb-calc-row__op-spacer')).toBeTruthy()
+	})
+
+	it('places the Then apply wording in the op column of the finisher row', () => {
+		setField(opTree)
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const finish = container.querySelector('.fb-calc-finish') as HTMLElement
+		expect(finish.querySelector('.fb-calc-row__op-spacer')).toBeNull()
+		const finishLabel = finish.firstElementChild as HTMLElement
+		expect(finishLabel.classList.contains('fb-calc-finish__label')).toBe(true)
+		expect(finishLabel.textContent).toBe(keys.calcBuilderThenApply)
+		expect(finishLabel.getAttribute('title')).toBe(keys.calcBuilderThenApply)
+		expect(finishLabel.nextElementSibling?.classList.contains('fb-calc-finish__select')).toBe(true)
 	})
 
 	it('loads a right-nested tree with a Group operand', () => {
@@ -343,17 +354,30 @@ describe('CalcExpressionBuilder', () => {
 		expect(setValue).toHaveBeenCalledWith(null)
 	})
 
-	it('reseeds a nested chain slot when its only row is removed', () => {
+	it('hides the row remove on a nested chain with only one row', () => {
 		const setValue = setField({ type: 'fn', fn: 'min', args: [{ type: 'lit', value: 5 }] })
 		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
 		const removes = screen.getAllByLabelText(keys.calcBuilderRemove)
-		expect(removes).toHaveLength(2)
+		expect(removes).toHaveLength(1)
 		fireEvent.click(removes[0] as HTMLElement)
-		expect(setValue).toHaveBeenCalledWith({
+		expect(setValue).toHaveBeenCalledWith(null)
+	})
+
+	it('keeps row removes inside a nested chain that has multiple rows', () => {
+		setField({
 			type: 'fn',
 			fn: 'min',
-			args: [{ type: 'ref', field: '' }],
+			args: [
+				{
+					type: 'op',
+					op: '+',
+					left: { type: 'ref', field: 'price' },
+					right: { type: 'ref', field: 'qty' },
+				},
+			],
 		})
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		expect(screen.getAllByLabelText(keys.calcBuilderRemove)).toHaveLength(3)
 	})
 
 	it('adds and removes function arguments, keeping at least one', () => {
@@ -509,88 +533,16 @@ describe('CalcExpressionBuilder', () => {
 		expect(preview.textContent).toBe('Price × ?')
 	})
 
-	it('rejects invalid JSON with an inline error and applies valid JSON', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
-		expect(textarea.value).toBe(JSON.stringify({ type: 'lit', value: 2 }, null, 2))
-
-		fireEvent.change(textarea, { target: { value: 'not json' } })
-		expect(screen.getByRole('alert').textContent).toBe(keys.calcBuilderJsonInvalid)
-		fireEvent.click(screen.getByText(keys.calcBuilderVisualMode))
-		expect(container.querySelector('textarea')).toBeTruthy()
-		expect(setValue).not.toHaveBeenCalled()
-
-		fireEvent.change(textarea, { target: { value: '{"type":"nope"}' } })
-		fireEvent.click(screen.getByText(keys.calcBuilderVisualMode))
-		expect(screen.getByRole('alert').textContent).toBe(keys.calcBuilderJsonInvalid)
-		expect(setValue).not.toHaveBeenCalled()
-
-		fireEvent.change(textarea, { target: { value: '{"type":"lit","value":7}' } })
-		fireEvent.click(screen.getByText(keys.calcBuilderVisualMode))
-		expect(setValue).toHaveBeenCalledWith({ type: 'lit', value: 7 })
-		expect(container.querySelector('textarea')).toBeNull()
-	})
-
-	it('live-commits a valid JSON draft without toggling back', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
-		fireEvent.change(textarea, { target: { value: '{"type":"lit","value":9}' } })
-		expect(setValue).toHaveBeenCalledWith({ type: 'lit', value: 9 })
-		expect(screen.queryByRole('alert')).toBeNull()
-		expect(container.querySelector('textarea')).toBeTruthy()
-	})
-
-	it('does not write when toggling back with no edits', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
-		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		fireEvent.click(screen.getByText(keys.calcBuilderVisualMode))
-		expect(setValue).not.toHaveBeenCalled()
-	})
-
-	it('clears the expression when applying an explicit null', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
-		fireEvent.change(textarea, { target: { value: 'null' } })
-		expect(screen.queryByRole('alert')).toBeNull()
-		expect(setValue).not.toHaveBeenCalled()
-		fireEvent.click(screen.getByText(keys.calcBuilderVisualMode))
-		expect(setValue).toHaveBeenCalledWith(null)
-		expect(container.querySelector('textarea')).toBeNull()
-	})
-
-	it('seeds the JSON draft from the raw value when it fails normalization', () => {
+	it('warns about an invalid stored value instead of silently clobbering it', () => {
 		setField({ type: 'bogus', anything: 1 })
 		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
-		expect(textarea.value).toContain('"bogus"')
-	})
+		expect(screen.getByText(keys.calcBuilderStoredInvalid)).toBeTruthy()
+		expect(container.querySelector('select.fb-calc-builder__seed')).toBeTruthy()
+		cleanup()
 
-	it('seeds the JSON draft from the current expression when the value arrives after first render', () => {
 		setField(undefined)
-		const { container, rerender } = render(
-			<CalcExpressionBuilder path="fields.4.expression" field={{}} />
-		)
-		fieldState.current = { ...fieldState.current, value: opTree }
-		rerender(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
-		expect(textarea.value).toBe(JSON.stringify(opTree, null, 2))
-	})
-
-	it('gives the JSON textarea an accessible name', () => {
-		setField({ type: 'lit', value: 2 })
 		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		const textarea = screen.getByLabelText(keys.calcBuilderJsonLabel) as HTMLTextAreaElement
-		expect(textarea.tagName).toBe('TEXTAREA')
+		expect(screen.queryByText(keys.calcBuilderStoredInvalid)).toBeNull()
 	})
 
 	it('disables every control and blocks writes when readOnly', () => {

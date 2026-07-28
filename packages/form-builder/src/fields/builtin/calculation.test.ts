@@ -1,7 +1,5 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { en } from '../../translations/en'
-import { keys } from '../../translations/keys'
 import { calculationField, validateExpression } from './calculation'
 
 const req = { t: (key: string) => key } as unknown as PayloadRequest
@@ -47,9 +45,7 @@ type FieldWithJSONShape = {
 	name: string
 	jsonSchema?: { fileMatch: string[]; schema: unknown; uri: string }
 	typescriptSchema?: Array<(args: { jsonSchema: unknown }) => unknown>
-	admin?: {
-		description?: (args: { t: (key: string, vars?: Record<string, unknown>) => string }) => string
-	}
+	admin?: { components?: { Field?: unknown }; description?: unknown }
 }
 
 const expressionField = (calculationField.config as FieldWithJSONShape[]).find(
@@ -71,25 +67,10 @@ describe('calculationField expression config', () => {
 		expect(JSON.stringify(generated)).not.toContain('$ref')
 	})
 
-	it('renders the description through Payload-style t()', () => {
-		const translations: Record<string, string> = {
-			[keys.configExpressionDescription]: en[keys.configExpressionDescription],
-		}
-		const fakeT = (key: string): string => translations[key] ?? key
-
-		const rendered = expressionField?.admin?.description?.({ t: fakeT })
-		expect(rendered).toBe(en[keys.configExpressionDescription])
-	})
-
-	it('mounts the visual expression builder with the description key', () => {
-		const admin = expressionField?.admin as
-			| { components?: { Field?: { path?: string; clientProps?: Record<string, unknown> } } }
-			| undefined
-		expect(admin?.components?.Field?.path).toBe(
+	it('mounts the visual expression builder without a field description', () => {
+		expect(expressionField?.admin?.components?.Field).toBe(
 			'@10x-media/form-builder/client#CalcExpressionBuilder'
 		)
-		expect(admin?.components?.Field?.clientProps).toEqual({
-			descriptionKey: keys.configExpressionDescription,
-		})
+		expect(expressionField?.admin?.description).toBeUndefined()
 	})
 })
