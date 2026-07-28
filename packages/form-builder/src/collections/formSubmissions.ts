@@ -11,6 +11,7 @@ import type { FieldTypeRegistry } from '../fields/registry'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import type { PollOptionSourceRegistry } from '../poll/registry'
+import { makeVoteTallyHook } from '../poll/votes/voteTallyHook'
 import { buildSpamGuard } from '../spam/spamGuard'
 import type { ResolvedSpamConfig } from '../spam/types'
 import { validateSubmission } from '../submissions/validateSubmission'
@@ -44,6 +45,8 @@ type BuildSubmissionsCollectionArgs = {
 	votedCookie?: boolean
 	/** Registered poll option sources; submission validation resolves allowed values through them. */
 	pollSourceRegistry?: PollOptionSourceRegistry
+	/** Resolved `poll.votes` option; `false` skips registering the append-only vote tally hook. */
+	pollVotes?: false | { overrides?: CollectionOverrides }
 	/**
 	 * When `true`, reveals the standalone `locale`, `values`, `descriptors`, `consent`, and `meta`
 	 * fields in the admin UI. Default `false`, because the `SubmissionAnswers` UI component already
@@ -53,7 +56,8 @@ type BuildSubmissionsCollectionArgs = {
 	overrides?: CollectionOverrides
 }
 
-const formIdOf = (form: unknown): number | string | undefined => {
+/** Narrow a submission's `form` relationship value (raw id or a populated relationship doc) to its id. */
+export const formIdOf = (form: unknown): number | string | undefined => {
 	if (typeof form === 'number' || typeof form === 'string') {
 		return form
 	}
@@ -181,6 +185,7 @@ export const buildSubmissionsCollection = ({
 	spam,
 	votedCookie = false,
 	pollSourceRegistry,
+	pollVotes = false,
 	showRawFields = false,
 	overrides,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => {
@@ -272,6 +277,10 @@ export const buildSubmissionsCollection = ({
 				...(overrides?.hooks?.beforeValidate ?? []),
 			],
 			afterChange: [
+				// The tally hook runs first and does not swallow errors: a bump failure must throw so
+				// Payload rolls the submission create/update back inside the operation transaction,
+				// rather than being absorbed by the dispatch hook's swallow-all error boundary below.
+				...(pollVotes !== false ? [makeVoteTallyHook()] : []),
 				makeAfterChange({ actionRegistry, events, hasRunner, richText }),
 				...(votedCookie ? [makeVotedCookieHook()] : []),
 				...(overrides?.hooks?.afterChange ?? []),

@@ -136,6 +136,7 @@ export const registerCollections = ({
 			spam,
 			votedCookie,
 			pollSourceRegistry,
+			pollVotes,
 			showRawFields: showSubmissionRawFields,
 			overrides: overrides?.formSubmissions,
 		}),
