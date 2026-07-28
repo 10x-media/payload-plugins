@@ -276,10 +276,23 @@
 
 /* Calculation expression builder */
 .fb-calc-builder {
+	margin-block-end: 1rem;
+}
+.fb-calc-builder > .field-type__wrap {
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
-	margin-block-end: 1rem;
+}
+.fb-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 .fb-calc-builder__hint {
 	color: var(--theme-elevation-400);
@@ -343,6 +356,11 @@
 	align-items: center;
 	gap: 0.5rem;
 	flex-wrap: wrap;
+}
+.fb-calc-node__hint {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
 }
 .fb-calc-node__header > .fb-calc-node__kind {
 	flex: 0 1 11rem;

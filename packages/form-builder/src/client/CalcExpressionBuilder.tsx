@@ -3,9 +3,11 @@
 import {
 	Button,
 	FieldDescription,
+	FieldError,
 	FieldLabel,
 	ReactSelect,
 	type ReactSelectOption,
+	RenderCustomComponent,
 	useField,
 	useFormFields,
 } from '@payloadcms/ui'
@@ -23,6 +25,7 @@ import './admin.css'
 export type CalcExpressionBuilderProps = {
 	path?: string
 	field?: { label?: unknown; admin?: { description?: unknown } }
+	readOnly?: boolean
 	/** Field description as a translation key; `admin.description` functions are dropped from client fields. */
 	descriptionKey?: TranslationKey
 }
@@ -39,8 +42,6 @@ type Siblings = {
 	choices: ChoiceSibling[]
 	labels: Record<string, string>
 }
-
-const NUMERIC_TYPES = ['number', 'calculation']
 
 const seedNode = (kind: NodeKind): CalcExpression => {
 	switch (kind) {
@@ -59,6 +60,22 @@ const seedNode = (kind: NodeKind): CalcExpression => {
 			return { type: 'fn', fn: 'round', args: [{ type: 'lit', value: 0 }] }
 		case 'weight':
 			return { type: 'weight', field: '', weights: {} }
+	}
+}
+
+/**
+ * Kind switches that can contain the current node promote it (Math takes it as the left operand,
+ * Function as the first argument) so switching never silently destroys a built subtree; the leaf
+ * kinds have no containment relationship and replace destructively.
+ */
+const convertNode = (current: CalcExpression, kind: NodeKind): CalcExpression => {
+	switch (kind) {
+		case 'op':
+			return { type: 'op', op: '+', left: current, right: { type: 'lit', value: 0 } }
+		case 'fn':
+			return { type: 'fn', fn: 'round', args: [current] }
+		default:
+			return seedNode(kind)
 	}
 }
 
@@ -129,7 +146,11 @@ const siblingsFromData = (data: Record<string, unknown>, selfIndex: number): Sib
 		}
 		const display = typeof label === 'string' && label.length > 0 ? label : trimmed
 		siblings.labels[trimmed] = display
-		if (index !== selfIndex && typeof blockType === 'string' && NUMERIC_TYPES.includes(blockType)) {
+		// Calculations fold in declaration order, so a calculation is only referenceable when it is
+		// declared before this one; a forward (or self) reference would always evaluate to 0.
+		const referenceable =
+			blockType === 'number' || (blockType === 'calculation' && index < selfIndex)
+		if (referenceable) {
 			siblings.numeric.push({ label: display, value: trimmed })
 		}
 		if (blockType === 'select') {
@@ -152,18 +173,31 @@ const withStored = (options: ChoiceOption[], stored: string): ChoiceOption[] =>
 		? [...options, { label: stored, value: stored }]
 		: options
 
+const sameExpression = (a: CalcExpression | undefined, b: CalcExpression | undefined): boolean =>
+	JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
 type NumberInputProps = {
 	value: number | undefined
 	onCommit: (value: number) => void
 	className: string
-	'aria-label': string
+	id?: string
+	disabled?: boolean
+	'aria-label'?: string
 }
 
 /**
- * Number input with a local draft so partial entries ("-", "1.") survive keystrokes; only finite
- * numbers commit, and an external value change (kind switch, JSON apply) resyncs the draft.
+ * Number input with a local draft: keystrokes commit only when the text parses to a finite number,
+ * an invalid draft reverts to the committed value on blur, and an external value change (kind
+ * switch, JSON apply) resyncs the draft.
  */
-const NumberInput = ({ value, onCommit, className, 'aria-label': ariaLabel }: NumberInputProps) => {
+const NumberInput = ({
+	value,
+	onCommit,
+	className,
+	id,
+	disabled,
+	'aria-label': ariaLabel,
+}: NumberInputProps) => {
 	const [draft, setDraft] = useState(value === undefined ? '' : String(value))
 	const [lastValue, setLastValue] = useState(value)
 	if (value !== lastValue) {
@@ -176,6 +210,8 @@ const NumberInput = ({ value, onCommit, className, 'aria-label': ariaLabel }: Nu
 		<input
 			type="number"
 			className={className}
+			id={id}
+			disabled={disabled}
 			aria-label={ariaLabel}
 			value={draft}
 			onChange={(event) => {
@@ -200,6 +236,8 @@ type BuilderCtx = {
 	t: (key: TranslationKey) => string
 	kindOptions: ChoiceOption[]
 	siblings: Siblings
+	readOnly: boolean
+	idBase: string
 	commit: (path: ChildSlot[], next: CalcExpression) => void
 }
 
@@ -209,7 +247,12 @@ const FN_OPTIONS: ChoiceOption[] = CALC_FNS.map((fn) => ({ label: fn, value: fn 
 type NodeEditorProps = { node: CalcExpression; nodePath: ChildSlot[]; ctx: BuilderCtx }
 
 const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
-	const { t, commit, siblings } = ctx
+	const { t, commit, siblings, readOnly } = ctx
+	const idPrefix = `${ctx.idBase}-${nodePath.map((slot) => slot.replace(':', '-')).join('-') || 'root'}`
+	const kindOptions =
+		node.type === 'neg'
+			? [...ctx.kindOptions, { label: t(keys.calcBuilderNegate), value: 'neg' }]
+			: ctx.kindOptions
 	const choice =
 		node.type === 'weight' ? siblings.choices.find((c) => c.name === node.field) : undefined
 	const refOptions = node.type === 'ref' ? withStored(siblings.numeric, node.field) : []
@@ -223,82 +266,125 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 	return (
 		<div className="fb-calc-node">
 			<div className="fb-calc-node__header">
+				<label className="fb-visually-hidden" htmlFor={`${idPrefix}-kind`}>
+					{t(keys.calcBuilderKind)}
+				</label>
 				<ReactSelect
 					className="fb-calc-node__kind"
-					options={ctx.kindOptions}
-					value={ctx.kindOptions.find((option) => option.value === node.type)}
+					inputId={`${idPrefix}-kind`}
+					options={kindOptions}
+					value={kindOptions.find((option) => option.value === node.type)}
 					isClearable={false}
+					disabled={readOnly}
 					onChange={(selected) => {
 						const chosen = singleOption(selected)
 						if (chosen && chosen.value !== node.type) {
-							commit(nodePath, seedNode(chosen.value as NodeKind))
+							commit(nodePath, convertNode(node, chosen.value as NodeKind))
 						}
 					}}
 				/>
 				{node.type === 'op' ? (
-					<ReactSelect
-						className="fb-calc-node__op"
-						options={OP_OPTIONS}
-						value={OP_OPTIONS.find((option) => option.value === node.op)}
-						isClearable={false}
-						onChange={(selected) => {
-							const chosen = singleOption(selected)
-							if (chosen) {
-								commit(nodePath, { ...node, op: chosen.value as typeof node.op })
-							}
-						}}
-					/>
+					<>
+						<label className="fb-visually-hidden" htmlFor={`${idPrefix}-op`}>
+							{t(keys.calcBuilderMath)}
+						</label>
+						<ReactSelect
+							className="fb-calc-node__op"
+							inputId={`${idPrefix}-op`}
+							options={OP_OPTIONS}
+							value={OP_OPTIONS.find((option) => option.value === node.op)}
+							isClearable={false}
+							disabled={readOnly}
+							onChange={(selected) => {
+								const chosen = singleOption(selected)
+								if (chosen) {
+									commit(nodePath, { ...node, op: chosen.value as typeof node.op })
+								}
+							}}
+						/>
+					</>
 				) : null}
 				{node.type === 'fn' ? (
-					<ReactSelect
-						className="fb-calc-node__fn"
-						options={FN_OPTIONS}
-						value={FN_OPTIONS.find((option) => option.value === node.fn)}
-						isClearable={false}
-						onChange={(selected) => {
-							const chosen = singleOption(selected)
-							if (chosen) {
-								commit(nodePath, { ...node, fn: chosen.value as typeof node.fn })
-							}
-						}}
-					/>
+					<>
+						<label className="fb-visually-hidden" htmlFor={`${idPrefix}-fn`}>
+							{t(keys.calcBuilderFunction)}
+						</label>
+						<ReactSelect
+							className="fb-calc-node__fn"
+							inputId={`${idPrefix}-fn`}
+							options={FN_OPTIONS}
+							value={FN_OPTIONS.find((option) => option.value === node.fn)}
+							isClearable={false}
+							disabled={readOnly}
+							onChange={(selected) => {
+								const chosen = singleOption(selected)
+								if (chosen) {
+									commit(nodePath, { ...node, fn: chosen.value as typeof node.fn })
+								}
+							}}
+						/>
+					</>
 				) : null}
 				{node.type === 'ref' ? (
-					<ReactSelect
-						className="fb-calc-node__ref"
-						options={refOptions}
-						value={refOptions.find((option) => option.value === node.field)}
-						isClearable={false}
-						placeholder={t(keys.calcBuilderPickField)}
-						onChange={(selected) => {
-							const chosen = singleOption(selected)
-							commit(nodePath, { type: 'ref', field: chosen ? String(chosen.value) : '' })
-						}}
-					/>
+					refOptions.length === 0 ? (
+						<p className="fb-calc-node__hint">{t(keys.calcBuilderNoNumericFields)}</p>
+					) : (
+						<>
+							<label className="fb-visually-hidden" htmlFor={`${idPrefix}-ref`}>
+								{t(keys.calcBuilderPickField)}
+							</label>
+							<ReactSelect
+								className="fb-calc-node__ref"
+								inputId={`${idPrefix}-ref`}
+								options={refOptions}
+								value={refOptions.find((option) => option.value === node.field)}
+								isClearable={false}
+								disabled={readOnly}
+								placeholder={t(keys.calcBuilderPickField)}
+								onChange={(selected) => {
+									const chosen = singleOption(selected)
+									commit(nodePath, { type: 'ref', field: chosen ? String(chosen.value) : '' })
+								}}
+							/>
+						</>
+					)
 				) : null}
 				{node.type === 'lit' ? (
 					<NumberInput
 						className="fb-calc-node__number"
+						id={`${idPrefix}-number`}
 						aria-label={t(keys.calcBuilderNumber)}
+						disabled={readOnly}
 						value={node.value}
 						onCommit={(value) => commit(nodePath, { type: 'lit', value })}
 					/>
 				) : null}
 				{node.type === 'weight' ? (
-					<ReactSelect
-						className="fb-calc-node__weight-field"
-						options={choiceOptions}
-						value={choiceOptions.find((option) => option.value === node.field)}
-						isClearable={false}
-						placeholder={t(keys.calcBuilderPickField)}
-						onChange={(selected) => {
-							const chosen = singleOption(selected)
-							const field = chosen ? String(chosen.value) : ''
-							if (field !== node.field) {
-								commit(nodePath, { type: 'weight', field, weights: {} })
-							}
-						}}
-					/>
+					choiceOptions.length === 0 ? (
+						<p className="fb-calc-node__hint">{t(keys.calcBuilderNoChoiceFields)}</p>
+					) : (
+						<>
+							<label className="fb-visually-hidden" htmlFor={`${idPrefix}-weight-field`}>
+								{t(keys.calcBuilderPickField)}
+							</label>
+							<ReactSelect
+								className="fb-calc-node__weight-field"
+								inputId={`${idPrefix}-weight-field`}
+								options={choiceOptions}
+								value={choiceOptions.find((option) => option.value === node.field)}
+								isClearable={false}
+								disabled={readOnly}
+								placeholder={t(keys.calcBuilderPickField)}
+								onChange={(selected) => {
+									const chosen = singleOption(selected)
+									const field = chosen ? String(chosen.value) : ''
+									if (field !== node.field) {
+										commit(nodePath, { type: 'weight', field, weights: {} })
+									}
+								}}
+							/>
+						</>
+					)
 				) : null}
 			</div>
 			{node.type === 'op' ? (
@@ -327,6 +413,7 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 										icon="x"
 										aria-label={t(keys.calcBuilderRemove)}
 										margin={false}
+										disabled={readOnly}
 										onClick={() =>
 											commit(nodePath, {
 												...node,
@@ -345,6 +432,7 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 							iconStyle="with-border"
 							iconPosition="left"
 							margin={false}
+							disabled={readOnly}
 							onClick={() => commit(nodePath, { ...node, args: [...node.args, seedNode('lit')] })}
 						>
 							{t(keys.calcBuilderAddArgument)}
@@ -356,10 +444,16 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 				<div className="fb-calc-node__weights">
 					{choice.options.map((option) => (
 						<div key={option.value} className="fb-calc-node__weight-row">
-							<span className="fb-calc-node__weight-label">{option.label}</span>
+							<label
+								className="fb-calc-node__weight-label"
+								htmlFor={`${idPrefix}-weight-${option.value}`}
+							>
+								{option.label}
+							</label>
 							<NumberInput
 								className="fb-calc-node__weight"
-								aria-label={option.label}
+								id={`${idPrefix}-weight-${option.value}`}
+								disabled={readOnly}
 								value={node.weights[option.value]}
 								onCommit={(value) =>
 									commit(nodePath, {
@@ -382,20 +476,29 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
  * "Edit as JSON" escape hatch that round-trips through `normalizeCalc`.
  */
 export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
-	const { path, setValue, value } = useField<unknown>({ path: props.path ?? '' })
+	const {
+		customComponents: { Description, Error: ErrorComponent, Label } = {},
+		disabled,
+		path,
+		setValue,
+		showError,
+		value,
+	} = useField<unknown>({ path: props.path })
 	const { t } = useTranslation()
 	const label = toStaticLabel(props.field?.label)
 	const description = props.descriptionKey
 		? t(props.descriptionKey)
 		: toStaticLabel(props.field?.admin?.description)
+	const readOnly = props.readOnly === true || disabled === true
 
 	const expression = useMemo(() => normalizeCalc(value), [value])
 
 	// The expression path is `fields.<row>.expression`; that row is the calculation block being
-	// edited, so it is excluded from the answer picker (a self-reference could never resolve).
+	// edited, so it bounds which calculation siblings are referenceable (see siblingsFromData).
+	// An unparseable path (never expected) offers every calculation rather than none.
 	const selfIndex = useMemo(() => {
 		const match = /^fields\.(\d+)\./.exec(path)
-		return match ? Number(match[1]) : -1
+		return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER
 	}, [path])
 
 	const siblingsJson = useFormFields(([fields]) =>
@@ -415,28 +518,68 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 		{ label: t(keys.calcBuilderWeights), value: 'weight' },
 	]
 
-	const commit = (nodePath: ChildSlot[], next: CalcExpression) =>
+	const commit = (nodePath: ChildSlot[], next: CalcExpression) => {
+		if (readOnly) {
+			return
+		}
 		setValue(expression ? replaceAt(expression, nodePath, next) : next)
+	}
 
 	const labelOf = (field: string) => siblings.labels[field] ?? field
 
+	/** `null` is a valid JSON parse, so failure needs a flag rather than a sentinel value. */
+	const parseDraft = (text: string): { ok: boolean; parsed: unknown } => {
+		try {
+			return { ok: true, parsed: JSON.parse(text) }
+		} catch {
+			return { ok: false, parsed: undefined }
+		}
+	}
+
+	// Live-commits the draft whenever it is a well-formed expression, so a JSON edit is never lost
+	// when the document is saved without leaving JSON mode; the toggle stays the final apply gate.
+	const handleJsonChange = (text: string) => {
+		setJsonDraft(text)
+		const { ok, parsed } = parseDraft(text)
+		if (!ok) {
+			setJsonError(true)
+			return
+		}
+		if (parsed === null) {
+			setJsonError(false)
+			return
+		}
+		const normalized = normalizeCalc(parsed)
+		if (!normalized) {
+			setJsonError(true)
+			return
+		}
+		setJsonError(false)
+		if (!sameExpression(normalized, expression)) {
+			setValue(normalized)
+		}
+	}
+
 	const toggleJson = () => {
 		if (!jsonMode) {
-			setJsonDraft(JSON.stringify(expression ?? null, null, 2))
+			// A stored value that fails normalization (legacy/foreign data) seeds the draft raw, so
+			// opening JSON mode never silently clobbers it.
+			const source = expression ?? (value === undefined || value === '' ? null : value)
+			setJsonDraft(JSON.stringify(source, null, 2))
 			setJsonError(false)
 			setJsonMode(true)
 			return
 		}
-		let parsed: unknown
-		try {
-			parsed = JSON.parse(jsonDraft)
-		} catch {
+		const { ok, parsed } = parseDraft(jsonDraft)
+		if (!ok) {
 			setJsonError(true)
 			return
 		}
 		// An explicit null clears the expression, matching the server gate (unset is valid).
 		if (parsed === null) {
-			setValue(null)
+			if (expression !== undefined || (value != null && value !== '')) {
+				setValue(null)
+			}
 			setJsonMode(false)
 			return
 		}
@@ -445,62 +588,88 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 			setJsonError(true)
 			return
 		}
-		setValue(normalized)
+		if (!sameExpression(normalized, expression)) {
+			setValue(normalized)
+		}
 		setJsonMode(false)
 	}
 
-	const ctx: BuilderCtx = { t, kindOptions, siblings, commit }
+	const idBase = `calc-${path.replace(/\./g, '__')}`
+	const ctx: BuilderCtx = { t, kindOptions, siblings, readOnly, idBase, commit }
 
 	return (
-		<div className="field-type fb-calc-builder">
-			<FieldLabel label={label} path={path} />
-			{jsonMode ? (
-				<>
-					<textarea
-						className="fb-calc-builder__json-input"
-						aria-label={t(keys.calcBuilderJsonMode)}
-						value={jsonDraft}
-						rows={10}
-						onChange={(event) => {
-							setJsonDraft(event.target.value)
-							setJsonError(false)
-						}}
-					/>
-					{jsonError ? (
-						<p className="fb-calc-builder__json-error" role="alert">
-							{t(keys.calcBuilderJsonInvalid)}
-						</p>
-					) : null}
-				</>
-			) : expression ? (
-				<NodeEditor node={expression} nodePath={[]} ctx={ctx} />
-			) : (
-				<div className="fb-calc-builder__empty">
-					<p className="fb-calc-builder__hint">{t(keys.calcBuilderAddExpression)}</p>
-					<ReactSelect
-						className="fb-calc-builder__seed"
-						options={kindOptions}
-						placeholder={t(keys.calcBuilderAddExpression)}
-						onChange={(selected) => {
-							const chosen = singleOption(selected)
-							if (chosen) {
-								setValue(seedNode(chosen.value as NodeKind))
-							}
-						}}
-					/>
-				</div>
-			)}
-			{!jsonMode && expression ? (
+		<div
+			className={['field-type', 'fb-calc-builder', showError && 'error', readOnly && 'read-only']
+				.filter(Boolean)
+				.join(' ')}
+			id={path ? `field-${path.replace(/\./g, '__')}` : undefined}
+		>
+			<RenderCustomComponent
+				CustomComponent={Label}
+				Fallback={<FieldLabel label={label} path={path} />}
+			/>
+			<div className="field-type__wrap">
+				<RenderCustomComponent
+					CustomComponent={ErrorComponent}
+					Fallback={<FieldError path={path} showError={showError} />}
+				/>
+				{jsonMode ? (
+					<>
+						<textarea
+							className="fb-calc-builder__json-input"
+							aria-label={t(keys.calcBuilderJsonMode)}
+							value={jsonDraft}
+							rows={10}
+							disabled={readOnly}
+							onChange={(event) => handleJsonChange(event.target.value)}
+						/>
+						{jsonError ? (
+							<p className="fb-calc-builder__json-error" role="alert">
+								{t(keys.calcBuilderJsonInvalid)}
+							</p>
+						) : null}
+					</>
+				) : expression ? (
+					<NodeEditor node={expression} nodePath={[]} ctx={ctx} />
+				) : (
+					<div className="fb-calc-builder__empty">
+						<label className="fb-calc-builder__hint" htmlFor={`${idBase}-seed`}>
+							{t(keys.calcBuilderAddExpression)}
+						</label>
+						<ReactSelect
+							className="fb-calc-builder__seed"
+							inputId={`${idBase}-seed`}
+							options={kindOptions}
+							disabled={readOnly}
+							placeholder={t(keys.calcBuilderAddExpression)}
+							onChange={(selected) => {
+								const chosen = singleOption(selected)
+								if (chosen && !readOnly) {
+									setValue(seedNode(chosen.value as NodeKind))
+								}
+							}}
+						/>
+					</div>
+				)}
 				<p className="fb-calc-builder__preview" aria-live="polite">
-					{formatCalc(expression, labelOf)}
+					{expression ? formatCalc(expression, labelOf) : ''}
 				</p>
-			) : null}
-			<div className="fb-calc-builder__actions">
-				<Button buttonStyle="pill" size="small" margin={false} onClick={toggleJson}>
-					{jsonMode ? t(keys.calcBuilderVisualMode) : t(keys.calcBuilderJsonMode)}
-				</Button>
+				<div className="fb-calc-builder__actions">
+					<Button
+						buttonStyle="pill"
+						size="small"
+						margin={false}
+						disabled={readOnly}
+						onClick={toggleJson}
+					>
+						{jsonMode ? t(keys.calcBuilderVisualMode) : t(keys.calcBuilderJsonMode)}
+					</Button>
+				</div>
 			</div>
-			<FieldDescription description={description} path={path} />
+			<RenderCustomComponent
+				CustomComponent={Description}
+				Fallback={<FieldDescription description={description} path={path} />}
+			/>
 		</div>
 	)
 }
