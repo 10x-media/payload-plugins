@@ -100,6 +100,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			pollTypeRegistry,
 			outcomeFields: options.poll?.outcomeFields,
 			buttons: options.buttons,
+			settings: options.settings,
 			response: options.response,
 			fromAddresses,
 			departments,
@@ -182,6 +183,8 @@ export type {
 	RedirectOption,
 	ResponseOption,
 } from './collections/redirectFields'
+export type { SettingsFieldsDefaults, SettingsOption } from './collections/settingsFields'
+export { buildDefaultSettingsFields } from './collections/settingsFields'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { applyConsentStatements } from './consent/applyConsentStatements'

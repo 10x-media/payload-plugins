@@ -7,6 +7,7 @@ import type { ActionsConfig } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
 import type { ButtonsOption } from './collections/buttonFields'
 import type { ResponseOption } from './collections/redirectFields'
+import type { SettingsOption } from './collections/settingsFields'
 import type { ConsentSnapshotMode } from './consent/captureConsent'
 import type { ConsentSourcesResolver } from './consent/types'
 import type { DepartmentEmailsResolver } from './email/departments'
@@ -141,6 +142,12 @@ export type FormBuilderPluginOptions = {
 	 * host-added sibling field is still stored but is read off the raw document, not `doc.buttons`.
 	 */
 	buttons?: ButtonsOption
+	/**
+	 * Form-level flag fields (`multistep`, `pollEnabled`, `persistSubmissions`), sidebar
+	 * checkboxes by default. `fields` composes them from the localized defaults so a host can
+	 * relocate, wrap, extend, or drop them.
+	 */
+	settings?: SettingsOption
 	/**
 	 * The success-response group. `redirect.fields` composes the fields inside the `response.redirect`
 	 * group, mirroring `buttons.fields`: it receives the default fields (the `url` text field, plus the

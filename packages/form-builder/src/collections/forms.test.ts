@@ -144,6 +144,27 @@ describe('forms admin.condition scopes', () => {
 	})
 })
 
+describe('forms settings flags', () => {
+	const collection = buildCollection()
+
+	it('places multistep, pollEnabled, and persistSubmissions at the root as sidebar checkboxes', () => {
+		for (const name of ['multistep', 'pollEnabled', 'persistSubmissions']) {
+			const field = collection.fields.find((f) => 'name' in f && f.name === name)
+			expect(field?.type).toBe('checkbox')
+			expect(field?.admin?.position).toBe('sidebar')
+		}
+	})
+
+	it('no longer nests multistep or pollEnabled in a root row', () => {
+		const rows = collection.fields.filter((f) => f.type === 'row')
+		for (const row of rows) {
+			const names = row.fields.map((f) => ('name' in f ? f.name : undefined))
+			expect(names).not.toContain('multistep')
+			expect(names).not.toContain('pollEnabled')
+		}
+	})
+})
+
 describe('forms response.redirect.reference', () => {
 	it('omits the reference field when redirectRelationships is unset', () => {
 		const collection = buildCollection()

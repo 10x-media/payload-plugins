@@ -8,6 +8,7 @@ import type { ButtonsOption } from '../collections/buttonFields'
 import { buildSubmissionsCollection } from '../collections/formSubmissions'
 import { buildFormsCollection } from '../collections/forms'
 import type { ResponseOption } from '../collections/redirectFields'
+import type { SettingsOption } from '../collections/settingsFields'
 import type { ConsentSnapshotMode } from '../consent/captureConsent'
 import type { ConsentSourcesResolver } from '../consent/types'
 import type { DepartmentEmailsResolver } from '../email/departments'
@@ -44,6 +45,7 @@ type RegisterCollectionsArgs = {
 	pollTypeRegistry: PollTypeRegistry
 	outcomeFields?: OutcomeFieldsOverride
 	buttons?: ButtonsOption
+	settings?: SettingsOption
 	response?: ResponseOption
 	fromAddresses?: FromAddressesResolver
 	departments?: DepartmentEmailsResolver
@@ -75,6 +77,7 @@ export const registerCollections = ({
 	pollTypeRegistry,
 	outcomeFields,
 	buttons,
+	settings,
 	response,
 	fromAddresses,
 	departments,
@@ -109,6 +112,7 @@ export const registerCollections = ({
 			pollTypeRegistry,
 			outcomeFields,
 			buttons,
+			settings,
 			response,
 			fromAddresses,
 			departments,

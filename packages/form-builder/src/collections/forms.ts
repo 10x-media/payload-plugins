@@ -46,6 +46,7 @@ import { validateUrl } from '../validation/validateUrl'
 import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
 import { buildFormsEndpoints } from './formsEndpoints'
 import type { ResponseOption } from './redirectFields'
+import { composeSettingsFields, type SettingsOption } from './settingsFields'
 
 export const FORMS_SLUG = 'forms'
 
@@ -160,6 +161,8 @@ type BuildFormsCollectionArgs = {
 	outcomeFields?: OutcomeFieldsOverride
 	/** The plugin `buttons` option; `fields` composes the `{ submit, prev, next }` labels from the localized defaults. */
 	buttons?: ButtonsOption
+	/** The plugin `settings` option; `fields` composes the sidebar flag checkboxes from the localized defaults. */
+	settings?: SettingsOption
 	/** The plugin `response` option; `redirect.fields` composes the `response.redirect` group from its default fields. */
 	response?: ResponseOption
 	/**
@@ -197,6 +200,7 @@ export const buildFormsCollection = ({
 	pollTypeRegistry,
 	outcomeFields,
 	buttons,
+	settings,
 	response,
 	fromAddresses,
 	departments,
@@ -617,36 +621,12 @@ export const buildFormsCollection = ({
 			...localizedIf(localizeContent),
 			validate: validateFormTitle,
 		},
-		// The two form-type flags: behavior, never localized. `multistep` gates the Flow tab and the
-		// client's step navigation; `pollEnabled` gates the Poll tab and marks the form a poll.
-		{
-			type: 'row',
-			fields: [
-				{
-					name: 'multistep',
-					type: 'checkbox',
-					defaultValue: false,
-					label: labelForKey(keys.formMultistep),
-					admin: { width: '50%' },
-				},
-				{
-					name: 'pollEnabled',
-					type: 'checkbox',
-					defaultValue: false,
-					label: labelForKey(keys.formPollEnabled),
-					admin: { width: '50%' },
-				},
-			],
-		},
-		// Storage flag, server-only: when unchecked, the plugin deletes the submission after its actions
-		// run (pruning a pure signup form's row). Default checked, so unchecking it is the opt-out.
-		{
-			name: 'persistSubmissions',
-			type: 'checkbox',
-			defaultValue: true,
-			label: labelForKey(keys.formPersistSubmissions),
-			admin: { width: '50%' },
-		},
+		// The three form-level flags: behavior, never localized, sidebar checkboxes by default.
+		// `multistep` gates the Flow tab and the client's step navigation; `pollEnabled` gates the
+		// Poll tab and marks the form a poll; `persistSubmissions` (default checked) tells the plugin
+		// whether to keep a submission's row after its actions run, or prune it. The `settings.fields`
+		// seam composes them from the localized defaults, mirroring `buttons.fields`.
+		...composeSettingsFields(settings),
 		// Unnamed tabs are presentational: their fields stay at the document root. An unnamed tab's
 		// `admin.condition` receives the whole document as its 2nd arg, so the Flow and Poll tabs gate
 		// on the root-level flags. The poll group nests its config under `form.poll` as before.
