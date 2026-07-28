@@ -1,7 +1,7 @@
 import type { CollectionAfterChangeHook } from 'payload'
-import { formIdOf } from '../../collections/formSubmissions'
 import { FORMS_SLUG } from '../../collections/forms'
 import { pollConfigOf } from '../../form/pollState'
+import { formIdOf } from '../../submissions/formIdOf'
 import type { SubmissionValue } from '../../submissions/types'
 import { bumpPollVote } from './bumpPollVote'
 import { RESPONDENTS_VALUE } from './votesCollection'
