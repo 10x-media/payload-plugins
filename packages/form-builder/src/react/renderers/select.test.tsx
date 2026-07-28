@@ -32,7 +32,8 @@ describe('select renderer', () => {
 				})
 			)
 		)
-		expect(within(container).getByText('Free')).toBeInTheDocument()
+		const select = within(container).getByRole('combobox')
+		expect(within(select).getByRole('option', { name: 'Free' })).toHaveValue('free')
 	})
 
 	it('falls back to the value as the visible label when no label was authored', () => {
@@ -42,6 +43,20 @@ describe('select renderer', () => {
 				props({ field: { blockType: 'select', name: 'plan', options: [{ value: 'a' }] } })
 			)
 		)
-		expect(within(container).getByText('a')).toBeInTheDocument()
+		const select = within(container).getByRole('combobox')
+		expect(within(select).getByRole('option', { name: 'a' })).toHaveValue('a')
+	})
+
+	it('falls back to the value when the authored label is blank', () => {
+		const { container } = render(
+			createElement(
+				selectRenderer,
+				props({
+					field: { blockType: 'select', name: 'plan', options: [{ label: '', value: 'b' }] },
+				})
+			)
+		)
+		const select = within(container).getByRole('combobox')
+		expect(within(select).getByRole('option', { name: 'b' })).toHaveValue('b')
 	})
 })

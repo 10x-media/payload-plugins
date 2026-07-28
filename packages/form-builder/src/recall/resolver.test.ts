@@ -101,4 +101,9 @@ describe('optionLabelsFor', () => {
 		expect(optionLabelsFor({ blockType: 'text', name: 't' })).toBeUndefined()
 		expect(optionLabelsFor({ blockType: 'select', name: 's', options: [] })).toBeUndefined()
 	})
+	it('falls back to the value when an option label is blank', () => {
+		expect(
+			optionLabelsFor({ blockType: 'select', name: 's', options: [{ label: '', value: 'pro' }] })
+		).toEqual({ pro: 'pro' })
+	})
 })

@@ -95,6 +95,24 @@ describe('runSubmission', () => {
 		expect(planDescriptor?.optionLabels).toEqual({ free: 'Free', pro: 'Pro' })
 	})
 
+	it('falls back to the value when an option label is blank', async () => {
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'select',
+				name: 'plan',
+				label: 'Plan',
+				options: [{ label: '', value: 'pro' }],
+			},
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'plan', value: 'pro' }],
+		})
+		const planDescriptor = result.descriptors.find((descriptor) => descriptor.field === 'plan')
+		expect(planDescriptor?.optionLabels).toEqual({ pro: 'pro' })
+	})
+
 	it('rejects a select value outside its options', async () => {
 		const fields: FormFieldInstance[] = [
 			{

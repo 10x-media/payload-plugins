@@ -15,7 +15,7 @@ export const optionLabelsFor = (field: FormFieldInstance): Record<string, string
 	const map: Record<string, string> = {}
 	for (const option of options as Option[]) {
 		if (option && typeof option.value === 'string') {
-			map[option.value] = option.label ?? option.value
+			map[option.value] = option.label?.trim() ? option.label : option.value
 		}
 	}
 	return Object.keys(map).length > 0 ? map : undefined

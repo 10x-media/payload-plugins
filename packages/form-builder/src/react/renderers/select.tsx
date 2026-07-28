@@ -9,7 +9,10 @@ export const selectRenderer = defineFieldRenderer<string>(
 		const describedById = `${id}-desc`
 		const options = (
 			Array.isArray(field.options) ? (field.options as { label?: string; value: string }[]) : []
-		).map((option) => ({ value: option.value, label: option.label ?? option.value }))
+		).map((option) => ({
+			value: option.value,
+			label: option.label?.trim() ? option.label : option.value,
+		}))
 		return (
 			<FieldShell
 				id={id}
