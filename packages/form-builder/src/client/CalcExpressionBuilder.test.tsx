@@ -1,8 +1,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { evaluateCalc } from '../calc/evaluate'
+import type { CalcExpression } from '../calc/types'
+import { de } from '../translations/de'
+import { en } from '../translations/en'
 import { keys } from '../translations/keys'
-import { CalcExpressionBuilder } from './CalcExpressionBuilder'
+import { astToChain, CalcExpressionBuilder, chainToAst } from './CalcExpressionBuilder'
 
 const fieldState = vi.hoisted(() => ({
 	current: {
@@ -56,7 +60,7 @@ vi.mock('@payloadcms/ui', () => ({
 		disabled,
 		inputId,
 		isClearable,
-		// biome-ignore lint/suspicious/noExplicitAny: test double
+		// biome-ignore lint/suspicious/noExplicitAny: test double renders ReactSelect as a native select
 	}: any) => (
 		<select
 			id={inputId}
@@ -106,6 +110,47 @@ const opTree = {
 	right: { type: 'ref', field: 'qty' },
 }
 
+const rightNested: CalcExpression = {
+	type: 'op',
+	op: '+',
+	left: { type: 'ref', field: 'price' },
+	right: {
+		type: 'op',
+		op: '*',
+		left: { type: 'ref', field: 'qty' },
+		right: { type: 'lit', value: 2 },
+	},
+}
+
+const quoteSubtotal: CalcExpression = {
+	type: 'op',
+	op: '*',
+	left: { type: 'ref', field: 'hours' },
+	right: { type: 'ref', field: 'rate' },
+}
+const quoteSurcharge: CalcExpression = {
+	type: 'weight',
+	field: 'priority',
+	weights: { standard: 0, rush: 250 },
+}
+const quoteTotal: CalcExpression = {
+	type: 'fn',
+	fn: 'round',
+	args: [
+		{
+			type: 'op',
+			op: '*',
+			left: {
+				type: 'op',
+				op: '+',
+				left: { type: 'ref', field: 'subtotal' },
+				right: { type: 'ref', field: 'surcharge' },
+			},
+			right: { type: 'lit', value: 1.19 },
+		},
+	],
+}
+
 formData.current = { fields: baseFields }
 
 afterEach(() => {
@@ -114,88 +159,286 @@ afterEach(() => {
 	formData.current = { fields: baseFields }
 })
 
+describe('chain mapping', () => {
+	it('round-trips the Project Quote expressions structurally', () => {
+		for (const expr of [quoteSubtotal, quoteSurcharge, quoteTotal]) {
+			expect(chainToAst(astToChain(expr))).toEqual(expr)
+		}
+	})
+
+	it('round-trips a right-nested tree structurally and evaluation-equivalently', () => {
+		const roundTripped = chainToAst(astToChain(rightNested))
+		expect(roundTripped).toEqual(rightNested)
+		for (const answers of [
+			{ price: 3, qty: 4 },
+			{ price: 0, qty: 7 },
+			{ price: -2.5, qty: 1.5 },
+		]) {
+			expect(evaluateCalc(roundTripped, answers)).toBe(evaluateCalc(rightNested, answers))
+		}
+	})
+
+	it('loads a wrapping unary fn as finish but keeps variadic fns as operands', () => {
+		const wrapped = astToChain(quoteTotal)
+		expect(wrapped.finish).toBe('round')
+		expect(wrapped.steps).toHaveLength(2)
+
+		const minWrapped: CalcExpression = { type: 'fn', fn: 'min', args: [quoteSubtotal] }
+		const minChain = astToChain(minWrapped)
+		expect(minChain.finish).toBeUndefined()
+		expect(minChain.first.kind).toBe('fn')
+		expect(chainToAst(minChain)).toEqual(minWrapped)
+	})
+})
+
 describe('CalcExpressionBuilder', () => {
-	it('renders the empty state with a kind picker that seeds the root', () => {
+	it('renders the empty state with a Start with picker and kind descriptions', () => {
 		const setValue = setField(undefined)
 		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
 		expect(screen.getByText(keys.calcBuilderAddExpression)).toBeTruthy()
-		const seed = container.querySelector('select.fb-calc-builder__seed') as HTMLSelectElement
-		expect(seed).toBeTruthy()
-		fireEvent.change(seed, { target: { value: 'op' } })
+		expect(screen.getByText(keys.calcBuilderFieldDescription)).toBeTruthy()
+		expect(screen.getByText(keys.calcBuilderNumberDescription)).toBeTruthy()
+		expect(screen.getByText(keys.calcBuilderWeightsDescription)).toBeTruthy()
+		expect(screen.getByText(keys.calcBuilderFunctionDescription)).toBeTruthy()
+		const seed = screen.getByLabelText(keys.calcBuilderStartWith) as HTMLSelectElement
+		expect(seed.classList.contains('fb-calc-builder__seed')).toBe(true)
+		const values = Array.from(seed.querySelectorAll('option')).map((option) => option.value)
+		expect(values).toEqual(['', 'ref', 'lit', 'weight', 'fn'])
+		fireEvent.change(seed, { target: { value: 'ref' } })
+		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: '' })
+		fireEvent.change(seed, { target: { value: 'fn' } })
 		expect(setValue).toHaveBeenCalledWith({
-			type: 'op',
-			op: '+',
-			left: { type: 'lit', value: 0 },
-			right: { type: 'lit', value: 0 },
+			type: 'fn',
+			fn: 'min',
+			args: [{ type: 'lit', value: 0 }],
 		})
+		expect(container.querySelector('.fb-calc-chain')).toBeNull()
 	})
 
-	it('renders an existing op tree as nested cards', () => {
+	it('builds price times qty left-to-right via Add step', () => {
+		const setValue = setField({ type: 'ref', field: 'price' })
+		const { container, rerender } = render(
+			<CalcExpressionBuilder path="fields.4.expression" field={{}} />
+		)
+		fireEvent.click(screen.getByText(keys.calcBuilderAddStep))
+		const afterAdd = {
+			type: 'op',
+			op: '*',
+			left: { type: 'ref', field: 'price' },
+			right: { type: 'ref', field: '' },
+		}
+		expect(setValue).toHaveBeenCalledWith(afterAdd)
+
+		fieldState.current = { ...fieldState.current, value: afterAdd }
+		rerender(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const refs = container.querySelectorAll('select.fb-calc-operand__ref')
+		expect(refs).toHaveLength(2)
+		fireEvent.change(refs[1] as HTMLSelectElement, { target: { value: 'qty' } })
+		expect(setValue).toHaveBeenCalledWith(opTree)
+	})
+
+	it('loads a left-leaning op tree as chain rows', () => {
 		setField(opTree)
 		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		expect(container.querySelectorAll('select.fb-calc-node__kind')).toHaveLength(3)
-		expect(container.querySelectorAll('select.fb-calc-node__ref')).toHaveLength(2)
-		const op = container.querySelector('select.fb-calc-node__op') as HTMLSelectElement
+		expect(container.querySelectorAll('.fb-calc-chain > .fb-calc-row')).toHaveLength(2)
+		expect(container.querySelectorAll('select.fb-calc-operand__ref')).toHaveLength(2)
+		const op = container.querySelector('select.fb-calc-row__op') as HTMLSelectElement
 		expect(op.value).toBe('*')
 	})
 
-	it('renders an existing neg node with a Negate kind option and its operand card', () => {
-		setField({ type: 'neg', operand: { type: 'lit', value: 3 } })
+	it('loads a right-nested tree with a Group operand', () => {
+		setField(rightNested)
 		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const kinds = container.querySelectorAll('select.fb-calc-node__kind')
-		expect(kinds).toHaveLength(2)
-		const rootKind = kinds[0] as HTMLSelectElement
-		expect(rootKind.value).toBe('neg')
-		expect(screen.getByText(keys.calcBuilderNegate)).toBeTruthy()
-		expect(container.querySelector('input.fb-calc-node__number')).toBeTruthy()
+		expect(screen.getByText(keys.calcBuilderGroup)).toBeTruthy()
+		expect(container.querySelector('.fb-calc-operand--group')).toBeTruthy()
+		const ops = Array.from(container.querySelectorAll('select.fb-calc-row__op')).map(
+			(select) => (select as HTMLSelectElement).value
+		)
+		expect(ops).toEqual(['+', '*'])
 	})
 
-	it('writes an updated AST when a literal is edited', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const input = container.querySelector('input.fb-calc-node__number') as HTMLInputElement
-		fireEvent.change(input, { target: { value: '5' } })
-		expect(setValue).toHaveBeenCalledWith({ type: 'lit', value: 5 })
-	})
-
-	it('reverts an uncommitted invalid draft on blur', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const input = container.querySelector('input.fb-calc-node__number') as HTMLInputElement
-		fireEvent.change(input, { target: { value: '' } })
-		expect(setValue).not.toHaveBeenCalled()
-		fireEvent.blur(input)
-		expect(input.value).toBe('2')
-	})
-
-	it('replaces destructively when switching to a leaf kind', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const kind = container.querySelector('select.fb-calc-node__kind') as HTMLSelectElement
-		fireEvent.change(kind, { target: { value: 'ref' } })
-		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: '' })
-	})
-
-	it('promotes the current node when switching to Math or Function', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
+	it('loads and saves the Then apply finisher', () => {
+		const setValue = setField(quoteTotal)
 		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.change(first.container.querySelector('select.fb-calc-node__kind') as HTMLElement, {
-			target: { value: 'op' },
-		})
-		expect(setValue).toHaveBeenCalledWith({
-			type: 'op',
-			op: '+',
-			left: { type: 'lit', value: 2 },
-			right: { type: 'lit', value: 0 },
-		})
+		const finish = first.container.querySelector(
+			'select.fb-calc-finish__select'
+		) as HTMLSelectElement
+		expect(finish.value).toBe('round')
+		const values = Array.from(finish.querySelectorAll('option')).map((option) => option.value)
+		expect(values).toEqual(['', 'round', 'abs', 'ceil', 'floor'])
+		fireEvent.change(finish, { target: { value: '' } })
+		expect(setValue).toHaveBeenCalledWith(quoteTotal.type === 'fn' ? quoteTotal.args[0] : null)
 		cleanup()
 
 		const setValue2 = setField(opTree)
 		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.change(container.querySelector('select.fb-calc-node__kind') as HTMLElement, {
-			target: { value: 'fn' },
+		fireEvent.change(container.querySelector('select.fb-calc-finish__select') as HTMLElement, {
+			target: { value: 'ceil' },
 		})
-		expect(setValue2).toHaveBeenCalledWith({ type: 'fn', fn: 'round', args: [opTree] })
+		expect(setValue2).toHaveBeenCalledWith({ type: 'fn', fn: 'ceil', args: [opTree] })
+	})
+
+	it('promotes the next row when the first row is removed', () => {
+		const setValue = setField(opTree)
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const removes = screen.getAllByLabelText(keys.calcBuilderRemove)
+		expect(removes).toHaveLength(2)
+		fireEvent.click(removes[0] as HTMLElement)
+		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: 'qty' })
+	})
+
+	it('drops a step row on remove', () => {
+		const setValue = setField(opTree)
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const removes = screen.getAllByLabelText(keys.calcBuilderRemove)
+		fireEvent.click(removes[1] as HTMLElement)
+		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: 'price' })
+	})
+
+	it('clears the expression when the only row is removed at the root', () => {
+		const setValue = setField({ type: 'ref', field: 'price' })
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		fireEvent.click(screen.getByLabelText(keys.calcBuilderRemove))
+		expect(setValue).toHaveBeenCalledWith(null)
+	})
+
+	it('reseeds a nested chain slot when its only row is removed', () => {
+		const setValue = setField({ type: 'fn', fn: 'min', args: [{ type: 'lit', value: 5 }] })
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const removes = screen.getAllByLabelText(keys.calcBuilderRemove)
+		expect(removes).toHaveLength(2)
+		fireEvent.click(removes[0] as HTMLElement)
+		expect(setValue).toHaveBeenCalledWith({
+			type: 'fn',
+			fn: 'min',
+			args: [{ type: 'ref', field: '' }],
+		})
+	})
+
+	it('adds and removes function arguments, keeping at least one', () => {
+		const setValue = setField({ type: 'fn', fn: 'min', args: [{ type: 'lit', value: 1 }] })
+		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		expect(first.container.querySelector('.fb-calc-fn__arg-remove')).toBeNull()
+		fireEvent.click(screen.getByText(keys.calcBuilderAddArgument))
+		expect(setValue).toHaveBeenCalledWith({
+			type: 'fn',
+			fn: 'min',
+			args: [
+				{ type: 'lit', value: 1 },
+				{ type: 'lit', value: 0 },
+			],
+		})
+		cleanup()
+
+		const setValue2 = setField({
+			type: 'fn',
+			fn: 'min',
+			args: [
+				{ type: 'lit', value: 1 },
+				{ type: 'lit', value: 2 },
+			],
+		})
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const argRemoves = container.querySelectorAll('.fb-calc-fn__arg-remove button')
+		expect(argRemoves).toHaveLength(2)
+		fireEvent.click(argRemoves[0] as HTMLElement)
+		expect(setValue2).toHaveBeenCalledWith({
+			type: 'fn',
+			fn: 'min',
+			args: [{ type: 'lit', value: 2 }],
+		})
+	})
+
+	it('switches a leaf operand kind in place, offering only leaf kinds', () => {
+		const setValue = setField({ type: 'lit', value: 2 })
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const kind = container.querySelector('select.fb-calc-operand__kind') as HTMLSelectElement
+		const values = Array.from(kind.querySelectorAll('option')).map((option) => option.value)
+		expect(values).toEqual(['', 'ref', 'lit', 'weight'])
+		fireEvent.change(kind, { target: { value: 'ref' } })
+		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: '' })
+	})
+
+	it('renders a neg operand with its Negate card', () => {
+		setField({ type: 'neg', operand: { type: 'lit', value: 3 } })
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		expect(screen.getByText(keys.calcBuilderNegate)).toBeTruthy()
+		expect(container.querySelector('.fb-calc-operand--neg')).toBeTruthy()
+		expect(container.querySelector('input.fb-calc-operand__number')).toBeTruthy()
+	})
+
+	it('writes an updated AST when a literal is edited and reverts invalid drafts on blur', () => {
+		const setValue = setField({ type: 'lit', value: 2 })
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const input = container.querySelector('input.fb-calc-operand__number') as HTMLInputElement
+		fireEvent.change(input, { target: { value: '5' } })
+		expect(setValue).toHaveBeenCalledWith({ type: 'lit', value: 5 })
+		fireEvent.change(input, { target: { value: '' } })
+		fireEvent.blur(input)
+		// The harness's setValue is a mock, so the committed prop value is still 2; blur reverts to it.
+		expect(input.value).toBe('2')
+	})
+
+	it('offers only backward-referenceable numeric siblings with a clearable picker', () => {
+		const setValue = setField({ type: 'ref', field: 'price' })
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const ref = container.querySelector('select.fb-calc-operand__ref') as HTMLSelectElement
+		const values = Array.from(ref.querySelectorAll('option')).map((option) => option.value)
+		expect(values).toEqual(['', 'price', 'qty', 'score'])
+		const labels = Array.from(ref.querySelectorAll('option')).map((option) => option.textContent)
+		expect(labels).toEqual(['', 'Price', 'qty', 'Score'])
+		expect(ref.getAttribute('data-clearable')).toBe('true')
+		fireEvent.change(ref, { target: { value: '' } })
+		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: '' })
+	})
+
+	it('edits weighted fields: per-option weights, source switch reset, clearable source', () => {
+		const setValue = setField({ type: 'weight', field: 'size', weights: { s: 2 } })
+		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		expect(screen.getByText('Small')).toBeTruthy()
+		expect(screen.getByText('m')).toBeTruthy()
+		const inputs = first.container.querySelectorAll('input.fb-calc-operand__weight')
+		expect(inputs).toHaveLength(2)
+		fireEvent.change(inputs[1] as HTMLInputElement, { target: { value: '3' } })
+		expect(setValue).toHaveBeenCalledWith({
+			type: 'weight',
+			field: 'size',
+			weights: { s: 2, m: 3 },
+		})
+		const chooser = first.container.querySelector(
+			'select.fb-calc-operand__weight-field'
+		) as HTMLSelectElement
+		expect(chooser.getAttribute('data-clearable')).toBe('true')
+		fireEvent.change(chooser, { target: { value: 'color' } })
+		expect(setValue).toHaveBeenCalledWith({ type: 'weight', field: 'color', weights: {} })
+	})
+
+	it('hints instead of rendering empty pickers when no eligible siblings exist', () => {
+		formData.current = { fields: [] }
+		setField({ type: 'ref', field: '' })
+		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		expect(screen.getByText(keys.calcBuilderNoNumericFields)).toBeTruthy()
+		expect(first.container.querySelector('select.fb-calc-operand__ref')).toBeNull()
+		cleanup()
+
+		setField({ type: 'weight', field: '', weights: {} })
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		expect(screen.getByText(keys.calcBuilderNoChoiceFields)).toBeTruthy()
+		expect(container.querySelector('select.fb-calc-operand__weight-field')).toBeNull()
+	})
+
+	it('names every chain select for assistive tech', () => {
+		setField(rightNested)
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		expect(screen.getAllByLabelText(keys.calcBuilderMath).length).toBeGreaterThan(0)
+		expect(screen.getAllByLabelText(keys.calcBuilderKind).length).toBeGreaterThan(0)
+		expect(screen.getAllByLabelText(keys.calcBuilderPickField).length).toBeGreaterThan(0)
+		expect(screen.getByLabelText(keys.calcBuilderThenApply)).toBeTruthy()
+	})
+
+	it('renames Weighted answers to Weighted field in both locales', () => {
+		expect(en[keys.calcBuilderWeights]).toBe('Weighted field')
+		expect(de[keys.calcBuilderWeights]).toBe('Gewichtetes Feld')
 	})
 
 	it('shows a readable live preview with sibling labels, mounted even when empty', () => {
@@ -269,6 +512,14 @@ describe('CalcExpressionBuilder', () => {
 		expect(container.querySelector('textarea')).toBeNull()
 	})
 
+	it('seeds the JSON draft from the raw value when it fails normalization', () => {
+		setField({ type: 'bogus', anything: 1 })
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
+		expect(textarea.value).toContain('"bogus"')
+	})
+
 	it('seeds the JSON draft from the current expression when the value arrives after first render', () => {
 		setField(undefined)
 		const { container, rerender } = render(
@@ -281,18 +532,6 @@ describe('CalcExpressionBuilder', () => {
 		expect(textarea.value).toBe(JSON.stringify(opTree, null, 2))
 	})
 
-	it('keeps the JSON textarea in sync when the value arrives while JSON mode is open', () => {
-		setField(undefined)
-		const { container, rerender } = render(
-			<CalcExpressionBuilder path="fields.4.expression" field={{}} />
-		)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		fieldState.current = { ...fieldState.current, value: opTree }
-		rerender(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
-		expect(textarea.value).toBe(JSON.stringify(opTree, null, 2))
-	})
-
 	it('gives the JSON textarea an accessible name', () => {
 		setField({ type: 'lit', value: 2 })
 		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
@@ -301,168 +540,8 @@ describe('CalcExpressionBuilder', () => {
 		expect(textarea.tagName).toBe('TEXTAREA')
 	})
 
-	it('seeds the JSON draft from the raw value when it fails normalization', () => {
-		setField({ type: 'bogus', anything: 1 })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByText(keys.calcBuilderJsonMode))
-		const textarea = container.querySelector('textarea') as HTMLTextAreaElement
-		expect(textarea.value).toContain('"bogus"')
-	})
-
-	it('offers only backward-referenceable numeric siblings, excluding self and later calculations', () => {
-		setField({ type: 'ref', field: '' })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const ref = container.querySelector('select.fb-calc-node__ref') as HTMLSelectElement
-		const values = Array.from(ref.querySelectorAll('option')).map((option) => option.value)
-		expect(values).toEqual(['', 'price', 'qty', 'score'])
-		const labels = Array.from(ref.querySelectorAll('option')).map((option) => option.textContent)
-		expect(labels).toEqual(['', 'Price', 'qty', 'Score'])
-	})
-
-	it('hints instead of rendering empty pickers when no eligible siblings exist', () => {
-		formData.current = { fields: [] }
-		setField({ type: 'ref', field: '' })
-		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		expect(screen.getByText(keys.calcBuilderNoNumericFields)).toBeTruthy()
-		expect(first.container.querySelector('select.fb-calc-node__ref')).toBeNull()
-		cleanup()
-
-		setField({ type: 'weight', field: '', weights: {} })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		expect(screen.getByText(keys.calcBuilderNoChoiceFields)).toBeTruthy()
-		expect(container.querySelector('select.fb-calc-node__weight-field')).toBeNull()
-	})
-
-	it('offers select siblings for the weight node and writes per-option weights', () => {
-		setField({ type: 'weight', field: '', weights: {} })
-		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const chooser = first.container.querySelector(
-			'select.fb-calc-node__weight-field'
-		) as HTMLSelectElement
-		const values = Array.from(chooser.querySelectorAll('option')).map((option) => option.value)
-		expect(values).toEqual(['', 'size', 'color'])
-		cleanup()
-
-		const setValue = setField({ type: 'weight', field: 'size', weights: { s: 2 } })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		expect(screen.getByText('Small')).toBeTruthy()
-		expect(screen.getByText('m')).toBeTruthy()
-		const inputs = container.querySelectorAll('input.fb-calc-node__weight')
-		expect(inputs).toHaveLength(2)
-		fireEvent.change(inputs[1] as HTMLInputElement, { target: { value: '3' } })
-		expect(setValue).toHaveBeenCalledWith({
-			type: 'weight',
-			field: 'size',
-			weights: { s: 2, m: 3 },
-		})
-	})
-
-	it('resets weights when the weight source field changes', () => {
-		const setValue = setField({ type: 'weight', field: 'size', weights: { s: 2 } })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const chooser = container.querySelector('select.fb-calc-node__weight-field') as HTMLElement
-		fireEvent.change(chooser, { target: { value: 'color' } })
-		expect(setValue).toHaveBeenCalledWith({ type: 'weight', field: 'color', weights: {} })
-	})
-
-	it('adds and removes function arguments, keeping at least one', () => {
-		const setValue = setField({ type: 'fn', fn: 'min', args: [{ type: 'lit', value: 1 }] })
-		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		expect(first.container.querySelector('.fb-calc-node__arg-remove')).toBeNull()
-		fireEvent.click(screen.getByText(keys.calcBuilderAddArgument))
-		expect(setValue).toHaveBeenCalledWith({
-			type: 'fn',
-			fn: 'min',
-			args: [
-				{ type: 'lit', value: 1 },
-				{ type: 'lit', value: 0 },
-			],
-		})
-		cleanup()
-
-		const setValue2 = setField({
-			type: 'fn',
-			fn: 'min',
-			args: [
-				{ type: 'lit', value: 1 },
-				{ type: 'lit', value: 2 },
-			],
-		})
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const removes = container.querySelectorAll('.fb-calc-node__arg-remove button')
-		expect(removes).toHaveLength(2)
-		fireEvent.click(removes[0] as HTMLElement)
-		expect(setValue2).toHaveBeenCalledWith({
-			type: 'fn',
-			fn: 'min',
-			args: [{ type: 'lit', value: 2 }],
-		})
-	})
-
-	it('offers clearable field pickers that reset the reference', () => {
-		const setValue = setField({ type: 'ref', field: 'price' })
-		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const ref = first.container.querySelector('select.fb-calc-node__ref') as HTMLSelectElement
-		expect(ref.getAttribute('data-clearable')).toBe('true')
-		const kind = first.container.querySelector('select.fb-calc-node__kind') as HTMLSelectElement
-		expect(kind.getAttribute('data-clearable')).toBe('false')
-		fireEvent.change(ref, { target: { value: '' } })
-		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: '' })
-		cleanup()
-
-		const setValue2 = setField({ type: 'weight', field: 'size', weights: { s: 2 } })
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const chooser = container.querySelector(
-			'select.fb-calc-node__weight-field'
-		) as HTMLSelectElement
-		expect(chooser.getAttribute('data-clearable')).toBe('true')
-		fireEvent.change(chooser, { target: { value: '' } })
-		expect(setValue2).toHaveBeenCalledWith({ type: 'weight', field: '', weights: {} })
-	})
-
-	it('unwraps a container node to its first child, preserving the subtree', () => {
-		const setValue = setField(opTree)
-		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByLabelText(keys.calcBuilderUnwrap))
-		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: 'price' })
-	})
-
-	it('clears the whole expression when removing a root leaf', () => {
-		const setValue = setField({ type: 'lit', value: 2 })
-		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		fireEvent.click(screen.getByLabelText(keys.calcBuilderRemove))
-		expect(setValue).toHaveBeenCalledWith(null)
-	})
-
-	it('reseeds a nested leaf to Number 0 on remove', () => {
-		const setValue = setField(opTree)
-		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const removes = screen.getAllByLabelText(keys.calcBuilderRemove)
-		expect(removes).toHaveLength(2)
-		fireEvent.click(removes[0] as HTMLElement)
-		expect(setValue).toHaveBeenCalledWith({
-			type: 'op',
-			op: '*',
-			left: { type: 'lit', value: 0 },
-			right: { type: 'ref', field: 'qty' },
-		})
-	})
-
-	it('edits a nested child immutably via its path', () => {
-		const setValue = setField(opTree)
-		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const refs = container.querySelectorAll('select.fb-calc-node__ref')
-		fireEvent.change(refs[1] as HTMLSelectElement, { target: { value: 'score' } })
-		expect(setValue).toHaveBeenCalledWith({
-			type: 'op',
-			op: '*',
-			left: { type: 'ref', field: 'price' },
-			right: { type: 'ref', field: 'score' },
-		})
-	})
-
 	it('disables every control and blocks writes when readOnly', () => {
-		const setValue = setField(opTree)
+		const setValue = setField(rightNested)
 		const { container } = render(
 			<CalcExpressionBuilder path="fields.4.expression" field={{}} readOnly />
 		)
@@ -476,7 +555,7 @@ describe('CalcExpressionBuilder', () => {
 		for (const button of Array.from(container.querySelectorAll('button'))) {
 			expect((button as HTMLButtonElement).disabled).toBe(true)
 		}
-		const kind = container.querySelector('select.fb-calc-node__kind') as HTMLElement
+		const kind = container.querySelector('select.fb-calc-operand__kind') as HTMLElement
 		fireEvent.change(kind, { target: { value: 'lit' } })
 		expect(setValue).not.toHaveBeenCalled()
 	})

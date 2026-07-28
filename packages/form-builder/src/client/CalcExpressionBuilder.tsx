@@ -15,7 +15,7 @@ import { reduceFieldsToValues } from 'payload/shared'
 import { useMemo, useState } from 'react'
 import { formatCalc } from '../calc/formatCalc'
 import { normalizeCalc } from '../calc/normalizeCalc'
-import { CALC_FNS, CALC_OPS, type CalcExpression } from '../calc/types'
+import { CALC_FNS, CALC_OPS, type CalcExpression, type CalcFn, type CalcOp } from '../calc/types'
 import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { FieldRow } from './synthesizeClientField'
@@ -30,10 +30,127 @@ export type CalcExpressionBuilderProps = {
 	descriptionKey?: TranslationKey
 }
 
-/** Node kinds offered by the picker. `neg` stays authorable via JSON only; an existing `neg` still renders. */
-type NodeKind = 'ref' | 'lit' | 'op' | 'fn' | 'weight'
+/**
+ * The editing view model: authors read and build expressions left-to-right, so the UI edits a
+ * chain (first operand, then op+operand steps, then an optional wrapping unary function) and the
+ * stored `CalcExpression` AST is derived by left-folding. The AST contract is untouched.
+ */
+export type CalcChain = { first: CalcOperand; steps: CalcChainStep[]; finish?: CalcFn }
+export type CalcChainStep = { op: CalcOp; operand: CalcOperand }
+export type CalcOperand =
+	| { kind: 'ref'; field: string }
+	| { kind: 'lit'; value: number }
+	| { kind: 'weight'; field: string; weights: Record<string, number> }
+	| { kind: 'group'; chain: CalcChain }
+	| { kind: 'fn'; fn: CalcFn; args: CalcChain[] }
+	| { kind: 'neg'; operand: CalcOperand }
 
-type ChildSlot = 'left' | 'right' | 'operand' | `arg:${number}`
+/** Kinds a leaf operand card can switch between in place; containers come from Start with, loading, or JSON. */
+type LeafKind = 'lit' | 'ref' | 'weight'
+type StartKind = 'fn' | LeafKind
+
+/** The single-argument functions offered by the "Then apply" finisher; min/max are variadic and stay Function operands. */
+const UNARY_FNS = CALC_FNS.filter((fn) => fn !== 'min' && fn !== 'max')
+
+const seedOperand = (kind: LeafKind): CalcOperand => {
+	switch (kind) {
+		case 'ref':
+			return { kind: 'ref', field: '' }
+		case 'lit':
+			return { kind: 'lit', value: 0 }
+		case 'weight':
+			return { kind: 'weight', field: '', weights: {} }
+	}
+}
+
+const seedAst = (kind: StartKind): CalcExpression => {
+	switch (kind) {
+		case 'ref':
+			return { type: 'ref', field: '' }
+		case 'lit':
+			return { type: 'lit', value: 0 }
+		case 'weight':
+			return { type: 'weight', field: '', weights: {} }
+		case 'fn':
+			return { type: 'fn', fn: 'min', args: [{ type: 'lit', value: 0 }] }
+	}
+}
+
+const emptyChain = (): CalcChain => ({ first: seedOperand('ref'), steps: [] })
+
+const astToOperand = (node: CalcExpression): CalcOperand => {
+	switch (node.type) {
+		case 'ref':
+			return { kind: 'ref', field: node.field }
+		case 'lit':
+			return { kind: 'lit', value: node.value }
+		case 'weight':
+			return { kind: 'weight', field: node.field, weights: node.weights }
+		case 'neg':
+			return { kind: 'neg', operand: astToOperand(node.operand) }
+		case 'fn':
+			return { kind: 'fn', fn: node.fn, args: node.args.map((arg) => toChain(arg, false)) }
+		case 'op':
+			return { kind: 'group', chain: toChain(node, false) }
+	}
+}
+
+const toChain = (expr: CalcExpression, allowFinish: boolean): CalcChain => {
+	const arg = expr.type === 'fn' ? expr.args[0] : undefined
+	if (
+		allowFinish &&
+		expr.type === 'fn' &&
+		expr.args.length === 1 &&
+		arg !== undefined &&
+		(UNARY_FNS as readonly CalcFn[]).includes(expr.fn)
+	) {
+		return { ...toChain(arg, false), finish: expr.fn }
+	}
+	const steps: CalcChainStep[] = []
+	let node = expr
+	while (node.type === 'op') {
+		steps.unshift({ op: node.op, operand: astToOperand(node.right) })
+		node = node.left
+	}
+	return { first: astToOperand(node), steps }
+}
+
+/**
+ * AST -> chain: the left spine of binary ops flattens into first + steps (a nested op on the right
+ * becomes a `group`); a root unary fn wrapping the whole expression loads as `finish` (min/max stay
+ * fn operands so the finisher select never holds a value it cannot offer). Total: every valid
+ * `CalcExpression` loads without loss, and `chainToAst(astToChain(x))` is structurally `x`.
+ */
+export const astToChain = (expr: CalcExpression): CalcChain => toChain(expr, true)
+
+const operandToAst = (operand: CalcOperand): CalcExpression => {
+	switch (operand.kind) {
+		case 'ref':
+			return { type: 'ref', field: operand.field }
+		case 'lit':
+			return { type: 'lit', value: operand.value }
+		case 'weight':
+			return { type: 'weight', field: operand.field, weights: operand.weights }
+		case 'neg':
+			return { type: 'neg', operand: operandToAst(operand.operand) }
+		case 'fn':
+			return { type: 'fn', fn: operand.fn, args: operand.args.map(chainBodyToAst) }
+		case 'group':
+			return chainBodyToAst(operand.chain)
+	}
+}
+
+const chainBodyToAst = (chain: CalcChain): CalcExpression =>
+	chain.steps.reduce<CalcExpression>(
+		(left, step) => ({ type: 'op', op: step.op, left, right: operandToAst(step.operand) }),
+		operandToAst(chain.first)
+	)
+
+/** Chain -> AST: left-fold first + steps into the binary tree (left-assoc matches `-`/`/`/`%`), then wrap in `finish` when set. */
+export const chainToAst = (chain: CalcChain): CalcExpression => {
+	const body = chainBodyToAst(chain)
+	return chain.finish ? { type: 'fn', fn: chain.finish, args: [body] } : body
+}
 
 type ChoiceOption = { label: string; value: string }
 type ChoiceSibling = { name: string; label: string; options: ChoiceOption[] }
@@ -41,76 +158,6 @@ type Siblings = {
 	numeric: ChoiceOption[]
 	choices: ChoiceSibling[]
 	labels: Record<string, string>
-}
-
-const seedNode = (kind: NodeKind): CalcExpression => {
-	switch (kind) {
-		case 'ref':
-			return { type: 'ref', field: '' }
-		case 'lit':
-			return { type: 'lit', value: 0 }
-		case 'op':
-			return {
-				type: 'op',
-				op: '+',
-				left: { type: 'lit', value: 0 },
-				right: { type: 'lit', value: 0 },
-			}
-		case 'fn':
-			return { type: 'fn', fn: 'round', args: [{ type: 'lit', value: 0 }] }
-		case 'weight':
-			return { type: 'weight', field: '', weights: {} }
-	}
-}
-
-/**
- * Kind switches that can contain the current node promote it (Math takes it as the left operand,
- * Function as the first argument) so switching never silently destroys a built subtree; the leaf
- * kinds have no containment relationship and replace destructively.
- */
-const convertNode = (current: CalcExpression, kind: NodeKind): CalcExpression => {
-	switch (kind) {
-		case 'op':
-			return { type: 'op', op: '+', left: current, right: { type: 'lit', value: 0 } }
-		case 'fn':
-			return { type: 'fn', fn: 'round', args: [current] }
-		default:
-			return seedNode(kind)
-	}
-}
-
-/**
- * Immutably replaces the node at `path` (a walk of child slots from the root), spreading every
- * ancestor on the way down so React re-renders exactly the edited branch and `setValue` always
- * receives a fresh tree. A slot that does not match the node shape returns the node unchanged.
- */
-const replaceAt = (
-	root: CalcExpression,
-	path: readonly ChildSlot[],
-	next: CalcExpression
-): CalcExpression => {
-	const slot = path[0]
-	if (slot === undefined) {
-		return next
-	}
-	const rest = path.slice(1)
-	if (slot === 'left' && root.type === 'op') {
-		return { ...root, left: replaceAt(root.left, rest, next) }
-	}
-	if (slot === 'right' && root.type === 'op') {
-		return { ...root, right: replaceAt(root.right, rest, next) }
-	}
-	if (slot === 'operand' && root.type === 'neg') {
-		return { ...root, operand: replaceAt(root.operand, rest, next) }
-	}
-	if (slot.startsWith('arg:') && root.type === 'fn') {
-		const index = Number(slot.slice(4))
-		return {
-			...root,
-			args: root.args.map((arg, i) => (i === index ? replaceAt(arg, rest, next) : arg)),
-		}
-	}
-	return root
 }
 
 const optionRows = (options: unknown): ChoiceOption[] => {
@@ -187,8 +234,8 @@ type NumberInputProps = {
 
 /**
  * Number input with a local draft: keystrokes commit only when the text parses to a finite number,
- * an invalid draft reverts to the committed value on blur, and an external value change (kind
- * switch, JSON apply) resyncs the draft.
+ * an invalid draft reverts to the committed value on blur, and an external value change resyncs
+ * the draft.
  */
 const NumberInput = ({
 	value,
@@ -234,213 +281,86 @@ const NumberInput = ({
 
 type BuilderCtx = {
 	t: (key: TranslationKey) => string
-	kindOptions: ChoiceOption[]
 	siblings: Siblings
 	readOnly: boolean
-	idBase: string
-	commit: (path: ChildSlot[], next: CalcExpression) => void
-	clear: () => void
 }
 
 const OP_OPTIONS: ChoiceOption[] = CALC_OPS.map((op) => ({ label: op, value: op }))
 const FN_OPTIONS: ChoiceOption[] = CALC_FNS.map((fn) => ({ label: fn, value: fn }))
+const UNARY_OPTIONS: ChoiceOption[] = UNARY_FNS.map((fn) => ({ label: fn, value: fn }))
 
-type NodeEditorProps = { node: CalcExpression; nodePath: ChildSlot[]; ctx: BuilderCtx }
+type OperandCardProps = {
+	operand: CalcOperand
+	onChange: (next: CalcOperand) => void
+	ctx: BuilderCtx
+	idPrefix: string
+}
 
-const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
-	const { t, commit, siblings, readOnly } = ctx
-	const idPrefix = `${ctx.idBase}-${nodePath.map((slot) => slot.replace(':', '-')).join('-') || 'root'}`
-	const kindOptions =
-		node.type === 'neg'
-			? [...ctx.kindOptions, { label: t(keys.calcBuilderNegate), value: 'neg' }]
-			: ctx.kindOptions
-	const choice =
-		node.type === 'weight' ? siblings.choices.find((c) => c.name === node.field) : undefined
-	const refOptions = node.type === 'ref' ? withStored(siblings.numeric, node.field) : []
-	const choiceOptions =
-		node.type === 'weight'
-			? withStored(
-					siblings.choices.map((c) => ({ label: c.label, value: c.name })),
-					node.field
-				)
-			: []
-	const isContainer = node.type === 'op' || node.type === 'fn' || node.type === 'neg'
-	// The inverse of promote-on-kind-switch: containers unwrap to their first child (subtree kept),
-	// a leaf at the root clears the expression, and a leaf in a child slot reseeds that slot.
-	const handleRemove = () => {
-		if (node.type === 'op') {
-			commit(nodePath, node.left)
-			return
-		}
-		if (node.type === 'fn') {
-			commit(nodePath, node.args[0] ?? seedNode('lit'))
-			return
-		}
-		if (node.type === 'neg') {
-			commit(nodePath, node.operand)
-			return
-		}
-		if (nodePath.length === 0) {
-			ctx.clear()
-			return
-		}
-		commit(nodePath, seedNode('lit'))
-	}
-	return (
-		<div className="fb-calc-node">
-			<div className="fb-calc-node__header">
-				<label className="fb-visually-hidden" htmlFor={`${idPrefix}-kind`}>
-					{t(keys.calcBuilderKind)}
-				</label>
-				<ReactSelect
-					className="fb-calc-node__kind"
-					inputId={`${idPrefix}-kind`}
-					options={kindOptions}
-					value={kindOptions.find((option) => option.value === node.type)}
-					isClearable={false}
-					disabled={readOnly}
-					onChange={(selected) => {
-						const chosen = singleOption(selected)
-						if (chosen && chosen.value !== node.type) {
-							commit(nodePath, convertNode(node, chosen.value as NodeKind))
-						}
-					}}
+const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => {
+	const { t, siblings, readOnly } = ctx
+
+	if (operand.kind === 'group') {
+		return (
+			<div className="fb-calc-operand fb-calc-operand--group">
+				<div className="fb-calc-operand__title">{t(keys.calcBuilderGroup)}</div>
+				<ChainEditor
+					chain={operand.chain}
+					onChange={(chain) => onChange({ ...operand, chain })}
+					onEmptied={() => onChange({ ...operand, chain: emptyChain() })}
+					ctx={ctx}
+					idPrefix={`${idPrefix}-g`}
 				/>
-				{node.type === 'op' ? (
-					<>
-						<label className="fb-visually-hidden" htmlFor={`${idPrefix}-op`}>
-							{t(keys.calcBuilderMath)}
-						</label>
-						<ReactSelect
-							className="fb-calc-node__op"
-							inputId={`${idPrefix}-op`}
-							options={OP_OPTIONS}
-							value={OP_OPTIONS.find((option) => option.value === node.op)}
-							isClearable={false}
-							disabled={readOnly}
-							onChange={(selected) => {
-								const chosen = singleOption(selected)
-								if (chosen) {
-									commit(nodePath, { ...node, op: chosen.value as typeof node.op })
-								}
-							}}
-						/>
-					</>
-				) : null}
-				{node.type === 'fn' ? (
-					<>
-						<label className="fb-visually-hidden" htmlFor={`${idPrefix}-fn`}>
-							{t(keys.calcBuilderFunction)}
-						</label>
-						<ReactSelect
-							className="fb-calc-node__fn"
-							inputId={`${idPrefix}-fn`}
-							options={FN_OPTIONS}
-							value={FN_OPTIONS.find((option) => option.value === node.fn)}
-							isClearable={false}
-							disabled={readOnly}
-							onChange={(selected) => {
-								const chosen = singleOption(selected)
-								if (chosen) {
-									commit(nodePath, { ...node, fn: chosen.value as typeof node.fn })
-								}
-							}}
-						/>
-					</>
-				) : null}
-				{node.type === 'ref' ? (
-					refOptions.length === 0 ? (
-						<p className="fb-calc-node__hint">{t(keys.calcBuilderNoNumericFields)}</p>
-					) : (
-						<>
-							<label className="fb-visually-hidden" htmlFor={`${idPrefix}-ref`}>
-								{t(keys.calcBuilderPickField)}
-							</label>
-							<ReactSelect
-								className="fb-calc-node__ref"
-								inputId={`${idPrefix}-ref`}
-								options={refOptions}
-								value={refOptions.find((option) => option.value === node.field)}
-								isClearable={!readOnly}
-								disabled={readOnly}
-								placeholder={t(keys.calcBuilderPickField)}
-								onChange={(selected) => {
-									const chosen = singleOption(selected)
-									commit(nodePath, { type: 'ref', field: chosen ? String(chosen.value) : '' })
-								}}
-							/>
-						</>
-					)
-				) : null}
-				{node.type === 'lit' ? (
-					<NumberInput
-						className="fb-calc-node__number"
-						id={`${idPrefix}-number`}
-						aria-label={t(keys.calcBuilderNumber)}
-						disabled={readOnly}
-						value={node.value}
-						onCommit={(value) => commit(nodePath, { type: 'lit', value })}
-					/>
-				) : null}
-				{node.type === 'weight' ? (
-					choiceOptions.length === 0 ? (
-						<p className="fb-calc-node__hint">{t(keys.calcBuilderNoChoiceFields)}</p>
-					) : (
-						<>
-							<label className="fb-visually-hidden" htmlFor={`${idPrefix}-weight-field`}>
-								{t(keys.calcBuilderPickField)}
-							</label>
-							<ReactSelect
-								className="fb-calc-node__weight-field"
-								inputId={`${idPrefix}-weight-field`}
-								options={choiceOptions}
-								value={choiceOptions.find((option) => option.value === node.field)}
-								isClearable={!readOnly}
-								disabled={readOnly}
-								placeholder={t(keys.calcBuilderPickField)}
-								onChange={(selected) => {
-									const chosen = singleOption(selected)
-									const field = chosen ? String(chosen.value) : ''
-									if (field !== node.field) {
-										commit(nodePath, { type: 'weight', field, weights: {} })
-									}
-								}}
-							/>
-						</>
-					)
-				) : null}
-				<div className="fb-calc-node__remove">
-					<Button
-						buttonStyle="icon-label"
-						icon="x"
-						aria-label={isContainer ? t(keys.calcBuilderUnwrap) : t(keys.calcBuilderRemove)}
-						margin={false}
-						disabled={readOnly}
-						onClick={handleRemove}
-					/>
-				</div>
 			</div>
-			{node.type === 'op' ? (
-				<div className="fb-calc-node__children">
-					<NodeEditor node={node.left} nodePath={[...nodePath, 'left']} ctx={ctx} />
-					<NodeEditor node={node.right} nodePath={[...nodePath, 'right']} ctx={ctx} />
+		)
+	}
+
+	if (operand.kind === 'fn') {
+		return (
+			<div className="fb-calc-operand fb-calc-operand--fn">
+				<div className="fb-calc-operand__header">
+					<label className="fb-visually-hidden" htmlFor={`${idPrefix}-fn`}>
+						{t(keys.calcBuilderFunction)}
+					</label>
+					<ReactSelect
+						className="fb-calc-operand__fn"
+						inputId={`${idPrefix}-fn`}
+						options={FN_OPTIONS}
+						value={FN_OPTIONS.find((option) => option.value === operand.fn)}
+						isClearable={false}
+						disabled={readOnly}
+						onChange={(selected) => {
+							const chosen = singleOption(selected)
+							if (chosen) {
+								onChange({ ...operand, fn: chosen.value as CalcFn })
+							}
+						}}
+					/>
 				</div>
-			) : null}
-			{node.type === 'neg' ? (
-				<div className="fb-calc-node__children">
-					<NodeEditor node={node.operand} nodePath={[...nodePath, 'operand']} ctx={ctx} />
-				</div>
-			) : null}
-			{node.type === 'fn' ? (
-				<div className="fb-calc-node__children">
-					{node.args.map((arg, index) => (
+				<div className="fb-calc-fn__args">
+					{operand.args.map((arg, index) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: args are positional and never reordered
-						<div key={index} className="fb-calc-node__arg">
-							<div className="fb-calc-node__arg-editor">
-								<NodeEditor node={arg} nodePath={[...nodePath, `arg:${index}`]} ctx={ctx} />
+						<div key={index} className="fb-calc-fn__arg">
+							<div className="fb-calc-fn__arg-chain">
+								<ChainEditor
+									chain={arg}
+									onChange={(next) =>
+										onChange({
+											...operand,
+											args: operand.args.map((a, i) => (i === index ? next : a)),
+										})
+									}
+									onEmptied={() =>
+										onChange({
+											...operand,
+											args: operand.args.map((a, i) => (i === index ? emptyChain() : a)),
+										})
+									}
+									ctx={ctx}
+									idPrefix={`${idPrefix}-a${index}`}
+								/>
 							</div>
-							{node.args.length > 1 ? (
-								<div className="fb-calc-node__arg-remove">
+							{operand.args.length > 1 ? (
+								<div className="fb-calc-fn__arg-remove">
 									<Button
 										buttonStyle="icon-label"
 										icon="x"
@@ -448,9 +368,9 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 										margin={false}
 										disabled={readOnly}
 										onClick={() =>
-											commit(nodePath, {
-												...node,
-												args: node.args.filter((_, i) => i !== index),
+											onChange({
+												...operand,
+												args: operand.args.filter((_, i) => i !== index),
 											})
 										}
 									/>
@@ -458,7 +378,7 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 							) : null}
 						</div>
 					))}
-					<div className="fb-calc-node__add">
+					<div className="fb-calc-fn__add">
 						<Button
 							buttonStyle="icon-label"
 							icon="plus"
@@ -466,32 +386,152 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 							iconPosition="left"
 							margin={false}
 							disabled={readOnly}
-							onClick={() => commit(nodePath, { ...node, args: [...node.args, seedNode('lit')] })}
+							onClick={() =>
+								onChange({
+									...operand,
+									args: [...operand.args, { first: { kind: 'lit', value: 0 }, steps: [] }],
+								})
+							}
 						>
 							{t(keys.calcBuilderAddArgument)}
 						</Button>
 					</div>
 				</div>
-			) : null}
-			{node.type === 'weight' && choice ? (
-				<div className="fb-calc-node__weights">
+			</div>
+		)
+	}
+
+	if (operand.kind === 'neg') {
+		return (
+			<div className="fb-calc-operand fb-calc-operand--neg">
+				<div className="fb-calc-operand__title">{t(keys.calcBuilderNegate)}</div>
+				<OperandCard
+					operand={operand.operand}
+					onChange={(next) => onChange({ kind: 'neg', operand: next })}
+					ctx={ctx}
+					idPrefix={`${idPrefix}-n`}
+				/>
+			</div>
+		)
+	}
+
+	const leafKindOptions: ChoiceOption[] = [
+		{ label: t(keys.calcBuilderAnswer), value: 'ref' },
+		{ label: t(keys.calcBuilderNumber), value: 'lit' },
+		{ label: t(keys.calcBuilderWeights), value: 'weight' },
+	]
+	const refOptions = operand.kind === 'ref' ? withStored(siblings.numeric, operand.field) : []
+	const choiceOptions =
+		operand.kind === 'weight'
+			? withStored(
+					siblings.choices.map((c) => ({ label: c.label, value: c.name })),
+					operand.field
+				)
+			: []
+	const choice =
+		operand.kind === 'weight' ? siblings.choices.find((c) => c.name === operand.field) : undefined
+
+	return (
+		<div className="fb-calc-operand">
+			<div className="fb-calc-operand__header">
+				<label className="fb-visually-hidden" htmlFor={`${idPrefix}-kind`}>
+					{t(keys.calcBuilderKind)}
+				</label>
+				<ReactSelect
+					className="fb-calc-operand__kind"
+					inputId={`${idPrefix}-kind`}
+					options={leafKindOptions}
+					value={leafKindOptions.find((option) => option.value === operand.kind)}
+					isClearable={false}
+					disabled={readOnly}
+					onChange={(selected) => {
+						const chosen = singleOption(selected)
+						if (chosen && chosen.value !== operand.kind) {
+							onChange(seedOperand(chosen.value as LeafKind))
+						}
+					}}
+				/>
+				{operand.kind === 'ref' ? (
+					refOptions.length === 0 ? (
+						<p className="fb-calc-hint">{t(keys.calcBuilderNoNumericFields)}</p>
+					) : (
+						<>
+							<label className="fb-visually-hidden" htmlFor={`${idPrefix}-ref`}>
+								{t(keys.calcBuilderPickField)}
+							</label>
+							<ReactSelect
+								className="fb-calc-operand__ref"
+								inputId={`${idPrefix}-ref`}
+								options={refOptions}
+								value={refOptions.find((option) => option.value === operand.field)}
+								isClearable={!readOnly}
+								disabled={readOnly}
+								placeholder={t(keys.calcBuilderPickField)}
+								onChange={(selected) => {
+									const chosen = singleOption(selected)
+									onChange({ kind: 'ref', field: chosen ? String(chosen.value) : '' })
+								}}
+							/>
+						</>
+					)
+				) : null}
+				{operand.kind === 'lit' ? (
+					<NumberInput
+						className="fb-calc-operand__number"
+						id={`${idPrefix}-number`}
+						aria-label={t(keys.calcBuilderNumber)}
+						disabled={readOnly}
+						value={operand.value}
+						onCommit={(value) => onChange({ kind: 'lit', value })}
+					/>
+				) : null}
+				{operand.kind === 'weight' ? (
+					choiceOptions.length === 0 ? (
+						<p className="fb-calc-hint">{t(keys.calcBuilderNoChoiceFields)}</p>
+					) : (
+						<>
+							<label className="fb-visually-hidden" htmlFor={`${idPrefix}-weight-field`}>
+								{t(keys.calcBuilderPickField)}
+							</label>
+							<ReactSelect
+								className="fb-calc-operand__weight-field"
+								inputId={`${idPrefix}-weight-field`}
+								options={choiceOptions}
+								value={choiceOptions.find((option) => option.value === operand.field)}
+								isClearable={!readOnly}
+								disabled={readOnly}
+								placeholder={t(keys.calcBuilderPickField)}
+								onChange={(selected) => {
+									const chosen = singleOption(selected)
+									const field = chosen ? String(chosen.value) : ''
+									if (field !== operand.field) {
+										onChange({ kind: 'weight', field, weights: {} })
+									}
+								}}
+							/>
+						</>
+					)
+				) : null}
+			</div>
+			{operand.kind === 'weight' && choice ? (
+				<div className="fb-calc-operand__weights">
 					{choice.options.map((option) => (
-						<div key={option.value} className="fb-calc-node__weight-row">
+						<div key={option.value} className="fb-calc-operand__weight-row">
 							<label
-								className="fb-calc-node__weight-label"
+								className="fb-calc-operand__weight-label"
 								htmlFor={`${idPrefix}-weight-${option.value}`}
 							>
 								{option.label}
 							</label>
 							<NumberInput
-								className="fb-calc-node__weight"
+								className="fb-calc-operand__weight"
 								id={`${idPrefix}-weight-${option.value}`}
 								disabled={readOnly}
-								value={node.weights[option.value]}
+								value={operand.weights[option.value]}
 								onCommit={(value) =>
-									commit(nodePath, {
-										...node,
-										weights: { ...node.weights, [option.value]: value },
+									onChange({
+										...operand,
+										weights: { ...operand.weights, [option.value]: value },
 									})
 								}
 							/>
@@ -503,10 +543,122 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 	)
 }
 
+type ChainEditorProps = {
+	chain: CalcChain
+	onChange: (next: CalcChain) => void
+	/** Called when the chain's only row is removed: the root clears the expression, nested slots reseed. */
+	onEmptied: () => void
+	ctx: BuilderCtx
+	idPrefix: string
+}
+
+const ChainEditor = ({ chain, onChange, onEmptied, ctx, idPrefix }: ChainEditorProps) => {
+	const { t, readOnly } = ctx
+
+	const removeRow = (row: number) => {
+		if (row === 0) {
+			const [promoted, ...rest] = chain.steps
+			if (!promoted) {
+				onEmptied()
+				return
+			}
+			onChange({ ...chain, first: promoted.operand, steps: rest })
+			return
+		}
+		onChange({ ...chain, steps: chain.steps.filter((_, i) => i !== row - 1) })
+	}
+
+	const rows: { op?: CalcOp; operand: CalcOperand }[] = [
+		{ operand: chain.first },
+		...chain.steps.map((step) => ({ op: step.op, operand: step.operand })),
+	]
+
+	return (
+		<div className="fb-calc-chain">
+			{rows.map((row, index) => (
+				// biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and never reordered
+				<div key={index} className="fb-calc-row">
+					{index > 0 ? (
+						<>
+							<label className="fb-visually-hidden" htmlFor={`${idPrefix}-r${index}-op`}>
+								{t(keys.calcBuilderMath)}
+							</label>
+							<ReactSelect
+								className="fb-calc-row__op"
+								inputId={`${idPrefix}-r${index}-op`}
+								options={OP_OPTIONS}
+								value={OP_OPTIONS.find((option) => option.value === row.op)}
+								isClearable={false}
+								disabled={readOnly}
+								onChange={(selected) => {
+									const chosen = singleOption(selected)
+									if (chosen) {
+										onChange({
+											...chain,
+											steps: chain.steps.map((step, i) =>
+												i === index - 1 ? { ...step, op: chosen.value as CalcOp } : step
+											),
+										})
+									}
+								}}
+							/>
+						</>
+					) : null}
+					<div className="fb-calc-row__operand">
+						<OperandCard
+							operand={row.operand}
+							onChange={(operand) =>
+								index === 0
+									? onChange({ ...chain, first: operand })
+									: onChange({
+											...chain,
+											steps: chain.steps.map((step, i) =>
+												i === index - 1 ? { ...step, operand } : step
+											),
+										})
+							}
+							ctx={ctx}
+							idPrefix={`${idPrefix}-r${index}`}
+						/>
+					</div>
+					<div className="fb-calc-row__remove">
+						<Button
+							buttonStyle="icon-label"
+							icon="x"
+							aria-label={t(keys.calcBuilderRemove)}
+							margin={false}
+							disabled={readOnly}
+							onClick={() => removeRow(index)}
+						/>
+					</div>
+				</div>
+			))}
+			<div className="fb-calc-chain__add">
+				<Button
+					buttonStyle="icon-label"
+					icon="plus"
+					iconStyle="with-border"
+					iconPosition="left"
+					margin={false}
+					disabled={readOnly}
+					onClick={() =>
+						onChange({
+							...chain,
+							steps: [...chain.steps, { op: '*', operand: seedOperand('ref') }],
+						})
+					}
+				>
+					{t(keys.calcBuilderAddStep)}
+				</Button>
+			</div>
+		</div>
+	)
+}
+
 /**
- * Visual editor for the calculation field's `expression` AST. Edits the stored `CalcExpression`
- * tree in place (storage shape unchanged; `validateExpression` stays the server gate) with an
- * "Edit as JSON" escape hatch that round-trips through `normalizeCalc`.
+ * Visual editor for the calculation field's `expression` AST, presented as a left-to-right chain
+ * (storage shape unchanged; `validateExpression` stays the server gate) with an "Edit as JSON"
+ * escape hatch that round-trips through `normalizeCalc`.
  */
 export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	const {
@@ -525,6 +677,7 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	const readOnly = props.readOnly === true || disabled === true
 
 	const expression = useMemo(() => normalizeCalc(value), [value])
+	const chain = useMemo(() => (expression ? astToChain(expression) : undefined), [expression])
 
 	// The expression path is `fields.<row>.expression`; that row is the calculation block being
 	// edited, so it bounds which calculation siblings are referenceable (see siblingsFromData).
@@ -546,28 +699,48 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	const [jsonDraft, setJsonDraft] = useState<string | null>(null)
 	const [jsonError, setJsonError] = useState(false)
 
-	const kindOptions: ChoiceOption[] = [
+	const startOptions: ChoiceOption[] = [
 		{ label: t(keys.calcBuilderAnswer), value: 'ref' },
 		{ label: t(keys.calcBuilderNumber), value: 'lit' },
-		{ label: t(keys.calcBuilderMath), value: 'op' },
-		{ label: t(keys.calcBuilderFunction), value: 'fn' },
 		{ label: t(keys.calcBuilderWeights), value: 'weight' },
+		{ label: t(keys.calcBuilderFunction), value: 'fn' },
+	]
+	const startDescriptions: { key: string; label: string; description: string }[] = [
+		{
+			key: 'ref',
+			label: t(keys.calcBuilderAnswer),
+			description: t(keys.calcBuilderFieldDescription),
+		},
+		{
+			key: 'lit',
+			label: t(keys.calcBuilderNumber),
+			description: t(keys.calcBuilderNumberDescription),
+		},
+		{
+			key: 'weight',
+			label: t(keys.calcBuilderWeights),
+			description: t(keys.calcBuilderWeightsDescription),
+		},
+		{
+			key: 'fn',
+			label: t(keys.calcBuilderFunction),
+			description: t(keys.calcBuilderFunctionDescription),
+		},
 	]
 
-	const commit = (nodePath: ChildSlot[], next: CalcExpression) => {
-		if (readOnly) {
-			return
+	const commitChain = (next: CalcChain) => {
+		if (!readOnly) {
+			setValue(chainToAst(next))
 		}
-		setValue(expression ? replaceAt(expression, nodePath, next) : next)
 	}
-
-	const labelOf = (field: string) => siblings.labels[field] ?? field
 
 	const clear = () => {
 		if (!readOnly) {
 			setValue(null)
 		}
 	}
+
+	const labelOf = (field: string) => siblings.labels[field] ?? field
 
 	/** `null` is a valid JSON parse, so failure needs a flag rather than a sentinel value. */
 	const parseDraft = (text: string): { ok: boolean; parsed: unknown } => {
@@ -577,6 +750,11 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 			return { ok: false, parsed: undefined }
 		}
 	}
+
+	// A stored value that fails normalization (legacy/foreign data) serializes raw, so JSON mode
+	// never silently clobbers it.
+	const serializeCurrent = () =>
+		JSON.stringify(expression ?? (value === undefined || value === '' ? null : value), null, 2)
 
 	// Live-commits the draft whenever it is a well-formed expression, so a JSON edit is never lost
 	// when the document is saved without leaving JSON mode; the toggle stays the final apply gate.
@@ -601,11 +779,6 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 			setValue(normalized)
 		}
 	}
-
-	// A stored value that fails normalization (legacy/foreign data) serializes raw, so JSON mode
-	// never silently clobbers it.
-	const serializeCurrent = () =>
-		JSON.stringify(expression ?? (value === undefined || value === '' ? null : value), null, 2)
 
 	const toggleJson = () => {
 		if (!jsonMode) {
@@ -639,7 +812,7 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	}
 
 	const idBase = `calc-${path.replace(/\./g, '__')}`
-	const ctx: BuilderCtx = { t, kindOptions, siblings, readOnly, idBase, commit, clear }
+	const ctx: BuilderCtx = { t, siblings, readOnly }
 
 	return (
 		<div
@@ -673,26 +846,63 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 							</p>
 						) : null}
 					</>
-				) : expression ? (
-					<NodeEditor node={expression} nodePath={[]} ctx={ctx} />
+				) : chain ? (
+					<>
+						<ChainEditor
+							chain={chain}
+							onChange={commitChain}
+							onEmptied={clear}
+							ctx={ctx}
+							idPrefix={idBase}
+						/>
+						<div className="fb-calc-finish">
+							<label className="fb-calc-finish__label" htmlFor={`${idBase}-finish`}>
+								{t(keys.calcBuilderThenApply)}
+							</label>
+							<ReactSelect
+								className="fb-calc-finish__select"
+								inputId={`${idBase}-finish`}
+								options={UNARY_OPTIONS}
+								value={UNARY_OPTIONS.find((option) => option.value === chain.finish)}
+								isClearable={!readOnly}
+								disabled={readOnly}
+								onChange={(selected) => {
+									const chosen = singleOption(selected)
+									commitChain({
+										...chain,
+										finish: chosen ? (chosen.value as CalcFn) : undefined,
+									})
+								}}
+							/>
+						</div>
+					</>
 				) : (
 					<div className="fb-calc-builder__empty">
-						<label className="fb-calc-builder__hint" htmlFor={`${idBase}-seed`}>
-							{t(keys.calcBuilderAddExpression)}
+						<p className="fb-calc-builder__hint">{t(keys.calcBuilderAddExpression)}</p>
+						<label className="fb-visually-hidden" htmlFor={`${idBase}-seed`}>
+							{t(keys.calcBuilderStartWith)}
 						</label>
 						<ReactSelect
 							className="fb-calc-builder__seed"
 							inputId={`${idBase}-seed`}
-							options={kindOptions}
+							options={startOptions}
 							disabled={readOnly}
-							placeholder={t(keys.calcBuilderAddExpression)}
+							placeholder={t(keys.calcBuilderStartWith)}
 							onChange={(selected) => {
 								const chosen = singleOption(selected)
 								if (chosen && !readOnly) {
-									setValue(seedNode(chosen.value as NodeKind))
+									setValue(seedAst(chosen.value as StartKind))
 								}
 							}}
 						/>
+						<ul className="fb-calc-builder__kinds">
+							{startDescriptions.map((entry) => (
+								<li key={entry.key}>
+									<span className="fb-calc-builder__kind-label">{entry.label}</span>{' '}
+									{entry.description}
+								</li>
+							))}
+						</ul>
 					</div>
 				)}
 				<p className="fb-calc-builder__preview" aria-live="polite">

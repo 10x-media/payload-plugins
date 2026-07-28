@@ -343,7 +343,50 @@
 	font-size: 0.875rem;
 	margin: 0;
 }
-.fb-calc-node {
+.fb-calc-builder__kinds {
+	margin: 0;
+	padding-inline-start: 1rem;
+	color: var(--theme-elevation-400);
+	font-size: 0.8125rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+}
+.fb-calc-builder__kind-label {
+	color: var(--theme-elevation-600);
+	font-weight: 600;
+}
+.fb-calc-chain {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+/* One deliberate row: [op select (fixed)] [operand card (flexes)] [remove]. Nothing wraps;
+ * flexing controls shrink and ellipsize instead. */
+.fb-calc-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+}
+.fb-calc-row__op {
+	flex: 0 0 90px;
+	min-width: 0;
+	/* Cards pad 0.75rem above their 40px control row; align the op select with that control. */
+	margin-block-start: 0.75rem;
+}
+.fb-calc-row__operand {
+	flex: 1;
+	min-width: 0;
+}
+.fb-calc-row__remove {
+	flex-shrink: 0;
+	padding-block-start: 0.75rem;
+}
+.fb-calc-chain__add {
+	align-self: flex-start;
+}
+.fb-calc-operand {
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
@@ -351,14 +394,19 @@
 	border: 1px solid var(--theme-border-color);
 	border-radius: var(--style-radius-s);
 }
-/* One deliberate row per card: kind select (fixed) | kind control (flexes) | remove (right).
- * Nothing wraps; flexing controls shrink and ellipsize instead. */
-.fb-calc-node__header {
+.fb-calc-operand__title {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--theme-elevation-400);
+}
+.fb-calc-operand__header {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
 }
-.fb-calc-node__hint {
+.fb-calc-hint {
 	color: var(--theme-elevation-400);
 	font-size: 0.875rem;
 	margin: 0;
@@ -368,34 +416,29 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-/* 200px fits the longest kind label in both locales ("Gewichtete Antworten": ~140px at the 13px
- * admin body size) plus the react-select control chrome (2 x base(0.6) padding + indicator). */
-.fb-calc-node__header > .fb-calc-node__kind {
+/* 200px fits the longest kind label in both locales ("Gewichtetes Feld" / "Weighted field":
+ * ~110px at the 13px admin body size) plus the react-select control chrome (2 x base(0.6)
+ * padding + indicator), with room for zoomed fonts. */
+.fb-calc-operand__header > .fb-calc-operand__kind {
 	flex: 0 0 200px;
 	min-width: 0;
 }
-.fb-calc-node__header > .fb-calc-node__op,
-.fb-calc-node__header > .fb-calc-node__fn {
-	flex: 0 0 90px;
+.fb-calc-operand__header > .fb-calc-operand__fn {
+	flex: 0 0 110px;
 	min-width: 0;
 }
-.fb-calc-node__header > .fb-calc-node__ref,
-.fb-calc-node__header > .fb-calc-node__weight-field {
+.fb-calc-operand__header > .fb-calc-operand__ref,
+.fb-calc-operand__header > .fb-calc-operand__weight-field {
 	flex: 1 1 auto;
 	min-width: 0;
 }
-.fb-calc-node__remove {
-	margin-inline-start: auto;
-	flex-shrink: 0;
-}
-.fb-calc-node .rs__single-value,
-.fb-calc-builder__seed .rs__single-value {
+.fb-calc-builder .rs__single-value {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.fb-calc-node__number,
-.fb-calc-node__weight {
+.fb-calc-operand__number,
+.fb-calc-operand__weight {
 	height: 40px;
 	padding: 0 15px;
 	font-size: 1rem;
@@ -409,55 +452,54 @@
 		background-color 100ms ease,
 		box-shadow 100ms ease;
 }
-.fb-calc-node__number:hover,
-.fb-calc-node__weight:hover {
+.fb-calc-operand__number:hover,
+.fb-calc-operand__weight:hover {
 	border-color: var(--theme-elevation-250);
 }
-.fb-calc-node__number:focus,
-.fb-calc-node__weight:focus {
+.fb-calc-operand__number:focus,
+.fb-calc-operand__weight:focus {
 	border-color: var(--theme-elevation-400);
 	outline: none;
 }
-.fb-calc-node__header > .fb-calc-node__number {
+.fb-calc-operand__header > .fb-calc-operand__number {
 	flex: 1 1 auto;
 	min-width: 60px;
 	width: 0;
 }
-.fb-calc-node__children {
+.fb-calc-fn__args {
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
 	padding-inline-start: 0.75rem;
 	border-inline-start: 2px solid var(--theme-elevation-100);
 }
-.fb-calc-node__arg {
+.fb-calc-fn__arg {
 	display: flex;
 	align-items: flex-start;
 	gap: 0.5rem;
 }
-.fb-calc-node__arg-editor {
+.fb-calc-fn__arg-chain {
 	flex: 1;
 	min-width: 0;
 }
-.fb-calc-node__arg-remove {
+.fb-calc-fn__arg-remove {
 	flex-shrink: 0;
-	/* Node cards are 40px-control rows plus 0.75rem padding; center the remove on the first row. */
 	padding-block-start: 0.75rem;
 }
-.fb-calc-node__add {
+.fb-calc-fn__add {
 	align-self: flex-start;
 }
-.fb-calc-node__weights {
+.fb-calc-operand__weights {
 	display: flex;
 	flex-direction: column;
 	gap: 0.375rem;
 }
-.fb-calc-node__weight-row {
+.fb-calc-operand__weight-row {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
 }
-.fb-calc-node__weight-label {
+.fb-calc-operand__weight-label {
 	flex: 1;
 	min-width: 0;
 	font-size: 0.875rem;
@@ -465,6 +507,20 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-.fb-calc-node__weight-row > .fb-calc-node__weight {
+.fb-calc-operand__weight-row > .fb-calc-operand__weight {
 	flex: 0 0 8rem;
+}
+.fb-calc-finish {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fb-calc-finish__label {
+	font-size: 0.875rem;
+	color: var(--theme-elevation-600);
+	white-space: nowrap;
+}
+.fb-calc-finish__select {
+	flex: 0 0 200px;
+	min-width: 0;
 }
