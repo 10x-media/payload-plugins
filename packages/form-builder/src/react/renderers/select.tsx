@@ -7,9 +7,9 @@ import { Select } from '../primitives/Select'
 export const selectRenderer = defineFieldRenderer<string>(
 	({ field, id, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const describedById = `${id}-desc`
-		const options = Array.isArray(field.options)
-			? (field.options as { label: string; value: string }[])
-			: []
+		const options = (
+			Array.isArray(field.options) ? (field.options as { label?: string; value: string }[]) : []
+		).map((option) => ({ value: option.value, label: option.label ?? option.value }))
 		return (
 			<FieldShell
 				id={id}

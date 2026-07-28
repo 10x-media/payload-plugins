@@ -3,7 +3,7 @@ import { labelFor } from '../../translations/server'
 import { defineFormField } from '../defineFormField'
 import { localizedIf } from '../localizedIf'
 
-type SelectOption = { label: string; value: string }
+type SelectOption = { label?: string; value: string }
 type SelectConfig = { options?: SelectOption[] }
 
 /** Option `label` is author-facing content and follows `localize`; `value` is an identifier and never does. */
@@ -24,7 +24,6 @@ export const buildSelectField = (localize: boolean) =>
 					{
 						name: 'label',
 						type: 'text',
-						required: true,
 						label: labelFor(keys.configOptionLabel),
 						...localizedIf(localize),
 					},

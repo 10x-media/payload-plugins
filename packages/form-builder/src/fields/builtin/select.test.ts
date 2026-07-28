@@ -7,6 +7,7 @@ const t = (key: string) => key
 
 type FieldWithLabel = {
 	name: string
+	required?: boolean
 	label?: (args: { t: (key: string) => string }) => string
 	fields?: FieldWithLabel[]
 }
@@ -44,6 +45,9 @@ describe('selectField', () => {
 	})
 	it('falls back to the raw value when no label is known', () => {
 		expect(selectField.format?.({ value: 'pro', config, locale: 'en', t })).toBe('pro')
+	})
+	it('does not require an option label; the value stands alone', () => {
+		expect(optionLabelField?.required).toBeFalsy()
 	})
 })
 
