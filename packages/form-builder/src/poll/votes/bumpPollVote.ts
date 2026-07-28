@@ -49,11 +49,18 @@ export async function bumpPollVote(
 		const model = db.collections[POLL_VOTES_SLUG]
 		if (!model) throw new Error(`form-builder: mongoose collection "${POLL_VOTES_SLUG}" not found`)
 		const session = transactionID !== undefined ? db.sessions?.[transactionID] : undefined
-		await model.collection.updateOne(
-			key,
-			{ $inc: { count: by }, $setOnInsert: key },
-			session ? { upsert: true, session } : { upsert: true }
-		)
+		const update = { $inc: { count: by }, $setOnInsert: key }
+		const options = session ? { upsert: true, session } : { upsert: true }
+		try {
+			await model.collection.updateOne(key, update, options)
+		} catch (error) {
+			// Concurrent first inserts for a new key can race the upsert into E11000; outside a
+			// transaction the row now exists, so one retry takes the $inc branch. Inside a
+			// transaction the error propagates and Payload's rollback/retry semantics apply.
+			const duplicate = (error as { code?: unknown } | null)?.code === 11000
+			if (session || !duplicate) throw error
+			await model.collection.updateOne(key, update, options)
+		}
 		return
 	}
 	const { sql } = await import('@payloadcms/db-postgres')

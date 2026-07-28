@@ -116,6 +116,39 @@ describe('bumpPollVote', () => {
 			expect(updateOne).toHaveBeenCalledWith(key, expect.anything(), { upsert: true })
 		})
 
+		it('retries once and resolves when a first-insert race duplicates the key without a session', async () => {
+			const { payload, updateOne } = makeMongoPayload()
+			updateOne.mockRejectedValueOnce(
+				Object.assign(new Error('E11000 duplicate key'), { code: 11000 })
+			)
+
+			await bumpPollVote(payload, key, 1)
+
+			expect(updateOne).toHaveBeenCalledTimes(2)
+			expect(updateOne.mock.calls[1]).toEqual([
+				key,
+				{ $inc: { count: 1 }, $setOnInsert: key },
+				{ upsert: true },
+			])
+		})
+
+		it('propagates a duplicate-key error without retry on the session path', async () => {
+			const session = { id: 'client-session' }
+			const { payload, updateOne } = makeMongoPayload({ sessions: { 'txn-1': session } })
+			updateOne.mockRejectedValue(Object.assign(new Error('E11000 duplicate key'), { code: 11000 }))
+
+			await expect(bumpPollVote(payload, key, 1, 'txn-1')).rejects.toThrow('E11000')
+			expect(updateOne).toHaveBeenCalledTimes(1)
+		})
+
+		it('propagates non-duplicate errors without retry', async () => {
+			const { payload, updateOne } = makeMongoPayload()
+			updateOne.mockRejectedValue(new Error('network reset'))
+
+			await expect(bumpPollVote(payload, key, 1)).rejects.toThrow('network reset')
+			expect(updateOne).toHaveBeenCalledTimes(1)
+		})
+
 		it('throws a clear error naming the collection when the model is missing', async () => {
 			const { payload } = makeMongoPayload({ withoutModel: true })
 
