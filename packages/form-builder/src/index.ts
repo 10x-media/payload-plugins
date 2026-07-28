@@ -183,7 +183,11 @@ export type {
 	RedirectOption,
 	ResponseOption,
 } from './collections/redirectFields'
-export type { SettingsFieldsDefaults, SettingsOption } from './collections/settingsFields'
+export type {
+	DefaultSettingsFields,
+	SettingsFieldsOverride,
+	SettingsOption,
+} from './collections/settingsFields'
 export { buildDefaultSettingsFields } from './collections/settingsFields'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'

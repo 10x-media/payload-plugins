@@ -144,7 +144,7 @@ export type FormBuilderPluginOptions = {
 	buttons?: ButtonsOption
 	/**
 	 * Form-level flag fields (`multistep`, `pollEnabled`, `persistSubmissions`), sidebar
-	 * checkboxes by default. `fields` composes them from the localized defaults so a host can
+	 * checkboxes by default. `fields` composes them from the defaults so a host can
 	 * relocate, wrap, extend, or drop them.
 	 */
 	settings?: SettingsOption
