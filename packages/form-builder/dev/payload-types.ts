@@ -686,6 +686,9 @@ export interface Form {
               [k: string]: unknown;
             };
             calcDisplay?: boolean | null;
+            decimals?: number | null;
+            prefix?: string | null;
+            suffix?: string | null;
             validations?:
               | (
                   | {
@@ -1302,6 +1305,9 @@ export interface Form {
                         [k: string]: unknown;
                       };
                       calcDisplay?: boolean | null;
+                      decimals?: number | null;
+                      prefix?: string | null;
+                      suffix?: string | null;
                       validations?:
                         | (
                             | {
@@ -2777,6 +2783,9 @@ export interface FormsSelect<T extends boolean = true> {
               description?: T;
               expression?: T;
               calcDisplay?: T;
+              decimals?: T;
+              prefix?: T;
+              suffix?: T;
               validations?:
                 | T
                 | {
@@ -3279,6 +3288,9 @@ export interface FormsSelect<T extends boolean = true> {
                           description?: T;
                           expression?: T;
                           calcDisplay?: T;
+                          decimals?: T;
+                          prefix?: T;
+                          suffix?: T;
                           validations?:
                             | T
                             | {
