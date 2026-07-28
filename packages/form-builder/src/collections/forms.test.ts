@@ -383,10 +383,16 @@ describe('forms beforeValidate persist-off guard', () => {
 	const run = (hook: ReturnType<typeof hookOf>, overrides?: Record<string, unknown>) =>
 		hook({ data: { ...data, ...overrides }, req } as never)
 
-	it('refuses a poll form that disables persistSubmissions while the vote store is off', () => {
+	const runPartial = (
+		hook: ReturnType<typeof hookOf>,
+		partial: Record<string, unknown>,
+		originalDoc: Record<string, unknown>
+	) => hook({ data: partial, originalDoc, req } as never)
+
+	const expectGuardError = (fn: () => unknown) => {
 		let thrown: unknown
 		try {
-			run(hookOf(false))
+			fn()
 		} catch (error) {
 			thrown = error
 		}
@@ -397,6 +403,49 @@ describe('forms beforeValidate persist-off guard', () => {
 				],
 			},
 		})
+	}
+
+	it('refuses a poll form that disables persistSubmissions while the vote store is off', () => {
+		expectGuardError(() => run(hookOf(false)))
+	})
+
+	it('refuses a partial update disabling persistSubmissions without sending fields', () => {
+		expectGuardError(() =>
+			runPartial(hookOf(false), { persistSubmissions: false }, { pollEnabled: true })
+		)
+	})
+
+	it('refuses an update enabling the poll while the stored doc already has persistSubmissions off', () => {
+		expectGuardError(() =>
+			runPartial(
+				hookOf(false),
+				{ pollEnabled: true, fields: [], poll: { resultsField: 'color' } },
+				{ persistSubmissions: false }
+			)
+		)
+	})
+
+	it('refuses a bare pollEnabled flip over a stored persist-off form', () => {
+		expectGuardError(() =>
+			runPartial(hookOf(false), { pollEnabled: true }, { persistSubmissions: false })
+		)
+	})
+
+	it('lets the incoming partial override the stored flags', () => {
+		expect(
+			runPartial(
+				hookOf(false),
+				{ persistSubmissions: true },
+				{ pollEnabled: true, persistSubmissions: false }
+			)
+		).toBeTruthy()
+		expect(
+			runPartial(
+				hookOf(false),
+				{ pollEnabled: false },
+				{ pollEnabled: true, persistSubmissions: false }
+			)
+		).toBeTruthy()
 	})
 
 	it('allows persist-off polls when the vote store carries the counts', () => {

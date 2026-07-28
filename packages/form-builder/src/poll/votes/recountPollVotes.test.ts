@@ -1,4 +1,4 @@
-import type { Payload } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POLL_VOTES_SLUG, RESPONDENTS_VALUE } from './votesCollection'
 
@@ -15,12 +15,23 @@ const findByID = vi.fn()
 const deleteMock = vi.fn()
 const payload = { findByID, delete: deleteMock } as unknown as Payload
 
-const aggregation = (total: number, buckets: { value: string; count: number }[]) => ({
+const aggregation = (
+	total: number,
+	buckets: { value: string; count: number }[],
+	truncated = false
+) => ({
 	field: 'color',
 	total,
 	buckets: buckets.map((bucket) => ({ ...bucket, label: bucket.value, percentage: 0 })),
-	truncated: false,
+	truncated,
 })
+
+const fullAggregation = () =>
+	aggregation(4, [
+		{ value: 'red', count: 3 },
+		{ value: 'blue', count: 1 },
+		{ value: 'green', count: 0 },
+	])
 
 describe('recountPollVotes', () => {
 	beforeEach(() => {
@@ -31,25 +42,15 @@ describe('recountPollVotes', () => {
 		findByID.mockResolvedValue({ id: 'f1', pollEnabled: true, poll: { resultsField: 'color' } })
 		deleteMock.mockResolvedValue({})
 		bumpPollVote.mockResolvedValue(undefined)
-		aggregateFieldResponses.mockResolvedValue(
-			aggregation(4, [
-				{ value: 'red', count: 3 },
-				{ value: 'blue', count: 1 },
-				{ value: 'green', count: 0 },
-			])
-		)
+		aggregateFieldResponses.mockResolvedValue(fullAggregation())
 	})
 
-	it('deletes the field tally rows, then replays the scan into fresh bumps plus the respondents row', async () => {
+	it('scans first, then deletes the field tally rows, then replays into fresh bumps plus the respondents row', async () => {
 		const calls: string[] = []
 		deleteMock.mockImplementation(async () => calls.push('delete'))
 		aggregateFieldResponses.mockImplementation(async () => {
 			calls.push('aggregate')
-			return aggregation(4, [
-				{ value: 'red', count: 3 },
-				{ value: 'blue', count: 1 },
-				{ value: 'green', count: 0 },
-			])
+			return fullAggregation()
 		})
 		bumpPollVote.mockImplementation(async (_payload, key: { value: string }) =>
 			calls.push(`bump:${key.value}`)
@@ -58,8 +59,8 @@ describe('recountPollVotes', () => {
 		await recountPollVotes({ payload, formId: 'f1' })
 
 		expect(calls).toEqual([
-			'delete',
 			'aggregate',
+			'delete',
 			'bump:red',
 			'bump:blue',
 			`bump:${RESPONDENTS_VALUE}`,
@@ -80,19 +81,39 @@ describe('recountPollVotes', () => {
 		expect(bumpPollVote).toHaveBeenCalledWith(
 			payload,
 			{ form: 'f1', field: 'color', value: 'red' },
-			3
+			3,
+			undefined
 		)
 		expect(bumpPollVote).toHaveBeenCalledWith(
 			payload,
 			{ form: 'f1', field: 'color', value: RESPONDENTS_VALUE },
-			4
+			4,
+			undefined
 		)
+	})
+
+	it('threads the request transaction id into every bump so the rebuild joins an open transaction', async () => {
+		const req = { transactionID: 'txn-9' } as unknown as PayloadRequest
+		await recountPollVotes({ payload, formId: 'f1', req })
+		expect(bumpPollVote).toHaveBeenCalledTimes(3)
+		for (const call of bumpPollVote.mock.calls) {
+			expect(call[3]).toBe('txn-9')
+		}
 	})
 
 	it('skips zero-count buckets so the rebuilt store carries no dead rows', async () => {
 		await recountPollVotes({ payload, formId: 'f1' })
 		const values = bumpPollVote.mock.calls.map((call) => (call[1] as { value: string }).value)
 		expect(values).not.toContain('green')
+	})
+
+	it('refuses a truncated scan before touching the store, naming the cap', async () => {
+		aggregateFieldResponses.mockResolvedValue(
+			aggregation(100_000, [{ value: 'red', count: 100_000 }], true)
+		)
+		await expect(recountPollVotes({ payload, formId: 'f1' })).rejects.toThrow(/100000/)
+		expect(deleteMock).not.toHaveBeenCalled()
+		expect(bumpPollVote).not.toHaveBeenCalled()
 	})
 
 	it('returns early without touching the store when the form has no results field', async () => {

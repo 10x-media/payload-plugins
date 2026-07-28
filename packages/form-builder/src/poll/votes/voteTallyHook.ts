@@ -17,7 +17,8 @@ const answerValues = (values: unknown, field: string): string[] => {
 	return raw.filter((value) => value != null && value !== '').map((value) => String(value))
 }
 
-const transactionIDOf = (transactionID: unknown): number | string | undefined =>
+/** Narrow a request's loosely typed `transactionID` to the value `bumpPollVote` accepts. */
+export const transactionIDOf = (transactionID: unknown): number | string | undefined =>
 	typeof transactionID === 'number' || typeof transactionID === 'string' ? transactionID : undefined
 
 /**

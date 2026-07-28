@@ -249,7 +249,29 @@ export const buildFormsCollection = ({
 		...[...pollTypes.values()].filter((strategy) => strategy.type !== 'mostVoted'),
 	]
 
-	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
+	const beforeValidate: CollectionBeforeValidateHook = ({ data, originalDoc, req }) => {
+		// Without the tally store, pruned submissions would erase every vote: a poll form may only
+		// turn `persistSubmissions` off while the store is registered to carry the counts. Evaluated
+		// on the incoming partial merged over the stored doc (outcomeBeforeChange precedent), so a
+		// PATCH flipping either flag alone cannot slip past the guard.
+		if (!pollVotesEnabled) {
+			const pollOn = (data?.pollEnabled ?? originalDoc?.pollEnabled) === true
+			const persistOff = (data?.persistSubmissions ?? originalDoc?.persistSubmissions) === false
+			if (pollOn && persistOff) {
+				throw new ValidationError(
+					{
+						collection: FORMS_SLUG,
+						errors: [
+							{
+								path: 'persistSubmissions',
+								message: asTranslate(req.t)(keys.pollNeedsPersistedSubmissions),
+							},
+						],
+					},
+					req.t
+				)
+			}
+		}
 		if (data && Array.isArray(data.fields)) {
 			const normalized: FieldRow[] = normalizeFormConditions(
 				data.fields as FieldRow[],
@@ -305,22 +327,6 @@ export const buildFormsCollection = ({
 			// polls that have no on-form vote field. `buildValidateResultsField` still checks a set value;
 			// this is the enforcer for enabled polls.
 			if (data.pollEnabled === true) {
-				// Without the tally store, pruned submissions would erase every vote: a poll form may
-				// only turn `persistSubmissions` off while the store is registered to carry the counts.
-				if (!pollVotesEnabled && data.persistSubmissions === false) {
-					throw new ValidationError(
-						{
-							collection: FORMS_SLUG,
-							errors: [
-								{
-									path: 'persistSubmissions',
-									message: asTranslate(req.t)(keys.pollNeedsPersistedSubmissions),
-								},
-							],
-						},
-						req.t
-					)
-				}
 				const poll =
 					data.poll != null && typeof data.poll === 'object'
 						? (data.poll as Record<string, unknown>)
