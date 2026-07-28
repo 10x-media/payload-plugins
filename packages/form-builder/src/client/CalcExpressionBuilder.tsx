@@ -578,7 +578,8 @@ const ChainEditor = ({ chain, onChange, onEmptied, ctx, idPrefix }: ChainEditorP
 		<div className="fb-calc-chain">
 			{rows.map((row, index) => (
 				// biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and never reordered
-				<div key={index} className="fb-calc-row">
+				<div key={index} className={index > 0 ? 'fb-calc-row fb-calc-row--divided' : 'fb-calc-row'}>
+					{index === 0 ? <div className="fb-calc-row__op-spacer" aria-hidden="true" /> : null}
 					{index > 0 ? (
 						<>
 							<label className="fb-visually-hidden" htmlFor={`${idPrefix}-r${index}-op`}>
@@ -859,6 +860,7 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 							idPrefix={idBase}
 						/>
 						<div className="fb-calc-finish">
+							<div className="fb-calc-row__op-spacer" aria-hidden="true" />
 							<label className="fb-calc-finish__label" htmlFor={`${idBase}-finish`}>
 								{t(keys.calcBuilderThenApply)}
 							</label>

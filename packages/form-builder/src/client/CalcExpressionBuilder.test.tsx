@@ -274,6 +274,19 @@ describe('CalcExpressionBuilder', () => {
 		expect(op.value).toBe('*')
 	})
 
+	it('reserves the op column on the first row and divides later rows', () => {
+		setField(opTree)
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const rows = container.querySelectorAll('.fb-calc-chain > .fb-calc-row')
+		expect(rows).toHaveLength(2)
+		expect(rows[0]?.querySelector('.fb-calc-row__op-spacer')).toBeTruthy()
+		expect(rows[0]?.querySelector('.fb-calc-row__op')).toBeNull()
+		expect((rows[0] as HTMLElement).classList.contains('fb-calc-row--divided')).toBe(false)
+		expect(rows[1]?.querySelector('.fb-calc-row__op-spacer')).toBeNull()
+		expect((rows[1] as HTMLElement).classList.contains('fb-calc-row--divided')).toBe(true)
+		expect(container.querySelector('.fb-calc-finish > .fb-calc-row__op-spacer')).toBeTruthy()
+	})
+
 	it('loads a right-nested tree with a Group operand', () => {
 		setField(rightNested)
 		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)

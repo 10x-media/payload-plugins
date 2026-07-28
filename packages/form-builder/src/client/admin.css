@@ -362,37 +362,52 @@
 	gap: 0.5rem;
 	min-width: 0;
 }
-/* One deliberate row: [op select (fixed)] [operand card (flexes)] [remove]. Nothing wraps;
- * flexing controls shrink and ellipsize instead. */
+/* Flat three-column grid, identical at every depth: [op select | spacer, fixed 90px]
+ * [operand controls, flexing] [remove, fixed]. The first row reserves the op column with a
+ * spacer so every kind select starts at the same left margin; nothing wraps, flexing
+ * controls shrink and ellipsize instead. */
 .fb-calc-row {
 	display: flex;
 	align-items: flex-start;
 	gap: 0.5rem;
 }
-.fb-calc-row__op {
+.fb-calc-row--divided {
+	border-block-start: 1px solid var(--theme-elevation-100);
+	padding-block-start: 0.5rem;
+}
+.fb-calc-row__op,
+.fb-calc-row__op-spacer {
 	flex: 0 0 90px;
 	min-width: 0;
-	/* Cards pad 0.75rem above their 40px control row; align the op select with that control. */
-	margin-block-start: 0.75rem;
 }
 .fb-calc-row__operand {
 	flex: 1;
 	min-width: 0;
 }
+/* A fixed 40px centering box pins the remove level with the first control line even when
+ * secondary content (weight rows, nested chains) extends the row downward. */
 .fb-calc-row__remove {
-	flex-shrink: 0;
-	padding-block-start: 0.75rem;
+	flex: 0 0 auto;
+	align-self: flex-start;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
 }
 .fb-calc-chain__add {
 	align-self: flex-start;
+	/* Column 1 width + row gap: aligns the button with the operand column. */
+	margin-inline-start: calc(90px + 0.5rem);
 }
 .fb-calc-operand {
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
-	padding: 0.75rem;
-	border: 1px solid var(--theme-border-color);
-	border-radius: var(--style-radius-s);
+	min-width: 0;
+}
+.fb-calc-operand--group > .fb-calc-chain {
+	padding-inline-start: 0.75rem;
+	border-inline-start: 2px solid var(--theme-elevation-100);
 }
 .fb-calc-operand__title {
 	font-size: 0.6875rem;
@@ -483,8 +498,11 @@
 	min-width: 0;
 }
 .fb-calc-fn__arg-remove {
-	flex-shrink: 0;
-	padding-block-start: 0.75rem;
+	flex: 0 0 auto;
+	align-self: flex-start;
+	height: 40px;
+	display: flex;
+	align-items: center;
 }
 .fb-calc-fn__add {
 	align-self: flex-start;
