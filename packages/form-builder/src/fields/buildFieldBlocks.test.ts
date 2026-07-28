@@ -144,6 +144,7 @@ describe('buildFieldBlocks', () => {
 			'width',
 			'description',
 			'required',
+			'display',
 		])
 	})
 

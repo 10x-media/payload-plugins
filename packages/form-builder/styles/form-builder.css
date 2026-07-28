@@ -117,6 +117,45 @@
 	opacity: var(--fb-choice-disabled-opacity, 0.5);
 }
 
+/* Checkbox field switch display: same input, appearance:none + track/thumb painted via background. */
+.fb-switch {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 2.5rem;
+	height: 1.5rem;
+	margin: 0;
+	border-radius: 999px;
+	background: var(--fb-switch-track, rgba(0, 0, 0, 0.25));
+	position: relative;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+.fb-switch::before {
+	content: '';
+	position: absolute;
+	top: 0.125rem;
+	left: 0.125rem;
+	width: 1.25rem;
+	height: 1.25rem;
+	border-radius: 50%;
+	background: var(--fb-switch-thumb, #fff);
+	transition: transform 0.15s ease;
+}
+.fb-switch:checked {
+	background: var(--fb-switch-track-checked, currentColor);
+}
+.fb-switch:checked::before {
+	transform: translateX(1rem);
+}
+.fb-switch:focus-visible {
+	outline: 2px solid var(--fb-choice-focus, currentColor);
+	outline-offset: 2px;
+}
+.fb-switch:disabled {
+	cursor: not-allowed;
+	opacity: var(--fb-choice-disabled-opacity, 0.5);
+}
+
 /* Poll / survey results: per-option bars. The text carries the meaning; the bar is decorative. */
 .fb-results__field {
 	margin-block: 1rem;
