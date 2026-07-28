@@ -351,30 +351,48 @@
 	border: 1px solid var(--theme-border-color);
 	border-radius: var(--style-radius-s);
 }
+/* One deliberate row per card: kind select (fixed) | kind control (flexes) | remove (right).
+ * Nothing wraps; flexing controls shrink and ellipsize instead. */
 .fb-calc-node__header {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
-	flex-wrap: wrap;
 }
 .fb-calc-node__hint {
 	color: var(--theme-elevation-400);
 	font-size: 0.875rem;
 	margin: 0;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
+/* 200px fits the longest kind label in both locales ("Gewichtete Antworten": ~140px at the 13px
+ * admin body size) plus the react-select control chrome (2 x base(0.6) padding + indicator). */
 .fb-calc-node__header > .fb-calc-node__kind {
-	flex: 0 1 11rem;
-	min-width: 8rem;
+	flex: 0 0 200px;
+	min-width: 0;
 }
 .fb-calc-node__header > .fb-calc-node__op,
 .fb-calc-node__header > .fb-calc-node__fn {
-	flex: 0 1 7rem;
-	min-width: 5rem;
+	flex: 0 0 90px;
+	min-width: 0;
 }
 .fb-calc-node__header > .fb-calc-node__ref,
 .fb-calc-node__header > .fb-calc-node__weight-field {
-	flex: 1 1 12rem;
-	min-width: 9rem;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.fb-calc-node__remove {
+	margin-inline-start: auto;
+	flex-shrink: 0;
+}
+.fb-calc-node .rs__single-value,
+.fb-calc-builder__seed .rs__single-value {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .fb-calc-node__number,
 .fb-calc-node__weight {
@@ -401,8 +419,9 @@
 	outline: none;
 }
 .fb-calc-node__header > .fb-calc-node__number {
-	flex: 1 1 8rem;
-	min-width: 6rem;
+	flex: 1 1 auto;
+	min-width: 60px;
+	width: 0;
 }
 .fb-calc-node__children {
 	display: flex;
@@ -447,5 +466,5 @@
 	white-space: nowrap;
 }
 .fb-calc-node__weight-row > .fb-calc-node__weight {
-	flex: 0 1 8rem;
+	flex: 0 0 8rem;
 }

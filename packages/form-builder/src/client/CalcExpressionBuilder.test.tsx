@@ -47,12 +47,22 @@ vi.mock('@payloadcms/ui', () => ({
 			{children}
 		</button>
 	),
-	// biome-ignore lint/suspicious/noExplicitAny: test double renders ReactSelect as a native select
-	ReactSelect: ({ className, options, value, onChange, placeholder, disabled, inputId }: any) => (
+	ReactSelect: ({
+		className,
+		options,
+		value,
+		onChange,
+		placeholder,
+		disabled,
+		inputId,
+		isClearable,
+		// biome-ignore lint/suspicious/noExplicitAny: test double
+	}: any) => (
 		<select
 			id={inputId}
 			className={className}
 			disabled={disabled}
+			data-clearable={isClearable ? 'true' : 'false'}
 			data-placeholder={typeof placeholder === 'string' ? placeholder : undefined}
 			value={value?.value ?? ''}
 			onChange={(event) => {
@@ -357,8 +367,8 @@ describe('CalcExpressionBuilder', () => {
 
 	it('adds and removes function arguments, keeping at least one', () => {
 		const setValue = setField({ type: 'fn', fn: 'min', args: [{ type: 'lit', value: 1 }] })
-		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		expect(screen.queryByLabelText(keys.calcBuilderRemove)).toBeNull()
+		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		expect(first.container.querySelector('.fb-calc-node__arg-remove')).toBeNull()
 		fireEvent.click(screen.getByText(keys.calcBuilderAddArgument))
 		expect(setValue).toHaveBeenCalledWith({
 			type: 'fn',
@@ -378,14 +388,63 @@ describe('CalcExpressionBuilder', () => {
 				{ type: 'lit', value: 2 },
 			],
 		})
-		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
-		const removes = screen.getAllByLabelText(keys.calcBuilderRemove)
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const removes = container.querySelectorAll('.fb-calc-node__arg-remove button')
 		expect(removes).toHaveLength(2)
 		fireEvent.click(removes[0] as HTMLElement)
 		expect(setValue2).toHaveBeenCalledWith({
 			type: 'fn',
 			fn: 'min',
 			args: [{ type: 'lit', value: 2 }],
+		})
+	})
+
+	it('offers clearable field pickers that reset the reference', () => {
+		const setValue = setField({ type: 'ref', field: 'price' })
+		const first = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const ref = first.container.querySelector('select.fb-calc-node__ref') as HTMLSelectElement
+		expect(ref.getAttribute('data-clearable')).toBe('true')
+		const kind = first.container.querySelector('select.fb-calc-node__kind') as HTMLSelectElement
+		expect(kind.getAttribute('data-clearable')).toBe('false')
+		fireEvent.change(ref, { target: { value: '' } })
+		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: '' })
+		cleanup()
+
+		const setValue2 = setField({ type: 'weight', field: 'size', weights: { s: 2 } })
+		const { container } = render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const chooser = container.querySelector(
+			'select.fb-calc-node__weight-field'
+		) as HTMLSelectElement
+		expect(chooser.getAttribute('data-clearable')).toBe('true')
+		fireEvent.change(chooser, { target: { value: '' } })
+		expect(setValue2).toHaveBeenCalledWith({ type: 'weight', field: '', weights: {} })
+	})
+
+	it('unwraps a container node to its first child, preserving the subtree', () => {
+		const setValue = setField(opTree)
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		fireEvent.click(screen.getByLabelText(keys.calcBuilderUnwrap))
+		expect(setValue).toHaveBeenCalledWith({ type: 'ref', field: 'price' })
+	})
+
+	it('clears the whole expression when removing a root leaf', () => {
+		const setValue = setField({ type: 'lit', value: 2 })
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		fireEvent.click(screen.getByLabelText(keys.calcBuilderRemove))
+		expect(setValue).toHaveBeenCalledWith(null)
+	})
+
+	it('reseeds a nested leaf to Number 0 on remove', () => {
+		const setValue = setField(opTree)
+		render(<CalcExpressionBuilder path="fields.4.expression" field={{}} />)
+		const removes = screen.getAllByLabelText(keys.calcBuilderRemove)
+		expect(removes).toHaveLength(2)
+		fireEvent.click(removes[0] as HTMLElement)
+		expect(setValue).toHaveBeenCalledWith({
+			type: 'op',
+			op: '*',
+			left: { type: 'lit', value: 0 },
+			right: { type: 'ref', field: 'qty' },
 		})
 	})
 

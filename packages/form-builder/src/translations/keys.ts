@@ -144,6 +144,7 @@ export const keys = {
 	calcBuilderNoNumericFields: 'formBuilder:calcBuilder.noNumericFields',
 	calcBuilderNoChoiceFields: 'formBuilder:calcBuilder.noChoiceFields',
 	calcBuilderJsonLabel: 'formBuilder:calcBuilder.jsonLabel',
+	calcBuilderUnwrap: 'formBuilder:calcBuilder.unwrap',
 	presentationPage: 'formBuilder:presentation.page',
 	presentationModal: 'formBuilder:presentation.modal',
 	presentationDrawer: 'formBuilder:presentation.drawer',

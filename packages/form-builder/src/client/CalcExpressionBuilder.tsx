@@ -239,6 +239,7 @@ type BuilderCtx = {
 	readOnly: boolean
 	idBase: string
 	commit: (path: ChildSlot[], next: CalcExpression) => void
+	clear: () => void
 }
 
 const OP_OPTIONS: ChoiceOption[] = CALC_OPS.map((op) => ({ label: op, value: op }))
@@ -263,6 +264,28 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 					node.field
 				)
 			: []
+	const isContainer = node.type === 'op' || node.type === 'fn' || node.type === 'neg'
+	// The inverse of promote-on-kind-switch: containers unwrap to their first child (subtree kept),
+	// a leaf at the root clears the expression, and a leaf in a child slot reseeds that slot.
+	const handleRemove = () => {
+		if (node.type === 'op') {
+			commit(nodePath, node.left)
+			return
+		}
+		if (node.type === 'fn') {
+			commit(nodePath, node.args[0] ?? seedNode('lit'))
+			return
+		}
+		if (node.type === 'neg') {
+			commit(nodePath, node.operand)
+			return
+		}
+		if (nodePath.length === 0) {
+			ctx.clear()
+			return
+		}
+		commit(nodePath, seedNode('lit'))
+	}
 	return (
 		<div className="fb-calc-node">
 			<div className="fb-calc-node__header">
@@ -338,7 +361,7 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 								inputId={`${idPrefix}-ref`}
 								options={refOptions}
 								value={refOptions.find((option) => option.value === node.field)}
-								isClearable={false}
+								isClearable={!readOnly}
 								disabled={readOnly}
 								placeholder={t(keys.calcBuilderPickField)}
 								onChange={(selected) => {
@@ -372,7 +395,7 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 								inputId={`${idPrefix}-weight-field`}
 								options={choiceOptions}
 								value={choiceOptions.find((option) => option.value === node.field)}
-								isClearable={false}
+								isClearable={!readOnly}
 								disabled={readOnly}
 								placeholder={t(keys.calcBuilderPickField)}
 								onChange={(selected) => {
@@ -386,6 +409,16 @@ const NodeEditor = ({ node, nodePath, ctx }: NodeEditorProps) => {
 						</>
 					)
 				) : null}
+				<div className="fb-calc-node__remove">
+					<Button
+						buttonStyle="icon-label"
+						icon="x"
+						aria-label={isContainer ? t(keys.calcBuilderUnwrap) : t(keys.calcBuilderRemove)}
+						margin={false}
+						disabled={readOnly}
+						onClick={handleRemove}
+					/>
+				</div>
 			</div>
 			{node.type === 'op' ? (
 				<div className="fb-calc-node__children">
@@ -530,6 +563,12 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 
 	const labelOf = (field: string) => siblings.labels[field] ?? field
 
+	const clear = () => {
+		if (!readOnly) {
+			setValue(null)
+		}
+	}
+
 	/** `null` is a valid JSON parse, so failure needs a flag rather than a sentinel value. */
 	const parseDraft = (text: string): { ok: boolean; parsed: unknown } => {
 		try {
@@ -600,7 +639,7 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	}
 
 	const idBase = `calc-${path.replace(/\./g, '__')}`
-	const ctx: BuilderCtx = { t, kindOptions, siblings, readOnly, idBase, commit }
+	const ctx: BuilderCtx = { t, kindOptions, siblings, readOnly, idBase, commit, clear }
 
 	return (
 		<div
