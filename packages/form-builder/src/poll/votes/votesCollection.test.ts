@@ -64,4 +64,18 @@ describe('buildPollVotesCollection', () => {
 	it('exports the reserved respondents tally value', () => {
 		expect(RESPONDENTS_VALUE).toBe('')
 	})
+
+	it('calls a fields override with the default fields and uses its return', () => {
+		const collection = buildPollVotesCollection({
+			overrides: {
+				fields: ({ defaultFields }) => [...defaultFields, { name: 'note', type: 'text' }],
+			},
+		})
+
+		expect(fieldNamed(collection.fields, 'form')).toBeDefined()
+		expect(fieldNamed(collection.fields, 'field')).toBeDefined()
+		expect(fieldNamed(collection.fields, 'value')).toBeDefined()
+		expect(fieldNamed(collection.fields, 'count')).toBeDefined()
+		expect(fieldNamed(collection.fields, 'note')).toBeDefined()
+	})
 })
