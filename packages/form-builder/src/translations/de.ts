@@ -140,7 +140,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.tabValidation]: 'Validierung',
 	[keys.tabAdvanced]: 'Erweitert',
 	[keys.fieldTypeCalculation]: 'Berechnung',
-	[keys.configExpression]: 'Berechnung',
+	[keys.configExpression]: 'Ausdruck',
 	[keys.configExpressionDescription]:
 		'Berechnet eine Zahl aus anderen Antworten, z. B. eine Bestellsumme oder Quiz-Punktzahl.',
 	[keys.configCalcDisplay]: 'Berechneten Wert anzeigen',
