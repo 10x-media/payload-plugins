@@ -509,6 +509,70 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		await seedLayoutShowcaseSubmission(payload, String(layoutShowcase.doc.id))
 	}
 
+	// A quote calculator exercising every calculation node kind the visual builder authors:
+	// answer arithmetic (subtotal = hours x rate), a weighted-answers surcharge computed but not
+	// rendered (calcDisplay false), and a total chaining the two earlier calculations through a
+	// rounded tax multiplication. Calculations may only reference earlier calculation fields, so
+	// the order here is load-bearing.
+	await ensureForm(payload, 'Project Quote', {
+		fields: [
+			{ blockType: 'number', name: 'hours', label: 'Estimated hours', required: true, width: 'half' },
+			{ blockType: 'number', name: 'rate', label: 'Hourly rate (EUR)', required: true, width: 'half' },
+			{
+				blockType: 'select',
+				name: 'priority',
+				label: 'Delivery',
+				display: 'buttons',
+				options: [
+					{ label: 'Standard', value: 'standard' },
+					{ label: 'Rush (+250 EUR)', value: 'rush' },
+				],
+			},
+			{
+				blockType: 'calculation',
+				name: 'subtotal',
+				label: 'Subtotal',
+				width: 'half',
+				expression: {
+					type: 'op',
+					op: '*',
+					left: { type: 'ref', field: 'hours' },
+					right: { type: 'ref', field: 'rate' },
+				},
+			},
+			{
+				blockType: 'calculation',
+				name: 'surcharge',
+				label: 'Priority surcharge',
+				calcDisplay: false,
+				expression: { type: 'weight', field: 'priority', weights: { standard: 0, rush: 250 } },
+			},
+			{
+				blockType: 'calculation',
+				name: 'total',
+				label: 'Total incl. 19% VAT',
+				width: 'half',
+				expression: {
+					type: 'fn',
+					fn: 'round',
+					args: [
+						{
+							type: 'op',
+							op: '*',
+							left: {
+								type: 'op',
+								op: '+',
+								left: { type: 'ref', field: 'subtotal' },
+								right: { type: 'ref', field: 'surcharge' },
+							},
+							right: { type: 'lit', value: 1.19 },
+						},
+					],
+				},
+			},
+		],
+	})
+
 	await seedKitchenSink(payload)
 }
 
