@@ -1,0 +1,73 @@
+import type { Payload } from 'payload'
+import { POLL_VOTES_SLUG } from './votesCollection'
+
+const PG_TABLE_KEY = 'form_poll_votes'
+
+// payload.db raw-access shapes are intentionally loose; these narrow casts reach the
+// Mongoose driver collection / Drizzle instance for atomic upserts (no public typed API).
+type MongoDb = {
+	name: 'mongoose'
+	collections: Record<
+		string,
+		{ collection: { updateOne: (f: object, u: object, o: object) => Promise<unknown> } }
+	>
+	sessions?: Record<number | string, unknown>
+}
+type PgInsert = {
+	insert: (t: unknown) => {
+		values: (v: unknown) => { onConflictDoUpdate: (c: unknown) => Promise<unknown> }
+	}
+}
+type PgDb = {
+	name: 'postgres'
+	drizzle: PgInsert
+	sessions?: Record<number | string, { db: PgInsert }>
+	tables: Record<string, Record<string, unknown>>
+	tableNameMap: Map<string, string>
+}
+
+/**
+ * Atomically bumps one (form, field, value) tally by `by` in a single upsert-increment
+ * statement (Mongo `$inc` + upsert, Postgres `INSERT ... ON CONFLICT DO UPDATE`); the unique
+ * compound index makes concurrent bumps for the same key safe without read-modify-write races.
+ *
+ * When `transactionID` names an open Payload transaction, the write joins it: a bump failure
+ * thrown from the submission hook rolls back the submission create (no undercount), and an
+ * aborted create rolls back the joined bump (no overcount). Without a transaction (e.g. Mongo
+ * with transactions disabled) the write lands on the root handle immediately; a later recount
+ * from stored submissions is the healer for any drift that window allows.
+ */
+// biome-ignore lint/complexity/useMaxParams: write primitive signature (payload, key, by, transactionID)
+export async function bumpPollVote(
+	payload: Payload,
+	key: { form: string; field: string; value: string },
+	by: number,
+	transactionID?: number | string
+): Promise<void> {
+	if (payload.db.name === 'mongoose') {
+		const db = payload.db as unknown as MongoDb
+		const model = db.collections[POLL_VOTES_SLUG]
+		if (!model) throw new Error(`form-builder: mongoose collection "${POLL_VOTES_SLUG}" not found`)
+		const session = transactionID !== undefined ? db.sessions?.[transactionID] : undefined
+		await model.collection.updateOne(
+			key,
+			{ $inc: { count: by }, $setOnInsert: key },
+			session ? { upsert: true, session } : { upsert: true }
+		)
+		return
+	}
+	const { sql } = await import('@payloadcms/db-postgres')
+	const db = payload.db as unknown as PgDb
+	const tableName = db.tableNameMap.get(PG_TABLE_KEY)
+	if (!tableName) throw new Error(`form-builder: drizzle table "${PG_TABLE_KEY}" not found`)
+	const table = db.tables[tableName]
+	if (!table) throw new Error(`form-builder: drizzle table object for "${tableName}" not found`)
+	const txn = transactionID !== undefined ? db.sessions?.[transactionID]?.db : undefined
+	await (txn ?? db.drizzle)
+		.insert(table)
+		.values({ ...key, count: by })
+		.onConflictDoUpdate({
+			target: [table.form, table.field, table.value],
+			set: { count: sql`${table.count} + ${by}` },
+		})
+}

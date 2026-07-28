@@ -88,10 +88,16 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@payloadcms/db-postgres": "^3.82.0",
 		"@payloadcms/ui": "^3.83.0",
 		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@payloadcms/db-postgres": {
+			"optional": true
+		}
 	},
 	"dependencies": {
 		"@standard-schema/spec": "^1.0.0"
