@@ -72,8 +72,9 @@ export interface Config {
     'legal-pages': LegalPage;
     notices: Notice;
     users: User;
-    'form-submissions': FormSubmission;
     forms: Form;
+    'form-submissions': FormSubmission;
+    'form-poll-votes': FormPollVote;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -87,8 +88,9 @@ export interface Config {
     'legal-pages': LegalPagesSelect<false> | LegalPagesSelect<true>;
     notices: NoticesSelect<false> | NoticesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
-    'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
+    'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
+    'form-poll-votes': FormPollVotesSelect<false> | FormPollVotesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -221,58 +223,6 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "form-submissions".
- */
-export interface FormSubmission {
-  id: string;
-  form: string | Form;
-  status?: ('complete' | 'partial') | null;
-  locale?: string | null;
-  values?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  descriptors?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  consent?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  meta?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  context?: {
-    relationTo?: string | null;
-    value?: string | null;
-  };
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "forms".
  */
 export interface Form {
@@ -286,7 +236,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
@@ -372,6 +322,7 @@ export interface Form {
               | boolean
               | null;
             hidden?: boolean | null;
+            autocomplete?: string | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'text';
@@ -379,7 +330,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
@@ -472,7 +423,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
@@ -540,6 +491,7 @@ export interface Form {
               | boolean
               | null;
             hidden?: boolean | null;
+            autocomplete?: string | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'email';
@@ -547,7 +499,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
@@ -566,6 +518,12 @@ export interface Form {
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'max';
+                    }
+                  | {
+                      message?: string | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'integer';
                     }
                   | {
                       field: string;
@@ -608,17 +566,18 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
             options?:
               | {
-                  label: string;
+                  label?: string | null;
                   value: string;
                   id?: string | null;
                 }[]
               | null;
+            display?: ('dropdown' | 'radio' | 'buttons') | null;
             validations?:
               | (
                   | {
@@ -674,9 +633,10 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             description?: string | null;
             required?: boolean | null;
+            display?: ('checkbox' | 'switch') | null;
             validations?:
               | (
                   | {
@@ -720,7 +680,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             description?: string | null;
             expression?: {
               [k: string]: unknown;
@@ -768,7 +728,7 @@ export interface Form {
           }
         | {
             name: string;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             required?: boolean | null;
             source?: string | null;
             validations?:
@@ -814,7 +774,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             description?: string | null;
             required?: boolean | null;
             uploadsCollection?: string | null;
@@ -881,7 +841,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             description?: string | null;
             required?: boolean | null;
             minRows?: number | null;
@@ -892,7 +852,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
@@ -978,6 +938,7 @@ export interface Form {
                         | boolean
                         | null;
                       hidden?: boolean | null;
+                      autocomplete?: string | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'text';
@@ -985,7 +946,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
@@ -1078,7 +1039,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
@@ -1146,6 +1107,7 @@ export interface Form {
                         | boolean
                         | null;
                       hidden?: boolean | null;
+                      autocomplete?: string | null;
                       id?: string | null;
                       blockName?: string | null;
                       blockType: 'email';
@@ -1153,7 +1115,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
@@ -1172,6 +1134,12 @@ export interface Form {
                                 id?: string | null;
                                 blockName?: string | null;
                                 blockType: 'max';
+                              }
+                            | {
+                                message?: string | null;
+                                id?: string | null;
+                                blockName?: string | null;
+                                blockType: 'integer';
                               }
                             | {
                                 field: string;
@@ -1214,17 +1182,18 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
                       options?:
                         | {
-                            label: string;
+                            label?: string | null;
                             value: string;
                             id?: string | null;
                           }[]
                         | null;
+                      display?: ('dropdown' | 'radio' | 'buttons') | null;
                       validations?:
                         | (
                             | {
@@ -1280,9 +1249,10 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       description?: string | null;
                       required?: boolean | null;
+                      display?: ('checkbox' | 'switch') | null;
                       validations?:
                         | (
                             | {
@@ -1326,7 +1296,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       description?: string | null;
                       expression?: {
                         [k: string]: unknown;
@@ -1374,7 +1344,7 @@ export interface Form {
                     }
                   | {
                       name: string;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       required?: boolean | null;
                       source?: string | null;
                       validations?:
@@ -1420,7 +1390,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       description?: string | null;
                       required?: boolean | null;
                       uploadsCollection?: string | null;
@@ -1487,7 +1457,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       description?: string | null;
                       required?: boolean | null;
                       validations?:
@@ -1547,7 +1517,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
@@ -1598,7 +1568,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
@@ -1645,7 +1615,7 @@ export interface Form {
                   | {
                       name: string;
                       label?: string | null;
-                      width: 'full' | 'half' | 'third' | 'twoThirds';
+                      width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
                       placeholder?: string | null;
                       description?: string | null;
                       required?: boolean | null;
@@ -1734,7 +1704,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             description?: string | null;
             required?: boolean | null;
             validations?:
@@ -1814,7 +1784,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
@@ -1865,7 +1835,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
@@ -1912,7 +1882,7 @@ export interface Form {
         | {
             name: string;
             label?: string | null;
-            width: 'full' | 'half' | 'third' | 'twoThirds';
+            width?: ('full' | 'half' | 'third' | 'twoThirds') | null;
             placeholder?: string | null;
             description?: string | null;
             required?: boolean | null;
@@ -2074,6 +2044,72 @@ export interface Form {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "form-submissions".
+ */
+export interface FormSubmission {
+  id: string;
+  form: string | Form;
+  status?: ('complete' | 'partial') | null;
+  locale?: string | null;
+  values?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  descriptors?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  consent?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  meta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  context?: {
+    relationTo?: string | null;
+    value?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "form-poll-votes".
+ */
+export interface FormPollVote {
+  id: string;
+  form: string;
+  field: string;
+  value?: string | null;
+  shard: number;
+  count: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -2209,12 +2245,16 @@ export interface PayloadLockedDocument {
         value: string | User;
       } | null)
     | ({
+        relationTo: 'forms';
+        value: string | Form;
+      } | null)
+    | ({
         relationTo: 'form-submissions';
         value: string | FormSubmission;
       } | null)
     | ({
-        relationTo: 'forms';
-        value: string | Form;
+        relationTo: 'form-poll-votes';
+        value: string | FormPollVote;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -2332,27 +2372,6 @@ export interface UsersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "form-submissions_select".
- */
-export interface FormSubmissionsSelect<T extends boolean = true> {
-  form?: T;
-  status?: T;
-  locale?: T;
-  values?: T;
-  descriptors?: T;
-  consent?: T;
-  meta?: T;
-  context?:
-    | T
-    | {
-        relationTo?: T;
-        value?: T;
-      };
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "forms_select".
  */
 export interface FormsSelect<T extends boolean = true> {
@@ -2446,6 +2465,7 @@ export interface FormsSelect<T extends boolean = true> {
               validateWhen?: T;
               visibleWhen?: T;
               hidden?: T;
+              autocomplete?: T;
               id?: T;
               blockName?: T;
             };
@@ -2598,6 +2618,7 @@ export interface FormsSelect<T extends boolean = true> {
               validateWhen?: T;
               visibleWhen?: T;
               hidden?: T;
+              autocomplete?: T;
               id?: T;
               blockName?: T;
             };
@@ -2625,6 +2646,13 @@ export interface FormsSelect<T extends boolean = true> {
                       | T
                       | {
                           max?: T;
+                          message?: T;
+                          id?: T;
+                          blockName?: T;
+                        };
+                    integer?:
+                      | T
+                      | {
                           message?: T;
                           id?: T;
                           blockName?: T;
@@ -2667,6 +2695,7 @@ export interface FormsSelect<T extends boolean = true> {
                     value?: T;
                     id?: T;
                   };
+              display?: T;
               validations?:
                 | T
                 | {
@@ -2713,6 +2742,7 @@ export interface FormsSelect<T extends boolean = true> {
               width?: T;
               description?: T;
               required?: T;
+              display?: T;
               validations?:
                 | T
                 | {
@@ -2937,6 +2967,7 @@ export interface FormsSelect<T extends boolean = true> {
                           validateWhen?: T;
                           visibleWhen?: T;
                           hidden?: T;
+                          autocomplete?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3089,6 +3120,7 @@ export interface FormsSelect<T extends boolean = true> {
                           validateWhen?: T;
                           visibleWhen?: T;
                           hidden?: T;
+                          autocomplete?: T;
                           id?: T;
                           blockName?: T;
                         };
@@ -3116,6 +3148,13 @@ export interface FormsSelect<T extends boolean = true> {
                                   | T
                                   | {
                                       max?: T;
+                                      message?: T;
+                                      id?: T;
+                                      blockName?: T;
+                                    };
+                                integer?:
+                                  | T
+                                  | {
                                       message?: T;
                                       id?: T;
                                       blockName?: T;
@@ -3158,6 +3197,7 @@ export interface FormsSelect<T extends boolean = true> {
                                 value?: T;
                                 id?: T;
                               };
+                          display?: T;
                           validations?:
                             | T
                             | {
@@ -3204,6 +3244,7 @@ export interface FormsSelect<T extends boolean = true> {
                           width?: T;
                           description?: T;
                           required?: T;
+                          display?: T;
                           validations?:
                             | T
                             | {
@@ -3734,6 +3775,40 @@ export interface FormsSelect<T extends boolean = true> {
               url?: T;
             };
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "form-submissions_select".
+ */
+export interface FormSubmissionsSelect<T extends boolean = true> {
+  form?: T;
+  status?: T;
+  locale?: T;
+  values?: T;
+  descriptors?: T;
+  consent?: T;
+  meta?: T;
+  context?:
+    | T
+    | {
+        relationTo?: T;
+        value?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "form-poll-votes_select".
+ */
+export interface FormPollVotesSelect<T extends boolean = true> {
+  form?: T;
+  field?: T;
+  value?: T;
+  shard?: T;
+  count?: T;
   updatedAt?: T;
   createdAt?: T;
 }
