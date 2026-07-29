@@ -5,6 +5,7 @@ import {
 	type CollectionConfig,
 	type CollectionSlug,
 	type Field,
+	type PayloadRequest,
 	type TextFieldSingleValidation,
 	ValidationError,
 } from 'payload'
@@ -13,7 +14,9 @@ import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { FromAddressesResolver } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
 import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
-import { normalizeCalc } from '../calc/normalizeCalc'
+import { type CalcAllowed, normalizeCalc } from '../calc/normalizeCalc'
+import type { CalcSource } from '../calc/registry'
+import { calcUsesSources, resolveCalcContext } from '../calc/resolveCalcContext'
 import { buildConditionTypeMap } from '../conditions/conditionType'
 import {
 	buildOperandTypes,
@@ -39,6 +42,7 @@ import { buildDefaultOutcomeFields, type OutcomeFieldsOverride } from '../poll/o
 import { type PollTypeRegistry, resolvePollTypes } from '../poll/pollTypeRegistry'
 import type { PollOptionSourceRegistry } from '../poll/registry'
 import { buildValidateResultsField, pollEligibleTypes } from '../poll/resultsField'
+import type { FormFieldInstance } from '../submissions/types'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey, resolveDefinitionLabel } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -46,11 +50,15 @@ import { validateUrl } from '../validation/validateUrl'
 import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
 import { buildFormsEndpoints } from './formsEndpoints'
 import type { ResponseOption } from './redirectFields'
+import { composeSettingsFields, type SettingsOption } from './settingsFields'
 
 export const FORMS_SLUG = 'forms'
 
 /** `req.context` key under which `consentAfterRead` tracks the form ids it is currently resolving, to break re-entrant reads. */
 const CONSENT_AFTER_READ_GUARD = 'formBuilderConsentAfterReadInFlight'
+
+/** `req.context` key under which `calcAfterRead` tracks the form ids it is currently resolving, to break re-entrant reads. */
+const CALC_AFTER_READ_GUARD = 'formBuilderCalcAfterReadInFlight'
 
 /**
  * Require the title in the default locale (and on hosts without localization), but let it be empty in
@@ -78,30 +86,34 @@ const validateFormTitle: TextFieldSingleValidation = (value, { req }) => {
  * references, so the unknown-target checks mainly protect partial API updates that send `flow`
  * without `fields`.
  */
-const validateFlow = (raw: unknown): string | true => {
+const validateFlow = (
+	raw: unknown,
+	{ req }: { data?: unknown; req: PayloadRequest }
+): string | true => {
 	if (raw === null || raw === undefined) return true
 	const r = raw as Record<string, unknown>
 	if (!Array.isArray(r.steps)) return true
 	const steps = r.steps as Array<Record<string, unknown>>
+	const t = asTranslate(req.t)
 	const emptyIdStep = steps.find((s) => typeof s?.id !== 'string' || s.id.length === 0)
-	if (emptyIdStep) return 'Flow: every step must have a non-empty ID'
+	if (emptyIdStep) return t(keys.flowStepIdEmpty)
 	if (steps.some((s) => s.id === END_OF_FORM)) {
-		return `Flow: step ID "${END_OF_FORM}" is reserved`
+		return t(keys.flowStepIdReserved).replace('{id}', END_OF_FORM)
 	}
 	const ids = steps.map((s) => s.id as string)
 	if (new Set(ids).size !== ids.length) {
-		return 'Flow: duplicate step IDs found'
+		return t(keys.flowDuplicateStepIds)
 	}
 	const idSet = new Set(ids)
 	for (const step of steps) {
 		const id = step.id as string
 		if (typeof step.next === 'string' && step.next.length > 0 && !idSet.has(step.next)) {
-			return `Flow: step "${id}" references unknown next step "${step.next}"`
+			return t(keys.flowUnknownNext).replace('{id}', id).replace('{next}', step.next)
 		}
 		if (Array.isArray(step.transitions)) {
-			for (const t of step.transitions as Array<Record<string, unknown>>) {
-				if (typeof t?.to === 'string' && t.to.length > 0 && !idSet.has(t.to)) {
-					return `Flow: step "${id}" has a transition to unknown step "${t.to}"`
+			for (const trans of step.transitions as Array<Record<string, unknown>>) {
+				if (typeof trans?.to === 'string' && trans.to.length > 0 && !idSet.has(trans.to)) {
+					return t(keys.flowUnknownTransition).replace('{id}', id).replace('{to}', trans.to)
 				}
 			}
 		}
@@ -137,6 +149,10 @@ const stampFileCollections = (rows: FieldRow[], slug: string): void => {
 type BuildFormsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	/** Registered calc extension names; expressions referencing anything else are dropped on save. */
+	calcAllowed?: CalcAllowed
+	/** Registered calc sources; when a form's expressions use any, an afterRead hook stamps `doc.calcResolved`. */
+	calcSources?: Record<string, CalcSource>
 	/**
 	 * The plugin `consent.sources` option. Present: the `/:id/consent-sources` endpoint backing the
 	 * consent field's source select is registered. Absent: neither it nor the consent field type exists.
@@ -152,6 +168,12 @@ type BuildFormsCollectionArgs = {
 	uploadsCollectionSlug?: string
 	/** Host seam gating anonymous results reads (plugin option `results.access`). */
 	resultsAccess?: FormResultsAccess
+	/**
+	 * Whether the hidden tally store is registered (`poll.votes !== false`). Threads into the poll
+	 * endpoints (tally-backed reads) and, when false, forbids poll forms from disabling
+	 * `persistSubmissions`: with neither store nor submissions there would be nothing to count.
+	 */
+	pollVotesEnabled?: boolean
 	/** Registered poll option sources (plugin option `poll.sources`); empty registry means no source fields. */
 	pollSourceRegistry?: PollOptionSourceRegistry
 	/** Registered poll outcome strategies (`poll.types`); drives the poll `type` select options. Defaults to the built-ins. */
@@ -160,6 +182,8 @@ type BuildFormsCollectionArgs = {
 	outcomeFields?: OutcomeFieldsOverride
 	/** The plugin `buttons` option; `fields` composes the `{ submit, prev, next }` labels from the localized defaults. */
 	buttons?: ButtonsOption
+	/** The plugin `settings` option; `fields` composes the sidebar flag checkboxes from the defaults. */
+	settings?: SettingsOption
 	/** The plugin `response` option; `redirect.fields` composes the `response.redirect` group from its default fields. */
 	response?: ResponseOption
 	/**
@@ -186,6 +210,8 @@ export const buildFormsCollection = ({
 	overrides,
 	registry,
 	ruleRegistry,
+	calcAllowed,
+	calcSources,
 	consentSources,
 	consentResolveOnRead,
 	actionRegistry = new Map(),
@@ -193,10 +219,12 @@ export const buildFormsCollection = ({
 	richText,
 	uploadsCollectionSlug,
 	resultsAccess,
+	pollVotesEnabled = false,
 	pollSourceRegistry,
 	pollTypeRegistry,
 	outcomeFields,
 	buttons,
+	settings,
 	response,
 	fromAddresses,
 	departments,
@@ -233,7 +261,29 @@ export const buildFormsCollection = ({
 		...[...pollTypes.values()].filter((strategy) => strategy.type !== 'mostVoted'),
 	]
 
-	const beforeValidate: CollectionBeforeValidateHook = ({ data, req }) => {
+	const beforeValidate: CollectionBeforeValidateHook = ({ data, originalDoc, req }) => {
+		// Without the tally store, pruned submissions would erase every vote: a poll form may only
+		// turn `persistSubmissions` off while the store is registered to carry the counts. Evaluated
+		// on the incoming partial merged over the stored doc (outcomeBeforeChange precedent), so a
+		// PATCH flipping either flag alone cannot slip past the guard.
+		if (!pollVotesEnabled) {
+			const pollOn = (data?.pollEnabled ?? originalDoc?.pollEnabled) === true
+			const persistOff = (data?.persistSubmissions ?? originalDoc?.persistSubmissions) === false
+			if (pollOn && persistOff) {
+				throw new ValidationError(
+					{
+						collection: FORMS_SLUG,
+						errors: [
+							{
+								path: 'persistSubmissions',
+								message: asTranslate(req.t)(keys.pollNeedsPersistedSubmissions),
+							},
+						],
+					},
+					req.t
+				)
+			}
+		}
 		if (data && Array.isArray(data.fields)) {
 			const normalized: FieldRow[] = normalizeFormConditions(
 				data.fields as FieldRow[],
@@ -241,7 +291,7 @@ export const buildFormsCollection = ({
 			)
 			for (const field of normalized) {
 				if ('expression' in field) {
-					field.expression = normalizeCalc(field.expression)
+					field.expression = normalizeCalc(field.expression, calcAllowed)
 				}
 			}
 			if (uploadsCollectionSlug) {
@@ -274,7 +324,7 @@ export const buildFormsCollection = ({
 						errors: [
 							{
 								path: 'flow',
-								message: 'A flow needs at least two steps. Add another step or remove the flow.',
+								message: asTranslate(req.t)(keys.flowNeedsTwoSteps),
 							},
 						],
 					},
@@ -617,36 +667,12 @@ export const buildFormsCollection = ({
 			...localizedIf(localizeContent),
 			validate: validateFormTitle,
 		},
-		// The two form-type flags: behavior, never localized. `multistep` gates the Flow tab and the
-		// client's step navigation; `pollEnabled` gates the Poll tab and marks the form a poll.
-		{
-			type: 'row',
-			fields: [
-				{
-					name: 'multistep',
-					type: 'checkbox',
-					defaultValue: false,
-					label: labelForKey(keys.formMultistep),
-					admin: { width: '50%' },
-				},
-				{
-					name: 'pollEnabled',
-					type: 'checkbox',
-					defaultValue: false,
-					label: labelForKey(keys.formPollEnabled),
-					admin: { width: '50%' },
-				},
-			],
-		},
-		// Storage flag, server-only: when unchecked, the plugin deletes the submission after its actions
-		// run (pruning a pure signup form's row). Default checked, so unchecking it is the opt-out.
-		{
-			name: 'persistSubmissions',
-			type: 'checkbox',
-			defaultValue: true,
-			label: labelForKey(keys.formPersistSubmissions),
-			admin: { width: '50%' },
-		},
+		// The three form-level flags: behavior, never localized, sidebar checkboxes by default.
+		// `multistep` gates the Flow tab and the client's step navigation; `pollEnabled` gates the
+		// Poll tab and marks the form a poll; `persistSubmissions` (default checked) tells the plugin
+		// whether to keep a submission's row after its actions run, or prune it. The `settings.fields`
+		// seam composes them from the defaults, mirroring `buttons.fields`.
+		...composeSettingsFields(settings),
 		// Unnamed tabs are presentational: their fields stay at the document root. An unnamed tab's
 		// `admin.condition` receives the whole document as its 2nd arg, so the Flow and Poll tabs gate
 		// on the root-level flags. The poll group nests its config under `form.poll` as before.
@@ -717,9 +743,57 @@ export const buildFormsCollection = ({
 				}
 			: undefined
 
+	// When calc sources are registered, resolve the values a form's expressions reference onto every
+	// read of its doc, stamped as `doc.calcResolved` (`toFormDocument` passes it through), so the
+	// client's live preview computes with real values. Fails open: a resolver outage must never break
+	// form/admin/relationship reads; the preview degrades to 0 and submit re-resolves loudly.
+	const calcAfterRead: CollectionAfterReadHook | undefined =
+		calcSources && Object.keys(calcSources).length > 0
+			? async ({ doc, req }) => {
+					const fields = Array.isArray((doc as { fields?: unknown }).fields)
+						? ((doc as { fields: unknown[] }).fields as FormFieldInstance[])
+						: []
+					if (!calcUsesSources(fields)) {
+						return doc
+					}
+					const id = (doc as { id?: unknown }).id
+					const key = id == null ? undefined : String(id)
+					// Re-entrance guard: a host resolver that reads this same form back (threading req) would
+					// otherwise re-enter this hook and recurse. Per-id Set, mutated in place, exactly like
+					// `consentAfterRead` above (afterRead fans out concurrently over one shared req.context).
+					if (key !== undefined && req.context) {
+						const inFlight =
+							(req.context[CALC_AFTER_READ_GUARD] as Set<string> | undefined) ?? new Set<string>()
+						if (inFlight.has(key)) {
+							return doc
+						}
+						inFlight.add(key)
+						req.context[CALC_AFTER_READ_GUARD] = inFlight
+					}
+					try {
+						const resolved = await resolveCalcContext({
+							fields,
+							sources: calcSources,
+							form: doc as { id: number | string } & Record<string, unknown>,
+							payload: req.payload,
+							req,
+						})
+						;(doc as Record<string, unknown>).calcResolved = resolved
+					} catch (error) {
+						req.payload.logger?.warn(`form-builder calc afterRead: ${String(error)}`)
+					} finally {
+						if (key !== undefined && req.context) {
+							;(req.context[CALC_AFTER_READ_GUARD] as Set<string> | undefined)?.delete(key)
+						}
+					}
+					return doc
+				}
+			: undefined
+
 	const defaultEndpoints = buildFormsEndpoints({
 		resultsAccess,
 		pollResultsTypes,
+		pollVotesEnabled,
 		consentSources,
 		fromAddresses,
 		departments,
@@ -748,6 +822,7 @@ export const buildFormsCollection = ({
 			afterChange: [pollCloseAfterChange, ...(overrides?.hooks?.afterChange ?? [])],
 			afterRead: [
 				...(consentAfterRead ? [consentAfterRead] : []),
+				...(calcAfterRead ? [calcAfterRead] : []),
 				...(overrides?.hooks?.afterRead ?? []),
 			],
 		},

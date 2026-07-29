@@ -1,5 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { calcExpressionOf, computeCalcFields } from '../calc/computeCalcFields'
+import type { CalcResolved } from '../calc/evaluate'
 import { evaluateCondition } from '../conditions/evaluate'
 import type { ConsentProof, ConsentSnapshotMode } from '../consent/captureConsent'
 import { captureConsent } from '../consent/captureConsent'
@@ -92,7 +93,7 @@ const optionLabelsFor = (instance: FormFieldInstance): Record<string, string> | 
 	const map: Record<string, string> = {}
 	for (const option of options as Array<{ label?: string; value?: string }>) {
 		if (typeof option?.value === 'string') {
-			map[option.value] = option.label ?? option.value
+			map[option.value] = option.label?.trim() ? option.label : option.value
 		}
 	}
 	return Object.keys(map).length > 0 ? map : undefined
@@ -127,6 +128,8 @@ export type RunSubmissionInput = {
 	expectedOwner?: string
 	/** Plugin `spam.uploadOwnership: 'strict'`: reject an owned upload when the submitter is unidentifiable. */
 	strictUploadOwnership?: boolean
+	/** Server-resolved calc context (sources/weights/functions); absent, extension nodes evaluate to 0. */
+	calcResolved?: CalcResolved
 }
 
 export type RunSubmissionResult = {
@@ -166,6 +169,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		uploadSlug,
 		expectedOwner,
 		strictUploadOwnership,
+		calcResolved,
 	} = input
 	const incoming = new Map(values.map((entry) => [entry.field, entry.value]))
 
@@ -205,7 +209,7 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 	}
 
 	// Calc values are authoritative everywhere downstream (conditions, validation, storage), never the client-sent value.
-	const effective = computeCalcFields(fields, coercedAnswers)
+	const effective = computeCalcFields(fields, coercedAnswers, calcResolved)
 
 	const errors: SubmissionFieldError[] = []
 	const outValues: SubmissionValue[] = []

@@ -1,4 +1,8 @@
 import { APIError, type CollectionBeforeValidateHook, ValidationError } from 'payload'
+import { calcExpressionOf } from '../calc/computeCalcFields'
+import type { CalcResolved } from '../calc/evaluate'
+import type { CalcFunction, CalcSource } from '../calc/registry'
+import { resolveCalcContext } from '../calc/resolveCalcContext'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import { FORMS_SLUG } from '../collections/forms'
 import type { ConsentSnapshotMode } from '../consent/captureConsent'
@@ -21,6 +25,10 @@ import { POLL_CONTEXT_KEY } from './votedCookie'
 export type ValidateSubmissionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	/** Registered calc sources (plugin option `calc.sources`); re-resolved fresh per submission. */
+	calcSources?: Record<string, CalcSource>
+	/** Registered calc functions (plugin option `calc.functions`); threaded into calc evaluation. */
+	calcFunctions?: Record<string, CalcFunction>
 	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
 	consentSources?: ConsentSourcesResolver
 	/** What each consent proof snapshots of the agreed wording (plugin option `consent.snapshot`). */
@@ -45,6 +53,8 @@ export const validateSubmission =
 	({
 		registry,
 		ruleRegistry,
+		calcSources,
+		calcFunctions,
 		consentSources,
 		consentSnapshot,
 		uploadSlug,
@@ -152,9 +162,45 @@ export const validateSubmission =
 			}
 		}
 
+		// Calc extension values re-resolve fresh here, never trusting the render-time embedding, and a
+		// resolver failure rejects the submission: a calc total is money math, so an outage must not
+		// silently evaluate to 0 (the render path fails open instead; see `calcAfterRead`). Surfaced as
+		// a translated 503 (the consent-sources precedent above), with the cause logged server-side
+		// rather than leaked to the anonymous caller.
+		let calcResolved: CalcResolved | undefined
+		if (fields.some((instance) => calcExpressionOf(instance) !== undefined)) {
+			let resolved: CalcResolved
+			try {
+				resolved = await resolveCalcContext({
+					fields,
+					sources: calcSources ?? {},
+					// Double cast: a host's generated Form interface has no index signature, so the direct
+					// cast fails under a consumer tsconfig even though the shape is a plain document.
+					form: form as unknown as { id: number | string } & Record<string, unknown>,
+					payload: req.payload,
+					req,
+				})
+			} catch (error) {
+				req.payload.logger?.error(
+					`@10x-media/form-builder: calc source resolution failed for form ${String(formId)}: ${
+						error instanceof Error ? error.message : String(error)
+					}`
+				)
+				throw new APIError(asTranslate(req.i18n.t)(keys.calcSourcesUnavailable), 503)
+			}
+			const functions =
+				calcFunctions && Object.keys(calcFunctions).length > 0
+					? Object.fromEntries(
+							Object.entries(calcFunctions).map(([name, definition]) => [name, definition.apply])
+						)
+					: undefined
+			calcResolved = { ...resolved, ...(functions ? { functions } : {}) }
+		}
+
 		const result = await runSubmission({
 			fields,
 			values: incoming,
+			calcResolved,
 			registry,
 			ruleRegistry,
 			consentEntries,

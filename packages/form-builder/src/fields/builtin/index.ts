@@ -1,6 +1,7 @@
 import type { RichTextField } from 'payload'
+import type { CalcAllowed } from '../../calc/normalizeCalc'
 import type { AnyFormFieldDefinition } from '../types'
-import { calculationField } from './calculation'
+import { buildCalculationField, type CalcSourceClientMeta } from './calculation'
 import { checkboxField } from './checkbox'
 import { consentField } from './consent'
 import { dateField } from './date'
@@ -19,12 +20,17 @@ import { textareaField } from './textarea'
  * richText editor on the message content field (from the plugin's `richText.editor` option). Field
  * types without content config are shared static definitions. Definitions are authored with precise
  * value/config generics; the registry stores them erased (config is re-narrowed per matched type at
- * execution), hence one cast per built-in, no `any`.
+ * execution), hence one cast per built-in, no `any`. `calcAllowed` threads the registered calc
+ * extension names into the calculation field's expression validate and editor schema;
+ * `calcSources` carries the serializable source metadata the builder UI renders from.
  */
+// biome-ignore lint/complexity/useMaxParams: the documented positional surface (localize, editor, uploadMimeTypes) plus the calc allowed sets and source metadata; an options object would break existing callers
 export const buildDefaultFieldDefinitions = (
 	localize: boolean,
 	editor?: RichTextField['editor'],
-	uploadMimeTypes?: string[]
+	uploadMimeTypes?: string[],
+	calcAllowed?: CalcAllowed,
+	calcSources?: CalcSourceClientMeta[]
 ): AnyFormFieldDefinition[] => [
 	textField as AnyFormFieldDefinition,
 	textareaField as AnyFormFieldDefinition,
@@ -32,7 +38,7 @@ export const buildDefaultFieldDefinitions = (
 	numberField as AnyFormFieldDefinition,
 	buildSelectField(localize) as AnyFormFieldDefinition,
 	checkboxField as AnyFormFieldDefinition,
-	calculationField as AnyFormFieldDefinition,
+	buildCalculationField(calcAllowed, { localize, sources: calcSources }) as AnyFormFieldDefinition,
 	consentField as AnyFormFieldDefinition,
 	buildFileField(uploadMimeTypes) as AnyFormFieldDefinition,
 	buildRepeaterField(localize) as AnyFormFieldDefinition,

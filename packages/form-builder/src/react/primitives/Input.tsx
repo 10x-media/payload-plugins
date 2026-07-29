@@ -12,6 +12,7 @@ export type InputProps = {
 	disabled?: boolean
 	invalid?: boolean
 	describedById?: string
+	autoComplete?: string
 }
 
 export const Input = ({
@@ -26,6 +27,7 @@ export const Input = ({
 	disabled,
 	invalid,
 	describedById,
+	autoComplete,
 }: InputProps) => (
 	<input
 		id={id}
@@ -38,6 +40,7 @@ export const Input = ({
 		disabled={disabled}
 		aria-invalid={invalid || undefined}
 		aria-describedby={describedById}
+		autoComplete={autoComplete}
 		onChange={(event) => onChange(event.target.value)}
 		onBlur={onBlur}
 	/>

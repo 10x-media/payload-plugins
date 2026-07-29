@@ -5,8 +5,10 @@ import type { FromAddressesResolver } from './actions/fromAddresses'
 import type { RecipientSourceRegistry } from './actions/recipientSources'
 import type { ActionsConfig } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
+import type { CalcFunction, CalcSource } from './calc/registry'
 import type { ButtonsOption } from './collections/buttonFields'
 import type { ResponseOption } from './collections/redirectFields'
+import type { SettingsOption } from './collections/settingsFields'
 import type { ConsentSnapshotMode } from './consent/captureConsent'
 import type { ConsentSourcesResolver } from './consent/types'
 import type { DepartmentEmailsResolver } from './email/departments'
@@ -50,6 +52,20 @@ export type FormBuilderPluginOptions = {
 	rules?: ValidationRulesConfig
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	actions?: ActionsConfig
+	/**
+	 * Calculation extensions. `sources` registers named value resolvers the calculation field can
+	 * reference: `resolve` supplies one number per render/submission (a tax rate, a member
+	 * discount), `resolveWeights` supplies per-option numbers for a chosen field (a product's
+	 * price per selectable product). Values resolve server-side, ride the form document for the
+	 * client's live preview, and re-resolve at submit, so the client never supplies them.
+	 * `functions` registers extra calculation functions; client-side live preview additionally
+	 * needs the same map passed to the Form component.
+	 *
+	 * Resolvers receive an unauthenticated visitor `req` on public reads and submits: never feed
+	 * data derived from it into access-escalated queries, and gate per-user-sensitive numbers on
+	 * `req.user`, because resolved values are embedded on every readable form document.
+	 */
+	calc?: { sources?: Record<string, CalcSource>; functions?: Record<string, CalcFunction> }
 	/**
 	 * Customize how the plugin's rich text is authored and rendered. `editor` is the default
 	 * Lexical/richText editor for every plugin richText field (message content, consent
@@ -142,6 +158,12 @@ export type FormBuilderPluginOptions = {
 	 */
 	buttons?: ButtonsOption
 	/**
+	 * Form-level flag fields (`multistep`, `pollEnabled`, `persistSubmissions`), sidebar
+	 * checkboxes by default. `fields` composes them from the defaults so a host can
+	 * relocate, wrap, extend, or drop them.
+	 */
+	settings?: SettingsOption
+	/**
 	 * The success-response group. `redirect.fields` composes the fields inside the `response.redirect`
 	 * group, mirroring `buttons.fields`: it receives the default fields (the `url` text field, plus the
 	 * polymorphic `reference` relationship when `redirectRelationships` is set) and returns the group's
@@ -210,6 +232,14 @@ export type FormBuilderPluginOptions = {
 		sources?: PollOptionSourcesConfig
 		types?: PollTypesConfig
 		outcomeFields?: OutcomeFieldsOverride
+		/**
+		 * Poll vote tally store (default on). Votes are counted into an append-only hidden
+		 * collection of aggregate rows at submit time, so results reads are O(options), never
+		 * truncate, and survive `persistSubmissions: false`. `false` restores scan-based results
+		 * (and then a persist-off poll is rejected at save). `overrides` opens the tally
+		 * collection (slug stays `form-poll-votes`).
+		 */
+		votes?: false | { overrides?: CollectionOverrides }
 	}
 	/**
 	 * When `true`, the raw `values`, `descriptors`, and `consent` JSON fields are visible in the

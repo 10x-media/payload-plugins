@@ -1,8 +1,12 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { en } from '../../translations/en'
-import { keys } from '../../translations/keys'
-import { calculationField, validateExpression } from './calculation'
+import {
+	buildCalculationField,
+	buildValidateExpression,
+	type CalcSourceClientMeta,
+	calculationField,
+	validateExpression,
+} from './calculation'
 
 const req = { t: (key: string) => key } as unknown as PayloadRequest
 
@@ -47,9 +51,7 @@ type FieldWithJSONShape = {
 	name: string
 	jsonSchema?: { fileMatch: string[]; schema: unknown; uri: string }
 	typescriptSchema?: Array<(args: { jsonSchema: unknown }) => unknown>
-	admin?: {
-		description?: (args: { t: (key: string, vars?: Record<string, unknown>) => string }) => string
-	}
+	admin?: { components?: { Field?: unknown }; description?: unknown }
 }
 
 const expressionField = (calculationField.config as FieldWithJSONShape[]).find(
@@ -71,26 +73,96 @@ describe('calculationField expression config', () => {
 		expect(JSON.stringify(generated)).not.toContain('$ref')
 	})
 
-	it('renders a description that keeps JSON braces intact through Payload-style t()', () => {
-		const translations: Record<string, string> = {
-			[keys.configExpressionDescription]: en[keys.configExpressionDescription],
-		}
-		// Mirrors Payload's real t(): only interpolates {{double curly}} vars, and only when
-		// called with a vars object. labelFor never passes vars, so single-brace JSON is untouched.
-		const fakeT = (key: string, vars?: Record<string, unknown>): string => {
-			let value = translations[key] ?? key
-			if (vars) {
-				value = value.replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
-					const v = vars[name.trim()]
-					return v !== undefined && v !== null ? String(v) : match
-				})
-			}
-			return value
-		}
+	it('mounts the visual expression builder without a field description', () => {
+		expect(expressionField?.admin?.components?.Field).toBe(
+			'@10x-media/form-builder/client#CalcExpressionBuilder'
+		)
+		expect(expressionField?.admin?.description).toBeUndefined()
+	})
 
-		const rendered = expressionField?.admin?.description?.({ t: fakeT })
-		expect(rendered).toBe(en[keys.configExpressionDescription])
-		expect(rendered).toContain('{"type":"op"')
-		expect(rendered).toContain('"value":10}}')
+	it('threads source metadata and custom function names to the builder as clientProps', () => {
+		const sources = [
+			{ key: 'serviceFee', label: 'Service fee', scalar: true, weights: false },
+		] satisfies CalcSourceClientMeta[]
+		const built = buildCalculationField(
+			{ sources: new Set(['serviceFee']), functions: new Set(['double']) },
+			{ sources }
+		)
+		const expression = (built.config as FieldWithJSONShape[]).find(
+			(field) => field.name === 'expression'
+		)
+		expect(expression?.admin?.components?.Field).toEqual({
+			path: '@10x-media/form-builder/client#CalcExpressionBuilder',
+			clientProps: { sources, functions: ['double'] },
+		})
+	})
+
+	it('offers display config fields after calcDisplay', () => {
+		const names = (calculationField.config as { name: string }[]).map((field) => field.name)
+		expect(names).toEqual(['expression', 'calcDisplay', 'decimals', 'prefix', 'suffix'])
+		const decimals = (
+			calculationField.config as { name: string; min?: number; max?: number }[]
+		).find((field) => field.name === 'decimals')
+		expect(decimals?.min).toBe(0)
+		expect(decimals?.max).toBe(6)
+	})
+
+	it('formats stored values with the display config', () => {
+		const t = (key: string): string => key
+		const format = calculationField.format as (args: {
+			value: unknown
+			config: Record<string, unknown>
+			locale: string
+			t: (key: string) => string
+		}) => string
+		expect(format({ value: 12.5, config: { decimals: 2, prefix: 'EUR ' }, locale: 'en', t })).toBe(
+			'EUR 12.50'
+		)
+		expect(format({ value: null, config: {}, locale: 'en', t })).toBe('')
+		expect(format({ value: 7, config: {}, locale: 'en', t })).toBe('7')
+	})
+})
+
+describe('buildValidateExpression with allowed extensions', () => {
+	const allowed = { sources: new Set(['taxRate']), functions: new Set(['double']) }
+	const validate = buildValidateExpression(allowed)
+
+	it('accepts source nodes and custom fns in the allowed sets', () => {
+		expect(validate({ type: 'source', source: 'taxRate' }, { req })).toBe(true)
+		expect(validate({ type: 'fn', fn: 'double', args: [{ type: 'lit', value: 1 }] }, { req })).toBe(
+			true
+		)
+	})
+
+	it('still rejects unregistered keys', () => {
+		expect(validate({ type: 'source', source: 'unknown' }, { req })).toBe(
+			'formBuilder:validation.calcExpressionInvalid'
+		)
+	})
+
+	it('the no-extensions validateExpression rejects source nodes', () => {
+		expect(validateExpression({ type: 'source', source: 'taxRate' }, { req })).toBe(
+			'formBuilder:validation.calcExpressionInvalid'
+		)
+	})
+})
+
+describe('buildCalculationField', () => {
+	it('threads the allowed sets into the expression validate', () => {
+		const field = buildCalculationField({ sources: new Set(['taxRate']), functions: new Set() })
+		const expression = (field.config as FieldWithJSONShape[]).find(
+			(entry) => entry.name === 'expression'
+		) as { validate?: (value: unknown, args: { req: PayloadRequest }) => string | true }
+		expect(expression?.validate?.({ type: 'source', source: 'taxRate' }, { req })).toBe(true)
+	})
+
+	it('the no-extensions calculationField equals buildCalculationField()', () => {
+		expect(calculationField.type).toBe('calculation')
+		const expression = (buildCalculationField().config as FieldWithJSONShape[]).find(
+			(entry) => entry.name === 'expression'
+		) as { validate?: (value: unknown, args: { req: PayloadRequest }) => string | true }
+		expect(expression?.validate?.({ type: 'source', source: 'taxRate' }, { req })).toBe(
+			'formBuilder:validation.calcExpressionInvalid'
+		)
 	})
 })

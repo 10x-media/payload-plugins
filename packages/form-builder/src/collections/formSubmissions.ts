@@ -3,6 +3,7 @@ import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
 import type { ActionInstance } from '../actions/runActions'
+import type { CalcFunction, CalcSource } from '../calc/registry'
 import type { ConsentSnapshotMode } from '../consent/captureConsent'
 import type { ConsentSourcesResolver } from '../consent/types'
 import { resolveEventSink } from '../events/resolveEventSink'
@@ -11,8 +12,10 @@ import type { FieldTypeRegistry } from '../fields/registry'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import type { PollOptionSourceRegistry } from '../poll/registry'
+import { makeVoteTallyHook } from '../poll/votes/voteTallyHook'
 import { buildSpamGuard } from '../spam/spamGuard'
 import type { ResolvedSpamConfig } from '../spam/types'
+import { formIdOf } from '../submissions/formIdOf'
 import { validateSubmission } from '../submissions/validateSubmission'
 import { verifyContext } from '../submissions/verifyContext'
 import { POLL_CONTEXT_KEY, votedCookieName } from '../submissions/votedCookie'
@@ -26,6 +29,10 @@ export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 type BuildSubmissionsCollectionArgs = {
 	registry: FieldTypeRegistry
 	ruleRegistry: ValidationRuleRegistry
+	/** Registered calc sources; submission validation re-resolves them fresh (a failure rejects the submission). */
+	calcSources?: Record<string, CalcSource>
+	/** Registered calc functions; threaded into submit-time calc evaluation. */
+	calcFunctions?: Record<string, CalcFunction>
 	/** The host's consent sources resolver (plugin option `consent.sources`); absent when no sources are configured. */
 	consentSources?: ConsentSourcesResolver
 	/** What each consent proof snapshots of the agreed wording (plugin option `consent.snapshot`). */
@@ -44,6 +51,8 @@ type BuildSubmissionsCollectionArgs = {
 	votedCookie?: boolean
 	/** Registered poll option sources; submission validation resolves allowed values through them. */
 	pollSourceRegistry?: PollOptionSourceRegistry
+	/** Resolved `poll.votes` option; `false` skips registering the append-only vote tally hook. */
+	pollVotes?: false | { overrides?: CollectionOverrides }
 	/**
 	 * When `true`, reveals the standalone `locale`, `values`, `descriptors`, `consent`, and `meta`
 	 * fields in the admin UI. Default `false`, because the `SubmissionAnswers` UI component already
@@ -51,19 +60,6 @@ type BuildSubmissionsCollectionArgs = {
 	 */
 	showRawFields?: boolean
 	overrides?: CollectionOverrides
-}
-
-const formIdOf = (form: unknown): number | string | undefined => {
-	if (typeof form === 'number' || typeof form === 'string') {
-		return form
-	}
-	if (form && typeof form === 'object' && 'id' in form) {
-		const id = (form as { id: unknown }).id
-		if (typeof id === 'number' || typeof id === 'string') {
-			return id
-		}
-	}
-	return undefined
 }
 
 /**
@@ -171,6 +167,8 @@ const makeVotedCookieHook = (): CollectionAfterChangeHook => {
 export const buildSubmissionsCollection = ({
 	registry,
 	ruleRegistry,
+	calcSources,
+	calcFunctions,
 	consentSources,
 	consentSnapshot,
 	actionRegistry = new Map(),
@@ -181,6 +179,7 @@ export const buildSubmissionsCollection = ({
 	spam,
 	votedCookie = false,
 	pollSourceRegistry,
+	pollVotes = false,
 	showRawFields = false,
 	overrides,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => {
@@ -263,6 +262,8 @@ export const buildSubmissionsCollection = ({
 				validateSubmission({
 					registry,
 					ruleRegistry,
+					calcSources,
+					calcFunctions,
 					consentSources,
 					consentSnapshot,
 					uploadSlug,
@@ -272,6 +273,10 @@ export const buildSubmissionsCollection = ({
 				...(overrides?.hooks?.beforeValidate ?? []),
 			],
 			afterChange: [
+				// The tally hook runs first and does not swallow errors: a bump failure must throw so
+				// Payload rolls the submission create/update back inside the operation transaction,
+				// rather than being absorbed by the dispatch hook's swallow-all error boundary below.
+				...(pollVotes !== false ? [makeVoteTallyHook()] : []),
 				makeAfterChange({ actionRegistry, events, hasRunner, richText }),
 				...(votedCookie ? [makeVotedCookieHook()] : []),
 				...(overrides?.hooks?.afterChange ?? []),

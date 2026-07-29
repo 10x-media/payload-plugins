@@ -7,6 +7,10 @@ import { Input } from '../primitives/Input'
 export const textRenderer = defineFieldRenderer<string>(
 	({ field, id, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const describedById = `${id}-desc`
+		const autoComplete =
+			typeof field.autocomplete === 'string' && field.autocomplete.trim()
+				? field.autocomplete
+				: undefined
 		return (
 			<FieldShell
 				id={id}
@@ -28,6 +32,7 @@ export const textRenderer = defineFieldRenderer<string>(
 					disabled={disabled}
 					invalid={errors.length > 0}
 					describedById={describedById}
+					autoComplete={autoComplete}
 				/>
 			</FieldShell>
 		)

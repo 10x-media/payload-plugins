@@ -1,10 +1,22 @@
 import type { Payload } from 'payload'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { definePollOptionSource } from './definePollOptionSource'
 import { resolvePollTypes, stashPollTypes } from './pollTypeRegistry'
 import type { PollOptionSourceRegistry } from './registry'
 import { stashPollOptionSources } from './resolvePollOptions'
-import { resolvePollOutcome } from './resolvePollOutcome'
+
+const { aggregateFieldResponses, aggregateFromVotes, resolveEffectivePollOptions } = vi.hoisted(
+	() => ({
+		aggregateFieldResponses: vi.fn(),
+		aggregateFromVotes: vi.fn(),
+		resolveEffectivePollOptions: vi.fn(),
+	})
+)
+vi.mock('../aggregation/aggregateResponses', () => ({ aggregateFieldResponses }))
+vi.mock('./votes/aggregateFromVotes', () => ({ aggregateFromVotes }))
+vi.mock('./effectivePollOptions', () => ({ resolveEffectivePollOptions }))
+
+const { resolvePollOutcome } = await import('./resolvePollOutcome')
 
 const sources: PollOptionSourceRegistry = new Map([
 	[
@@ -139,5 +151,57 @@ describe('resolvePollOutcome', () => {
 			resolvePollOutcome({ payload, formId: 1, winningValues: ['ada'] })
 		).rejects.toThrow(/not poll-enabled/)
 		expect(update).not.toHaveBeenCalled()
+	})
+})
+
+describe('resolvePollOutcome tally switch (mostVoted)', () => {
+	const votesAggregation = {
+		field: 'winner',
+		total: 4,
+		buckets: [
+			{ value: 'ada', label: 'Ada', count: 3, percentage: 75 },
+			{ value: 'grace', label: 'Grace', count: 1, percentage: 25 },
+		],
+		truncated: false,
+	}
+
+	beforeEach(() => {
+		aggregateFieldResponses.mockReset()
+		aggregateFromVotes.mockReset()
+		resolveEffectivePollOptions.mockReset()
+		aggregateFieldResponses.mockResolvedValue(votesAggregation)
+		aggregateFromVotes.mockResolvedValue(votesAggregation)
+		resolveEffectivePollOptions.mockResolvedValue([{ value: 'ada', label: 'Ada' }])
+	})
+
+	it('aggregates from the tally store when pollVotesEnabled, with the effective options', async () => {
+		const { payload, update } = payloadWith({ type: 'mostVoted', resultsField: 'winner' })
+		const recorded = await resolvePollOutcome({ payload, formId: 1, pollVotesEnabled: true })
+		expect(recorded).toEqual(['ada'])
+		expect(aggregateFromVotes).toHaveBeenCalledWith({
+			payload,
+			formId: 1,
+			field: 'winner',
+			options: [{ value: 'ada', label: 'Ada' }],
+			req: undefined,
+		})
+		expect(aggregateFieldResponses).not.toHaveBeenCalled()
+		expect(update).toHaveBeenCalledOnce()
+	})
+
+	it('still resolves from raw tallies when the option resolve fails', async () => {
+		resolveEffectivePollOptions.mockRejectedValue(new Error('source down'))
+		const { payload } = payloadWith({ type: 'mostVoted', resultsField: 'winner' })
+		const recorded = await resolvePollOutcome({ payload, formId: 1, pollVotesEnabled: true })
+		expect(recorded).toEqual(['ada'])
+		expect(aggregateFromVotes).toHaveBeenCalledWith(expect.objectContaining({ options: [] }))
+	})
+
+	it('keeps the submission scan when the store is disabled', async () => {
+		const { payload } = payloadWith({ type: 'mostVoted', resultsField: 'winner' })
+		const recorded = await resolvePollOutcome({ payload, formId: 1 })
+		expect(recorded).toEqual(['ada'])
+		expect(aggregateFieldResponses).toHaveBeenCalledOnce()
+		expect(aggregateFromVotes).not.toHaveBeenCalled()
 	})
 })

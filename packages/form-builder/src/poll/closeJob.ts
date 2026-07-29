@@ -49,34 +49,41 @@ export const shouldAutoResolvePoll = (form: PollFormLike): boolean => {
 export const runPollClose = async (args: {
 	payload: Payload
 	input: PollCloseTaskInput
+	/** Whether the hidden tally store backs the outcome aggregation (see `resolvePollOutcome`). */
+	pollVotesEnabled?: boolean
 	req?: PayloadRequest
 }): Promise<void> => {
-	const { payload, input, req } = args
+	const { payload, input, pollVotesEnabled, req } = args
 	const form = await payload
 		.findByID({ collection: FORMS_SLUG, id: input.formId, depth: 0, overrideAccess: true, req })
 		.catch(() => null)
 	if (!form || !shouldAutoResolvePoll(form as PollFormLike)) {
 		return
 	}
-	await resolvePollOutcome({ payload, formId: input.formId, req })
+	await resolvePollOutcome({ payload, formId: input.formId, pollVotesEnabled, req })
 }
 
 /** Native Payload jobs task that resolves a poll's outcome once it closes. */
-export const buildPollCloseTask = (): TaskConfig =>
+export const buildPollCloseTask = (pollVotesEnabled = false): TaskConfig =>
 	({
 		slug: POLL_CLOSE_TASK_SLUG,
 		inputSchema: [{ name: 'formId', type: 'text', required: true }],
 		handler: async ({ input, req }) => {
-			await runPollClose({ payload: req.payload, input: input as PollCloseTaskInput, req })
+			await runPollClose({
+				payload: req.payload,
+				input: input as PollCloseTaskInput,
+				pollVotesEnabled,
+				req,
+			})
 			return { output: {} }
 		},
 	}) as TaskConfig
 
 /** Register the poll-close task on `config.jobs.tasks`, creating the jobs config if absent. */
-export const registerPollCloseTask = (config: Config): void => {
+export const registerPollCloseTask = (config: Config, pollVotesEnabled = false): void => {
 	config.jobs ??= {}
 	config.jobs.tasks ??= []
-	config.jobs.tasks.push(buildPollCloseTask())
+	config.jobs.tasks.push(buildPollCloseTask(pollVotesEnabled))
 }
 
 const canQueue = (payload: Payload): boolean => typeof payload.jobs?.queue === 'function'

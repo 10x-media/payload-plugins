@@ -12,6 +12,8 @@ export type CheckboxProps = {
 	describedById?: string
 	/** Overrides the accessible name (e.g. when the visible label is rich HTML with a plain-text equivalent). */
 	ariaLabel?: string
+	/** `switch` renders the same input as `role="switch"` styled as a toggle; omit for the plain checkbox. */
+	variant?: 'checkbox' | 'switch'
 }
 
 export const Checkbox = ({
@@ -25,10 +27,12 @@ export const Checkbox = ({
 	invalid,
 	describedById,
 	ariaLabel,
+	variant,
 }: CheckboxProps) => (
 	<input
 		type="checkbox"
-		className="fb-checkbox"
+		role={variant === 'switch' ? 'switch' : undefined}
+		className={variant === 'switch' ? 'fb-checkbox fb-switch' : 'fb-checkbox'}
 		id={id}
 		name={name}
 		checked={checked}

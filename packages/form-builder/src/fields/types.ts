@@ -100,6 +100,11 @@ export type FormFieldDefinition<
 	label: string
 	value: K
 	config?: Field[]
+	/**
+	 * Extra per-type fields for the Advanced tab, after `visibleWhen`/`hidden`. Lets a type add
+	 * behavior settings (e.g. `autocomplete`) without crowding the Field tab.
+	 */
+	advancedConfig?: Field[]
 	validate?: FormFieldValidate<K, TConfig>
 	format?: FormFieldFormat<K, TConfig>
 	Field?: string
@@ -169,6 +174,8 @@ export type AnyFormFieldDefinition = {
 	label: string
 	value: FormFieldValueKind
 	config?: Field[]
+	/** See `FormFieldDefinition.advancedConfig`: extra per-type fields for the Advanced tab. */
+	advancedConfig?: Field[]
 	validate?: AnyFormFieldValidate
 	format?: AnyFormFieldFormat
 	Field?: string

@@ -144,3 +144,85 @@ describe('evaluateCalc', () => {
 		expect(evaluateCalc(expr, {})).toBe(0)
 	})
 })
+
+describe('evaluateCalc with resolved context', () => {
+	const source = (key: string): CalcExpression => ({ type: 'source', source: key })
+	const weightFrom = (field: string, key: string): CalcExpression => ({
+		type: 'weight',
+		field,
+		source: key,
+	})
+
+	it('source node reads resolved.sources', () => {
+		expect(evaluateCalc(source('taxRate'), {}, { sources: { taxRate: 0.19 } })).toBe(0.19)
+	})
+
+	it('source node without resolved context returns 0', () => {
+		expect(evaluateCalc(source('taxRate'), {})).toBe(0)
+		expect(evaluateCalc(source('taxRate'), {}, {})).toBe(0)
+		expect(evaluateCalc(source('taxRate'), {}, { sources: {} })).toBe(0)
+	})
+
+	it('source node guards non-finite resolved values to 0', () => {
+		expect(evaluateCalc(source('bad'), {}, { sources: { bad: Number.NaN } })).toBe(0)
+	})
+
+	it('weight with source reads the resolved map keyed source + space + field', () => {
+		const resolved = { weights: { 'productPrices product': { a: 10, b: 25 } } }
+		expect(evaluateCalc(weightFrom('product', 'productPrices'), { product: 'b' }, resolved)).toBe(
+			25
+		)
+		expect(
+			evaluateCalc(weightFrom('product', 'productPrices'), { product: ['a', 'b'] }, resolved)
+		).toBe(35)
+	})
+
+	it('weight with source and a missing resolved map returns 0 per chosen', () => {
+		expect(evaluateCalc(weightFrom('product', 'productPrices'), { product: 'a' })).toBe(0)
+		expect(evaluateCalc(weightFrom('product', 'productPrices'), { product: 'a' }, {})).toBe(0)
+	})
+
+	it('weight with source ignores inline weights', () => {
+		const expr: CalcExpression = {
+			type: 'weight',
+			field: 'product',
+			weights: { a: 999 },
+			source: 'productPrices',
+		}
+		expect(
+			evaluateCalc(expr, { product: 'a' }, { weights: { 'productPrices product': { a: 10 } } })
+		).toBe(10)
+		expect(evaluateCalc(expr, { product: 'a' }, {})).toBe(0)
+	})
+
+	it('custom fn resolves through resolved.functions', () => {
+		const expr: CalcExpression = { type: 'fn', fn: 'double', args: [lit(21)] }
+		expect(evaluateCalc(expr, {}, { functions: { double: (a) => (a[0] ?? 0) * 2 } })).toBe(42)
+	})
+
+	it('unknown fn with no resolved entry returns 0', () => {
+		const expr: CalcExpression = { type: 'fn', fn: 'double', args: [lit(21)] }
+		expect(evaluateCalc(expr, {})).toBe(0)
+		expect(evaluateCalc(expr, {}, { functions: {} })).toBe(0)
+	})
+
+	it('a throwing custom fn evaluates to 0', () => {
+		const expr: CalcExpression = { type: 'fn', fn: 'boom', args: [lit(1)] }
+		const functions = {
+			boom: () => {
+				throw new Error('nope')
+			},
+		}
+		expect(evaluateCalc(expr, {}, { functions })).toBe(0)
+	})
+
+	it('a non-finite custom fn result is guarded to 0', () => {
+		const expr: CalcExpression = { type: 'fn', fn: 'inf', args: [] }
+		expect(evaluateCalc(expr, {}, { functions: { inf: () => Number.POSITIVE_INFINITY } })).toBe(0)
+	})
+
+	it('a built-in fn wins over a custom fn of the same name', () => {
+		const expr: CalcExpression = { type: 'fn', fn: 'round', args: [lit(1.4)] }
+		expect(evaluateCalc(expr, {}, { functions: { round: () => 999 } })).toBe(1)
+	})
+})

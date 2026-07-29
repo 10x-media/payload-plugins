@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CalcExpression } from '../calc/types'
 import type { FormFieldInstance } from '../submissions/types'
 import { Form, type FormDocument } from './Form'
+import { useCalcValues } from './useCalcValues'
 
 afterEach(() => {
 	cleanup()
@@ -161,6 +162,85 @@ describe('Form calculation fields', () => {
 				values: expect.arrayContaining([{ field: 'total', value: 8 }]),
 			})
 		})
+	})
+
+	it('computes with server-resolved source values from the document', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'number', name: 'a', label: 'A' },
+			{
+				blockType: 'calculation',
+				name: 'total',
+				label: 'Total',
+				expression: {
+					type: 'op',
+					op: '+',
+					left: { type: 'ref', field: 'a' },
+					right: { type: 'source', source: 'fee' },
+				},
+			},
+		]
+		const form: FormDocument = { ...doc(fields), calcResolved: { sources: { fee: 25 } } }
+		const { container } = render(<Form form={form} onSubmit={vi.fn()} />)
+		fireEvent.change(screen.getByLabelText('A'), { target: { value: '5' } })
+		expect(container.querySelector('output')?.textContent).toBe('30')
+	})
+
+	it('computes with client halves of custom functions from the calcFunctions prop', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'number', name: 'a', label: 'A' },
+			{
+				blockType: 'calculation',
+				name: 'total',
+				label: 'Total',
+				expression: { type: 'fn', fn: 'double', args: [{ type: 'ref', field: 'a' }] },
+			},
+		]
+		const { container } = render(
+			<Form
+				form={doc(fields)}
+				onSubmit={vi.fn()}
+				calcFunctions={{ double: (args) => (args[0] ?? 0) * 2 }}
+			/>
+		)
+		fireEvent.change(screen.getByLabelText('A'), { target: { value: '4' } })
+		expect(container.querySelector('output')?.textContent).toBe('8')
+	})
+
+	it('formats the rendered value with decimals, prefix, and suffix', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'number', name: 'a', label: 'A' },
+			{ blockType: 'number', name: 'b', label: 'B' },
+			{
+				blockType: 'calculation',
+				name: 'total',
+				label: 'Total',
+				expression: sum,
+				decimals: 2,
+				prefix: 'EUR ',
+			},
+		]
+		const { container } = render(<Form form={doc(fields)} onSubmit={vi.fn()} />)
+		fireEvent.change(screen.getByLabelText('A'), { target: { value: '3' } })
+		fireEvent.change(screen.getByLabelText('B'), { target: { value: '4' } })
+		expect(container.querySelector('output')?.textContent).toBe('EUR 7.00')
+	})
+
+	it('exposes live calc values to composed frontends via useCalcValues', () => {
+		const Probe = () => {
+			const values = useCalcValues()
+			return <div data-testid="calc-probe">{JSON.stringify(values)}</div>
+		}
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'number', name: 'a', label: 'A' },
+			{ blockType: 'number', name: 'b', label: 'B' },
+			{ blockType: 'calculation', name: 'total', label: 'Total', expression: sum },
+		]
+		render(
+			<Form form={doc(fields)} onSubmit={vi.fn()} initialValues={{ a: 3, b: 4 }}>
+				<Probe />
+			</Form>
+		)
+		expect(screen.getByTestId('calc-probe').textContent).toBe('{"total":7}')
 	})
 
 	it('shows a field gated on a computed calc value once the calc makes the condition true', async () => {

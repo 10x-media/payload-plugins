@@ -103,3 +103,54 @@ describe('computeCalcFields', () => {
 		expect(Object.keys(answers)).toEqual(['a'])
 	})
 })
+
+describe('computeCalcFields with resolved context', () => {
+	it('threads resolved sources, weights, and functions into evaluation', () => {
+		const fields: FormFieldInstance[] = [
+			mkField('product'),
+			mkField('net', {
+				expression: {
+					type: 'weight',
+					field: 'product',
+					source: 'productPrices',
+				} satisfies CalcExpression,
+			}),
+			mkField('tax', {
+				expression: {
+					type: 'op',
+					op: '*',
+					left: { type: 'ref', field: 'net' },
+					right: { type: 'source', source: 'taxRate' },
+				} satisfies CalcExpression,
+			}),
+			mkField('doubled', {
+				expression: {
+					type: 'fn',
+					fn: 'double',
+					args: [{ type: 'ref', field: 'net' }],
+				} satisfies CalcExpression,
+			}),
+		]
+		const result = computeCalcFields(
+			fields,
+			{ product: 'a' },
+			{
+				sources: { taxRate: 0.5 },
+				weights: { 'productPrices product': { a: 100 } },
+				functions: { double: (args) => (args[0] ?? 0) * 2 },
+			}
+		)
+		expect(result.net).toBe(100)
+		expect(result.tax).toBe(50)
+		expect(result.doubled).toBe(200)
+	})
+
+	it('without resolved context, extension nodes degrade to 0', () => {
+		const fields: FormFieldInstance[] = [
+			mkField('tax', {
+				expression: { type: 'source', source: 'taxRate' } satisfies CalcExpression,
+			}),
+		]
+		expect(computeCalcFields(fields, {}).tax).toBe(0)
+	})
+})

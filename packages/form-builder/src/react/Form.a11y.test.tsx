@@ -49,6 +49,46 @@ describe('Form accessibility (axe)', () => {
 		expect(await axeViolations(container)).toEqual([])
 	})
 
+	it('the select field radio and buttons displays have no structural violations', async () => {
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'select',
+				name: 'plan',
+				label: 'Plan',
+				display: 'radio',
+				options: [
+					{ label: 'Free', value: 'free' },
+					{ label: 'Pro', value: 'pro' },
+				],
+			} as FormFieldInstance,
+			{
+				blockType: 'select',
+				name: 'billing',
+				label: 'Billing cycle',
+				display: 'buttons',
+				options: [
+					{ label: 'Monthly', value: 'monthly' },
+					{ label: 'Yearly', value: 'yearly' },
+				],
+			} as FormFieldInstance,
+		]
+		const { container } = render(<Form form={doc(fields)} />)
+		expect(await axeViolations(container)).toEqual([])
+	})
+
+	it('the checkbox field switch display has no structural violations', async () => {
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'checkbox',
+				name: 'notifications',
+				label: 'Enable notifications',
+				display: 'switch',
+			} as FormFieldInstance,
+		]
+		const { container } = render(<Form form={doc(fields)} />)
+		expect(await axeViolations(container)).toEqual([])
+	})
+
 	it('the post-submit error state has no structural violations', async () => {
 		const { container } = render(
 			<Form

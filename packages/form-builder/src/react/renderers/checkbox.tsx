@@ -26,6 +26,7 @@ export const checkboxRenderer = defineFieldRenderer<boolean>(
 					disabled={disabled}
 					invalid={errors.length > 0}
 					describedById={describedById}
+					variant={field.display === 'switch' ? 'switch' : undefined}
 				/>
 			</FieldShell>
 		)

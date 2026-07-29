@@ -15,6 +15,9 @@ export const instanceOptionsOf = (
 	}
 	const options = (field.options as Array<{ label?: string; value?: string }>)
 		.filter((option) => typeof option?.value === 'string')
-		.map((option) => ({ value: String(option.value), label: option.label ?? String(option.value) }))
+		.map((option) => ({
+			value: String(option.value),
+			label: option.label?.trim() ? option.label : String(option.value),
+		}))
 	return options.length > 0 ? options : undefined
 }

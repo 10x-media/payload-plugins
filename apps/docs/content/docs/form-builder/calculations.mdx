@@ -45,11 +45,116 @@ const scoreQ1: CalcExpression = {
 
 ## Authoring in the admin
 
-Expressions are authored in the field's JSON config field. The field describes the node shapes inline and ships a JSON schema for the admin's Monaco editor, so authors get autocomplete and inline diagnostics while typing. Validity is enforced on save: an expression that does not normalize into a well-formed tree is rejected with a field error, so a broken calculation cannot reach the public form.
+The `expression` config field renders a visual builder that reads left to right, the way the calculation is spoken: a first value, then one step per operation, then an optional finishing function. An empty expression starts with a **Start with** picker naming what each value kind is for:
 
-<Callout type="info">
-A visual expression builder is planned; expressions are authored as data today.
-</Callout>
+| Builder label | Node | What it offers |
+|---|---|---|
+| Field | `ref` | A select of the fields this calculation may reference: `number` fields, plus earlier `calculation` fields (see [forward references](#forward-references) below). |
+| Number | `lit` | A plain numeric input. |
+| Weighted field | `weight` | A `select` field to score, then a number input per one of its options, turning the chosen option into a number you define. |
+| Function | `fn` | A function select (`min`, `max`, `round`, `abs`, `ceil`, `floor`) over one or more arguments, each its own chain, with add/remove buttons for `min`/`max`'s variadic args. |
+
+**Add step** appends an operation row (`+ - * / %` plus a value); steps apply in order to the running result, and the live preview renders the parenthesized reading on every edit, marking an unfilled slot with `?`. **Then apply** wraps the finished chain in a single-argument function (`round`, `abs`, `ceil`, `floor`). Each row removes with its trailing button; removing the first row promotes the next, and a remove control is only rendered where removal is genuinely possible.
+
+An order total with tax, built as Field `price`, then `× ` Field `quantity`, then `× ` Number `1.19`, reads back as `price × quantity × 1.19` in the preview and stores:
+
+```ts
+import type { CalcExpression } from '@10x-media/form-builder'
+
+const total: CalcExpression = {
+  type: 'op',
+  op: '*',
+  left: {
+    type: 'op',
+    op: '*',
+    left: { type: 'ref', field: 'price' },
+    right: { type: 'ref', field: 'quantity' },
+  },
+  right: { type: 'lit', value: 1.19 },
+}
+```
+
+A quiz score, built as Weighted field over a `q1` select, with a weight typed in next to each of its options (`a` → 10, `b` → 0, `c` → 5):
+
+```ts
+const scoreQ1: CalcExpression = {
+  type: 'weight',
+  field: 'q1',
+  weights: { a: 10, b: 0, c: 5 },
+}
+```
+
+The builder is a view onto the stored `CalcExpression` JSON, not a separate format: an expression written through the API (or seeded programmatically) opens in the builder as the equivalent chain, with right-nested math rendered as a group.
+
+Validity is still enforced on save server-side: an expression that does not normalize into a well-formed tree is rejected with a field error, so a broken calculation cannot reach the public form, regardless of which editor produced it.
+
+### Forward references
+
+A calculation can reference a `number` field declared anywhere on the form, but another `calculation` field only if it is declared *earlier* in the fields list. The engine folds calculations in declaration order, so a forward or self reference would always evaluate to `0`; the builder's Field picker enforces this by only offering earlier calculations, not later ones, keeping the authoring UI honest about what will actually compute.
+
+### Display formatting
+
+A calculation field carries optional display settings: `decimals` (0 to 6), and localized `prefix`/`suffix` strings rendered exactly as authored (`EUR ` + `118.99` reads `EUR 118.99`; you control the spacing). The same formatting applies in the visitor renderer, the admin answers view, and email output via the shared `formatCalcValue` helper.
+
+## Value sources
+
+`ref` reads answers and `weight` reads authored numbers, which leaves out values that live in your app: a product's price, a tax rate on a global, a member's discount. The `calc.sources` option registers named resolvers for exactly that:
+
+```ts title="payload.config.ts"
+import { defineCalcSource } from '@10x-media/form-builder'
+
+formBuilder({
+  calc: {
+    sources: {
+      taxRate: defineCalcSource({
+        label: { en: 'Tax rate', de: 'Steuersatz' },
+        resolve: async ({ payload }) => {
+          const settings = await payload.findGlobal({ slug: 'settings' })
+          return settings.taxRate ?? 1.19
+        },
+      }),
+      productPrice: defineCalcSource({
+        label: { en: 'Product price', de: 'Produktpreis' },
+        resolveWeights: async ({ field, payload }) => {
+          const options = (field.options ?? []) as { value: string }[]
+          const ids = options.map((option) => option.value)
+          const products = await payload.find({
+            collection: 'products',
+            where: { id: { in: ids } },
+            depth: 0,
+          })
+          return Object.fromEntries(products.docs.map((p) => [String(p.id), p.price]))
+        },
+      }),
+    },
+  },
+})
+```
+
+`resolve` supplies one number per render/submission and backs a `{ type: 'source', source: 'taxRate' }` node; the builder offers it in the Start with and value pickers under its label. `resolveWeights` supplies per-option numbers for a chosen field and backs the Weighted field's **Values** select: the author picks the product field, your resolver prices its options, and nothing is hand-typed or stale.
+
+Values resolve server-side: they are embedded on the form document at render (for the client's live preview) and re-resolved fresh at submit, so the client never supplies them. A resolver failure at render degrades the preview to `0` without breaking the page; at submit it rejects the submission with a 503 instead of silently computing with zeros. Resolvers receive `payload` and `req`; treat `req` as an unauthenticated visitor request, and remember resolved values ride every readable form document, so gate per-user-sensitive numbers on `req.user`.
+
+## Custom functions
+
+`calc.functions` extends the function set beyond the built-ins:
+
+```ts
+import { defineCalcFunction } from '@10x-media/form-builder'
+
+formBuilder({
+  calc: {
+    functions: {
+      clamp: defineCalcFunction({
+        label: { en: 'Clamp' },
+        apply: ([value, min, max]) => Math.min(Math.max(value ?? 0, min ?? 0), max ?? 0),
+      }),
+    },
+  },
+})
+```
+
+The server evaluates registered functions authoritatively at submit. For the client's live preview, pass the same map to the Form component (`<Form calcFunctions={{ clamp }} />`); a function missing on the client degrades to `0` in the preview only. Built-in names cannot be shadowed; a colliding key throws at boot.
 
 ## Totality and safety
 
@@ -57,14 +162,25 @@ The evaluator always produces a finite number: division or modulo by zero yields
 
 ## Using the engine directly
 
-`evaluateCalc`, `computeCalcFields`, `calcExpressionOf`, and `normalizeCalc` are exported from the root and from `./react`, so custom layouts compute with the identical engine:
+`evaluateCalc`, `computeCalcFields`, `calcExpressionOf`, and `normalizeCalc` are exported from the root and from `./react`, so custom layouts compute with the identical engine; `formatCalc` renders an expression as a readable formula and `formatCalcValue` applies a field's display formatting:
 
 ```ts
-import { evaluateCalc, computeCalcFields } from '@10x-media/form-builder/react'
+import { evaluateCalc, computeCalcFields, formatCalc } from '@10x-media/form-builder/react'
 
 evaluateCalc({ type: 'ref', field: 'qty' }, { qty: 3 }) // 3
-const updatedValues = computeCalcFields(fields, currentValues)
+const updatedValues = computeCalcFields(fields, currentValues, form.calcResolved)
+formatCalc(expr, (field) => labels[field] ?? field) // '(Price × Quantity) × 1.19'
 ```
+
+Inside a composed frontend (custom layouts under `<Form>`), `useCalcValues()` returns the live computed values of every calculation field without recomputation:
+
+```tsx
+import { useCalcValues } from '@10x-media/form-builder/react'
+
+const { total } = useCalcValues()
+```
+
+On the server, `resolveCalcContext` resolves registered sources for a form's fields into the `CalcResolved` context `evaluateCalc` and `computeCalcFields` accept, when host code computes outside the submit path (a quote preview endpoint, a scheduled export).
 
 ## Downstream
 

@@ -2,6 +2,7 @@ import { type Config, definePlugin } from 'payload'
 import { assertNoActionBlockCollision } from './actions/assertNoBlockCollision'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import { resolveActions } from './actions/registry'
+import { assertNoCalcFunctionCollision, assertValidCalcSourceKeys } from './calc/registry'
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { resolveFieldTypes, stashFieldTypes } from './fields/registry'
@@ -25,6 +26,27 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const localizeContent = options.localizeContent !== false
 		const uploads = options.uploads ?? false
+		const calcSources = options.calc?.sources ?? {}
+		const calcFunctions = options.calc?.functions ?? {}
+		// Fail fast: the evaluator resolves built-ins first, so a colliding custom function could never
+		// run; a source key with a space would make the weight-map key (`calcWeightKey`) ambiguous.
+		assertNoCalcFunctionCollision(calcFunctions)
+		assertValidCalcSourceKeys(calcSources)
+		// The allowed extension names, threaded into every normalizeCalc gate (the calculation field's
+		// validate and the forms beforeValidate) so a stored expression can only ever reference a
+		// registered source or function.
+		const calcAllowed = {
+			sources: new Set(Object.keys(calcSources)),
+			functions: new Set(Object.keys(calcFunctions)),
+		}
+		// Serializable source metadata for the builder UI: key, label, and implemented modes. The
+		// resolver functions themselves never leave the server.
+		const calcSourceMeta = Object.entries(calcSources).map(([key, source]) => ({
+			key,
+			label: source.label,
+			scalar: typeof source.resolve === 'function',
+			weights: typeof source.resolveWeights === 'function',
+		}))
 		// The file field's MIME picker is constrained to what the host upload collection accepts: the
 		// explicit `uploads.mimeTypes` override, else the collection's own `upload.mimeTypes`. Read here,
 		// before the field registry freezes below (attachUploadsCollection runs too late).
@@ -40,7 +62,9 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		const defaultFieldDefinitions = buildDefaultFieldDefinitions(
 			localizeContent,
 			options.richText?.editor,
-			uploadMimeTypes
+			uploadMimeTypes,
+			calcAllowed,
+			calcSourceMeta
 		).filter(
 			(definition) =>
 				(uploads !== false || definition.type !== 'file') &&
@@ -83,6 +107,9 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			config,
 			registry,
 			ruleRegistry,
+			calcAllowed,
+			calcSources,
+			calcFunctions,
 			consentSources,
 			consentSnapshot: options.consent?.snapshot ?? 'both',
 			consentResolveOnRead: options.consent?.resolveOnRead,
@@ -99,7 +126,9 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			pollSourceRegistry,
 			pollTypeRegistry,
 			outcomeFields: options.poll?.outcomeFields,
+			pollVotes: options.poll?.votes === false ? false : (options.poll?.votes ?? {}),
 			buttons: options.buttons,
+			settings: options.settings,
 			response: options.response,
 			fromAddresses,
 			departments,
@@ -163,8 +192,22 @@ export type {
 	SubmissionStatusFilter,
 } from './aggregation/types'
 export { calcExpressionOf, computeCalcFields } from './calc/computeCalcFields'
-export { evaluateCalc } from './calc/evaluate'
+export type { CalcResolved } from './calc/evaluate'
+export { calcWeightKey, evaluateCalc } from './calc/evaluate'
+export { formatCalc } from './calc/formatCalc'
+export type { CalcDisplayConfig } from './calc/formatCalcValue'
+export { formatCalcValue } from './calc/formatCalcValue'
+export type { CalcAllowed } from './calc/normalizeCalc'
 export { normalizeCalc } from './calc/normalizeCalc'
+export type {
+	CalcFunction,
+	CalcSource,
+	CalcSourceResolveArgs,
+	CalcWeightResolveArgs,
+} from './calc/registry'
+export { defineCalcFunction, defineCalcSource } from './calc/registry'
+export type { ResolveCalcContextArgs } from './calc/resolveCalcContext'
+export { calcUsesSources, resolveCalcContext } from './calc/resolveCalcContext'
 export type { CalcExpression } from './calc/types'
 export type {
 	ButtonFieldsOverride,
@@ -182,6 +225,12 @@ export type {
 	RedirectOption,
 	ResponseOption,
 } from './collections/redirectFields'
+export type {
+	DefaultSettingsFields,
+	SettingsFieldsOverride,
+	SettingsOption,
+} from './collections/settingsFields'
+export { buildDefaultSettingsFields } from './collections/settingsFields'
 export { evaluateCondition } from './conditions/evaluate'
 export type { FieldCondition } from './conditions/types'
 export { applyConsentStatements } from './consent/applyConsentStatements'
@@ -302,6 +351,9 @@ export type { ResolvePollOptionsArgs } from './poll/resolvePollOptions'
 export { resolvePollOptions } from './poll/resolvePollOptions'
 export type { ResolvePollOutcomeArgs } from './poll/resolvePollOutcome'
 export { resolvePollOutcome } from './poll/resolvePollOutcome'
+export { aggregateFromVotes } from './poll/votes/aggregateFromVotes'
+export { recountPollVotes } from './poll/votes/recountPollVotes'
+export { POLL_VOTES_SLUG, RESPONDENTS_VALUE, VOTE_SHARDS } from './poll/votes/votesCollection'
 export type { PrefillOptions } from './prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from './prefill/valuesFromSearchParams'
 export { DEFAULT_PRESENTATION_NAME, defaultPresentationDescriptors } from './presentations/defaults'

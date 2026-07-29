@@ -1,3 +1,4 @@
+import type { CalcResolved } from '../calc/evaluate'
 import { applyConsentStatements } from '../consent/applyConsentStatements'
 import type { ConsentStatements } from '../consent/resolveConsentStatements'
 import type { FormFlow } from '../flow/types'
@@ -114,6 +115,12 @@ export function toFormDocument(
 		 * An explicit `options.consentStatements` takes precedence when both are present.
 		 */
 		consentStatements?: ConsentStatements
+		/**
+		 * Calc source values resolved onto the doc by the plugin's forms `afterRead` hook (when calc
+		 * sources are registered and used); passed through so the client's live preview computes with
+		 * real values. `functions` can never ride a document, hence the Pick.
+		 */
+		calcResolved?: Pick<CalcResolved, 'sources' | 'weights'>
 	},
 	options?: ToFormDocumentOptions
 ): FormDocument {
@@ -165,5 +172,6 @@ export function toFormDocument(
 		multistep: form.multistep === true,
 		pollEnabled: form.pollEnabled === true,
 		poll,
+		calcResolved: form.calcResolved,
 	}
 }

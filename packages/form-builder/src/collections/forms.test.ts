@@ -144,6 +144,27 @@ describe('forms admin.condition scopes', () => {
 	})
 })
 
+describe('forms settings flags', () => {
+	const collection = buildCollection()
+
+	it('places multistep, pollEnabled, and persistSubmissions at the root as sidebar checkboxes', () => {
+		for (const name of ['multistep', 'pollEnabled', 'persistSubmissions']) {
+			const field = collection.fields.find((f) => 'name' in f && f.name === name)
+			expect(field?.type).toBe('checkbox')
+			expect(field?.admin?.position).toBe('sidebar')
+		}
+	})
+
+	it('no longer nests multistep or pollEnabled in a root row', () => {
+		const rows = collection.fields.filter((f) => f.type === 'row')
+		for (const row of rows) {
+			const names = row.fields.map((f) => ('name' in f ? f.name : undefined))
+			expect(names).not.toContain('multistep')
+			expect(names).not.toContain('pollEnabled')
+		}
+	})
+})
+
 describe('forms response.redirect.reference', () => {
 	it('omits the reference field when redirectRelationships is unset', () => {
 		const collection = buildCollection()
@@ -336,5 +357,103 @@ describe('forms /:id/from-addresses endpoint', () => {
 		const req = { user: { id: 1 } } as unknown as PayloadRequest
 		const response = (await endpointOf(collection)?.handler(req)) as Response
 		expect(response.status).toBe(503)
+	})
+})
+
+describe('forms beforeValidate persist-off guard', () => {
+	const hookOf = (pollVotesEnabled?: boolean) => {
+		const collection = buildFormsCollection({
+			registry: resolveFieldTypes(buildDefaultFieldDefinitions(true)),
+			ruleRegistry: resolveValidationRules(defaultValidationRules),
+			pollVotesEnabled,
+		})
+		const hook = collection.hooks?.beforeValidate?.[0]
+		if (!hook) {
+			throw new Error('missing beforeValidate hook')
+		}
+		return hook
+	}
+	const req = { t: (key: string) => key } as unknown as PayloadRequest
+	const data = {
+		pollEnabled: true,
+		persistSubmissions: false,
+		fields: [],
+		poll: { resultsField: 'color' },
+	}
+	const run = (hook: ReturnType<typeof hookOf>, overrides?: Record<string, unknown>) =>
+		hook({ data: { ...data, ...overrides }, req } as never)
+
+	const runPartial = (
+		hook: ReturnType<typeof hookOf>,
+		partial: Record<string, unknown>,
+		originalDoc: Record<string, unknown>
+	) => hook({ data: partial, originalDoc, req } as never)
+
+	const expectGuardError = (fn: () => unknown) => {
+		let thrown: unknown
+		try {
+			fn()
+		} catch (error) {
+			thrown = error
+		}
+		expect(thrown).toMatchObject({
+			data: {
+				errors: [
+					{ path: 'persistSubmissions', message: 'formBuilder:poll.needsPersistedSubmissions' },
+				],
+			},
+		})
+	}
+
+	it('refuses a poll form that disables persistSubmissions while the vote store is off', () => {
+		expectGuardError(() => run(hookOf(false)))
+	})
+
+	it('refuses a partial update disabling persistSubmissions without sending fields', () => {
+		expectGuardError(() =>
+			runPartial(hookOf(false), { persistSubmissions: false }, { pollEnabled: true })
+		)
+	})
+
+	it('refuses an update enabling the poll while the stored doc already has persistSubmissions off', () => {
+		expectGuardError(() =>
+			runPartial(
+				hookOf(false),
+				{ pollEnabled: true, fields: [], poll: { resultsField: 'color' } },
+				{ persistSubmissions: false }
+			)
+		)
+	})
+
+	it('refuses a bare pollEnabled flip over a stored persist-off form', () => {
+		expectGuardError(() =>
+			runPartial(hookOf(false), { pollEnabled: true }, { persistSubmissions: false })
+		)
+	})
+
+	it('lets the incoming partial override the stored flags', () => {
+		expect(
+			runPartial(
+				hookOf(false),
+				{ persistSubmissions: true },
+				{ pollEnabled: true, persistSubmissions: false }
+			)
+		).toBeTruthy()
+		expect(
+			runPartial(
+				hookOf(false),
+				{ pollEnabled: false },
+				{ pollEnabled: true, persistSubmissions: false }
+			)
+		).toBeTruthy()
+	})
+
+	it('allows persist-off polls when the vote store carries the counts', () => {
+		expect(run(hookOf(true))).toBeTruthy()
+	})
+
+	it('leaves persisting poll forms and non-poll persist-off forms alone', () => {
+		expect(run(hookOf(false), { persistSubmissions: true })).toBeTruthy()
+		expect(run(hookOf(false), { pollEnabled: false })).toBeTruthy()
 	})
 })

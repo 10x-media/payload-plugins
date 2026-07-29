@@ -144,6 +144,7 @@ describe('buildFieldBlocks', () => {
 			'width',
 			'description',
 			'required',
+			'display',
 		])
 	})
 
@@ -157,10 +158,10 @@ describe('buildFieldBlocks', () => {
 		expect(widthRow.fields[0]?.admin).not.toHaveProperty('width')
 	})
 
-	it('makes the width select required and not clearable', () => {
+	it('makes the width select optional and not clearable', () => {
 		const text = blocks.find((block) => block.slug === 'text')
 		const width = flatTabFields(text, 0).find((f) => 'name' in f && f.name === 'width')
-		expect(width && 'required' in width && width.required).toBe(true)
+		expect(width && 'required' in width ? width.required : undefined).toBeUndefined()
 		expect(width?.admin && 'isClearable' in width.admin && width.admin.isClearable).toBe(false)
 	})
 
@@ -170,8 +171,23 @@ describe('buildFieldBlocks', () => {
 	})
 
 	it('puts visibleWhen and hidden in the Advanced tab', () => {
+		const number = blocks.find((block) => block.slug === 'number')
+		expect(tabFields(number, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden'])
+	})
+
+	it('appends autocomplete to the text Advanced tab, after visibleWhen and hidden', () => {
 		const text = blocks.find((block) => block.slug === 'text')
-		expect(tabFields(text, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden'])
+		expect(tabFields(text, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden', 'autocomplete'])
+	})
+
+	it('appends autocomplete to the email Advanced tab', () => {
+		const email = blocks.find((block) => block.slug === 'email')
+		expect(tabFields(email, 2).map(fieldName)).toEqual(['visibleWhen', 'hidden', 'autocomplete'])
+	})
+
+	it('leaves types without advancedConfig without an autocomplete field', () => {
+		const number = blocks.find((block) => block.slug === 'number')
+		expect(tabFields(number, 2).map(fieldName)).not.toContain('autocomplete')
 	})
 
 	it('localizes the shared label field by default and not when localize is false', () => {

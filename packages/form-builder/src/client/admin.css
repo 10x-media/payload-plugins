@@ -273,3 +273,285 @@
 .fb-condensed-array__actions {
 	margin-block-start: 0.25rem;
 }
+
+/* Calculation expression builder */
+.fb-calc-builder {
+	margin-block-end: 1rem;
+}
+.fb-calc-builder > .field-type__wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.fb-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+.fb-calc-builder__hint {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+}
+.fb-calc-builder__empty {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+}
+.fb-calc-builder__seed {
+	max-width: 16rem;
+}
+.fb-calc-builder__preview {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+}
+.fb-calc-builder__actions {
+	align-self: flex-start;
+}
+.fb-calc-builder__warning {
+	color: var(--theme-elevation-400);
+	font-size: 0.8125rem;
+	margin: 0;
+}
+.fb-calc-builder__kinds {
+	margin: 0;
+	margin-inline-start: 0.75rem;
+	padding-inline-start: 1rem;
+	color: var(--theme-elevation-400);
+	font-size: 0.8125rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+}
+.fb-calc-builder__kind-label {
+	color: var(--theme-elevation-600);
+	font-weight: 600;
+}
+.fb-calc-chain {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+/* Flat three-column grid, identical at every depth: [op select | spacer, fixed 90px]
+ * [operand controls, flexing] [remove, fixed]. The first row reserves the op column with a
+ * spacer so every kind select starts at the same left margin; nothing wraps, flexing
+ * controls shrink and ellipsize instead. */
+.fb-calc-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+}
+.fb-calc-row--divided {
+	border-block-start: 1px solid var(--theme-elevation-100);
+	padding-block-start: 0.5rem;
+}
+.fb-calc-row__op,
+.fb-calc-row__op-spacer {
+	flex: 0 0 90px;
+	min-width: 0;
+}
+.fb-calc-row__operand {
+	flex: 1;
+	min-width: 0;
+}
+/* A fixed 40px centering box pins the remove level with the first control line even when
+ * secondary content (weight rows, nested chains) extends the row downward. */
+.fb-calc-row__remove {
+	flex: 0 0 auto;
+	align-self: flex-start;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+}
+.fb-calc-chain__add {
+	align-self: flex-start;
+	/* Column 1 width + row gap: aligns the button with the operand column. */
+	margin-inline-start: calc(90px + 0.5rem);
+}
+.fb-calc-operand {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+.fb-calc-operand--group > .fb-calc-chain {
+	padding-inline-start: 0.75rem;
+	border-inline-start: 2px solid var(--theme-elevation-100);
+}
+.fb-calc-operand__title {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--theme-elevation-400);
+}
+.fb-calc-operand__header {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fb-calc-hint {
+	color: var(--theme-elevation-400);
+	font-size: 0.875rem;
+	margin: 0;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* 200px fits the longest kind label in both locales ("Gewichtetes Feld" / "Weighted field":
+ * ~110px at the 13px admin body size) plus the react-select control chrome (2 x base(0.6)
+ * padding + indicator), with room for zoomed fonts. */
+.fb-calc-operand__header > .fb-calc-operand__kind {
+	flex: 0 0 200px;
+	min-width: 0;
+}
+.fb-calc-operand__header > .fb-calc-operand__fn {
+	flex: 0 0 110px;
+	min-width: 0;
+}
+.fb-calc-operand__header > .fb-calc-operand__ref,
+.fb-calc-operand__header > .fb-calc-operand__weight-field {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.fb-calc-builder .rs__single-value {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.fb-calc-operand__number,
+.fb-calc-operand__weight {
+	height: 40px;
+	padding: 0 15px;
+	font-size: 1rem;
+	font-family: inherit;
+	color: var(--theme-elevation-800);
+	background: var(--theme-input-bg);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	transition:
+		border-color 100ms ease,
+		background-color 100ms ease,
+		box-shadow 100ms ease;
+}
+.fb-calc-operand__number:hover,
+.fb-calc-operand__weight:hover {
+	border-color: var(--theme-elevation-250);
+}
+.fb-calc-operand__number:focus,
+.fb-calc-operand__weight:focus {
+	border-color: var(--theme-elevation-400);
+	outline: none;
+}
+.fb-calc-operand__header > .fb-calc-operand__number {
+	flex: 1 1 auto;
+	min-width: 60px;
+	width: 0;
+}
+.fb-calc-fn__args {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding-inline-start: 0.75rem;
+	border-inline-start: 2px solid var(--theme-elevation-100);
+}
+.fb-calc-fn__arg {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+}
+.fb-calc-fn__arg-chain {
+	flex: 1;
+	min-width: 0;
+}
+.fb-calc-fn__arg-remove {
+	flex: 0 0 auto;
+	align-self: flex-start;
+	height: 40px;
+	display: flex;
+	align-items: center;
+}
+.fb-calc-fn__add {
+	align-self: flex-start;
+}
+.fb-calc-operand__source {
+	flex: 1 1 auto;
+	min-width: 0;
+	line-height: 40px;
+	font-size: 0.875rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fb-calc-operand__weight-values-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fb-calc-operand__weight-values-label {
+	flex: 0 0 90px;
+	min-width: 0;
+	line-height: 40px;
+	font-size: 0.875rem;
+	color: var(--theme-elevation-600);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.fb-calc-operand__weight-values-row > .fb-calc-operand__weight-values {
+	flex: 0 0 200px;
+	min-width: 0;
+}
+.fb-calc-operand__weights {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+}
+.fb-calc-operand__weight-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fb-calc-operand__weight-label {
+	flex: 1;
+	min-width: 0;
+	font-size: 0.875rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fb-calc-operand__weight-row > .fb-calc-operand__weight {
+	flex: 0 0 8rem;
+}
+.fb-calc-finish {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+}
+/* The wording occupies column 1 (the 90px op column), centered on the 40px control line, so the
+ * select below aligns exactly with the operand column's kind selects. */
+.fb-calc-finish__label {
+	flex: 0 0 90px;
+	min-width: 0;
+	line-height: 40px;
+	font-size: 0.875rem;
+	color: var(--theme-elevation-600);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.fb-calc-finish__select {
+	flex: 0 0 200px;
+	min-width: 0;
+}

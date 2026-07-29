@@ -70,7 +70,7 @@
 		"test": "vitest run",
 		"test:unit": "vitest run src",
 		"test:int": "vitest run tests/int",
-		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/messageResponse.int.spec.ts tests/int/pollAutoClose.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/messageResponse.int.spec.ts tests/int/pollAutoClose.int.spec.ts",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/messageResponse.int.spec.ts tests/int/pollAutoClose.int.spec.ts tests/int/pollVotes.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/messageResponse.int.spec.ts tests/int/pollAutoClose.int.spec.ts tests/int/pollVotes.int.spec.ts",
 		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/form-builder-dev dev",
@@ -88,10 +88,16 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@payloadcms/db-postgres": "^3.82.0",
 		"@payloadcms/ui": "^3.83.0",
 		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@payloadcms/db-postgres": {
+			"optional": true
+		}
 	},
 	"dependencies": {
 		"@standard-schema/spec": "^1.0.0"
