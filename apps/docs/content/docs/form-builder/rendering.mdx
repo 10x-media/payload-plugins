@@ -225,6 +225,8 @@ Unstyled, accessible control primitives for building custom renderers: `Input`, 
 
 If you write renderers from scratch instead, uphold the a11y contract: a programmatically associated label, `aria-invalid` only when invalid, `aria-describedby` pointing at an error region with `role="alert"` and `aria-atomic`, an `aria-hidden` required indicator, and native `required` on the control.
 
+A custom renderer also replaces the built-in wholesale, which means every per-instance authoring setting the built-in honors becomes your renderer's job. Read them off the field instance, or an author's choice is silently ignored: `field.display` (select `dropdown | radio | buttons`, checkbox `checkbox | switch`; the `ChoiceGroup` primitive covers the radio and buttons variants), `field.autocomplete` on text and email, and a calculation's `decimals`/`prefix`/`suffix` via `formatCalcValue`. New instance settings ship in minor releases, so after a bump, diff your custom renderers against the built-ins for settings they gained.
+
 ## Layout grid
 
 An optional container-query grid ships in the stylesheet:
