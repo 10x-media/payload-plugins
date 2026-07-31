@@ -4,6 +4,23 @@ import type { RollupKey, RollupMetric } from './deltas'
 
 const PG_TABLE_KEY = 'analytics_rollups'
 
+type PostgresSqlModule = { sql: typeof import('@payloadcms/db-postgres')['sql'] }
+
+/**
+ * Loads the optional Postgres peer without a literal specifier: bundlers (Turbopack, webpack,
+ * Vite) resolve literal dynamic imports at build time, which fails a Mongo host's build even
+ * though this branch is unreachable there. The function-built specifier is opaque to their
+ * analyzers, the ignore comments cover bundlers that would still warn, and the type-only
+ * reference above erases at compile time, so the package is touched only when the Postgres
+ * branch actually runs.
+ */
+const importPostgresSql = (): Promise<PostgresSqlModule> => {
+	const specifier = ['@payloadcms', 'db-postgres'].join('/')
+	return import(
+		/* webpackIgnore: true */ /* turbopackIgnore: true */ /* @vite-ignore */ specifier
+	) as Promise<PostgresSqlModule>
+}
+
 // payload.db raw-access shapes are intentionally loose; these narrow casts reach the
 // Mongoose driver collection / Drizzle instance for atomic upserts (no public typed API).
 type MongoDb = {
@@ -55,7 +72,7 @@ export async function bumpRollup(
 		)
 		return
 	}
-	const { sql } = await import('@payloadcms/db-postgres')
+	const { sql } = await importPostgresSql()
 	const db = payload.db as unknown as PgDb
 	const tableName = db.tableNameMap.get(PG_TABLE_KEY)
 	if (!tableName) throw new Error(`analytics: drizzle table "${PG_TABLE_KEY}" not found`)
