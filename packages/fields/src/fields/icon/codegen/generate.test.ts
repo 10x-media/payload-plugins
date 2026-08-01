@@ -85,15 +85,79 @@ describe('generateIconManifest', () => {
 		expect(existsSync(path.join(outDir, 'manifest.ts'))).toBe(false)
 	})
 
-	it('rejects icon names that are not kebab-case', async () => {
+	// Kebab-case was never the real constraint, only the shape the two bundled
+	// libraries happened to have. A library keyed by country code is legitimate.
+	it('accepts uppercase, non-kebab names end to end', async () => {
+		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
+		dirs.push(outDir)
+		const result = await generateIconManifest({
+			outDir,
+			source: {
+				icons: [
+					{ categories: [], label: 'Hungary', name: 'HUN', tags: ['hungary'] },
+					{ categories: [], label: 'Switzerland', name: 'SUI', tags: ['switzerland'] },
+				],
+				importFor: (icon) => ({ module: `flags/${icon.name}.js` }),
+			},
+		})
+		expect(result.iconCount).toBe(2)
+		const manifest = await readFile(path.join(outDir, 'manifest.ts'), 'utf8')
+		const parsed = JSON.parse(manifest.slice(manifest.indexOf('= ') + 2)) as {
+			icons: { label?: string; name: string }[]
+		}
+		expect(parsed.icons.map((icon) => icon.name)).toEqual(['HUN', 'SUI'])
+		expect(parsed.icons[0]?.label).toBe('Hungary')
+		const imports = await readFile(path.join(outDir, 'imports.ts'), 'utf8')
+		expect(imports).toContain(`'HUN': () => import('flags/HUN.js'),`)
+	})
+
+	it.each([
+		["ev'il", 'a quote would escape the emitted key'],
+		['back\\slash', 'a backslash would escape the emitted key'],
+		['has space', 'whitespace breaks search normalisation'],
+		['ns:name', 'a colon reparses as a different library and name'],
+		['', 'an empty name addresses nothing'],
+	])('rejects the unsafe icon name %j', async (name) => {
+		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
+		dirs.push(outDir)
+		await expect(
+			generateIconManifest({ outDir, source: { icons: [{ categories: [], name, tags: [] }] } })
+		).rejects.toThrow('invalid icon name')
+		expect(existsSync(path.join(outDir, 'manifest.ts'))).toBe(false)
+	})
+
+	// Drawer search is case-insensitive, so these two are indistinguishable to an
+	// editor even though they are distinct keys everywhere else.
+	it('rejects names that differ only by case', async () => {
 		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
 		dirs.push(outDir)
 		await expect(
 			generateIconManifest({
 				outDir,
-				source: { icons: [{ name: "ev'il", tags: [], categories: [] }] },
+				source: {
+					icons: [
+						{ categories: [], name: 'HUN', tags: [] },
+						{ categories: [], name: 'hun', tags: [] },
+					],
+				},
 			})
-		).rejects.toThrow('invalid icon name: "ev\'il"')
+		).rejects.toThrow('differ only by case')
+	})
+
+	it('still rejects an exact duplicate name', async () => {
+		const outDir = await mkdtemp(path.join(tmpdir(), 'fields-codegen-'))
+		dirs.push(outDir)
+		await expect(
+			generateIconManifest({
+				outDir,
+				source: {
+					icons: [
+						{ categories: [], name: 'solo', tags: [] },
+						{ categories: [], name: 'solo', tags: [] },
+					],
+				},
+			})
+		).rejects.toThrow('duplicate icon name: solo')
 	})
 
 	it('rejects module specifiers that would break out of the emitted literal', async () => {

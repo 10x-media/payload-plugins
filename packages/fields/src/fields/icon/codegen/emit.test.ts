@@ -29,6 +29,15 @@ describe('codegen emitters', () => {
 		expect(output).toContain('export const iconImports')
 	})
 
+	// The name is interpolated bare into a single-quoted key, so the emitter must guard
+	// it in its own right. Relaxing the name rule in generate.ts removed the kebab
+	// regex that had been covering this by accident.
+	it('rejects an icon name that would escape the emitted key', () => {
+		expect(() =>
+			emitImportsModule([{ categories: [], name: "ev'il", tags: [] }], () => ({ module: 'x' }))
+		).toThrow('unsafe icon name')
+	})
+
 	it('emits a nodes module in manifest order with parseable node-data', () => {
 		const nodes: IconNodeMap = {
 			beta: [['circle', { cx: '12', cy: '12', r: '4' }]],
