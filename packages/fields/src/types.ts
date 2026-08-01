@@ -1,4 +1,4 @@
-import type { PayloadRequest, StaticLabel } from 'payload'
+import type { Payload, PayloadRequest, StaticLabel } from 'payload'
 
 /** Args passed to async per-document resolvers (color presets, icon availability). */
 export type FieldsResolverArgs = {
@@ -14,7 +14,25 @@ export type ColorPreset = string | { key: string; value: string; label?: StaticL
 export type ColorFormat = 'hex' | 'rgb' | 'hsl' | 'oklch'
 
 /** One icon's manifest entry. */
-export type IconMeta = { name: string; tags: string[]; categories: string[] }
+export type IconMeta = {
+	name: string
+	tags: string[]
+	categories: string[]
+	/**
+	 * Human-readable name shown to editors, replacing the one derived from `name`.
+	 * Supply it wherever the name is a code rather than words: `HUN` reads as `Hun`
+	 * without one, and a screen reader announces that. Omit it and every existing
+	 * manifest keeps its derived label unchanged.
+	 */
+	label?: StaticLabel
+}
+
+/**
+ * What an icon adapter's async resolvers receive. `req` is optional because Payload
+ * renders list cells without one (`DefaultServerCellComponentProps` carries `payload`
+ * and `i18n` only), so a resolver must not depend on it being present.
+ */
+export type IconLayerContext = { payload: Payload; req?: PayloadRequest }
 
 /** Lazily loaded icon library manifest. */
 export type IconManifest = { icons: IconMeta[]; categories: string[] }
@@ -34,6 +52,14 @@ export type IconAdapter = {
 	label: StaticLabel
 	/** Lazy manifest loader; used server-side for validation and never bundled eagerly. */
 	loadManifest: () => Promise<IconManifest>
+	/**
+	 * Exact single-name lookup, serving validation (non-null means the name exists)
+	 * and label resolution from one query. Supply it for a library whose contents
+	 * change at runtime: it stays correct where a cached manifest snapshot cannot,
+	 * and it answers without materialising the whole manifest. Omit it and the
+	 * cached manifest index answers both.
+	 */
+	resolveMeta?: (name: string, ctx: IconLayerContext) => Promise<IconMeta | null>
 	/** importMap path of a client component rendering one icon by name, e.g. '@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon'. */
 	Icon: string
 	/** importMap path of a client component that loads the manifest for the admin drawer. */

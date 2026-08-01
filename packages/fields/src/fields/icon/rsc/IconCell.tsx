@@ -3,8 +3,9 @@ import { getFromImportMap } from 'payload/shared'
 import type { ReactNode } from 'react'
 import { getFieldsRegistry } from '../../../plugin/registry'
 import type { IconAdapter } from '../../../types'
+import { resolveIconMeta } from '../server/resolveIconMeta'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
-import { formatIconLabel } from '../shared/formatIconLabel'
+import { resolveIconDisplay } from '../shared/iconLabel'
 import { resolveIconValue } from '../shared/value'
 
 type IconCellProps = {
@@ -12,9 +13,9 @@ type IconCellProps = {
 	defaultLibrary?: string
 } & DefaultServerCellComponentProps
 
-/** List cell: the selected glyph plus its formatted name, degrading to name-only for unavailable or removed libraries. */
-export const IconCell = (props: IconCellProps): ReactNode => {
-	const { cellData, payload } = props
+/** List cell: the selected glyph plus its label, degrading to name-only for unavailable or removed libraries. */
+export const IconCell = async (props: IconCellProps): Promise<ReactNode> => {
+	const { cellData, i18n, payload } = props
 	if (typeof cellData !== 'string' || cellData === '') return null
 	const registryIcon = getFieldsRegistry(payload.config)?.icon
 	const adapters = props.adapters ?? registryIcon?.adapters ?? []
@@ -30,10 +31,14 @@ export const IconCell = (props: IconCellProps): ReactNode => {
 				silent: true,
 			})
 		: null
+	// A cached manifest index makes this a map hit for a static library, so a long list
+	// costs nothing extra. Payload renders cells without a request, hence no `req`.
+	const meta = adapter ? await resolveIconMeta(adapter, name, { payload }) : null
+	const display = resolveIconDisplay({ language: i18n.language, meta, name })
 	return (
 		<span className="tenx-icon-cell">
 			{Icon ? <Icon name={name} size={16} /> : null}
-			<span>{formatIconLabel(name)}</span>
+			<span>{display.label}</span>
 		</span>
 	)
 }

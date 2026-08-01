@@ -15,11 +15,12 @@ import {
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { TextFieldClientProps } from 'payload'
-import React, { Suspense, useCallback, useMemo, useState } from 'react'
+import React, { Suspense, useCallback, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations'
 import { useTranslation } from '../../../translations/useTranslation'
+import type { IconMeta } from '../../../types'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
-import { formatIconLabel } from '../shared/formatIconLabel'
+import { resolveIconDisplay } from '../shared/iconLabel'
 import { formatIconValue, resolveIconValue } from '../shared/value'
 import { filterAvailableLibraries, pickInitialLibrary } from './availableLibraries'
 import './icon-field.css'
@@ -49,6 +50,12 @@ export type IconFieldClientExtraProps = {
 	adapters: { label: string; slug: string }[]
 	available: string[]
 	defaultLibrary: string
+	/**
+	 * Manifest entry for the value this field rendered with, resolved server-side.
+	 * The trigger has only a stored value, so without this a library-supplied label
+	 * could not appear until the editor opened the drawer.
+	 */
+	selectedMeta?: IconMeta | null
 	showTextInput: boolean
 }
 
@@ -63,9 +70,10 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 		field,
 		path: pathFromProps,
 		readOnly,
+		selectedMeta,
 		showTextInput,
 	} = props
-	const { t } = useTranslation()
+	const { i18n, t } = useTranslation()
 	const editDepth = useEditDepth()
 	const { closeModal, isModalOpen, openModal } = useModal()
 
@@ -92,7 +100,21 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 		(!registeredSlugs.has(resolved.library) || !available.includes(resolved.library))
 	const previewEntry = resolved ? adapterComponents[resolved.library] : undefined
 	const hasGlyph = Boolean(resolved && previewEntry)
-	const displayLabel = resolved ? formatIconLabel(resolved.name) : ''
+
+	// Manifest entries by stored value, seeded with the server's answer for the value
+	// this field rendered with and extended whenever the editor picks. A pick has to
+	// relabel the trigger immediately, and the manifest only lives inside the drawer.
+	const knownMeta = useRef(new Map<string, IconMeta>())
+	if (value && selectedMeta && !knownMeta.current.has(value)) {
+		knownMeta.current.set(value, selectedMeta)
+	}
+	const displayLabel = resolved
+		? resolveIconDisplay({
+				language: i18n.language,
+				meta: value ? knownMeta.current.get(value) : undefined,
+				name: resolved.name,
+			}).label
+		: ''
 
 	const availableAdapters = useMemo(
 		() => filterAvailableLibraries(adapters, available),
@@ -107,8 +129,10 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 	const [editing, setEditing] = useState(false)
 
 	const handleSelect = useCallback(
-		(library: string, name: string) => {
-			setValue(formatIconValue(library, name))
+		(library: string, icon: IconMeta) => {
+			const next = formatIconValue(library, icon.name)
+			knownMeta.current.set(next, icon)
+			setValue(next)
 			closeModal(drawerSlug)
 		},
 		[closeModal, drawerSlug, setValue]

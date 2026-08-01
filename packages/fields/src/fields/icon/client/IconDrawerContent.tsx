@@ -1,15 +1,15 @@
 'use client'
 
-import { ReactSelect, SearchIcon, Tooltip } from '@payloadcms/ui'
+import { ReactSelect, SearchIcon } from '@payloadcms/ui'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import type React from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations'
 import { useTranslation } from '../../../translations/useTranslation'
-import type { IconManifest, IconMeta, IconNode, IconNodeMap } from '../../../types'
+import type { IconManifest, IconMeta, IconNodeMap } from '../../../types'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
-import { formatIconLabel } from '../shared/formatIconLabel'
 import { buildIconSearchIndex, searchIcons } from '../shared/search'
-import { DrawerGlyph } from './DrawerGlyph'
+import { IconGridCell } from './IconGridCell'
 import { useRecentIcons } from './useRecentIcons'
 
 // One fixed size drives both the column count and the virtualizer row height. With no
@@ -25,65 +25,10 @@ export type IconDrawerContentProps = {
 	/** Libraries available for selection: registered adapters already intersected with `available`. */
 	adapters: { label: string; slug: string }[]
 	onLibraryChange: (slug: string) => void
-	onSelect: (library: string, name: string) => void
+	onSelect: (library: string, icon: IconMeta) => void
 	selected: { library: string; name: string } | null
 	slugPrefix: string
 }
-
-type CellProps = {
-	entry: AdapterComponentsEntry | undefined
-	focused: boolean
-	icon: IconMeta
-	index: number
-	isSelected: boolean
-	/** Bulk glyph data for inline rendering; when absent the cell falls back to the per-icon Icon. */
-	nodes: IconNode[] | undefined
-	onSelect: (name: string) => void
-	registerRef: (index: number, element: HTMLButtonElement | null) => void
-}
-
-const IconGridCell: React.FC<CellProps> = React.memo(
-	({ entry, focused, icon, index, isSelected, nodes, onSelect, registerRef }) => {
-		const [showTooltip, setShowTooltip] = useState(false)
-		// The name is not rendered in-flow (that variance broke grid alignment); it lives on
-		// the accessible name and a hover/focus tooltip, sentence-cased for readability.
-		const label = formatIconLabel(icon.name)
-		return (
-			<div className="tenx-icon-drawer__cell" role="presentation">
-				<button
-					aria-label={label}
-					aria-selected={isSelected}
-					className={
-						isSelected
-							? 'tenx-icon-drawer__cell-button tenx-icon-drawer__cell-button--selected'
-							: 'tenx-icon-drawer__cell-button'
-					}
-					onBlur={() => setShowTooltip(false)}
-					onClick={() => onSelect(icon.name)}
-					onFocus={() => setShowTooltip(true)}
-					onMouseEnter={() => setShowTooltip(true)}
-					onMouseLeave={() => setShowTooltip(false)}
-					ref={(element) => registerRef(index, element)}
-					role="option"
-					tabIndex={focused ? 0 : -1}
-					type="button"
-				>
-					<Tooltip show={showTooltip} staticPositioning>
-						{label}
-					</Tooltip>
-					<span className="tenx-icon-drawer__glyph">
-						{nodes ? (
-							<DrawerGlyph nodes={nodes} size={24} />
-						) : entry ? (
-							<entry.Icon name={icon.name} size={24} />
-						) : null}
-					</span>
-				</button>
-			</div>
-		)
-	}
-)
-IconGridCell.displayName = 'IconGridCell'
 
 const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	activeLibrary,
@@ -94,7 +39,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	selected,
 	slugPrefix,
 }) => {
-	const { t } = useTranslation()
+	const { i18n, t } = useTranslation()
 	const [manifests, setManifests] = useState<Map<string, IconManifest>>(() => new Map())
 	const [nodeMaps, setNodeMaps] = useState<Map<string, IconNodeMap>>(() => new Map())
 	const [query, setQuery] = useState('')
@@ -216,9 +161,9 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	)
 
 	const handleSelect = useCallback(
-		(name: string) => {
-			addRecent(name)
-			onSelect(activeLibrary, name)
+		(icon: IconMeta) => {
+			addRecent(icon.name)
+			onSelect(activeLibrary, icon)
 		},
 		[activeLibrary, addRecent, onSelect]
 	)
@@ -363,6 +308,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 															selected?.library === activeLibrary && selected.name === icon.name
 														}
 														key={icon.name}
+														language={i18n.language}
 														nodes={NodesLoader ? nodeMap?.[icon.name] : undefined}
 														onSelect={handleSelect}
 														registerRef={registerRef}
