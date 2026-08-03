@@ -16,7 +16,8 @@ export const tenants: CollectionConfig = {
 			fields: [
 				{ name: 'key', type: 'text', required: true },
 				{ name: 'label', type: 'text' },
-				colorField({ name: 'value', required: true }),
+				colorField({ name: 'value', label: { de: 'Hell', en: 'Light' }, required: true }),
+				colorField({ name: 'valueDark', label: { de: 'Dunkel', en: 'Dark' } }),
 			],
 		},
 	],

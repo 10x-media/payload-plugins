@@ -13,7 +13,9 @@ export {
 	formatColor,
 	hslToRgb,
 	hsvToRgb,
+	isColorSchemeValue,
 	isInSrgbGamut,
+	lightDark,
 	namedColors,
 	oklchToRgb,
 	parseColor,
@@ -25,3 +27,4 @@ export {
 	toOklch,
 	toRgb,
 } from '../fields/color/engine'
+export type { ColorSchemeValue } from '../types'

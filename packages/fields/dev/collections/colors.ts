@@ -1,9 +1,14 @@
 import type { CollectionConfig } from 'payload'
-import { colorField, presetsFromDoc } from '../../src/exports/color'
+import { colorField, presetsFromArray, presetsFromDoc } from '../../src/exports/color'
 import type { ColorPreset, FieldsResolverArgs } from '../../src/types'
 
 type TenantDoc = {
-	brandColors?: Array<{ key: string; label?: null | string; value: string }> | null
+	brandColors?: Array<{
+		key: string
+		label?: null | string
+		value: string
+		valueDark?: null | string
+	}> | null
 	name: string
 }
 
@@ -27,6 +32,21 @@ const tenantBrandPresets = async ({ req }: FieldsResolverArgs): Promise<ColorPre
 			})),
 		]
 	})
+}
+
+/** Scheme-aware palette lifted straight off each tenant's brandColors rows. */
+const tenantSchemePresets = async ({ req }: FieldsResolverArgs): Promise<ColorPreset[]> => {
+	const result = await req.payload.find({ collection: 'tenants', depth: 0, limit: 25 })
+	return result.docs.flatMap((doc) =>
+		presetsFromArray({
+			doc: doc as unknown as Record<string, unknown>,
+			key: 'key',
+			keyPrefix: `${(doc as unknown as TenantDoc).name}/`,
+			label: 'label',
+			path: 'brandColors',
+			value: { dark: 'valueDark', light: 'value' },
+		})
+	)
 }
 
 const staticPresets: ColorPreset[] = [
@@ -88,5 +108,11 @@ export const colors: CollectionConfig = {
 			name: 'linkedTenant',
 			presets: tenantBrandPresets,
 		}),
+		...colorField({
+			linked: { fallback: { dark: '#1e293b', light: '#94a3b8' }, resolve: 'schemes' },
+			name: 'linkedSchemes',
+			presets: tenantSchemePresets,
+		}),
+		colorField({ name: 'schemePresetsFlat', presets: tenantSchemePresets }),
 	],
 }
