@@ -8,6 +8,10 @@ const FIXTURES = {
 	basicSeedValue: '#7c3aed',
 	presetLabel: 'Global blue',
 	presetValue: '#1d4ed8',
+	schemeField: 'linkedSchemes',
+	schemeFlatField: 'schemePresetsFlat',
+	schemePresetLabel: 'Acme surface',
+	schemePresetLight: '#f5f3ff',
 }
 
 const login = async (page: Page): Promise<void> => {
@@ -93,6 +97,41 @@ test.describe('color field', () => {
 			.locator(`.fields-color__preset[aria-label="${FIXTURES.presetLabel}"]`)
 			.click()
 		await expect(page.locator(`#field-${FIXTURES.basic}`)).toHaveValue(FIXTURES.presetValue)
+		await saveDoc(page)
+	})
+
+	test('a scheme preset renders a split swatch in the picker and the chip', async ({ page }) => {
+		await openShowcaseDoc(page)
+		await swatchButton(page, FIXTURES.schemeField).click()
+		await expect(popover(page)).toBeVisible()
+
+		const preset = popover(page).locator(
+			`.fields-color__preset[aria-label="${FIXTURES.schemePresetLabel}"]`
+		)
+		await expect(preset.locator('span')).toHaveCSS('background-image', /linear-gradient/)
+		await preset.click()
+
+		const field = page
+			.locator('.fields-color')
+			.filter({ has: page.locator(`#field-${FIXTURES.schemeField}`) })
+		await expect(field.locator('.fields-color__chip-label')).toHaveText(FIXTURES.schemePresetLabel)
+		await expect(field.locator('.fields-color__chip-color')).toHaveCSS(
+			'background-image',
+			/linear-gradient/
+		)
+		await saveDoc(page)
+	})
+
+	test('a non-linked field stores a scheme preset light member', async ({ page }) => {
+		await openShowcaseDoc(page)
+		await swatchButton(page, FIXTURES.schemeFlatField).click()
+		await expect(popover(page)).toBeVisible()
+		await popover(page)
+			.locator(`.fields-color__preset[aria-label="${FIXTURES.schemePresetLabel}"]`)
+			.click()
+		await expect(page.locator(`#field-${FIXTURES.schemeFlatField}`)).toHaveValue(
+			FIXTURES.schemePresetLight
+		)
 		await saveDoc(page)
 	})
 
