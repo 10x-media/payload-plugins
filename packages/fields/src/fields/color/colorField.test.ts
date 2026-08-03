@@ -118,3 +118,72 @@ describe('colorField', () => {
 		expect(await runHook(hook, 'red')).toBe('#ff0000')
 	})
 })
+
+/** Runs a linked field's afterRead resolve hook against a stored value. */
+const runResolve = (field: { hooks?: { afterRead?: FieldHook[] } }, stored: unknown) =>
+	field.hooks?.afterRead?.[0]?.({
+		req: { payload: { config: { custom: {} }, logger: { error: () => undefined } } },
+		siblingData: { brand: stored },
+	} as unknown as FieldHookArgs)
+
+describe('colorField linked.resolve', () => {
+	const presets = [
+		{ key: 'flat', value: '#ffffff' },
+		{ key: 'scheme', value: { dark: '#000000', light: '#ffffff' } },
+	]
+
+	it("resolve 'value' keeps a text sibling and flattens a scheme to light", async () => {
+		const [, resolved] = colorField({ linked: true, name: 'brand', presets })
+		expect(resolved.type).toBe('text')
+		expect(await runResolve(resolved, '')).toBeNull()
+		expect(await runResolve(resolved, '#123456')).toBe('#123456')
+		expect(await runResolve(resolved, 'preset:flat')).toBe('#ffffff')
+		expect(await runResolve(resolved, 'preset:scheme')).toBe('#ffffff')
+		expect(await runResolve(resolved, 'preset:gone')).toBeNull()
+	})
+
+	it("resolve 'schemes' emits a json sibling and inflates flat values", async () => {
+		const [, resolved] = colorField({ linked: { resolve: 'schemes' }, name: 'brand', presets })
+		expect(resolved.type).toBe('json')
+		expect(resolved.virtual).toBe(true)
+		expect(resolved.name).toBe('brandResolved')
+		expect(resolved.admin?.hidden).toBe(true)
+		expect(resolved.admin?.disableListColumn).toBe(true)
+		expect(await runResolve(resolved, '')).toBeNull()
+		expect(await runResolve(resolved, '#123456')).toEqual({ dark: '#123456', light: '#123456' })
+		expect(await runResolve(resolved, 'preset:flat')).toEqual({ dark: '#ffffff', light: '#ffffff' })
+		expect(await runResolve(resolved, 'preset:scheme')).toEqual({
+			dark: '#000000',
+			light: '#ffffff',
+		})
+		expect(await runResolve(resolved, 'preset:gone')).toBeNull()
+	})
+
+	it('applies a string fallback in both shapes', async () => {
+		const [, flat] = colorField({ linked: { fallback: '#94a3b8' }, name: 'brand', presets })
+		expect(await runResolve(flat, 'preset:gone')).toBe('#94a3b8')
+
+		const [, schemes] = colorField({
+			linked: { fallback: '#94a3b8', resolve: 'schemes' },
+			name: 'brand',
+			presets,
+		})
+		expect(await runResolve(schemes, 'preset:gone')).toEqual({
+			dark: '#94a3b8',
+			light: '#94a3b8',
+		})
+	})
+
+	it("applies a scheme fallback, flattening to light under resolve 'value'", async () => {
+		const fallback = { dark: '#1e293b', light: '#94a3b8' }
+		const [, flat] = colorField({ linked: { fallback }, name: 'brand', presets })
+		expect(await runResolve(flat, 'preset:gone')).toBe('#94a3b8')
+
+		const [, schemes] = colorField({
+			linked: { fallback, resolve: 'schemes' },
+			name: 'brand',
+			presets,
+		})
+		expect(await runResolve(schemes, 'preset:gone')).toEqual(fallback)
+	})
+})

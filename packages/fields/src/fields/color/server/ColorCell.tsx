@@ -2,6 +2,7 @@ import type { DefaultServerCellComponentProps } from 'payload'
 import { keys } from '../../../translations/keys'
 import { asTranslate } from '../../../translations/server'
 import { PRESET_PREFIX } from '../options'
+import { swatchBackground } from '../schemeValue'
 import './colorCell.css'
 
 export const ColorCell = (props: DefaultServerCellComponentProps) => {
@@ -12,7 +13,7 @@ export const ColorCell = (props: DefaultServerCellComponentProps) => {
 	const resolvedRaw = isPreset
 		? (rowData as Record<string, unknown>)?.[`${name}Resolved`]
 		: cellData
-	const swatch = typeof resolvedRaw === 'string' && resolvedRaw !== '' ? resolvedRaw : null
+	const swatch = swatchBackground(resolvedRaw)
 	const label = isPreset ? cellData.slice(PRESET_PREFIX.length) : cellData
 	return (
 		<span className="fields-color-cell">

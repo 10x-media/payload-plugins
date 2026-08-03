@@ -1,9 +1,9 @@
-import type { FieldHook, PayloadRequest, TextField, TextFieldValidation } from 'payload'
+import type { FieldHook, JSONField, PayloadRequest, TextField, TextFieldValidation } from 'payload'
 import { text } from 'payload/shared'
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
-import type { ColorFormat } from '../../types'
-import { formatColor, parseColor } from './engine'
+import type { ColorFormat, ColorSchemeValue } from '../../types'
+import { formatColor, isColorSchemeValue, parseColor } from './engine'
 import {
 	COLOR_CUSTOM_KEY,
 	type ColorFieldCustom,
@@ -14,6 +14,7 @@ import {
 } from './options'
 import { resolveColorFormat } from './resolveFormat'
 import { resolvePresets } from './resolvePresets'
+import { flatValue } from './schemeValue'
 
 const buildValidate =
 	(opts: { linked: boolean }): TextFieldValidation =>
@@ -50,9 +51,14 @@ const buildNormalizeHook =
  */
 export function colorField(options?: ColorFieldOptions & { linked?: false }): TextField
 export function colorField(
-	options: ColorFieldOptions & { linked: ColorLinkedOptions | true }
+	options: ColorFieldOptions & { linked: (ColorLinkedOptions & { resolve?: 'value' }) | true }
 ): [TextField, TextField]
-export function colorField(options: ColorFieldOptions = {}): TextField | [TextField, TextField] {
+export function colorField(
+	options: ColorFieldOptions & { linked: ColorLinkedOptions & { resolve: 'schemes' } }
+): [TextField, JSONField]
+export function colorField(
+	options: ColorFieldOptions = {}
+): TextField | [TextField, JSONField | TextField] {
 	const {
 		name = 'color',
 		alpha = true,
@@ -69,7 +75,9 @@ export function colorField(options: ColorFieldOptions = {}): TextField | [TextFi
 	} = options
 
 	const linked = linkedOption !== false
-	const linkedFallback = typeof linkedOption === 'object' ? (linkedOption.fallback ?? null) : null
+	const linkedOptions: ColorLinkedOptions = typeof linkedOption === 'object' ? linkedOption : {}
+	const linkedFallback = linkedOptions.fallback ?? null
+	const resolveMode = linkedOptions.resolve ?? 'value'
 	const memoKey = Symbol(`colorField:${name}`)
 
 	// format stays possibly-undefined here; ColorFieldServer resolves the effective
@@ -111,15 +119,27 @@ export function colorField(options: ColorFieldOptions = {}): TextField | [TextFi
 
 	const loggedRequests = new WeakSet<PayloadRequest>()
 
+	/**
+	 * Shapes a resolved value for the configured sibling. 'value' flattens a
+	 * scheme to its light member so a field configured before schemes existed
+	 * keeps working when its resolver starts returning them; 'schemes' inflates
+	 * a flat color so consumers never branch on the shape.
+	 */
+	const shape = (value: null | string | ColorSchemeValue): null | string | ColorSchemeValue => {
+		if (value === null) return null
+		if (resolveMode === 'value') return flatValue(value)
+		return isColorSchemeValue(value) ? value : { dark: value, light: value }
+	}
+
 	const resolveHook: FieldHook = async ({ collection, global, req, siblingData }) => {
 		const raw = siblingData?.[field.name]
 		if (typeof raw !== 'string' || raw === '') return null
-		if (!raw.startsWith(PRESET_PREFIX)) return raw
+		if (!raw.startsWith(PRESET_PREFIX)) return shape(raw)
 		const key = raw.slice(PRESET_PREFIX.length)
 		try {
 			const all = await resolvePresets({ memoKey, req, source: presets })
 			const match = all.find((preset) => preset.key === key)
-			return match ? match.value : linkedFallback
+			return shape(match ? match.value : linkedFallback)
 		} catch (error) {
 			// A broken resolver must not take down reads; degrade like a missing preset
 			if (!loggedRequests.has(req)) {
@@ -130,17 +150,28 @@ export function colorField(options: ColorFieldOptions = {}): TextField | [TextFi
 					`colorField preset resolver failed for ${slug}.${field.name}`
 				)
 			}
-			return linkedFallback
+			return shape(linkedFallback)
 		}
 	}
 
-	const resolvedField: TextField = {
-		name: `${field.name}Resolved`,
-		type: 'text',
-		admin: { disableListColumn: true, hidden: true },
-		hooks: { afterRead: [resolveHook] },
-		virtual: true,
-	}
+	const resolvedAdmin = { disableListColumn: true, hidden: true } as const
+
+	const resolvedField: JSONField | TextField =
+		resolveMode === 'schemes'
+			? {
+					name: `${field.name}Resolved`,
+					type: 'json',
+					admin: resolvedAdmin,
+					hooks: { afterRead: [resolveHook] },
+					virtual: true,
+				}
+			: {
+					name: `${field.name}Resolved`,
+					type: 'text',
+					admin: resolvedAdmin,
+					hooks: { afterRead: [resolveHook] },
+					virtual: true,
+				}
 
 	return [field, resolvedField]
 }

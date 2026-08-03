@@ -1,5 +1,5 @@
 import type { StaticLabel, TextField } from 'payload'
-import type { ColorFormat, ColorPreset, FieldsResolverArgs } from '../../types'
+import type { ColorFormat, ColorPreset, ColorSchemeValue, FieldsResolverArgs } from '../../types'
 
 export const PRESET_PREFIX = 'preset:'
 
@@ -11,7 +11,9 @@ export type ColorPresetsSource = ColorPreset[] | ColorPresetsResolver
 
 export type ColorLinkedOptions = {
 	/** Resolved value when a stored preset reference no longer exists. Defaults to null. */
-	fallback?: null | string
+	fallback?: null | string | ColorSchemeValue
+	/** Shape of the virtual sibling. 'value' emits text, 'schemes' emits json. Defaults to 'value'. */
+	resolve?: 'schemes' | 'value'
 }
 
 export type ColorFieldOptions = {
@@ -40,7 +42,7 @@ export type ColorFieldClientOptions = {
 	format: ColorFormat
 	isClearable: boolean
 	linked: boolean
-	linkedFallback: null | string
+	linkedFallback: null | string | ColorSchemeValue
 }
 
 /**
@@ -54,7 +56,7 @@ export type ColorFieldServerOptions = Omit<ColorFieldClientOptions, 'format'> & 
 }
 
 /** Preset with its label resolved to a plain string, safe for clientProps. */
-export type ResolvedColorPreset = { key: string; label: string; value: string }
+export type ResolvedColorPreset = { key: string; label: string; value: string | ColorSchemeValue }
 
 export type ColorFieldCustom = {
 	memoKey: symbol

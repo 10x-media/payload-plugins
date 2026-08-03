@@ -1,10 +1,11 @@
+import type { ColorSchemeValue } from '../../types'
 import { PRESET_PREFIX, type ResolvedColorPreset } from './options'
 
 export type PresetChip = {
 	key: string
 	label: string
 	missing: boolean
-	value: null | string
+	value: null | string | ColorSchemeValue
 }
 
 /**
