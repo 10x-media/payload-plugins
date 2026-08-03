@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import { resolveIconValue } from '../shared/value'
+import { resolveRenderedIcon } from './resolveRendered'
 import type { IconProps, IconRendererAdapter, IconRenderProps } from './types'
 
 /** Async server component factory: the per-icon import is awaited server-side and the SVG streams with zero client JS. */
@@ -27,7 +28,7 @@ export const createRscIcon = (args: {
 		const key = `${adapter.slug}:${name}`
 		let entry = cache.get(key)
 		if (!entry) {
-			entry = adapter.loadIcon(name)
+			entry = resolveRenderedIcon(adapter, name)
 			cache.set(key, entry)
 			// A rejected load must not poison the icon for the process lifetime; evict
 			// so the next render retries. Same contract as the manifest cache, and the

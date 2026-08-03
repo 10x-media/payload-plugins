@@ -3,6 +3,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import React, { createContext, Suspense, useContext } from 'react'
 import { resolveIconValue } from '../shared/value'
+import { resolveRenderedIcon } from './resolveRendered'
 import type { IconProps, IconRendererAdapter, IconRenderProps } from './types'
 
 /**
@@ -40,7 +41,7 @@ export const createIcon = (args: {
 		let component = cache.get(key)
 		if (!component) {
 			component = React.lazy(async () => ({
-				default: (await adapter.loadIcon(name)) ?? MissingIcon,
+				default: (await resolveRenderedIcon(adapter, name)) ?? MissingIcon,
 			})) as unknown as ComponentType<IconRenderProps>
 			cache.set(key, component)
 		}
