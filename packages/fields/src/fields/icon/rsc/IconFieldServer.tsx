@@ -81,7 +81,8 @@ export const IconFieldServer = async (props: ServerProps): Promise<ReactNode> =>
 					silent: true,
 				})
 			: undefined
-		if (Icon && Assets) adapterComponents[adapter.slug] = { Assets, Icon, Nodes }
+		if (Icon && Assets)
+			adapterComponents[adapter.slug] = { Assets, canvas: adapter.canvas, Icon, Nodes }
 	}
 
 	// The trigger renders from a stored value alone, so a library-supplied label has to

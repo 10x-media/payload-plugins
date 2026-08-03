@@ -32,12 +32,16 @@ describe('registerIcon', () => {
 			type: 'component',
 		})
 		// The optional Nodes loader is registered only when the adapter ships one, so a
-		// generate:importmap keeps the drawer's bulk node-data path (lucide has it, radix does not).
+		// generate:importmap keeps the drawer's bulk node-data path. Both bundled libraries
+		// have one now that a canvas can be declared per library.
 		expect(config.admin?.dependencies?.['fields-icon-lucide-Nodes']).toEqual({
 			path: '@10x-media/fields/icon/adapters/lucide#LucideAdapterNodes',
 			type: 'component',
 		})
-		expect(config.admin?.dependencies?.['fields-icon-radix-Nodes']).toBeUndefined()
+		expect(config.admin?.dependencies?.['fields-icon-radix-Nodes']).toEqual({
+			path: '@10x-media/fields/icon/adapters/radix#RadixAdapterNodes',
+			type: 'component',
+		})
 	})
 
 	it('preserves registry slices written by other field families', () => {

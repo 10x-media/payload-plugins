@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { IconManifest, IconNodeMap } from '../../../types'
+import type { IconCanvas, IconManifest, IconNodeMap } from '../../../types'
 import { DrawerGlyph } from '../client/DrawerGlyph'
 import type { IconRendererAdapter } from '../react/types'
 import { resolveIconDisplay } from '../shared/iconLabel'
 import { lucideRenderer } from './lucide/renderer'
+import { radixAdapter } from './radix/adapter'
 import { radixRenderer } from './radix/renderer'
 import { tablerRenderer } from './tabler/renderer'
 
@@ -20,13 +21,13 @@ import { tablerRenderer } from './tabler/renderer'
  * examples beside it exist so a failure says what broke instead of only that something did.
  */
 
-const hashGlyphs = (nodeMap: IconNodeMap): string => {
+const hashGlyphs = (nodeMap: IconNodeMap, canvas?: IconCanvas): string => {
 	const hash = createHash('sha256')
 	for (const name of Object.keys(nodeMap).sort()) {
 		const glyph = nodeMap[name]
 		if (!glyph) continue
 		hash.update(name)
-		hash.update(renderToStaticMarkup(<DrawerGlyph nodes={glyph} size={24} />))
+		hash.update(renderToStaticMarkup(<DrawerGlyph canvas={canvas} nodes={glyph} size={24} />))
 	}
 	return hash.digest('hex')
 }
@@ -74,6 +75,27 @@ describe('bundled library rendering is unchanged', () => {
 		expect(hashGlyphs(nodes)).toBe(
 			'98de3badb7d09f26bb4bf141c27d8a668839edc50bd2963f89a03fcf20dcf9b1'
 		)
+	})
+
+	// Radix joined the bulk fast path once a layer could declare its canvas. It is a
+	// filled 15x15 set, so it would render stroked under the outline default; this pins
+	// both the node-data and the canvas that makes it correct.
+	it('renders every radix glyph on its declared canvas', async () => {
+		const { nodes } = await import('./radix/generated/nodes')
+		expect(Object.keys(nodes).length).toBe(318)
+		expect(hashGlyphs(nodes, radixAdapter().canvas)).toBe(
+			'07e4b0a4876737182092f0f172c93e9fdd3c7fab1e7b4775cc577e27728e95ab'
+		)
+	})
+
+	it('draws radix filled rather than stroked', async () => {
+		const { nodes } = await import('./radix/generated/nodes')
+		const markup = renderToStaticMarkup(
+			<DrawerGlyph canvas={radixAdapter().canvas} nodes={nodes.check ?? []} size={24} />
+		)
+		expect(markup).toContain('viewBox="0 0 15 15"')
+		expect(markup).toContain('stroke="none"')
+		expect(markup).toContain('fill="currentColor"')
 	})
 
 	// Diagnosable companion to the hashes: names the exact markup a drawer cell emits,

@@ -300,6 +300,7 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 												const cellIndex = row.index * columns + columnIndex
 												return (
 													<IconGridCell
+														canvas={entry?.canvas}
 														entry={entry}
 														focused={cellIndex === focusIndex}
 														icon={icon}

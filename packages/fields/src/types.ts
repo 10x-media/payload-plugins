@@ -151,10 +151,16 @@ export type IconAdapter = {
 	Assets: string
 	/**
 	 * importMap path of a client component that loads this library's bulk node-data
-	 * for fast drawer rendering. Omit for libraries that ship a single shared module
-	 * (e.g. radix); the drawer then falls back to the per-icon `Icon` component.
+	 * for fast drawer rendering. Omit for a library with no node-data; the drawer then
+	 * falls back to the per-icon `Icon` component.
 	 */
 	Nodes?: string
+	/**
+	 * Canvas its `Nodes` glyphs are drawn on. Omitted means lucide's outline convention,
+	 * which is what the drawer assumed before this existed, so every library that shipped
+	 * without one is unaffected. A filled set must declare its own or it inherits a stroke.
+	 */
+	canvas?: IconCanvas
 	version: 1
 }
 

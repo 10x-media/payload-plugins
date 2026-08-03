@@ -2,12 +2,14 @@
 
 import { Tooltip } from '@payloadcms/ui'
 import React, { useState } from 'react'
-import type { IconMeta, IconNode } from '../../../types'
+import type { IconCanvas, IconMeta, IconNode } from '../../../types'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
 import { resolveIconDisplay } from '../shared/iconLabel'
 import { DrawerGlyph } from './DrawerGlyph'
 
 export type IconGridCellProps = {
+	/** Canvas the library's bulk glyphs draw on; absent means the outline default. */
+	canvas?: IconCanvas
 	entry: AdapterComponentsEntry | undefined
 	focused: boolean
 	icon: IconMeta
@@ -33,7 +35,7 @@ export type IconGridCellProps = {
  * `HUN`, which they need in order to write frontend code against the value.
  */
 export const IconGridCell: React.FC<IconGridCellProps> = React.memo(
-	({ entry, focused, icon, index, isSelected, language, nodes, onSelect, registerRef }) => {
+	({ canvas, entry, focused, icon, index, isSelected, language, nodes, onSelect, registerRef }) => {
 		const [showTooltip, setShowTooltip] = useState(false)
 		const display = resolveIconDisplay({ language, meta: icon, name: icon.name })
 		return (
@@ -64,7 +66,7 @@ export const IconGridCell: React.FC<IconGridCellProps> = React.memo(
 					</Tooltip>
 					<span className="tenx-icon-drawer__glyph">
 						{nodes ? (
-							<DrawerGlyph nodes={nodes} size={24} />
+							<DrawerGlyph canvas={canvas} nodes={nodes} size={24} />
 						) : entry ? (
 							<entry.Icon name={icon.name} size={24} />
 						) : null}
