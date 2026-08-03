@@ -11,6 +11,7 @@ const FIXTURES = {
 	schemeField: 'linkedSchemes',
 	schemeFlatField: 'schemePresetsFlat',
 	schemePresetLabel: 'Acme surface',
+	schemePresetKey: 'acme/surface',
 	schemePresetLight: '#f5f3ff',
 }
 
@@ -133,6 +134,31 @@ test.describe('color field', () => {
 			FIXTURES.schemePresetLight
 		)
 		await saveDoc(page)
+	})
+
+	test('the list cell renders a split swatch for a scheme reference', async ({ page }) => {
+		// Set the reference over the API so this does not depend on another test having saved it
+		const res = await page.request.get(
+			`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
+		)
+		const { docs } = (await res.json()) as { docs: { id: string }[] }
+		const doc = docs[0]
+		if (!doc) throw new Error(`no ${FIXTURES.collection} doc titled ${FIXTURES.docTitle}`)
+		const patched = await page.request.patch(`/api/${FIXTURES.collection}/${doc.id}`, {
+			data: { [FIXTURES.schemeField]: `preset:${FIXTURES.schemePresetKey}` },
+		})
+		expect(patched.ok()).toBeTruthy()
+
+		const columns = encodeURIComponent(JSON.stringify(['title', FIXTURES.schemeField]))
+		await page.goto(`/admin/collections/${FIXTURES.collection}?columns=${columns}`)
+
+		const cell = page.locator('.fields-color-cell').first()
+		await expect(cell).toBeVisible()
+		await expect(cell.locator('.fields-color-cell__swatch span')).toHaveCSS(
+			'background-image',
+			/linear-gradient/
+		)
+		await expect(cell.locator('.fields-color-cell__missing')).toHaveCount(0)
 	})
 
 	test('keyboard: enter opens the popover, escape closes it and restores trigger focus', async ({
