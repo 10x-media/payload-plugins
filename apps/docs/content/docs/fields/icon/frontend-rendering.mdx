@@ -49,7 +49,7 @@ Per-icon code-splitting uses each library's lazy path: Lucide through its own dy
 
 ## Fallbacks
 
-`fallback` renders when the value is empty, malformed, or names an icon the registered adapters cannot resolve (for example a library you stopped registering). Without a fallback the component renders nothing; it never throws on bad data.
+`fallback` renders when the value is empty, malformed, or names an icon the registered adapters cannot resolve (for example a library you stopped registering). Without a fallback the component renders nothing; it never throws on bad data. Both factories honour it identically.
 
 ## Custom adapters
 
@@ -65,3 +65,7 @@ const acmeRenderer = (): IconRendererAdapter => ({
 ```
 
 Pass it to `createIcon` or `createRscIcon` like any first-party renderer. The [codegen](/fields/icon/codegen) import map gives you a ready name-to-module mapping to build `loadIcon` cleanly.
+
+## Layered renderers
+
+A renderer adapter may take `layers` for a library whose glyphs come from more than one place, such as a package plus overrides. Each is asked in turn, later first, so an override wins and an older layer still serves names the newer one lacks. See [layers](/fields/icon/layers).
