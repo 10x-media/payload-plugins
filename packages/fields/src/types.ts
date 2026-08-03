@@ -44,6 +44,74 @@ export type IconNode = [tag: string, attrs: Record<string, string>]
 export type IconNodeMap = Record<string, IconNode[]>
 
 /**
+ * How a layer's glyphs paint in the admin. Every variant carries importMap path
+ * strings, so a layer stays serializable inside a field config.
+ */
+export type IconRenderStrategy =
+	/** Bulk node-data rendered as inline SVG. `load` resolves `() => Promise<IconNodeMap>`. */
+	| { type: 'nodes'; canvas?: IconCanvas; load: string }
+	/** Bulk raw SVG, sprited once client-side. `load` resolves `() => Promise<Record<string, string>>`. */
+	| { type: 'svg'; load: string }
+	/** One image per icon. `resolve` resolves `(name: string) => null | string`. */
+	| { type: 'url'; resolve: string }
+	/** A component per icon, for libraries that ship their own lazy glyph components. */
+	| { type: 'component'; Icon: string }
+
+/**
+ * The SVG canvas a library's glyphs are drawn on. Defaults are lucide's outline
+ * convention, which is what the drawer hardcoded before layers existed, so a layer
+ * that declares nothing renders exactly as lucide and tabler always have.
+ */
+export type IconCanvas = {
+	viewBox?: string
+	fill?: string
+	stroke?: string
+	strokeWidth?: number | string
+	strokeLinecap?: 'butt' | 'round' | 'square'
+	strokeLinejoin?: 'arcs' | 'bevel' | 'miter' | 'miter-clip' | 'round'
+}
+
+/**
+ * How long a layer's manifest listing may be reused. `'forever'` is the default and
+ * matches how a static build artifact has always been cached. A `ttl` in milliseconds
+ * suits a layer whose contents change at runtime.
+ *
+ * Note this governs the drawer *listing* only. Validation goes through `resolveMeta`,
+ * which is never cached, so an icon added at runtime is valid immediately regardless.
+ */
+export type IconLayerCache = 'forever' | { ttl: number }
+
+/**
+ * One source within a library. Layers are ordered and later ones win by name, so a
+ * static base set can be overridden by a runtime-backed layer under a single slug.
+ */
+export type IconLayer = {
+	/** Diagnostic identity, unique within the adapter. Never part of a stored value. */
+	id: string
+	/** Lists this layer's icons for the drawer. */
+	loadManifest: (ctx: IconLayerContext) => Promise<IconManifest>
+	/** Exact single-name lookup, serving validation and label resolution. Never cached. */
+	resolveMeta?: (name: string, ctx: IconLayerContext) => Promise<IconMeta | null>
+	/**
+	 * Batched `resolveMeta`. Lookups issued in one microtask are coalesced into a single
+	 * call, which is what turns a document holding eight icon fields, or a fifty-row list,
+	 * into one query instead of eight or fifty.
+	 */
+	resolveMetaMany?: (names: string[], ctx: IconLayerContext) => Promise<Map<string, IconMeta>>
+	/** Cache policy for `loadManifest`. Defaults to `'forever'`. */
+	cache?: IconLayerCache
+	/**
+	 * Extra cache-key segment derived from the request. A layer whose listing differs per
+	 * tenant, locale or user MUST supply this, or one caller's manifest is served to
+	 * another: the cache is otherwise keyed by adapter slug and layer id alone, which are
+	 * identical across tenants by construction.
+	 */
+	cacheKey?: (ctx: IconLayerContext) => string
+	/** How this layer's glyphs paint. */
+	render: IconRenderStrategy
+}
+
+/**
  * An icon library adapter. `Icon`, `Assets`, and `Nodes` are importMap component
  * path strings so adapters stay serializable inside field configs.
  */
@@ -60,6 +128,15 @@ export type IconAdapter = {
 	 * cached manifest index answers both.
 	 */
 	resolveMeta?: (name: string, ctx: IconLayerContext) => Promise<IconMeta | null>
+	/** Batched `resolveMeta`; see `IconLayer.resolveMetaMany`. */
+	resolveMetaMany?: (names: string[], ctx: IconLayerContext) => Promise<Map<string, IconMeta>>
+	/**
+	 * Ordered sources composing this library, later winning by name. Omit for a
+	 * single-source library, which is every adapter written before layers existed:
+	 * `loadManifest`, `resolveMeta`, `Icon`, `Assets` and `Nodes` then drive everything
+	 * exactly as they did.
+	 */
+	layers?: IconLayer[]
 	/** importMap path of a client component rendering one icon by name, e.g. '@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon'. */
 	Icon: string
 	/** importMap path of a client component that loads the manifest for the admin drawer. */

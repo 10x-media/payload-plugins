@@ -1,6 +1,14 @@
 import type { Config } from 'payload'
 import { FIELDS_REGISTRY_KEY } from '../../plugin/registry'
-import type { FieldsPluginRegistry, IconGlobalConfig } from '../../types'
+import type { FieldsPluginRegistry, IconGlobalConfig, IconRenderStrategy } from '../../types'
+
+/** The importMap path a render strategy needs registered, so generate:importmap picks it up. */
+const renderDependency = (
+	render: IconRenderStrategy
+): { path: string; type: 'function' | 'component' } =>
+	render.type === 'component'
+		? { path: render.Icon, type: 'component' }
+		: { path: render.type === 'url' ? render.resolve : render.load, type: 'function' }
 
 /**
  * Slugs prefix every stored value (`<slug>:<icon-name>`), so a slug carrying a
@@ -33,6 +41,17 @@ export const registerIcon = (config: Config, icon: IconGlobalConfig | undefined)
 			throw new Error(`[fields] duplicate icon adapter slug: ${adapter.slug}`)
 		}
 		slugs.add(adapter.slug)
+		// Layer ids key the manifest cache, so a duplicate would make two layers share
+		// one cached listing and silently serve the wrong one.
+		const layerIds = new Set<string>()
+		for (const layer of adapter.layers ?? []) {
+			if (layerIds.has(layer.id)) {
+				throw new Error(
+					`[fields] duplicate icon layer id "${layer.id}" in adapter "${adapter.slug}"`
+				)
+			}
+			layerIds.add(layer.id)
+		}
 	}
 	const defaultLibrary = icon.defaultLibrary ?? firstAdapter.slug
 	if (!slugs.has(defaultLibrary)) {
@@ -66,6 +85,14 @@ export const registerIcon = (config: Config, icon: IconGlobalConfig | undefined)
 				path: adapter.Nodes,
 				type: 'component',
 			}
+		}
+		// Each layer's render strategy points at its own importMap entry. Registered here
+		// for the same reason Nodes is: generate:importmap scans admin.dependencies, not
+		// registry strings, so a regeneration would otherwise drop them.
+		for (const layer of adapter.layers ?? []) {
+			config.admin.dependencies[`fields-icon-${adapter.slug}-${layer.id}`] = renderDependency(
+				layer.render
+			)
 		}
 	}
 }
