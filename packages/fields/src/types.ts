@@ -7,8 +7,16 @@ export type FieldsResolverArgs = {
 	siblingData?: Record<string, unknown>
 }
 
+/**
+ * A color that varies by color scheme. Consumers read members individually, so
+ * an optional third scheme stays a non-breaking addition.
+ */
+export type ColorSchemeValue = { light: string; dark: string }
+
 /** A color preset: bare CSS string, or a keyed entry usable in linked mode. */
-export type ColorPreset = string | { key: string; value: string; label?: StaticLabel }
+export type ColorPreset =
+	| string
+	| { key: string; value: string | ColorSchemeValue; label?: StaticLabel }
 
 /** Stored CSS color format for colorField(). */
 export type ColorFormat = 'hex' | 'rgb' | 'hsl' | 'oklch'
