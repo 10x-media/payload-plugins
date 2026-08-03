@@ -37,8 +37,15 @@ export type IconLayerContext = { payload: Payload; req?: PayloadRequest }
 /** Lazily loaded icon library manifest. */
 export type IconManifest = { icons: IconMeta[]; categories: string[] }
 
-/** One SVG child of a glyph: an element tag and its attribute map, matching lucide-static's icon-nodes shape. */
-export type IconNode = [tag: string, attrs: Record<string, string>]
+/**
+ * One SVG child of a glyph: an element tag and its attribute map, matching lucide-static's
+ * icon-nodes shape. An optional third element carries children, so a glyph needing `<g>`
+ * or `<defs>` is expressible; the two-element form every generated manifest already uses
+ * keeps parsing exactly as before.
+ */
+export type IconNode =
+	| [tag: string, attrs: Record<string, string>]
+	| [tag: string, attrs: Record<string, string>, children: IconNode[]]
 
 /** An icon library's glyphs keyed by name, so the drawer renders inline SVG in bulk instead of per-icon imports. */
 export type IconNodeMap = Record<string, IconNode[]>
@@ -68,7 +75,8 @@ export type IconCanvas = {
 	stroke?: string
 	strokeWidth?: number | string
 	strokeLinecap?: 'butt' | 'round' | 'square'
-	strokeLinejoin?: 'arcs' | 'bevel' | 'miter' | 'miter-clip' | 'round'
+	/** SVG2's `arcs` and `miter-clip` are omitted: React does not type them and browsers barely support them. */
+	strokeLinejoin?: 'bevel' | 'miter' | 'round'
 }
 
 /**

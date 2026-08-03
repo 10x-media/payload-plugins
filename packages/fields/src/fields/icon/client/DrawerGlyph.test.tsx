@@ -24,4 +24,40 @@ describe('DrawerGlyph', () => {
 		const sameKeyWarning = errorSpy.mock.calls.some((call) => String(call[0]).includes('same key'))
 		expect(sameKeyWarning).toBe(false)
 	})
+
+	// Defaults must equal the constants the drawer hardcoded before layers existed, or
+	// every lucide and tabler glyph shifts at once.
+	it('draws on the lucide outline canvas when the layer declares nothing', () => {
+		const { container } = render(<DrawerGlyph nodes={[['path', { d: 'M0 0' }]]} size={24} />)
+		const svg = container.querySelector('svg')
+		expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24')
+		expect(svg?.getAttribute('fill')).toBe('none')
+		expect(svg?.getAttribute('stroke')).toBe('currentColor')
+		expect(svg?.getAttribute('stroke-width')).toBe('2')
+	})
+
+	it('honours a layer-declared canvas, so a filled 15x15 set renders correctly', () => {
+		const { container } = render(
+			<DrawerGlyph
+				canvas={{ fill: 'currentColor', stroke: 'none', strokeWidth: 0, viewBox: '0 0 15 15' }}
+				nodes={[['path', { d: 'M0 0' }]]}
+				size={24}
+			/>
+		)
+		const svg = container.querySelector('svg')
+		expect(svg?.getAttribute('viewBox')).toBe('0 0 15 15')
+		expect(svg?.getAttribute('fill')).toBe('currentColor')
+		expect(svg?.getAttribute('stroke')).toBe('none')
+	})
+
+	it('renders nested children, which a flat node list could not express', () => {
+		const { container } = render(
+			<DrawerGlyph
+				nodes={[['g', { transform: 'scale(2)' }, [['circle', { cx: '1', cy: '1', r: '1' }]]]]}
+				size={24}
+			/>
+		)
+		const circle = container.querySelector('g > circle')
+		expect(circle?.getAttribute('r')).toBe('1')
+	})
 })

@@ -60,6 +60,9 @@ catalogs:
     axe-core:
       specifier: ^4.12.1
       version: 4.12.1
+    dompurify:
+      specifier: ^3.2.7
+      version: 3.2.7
     jsdom:
       specifier: ^25.0.1
       version: 25.0.1
@@ -438,6 +441,9 @@ importers:
       '@tanstack/react-virtual':
         specifier: 'catalog:'
         version: 3.14.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      dompurify:
+        specifier: 'catalog:'
+        version: 3.2.7
     devDependencies:
       '@10x-media/payload-test-harness':
         specifier: workspace:*
