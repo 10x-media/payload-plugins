@@ -1,3 +1,4 @@
+import { getFromImportMap } from 'payload/shared'
 import { describe, expect, it } from 'vitest'
 import type { IconAdapter } from '../../../types'
 import { lucideAdapter } from './lucide/adapter'
@@ -47,5 +48,28 @@ describe('bundled adapters declare only paths they export', () => {
 		['tabler', tablerAdapter()],
 	])('%s declares a Nodes loader for its committed node-data', (_slug, adapter) => {
 		expect(adapter.Nodes).toBeTruthy()
+	})
+
+	// Closes the loop the two cases above leave open: the adapter names a path, the barrel
+	// exports it, and `getFromImportMap` actually finds it under a Payload-shaped map. That
+	// last hop is what `IconFieldServer` performs, and it is the one that fails silently.
+	it('resolves every declared path through a payload-shaped import map', async () => {
+		const importMap: Record<string, unknown> = {}
+		for (const [specifier, load] of Object.entries(barrels)) {
+			const module = await load()
+			for (const [exportName, value] of Object.entries(module)) {
+				importMap[`${specifier}#${exportName}`] = value
+			}
+		}
+		for (const adapter of [lucideAdapter(), radixAdapter(), tablerAdapter()]) {
+			for (const path of declaredPaths(adapter)) {
+				const resolved = getFromImportMap<unknown>({
+					importMap: importMap as never,
+					PayloadComponent: path,
+					silent: true,
+				})
+				expect(resolved, `${adapter.slug}: import map has no entry for ${path}`).toBeDefined()
+			}
+		}
 	})
 })
