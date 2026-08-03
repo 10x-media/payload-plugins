@@ -1,6 +1,7 @@
 import type { Config } from 'payload'
 import { FIELDS_REGISTRY_KEY } from '../../plugin/registry'
 import type { FieldsPluginRegistry, IconGlobalConfig, IconRenderStrategy } from '../../types'
+import { createIconManifestHandler, ICON_MANIFEST_PATH } from './server/endpoint'
 
 /** The importMap path a render strategy needs registered, so generate:importmap picks it up. */
 const renderDependency = (
@@ -66,6 +67,25 @@ export const registerIcon = (config: Config, icon: IconGlobalConfig | undefined)
 		resolveAvailable: icon.resolveAvailable,
 	}
 	config.custom[FIELDS_REGISTRY_KEY] = registry
+	// The endpoint only exists for libraries whose data lives on the server. A config with
+	// none stays byte-identical, which is every config written before layers existed.
+	const hasServerLayer = icon.adapters.some((adapter) =>
+		adapter.layers?.some((layer) => layer.render.type !== 'component' || layer.resolveMeta)
+	)
+	if (hasServerLayer) {
+		config.endpoints = [
+			...(config.endpoints ?? []),
+			{
+				handler: createIconManifestHandler({
+					adapters: icon.adapters,
+					alwaysAvailable: icon.alwaysAvailable,
+					resolveAvailable: icon.resolveAvailable,
+				}),
+				method: 'get',
+				path: ICON_MANIFEST_PATH,
+			},
+		]
+	}
 	config.admin ??= {}
 	config.admin.dependencies ??= {}
 	for (const adapter of icon.adapters) {
