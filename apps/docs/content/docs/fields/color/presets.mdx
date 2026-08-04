@@ -20,6 +20,24 @@ colorField({
 
 A bare string is shorthand for a preset whose key and value are both the CSS string. Object presets carry a stable `key` (required for linked mode) and an optional localizable `label`.
 
+## Scheme-aware presets
+
+A preset's `value` can be a light/dark pair instead of a single color, so one reference stays mode-responsive wherever it renders:
+
+```ts
+colorField({
+  name: 'accent',
+  linked: { resolve: 'schemes' },
+  presets: [{ key: 'brand', label: 'Brand', value: { light: '#0ea5e9', dark: '#0369a1' } }],
+})
+```
+
+Scheme and flat presets mix freely in one palette. The picker renders a scheme preset as a diagonal split swatch, so an editor sees the color is mode-responsive without visiting the site.
+
+A pair with only one member filled in behaves as that color in both schemes, rather than disappearing from the picker while the palette is half authored. A pair with neither member filled in is not a preset and is skipped.
+
+[Linked mode](/fields/color/linked-mode) covers what a document stores and what it resolves to.
+
 ## Async presets
 
 `presets` also accepts a resolver, for palettes that live in your data (a tenant's brand colors, a design-tokens global):

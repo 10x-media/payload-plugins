@@ -1,4 +1,4 @@
 {
 	"title": "Color",
-	"pages": ["index", "presets", "linked-mode", "utils"]
+	"pages": ["index", "presets", "palette-sources", "linked-mode", "utils"]
 }

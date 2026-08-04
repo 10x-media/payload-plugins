@@ -8,6 +8,11 @@ const FIXTURES = {
 	basicSeedValue: '#7c3aed',
 	presetLabel: 'Global blue',
 	presetValue: '#1d4ed8',
+	schemeField: 'linkedSchemes',
+	schemeFlatField: 'schemePresetsFlat',
+	schemePresetLabel: 'Acme surface',
+	schemePresetKey: 'acme/surface',
+	schemePresetLight: '#f5f3ff',
 }
 
 const login = async (page: Page): Promise<void> => {
@@ -94,6 +99,66 @@ test.describe('color field', () => {
 			.click()
 		await expect(page.locator(`#field-${FIXTURES.basic}`)).toHaveValue(FIXTURES.presetValue)
 		await saveDoc(page)
+	})
+
+	test('a scheme preset renders a split swatch in the picker and the chip', async ({ page }) => {
+		await openShowcaseDoc(page)
+		await swatchButton(page, FIXTURES.schemeField).click()
+		await expect(popover(page)).toBeVisible()
+
+		const preset = popover(page).locator(
+			`.fields-color__preset[aria-label="${FIXTURES.schemePresetLabel}"]`
+		)
+		await expect(preset.locator('span')).toHaveCSS('background-image', /linear-gradient/)
+		await preset.click()
+
+		const field = page
+			.locator('.fields-color')
+			.filter({ has: page.locator(`#field-${FIXTURES.schemeField}`) })
+		await expect(field.locator('.fields-color__chip-label')).toHaveText(FIXTURES.schemePresetLabel)
+		await expect(field.locator('.fields-color__chip-color')).toHaveCSS(
+			'background-image',
+			/linear-gradient/
+		)
+		await saveDoc(page)
+	})
+
+	test('a non-linked field stores a scheme preset light member', async ({ page }) => {
+		await openShowcaseDoc(page)
+		await swatchButton(page, FIXTURES.schemeFlatField).click()
+		await expect(popover(page)).toBeVisible()
+		await popover(page)
+			.locator(`.fields-color__preset[aria-label="${FIXTURES.schemePresetLabel}"]`)
+			.click()
+		await expect(page.locator(`#field-${FIXTURES.schemeFlatField}`)).toHaveValue(
+			FIXTURES.schemePresetLight
+		)
+		await saveDoc(page)
+	})
+
+	test('the list cell renders a split swatch for a scheme reference', async ({ page }) => {
+		// Set the reference over the API so this does not depend on another test having saved it
+		const res = await page.request.get(
+			`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
+		)
+		const { docs } = (await res.json()) as { docs: { id: string }[] }
+		const doc = docs[0]
+		if (!doc) throw new Error(`no ${FIXTURES.collection} doc titled ${FIXTURES.docTitle}`)
+		const patched = await page.request.patch(`/api/${FIXTURES.collection}/${doc.id}`, {
+			data: { [FIXTURES.schemeField]: `preset:${FIXTURES.schemePresetKey}` },
+		})
+		expect(patched.ok()).toBeTruthy()
+
+		const columns = encodeURIComponent(JSON.stringify(['title', FIXTURES.schemeField]))
+		await page.goto(`/admin/collections/${FIXTURES.collection}?columns=${columns}`)
+
+		const cell = page.locator('.fields-color-cell').first()
+		await expect(cell).toBeVisible()
+		await expect(cell.locator('.fields-color-cell__swatch span')).toHaveCSS(
+			'background-image',
+			/linear-gradient/
+		)
+		await expect(cell.locator('.fields-color-cell__missing')).toHaveCount(0)
 	})
 
 	test('keyboard: enter opens the popover, escape closes it and restores trigger focus', async ({

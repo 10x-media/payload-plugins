@@ -12,6 +12,8 @@ import {
   convertColor,
   contrastRatio,
   relativeLuminance,
+  lightDark,
+  isColorSchemeValue,
 } from '@10x-media/fields/color/utils'
 ```
 
@@ -46,6 +48,19 @@ Both accept a CSS string or a parsed color. `contrastRatio` implements the WCAG 
 ```ts
 const textColor = contrastRatio(doc.accent, '#ffffff') >= 4.5 ? '#ffffff' : '#0f172a'
 ```
+
+## Color schemes
+
+```ts
+lightDark('#3b82f6')                             // '#3b82f6'
+lightDark({ light: '#ffffff', dark: '#000000' }) // 'light-dark(#ffffff, #000000)'
+
+isColorSchemeValue(doc.accentResolved)  // narrows to { light: string; dark: string }
+```
+
+`lightDark` accepts either shape a resolved [linked field](/fields/color/linked-mode) can hold, so it works whichever `resolve` mode a field uses. The two-argument CSS output needs `color-scheme: light dark` on the element or an ancestor; without it, browsers resolve it as light.
+
+`isColorSchemeValue` is the type guard for narrowing a `string | ColorSchemeValue` union, which is what preset values and resolved siblings hold.
 
 ## Guarantees
 

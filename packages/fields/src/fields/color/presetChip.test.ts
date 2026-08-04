@@ -14,6 +14,18 @@ describe('derivePresetChip', () => {
 		).toEqual({ key: 'brand', label: 'Brand blue', missing: false, value: '#0ea5e9' })
 	})
 
+	it('returns a scheme preset value intact', () => {
+		const value = { dark: '#0369a1', light: '#0ea5e9' }
+		expect(
+			derivePresetChip({
+				editing: false,
+				linked: true,
+				presets: [{ key: 'scheme', label: 'Scheme', value }],
+				value: 'preset:scheme',
+			})
+		).toEqual({ key: 'scheme', label: 'Scheme', missing: false, value })
+	})
+
 	it('keeps the stored ref key intact for value-keyed shorthand presets', () => {
 		expect(
 			derivePresetChip({ editing: false, linked: true, presets, value: 'preset:#f8fafc' })

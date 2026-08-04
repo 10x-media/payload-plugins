@@ -7,6 +7,7 @@ import type {
 } from 'payload'
 import type { ColorPreset } from '../../types'
 import { PRESET_PREFIX } from './options'
+import { findNamedField, readPath } from './paths'
 
 export type PresetsFromDocArgs = {
 	/** Collection whose sanitized field configs supply the labels. */
@@ -20,33 +21,7 @@ export type PresetsFromDocArgs = {
 	req: PayloadRequest
 }
 
-/**
- * Rows, collapsibles, and unnamed tabs are already inlined by Payload's
- * flattening, so each dot segment only ever names a data field or a named
- * container (group, named tab, array) carrying nested flattenedFields.
- */
-export const findNamedField = (
-	fields: FlattenedField[] | undefined,
-	path: string
-): FlattenedField | undefined => {
-	let scope = fields
-	let found: FlattenedField | undefined
-	for (const segment of path.split('.')) {
-		found = scope?.find((field) => field.name === segment)
-		if (!found) return undefined
-		scope = 'flattenedFields' in found ? found.flattenedFields : undefined
-	}
-	return found
-}
-
-const readPath = (doc: Record<string, unknown>, path: string): unknown => {
-	let value: unknown = doc
-	for (const segment of path.split('.')) {
-		if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
-		value = (value as Record<string, unknown>)[segment]
-	}
-	return value
-}
+export { findNamedField } from './paths'
 
 /**
  * Function labels resolve here with the same args Payload's own

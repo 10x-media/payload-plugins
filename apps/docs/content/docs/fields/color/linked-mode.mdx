@@ -38,6 +38,45 @@ Resolution deliberately happens on the sibling, not in place. Resolving in place
 
 Because the async preset resolver is memoized per request and shared across every document, it derives from `req` and returns the full governed palette (keyed by preset key); each document's stored reference selects its entry. Resolving a list view costs one palette lookup.
 
+## Scheme-aware resolution
+
+When presets carry [light/dark pairs](/fields/color/presets), `linked.resolve` chooses the sibling's shape:
+
+```ts
+fields: [
+  ...colorField({
+    name: 'accent',
+    linked: { resolve: 'schemes', fallback: { light: '#94a3b8', dark: '#1e293b' } },
+    presets: async ({ req }) => resolveGovernedPalette(req),
+  }),
+]
+```
+
+`resolve: 'value'` (the default) keeps `<name>Resolved` a text field. `resolve: 'schemes'` makes it a JSON field carrying `{ light, dark }`. The sibling's name is the same in both shapes, so the shape is the only thing your frontend switches on.
+
+| Stored value | `resolve: 'value'` | `resolve: 'schemes'` |
+| --- | --- | --- |
+| empty | `null` | `null` |
+| a custom color | the string | `{ light: it, dark: it }` |
+| a reference to a flat preset | the preset's value | `{ light: value, dark: value }` |
+| a reference to a scheme preset | the `light` member | `{ light, dark }` |
+| a reference that no longer resolves | `fallback` | `fallback`, widened to a pair |
+| a reference that no longer resolves, no fallback | `null` | `null` |
+
+`fallback` accepts a pair as well as a string. Under `resolve: 'value'` a pair fallback flattens to its `light` member, exactly like a pair preset does.
+
+Flattening to `light` under `resolve: 'value'` is deliberate: a field configured before scheme presets existed keeps working when its resolver starts returning them, rather than breaking.
+
+To render a pair, `lightDark()` from [the color utilities](/fields/color/utils) produces the CSS one-liner:
+
+```tsx
+<div style={{ colorScheme: 'light dark', background: lightDark(doc.accentResolved) }} />
+```
+
+## Scheme presets in non-linked fields
+
+A non-linked field stores a preset's literal value, and a text column holds one color. Picking a scheme preset there stores its `light` member. The picker still shows the split swatch, so it stays visible that the field is holding one half of a mode-responsive color. Use linked mode when you need both.
+
 ## Missing presets
 
 When a stored reference points at a preset that no longer exists (a tenant deleted a brand color), the sibling resolves to `linked.fallback` (default `null`), and the picker shows a missing-preset state prompting for a replacement. Nothing throws, and the stale reference stays queryable until an editor replaces it.

@@ -147,6 +147,17 @@ export interface Color {
   linkedStaticResolved?: string | null;
   linkedTenant?: string | null;
   linkedTenantResolved?: string | null;
+  linkedSchemes?: string | null;
+  linkedSchemesResolved?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  schemePresetsFlat?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -271,6 +282,7 @@ export interface Tenant {
         key: string;
         label?: string | null;
         value: string;
+        valueDark?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -411,6 +423,9 @@ export interface ColorsSelect<T extends boolean = true> {
   linkedStaticResolved?: T;
   linkedTenant?: T;
   linkedTenantResolved?: T;
+  linkedSchemes?: T;
+  linkedSchemesResolved?: T;
+  schemePresetsFlat?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -472,6 +487,7 @@ export interface TenantsSelect<T extends boolean = true> {
         key?: T;
         label?: T;
         value?: T;
+        valueDark?: T;
         id?: T;
       };
   updatedAt?: T;
