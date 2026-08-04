@@ -49,6 +49,6 @@ The drawer's header pieces (`ListHeader`, `SearchBar`, `SortByPill`, `NoListResu
 
 Drift there shows up as **visual breakage, not a runtime error**: nothing throws, the drawer just looks wrong, so no test catches it and no log mentions it.
 
-The peer range (`payload@^3.83.0`, same as every plugin here) is not a guarantee against that; semver has nothing to say about internal class names. Verified by hand: the markup and classes this copies are present from 3.83, the suite runs green on 3.85, and 3.86 is what the implementation this was ported from runs in production. On a newer Payload, open a drawer and look at it once.
+The peer range (`payload@^3.83.0`, same as every plugin here) is not a guarantee against that; semver has nothing to say about internal class names. Verified by hand: the markup and classes this copies are present from 3.83, and the suite runs green on 3.85. On a newer Payload, open a drawer and look at it once.
 
 The file results themselves are not reproduced. They come from the `get-folder-results-component-and-data` server function already rendered, so the cards and tables in the drawer are Payload's own components, not copies.
