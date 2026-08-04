@@ -79,12 +79,26 @@ const uploadUnfiled = async (
 }
 
 /**
+ * One in-flight seed per process. `next build` collects page data with several workers and each
+ * evaluates the config, so `onInit` fires more than once; a per-collection count check alone
+ * still lets two runs interleave and Payload then appends a counter to every colliding filename.
+ */
+const globalForSeed = globalThis as typeof globalThis & {
+	__10xMediaFolderPickerSeed?: Promise<void>
+}
+
+/**
  * Seed the dev Payload app: an admin user, a nested folder tree, and uploads spread across it.
  * The picker has nothing to show without folders to browse, and unfoldered documents are invisible
  * to it by design, so everything lands in a folder except the deliberate controls.
  * Idempotent: each block is skipped once its collection holds documents.
  */
-export const seedDev = async (payload: Payload): Promise<void> => {
+export const seedDev = (payload: Payload): Promise<void> => {
+	globalForSeed.__10xMediaFolderPickerSeed ??= runSeed(payload)
+	return globalForSeed.__10xMediaFolderPickerSeed
+}
+
+const runSeed = async (payload: Payload): Promise<void> => {
 	const userCount = await payload.count({ collection: 'users' })
 	if (userCount.totalDocs === 0) {
 		await payload.create({

@@ -1,0 +1,64 @@
+---
+title: Quick start
+description: Enable folders, install the plugin, and browse them from an upload field.
+---
+
+## Requirements
+
+- Folders enabled at the root of the config (`folders: { ... }`).
+- At least one collection with `folders: true`.
+
+Both are Payload features, not this plugin's. Without them there is nothing to browse and the plugin returns the config untouched.
+
+## Install
+
+```bash
+pnpm add @10x-media/folder-picker
+```
+
+## Configure
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { folderPicker } from '@10x-media/folder-picker'
+
+export default buildConfig({
+  folders: { browseByFolder: true },
+  collections: [
+    { slug: 'media', folders: true, upload: true, fields: [] },
+    {
+      slug: 'posts',
+      fields: [{ name: 'cover', type: 'upload', relationTo: 'media' }],
+    },
+  ],
+  plugins: [folderPicker({})],
+})
+```
+
+Payload creates the `payload-folders` collection itself; you do not declare it.
+
+## Regenerate the import map
+
+```bash
+payload generate:importmap
+```
+
+The swapped view is referenced by string, so Payload resolves it through the import map. Development regenerates it on boot; a production build uses the committed file. Skip this and the drawer silently falls back to the default list, with `getFromImportMap: PayloadComponent not found` in the server log.
+
+## Try it
+
+1. Open **Media**, switch to **By folder**, and create a folder.
+2. Upload a file into it.
+3. Open a Post and press **Choose from existing** on the `cover` field.
+
+The drawer now has **All media** and **By folder** tabs. Double click a folder to enter it, double click a file to pick it.
+
+## Turning it off
+
+Per environment:
+
+```ts
+folderPicker({ disabled: process.env.NODE_ENV === 'test' })
+```
+
+Per collection, drop `folders: true`. There is no per-field switch; see [Limits](/folder-picker/limits).

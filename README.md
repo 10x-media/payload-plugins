@@ -11,6 +11,7 @@ Open-source plugins for [Payload v3](https://payloadcms.com) maintained by [10x-
 | [@10x-media/jobs](./packages/jobs) | Ops dashboard plus reliability, worker, and queue-control layers for Payload jobs | [![npm](https://img.shields.io/npm/v/@10x-media/jobs)](https://www.npmjs.com/package/@10x-media/jobs) |
 | [@10x-media/webhooks](./packages/webhooks) | Outbound webhook subscriptions with signing, retries, and a delivery log | [![npm](https://img.shields.io/npm/v/@10x-media/webhooks)](https://www.npmjs.com/package/@10x-media/webhooks) |
 | [@10x-media/automations](./packages/automations) | No-code automation engine (beta scaffold) | [![npm](https://img.shields.io/npm/v/@10x-media/automations)](https://www.npmjs.com/package/@10x-media/automations) |
+| [@10x-media/folder-picker](./packages/folder-picker) | Folder browsing inside the list drawer, so any field picks documents by folder | [![npm](https://img.shields.io/npm/v/@10x-media/folder-picker)](https://www.npmjs.com/package/@10x-media/folder-picker) |
 
 ## Status
 

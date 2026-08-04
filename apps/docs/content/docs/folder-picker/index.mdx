@@ -1,0 +1,48 @@
+---
+title: Folder Picker
+description: Folder browsing inside Payload's list drawer, so any field picks documents by folder.
+---
+
+`@10x-media/folder-picker` puts folders into the drawer that opens when a field picks an existing document. Payload has had folders since 3.39, but only on the collection route: from an upload field's "choose from existing" you get a flat, paginated list with no folders in sight.
+
+The plugin replaces one thing, the list view of each folder-enabled collection, and that single swap covers every field that opens a drawer.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { folderPicker } from '@10x-media/folder-picker'
+
+export default buildConfig({
+  folders: { browseByFolder: true },
+  collections: [{ slug: 'media', folders: true, upload: true, fields: [] }],
+  plugins: [folderPicker({})],
+})
+```
+
+## What it covers
+
+Anything that opens a list drawer, because they all render the same collection list view:
+
+- upload fields, single and `hasMany`
+- polymorphic upload fields, one tab per collection
+- relationship fields with `admin: { appearance: 'drawer' }`
+- the lexical upload node
+
+No field is patched, and no lexical feature is registered. See [How it works](/folder-picker/internals) for why one swap is enough.
+
+## What it adds inside the drawer
+
+- subfolder navigation with breadcrumbs, plus search within the current folder
+- grid or list display, and sorting by name, created or updated
+- create a folder or a document without leaving the editor
+- move, rename and delete folders
+- bulk upload straight into the folder being viewed, for `hasMany` fields
+
+## What it leaves alone
+
+- **The collection's list route.** Outside a drawer the swapped view defers to Payload's own, so `/admin/collections/media` is byte-for-byte what it was.
+- **Collections without `folders: true`.** Their drawer stays the stock flat list.
+- **Collections that already declare a list view.** A host customization is never overwritten.
+
+## Requirements
+
+Payload `^3.83.0`, React 19, with folders enabled in the config and on at least one collection. The drawer's header is rebuilt from copies of Payload's internal markup, so an upgrade is worth a quick look at the drawer; see [How it works](/folder-picker/internals).

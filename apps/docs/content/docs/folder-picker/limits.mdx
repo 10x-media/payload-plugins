@@ -1,0 +1,41 @@
+---
+title: Limits
+description: What the plugin deliberately does not do, and why.
+---
+
+## No per-field opt-out
+
+Folders are switched on or off per collection, through Payload's own `folders: true`. There is no way to say "folders in this field, but not in that one".
+
+This is a consequence of the design rather than an omission. The list drawer carries no information about which field opened it: an upload field calls `useListDrawer({ collectionSlugs, filterOptions })` and the drawer slug is `list-drawer_<depth>_<uuid>`. The swapped list view therefore cannot tell one caller from another.
+
+Turning the picker off for a collection means removing `folders: true` from it, which also removes Payload's own **By folder** tab on the route.
+
+## Documents without a folder are hidden
+
+The folder view only lists documents that have a folder assigned. Unfiled documents are invisible there, exactly as in Payload's own folder view; they are still reachable from the **All** tab.
+
+Assign a folder first if a document must be pickable by folder.
+
+## Folders belong to collections
+
+A folder carries `folderType`, the list of collections whose documents it may hold. A folder created while picking for `media` does not appear when picking for `files`.
+
+For a polymorphic upload field (`relationTo: ['media', 'files']`) this means each tab shows its own folder tree.
+
+## Collections with a custom list view are skipped
+
+If a collection already declares `admin.components.views.list.Component`, the plugin leaves it alone rather than overwrite a deliberate customization. Such a collection keeps the stock drawer.
+
+To get both, render the plugin's view from your own:
+
+```tsx title="MyListView.tsx"
+'use client'
+
+import { FolderListView } from '@10x-media/folder-picker/client'
+import type { ListViewClientProps } from 'payload'
+
+export const MyListView: React.FC<ListViewClientProps> = (props) => (
+  <FolderListView {...props} />
+)
+```
