@@ -1,3 +1,3 @@
 'use client'
 
-export {}
+export { FolderListView } from '../folder/index'

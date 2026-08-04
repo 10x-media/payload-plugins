@@ -3,12 +3,10 @@
 import { getTranslation } from '@payloadcms/translations'
 import {
 	Button,
-	ConfirmationModal,
 	FolderIcon,
 	FolderProvider,
 	Gutter,
 	LoadingOverlay,
-	MoveDocToFolderButton,
 	Popup,
 	PopupList,
 	useAuth,
@@ -27,7 +25,6 @@ import type { FolderActionHandlers } from './FolderActions'
 import { FolderActionsMenu, FolderSelectionBar } from './FolderActions'
 import {
 	CloseModalButton,
-	Dots,
 	ListHeader,
 	NoListResults,
 	SearchBar,
@@ -36,8 +33,6 @@ import {
 } from './native'
 
 const baseClass = 'collection-folder-list'
-const deleteModalSlug = 'folder-browser-confirm-delete'
-const moveModalSlug = 'folder-browser-move'
 
 type FolderBrowserProps = {
 	readonly collectionSlug: CollectionSlug
@@ -61,7 +56,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 	const { permissions } = useAuth()
 	const { i18n, t } = useTranslation()
 	const { getFolderResultsComponentAndData } = useServerFunctions()
-	const { drawerSlug, onBulkSelect, onSelect } = useListDrawerContext()
+	const { drawerSlug, onSelect } = useListDrawerContext()
 	const {
 		breakpoints: { s: smallBreak },
 	} = useWindowInfo()
@@ -200,17 +195,20 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 	].filter(Boolean) as { label: string; onClick: () => void; slug: string }[]
 
 	// One option renders as a plain button, several as a chevron popup, the same shape
-	// ListCreateNewDocInFolderButton uses.
+	// ListCreateNewDocInFolderButton uses. Read out rather than indexed twice, so
+	// noUncheckedIndexedAccess narrows once for the whole branch.
+	const [onlyCreatable] = creatable
+
 	const createAction =
-		creatable.length === 0 ? null : creatable.length === 1 ? (
+		creatable.length === 0 ? null : onlyCreatable && creatable.length === 1 ? (
 			<Button
 				buttonStyle="pill"
 				el="div"
 				key="create-new"
-				onClick={creatable[0].onClick}
+				onClick={onlyCreatable.onClick}
 				size="small"
 			>
-				{`${t('general:create')} ${creatable[0].label.toLowerCase()}`}
+				{`${t('general:create')} ${onlyCreatable.label.toLowerCase()}`}
 			</Button>
 		) : (
 			<Popup

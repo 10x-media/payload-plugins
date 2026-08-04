@@ -1,0 +1,67 @@
+/* Styles for the folder browsing the plugin adds to Payload's list drawer. Class names
+   deliberately match Payload's own (.list-drawer__header, .collection-folder-list) rather than
+   carrying a plugin prefix: this restyles Payload's markup, it does not introduce its own. */
+
+/* Both drawer views stack below the All Media / By Folder tabs, so neither header should keep the
+   top margin it carries when it leads the drawer (base(2.5) on .list-drawer__header). Zeroing both
+   leaves the h1's own leading as the gap, which matches the space below the title and keeps the
+   two views identical. Keyed on markup only FolderListView renders, the folder view's own root and
+   the tabs gutter that precedes DefaultListView, so every other list drawer (a relationship field
+   with appearance: 'drawer', whose header does lead the drawer) keeps its margin. Two rules rather
+   than one selector group so the weaker selector comes first (noDescendingSpecificity). */
+.collection-folder-list .list-drawer__header {
+	margin-top: 0;
+}
+
+.default-list-view-tabs__drawer-gutter ~ .collection-list .list-drawer__header {
+	margin-top: 0;
+}
+
+/* The drawer folder view puts its trail beside the All Media / By Folder tabs, which the route
+   view cannot do because its own trail lives in the admin step nav. Slash separators rather than
+   the chevron the folder breadcrumbs use, and a muted icon that follows the active theme. */
+.collection-folder-list__tabs-row {
+	align-items: center;
+	display: flex;
+	flex-wrap: nowrap;
+	gap: calc(var(--base) * 0.75);
+	min-width: 0;
+}
+
+.collection-folder-list__trail {
+	align-items: center;
+	color: var(--theme-elevation-500);
+	display: flex;
+	flex-wrap: nowrap;
+	gap: calc(var(--base) * 0.25);
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.collection-folder-list__trail .icon--folder {
+	flex-shrink: 0;
+}
+
+.collection-folder-list__trail .btn {
+	margin: 0;
+}
+
+.collection-folder-list__trail-sep {
+	color: var(--theme-elevation-400);
+}
+
+.collection-folder-list__trail-crumb {
+	color: var(--theme-elevation-800);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* The All Media tab's own header is owned by DefaultListView, so bulk upload sits with the view
+   tabs instead. Scoped to the drawer so no other list view is touched. */
+.list-drawer .default-list-view-tabs__drawer-row {
+	align-items: center;
+	display: flex;
+	gap: calc(var(--base) * 0.5);
+}

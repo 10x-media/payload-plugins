@@ -3,8 +3,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { buildConfig, type CollectionConfig } from 'payload'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { buildConfig } from 'payload'
 import { folderPicker } from '../src/index'
+import { posts } from './collections/posts'
+import { attachments, curated, files, media } from './collections/uploads'
+import { users } from './collections/users'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -12,13 +16,6 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
-
-const users: CollectionConfig = {
-	slug: 'users',
-	auth: true,
-	admin: { useAsTitle: 'email' },
-	fields: [],
-}
 
 const db =
 	useDb === 'postgres'
@@ -39,7 +36,17 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
+	collections: [
+		users,
+		media(dirname),
+		files(dirname),
+		attachments(dirname),
+		curated(dirname),
+		posts,
+	],
+	// The plugin is a no-op without this; `payload-folders` is created by Payload itself.
+	folders: { browseByFolder: true },
+	editor: lexicalEditor(),
 	plugins: [folderPicker({})],
 	telemetry: false,
 	onInit: async (payload) => {

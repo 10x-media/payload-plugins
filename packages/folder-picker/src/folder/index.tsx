@@ -13,7 +13,7 @@ import type { ListViewClientProps } from 'payload'
 import React from 'react'
 import { BulkUploadButton } from './BulkUploadButton'
 import { FolderBrowser } from './FolderBrowser'
-
+import './folder.css'
 const tabsClass = 'default-list-view-tabs'
 
 /**

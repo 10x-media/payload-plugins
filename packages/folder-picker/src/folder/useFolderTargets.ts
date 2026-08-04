@@ -40,10 +40,17 @@ export const useFolderTargets = ({
 		i18n
 	)
 
-	/** Editing needs one document; with none selected that is the folder in view. */
+	/**
+	 * Editing needs one document; with none selected that is the folder in view. Read out
+	 * rather than indexed twice, so noUncheckedIndexedAccess narrows once for the branch.
+	 */
+	const [firstSelected] = selected
 	const editTarget =
-		count === 1
-			? { id: selected[0].value.id, name: String(selected[0].value._folderOrDocumentTitle ?? '') }
+		count === 1 && firstSelected
+			? {
+					id: firstSelected.value.id,
+					name: String(firstSelected.value._folderOrDocumentTitle ?? ''),
+				}
 			: count === 0 && folderID
 				? { id: folderID, name: currentFolderName }
 				: null
