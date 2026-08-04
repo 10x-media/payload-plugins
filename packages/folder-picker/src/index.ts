@@ -1,8 +1,7 @@
 import { type Config, definePlugin } from 'payload'
-
+import { registerFolderListView } from './plugin/registerFolderListView'
 import { registerTranslations } from './plugin/registerTranslations'
 import type { TranslationsOption } from './translations'
-
 export type FolderPickerPluginOptions = {
 	/**
 	 * Disable the plugin entirely (incoming config returned untouched).
@@ -25,9 +24,11 @@ declare module 'payload' {
 }
 
 /**
- * Folder Picker plugin for Payload v3. Currently registers this plugin's
- * translations; future releases will add feature behavior. Authored with
- * `definePlugin` so sibling plugins can detect it by slug.
+ * Folder Picker plugin for Payload v3. Swaps the list view of every folder-enabled
+ * collection so the list drawer browses folders instead of a flat list. Payload
+ * resolves that one component for both the collection route and the drawer, so upload
+ * fields, relationship fields and the lexical upload node are covered without patching
+ * a single field. Authored with `definePlugin` so sibling plugins can detect it by slug.
  */
 export const folderPicker = definePlugin<FolderPickerPluginOptions>({
 	slug: '@10x-media/folder-picker',
@@ -36,6 +37,8 @@ export const folderPicker = definePlugin<FolderPickerPluginOptions>({
 			return config
 		}
 		registerTranslations(config, options.translations)
+
+		registerFolderListView(config)
 		return config
 	},
 })

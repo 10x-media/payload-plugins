@@ -75,6 +75,7 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@payloadcms/translations": "^3.83.0",
 		"@payloadcms/ui": "^3.83.0",
 		"payload": "^3.83.0",
 		"react": "^19.0.0",
@@ -89,6 +90,7 @@
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
+		"@payloadcms/translations": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
