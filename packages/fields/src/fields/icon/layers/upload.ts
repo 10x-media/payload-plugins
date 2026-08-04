@@ -4,6 +4,17 @@ import type { IconLayer, IconLayerCache, IconLayerContext, IconMeta } from '../.
 /** Document shape the layer reads, after the configurable field names are applied. */
 type UploadDoc = Record<string, unknown>
 
+/**
+ * Widens one document to a bag of fields.
+ *
+ * Payload types `find` as the document union of the host app's collections, and a generated
+ * document type has no index signature, so asserting the array directly is rejected wherever
+ * types have been generated. That is the dev app and every real consumer, and it is why this
+ * only shows up outside the package's own typecheck. Taking `unknown` keeps it one legal
+ * assertion rather than a double cast.
+ */
+const asUploadDoc = (doc: unknown): UploadDoc => doc as UploadDoc
+
 export type UploadIconLayerOptions = {
 	/** Upload collection holding the icons. */
 	collection: CollectionSlug
@@ -84,7 +95,7 @@ const findDocs = async (args: {
 		...(args.ctx.req ? { req: args.ctx.req } : {}),
 		...(args.where ? { where: args.where } : {}),
 	})
-	return result.docs as UploadDoc[]
+	return result.docs.map(asUploadDoc)
 }
 
 /**
@@ -149,7 +160,7 @@ export const uploadIconLayer = (options: UploadIconLayerOptions): IconLayer => {
 				...(ctx.req ? { req: ctx.req } : {}),
 				where,
 			})
-			const doc = (result.docs as UploadDoc[])[0]
+			const doc = result.docs.map(asUploadDoc)[0]
 			return doc ? toMeta(doc, fields) : null
 		},
 		// One `in` query for every name looked up in the tick. A document holding eight icon
@@ -168,7 +179,7 @@ export const uploadIconLayer = (options: UploadIconLayerOptions): IconLayer => {
 				where,
 			})
 			const found = new Map<string, IconMeta>()
-			for (const doc of result.docs as UploadDoc[]) {
+			for (const doc of result.docs.map(asUploadDoc)) {
 				const meta = toMeta(doc, fields)
 				if (meta) found.set(meta.name, meta)
 			}
