@@ -90,6 +90,7 @@
 		"form-builder-standard-schema-dep",
 		"form-builder-v1",
 		"icon-async-libraries",
+		"icon-manifest-label-annotation",
 		"jobs-admin-ux",
 		"jobs-boolean-opt-in",
 		"jobs-feedback",
