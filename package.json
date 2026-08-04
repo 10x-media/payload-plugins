@@ -64,11 +64,5 @@
 	},
 	"lint-staged": {
 		"*.{ts,tsx,js,jsx,mjs,mts,json,jsonc,css,md,mdx}": "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"esbuild",
-			"mongodb-memory-server"
-		]
 	}
 }
