@@ -5,8 +5,10 @@ import { getFieldsRegistry } from '../../../plugin/registry'
 import type { IconAdapter, IconAvailabilityResolver } from '../../../types'
 import { IconField } from '../client/IconFieldClient'
 import { resolveAvailableLibraries, unionAlwaysAvailable } from '../server/availability'
+import { resolveIconMeta } from '../server/resolveIconMeta'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
-import { resolveStaticLabel } from './resolveStaticLabel'
+import { resolveStaticLabel } from '../shared/resolveStaticLabel'
+import { resolveIconValue } from '../shared/value'
 
 type IconFieldServerExtraProps = {
 	adapters?: IconAdapter[]
@@ -79,7 +81,22 @@ export const IconFieldServer = async (props: ServerProps): Promise<ReactNode> =>
 					silent: true,
 				})
 			: undefined
-		if (Icon && Assets) adapterComponents[adapter.slug] = { Assets, Icon, Nodes }
+		if (Icon && Assets)
+			adapterComponents[adapter.slug] = { Assets, canvas: adapter.canvas, Icon, Nodes }
+	}
+
+	// The trigger renders from a stored value alone, so a library-supplied label has to
+	// arrive with it. A miss is not an error here: an unknown or removed icon still
+	// renders, falling back to the name-derived label exactly as before.
+	const storedValue =
+		typeof siblingData?.[String(clientField.name)] === 'string'
+			? (siblingData[String(clientField.name)] as string)
+			: null
+	let selectedMeta = null
+	if (storedValue !== null && storedValue !== '') {
+		const { library, name } = resolveIconValue(storedValue, defaultLibrary)
+		const adapter = adapters.find((candidate) => candidate.slug === library)
+		if (adapter) selectedMeta = await resolveIconMeta(adapter, name, { payload, req })
 	}
 
 	return (
@@ -96,6 +113,7 @@ export const IconFieldServer = async (props: ServerProps): Promise<ReactNode> =>
 			permissions={permissions}
 			readOnly={readOnly}
 			schemaPath={schemaPath}
+			selectedMeta={selectedMeta}
 			showTextInput={props.showTextInput === true}
 		/>
 	)

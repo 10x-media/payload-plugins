@@ -40,7 +40,13 @@ export const acmeIcons = defineIconAdapter({
 ```
 
 - `slug` becomes the value prefix (`acme:rocket`) and must stay stable forever; it is stored data.
-- `loadManifest` is called on first drawer open, never eagerly, and resolves the generated `manifest`. Its shape is `{ icons: [{ name, tags, categories }], categories: string[] }`.
+- `loadManifest` is called on first drawer open, never eagerly, and resolves the generated `manifest`. Its shape is `{ icons: [{ name, tags, categories, label? }], categories: string[] }`.
+- `label` on an icon is optional and replaces the label otherwise derived from its name. Supply it wherever a name is a code rather than words: `HUN` reads as `Hun` without one, and a screen reader announces exactly that. It accepts a per-locale record as well as a string. Every manifest without one is unaffected.
+- `resolveMeta(name, ctx)` is optional and answers one name exactly, serving both validation and label resolution. Supply it for a library whose contents change at runtime; it stays correct where a cached manifest snapshot cannot. See [layers](/fields/icon/layers).
 - `Icon` and `Assets` are import-map component paths (the same string-path convention as every admin component). `Icon` renders one icon by name, lazily; `Assets` loads the manifest for the drawer. An optional `Nodes` path supplies bulk glyph data for fast inline-SVG drawer rendering; omit it for libraries the drawer renders through the per-icon `Icon` component (Radix does). The first-party adapters are the reference implementation for these components.
+
+### Labels an editor sees
+
+Where a library supplies `label`, the drawer deliberately shows two different things. The **accessible name** carries the label alone, so a screen reader browsing a country library announces "Hungary" rather than "Hungary HUN" across every cell. The **tooltip** shows the label with the raw name beside it, because that tooltip is the only place an editor can discover that "Hungary" stores as `flag:HUN`, which they need in order to write frontend code against the value.
 
 Hand-writing a manifest for a large library is busywork; [codegen](/fields/icon/codegen) generates the manifest, and the per-icon import map those components load, from an icon set you describe.

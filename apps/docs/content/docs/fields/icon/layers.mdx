@@ -1,0 +1,114 @@
+---
+title: Layers
+description: Compose one icon library from several sources, including a Payload upload collection editors can add to.
+---
+
+Most libraries are one source: a package, a generated manifest, done. Some are not. A country-flag library might be an npm package **plus** overrides an editor uploads, under a single slug, where the uploads win.
+
+Layers express that. An adapter declares an ordered list of sources; later layers win by name and may add names the base does not have.
+
+```ts
+import { defineIconAdapter, uploadIconLayer } from '@10x-media/fields/icon'
+
+export const flagIcons = defineIconAdapter({
+  slug: 'flag',
+  label: 'Flags',
+  loadManifest: () => import('./generated/manifest').then((m) => m.manifest),
+  Icon: '@acme/icons/client#FlagIcon',
+  Assets: '@acme/icons/client#FlagAssets',
+  layers: [
+    {
+      id: 'package',
+      loadManifest: () => import('./generated/manifest').then((m) => m.manifest),
+      render: { type: 'nodes', load: '@acme/icons/client#loadFlagNodes' },
+    },
+    uploadIconLayer({
+      collection: 'icon-overrides',
+      resolveUrl: '@acme/icons/client#resolveOverrideUrl',
+    }),
+  ],
+})
+```
+
+Layers are entirely optional. An adapter without them behaves exactly as it always has.
+
+## Listing and lookup are different jobs
+
+This is the part worth understanding, because it is what makes a runtime-backed library correct rather than merely possible.
+
+- **`loadManifest`** lists a layer for the drawer. Staleness here is cosmetic, so it is cached to a declared policy.
+- **`resolveMeta`** answers one name exactly, and is **never cached**. Validation and label resolution both go through it.
+
+So an icon uploaded a moment ago validates immediately, on every instance, even while the drawer listing is still a few seconds stale. Fusing the two is what made a database-backed library reject its own new icons until the process restarted.
+
+### Cache policy
+
+```ts
+cache: 'forever'      // default; correct for a static build artifact
+cache: { ttl: 30_000 }  // a listing that changes at runtime
+```
+
+<Callout type="warn">
+A layer whose listing differs per tenant, locale, or user **must** supply `cacheKey`. The cache is otherwise keyed by adapter slug and layer id alone, and those are identical across tenants by construction, so one caller's library would be served to another.
+</Callout>
+
+```ts
+uploadIconLayer({
+  collection: 'icon-overrides',
+  resolveUrl: '@acme/icons/client#resolveOverrideUrl',
+  where: ({ req }) => ({ tenant: { equals: req.user?.tenant } }),
+  cacheKey: ({ req }) => String(req?.user?.tenant ?? ''),
+})
+```
+
+### Batched lookups
+
+Supply `resolveMetaMany` and the plugin coalesces every lookup issued in one tick into a single call. A document holding eight icon fields, or a fifty-row list view, then costs one query rather than eight or fifty. `uploadIconLayer` implements it as one `in` clause.
+
+## How glyphs paint
+
+Each layer declares its own render strategy, which is why layers are a core concept rather than a helper: the drawer paints layers with different strategies in the same grid.
+
+| Strategy | Use it for | Cost |
+|---|---|---|
+| `nodes` | Bulk node-data, the fastest path | One fetch per library, inline SVG per cell |
+| `svg` | Bulk raw SVG; sprited once client-side | One fetch and one parse per library |
+| `url` | Remote images, typically uploads | Browser-managed, lazy, no `currentColor` |
+| `component` | A library shipping its own lazy glyph components | One dynamic import per icon |
+
+`nodes` takes an optional `canvas` (`viewBox`, `fill`, `stroke`, `strokeWidth`, …). Omit it and glyphs draw on Lucide's outline convention, which is what every bundled library used before this existed. A filled set must declare its own or it renders stroked.
+
+## Server layers and the manifest endpoint
+
+A layer whose data lives on the server receives `{ payload, req }`, so it can use the local API, transactions, and tenant scoping. The drawer reaches it through an endpoint the plugin registers itself at `/10x-fields/icon-manifest/:slug`, mounted only when a server layer exists.
+
+It requires an authenticated user, filters through the same availability rules as the field (including `alwaysAvailable`), and is never browser-cacheable. You write your source logic once, server-side; there is no endpoint to hand-roll and no auth story to invent.
+
+## Uploaded icons and trust
+
+`uploadIconLayer` defaults to `render: 'url'`, which paints each icon through an `<img>`. An SVG loaded that way is inert: it cannot execute script.
+
+Choosing `render: 'svg'` inlines the uploaded markup into the admin instead, which buys `currentColor` recolouring. The markup is sanitised either way, but on a multi-tenant install the uploader may be a per-tenant editor (a customer, not an operator), and inline markup in a shared admin is a wider blast radius than an `<img>`. Choose it deliberately.
+
+## Frontend
+
+Renderer adapters take layers too, walked in the same precedence order:
+
+```tsx
+import { createIcon } from '@10x-media/fields/icon/react'
+
+export const Icon = createIcon({
+  adapters: [
+    {
+      slug: 'flag',
+      loadIcon: async () => null,
+      layers: [
+        { loadIcon: async (name) => loadPackageFlag(name) },
+        { loadIcon: async (name) => loadOverrideFlag(name) },
+      ],
+    },
+  ],
+})
+```
+
+The renderer adapter stays separate from the admin adapter deliberately: merging them would pull manifest and drawer code into your frontend bundle.

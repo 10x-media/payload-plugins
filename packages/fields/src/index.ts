@@ -97,9 +97,14 @@ export type {
 	FieldsPluginRegistry,
 	FieldsResolverArgs,
 	IconAdapter,
+	IconCanvas,
 	IconGlobalConfig,
+	IconLayer,
+	IconLayerCache,
+	IconLayerContext,
 	IconManifest,
 	IconMeta,
+	IconRenderStrategy,
 	KeysConfig,
 } from './types'
 export type { FieldsPluginOptions as PluginOptions }

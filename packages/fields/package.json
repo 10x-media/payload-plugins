@@ -156,7 +156,8 @@
 		}
 	},
 	"dependencies": {
-		"@tanstack/react-virtual": "catalog:"
+		"@tanstack/react-virtual": "catalog:",
+		"dompurify": "catalog:"
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
@@ -173,6 +174,7 @@
 		"@tabler/icons": "catalog:",
 		"@tabler/icons-react": "catalog:",
 		"@testing-library/react": "catalog:",
+		"@types/jsdom": "catalog:",
 		"@types/json-schema": "^7.0.15",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
