@@ -1,0 +1,35 @@
+---
+title: i18n
+description: Override or localize the Folder Picker admin strings.
+---
+
+The plugin's own strings live under the `folderPicker:` namespace as typed translations. Override or extend through the `translations` option:
+
+```ts title="payload.config.ts"
+import { folderPicker } from '@10x-media/folder-picker'
+import { keys } from '@10x-media/folder-picker/i18n'
+
+folderPicker({
+  translations: {
+    de: { [keys.pluginName]: 'Ordnerauswahl' },
+  },
+})
+```
+
+`@10x-media/folder-picker/i18n` exports `keys` (currently `keys.pluginName`), the built-in English `translations`, and the `TranslationKey` / `TranslationsOption` types. Misspell a key and the build fails.
+
+## Everything else is Payload's
+
+The namespace is deliberately small. The drawer speaks in Payload's own strings, `general:select`, `general:move`, `general:delete`, `folder:byFolder` and the rest, so the picker follows the admin locale without the plugin restating any of it.
+
+Retitling those goes through Payload's `i18n.translations`, not this option:
+
+```ts title="payload.config.ts"
+export default buildConfig({
+  i18n: {
+    translations: {
+      de: { general: { select: 'Übernehmen' } },
+    },
+  },
+})
+```

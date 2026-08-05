@@ -10,7 +10,9 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 - **One view swap, every caller**: upload fields, `hasMany` uploads, relationship fields with `appearance: 'drawer'`, and the lexical upload node, without patching a single field.
 - **Folder browsing in the drawer**: subfolder navigation, breadcrumbs, search, grid or list display, and sorting, none of which tears the drawer down.
-- **Folder management inline**: create, move, rename and delete folders, and create documents, without leaving the document you are editing.
+- **Folder management inline**: create, move, rename and delete folders, drag files and folders between them, and create documents, without leaving the document you are editing.
+- **Picking is explicit**: one click selects, **Select** confirms, for single and `hasMany` fields alike.
+- **Polymorphic fields switch collection in place**, through the same collection select the list tab carries.
 - **Bulk upload into the current folder** for `hasMany` fields.
 - **The list route stays Payload's**: outside a drawer the collection renders exactly as before.
 - **Respects host customization**: collections that already declare a list view are never overwritten, and collections without `folders: true` keep the stock drawer.

@@ -43,9 +43,33 @@ if (!isInDrawer) return <DefaultListView {...props} />
 
 `DefaultListViewTabs` is also absent from the client bundle of `@payloadcms/ui`, and it changes view by pushing an admin route, which a drawer cannot survive. So the plugin rebuilds the tabs row itself and puts a folder tab beside it.
 
+## Changing collection re-renders the view in place
+
+For a polymorphic field the drawer's collection select calls `setSelectedOption`, which is `DrawerContent`'s own:
+
+```js
+setSelectedOption(incomingSelection)
+void refresh({ slug: incomingSelection?.value })
+```
+
+`refresh` asks the server to render the list for the new collection and swaps the result in. React sees the same component type at the same position, so the folder view is **updated, not remounted**: every piece of its state survives a switch that was supposed to change everything.
+
+The view therefore tracks the collection its data was loaded for and reloads when the prop no longer matches, rather than loading once on mount. Keying the component to the collection instead would work too, but it blanks the header the user just clicked in while the second round trip runs.
+
+## A drawer has no live preview area, which used to crash the drag
+
+A document view wraps its children in `LivePreviewProvider`. That provider mounts a `DndContext` whose collision detection looks its own droppable up and passes the result on unchecked:
+
+```js
+const area = droppableContainers.find(({ id }) => id === 'live-preview-area')
+return rectIntersection({ ...args, droppableContainers: [area] })
+```
+
+Inside a drawer there is no such area, `find` returns undefined, and the first pointer movement throws before any drop. The folder cards are therefore registered in the plugin's own `DndContext` with `pointerWithin`, the collision detection the admin root uses, which keeps them out of that provider entirely.
+
 ## Where it is fragile
 
-The drawer's header pieces (`ListHeader`, `SearchBar`, `SortByPill`, `NoListResults` and friends) are internal to `@payloadcms/ui`. The plugin reproduces their markup and class names and relies on `@payloadcms/next/css` shipping the matching styles.
+The drawer's header pieces (`ListHeader`, `SearchBar`, `SortByPill`, `NoListResults`, `DrawerRelationshipSelect` and friends) are internal to `@payloadcms/ui`. The plugin reproduces their markup and class names and relies on `@payloadcms/next/css` shipping the matching styles.
 
 Drift there shows up as **visual breakage, not a runtime error**: nothing throws, the drawer just looks wrong, so no test catches it and no log mentions it.
 

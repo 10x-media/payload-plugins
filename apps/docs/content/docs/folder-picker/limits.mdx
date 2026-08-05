@@ -21,7 +21,7 @@ Assign a folder first if a document must be pickable by folder.
 
 A folder carries `folderType`, the list of collections whose documents it may hold. A folder created while picking for `media` does not appear when picking for `files`.
 
-For a polymorphic upload field (`relationTo: ['media', 'files']`) this means each tab shows its own folder tree.
+For a polymorphic upload field (`relationTo: ['media', 'files']`) this means one folder tree per collection, never a merged one. The drawer's collection select sits above the folder view exactly as it does above the list, so switching between those trees takes one click.
 
 ## Collections with a custom list view are skipped
 
