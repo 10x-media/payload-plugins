@@ -599,6 +599,9 @@ importers:
       '@10x-media/vitest-config':
         specifier: workspace:*
         version: link:../../config/vitest
+      '@dnd-kit/core':
+        specifier: 6.3.1
+        version: 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@payloadcms/db-mongodb':
         specifier: 'catalog:'
         version: 3.85.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
