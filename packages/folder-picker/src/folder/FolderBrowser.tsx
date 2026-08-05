@@ -1,5 +1,6 @@
 'use client'
 
+import { DndContext, type DragEndEvent, pointerWithin } from '@dnd-kit/core'
 import { getTranslation } from '@payloadcms/translations'
 import {
 	Button,
@@ -12,6 +13,7 @@ import {
 	useAuth,
 	useConfig,
 	useDocumentDrawer,
+	useFolder,
 	useListDrawerContext,
 	useServerFunctions,
 	useTranslation,
@@ -25,6 +27,8 @@ import type { FolderActionHandlers } from './FolderActions'
 import { FolderActionsMenu, FolderSelectionBar } from './FolderActions'
 import {
 	CloseModalButton,
+	DndEventListener,
+	DragOverlaySelection,
 	ListHeader,
 	NoListResults,
 	SearchBar,
@@ -33,6 +37,42 @@ import {
 } from './native'
 
 const baseClass = 'collection-folder-list'
+
+/**
+ * Dragging, the way the route view wires it: a listener that turns a drop into a move, and the card
+ * that follows the cursor. Lives inside the provider because that is where the selection and
+ * `moveToFolder` are, and reloads rather than clearing the route cache, since a drawer changes no
+ * route.
+ */
+const FolderDragLayer: React.FC<{ readonly onMoved: () => Promise<void> }> = ({ onMoved }) => {
+	const { dragOverlayItem, getSelectedItems, moveToFolder, selectedItemKeys, setIsDragging } =
+		useFolder()
+
+	const handleDragEnd = React.useCallback(
+		async (event: DragEndEvent) => {
+			const target = event.over?.data.current
+			if (target?.type !== 'folder' || !('id' in target)) {
+				return
+			}
+
+			await moveToFolder({ itemsToMove: getSelectedItems?.() ?? [], toFolderID: target.id })
+			await onMoved()
+		},
+		[getSelectedItems, moveToFolder, onMoved]
+	)
+
+	return (
+		<React.Fragment>
+			<DndEventListener onDragEnd={handleDragEnd} setIsDragging={setIsDragging} />
+			{selectedItemKeys.size > 0 && dragOverlayItem ? (
+				<DragOverlaySelection
+					selectedCount={selectedItemKeys.size}
+					title={String(dragOverlayItem.value._folderOrDocumentTitle ?? '')}
+				/>
+			) : null}
+		</React.Fragment>
+	)
+}
 
 type FolderBrowserProps = {
 	readonly collectionSlug: CollectionSlug
@@ -259,171 +299,179 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 			</nav>
 		) : null
 
+	// A document view wraps its children in LivePreviewProvider, whose DndContext looks up a
+	// `live-preview-area` droppable and hands the result to rectIntersection unchecked. In a drawer
+	// that area does not exist, so the first pointer move throws. Registering the cards here keeps
+	// them out of that context, and matches the collision detection the admin root uses.
 	return (
-		<div className={`${baseClass} ${baseClass}--${collectionSlug}`}>
-			{Tabs || trail ? (
-				<Gutter className="default-list-view-tabs__drawer-gutter">
-					<div className={`${baseClass}__tabs-row`}>
-						{Tabs}
-						{trail}
-					</div>
-				</Gutter>
-			) : null}
+		<DndContext collisionDetection={pointerWithin}>
+			<div className={`${baseClass} ${baseClass}--${collectionSlug}`}>
+				{Tabs || trail ? (
+					<Gutter className="default-list-view-tabs__drawer-gutter">
+						<div className={`${baseClass}__tabs-row`}>
+							{Tabs}
+							{trail}
+						</div>
+					</Gutter>
+				) : null}
 
-			<FolderProvider
-				allCollectionFolderSlugs={[folderCollectionSlug]}
-				allowCreateCollectionSlugs={canCreateFolder ? [folderCollectionSlug] : []}
-				allowMultiSelection
-				breadcrumbs={breadcrumbs}
-				documents={visibleDocuments}
-				folderFieldName={folderFieldName}
-				folderID={folderID ?? undefined}
-				FolderResultsComponent={ResultsComponent}
-				key={`${String(folderID)}-${displayAs}`}
-				onItemClick={handleItemClick}
-				subfolders={visibleSubfolders}
-			>
-				<Gutter className={`${baseClass}__wrap`}>
-					<ListHeader
-						Actions={[
-							// Hidden on small screens, where the actions menu in the search bar is the
-							// usable form. Both are available above that break, as in the route view.
-							smallBreak ? null : (
-								<FolderSelectionBar
+				<FolderProvider
+					allCollectionFolderSlugs={[folderCollectionSlug]}
+					allowCreateCollectionSlugs={canCreateFolder ? [folderCollectionSlug] : []}
+					allowMultiSelection
+					breadcrumbs={breadcrumbs}
+					documents={visibleDocuments}
+					folderFieldName={folderFieldName}
+					folderID={folderID ?? undefined}
+					FolderResultsComponent={ResultsComponent}
+					key={`${String(folderID)}-${displayAs}`}
+					onItemClick={handleItemClick}
+					subfolders={visibleSubfolders}
+				>
+					<Gutter className={`${baseClass}__wrap`}>
+						<ListHeader
+							Actions={[
+								// Hidden on small screens, where the actions menu in the search bar is the
+								// usable form. Both are available above that break, as in the route view.
+								smallBreak ? null : (
+									<FolderSelectionBar
+										collectionSlug={collectionSlug}
+										currentFolderName={String(currentFolder?.name ?? '')}
+										handlersRef={actionHandlersRef}
+										folderCollectionSlug={folderCollectionSlug}
+										folderFieldName={folderFieldName}
+										key="selection-bar"
+										onChanged={(next: null | number | string) =>
+											loadFolder({ displayAs, folderID: next, sort })
+										}
+										parentFolderID={parentFolder?.id ?? undefined}
+									/>
+								),
+								drawerSlug ? (
+									<CloseModalButton
+										className="list-drawer__header-close"
+										key="close-button"
+										slug={drawerSlug}
+									/>
+								) : null,
+							].filter(Boolean)}
+							// Same class the drawer's own list header carries, so both views lay their header
+							// out identically and the close button lands in the same place.
+							className="list-drawer__header"
+							title={pluralLabel}
+							TitleActions={[
+								createAction,
+								<BulkUploadButton
+									collectionSlug={collectionSlug}
+									enableRowSelections={enableRowSelections}
+									folderID={folderID}
+									key="bulk-upload"
+								/>,
+							].filter(Boolean)}
+						/>
+
+						<SearchBar
+							Actions={[
+								<SelectManyFolderItems
+									collectionSlug={collectionSlug}
+									enableRowSelections={enableRowSelections}
+									key="select-many"
+								/>,
+								<SortByPill
+									key="sort-by-pill"
+									onChange={(next) => {
+										setSort(next)
+										void loadFolder({ displayAs, folderID, sort: next })
+									}}
+									sort={sort}
+									t={t as unknown as (key: string) => string}
+								/>,
+								<ToggleViewButtons
+									activeView={displayAs}
+									key="toggle-view-buttons"
+									setActiveView={(view) => {
+										setDisplayAs(view)
+										void loadFolder({ displayAs: view, folderID, sort })
+									}}
+								/>,
+								<FolderActionsMenu
 									collectionSlug={collectionSlug}
 									currentFolderName={String(currentFolder?.name ?? '')}
 									handlersRef={actionHandlersRef}
 									folderCollectionSlug={folderCollectionSlug}
 									folderFieldName={folderFieldName}
-									key="selection-bar"
+									key="current-folder-actions"
 									onChanged={(next: null | number | string) =>
 										loadFolder({ displayAs, folderID: next, sort })
 									}
 									parentFolderID={parentFolder?.id ?? undefined}
-								/>
-							),
-							drawerSlug ? (
-								<CloseModalButton
-									className="list-drawer__header-close"
-									key="close-button"
-									slug={drawerSlug}
-								/>
-							) : null,
-						].filter(Boolean)}
-						// Same class the drawer's own list header carries, so both views lay their header
-						// out identically and the close button lands in the same place.
-						className="list-drawer__header"
-						title={pluralLabel}
-						TitleActions={[
-							createAction,
-							<BulkUploadButton
-								collectionSlug={collectionSlug}
-								enableRowSelections={enableRowSelections}
-								folderID={folderID}
-								key="bulk-upload"
-							/>,
-						].filter(Boolean)}
-					/>
-
-					<SearchBar
-						Actions={[
-							<SelectManyFolderItems
-								collectionSlug={collectionSlug}
-								enableRowSelections={enableRowSelections}
-								key="select-many"
-							/>,
-							<SortByPill
-								key="sort-by-pill"
-								onChange={(next) => {
-									setSort(next)
-									void loadFolder({ displayAs, folderID, sort: next })
-								}}
-								sort={sort}
-								t={t as unknown as (key: string) => string}
-							/>,
-							<ToggleViewButtons
-								activeView={displayAs}
-								key="toggle-view-buttons"
-								setActiveView={(view) => {
-									setDisplayAs(view)
-									void loadFolder({ displayAs: view, folderID, sort })
-								}}
-							/>,
-							<FolderActionsMenu
-								collectionSlug={collectionSlug}
-								currentFolderName={String(currentFolder?.name ?? '')}
-								handlersRef={actionHandlersRef}
-								folderCollectionSlug={folderCollectionSlug}
-								folderFieldName={folderFieldName}
-								key="current-folder-actions"
-								onChanged={(next: null | number | string) =>
-									loadFolder({ displayAs, folderID: next, sort })
-								}
-								parentFolderID={parentFolder?.id ?? undefined}
-							/>,
-						].filter(Boolean)}
-						label={t('general:searchBy', { label: t('general:name') })}
-						onSearchChange={setSearch}
-					/>
-
-					{totalVisible > 0 ? (
-						ResultsComponent
-					) : (
-						<NoListResults
-							Actions={[
-								canCreateFolder ? (
-									<Button
-										buttonStyle="primary"
-										el="button"
-										key="create-folder"
-										onClick={openCreateFolderDrawer}
-										size="medium"
-									>
-										{`${t('general:create')} ${folderLabel.toLowerCase()}`}
-									</Button>
-								) : null,
-								canCreateDocument ? (
-									<Button
-										buttonStyle="primary"
-										el="button"
-										key="create-document"
-										onClick={openCreateDocumentDrawer}
-										size="medium"
-									>
-										{`${t('general:create')} ${t('general:document').toLowerCase()}`}
-									</Button>
-								) : null,
+								/>,
 							].filter(Boolean)}
-							Message={
-								<>
-									<h3>{t('general:noResultsFound')}</h3>
-									<p>{t('general:noResultsDescription')}</p>
-								</>
-							}
+							label={t('general:searchBy', { label: t('general:name') })}
+							onSearchChange={setSearch}
 						/>
-					)}
 
-					{/* Mirrors ListCreateNewDocInFolderButton: a new folder lands in the folder being
+						{totalVisible > 0 ? (
+							ResultsComponent
+						) : (
+							<NoListResults
+								Actions={[
+									canCreateFolder ? (
+										<Button
+											buttonStyle="primary"
+											el="button"
+											key="create-folder"
+											onClick={openCreateFolderDrawer}
+											size="medium"
+										>
+											{`${t('general:create')} ${folderLabel.toLowerCase()}`}
+										</Button>
+									) : null,
+									canCreateDocument ? (
+										<Button
+											buttonStyle="primary"
+											el="button"
+											key="create-document"
+											onClick={openCreateDocumentDrawer}
+											size="medium"
+										>
+											{`${t('general:create')} ${t('general:document').toLowerCase()}`}
+										</Button>
+									) : null,
+								].filter(Boolean)}
+								Message={
+									<>
+										<h3>{t('general:noResultsFound')}</h3>
+										<p>{t('general:noResultsDescription')}</p>
+									</>
+								}
+							/>
+						)}
+
+						{/* Mirrors ListCreateNewDocInFolderButton: a new folder lands in the folder being
 					viewed and is typed to the collection this drawer is picking for, so the editor
 					never has to set Folder Type by hand. */}
-					<CreateFolderDrawer
-						initialData={{ [folderFieldName]: folderID, folderType: [collectionSlug] }}
-						onSave={async () => {
-							closeCreateFolderDrawer()
-							await reload()
-						}}
-						redirectAfterCreate={false}
-					/>
-					<CreateDocumentDrawer
-						initialData={{ [folderFieldName]: folderID }}
-						onSave={async () => {
-							closeCreateDocumentDrawer()
-							await reload()
-						}}
-						redirectAfterCreate={false}
-					/>
-				</Gutter>
-			</FolderProvider>
-		</div>
+						<CreateFolderDrawer
+							initialData={{ [folderFieldName]: folderID, folderType: [collectionSlug] }}
+							onSave={async () => {
+								closeCreateFolderDrawer()
+								await reload()
+							}}
+							redirectAfterCreate={false}
+						/>
+						<CreateDocumentDrawer
+							initialData={{ [folderFieldName]: folderID }}
+							onSave={async () => {
+								closeCreateDocumentDrawer()
+								await reload()
+							}}
+							redirectAfterCreate={false}
+						/>
+
+						<FolderDragLayer onMoved={reload} />
+					</Gutter>
+				</FolderProvider>
+			</div>
+		</DndContext>
 	)
 }

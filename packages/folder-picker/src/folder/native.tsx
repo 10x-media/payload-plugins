@@ -1,8 +1,10 @@
 'use client'
 
+import { type DragEndEvent, DragOverlay, useDndMonitor } from '@dnd-kit/core'
 import {
 	Button,
 	ChevronIcon,
+	FolderIcon,
 	GridViewIcon,
 	ListViewIcon,
 	Pill,
@@ -331,3 +333,65 @@ export const ListSelectionButton: React.FC<{
 		{children}
 	</Button>
 )
+
+const dragOverlayClass = 'drag-overlay-selection'
+
+/**
+ * The card that follows the cursor while dragging. `DragOverlaySelection` and the `FolderFileCard`
+ * it renders are both internal, so this reproduces the folder variant of that card: an icon and a
+ * title, which is all the original draws once its drop area and popup are left out.
+ */
+export const DragOverlaySelection: React.FC<{
+	readonly selectedCount: number
+	readonly title: string
+}> = ({ selectedCount, title }) => (
+	<DragOverlay dropAnimation={null} style={{ height: 'unset', maxWidth: '220px' }}>
+		<div className={`${dragOverlayClass}__cards`}>
+			{Array.from({ length: selectedCount > 1 ? 2 : 1 }).map((_, index) => (
+				<div
+					className={`${dragOverlayClass}__card`}
+					// biome-ignore lint/suspicious/noArrayIndexKey: mirrors Payload's own overlay
+					key={index}
+					style={{ right: `${index * 3}px`, top: `-${index * 3}px` }}
+				>
+					<div className="folder-file-card folder-file-card--folder folder-file-card--selected">
+						<div className="folder-file-card__titlebar-area">
+							<div className="folder-file-card__icon-wrap">
+								<FolderIcon className="colored-folder-icon" />
+							</div>
+							<div className="folder-file-card__titlebar-labels">
+								<p className="folder-file-card__name" title={title}>
+									<span>{title}</span>
+								</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			))}
+			{selectedCount > 1 ? (
+				<span className={`${dragOverlayClass}__card-count`}>{selectedCount}</span>
+			) : null}
+		</div>
+	</DragOverlay>
+)
+
+/**
+ * Copy of the listener `DefaultCollectionFolderView` declares inline, which is why it is not
+ * importable. Without it a drop never reaches `moveToFolder` and the provider's drag flag is
+ * never cleared.
+ */
+export const DndEventListener: React.FC<{
+	readonly onDragEnd: (event: DragEndEvent) => void
+	readonly setIsDragging: (isDragging: boolean) => void
+}> = ({ onDragEnd, setIsDragging }) => {
+	useDndMonitor({
+		onDragCancel: () => setIsDragging(false),
+		onDragEnd: (event) => {
+			setIsDragging(false)
+			onDragEnd(event)
+		},
+		onDragStart: () => setIsDragging(true),
+	})
+
+	return null
+}
