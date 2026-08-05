@@ -88,37 +88,46 @@ export const BulkUploadButton: React.FC<BulkUploadButtonProps> = ({
 }
 
 /**
- * Payload's own SelectMany, which the All Media tab shows in its search bar, reads the table's
- * selection provider. The folder view keeps its selection in FolderProvider, so this is the same
- * pill driven from there. Folders are skipped: an upload field can only take documents.
+ * Hands the selection to the field, in the search bar row and as the same `Pill` Payload puts its
+ * own `SelectMany` in, so both tabs of the drawer confirm in the same place. Dark rather than white
+ * because the folder view has no row checkboxes to hint that selecting is a thing, which is what
+ * made picking a file look like it needed a double click.
+ *
+ * Payload's own version covers `hasMany` alone. A single-value field has no bulk path, so it gets
+ * the first selected document through the same `onSelect` a double click uses. Folders are skipped
+ * either way: an upload field can only hold documents.
  */
-export const SelectManyFolderItems: React.FC<{
+export const SelectFolderItems: React.FC<{
 	readonly collectionSlug: CollectionSlug
 	readonly enableRowSelections?: boolean
 }> = ({ collectionSlug, enableRowSelections }) => {
 	const { getSelectedItems } = useFolder()
-	const { onBulkSelect } = useListDrawerContext()
+	const { onBulkSelect, onSelect } = useListDrawerContext()
 	const { t } = useTranslation()
 
 	const documents = (getSelectedItems?.() ?? []).filter(
 		(item) => item.relationTo === collectionSlug
 	)
+	const [first] = documents
 
-	if (!enableRowSelections || !onBulkSelect || documents.length === 0) {
+	if (!first) {
 		return null
 	}
 
+	const confirm = () => {
+		if (enableRowSelections && onBulkSelect) {
+			void onBulkSelect(
+				new Map<number | string, boolean>(documents.map((item) => [item.value.id, true]))
+			)
+			return
+		}
+
+		onSelect?.({ collectionSlug, doc: first.value, docID: String(first.value.id) })
+	}
+
 	return (
-		<Pill
-			onClick={() => {
-				void onBulkSelect(
-					new Map<number | string, boolean>(documents.map((item) => [item.value.id, true]))
-				)
-			}}
-			pillStyle="white"
-			size="small"
-		>
-			{t('general:select')} {documents.length}
+		<Pill onClick={confirm} pillStyle="dark" size="small">
+			{documents.length > 1 ? `${t('general:select')} ${documents.length}` : t('general:select')}
 		</Pill>
 	)
 }

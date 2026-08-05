@@ -3,12 +3,16 @@ import { expect, type Locator, type Page, test } from '@playwright/test'
 const FIXTURES = {
 	collection: 'posts',
 	docTitle: 'Picker showcase',
+	// The second folder-enabled collection, so these prove a switch actually changed what is listed.
+	filesFile: 'spec-sheet',
+	filesFolder: 'Documents',
 	// Payload appends a counter on filename collisions, and the dev seed can run more than once
 	// per boot, so match on the stable prefix rather than the exact stored filename.
 	nestedFile: 'hero-desktop',
 	nestedFolder: 'Hero images',
 	parentFolder: 'Marketing',
 	rootFile: 'brand-logo',
+	rootFileSecond: 'brand-mark',
 	rootFolder: 'Brand',
 	teamFile: 'team-anna',
 	teamFolder: 'Team',
@@ -28,6 +32,9 @@ const SELECTORS = {
 	// A relationship with `appearance: 'drawer'` opens the drawer from the select's onMenuOpen,
 	// so its control is the trigger; there is no separate button to click.
 	relationshipControl: '.rs__control',
+	selectCollection: '.list-drawer__select-collection-wrap',
+	// The dark pill in the search bar row, which is what makes confirming the obvious action.
+	confirm: '.search-bar .pill--style-dark',
 	tab: '.default-list-view-tabs__button',
 	table: '.table',
 }
@@ -84,6 +91,72 @@ const fieldValue = async (page: Page, id: string, field: string): Promise<unknow
 	const doc = (await res.json()) as Record<string, unknown>
 	return doc[field]
 }
+
+/**
+ * Every test drives the same showcase document, so one that asserts on an exact value empties the
+ * field first rather than depending on what ran before it. A filled single upload also hides the
+ * toggler this file opens the drawer with.
+ */
+const clearField = async (page: Page, id: string, field: string): Promise<void> => {
+	const res = await page.request.patch(`/api/${FIXTURES.collection}/${id}`, {
+		data: { [field]: null },
+	})
+	expect(res.ok()).toBeTruthy()
+	await page.reload()
+	await expect(page.locator(`#field-${field}`)).toBeVisible()
+}
+
+type FolderDoc = { folder?: { name?: string } | null; id: string }
+
+const folderByName = async (page: Page, name: string): Promise<FolderDoc> => {
+	const res = await page.request.get(
+		`/api/payload-folders?where[name][equals]=${encodeURIComponent(name)}&depth=1&limit=1`
+	)
+	const { docs } = (await res.json()) as { docs: FolderDoc[] }
+	const doc = docs[0]
+	if (!doc) throw new Error(`no folder named ${name}`)
+	return doc
+}
+
+/** Puts a folder back at the root, so a drag test can run twice and still start from the seed. */
+const detachFolder = async (page: Page, name: string): Promise<void> => {
+	const folder = await folderByName(page, name)
+	const res = await page.request.patch(`/api/payload-folders/${folder.id}`, {
+		data: { folder: null },
+	})
+	expect(res.ok()).toBeTruthy()
+}
+
+/**
+ * dnd-kit activates on pointer movement, so a single jump (what `dragTo` does) never starts a drag.
+ * The intermediate moves are the point rather than the distance: the crash this guards against was
+ * thrown on the first one, before any drop could happen.
+ */
+const dragOnto = async (page: Page, from: Locator, to: Locator): Promise<void> => {
+	const start = await from.boundingBox()
+	const end = await to.boundingBox()
+	if (!start || !end) throw new Error('both cards have to be on screen to drag between them')
+
+	const fromX = start.x + start.width / 2
+	const fromY = start.y + start.height / 2
+	const toX = end.x + end.width / 2
+	const toY = end.y + end.height / 2
+
+	await page.mouse.move(fromX, fromY)
+	await page.mouse.down()
+	for (let step = 1; step <= 10; step += 1) {
+		await page.mouse.move(fromX + ((toX - fromX) * step) / 10, fromY + ((toY - fromY) * step) / 10)
+		await page.waitForTimeout(30)
+	}
+	await page.mouse.up()
+}
+
+const pickCollection = async (page: Page, drawer: Locator, label: string): Promise<void> => {
+	await drawer.locator(`${SELECTORS.selectCollection} ${SELECTORS.relationshipControl}`).click()
+	await page.locator('.rs__option').filter({ hasText: label }).first().click()
+}
+
+const activeTab = (drawer: Locator): Locator => drawer.locator(`${SELECTORS.tab}--active`)
 
 const save = async (page: Page): Promise<void> => {
 	const saved = page.waitForResponse(
@@ -152,6 +225,162 @@ test.describe('folder picker', () => {
 		await save(page)
 		const value = await fieldValue(page, id, 'uploadMany')
 		expect(Array.isArray(value) ? value.length : 0).toBeGreaterThan(1)
+	})
+
+	test('picks a file with one click and the selection bar, without a double click', async ({
+		page,
+	}) => {
+		const id = await openShowcase(page)
+		await clearField(page, id, 'uploadSingle')
+		const drawer = await openUploadDrawer(page, 'uploadSingle')
+
+		await byFolderTab(drawer).click()
+		await openFolder(page, drawer, FIXTURES.rootFolder)
+
+		// Nothing is offered until something is selected, and one click is enough to offer it.
+		await expect(drawer.locator(SELECTORS.confirm)).toHaveCount(0)
+		await drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.rootFile }).first().click()
+		await expect(drawer.locator(SELECTORS.confirm)).toBeVisible()
+
+		await drawer.locator(SELECTORS.confirm).click()
+		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
+
+		await save(page)
+		expect(await fieldValue(page, id, 'uploadSingle')).toBeTruthy()
+	})
+
+	test('confirms several files at once for a hasMany field', async ({ page }) => {
+		const id = await openShowcase(page)
+		await clearField(page, id, 'uploadMany')
+		const drawer = await openUploadDrawer(page, 'uploadMany')
+
+		await byFolderTab(drawer).click()
+		await openFolder(page, drawer, FIXTURES.rootFolder)
+
+		await drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.rootFile }).first().click()
+		// A plain click replaces the selection, so a second file is added the way a file manager does.
+		await drawer
+			.locator(SELECTORS.card)
+			.filter({ hasText: FIXTURES.rootFileSecond })
+			.first()
+			.click({ modifiers: ['ControlOrMeta'] })
+
+		await expect(drawer.locator(SELECTORS.confirm)).toHaveText(/2/)
+		await drawer.locator(SELECTORS.confirm).click()
+		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
+
+		await save(page)
+		const value = await fieldValue(page, id, 'uploadMany')
+		expect(Array.isArray(value) ? value.length : 0).toBe(2)
+	})
+
+	test('switches collections from the folder tab of a polymorphic field', async ({ page }) => {
+		await openShowcase(page)
+		const drawer = await openUploadDrawer(page, 'uploadPolymorphic')
+
+		// The drawer's own list tab carries the select, so the folder tab has to as well.
+		await expect(drawer.locator(SELECTORS.selectCollection)).toBeVisible()
+		await byFolderTab(drawer).click()
+		await expect(drawer.locator(SELECTORS.folderBrowser)).toBeVisible()
+		await expect(drawer.locator(SELECTORS.selectCollection)).toBeVisible()
+
+		await pickCollection(page, drawer, 'File')
+
+		// Switching re-renders the view in place rather than remounting it, so the folders shown have
+		// to belong to the collection that was picked.
+		await expect(drawer.locator('.list-header__title')).toHaveText('Files')
+		await expect(
+			drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.filesFolder })
+		).toBeVisible()
+		await expect(
+			drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.parentFolder })
+		).toHaveCount(0)
+	})
+
+	test('stays on the folder tab and returns to the root when the collection changes', async ({
+		page,
+	}) => {
+		await openShowcase(page)
+		const drawer = await openUploadDrawer(page, 'uploadPolymorphic')
+
+		await byFolderTab(drawer).click()
+		await openFolder(page, drawer, FIXTURES.parentFolder)
+		await pickCollection(page, drawer, 'File')
+
+		// The view is re-rendered for the new collection, which must not drop the caller back on the
+		// list tab, and must not leave a trail into a folder the new collection has no part in.
+		await expect(activeTab(drawer)).toHaveText(/folder/i)
+		await expect(drawer.locator(SELECTORS.folderBrowser)).toBeVisible()
+		await expect(drawer.locator(SELECTORS.table)).toHaveCount(0)
+		await expect(
+			drawer.locator(SELECTORS.crumb).filter({ hasText: FIXTURES.parentFolder })
+		).toHaveCount(0)
+		await expect(
+			drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.filesFolder })
+		).toBeVisible()
+
+		// And back, since the second switch runs against state the first one left behind.
+		await pickCollection(page, drawer, 'Media')
+		await expect(activeTab(drawer)).toHaveText(/folder/i)
+		await expect(
+			drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.parentFolder })
+		).toBeVisible()
+		await expect(
+			drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.filesFolder })
+		).toHaveCount(0)
+	})
+
+	test('carries the switched collection into the folder tab and into the saved value', async ({
+		page,
+	}) => {
+		const id = await openShowcase(page)
+		await clearField(page, id, 'uploadPolymorphic')
+		const drawer = await openUploadDrawer(page, 'uploadPolymorphic')
+
+		// Switching from the list tab first: the folder tab has to open on the collection that was
+		// chosen there rather than on the field's first one.
+		await pickCollection(page, drawer, 'File')
+		await expect(drawer.locator(SELECTORS.table)).toBeVisible()
+		await byFolderTab(drawer).click()
+		await openFolder(page, drawer, FIXTURES.filesFolder)
+
+		await drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.filesFile }).first().click()
+		await drawer.locator(SELECTORS.confirm).click()
+		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
+
+		await save(page)
+		// A polymorphic field stores what it was told to store, so the wrong slug here would be a
+		// silent mismatch rather than a visible one.
+		expect(await fieldValue(page, id, 'uploadPolymorphic')).toMatchObject({ relationTo: 'files' })
+	})
+
+	test('drags a folder into another one without crashing the drawer', async ({ page }) => {
+		const errors: string[] = []
+		page.on('pageerror', (error) => errors.push(error.message))
+
+		// The seed puts both folders at the root; a previous run of this test may not have.
+		await detachFolder(page, FIXTURES.rootFolder)
+
+		const id = await openShowcase(page)
+		await clearField(page, id, 'uploadSingle')
+		const drawer = await openUploadDrawer(page, 'uploadSingle')
+		await byFolderTab(drawer).click()
+		await expect(drawer.locator(SELECTORS.folderBrowser)).toBeVisible()
+
+		await dragOnto(
+			page,
+			drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.rootFolder }).first(),
+			drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.parentFolder }).first()
+		)
+
+		// The crash was thrown on the first pointer move, so this fails even if the drop is ignored.
+		expect(errors).toEqual([])
+		await expect(
+			drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.rootFolder })
+		).toHaveCount(0)
+		expect((await folderByName(page, FIXTURES.rootFolder)).folder?.name).toBe(FIXTURES.parentFolder)
+
+		await detachFolder(page, FIXTURES.rootFolder)
 	})
 
 	test('opens the same picker from a lexical upload node', async ({ page }) => {

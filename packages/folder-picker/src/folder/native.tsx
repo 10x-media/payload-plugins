@@ -1,17 +1,22 @@
 'use client'
 
 import { type DragEndEvent, DragOverlay, useDndMonitor } from '@dnd-kit/core'
+import { getTranslation } from '@payloadcms/translations'
 import {
 	Button,
 	ChevronIcon,
+	FieldLabel,
 	FolderIcon,
 	GridViewIcon,
 	ListViewIcon,
 	Pill,
 	Popup,
 	PopupList,
+	ReactSelect,
 	SearchIcon,
+	useConfig,
 	useDebounce,
+	useListDrawerContext,
 	useModal,
 	useTranslation,
 	XIcon,
@@ -31,10 +36,11 @@ export const listHeaderClass = 'list-header'
 
 export const ListHeader: React.FC<{
 	readonly Actions?: React.ReactNode[]
+	readonly AfterListHeaderContent?: React.ReactNode
 	readonly className?: string
 	readonly title: string
 	readonly TitleActions?: React.ReactNode[]
-}> = ({ Actions = [], className, title, TitleActions = [] }) => (
+}> = ({ Actions = [], AfterListHeaderContent, className, title, TitleActions = [] }) => (
 	<header className={[listHeaderClass, className].filter(Boolean).join(' ')}>
 		<div className={`${listHeaderClass}__content`}>
 			<div className={`${listHeaderClass}__title-and-actions`}>
@@ -45,8 +51,60 @@ export const ListHeader: React.FC<{
 			</div>
 			{Actions.length ? <div className={`${listHeaderClass}__actions`}>{Actions}</div> : null}
 		</div>
+		{AfterListHeaderContent ? (
+			<div className={`${listHeaderClass}__after-header-content`}>{AfterListHeaderContent}</div>
+		) : null}
 	</header>
 )
+
+/**
+ * Copy of the internal `DrawerRelationshipSelect`, which the drawer's list header renders for a
+ * polymorphic upload field and hides when only one collection is allowed. Picking an option calls
+ * the drawer's own `setSelectedOption`, which re-renders the list server side for that collection,
+ * so switching needs nothing from the folder view itself.
+ */
+export const DrawerRelationshipSelect: React.FC = () => {
+	const { config } = useConfig()
+	const { enabledCollections, selectedOption, setSelectedOption } = useListDrawerContext()
+	const { i18n, t } = useTranslation()
+
+	const enabled = config.collections.filter(({ slug }) => enabledCollections?.includes(slug))
+
+	if (enabled.length < 2) {
+		return null
+	}
+
+	const active = enabled.find(({ slug }) => slug === selectedOption?.value)
+
+	return (
+		<div className="list-drawer__select-collection-wrap">
+			<FieldLabel label={t('upload:selectCollectionToBrowse')} />
+			<ReactSelect
+				className={`${listHeaderClass}__select-collection`}
+				isClearable={false}
+				onChange={(option) => {
+					const picked = Array.isArray(option) ? option[0] : option
+					const target = enabled.find(({ slug }) => slug === picked?.value)
+
+					if (target) {
+						setSelectedOption?.({
+							label: getTranslation(target.labels.singular, i18n),
+							value: target.slug,
+						})
+					}
+				}}
+				options={enabled.map((collection) => ({
+					label: getTranslation(collection.labels.singular, i18n),
+					value: collection.slug,
+				}))}
+				value={{
+					label: active ? getTranslation(active.labels.singular, i18n) : '',
+					value: active?.slug,
+				}}
+			/>
+		</div>
+	)
+}
 
 /** Copy of the internal CloseModalButton the drawer's list header renders. */
 export const CloseModalButton: React.FC<{ readonly className?: string; readonly slug: string }> = ({

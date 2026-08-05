@@ -10,6 +10,8 @@ type Args = {
 	collectionSlug: CollectionSlug
 	currentFolderName: string
 	folderCollectionSlug: CollectionSlug
+	/** `config.folders.fieldName`, which a host is free to rename away from the default `folder`. */
+	folderFieldName: string
 	onChanged: (nextFolderID: null | number | string) => Promise<void> | void
 	parentFolderID?: number | string
 }
@@ -26,6 +28,7 @@ export const useFolderTargets = ({
 	collectionSlug,
 	currentFolderName,
 	folderCollectionSlug,
+	folderFieldName,
 	onChanged,
 	parentFolderID,
 }: Args) => {
@@ -65,10 +68,11 @@ export const useFolderTargets = ({
 				return
 			}
 
-			// Nothing selected: the folder in view is being moved, so follow it.
+			// Nothing selected: the folder in view is being moved, so follow it. A folder's parent is
+			// held in the same configured field its documents use, which the host may have renamed.
 			if (!folderID) return
 			await fetch(`${config.routes.api}/${folderCollectionSlug}/${folderID}`, {
-				body: JSON.stringify({ folder: destination.id ?? null }),
+				body: JSON.stringify({ [folderFieldName]: destination.id ?? null }),
 				credentials: 'include',
 				headers: { 'Content-Type': 'application/json' },
 				method: 'PATCH',
@@ -80,6 +84,7 @@ export const useFolderTargets = ({
 			config.routes.api,
 			count,
 			folderCollectionSlug,
+			folderFieldName,
 			folderID,
 			moveToFolder,
 			onChanged,

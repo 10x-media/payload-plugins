@@ -22,13 +22,14 @@ import {
 import type { CollectionSlug, FolderSortKeys } from 'payload'
 import type { FolderBreadcrumb, FolderOrDocument } from 'payload/shared'
 import React from 'react'
-import { BulkUploadButton, SelectManyFolderItems } from './BulkUploadButton'
+import { BulkUploadButton, SelectFolderItems } from './BulkUploadButton'
 import type { FolderActionHandlers } from './FolderActions'
 import { FolderActionsMenu, FolderSelectionBar } from './FolderActions'
 import {
 	CloseModalButton,
 	DndEventListener,
 	DragOverlaySelection,
+	DrawerRelationshipSelect,
 	ListHeader,
 	NoListResults,
 	SearchBar,
@@ -113,7 +114,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 	const [subfolders, setSubfolders] = React.useState<FolderOrDocument[]>([])
 	const [documents, setDocuments] = React.useState<FolderOrDocument[]>([])
 	const [ResultsComponent, setResultsComponent] = React.useState<React.ReactNode>(null)
-	const [hasLoaded, setHasLoaded] = React.useState(false)
+	const [loadedFor, setLoadedFor] = React.useState<CollectionSlug | null>(null)
 	const [displayAs, setDisplayAs] = React.useState<'grid' | 'list'>('grid')
 	const [sort, setSort] = React.useState<FolderSortKeys>('name')
 	const [search, setSearch] = React.useState('')
@@ -142,7 +143,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 			setDocuments(result?.documents || [])
 			setResultsComponent(result?.FolderResultsComponent || null)
 			setFolderID(args.folderID)
-			setHasLoaded(true)
+			setLoadedFor(collectionSlug)
 		},
 		[collectionSlug, folderCollectionSlug, getFolderResultsComponentAndData]
 	)
@@ -153,13 +154,16 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 	)
 
 	const actionHandlersRef = React.useRef<FolderActionHandlers | null>(null)
-	const hasRequestedRef = React.useRef(false)
+	// The drawer's collection select re-renders this view in place rather than remounting it, so a
+	// switch has to be caught here. Requesting per collection rather than once also keeps the effect
+	// idempotent, which the toggles below rely on since they load on their own.
+	const requestedFor = React.useRef<CollectionSlug | null>(null)
 	React.useEffect(() => {
-		if (!hasRequestedRef.current) {
-			hasRequestedRef.current = true
-			void loadFolder({ displayAs: 'grid', folderID: null, sort: 'name' })
+		if (requestedFor.current !== collectionSlug) {
+			requestedFor.current = collectionSlug
+			void loadFolder({ displayAs, folderID: null, sort })
 		}
-	}, [loadFolder])
+	}, [collectionSlug, displayAs, loadFolder, sort])
 
 	const currentFolder = breadcrumbs[breadcrumbs.length - 1]
 	const parentFolder = breadcrumbs[breadcrumbs.length - 2]
@@ -197,9 +201,14 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 		return null
 	}
 
-	if (!hasLoaded) {
+	// Only the very first load has nothing to draw. A collection switch keeps the header up and
+	// swaps the results alone, since blanking a drawer the user is still reading it looks like it
+	// closed and reopened.
+	if (loadedFor === null) {
 		return <LoadingOverlay />
 	}
+
+	const isSwitchingCollection = loadedFor !== collectionSlug
 
 	// The server function takes no search argument (the route view reads it off the request), so the
 	// current folder's contents are narrowed in the browser instead. Same scope, no round trip.
@@ -355,6 +364,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 									/>
 								) : null,
 							].filter(Boolean)}
+							AfterListHeaderContent={<DrawerRelationshipSelect />}
 							// Same class the drawer's own list header carries, so both views lay their header
 							// out identically and the close button lands in the same place.
 							className="list-drawer__header"
@@ -372,10 +382,10 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
 						<SearchBar
 							Actions={[
-								<SelectManyFolderItems
+								<SelectFolderItems
 									collectionSlug={collectionSlug}
 									enableRowSelections={enableRowSelections}
-									key="select-many"
+									key="select-items"
 								/>,
 								<SortByPill
 									key="sort-by-pill"
@@ -411,7 +421,9 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 							onSearchChange={setSearch}
 						/>
 
-						{totalVisible > 0 ? (
+						{isSwitchingCollection ? (
+							<LoadingOverlay />
+						) : totalVisible > 0 ? (
 							ResultsComponent
 						) : (
 							<NoListResults

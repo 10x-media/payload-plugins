@@ -13,6 +13,8 @@ export type TranslationsOption = {
  * Flat `folderPicker:foo` entries to the nested `{ folderPicker: { foo } }`
  * shape Payload resolves `t('folderPicker:foo')` against (it splits on `:`).
  * Undefined values are skipped so `Partial` override maps pass through.
+ * A key with no `:` has no namespace to nest under, so it is dropped rather than
+ * split at -1, which would file it under the key with its last character shaved off.
  */
 export const toNested = (flat: {
 	[key: string]: string | undefined
@@ -23,6 +25,9 @@ export const toNested = (flat: {
 			continue
 		}
 		const separator = fullKey.indexOf(':')
+		if (separator < 1) {
+			continue
+		}
 		const namespace = fullKey.slice(0, separator)
 		const bucket = out[namespace] ?? {}
 		bucket[fullKey.slice(separator + 1)] = value
