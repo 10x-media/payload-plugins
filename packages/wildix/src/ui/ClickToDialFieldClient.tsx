@@ -3,6 +3,7 @@
 import { Button, Drawer, DrawerToggler, FieldLabel, TextInput, useField } from '@payloadcms/ui'
 import type { ChangeEvent } from 'react'
 import { useState } from 'react'
+import { PhoneIcon } from './PhoneIcon'
 
 type WildixDevice = {
 	contact: string
@@ -72,15 +73,26 @@ export const ClickToDialFieldClient = ({
 					slug={DRAWER_SLUG}
 					disabled={!value || readOnly || dialState === 'dialing'}
 					className={`btn btn--size-medium btn--style-${dialState === 'error' ? 'error' : 'primary'}`}
-					style={{ margin: 0 }}
+					aria-label={
+						dialState === 'idle'
+							? 'Dial'
+							: dialState === 'dialing'
+								? 'Dialing...'
+								: dialState === 'success'
+									? 'Called!'
+									: 'Failed'
+					}
+					style={{
+						margin: 0,
+						width: 40,
+						height: 40,
+						padding: 0,
+						display: 'inline-flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+					}}
 				>
-					{dialState === 'idle'
-						? 'Dial'
-						: dialState === 'dialing'
-							? 'Dialing...'
-							: dialState === 'success'
-								? 'Called!'
-								: 'Failed'}
+					<PhoneIcon />
 				</DrawerToggler>
 			</div>
 
