@@ -74,6 +74,9 @@
 		"migrate:fresh": "pnpm --filter @10x-media/undo-redo-dev migrate:fresh",
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
+	"dependencies": {
+		"react-hotkeys-hook": "catalog:"
+	},
 	"peerDependencies": {
 		"@payloadcms/ui": "^3.83.0",
 		"payload": "^3.83.0",

@@ -1,6 +1,5 @@
 import type { FormState } from 'payload'
 import { describe, expect, it } from 'vitest'
-
 import {
 	buildRestoreState,
 	canRedo,
@@ -14,6 +13,7 @@ import {
 	pushSnapshot,
 	type UndoHistory,
 } from './historyCore'
+import { createPathMatcher } from './pathPatterns'
 
 const textField = (value: unknown, initialValue: unknown = value): FormState[string] => ({
 	initialValue,
@@ -62,11 +62,10 @@ describe('extractComparable', () => {
 		expect(comparable.updatedAt).toBeUndefined()
 	})
 
-	it('ignores hook-derived and auth-managed paths including nested ones', () => {
+	it("ignores Payload's own fields including nested ones", () => {
 		const fields: FormState = {
-			'breadcrumbs.0.url': textField('/old'),
-			breadcrumbs: arrayField(['b1']),
-			pathname: textField('/old'),
+			_status: textField('draft'),
+			'sessions.0.expiresAt': textField('2026-01-01'),
 			sessions: arrayField(['s1']),
 			title: textField('Hello'),
 		}
@@ -74,11 +73,21 @@ describe('extractComparable', () => {
 		expect(Object.keys(comparable)).toEqual(['title'])
 	})
 
-	it('does not create phantom entries when only derived fields change', () => {
+	it('keeps project fields that merely look derived', () => {
+		const comparable = extractComparable({
+			breadcrumbs: arrayField(['b1']),
+			pathname: textField('/old'),
+		})
+		expect(Object.keys(comparable).sort()).toEqual(['breadcrumbs', 'pathname'])
+	})
+
+	it("does not create phantom entries when only Payload's own fields change", () => {
 		const history = createHistory()
-		pushSnapshot(history, { pathname: textField('/a'), title: textField('x') })
-		// Server merge recomputed pathname, so there is no user-visible change.
-		expect(pushSnapshot(history, { pathname: textField('/b'), title: textField('x') })).toBe(false)
+		pushSnapshot(history, { _status: textField('draft'), title: textField('x') })
+		// Publishing rewrote _status, so there is no user-visible change.
+		expect(pushSnapshot(history, { _status: textField('published'), title: textField('x') })).toBe(
+			false
+		)
 	})
 })
 
@@ -204,22 +213,23 @@ describe('buildRestoreState', () => {
 		expect(restored.content?.initialValue).not.toBe(initial)
 	})
 
-	it('passes system/derived fields through from the live state', () => {
+	it("passes Payload's own fields through from the live state", () => {
 		const history = createHistory()
 		pushSnapshot(history, {
-			pathname: textField('/old-path'),
+			_status: textField('draft'),
 			sessions: arrayField(['s1']),
 			title: textField('old'),
 		})
 		const currentSessions = arrayField(['s1', 's2'])
 		const current: FormState = {
-			pathname: textField('/new-path'),
+			_status: textField('published'),
 			sessions: currentSessions,
 			title: textField('new'),
 		}
 		const restored = buildRestoreState(entryAt(history, 0), current)
 		expect(restored.title?.value).toBe('old')
-		expect(restored.pathname?.value).toBe('/new-path')
+		// Undoing an edit must not unpublish the document.
+		expect(restored._status?.value).toBe('published')
 		expect(restored.sessions).toBe(currentSessions)
 	})
 
@@ -301,5 +311,45 @@ describe('diffComparable', () => {
 		const from = extractComparable({ title: textField('a'), updatedAt: textField('t1') })
 		const to = extractComparable({ title: textField('a'), updatedAt: textField('t2') })
 		expect(diffComparable(from, to)).toEqual([])
+	})
+})
+
+describe('history options', () => {
+	it('caps the stack at a custom maxHistory', () => {
+		const history = createHistory({ maxHistory: 3 })
+		for (let i = 0; i < 10; i++) pushSnapshot(history, { title: textField(`v${i}`) })
+		expect(history.stack).toHaveLength(3)
+		expect(entryAt(history, 2).comparable.title?.value).toBe('v9')
+	})
+
+	it('excludes paths matched by a custom matcher from capture', () => {
+		const history = createHistory({ isIgnored: createPathMatcher(['list.*.rowRich']) })
+		pushSnapshot(history, {
+			'list.0.rowRich': textField('a'),
+			'list.0.title': textField('one'),
+		})
+		expect(Object.keys(entryAt(history, 0).comparable)).toEqual(['list.0.title'])
+	})
+
+	it('creates no entry when only an excluded path changed', () => {
+		const history = createHistory({ isIgnored: createPathMatcher(['slug']) })
+		pushSnapshot(history, { slug: textField('a'), title: textField('x') })
+		expect(pushSnapshot(history, { slug: textField('b'), title: textField('x') })).toBe(false)
+	})
+
+	it('passes excluded paths through untouched on restore', () => {
+		const isIgnored = createPathMatcher(['slug'])
+		const history = createHistory({ isIgnored })
+		pushSnapshot(history, { slug: textField('old'), title: textField('old') })
+		const current: FormState = { slug: textField('new'), title: textField('new') }
+		const restored = buildRestoreState(entryAt(history, 0), current, isIgnored)
+		expect(restored.title?.value).toBe('old')
+		expect(restored.slug?.value).toBe('new')
+	})
+
+	it('still ignores Payload internals when no matcher is given', () => {
+		const history = createHistory()
+		pushSnapshot(history, { _status: textField('draft'), title: textField('x') })
+		expect(Object.keys(entryAt(history, 0).comparable)).toEqual(['title'])
 	})
 })

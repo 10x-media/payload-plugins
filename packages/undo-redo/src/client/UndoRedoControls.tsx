@@ -2,50 +2,38 @@
 import {
 	Button,
 	useAllFormFields,
+	useConfig,
+	useDocumentInfo,
 	useForm,
 	useFormInitializing,
 	useFormProcessing,
 } from '@payloadcms/ui'
 import type { FormState } from 'payload'
 import type React from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useHotkeys } from 'react-hotkeys-hook'
 
 import {
 	buildRestoreState,
 	canRedo,
 	canUndo,
 	createHistory,
+	MAX_HISTORY_ENTRIES,
 	pushSnapshot,
+	type UndoHistory,
 } from '../history/historyCore'
+import { createPathMatcher } from '../history/pathPatterns'
+import {
+	type ControlsClientProps,
+	DEFAULT_CAPTURE_DEBOUNCE_MS,
+	DEFAULT_SHORTCUTS,
+} from '../plugin/options'
+import { buildFieldSchemaMap, collectIgnorePatterns } from '../schema/fieldSchema'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { HistoryDebugOverlay } from './HistoryDebugOverlay'
 
 const baseClass = 'undo-redo-controls'
-
-/**
- * Snapshot debounce. Rapid consecutive edits (typing) coalesce into one
- * history entry; structural edits (row delete/move) are far enough apart
- * in practice to land in their own entries.
- *
- * Echoes of our own restores (the form's post-restore onChange/server merge)
- * need no time-based suppression: they compare equal to the entry at the
- * current history index and are absorbed by the dedupe in pushSnapshot, while
- * hook-derived fields that servers rewrite (pathname, breadcrumbs, sessions)
- * are excluded from the comparison entirely (see historyCore IGNORED_ROOTS).
- */
-const CAPTURE_DEBOUNCE_MS = 400
-
-/**
- * Editing surfaces own their keyboard undo: native inputs use the browser's
- * text undo, Lexical rich text uses its internal history plugin.
- */
-const isTextEditingTarget = (target: EventTarget | null): boolean => {
-	if (!(target instanceof HTMLElement)) return false
-	if (target.isContentEditable) return true
-	const tag = target.tagName
-	return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-}
 
 const UndoIcon: React.FC = () => (
 	<svg
@@ -99,28 +87,66 @@ const HistoryIcon: React.FC = () => (
 	</svg>
 )
 
-export interface UndoRedoControlsProps {
-	/**
-	 * Render the history inspector toggle. Set from the plugin's `debug` option
-	 * and passed through as a client prop, so production builds never mount the
-	 * overlay or pay for its per-capture re-render.
-	 */
-	debug?: boolean
-}
+/**
+ * Every setting is optional so the component stays usable when a host mounts it
+ * by hand (`autoMount: false`) rather than through the plugin, which always
+ * passes a fully resolved set.
+ */
+export type UndoRedoControlsProps = Partial<ControlsClientProps>
 
 /**
  * Undo/redo buttons for the document edit view. Keeps a client-side history of
  * form-state snapshots, independent of Payload's document versions: nothing is
  * read from or written to the server until the user saves.
  */
-export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ debug = false }) => {
+export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
+	captureDebounce = DEFAULT_CAPTURE_DEBOUNCE_MS,
+	debug = false,
+	ignoreFieldTypes,
+	ignorePaths,
+	maxHistory = MAX_HISTORY_ENTRIES,
+	shortcuts,
+}) => {
 	const [fields, dispatchFields] = useAllFormFields()
 	const { setModified } = useForm()
 	const initializing = useFormInitializing()
 	const processing = useFormProcessing()
 	const { t } = useTranslation()
+	const { getEntityConfig, config } = useConfig()
+	const { collectionSlug, globalSlug } = useDocumentInfo()
 
-	const historyRef = useRef(createHistory())
+	/**
+	 * Ignore patterns from the config, plus the ones derived from the document's
+	 * own schema: fields the host opted out through `admin.custom`, and every
+	 * field of an excluded type. The schema is the only place a mounted
+	 * component can learn field types, since form state omits them unless
+	 * `buildFormState` was called with `includeSchema`, which the edit view never
+	 * does.
+	 */
+	const isIgnored = useMemo(() => {
+		const entity = collectionSlug
+			? getEntityConfig({ collectionSlug })
+			: globalSlug
+				? getEntityConfig({ globalSlug })
+				: null
+		const schemaPatterns = entity
+			? collectIgnorePatterns(
+					buildFieldSchemaMap(entity.fields, { blocksMap: config.blocksMap }),
+					ignoreFieldTypes
+				)
+			: []
+		return createPathMatcher([...(ignorePaths ?? []), ...schemaPatterns])
+	}, [collectionSlug, config.blocksMap, getEntityConfig, globalSlug, ignoreFieldTypes, ignorePaths])
+
+	const historyRef = useRef<UndoHistory | null>(null)
+	if (historyRef.current === null) {
+		historyRef.current = createHistory({ isIgnored, maxHistory })
+	}
+	const history = historyRef.current
+	// Kept in sync rather than rebuilt, so changing a setting cannot silently
+	// drop the entries the editor has already accumulated.
+	history.options = { isIgnored, maxHistory }
+
 	const fieldsRef = useRef<FormState | null>(null)
 	const rootRef = useRef<HTMLDivElement>(null)
 	const [flags, setFlags] = useState({ redo: false, undo: false })
@@ -139,30 +165,29 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ debug = fals
 	}, [debug])
 
 	const refreshFlags = useCallback(() => {
-		const history = historyRef.current
 		const next = { redo: canRedo(history), undo: canUndo(history) }
 		setFlags((prev) => (prev.undo === next.undo && prev.redo === next.redo ? prev : next))
-	}, [])
+	}, [history])
 
 	// Debug/e2e handle: lets tests inspect the history without reaching into React.
 	useEffect(() => {
-		const win = window as Window & { __payloadUndoHistory?: typeof historyRef.current }
-		win.__payloadUndoHistory = historyRef.current
+		const win = window as Window & { __payloadUndoHistory?: UndoHistory }
+		win.__payloadUndoHistory = history
 		return () => {
 			delete win.__payloadUndoHistory
 		}
-	}, [])
+	}, [history])
 
 	useEffect(() => {
 		if (initializing || !fields || Object.keys(fields).length === 0) return
 		const timer = setTimeout(() => {
 			const latest = fieldsRef.current
 			if (!latest) return
-			if (pushSnapshot(historyRef.current, latest)) bumpRevision()
+			if (pushSnapshot(history, latest)) bumpRevision()
 			refreshFlags()
-		}, CAPTURE_DEBOUNCE_MS)
+		}, captureDebounce)
 		return () => clearTimeout(timer)
-	}, [fields, initializing, refreshFlags, bumpRevision])
+	}, [captureDebounce, fields, history, initializing, refreshFlags, bumpRevision])
 
 	/**
 	 * Restore the entry that `resolveTarget` picks. The target is resolved from
@@ -171,7 +196,6 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ debug = fals
 	 */
 	const applyRestore = useCallback(
 		(resolveTarget: (indexAfterCapture: number) => number) => {
-			const history = historyRef.current
 			const current = fieldsRef.current
 			if (!current) return
 			// Capture pending (not yet debounced) edits first so undo steps back
@@ -187,7 +211,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ debug = fals
 			}
 			dispatchFields({
 				type: 'REPLACE_STATE',
-				state: buildRestoreState(entry, current),
+				state: buildRestoreState(entry, current, isIgnored),
 				optimize: false,
 			})
 			// Mark the form modified so the debounced onChange revalidates the
@@ -197,7 +221,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ debug = fals
 			refreshFlags()
 			bumpRevision()
 		},
-		[bumpRevision, dispatchFields, refreshFlags, setModified]
+		[bumpRevision, dispatchFields, history, isIgnored, refreshFlags, setModified]
 	)
 
 	const restore = useCallback(
@@ -207,32 +231,50 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ debug = fals
 
 	const jumpTo = useCallback((index: number) => applyRestore(() => index), [applyRestore])
 
-	useEffect(() => {
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented) return
-			const key = e.key.toLowerCase()
-			const isUndo = key === 'z' && !e.shiftKey
-			const isRedo = (key === 'z' && e.shiftKey) || key === 'y'
-			if (!isUndo && !isRedo) return
-			if (isTextEditingTarget(e.target)) return
-			// Multiple edit forms can be mounted at once (document drawers).
-			// Only the instance belonging to the form the event happened in,
-			// or, for events outside any form, the topmost open drawer, reacts.
-			const ourForm = rootRef.current?.closest('form')
-			const targetForm = e.target instanceof HTMLElement ? e.target.closest('form') : null
-			if (targetForm) {
-				if (targetForm !== ourForm) return
-			} else {
-				const openDrawers = document.querySelectorAll('.drawer--is-open')
-				const topDrawer = openDrawers[openDrawers.length - 1]
-				if (topDrawer && ourForm && !topDrawer.contains(ourForm)) return
-			}
-			e.preventDefault()
-			restore(isUndo ? -1 : 1)
-		}
-		document.addEventListener('keydown', onKeyDown)
-		return () => document.removeEventListener('keydown', onKeyDown)
-	}, [restore])
+	/**
+	 * Several edit forms can be mounted at once (document drawers). Only the
+	 * instance belonging to the form the event happened in reacts; for events
+	 * outside any form, the topmost open drawer wins.
+	 *
+	 * Text-editing surfaces need no check here: react-hotkeys-hook skips form
+	 * tags and contenteditable by default, which is exactly the rule we want,
+	 * since native inputs own the browser's text undo and Lexical owns its own.
+	 */
+	const isForAnotherForm = useCallback((e: KeyboardEvent): boolean => {
+		const ourForm = rootRef.current?.closest('form')
+		const targetForm = e.target instanceof HTMLElement ? e.target.closest('form') : null
+		if (targetForm) return targetForm !== ourForm
+		const openDrawers = document.querySelectorAll('.drawer--is-open')
+		const topDrawer = openDrawers[openDrawers.length - 1]
+		return Boolean(topDrawer && ourForm && !topDrawer.contains(ourForm))
+	}, [])
+
+	const hotkeyOptions = useMemo(
+		() => ({
+			enabled: shortcuts !== false,
+			ignoreEventWhen: isForAnotherForm,
+			preventDefault: true,
+		}),
+		[isForAnotherForm, shortcuts]
+	)
+
+	useHotkeys(
+		shortcuts === false ? [] : (shortcuts?.undo ?? DEFAULT_SHORTCUTS.undo),
+		() => {
+			restore(-1)
+		},
+		hotkeyOptions,
+		[restore]
+	)
+
+	useHotkeys(
+		shortcuts === false ? [] : (shortcuts?.redo ?? DEFAULT_SHORTCUTS.redo),
+		() => {
+			restore(1)
+		},
+		hotkeyOptions,
+		[restore]
+	)
 
 	return (
 		<div
@@ -283,7 +325,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ debug = fals
 			{debug && overlayOpen ? (
 				<HistoryDebugOverlay
 					fields={fields}
-					history={historyRef.current}
+					history={history}
 					onClose={() => setOverlayOpen(false)}
 					onJump={jumpTo}
 					revision={revision}

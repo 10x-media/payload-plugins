@@ -93,6 +93,9 @@ catalogs:
     react-dom:
       specifier: 19.2.6
       version: 19.2.6
+    react-hotkeys-hook:
+      specifier: 5.3.3
+      version: 5.3.3
     tsdown:
       specifier: 0.22.1
       version: 0.22.1
@@ -848,6 +851,10 @@ importers:
         version: 5.9.3
 
   packages/undo-redo:
+    dependencies:
+      react-hotkeys-hook:
+        specifier: 'catalog:'
+        version: 5.3.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
     devDependencies:
       '@10x-media/payload-test-harness':
         specifier: workspace:*
@@ -6507,6 +6514,12 @@ packages:
     resolution: {integrity: sha512-3DpCr5HVdZ0caUjYE/kIHBEJN0mNP3ZCgf16c48uJ5TbWjorKVp+YG8W3XqlJ7vJAVNw6wNIImyPXmFydwmyng==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
+
+  react-hotkeys-hook@5.3.3:
+    resolution: {integrity: sha512-aswgyWUnE25hmhzHTfKDmKzsaSE5DJ4LKaU/o6rQSXkDd/1Bh9TfAFQbHkf6fLy11HvlYkp+cDDarGdhmCDhoQ==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   react-image-crop@10.1.8:
     resolution: {integrity: sha512-4rb8XtXNx7ZaOZarKKnckgz4xLMvds/YrU6mpJfGhGAsy2Mg4mIw1x+DCCGngVGq2soTBVVOxx2s/C6mTX9+pA==}
@@ -13442,6 +13455,11 @@ snapshots:
   react-error-boundary@6.1.2(react@19.2.6):
     dependencies:
       react: 19.2.6
+
+  react-hotkeys-hook@5.3.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+    dependencies:
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
 
   react-image-crop@10.1.8(react@19.2.6):
     dependencies:

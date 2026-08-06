@@ -65,7 +65,19 @@ export default buildConfig({
 	globals: [siteSettings],
 	i18n: { supportedLanguages: { de, en } },
 	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
-	plugins: [undoRedo({ debug: true })],
+	plugins: [
+		undoRedo({
+			debug: true,
+			// Exercises the option surface end to end: `tags` opts out entirely,
+			// `drafts` gets a short stack to make eviction easy to hit by hand, and
+			// `users` keeps the controls out of the way of auth fields.
+			collections: {
+				tags: false,
+				users: false,
+				drafts: { maxHistory: 5, captureDebounce: 250 },
+			},
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

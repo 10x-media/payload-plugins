@@ -1,5 +1,7 @@
 import type { FormState } from 'payload'
 
+import { createPathMatcher, type PathMatcher } from './pathPatterns'
+
 /**
  * Pure, React-free core of the admin undo/redo feature.
  *
@@ -13,32 +15,35 @@ import type { FormState } from 'payload'
  */
 
 /**
- * Field roots whose changes never create a history entry and that undo/redo
- * must never touch. These are system- or hook-managed and change on
- * save/autosave/token-refresh without user interaction, so treating them as
- * edits would create "phantom" history entries where undo appears to do
- * nothing, and restoring stale values for them could corrupt derived data
- * (pathname/breadcrumbs) or auth state (sessions).
+ * Payload's own fields, which no editor edits directly and undo must never
+ * touch. They change on save, autosave, publish and token refresh without user
+ * interaction, so treating them as edits would create "phantom" history entries
+ * where undo appears to do nothing, and restoring a stale value could revert a
+ * publish (`_status`) or corrupt auth state (`sessions`, `salt`, `hash`).
+ *
+ * Deliberately limited to fields Payload itself injects. Derived fields that a
+ * plugin or project adds are user-facing (a project may well have its own
+ * `pathname`), so excluding those is the host's call through `ignorePaths`
+ * rather than a default baked in here.
+ *
+ * Each entry ignores its whole subtree, which is what the pattern matcher does
+ * for a pattern that runs out before the path does.
  */
-const IGNORED_ROOTS = new Set([
-	'breadcrumbs',
+export const DEFAULT_IGNORED_PATHS = [
+	'_status',
 	'createdAt',
 	'hash',
 	'lockUntil',
 	'loginAttempts',
-	'pathname',
 	'resetPasswordExpiration',
 	'resetPasswordToken',
 	'salt',
 	'sessions',
 	'updatedAt',
-])
+] as const
 
-/** True for paths the undo history ignores entirely (see IGNORED_ROOTS). */
-export const isIgnoredPath = (path: string): boolean => {
-	const dot = path.indexOf('.')
-	return IGNORED_ROOTS.has(dot === -1 ? path : path.slice(0, dot))
-}
+/** True for paths the undo history ignores entirely (see DEFAULT_IGNORED_PATHS). */
+export const isIgnoredPath: PathMatcher = createPathMatcher(DEFAULT_IGNORED_PATHS)
 
 export interface ComparableField {
 	value: unknown
@@ -60,13 +65,31 @@ export interface HistoryEntry {
 	comparable: ComparableState
 }
 
+export const MAX_HISTORY_ENTRIES = 50
+
+/**
+ * Per-history settings. They live on the history object rather than being
+ * threaded through every call so that a snapshot and the restore built from it
+ * can never disagree about which paths are in scope.
+ */
+export interface HistoryOptions {
+	/** Paths excluded from capture and from restore. */
+	isIgnored: PathMatcher
+	/** Entries kept before the oldest is evicted. */
+	maxHistory: number
+}
+
 export interface UndoHistory {
 	stack: HistoryEntry[]
 	/** Index of the entry representing the current form state. */
 	index: number
+	options: HistoryOptions
 }
 
-export const MAX_HISTORY_ENTRIES = 50
+export const DEFAULT_HISTORY_OPTIONS: HistoryOptions = {
+	isIgnored: isIgnoredPath,
+	maxHistory: MAX_HISTORY_ENTRIES,
+}
 
 /**
  * Structural deep equality for JSON-ish data (objects, arrays, primitives).
@@ -97,10 +120,13 @@ const extractComparableField = (field: FormState[string]): ComparableField => {
 	return entry
 }
 
-export const extractComparable = (fields: FormState): ComparableState => {
+export const extractComparable = (
+	fields: FormState,
+	isIgnored: PathMatcher = isIgnoredPath
+): ComparableState => {
 	const out: ComparableState = {}
 	for (const [path, field] of Object.entries(fields)) {
-		if (isIgnoredPath(path) || !field) continue
+		if (isIgnored(path) || !field) continue
 		out[path] = extractComparableField(field)
 	}
 	return out
@@ -108,28 +134,36 @@ export const extractComparable = (fields: FormState): ComparableState => {
 
 let nextEntryId = 0
 
-export const createSnapshot = (fields: FormState): HistoryEntry => ({
+export const createSnapshot = (
+	fields: FormState,
+	isIgnored: PathMatcher = isIgnoredPath
+): HistoryEntry => ({
 	id: nextEntryId++,
 	fields: Object.fromEntries(Object.entries(fields).map(([path, field]) => [path, { ...field }])),
-	comparable: extractComparable(fields),
+	comparable: extractComparable(fields, isIgnored),
 })
 
-export const createHistory = (): UndoHistory => ({ stack: [], index: -1 })
+export const createHistory = (options: Partial<HistoryOptions> = {}): UndoHistory => ({
+	stack: [],
+	index: -1,
+	options: { ...DEFAULT_HISTORY_OPTIONS, ...options },
+})
 
 /**
  * Push the current form state onto the history. No-ops (and returns false) when
  * nothing user-visible changed relative to the entry at the current index,
  * which absorbs server-merge echoes after saves/restores. A real change drops
- * the redo tail, appends, and caps the stack at MAX_HISTORY_ENTRIES.
+ * the redo tail, appends, and caps the stack at the history's `maxHistory`.
  */
 export const pushSnapshot = (history: UndoHistory, fields: FormState): boolean => {
-	const snapshot = createSnapshot(fields)
+	const { isIgnored, maxHistory } = history.options
+	const snapshot = createSnapshot(fields, isIgnored)
 	const current = history.stack[history.index]
 	if (current && deepEqual(current.comparable, snapshot.comparable)) return false
 	history.stack.splice(history.index + 1)
 	history.stack.push(snapshot)
-	if (history.stack.length > MAX_HISTORY_ENTRIES) {
-		history.stack.splice(0, history.stack.length - MAX_HISTORY_ENTRIES)
+	if (history.stack.length > maxHistory) {
+		history.stack.splice(0, history.stack.length - maxHistory)
 	}
 	history.index = history.stack.length - 1
 	return true
@@ -197,10 +231,14 @@ const cloneJson = <T>(value: T): T =>
  *   the mounted Lexical editor only re-initializes from the form value when the
  *   initialValue reference changes (see @payloadcms/richtext-lexical Field.tsx).
  */
-export const buildRestoreState = (snapshot: HistoryEntry, currentFields: FormState): FormState => {
+export const buildRestoreState = (
+	snapshot: HistoryEntry,
+	currentFields: FormState,
+	isIgnored: PathMatcher = isIgnoredPath
+): FormState => {
 	const out: FormState = {}
 	for (const [path, snapField] of Object.entries(snapshot.fields)) {
-		if (isIgnoredPath(path)) continue
+		if (isIgnored(path)) continue
 		const cur = currentFields[path]
 		const snapComparable = snapshot.comparable[path] ?? extractComparableField(snapField)
 		const changed = !cur || !deepEqual(snapComparable, extractComparableField(cur))
@@ -216,10 +254,10 @@ export const buildRestoreState = (snapshot: HistoryEntry, currentFields: FormSta
 		}
 		out[path] = restored
 	}
-	// System/derived fields pass through untouched from the live state: undo
-	// must neither revert them nor drop them from the replaced state.
+	// Ignored paths pass through untouched from the live state: undo must
+	// neither revert them nor drop them from the replaced state.
 	for (const [path, curField] of Object.entries(currentFields)) {
-		if (isIgnoredPath(path)) out[path] = curField
+		if (isIgnored(path)) out[path] = curField
 	}
 	return out
 }

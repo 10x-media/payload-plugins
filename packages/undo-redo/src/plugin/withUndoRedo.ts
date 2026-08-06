@@ -1,36 +1,37 @@
 import type { CollectionConfig, GlobalConfig, PayloadComponent } from 'payload'
 
+import { type ResolvedDocOptions, toClientProps } from './options'
+
 /** Client component path resolved through the package export map by the import map. */
 export const UNDO_REDO_COMPONENT_PATH = '@10x-media/undo-redo/client#UndoRedoControls'
 
-export interface ControlsMountOptions {
-	/** Mount the history inspector overlay alongside the buttons. */
-	debug?: boolean
-}
-
 /**
- * The component entry to append to a `beforeDocumentControls` slot.
+ * The component entry to append to a `beforeDocumentControls` slot, carrying
+ * the resolved settings as client props.
  *
- * Stays a bare path string in the default case so generated import maps and
- * config dumps read cleanly, and only becomes an object once there is a client
- * prop to carry.
+ * The settings travel as props rather than being re-derived on the client so
+ * there is a single resolution path: whatever the config says is what the
+ * mounted controls use, and the debug overlay shows exactly that.
  */
-export const undoRedoComponent = (
-	options: ControlsMountOptions = {}
-): PayloadComponent<never, never> =>
-	options.debug === true
-		? { path: UNDO_REDO_COMPONENT_PATH, clientProps: { debug: true } }
-		: UNDO_REDO_COMPONENT_PATH
+export const undoRedoComponent = (options: ResolvedDocOptions): PayloadComponent<never, never> => ({
+	path: UNDO_REDO_COMPONENT_PATH,
+	clientProps: toClientProps(options),
+})
 
 /**
  * Add the undo/redo controls to a collection's edit view by appending to
  * `admin.components.edit.beforeDocumentControls`, preserving any components
  * the config already declares.
+ *
+ * A `null` options object means undo/redo is off for this collection, and
+ * `autoMount: false` means the host mounts the controls itself; both return the
+ * config untouched.
  */
 export const withUndoRedo = (
 	config: CollectionConfig,
-	options: ControlsMountOptions = {}
+	options: ResolvedDocOptions | null
 ): CollectionConfig => {
+	if (!options?.autoMount) return config
 	const admin = config.admin ?? {}
 	const components = admin.components ?? {}
 	const edit = components.edit ?? {}
@@ -59,8 +60,9 @@ export const withUndoRedo = (
  */
 export const withUndoRedoGlobal = (
 	config: GlobalConfig,
-	options: ControlsMountOptions = {}
+	options: ResolvedDocOptions | null
 ): GlobalConfig => {
+	if (!options?.autoMount) return config
 	const admin = config.admin ?? {}
 	const components = admin.components ?? {}
 	const elements = components.elements ?? {}

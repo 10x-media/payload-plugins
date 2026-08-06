@@ -5,5 +5,19 @@ export type {
 	HistoryEntry,
 	UndoHistory,
 } from '../history/historyCore'
-export type { UndoRedoPluginOptions } from '../index'
-export type { ControlsMountOptions } from '../plugin/withUndoRedo'
+export type {
+	ControlsClientProps,
+	DocScope,
+	ResolvedDocOptions,
+	ShortcutKeys,
+	UndoRedoDocOptions,
+	UndoRedoPluginOptions,
+} from '../plugin/options'
+export type { UndoRedoFieldConfig } from '../schema/fieldConfig'
+export type {
+	FieldSchemaEntry,
+	FieldSchemaMap,
+	WalkableBlock,
+	WalkableField,
+	WalkableTab,
+} from '../schema/fieldSchema'

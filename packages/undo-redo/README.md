@@ -12,7 +12,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - `Ctrl+Z` / `Ctrl+Shift+Z` (and `Ctrl+Y`) when focus is outside text-editing surfaces, which keep their own native or Lexical undo.
 - Covers text edits plus array and blocks row additions, deletions and moves, restoring deleted rows with their subfield state.
 - Client-side only: history lives in memory for the editor session and nothing reaches the server until you save. Independent of Payload versions and drafts.
-- Hook-derived and auth-managed paths (`pathname`, `breadcrumbs`, `sessions`, `updatedAt`, ...) are excluded from history and passed through untouched on restore.
+- Payload's own fields (`_status`, `createdAt`, `updatedAt`, `sessions` and the other auth fields) are excluded from history and passed through untouched on restore, so undo never unpublishes a document or disturbs auth state. Project fields stay tracked, whether or not a hook derives them.
 - Typed translations with per-key overrides via `@10x-media/undo-redo/i18n`.
 
 ## Quick start

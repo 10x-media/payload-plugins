@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { undoRedoCustom } from '../../src/schema/fieldConfig'
 import { allBlocks } from './blocks'
 
 /**
@@ -86,7 +87,14 @@ export const posts: CollectionConfig = {
 					description: 'Lexical owns its own undo. The plugin must not double-apply.',
 					fields: [
 						{ name: 'content', type: 'richText' },
-						{ name: 'notes', type: 'richText' },
+						{
+							name: 'notes',
+							type: 'richText',
+							admin: {
+								custom: undoRedoCustom({ disabled: true }),
+								description: 'Opted out per field: edits here never appear in the history overlay.',
+							},
+						},
 						{ name: 'plainNextToRich', type: 'text' },
 					],
 				},

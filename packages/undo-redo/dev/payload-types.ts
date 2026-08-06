@@ -201,6 +201,9 @@ export interface Post {
     };
     [k: string]: unknown;
   } | null;
+  /**
+   * Opted out per field: edits here never appear in the history overlay.
+   */
   notes?: {
     root: {
       type: string;
