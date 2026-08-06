@@ -1,0 +1,72 @@
+---
+title: Quick start
+description: Install the plugin, see the controls, and scope them to the collections you want.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/undo-redo
+```
+
+## Configure
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { undoRedo } from '@10x-media/undo-redo'
+
+export default buildConfig({
+  // ...
+  plugins: [undoRedo({})],
+})
+```
+
+Then regenerate the import map, which is how Payload resolves the plugin's client component:
+
+```bash
+payload generate:importmap
+```
+
+## Verify
+
+Open any document. Two buttons appear before the save button, both disabled: the history has exactly one entry, the document as it loaded, and there is nothing to step back to.
+
+Type into a field and pause. Undo lights up. Press it and the field reverts; redo lights up in turn. Add an array row, delete it, undo, and the row comes back with its subfield values.
+
+## Scope it
+
+Undo/redo is on everywhere by default, so scoping means turning it *off*:
+
+```ts title="payload.config.ts"
+undoRedo({
+  collections: {
+    'payload-locked-documents': false, // off for this collection
+    posts: { debug: true },            // on, with overrides
+  },
+  globals: false,                      // off for every global
+})
+```
+
+Per-field exclusions are declared on the field instead, so they survive renames:
+
+```ts
+import { undoRedoCustom } from '@10x-media/undo-redo'
+
+{
+  name: 'internalNotes',
+  type: 'richText',
+  admin: { custom: undoRedoCustom({ disabled: true }) },
+}
+```
+
+See [Configuration](/undo-redo/configuration) for the full option set and [What is tracked](/undo-redo/what-is-tracked) for the exclusion rules.
+
+## If the controls do not appear
+
+Three things account for almost every case.
+
+**The import map is stale.** `payload generate:importmap` after installing, and again after upgrading.
+
+**The collection or global is opted out**, through `collections`/`globals` or through `autoMount: false`, which leaves the mounting to you.
+
+**Something else owns the slot.** The plugin appends to `admin.components.edit.beforeDocumentControls` (collections) and `admin.components.elements.beforeDocumentControls` (globals), preserving whatever is already there. A config that overwrites those arrays after the plugin runs wins.

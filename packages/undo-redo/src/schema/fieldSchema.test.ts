@@ -250,6 +250,53 @@ describe('collectIgnorePatterns', () => {
 		expect(collectIgnorePatterns(buildFieldSchemaMap(fields))).toEqual(['named'])
 	})
 
+	it('carries an opt-out down from a tabs field, which records no pattern', () => {
+		const fields: WalkableField[] = [
+			{
+				type: 'tabs',
+				admin: disabled,
+				tabs: [
+					{ name: 'seo', fields: [{ name: 'title', type: 'text' }] },
+					{ fields: [{ name: 'summary', type: 'textarea' }] },
+				],
+			},
+		]
+		expect(collectIgnorePatterns(buildFieldSchemaMap(fields)).sort()).toEqual([
+			'seo.title',
+			'summary',
+		])
+	})
+
+	it('carries an opt-out down from one tab without touching its siblings', () => {
+		const fields: WalkableField[] = [
+			{
+				type: 'tabs',
+				tabs: [
+					{ name: 'seo', admin: disabled, fields: [{ name: 'title', type: 'text' }] },
+					{ name: 'meta', fields: [{ name: 'title', type: 'text' }] },
+				],
+			},
+		]
+		expect(collectIgnorePatterns(buildFieldSchemaMap(fields))).toEqual(['seo.title'])
+	})
+
+	it('carries an opt-out down from an unnamed container', () => {
+		const fields: WalkableField[] = [
+			{
+				type: 'collapsible',
+				admin: disabled,
+				fields: [
+					{ name: 'alpha', type: 'text' },
+					{ name: 'nested', type: 'group', fields: [{ name: 'beta', type: 'text' }] },
+				],
+			},
+			{ name: 'kept', type: 'text' },
+		]
+		// `nested` records a pattern of its own, which covers `nested.beta`, so the
+		// inherited flag stops there rather than emitting both.
+		expect(collectIgnorePatterns(buildFieldSchemaMap(fields)).sort()).toEqual(['alpha', 'nested'])
+	})
+
 	it('collects by field type', () => {
 		const fields: WalkableField[] = [
 			{ name: 'title', type: 'text' },

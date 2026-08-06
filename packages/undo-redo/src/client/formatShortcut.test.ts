@@ -35,6 +35,14 @@ describe('formatShortcut', () => {
 		expect(formatShortcut('mod+return', false)).toBe('Ctrl+Enter')
 	})
 
+	it('applies the aliases regardless of how they are cased', () => {
+		// The library lowercases the whole chord before mapping, so an alias
+		// written in caps still binds the canonical key and has to be drawn as one.
+		expect(formatShortcut('mod+LEFT', false)).toBe('Ctrl+←')
+		expect(formatShortcut('mod+Return', false)).toBe('Ctrl+Enter')
+		expect(formatShortcut('ESC', true)).toBe('⎋')
+	})
+
 	it('strips the key/digit/numpad code prefixes the library strips', () => {
 		expect(formatShortcut('mod+KeyZ', false)).toBe('Ctrl+Z')
 		expect(formatShortcut('mod+Digit1', false)).toBe('Ctrl+1')

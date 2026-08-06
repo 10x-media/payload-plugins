@@ -8,6 +8,7 @@
 		"fields",
 		"jobs",
 		"webhooks",
+		"undo-redo",
 		"automations"
 	]
 }

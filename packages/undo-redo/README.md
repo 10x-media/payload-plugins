@@ -1,6 +1,6 @@
 # @10x-media/undo-redo
 
-Introduces undo/redo functionality to Payload forms.
+Client-side undo/redo for Payload v3 admin forms. Snapshots the document form state as the editor works and steps back and forth through it, independent of Payload's document versions: nothing reaches the server until the editor saves.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/undo-redo?style=flat-square)](https://www.npmjs.com/package/@10x-media/undo-redo)
 
@@ -8,12 +8,14 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 ## Features
 
-- Undo/redo controls before the document controls on every collection and global edit view.
-- `Ctrl+Z` / `Ctrl+Shift+Z` (and `Ctrl+Y`), Cmd on macOS, when focus is outside text-editing surfaces, which keep their own native or Lexical undo. Configurable through `shortcuts`; the tooltips render whatever is bound in the platform's own notation.
-- Covers text edits plus array and blocks row additions, deletions and moves, restoring deleted rows with their subfield state.
-- Client-side only: history lives in memory for the editor session and nothing reaches the server until you save. Independent of Payload versions and drafts.
-- Payload's own fields (`_status`, `createdAt`, `updatedAt`, `sessions` and the other auth fields) are excluded from history and passed through untouched on restore, so undo never unpublishes a document or disturbs auth state. Project fields stay tracked, whether or not a hook derives them.
-- Typed translations with per-key overrides via `@10x-media/undo-redo/i18n`.
+- **Controls on every edit view**, collections and globals, mounted before the document controls. Placement is overridable.
+- **Keyboard**: `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` (plus `Ctrl/Cmd+Y`), skipped inside inputs and Lexical, which own their native undo. Rebindable; tooltips render whatever is bound, in the platform's own notation.
+- **Every field type**, including array and blocks row additions, deletions and moves, restoring deleted rows with their subfield state, and conditionally hidden fields with their whole subtree.
+- **Scoped exclusions**: per collection, per global, per field via `admin.custom`, per field type, or by path pattern (`list.*.readingTime`).
+- **Payload's own fields excluded by default** (`_status`, `createdAt`, `sessions` and the rest of auth), so undo never unpublishes a document or disturbs auth state.
+- **Truthful save state**: the saved document is tracked as a baseline, so undoing back onto it reports the form clean rather than merely unchanged since load.
+- **Debug overlay** listing every entry, the paths it changed, and pending edits, with click-to-restore.
+- **Typed translations** with per-key overrides via `@10x-media/undo-redo/i18n`.
 
 ## Quick start
 
@@ -31,14 +33,19 @@ export default buildConfig({
 })
 ```
 
+Run `payload generate:importmap`. Undo/redo is on for every collection and global; `collections` and `globals` are opt-*out* maps.
+
 ## Documentation
 
 Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/undo-redo):
 
 - [Overview](https://docs.10xmedia.de/undo-redo)
 - [Quick start](https://docs.10xmedia.de/undo-redo/quick-start)
-
-Add the plugin's docs tree under `apps/docs/content/docs/undo-redo/` and list its pages here. Long-form documentation lives on the docs site, not in this README.
+- [Configuration](https://docs.10xmedia.de/undo-redo/configuration)
+- [What is tracked](https://docs.10xmedia.de/undo-redo/what-is-tracked)
+- [Keyboard shortcuts](https://docs.10xmedia.de/undo-redo/shortcuts)
+- [Debugging](https://docs.10xmedia.de/undo-redo/debugging)
+- [i18n](https://docs.10xmedia.de/undo-redo/i18n)
 
 ## License
 

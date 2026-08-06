@@ -99,15 +99,17 @@ test.describe('undo/redo controls', () => {
 		await title.fill('typed into the input')
 		await waitForEntries(page, 2)
 
-		// The browser owns undo inside an input, and it works: the field reverts
-		// without the plugin stepping the history at all.
+		// The browser owns undo inside an input, and it works: the field reverts.
 		await title.focus()
 		await page.keyboard.press('ControlOrMeta+z')
 		await expect(title).toHaveValue('Native undo')
-		expect((await readHistory(page))?.index).toBe(1)
 
 		// What the browser did is an edit like any other, so it is captured as the
-		// next entry rather than being confused with a history step.
+		// next entry rather than being confused with a history step. This is also
+		// what proves the plugin kept its hands off: had it stepped back too, the
+		// index would sit at 0 on an unchanged stack and no third entry would
+		// arrive. Asserting the index before this point instead would race the
+		// capture debounce, which moves it for an entirely legitimate reason.
 		await waitForEntries(page, 3)
 		expect((await readHistory(page))?.index).toBe(2)
 	})

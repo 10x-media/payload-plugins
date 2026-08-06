@@ -16,7 +16,8 @@ export interface UndoRedoFieldConfig {
 	/**
 	 * Leave this field out of the undo history entirely: its changes create no
 	 * entries and undo never writes to it. Applies to the whole subtree when set
-	 * on a group, array, blocks or tab field.
+	 * on anything with children: a group, array, blocks field, tabs field, an
+	 * individual tab, a row or a collapsible.
 	 */
 	disabled?: boolean
 }

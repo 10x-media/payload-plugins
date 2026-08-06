@@ -66,8 +66,16 @@ const MAC_KEY_LABELS: Record<string, string> = {
 const SPLIT_KEY = '+'
 const SEQUENCE_SPLIT_KEY = '>'
 
-const normalizePart = (part: string): string =>
-	(KEY_ALIASES[part.trim()] ?? part.trim()).toLowerCase().replace(/key|digit|numpad/, '')
+/**
+ * Lowercased before the alias lookup, not after, because the library lowercases
+ * the whole chord before it maps anything. Looking `Left` up in a lowercase
+ * alias table misses, and `mod+Left` would then be drawn as `Left` while the
+ * binding listens for `arrowleft`.
+ */
+const normalizePart = (part: string): string => {
+	const key = part.trim().toLowerCase()
+	return (KEY_ALIASES[key] ?? key).replace(/key|digit|numpad/, '')
+}
 
 const isModifier = (part: string): part is Modifier => MODIFIERS.includes(part as Modifier)
 
