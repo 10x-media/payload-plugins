@@ -320,6 +320,30 @@ export interface Post {
           }
       )[]
     | null;
+  hasPromo?: boolean | null;
+  promoCode?: string | null;
+  /**
+   * A hidden container: its children disappear from form state, not just from view.
+   */
+  promoDetails?: {
+    note?: string | null;
+    tiers?:
+      | {
+          label?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  /**
+   * Per-row conditions, keyed off sibling data rather than the document.
+   */
+  conditionalRows?:
+    | {
+        mode?: ('simple' | 'detailed') | null;
+        detail?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -933,6 +957,26 @@ export interface PostsSelect<T extends boolean = true> {
               id?: T;
               blockName?: T;
             };
+      };
+  hasPromo?: T;
+  promoCode?: T;
+  promoDetails?:
+    | T
+    | {
+        note?: T;
+        tiers?:
+          | T
+          | {
+              label?: T;
+              id?: T;
+            };
+      };
+  conditionalRows?:
+    | T
+    | {
+        mode?: T;
+        detail?: T;
+        id?: T;
       };
   updatedAt?: T;
   createdAt?: T;

@@ -102,6 +102,56 @@ export const posts: CollectionConfig = {
 					label: 'Blocks',
 					fields: [{ name: 'layout', type: 'blocks', blocks: allBlocks }],
 				},
+				{
+					label: 'Conditions',
+					description:
+						'Conditions are evaluated on the server and shipped as `passesCondition`, and a failing condition stops the walk into a field, so the paths below it leave form state entirely. Undo has to bring back the visibility, the value, and the subtree together.',
+					fields: [
+						{ name: 'hasPromo', type: 'checkbox' },
+						{
+							name: 'promoCode',
+							type: 'text',
+							admin: { condition: (data) => Boolean(data?.hasPromo) },
+						},
+						{
+							name: 'promoDetails',
+							type: 'group',
+							admin: {
+								condition: (data) => Boolean(data?.hasPromo),
+								description:
+									'A hidden container: its children disappear from form state, not just from view.',
+							},
+							fields: [
+								{ name: 'note', type: 'text' },
+								{
+									name: 'tiers',
+									type: 'array',
+									fields: [{ name: 'label', type: 'text' }],
+								},
+							],
+						},
+						{
+							name: 'conditionalRows',
+							type: 'array',
+							admin: {
+								description: 'Per-row conditions, keyed off sibling data rather than the document.',
+							},
+							fields: [
+								{
+									name: 'mode',
+									type: 'select',
+									options: ['simple', 'detailed'],
+									defaultValue: 'simple',
+								},
+								{
+									name: 'detail',
+									type: 'text',
+									admin: { condition: (_data, siblingData) => siblingData?.mode === 'detailed' },
+								},
+							],
+						},
+					],
+				},
 			],
 		},
 	],

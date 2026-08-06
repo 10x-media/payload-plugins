@@ -120,8 +120,14 @@ export const HistoryDebugOverlay: React.FC<HistoryDebugOverlayProps> = ({
 
 	if (!mounted) return null
 
+	// Filtered through the history's own matcher, not the built-in defaults:
+	// otherwise a path the host opted out of shows up here as a change that is
+	// forever "pending", since it is never going to be captured.
 	const pending = fields
-		? diffComparable(history.stack[history.index]?.comparable ?? {}, extractComparable(fields))
+		? diffComparable(
+				history.stack[history.index]?.comparable ?? {},
+				extractComparable(fields, history.options.isIgnored)
+			)
 		: []
 
 	const copy = () => {
