@@ -46,7 +46,8 @@ export const DEFAULT_IGNORED_PATHS = [
 export const isIgnoredPath: PathMatcher = createPathMatcher(DEFAULT_IGNORED_PATHS)
 
 export interface ComparableField {
-	value: unknown
+	/** Absent for array and blocks fields, whose `value` carries no information (see extractComparableField). */
+	value?: unknown
 	/** Row ids in order, which captures array/blocks row additions, deletions and moves. */
 	rowIds?: (string | undefined)[]
 }
@@ -83,6 +84,24 @@ export interface UndoHistory {
 	stack: HistoryEntry[]
 	/** Index of the entry representing the current form state. */
 	index: number
+	/**
+	 * The comparable state of the persisted document, or null before anything has
+	 * been saved or loaded.
+	 *
+	 * This is what makes the "leave without saving" prompt truthful in both
+	 * directions. Undoing back to the *first* entry is not the same as being
+	 * unsaved: after a save, the baseline moves to wherever the document was
+	 * saved from, and stepping back past that point is a real unsaved change even
+	 * though the form looks like it did on load.
+	 *
+	 * Held as a value rather than an index on purpose. An index has to be
+	 * renumbered when the cap evicts entries and invalidated when a new edit
+	 * drops the redo tail, and recording one meant pushing a snapshot at save
+	 * time, which truncated the redo tail through the very branch redo was about
+	 * to walk into. A value needs none of that bookkeeping and lets the baseline
+	 * be recorded without touching the stack at all.
+	 */
+	savedComparable: ComparableState | null
 	options: HistoryOptions
 }
 
@@ -114,11 +133,24 @@ export const deepEqual = (a: unknown, b: unknown): boolean => {
 	return true
 }
 
-const extractComparableField = (field: FormState[string]): ComparableField => {
-	const entry: ComparableField = { value: field.value }
-	if (field.rows) entry.rowIds = field.rows.map((row) => row.id)
-	return entry
-}
+/**
+ * Reduce a field state to what counts as a user-visible edit.
+ *
+ * For array and blocks fields the row ids are the whole story, and `value` is
+ * deliberately dropped: Payload sets it to the row count, which `rowIds` already
+ * encodes, and uses it as a "no data" marker in a way that changes without any
+ * edit. A localized blocks field with no value in the active locale is built
+ * with `value: null`, and the next form-state build, triggered by an edit to
+ * some unrelated field, rewrites it to `0` (arrays do the same between
+ * `undefined` and `0`, see @payloadcms/ui addFieldStatePromise).
+ *
+ * Comparing that would report an edit nobody made. Worse, the phantom lands on
+ * the capture that runs at the start of the next restore, which appends an
+ * entry and truncates the redo tail, so redo silently stops working after the
+ * first undo.
+ */
+const extractComparableField = (field: FormState[string]): ComparableField =>
+	field.rows ? { rowIds: field.rows.map((row) => row.id) } : { value: field.value }
 
 export const extractComparable = (
 	fields: FormState,
@@ -146,8 +178,28 @@ export const createSnapshot = (
 export const createHistory = (options: Partial<HistoryOptions> = {}): UndoHistory => ({
 	stack: [],
 	index: -1,
+	savedComparable: null,
 	options: { ...DEFAULT_HISTORY_OPTIONS, ...options },
 })
+
+/**
+ * Record `fields` as the persisted state. Call whenever the form becomes clean:
+ * a save, an autosave, a reset, the initial load.
+ *
+ * Reads the live form state rather than the stack, so a save made with edits
+ * still inside the capture debounce is recorded accurately, and does not append
+ * an entry, so it can never disturb the redo tail.
+ */
+export const markSaved = (history: UndoHistory, fields: FormState): void => {
+	history.savedComparable = extractComparable(fields, history.options.isIgnored)
+}
+
+/** True when the form matches the persisted document, so it can be reported clean. */
+export const isAtSavedState = (history: UndoHistory): boolean => {
+	if (!history.savedComparable) return false
+	const current = history.stack[history.index]
+	return current !== undefined && deepEqual(current.comparable, history.savedComparable)
+}
 
 /**
  * Push the current form state onto the history. No-ops (and returns false) when

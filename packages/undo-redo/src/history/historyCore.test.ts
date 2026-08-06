@@ -9,7 +9,9 @@ import {
 	diffComparable,
 	extractComparable,
 	type HistoryEntry,
+	isAtSavedState,
 	MAX_HISTORY_ENTRIES,
+	markSaved,
 	pushSnapshot,
 	type UndoHistory,
 } from './historyCore'
@@ -288,14 +290,13 @@ describe('diffComparable', () => {
 		])
 	})
 
-	it('reports a row reorder that leaves every value untouched', () => {
+	it('reports a row reorder as a row id change and nothing else', () => {
 		const from = extractComparable({ items: arrayField(['r1', 'r2']) })
 		const to = extractComparable({ items: arrayField(['r2', 'r1']) })
+		// No `from`/`to`: a rows field contributes no comparable value.
 		expect(diffComparable(from, to)).toEqual([
 			{
 				path: 'items',
-				from: 2,
-				to: 2,
 				fromRowIds: ['r1', 'r2'],
 				toRowIds: ['r2', 'r1'],
 			},
@@ -351,5 +352,157 @@ describe('history options', () => {
 		const history = createHistory()
 		pushSnapshot(history, { _status: textField('draft'), title: textField('x') })
 		expect(Object.keys(entryAt(history, 0).comparable)).toEqual(['title'])
+	})
+})
+
+describe('array and blocks value normalization', () => {
+	/** A localized blocks field with no value in the active locale. */
+	const emptyLocalizedBlocks = (): FormState[string] => ({
+		initialValue: null,
+		rows: [],
+		valid: true,
+		value: null,
+	})
+
+	/** The same field after Payload rebuilt form state and normalized it. */
+	const normalizedEmptyBlocks = (): FormState[string] => ({
+		initialValue: 0,
+		rows: [],
+		valid: true,
+		value: 0,
+	})
+
+	it('treats the null to zero normalization as no change', () => {
+		const history = createHistory()
+		pushSnapshot(history, { sections: emptyLocalizedBlocks(), title: textField('a') })
+		expect(
+			pushSnapshot(history, { sections: normalizedEmptyBlocks(), title: textField('a') })
+		).toBe(false)
+		expect(history.stack).toHaveLength(1)
+	})
+
+	it('reports no diff for it, so the overlay stays truthful', () => {
+		const from = extractComparable({ sections: emptyLocalizedBlocks() })
+		const to = extractComparable({ sections: normalizedEmptyBlocks() })
+		expect(diffComparable(from, to)).toEqual([])
+	})
+
+	it('does not let the normalization truncate the redo tail', () => {
+		const history = createHistory()
+		pushSnapshot(history, { sections: emptyLocalizedBlocks(), title: textField('a') })
+		pushSnapshot(history, { sections: emptyLocalizedBlocks(), title: textField('ab') })
+		// The user steps back, then the server merge answers with the normalized
+		// field. Capturing that must not append an entry over the redo tail.
+		history.index = 0
+		expect(
+			pushSnapshot(history, { sections: normalizedEmptyBlocks(), title: textField('a') })
+		).toBe(false)
+		expect(canRedo(history)).toBe(true)
+		expect(history.stack).toHaveLength(2)
+	})
+
+	it('still detects real row changes', () => {
+		const history = createHistory()
+		pushSnapshot(history, { items: arrayField(['r1']) })
+		expect(pushSnapshot(history, { items: arrayField(['r1', 'r2']) })).toBe(true)
+		expect(pushSnapshot(history, { items: arrayField(['r2', 'r1']) })).toBe(true)
+	})
+
+	it('keeps comparing values for fields without rows', () => {
+		const history = createHistory()
+		pushSnapshot(history, { count: textField(null) })
+		expect(pushSnapshot(history, { count: textField(0) })).toBe(true)
+	})
+})
+
+describe('saved baseline', () => {
+	it('starts with no baseline, so nothing reads as clean', () => {
+		const history = createHistory()
+		expect(history.savedComparable).toBeNull()
+		expect(isAtSavedState(history)).toBe(false)
+	})
+
+	it('tracks the state the document was saved from', () => {
+		const history = createHistory()
+		const loaded: FormState = { title: textField('loaded') }
+		pushSnapshot(history, loaded)
+		markSaved(history, loaded)
+		expect(isAtSavedState(history)).toBe(true)
+
+		pushSnapshot(history, { title: textField('edited') })
+		expect(isAtSavedState(history)).toBe(false)
+
+		history.index = 0
+		expect(isAtSavedState(history)).toBe(true)
+	})
+
+	it('reports clean at the save point, not at the first entry', () => {
+		const history = createHistory()
+		pushSnapshot(history, { title: textField('loaded') })
+		const saved: FormState = { title: textField('edited') }
+		pushSnapshot(history, saved)
+		markSaved(history, saved)
+		pushSnapshot(history, { title: textField('edited more') })
+
+		history.index = 1
+		expect(isAtSavedState(history)).toBe(true)
+		// Back at the loaded state, which is no longer what is persisted.
+		history.index = 0
+		expect(isAtSavedState(history)).toBe(false)
+	})
+
+	it('records a save made while edits were still inside the capture debounce', () => {
+		const history = createHistory()
+		pushSnapshot(history, { title: textField('captured') })
+		// The user typed on and hit save before the next capture ran.
+		markSaved(history, { title: textField('typed then saved') })
+		expect(isAtSavedState(history)).toBe(false)
+		pushSnapshot(history, { title: textField('typed then saved') })
+		expect(isAtSavedState(history)).toBe(true)
+	})
+
+	it('leaves the stack untouched, so redo onto the saved state survives', () => {
+		const history = createHistory()
+		const loaded: FormState = { title: textField('a') }
+		pushSnapshot(history, loaded)
+		markSaved(history, loaded)
+		pushSnapshot(history, { title: textField('b') })
+		pushSnapshot(history, { title: textField('c') })
+
+		// Undo twice to the saved state, which makes the form clean and
+		// re-records the baseline, then redo back up.
+		history.index = 0
+		expect(isAtSavedState(history)).toBe(true)
+		markSaved(history, loaded)
+
+		expect(history.stack).toHaveLength(3)
+		expect(canRedo(history)).toBe(true)
+		history.index = 1
+		expect(entryAt(history, 1).comparable.title?.value).toBe('b')
+		expect(entryAt(history, 2).comparable.title?.value).toBe('c')
+	})
+
+	it('survives eviction without renumbering, unlike an index would', () => {
+		const history = createHistory({ maxHistory: 2 })
+		const saved: FormState = { title: textField('a') }
+		pushSnapshot(history, saved)
+		markSaved(history, saved)
+		pushSnapshot(history, { title: textField('b') })
+		pushSnapshot(history, { title: textField('c') })
+		// Entry 'a' was evicted, but the baseline is a value and still answers
+		// correctly for any entry that matches it.
+		expect(history.savedComparable).not.toBeNull()
+		expect(isAtSavedState(history)).toBe(false)
+		pushSnapshot(history, saved)
+		expect(isAtSavedState(history)).toBe(true)
+	})
+
+	it('ignores the paths the history ignores', () => {
+		const history = createHistory()
+		const fields: FormState = { _status: textField('draft'), title: textField('a') }
+		pushSnapshot(history, fields)
+		markSaved(history, fields)
+		// Publishing rewrites _status, which must not make the form look dirty.
+		expect(isAtSavedState(history)).toBe(true)
 	})
 })

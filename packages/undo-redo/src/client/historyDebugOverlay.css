@@ -194,3 +194,13 @@
 	width: 29%;
 	color: var(--theme-success-500);
 }
+
+/* The entry that matches the persisted document. */
+.undo-redo-debug__saved {
+	flex-shrink: 0;
+	padding: 0 4px;
+	border-radius: var(--style-radius-s);
+	background: var(--theme-success-100);
+	color: var(--theme-success-600);
+	font-size: 10px;
+}

@@ -6,8 +6,10 @@ import { createPortal } from 'react-dom'
 
 import {
 	type ComparableDiff,
+	deepEqual,
 	diffComparable,
 	extractComparable,
+	isAtSavedState,
 	type UndoHistory,
 } from '../history/historyCore'
 import { keys } from '../translations/keys'
@@ -79,6 +81,8 @@ export interface HistoryDebugOverlayProps {
 	fields: FormState | null
 	/** Monotonic counter of captures and restores, shown as a liveness signal. */
 	revision: number
+	/** False under autosave, where the saved baseline is deliberately not tracked. */
+	tracksSavedState: boolean
 	onClose: () => void
 	onJump: (index: number) => void
 }
@@ -94,6 +98,7 @@ export const HistoryDebugOverlay: React.FC<HistoryDebugOverlayProps> = ({
 	history,
 	fields,
 	revision,
+	tracksSavedState,
 	onClose,
 	onJump,
 }) => {
@@ -133,8 +138,15 @@ export const HistoryDebugOverlay: React.FC<HistoryDebugOverlayProps> = ({
 			<header className={`${baseClass}__header`}>
 				<strong className={`${baseClass}__title`}>{t(keys.debugTitle)}</strong>
 				<span className={`${baseClass}__meta`}>
-					{history.stack.length === 0 ? 0 : history.index + 1}/{history.stack.length} · rev{' '}
-					{revision}
+					{history.stack.length === 0 ? 0 : history.index + 1}/{history.stack.length} ·{' '}
+					{!tracksSavedState
+						? 'autosave, no baseline'
+						: history.savedComparable
+							? isAtSavedState(history)
+								? 'clean'
+								: 'unsaved'
+							: 'no baseline'}{' '}
+					· rev {revision}
 				</span>
 				<button className={`${baseClass}__action`} onClick={copy} type="button">
 					{t(keys.debugCopy)}
@@ -161,6 +173,10 @@ export const HistoryDebugOverlay: React.FC<HistoryDebugOverlayProps> = ({
 					)
 					const isCurrent = index === history.index
 					const isOpen = expanded === entry.id
+					// Compared by value, so more than one entry can read as saved,
+					// which is correct: they hold the same form state.
+					const isSaved =
+						history.savedComparable !== null && deepEqual(entry.comparable, history.savedComparable)
 					return (
 						<section
 							className={`${baseClass}__entry${isCurrent ? ` ${baseClass}__entry--current` : ''}`}
@@ -177,6 +193,11 @@ export const HistoryDebugOverlay: React.FC<HistoryDebugOverlayProps> = ({
 										{isOpen ? '▾' : '▸'}
 									</span>
 									<span className={`${baseClass}__index`}>#{index}</span>
+									{isSaved ? (
+										<span className={`${baseClass}__saved`} title="matches the persisted document">
+											saved
+										</span>
+									) : null}
 									<span className={`${baseClass}__summary`}>
 										{index === 0
 											? t(keys.debugOriginal)

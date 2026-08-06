@@ -6,6 +6,7 @@ import {
 	useDocumentInfo,
 	useForm,
 	useFormInitializing,
+	useFormModified,
 	useFormProcessing,
 } from '@payloadcms/ui'
 import type { FormState } from 'payload'
@@ -18,7 +19,9 @@ import {
 	canRedo,
 	canUndo,
 	createHistory,
+	isAtSavedState,
 	MAX_HISTORY_ENTRIES,
+	markSaved,
 	pushSnapshot,
 	type UndoHistory,
 } from '../history/historyCore'
@@ -111,6 +114,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 	const { setModified } = useForm()
 	const initializing = useFormInitializing()
 	const processing = useFormProcessing()
+	const modified = useFormModified()
 	const { t } = useTranslation()
 	const { getEntityConfig, config } = useConfig()
 	const { collectionSlug, globalSlug } = useDocumentInfo()
@@ -123,12 +127,31 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 	 * `buildFormState` was called with `includeSchema`, which the edit view never
 	 * does.
 	 */
+	const entity = useMemo(
+		() =>
+			collectionSlug
+				? getEntityConfig({ collectionSlug })
+				: globalSlug
+					? getEntityConfig({ globalSlug })
+					: null,
+		[collectionSlug, getEntityConfig, globalSlug]
+	)
+
+	/**
+	 * Autosave persists every edit continuously, so "differs from what is
+	 * persisted" is not a state the editor can meaningfully be in: the baseline
+	 * would move on every autosave, and an undo would immediately trigger one and
+	 * move it again. Tracking it there produces a saved marker that chases the
+	 * user around instead of telling them anything, so the whole baseline
+	 * mechanism is skipped and restores simply report the form as modified.
+	 */
+	const tracksSavedState = useMemo(() => {
+		const drafts = entity?.versions?.drafts
+		const autosave = typeof drafts === 'object' && drafts !== null ? drafts.autosave : false
+		return !autosave
+	}, [entity])
+
 	const isIgnored = useMemo(() => {
-		const entity = collectionSlug
-			? getEntityConfig({ collectionSlug })
-			: globalSlug
-				? getEntityConfig({ globalSlug })
-				: null
 		const schemaPatterns = entity
 			? collectIgnorePatterns(
 					buildFieldSchemaMap(entity.fields, { blocksMap: config.blocksMap }),
@@ -136,7 +159,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 				)
 			: []
 		return createPathMatcher([...(ignorePaths ?? []), ...schemaPatterns])
-	}, [collectionSlug, config.blocksMap, getEntityConfig, globalSlug, ignoreFieldTypes, ignorePaths])
+	}, [config.blocksMap, entity, ignoreFieldTypes, ignorePaths])
 
 	const historyRef = useRef<UndoHistory | null>(null)
 	if (historyRef.current === null) {
@@ -190,6 +213,44 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 	}, [captureDebounce, fields, history, initializing, refreshFlags, bumpRevision])
 
 	/**
+	 * Set when this component is the one clearing `modified`, which happens when
+	 * a restore lands back on the saved state.
+	 *
+	 * The baseline is already correct in that case, by definition: the restore
+	 * only reports clean because the entry it landed on matches the baseline.
+	 * Re-recording it there reads live form state while the server merge that
+	 * follows REPLACE_STATE is still in flight, so the baseline lands on a state
+	 * that matches no entry, and moves again once the merge settles.
+	 */
+	const clearedByRestoreRef = useRef(false)
+
+	/**
+	 * Re-baseline on every point Payload itself considers the form clean: a
+	 * successful save or autosave, a reset, and the initial load. Reading
+	 * Payload's own flag rather than watching for a save keeps the baseline
+	 * correct for all of them without re-deriving what "saved" means.
+	 *
+	 * This records a baseline and deliberately does not touch the stack. Pushing
+	 * here would run the redo-tail truncation in pushSnapshot, and since redoing
+	 * onto the saved state makes the form clean, it would destroy the very branch
+	 * redo had just stepped into.
+	 */
+	useEffect(() => {
+		if (!tracksSavedState) return
+		if (modified) {
+			clearedByRestoreRef.current = false
+			return
+		}
+		if (initializing || !fieldsRef.current) return
+		if (clearedByRestoreRef.current) {
+			clearedByRestoreRef.current = false
+			return
+		}
+		markSaved(history, fieldsRef.current)
+		bumpRevision()
+	}, [bumpRevision, history, initializing, modified, tracksSavedState])
+
+	/**
 	 * Restore the entry that `resolveTarget` picks. The target is resolved from
 	 * the index *after* capturing pending edits, not before: capturing can move
 	 * the index, and a relative step must be relative to where the user is.
@@ -214,14 +275,20 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 				state: buildRestoreState(entry, current, isIgnored),
 				optimize: false,
 			})
-			// Mark the form modified so the debounced onChange revalidates the
-			// restored state on the server and autosave/save picks it up.
-			setModified(true)
 			history.index = target
+			// Modified drives the "leave without saving" prompt and the save
+			// button, so it has to answer "does the form differ from what is
+			// persisted", not "did something just happen". Landing back on the
+			// saved entry is a return to clean; anywhere else is a real change,
+			// and marking it also makes the debounced onChange revalidate the
+			// restored state on the server so save and autosave pick it up.
+			const clean = tracksSavedState && isAtSavedState(history)
+			clearedByRestoreRef.current = clean
+			setModified(!clean)
 			refreshFlags()
 			bumpRevision()
 		},
-		[bumpRevision, dispatchFields, history, isIgnored, refreshFlags, setModified]
+		[bumpRevision, dispatchFields, history, isIgnored, refreshFlags, setModified, tracksSavedState]
 	)
 
 	const restore = useCallback(
@@ -329,6 +396,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 					onClose={() => setOverlayOpen(false)}
 					onJump={jumpTo}
 					revision={revision}
+					tracksSavedState={tracksSavedState}
 				/>
 			) : null}
 		</div>
