@@ -5,9 +5,7 @@
  */
 export const keys = {
 	undo: 'undoRedo:undo',
-	undoTooltip: 'undoRedo:undoTooltip',
 	redo: 'undoRedo:redo',
-	redoTooltip: 'undoRedo:redoTooltip',
 	debug: 'undoRedo:debug',
 	debugTooltip: 'undoRedo:debugTooltip',
 	debugTitle: 'undoRedo:debugTitle',

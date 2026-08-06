@@ -34,9 +34,23 @@ import {
 import { buildFieldSchemaMap, collectIgnorePatterns } from '../schema/fieldSchema'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
+import { formatShortcut, isMacPlatform } from './formatShortcut'
 import { HistoryDebugOverlay } from './HistoryDebugOverlay'
+import './undoRedoControls.css'
 
 const baseClass = 'undo-redo-controls'
+
+/**
+ * Resolved after mount rather than during render: the server render has no
+ * `navigator`, so deciding there would either hydrate into a mismatch or lock
+ * every user to the non-mac notation. The value only feeds tooltip text, which
+ * nobody can hover before the first paint.
+ */
+const useIsMac = (): boolean => {
+	const [isMac, setIsMac] = useState(false)
+	useEffect(() => setIsMac(isMacPlatform()), [])
+	return isMac
+}
 
 const UndoIcon: React.FC = () => (
 	<svg
@@ -116,6 +130,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 	const processing = useFormProcessing()
 	const modified = useFormModified()
 	const { t } = useTranslation()
+	const isMac = useIsMac()
 	const { getEntityConfig, config } = useConfig()
 	const { collectionSlug, globalSlug } = useDocumentInfo()
 
@@ -316,17 +331,25 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 		return Boolean(topDrawer && ourForm && !topDrawer.contains(ourForm))
 	}, [])
 
+	const chords = useMemo(() => {
+		if (shortcuts === false) return null
+		return {
+			redo: shortcuts?.redo ?? [...DEFAULT_SHORTCUTS.redo],
+			undo: shortcuts?.undo ?? [...DEFAULT_SHORTCUTS.undo],
+		}
+	}, [shortcuts])
+
 	const hotkeyOptions = useMemo(
 		() => ({
-			enabled: shortcuts !== false,
+			enabled: chords !== null,
 			ignoreEventWhen: isForAnotherForm,
 			preventDefault: true,
 		}),
-		[isForAnotherForm, shortcuts]
+		[chords, isForAnotherForm]
 	)
 
 	useHotkeys(
-		shortcuts === false ? [] : (shortcuts?.undo ?? DEFAULT_SHORTCUTS.undo),
+		chords?.undo ?? [],
 		() => {
 			restore(-1)
 		},
@@ -335,7 +358,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 	)
 
 	useHotkeys(
-		shortcuts === false ? [] : (shortcuts?.redo ?? DEFAULT_SHORTCUTS.redo),
+		chords?.redo ?? [],
 		() => {
 			restore(1)
 		},
@@ -343,47 +366,70 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({
 		[restore]
 	)
 
+	/**
+	 * Button labels, and the same labels with the bound chord appended for the
+	 * tooltip. Only the first chord is shown: the rest are aliases for the same
+	 * action, and listing them turns a hint into something to read.
+	 *
+	 * The shortcut stays out of the accessible name on purpose, since a screen
+	 * reader announces `⇧⌘Z` as punctuation rather than as a key combination.
+	 */
+	const labels = useMemo(() => {
+		const withChord = (label: string, chord: string | undefined) => {
+			const hint = chord ? formatShortcut(chord, isMac) : ''
+			return hint ? `${label} (${hint})` : label
+		}
+		const undo = t(keys.undo)
+		const redo = t(keys.redo)
+		return {
+			redo,
+			redoTooltip: withChord(redo, chords?.redo[0]),
+			undo,
+			undoTooltip: withChord(undo, chords?.undo[0]),
+		}
+	}, [chords, isMac, t])
+
 	return (
-		<div
-			ref={rootRef}
-			className={baseClass}
-			style={{ alignItems: 'center', display: 'flex', gap: '4px' }}
-		>
+		<div ref={rootRef} className={baseClass}>
 			<Button
-				// aria-label={t(keys.undo)}
-				buttonStyle={!flags.undo || processing ? 'dashed' : 'subtle'}
-				className={`${baseClass}__undo`}
+				buttonStyle="subtle"
+				className={`${baseClass}__button ${baseClass}__undo`}
 				disabled={!flags.undo || processing}
+				// Button's own `aria-label` prop is also written to `title`, and the
+				// native title tooltip then covers Payload's. Going through
+				// `extraButtonProps`, which is spread last, sets the accessible name
+				// without the title.
+				extraButtonProps={{ 'aria-label': labels.undo }}
 				margin={false}
 				onClick={() => restore(-1)}
-				size="small"
-				tooltip={t(keys.undoTooltip)}
+				tooltip={labels.undoTooltip}
 			>
 				<UndoIcon />
 			</Button>
 			<Button
-				// aria-label in payload button components also goes to the title attribute
-				// Which messes up tooltips in the admin panel (title renders above tooltip,
-				// so essentially hovering over the button shows the title, and tooltip is mostly hidden)
-				// aria-label={t(keys.redo)}
-				buttonStyle={!flags.redo || processing ? 'dashed' : 'subtle'}
-				className={`${baseClass}__redo`}
+				buttonStyle="subtle"
+				className={`${baseClass}__button ${baseClass}__redo`}
 				disabled={!flags.redo || processing}
+				extraButtonProps={{ 'aria-label': labels.redo }}
 				margin={false}
 				onClick={() => restore(1)}
-				size="small"
-				tooltip={t(keys.redoTooltip)}
+				tooltip={labels.redoTooltip}
 			>
 				<RedoIcon />
 			</Button>
 			{debug ? (
 				<Button
-					aria-label={t(keys.debug)}
-					buttonStyle={overlayOpen ? 'secondary' : 'pill'}
-					className={`${baseClass}__debug`}
+					buttonStyle="subtle"
+					className={[
+						`${baseClass}__button`,
+						`${baseClass}__debug`,
+						overlayOpen ? `${baseClass}__button--active` : '',
+					]
+						.filter(Boolean)
+						.join(' ')}
+					extraButtonProps={{ 'aria-expanded': overlayOpen, 'aria-label': t(keys.debug) }}
 					margin={false}
 					onClick={() => setOverlayOpen((open) => !open)}
-					size="small"
 					tooltip={t(keys.debugTooltip)}
 				>
 					<HistoryIcon />

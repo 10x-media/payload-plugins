@@ -7,9 +7,7 @@ import { keys, type TranslationKey } from './keys'
  */
 export const en: Record<TranslationKey, string> = {
 	[keys.undo]: 'Undo',
-	[keys.undoTooltip]: 'Undo change (Ctrl+Z)',
 	[keys.redo]: 'Redo',
-	[keys.redoTooltip]: 'Redo change (Ctrl+Shift+Z)',
 	[keys.debug]: 'Undo history',
 	[keys.debugTooltip]: 'Inspect undo history',
 	[keys.debugTitle]: 'Undo history',
