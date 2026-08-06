@@ -7,4 +7,5 @@ export default definePluginBuild({
 		'exports/client': 'src/exports/client.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 	},
+	copy: [{ from: 'src/client/historyDebugOverlay.css', to: 'dist/client' }],
 })

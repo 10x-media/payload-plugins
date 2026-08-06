@@ -3,8 +3,18 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { buildConfig, type CollectionConfig } from 'payload'
+import { BlocksFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
+import { de } from '@payloadcms/translations/languages/de'
+import { en } from '@payloadcms/translations/languages/en'
+import { buildConfig } from 'payload'
 import { undoRedo } from '../src/index'
+import { drafts } from './collections/drafts'
+import { localized } from './collections/localized'
+import { nesting } from './collections/nesting'
+import { posts } from './collections/posts'
+import { tags } from './collections/tags'
+import { users } from './collections/users'
+import { siteSettings } from './globals/siteSettings'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -12,30 +22,6 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
-
-const users: CollectionConfig = {
-	slug: 'users',
-	auth: true,
-	admin: { useAsTitle: 'email' },
-	fields: [],
-}
-
-/** Exercise surface for the controls: a text field plus an array with subfields. */
-const posts: CollectionConfig = {
-	slug: 'posts',
-	admin: { useAsTitle: 'title' },
-	fields: [
-		{ name: 'title', type: 'text' },
-		{
-			name: 'items',
-			type: 'array',
-			fields: [
-				{ name: 'ean', type: 'text' },
-				{ name: 'note', type: 'textarea' },
-			],
-		},
-	],
-}
 
 const db =
 	useDb === 'postgres'
@@ -55,8 +41,31 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users, posts],
-	plugins: [undoRedo({})],
+	// Blocks inside rich text are the case where Lexical's own history and the
+	// form-state history overlap most: editing a block sub-field mutates the
+	// editor value from outside the editor's own undo stack.
+	editor: lexicalEditor({
+		features: ({ defaultFeatures }) => [
+			...defaultFeatures,
+			BlocksFeature({
+				blocks: [
+					{
+						slug: 'callout',
+						fields: [
+							{ name: 'tone', type: 'select', options: ['info', 'warning'], defaultValue: 'info' },
+							{ name: 'body', type: 'text' },
+							{ name: 'points', type: 'array', fields: [{ name: 'text', type: 'text' }] },
+						],
+					},
+				],
+			}),
+		],
+	}),
+	collections: [posts, nesting, localized, drafts, tags, users],
+	globals: [siteSettings],
+	i18n: { supportedLanguages: { de, en } },
+	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
+	plugins: [undoRedo({ debug: true })],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

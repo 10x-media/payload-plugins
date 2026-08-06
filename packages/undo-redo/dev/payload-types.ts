@@ -67,8 +67,12 @@ export interface Config {
   };
   blocks: {};
   collections: {
-    users: User;
     posts: Post;
+    nesting: Nesting;
+    'localized-docs': LocalizedDoc;
+    drafts: Draft;
+    tags: Tag;
+    users: User;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -76,8 +80,12 @@ export interface Config {
   };
   collectionsJoins: {};
   collectionsSelect: {
-    users: UsersSelect<false> | UsersSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
+    nesting: NestingSelect<false> | NestingSelect<true>;
+    'localized-docs': LocalizedDocsSelect<false> | LocalizedDocsSelect<true>;
+    drafts: DraftsSelect<false> | DraftsSelect<true>;
+    tags: TagsSelect<false> | TagsSelect<true>;
+    users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -86,10 +94,14 @@ export interface Config {
   db: {
     defaultIDType: string;
   };
-  fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
-  locale: null;
+  fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'de') | ('en' | 'de')[];
+  globals: {
+    'site-settings': SiteSetting;
+  };
+  globalsSelect: {
+    'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+  };
+  locale: 'en' | 'de';
   widgets: {
     collections: CollectionsWidget;
   };
@@ -119,6 +131,552 @@ export interface UserAuthOperations {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts".
+ */
+export interface Post {
+  id: string;
+  title?: string | null;
+  summary?: string | null;
+  views?: number | null;
+  rating?: number | null;
+  published?: boolean | null;
+  status?: ('draft' | 'review' | 'published') | null;
+  audiences?: ('dev' | 'design' | 'sales' | 'support')[] | null;
+  flavor?: ('sweet' | 'salty' | 'sour') | null;
+  publishAt?: string | null;
+  publishAtWithTime?: string | null;
+  contact?: string | null;
+  snippet?: string | null;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  location?: [number, number] | null;
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+    noIndex?: boolean | null;
+    keywords?:
+      | {
+          word?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  primaryTag?: (string | null) | Tag;
+  relatedTags?: (string | Tag)[] | null;
+  mixed?:
+    | (
+        | {
+            relationTo: 'tags';
+            value: string | Tag;
+          }
+        | {
+            relationTo: 'posts';
+            value: string | Post;
+          }
+      )[]
+    | null;
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  notes?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  plainNextToRich?: string | null;
+  layout?:
+    | (
+        | {
+            heading?: string | null;
+            subheading?: string | null;
+            cta?: {
+              label?: string | null;
+              url?: string | null;
+            };
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'hero';
+          }
+        | {
+            intro?: string | null;
+            cards?:
+              | {
+                  title?: string | null;
+                  link?: {
+                    label?: string | null;
+                    url?: string | null;
+                  };
+                  id?: string | null;
+                }[]
+              | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'cards';
+          }
+        | {
+            body?: {
+              root: {
+                type: string;
+                children: {
+                  type: any;
+                  version: number;
+                  [k: string]: unknown;
+                }[];
+                direction: ('ltr' | 'rtl') | null;
+                format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                indent: number;
+                version: number;
+              };
+              [k: string]: unknown;
+            } | null;
+            caption?: string | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'richBlock';
+          }
+        | {
+            blockTitle?: string | null;
+            blockBody?: string | null;
+            settings?: {
+              theme?: ('light' | 'dark') | null;
+              featured?: boolean | null;
+            };
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'tabbedBlock';
+          }
+        | {
+            label?: string | null;
+            inner?:
+              | (
+                  | {
+                      heading?: string | null;
+                      subheading?: string | null;
+                      cta?: {
+                        label?: string | null;
+                        url?: string | null;
+                      };
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'hero';
+                    }
+                  | {
+                      intro?: string | null;
+                      cards?:
+                        | {
+                            title?: string | null;
+                            link?: {
+                              label?: string | null;
+                              url?: string | null;
+                            };
+                            id?: string | null;
+                          }[]
+                        | null;
+                      id?: string | null;
+                      blockName?: string | null;
+                      blockType: 'cards';
+                    }
+                )[]
+              | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'nested';
+          }
+      )[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tags".
+ */
+export interface Tag {
+  id: string;
+  name?: string | null;
+  color?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "nesting".
+ */
+export interface Nesting {
+  id: string;
+  label?: string | null;
+  /**
+   * path: looseAlpha
+   */
+  looseAlpha?: string | null;
+  /**
+   * path: looseBeta
+   */
+  looseBeta?: string | null;
+  /**
+   * path: rowLeft
+   */
+  rowLeft?: string | null;
+  /**
+   * path: rowRight
+   */
+  rowRight?: string | null;
+  named?: {
+    /**
+     * path: named.alpha
+     */
+    alpha?: string | null;
+    beta?: number | null;
+    deep?: {
+      /**
+       * path: named.deep.value
+       */
+      value?: string | null;
+      /**
+       * array in group in group: named.deep.list.N.item
+       */
+      list?:
+        | {
+            item?: string | null;
+            id?: string | null;
+          }[]
+        | null;
+    };
+    /**
+     * path: named.nestedLoose (no extra segment)
+     */
+    nestedLoose?: string | null;
+  };
+  /**
+   * rows carry ids, so reorder is distinguishable from edit
+   */
+  list?:
+    | {
+        /**
+         * path: list.N.title
+         */
+        title?: string | null;
+        meta?: {
+          /**
+           * path: list.N.meta.note
+           */
+          note?: string | null;
+          weight?: number | null;
+        };
+        /**
+         * path: list.N.looseInRow
+         */
+        looseInRow?: string | null;
+        /**
+         * path: list.N.nested.M.value
+         */
+        nested?:
+          | {
+              value?: string | null;
+              /**
+               * path: list.N.nested.M.deeper.K.leaf
+               */
+              deeper?:
+                | {
+                    leaf?: string | null;
+                    id?: string | null;
+                  }[]
+                | null;
+              id?: string | null;
+            }[]
+          | null;
+        /**
+         * path: list.N.rowBlocks.M.<field>
+         */
+        rowBlocks?:
+          | (
+              | {
+                  heading?: string | null;
+                  subheading?: string | null;
+                  cta?: {
+                    label?: string | null;
+                    url?: string | null;
+                  };
+                  id?: string | null;
+                  blockName?: string | null;
+                  blockType: 'hero';
+                }
+              | {
+                  intro?: string | null;
+                  cards?:
+                    | {
+                        title?: string | null;
+                        link?: {
+                          label?: string | null;
+                          url?: string | null;
+                        };
+                        id?: string | null;
+                      }[]
+                    | null;
+                  id?: string | null;
+                  blockName?: string | null;
+                  blockType: 'cards';
+                }
+            )[]
+          | null;
+        rowRich?: {
+          root: {
+            type: string;
+            children: {
+              type: any;
+              version: number;
+              [k: string]: unknown;
+            }[];
+            direction: ('ltr' | 'rtl') | null;
+            format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+            indent: number;
+            version: number;
+          };
+          [k: string]: unknown;
+        } | null;
+        id?: string | null;
+      }[]
+    | null;
+  sections?:
+    | (
+        | {
+            heading?: string | null;
+            subheading?: string | null;
+            cta?: {
+              label?: string | null;
+              url?: string | null;
+            };
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'hero';
+          }
+        | {
+            intro?: string | null;
+            cards?:
+              | {
+                  title?: string | null;
+                  link?: {
+                    label?: string | null;
+                    url?: string | null;
+                  };
+                  id?: string | null;
+                }[]
+              | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'cards';
+          }
+        | {
+            body?: {
+              root: {
+                type: string;
+                children: {
+                  type: any;
+                  version: number;
+                  [k: string]: unknown;
+                }[];
+                direction: ('ltr' | 'rtl') | null;
+                format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                indent: number;
+                version: number;
+              };
+              [k: string]: unknown;
+            } | null;
+            caption?: string | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'richBlock';
+          }
+        | {
+            blockTitle?: string | null;
+            blockBody?: string | null;
+            settings?: {
+              theme?: ('light' | 'dark') | null;
+              featured?: boolean | null;
+            };
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'tabbedBlock';
+          }
+      )[]
+    | null;
+  /**
+   * path: inUnnamedTab (root level)
+   */
+  inUnnamedTab?: string | null;
+  /**
+   * path: tabArray.N.value
+   */
+  tabArray?:
+    | {
+        value?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  namedTab?: {
+    /**
+     * path: namedTab.inNamedTab
+     */
+    inNamedTab?: string | null;
+    group?: {
+      /**
+       * path: namedTab.group.deep
+       */
+      deep?: string | null;
+    };
+    /**
+     * path: namedTab.tabBlocks.N.<field>
+     */
+    tabBlocks?:
+      | {
+          heading?: string | null;
+          subheading?: string | null;
+          cta?: {
+            label?: string | null;
+            url?: string | null;
+          };
+          id?: string | null;
+          blockName?: string | null;
+          blockType: 'hero';
+        }[]
+      | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "localized-docs".
+ */
+export interface LocalizedDoc {
+  id: string;
+  title?: string | null;
+  /**
+   * not localized: one value for all locales
+   */
+  shared?: string | null;
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * the whole array is per locale, including row count and order
+   */
+  localizedItems?:
+    | {
+        label?: string | null;
+        note?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * shared rows, per-locale leaf values
+   */
+  sharedItems?:
+    | {
+        sku?: string | null;
+        label?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  meta?: {
+    headline?: string | null;
+    internalId?: string | null;
+  };
+  sections?:
+    | {
+        heading?: string | null;
+        subheading?: string | null;
+        cta?: {
+          label?: string | null;
+          url?: string | null;
+        };
+        id?: string | null;
+        blockName?: string | null;
+        blockType: 'hero';
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "drafts".
+ */
+export interface Draft {
+  id: string;
+  title?: string | null;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  items?:
+    | {
+        value?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
 export interface User {
@@ -141,23 +699,6 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "posts".
- */
-export interface Post {
-  id: string;
-  title?: string | null;
-  items?:
-    | {
-        ean?: string | null;
-        note?: string | null;
-        id?: string | null;
-      }[]
-    | null;
-  updatedAt: string;
-  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -184,12 +725,28 @@ export interface PayloadLockedDocument {
   id: string;
   document?:
     | ({
-        relationTo: 'users';
-        value: string | User;
-      } | null)
-    | ({
         relationTo: 'posts';
         value: string | Post;
+      } | null)
+    | ({
+        relationTo: 'nesting';
+        value: string | Nesting;
+      } | null)
+    | ({
+        relationTo: 'localized-docs';
+        value: string | LocalizedDoc;
+      } | null)
+    | ({
+        relationTo: 'drafts';
+        value: string | Draft;
+      } | null)
+    | ({
+        relationTo: 'tags';
+        value: string | Tag;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -235,6 +792,414 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts_select".
+ */
+export interface PostsSelect<T extends boolean = true> {
+  title?: T;
+  summary?: T;
+  views?: T;
+  rating?: T;
+  published?: T;
+  status?: T;
+  audiences?: T;
+  flavor?: T;
+  publishAt?: T;
+  publishAtWithTime?: T;
+  contact?: T;
+  snippet?: T;
+  metadata?: T;
+  location?: T;
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        noIndex?: T;
+        keywords?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
+      };
+  primaryTag?: T;
+  relatedTags?: T;
+  mixed?: T;
+  content?: T;
+  notes?: T;
+  plainNextToRich?: T;
+  layout?:
+    | T
+    | {
+        hero?:
+          | T
+          | {
+              heading?: T;
+              subheading?: T;
+              cta?:
+                | T
+                | {
+                    label?: T;
+                    url?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+        cards?:
+          | T
+          | {
+              intro?: T;
+              cards?:
+                | T
+                | {
+                    title?: T;
+                    link?:
+                      | T
+                      | {
+                          label?: T;
+                          url?: T;
+                        };
+                    id?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+        richBlock?:
+          | T
+          | {
+              body?: T;
+              caption?: T;
+              id?: T;
+              blockName?: T;
+            };
+        tabbedBlock?:
+          | T
+          | {
+              blockTitle?: T;
+              blockBody?: T;
+              settings?:
+                | T
+                | {
+                    theme?: T;
+                    featured?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+        nested?:
+          | T
+          | {
+              label?: T;
+              inner?:
+                | T
+                | {
+                    hero?:
+                      | T
+                      | {
+                          heading?: T;
+                          subheading?: T;
+                          cta?:
+                            | T
+                            | {
+                                label?: T;
+                                url?: T;
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                    cards?:
+                      | T
+                      | {
+                          intro?: T;
+                          cards?:
+                            | T
+                            | {
+                                title?: T;
+                                link?:
+                                  | T
+                                  | {
+                                      label?: T;
+                                      url?: T;
+                                    };
+                                id?: T;
+                              };
+                          id?: T;
+                          blockName?: T;
+                        };
+                  };
+              id?: T;
+              blockName?: T;
+            };
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "nesting_select".
+ */
+export interface NestingSelect<T extends boolean = true> {
+  label?: T;
+  looseAlpha?: T;
+  looseBeta?: T;
+  rowLeft?: T;
+  rowRight?: T;
+  named?:
+    | T
+    | {
+        alpha?: T;
+        beta?: T;
+        deep?:
+          | T
+          | {
+              value?: T;
+              list?:
+                | T
+                | {
+                    item?: T;
+                    id?: T;
+                  };
+            };
+        nestedLoose?: T;
+      };
+  list?:
+    | T
+    | {
+        title?: T;
+        meta?:
+          | T
+          | {
+              note?: T;
+              weight?: T;
+            };
+        looseInRow?: T;
+        nested?:
+          | T
+          | {
+              value?: T;
+              deeper?:
+                | T
+                | {
+                    leaf?: T;
+                    id?: T;
+                  };
+              id?: T;
+            };
+        rowBlocks?:
+          | T
+          | {
+              hero?:
+                | T
+                | {
+                    heading?: T;
+                    subheading?: T;
+                    cta?:
+                      | T
+                      | {
+                          label?: T;
+                          url?: T;
+                        };
+                    id?: T;
+                    blockName?: T;
+                  };
+              cards?:
+                | T
+                | {
+                    intro?: T;
+                    cards?:
+                      | T
+                      | {
+                          title?: T;
+                          link?:
+                            | T
+                            | {
+                                label?: T;
+                                url?: T;
+                              };
+                          id?: T;
+                        };
+                    id?: T;
+                    blockName?: T;
+                  };
+            };
+        rowRich?: T;
+        id?: T;
+      };
+  sections?:
+    | T
+    | {
+        hero?:
+          | T
+          | {
+              heading?: T;
+              subheading?: T;
+              cta?:
+                | T
+                | {
+                    label?: T;
+                    url?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+        cards?:
+          | T
+          | {
+              intro?: T;
+              cards?:
+                | T
+                | {
+                    title?: T;
+                    link?:
+                      | T
+                      | {
+                          label?: T;
+                          url?: T;
+                        };
+                    id?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+        richBlock?:
+          | T
+          | {
+              body?: T;
+              caption?: T;
+              id?: T;
+              blockName?: T;
+            };
+        tabbedBlock?:
+          | T
+          | {
+              blockTitle?: T;
+              blockBody?: T;
+              settings?:
+                | T
+                | {
+                    theme?: T;
+                    featured?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+      };
+  inUnnamedTab?: T;
+  tabArray?:
+    | T
+    | {
+        value?: T;
+        id?: T;
+      };
+  namedTab?:
+    | T
+    | {
+        inNamedTab?: T;
+        group?:
+          | T
+          | {
+              deep?: T;
+            };
+        tabBlocks?:
+          | T
+          | {
+              hero?:
+                | T
+                | {
+                    heading?: T;
+                    subheading?: T;
+                    cta?:
+                      | T
+                      | {
+                          label?: T;
+                          url?: T;
+                        };
+                    id?: T;
+                    blockName?: T;
+                  };
+            };
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "localized-docs_select".
+ */
+export interface LocalizedDocsSelect<T extends boolean = true> {
+  title?: T;
+  shared?: T;
+  content?: T;
+  localizedItems?:
+    | T
+    | {
+        label?: T;
+        note?: T;
+        id?: T;
+      };
+  sharedItems?:
+    | T
+    | {
+        sku?: T;
+        label?: T;
+        id?: T;
+      };
+  meta?:
+    | T
+    | {
+        headline?: T;
+        internalId?: T;
+      };
+  sections?:
+    | T
+    | {
+        hero?:
+          | T
+          | {
+              heading?: T;
+              subheading?: T;
+              cta?:
+                | T
+                | {
+                    label?: T;
+                    url?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "drafts_select".
+ */
+export interface DraftsSelect<T extends boolean = true> {
+  title?: T;
+  body?: T;
+  items?:
+    | T
+    | {
+        value?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tags_select".
+ */
+export interface TagsSelect<T extends boolean = true> {
+  name?: T;
+  color?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
@@ -254,22 +1219,6 @@ export interface UsersSelect<T extends boolean = true> {
         createdAt?: T;
         expiresAt?: T;
       };
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "posts_select".
- */
-export interface PostsSelect<T extends boolean = true> {
-  title?: T;
-  items?:
-    | T
-    | {
-        ean?: T;
-        note?: T;
-        id?: T;
-      };
-  updatedAt?: T;
-  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -310,6 +1259,97 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings".
+ */
+export interface SiteSetting {
+  id: string;
+  siteName?: string | null;
+  tagline?: string | null;
+  nav?:
+    | {
+        label?: string | null;
+        url?: string | null;
+        children?:
+          | {
+              label?: string | null;
+              url?: string | null;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  contact?: {
+    email?: string | null;
+    phone?: string | null;
+  };
+  promo?:
+    | {
+        heading?: string | null;
+        subheading?: string | null;
+        cta?: {
+          label?: string | null;
+          url?: string | null;
+        };
+        id?: string | null;
+        blockName?: string | null;
+        blockType: 'hero';
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings_select".
+ */
+export interface SiteSettingsSelect<T extends boolean = true> {
+  siteName?: T;
+  tagline?: T;
+  nav?:
+    | T
+    | {
+        label?: T;
+        url?: T;
+        children?:
+          | T
+          | {
+              label?: T;
+              url?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  contact?:
+    | T
+    | {
+        email?: T;
+        phone?: T;
+      };
+  promo?:
+    | T
+    | {
+        hero?:
+          | T
+          | {
+              heading?: T;
+              subheading?: T;
+              cta?:
+                | T
+                | {
+                    label?: T;
+                    url?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

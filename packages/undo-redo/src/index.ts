@@ -11,6 +11,15 @@ export type UndoRedoPluginOptions = {
 	 */
 	disabled?: boolean
 	/**
+	 * Mount a history inspector overlay behind a third toolbar button: every
+	 * captured entry, the paths it changed, which entry is current, and edits
+	 * still inside the capture debounce. Entries are clickable to restore them.
+	 *
+	 * Development aid only. Leave it off in production so the overlay code never
+	 * mounts and captures do not trigger an extra re-render.
+	 */
+	debug?: boolean
+	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
 	 * translation keys exported from `@10x-media/undo-redo/i18n`. Values win
 	 * over the built-in locales key-by-key; locales the plugin does not ship are
@@ -38,13 +47,20 @@ export const undoRedo = definePlugin<UndoRedoPluginOptions>({
 			return config
 		}
 		registerTranslations(config, options.translations)
+		const mount = { debug: options.debug === true }
 		return {
 			...config,
-			collections: config.collections?.map(withUndoRedo),
-			globals: config.globals?.map(withUndoRedoGlobal),
+			collections: config.collections?.map((each) => withUndoRedo(each, mount)),
+			globals: config.globals?.map((each) => withUndoRedoGlobal(each, mount)),
 		}
 	},
 })
 
-export { UNDO_REDO_COMPONENT_PATH, withUndoRedo, withUndoRedoGlobal } from './plugin/withUndoRedo'
+export type { ControlsMountOptions } from './plugin/withUndoRedo'
+export {
+	UNDO_REDO_COMPONENT_PATH,
+	undoRedoComponent,
+	withUndoRedo,
+	withUndoRedoGlobal,
+} from './plugin/withUndoRedo'
 export type { UndoRedoPluginOptions as PluginOptions }

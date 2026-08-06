@@ -7,6 +7,7 @@ import {
 	canUndo,
 	createHistory,
 	deepEqual,
+	diffComparable,
 	extractComparable,
 	type HistoryEntry,
 	MAX_HISTORY_ENTRIES,
@@ -238,5 +239,67 @@ describe('buildRestoreState', () => {
 		expect(restored['items.1.ean']?.value).toBe('222')
 		expect(restored['items.1.ean']?.isModified).toBe(true)
 		expect(restored.items?.isModified).toBe(true)
+	})
+})
+
+describe('createSnapshot ids', () => {
+	it('gives every snapshot a distinct id that survives cap eviction', () => {
+		const history = createHistory()
+		pushSnapshot(history, { title: textField('first') })
+		const firstId = entryAt(history, 0).id
+		for (let i = 0; i < MAX_HISTORY_ENTRIES + 5; i++) {
+			pushSnapshot(history, { title: textField(`v${i}`) })
+		}
+		const ids = history.stack.map((entry) => entry.id)
+		expect(new Set(ids).size).toBe(ids.length)
+		// Eviction drops the front, so the surviving ids stay ascending and the
+		// oldest survivor is no longer the entry this test started with.
+		expect([...ids].sort((a, b) => a - b)).toEqual(ids)
+		expect(entryAt(history, 0).id).toBeGreaterThan(firstId)
+	})
+})
+
+describe('diffComparable', () => {
+	it('reports changed, added and removed paths sorted by path', () => {
+		const from = extractComparable({
+			removed: textField('gone'),
+			title: textField('old'),
+			untouched: textField('same'),
+		})
+		const to = extractComparable({
+			added: textField('new field'),
+			title: textField('new'),
+			untouched: textField('same'),
+		})
+		expect(diffComparable(from, to)).toEqual([
+			{ path: 'added', from: undefined, to: 'new field', presence: 'added' },
+			{ path: 'removed', from: 'gone', to: undefined, presence: 'removed' },
+			{ path: 'title', from: 'old', to: 'new' },
+		])
+	})
+
+	it('reports a row reorder that leaves every value untouched', () => {
+		const from = extractComparable({ items: arrayField(['r1', 'r2']) })
+		const to = extractComparable({ items: arrayField(['r2', 'r1']) })
+		expect(diffComparable(from, to)).toEqual([
+			{
+				path: 'items',
+				from: 2,
+				to: 2,
+				fromRowIds: ['r1', 'r2'],
+				toRowIds: ['r2', 'r1'],
+			},
+		])
+	})
+
+	it('is empty for identical states', () => {
+		const state = extractComparable({ items: arrayField(['r1']), title: textField('x') })
+		expect(diffComparable(state, state)).toEqual([])
+	})
+
+	it('ignores the paths the history ignores', () => {
+		const from = extractComparable({ title: textField('a'), updatedAt: textField('t1') })
+		const to = extractComparable({ title: textField('a'), updatedAt: textField('t2') })
+		expect(diffComparable(from, to)).toEqual([])
 	})
 })

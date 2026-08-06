@@ -50,6 +50,12 @@ export interface ComparableField {
 export type ComparableState = Record<string, ComparableField>
 
 export interface HistoryEntry {
+	/**
+	 * Monotonic id, stable across the stack shifting when the cap evicts the
+	 * oldest entries. Positional indexes are not stable for that reason, so
+	 * anything keyed per entry (React keys, debug UI expansion) uses this.
+	 */
+	id: number
 	fields: FormState
 	comparable: ComparableState
 }
@@ -100,7 +106,10 @@ export const extractComparable = (fields: FormState): ComparableState => {
 	return out
 }
 
+let nextEntryId = 0
+
 export const createSnapshot = (fields: FormState): HistoryEntry => ({
+	id: nextEntryId++,
 	fields: Object.fromEntries(Object.entries(fields).map(([path, field]) => [path, { ...field }])),
 	comparable: extractComparable(fields),
 })
@@ -124,6 +133,41 @@ export const pushSnapshot = (history: UndoHistory, fields: FormState): boolean =
 	}
 	history.index = history.stack.length - 1
 	return true
+}
+
+/** A single path-level change between two comparable states. */
+export interface ComparableDiff {
+	path: string
+	from: unknown
+	to: unknown
+	/** Set only when the path carries array/blocks rows and those rows changed. */
+	fromRowIds?: (string | undefined)[]
+	toRowIds?: (string | undefined)[]
+	/** Whether the path itself appeared or disappeared between the two states. */
+	presence?: 'added' | 'removed'
+}
+
+/**
+ * Path-level changes from one comparable state to another, sorted by path.
+ * Powers the debug overlay and makes "what did this history entry capture?"
+ * answerable without diffing whole FormState objects by eye.
+ */
+export const diffComparable = (from: ComparableState, to: ComparableState): ComparableDiff[] => {
+	const out: ComparableDiff[] = []
+	for (const path of new Set([...Object.keys(from), ...Object.keys(to)])) {
+		const a = from[path]
+		const b = to[path]
+		if (a && b && deepEqual(a.value, b.value) && deepEqual(a.rowIds, b.rowIds)) continue
+		const diff: ComparableDiff = { path, from: a?.value, to: b?.value }
+		if (a?.rowIds || b?.rowIds) {
+			diff.fromRowIds = a?.rowIds
+			diff.toRowIds = b?.rowIds
+		}
+		if (!a) diff.presence = 'added'
+		else if (!b) diff.presence = 'removed'
+		out.push(diff)
+	}
+	return out.sort((x, y) => x.path.localeCompare(y.path))
 }
 
 export const canUndo = (history: UndoHistory): boolean => history.index > 0

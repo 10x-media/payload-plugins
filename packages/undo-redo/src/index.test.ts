@@ -54,6 +54,24 @@ describe('undoRedo factory', () => {
 		])
 	})
 
+	it('mounts a bare path when debug is off', () => {
+		const out = apply(fakeConfig(), { debug: false })
+		expect(out.collections?.[0]?.admin?.components?.edit?.beforeDocumentControls).toEqual([
+			UNDO_REDO_COMPONENT_PATH,
+		])
+	})
+
+	it('passes debug through as a client prop on collections and globals', () => {
+		const out = apply(fakeConfig({ globals: [global()] }), { debug: true })
+		const expected = { path: UNDO_REDO_COMPONENT_PATH, clientProps: { debug: true } }
+		expect(out.collections?.[0]?.admin?.components?.edit?.beforeDocumentControls).toEqual([
+			expected,
+		])
+		expect(out.globals?.[0]?.admin?.components?.elements?.beforeDocumentControls).toEqual([
+			expected,
+		])
+	})
+
 	it('applies the translations option', () => {
 		const out = apply(fakeConfig(), { translations: { de: { [keys.undo]: 'Zurück' } } })
 		const i18n = out.i18n?.translations as Record<string, Record<string, Record<string, string>>>

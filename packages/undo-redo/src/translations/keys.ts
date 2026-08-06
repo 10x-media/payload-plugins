@@ -8,6 +8,14 @@ export const keys = {
 	undoTooltip: 'undoRedo:undoTooltip',
 	redo: 'undoRedo:redo',
 	redoTooltip: 'undoRedo:redoTooltip',
+	debug: 'undoRedo:debug',
+	debugTooltip: 'undoRedo:debugTooltip',
+	debugTitle: 'undoRedo:debugTitle',
+	debugEmpty: 'undoRedo:debugEmpty',
+	debugClose: 'undoRedo:debugClose',
+	debugPending: 'undoRedo:debugPending',
+	debugOriginal: 'undoRedo:debugOriginal',
+	debugCopy: 'undoRedo:debugCopy',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -10,4 +10,12 @@ export const en: Record<TranslationKey, string> = {
 	[keys.undoTooltip]: 'Undo change (Ctrl+Z)',
 	[keys.redo]: 'Redo',
 	[keys.redoTooltip]: 'Redo change (Ctrl+Shift+Z)',
+	[keys.debug]: 'Undo history',
+	[keys.debugTooltip]: 'Inspect undo history',
+	[keys.debugTitle]: 'Undo history',
+	[keys.debugEmpty]: 'No history captured yet.',
+	[keys.debugClose]: 'Close',
+	[keys.debugPending]: 'Pending (not captured)',
+	[keys.debugOriginal]: 'Original state',
+	[keys.debugCopy]: 'Copy JSON',
 }
