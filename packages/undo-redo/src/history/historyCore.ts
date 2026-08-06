@@ -272,6 +272,29 @@ const cloneJson = <T>(value: T): T =>
 	value == null ? value : (JSON.parse(JSON.stringify(value)) as T)
 
 /**
+ * A value that means the same as `live` but is never `Object.is` to it.
+ *
+ * Lexical only re-initializes a mounted editor when the `initialValue` it is
+ * handed is a different *reference* from the one it last saw, so restoring has
+ * to hand it a new one. Cloning covers that for an editor state object, but not
+ * for a rich text field that was never saved, whose initialValue is nullish: a
+ * primitive cannot be cloned into a fresh identity, and `null` re-sent as
+ * `null` looks unchanged.
+ *
+ * Undo appeared to work there because it swapped `undefined` for `null`, which
+ * is an identity change once. Every restore after it kept sending `null` and
+ * the editor stayed on screen holding stale content, even though the form value
+ * underneath had been restored, which is why saving made the change appear.
+ * Alternating between the two nullish values keeps every restore distinguishable
+ * while leaving the meaning, "this field started out empty", untouched.
+ */
+const withNewIdentity = (live: unknown): unknown => {
+	if (live === null) return undefined
+	if (live === undefined) return null
+	return cloneJson(live)
+}
+
+/**
  * Build the FormState to dispatch via REPLACE_STATE when restoring `snapshot`.
  *
  * - `initialValue` is taken from the live state, not the snapshot, so Payload's
@@ -299,9 +322,7 @@ export const buildRestoreState = (
 		if (changed) {
 			restored.isModified = true
 			if (isLexicalValue(snapField.value) || isLexicalValue(cur?.value)) {
-				// `?? null` keeps the reference change detectable even when the
-				// live initialValue is undefined (never-saved rich text field).
-				restored.initialValue = cloneJson(cur ? (cur.initialValue ?? null) : null)
+				restored.initialValue = withNewIdentity(cur?.initialValue)
 			}
 		}
 		out[path] = restored

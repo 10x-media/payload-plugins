@@ -215,6 +215,34 @@ describe('buildRestoreState', () => {
 		expect(restored.content?.initialValue).not.toBe(initial)
 	})
 
+	it('keeps changing the initialValue identity of a never-saved rich text field', () => {
+		const lexical = (text: string) => ({
+			root: { children: [{ text, type: 'paragraph' }], type: 'root' },
+		})
+		// Nothing was ever persisted here, so the live initialValue is nullish.
+		// A primitive cannot be cloned into a new reference, yet restoring twice in
+		// a row still has to look like two distinct initialValues to the editor.
+		const richText = (value: unknown, initialValue: unknown): FormState[string] => ({
+			initialValue,
+			valid: true,
+			value,
+		})
+		const history = createHistory()
+		pushSnapshot(history, { content: richText(undefined, undefined) })
+		pushSnapshot(history, { content: richText(lexical('typed'), undefined) })
+
+		const undone = buildRestoreState(entryAt(history, 0), {
+			content: richText(lexical('typed'), undefined),
+		})
+		expect(undone.content?.value).toBeUndefined()
+
+		const redone = buildRestoreState(entryAt(history, 1), {
+			content: richText(undefined, undone.content?.initialValue),
+		})
+		expect(redone.content?.value).toEqual(lexical('typed'))
+		expect(Object.is(redone.content?.initialValue, undone.content?.initialValue)).toBe(false)
+	})
+
 	it("passes Payload's own fields through from the live state", () => {
 		const history = createHistory()
 		pushSnapshot(history, {
