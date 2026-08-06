@@ -1,0 +1,41 @@
+{
+	"name": "@10x-media/undo-redo-dev",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "next dev --turbo -p ${PORT:-3000}",
+		"build": "next build",
+		"start": "next start -p ${PORT:-3000}",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"generate": "pnpm generate:types && pnpm generate:importmap",
+		"generate:types": "bash ../../../scripts/payload.sh . generate:types",
+		"generate:importmap": "bash ../../../scripts/payload.sh . generate:importmap",
+		"migrate": "bash ../../../scripts/payload.sh . migrate",
+		"migrate:create": "bash ../../../scripts/payload.sh . migrate:create",
+		"migrate:down": "bash ../../../scripts/payload.sh . migrate:down",
+		"migrate:refresh": "bash ../../../scripts/payload.sh . migrate:refresh",
+		"migrate:reset": "bash ../../../scripts/payload.sh . migrate:reset",
+		"migrate:status": "bash ../../../scripts/payload.sh . migrate:status",
+		"migrate:fresh": "bash ../../../scripts/payload.sh . migrate:fresh"
+	},
+	"dependencies": {
+		"@10x-media/undo-redo": "workspace:*",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/next": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"next": "catalog:",
+		"payload": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:"
+	},
+	"devDependencies": {
+		"@10x-media/tsconfig": "workspace:*",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"mongodb-memory-server": "^10.1.0",
+		"typescript": "catalog:"
+	}
+}
