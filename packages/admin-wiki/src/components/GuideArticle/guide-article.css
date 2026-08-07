@@ -1,0 +1,130 @@
+.wiki-guide-article {
+	color: var(--theme-text);
+	font-size: 1rem;
+	line-height: 1.6;
+	max-width: 100%;
+}
+
+.wiki-guide-article h2,
+.wiki-guide-article h3,
+.wiki-guide-article h4 {
+	line-height: 1.3;
+	margin: 1.5em 0 0.5em;
+}
+
+.wiki-guide-article h2:first-child,
+.wiki-guide-article h3:first-child,
+.wiki-guide-article p:first-child {
+	margin-top: 0;
+}
+
+.wiki-guide-article p {
+	margin: 0.75em 0;
+}
+
+.wiki-guide-article ul,
+.wiki-guide-article ol {
+	margin: 0.75em 0;
+	padding-inline-start: 1.5em;
+}
+
+.wiki-guide-article li {
+	margin: 0.25em 0;
+}
+
+.wiki-guide-article a {
+	color: var(--theme-text);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.wiki-guide-article blockquote {
+	border-inline-start: 3px solid var(--theme-elevation-200);
+	color: var(--theme-elevation-650);
+	margin: 1em 0;
+	padding: 0.25em 0 0.25em 1em;
+}
+
+.wiki-guide-article hr {
+	border: 0;
+	border-top: 1px solid var(--theme-elevation-150);
+	margin: 1.5em 0;
+}
+
+.wiki-guide-article code {
+	background: var(--theme-elevation-100);
+	border-radius: 4px;
+	font-size: 0.875em;
+	padding: 0.1em 0.35em;
+}
+
+.wiki-guide-article img,
+.wiki-guide-article video {
+	border-radius: 4px;
+	height: auto;
+	max-width: 100%;
+}
+
+.wiki-guide-link {
+	background: none;
+	border: 0;
+	color: var(--theme-text);
+	cursor: pointer;
+	display: inline;
+	font: inherit;
+	padding: 0;
+	text-decoration: underline;
+	text-decoration-style: dotted;
+	text-underline-offset: 2px;
+}
+
+.wiki-guide-link:hover {
+	text-decoration-style: solid;
+}
+
+.wiki-guide-link--dead {
+	color: var(--theme-elevation-450);
+	cursor: default;
+	text-decoration: line-through;
+}
+
+.wiki-callout {
+	border-inline-start: 3px solid var(--theme-elevation-400);
+	border-radius: 4px;
+	background: var(--theme-elevation-50);
+	margin: 1em 0;
+	padding: 0.75rem 1rem;
+}
+
+.wiki-callout p {
+	margin: 0.25em 0;
+}
+
+.wiki-callout--info {
+	background: var(--theme-elevation-50);
+	border-color: var(--theme-elevation-400);
+}
+
+.wiki-callout--tip {
+	background: var(--theme-success-50);
+	border-color: var(--theme-success-500);
+}
+
+.wiki-callout--warning {
+	background: var(--theme-warning-50);
+	border-color: var(--theme-warning-500);
+}
+
+.wiki-callout--danger {
+	background: var(--theme-error-50);
+	border-color: var(--theme-error-500);
+}
+
+.wiki-guide-article__missing-block {
+	background: var(--theme-warning-50);
+	border: 1px dashed var(--theme-warning-500);
+	border-radius: 4px;
+	color: var(--theme-elevation-650);
+	font-size: 0.875rem;
+	padding: 0.5rem 0.75rem;
+}

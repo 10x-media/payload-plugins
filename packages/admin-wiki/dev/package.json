@@ -21,9 +21,13 @@
 	},
 	"dependencies": {
 		"@10x-media/admin-wiki": "workspace:*",
+		"@10x-media/fields": "workspace:*",
+		"lucide-react": "catalog:",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/next": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
+		"@payloadcms/translations": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"next": "catalog:",
 		"payload": "catalog:",

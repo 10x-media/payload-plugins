@@ -1,0 +1,31 @@
+.wiki-surface-trigger {
+	align-items: center;
+	background: none;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s, 4px);
+	color: var(--theme-elevation-650);
+	cursor: pointer;
+	display: inline-flex;
+	font-size: 0.8125rem;
+	gap: 0.4em;
+	padding: 0.35rem 0.7rem;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.wiki-surface-trigger:hover,
+.wiki-surface-trigger:focus-visible {
+	background: var(--theme-elevation-50);
+	color: var(--theme-text);
+}
+
+.wiki-surface-trigger--write {
+	border-style: dashed;
+	color: var(--theme-elevation-450);
+}
+
+.wiki-surface-trigger span {
+	max-width: 14rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}

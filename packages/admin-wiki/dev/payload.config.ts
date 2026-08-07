@@ -1,10 +1,18 @@
 // biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { fields } from '@10x-media/fields'
+import { lucideAdapter } from '@10x-media/fields/icon/adapters/lucide'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { de } from '@payloadcms/translations/languages/de'
+import { en } from '@payloadcms/translations/languages/en'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { adminWiki } from '../src/index'
+import { tipBlock } from './blocks/tipBlock'
+import { posts } from './collections/posts'
+import { products } from './collections/products'
+import { settings } from './globals/settings'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -39,8 +47,18 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [adminWiki({})],
+	collections: [posts, products, users],
+	globals: [settings],
+	i18n: { supportedLanguages: { de, en } },
+	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
+	// Field-adding plugins first so the wiki walker sees their fields.
+	plugins: [
+		fields({ icon: { adapters: [lucideAdapter()], defaultLibrary: 'lucide' } }),
+		adminWiki({
+			editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
+			video: true,
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

@@ -1,0 +1,12 @@
+.wiki-block-label {
+	align-items: center;
+	display: inline-flex;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.wiki-block-label__text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
