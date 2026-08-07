@@ -1,6 +1,6 @@
 'use client'
 
-import { type DragEndEvent, DragOverlay, useDndMonitor } from '@dnd-kit/core'
+import { type DragEndEvent, DragOverlay, type Modifier, useDndMonitor } from '@dnd-kit/core'
 import { getTranslation } from '@payloadcms/translations'
 import {
 	Button,
@@ -394,6 +394,50 @@ export const ListSelectionButton: React.FC<{
 
 const dragOverlayClass = 'drag-overlay-selection'
 
+/** Distance the card is held away from the cursor, matching Payload's own overlay. */
+const cursorGap = 5
+
+/**
+ * `getEventCoordinates` from `@dnd-kit/utilities`, which reaches this package only through
+ * `@dnd-kit/core` and would have to be declared a second peer dependency to import. Reading two
+ * numbers off an event does not justify that.
+ */
+const eventCoordinates = (event: Event): null | { x: number; y: number } => {
+	if (typeof TouchEvent !== 'undefined' && event instanceof TouchEvent) {
+		const touch = event.touches[0] ?? event.changedTouches[0]
+		return touch ? { x: touch.clientX, y: touch.clientY } : null
+	}
+
+	return event instanceof MouseEvent ? { x: event.clientX, y: event.clientY } : null
+}
+
+/**
+ * Pins the card's top left corner just below and to the right of the cursor, whatever part of it
+ * was grabbed. dnd-kit otherwise preserves the grab point, so a card taken by its bottom edge
+ * trails from that edge and covers what is being dragged over.
+ *
+ * Payload applies the same modifier to its own folder overlay but does not export it.
+ */
+export const snapTopLeftToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+	if (!draggingNodeRect || !activatorEvent) {
+		return transform
+	}
+
+	const coordinates = eventCoordinates(activatorEvent)
+	if (!coordinates) {
+		return transform
+	}
+
+	return {
+		...transform,
+		x: transform.x + coordinates.x - draggingNodeRect.left + cursorGap,
+		y: transform.y + coordinates.y - draggingNodeRect.top + cursorGap,
+	}
+}
+
+/** Hoisted so the overlay is not handed a new array on every render. */
+const dragOverlayModifiers = [snapTopLeftToCursor]
+
 /**
  * The card that follows the cursor while dragging. `DragOverlaySelection` and the `FolderFileCard`
  * it renders are both internal, so this reproduces the folder variant of that card: an icon and a
@@ -403,7 +447,11 @@ export const DragOverlaySelection: React.FC<{
 	readonly selectedCount: number
 	readonly title: string
 }> = ({ selectedCount, title }) => (
-	<DragOverlay dropAnimation={null} style={{ height: 'unset', maxWidth: '220px' }}>
+	<DragOverlay
+		dropAnimation={null}
+		modifiers={dragOverlayModifiers}
+		style={{ height: 'unset', maxWidth: '220px' }}
+	>
 		<div className={`${dragOverlayClass}__cards`}>
 			{Array.from({ length: selectedCount > 1 ? 2 : 1 }).map((_, index) => (
 				<div
