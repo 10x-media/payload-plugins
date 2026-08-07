@@ -20,7 +20,9 @@
 		"@10x-media/analytics-dev": "0.0.0",
 		"@10x-media/tsdown-config": "0.0.0",
 		"@10x-media/fields": "0.0.0",
-		"@10x-media/fields-dev": "0.0.0"
+		"@10x-media/fields-dev": "0.0.0",
+		"@10x-media/undo-redo": "0.0.0",
+		"@10x-media/undo-redo-dev": "0.0.0"
 	},
 	"changesets": [
 		"analytics-api-feedback",
@@ -105,6 +107,10 @@
 		"readme-restructure",
 		"readme-root-docs-urls",
 		"unbundled-plugin-builds",
+		"undo-redo-initial-controls",
+		"undo-redo-malformed-json",
+		"undo-redo-polymorphic-relationship-noise",
+		"undo-redo-use-undo-redo-hook",
 		"webhooks-initial-beta",
 		"webhooks-previous-data-transform",
 		"webhooks-redeliver-endpoint"
