@@ -15,14 +15,15 @@ import {
 	ReactSelect,
 	SearchIcon,
 	useConfig,
-	useDebounce,
 	useListDrawerContext,
 	useModal,
-	useTranslation,
 	XIcon,
 } from '@payloadcms/ui'
 import type { FolderSortKeys } from 'payload'
 import React from 'react'
+
+import { keys } from '../translations/keys'
+import { useTranslation } from '../translations/useTranslation'
 
 /**
  * Faithful copies of the folder view's header pieces. `ListHeader`, `SearchBar`, `SearchFilter`,
@@ -137,35 +138,30 @@ export const Dots: React.FC<{ readonly ariaLabel?: string }> = ({ ariaLabel }) =
 
 const searchFilterClass = 'search-filter'
 
+/**
+ * Controlled from above rather than holding the typed text itself. This sits inside the folder
+ * provider, which is rebuilt whenever the view or the folder changes, and local state would be
+ * wiped by that while the search it had already reported went on filtering the results.
+ */
 const SearchFilter: React.FC<{
 	readonly label: string
 	readonly onChange: (search: string) => void
-}> = ({ label, onChange }) => {
-	const [search, setSearch] = React.useState('')
-	const debounced = useDebounce(search, 300)
-	const previous = React.useRef('')
-
-	React.useEffect(() => {
-		if (debounced !== previous.current) {
-			previous.current = debounced
-			onChange(debounced)
-		}
-	}, [debounced, onChange])
-
-	return (
-		<div className={searchFilterClass}>
-			<input
-				aria-label={label}
-				className={`${searchFilterClass}__input`}
-				id="search-filter-input"
-				onChange={(event) => setSearch(event.target.value)}
-				placeholder={label}
-				type="text"
-				value={search}
-			/>
-		</div>
-	)
-}
+	readonly value: string
+}> = ({ label, onChange, value }) => (
+	<div className={searchFilterClass}>
+		{/* No id: Payload's own search filter hard-codes `search-filter-input`, and two of those in
+		    one document break every label and aria association pointing at it. `aria-label` names
+		    this input without one. */}
+		<input
+			aria-label={label}
+			className={`${searchFilterClass}__input`}
+			onChange={(event) => onChange(event.target.value)}
+			placeholder={label}
+			type="text"
+			value={value}
+		/>
+	</div>
+)
 
 const searchBarClass = 'search-bar'
 
@@ -173,41 +169,55 @@ export const SearchBar: React.FC<{
 	readonly Actions?: React.ReactNode[]
 	readonly label: string
 	readonly onSearchChange: (search: string) => void
-}> = ({ Actions = [], label, onSearchChange }) => (
+	readonly search: string
+}> = ({ Actions = [], label, onSearchChange, search }) => (
 	<div className={searchBarClass}>
 		<SearchIcon />
-		<SearchFilter label={label} onChange={onSearchChange} />
+		<SearchFilter label={label} onChange={onSearchChange} value={search} />
 		{Actions.length ? <div className={`${searchBarClass}__actions`}>{Actions}</div> : null}
 	</div>
 )
 
 const toggleClass = 'folder-view-toggle-button'
 
+/**
+ * Both buttons are icon only, so without a name a screen reader announces two unlabelled buttons
+ * and neither can be told from the other. `aria-pressed` carries the active state that the class
+ * shows sighted users.
+ */
 export const ToggleViewButtons: React.FC<{
 	readonly activeView: 'grid' | 'list'
 	readonly setActiveView: (view: 'grid' | 'list') => void
-}> = ({ activeView, setActiveView }) => (
-	<React.Fragment>
-		<Button
-			buttonStyle="pill"
-			className={[toggleClass, activeView === 'grid' && `${toggleClass}--active`]
-				.filter(Boolean)
-				.join(' ')}
-			icon={<GridViewIcon />}
-			margin={false}
-			onClick={() => setActiveView('grid')}
-		/>
-		<Button
-			buttonStyle="pill"
-			className={[toggleClass, activeView === 'list' && `${toggleClass}--active`]
-				.filter(Boolean)
-				.join(' ')}
-			icon={<ListViewIcon />}
-			margin={false}
-			onClick={() => setActiveView('list')}
-		/>
-	</React.Fragment>
-)
+}> = ({ activeView, setActiveView }) => {
+	const { t } = useTranslation()
+
+	return (
+		<React.Fragment>
+			<Button
+				aria-label={t(keys.gridView)}
+				aria-pressed={activeView === 'grid'}
+				buttonStyle="pill"
+				className={[toggleClass, activeView === 'grid' && `${toggleClass}--active`]
+					.filter(Boolean)
+					.join(' ')}
+				icon={<GridViewIcon />}
+				margin={false}
+				onClick={() => setActiveView('grid')}
+			/>
+			<Button
+				aria-label={t(keys.listView)}
+				aria-pressed={activeView === 'list'}
+				buttonStyle="pill"
+				className={[toggleClass, activeView === 'list' && `${toggleClass}--active`]
+					.filter(Boolean)
+					.join(' ')}
+				icon={<ListViewIcon />}
+				margin={false}
+				onClick={() => setActiveView('list')}
+			/>
+		</React.Fragment>
+	)
+}
 
 const SortDownIcon: React.FC<{ className?: string }> = ({ className }) => (
 	<svg
@@ -282,7 +292,7 @@ export const SortByPill: React.FC<{
 			horizontalAlign="right"
 			render={({ close }) => (
 				<React.Fragment>
-					<PopupList.GroupLabel label="Sort by" />
+					<PopupList.GroupLabel label={t(keys.sortByLabel)} />
 					<PopupList.ButtonGroup>
 						{SORT_FIELDS.map((option) => (
 							<PopupList.Button
@@ -298,7 +308,7 @@ export const SortByPill: React.FC<{
 						))}
 					</PopupList.ButtonGroup>
 					<PopupList.Divider />
-					<PopupList.GroupLabel label="Order" />
+					<PopupList.GroupLabel label={t(keys.orderLabel)} />
 					<PopupList.ButtonGroup>
 						<PopupList.Button
 							active={!descending}

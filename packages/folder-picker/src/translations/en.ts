@@ -6,5 +6,10 @@ import { keys, type TranslationKey } from './keys'
  * unknown key a type error. `translations/index.ts` nests these for Payload.
  */
 export const en: Record<TranslationKey, string> = {
+	[keys.gridView]: 'Show as grid',
+	[keys.listView]: 'Show as list',
+	[keys.orderLabel]: 'Order',
 	[keys.pluginName]: 'Folder Picker',
+	[keys.retry]: 'Try again',
+	[keys.sortByLabel]: 'Sort by',
 }

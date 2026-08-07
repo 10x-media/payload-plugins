@@ -7,21 +7,26 @@ import {
 	FolderIcon,
 	FolderProvider,
 	Gutter,
+	ItemCardGrid,
 	LoadingOverlay,
 	Popup,
 	PopupList,
+	toast,
 	useAuth,
 	useConfig,
+	useDebounce,
 	useDocumentDrawer,
 	useFolder,
 	useListDrawerContext,
 	useServerFunctions,
-	useTranslation,
 	useWindowInfo,
 } from '@payloadcms/ui'
 import type { CollectionSlug, FolderSortKeys } from 'payload'
 import type { FolderBreadcrumb, FolderOrDocument } from 'payload/shared'
 import React from 'react'
+
+import { keys } from '../translations/keys'
+import { useTranslation } from '../translations/useTranslation'
 import { BulkUploadButton, SelectFolderItems } from './BulkUploadButton'
 import type { FolderActionHandlers } from './FolderActions'
 import { FolderActionsMenu, FolderSelectionBar } from './FolderActions'
@@ -115,9 +120,21 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 	const [documents, setDocuments] = React.useState<FolderOrDocument[]>([])
 	const [ResultsComponent, setResultsComponent] = React.useState<React.ReactNode>(null)
 	const [loadedFor, setLoadedFor] = React.useState<CollectionSlug | null>(null)
+	const [loadError, setLoadError] = React.useState(false)
 	const [displayAs, setDisplayAs] = React.useState<'grid' | 'list'>('grid')
 	const [sort, setSort] = React.useState<FolderSortKeys>('name')
-	const [search, setSearch] = React.useState('')
+	const [searchInput, setSearchInput] = React.useState('')
+	// The typed text lives here rather than in the input, which is rebuilt with the provider on
+	// every view or folder change. Debounced here for the same reason.
+	const search = useDebounce(searchInput, 300)
+
+	/**
+	 * Breadcrumbs, cards, the sort pill, the view toggle and the mount effect all load, and each
+	 * load writes six pieces of state. A slow early request resolving after a fast later one would
+	 * otherwise put one folder's contents under another folder's breadcrumb, so every response
+	 * checks that it is still the one being waited for.
+	 */
+	const latestRequest = React.useRef(0)
 
 	const loadFolder = React.useCallback(
 		async (args: {
@@ -127,23 +144,38 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 		}) => {
 			if (!folderCollectionSlug) return
 
-			const result = await getFolderResultsComponentAndData({
-				browseByFolder: false,
-				// The folders collection has to be listed here or getFolderResultsComponentAndData
-				// never builds its folderWhere, and no subfolder is ever returned.
-				collectionsToDisplay: [folderCollectionSlug, collectionSlug],
-				displayAs: args.displayAs,
-				folderAssignedCollections: [collectionSlug],
-				folderID: args.folderID ?? undefined,
-				sort: args.sort,
-			})
+			const request = ++latestRequest.current
 
-			setBreadcrumbs(result?.breadcrumbs || [])
-			setSubfolders(result?.subfolders || [])
-			setDocuments(result?.documents || [])
-			setResultsComponent(result?.FolderResultsComponent || null)
-			setFolderID(args.folderID)
-			setLoadedFor(collectionSlug)
+			try {
+				const result = await getFolderResultsComponentAndData({
+					browseByFolder: false,
+					// The folders collection has to be listed here or getFolderResultsComponentAndData
+					// never builds its folderWhere, and no subfolder is ever returned.
+					collectionsToDisplay: [folderCollectionSlug, collectionSlug],
+					displayAs: args.displayAs,
+					folderAssignedCollections: [collectionSlug],
+					folderID: args.folderID ?? undefined,
+					sort: args.sort,
+				})
+
+				if (request !== latestRequest.current) return
+
+				setLoadError(false)
+				setBreadcrumbs(result?.breadcrumbs || [])
+				setSubfolders(result?.subfolders || [])
+				setDocuments(result?.documents || [])
+				setResultsComponent(result?.FolderResultsComponent || null)
+				setFolderID(args.folderID)
+				setLoadedFor(collectionSlug)
+			} catch (error) {
+				if (request !== latestRequest.current) return
+
+				// Every call site fires this and forgets it, so a rejection would surface as nothing but
+				// an unhandled promise while the drawer sat under its loading overlay for good.
+				toast.error(error instanceof Error ? error.message : String(error))
+				setLoadError(true)
+				setLoadedFor(collectionSlug)
+			}
 		},
 		[collectionSlug, folderCollectionSlug, getFolderResultsComponentAndData]
 	)
@@ -223,7 +255,34 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 	const totalVisible = visibleSubfolders.length + visibleDocuments.length
 
 	const folderLabel = getTranslation(folderCollectionConfig?.labels?.singular ?? '', i18n)
+	const folderPluralLabel = getTranslation(folderCollectionConfig?.labels?.plural ?? '', i18n)
 	const pluralLabel = getTranslation(targetConfig?.labels?.plural ?? collectionSlug, i18n)
+
+	/**
+	 * The server bakes the items into its grid, so narrowing the provider reaches the table view
+	 * alone and the grid keeps drawing everything: searching would leave the count and the cards
+	 * disagreeing. The grid is rebuilt here from the same filtered arrays, using the card grid
+	 * Payload builds it from, so only the data differs. The table needs none of this because it
+	 * takes no items and reads the provider itself.
+	 */
+	const Results =
+		displayAs === 'grid' ? (
+			<div>
+				{visibleSubfolders.length ? (
+					<ItemCardGrid items={visibleSubfolders} title={folderPluralLabel} type="folder" />
+				) : null}
+				{visibleDocuments.length ? (
+					<ItemCardGrid
+						items={visibleDocuments}
+						subfolderCount={visibleSubfolders.length}
+						title={pluralLabel}
+						type="file"
+					/>
+				) : null}
+			</div>
+		) : (
+			ResultsComponent
+		)
 	const canCreateFolder = Boolean(permissions?.collections?.[folderCollectionSlug]?.create)
 	// A document needs a folder to live in, so it is only creatable once inside one. Mirrors the
 	// route view, where the root offers folders alone and nested folders offer both.
@@ -418,13 +477,29 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 								/>,
 							].filter(Boolean)}
 							label={t('general:searchBy', { label: t('general:name') })}
-							onSearchChange={setSearch}
+							onSearchChange={setSearchInput}
+							search={searchInput}
 						/>
 
 						{isSwitchingCollection ? (
 							<LoadingOverlay />
+						) : loadError ? (
+							<NoListResults
+								Actions={[
+									<Button
+										buttonStyle="primary"
+										el="button"
+										key="retry"
+										onClick={() => void reload()}
+										size="medium"
+									>
+										{t(keys.retry)}
+									</Button>,
+								]}
+								Message={<p>{t('error:unknown')}</p>}
+							/>
 						) : totalVisible > 0 ? (
-							ResultsComponent
+							Results
 						) : (
 							<NoListResults
 								Actions={[
