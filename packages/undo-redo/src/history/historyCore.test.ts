@@ -612,3 +612,66 @@ describe('volatile values', () => {
 		expect(entryAt(history, 1).comparable.metadata?.value).toEqual({ test: '456' })
 	})
 })
+
+describe('polymorphic relationship values', () => {
+	const option = (extra: Record<string, unknown>) => ({
+		relationTo: 'tags',
+		value: 'tag-1',
+		...extra,
+	})
+
+	it('ignores the label and permission members the admin field adds', () => {
+		const history = createHistory()
+		pushSnapshot(history, { mixed: textField([option({ label: 'alpha' })]) })
+		expect(
+			pushSnapshot(history, {
+				mixed: textField([option({ allowEdit: true, label: 'alpha renamed' })]),
+			})
+		).toBe(false)
+	})
+
+	/**
+	 * The server merge after a save replaces the whole option with the bare
+	 * reference, which used to append an entry identical to the one before it.
+	 */
+	it('creates no entry when a save strips the options down to references', () => {
+		const history = createHistory()
+		pushSnapshot(history, {
+			mixed: textField([option({ allowEdit: true, label: 'alpha' })]),
+		})
+		expect(pushSnapshot(history, { mixed: textField([option({})]) })).toBe(false)
+	})
+
+	it('still sees a changed target, a changed id and a changed order', () => {
+		const history = createHistory()
+		const a = option({ label: 'alpha' })
+		const b = { label: 'a post', relationTo: 'posts', value: 'post-1' }
+		pushSnapshot(history, { mixed: textField([a]) })
+		expect(pushSnapshot(history, { mixed: textField([{ ...a, relationTo: 'posts' }]) })).toBe(true)
+		expect(pushSnapshot(history, { mixed: textField([{ ...a, value: 'tag-2' }]) })).toBe(true)
+		expect(pushSnapshot(history, { mixed: textField([a, b]) })).toBe(true)
+		expect(pushSnapshot(history, { mixed: textField([b, a]) })).toBe(true)
+	})
+
+	it('normalizes a single (non-hasMany) polymorphic value too', () => {
+		const history = createHistory()
+		pushSnapshot(history, { primary: textField(option({ label: 'alpha' })) })
+		expect(pushSnapshot(history, { primary: textField(option({})) })).toBe(false)
+	})
+
+	it('leaves values that are not references untouched', () => {
+		const history = createHistory()
+		// A single-target relationship stores bare ids, and arbitrary data has no
+		// business being reduced to two of its keys.
+		pushSnapshot(history, {
+			data: textField({ relationTo: 'tags', value: { nested: 1 } }),
+			tags: textField(['tag-1', 'tag-2']),
+		})
+		expect(
+			pushSnapshot(history, {
+				data: textField({ relationTo: 'tags', value: { nested: 2 } }),
+				tags: textField(['tag-1', 'tag-2']),
+			})
+		).toBe(true)
+	})
+})

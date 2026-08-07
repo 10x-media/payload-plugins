@@ -150,6 +150,45 @@ export const deepEqual = (a: unknown, b: unknown): boolean => {
 }
 
 /**
+ * True for one reference of a polymorphic relationship or upload.
+ *
+ * Deliberately structural. The alternative, asking the schema for the field's
+ * type, cannot answer for a path that two blocks declare differently, and this
+ * needs no such tie-break: the shape it matches, a `relationTo` slug next to an
+ * id, is what Payload writes for exactly these fields.
+ */
+const isPolymorphicRef = (value: unknown): value is { relationTo: string; value: unknown } => {
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+	const ref = value as Record<string, unknown>
+	return (
+		typeof ref.relationTo === 'string' &&
+		(typeof ref.value === 'string' || typeof ref.value === 'number')
+	)
+}
+
+/**
+ * Reduce a polymorphic reference to the reference itself.
+ *
+ * A polymorphic relationship hands react-select's own option objects straight
+ * to form state rather than mapping them down to ids the way a single-target
+ * one does (see @payloadcms/ui fields/Relationship, `dataToSet`), so the value
+ * carries `label` and `allowEdit` alongside `relationTo` and `value`. Those
+ * move without anyone editing anything: a label refreshes when the related
+ * document is saved, `allowEdit` appears once permissions resolve, and the
+ * server merge after a save replaces the whole option with the bare reference.
+ * The save case is the visible one, since it appends an entry identical to the
+ * one before it, which then costs an extra undo to get past.
+ *
+ * Payload draws the same line: its own "did this change" test for polymorphic
+ * values compares `value` and `relationTo` and nothing else.
+ */
+const toReference = (value: unknown): unknown =>
+	isPolymorphicRef(value) ? { relationTo: value.relationTo, value: value.value } : value
+
+const normalizeComparableValue = (value: unknown): unknown =>
+	Array.isArray(value) ? value.map(toReference) : toReference(value)
+
+/**
  * Reduce a field state to what counts as a user-visible edit.
  *
  * For array and blocks fields the row ids are the whole story, and `value` is
@@ -166,7 +205,9 @@ export const deepEqual = (a: unknown, b: unknown): boolean => {
  * first undo.
  */
 const extractComparableField = (field: FormState[string]): ComparableField =>
-	field.rows ? { rowIds: field.rows.map((row) => row.id) } : { value: field.value }
+	field.rows
+		? { rowIds: field.rows.map((row) => row.id) }
+		: { value: normalizeComparableValue(field.value) }
 
 export const extractComparable = (
 	fields: FormState,

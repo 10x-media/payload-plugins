@@ -16,6 +16,8 @@ import {
 	redo,
 	richText,
 	rowAction,
+	saveButton,
+	saveDoc,
 	undo,
 	waitForEntries,
 } from './helpers'
@@ -415,5 +417,34 @@ test.describe('field coverage', () => {
 		// A restored raw string would arrive escaped inside quotes instead, so the
 		// absence of a backslash is the assertion that matters here.
 		expect(await codeEditorText(page, 'metadata')).not.toContain('\\')
+	})
+
+	/**
+	 * A polymorphic relationship hands react-select's option objects straight to
+	 * form state, so its value carries a label and permission flags that move on
+	 * their own. The save is the visible case: the server merge replaces the
+	 * options with bare references, which used to be captured as an edit and
+	 * appended an entry identical to the one before it.
+	 */
+	test('captures no entry when a save strips a polymorphic relationship down', async ({ page }) => {
+		await createDoc(page, 'tags', { name: 'alpha' })
+		const id = await createDoc(page, 'posts', { title: 'Polymorphic' })
+		await openDocWithHistory(page, 'posts', id)
+		await openTab(page, 'Relations')
+
+		await field(page, 'mixed').locator('.rs__control').click()
+		await page.locator('.rs__option', { hasText: 'alpha' }).first().click()
+		await waitForEntries(page, 2)
+
+		await saveDoc(page, 'posts')
+		await expect(saveButton(page)).toBeDisabled()
+		// The merge arrives after the save response and the capture that used to
+		// turn it into a duplicate entry is debounced behind that, so asserting
+		// the absence of an entry means outlasting both rather than sampling once.
+		await page.waitForTimeout(1500)
+		await waitForEntries(page, 2)
+
+		await undo(page)
+		await expect(field(page, 'mixed').locator('.rs__multi-value')).toHaveCount(0)
 	})
 })
