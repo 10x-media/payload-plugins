@@ -44,12 +44,16 @@ export const useFolderTargets = ({
 	)
 
 	/**
-	 * Editing needs one document; with none selected that is the folder in view. Read out
-	 * rather than indexed twice, so noUncheckedIndexedAccess narrows once for the branch.
+	 * Editing needs one folder; with none selected that is the folder in view. Read out rather than
+	 * indexed twice, so noUncheckedIndexedAccess narrows once for the branch.
+	 *
+	 * A selected document is not a target. The drawer this feeds is keyed to the folder collection,
+	 * so handing it a document's id sends the admin to `?notFound=<id>`, and Payload's own selection
+	 * bar hides the action in exactly this case rather than editing the document.
 	 */
 	const [firstSelected] = selected
 	const editTarget =
-		count === 1 && firstSelected
+		count === 1 && firstSelected && firstSelected.relationTo === folderCollectionSlug
 			? {
 					id: firstSelected.value.id,
 					name: String(firstSelected.value._folderOrDocumentTitle ?? ''),
