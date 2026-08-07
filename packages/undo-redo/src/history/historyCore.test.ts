@@ -534,3 +534,81 @@ describe('saved baseline', () => {
 		expect(isAtSavedState(history)).toBe(true)
 	})
 })
+
+describe('volatile values', () => {
+	/** Stands in for a JSON field: unparsed text is the field mid-edit. */
+	const isVolatile = (path: string, field: FormState[string]): boolean => {
+		if (path !== 'metadata' || typeof field.value !== 'string') return false
+		try {
+			JSON.parse(field.value)
+			return false
+		} catch {
+			return true
+		}
+	}
+
+	const withVolatile = (): UndoHistory => createHistory({ isVolatile })
+
+	it('creates no entry when only a volatile path changed', () => {
+		const history = withVolatile()
+		pushSnapshot(history, { metadata: textField({ test: '123' }), title: textField('a') })
+		expect(pushSnapshot(history, { metadata: textField('{"test":'), title: textField('a') })).toBe(
+			false
+		)
+		expect(history.stack).toHaveLength(1)
+	})
+
+	it('captures the previous entry\u2019s value alongside a real edit', () => {
+		const history = withVolatile()
+		pushSnapshot(history, { metadata: textField({ test: '123' }), title: textField('a') })
+		pushSnapshot(history, { metadata: textField('{"test":'), title: textField('b') })
+
+		const entry = entryAt(history, 1)
+		expect(entry.comparable.metadata?.value).toEqual({ test: '123' })
+		expect(entry.fields.metadata?.value).toEqual({ test: '123' })
+		expect(entry.comparable.title?.value).toBe('b')
+	})
+
+	it('falls back to the persisted value when there is no entry to carry from', () => {
+		const history = withVolatile()
+		pushSnapshot(history, { metadata: textField('{"test":', { test: 'saved' }) })
+		expect(entryAt(history, 0).comparable.metadata?.value).toEqual({ test: 'saved' })
+	})
+
+	/**
+	 * The failure this whole mechanism exists to prevent: an entry holding a
+	 * value the restore cannot reproduce leaves the form in a state that differs
+	 * from its own entry, and the next capture records that difference, appending
+	 * a phantom entry and truncating the redo tail.
+	 */
+	it('leaves nothing pending after restoring an entry captured while volatile', () => {
+		const history = withVolatile()
+		pushSnapshot(history, { metadata: textField({ test: '123' }), title: textField('a') })
+		pushSnapshot(history, { metadata: textField('{"test":'), title: textField('b') })
+
+		const entry = entryAt(history, 1)
+		const restored = buildRestoreState(entry, {
+			metadata: textField('{"test":'),
+			title: textField('b'),
+		})
+		history.index = 1
+		expect(pushSnapshot(history, restored)).toBe(false)
+		expect(history.stack).toHaveLength(2)
+	})
+
+	it('carries forward in the saved baseline too, so the marker stays reachable', () => {
+		const history = withVolatile()
+		const loaded: FormState = { metadata: textField({ test: '123' }), title: textField('a') }
+		pushSnapshot(history, loaded)
+		markSaved(history, { metadata: textField('{"test":'), title: textField('a') })
+		expect(isAtSavedState(history)).toBe(true)
+	})
+
+	it('resumes capturing once the value parses again', () => {
+		const history = withVolatile()
+		pushSnapshot(history, { metadata: textField({ test: '123' }) })
+		pushSnapshot(history, { metadata: textField('{"test":') })
+		expect(pushSnapshot(history, { metadata: textField({ test: '456' }) })).toBe(true)
+		expect(entryAt(history, 1).comparable.metadata?.value).toEqual({ test: '456' })
+	})
+})

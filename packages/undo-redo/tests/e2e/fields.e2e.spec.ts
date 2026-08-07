@@ -3,9 +3,12 @@ import { expect, test } from '@playwright/test'
 import {
 	arrayRows,
 	blockRows,
+	codeEditorText,
 	createDoc,
 	dragRow,
+	entryValue,
 	field,
+	fillCodeEditor,
 	login,
 	openDocWithHistory,
 	openTab,
@@ -384,5 +387,33 @@ test.describe('field coverage', () => {
 		const de = await readDoc(page, `localized-docs/${id}?locale=de&depth=0`)
 		expect(de.title).toBe('Deutsch')
 		expect((de.localizedItems as { label: string }[])[0]?.label).toBe('Deutsche Zeile')
+	})
+
+	/**
+	 * Payload's JSON field keeps the raw editor text in form state while it does
+	 * not parse, and renders the editor from JSON.stringify(value), so restoring
+	 * that text would show it double-encoded. The history carries the last value
+	 * it can restore instead of recording one it cannot.
+	 */
+	test('keeps a JSON field out of the history while its text does not parse', async ({ page }) => {
+		const id = await createDoc(page, 'posts', { title: 'JSON', metadata: { test: '123' } })
+		await openDocWithHistory(page, 'posts', id)
+		await openTab(page, 'Scalars')
+
+		await fillCodeEditor(page, 'metadata', '{"test": }')
+		await field(page, 'title').fill('typed after breaking the json')
+		await waitForEntries(page, 2)
+		expect(await entryValue(page, 'metadata')).toEqual({ test: '123' })
+
+		await undo(page)
+		await expect(field(page, 'title')).toHaveValue('JSON')
+		await expect.poll(() => codeEditorText(page, 'metadata')).toContain('"test": "123"')
+
+		await redo(page)
+		await expect(field(page, 'title')).toHaveValue('typed after breaking the json')
+		await expect.poll(() => codeEditorText(page, 'metadata')).toContain('"test": "123"')
+		// A restored raw string would arrive escaped inside quotes instead, so the
+		// absence of a backslash is the assertion that matters here.
+		expect(await codeEditorText(page, 'metadata')).not.toContain('\\')
 	})
 })

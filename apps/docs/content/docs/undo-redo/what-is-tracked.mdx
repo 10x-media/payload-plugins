@@ -109,6 +109,25 @@ Lexical keeps its own undo stack for edits inside the editor, and the plugin sta
 
 Restoring a rich text field re-initializes the mounted editor, so the content repaints immediately rather than waiting for a save.
 
+## JSON fields, while the JSON is broken
+
+A JSON field is tracked like any other, with one gap: **while its text is not valid JSON, changes to it do not enter the history.** The field rejoins as soon as the text parses again, and nothing else about the document stops being tracked in the meantime.
+
+The reason is in how Payload's JSON field works. While the text parses, form state holds the parsed data. The moment it does not, the field writes the raw editor text into form state as a string instead, and the editor is rendered back from `JSON.stringify(value)`. Half-finished text is not the result of stringifying anything, so there is no value the plugin could dispatch that would put the editor back the way it was: restoring the string would show it escaped inside quotes rather than as the text you typed.
+
+Rather than record a state it cannot honour, a capture taken while the text is broken carries the field's last restorable value forward. Concretely:
+
+- Breaking the JSON and changing nothing else creates no history entry.
+- Breaking it and then editing another field does create one, and that entry holds the last value the JSON field parsed to, not the broken text.
+- Undoing to an earlier entry restores the JSON that entry held, which puts the field back to a valid value.
+- Redo never re-breaks it.
+
+Stepping through the broken text itself is Monaco's job, exactly as it is Lexical's inside a rich text field: `Ctrl+Z` with the cursor in the editor is the editor's own undo and the plugin does not intercept it.
+
+<Callout>
+A JSON field holding a bare string, such as `"hello"` rather than an object, is indistinguishable from text mid-edit: both reach form state as a string that does not parse, and Payload keeps no error flag there to tell them apart. Such a field stays out of the history for as long as it holds one. Objects, arrays, numbers and booleans are unaffected.
+</Callout>
+
 ## The saved baseline
 
 The plugin records the state the document was last persisted from, and reports the form clean when the current entry matches it. This is what keeps the save button and the "leave without saving" prompt truthful in both directions: undoing back onto the saved state leaves nothing to save, and undoing *past* it is a real unsaved change even when the form looks the way it did on load.

@@ -110,6 +110,57 @@ const entry = resolved ? [undoRedoComponent(resolved)] : []
 
 Put `entry` in any `admin.components` slot that renders inside the document form. `resolveDocOptions` returns `null` when the slug is opted out, which is why the entry is guarded.
 
+## Building your own controls
+
+`UndoRedoControls` is presentation over `useUndoRedo`, which owns the history. When restyling is not enough, call the hook and render whatever you like:
+
+```tsx title="src/admin/MyUndoRedo.tsx"
+'use client'
+import { useUndoRedo } from '@10x-media/undo-redo/client'
+import { useFormProcessing } from '@payloadcms/ui'
+
+export const MyUndoRedo = () => {
+  const { canUndo, canRedo, undo, redo } = useUndoRedo({ maxHistory: 100 })
+  const processing = useFormProcessing()
+
+  return (
+    <>
+      <button type="button" disabled={!canUndo || processing} onClick={undo}>
+        Undo
+      </button>
+      <button type="button" disabled={!canRedo || processing} onClick={redo}>
+        Redo
+      </button>
+    </>
+  )
+}
+```
+
+The options are the same ones the plugin resolves, minus `autoMount`, and all of them are optional. Keyboard handling comes with the hook: it binds the configured chords and applies the same targeting rules, so pass `shortcuts: false` if you would rather bind your own.
+
+| Returned | What it is |
+|---|---|
+| `canUndo` / `canRedo` | Whether the stack has an entry to step to. Deliberately unaware of `useFormProcessing()`, so disable on that too if a save should block a restore. |
+| `undo()` / `redo()` | Step one entry, capturing pending edits first. |
+| `jumpTo(index)` | Restore an arbitrary entry. Out-of-range indexes no-op. |
+| `chords` | The bound chords, or `null` under `shortcuts: false`. Useful for labels. |
+| `fields` | Live form state, as `useAllFormFields` reports it. |
+| `history` | The history object. Read-only in practice, and internal: its shape can change in a minor release. |
+| `revision` | Counter bumped on capture and restore, and only under `debug`. Pulls the mutable history into React's render cycle. |
+| `tracksSavedState` | `false` under autosave, where no saved baseline is kept. |
+
+The last four are what [the history inspector](/undo-redo/debugging) consumes, so your own controls can mount it as well:
+
+```tsx
+import { HistoryDebugOverlay, useUndoRedo } from '@10x-media/undo-redo/client'
+
+const { fields, history, jumpTo, revision, tracksSavedState } = useUndoRedo({ debug: true })
+```
+
+<Callout type="warn">
+Each call to `useUndoRedo` creates its own history. Two of them on the same form keep two independent stacks and each records the other's restores as fresh edits, so mount either our controls or yours, not both: that is what `autoMount: false` is for.
+</Callout>
+
 ## Styling
 
 The controls carry stable class names and size themselves from one custom property, so matching another toolbar takes one rule:

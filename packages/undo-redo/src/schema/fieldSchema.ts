@@ -238,3 +238,22 @@ export const collectIgnorePatterns = (
 	}
 	return patterns
 }
+
+/**
+ * The patterns whose field type is *unambiguously* `type`.
+ *
+ * Ambiguous patterns are left out, the opposite of how `collectIgnorePatterns`
+ * resolves them. Over-matching is the safe direction for an opt-out, because
+ * the cost is a field the host did not ask to exclude staying out of the
+ * history. It is the unsafe direction here: callers use this to decide how to
+ * read a *value*, and applying a JSON field's reading to a text field that
+ * shares its path pattern in a sibling block would quietly stop that text field
+ * from being captured.
+ */
+export const collectPatternsOfType = (map: FieldSchemaMap, type: string): string[] => {
+	const patterns: string[] = []
+	for (const entry of map.values()) {
+		if (entry.type === type) patterns.push(entry.pattern)
+	}
+	return patterns
+}

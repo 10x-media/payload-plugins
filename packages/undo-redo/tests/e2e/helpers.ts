@@ -60,6 +60,27 @@ export const field = (page: Page, path: string): Locator =>
 export const richText = (page: Page, path: string): Locator =>
 	page.locator(`[data-field-path="${path}"] .ContentEditable__root`)
 
+/**
+ * Replace the contents of a Monaco-backed field (`code`, `json`).
+ *
+ * Typed through `insertText` rather than `keyboard.type`, which would go
+ * through Monaco's auto-closing brackets and quotes and produce text nobody
+ * asked for. Deliberately usable for text that does not parse, which is the
+ * state the JSON field spec is about.
+ */
+export const fillCodeEditor = async (page: Page, path: string, text: string): Promise<void> => {
+	await field(page, path).locator('.monaco-editor').first().click()
+	await page.keyboard.press('ControlOrMeta+a')
+	await page.keyboard.insertText(text)
+}
+
+/**
+ * The text a Monaco-backed field is currently showing, with the non-breaking
+ * spaces it renders indentation as folded back into ordinary ones.
+ */
+export const codeEditorText = async (page: Page, path: string): Promise<string> =>
+	(await field(page, path).locator('.view-lines').first().innerText()).replace(/ /g, ' ')
+
 export const readHistory = async (page: Page): Promise<HistoryProbe | null> =>
 	page.evaluate(() => {
 		const history = (

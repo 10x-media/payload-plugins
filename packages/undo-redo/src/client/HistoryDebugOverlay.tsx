@@ -8,8 +8,8 @@ import {
 	type ComparableDiff,
 	deepEqual,
 	diffComparable,
-	extractComparable,
 	isAtSavedState,
+	projectComparable,
 	type UndoHistory,
 } from '../history/historyCore'
 import { keys } from '../translations/keys'
@@ -120,13 +120,14 @@ export const HistoryDebugOverlay: React.FC<HistoryDebugOverlayProps> = ({
 
 	if (!mounted) return null
 
-	// Filtered through the history's own matcher, not the built-in defaults:
-	// otherwise a path the host opted out of shows up here as a change that is
-	// forever "pending", since it is never going to be captured.
+	// Projected through the history's own settings, not extracted raw: otherwise
+	// a path the host opted out of, or one holding a value no restore could put
+	// back, shows up here as a change that is forever "pending", since it is
+	// never going to be captured.
 	const pending = fields
 		? diffComparable(
 				history.stack[history.index]?.comparable ?? {},
-				extractComparable(fields, history.options.isIgnored)
+				projectComparable(history, fields)
 			)
 		: []
 

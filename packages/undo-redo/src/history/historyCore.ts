@@ -69,6 +69,19 @@ export interface HistoryEntry {
 export const MAX_HISTORY_ENTRIES = 50
 
 /**
+ * True for a field whose current value the history cannot put back.
+ *
+ * Payload's JSON field is the case this exists for. While its text does not
+ * parse, the field writes the raw editor text into form state as a string, and
+ * the editor is then rendered from `JSON.stringify(value)`, so dispatching that
+ * string back would show it double-encoded rather than as the text the editor
+ * had. No value we could dispatch reproduces broken text, so rather than record
+ * a state it cannot honour, a capture carries the last value it can (see
+ * pushSnapshot).
+ */
+export type VolatileMatcher = (path: string, field: FormState[string]) => boolean
+
+/**
  * Per-history settings. They live on the history object rather than being
  * threaded through every call so that a snapshot and the restore built from it
  * can never disagree about which paths are in scope.
@@ -76,6 +89,8 @@ export const MAX_HISTORY_ENTRIES = 50
 export interface HistoryOptions {
 	/** Paths excluded from capture and from restore. */
 	isIgnored: PathMatcher
+	/** Paths whose live value is captured as the previous entry's instead. */
+	isVolatile: VolatileMatcher
 	/** Entries kept before the oldest is evicted. */
 	maxHistory: number
 }
@@ -107,6 +122,7 @@ export interface UndoHistory {
 
 export const DEFAULT_HISTORY_OPTIONS: HistoryOptions = {
 	isIgnored: isIgnoredPath,
+	isVolatile: () => false,
 	maxHistory: MAX_HISTORY_ENTRIES,
 }
 
@@ -191,7 +207,7 @@ export const createHistory = (options: Partial<HistoryOptions> = {}): UndoHistor
  * an entry, so it can never disturb the redo tail.
  */
 export const markSaved = (history: UndoHistory, fields: FormState): void => {
-	history.savedComparable = extractComparable(fields, history.options.isIgnored)
+	history.savedComparable = projectComparable(history, fields)
 }
 
 /** True when the form matches the persisted document, so it can be reported clean. */
@@ -199,6 +215,62 @@ export const isAtSavedState = (history: UndoHistory): boolean => {
 	if (!history.savedComparable) return false
 	const current = history.stack[history.index]
 	return current !== undefined && deepEqual(current.comparable, history.savedComparable)
+}
+
+/**
+ * What a volatile path contributes to a snapshot: whatever the previous entry
+ * recorded for it, or, with no entry to carry from, the live field reverted to
+ * its `initialValue`, which is the persisted value and therefore a state the
+ * document really was in.
+ */
+const carryForward = (
+	path: string,
+	live: FormState[string],
+	previous: HistoryEntry | undefined
+): { comparable: ComparableField; field: FormState[string] } => {
+	const carried = previous?.fields[path]
+	if (carried) {
+		return {
+			comparable: previous?.comparable[path] ?? extractComparableField(carried),
+			field: carried,
+		}
+	}
+	const reverted = { ...live, value: live.initialValue }
+	return { comparable: extractComparableField(reverted), field: reverted }
+}
+
+/**
+ * Every volatile, non-ignored path of `fields`, mapped to what it carries
+ * forward from the entry the form currently shows.
+ */
+const collectCarried = (
+	history: UndoHistory,
+	fields: FormState
+): Map<string, { comparable: ComparableField; field: FormState[string] }> => {
+	const { isIgnored, isVolatile } = history.options
+	const previous = history.stack[history.index]
+	const out = new Map<string, { comparable: ComparableField; field: FormState[string] }>()
+	for (const [path, field] of Object.entries(fields)) {
+		if (!field || isIgnored(path) || !isVolatile(path, field)) continue
+		out.set(path, carryForward(path, field, previous))
+	}
+	return out
+}
+
+/**
+ * The comparable state a capture of `fields` would record right now, carry
+ * forward included.
+ *
+ * The debug overlay diffs live form state against this rather than against a
+ * plain extract, so a value that can never be captured does not show up as a
+ * change that is forever pending.
+ */
+export const projectComparable = (history: UndoHistory, fields: FormState): ComparableState => {
+	const out = extractComparable(fields, history.options.isIgnored)
+	for (const [path, carried] of collectCarried(history, fields)) {
+		out[path] = carried.comparable
+	}
+	return out
 }
 
 /**
@@ -211,6 +283,15 @@ export const pushSnapshot = (history: UndoHistory, fields: FormState): boolean =
 	const { isIgnored, maxHistory } = history.options
 	const snapshot = createSnapshot(fields, isIgnored)
 	const current = history.stack[history.index]
+	// Substituting here rather than at restore time is what keeps the stack
+	// honest: an entry's comparable always matches what restoring it produces, so
+	// a restore cannot land on a state that differs from its own entry and have
+	// the next capture record that difference as a phantom edit, truncating the
+	// redo tail.
+	for (const [path, carried] of collectCarried(history, fields)) {
+		snapshot.fields[path] = carried.field
+		snapshot.comparable[path] = carried.comparable
+	}
 	if (current && deepEqual(current.comparable, snapshot.comparable)) return false
 	history.stack.splice(history.index + 1)
 	history.stack.push(snapshot)
