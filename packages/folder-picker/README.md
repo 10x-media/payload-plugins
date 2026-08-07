@@ -20,7 +20,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/folder-picker
+pnpm add @10x-media/folder-picker@beta
 ```
 
 ```ts

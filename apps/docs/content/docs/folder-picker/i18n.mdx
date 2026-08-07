@@ -8,15 +8,21 @@ The plugin's own strings live under the `folderPicker:` namespace as typed trans
 ```ts title="payload.config.ts"
 import { folderPicker } from '@10x-media/folder-picker'
 import { keys } from '@10x-media/folder-picker/i18n'
+import { buildConfig } from 'payload'
 
-folderPicker({
-  translations: {
-    de: { [keys.pluginName]: 'Ordnerauswahl' },
-  },
+export default buildConfig({
+  // ...
+  plugins: [
+    folderPicker({
+      translations: {
+        de: { [keys.pluginName]: 'Ordnerauswahl' },
+      },
+    }),
+  ],
 })
 ```
 
-`@10x-media/folder-picker/i18n` exports `keys` (currently `keys.pluginName`), the built-in English `translations`, and the `TranslationKey` / `TranslationsOption` types. Misspell a key and the build fails.
+`@10x-media/folder-picker/i18n` exports `keys`, the built-in English `translations`, and the `TranslationKey` / `TranslationsOption` types. Misspell a key and the build fails.
 
 ## Everything else is Payload's
 

@@ -39,3 +39,20 @@ export const MyListView: React.FC<ListViewClientProps> = (props) => (
   <FolderListView {...props} />
 )
 ```
+
+Declaring the component is only half of it. It has to be the collection's list view, which is the
+same declaration that made the plugin skip the collection in the first place:
+
+```ts title="payload.config.ts"
+export const Media: CollectionConfig = {
+  slug: 'media',
+  admin: {
+    components: {
+      views: {
+        list: { Component: '/components/MyListView#MyListView' },
+      },
+    },
+  },
+  upload: true,
+}
+```
