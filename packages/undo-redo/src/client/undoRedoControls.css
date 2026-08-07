@@ -1,0 +1,58 @@
+/* The controls mount inside Payload's document controls, next to Save/Publish.
+   Payload's Button sizes itself from text padding, which makes an icon-only
+   button a wide rounded rectangle. These are squared off to the same box as the
+   row's own icon button (the kebab menu: 1.6 * base, matching the height of a
+   medium button) so the group reads as toolbar chrome rather than as three text
+   buttons that happen to hold icons.
+
+   `--undo-redo-control-size` is the one knob for hosts mounting the controls
+   somewhere tighter than the document controls. */
+.undo-redo-controls {
+	--undo-redo-control-size: calc(var(--base) * 1.6);
+	--undo-redo-icon-size: calc(var(--base) * 0.9);
+
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.2);
+}
+
+/* Doubled class so the padding reset outranks Payload's own `.btn--size-*`
+   rules whichever order the two stylesheets end up in. */
+.undo-redo-controls__button.btn {
+	--btn-padding-block-start: 0;
+	--btn-padding-block-end: 0;
+	--btn-padding-inline-start: 0;
+	--btn-padding-inline-end: 0;
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--undo-redo-control-size);
+	height: var(--undo-redo-control-size);
+}
+
+.undo-redo-controls__button.btn svg {
+	width: var(--undo-redo-icon-size);
+	height: var(--undo-redo-icon-size);
+}
+
+/* Disabled has to be readable across three squares sitting side by side, and a
+   muted icon alone is not enough at this size. So the fill and the enabled
+   border are dropped while the outline stays: the square keeps its place in the
+   row, but reads as an empty slot rather than a pressable control.
+
+   Payload's subtle style derives its hover variables from `--bg-color`,
+   `--btn-border` and `--color`, all overridden here, so hover stays flat
+   without restating it. */
+.undo-redo-controls__button.btn.btn--disabled {
+	--bg-color: transparent;
+	--btn-border: 1px solid var(--theme-elevation-100);
+	--color: var(--theme-elevation-350);
+}
+
+/* Held-open state, mirroring how the document controls mark their own popup
+   trigger while its menu is showing. */
+.undo-redo-controls__button--active.btn {
+	--bg-color: var(--theme-elevation-150);
+	--btn-border: 1px solid var(--theme-elevation-400);
+}

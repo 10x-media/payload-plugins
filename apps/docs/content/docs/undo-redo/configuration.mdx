@@ -1,0 +1,175 @@
+---
+title: Configuration
+description: Every option, how per-collection overrides resolve, and how to place the controls yourself.
+---
+
+## Options
+
+```ts title="payload.config.ts"
+undoRedo({
+  maxHistory: 50,
+  captureDebounce: 400,
+  debug: false,
+  autoMount: true,
+  ignorePaths: [],
+  ignoreFieldTypes: [],
+  shortcuts: { undo: ['mod+z'], redo: ['mod+shift+z', 'mod+y'] },
+  collections: {},
+  globals: {},
+  translations: {},
+  disabled: false,
+})
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `maxHistory` | `50` | Entries kept before the oldest is dropped. |
+| `captureDebounce` | `400` | Milliseconds of quiet before edits become one entry. Raise it to coalesce more typing into a single undo step, lower it for finer steps. |
+| `debug` | `false` | Adds a third toolbar button opening the [history inspector](/undo-redo/debugging). |
+| `autoMount` | `true` | Whether the plugin places the controls itself. See [Placing the controls yourself](#placing-the-controls-yourself). |
+| `ignorePaths` | `[]` | Form-state paths to leave out of the history. See [What is tracked](/undo-redo/what-is-tracked#by-path). |
+| `ignoreFieldTypes` | `[]` | Field types to leave out wherever they appear. |
+| `shortcuts` | `mod+z` / `mod+shift+z`, `mod+y` | Key bindings, or `false` to drop keyboard handling and keep the buttons. See [Shortcuts](/undo-redo/shortcuts). |
+| `collections` | on for all | Per-collection opt-out map, or `false` for none. |
+| `globals` | on for all | Per-global opt-out map, same shape. |
+| `translations` | `{}` | Per-locale string overrides. See [i18n](/undo-redo/i18n). |
+| `disabled` | `false` | Returns the incoming config untouched. |
+
+## Per-collection and per-global overrides
+
+Undo/redo is on everywhere, so `collections` and `globals` are opt-*out* maps rather than opt-in ones. Three values are meaningful:
+
+```ts
+undoRedo({
+  maxHistory: 30,
+  collections: {
+    'payload-locked-documents': false,   // off for this collection
+    media: false,
+    pages: { maxHistory: 100 },          // on, with an override
+    posts: { debug: true },
+  },
+  globals: false,                        // off for every global
+})
+```
+
+An omitted slug inherits the top-level settings. `false` disables the slug entirely: no component is mounted and no history is kept. An object overrides the top-level settings for that slug only.
+
+Everything in the table above is overridable per slug **except** `shortcuts`, `collections`, `globals`, `translations`, and `disabled`, which are global by nature. Shortcuts in particular are deliberately not per-collection: bindings that change as an editor moves between collections are a way to confuse people, not a feature.
+
+## How overrides resolve
+
+Settings resolve in three layers: built-in defaults, then top-level options, then the per-slug entry. The last layer that names a key wins.
+
+`ignorePaths` and `ignoreFieldTypes` are the exception. They **merge** across layers instead of replacing, and `ignorePaths` additionally always includes the fields Payload owns:
+
+```ts
+undoRedo({
+  ignorePaths: ['slug'],
+  collections: {
+    posts: { ignorePaths: ['readingTime'] },
+  },
+})
+```
+
+`posts` ignores `slug`, `readingTime`, *and* the built-in `_status`, `createdAt`, `sessions` and friends. A collection adding one path never silently drops the ones declared above it, which is almost always what was meant and never a surprise in the dangerous direction.
+
+## Placing the controls yourself
+
+`autoMount: false` stops the plugin from touching `admin.components`, leaving the controls for you to place. Everything else about the option still resolves, so this is a placement switch, not an off switch.
+
+```ts title="payload.config.ts"
+undoRedo({ autoMount: false })
+```
+
+The component is exported from the client subpath and every prop is optional, so it is usable from any admin slot or from inside your own client component:
+
+```tsx title="src/admin/DocumentHeader.tsx"
+'use client'
+import { UndoRedoControls } from '@10x-media/undo-redo/client'
+
+export const DocumentHeader = () => (
+  <header>
+    <UndoRedoControls maxHistory={100} debug />
+  </header>
+)
+```
+
+<Callout type="warn">
+The controls read the surrounding form through Payload's form context, so they must render inside a document edit form. Mounted outside one, they find no fields and stay disabled.
+</Callout>
+
+Registering it through the config instead of in JSX works the same way, and `undoRedoComponent` builds the entry with the settings already resolved, so the mounted controls and the config cannot drift apart:
+
+```ts title="payload.config.ts"
+import { resolveDocOptions, undoRedoComponent } from '@10x-media/undo-redo'
+
+const options = { autoMount: false, maxHistory: 100 }
+const resolved = resolveDocOptions(options, 'collections', 'posts')
+const entry = resolved ? [undoRedoComponent(resolved)] : []
+```
+
+Put `entry` in any `admin.components` slot that renders inside the document form. `resolveDocOptions` returns `null` when the slug is opted out, which is why the entry is guarded.
+
+## Building your own controls
+
+`UndoRedoControls` is presentation over `useUndoRedo`, which owns the history. When restyling is not enough, call the hook and render whatever you like:
+
+```tsx title="src/admin/MyUndoRedo.tsx"
+'use client'
+import { useUndoRedo } from '@10x-media/undo-redo/client'
+import { useFormProcessing } from '@payloadcms/ui'
+
+export const MyUndoRedo = () => {
+  const { canUndo, canRedo, undo, redo } = useUndoRedo({ maxHistory: 100 })
+  const processing = useFormProcessing()
+
+  return (
+    <>
+      <button type="button" disabled={!canUndo || processing} onClick={undo}>
+        Undo
+      </button>
+      <button type="button" disabled={!canRedo || processing} onClick={redo}>
+        Redo
+      </button>
+    </>
+  )
+}
+```
+
+The options are the same ones the plugin resolves, minus `autoMount`, and all of them are optional. Keyboard handling comes with the hook: it binds the configured chords and applies the same targeting rules, so pass `shortcuts: false` if you would rather bind your own.
+
+| Returned | What it is |
+|---|---|
+| `canUndo` / `canRedo` | Whether the stack has an entry to step to. Deliberately unaware of `useFormProcessing()`, so disable on that too if a save should block a restore. |
+| `undo()` / `redo()` | Step one entry, capturing pending edits first. |
+| `jumpTo(index)` | Restore an arbitrary entry. Out-of-range indexes no-op. |
+| `chords` | The bound chords, or `null` under `shortcuts: false`. Useful for labels. |
+| `fields` | Live form state, as `useAllFormFields` reports it. |
+| `history` | The history object. Read-only in practice, and internal: its shape can change in a minor release. |
+| `revision` | Counter bumped on capture and restore, and only under `debug`. Pulls the mutable history into React's render cycle. |
+| `tracksSavedState` | `false` under autosave, where no saved baseline is kept. |
+
+The last four are what [the history inspector](/undo-redo/debugging) consumes, so your own controls can mount it as well:
+
+```tsx
+import { HistoryDebugOverlay, useUndoRedo } from '@10x-media/undo-redo/client'
+
+const { fields, history, jumpTo, revision, tracksSavedState } = useUndoRedo({ debug: true })
+```
+
+<Callout type="warn">
+Each call to `useUndoRedo` creates its own history. Two of them on the same form keep two independent stacks and each records the other's restores as fresh edits, so mount either our controls or yours, not both: that is what `autoMount: false` is for.
+</Callout>
+
+## Styling
+
+The controls carry stable class names and size themselves from one custom property, so matching another toolbar takes one rule:
+
+```css
+.undo-redo-controls {
+  --undo-redo-control-size: calc(var(--base) * 2);
+  --undo-redo-icon-size: calc(var(--base) * 1);
+}
+```
+
+The root is `.undo-redo-controls`; each button is `.undo-redo-controls__button` plus one of `__undo`, `__redo`, `__debug`; the open debug button also carries `--active`.

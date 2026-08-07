@@ -1,0 +1,46 @@
+---
+title: Keyboard shortcuts
+description: The default bindings, the chord syntax, and which surfaces keep their own undo.
+---
+
+## Defaults
+
+| Action | Binding |
+|---|---|
+| Undo | `Ctrl+Z`, `Cmd+Z` on macOS |
+| Redo | `Ctrl+Shift+Z` and `Ctrl+Y`, `Cmd` on macOS |
+
+## Rebinding
+
+```ts title="payload.config.ts"
+undoRedo({
+  shortcuts: {
+    undo: 'mod+u',
+    redo: ['mod+shift+u', 'mod+r'],
+  },
+})
+```
+
+Bindings are [react-hotkeys-hook](https://react-hotkeys-hook.vercel.app) chords. A single string or an array of them; every chord in the array triggers the same action.
+
+`mod` resolves to Cmd on macOS and Ctrl everywhere else, which is what you want for anything mirroring a native editing shortcut. `ctrl`, `alt`, `shift` and `meta` are literal. Use `>` between chords for a sequence: `'g > u'`.
+
+Omit either key and it keeps its default, so overriding only `undo` leaves redo as it was. Set `shortcuts: false` to drop keyboard handling entirely and keep the buttons.
+
+Shortcuts are global on purpose and cannot be set per collection: bindings that change as an editor moves between collections are a way to confuse people, not a feature.
+
+## Tooltips
+
+The button tooltips render whatever is actually bound, parsed the same way the hotkey library parses it, so a label can never disagree with the binding. Notation follows the platform: `⇧⌘Z` on macOS, `Ctrl+Shift+Z` elsewhere. Only the first chord of an array is shown, since the rest are aliases for the same action.
+
+The shortcut stays out of the button's accessible name, where a screen reader would announce `⇧⌘Z` as punctuation rather than as a key combination.
+
+## Where the shortcuts do not fire
+
+**Inside text inputs and textareas.** The browser has its own undo there, scoped to the field, and it is the more useful one mid-sentence. The plugin sees the result of a native undo as an ordinary edit and captures it as the next entry, so the two never fight.
+
+**Inside a rich text editor.** Lexical owns undo in its own contenteditable. One keypress must not undo two things.
+
+**In another form.** Document drawers mount their own edit forms, and only the one the event happened in reacts. For a keypress outside any form, the topmost open drawer wins.
+
+The buttons are unaffected by all of this: they act on the document form they belong to, regardless of where focus is.
