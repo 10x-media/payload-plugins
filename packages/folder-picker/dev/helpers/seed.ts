@@ -94,7 +94,14 @@ const globalForSeed = globalThis as typeof globalThis & {
  * Idempotent: each block is skipped once its collection holds documents.
  */
 export const seedDev = (payload: Payload): Promise<void> => {
-	globalForSeed.__10xMediaFolderPickerSeed ??= runSeed(payload)
+	// The memo is dropped on failure. Keeping a rejected promise would hand the same rejection to
+	// every later call, so one transient database hiccup would leave a long-lived `next dev` unable
+	// to seed until it is restarted.
+	globalForSeed.__10xMediaFolderPickerSeed ??= runSeed(payload).catch((error: unknown) => {
+		globalForSeed.__10xMediaFolderPickerSeed = undefined
+		throw error
+	})
+
 	return globalForSeed.__10xMediaFolderPickerSeed
 }
 

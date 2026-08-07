@@ -5,13 +5,16 @@ services:
     ports:
       - '${MONGO_E2E_PORT:-37017}:27017'
     healthcheck:
+      # Reports healthy only once a primary has been elected. rs.initiate() returns ok before that
+      # happens, so answering on it alone let Payload start into NotWritablePrimary errors.
       test: |
         mongosh --quiet --eval '
           try {
-            rs.status().ok
+            rs.status()
           } catch (e) {
-            rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]}).ok
+            rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})
           }
+          rs.status().members.some((member) => member.stateStr === "PRIMARY") ? 0 : quit(1)
         '
       interval: 2s
       timeout: 5s

@@ -24,14 +24,20 @@ export const startMemoryMongo = async (): Promise<string> => {
 	if (!globalForMongo.__10xMediaDevMemoryMongo) {
 		globalForMongo.__10xMediaDevMemoryMongo = MongoMemoryReplSet.create({ replSet: { count: 1 } })
 
-		const stop = (): void => {
+		/**
+		 * Signals only. An `exit` listener cannot await anything, so stopping the replica set from
+		 * there never gets past the first tick and leaves a mongod behind; handling the signal and
+		 * re-raising it after the stop is the only way to shut down cleanly.
+		 */
+		const stop = async (signal: NodeJS.Signals): Promise<void> => {
 			const pending = globalForMongo.__10xMediaDevMemoryMongo
 			globalForMongo.__10xMediaDevMemoryMongo = undefined
-			void pending?.then((replSet) => replSet.stop())
+			await pending?.then((replSet) => replSet.stop())
+			process.kill(process.pid, signal)
 		}
-		process.once('SIGINT', stop)
-		process.once('SIGTERM', stop)
-		process.once('exit', stop)
+
+		process.once('SIGINT', () => void stop('SIGINT'))
+		process.once('SIGTERM', () => void stop('SIGTERM'))
 	}
 
 	return (await globalForMongo.__10xMediaDevMemoryMongo).getUri()
