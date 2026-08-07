@@ -711,9 +711,16 @@ describe('server-filled paths', () => {
 	it('leaves the entries before the current one alone', () => {
 		const history = createHistory()
 		pushSnapshot(history, { title: textField('a') })
-		pushSnapshot(history, { extra: textField('x'), title: textField('a') })
-		expect(history.stack).toHaveLength(1)
-		expect(entryAt(history, 0).comparable).toHaveProperty(['extra'])
+		pushSnapshot(history, { title: textField('b') })
+		expect(history.stack).toHaveLength(2)
+
+		pushSnapshot(history, { extra: textField('x'), title: textField('b') })
+		expect(history.stack).toHaveLength(2)
+		expect(entryAt(history, 1).comparable).toHaveProperty(['extra'])
+		// The fold lands on the current entry only. Stepping back has to reach the
+		// state before the addition existed, not a rewritten version of it.
+		expect(entryAt(history, 0).comparable.title?.value).toBe('a')
+		expect(entryAt(history, 0).comparable).not.toHaveProperty(['extra'])
 	})
 
 	it('still appends when a value changed alongside the additions', () => {
@@ -728,6 +735,17 @@ describe('server-filled paths', () => {
 		expect(
 			pushSnapshot(history, { list: arrayField(['r1']), 'list.0.word': textField(undefined) })
 		).toBe(true)
+	})
+
+	/**
+	 * A path holding `undefined` still occupies a key in the comparable state, so
+	 * losing one is a removal like any other and must not read as "nothing that
+	 * existed changed" just because both sides look empty.
+	 */
+	it('still appends when a path holding undefined disappeared alongside an addition', () => {
+		const history = createHistory()
+		pushSnapshot(history, { ghost: textField(undefined), title: textField('a') })
+		expect(pushSnapshot(history, { extra: textField('x'), title: textField('a') })).toBe(true)
 	})
 
 	it('still appends when a path disappeared', () => {
