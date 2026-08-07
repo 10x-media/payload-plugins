@@ -1,10 +1,23 @@
 'use client'
 
 import { getTranslation } from '@payloadcms/translations'
-import { useConfig, useFolder, useTranslation } from '@payloadcms/ui'
+import { toast, useConfig, useFolder, useTranslation } from '@payloadcms/ui'
 import type { CollectionSlug } from 'payload'
 import type { FolderOrDocument } from 'payload/shared'
 import React from 'react'
+
+/**
+ * `fetch` rejects only on a network failure, so a 401, 403 or 500 arrives as an ordinary response.
+ * Left unchecked the caller would clear the selection and reload, presenting a refusal as a
+ * success: the same rows, no message, and the user believing the move or the delete happened.
+ */
+const reportFailure = async (response: Response): Promise<void> => {
+	const body = (await response.json().catch(() => null)) as null | {
+		errors?: { message?: string }[]
+	}
+
+	toast.error(body?.errors?.[0]?.message ?? `${response.status} ${response.statusText}`)
+}
 
 type Args = {
 	collectionSlug: CollectionSlug
@@ -75,12 +88,18 @@ export const useFolderTargets = ({
 			// Nothing selected: the folder in view is being moved, so follow it. A folder's parent is
 			// held in the same configured field its documents use, which the host may have renamed.
 			if (!folderID) return
-			await fetch(`${config.routes.api}/${folderCollectionSlug}/${folderID}`, {
+			const response = await fetch(`${config.routes.api}/${folderCollectionSlug}/${folderID}`, {
 				body: JSON.stringify({ [folderFieldName]: destination.id ?? null }),
 				credentials: 'include',
 				headers: { 'Content-Type': 'application/json' },
 				method: 'PATCH',
 			})
+
+			if (!response.ok) {
+				await reportFailure(response)
+				return
+			}
+
 			await onChanged(folderID)
 		},
 		[
@@ -106,10 +125,18 @@ export const useFolderTargets = ({
 		if (targets.length === 0) return
 
 		for (const item of targets) {
-			await fetch(`${config.routes.api}/${item.relationTo}/${item.value.id}`, {
+			const response = await fetch(`${config.routes.api}/${item.relationTo}/${item.value.id}`, {
 				credentials: 'include',
 				method: 'DELETE',
 			})
+
+			// Stopping on the first refusal rather than carrying on: whatever denied one delete, a
+			// permission or a relationship, will deny the rest, and the ones already gone still need
+			// the view refreshed below.
+			if (!response.ok) {
+				await reportFailure(response)
+				break
+			}
 		}
 
 		clearSelections()
