@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/undo-redo
 
 Client-side undo/redo for Payload v3 admin forms. Snapshots the document form state as the editor works and steps back and forth through it, independent of Payload's document versions: nothing reaches the server until the editor saves.
