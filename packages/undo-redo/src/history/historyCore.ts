@@ -315,10 +315,38 @@ export const projectComparable = (history: UndoHistory, fields: FormState): Comp
 }
 
 /**
+ * True when `to` is `from` plus paths that did not exist before, with nothing
+ * that did exist having changed.
+ *
+ * This is the shape of Payload finishing a job rather than of an edit. Adding a
+ * row dispatches `ADD_ROW` with a blank row and leaves the real state to the
+ * debounced form-state request that follows (see @payloadcms/ui Form
+ * `addFieldRow`), so the row's own fields arrive as a second wave, milliseconds
+ * to seconds later depending on how big the config is. Every user action that
+ * adds paths brings something else with it: adding a row changes the row ids,
+ * revealing a conditional field changes the value that controls it. A wave of
+ * pure additions has no such companion, and treating it as an edit costs a
+ * second undo to get past a single click.
+ */
+const addsPathsOnly = (from: ComparableState, to: ComparableState): boolean => {
+	let added = false
+	for (const path of Object.keys(to)) {
+		if (!(path in from)) added = true
+	}
+	if (!added) return false
+	return Object.keys(from).every((path) => deepEqual(from[path], to[path]))
+}
+
+/**
  * Push the current form state onto the history. No-ops (and returns false) when
  * nothing user-visible changed relative to the entry at the current index,
  * which absorbs server-merge echoes after saves/restores. A real change drops
  * the redo tail, appends, and caps the stack at the history's `maxHistory`.
+ *
+ * A wave of pure path additions is folded into the current entry instead of
+ * appended (see addsPathsOnly). Folded rather than dropped, because an entry
+ * restores exactly the paths it holds: leaving the new ones out would make
+ * stepping back onto that entry delete the fields Payload had just filled in.
  */
 export const pushSnapshot = (history: UndoHistory, fields: FormState): boolean => {
 	const { isIgnored, maxHistory } = history.options
@@ -333,7 +361,14 @@ export const pushSnapshot = (history: UndoHistory, fields: FormState): boolean =
 		snapshot.fields[path] = carried.field
 		snapshot.comparable[path] = carried.comparable
 	}
-	if (current && deepEqual(current.comparable, snapshot.comparable)) return false
+	if (current) {
+		if (deepEqual(current.comparable, snapshot.comparable)) return false
+		if (addsPathsOnly(current.comparable, snapshot.comparable)) {
+			current.fields = snapshot.fields
+			current.comparable = snapshot.comparable
+			return false
+		}
+	}
 	history.stack.splice(history.index + 1)
 	history.stack.push(snapshot)
 	if (history.stack.length > maxHistory) {

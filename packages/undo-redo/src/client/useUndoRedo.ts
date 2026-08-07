@@ -204,7 +204,11 @@ export const useUndoRedo = ({
 		const timer = setTimeout(() => {
 			const latest = fieldsRef.current
 			if (!latest) return
-			if (pushSnapshot(history, latest)) bumpRevision()
+			// Bumped whether or not an entry was appended: a capture that folds
+			// into the current entry changes what the inspector is showing just as
+			// much as one that adds a row to it.
+			pushSnapshot(history, latest)
+			bumpRevision()
 			refreshFlags()
 		}, captureDebounce)
 		return () => clearTimeout(timer)

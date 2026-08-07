@@ -675,3 +675,89 @@ describe('polymorphic relationship values', () => {
 		).toBe(true)
 	})
 })
+
+describe('server-filled paths', () => {
+	/**
+	 * Payload adds a row as a blank one and lets the debounced form-state request
+	 * fill in its fields, so a capture can land between the two. That used to
+	 * cost a second undo to get past a single click.
+	 */
+	it('folds a wave of pure additions into the current entry', () => {
+		const history = createHistory()
+		pushSnapshot(history, { blocks: arrayField([]), title: textField('a') })
+		pushSnapshot(history, {
+			blocks: arrayField(['row-1']),
+			'blocks.0.blockType': textField('preset'),
+			title: textField('a'),
+		})
+		expect(history.stack).toHaveLength(2)
+
+		// The server's answer arrives with the row's own fields.
+		expect(
+			pushSnapshot(history, {
+				blocks: arrayField(['row-1']),
+				'blocks.0.blockType': textField('preset'),
+				'blocks.0.preset': textField(undefined),
+				title: textField('a'),
+			})
+		).toBe(false)
+		expect(history.stack).toHaveLength(2)
+		// Folded, not dropped: restoring this entry has to put the field back
+		// rather than delete what Payload just filled in.
+		expect(entryAt(history, 1).comparable).toHaveProperty(['blocks.0.preset'])
+		expect(entryAt(history, 1).fields['blocks.0.preset']).toBeDefined()
+	})
+
+	it('leaves the entries before the current one alone', () => {
+		const history = createHistory()
+		pushSnapshot(history, { title: textField('a') })
+		pushSnapshot(history, { title: textField('b') })
+		expect(history.stack).toHaveLength(2)
+
+		pushSnapshot(history, { extra: textField('x'), title: textField('b') })
+		expect(history.stack).toHaveLength(2)
+		expect(entryAt(history, 1).comparable).toHaveProperty(['extra'])
+		// The fold lands on the current entry only. Stepping back has to reach the
+		// state before the addition existed, not a rewritten version of it.
+		expect(entryAt(history, 0).comparable.title?.value).toBe('a')
+		expect(entryAt(history, 0).comparable).not.toHaveProperty(['extra'])
+	})
+
+	it('still appends when a value changed alongside the additions', () => {
+		const history = createHistory()
+		pushSnapshot(history, { title: textField('a') })
+		expect(pushSnapshot(history, { extra: textField('x'), title: textField('b') })).toBe(true)
+	})
+
+	it('still appends when rows changed alongside the additions', () => {
+		const history = createHistory()
+		pushSnapshot(history, { list: arrayField([]) })
+		expect(
+			pushSnapshot(history, { list: arrayField(['r1']), 'list.0.word': textField(undefined) })
+		).toBe(true)
+	})
+
+	/**
+	 * A path holding `undefined` still occupies a key in the comparable state, so
+	 * losing one is a removal like any other and must not read as "nothing that
+	 * existed changed" just because both sides look empty.
+	 */
+	it('still appends when a path holding undefined disappeared alongside an addition', () => {
+		const history = createHistory()
+		pushSnapshot(history, { ghost: textField(undefined), title: textField('a') })
+		expect(pushSnapshot(history, { extra: textField('x'), title: textField('a') })).toBe(true)
+	})
+
+	it('still appends when a path disappeared', () => {
+		const history = createHistory()
+		pushSnapshot(history, { hidden: textField('x'), title: textField('a') })
+		expect(pushSnapshot(history, { title: textField('a') })).toBe(true)
+	})
+
+	it('does not fold a repeat of the same state', () => {
+		const history = createHistory()
+		pushSnapshot(history, { title: textField('a') })
+		expect(pushSnapshot(history, { title: textField('a') })).toBe(false)
+		expect(history.stack).toHaveLength(1)
+	})
+})
