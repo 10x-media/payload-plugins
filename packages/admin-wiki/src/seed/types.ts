@@ -1,6 +1,19 @@
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
 
-import type { WikiTargetRow } from '../shared/targetKeys'
+/** The surfaces a seeded guide attaches to, one list per target kind. */
+export type WikiSeedTargets = {
+	/** Block slugs, e.g. `heroBanner`. */
+	blocks?: string[]
+	/** Collection slugs, e.g. `posts`. */
+	collections?: string[]
+	/**
+	 * Entity-qualified field schema paths, e.g. `collection:posts.hero.title` or
+	 * `global:settings.siteName`.
+	 */
+	fields?: string[]
+	/** Global slugs, e.g. `settings`. */
+	globals?: string[]
+}
 
 /**
  * A value that is either one plain value (written in the default locale) or a
@@ -48,7 +61,7 @@ export type WikiSeedGuideDef = {
 	/** Stable identity across runs; re-running updates instead of duplicating. */
 	slug: string
 	summary?: WikiSeedLocalized<string>
-	targets?: WikiTargetRow[]
+	targets?: WikiSeedTargets
 	title: WikiSeedLocalized<string>
 }
 

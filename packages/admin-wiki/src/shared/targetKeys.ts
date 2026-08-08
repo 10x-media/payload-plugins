@@ -6,13 +6,26 @@
 
 export type WikiTargetType = 'block' | 'collection' | 'field' | 'global'
 
-export type WikiTargetRow = {
-	blockSlug?: string | null
-	collectionSlug?: string | null
-	fieldPath?: string | null
-	globalSlug?: string | null
-	type?: WikiTargetType | null
+/**
+ * The four `string[]` fields a guide stores its attachments in, one per target
+ * kind. Every value is a bare slug except `targetFields`, which stores an
+ * entity-qualified schema path (`collection:posts.title`) because a collection
+ * and a global may share a slug.
+ */
+export type WikiTargetDoc = {
+	targetBlocks?: null | string[]
+	targetCollections?: null | string[]
+	targetFields?: null | string[]
+	targetGlobals?: null | string[]
 }
+
+/** The `select` shape every query that needs target keys must ask for. */
+export const wikiTargetSelect = {
+	targetBlocks: true,
+	targetCollections: true,
+	targetFields: true,
+	targetGlobals: true,
+} as const
 
 /** A guide as listed in the targets map: enough for triggers and hover cards. */
 export type WikiTargetEntry = {
@@ -49,35 +62,44 @@ export type WikiGuideDoc = {
 
 export const collectionTargetKey = (slug: string): string => `collection:${slug}`
 export const globalTargetKey = (slug: string): string => `global:${slug}`
-export const fieldTargetKey = (schemaPath: string): string => `field:${schemaPath}`
 export const blockTargetKey = (slug: string): string => `block:${slug}`
 
-/** Key for a stored target row, or null when the row is incomplete. */
-export const targetKeyForRow = (row: WikiTargetRow): null | string => {
-	switch (row.type) {
+/**
+ * `schemaPath` is entity-qualified, as the walker emits it and as
+ * `targetFields` stores it: `collection:posts.title`, `global:settings.name`.
+ */
+export const fieldTargetKey = (schemaPath: string): string => `field:${schemaPath}`
+
+/** The stored field a target kind lives in, for prefill and mapping. */
+export const targetFieldNameFor = (kind: WikiTargetType): keyof WikiTargetDoc => {
+	switch (kind) {
 		case 'block':
-			return row.blockSlug ? blockTargetKey(row.blockSlug) : null
+			return 'targetBlocks'
 		case 'collection':
-			return row.collectionSlug ? collectionTargetKey(row.collectionSlug) : null
+			return 'targetCollections'
 		case 'field':
-			return row.fieldPath ? fieldTargetKey(row.fieldPath) : null
+			return 'targetFields'
 		case 'global':
-			return row.globalSlug ? globalTargetKey(row.globalSlug) : null
-		default:
-			return null
+			return 'targetGlobals'
 	}
 }
 
-/** Every target key on a guide document's stored `targets` array, deduplicated. */
-export const targetKeysForDoc = (targets: unknown): string[] => {
-	if (!Array.isArray(targets)) {
-		return []
-	}
+const keyBuilders: Array<[keyof WikiTargetDoc, (value: string) => string]> = [
+	['targetCollections', collectionTargetKey],
+	['targetGlobals', globalTargetKey],
+	['targetFields', fieldTargetKey],
+	['targetBlocks', blockTargetKey],
+]
+
+/** Every target key a guide document is attached to, deduplicated. */
+export const targetKeysForDoc = (doc: unknown): string[] => {
+	const source = (doc ?? {}) as WikiTargetDoc
 	const keys = new Set<string>()
-	for (const row of targets) {
-		const key = targetKeyForRow((row ?? {}) as WikiTargetRow)
-		if (key) {
-			keys.add(key)
+	for (const [field, toKey] of keyBuilders) {
+		for (const value of source[field] ?? []) {
+			if (typeof value === 'string' && value.length > 0) {
+				keys.add(toKey(value))
+			}
 		}
 	}
 	return [...keys]

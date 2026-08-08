@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { compareTargetEntries, targetKeyForRow, type WikiTargetEntry } from './targetKeys'
+import { compareTargetEntries, targetKeysForDoc, type WikiTargetEntry } from './targetKeys'
 
 const entry = (overrides: Partial<WikiTargetEntry>): WikiTargetEntry => ({
 	featured: false,
@@ -12,21 +12,34 @@ const entry = (overrides: Partial<WikiTargetEntry>): WikiTargetEntry => ({
 	...overrides,
 })
 
-describe('targetKeyForRow', () => {
-	it('builds keys per target type', () => {
-		expect(targetKeyForRow({ collectionSlug: 'posts', type: 'collection' })).toBe(
-			'collection:posts'
-		)
-		expect(targetKeyForRow({ globalSlug: 'settings', type: 'global' })).toBe('global:settings')
-		expect(targetKeyForRow({ fieldPath: 'posts.hero.title', type: 'field' })).toBe(
-			'field:posts.hero.title'
-		)
-		expect(targetKeyForRow({ blockSlug: 'cta', type: 'block' })).toBe('block:cta')
+describe('targetKeysForDoc', () => {
+	it('builds one key per stored value, per kind', () => {
+		expect(
+			targetKeysForDoc({
+				targetBlocks: ['cta'],
+				targetCollections: ['posts', 'products'],
+				targetFields: ['collection:posts.hero.title', 'global:settings.siteName'],
+				targetGlobals: ['settings'],
+			})
+		).toEqual([
+			'collection:posts',
+			'collection:products',
+			'global:settings',
+			'field:collection:posts.hero.title',
+			'field:global:settings.siteName',
+			'block:cta',
+		])
 	})
 
-	it('returns null for incomplete rows', () => {
-		expect(targetKeyForRow({ type: 'collection' })).toBeNull()
-		expect(targetKeyForRow({ fieldPath: 'x.y' })).toBeNull()
+	it('tolerates absent, null, and empty values', () => {
+		expect(targetKeysForDoc({ targetCollections: null, targetFields: [''] })).toEqual([])
+		expect(targetKeysForDoc(undefined)).toEqual([])
+	})
+
+	it('deduplicates repeated values', () => {
+		expect(targetKeysForDoc({ targetCollections: ['posts', 'posts'] })).toEqual([
+			'collection:posts',
+		])
 	})
 })
 

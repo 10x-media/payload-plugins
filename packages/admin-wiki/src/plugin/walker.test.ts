@@ -38,13 +38,13 @@ describe('walkAndInjectFieldHelp', () => {
 		])
 		const result = walkAndInjectFieldHelp(config, resolved)
 		expect(result.validTargetKeys).toContain('collection:posts')
-		expect(result.validTargetKeys).toContain('field:posts.title')
-		expect(result.validTargetKeys).toContain('field:posts.plain')
-		expect(result.validTargetKeys).toContain('field:posts.meta.seoTitle')
-		expect(result.validTargetKeys).toContain('field:posts.hero')
-		expect(result.validTargetKeys).toContain('field:posts.hero.headline')
+		expect(result.validTargetKeys).toContain('field:collection:posts.title')
+		expect(result.validTargetKeys).toContain('field:collection:posts.plain')
+		expect(result.validTargetKeys).toContain('field:collection:posts.meta.seoTitle')
+		expect(result.validTargetKeys).toContain('field:collection:posts.hero')
+		expect(result.validTargetKeys).toContain('field:collection:posts.hero.headline')
 		const injected = descriptionOf(titleField) as { clientProps: { schemaPath: string } }
-		expect(injected.clientProps.schemaPath).toBe('posts.title')
+		expect(injected.clientProps.schemaPath).toBe('collection:posts.title')
 		expect(result.injectedFieldCount).toBe(5)
 	})
 
@@ -69,7 +69,7 @@ describe('walkAndInjectFieldHelp', () => {
 		])
 		const result = walkAndInjectFieldHelp(config, resolved)
 		expect(result.validTargetKeys).toContain('block:cta')
-		expect(result.validTargetKeys).toContain('field:pages.layout.cta.label')
+		expect(result.validTargetKeys).toContain('field:collection:pages.layout.cta.label')
 		const injectedLabel = (ctaBlock as { admin?: { components?: { Label?: unknown } } }).admin
 			?.components?.Label
 		expect(injectedLabel).toMatchObject({ clientProps: { blockSlug: 'cta' } })
@@ -83,9 +83,19 @@ describe('walkAndInjectFieldHelp', () => {
 		)
 		const result = walkAndInjectFieldHelp(config, resolved)
 		expect(result.validTargetKeys).toContain('global:settings')
-		expect(result.validTargetKeys).toContain('field:settings.siteName')
+		expect(result.validTargetKeys).toContain('field:global:settings.siteName')
 		expect(result.validTargetKeys).not.toContain('collection:wiki-pages')
-		expect(result.validTargetKeys).not.toContain('field:wiki-pages.title')
+		expect(result.validTargetKeys).not.toContain('field:collection:wiki-pages.title')
+	})
+
+	it('keeps a collection and a global that share a slug apart', () => {
+		const config = makeConfig(
+			[{ slug: 'settings', fields: [{ name: 'siteName', type: 'text' }] }],
+			[{ slug: 'settings', fields: [{ name: 'siteName', type: 'text' }] }]
+		)
+		const result = walkAndInjectFieldHelp(config, resolved)
+		expect(result.validTargetKeys).toContain('field:collection:settings.siteName')
+		expect(result.validTargetKeys).toContain('field:global:settings.siteName')
 	})
 
 	it('preserves an existing static description and skips custom components', () => {
@@ -112,7 +122,7 @@ describe('walkAndInjectFieldHelp', () => {
 		expect(injected.clientProps.description).toBe('keep me')
 		expect(descriptionOf(withComponent)).toBe('/custom#X')
 		expect(descriptionOf(withFunction)).toBeUndefined()
-		expect(result.validTargetKeys).toContain('field:posts.c')
+		expect(result.validTargetKeys).toContain('field:collection:posts.c')
 		expect(result.injectedFieldCount).toBe(1)
 	})
 })

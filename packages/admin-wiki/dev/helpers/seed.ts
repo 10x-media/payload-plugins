@@ -92,10 +92,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 						de: 'Vom Entwurf zur Veröffentlichung, Schritt für Schritt.',
 						en: 'From draft to published, step by step.',
 					},
-					targets: [
-						{ collectionSlug: 'posts', type: 'collection' },
-						{ fieldPath: 'posts.title', type: 'field' },
-					],
+					targets: {
+						collections: ['posts'],
+						fields: ['collection:posts.title'],
+					},
 					title: { de: 'Beitrag veröffentlichen', en: 'Publishing a post' },
 				},
 				{
@@ -104,18 +104,20 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					featuredOrder: 2,
 					slug: 'editor-features-tour',
 					summary: 'Callouts, consumer blocks, video embeds, and guide links in one page.',
-					targets: [{ collectionSlug: 'products', type: 'collection' }],
+					targets: { collections: ['products'] },
 					title: 'Editor features tour',
 				},
 				{
 					content: { markdown: postFieldsGuide },
 					slug: 'post-fields-explained',
 					summary: 'What each post field does, including the @10x-media/fields ones.',
-					targets: [
-						{ fieldPath: 'posts.intro', type: 'field' },
-						{ fieldPath: 'posts.branding.accent', type: 'field' },
-						{ fieldPath: 'posts.branding.icon', type: 'field' },
-					],
+					targets: {
+						fields: [
+							'collection:posts.intro',
+							'collection:posts.branding.accent',
+							'collection:posts.branding.icon',
+						],
+					},
 					title: { de: 'Beitragsfelder erklärt', en: 'Post fields explained' },
 				},
 				{
@@ -125,7 +127,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					},
 					slug: 'hero-banner-guide',
 					summary: 'How to use the hero banner block well.',
-					targets: [{ blockSlug: 'heroBanner', type: 'block' }],
+					targets: { blocks: ['heroBanner'] },
 					title: 'Hero banner',
 				},
 				{
@@ -135,10 +137,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					},
 					slug: 'site-settings',
 					summary: 'What the global settings control.',
-					targets: [
-						{ globalSlug: 'settings', type: 'global' },
-						{ fieldPath: 'settings.siteName', type: 'field' },
-					],
+					targets: {
+						fields: ['global:settings.siteName'],
+						globals: ['settings'],
+					},
 					title: 'Site settings',
 				},
 				{
@@ -148,10 +150,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					},
 					slug: 'managing-products',
 					summary: 'The product catalog basics.',
-					targets: [
-						{ collectionSlug: 'products', type: 'collection' },
-						{ fieldPath: 'products.description', type: 'field' },
-					],
+					targets: {
+						collections: ['products'],
+						fields: ['collection:products.description'],
+					},
 					title: { de: 'Produkte verwalten', en: 'Managing products' },
 				},
 				{
@@ -160,7 +162,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					},
 					slug: 'orphaned-example',
 					summary: 'Demonstrates the orphaned-target banner.',
-					targets: [{ fieldPath: 'posts.removedField', type: 'field' }],
+					targets: { fields: ['collection:posts.removedField'] },
 					title: 'Orphaned example',
 				},
 			],

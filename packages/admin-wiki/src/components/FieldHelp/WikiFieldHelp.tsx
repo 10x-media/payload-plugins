@@ -30,7 +30,7 @@ export const useWikiFieldHelp = (schemaPath: string) => {
 export type WikiTargetHelpProps = {
 	/** Show the "write this guide" affordance when no guide exists yet. */
 	showWriteAffordance?: boolean
-	/** Full target key the surface listens on, e.g. `field:posts.title`. */
+	/** Full target key the surface listens on, e.g. `field:collection:posts.title`. */
 	targetKey: string
 }
 
@@ -152,7 +152,12 @@ export const WikiTargetHelp = ({ showWriteAffordance = true, targetKey }: WikiTa
 }
 
 export type WikiFieldHelpProps = {
-	/** Index-free schema path of the field, e.g. `posts.hero.title`. */
+	/**
+	 * Index-free schema path of the field, rooted at the entity that owns it:
+	 * `collection:posts.hero.title`, `global:settings.siteName`. This is exactly
+	 * what the plugin injects as `clientProps.schemaPath`, so a custom field that
+	 * forwards its own props needs no construction of its own.
+	 */
 	schemaPath: string
 }
 

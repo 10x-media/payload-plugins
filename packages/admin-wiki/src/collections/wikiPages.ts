@@ -1,4 +1,4 @@
-import type { CollectionConfig, Config, Field, OptionObject } from 'payload'
+import type { CollectionConfig, Config, Field } from 'payload'
 import { buildWikiEditor } from '../editor/wikiEditor'
 import { buildOrphanedTargetsEndpoint } from '../endpoints/orphanedTargets'
 import { buildTargetsMapEndpoint } from '../endpoints/targetsMap'
@@ -14,23 +14,6 @@ export const SUMMARY_MAX_LENGTH = 400
 /** Spreadable `{ localized: true }` only when the host config has localization. */
 const localizedIf = (localize: boolean): { localized: true } | Record<string, never> =>
 	localize ? { localized: true } : {}
-
-const entityOptions = (
-	entities: Array<{ labels?: unknown; label?: unknown; slug: string }>,
-	exclude: string[]
-): OptionObject[] =>
-	entities
-		.filter((entity) => !exclude.includes(entity.slug))
-		.map((entity) => {
-			const labels = entity.labels as { singular?: unknown } | undefined
-			const label =
-				typeof labels?.singular === 'string'
-					? labels.singular
-					: typeof entity.label === 'string'
-						? entity.label
-						: entity.slug
-			return { label, value: entity.slug }
-		})
 
 const ORPHAN_BANNER = { path: '@10x-media/admin-wiki/client#WikiOrphanBanner' }
 const FEATURED_LIST = { path: '@10x-media/admin-wiki/client#WikiFeaturedList' }
@@ -62,8 +45,46 @@ export type BuildWikiPagesArgs = {
 }
 
 /**
+ * One `string[]` field per target kind. Values are stored raw, with no `select`
+ * options, so a guide can be attached before its surface exists and survives a
+ * surface being removed from the config; the orphan endpoint is what surfaces
+ * targets that no longer resolve. Authoring UI is built on top of these, not by
+ * Payload's default text inputs.
+ */
+const targetFields = (): Field[] => [
+	{
+		name: 'targetCollections',
+		type: 'text',
+		hasMany: true,
+		label: labelForKey(keys.targetCollectionsLabel),
+		admin: { description: labelForKey(keys.targetCollectionsDescription) },
+	},
+	{
+		name: 'targetGlobals',
+		type: 'text',
+		hasMany: true,
+		label: labelForKey(keys.targetGlobalsLabel),
+		admin: { description: labelForKey(keys.targetGlobalsDescription) },
+	},
+	{
+		name: 'targetFields',
+		type: 'text',
+		hasMany: true,
+		label: labelForKey(keys.targetFieldsLabel),
+		admin: { description: labelForKey(keys.targetFieldsDescription) },
+	},
+	{
+		name: 'targetBlocks',
+		type: 'text',
+		hasMany: true,
+		label: labelForKey(keys.targetBlocksLabel),
+		admin: { description: labelForKey(keys.targetBlocksDescription) },
+	},
+]
+
+/**
  * The guide pages collection: drafts enabled; localized title, summary, and
- * content; featured flag with ordering; and a non-localized `targets` array
+ * content; featured flag with ordering; and four non-localized target lists
  * attaching one guide to any number of surfaces (collections, globals, field
  * schema paths, block slugs).
  */
@@ -74,54 +95,6 @@ export const buildWikiPagesCollection = ({
 	resolved,
 }: BuildWikiPagesArgs): CollectionConfig => {
 	const localize = Boolean(config.localization)
-	const wikiSlugs = [resolved.slugs.pages, resolved.slugs.media]
-	const collectionOptions = entityOptions(config.collections ?? [], wikiSlugs)
-	const globalOptions = entityOptions(config.globals ?? [], [])
-
-	const targetFields: Field[] = [
-		{
-			name: 'type',
-			type: 'select',
-			label: labelForKey(keys.targetTypeLabel),
-			options: [
-				{ label: labelForKey(keys.targetTypeCollection), value: 'collection' },
-				{ label: labelForKey(keys.targetTypeGlobal), value: 'global' },
-				{ label: labelForKey(keys.targetTypeField), value: 'field' },
-				{ label: labelForKey(keys.targetTypeBlock), value: 'block' },
-			],
-			required: true,
-			defaultValue: 'collection',
-		},
-		{
-			name: 'collectionSlug',
-			type: 'select',
-			label: labelForKey(keys.targetCollectionLabel),
-			options: collectionOptions,
-			admin: { condition: (_data, siblingData) => siblingData?.type === 'collection' },
-		},
-		{
-			name: 'globalSlug',
-			type: 'select',
-			label: labelForKey(keys.targetGlobalLabel),
-			options: globalOptions,
-			admin: { condition: (_data, siblingData) => siblingData?.type === 'global' },
-		},
-		{
-			name: 'fieldPath',
-			type: 'text',
-			label: labelForKey(keys.targetFieldPathLabel),
-			admin: {
-				condition: (_data, siblingData) => siblingData?.type === 'field',
-				description: labelForKey(keys.targetFieldPathDescription),
-			},
-		},
-		{
-			name: 'blockSlug',
-			type: 'text',
-			label: labelForKey(keys.targetBlockSlugLabel),
-			admin: { condition: (_data, siblingData) => siblingData?.type === 'block' },
-		},
-	]
 
 	return {
 		slug: resolved.slugs.pages,
@@ -216,17 +189,7 @@ export const buildWikiPagesCollection = ({
 					position: 'sidebar',
 				},
 			},
-			{
-				name: 'targets',
-				type: 'array',
-				label: labelForKey(keys.fieldTargetsLabel),
-				labels: {
-					singular: labelForKey(keys.targetRowSingular),
-					plural: labelForKey(keys.targetRowPlural),
-				},
-				fields: targetFields,
-				admin: { description: labelForKey(keys.fieldTargetsDescription) },
-			},
+			...targetFields(),
 		],
 	}
 }

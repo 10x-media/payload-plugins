@@ -7,6 +7,7 @@ import {
 	type WikiOrphanedGuide,
 	type WikiOrphansResponse,
 } from '../shared/orphanedTargets'
+import { wikiTargetSelect } from '../shared/targetKeys'
 
 type BuildOrphanedTargetsEndpointArgs = {
 	access: Required<WikiAccessOptions>
@@ -40,7 +41,7 @@ export const buildOrphanedTargetsEndpoint = ({
 				overrideAccess: false,
 				pagination: false,
 				req,
-				select: { slug: true, targets: true, title: true },
+				select: { slug: true, title: true, ...wikiTargetSelect },
 				user: req.user,
 			})
 			const body: WikiOrphansResponse = {

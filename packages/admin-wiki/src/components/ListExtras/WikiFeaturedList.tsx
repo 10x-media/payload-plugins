@@ -61,7 +61,7 @@ export const WikiFeaturedList = () => {
 							id: doc.id,
 							slug: typeof doc.slug === 'string' ? doc.slug : null,
 							summary: typeof doc.summary === 'string' ? doc.summary : null,
-							targetKeys: targetKeysForDoc(doc.targets),
+							targetKeys: targetKeysForDoc(doc),
 							title: typeof doc.title === 'string' ? doc.title : null,
 						})
 					)

@@ -10,9 +10,9 @@ const sources = {
 describe('parseTargetKey', () => {
 	it('splits a key into kind and value', () => {
 		expect(parseTargetKey('collection:posts')).toEqual({ kind: 'collection', value: 'posts' })
-		expect(parseTargetKey('field:posts.hero.title')).toEqual({
+		expect(parseTargetKey('field:collection:posts.hero.title')).toEqual({
 			kind: 'field',
-			value: 'posts.hero.title',
+			value: 'collection:posts.hero.title',
 		})
 	})
 
@@ -35,12 +35,20 @@ describe('describeTarget', () => {
 		expect(describeTarget('collection:gone', sources)?.label).toBe('gone')
 	})
 
-	it('shows field paths and block slugs verbatim', () => {
-		expect(describeTarget('field:posts.title', sources)).toEqual({
+	it('resolves the entity half of a field path', () => {
+		expect(describeTarget('field:collection:posts.hero.title', sources)).toEqual({
 			kind: 'field',
-			label: 'posts.title',
-			value: 'posts.title',
+			label: 'Post · hero.title',
+			value: 'collection:posts.hero.title',
 		})
+		expect(describeTarget('field:global:settings.siteName', sources)?.label).toBe(
+			'Site settings · siteName'
+		)
+		expect(describeTarget('field:collection:gone.title', sources)?.label).toBe('gone · title')
+	})
+
+	it('shows unqualified field paths and block slugs verbatim', () => {
+		expect(describeTarget('field:posts.title', sources)?.label).toBe('posts.title')
 		expect(describeTarget('block:heroBanner', sources)?.label).toBe('heroBanner')
 	})
 })

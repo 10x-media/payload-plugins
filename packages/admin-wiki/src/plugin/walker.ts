@@ -151,6 +151,11 @@ const walkFields = (fields: Field[], parentPath: string, context: WalkContext): 
  * Walk every collection and global (except the wiki's own), injecting the
  * field-help Description component on every named field and collecting the set
  * of valid target keys for orphan detection. One walk, two outputs.
+ *
+ * Schema paths are rooted at `collection:<slug>` or `global:<slug>` rather than
+ * the bare slug: Payload only enforces slug uniqueness within collections
+ * (`DuplicateCollection` in its config sanitizer), so a collection and a global
+ * may share one, and an unqualified path would silently merge their fields.
  */
 export const walkAndInjectFieldHelp = (
 	config: Config,
@@ -172,11 +177,11 @@ export const walkAndInjectFieldHelp = (
 			continue
 		}
 		context.validKeys.add(collectionTargetKey(collection.slug))
-		walkFields(collection.fields, collection.slug, context)
+		walkFields(collection.fields, `collection:${collection.slug}`, context)
 	}
 	for (const global of config.globals ?? []) {
 		context.validKeys.add(globalTargetKey(global.slug))
-		walkFields(global.fields, global.slug, context)
+		walkFields(global.fields, `global:${global.slug}`, context)
 	}
 	return {
 		injectedFieldCount: context.injected.count,

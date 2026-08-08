@@ -230,16 +230,10 @@ export interface WikiPage {
   } | null;
   featured?: boolean | null;
   featuredOrder?: number | null;
-  targets?:
-    | {
-        type: 'collection' | 'global' | 'field' | 'block';
-        collectionSlug?: ('posts' | 'products' | 'users') | null;
-        globalSlug?: 'settings' | null;
-        fieldPath?: string | null;
-        blockSlug?: string | null;
-        id?: string | null;
-      }[]
-    | null;
+  targetCollections?: string[] | null;
+  targetGlobals?: string[] | null;
+  targetFields?: string[] | null;
+  targetBlocks?: string[] | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -435,16 +429,10 @@ export interface WikiPagesSelect<T extends boolean = true> {
   content?: T;
   featured?: T;
   featuredOrder?: T;
-  targets?:
-    | T
-    | {
-        type?: T;
-        collectionSlug?: T;
-        globalSlug?: T;
-        fieldPath?: T;
-        blockSlug?: T;
-        id?: T;
-      };
+  targetCollections?: T;
+  targetGlobals?: T;
+  targetFields?: T;
+  targetBlocks?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;

@@ -64,9 +64,32 @@ const findLabel = (entities: LabelledEntity[] | undefined, slug: string): null |
 }
 
 /**
+ * Split a stored field target (`collection:posts.branding.color`) into the
+ * entity that owns it and the path inside that entity. Null when the value
+ * carries no entity prefix, in which case it is shown verbatim.
+ */
+const parseFieldTarget = (
+	value: string
+): null | { entitySlug: string; entityType: 'collection' | 'global'; path: string } => {
+	const separator = value.indexOf(':')
+	const entityType = value.slice(0, separator)
+	if (separator < 1 || (entityType !== 'collection' && entityType !== 'global')) {
+		return null
+	}
+	const rest = value.slice(separator + 1)
+	const dot = rest.indexOf('.')
+	if (dot < 1) {
+		return null
+	}
+	return { entitySlug: rest.slice(0, dot), entityType, path: rest.slice(dot + 1) }
+}
+
+/**
  * Describe one target key for display. Collections and globals resolve to their
- * configured labels; field paths and block slugs have no label in the config, so
- * they show their own value, which is what an author typed and recognizes.
+ * configured labels, and a field target resolves the entity half of its path
+ * the same way, so a chip reads "Post · branding.color" rather than the stored
+ * `collection:posts.branding.color`. Block slugs have no label in the config and
+ * show verbatim, which is what an author typed and recognizes.
  */
 export const describeTarget = (
 	key: string,
@@ -81,6 +104,15 @@ export const describeTarget = (
 			return { ...parsed, label: findLabel(sources.collections, parsed.value) ?? parsed.value }
 		case 'global':
 			return { ...parsed, label: findLabel(sources.globals, parsed.value) ?? parsed.value }
+		case 'field': {
+			const field = parseFieldTarget(parsed.value)
+			if (!field) {
+				return { ...parsed, label: parsed.value }
+			}
+			const entities = field.entityType === 'collection' ? sources.collections : sources.globals
+			const entityLabel = findLabel(entities, field.entitySlug) ?? field.entitySlug
+			return { ...parsed, label: `${entityLabel} · ${field.path}` }
+		}
 		default:
 			return { ...parsed, label: parsed.value }
 	}

@@ -15,8 +15,21 @@ import type {
 	WikiSeedGuideDef,
 	WikiSeedOptions,
 	WikiSeedResult,
+	WikiSeedTargets,
 	WikiSeedTransformer,
 } from './types'
+
+/**
+ * Map the seed's grouped targets onto the four stored lists. Always writes all
+ * four, so a guide that drops a target on re-run has it cleared rather than
+ * left behind.
+ */
+const targetData = (targets: WikiSeedTargets | undefined) => ({
+	targetBlocks: targets?.blocks ?? [],
+	targetCollections: targets?.collections ?? [],
+	targetFields: targets?.fields ?? [],
+	targetGlobals: targets?.globals ?? [],
+})
 
 type SanitizedEditorConfig = Awaited<ReturnType<typeof editorConfigFactory.fromEditor>>
 
@@ -141,7 +154,7 @@ export const seedWiki = async (
 				featured: def.featured ?? false,
 				...(def.featuredOrder !== undefined ? { featuredOrder: def.featuredOrder } : {}),
 				slug: def.slug,
-				targets: def.targets ?? [],
+				...targetData(def.targets),
 				...(title.base !== undefined ? { title: title.base } : {}),
 				...(summary.base !== undefined ? { summary: summary.base } : {}),
 				...(content.base !== undefined

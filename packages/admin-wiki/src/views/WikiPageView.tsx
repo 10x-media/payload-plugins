@@ -8,7 +8,7 @@ import { formatAdminURL } from 'payload/shared'
 import { GuideArticle } from '../components/GuideArticle/GuideArticle'
 import { StarIcon } from '../components/icons'
 import { TargetChips } from '../components/TargetChips/TargetChips'
-import { targetKeysForDoc, type WikiGuideDoc } from '../shared/targetKeys'
+import { targetKeysForDoc, type WikiGuideDoc, type WikiTargetDoc } from '../shared/targetKeys'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { buildWikiViewContext, wikiLoginRedirectUrl } from './shared'
@@ -30,7 +30,7 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 		redirect(wikiLoginRedirectUrl(props, slug ? `${context.wikiPath}/${slug}` : context.wikiPath))
 	}
 	const t = asTranslate(i18n.t)
-	let doc: null | (WikiGuideDoc & { featured?: unknown; targets?: unknown }) = null
+	let doc: null | (WikiGuideDoc & WikiTargetDoc & { featured?: unknown }) = null
 	if (slug) {
 		try {
 			const result = await payload.find({
@@ -48,7 +48,9 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 					? { fallbackLocale: context.fallbackLocale, locale: context.locale }
 					: {}),
 			})
-			doc = (result.docs[0] as undefined | (WikiGuideDoc & { featured?: unknown })) ?? null
+			doc =
+				(result.docs[0] as undefined | (WikiGuideDoc & WikiTargetDoc & { featured?: unknown })) ??
+				null
 		} catch {
 			doc = null
 		}
@@ -60,7 +62,7 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 				path: `/collections/${context.registry.slugs.pages}/${doc.id}`,
 			})
 		: null
-	const targetKeys = doc ? targetKeysForDoc(doc.targets) : []
+	const targetKeys = targetKeysForDoc(doc)
 	return (
 		<DefaultTemplate
 			i18n={i18n}

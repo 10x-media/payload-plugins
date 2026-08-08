@@ -6,7 +6,12 @@ import { formatAdminURL } from 'payload/shared'
 
 import { WikiEditModeToggle } from '../components/EditMode/WikiEditModeToggle'
 import { WikiIndexClient } from '../components/WikiView/WikiIndexClient'
-import { compareTargetEntries, targetKeysForDoc, type WikiTargetEntry } from '../shared/targetKeys'
+import {
+	compareTargetEntries,
+	targetKeysForDoc,
+	type WikiTargetEntry,
+	wikiTargetSelect,
+} from '../shared/targetKeys'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { buildWikiViewContext, wikiLoginRedirectUrl } from './shared'
@@ -41,8 +46,8 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 				featuredOrder: true,
 				slug: true,
 				summary: true,
-				targets: true,
 				title: true,
+				...wikiTargetSelect,
 			},
 			user: req.user,
 			where: { _status: { equals: 'published' } },
@@ -55,7 +60,7 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 				id: doc.id,
 				slug: typeof doc.slug === 'string' ? doc.slug : null,
 				summary: typeof doc.summary === 'string' ? doc.summary : null,
-				targetKeys: targetKeysForDoc(doc.targets),
+				targetKeys: targetKeysForDoc(doc),
 				title: typeof doc.title === 'string' ? doc.title : null,
 			}))
 			.sort(compareTargetEntries)

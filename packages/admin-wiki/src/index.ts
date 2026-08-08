@@ -120,5 +120,6 @@ export type {
 	WikiSeedMediaDef,
 	WikiSeedOptions,
 	WikiSeedResult,
+	WikiSeedTargets,
 	WikiSeedTransformer,
 } from './seed/types'

@@ -9,7 +9,7 @@ export type TargetChipsProps = {
 	className?: string
 	/** How many chips to show before collapsing the rest into a `+N`. */
 	limit?: number
-	/** The guide's target keys, e.g. `['collection:posts', 'field:posts.title']`. */
+	/** The guide's target keys, e.g. `['collection:posts', 'field:collection:posts.title']`. */
 	targetKeys: string[] | undefined
 }
 
@@ -18,7 +18,7 @@ export type TargetChipsProps = {
  * titles into something a reader can scan: "Publishing a post" says little,
  * "Publishing a post — Post, posts.title" says where it applies.
  *
- * Collection and global chips carry their configured labels; field paths and
+ * Collection, global, and field chips carry their entity's configured label;
  * block slugs show verbatim, which is what the author typed.
  */
 export const TargetChips = ({ className, limit = 4, targetKeys }: TargetChipsProps) => {

@@ -4,10 +4,10 @@ import type { WikiAccessOptions } from '../options'
 import { resolveReaderLocale } from '../shared/resolveLocale'
 import {
 	compareTargetEntries,
-	targetKeyForRow,
+	targetKeysForDoc,
 	type WikiTargetEntry,
-	type WikiTargetRow,
 	type WikiTargetsResponse,
+	wikiTargetSelect,
 } from '../shared/targetKeys'
 
 type BuildTargetsMapEndpointArgs = {
@@ -61,8 +61,8 @@ export const buildTargetsMapEndpoint = ({
 					featuredOrder: true,
 					slug: true,
 					summary: true,
-					targets: true,
 					title: true,
+					...wikiTargetSelect,
 				},
 				user: req.user,
 				where: { _status: { equals: 'published' } },
@@ -74,9 +74,7 @@ export const buildTargetsMapEndpoint = ({
 					: {}),
 			})
 			const targets: Record<string, WikiTargetEntry[]> = {}
-			for (const doc of result.docs as Array<
-				Record<string, unknown> & { id: number | string; targets?: WikiTargetRow[] | null }
-			>) {
+			for (const doc of result.docs as Array<Record<string, unknown> & { id: number | string }>) {
 				const entry: WikiTargetEntry = {
 					featured: doc.featured === true,
 					featuredOrder: typeof doc.featuredOrder === 'number' ? doc.featuredOrder : null,
@@ -85,13 +83,10 @@ export const buildTargetsMapEndpoint = ({
 					summary: typeof doc.summary === 'string' ? doc.summary : null,
 					title: typeof doc.title === 'string' ? doc.title : null,
 				}
-				for (const row of doc.targets ?? []) {
-					const key = targetKeyForRow(row)
-					if (key) {
-						const bucket = targets[key] ?? []
-						bucket.push(entry)
-						targets[key] = bucket
-					}
+				for (const key of targetKeysForDoc(doc)) {
+					const bucket = targets[key] ?? []
+					bucket.push(entry)
+					targets[key] = bucket
 				}
 			}
 			for (const bucket of Object.values(targets)) {

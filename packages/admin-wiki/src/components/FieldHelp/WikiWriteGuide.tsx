@@ -2,6 +2,7 @@
 
 import { Button, PopupList, useDocumentDrawer } from '@payloadcms/ui'
 
+import { targetFieldNameFor } from '../../shared/targetKeys'
 import { parseTargetKey } from '../../shared/targetLabels'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
@@ -9,28 +10,14 @@ import { BookIcon } from '../icons'
 import { useWikiTargets } from '../WikiProvider/WikiProvider'
 import './field-help.css'
 
-/** The stored `targets` row a target key describes, for drawer prefill. */
-const targetRowFor = (targetKey: string): null | Record<string, string> => {
+/** The new guide's prefilled target list: one value in the matching field. */
+const initialDataFor = (targetKey: string): null | Record<string, string[]> => {
 	const parsed = parseTargetKey(targetKey)
-	if (!parsed) {
-		return null
-	}
-	switch (parsed.kind) {
-		case 'block':
-			return { blockSlug: parsed.value, type: 'block' }
-		case 'collection':
-			return { collectionSlug: parsed.value, type: 'collection' }
-		case 'field':
-			return { fieldPath: parsed.value, type: 'field' }
-		case 'global':
-			return { globalSlug: parsed.value, type: 'global' }
-		default:
-			return null
-	}
+	return parsed ? { [targetFieldNameFor(parsed.kind)]: [parsed.value] } : null
 }
 
 export type WikiWriteGuideProps = {
-	/** The surface the new guide should target, e.g. `field:posts.title`. */
+	/** The surface the new guide should target, e.g. `field:collection:posts.title`. */
 	targetKey: string
 	/**
 	 * `inline` is the hover-revealed line beside a field, `button` the standalone
@@ -41,10 +28,10 @@ export type WikiWriteGuideProps = {
 
 /**
  * The "write this guide" affordance for a surface that has none. Opens a create
- * drawer for the wiki pages collection with the target row already filled in,
- * so the author never retypes a schema path and never leaves the page whose
- * field they were looking at. Saving refreshes the targets map, so the new
- * guide's trigger appears in place of this affordance without a reload.
+ * drawer for the wiki pages collection with the target already filled in, so
+ * the author never retypes a schema path and never leaves the page whose field
+ * they were looking at. Saving refreshes the targets map, so the new guide's
+ * trigger appears in place of this affordance without a reload.
  *
  * Renders nothing unless the reader's create permission resolves true and the
  * configured `writeAffordances` mode allows it (by default, only while wiki
@@ -56,14 +43,14 @@ export const WikiWriteGuide = ({ targetKey, variant = 'inline' }: WikiWriteGuide
 	const [DocumentDrawer, DocumentDrawerToggler, { openDrawer }] = useDocumentDrawer({
 		collectionSlug: pagesSlug,
 	})
-	const row = targetRowFor(targetKey)
+	const initialData = initialDataFor(targetKey)
 
-	if (!canWrite || !row) {
+	if (!canWrite || !initialData) {
 		return null
 	}
 
 	const label = t(keys.fieldHelpWriteGuide)
-	const drawer = <DocumentDrawer initialData={{ targets: [row] }} onSave={refresh} />
+	const drawer = <DocumentDrawer initialData={initialData} onSave={refresh} />
 
 	if (variant === 'menuItem') {
 		return (
