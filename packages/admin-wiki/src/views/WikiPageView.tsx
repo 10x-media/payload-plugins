@@ -8,6 +8,8 @@ import { formatAdminURL } from 'payload/shared'
 import { GuideArticle } from '../components/GuideArticle/GuideArticle'
 import { StarIcon } from '../components/icons'
 import { TargetChips } from '../components/TargetChips/TargetChips'
+import { WikiToc } from '../components/Toc/WikiToc'
+import { collectGuideHeadings, hasTocHeadings } from '../shared/headings'
 import { targetKeysForDoc, type WikiGuideDoc, type WikiTargetDoc } from '../shared/targetKeys'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
@@ -63,6 +65,8 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 			})
 		: null
 	const targetKeys = targetKeysForDoc(doc)
+	const { headings } = collectGuideHeadings(content)
+	const showToc = hasTocHeadings(headings)
 	return (
 		<DefaultTemplate
 			i18n={i18n}
@@ -80,54 +84,63 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 			}}
 		>
 			<Gutter className="wiki-view wiki-view--page">
-				<div className="wiki-view__breadcrumbs">
-					<Button
-						buttonStyle="pill"
-						el="link"
-						icon={<ChevronIcon direction="left" size="small" />}
-						iconPosition="left"
-						iconStyle="none"
-						margin={false}
-						size="small"
-						to={context.wikiPath}
-					>
-						{t(keys.wikiBackToIndex)}
-					</Button>
-					{doc && context.canUpdate && editUrl ? (
+				<div
+					className={['wiki-guide-layout', showToc ? 'wiki-guide-layout--with-toc' : null]
+						.filter(Boolean)
+						.join(' ')}
+				>
+					<div className="wiki-view__breadcrumbs">
 						<Button
 							buttonStyle="pill"
 							el="link"
-							icon="edit"
+							icon={<ChevronIcon direction="left" size="small" />}
 							iconPosition="left"
 							iconStyle="none"
 							margin={false}
 							size="small"
-							to={editUrl}
+							to={context.wikiPath}
 						>
-							{t(keys.drawerEditGuide)}
+							{t(keys.wikiBackToIndex)}
 						</Button>
-					) : null}
+						{doc && context.canUpdate && editUrl ? (
+							<Button
+								buttonStyle="pill"
+								el="link"
+								icon="edit"
+								iconPosition="left"
+								iconStyle="none"
+								margin={false}
+								size="small"
+								to={editUrl}
+							>
+								{t(keys.drawerEditGuide)}
+							</Button>
+						) : null}
+					</div>
+					{doc ? (
+						<article className="wiki-view__article">
+							<header className="wiki-view__article-header">
+								<h1 className="wiki-view__article-title">
+									{doc.featured === true ? <StarIcon /> : null}
+									{doc.title}
+								</h1>
+								{doc.summary ? <p className="wiki-view__summary">{doc.summary}</p> : null}
+								{targetKeys.length > 0 ? (
+									<div className="wiki-view__article-targets">
+										<span className="wiki-view__article-targets-label">
+											{t(keys.targetsHeading)}
+										</span>
+										<TargetChips limit={8} targetKeys={targetKeys} />
+									</div>
+								) : null}
+							</header>
+							{content ? <GuideArticle data={content} /> : null}
+						</article>
+					) : (
+						<p className="wiki-view__status">{t(keys.wikiGuideNotFound)}</p>
+					)}
+					{showToc ? <WikiToc headings={headings} /> : null}
 				</div>
-				{doc ? (
-					<article className="wiki-view__article">
-						<header className="wiki-view__article-header">
-							<h1 className="wiki-view__article-title">
-								{doc.featured === true ? <StarIcon /> : null}
-								{doc.title}
-							</h1>
-							{doc.summary ? <p className="wiki-view__summary">{doc.summary}</p> : null}
-							{targetKeys.length > 0 ? (
-								<div className="wiki-view__article-targets">
-									<span className="wiki-view__article-targets-label">{t(keys.targetsHeading)}</span>
-									<TargetChips limit={8} targetKeys={targetKeys} />
-								</div>
-							) : null}
-						</header>
-						{content ? <GuideArticle data={content} /> : null}
-					</article>
-				) : (
-					<p className="wiki-view__status">{t(keys.wikiGuideNotFound)}</p>
-				)}
 			</Gutter>
 		</DefaultTemplate>
 	)

@@ -1,13 +1,8 @@
 import type { FieldHook } from 'payload'
 
-/** Kebab-case a title into a URL-safe slug. */
-export const slugify = (value: string): string =>
-	value
-		.toLowerCase()
-		.normalize('NFKD')
-		.replace(/[̀-ͯ]/g, '')
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
+import { slugify } from '../shared/slugify'
+
+export { slugify }
 
 /**
  * Fill the slug from the title when absent and normalize manual input.

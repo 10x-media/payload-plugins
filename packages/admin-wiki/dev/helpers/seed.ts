@@ -11,42 +11,66 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Guide content never restates the guide's own title: the wiki view, the drawer
 // and the hover card all print it above the content already.
-const publishingGuideEn = `Give the post a clear **title**; it becomes the page heading.
+// Both guides below carry three or more h2/h3 headings on purpose: that is the
+// threshold at which a table of contents renders, so they demonstrate it. The
+// products guides deliberately do not, which is what shows a drawer rail
+// suppressing the TOC.
+const publishingGuideEn = `## Write the draft
+
+Give the post a clear **title**; it becomes the page heading.
 
 > [!TIP]
 > Draft first, publish when review is done.
+
+## Lay out the page
 
 {{wiki:media:diagram}}
 
 Layout blocks are covered in {{wiki:guide:hero-banner-guide}}.
 
+## Publish
+
 > [!WARNING]
 > Published changes go live immediately.
 `
 
-const publishingGuideDe = `Gib dem Beitrag einen klaren **Titel**; er wird die Seitenüberschrift.
+const publishingGuideDe = `## Entwurf schreiben
+
+Gib dem Beitrag einen klaren **Titel**; er wird die Seitenüberschrift.
 
 > [!TIP]
 > Erst als Entwurf speichern, nach dem Review veröffentlichen.
+
+## Seite aufbauen
 
 {{wiki:media:diagram}}
 
 Layout-Blöcke werden in {{wiki:guide:hero-banner-guide}} erklärt.
 
+## Veröffentlichen
+
 > [!WARNING]
 > Veröffentlichte Änderungen sind sofort live.
 `
 
-const editorTourGuide = `## What the wiki editor can do
+const editorTourGuide = `## Formatting
 
 Standard formatting, lists, quotes, and links work as expected.
+
+## Callouts
 
 > [!NOTE]
 > Callouts come in info, tip, warning, and danger variants.
 
+### Consumer blocks
+
 :::tip This box is a consumer-supplied block, rendered by the dev app's own component.
 
+## Video
+
 {{embed:https://www.youtube.com/watch?v=dQw4w9WgXcQ}}
+
+## Linking guides
 
 Cross-reference other guides inline, like {{wiki:guide:publishing-a-post}}.
 `

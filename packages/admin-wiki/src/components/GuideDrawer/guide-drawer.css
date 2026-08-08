@@ -1,10 +1,25 @@
+/* Payload sizes a drawer to the viewport through an inline `width` on
+   `.drawer__content`. A guide is a reading surface, not a full-screen takeover,
+   so the panel is capped instead: `max-width` constrains that inline width
+   without having to fight it with `!important`, and the close strip
+   (`flex-grow: 1`) absorbs the rest, which has the side benefit of making the
+   empty space click-to-close. Nested drawers keep a gutter of peek so a stacked
+   guide still reads as stacked. */
+.wiki-guide-drawer-modal .drawer__content {
+	max-width: 85rem;
+}
+
+.wiki-guide-drawer-modal.drawer--nested .drawer__content {
+	max-width: 80rem;
+}
+
 /* Payload's Drawer supplies the title and close button; everything below is the
-   reading surface. The drawer is as wide as the viewport allows, so the prose
-   column is capped at a comfortable measure and the rail takes the space to its
-   left rather than letting lines run the full width. */
+   reading surface. Centered because a single guide has no rail and would
+   otherwise hug the left edge of the panel. */
 .wiki-guide-drawer {
 	display: flex;
 	gap: calc(var(--base) * 1.5);
+	justify-content: center;
 	min-height: 100%;
 	padding-bottom: var(--base);
 }
@@ -62,7 +77,7 @@
 
 .wiki-guide-drawer__pane {
 	flex-grow: 1;
-	max-width: 44rem;
+	max-width: 56rem;
 	min-width: 0;
 }
 
@@ -105,6 +120,19 @@
 .wiki-guide-drawer__status {
 	color: var(--theme-elevation-500);
 	margin: 0;
+}
+
+/* The TOC only ever renders here when there is no rail (see GuideDrawer), so the
+   drawer is never three columns and the existing cap still fits. */
+.wiki-guide-drawer > .wiki-toc {
+	flex-shrink: 0;
+	width: 16rem;
+}
+
+@media (max-width: 1100px) {
+	.wiki-guide-drawer > .wiki-toc {
+		display: none;
+	}
 }
 
 @media (max-width: 1024px) {

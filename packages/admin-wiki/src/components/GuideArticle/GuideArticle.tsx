@@ -10,6 +10,7 @@ import {
 	VIDEO_EMBED_BLOCK_SLUG,
 	WIKI_VIDEO_NODE_TYPE,
 } from '../../editor/constants'
+import { collectGuideHeadings } from '../../shared/headings'
 import { GuideVideo } from '../Video/GuideVideo'
 import { VideoEmbed } from '../Video/VideoEmbed'
 import { useWikiTargets, type WikiBlockRenderer } from '../WikiProvider/WikiProvider'
@@ -31,9 +32,21 @@ export type GuideArticleProps = {
 }
 
 const buildConverters =
-	(blockRenderers: Record<string, WikiBlockRenderer>): JSXConvertersFunction =>
+	(
+		blockRenderers: Record<string, WikiBlockRenderer>,
+		idsByNode: Map<object, string>
+	): JSXConvertersFunction =>
 	({ defaultConverters }) => ({
 		...defaultConverters,
+		/**
+		 * The default converter renders the tag and nothing else. Headings need an
+		 * id for the table of contents to link to, and the id comes from the same
+		 * walk the TOC itself used, keyed by node identity.
+		 */
+		heading: ({ node, nodesToJSX }) => {
+			const Tag = node.tag
+			return <Tag id={idsByNode.get(node as object)}>{nodesToJSX({ nodes: node.children })}</Tag>
+		},
 		blocks: {
 			...Object.fromEntries(
 				Object.entries(blockRenderers).map(([slug, Renderer]) => [
@@ -79,9 +92,10 @@ const buildConverters =
  */
 export const GuideArticle = ({ blockRenderers, className, data }: GuideArticleProps) => {
 	const { blockRenderers: providerRenderers } = useWikiTargets()
+	const { idsByNode } = useMemo(() => collectGuideHeadings(data), [data])
 	const converters = useMemo(
-		() => buildConverters({ ...providerRenderers, ...blockRenderers }),
-		[blockRenderers, providerRenderers]
+		() => buildConverters({ ...providerRenderers, ...blockRenderers }, idsByNode),
+		[blockRenderers, idsByNode, providerRenderers]
 	)
 	return (
 		<div className={['wiki-guide-article', className].filter(Boolean).join(' ')}>

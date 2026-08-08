@@ -4,11 +4,13 @@ import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical
 import { Button, Drawer, ShimmerEffect, useConfig, useModal } from '@payloadcms/ui'
 import { useEffect, useMemo, useState } from 'react'
 
+import { collectGuideHeadings, hasTocHeadings } from '../../shared/headings'
 import type { WikiGuideDoc, WikiTargetEntry } from '../../shared/targetKeys'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { GuideArticle } from '../GuideArticle/GuideArticle'
 import { BookIcon, StarIcon } from '../icons'
+import { WikiToc } from '../Toc/WikiToc'
 import { useWikiTargets } from '../WikiProvider/WikiProvider'
 import './guide-drawer.css'
 
@@ -75,6 +77,15 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 
 	const activeEntry = entries.find((entry) => entry.id === resolvedActiveId)
 	const content = doc?.content as SerializedEditorState | null | undefined
+	const hasRail = entries.length > 1
+	/**
+	 * The rail owns the left side when it exists, and a table of contents on the
+	 * right would then be a second navigation list in the same drawer. One
+	 * navigation surface per drawer: with several guides the reader switches
+	 * guides, with one guide they move within it.
+	 */
+	const { headings } = useMemo(() => collectGuideHeadings(content), [content])
+	const showToc = !hasRail && hasTocHeadings(headings)
 	const wikiHref =
 		wikiViewEnabled && activeEntry?.slug
 			? `${config.routes.admin}/wiki/${activeEntry.slug}`
@@ -85,9 +96,9 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 			: undefined
 
 	return (
-		<Drawer slug={slug} title={activeEntry?.title ?? ''}>
+		<Drawer className="wiki-guide-drawer-modal" slug={slug} title={activeEntry?.title ?? ''}>
 			<div className="wiki-guide-drawer">
-				{entries.length > 1 ? (
+				{hasRail ? (
 					<nav aria-label={t(keys.drawerGuideList)} className="wiki-guide-drawer__rail">
 						<p className="wiki-guide-drawer__rail-heading">
 							{t(keys.guideCount, { count: entries.length })}
@@ -147,6 +158,7 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 					) : null}
 					{state === 'ready' && content ? <GuideArticle data={content} /> : null}
 				</div>
+				{showToc ? <WikiToc headings={headings} /> : null}
 			</div>
 		</Drawer>
 	)

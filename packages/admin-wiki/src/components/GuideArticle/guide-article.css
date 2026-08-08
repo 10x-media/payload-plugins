@@ -1,15 +1,20 @@
+/* Leading is a touch looser than Payload's form defaults because the measure is
+   wide: long lines need the extra leading to stay trackable back to the start. */
 .wiki-guide-article {
 	color: var(--theme-text);
 	font-size: 1rem;
-	line-height: 1.6;
+	line-height: 1.7;
 	max-width: 100%;
 }
 
+/* `scroll-margin-top` keeps a heading clear of the top edge when the table of
+   contents jumps to it, in the window and inside a drawer alike. */
 .wiki-guide-article h2,
 .wiki-guide-article h3,
 .wiki-guide-article h4 {
 	line-height: 1.3;
 	margin: 1.5em 0 0.5em;
+	scroll-margin-top: calc(var(--base) * 1.5);
 }
 
 /* The view and the drawer both print the guide title above the content, so an h1

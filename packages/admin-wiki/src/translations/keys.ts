@@ -51,6 +51,7 @@ export const keys = {
 	orphanedIntro: 'adminWiki:orphanedIntro',
 	surfaceTriggerLabel: 'adminWiki:surfaceTriggerLabel',
 	targetsHeading: 'adminWiki:targetsHeading',
+	tocHeading: 'adminWiki:tocHeading',
 	targetBlocksDescription: 'adminWiki:targetBlocksDescription',
 	targetBlocksLabel: 'adminWiki:targetBlocksLabel',
 	targetCollectionsDescription: 'adminWiki:targetCollectionsDescription',
