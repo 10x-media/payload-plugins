@@ -1,28 +1,52 @@
+/* Payload's Drawer supplies the title and close button; everything below is the
+   reading surface. The drawer is as wide as the viewport allows, so the prose
+   column is capped at a comfortable measure and the rail takes the space to its
+   left rather than letting lines run the full width. */
 .wiki-guide-drawer {
 	display: flex;
-	gap: 2rem;
+	gap: calc(var(--base) * 1.5);
 	min-height: 100%;
+	padding-bottom: var(--base);
 }
 
 .wiki-guide-drawer__rail {
-	border-inline-end: 1px solid var(--theme-elevation-150);
+	border-inline-end: 1px solid var(--theme-elevation-100);
 	display: flex;
 	flex-direction: column;
 	flex-shrink: 0;
-	gap: 0.25rem;
-	padding-inline-end: 1rem;
-	width: 220px;
+	gap: 2px;
+	padding-inline-end: var(--base);
+	width: calc(var(--base) * 11);
+}
+
+.wiki-guide-drawer__rail-heading {
+	color: var(--theme-elevation-450);
+	font-size: 0.8125rem;
+	letter-spacing: 0.04em;
+	margin: 0 0 calc(var(--base) / 3);
+	padding-inline: calc(var(--base) / 2);
+	text-transform: uppercase;
 }
 
 .wiki-guide-drawer__rail-item {
+	align-items: center;
 	background: none;
 	border: 0;
-	border-radius: 4px;
+	border-radius: var(--style-radius-s, 3px);
 	color: var(--theme-elevation-650);
 	cursor: pointer;
-	font-size: 0.875rem;
-	padding: 0.5rem 0.75rem;
+	display: flex;
+	font: inherit;
+	gap: calc(var(--base) / 3);
+	min-width: 0;
+	padding: calc(var(--base) / 3) calc(var(--base) / 2);
 	text-align: start;
+}
+
+.wiki-guide-drawer__rail-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .wiki-guide-drawer__rail-item:hover {
@@ -38,44 +62,72 @@
 
 .wiki-guide-drawer__pane {
 	flex-grow: 1;
-	max-width: 46rem;
+	max-width: 44rem;
 	min-width: 0;
+}
+
+/* The summary is the lede the drawer title needs to be worth opening, so it
+   shares a rule with the actions rather than sitting loose above the prose. */
+.wiki-guide-drawer__header {
+	align-items: flex-start;
+	border-bottom: 1px solid var(--theme-elevation-100);
+	display: flex;
+	gap: var(--base);
+	justify-content: space-between;
+	margin-bottom: var(--base);
+	padding-bottom: calc(var(--base) / 2);
+}
+
+.wiki-guide-drawer__header:empty {
+	display: none;
+}
+
+.wiki-guide-drawer__summary {
+	color: var(--theme-elevation-650);
+	line-height: 1.5;
+	margin: 0;
+	max-width: 34rem;
 }
 
 .wiki-guide-drawer__actions {
 	display: flex;
-	gap: 1rem;
-	justify-content: flex-end;
-	margin-bottom: 0.5rem;
+	flex-shrink: 0;
+	gap: calc(var(--base) / 3);
 }
 
-.wiki-guide-drawer__edit {
-	color: var(--theme-elevation-600);
-	font-size: 0.8125rem;
-	text-decoration: underline;
-	text-underline-offset: 2px;
-}
-
-.wiki-guide-drawer__edit:hover {
-	color: var(--theme-text);
+.wiki-guide-drawer__loading {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+	max-width: 32rem;
 }
 
 .wiki-guide-drawer__status {
-	color: var(--theme-elevation-600);
+	color: var(--theme-elevation-500);
+	margin: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
 	.wiki-guide-drawer {
 		flex-direction: column;
-		gap: 1rem;
+		gap: var(--base);
 	}
 
 	.wiki-guide-drawer__rail {
+		border-bottom: 1px solid var(--theme-elevation-100);
 		border-inline-end: 0;
-		border-bottom: 1px solid var(--theme-elevation-150);
 		flex-direction: row;
 		flex-wrap: wrap;
-		padding: 0 0 0.75rem;
+		padding: 0 0 calc(var(--base) / 2);
 		width: 100%;
+	}
+
+	.wiki-guide-drawer__rail-heading {
+		flex-basis: 100%;
+		margin-bottom: 0;
+	}
+
+	.wiki-guide-drawer__header {
+		flex-direction: column;
 	}
 }

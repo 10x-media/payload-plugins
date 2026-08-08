@@ -9,9 +9,9 @@ const DEV_PASSWORD = 'password'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const publishingGuideEn = `## Publishing a post
-
-Give the post a clear **title**; it becomes the page heading.
+// Guide content never restates the guide's own title: the wiki view, the drawer
+// and the hover card all print it above the content already.
+const publishingGuideEn = `Give the post a clear **title**; it becomes the page heading.
 
 > [!TIP]
 > Draft first, publish when review is done.
@@ -24,9 +24,7 @@ Layout blocks are covered in {{wiki:guide:hero-banner-guide}}.
 > Published changes go live immediately.
 `
 
-const publishingGuideDe = `## Einen Beitrag veröffentlichen
-
-Gib dem Beitrag einen klaren **Titel**; er wird die Seitenüberschrift.
+const publishingGuideDe = `Gib dem Beitrag einen klaren **Titel**; er wird die Seitenüberschrift.
 
 > [!TIP]
 > Erst als Entwurf speichern, nach dem Review veröffentlichen.

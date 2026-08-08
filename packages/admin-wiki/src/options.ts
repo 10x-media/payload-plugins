@@ -53,6 +53,28 @@ export type WikiEditorOptions = {
 	blocks?: WikiEditorBlockOption[]
 }
 
+/**
+ * When the "write this guide" affordances render for users whose create
+ * permission resolves true. Field-level surfaces put one affordance next to
+ * every unguided field, so `always` is deliberately not the default.
+ *
+ * - `editMode`: only while the reader has wiki edit mode on, a per-browser
+ *   toggle the plugin persists in `localStorage`.
+ * - `always`: whenever create permission resolves true.
+ * - `never`: no write affordance anywhere; guides are authored from the wiki
+ *   collection itself.
+ */
+export type WikiWriteAffordanceMode = 'always' | 'editMode' | 'never'
+
+/** List-view slot the featured-guides section renders in. */
+export type WikiFeaturedSlot = 'afterList' | 'afterListTable' | 'beforeList' | 'beforeListTable'
+
+/** The featured-guides section above the wiki pages list; `false` disables it. */
+export type WikiFeaturedOptions = {
+	/** Which list slot to render in. Defaults to `beforeList`. */
+	slot?: WikiFeaturedSlot
+}
+
 export type WikiListTriggerSlot = 'actions' | 'beforeListTable' | 'menu'
 export type WikiEditTriggerSlot = 'beforeDocumentControls' | 'menu'
 export type WikiGlobalTriggerSlot = 'beforeDocumentControls'
@@ -91,6 +113,11 @@ export type AdminWikiPluginOptions = {
 	access?: WikiAccessOptions
 	/** Extensions to the wiki editor (consumer blocks with renderers). */
 	editor?: WikiEditorOptions
+	/**
+	 * The featured-guides section on the wiki pages list view. `false` removes
+	 * it; the wiki view leads with featured guides either way.
+	 */
+	featured?: false | WikiFeaturedOptions
 	/** Per-collection `admin.hidden` passthrough. */
 	hidden?: WikiHiddenOptions
 	/**
@@ -110,4 +137,9 @@ export type AdminWikiPluginOptions = {
 	video?: boolean | WikiVideoOptions
 	/** Register the `/wiki` browsing and reading views. Defaults to `true`. */
 	wikiView?: boolean
+	/**
+	 * When the "write this guide" affordances render. Defaults to `editMode`,
+	 * which keeps edit views clean until a reader turns wiki edit mode on.
+	 */
+	writeAffordances?: WikiWriteAffordanceMode
 }

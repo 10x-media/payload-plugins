@@ -50,6 +50,7 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 			pagesSlug={registry.slugs.pages}
 			videoPlayer={videoPlayer}
 			wikiView={registry.wikiView}
+			writeAffordances={registry.writeAffordances}
 		>
 			{children}
 		</WikiProvider>

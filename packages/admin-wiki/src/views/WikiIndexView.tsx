@@ -1,10 +1,12 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
-import { Gutter } from '@payloadcms/ui'
+import { Button, Gutter } from '@payloadcms/ui'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug } from 'payload'
 import { formatAdminURL } from 'payload/shared'
+
+import { WikiEditModeToggle } from '../components/EditMode/WikiEditModeToggle'
 import { WikiIndexClient } from '../components/WikiView/WikiIndexClient'
-import { compareTargetEntries, type WikiTargetEntry } from '../shared/targetKeys'
+import { compareTargetEntries, targetKeysForDoc, type WikiTargetEntry } from '../shared/targetKeys'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { buildWikiViewContext, wikiLoginRedirectUrl } from './shared'
@@ -34,7 +36,14 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 			overrideAccess: false,
 			pagination: false,
 			req,
-			select: { featured: true, featuredOrder: true, slug: true, summary: true, title: true },
+			select: {
+				featured: true,
+				featuredOrder: true,
+				slug: true,
+				summary: true,
+				targets: true,
+				title: true,
+			},
 			user: req.user,
 			where: { _status: { equals: 'published' } },
 			...(context.locale ? { fallbackLocale: context.fallbackLocale, locale: context.locale } : {}),
@@ -46,6 +55,7 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 				id: doc.id,
 				slug: typeof doc.slug === 'string' ? doc.slug : null,
 				summary: typeof doc.summary === 'string' ? doc.summary : null,
+				targetKeys: targetKeysForDoc(doc.targets),
 				title: typeof doc.title === 'string' ? doc.title : null,
 			}))
 			.sort(compareTargetEntries)
@@ -74,12 +84,27 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 		>
 			<Gutter className="wiki-view">
 				<header className="wiki-view__header">
-					<h1 className="wiki-view__title">{t(keys.wikiViewTitle)}</h1>
-					{context.canCreate ? (
-						<a className="wiki-view__create" href={createUrl}>
-							{t(keys.wikiCreateGuide)}
-						</a>
-					) : null}
+					<div>
+						<h1 className="wiki-view__title">{t(keys.wikiViewTitle)}</h1>
+						<p className="wiki-view__subtitle">{t(keys.wikiSubtitle)}</p>
+					</div>
+					<div className="wiki-view__header-actions">
+						<WikiEditModeToggle />
+						{context.canCreate ? (
+							<Button
+								buttonStyle="pill"
+								el="link"
+								icon="plus"
+								iconPosition="left"
+								iconStyle="none"
+								margin={false}
+								size="small"
+								to={createUrl}
+							>
+								{t(keys.wikiCreateGuide)}
+							</Button>
+						) : null}
+					</div>
 				</header>
 				<WikiIndexClient baseUrl={context.wikiPath} entries={entries} />
 			</Gutter>

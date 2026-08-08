@@ -1,7 +1,7 @@
 .wiki-block-label {
 	align-items: center;
 	display: inline-flex;
-	gap: 0.5rem;
+	gap: calc(var(--base) / 2);
 	min-width: 0;
 }
 
@@ -9,4 +9,11 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* Inside a collapsible row header the help trigger is a sibling of the row
+   label, not a field description below an input, so it drops the description's
+   top margin and takes the row's own text size. */
+.wiki-block-label .wiki-field-help {
+	margin-top: 0;
 }

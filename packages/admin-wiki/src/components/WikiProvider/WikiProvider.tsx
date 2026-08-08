@@ -1,6 +1,6 @@
 'use client'
 
-import { useConfig, useTranslation } from '@payloadcms/ui'
+import { useAuth, useConfig, useTranslation } from '@payloadcms/ui'
 import {
 	type ComponentType,
 	createContext,
@@ -13,10 +13,31 @@ import {
 	useState,
 } from 'react'
 
+import type { WikiWriteAffordanceMode } from '../../options'
 import type { WikiGuideDoc, WikiTargetEntry, WikiTargetsResponse } from '../../shared/targetKeys'
 import type { WikiMediaDoc } from '../Video/useWikiMediaDoc'
 
 const REFRESH_AFTER_MS = 60_000
+
+/** Per-browser wiki edit mode, shared by every admin tab through `localStorage`. */
+const EDIT_MODE_STORAGE_KEY = '@10x-media/admin-wiki:editMode'
+
+const readStoredEditMode = (): boolean => {
+	try {
+		return window.localStorage.getItem(EDIT_MODE_STORAGE_KEY) === '1'
+	} catch {
+		// Private-mode browsers throw on storage access; edit mode simply stays off.
+		return false
+	}
+}
+
+const writeStoredEditMode = (enabled: boolean): void => {
+	try {
+		window.localStorage.setItem(EDIT_MODE_STORAGE_KEY, enabled ? '1' : '0')
+	} catch {
+		// Non-fatal: the toggle still applies for the lifetime of this page.
+	}
+}
 
 /** A consumer block renderer: receives the block node's field values. */
 export type WikiBlockRenderer = ComponentType<{ fields: Record<string, unknown> }>
@@ -31,6 +52,13 @@ export type WikiTargetsContextValue = {
 	canCreate: boolean
 	/** The reader's evaluated update permission (drives edit shortcuts). */
 	canUpdate: boolean
+	/**
+	 * Whether "write this guide" affordances should render: create permission
+	 * resolved true AND the configured `writeAffordances` mode allows it here.
+	 */
+	canWrite: boolean
+	/** Wiki edit mode, the per-browser toggle gating write affordances. */
+	editMode: boolean
 	/** Guides attached to a target key; empty array when none. */
 	entriesFor: (key: string) => WikiTargetEntry[]
 	/** Lazily load one guide's full document, cached per id and locale. */
@@ -41,10 +69,17 @@ export type WikiTargetsContextValue = {
 	/** The wiki pages collection slug, for links and lazy content loads. */
 	pagesSlug: string
 	refresh: () => void
+	/** Turn wiki edit mode on or off; persisted per browser. */
+	setEditMode: (enabled: boolean) => void
 	/** Consumer player replacing the default HTML5 player, when configured. */
 	videoPlayer: undefined | WikiVideoPlayerComponent
 	/** Whether the plugin registered the `/wiki` view, for "open in wiki" links. */
 	wikiViewEnabled: boolean
+	/**
+	 * Whether the edit-mode toggle is worth showing: the configured mode is
+	 * `editMode` and this reader could author guides.
+	 */
+	writeAffordancesToggleable: boolean
 }
 
 const EMPTY: WikiTargetEntry[] = []
@@ -53,14 +88,18 @@ const WikiTargetsContext = createContext<WikiTargetsContextValue>({
 	blockRenderers: {},
 	canCreate: false,
 	canUpdate: false,
+	canWrite: false,
+	editMode: false,
 	entriesFor: () => EMPTY,
 	loadGuide: () => Promise.resolve(null),
 	loading: false,
 	locale: null,
 	pagesSlug: 'wiki-pages',
 	refresh: () => {},
+	setEditMode: () => {},
 	videoPlayer: undefined,
 	wikiViewEnabled: false,
+	writeAffordancesToggleable: false,
 })
 
 export type WikiProviderProps = {
@@ -69,6 +108,7 @@ export type WikiProviderProps = {
 	pagesSlug?: string
 	videoPlayer?: WikiVideoPlayerComponent
 	wikiView?: boolean
+	writeAffordances?: WikiWriteAffordanceMode
 }
 
 /**
@@ -82,13 +122,25 @@ export const WikiProvider = ({
 	pagesSlug = 'wiki-pages',
 	videoPlayer,
 	wikiView = false,
+	writeAffordances = 'editMode',
 }: WikiProviderProps) => {
 	const { config } = useConfig()
 	const { i18n } = useTranslation()
+	const { user } = useAuth()
 	const [data, setData] = useState<null | WikiTargetsResponse>(null)
 	const [loading, setLoading] = useState(true)
+	const [editMode, setEditModeState] = useState(false)
 	const fetchedAt = useRef(0)
 	const guideCache = useRef(new Map<string, Promise<null | WikiGuideDoc>>())
+
+	// Read on mount rather than in the initializer: the provider renders on the
+	// server too, where `window` does not exist.
+	useEffect(() => setEditModeState(readStoredEditMode()), [])
+
+	const setEditMode = useCallback((enabled: boolean) => {
+		setEditModeState(enabled)
+		writeStoredEditMode(enabled)
+	}, [])
 
 	const load = useCallback(async () => {
 		fetchedAt.current = Date.now()
@@ -107,11 +159,21 @@ export const WikiProvider = ({
 		}
 	}, [config.routes.api, config.serverURL, i18n.language, pagesSlug])
 
+	// The provider is admin-wide, so it also mounts on the login screen, where the
+	// endpoint can only answer 403. Waiting for a user keeps that noise out of the
+	// console and out of the server log.
 	useEffect(() => {
+		if (!user) {
+			setLoading(false)
+			return
+		}
 		void load()
-	}, [load])
+	}, [load, user])
 
 	useEffect(() => {
+		if (!user) {
+			return
+		}
 		const onFocus = () => {
 			if (Date.now() - fetchedAt.current > REFRESH_AFTER_MS) {
 				void load()
@@ -119,7 +181,7 @@ export const WikiProvider = ({
 		}
 		window.addEventListener('focus', onFocus)
 		return () => window.removeEventListener('focus', onFocus)
-	}, [load])
+	}, [load, user])
 
 	const locale = data?.locale ?? null
 
@@ -146,21 +208,43 @@ export const WikiProvider = ({
 		[config.routes.api, config.serverURL, locale, pagesSlug]
 	)
 
+	const canCreate = data?.canCreate ?? false
+
 	const value = useMemo<WikiTargetsContextValue>(
 		() => ({
 			blockRenderers: blockRenderers ?? {},
-			canCreate: data?.canCreate ?? false,
+			canCreate,
 			canUpdate: data?.canUpdate ?? false,
+			canWrite:
+				canCreate &&
+				(writeAffordances === 'always' || (writeAffordances === 'editMode' && editMode)),
+			editMode,
 			entriesFor: (key) => data?.targets[key] ?? EMPTY,
 			loadGuide,
 			loading,
 			locale,
 			pagesSlug,
 			refresh: () => void load(),
+			setEditMode,
 			videoPlayer,
 			wikiViewEnabled: wikiView,
+			writeAffordancesToggleable: canCreate && writeAffordances === 'editMode',
 		}),
-		[blockRenderers, data, loadGuide, loading, locale, load, pagesSlug, videoPlayer, wikiView]
+		[
+			blockRenderers,
+			canCreate,
+			data,
+			editMode,
+			load,
+			loadGuide,
+			loading,
+			locale,
+			pagesSlug,
+			setEditMode,
+			videoPlayer,
+			wikiView,
+			writeAffordances,
+		]
 	)
 
 	return <WikiTargetsContext.Provider value={value}>{children}</WikiTargetsContext.Provider>

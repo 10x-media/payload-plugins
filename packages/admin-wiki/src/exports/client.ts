@@ -1,6 +1,7 @@
 'use client'
 
 export { WikiBlockLabelClient } from '../components/BlockHelp/WikiBlockLabelClient'
+export { WikiEditModeToggle } from '../components/EditMode/WikiEditModeToggle'
 export {
 	WikiFieldDescription,
 	type WikiFieldDescriptionProps,
@@ -12,7 +13,12 @@ export {
 	WikiTargetHelp,
 	type WikiTargetHelpProps,
 } from '../components/FieldHelp/WikiFieldHelp'
+export {
+	WikiWriteGuide,
+	type WikiWriteGuideProps,
+} from '../components/FieldHelp/WikiWriteGuide'
 export { Callout, type CalloutProps } from '../components/GuideArticle/Callout'
+export { CalloutBlockLabel } from '../components/GuideArticle/CalloutBlockLabel'
 export { GuideArticle, type GuideArticleProps } from '../components/GuideArticle/GuideArticle'
 export { GuideLink, type GuideLinkFields } from '../components/GuideArticle/GuideLink'
 export { GuideLinkBlockLabel } from '../components/GuideArticle/GuideLinkBlockLabel'
@@ -24,6 +30,7 @@ export {
 	WikiSurfaceTrigger,
 	type WikiSurfaceTriggerProps,
 } from '../components/SurfaceTrigger/WikiSurfaceTrigger'
+export { TargetChips, type TargetChipsProps } from '../components/TargetChips/TargetChips'
 export { GuideVideo, type GuideVideoProps } from '../components/Video/GuideVideo'
 export { useWikiMediaDoc, type WikiMediaDoc } from '../components/Video/useWikiMediaDoc'
 export { VideoEmbed, type VideoEmbedProps } from '../components/Video/VideoEmbed'

@@ -21,6 +21,12 @@ export type WikiTargetEntry = {
 	id: number | string
 	slug: null | string
 	summary: null | string
+	/**
+	 * Every target key this guide is attached to, for the chips that tell a
+	 * reader which surfaces it covers. Omitted where the caller does not select
+	 * the `targets` field.
+	 */
+	targetKeys?: string[]
 	title: null | string
 }
 
@@ -60,6 +66,21 @@ export const targetKeyForRow = (row: WikiTargetRow): null | string => {
 		default:
 			return null
 	}
+}
+
+/** Every target key on a guide document's stored `targets` array, deduplicated. */
+export const targetKeysForDoc = (targets: unknown): string[] => {
+	if (!Array.isArray(targets)) {
+		return []
+	}
+	const keys = new Set<string>()
+	for (const row of targets) {
+		const key = targetKeyForRow((row ?? {}) as WikiTargetRow)
+		if (key) {
+			keys.add(key)
+		}
+	}
+	return [...keys]
 }
 
 /** Sort guides for presentation: featured first (by order), then by title. */

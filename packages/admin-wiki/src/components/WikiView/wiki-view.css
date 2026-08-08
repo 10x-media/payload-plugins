@@ -1,138 +1,212 @@
+/* Page shell ---------------------------------------------------------------- */
+
 .wiki-view {
-	padding-block: 2rem;
+	padding-block: var(--base) calc(var(--base) * 2);
 }
 
 .wiki-view__header {
-	align-items: baseline;
+	align-items: flex-start;
 	display: flex;
-	gap: 1rem;
+	gap: var(--base);
 	justify-content: space-between;
-	margin-bottom: 1.5rem;
+	margin-bottom: calc(var(--base) * 1.5);
 }
 
 .wiki-view__title {
 	margin: 0;
 }
 
-.wiki-view__create {
-	color: var(--theme-elevation-600);
-	font-size: 0.875rem;
-	text-decoration: underline;
-	text-underline-offset: 2px;
-	white-space: nowrap;
+.wiki-view__subtitle {
+	color: var(--theme-elevation-500);
+	margin: calc(var(--base) / 4) 0 0;
+	max-width: 34rem;
 }
 
-.wiki-view__create:hover {
-	color: var(--theme-text);
+.wiki-view__header-actions {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	gap: calc(var(--base) / 3);
+	/* Optical alignment with the title's cap height rather than its line box. */
+	padding-top: calc(var(--base) / 4);
 }
+
+/* Guide page --------------------------------------------------------------- */
 
 .wiki-view__breadcrumbs {
+	align-items: center;
 	display: flex;
-	gap: 1rem;
+	gap: var(--base);
 	justify-content: space-between;
-	margin-bottom: 1.5rem;
-}
-
-.wiki-view__back,
-.wiki-view__edit {
-	color: var(--theme-elevation-600);
-	font-size: 0.875rem;
-	text-decoration: underline;
-	text-underline-offset: 2px;
-}
-
-.wiki-view__back:hover,
-.wiki-view__edit:hover {
-	color: var(--theme-text);
+	margin-bottom: var(--base);
 }
 
 .wiki-view__article {
-	max-width: 46rem;
+	max-width: 44rem;
 }
 
 .wiki-view__article-header {
-	margin-bottom: 1.5rem;
+	border-bottom: 1px solid var(--theme-elevation-100);
+	margin-bottom: calc(var(--base) * 1.25);
+	padding-bottom: var(--base);
+}
+
+.wiki-view__article-title {
+	align-items: center;
+	display: flex;
+	gap: calc(var(--base) / 3);
+	margin: 0;
 }
 
 .wiki-view__summary {
 	color: var(--theme-elevation-650);
 	font-size: 1.0625rem;
-	margin-top: 0.5rem;
+	line-height: 1.5;
+	margin: calc(var(--base) / 2) 0 0;
 }
 
-.wiki-view__status {
-	color: var(--theme-elevation-600);
+.wiki-view__article-targets {
+	align-items: baseline;
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) / 3);
+	margin-top: calc(var(--base) / 1.5);
 }
 
-.wiki-index__search {
-	background: var(--theme-input-bg, var(--theme-elevation-0));
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: 4px;
-	color: var(--theme-text);
-	font-size: 0.9375rem;
-	margin-bottom: 1.5rem;
-	max-width: 28rem;
-	padding: 0.5rem 0.75rem;
-	width: 100%;
-}
-
-.wiki-index__search:focus {
-	border-color: var(--theme-elevation-400);
-	outline: none;
-}
-
-.wiki-index__status {
-	color: var(--theme-elevation-600);
-}
-
-.wiki-index__heading {
-	color: var(--theme-elevation-650);
+.wiki-view__article-targets-label {
+	color: var(--theme-elevation-450);
 	font-size: 0.8125rem;
-	font-weight: 600;
 	letter-spacing: 0.04em;
-	margin: 0 0 0.75rem;
 	text-transform: uppercase;
 }
 
-.wiki-index__featured {
-	margin-bottom: 2rem;
+.wiki-view__status {
+	color: var(--theme-elevation-500);
 }
 
+/* Index ------------------------------------------------------------------- */
+
+/* The shape of the list view's own search bar (packages/ui/src/elements/
+   SearchBar/index.scss): one elevated rounded surface with the glyph inside it,
+   the input transparent on top. Reproduced rather than imported because
+   `SearchFilter` writes the list view's URL query, which this page has none. */
+.wiki-index__search {
+	--icon-width: 40px;
+
+	background: var(--theme-elevation-50);
+	border-radius: var(--style-radius-m, 4px);
+	display: grid;
+	grid-template-columns: auto 1fr;
+	isolation: isolate;
+	margin-bottom: calc(var(--base) * 1.5);
+	max-width: 32rem;
+	min-height: 46px;
+}
+
+.wiki-index__search .icon--search {
+	align-self: center;
+	grid-area: 1 / 1 / 2 / 2;
+	justify-self: center;
+	pointer-events: none;
+	width: var(--icon-width);
+	z-index: 1;
+}
+
+.wiki-index__search-input {
+	background: transparent;
+	border: 0;
+	border-radius: inherit;
+	color: var(--theme-text);
+	font-family: var(--font-body);
+	font-size: 1rem;
+	grid-area: 1 / 1 / 2 / 3;
+	height: 100%;
+	padding-block: calc(var(--base) * 0.5);
+	padding-inline: var(--icon-width) var(--base);
+	width: 100%;
+}
+
+.wiki-index__search-input:focus {
+	outline: 0;
+}
+
+.wiki-index__search:focus-within {
+	box-shadow: 0 0 0 1px var(--theme-elevation-250);
+}
+
+.wiki-index__section + .wiki-index__section {
+	margin-top: calc(var(--base) * 1.75);
+}
+
+.wiki-index__heading {
+	align-items: baseline;
+	color: var(--theme-elevation-650);
+	display: flex;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	gap: calc(var(--base) / 2);
+	letter-spacing: 0.04em;
+	margin: 0 0 calc(var(--base) / 2);
+	text-transform: uppercase;
+}
+
+.wiki-index__count {
+	color: var(--theme-elevation-400);
+	font-weight: 400;
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+/* Cards take Payload's own card surface (packages/ui/src/elements/Card/
+   index.scss): elevation-50 on the border colour, radius-m, and a lift on
+   hover. Three up at a comfortable width, wrapping down on narrow viewports. */
 .wiki-index__cards {
 	display: grid;
-	gap: 0.75rem;
-	grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+	gap: calc(var(--base) / 2);
+	grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
 }
 
 .wiki-index__card {
 	background: var(--theme-elevation-50);
-	border: 1px solid var(--theme-elevation-100);
-	border-radius: 6px;
+	border: 1px solid var(--theme-border-color);
+	border-radius: var(--style-radius-m, 4px);
 	display: flex;
 	flex-direction: column;
-	gap: 0.375rem;
-	padding: 1rem;
+	gap: calc(var(--base) / 3);
+	padding: calc(var(--base) * 0.75);
 	text-decoration: none;
+	transition-duration: 100ms;
+	transition-property: border, box-shadow, background;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
 }
 
 .wiki-index__card:hover {
-	background: var(--theme-elevation-100);
-	border-color: var(--theme-elevation-150);
+	border-color: var(--theme-elevation-250);
+	box-shadow: 0 4px 8px -2px rgb(0 0 0 / 0.05);
 }
 
 .wiki-index__card-title {
+	align-items: center;
 	color: var(--theme-text);
+	display: flex;
 	font-weight: 600;
+	gap: calc(var(--base) / 4);
 }
 
 .wiki-index__card-summary,
 .wiki-index__row-summary {
+	-webkit-box-orient: vertical;
 	color: var(--theme-elevation-650);
 	display: -webkit-box;
-	font-size: 0.875rem;
-	overflow: hidden;
-	-webkit-box-orient: vertical;
+	font-size: 0.9375rem;
+	line-height: 1.45;
 	-webkit-line-clamp: 3;
+	overflow: hidden;
+}
+
+.wiki-index__card-chips {
+	margin-top: auto;
+	padding-top: calc(var(--base) / 4);
 }
 
 .wiki-index__list {
@@ -152,10 +226,11 @@
 }
 
 .wiki-index__row-link {
+	align-items: center;
 	display: flex;
-	flex-direction: column;
-	gap: 0.25rem;
-	padding: 0.75rem 0.5rem;
+	gap: var(--base);
+	justify-content: space-between;
+	padding: calc(var(--base) / 2);
 	text-decoration: none;
 }
 
@@ -163,19 +238,82 @@
 	background: var(--theme-elevation-50);
 }
 
-.wiki-index__row-title {
-	color: var(--theme-text);
-	font-weight: 500;
+.wiki-index__row-main {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 6);
+	min-width: 0;
 }
+
+.wiki-index__row-title {
+	align-items: center;
+	color: var(--theme-text);
+	display: flex;
+	font-weight: 500;
+	gap: calc(var(--base) / 4);
+}
+
+.wiki-index__row-chips {
+	flex-shrink: 0;
+	justify-content: flex-end;
+	max-width: 40%;
+}
+
+/* An empty wiki is the state a new install opens in, so it explains itself
+   rather than showing one grey sentence. */
+.wiki-index__empty {
+	align-items: center;
+	border: 1px dashed var(--theme-elevation-150);
+	border-radius: var(--style-radius-m, 4px);
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 4);
+	padding: calc(var(--base) * 2) var(--base);
+	text-align: center;
+}
+
+.wiki-index__empty--inline {
+	padding: calc(var(--base) * 1.25) var(--base);
+}
+
+.wiki-index__empty-icon {
+	color: var(--theme-elevation-300);
+	height: calc(var(--base) * 1.6);
+	width: calc(var(--base) * 1.6);
+}
+
+.wiki-index__empty-title {
+	font-weight: 600;
+	margin: 0;
+}
+
+.wiki-index__empty-hint {
+	color: var(--theme-elevation-500);
+	margin: 0;
+	max-width: 28rem;
+}
+
+/* List-view actions -------------------------------------------------------- */
 
 .wiki-view-link {
-	color: var(--theme-elevation-600);
-	font-size: 0.875rem;
-	text-decoration: underline;
-	text-underline-offset: 2px;
-	white-space: nowrap;
+	align-items: center;
+	display: inline-flex;
+	gap: calc(var(--base) / 3);
 }
 
-.wiki-view-link:hover {
-	color: var(--theme-text);
+@media (max-width: 768px) {
+	.wiki-view__header {
+		flex-direction: column;
+	}
+
+	.wiki-index__row-link {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: calc(var(--base) / 3);
+	}
+
+	.wiki-index__row-chips {
+		justify-content: flex-start;
+		max-width: 100%;
+	}
 }

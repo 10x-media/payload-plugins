@@ -1,12 +1,14 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
-import { Gutter } from '@payloadcms/ui'
+import { Button, ChevronIcon, Gutter } from '@payloadcms/ui'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 
 import { GuideArticle } from '../components/GuideArticle/GuideArticle'
-import type { WikiGuideDoc } from '../shared/targetKeys'
+import { StarIcon } from '../components/icons'
+import { TargetChips } from '../components/TargetChips/TargetChips'
+import { targetKeysForDoc, type WikiGuideDoc } from '../shared/targetKeys'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { buildWikiViewContext, wikiLoginRedirectUrl } from './shared'
@@ -28,7 +30,7 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 		redirect(wikiLoginRedirectUrl(props, slug ? `${context.wikiPath}/${slug}` : context.wikiPath))
 	}
 	const t = asTranslate(i18n.t)
-	let doc: null | WikiGuideDoc = null
+	let doc: null | (WikiGuideDoc & { featured?: unknown; targets?: unknown }) = null
 	if (slug) {
 		try {
 			const result = await payload.find({
@@ -46,7 +48,7 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 					? { fallbackLocale: context.fallbackLocale, locale: context.locale }
 					: {}),
 			})
-			doc = (result.docs[0] as undefined | WikiGuideDoc) ?? null
+			doc = (result.docs[0] as undefined | (WikiGuideDoc & { featured?: unknown })) ?? null
 		} catch {
 			doc = null
 		}
@@ -58,6 +60,7 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 				path: `/collections/${context.registry.slugs.pages}/${doc.id}`,
 			})
 		: null
+	const targetKeys = doc ? targetKeysForDoc(doc.targets) : []
 	return (
 		<DefaultTemplate
 			i18n={i18n}
@@ -76,20 +79,47 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 		>
 			<Gutter className="wiki-view wiki-view--page">
 				<div className="wiki-view__breadcrumbs">
-					<a className="wiki-view__back" href={context.wikiPath}>
+					<Button
+						buttonStyle="pill"
+						el="link"
+						icon={<ChevronIcon direction="left" size="small" />}
+						iconPosition="left"
+						iconStyle="none"
+						margin={false}
+						size="small"
+						to={context.wikiPath}
+					>
 						{t(keys.wikiBackToIndex)}
-					</a>
+					</Button>
 					{doc && context.canUpdate && editUrl ? (
-						<a className="wiki-view__edit" href={editUrl}>
+						<Button
+							buttonStyle="pill"
+							el="link"
+							icon="edit"
+							iconPosition="left"
+							iconStyle="none"
+							margin={false}
+							size="small"
+							to={editUrl}
+						>
 							{t(keys.drawerEditGuide)}
-						</a>
+						</Button>
 					) : null}
 				</div>
 				{doc ? (
 					<article className="wiki-view__article">
 						<header className="wiki-view__article-header">
-							<h1 className="wiki-view__title">{doc.title}</h1>
+							<h1 className="wiki-view__article-title">
+								{doc.featured === true ? <StarIcon /> : null}
+								{doc.title}
+							</h1>
 							{doc.summary ? <p className="wiki-view__summary">{doc.summary}</p> : null}
+							{targetKeys.length > 0 ? (
+								<div className="wiki-view__article-targets">
+									<span className="wiki-view__article-targets-label">{t(keys.targetsHeading)}</span>
+									<TargetChips limit={8} targetKeys={targetKeys} />
+								</div>
+							) : null}
 						</header>
 						{content ? <GuideArticle data={content} /> : null}
 					</article>

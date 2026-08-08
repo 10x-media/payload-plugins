@@ -6,6 +6,7 @@ describe('resolveOptions', () => {
 	it('applies defaults', () => {
 		expect(resolveOptions({})).toEqual({
 			editorBlocks: [],
+			featured: { slot: 'beforeList' },
 			localeMap: {},
 			slugs: { media: 'wiki-media', pages: 'wiki-pages' },
 			triggers: {
@@ -15,7 +16,20 @@ describe('resolveOptions', () => {
 			},
 			video: false,
 			wikiView: true,
+			writeAffordances: 'editMode',
 		})
+	})
+
+	it('honors the featured slot and disables the section', () => {
+		expect(resolveOptions({ featured: { slot: 'afterListTable' } }).featured).toEqual({
+			slot: 'afterListTable',
+		})
+		expect(resolveOptions({ featured: false }).featured).toBe(false)
+	})
+
+	it('honors the write affordance mode', () => {
+		expect(resolveOptions({ writeAffordances: 'never' }).writeAffordances).toBe('never')
+		expect(resolveOptions({ writeAffordances: 'always' }).writeAffordances).toBe('always')
 	})
 
 	it('normalizes video: true to an empty options object', () => {

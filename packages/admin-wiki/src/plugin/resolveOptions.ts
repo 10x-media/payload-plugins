@@ -2,14 +2,17 @@ import type {
 	AdminWikiPluginOptions,
 	WikiEditorBlockOption,
 	WikiEditTriggerSlot,
+	WikiFeaturedSlot,
 	WikiGlobalTriggerSlot,
 	WikiListTriggerSlot,
 	WikiVideoOptions,
+	WikiWriteAffordanceMode,
 } from '../options'
 
 /** Plugin options normalized to their effective values. */
 export type ResolvedWikiOptions = {
 	editorBlocks: WikiEditorBlockOption[]
+	featured: false | { slot: WikiFeaturedSlot }
 	localeMap: Record<string, string>
 	slugs: { media: string; pages: string }
 	triggers: {
@@ -19,11 +22,13 @@ export type ResolvedWikiOptions = {
 	}
 	video: false | WikiVideoOptions
 	wikiView: boolean
+	writeAffordances: WikiWriteAffordanceMode
 }
 
 /** Apply defaults and normalize shorthand option forms. */
 export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOptions => ({
 	editorBlocks: options.editor?.blocks ?? [],
+	featured: options.featured === false ? false : { slot: options.featured?.slot ?? 'beforeList' },
 	localeMap: options.localeMap ?? {},
 	slugs: {
 		media: options.slugs?.media ?? 'wiki-media',
@@ -36,4 +41,5 @@ export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOpt
 	},
 	video: options.video === true ? {} : (options.video ?? false),
 	wikiView: options.wikiView ?? true,
+	writeAffordances: options.writeAffordances ?? 'editMode',
 })

@@ -32,6 +32,27 @@ const entityOptions = (
 			return { label, value: entity.slug }
 		})
 
+const ORPHAN_BANNER = { path: '@10x-media/admin-wiki/client#WikiOrphanBanner' }
+const FEATURED_LIST = { path: '@10x-media/admin-wiki/client#WikiFeaturedList' }
+
+/**
+ * The list-view slot components, with the featured section placed at the
+ * configured slot. The orphan banner always sits in `beforeListTable`, directly
+ * above the table it explains, so the two can land in the same slot.
+ */
+const listSlotComponents = (
+	resolved: ResolvedWikiOptions
+): Record<string, Array<{ path: string }>> => {
+	const slots: Record<string, Array<{ path: string }>> = {
+		beforeListTable: [ORPHAN_BANNER],
+	}
+	if (resolved.featured !== false) {
+		const { slot } = resolved.featured
+		slots[slot] = slot === 'beforeListTable' ? [FEATURED_LIST, ORPHAN_BANNER] : [FEATURED_LIST]
+	}
+	return slots
+}
+
 export type BuildWikiPagesArgs = {
 	access: Required<WikiAccessOptions>
 	/** The host config as it stands when the plugin runs, for target enumeration. */
@@ -123,8 +144,7 @@ export const buildWikiPagesCollection = ({
 			useAsTitle: 'title',
 			...(hidden !== undefined ? { hidden } : {}),
 			components: {
-				beforeList: [{ path: '@10x-media/admin-wiki/client#WikiFeaturedList' }],
-				beforeListTable: [{ path: '@10x-media/admin-wiki/client#WikiOrphanBanner' }],
+				...listSlotComponents(resolved),
 				...(resolved.wikiView
 					? {
 							views: {

@@ -99,10 +99,13 @@ export type {
 	WikiAccessOptions,
 	WikiEditorBlockOption,
 	WikiEditorOptions,
+	WikiFeaturedOptions,
+	WikiFeaturedSlot,
 	WikiHiddenOptions,
 	WikiSlugsOptions,
 	WikiTriggersOptions,
 	WikiVideoOptions,
+	WikiWriteAffordanceMode,
 } from './options'
 export { getWikiRegistry } from './plugin/registry'
 export { seedWiki } from './seed/seedWiki'

@@ -43,6 +43,9 @@ export const buildCalloutBlock = (): Block => ({
 		singular: labelForKey(keys.calloutBlockSingular),
 		plural: labelForKey(keys.calloutBlockPlural),
 	},
+	admin: {
+		components: { Label: '@10x-media/admin-wiki/client#CalloutBlockLabel' },
+	},
 	fields: [
 		{
 			name: 'variant',
