@@ -96,7 +96,18 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 			return stockCreate.handler(req)
 		}
 		req.context[VOTE_CHANGE_CONTEXT_KEY] = target.submissionId
-		const doc = await req.payload.update({
+		// Slug-agnostic cast (the `createSubmission` idiom): a host's generated types pin the
+		// runtime-registered collection's `form` id flavor and `values` JSON shape, which this
+		// framework-level write cannot know. Bound, because `update` is a prototype method.
+		const update = req.payload.update.bind(req.payload) as unknown as (options: {
+			collection: string
+			id: number | string
+			data: { form?: number | string; values?: unknown }
+			depth?: number
+			overrideAccess?: boolean
+			req?: PayloadRequest
+		}) => Promise<unknown>
+		const doc = await update({
 			collection: FORM_SUBMISSIONS_SLUG,
 			id: target.submissionId,
 			data: { form: data.form, values: data.values },
