@@ -58,21 +58,31 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 		})
 
 	// Sharded tallies (VOTE_SHARDS) make same-document transactional writes rare, but two
-	// transactions can still pick the same shard: Mongo then aborts one (WriteConflict, labelled
-	// TransientTransactionError) and the losing submission rolls back whole, so counts stay
-	// consistent either way. This minimal retry (transient-only, max 2 attempts) mirrors what a
-	// real client does: the visitor's browser resubmits the failed vote. Postgres never needs it
-	// (ON CONFLICT DO UPDATE serializes via a row lock instead of aborting).
-	const isTransientConflict = (error: unknown): boolean =>
-		Array.isArray((error as { errorLabels?: unknown })?.errorLabels) &&
-		(error as { errorLabels: string[] }).errorLabels.includes('TransientTransactionError')
+	// transactions can still pick the same shard: Mongo then aborts one (WriteConflict) and the
+	// losing submission rolls back whole, so counts stay consistent either way. The retry mirrors
+	// what a real client does: the visitor's browser resubmits the failed vote, as often as needed.
+	// Detection is deliberately broad, the TransientTransactionError label is not always attached
+	// (a conflict surfacing at commit carries only WriteConflict code 112 and the "please retry"
+	// message), and one retry can itself collide again under four concurrent votes. Postgres never
+	// needs any of this (ON CONFLICT DO UPDATE serializes via a row lock instead of aborting).
+	const isTransientConflict = (error: unknown): boolean => {
+		const err = error as { errorLabels?: unknown; code?: unknown; message?: unknown } | null
+		if (Array.isArray(err?.errorLabels) && err.errorLabels.includes('TransientTransactionError')) {
+			return true
+		}
+		if (err?.code === 112) {
+			return true
+		}
+		return typeof err?.message === 'string' && /retry your operation/i.test(err.message)
+	}
 
 	const voteRetrying = async (formId: number | string, value: string) => {
-		try {
-			return await vote(formId, value)
-		} catch (error) {
-			if (!isTransientConflict(error)) throw error
-			return vote(formId, value)
+		for (let attempt = 0; ; attempt++) {
+			try {
+				return await vote(formId, value)
+			} catch (error) {
+				if (attempt >= 4 || !isTransientConflict(error)) throw error
+			}
 		}
 	}
 
