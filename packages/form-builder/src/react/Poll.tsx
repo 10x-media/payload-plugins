@@ -6,6 +6,7 @@ import { isPollClosed } from '../form/pollState'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
 import { makeTranslate } from '../translations/makeTranslate'
+import type { VoteStorage } from './adapters'
 import { Form, type FormProps } from './Form'
 import { FormResults } from './FormResults'
 import { type FetchResultsResult, fetchFormResults } from './fetchResults'
@@ -13,7 +14,10 @@ import { type FetchResultsResult, fetchFormResults } from './fetchResults'
 export type PollProps = FormProps & {
 	/** The choice field whose results are shown after voting (should match the form's public `poll.resultsField`). */
 	resultsField: string
-	/** localStorage key for the per-browser voted guard. Default `fb-poll-{form.id}`. */
+	/**
+	 * Key for the per-browser voted guard (localStorage by default; overridable or disabled via
+	 * `adapters.voteStorage`). Default `fb-poll-{form.id}`.
+	 */
 	storageKey?: string
 	/**
 	 * Server-known voted state, ORed with the localStorage guard: `true` marks the visitor as voted;
@@ -28,20 +32,31 @@ export type PollProps = FormProps & {
 	fetchResultsImpl?: typeof fetchFormResults
 }
 
-const readVoted = (key: string): boolean => {
-	try {
-		return window.localStorage.getItem(key) != null
-	} catch {
-		return false
-	}
+const localStorageVoteStorage: VoteStorage = {
+	read: (key) => {
+		try {
+			return window.localStorage.getItem(key) != null
+		} catch {
+			return false
+		}
+	},
+	write: (key) => {
+		try {
+			window.localStorage.setItem(key, '1')
+		} catch {
+			// Private mode / storage disabled: the guard is best-effort UX, never integrity.
+		}
+	},
 }
 
-const writeVoted = (key: string): void => {
-	try {
-		window.localStorage.setItem(key, '1')
-	} catch {
-		// Private mode / storage disabled: the guard is best-effort UX, never integrity.
+/** `false` disables client persistence entirely (`hasVoted` still marks voted). */
+const noopVoteStorage: VoteStorage = { read: () => false, write: () => {} }
+
+const resolveVoteStorage = (configured: VoteStorage | false | undefined): VoteStorage => {
+	if (configured === false) {
+		return noopVoteStorage
 	}
+	return configured ?? localStorageVoteStorage
 }
 
 /**
@@ -75,6 +90,11 @@ export const Poll = ({
 	const [results, setResults] = useState<FieldAggregation[] | null>(null)
 	const [loadFailed, setLoadFailed] = useState(false)
 	const translate = useMemo(() => formProps.t ?? makeTranslate(en), [formProps.t])
+	const configuredVoteStorage = formProps.adapters?.voteStorage
+	const voteStorage = useMemo(
+		() => resolveVoteStorage(configuredVoteStorage),
+		[configuredVoteStorage]
+	)
 
 	const loadResults = useCallback(async () => {
 		const result: FetchResultsResult = await fetchResultsImpl({
@@ -98,18 +118,18 @@ export const Poll = ({
 	)
 
 	useEffect(() => {
-		const already = hasVoted === true || readVoted(key)
+		const already = hasVoted === true || voteStorage.read(key)
 		if (already) {
 			setVoted(true)
 		}
 		if ((already && !resultsAwaitClose) || closed || finalized) {
 			void loadResults()
 		}
-	}, [hasVoted, key, loadResults, closed, resultsAwaitClose, finalized])
+	}, [hasVoted, key, loadResults, closed, resultsAwaitClose, finalized, voteStorage])
 
 	const handleSuccess = useCallback<NonNullable<FormProps['onSuccess']>>(
 		(submissionId, result) => {
-			writeVoted(key)
+			voteStorage.write(key)
 			setVoted(true)
 			if (!resultsAwaitClose) {
 				void loadResults()
@@ -117,7 +137,7 @@ export const Poll = ({
 			// Forward the resolved success response so a Poll host gets the same onSuccess payload as a Form host.
 			onSuccess?.(submissionId, result)
 		},
-		[key, loadResults, onSuccess, resultsAwaitClose]
+		[key, loadResults, onSuccess, resultsAwaitClose, voteStorage]
 	)
 
 	if (finalized) {
