@@ -97,10 +97,17 @@ export const Poll = ({
 	const winningValues = poll?.outcome?.winningValues
 	const finalized = Array.isArray(winningValues) && winningValues.length > 0
 	const resultsAwaitClose = !closed && !finalized && poll?.resultsVisibility === 'afterClose'
-	const [voted, setVoted] = useState(false)
+	// Server-known voted state renders the results view on the very first paint; the effect below
+	// only adds the localStorage read.
+	const [voted, setVoted] = useState(hasVoted === true || currentVote != null)
 	const [changing, setChanging] = useState(false)
 	const [pick, setPick] = useState<string[] | undefined>(currentVote?.pick)
 	const [prefill, setPrefill] = useState<unknown>(currentVote?.value)
+	// Changing is offered only when the signed cookie verifiably identifies a submission: at mount
+	// via a resolved `currentVote`, or after an in-session vote (the server just issued the cookie).
+	// A localStorage-only voted flag proves nothing about the cookie, and a "change" without one
+	// would create a second submission instead of updating.
+	const [changeReady, setChangeReady] = useState(currentVote != null)
 	const [results, setResults] = useState<FieldAggregation[] | null>(null)
 	const [loadFailed, setLoadFailed] = useState(false)
 	const translate = useMemo(() => formProps.t ?? makeTranslate(en), [formProps.t])
@@ -146,6 +153,7 @@ export const Poll = ({
 			voteStorage.write(key)
 			setVoted(true)
 			setChanging(false)
+			setChangeReady(true)
 			// Track the pick client-side so the "your vote" marker is fresh right after a (re-)vote,
 			// without waiting for a server-resolved currentVote on the next page load.
 			if (result?.values) {
@@ -214,7 +222,7 @@ export const Poll = ({
 					t={formProps.t}
 					locale={formProps.locale}
 				/>
-				{allowChange ? (
+				{allowChange && changeReady ? (
 					<button className="fb-poll__change" type="button" onClick={() => setChanging(true)}>
 						{translate(keys.pollChangeVote)}
 					</button>

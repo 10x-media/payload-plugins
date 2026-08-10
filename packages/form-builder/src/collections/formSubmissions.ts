@@ -183,10 +183,22 @@ const makeVotedCookieHook = (args: { votedCookie: boolean }): CollectionAfterCha
 		const value = state.allowChange
 			? signVotedCookieValue(req.payload, doc.id as number | string)
 			: '1'
+		// A signed id is a bearer capability (it authorizes changing that vote), so it follows the
+		// host's Payload auth-cookie transport policy: `Secure` whenever the admin user collection's
+		// `auth.cookies.secure` is on. The legacy `1` marker stays a plain UX flag either way.
+		const adminUserSlug = req.payload.config.admin?.user
+		// String-indexed cast: a host's generated types key `collections` to its own slugs, which
+		// this framework-level read cannot know.
+		const collections = req.payload.collections as Record<
+			string,
+			{ config: { auth?: { cookies?: { secure?: boolean } } } } | undefined
+		>
+		const authCookies = adminUserSlug ? collections[adminUserSlug]?.config.auth?.cookies : undefined
+		const secure = state.allowChange && authCookies?.secure === true ? '; Secure' : ''
 		req.responseHeaders ??= new Headers()
 		req.responseHeaders.append(
 			'Set-Cookie',
-			`${votedCookieName(formId)}=${value}; Path=/; Max-Age=${VOTED_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax`
+			`${votedCookieName(formId)}=${value}; Path=/; Max-Age=${VOTED_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`
 		)
 		return doc
 	}

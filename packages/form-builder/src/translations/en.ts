@@ -241,6 +241,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.pollAllowChange]: 'Allow changing votes',
 	[keys.pollAllowChangeDescription]:
 		'Returning voters update their existing vote instead of adding another. Votes are matched per browser via the voted cookie.',
+	[keys.pollAllowChangeNeedsPersistedSubmissions]:
+		'Changeable votes need stored submissions: turn Keep submissions back on or disable vote changing.',
 	[keys.pollClosed]: 'This poll is closed.',
 	[keys.pollResultsAfterClose]: 'Results will be shown after the poll closes.',
 	[keys.pollOptionSource]: 'Option source',

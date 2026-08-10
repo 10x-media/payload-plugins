@@ -434,7 +434,9 @@ describe('Poll', () => {
 		expect(within(container).queryByRole('combobox')).toBeNull()
 	})
 
-	it('offers changing without a prefill when voted is only known locally', async () => {
+	it('offers no change control when voted is known only locally', async () => {
+		// A localStorage flag proves nothing about the httpOnly cookie; without a resolved
+		// currentVote a "change" would create a second submission, so the button must not render.
 		window.localStorage.setItem('fb-poll-1', '1')
 		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
 		const { container } = render(
@@ -444,13 +446,30 @@ describe('Poll', () => {
 				fetchResultsImpl,
 			})
 		)
+		await waitFor(() => expect(within(container).getByText('Colour')).toBeInTheDocument())
+		expect(within(container).queryByRole('button', { name: 'Change vote' })).toBeNull()
+	})
+
+	it('enables changing right after an in-session vote', async () => {
+		// The server issues the signed cookie on the vote itself, so an in-session voter can change.
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })
+		const { container } = render(
+			createElement(Poll, {
+				form: { ...form, poll: { allowChange: true } },
+				resultsField: 'colour',
+				onSubmit,
+				fetchResultsImpl,
+			})
+		)
+		fireEvent.change(within(container).getByRole('combobox'), { target: { value: 'blue' } })
+		fireEvent.click(within(container).getByRole('button', { name: /submit|vote/i }))
 		await waitFor(() =>
 			expect(within(container).getByRole('button', { name: 'Change vote' })).toBeInTheDocument()
 		)
 		fireEvent.click(within(container).getByRole('button', { name: 'Change vote' }))
-		// No stored pick to prefill: the select sits on its native first-option default.
 		const select = within(container).getByRole('combobox') as HTMLSelectElement
-		expect(select.value).toBe('red')
+		expect(select.value).toBe('blue')
 	})
 
 	it('shows the wait notice after voting on an open afterClose poll', async () => {

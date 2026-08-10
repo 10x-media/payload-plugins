@@ -50,11 +50,7 @@ export const hasVotedCookie = (
 	if (!cookieHeader) {
 		return false
 	}
-	const name = votedCookieName(formId)
-	return cookieHeader.split(';').some((pair) => {
-		const eq = pair.indexOf('=')
-		return eq !== -1 && pair.slice(0, eq).trim() === name
-	})
+	return votedCookieValue(cookieHeader, formId) != null
 }
 
 const votedCookieValue = (

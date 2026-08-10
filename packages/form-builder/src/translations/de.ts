@@ -251,6 +251,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.pollAllowChange]: 'Stimmänderung erlauben',
 	[keys.pollAllowChangeDescription]:
 		'Wiederkehrende Teilnehmer aktualisieren ihre bestehende Stimme, statt eine weitere abzugeben. Die Zuordnung erfolgt pro Browser über das Abstimmungs-Cookie.',
+	[keys.pollAllowChangeNeedsPersistedSubmissions]:
+		'Stimmänderungen benötigen gespeicherte Einsendungen: Aufbewahrung wieder aktivieren oder Stimmänderung deaktivieren.',
 	[keys.pollClosed]: 'Diese Umfrage ist beendet.',
 	[keys.pollResultsAfterClose]: 'Die Ergebnisse werden nach Ende der Umfrage angezeigt.',
 	[keys.pollOptionSource]: 'Optionsquelle',

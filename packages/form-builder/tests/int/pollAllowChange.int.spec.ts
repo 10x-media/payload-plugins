@@ -105,6 +105,9 @@ describeForDb(
 		it('registers the vote-submit endpoint ahead of the stock create', () => {
 			const posts = rootPostEndpoints()
 			expect(posts).toHaveLength(2)
+			// First match wins in handleEndpoints, so index 0 must be ours, not the stock create.
+			expect(posts[0]?.custom).toEqual({ formBuilder: 'vote-submit' })
+			expect(posts[1]?.custom).toBeUndefined()
 		})
 
 		it('creates on first vote and sets a signed submission-id cookie', async () => {
@@ -231,7 +234,9 @@ describeForDb(
 			const form = await makeForm()
 			const first = await submitViaRest({ form: form.id, values: [{ field: 'vote', value: 'a' }] })
 			const cookie = asCookieHeader(setCookieOf(first.req) ?? '')
-			const forged = `${cookie.slice(0, -2)}ff`
+			// Flip the last hex character so the forgery can never equal the original signature.
+			const last = cookie.slice(-1)
+			const forged = `${cookie.slice(0, -1)}${last === 'f' ? '0' : 'f'}`
 
 			const second = await submitViaRest(
 				{ form: form.id, values: [{ field: 'vote', value: 'b' }] },
@@ -268,6 +273,21 @@ describeForDb(
 			const second = await submitViaRest({ form: form.id, values: [{ field: 'vote', value: 'b' }] })
 			expect(second.status).toBe(201)
 			expect(await submissionCount(form.id)).toBe(2)
+		})
+
+		it('rejects allowChange together with persistSubmissions off', async () => {
+			await expect(makeForm({ persistSubmissions: false })).rejects.toThrow(/persistSubmissions/)
+		})
+
+		it('rejects turning persistence off on an existing allowChange poll', async () => {
+			const form = await makeForm()
+			await expect(
+				booted.payload.update({
+					collection: 'forms',
+					id: form.id,
+					data: { persistSubmissions: false },
+				})
+			).rejects.toThrow(/persistSubmissions/)
 		})
 
 		it('resolveVotedSubmission returns the voter pick from the cookie', async () => {
@@ -344,3 +364,64 @@ describeForDb(
 		})
 	}
 )
+
+// The signed cookie is a bearer capability, so it mirrors the host's Payload auth-cookie
+// transport policy; a dedicated boot supplies an auth collection with secure cookies on.
+describeForDb('form-builder changeable votes (secure auth cookies)', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: formBuilder({ poll: { votedCookie: true } }),
+			db,
+			collections: [{ slug: 'users', auth: { cookies: { secure: true } }, fields: [] }],
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const makePoll = async (allowChange: boolean) =>
+		booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Secure poll',
+				fields: [
+					{
+						blockType: 'select',
+						name: 'vote',
+						label: 'Vote',
+						options: [{ label: 'A', value: 'a' }],
+					},
+				],
+				pollEnabled: true,
+				poll: { resultsField: 'vote', type: 'mostVoted', allowChange },
+			},
+		})
+
+	const voteWithReq = async (formId: number | string) => {
+		const req = await createLocalReq({}, booted.payload)
+		await booted.payload.create({
+			collection: 'form-submissions',
+			depth: 0,
+			data: { form: formId, values: [{ field: 'vote', value: 'a' }] },
+			req,
+		})
+		return req.responseHeaders?.get('set-cookie') ?? null
+	}
+
+	it('marks the signed submission-id cookie Secure', async () => {
+		const form = await makePoll(true)
+		const cookie = await voteWithReq(form.id)
+		expect(cookie).toContain(votedCookieName(form.id))
+		expect(cookie).toContain('; Secure')
+	})
+
+	it('keeps the legacy UX marker cookie non-Secure', async () => {
+		const form = await makePoll(false)
+		const cookie = await voteWithReq(form.id)
+		expect(cookie).toContain(`${votedCookieName(form.id)}=1`)
+		expect(cookie).not.toContain('Secure')
+	})
+})

@@ -75,9 +75,10 @@ export const validateSubmission =
 			return data
 		}
 		if (changeTarget !== undefined) {
+			// Fail closed: an unresolvable stored form binding is as disqualifying as a mismatched one.
 			const originalFormId = (originalDoc as { form?: unknown } | undefined)?.form
 			const boundFormId = originalFormId != null ? formIdOf(originalFormId) : null
-			if (boundFormId != null && String(boundFormId) !== String(formId)) {
+			if (boundFormId == null || String(boundFormId) !== String(formId)) {
 				throw new APIError('form-builder: a vote change cannot move a submission across forms', 400)
 			}
 		}

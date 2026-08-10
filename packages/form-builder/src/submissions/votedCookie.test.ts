@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
+import { signFormContext } from '../context/formContext'
 import {
 	hasVotedCookie,
 	signVotedCookieValue,
@@ -81,6 +82,16 @@ describe('votedSubmissionIdFromCookie', () => {
 
 	it('rejects a token signed with a different secret', () => {
 		const token = signVotedCookieValue({ secret: 'other-secret' } as Payload, 'sub-42')
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${token}`, 7, SECRET)).toBeNull()
+	})
+
+	it('rejects a validly signed token for a different relation', () => {
+		// e.g. a signFormContext token for a page reference dropped into the voted cookie.
+		const token = signFormContext({
+			payload: fakePayload,
+			relationTo: 'pages',
+			value: 'sub-42',
+		})
 		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${token}`, 7, SECRET)).toBeNull()
 	})
 })

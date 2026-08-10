@@ -327,7 +327,9 @@ export default async function PollPage({ params }) {
 }
 ```
 
-The cookie is `HttpOnly; SameSite=Lax` with a one-year `Max-Age`, and deliberately not `Secure`: it is a UX marker only (skip re-showing a form the visitor already answered), never an integrity or auth signal, and omitting `Secure` keeps it working on plain-HTTP local development. Do not build any server-side trust on its presence; one-per-identity enforcement is the previous section's territory. On an [`allowChange`](#changeable-votes) poll the cookie's value is a signed submission id instead of `1` (set even without the `votedCookie` option); `hasVotedCookie` reads both forms identically.
+The cookie is `HttpOnly; SameSite=Lax` with a one-year `Max-Age`. The `1` marker is deliberately not `Secure`: it is a UX marker only (skip re-showing a form the visitor already answered), never an integrity or auth signal, and omitting `Secure` keeps it working on plain-HTTP local development. Do not build any server-side trust on its presence; one-per-identity enforcement is the previous section's territory.
+
+On an [`allowChange`](#changeable-votes) poll the cookie's value is a signed submission id instead of `1` (set even without the `votedCookie` option); `hasVotedCookie` reads both forms identically. Unlike the marker, the signed id is a **bearer capability**, whoever holds it can change that vote, so it belongs on HTTPS: the plugin adds `Secure` to it whenever your admin user collection's `auth.cookies.secure` is on, mirroring how you already transport Payload's own auth cookies. Payload defaults that setting to off (which is what keeps plain-HTTP local development working); set `auth: { cookies: { secure: true } }` in production so the vote capability never crosses the wire in clear.
 
 ## Changeable votes
 
@@ -338,6 +340,7 @@ The **Allow changing votes** checkbox on the Poll tab (`poll.allowChange`, defau
 - **Closing still wins.** Past `closesAt` a change is rejected exactly like a new vote, and the tally stays as last voted.
 - **Same guards as a vote.** The change runs the full create pipeline: field validation against the poll's effective options, [spam controls](/form-builder/spam) (rate limit, honeypot, captcha), and consent recapture. The `notAlreadySubmitted` rule excludes the voter's own submission, so keeping the same answer never collides with itself.
 - **Cookie-scoped by design.** Clearing cookies (or a different device) makes the browser a new voter; that is the intended granularity for an anonymous fan vote, not a bug. Pair with server-enforced one-per-identity dedup when you need more.
+- **Requires stored submissions.** Changing updates the voter's stored row, so `allowChange` cannot combine with `persistSubmissions: false`: a pruned submission would turn the next "change" into a second, double-counted vote. The server rejects the combination at save time (either direction: enabling `allowChange` on a persist-off form, or turning persistence off on an `allowChange` poll).
 
 ### Showing and changing the current pick
 
@@ -366,4 +369,6 @@ export default async function PollPage({ params }) {
 }
 ```
 
-With `currentVote` set, `<Poll>` treats the visitor as voted, marks their option in the results (`fb-results__bucket--yours` row class plus a translated "Your vote" badge, also available directly as `<FormResults currentValues>`), and, while an `allowChange` poll is open, renders a **Change vote** button (`fb-poll__change`) that reopens the form prefilled with their current answer. After the change it returns to results with the marker on the new option. A client-only host without the server read still gets the button once the localStorage flag marks the browser as voted, just without the prefill or marker, since the pick lives behind the httpOnly cookie. The `VotedSubmission` type is exported from the root, `/rsc`, and `/react`.
+With `currentVote` set, `<Poll>` treats the visitor as voted, marks their option in the results (`fb-results__bucket--yours` row class plus a translated "Your vote" badge, also available directly as `<FormResults currentValues>`), and, while an `allowChange` poll is open, renders a **Change vote** button (`fb-poll__change`) that reopens the form prefilled with their current answer. After the change it returns to results with the marker on the new option.
+
+The button appears only when a change would actually be a change: with a resolved `currentVote`, or right after an in-session vote (the server just issued the signed cookie). A localStorage-only voted flag proves nothing about the httpOnly cookie, and a "change" without one would silently create a second submission, so on a plain revisit a client-only host shows results without the button; pass the server-resolved `currentVote` to offer changing across visits. The `VotedSubmission` type is exported from the root, `/rsc`, and `/react`.

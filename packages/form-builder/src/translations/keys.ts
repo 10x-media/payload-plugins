@@ -216,6 +216,7 @@ export const keys = {
 	pollClosesAt: 'formBuilder:poll.closesAt',
 	pollAllowChange: 'formBuilder:poll.allowChange',
 	pollAllowChangeDescription: 'formBuilder:poll.allowChangeDescription',
+	pollAllowChangeNeedsPersistedSubmissions: 'formBuilder:poll.allowChangeNeedsPersistedSubmissions',
 	pollClosed: 'formBuilder:poll.closed',
 	pollResultsAfterClose: 'formBuilder:poll.resultsAfterClose',
 	pollOptionSource: 'formBuilder:poll.optionSource',

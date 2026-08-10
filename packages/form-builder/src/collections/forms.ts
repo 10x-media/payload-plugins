@@ -33,6 +33,7 @@ import { localizedIf } from '../fields/localizedIf'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { normalizeFlow } from '../flow/normalizeFlow'
 import { END_OF_FORM } from '../flow/types'
+import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
@@ -277,6 +278,30 @@ export const buildFormsCollection = ({
 							{
 								path: 'persistSubmissions',
 								message: asTranslate(req.t)(keys.pollNeedsPersistedSubmissions),
+							},
+						],
+					},
+					req.t
+				)
+			}
+		}
+		{
+			// Changeable votes update the voter's stored submission in place, so `allowChange` cannot
+			// coexist with pruning: a pruned row would make the next "change" a second, double-counted
+			// vote. Same merged-partial evaluation as the guard above.
+			const pollOn = (data?.pollEnabled ?? originalDoc?.pollEnabled) === true
+			const persistOff = (data?.persistSubmissions ?? originalDoc?.persistSubmissions) === false
+			const allowChangeOn =
+				(pollConfigOf(data?.poll)?.allowChange ?? pollConfigOf(originalDoc?.poll)?.allowChange) ===
+				true
+			if (pollOn && persistOff && allowChangeOn) {
+				throw new ValidationError(
+					{
+						collection: FORMS_SLUG,
+						errors: [
+							{
+								path: 'persistSubmissions',
+								message: asTranslate(req.t)(keys.pollAllowChangeNeedsPersistedSubmissions),
 							},
 						],
 					},

@@ -117,5 +117,5 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 		})
 		return Response.json({ doc, message: req.t('general:updatedSuccessfully') }, { status: 200 })
 	}
-	return { path: '/', method: 'post', handler }
+	return { path: '/', method: 'post', handler, custom: { formBuilder: 'vote-submit' } }
 }
