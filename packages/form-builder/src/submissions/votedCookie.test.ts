@@ -1,5 +1,14 @@
+import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { hasVotedCookie, votedCookieName } from './votedCookie'
+import {
+	hasVotedCookie,
+	signVotedCookieValue,
+	votedCookieName,
+	votedSubmissionIdFromCookie,
+} from './votedCookie'
+
+const SECRET = 'test-secret'
+const fakePayload = { secret: SECRET } as Payload
 
 describe('votedCookieName', () => {
 	it('prefixes the form id', () => {
@@ -35,5 +44,43 @@ describe('hasVotedCookie', () => {
 
 	it('tolerates whitespace around pairs', () => {
 		expect(hasVotedCookie(' fb-voted-9=1 ;other=2', 9)).toBe(true)
+	})
+
+	it('is true for a signed submission-id value too', () => {
+		const token = signVotedCookieValue(fakePayload, 'sub-1')
+		expect(hasVotedCookie(`fb-voted-3=${token}`, 3)).toBe(true)
+	})
+})
+
+describe('votedSubmissionIdFromCookie', () => {
+	it('round-trips a signed submission id', () => {
+		const token = signVotedCookieValue(fakePayload, 'sub-42')
+		const header = `session=xyz; ${votedCookieName(7)}=${token}`
+		expect(votedSubmissionIdFromCookie(header, 7, SECRET)).toBe('sub-42')
+	})
+
+	it('preserves numeric ids as strings', () => {
+		const token = signVotedCookieValue(fakePayload, 42)
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(1)}=${token}`, 1, SECRET)).toBe('42')
+	})
+
+	it('returns null for the legacy boolean marker', () => {
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=1`, 7, SECRET)).toBeNull()
+	})
+
+	it('returns null for a missing header or cookie', () => {
+		expect(votedSubmissionIdFromCookie(null, 7, SECRET)).toBeNull()
+		expect(votedSubmissionIdFromCookie('other=1', 7, SECRET)).toBeNull()
+	})
+
+	it('rejects a tampered token', () => {
+		const token = signVotedCookieValue(fakePayload, 'sub-42')
+		const forged = `${token.slice(0, -2)}ff`
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${forged}`, 7, SECRET)).toBeNull()
+	})
+
+	it('rejects a token signed with a different secret', () => {
+		const token = signVotedCookieValue({ secret: 'other-secret' } as Payload, 'sub-42')
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${token}`, 7, SECRET)).toBeNull()
 	})
 })
