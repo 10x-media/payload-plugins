@@ -238,6 +238,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.pollVisibilityAfterVote]: 'After voting',
 	[keys.pollVisibilityAfterClose]: 'After the poll closes',
 	[keys.pollClosesAt]: 'Closes at',
+	[keys.pollAllowChange]: 'Allow changing votes',
+	[keys.pollAllowChangeDescription]:
+		'Returning voters update their existing vote instead of adding another. Votes are matched per browser via the voted cookie.',
 	[keys.pollClosed]: 'This poll is closed.',
 	[keys.pollResultsAfterClose]: 'Results will be shown after the poll closes.',
 	[keys.pollOptionSource]: 'Option source',

@@ -214,6 +214,8 @@ export const keys = {
 	pollVisibilityAfterVote: 'formBuilder:poll.visibility.afterVote',
 	pollVisibilityAfterClose: 'formBuilder:poll.visibility.afterClose',
 	pollClosesAt: 'formBuilder:poll.closesAt',
+	pollAllowChange: 'formBuilder:poll.allowChange',
+	pollAllowChangeDescription: 'formBuilder:poll.allowChangeDescription',
 	pollClosed: 'formBuilder:poll.closed',
 	pollResultsAfterClose: 'formBuilder:poll.resultsAfterClose',
 	pollOptionSource: 'formBuilder:poll.optionSource',

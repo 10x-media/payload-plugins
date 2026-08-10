@@ -43,6 +43,8 @@ export type FormPollSettings = {
 	resultsVisibility?: 'afterVote' | 'afterClose' | null
 	/** ISO date after which submissions are rejected and the poll renders as closed. */
 	closesAt?: string | null
+	/** Whether a voter may change their vote while the poll is open (`poll.allowChange`). Present only when enabled. */
+	allowChange?: boolean
 	/** Present once the host recorded a final outcome via `resolvePollOutcome`; `<Poll>` renders the final state. A tie carries more than one value. */
 	outcome?: { winningValues?: string[] }
 }

@@ -612,6 +612,13 @@ export const buildFormsCollection = ({
 				],
 			},
 			{
+				name: 'allowChange',
+				type: 'checkbox',
+				defaultValue: false,
+				label: labelForKey(keys.pollAllowChange),
+				admin: { description: labelForKey(keys.pollAllowChangeDescription) },
+			},
+			{
 				name: 'closesAt',
 				type: 'date',
 				label: labelForKey(keys.pollClosesAt),
