@@ -1,3 +1,3 @@
 'use client'
 
-export {}
+export { AuditRelationshipField } from '../components/AuditRelationshipField/index.js'
