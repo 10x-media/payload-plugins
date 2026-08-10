@@ -326,6 +326,133 @@ describe('Poll', () => {
 		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
 	})
 
+	it('currentVote implies voted and highlights the pick in results', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const { container } = render(
+			createElement(Poll, {
+				form: { ...form, poll: { allowChange: true } },
+				resultsField: 'colour',
+				currentVote: { value: 'red', pick: ['red'] },
+				fetchResultsImpl,
+			})
+		)
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+		await waitFor(() =>
+			expect(container.querySelector('.fb-results__bucket--yours')?.textContent).toContain('Red')
+		)
+		expect(within(container).queryByRole('combobox')).toBeNull()
+	})
+
+	it('offers a change-vote button only for an open allowChange poll', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const changeable = render(
+			createElement(Poll, {
+				form: { ...form, poll: { allowChange: true } },
+				resultsField: 'colour',
+				currentVote: { value: 'red', pick: ['red'] },
+				fetchResultsImpl,
+			})
+		)
+		await waitFor(() =>
+			expect(
+				within(changeable.container).getByRole('button', { name: 'Change vote' })
+			).toBeInTheDocument()
+		)
+		cleanup()
+
+		const fixed = render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				hasVoted: true,
+				fetchResultsImpl: vi.fn().mockResolvedValue(resultsOk()),
+			})
+		)
+		await waitFor(() => expect(within(fixed.container).getByText('Colour')).toBeInTheDocument())
+		expect(within(fixed.container).queryByRole('button', { name: 'Change vote' })).toBeNull()
+		cleanup()
+
+		const closed = render(
+			createElement(Poll, {
+				form: {
+					...form,
+					poll: { allowChange: true, closesAt: new Date(Date.now() - 60_000).toISOString() },
+				},
+				resultsField: 'colour',
+				currentVote: { value: 'red', pick: ['red'] },
+				fetchResultsImpl: vi.fn().mockResolvedValue(resultsOk()),
+			})
+		)
+		await waitFor(() =>
+			expect(within(closed.container).getByText('This poll is closed.')).toBeInTheDocument()
+		)
+		expect(within(closed.container).queryByRole('button', { name: 'Change vote' })).toBeNull()
+	})
+
+	it('reopens the form prefilled with the current pick on change vote', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const { container } = render(
+			createElement(Poll, {
+				form: { ...form, poll: { allowChange: true } },
+				resultsField: 'colour',
+				// 'blue' so the assertion cannot pass via the select's native first-option default ('red').
+				currentVote: { value: 'blue', pick: ['blue'] },
+				fetchResultsImpl,
+			})
+		)
+		await waitFor(() =>
+			expect(within(container).getByRole('button', { name: 'Change vote' })).toBeInTheDocument()
+		)
+		fireEvent.click(within(container).getByRole('button', { name: 'Change vote' }))
+		const select = within(container).getByRole('combobox') as HTMLSelectElement
+		expect(select.value).toBe('blue')
+	})
+
+	it('returns to results with the updated pick after a successful change', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })
+		const { container } = render(
+			createElement(Poll, {
+				form: { ...form, poll: { allowChange: true } },
+				resultsField: 'colour',
+				currentVote: { value: 'red', pick: ['red'] },
+				onSubmit,
+				fetchResultsImpl,
+			})
+		)
+		await waitFor(() =>
+			expect(within(container).getByRole('button', { name: 'Change vote' })).toBeInTheDocument()
+		)
+		fireEvent.click(within(container).getByRole('button', { name: 'Change vote' }))
+		fireEvent.change(within(container).getByRole('combobox'), { target: { value: 'blue' } })
+		fireEvent.click(within(container).getByRole('button', { name: /submit|vote/i }))
+
+		await waitFor(() =>
+			expect(container.querySelector('.fb-results__bucket--yours')?.textContent).toContain('Blue')
+		)
+		expect(onSubmit).toHaveBeenCalledTimes(1)
+		expect(within(container).queryByRole('combobox')).toBeNull()
+	})
+
+	it('offers changing without a prefill when voted is only known locally', async () => {
+		window.localStorage.setItem('fb-poll-1', '1')
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const { container } = render(
+			createElement(Poll, {
+				form: { ...form, poll: { allowChange: true } },
+				resultsField: 'colour',
+				fetchResultsImpl,
+			})
+		)
+		await waitFor(() =>
+			expect(within(container).getByRole('button', { name: 'Change vote' })).toBeInTheDocument()
+		)
+		fireEvent.click(within(container).getByRole('button', { name: 'Change vote' }))
+		// No stored pick to prefill: the select sits on its native first-option default.
+		const select = within(container).getByRole('combobox') as HTMLSelectElement
+		expect(select.value).toBe('red')
+	})
+
 	it('shows the wait notice after voting on an open afterClose poll', async () => {
 		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })

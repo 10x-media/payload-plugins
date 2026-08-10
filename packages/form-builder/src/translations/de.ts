@@ -285,6 +285,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.pollFinalResult]: 'Endergebnis',
 	[keys.pollResultsError]: 'Ergebnisse konnten nicht geladen werden.',
 	[keys.resultsWinner]: 'Gewinner',
+	[keys.resultsYourVote]: 'Deine Stimme',
+	[keys.pollChangeVote]: 'Stimme ändern',
 	[keys.validationFileMissing]: 'Datei hochladen',
 	[keys.validationFileMimeType]: 'Dateityp nicht erlaubt',
 	[keys.validationFileTooLarge]: 'Datei ist zu groß',

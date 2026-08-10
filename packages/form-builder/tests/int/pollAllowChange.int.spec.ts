@@ -3,6 +3,7 @@ import { createLocalReq, type Endpoint, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { formBuilder } from '../../src/index'
 import { POLL_VOTES_SLUG, RESPONDENTS_VALUE } from '../../src/poll/votes/votesCollection'
+import { resolveVotedSubmission } from '../../src/submissions/resolveVotedSubmission'
 import { votedCookieName, votedSubmissionIdFromCookie } from '../../src/submissions/votedCookie'
 
 type VoteRow = { value?: unknown; count?: unknown }
@@ -267,6 +268,79 @@ describeForDb(
 			const second = await submitViaRest({ form: form.id, values: [{ field: 'vote', value: 'b' }] })
 			expect(second.status).toBe(201)
 			expect(await submissionCount(form.id)).toBe(2)
+		})
+
+		it('resolveVotedSubmission returns the voter pick from the cookie', async () => {
+			const form = await makeForm()
+			const first = await submitViaRest({ form: form.id, values: [{ field: 'vote', value: 'a' }] })
+			const cookie = asCookieHeader(setCookieOf(first.req) ?? '')
+
+			const voted = await resolveVotedSubmission({
+				payload: booted.payload,
+				cookieHeader: cookie,
+				formId: form.id,
+			})
+			expect(voted).toEqual({
+				submissionId: String(first.doc?.id),
+				value: 'a',
+				pick: ['a'],
+			})
+		})
+
+		it('resolveVotedSubmission reflects a changed vote', async () => {
+			const form = await makeForm()
+			const first = await submitViaRest({ form: form.id, values: [{ field: 'vote', value: 'a' }] })
+			const cookie = asCookieHeader(setCookieOf(first.req) ?? '')
+			await submitViaRest({ form: form.id, values: [{ field: 'vote', value: 'b' }] }, cookie)
+
+			const voted = await resolveVotedSubmission({
+				payload: booted.payload,
+				cookieHeader: cookie,
+				formId: form.id,
+			})
+			expect(voted?.pick).toEqual(['b'])
+		})
+
+		it('resolveVotedSubmission is null without a usable cookie or submission', async () => {
+			const form = await makeForm()
+			const first = await submitViaRest({ form: form.id, values: [{ field: 'vote', value: 'a' }] })
+			const cookie = asCookieHeader(setCookieOf(first.req) ?? '')
+
+			expect(
+				await resolveVotedSubmission({
+					payload: booted.payload,
+					cookieHeader: null,
+					formId: form.id,
+				})
+			).toBeNull()
+			expect(
+				await resolveVotedSubmission({
+					payload: booted.payload,
+					cookieHeader: `${votedCookieName(form.id)}=1`,
+					formId: form.id,
+				})
+			).toBeNull()
+
+			const other = await makeForm({ title: 'Other poll' })
+			expect(
+				await resolveVotedSubmission({
+					payload: booted.payload,
+					cookieHeader: cookie,
+					formId: other.id,
+				})
+			).toBeNull()
+
+			await booted.payload.delete({
+				collection: 'form-submissions',
+				id: first.doc?.id as number | string,
+			})
+			expect(
+				await resolveVotedSubmission({
+					payload: booted.payload,
+					cookieHeader: cookie,
+					formId: form.id,
+				})
+			).toBeNull()
 		})
 	}
 )

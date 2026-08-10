@@ -273,6 +273,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.pollFinalResult]: 'Final result',
 	[keys.pollResultsError]: 'Results could not be loaded.',
 	[keys.resultsWinner]: 'Winner',
+	[keys.resultsYourVote]: 'Your vote',
+	[keys.pollChangeVote]: 'Change vote',
 	[keys.validationFileMissing]: 'Upload a file',
 	[keys.validationFileMimeType]: 'File type not allowed',
 	[keys.validationFileTooLarge]: 'File is too large',

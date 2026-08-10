@@ -2,20 +2,12 @@ import type { CollectionAfterChangeHook } from 'payload'
 import { FORMS_SLUG } from '../../collections/forms'
 import { pollConfigOf } from '../../form/pollState'
 import { formIdOf } from '../../submissions/formIdOf'
-import type { SubmissionValue } from '../../submissions/types'
+import { answerValues } from './answerValues'
 import { bumpPollVote } from './bumpPollVote'
 import { RESPONDENTS_VALUE } from './votesCollection'
 
 const isComplete = (doc: { status?: unknown }): boolean =>
 	doc.status == null || doc.status === 'complete'
-
-const answerValues = (values: unknown, field: string): string[] => {
-	if (!Array.isArray(values)) return []
-	const entry = (values as SubmissionValue[]).find((row) => row.field === field)
-	if (entry == null) return []
-	const raw = Array.isArray(entry.value) ? entry.value : [entry.value]
-	return raw.filter((value) => value != null && value !== '').map((value) => String(value))
-}
 
 /** Narrow a request's loosely typed `transactionID` to the value `bumpPollVote` accepts. */
 export const transactionIDOf = (transactionID: unknown): number | string | undefined =>

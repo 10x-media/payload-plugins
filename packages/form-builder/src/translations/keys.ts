@@ -246,6 +246,8 @@ export const keys = {
 	pollFinalResult: 'formBuilder:poll.finalResult',
 	pollResultsError: 'formBuilder:poll.resultsError',
 	resultsWinner: 'formBuilder:results.winner',
+	resultsYourVote: 'formBuilder:results.yourVote',
+	pollChangeVote: 'formBuilder:poll.changeVote',
 	validationFileMissing: 'formBuilder:validation.file.missing',
 	validationFileMimeType: 'formBuilder:validation.file.mimeType',
 	validationFileTooLarge: 'formBuilder:validation.file.tooLarge',
