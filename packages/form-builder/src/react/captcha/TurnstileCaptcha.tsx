@@ -1,6 +1,7 @@
 'use client'
 
 import { type Ref, useEffect, useImperativeHandle, useRef } from 'react'
+import type { FormAdapters } from '../adapters'
 import type { CaptchaWidgetHandle } from './types'
 import { useCaptchaScript } from './useCaptchaScript'
 import { getTurnstile } from './vendors'
@@ -18,6 +19,8 @@ export type TurnstileCaptchaProps = {
 	className?: string
 	/** Override the vendor script URL. */
 	scriptSrc?: string
+	/** Host-owned effects; only `loadScript` applies here (consent-gated or CSP-nonced script loading). */
+	adapters?: Pick<FormAdapters, 'loadScript'>
 	ref?: Ref<CaptchaWidgetHandle>
 }
 
@@ -31,6 +34,7 @@ export const TurnstileCaptcha = ({
 	options,
 	className,
 	scriptSrc = TURNSTILE_SCRIPT_URL,
+	adapters,
 	ref,
 }: TurnstileCaptchaProps) => {
 	const containerRef = useRef<HTMLDivElement>(null)
@@ -39,7 +43,7 @@ export const TurnstileCaptcha = ({
 	onTokenRef.current = onToken
 	const optionsRef = useRef(options)
 	optionsRef.current = options
-	const ready = useCaptchaScript(scriptSrc)
+	const ready = useCaptchaScript(scriptSrc, adapters?.loadScript)
 
 	useImperativeHandle(
 		ref,
