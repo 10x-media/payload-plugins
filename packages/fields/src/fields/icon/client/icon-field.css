@@ -453,6 +453,14 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
 	height: var(--tenx-icon-cell-size);
 }
 
+/* Raw icon name beside a library-supplied label: the only place an editor can see that
+   "Hungary" stores as HUN. Muted and secondary, and deliberately absent from the
+   accessible name so a screen reader announces the label alone. */
+.tenx-icon-drawer__cell-code {
+	margin-left: 0.5ch;
+	opacity: 0.65;
+}
+
 .tenx-icon-drawer__cell-button {
 	position: relative;
 	display: flex;

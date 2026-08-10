@@ -1,5 +1,9 @@
 export { defineIconAdapter } from '../fields/icon/defineIconAdapter'
+export { invalidateLayerManifests } from '../fields/icon/layers/manifestCache'
+export { loadLayeredManifest, resolveLayeredMeta } from '../fields/icon/layers/resolve'
+export { type UploadIconLayerOptions, uploadIconLayer } from '../fields/icon/layers/upload'
 export { resolveAvailableLibraries } from '../fields/icon/server/availability'
+export { ICON_MANIFEST_PATH } from '../fields/icon/server/endpoint'
 export { type IconFieldOptions, iconField } from '../fields/icon/server/iconField'
 export {
 	type IconLibraryFieldOptions,
@@ -10,7 +14,12 @@ export { formatIconValue, parseIconValue, resolveIconValue } from '../fields/ico
 export type {
 	IconAdapter,
 	IconAvailabilityResolver,
+	IconCanvas,
 	IconGlobalConfig,
+	IconLayer,
+	IconLayerCache,
+	IconLayerContext,
 	IconManifest,
 	IconMeta,
+	IconRenderStrategy,
 } from '../types'

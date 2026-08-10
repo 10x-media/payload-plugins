@@ -21,6 +21,7 @@ import { resolveCommitValue } from '../commitValue'
 import { formatColor, parseColor, rgbToHsv, salvageColor, toRgb } from '../engine'
 import { type ColorFieldClientOptions, PRESET_PREFIX, type ResolvedColorPreset } from '../options'
 import { derivePresetChip } from '../presetChip'
+import { flatValue, swatchBackground } from '../schemeValue'
 import { ColorPickerPanel, type Hsva } from './ColorPickerPanel'
 import './colorField.css'
 
@@ -85,8 +86,9 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 	const activePreset =
 		presetKey !== null ? resolvedPresets.find((preset) => preset.key === presetKey) : undefined
 	const presetMissing = presetKey !== null && !activePreset
-	const cssValue =
+	const rawValue: unknown =
 		presetKey !== null ? (activePreset?.value ?? linkedFallback) : stringValue || null
+	const cssValue = flatValue(rawValue)
 	const parsed = useMemo(() => (cssValue ? parseColor(cssValue) : null), [cssValue])
 
 	const [displayFormat, setDisplayFormat] = useState<ColorFormat>(format)
@@ -228,7 +230,7 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 	}, [parsed])
 
 	const styles = useMemo(() => mergeFieldStyles(field), [field])
-	const swatchCss = parsed ? formatColor(parsed, 'rgb') : null
+	const swatchCss = swatchBackground(rawValue)
 
 	const swatch = (
 		<span className={`${baseClass}__swatch ${baseClass}__checker`}>
@@ -291,7 +293,11 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 									onPickCss={commitCss}
 									onPickPreset={(preset) => {
 										if (linked) setValue(`${PRESET_PREFIX}${preset.key}`)
-										else commitCss(preset.value)
+										else {
+											// A text column holds one color, so a scheme preset stores its light member
+											const flat = flatValue(preset.value)
+											if (flat) commitCss(flat)
+										}
 									}}
 									presetMissing={presetMissing}
 									presets={resolvedPresets}

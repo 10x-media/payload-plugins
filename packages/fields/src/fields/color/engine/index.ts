@@ -20,6 +20,7 @@ export { convertColor, formatColor } from './format'
 export { namedColors } from './namedColors'
 export { parseColor } from './parse'
 export { salvageColor } from './salvage'
+export { isColorSchemeValue, lightDark } from './scheme'
 export type {
 	ColorFormat,
 	FormatColorOptions,

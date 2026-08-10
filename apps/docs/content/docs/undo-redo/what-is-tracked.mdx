@@ -1,0 +1,135 @@
+---
+title: What is tracked
+description: Which edits become history entries, the four ways to exclude a field, and what the plugin deliberately leaves alone.
+---
+
+## What counts as an edit
+
+The form state is a flat map of path to field state. After `captureDebounce` milliseconds of quiet, the plugin reduces that map to the part a person can see and compares it with the current entry. If it differs, a new entry is appended.
+
+For most fields "the part a person can see" is the value. For arrays and blocks it is the **row ids, in order**, which is what makes additions, deletions and reorders each a distinct entry. Their `value` is deliberately ignored: Payload uses it as a row count and as a no-data marker, and it changes without anyone editing anything.
+
+Because comparison happens on that reduced state, the echo Payload sends back after a save or a restore matches the current entry and appends nothing. No phantom entries, and the redo tail survives a save.
+
+## Paths, not names
+
+Everything is keyed by the full form-state path, so two fields called `title` in different places are two different fields:
+
+```
+title            # a root text field
+seo.title        # inside a named tab or group
+layout.2.title   # inside the third block
+```
+
+Row indexes appear literally in a path. Exclusion patterns use `*` for exactly one segment, and a pattern that runs out before the path does covers the whole subtree below it:
+
+| Pattern | Matches |
+|---|---|
+| `slug` | `slug` |
+| `promoDetails` | `promoDetails` and everything under it |
+| `list.*.readingTime` | `list.0.readingTime`, `list.7.readingTime` |
+| `list` | the array itself, every row, and every field in every row |
+
+`*` never spans several segments, so `list.*.title` does not match `list.0.meta.title`.
+
+## The four ways to exclude a field
+
+### By field, in the schema
+
+The one to reach for first. It lives next to the field, so it survives renames and moves:
+
+```ts
+import { undoRedoCustom } from '@10x-media/undo-redo'
+
+{
+  name: 'internalNotes',
+  type: 'richText',
+  admin: { custom: undoRedoCustom({ disabled: true }) },
+}
+```
+
+Set on anything with children, it excludes the whole subtree: a group, array or blocks field, a tabs field, an individual tab, a row or a collapsible. Presentational containers work too even though they contribute no path of their own, so wrapping a set of fields in a collapsible is a legitimate way to opt all of them out at once.
+
+If the field already carries custom data, spread it: `custom: { ...existing, ...undoRedoCustom({ disabled: true }) }`.
+
+<Callout type="info">
+It has to be `admin.custom`, not the field's own `custom`. Payload strips `custom` from the client config, and the controls run on the client, so `admin.custom` is the only channel that reaches them.
+</Callout>
+
+### By path
+
+For fields whose definition you cannot edit, in a third-party plugin's collection or a Payload built-in:
+
+```ts
+undoRedo({
+  ignorePaths: ['someVendorField', 'list.*.readingTime'],
+})
+```
+
+### By field type
+
+To leave a whole category out wherever it appears:
+
+```ts
+undoRedo({ ignoreFieldTypes: ['upload', 'relationship'] })
+```
+
+Types are resolved from the document's schema, since form state carries no type information. One caveat: two blocks in the same blocks field can declare the same field name with different types, and a form-state path has no block discriminator to tell them apart. Such a path is treated as excluded if *any* of the types at it is excluded, which honours an opt-out that was meant for a sibling rather than ignoring one that was asked for.
+
+### By collection or global
+
+`collections: { media: false }`. See [Configuration](/undo-redo/configuration#per-collection-and-per-global-overrides).
+
+Excluded fields are excluded from both halves: their edits create no entries, and undo never writes to them. They are passed through untouched from the live form, not dropped.
+
+## Payload's own fields, excluded by default
+
+These are always ignored, on top of anything you configure:
+
+```
+_status  createdAt  updatedAt  hash  salt  sessions
+lockUntil  loginAttempts  resetPasswordExpiration  resetPasswordToken
+```
+
+They change on save, autosave, publish and token refresh with no user interaction, so treating them as edits would produce entries where undo appears to do nothing. Restoring a stale one is worse: it could revert a publish through `_status` or corrupt auth state through `sessions`.
+
+The list is deliberately limited to fields Payload itself injects. A derived field that your project or another plugin adds is user-facing (plenty of projects have their own `pathname`), so excluding it is your call through `ignorePaths`.
+
+## Fields with conditions
+
+Fields hidden by `admin.condition` are handled correctly in both directions, and the reason is worth knowing, because it is not what you would guess.
+
+`admin.condition` is a server-only property: Payload strips it from the client config entirely. Visibility travels as a `passesCondition` flag on each field's form state, computed on the server. When a condition fails, Payload also stops walking into that field, so nothing below it exists in form state at all.
+
+Both facts are part of what the snapshot captures. Undo restores the visibility, the value, and the missing subtree together, rather than recomputing anything. Hiding a field and undoing brings it back with its contents; revealing one and undoing removes the paths the server had just added.
+
+## Rich text
+
+Lexical keeps its own undo stack for edits inside the editor, and the plugin stays out of its way: the keyboard shortcuts do not fire while focus is in a contenteditable. Press `Ctrl+Z` inside the editor and Lexical handles it; press it anywhere else and the document history steps, including over rich text changes.
+
+Restoring a rich text field re-initializes the mounted editor, so the content repaints immediately rather than waiting for a save.
+
+## JSON fields, while the JSON is broken
+
+A JSON field is tracked like any other, with one gap: **while its text is not valid JSON, changes to it do not enter the history.** The field rejoins as soon as the text parses again, and nothing else about the document stops being tracked in the meantime.
+
+The reason is in how Payload's JSON field works. While the text parses, form state holds the parsed data. The moment it does not, the field writes the raw editor text into form state as a string instead, and the editor is rendered back from `JSON.stringify(value)`. Half-finished text is not the result of stringifying anything, so there is no value the plugin could dispatch that would put the editor back the way it was: restoring the string would show it escaped inside quotes rather than as the text you typed.
+
+Rather than record a state it cannot honour, a capture taken while the text is broken carries the field's last restorable value forward. Concretely:
+
+- Breaking the JSON and changing nothing else creates no history entry.
+- Breaking it and then editing another field does create one, and that entry holds the last value the JSON field parsed to, not the broken text.
+- Undoing to an earlier entry restores the JSON that entry held, which puts the field back to a valid value.
+- Redo never re-breaks it.
+
+Stepping through the broken text itself is Monaco's job, exactly as it is Lexical's inside a rich text field: `Ctrl+Z` with the cursor in the editor is the editor's own undo and the plugin does not intercept it.
+
+<Callout>
+A JSON field holding a bare string, such as `"hello"` rather than an object, is indistinguishable from text mid-edit: both reach form state as a string that does not parse, and Payload keeps no error flag there to tell them apart. Such a field stays out of the history for as long as it holds one. Objects, arrays, numbers and booleans are unaffected.
+</Callout>
+
+## The saved baseline
+
+The plugin records the state the document was last persisted from, and reports the form clean when the current entry matches it. This is what keeps the save button and the "leave without saving" prompt truthful in both directions: undoing back onto the saved state leaves nothing to save, and undoing *past* it is a real unsaved change even when the form looks the way it did on load.
+
+Under autosave the baseline is skipped. Autosave persists continuously, so "differs from what is persisted" is not a state an editor stays in long enough to be worth reporting, and tracking it would produce a marker that moves on every keystroke. Undo and redo work normally there; only the clean/unsaved reporting is dropped.

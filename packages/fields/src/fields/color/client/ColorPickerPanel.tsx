@@ -6,6 +6,7 @@ import { useTranslation } from '../../../translations/useTranslation'
 import type { ColorFormat } from '../../../types'
 import { formatColor, hsvToRgb } from '../engine'
 import type { ResolvedColorPreset } from '../options'
+import { swatchBackground } from '../schemeValue'
 import { EyedropperIcon } from './icons'
 
 const baseClass = 'fields-color'
@@ -280,7 +281,7 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 								title={preset.label}
 								type="button"
 							>
-								<span style={{ background: preset.value }} />
+								<span style={{ background: swatchBackground(preset.value) ?? undefined }} />
 							</button>
 						))}
 					</div>

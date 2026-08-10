@@ -248,6 +248,84 @@ describe('Poll', () => {
 		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
 	})
 
+	it('reads and writes the voted flag through a custom voteStorage adapter', async () => {
+		const store = new Set<string>()
+		const voteStorage = {
+			read: vi.fn((key: string) => store.has(key)),
+			write: vi.fn((key: string) => {
+				store.add(key)
+			}),
+		}
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })
+		const { container } = render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				onSubmit,
+				fetchResultsImpl,
+				adapters: { voteStorage },
+			})
+		)
+		expect(voteStorage.read).toHaveBeenCalledWith('fb-poll-1')
+		fireEvent.change(within(container).getByRole('combobox'), { target: { value: 'red' } })
+		fireEvent.click(within(container).getByRole('button', { name: /submit|vote/i }))
+		await waitFor(() => expect(voteStorage.write).toHaveBeenCalledWith('fb-poll-1'))
+		expect(window.localStorage.getItem('fb-poll-1')).toBeNull()
+	})
+
+	it('skips the form when the custom voteStorage reports voted', async () => {
+		const voteStorage = { read: () => true, write: vi.fn() }
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const { container } = render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				fetchResultsImpl,
+				adapters: { voteStorage },
+			})
+		)
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
+	})
+
+	it('performs no client persistence with voteStorage false', async () => {
+		window.localStorage.setItem('fb-poll-1', '1')
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })
+		const { container } = render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				onSubmit,
+				fetchResultsImpl,
+				adapters: { voteStorage: false as const },
+			})
+		)
+		// The pre-set localStorage flag is ignored: the form still renders.
+		const select = within(container).getByRole('combobox')
+		fireEvent.change(select, { target: { value: 'red' } })
+		window.localStorage.clear()
+		fireEvent.click(within(container).getByRole('button', { name: /submit|vote/i }))
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+		expect(window.localStorage.getItem('fb-poll-1')).toBeNull()
+	})
+
+	it('voteStorage false still honors hasVoted', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const { container } = render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				hasVoted: true,
+				fetchResultsImpl,
+				adapters: { voteStorage: false as const },
+			})
+		)
+		await waitFor(() => expect(fetchResultsImpl).toHaveBeenCalled())
+		expect(within(container).queryByRole('button', { name: /submit|vote/i })).toBeNull()
+	})
+
 	it('shows the wait notice after voting on an open afterClose poll', async () => {
 		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })

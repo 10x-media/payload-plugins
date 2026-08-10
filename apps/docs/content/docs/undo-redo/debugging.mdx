@@ -1,0 +1,74 @@
+---
+title: Debugging
+description: The history inspector overlay, what its readout means, and how to reach the history from tests.
+---
+
+## The overlay
+
+`debug: true` adds a third toolbar button that opens a history inspector:
+
+```ts title="payload.config.ts"
+undoRedo({
+  collections: {
+    posts: { debug: true },
+  },
+})
+```
+
+It lists every entry with the paths that entry changed, marks the current one, and shows a **restore** button per entry, which is how you step to a specific point without pressing undo repeatedly. Expanding an entry shows the actual diff: path, previous value, new value, and for arrays and blocks the row ids before and after, so a reorder reads as a reorder rather than as an opaque change.
+
+Anything still inside the capture debounce appears at the bottom under **Pending**, which answers the most common question directly: whether an edit has not been captured yet, or is not being captured at all.
+
+**Copy JSON** puts the whole stack on the clipboard as entries with their diffs, which is the useful thing to attach to a bug report.
+
+The header reads `3/7 · unsaved · rev 12`:
+
+| Part | Meaning |
+|---|---|
+| `3/7` | Current entry, and how many are held. |
+| `clean` | The form matches the persisted document. |
+| `unsaved` | It does not. |
+| `no baseline` | Nothing has been saved or loaded yet. |
+| `autosave, no baseline` | The collection autosaves, so the baseline is deliberately not tracked. |
+| `rev N` | Captures and restores so far, as a liveness signal. |
+
+Entries matching the persisted document are tagged **saved**. More than one can carry the tag, which is correct: they hold the same state.
+
+<Callout type="warn">
+The overlay is a development tool. Leave `debug` off in production; it is off by default, and the extra re-render work only happens when it is on.
+</Callout>
+
+## Reaching the history from a test
+
+While the controls are mounted, the live history object is on `window.__payloadUndoHistory`. It is the real object, not a copy, so a Playwright test can assert on it without sleeping on the capture debounce:
+
+```ts title="a Playwright spec"
+const entries = await page.evaluate(() => {
+  const history = (window as any).__payloadUndoHistory
+  return { index: history.index, length: history.stack.length }
+})
+```
+
+Waiting on `length` is what makes an undo/redo test deterministic: entries appear one debounce after the edit, and asserting on the field too early passes for the wrong reason.
+
+```ts
+await expect.poll(async () =>
+  page.evaluate(() => (window as any).__payloadUndoHistory.stack.length)
+).toBe(2)
+```
+
+Assert on an **exact** count rather than a minimum. An extra entry is itself a bug worth failing on, because a phantom capture is what silently truncates the redo tail.
+
+<Callout type="info">
+`__payloadUndoHistory` is a debug handle for tests and console work, not a public API. It is present whenever the controls are mounted, `debug` or not, and its shape follows the internals.
+</Callout>
+
+## Common symptoms
+
+**Nothing is captured.** The field is excluded, by `admin.custom`, `ignorePaths`, `ignoreFieldTypes`, or by being one of [Payload's own fields](/undo-redo/what-is-tracked#payloads-own-fields-excluded-by-default). Open the overlay and check whether the edit shows up under Pending: if it does not, it is filtered rather than merely uncaptured.
+
+**One undo reverts a whole paragraph.** Typing coalesces into one entry per `captureDebounce`. Lower it for finer steps.
+
+**Undo does nothing inside the editor.** Rich text and plain inputs keep their own undo; see [Shortcuts](/undo-redo/shortcuts#where-the-shortcuts-do-not-fire).
+
+**Old entries disappear.** `maxHistory` evicts from the front. Undo bottoms out inside the retained window, not at the document as it loaded.

@@ -33,8 +33,8 @@ const EXPORT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/
 /**
  * The complete set of characters that can escape a single-quoted JS string:
  * the quote, the escape character, and the four line terminators. Specifiers
- * are validated rather than escaped so a bad one fails generation loudly
- * instead of emitting a module that only breaks at import time.
+ * and icon names are validated rather than escaped so a bad one fails generation
+ * loudly instead of emitting a module that only breaks at import time.
  */
 const UNSAFE_IN_SPECIFIER = /['\\\n\r\u2028\u2029]/
 
@@ -44,7 +44,10 @@ export const emitManifestModule = (
 	header: string = GENERATED_HEADER
 ): string => {
 	const data = JSON.stringify({ icons, categories }, null, '\t')
-	return `${header}export const manifest: {\n\ticons: { name: string; tags: string[]; categories: string[] }[]\n\tcategories: string[]\n} = ${data}\n`
+	// The annotation mirrors IconMeta by hand because the generated file must stand alone
+	// with no import. Anything the data can carry must be annotated, or a consumer whose
+	// manifest uses an optional field fails strict typecheck against our own output.
+	return `${header}export const manifest: {\n\ticons: {\n\t\tname: string\n\t\ttags: string[]\n\t\tcategories: string[]\n\t\tlabel?: string | Record<string, string>\n\t}[]\n\tcategories: string[]\n} = ${data}\n`
 }
 
 export const emitImportsModule = (
@@ -61,6 +64,12 @@ export const emitImportsModule = (
 		'const map = {',
 	]
 	for (const icon of icons) {
+		// The name is interpolated bare as the map key, so it needs the same guard the
+		// specifier gets. `generate` rejects these too; this is the emitter standing on
+		// its own, since it is exported and callable directly.
+		if (UNSAFE_IN_SPECIFIER.test(icon.name)) {
+			throw new Error(`unsafe icon name for an emitted key: ${icon.name}`)
+		}
 		const spec = importFor(icon)
 		if (UNSAFE_IN_SPECIFIER.test(spec.module)) {
 			throw new Error(`icon "${icon.name}": unsafe module specifier: ${spec.module}`)
@@ -110,5 +119,7 @@ export const emitNodesModule = (
 		ordered[icon.name] = glyph
 	}
 	const data = JSON.stringify(ordered)
-	return `${header}export const nodes: Record<string, [string, Record<string, string>][]> = ${data}\n`
+	// Recursive alias mirroring IconNode, since a glyph may nest children under <g> or
+	// <defs> and a flat tuple annotation would reject the module's own data.
+	return `${header}type GeneratedIconNode =\n\t| [string, Record<string, string>]\n\t| [string, Record<string, string>, GeneratedIconNode[]]\n\nexport const nodes: Record<string, GeneratedIconNode[]> = ${data}\n`
 }

@@ -1,0 +1,12 @@
+{
+	"title": "Undo/Redo",
+	"pages": [
+		"index",
+		"quick-start",
+		"configuration",
+		"what-is-tracked",
+		"shortcuts",
+		"debugging",
+		"i18n"
+	]
+}

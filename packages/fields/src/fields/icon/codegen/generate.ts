@@ -6,8 +6,33 @@ import { loadRadixSource } from './sources/radix'
 import { loadTablerSource } from './sources/tabler'
 import type { GenerateIconManifestOptions, LoadedIconSource } from './types'
 
-/** The stored value format (`library:icon-name`) and every picker lookup assume kebab-case. */
-const ICON_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/
+/**
+ * What actually constrains an icon name, which is far narrower than kebab-case:
+ *
+ * - `:` separates library from name in a stored value, so a name holding one reparses
+ *   as a different library entirely
+ * - whitespace and control characters break search normalisation, which folds runs of
+ *   whitespace and dashes into one separator
+ * - `'`, `\` and line terminators would escape the single-quoted key in `imports.ts`
+ *
+ * Everything else is legitimate: uppercase, digits, dots, underscores, non-latin
+ * scripts. Requiring kebab-case rejected libraries keyed by code (`HUN`, `SUI`) and
+ * forced them to hand-write an emitter, which is the same wrong assumption as deriving
+ * a display label from the name.
+ */
+const UNSAFE_ICON_NAME = /[\s:'\\]/
+
+/**
+ * Control characters that `\s` does not already cover. They would survive into the
+ * emitted module and the DOM, where they are invisible and unsearchable.
+ */
+const hasControlCharacter = (value: string): boolean => {
+	for (let index = 0; index < value.length; index += 1) {
+		const code = value.charCodeAt(index)
+		if (code < 0x20 || (code >= 0x7f && code <= 0x9f)) return true
+	}
+	return false
+}
 
 /** Codepoint order, so committed output does not depend on the generating machine's locale. */
 const byCodepoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
@@ -29,13 +54,25 @@ export const generateIconManifest = async (
 	const icons = rawIcons
 		.map((icon) => ({ ...icon, categories: [...icon.categories].sort(byCodepoint) }))
 		.sort((a, b) => byCodepoint(a.name, b.name))
-	const seen = new Set<string>()
+	const seen = new Map<string, string>()
 	for (const icon of icons) {
-		if (!ICON_NAME.test(icon.name)) {
-			throw new Error(`invalid icon name: "${icon.name}" (expected kebab-case, e.g. "arrow-up")`)
+		if (icon.name === '' || UNSAFE_ICON_NAME.test(icon.name) || hasControlCharacter(icon.name)) {
+			throw new Error(
+				`invalid icon name: "${icon.name}" (must be non-empty and free of whitespace, ":", "'" and "\\")`
+			)
 		}
-		if (seen.has(icon.name)) throw new Error(`duplicate icon name: ${icon.name}`)
-		seen.add(icon.name)
+		const folded = icon.name.toLowerCase()
+		const clash = seen.get(folded)
+		if (clash !== undefined) {
+			// Drawer search normalises case, so two names differing only by case are
+			// indistinguishable to an editor even though they are distinct keys elsewhere.
+			throw new Error(
+				clash === icon.name
+					? `duplicate icon name: ${icon.name}`
+					: `icon names differ only by case: "${clash}" and "${icon.name}"`
+			)
+		}
+		seen.set(folded, icon.name)
 	}
 	const categories = [...new Set(icons.flatMap((icon) => icon.categories))].sort(byCodepoint)
 	// Emit every module before writing any, so a specifier or node the emitter

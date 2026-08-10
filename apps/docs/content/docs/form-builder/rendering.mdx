@@ -28,7 +28,7 @@ return <ContactForm form={toFormDocument(doc)} />
 
 `toFormDocument` is framework-agnostic (no `'use client'`) and exported from the root, `/rsc`, and `/react`, so it runs in a Server Component before the document crosses to the client. It also strips server-only poll config (`resultsField`, source config) and takes a second argument for injecting request-resolved data: `{ pollOptions }` for [source-resolved poll options](/form-builder/polls#option-sources) (from `resolvePollOptions`) and `{ consentStatements }` for [live consent statements](/form-builder/consent#rendering-the-statement) (from `resolveConsentStatements`), since a form stores only a source id and resolves the sentence per request.
 
-`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `multistep` and `pollEnabled` mirror the form's two admin checkboxes; `<Form>` reads `multistep` (via `flow`) for step navigation, and a poll page typically renders `<Poll>` instead of `<Form>` when `pollEnabled` is true. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, its `{{field}}` / `{{field||fallback}}` tokens interpolated against the submission's own formatted answers (option labels, Yes/No, localized dates) exactly like an [action body](/form-builder/actions#rich-text-bodies); type `redirect` navigates to the configured URL (part of submit handling, so it fires on the custom-`children` path too; see [below](#redirecting-to-an-internal-document) for redirecting to an internal document instead). `buttons` carries the form-level submit/next/prev labels (see label precedence below); a host-added button field needs merging into `toFormDocument`'s output by hand to reach the client, see [Customization](/form-builder/customization#form-level-buttons).
+`title` is the form's admin title, passed through as a plain string. `<Form>` never renders it: whether and where a title appears above the fields is entirely up to your page, so render `form.title` yourself (or don't) alongside `<Form>`. `multistep` and `pollEnabled` mirror the form's two admin checkboxes; `<Form>` reads `multistep` (via `flow`) for step navigation, and a poll page typically renders `<Poll>` instead of `<Form>` when `pollEnabled` is true. `response` controls what a successful submit does: type `message` renders the authored rich text in place of the plain `successMessage` prop, its `{{field}}` / `{{field||fallback}}` tokens interpolated against the submission's own formatted answers (option labels, Yes/No, localized dates) exactly like an [action body](/form-builder/actions#rich-text-bodies); type `redirect` navigates to the configured URL (a full document load by default; give your router control with [`adapters.navigate`](#host-adapters); part of submit handling, so it fires on the custom-`children` path too; see [below](#redirecting-to-an-internal-document) for redirecting to an internal document instead). `buttons` carries the form-level submit/next/prev labels (see label precedence below); a host-added button field needs merging into `toFormDocument`'s output by hand to reach the client, see [Customization](/form-builder/customization#form-level-buttons).
 
 ### Redirecting to an internal document
 
@@ -72,6 +72,37 @@ formBuilder({
   },
 })
 ```
+
+### Host adapters
+
+The React layer performs three effects a host framework usually owns: navigation, client persistence, and third-party script loading. The `adapters` prop overrides them, the same way `onSubmit` and `fetchResultsImpl` already override the network calls. Every member is optional and defaults to the current DOM behavior, so omitting the prop changes nothing:
+
+```ts
+type FormAdapters = {
+  /** Replaces window.location for the post-submit redirect. */
+  navigate?: (url: string, options: { replace: boolean }) => void
+  /** Replaces the <Poll> localStorage voted flag; false disables client persistence. */
+  voteStorage?: VoteStorage | false
+  /** Replaces the captcha widgets' script injection (consent managers, CSP nonces). */
+  loadScript?: (src: string) => Promise<void>
+}
+```
+
+`navigate` is the one most hosts want. Without it, a `redirect` response hard-navigates via `window.location.assign` after `onSuccess`, so a `router.push` inside `onSuccess` starts a transition the full document load immediately discards. With it, the plugin calls your adapter instead and never touches `window.location` for that form: no fallback, no double navigation, and a throwing adapter propagates rather than degrading to a hard load. It fires after `onSuccess` and after the overlay dismissal under `dismissOnSuccess`, with the plugin's intent passed as `options` (`{ replace: false }` today: the built-in default keeps push semantics):
+
+```tsx
+// Next.js App Router
+const router = useRouter()
+const adapters = useMemo<FormAdapters>(() => ({
+  navigate: (url, { replace }) => (replace ? router.replace(url) : router.push(url)),
+}), [router])
+
+<Form form={form} adapters={adapters} />
+```
+
+The same shape covers TanStack Router (`navigate({ to: url, replace })`) and React Router (`navigate(url, { replace })`). Define the object once in a host module and pass it everywhere: `<Poll>` forwards `adapters` to its inner `<Form>`, and the captcha widgets accept it too. Pass a stable reference (module scope or `useMemo`), matching the other injectable props.
+
+`voteStorage` is documented with [polls](/form-builder/polls#vote-storage), `loadScript` with the [captcha widgets](/form-builder/spam#consent-gated-script-loading). The `FormAdapters`, `VoteStorage`, `NavigateOptions`, and `LoadScript` types are exported from `@10x-media/form-builder/react`.
 
 ### Progressive validation
 
@@ -119,6 +150,7 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `presentation`, `presentations`, `onClose`, `title` | | | Overlay control; see [Presentations](/form-builder/presentations). |
 | `initialValues` | `Record<string, unknown>` | none | Seed values; see [Prefill](/form-builder/recall-prefill#url-prefill). |
 | `honeypot`, `captchaToken` | | defaults on / none | See [Spam](/form-builder/spam). |
+| `adapters` | `FormAdapters` | DOM behavior | Host-owned effects (navigation, vote persistence, script loading); see [Host adapters](#host-adapters). |
 | `children` | `ReactNode` | none | Custom layout mode; see below. |
 
 A repeater field with `minRows` starts pre-seeded with that many empty rows, matching the schema's floor. An explicit `initialValues` entry for the field (including an empty array) wins over the seed.

@@ -56,3 +56,9 @@ For a custom set of SVG files, build the `icons` array yourself, deriving each `
 - **Heroicons / Phosphor**: build the `icons` array from the package's icon list and point `importFor` at each icon's module. Each style variant (outline, solid) works best as its own adapter slug so stored values stay unambiguous.
 - **Full shadcn set**: shadcn projects standardize on Lucide, so the first-party `lucideAdapter()` already covers them; add codegen adapters only for the extra sets your design system pulls in.
 - **Regeneration**: re-run codegen when you bump the icon package. The manifest is data, so a new version adding icons is additive; removing icons turns stored values into [gracefully degraded ones](/fields/icon/multi-tenancy#when-a-stored-values-library-is-disabled) rather than errors.
+
+## Icon name rules
+
+A name must be non-empty and free of whitespace, control characters, `:` (which separates library from name in a stored value), and the `'` and `\` that would escape the emitted import key. Everything else is legitimate, including uppercase, digits, dots and non-latin scripts, so a library keyed by code (`HUN`, `SUI`) generates like any other.
+
+Names that differ only by case are rejected. Drawer search normalises case, so `HUN` beside `hun` would be indistinguishable to an editor.

@@ -1,0 +1,78 @@
+---
+title: Palette sources
+description: Build preset palettes from documents, from repeatable arrays, or from a resolver you write yourself.
+---
+
+A [preset resolver](/fields/color/presets) returns `ColorPreset[]` from whatever your data looks like. Two helpers cover the shapes a governed palette usually takes; anything else is a plain function you write.
+
+## From individual fields: `presetsFromDoc`
+
+When a fixed set of brand colors lives as individual fields on a settings document or a tenant, `presetsFromDoc` lifts them into presets, reusing each field's own admin identity:
+
+```ts
+import { presetsFromDoc } from '@10x-media/fields/color'
+
+presets: async ({ req }) => {
+  const { docs } = await req.payload.find({ collection: 'tenants', depth: 0, limit: 50 })
+  return docs.flatMap((tenant) =>
+    presetsFromDoc({
+      collection: 'tenants',
+      doc: tenant,
+      fields: ['primary', 'accent', 'brand.surface'],
+      keyPrefix: `${tenant.slug}/`,
+      req,
+    })
+  )
+}
+```
+
+Each preset's key is `keyPrefix + fieldPath` and its label is the field config's own label, so picker chips read the same as the source document's edit view. Dot paths reach into groups and named tabs. Function labels resolve against `req.i18n`; locale maps pass through untouched, so the admin localizes them per request.
+
+Missing fields, and empty, non-string, or already-`preset:` values, are skipped rather than thrown, so a partly filled document degrades to fewer presets.
+
+## From a repeatable array: `presetsFromArray`
+
+When the palette is authored as an array field, one row per color, `presetsFromArray` lifts the rows:
+
+```ts
+import { presetsFromArray } from '@10x-media/fields/color'
+
+presets: async ({ req }) => {
+  const { docs } = await req.payload.find({ collection: 'tenants', depth: 0, limit: 50 })
+  return docs.flatMap((tenant) =>
+    presetsFromArray({
+      doc: tenant,
+      path: 'brandColors',
+      key: 'slug',
+      label: 'name',
+      value: { light: 'color', dark: 'colorDark' },
+      keyPrefix: `${tenant.slug}/`,
+    })
+  )
+}
+```
+
+`value` is either one row field name for a flat color, or a pair of row field names for a [scheme-aware](/fields/color/linked-mode) one. `path` is a dot path to the array and reaches into groups and named tabs. `label` falls back to the row's own key, unprefixed.
+
+It takes no `req` or `collection`, unlike `presetsFromDoc`: keys and labels come from row data rather than field config, so there is nothing to look up or localize.
+
+Rows are skipped when the key is missing, non-string, or empty; when the value fields yield nothing usable; and when a value already carries a `preset:` reference. A pair with one member filled in becomes that color in both schemes. On duplicate keys the first row wins, so keep generated keys unique.
+
+## Anything else
+
+Both helpers are conveniences over a plain array `map`. Two flat light and dark fields on one document have no helper, because a pair entry has two paths and neither is the key, so both the key and the label would have to be spelled out anyway:
+
+```ts
+presets: async ({ req }) => {
+  const settings = await req.payload.findGlobal({ slug: 'settings' })
+  return [
+    {
+      key: 'brand',
+      label: 'Brand',
+      value: { light: settings.brandLight, dark: settings.brandDark },
+    },
+  ]
+}
+```
+
+Resolvers are memoized per request, so a list view rendering fifty rows resolves the palette once. Because that one result is shared across every document in the request, derive from `req` rather than from a single document's data.

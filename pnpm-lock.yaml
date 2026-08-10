@@ -48,6 +48,9 @@ catalogs:
     '@testing-library/react':
       specifier: ^16.1.0
       version: 16.3.2
+    '@types/jsdom':
+      specifier: ^21.1.7
+      version: 21.1.7
     '@types/node':
       specifier: 22.19.19
       version: 22.19.19
@@ -60,6 +63,9 @@ catalogs:
     axe-core:
       specifier: ^4.12.1
       version: 4.12.1
+    dompurify:
+      specifier: ^3.2.7
+      version: 3.2.7
     jsdom:
       specifier: ^25.0.1
       version: 25.0.1
@@ -87,6 +93,9 @@ catalogs:
     react-dom:
       specifier: 19.2.6
       version: 19.2.6
+    react-hotkeys-hook:
+      specifier: 5.3.3
+      version: 5.3.3
     tsdown:
       specifier: 0.22.1
       version: 0.22.1
@@ -438,6 +447,9 @@ importers:
       '@tanstack/react-virtual':
         specifier: 'catalog:'
         version: 3.14.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      dompurify:
+        specifier: 'catalog:'
+        version: 3.2.7
     devDependencies:
       '@10x-media/payload-test-harness':
         specifier: workspace:*
@@ -481,6 +493,9 @@ importers:
       '@testing-library/react':
         specifier: 'catalog:'
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@types/jsdom':
+        specifier: 'catalog:'
+        version: 21.1.7
       '@types/json-schema':
         specifier: ^7.0.15
         version: 7.0.15
@@ -946,6 +961,122 @@ importers:
       tsx:
         specifier: ^4.19.2
         version: 4.22.3
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
+  packages/undo-redo:
+    dependencies:
+      react-hotkeys-hook:
+        specifier: 'catalog:'
+        version: 5.3.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+    devDependencies:
+      '@10x-media/payload-test-harness':
+        specifier: workspace:*
+        version: link:../../tooling/test-harness
+      '@10x-media/tsconfig':
+        specifier: workspace:*
+        version: link:../../config/typescript
+      '@10x-media/tsdown-config':
+        specifier: workspace:*
+        version: link:../../config/tsdown
+      '@10x-media/vitest-config':
+        specifier: workspace:*
+        version: link:../../config/vitest
+      '@payloadcms/db-mongodb':
+        specifier: 'catalog:'
+        version: 3.85.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@payloadcms/db-postgres':
+        specifier: 'catalog:'
+        version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@payloadcms/ui':
+        specifier: 'catalog:'
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.60.0
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.19
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.15)
+      payload:
+        specifier: 'catalog:'
+        version: 3.85.0(graphql@16.14.0)(typescript@5.9.3)
+      playwright:
+        specifier: 'catalog:'
+        version: 1.60.0
+      react:
+        specifier: 'catalog:'
+        version: 19.2.6
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.6(react@19.2.6)
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.7(@types/node@22.19.19)(happy-dom@20.10.6)(jsdom@25.0.1)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.77.4)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/undo-redo/dev:
+    dependencies:
+      '@10x-media/undo-redo':
+        specifier: workspace:*
+        version: link:..
+      '@payloadcms/db-mongodb':
+        specifier: 'catalog:'
+        version: 3.85.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@payloadcms/db-postgres':
+        specifier: 'catalog:'
+        version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@payloadcms/next':
+        specifier: 'catalog:'
+        version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      '@payloadcms/richtext-lexical':
+        specifier: 'catalog:'
+        version: 3.85.0(@faceless-ui/modal@3.0.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@faceless-ui/scroll-info@2.0.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@payloadcms/next@3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3))(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(yjs@13.6.31)
+      '@payloadcms/translations':
+        specifier: 'catalog:'
+        version: 3.85.0
+      '@payloadcms/ui':
+        specifier: 'catalog:'
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      next:
+        specifier: 'catalog:'
+        version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
+      payload:
+        specifier: 'catalog:'
+        version: 3.85.0(graphql@16.14.0)(typescript@5.9.3)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.6
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@10x-media/tsconfig':
+        specifier: workspace:*
+        version: link:../../../config/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.19
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.15)
+      mongodb-memory-server:
+        specifier: ^10.1.0
+        version: 10.4.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3606,6 +3737,9 @@ packages:
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
 
+  '@types/jsdom@21.1.7':
+    resolution: {integrity: sha512-yOriVnggzrnQ3a9OKOCxaVuSug3w3/SbOj5i7VwXWZEyUNl3bLF9V3MfxGbZKuwqJOQyRfqXyROBB1CoZLFWzA==}
+
   '@types/jsesc@2.5.1':
     resolution: {integrity: sha512-9VN+6yxLOPLOav+7PwjZbxiID2bVaeq0ED4qSQmdQTdjnXJSaCVKTR58t15oqH1H5t8Ng2ZX1SabJVoN9Q34bw==}
 
@@ -3666,6 +3800,9 @@ packages:
 
   '@types/statuses@2.0.6':
     resolution: {integrity: sha512-xMAgYwceFhRA2zY+XbEA7mxYbA093wdiW8Vu6gZPGWy9cmOyU9XesH1tNcEWsKFd5Vzrqx5T3D38PWx1FIIXkA==}
+
+  '@types/tough-cookie@4.0.5':
+    resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
@@ -6493,6 +6630,12 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
+  react-hotkeys-hook@5.3.3:
+    resolution: {integrity: sha512-aswgyWUnE25hmhzHTfKDmKzsaSE5DJ4LKaU/o6rQSXkDd/1Bh9TfAFQbHkf6fLy11HvlYkp+cDDarGdhmCDhoQ==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
   react-image-crop@10.1.8:
     resolution: {integrity: sha512-4rb8XtXNx7ZaOZarKKnckgz4xLMvds/YrU6mpJfGhGAsy2Mg4mIw1x+DCCGngVGq2soTBVVOxx2s/C6mTX9+pA==}
     peerDependencies:
@@ -8120,7 +8263,7 @@ snapshots:
       '@commitlint/types': 19.8.1
       git-raw-commits: 4.0.0
       minimist: 1.2.8
-      tinyexec: 1.2.2
+      tinyexec: 1.2.4
 
   '@commitlint/resolve-extends@19.8.1':
     dependencies:
@@ -10163,6 +10306,12 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
+  '@types/jsdom@21.1.7':
+    dependencies:
+      '@types/node': 22.19.19
+      '@types/tough-cookie': 4.0.5
+      parse5: 7.3.0
+
   '@types/jsesc@2.5.1': {}
 
   '@types/json-schema@7.0.15': {}
@@ -10225,6 +10374,8 @@ snapshots:
       '@types/node': 18.19.130
 
   '@types/statuses@2.0.6': {}
+
+  '@types/tough-cookie@4.0.5': {}
 
   '@types/trusted-types@2.0.7':
     optional: true
@@ -13419,6 +13570,11 @@ snapshots:
   react-error-boundary@6.1.2(react@19.2.6):
     dependencies:
       react: 19.2.6
+
+  react-hotkeys-hook@5.3.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+    dependencies:
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
 
   react-image-crop@10.1.8(react@19.2.6):
     dependencies:

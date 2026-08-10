@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/fields",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.2",
 	"description": "Reusable admin fields for Payload: color picker, icon picker, encrypted fields, and more",
 	"license": "MIT",
 	"repository": {
@@ -112,8 +112,8 @@
 		"test:unit": "vitest run src",
 		"test:int": "vitest run tests/int",
 		"test:dist": "REQUIRE_DIST=1 vitest run --passWithNoTests=false tests/dist",
-		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts",
-		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-schemes.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-schemes.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-schemes.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/color.int.spec.ts tests/int/color-schemes.int.spec.ts tests/int/color-format.int.spec.ts tests/int/icon.int.spec.ts tests/int/encrypted.int.spec.ts tests/int/encrypted-query.int.spec.ts",
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/fields-dev dev",
 		"start": "pnpm --filter @10x-media/fields-dev start",
@@ -156,7 +156,8 @@
 		}
 	},
 	"dependencies": {
-		"@tanstack/react-virtual": "catalog:"
+		"@tanstack/react-virtual": "catalog:",
+		"dompurify": "catalog:"
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
@@ -173,6 +174,7 @@
 		"@tabler/icons": "catalog:",
 		"@tabler/icons-react": "catalog:",
 		"@testing-library/react": "catalog:",
+		"@types/jsdom": "catalog:",
 		"@types/json-schema": "^7.0.15",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",

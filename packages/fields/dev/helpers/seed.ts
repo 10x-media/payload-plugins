@@ -23,7 +23,9 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			data: {
 				name: 'acme',
 				accent: '#f59e0b',
-				brandColors: [{ key: 'surface', label: 'Acme surface', value: '#f5f3ff' }],
+				brandColors: [
+					{ key: 'surface', label: 'Acme surface', value: '#f5f3ff', valueDark: '#1e1b4b' },
+				],
 				enabledLibraries: ['lucide', 'radix'],
 				primary: '#7c3aed',
 			},

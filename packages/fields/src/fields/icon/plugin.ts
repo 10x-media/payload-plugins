@@ -1,6 +1,15 @@
 import type { Config } from 'payload'
 import { FIELDS_REGISTRY_KEY } from '../../plugin/registry'
-import type { FieldsPluginRegistry, IconGlobalConfig } from '../../types'
+import type { FieldsPluginRegistry, IconGlobalConfig, IconRenderStrategy } from '../../types'
+import { createIconManifestHandler, ICON_MANIFEST_PATH } from './server/endpoint'
+
+/** The importMap path a render strategy needs registered, so generate:importmap picks it up. */
+const renderDependency = (
+	render: IconRenderStrategy
+): { path: string; type: 'function' | 'component' } =>
+	render.type === 'component'
+		? { path: render.Icon, type: 'component' }
+		: { path: render.type === 'url' ? render.resolve : render.load, type: 'function' }
 
 /**
  * Slugs prefix every stored value (`<slug>:<icon-name>`), so a slug carrying a
@@ -33,6 +42,17 @@ export const registerIcon = (config: Config, icon: IconGlobalConfig | undefined)
 			throw new Error(`[fields] duplicate icon adapter slug: ${adapter.slug}`)
 		}
 		slugs.add(adapter.slug)
+		// Layer ids key the manifest cache, so a duplicate would make two layers share
+		// one cached listing and silently serve the wrong one.
+		const layerIds = new Set<string>()
+		for (const layer of adapter.layers ?? []) {
+			if (layerIds.has(layer.id)) {
+				throw new Error(
+					`[fields] duplicate icon layer id "${layer.id}" in adapter "${adapter.slug}"`
+				)
+			}
+			layerIds.add(layer.id)
+		}
 	}
 	const defaultLibrary = icon.defaultLibrary ?? firstAdapter.slug
 	if (!slugs.has(defaultLibrary)) {
@@ -47,6 +67,25 @@ export const registerIcon = (config: Config, icon: IconGlobalConfig | undefined)
 		resolveAvailable: icon.resolveAvailable,
 	}
 	config.custom[FIELDS_REGISTRY_KEY] = registry
+	// The endpoint only exists for libraries whose data lives on the server. A config with
+	// none stays byte-identical, which is every config written before layers existed.
+	const hasServerLayer = icon.adapters.some((adapter) =>
+		adapter.layers?.some((layer) => layer.render.type !== 'component' || layer.resolveMeta)
+	)
+	if (hasServerLayer) {
+		config.endpoints = [
+			...(config.endpoints ?? []),
+			{
+				handler: createIconManifestHandler({
+					adapters: icon.adapters,
+					alwaysAvailable: icon.alwaysAvailable,
+					resolveAvailable: icon.resolveAvailable,
+				}),
+				method: 'get',
+				path: ICON_MANIFEST_PATH,
+			},
+		]
+	}
 	config.admin ??= {}
 	config.admin.dependencies ??= {}
 	for (const adapter of icon.adapters) {
@@ -66,6 +105,14 @@ export const registerIcon = (config: Config, icon: IconGlobalConfig | undefined)
 				path: adapter.Nodes,
 				type: 'component',
 			}
+		}
+		// Each layer's render strategy points at its own importMap entry. Registered here
+		// for the same reason Nodes is: generate:importmap scans admin.dependencies, not
+		// registry strings, so a regeneration would otherwise drop them.
+		for (const layer of adapter.layers ?? []) {
+			config.admin.dependencies[`fields-icon-${adapter.slug}-${layer.id}`] = renderDependency(
+				layer.render
+			)
 		}
 	}
 }

@@ -5,7 +5,7 @@ import { keys } from '../../../translations/keys'
 import { asTranslate } from '../../../translations/server'
 import type { IconAdapter } from '../../../types'
 import { resolveIconValue } from '../shared/value'
-import { loadManifestNames } from './manifestCache'
+import { resolveIconMeta } from './resolveIconMeta'
 
 export type CreateIconValidateArgs = {
 	adapters?: IconAdapter[]
@@ -36,8 +36,11 @@ export const createIconValidate =
 				if (!adapter) {
 					return t(keys.invalidIconLibrary, { library })
 				}
-				const names = await loadManifestNames(adapter)
-				if (!names.has(name)) {
+				const meta = await resolveIconMeta(adapter, name, {
+					payload: options.req.payload,
+					req: options.req,
+				})
+				if (!meta) {
 					return t(keys.invalidIconName, { library, name })
 				}
 			}

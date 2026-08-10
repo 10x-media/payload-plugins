@@ -9,6 +9,7 @@
 		"jobs",
 		"webhooks",
 		"folder-picker",
+		"undo-redo",
 		"automations"
 	]
 }

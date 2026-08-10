@@ -1,0 +1,43 @@
+---
+title: Undo/Redo
+description: Client-side undo and redo for Payload admin forms, independent of document versions.
+---
+
+`@10x-media/undo-redo` gives the admin document form the one thing every other editor has: `Ctrl+Z` across the whole document, not just inside the field you happen to be in.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { undoRedo } from '@10x-media/undo-redo'
+
+export default buildConfig({
+  plugins: [undoRedo({})],
+})
+```
+
+That is the whole minimum config. Undo/redo appears on every collection and global edit view; `collections` and `globals` are opt-*out* maps.
+
+## How it works
+
+The admin form keeps its state as a flat map of path to field state. The plugin snapshots that map after a short pause in editing, and steps between snapshots by dispatching the form's own `REPLACE_STATE` action. Nothing else is involved: no server round trip, no document version, no local storage.
+
+That has three consequences worth knowing up front.
+
+**The history is per editor session.** It lives in memory in the mounted component. Reload the page and it starts over, which also means an unsaved edit is gone with it, exactly as it was before the plugin existed.
+
+**Nothing reaches the server until save.** Undo does not write, does not create a version, and does not race an autosave. The document on disk is untouched until the editor presses save, at which point Payload saves whatever the form currently holds.
+
+**It is not document versions.** Payload's versions and drafts answer "what did this document look like after each save". This answers "undo the last thing I did", including edits that were never saved and never will be. The two are complementary, and the plugin deliberately stays out of `_status` so undo can never unpublish anything.
+
+## What it covers
+
+Every field type in the form, including the structural edits that are usually the ones you want back: an array row you deleted, a block you added to the wrong place, a reorder that went one position too far. Deleted rows come back with their subfield values intact, because the snapshot holds the whole subtree, not just the row list.
+
+Fields hidden by an `admin.condition` are covered too, in both directions. See [What is tracked](/undo-redo/what-is-tracked) for the full scope and for everything deliberately left out.
+
+## When to use it
+
+Any admin where documents are long enough that a mis-click costs real work: page builders with blocks, structured content with deep arrays, anything an editor spends more than a few minutes in. The cost is one component per edit view and a bounded snapshot stack, so there is little reason to scope it narrowly, but you can (see [Configuration](/undo-redo/configuration)).
+
+## Next
+
+Start with the [quick start](/undo-redo/quick-start), then read [what is tracked](/undo-redo/what-is-tracked) if your schema has fields that should stay out of the history.

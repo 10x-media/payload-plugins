@@ -110,6 +110,18 @@ formBuilder({
 <HcaptchaCaptcha siteKey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!} onToken={setToken} />
 ```
 
+### Consent-gated script loading
+
+Each widget loads its vendor script by injecting a `<script>` into `document.head`, once per src with an evict-on-failure retry. If a consent manager owns all script loading, or a CSP requires nonce attribution, pass your own loader via the [`adapters`](/form-builder/rendering#host-adapters) prop instead; the per-src cache and retry semantics stay:
+
+```tsx
+const adapters = { loadScript: (src: string) => consentManager.loadScript(src) }
+
+<TurnstileCaptcha siteKey={siteKey} onToken={setToken} adapters={adapters} />
+```
+
+The loader resolves once the script is executable and rejects on failure (a rejection evicts the cache entry so a later mount retries). Define `adapters` at module scope or memoize it: a fresh function identity per render re-runs the load with a fresh cache. All three widgets accept the prop.
+
 ### Custom providers
 
 Any other verification service plugs into the same seam with `defineCaptchaProvider`:

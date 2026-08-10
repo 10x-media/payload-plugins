@@ -70,6 +70,22 @@ describe('TurnstileCaptcha', () => {
 		expect(onToken).toHaveBeenLastCalledWith(null)
 	})
 
+	it('loads the vendor script through a custom loadScript adapter', async () => {
+		const src = 'https://vendor.test/turnstile-adapter.js'
+		const loadScript = vi.fn().mockResolvedValue(undefined)
+		render(
+			<TurnstileCaptcha
+				siteKey="site-1"
+				onToken={() => {}}
+				scriptSrc={src}
+				adapters={{ loadScript }}
+			/>
+		)
+		await waitFor(() => expect(turnstile.render).toHaveBeenCalled())
+		expect(loadScript).toHaveBeenCalledWith(src)
+		expect(document.querySelectorAll(`script[src="${src}"]`)).toHaveLength(0)
+	})
+
 	it('exposes reset through the handle and removes the widget on unmount', async () => {
 		const ref = createRef<CaptchaWidgetHandle>()
 		const { unmount } = render(<TurnstileCaptcha ref={ref} siteKey="site-1" onToken={() => {}} />)

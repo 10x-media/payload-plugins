@@ -1,6 +1,6 @@
 'use client'
 
-import { createGeneratedAdapterComponents } from '../../client/generatedAdapter'
+import { createGeneratedAdapterComponents, createNodesLoader } from '../../client/generatedAdapter'
 
 // Radix icons size through width/height SVG props, not a `size` prop.
 const { Assets, Icon } = createGeneratedAdapterComponents({
@@ -11,3 +11,7 @@ const { Assets, Icon } = createGeneratedAdapterComponents({
 
 export const RadixAdapterIcon = Icon
 export const RadixAdapterAssets = Assets
+
+export const RadixAdapterNodes = createNodesLoader(() =>
+	import('./generated/nodes').then((m) => m.nodes)
+)
