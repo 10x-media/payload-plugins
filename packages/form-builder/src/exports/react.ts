@@ -22,6 +22,12 @@ export type { ToFormDocumentOptions } from '../form/toFormDocument'
 export { toFormDocument } from '../form/toFormDocument'
 export type { PrefillOptions } from '../prefill/valuesFromSearchParams'
 export { valuesFromSearchParams } from '../prefill/valuesFromSearchParams'
+export type {
+	FormAdapters,
+	LoadScript,
+	NavigateOptions,
+	VoteStorage,
+} from '../react/adapters'
 export type { HcaptchaCaptchaProps } from '../react/captcha/HcaptchaCaptcha'
 export { HCAPTCHA_SCRIPT_URL, HcaptchaCaptcha } from '../react/captcha/HcaptchaCaptcha'
 export type {
