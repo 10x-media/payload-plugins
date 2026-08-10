@@ -70,6 +70,7 @@ describe('walkAndInjectFieldHelp', () => {
 		const result = walkAndInjectFieldHelp(config, resolved)
 		expect(result.validTargetKeys).toContain('block:cta')
 		expect(result.validTargetKeys).toContain('field:collection:pages.layout.cta.label')
+		expect(result.blockSlugs).toEqual(['cta', 'custom'])
 		expect(ctaBlock.fields[0]).toMatchObject({ name: 'label' })
 		expect(ctaBlock.fields[1]).toMatchObject({
 			name: WIKI_BLOCK_HELP_FIELD,
@@ -137,6 +138,7 @@ describe('walkAndInjectFieldHelp', () => {
 		const result = walkAndInjectFieldHelp(config, resolveOptions({ exclude: { blocks: ['cta'] } }))
 		expect(result.validTargetKeys).not.toContain('block:cta')
 		expect(result.validTargetKeys).not.toContain('field:collection:pages.layout.cta.label')
+		expect(result.blockSlugs).toEqual([])
 		expect(ctaBlock.fields).toHaveLength(1)
 	})
 

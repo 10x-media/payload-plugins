@@ -9,14 +9,16 @@ A guide stores what it is about in four string lists, and every surface in the a
 
 The **Targets** tab of a wiki page holds one list per kind:
 
-| Field | Kind | Value format | Example |
-|---|---|---|---|
-| `targetCollections` | Collection | Bare slug | `posts` |
-| `targetGlobals` | Global | Bare slug | `settings` |
-| `targetFields` | Field | Entity-qualified schema path | `collection:posts.hero.title` |
-| `targetBlocks` | Block | Bare block slug | `heroBanner` |
+| Field | Kind | Value format | Example | Entered by |
+|---|---|---|---|---|
+| `targetCollections` | Collection | Bare slug | `posts` | Picking from the collections the plugin covers |
+| `targetGlobals` | Global | Bare slug | `settings` | Picking from the globals the plugin covers |
+| `targetFields` | Field | Entity-qualified schema path | `collection:posts.hero.title` | Typing, or a [write affordance](#prefilled-targets) |
+| `targetBlocks` | Block | Bare block slug | `heroBanner` | Picking from the blocks the plugin covers |
 
 One guide may fill all four, and any number of guides may name the same target. A surface with several guides shows them all, ordered featured-first, then by title.
+
+**Collections** and **Globals** are multi-selects. **Blocks** is a select whose menu is Payload's own block drawer, with thumbnails, groups, and search, so blocks are chosen by their label rather than by slug. All three list only what the plugin covers, so an [excluded](/admin-wiki/configuration#exclusions) entity cannot be targeted. Labels follow the reader's admin language wherever the entity declares one per locale.
 
 ## Field schema paths
 
@@ -53,15 +55,15 @@ field:collection:posts.title
 
 Field keys carry a double prefix: `field:` plus the entity-qualified path the author stored. These are what the [orphan banner](#orphaned-targets) prints and what the [component API](/admin-wiki/customization) takes.
 
-## Targets are plain strings
+## Targets are stored as plain strings
 
-The target lists are `text` fields with `hasMany`, not relationships and not `select` fields with generated options. That has three consequences worth knowing:
+All four lists are `text` fields with `hasMany`, not relationships and not `select` fields with stored options. Every picker is a UI over the same string storage. That has three consequences worth knowing:
 
-- A guide can be written **before** the surface exists, which is normal when documenting a block while it is still being built.
-- A guide **survives** its surface being removed or renamed. Only the attachment is stale, and the content is still there to reattach.
+- A field guide can be written **before** the field exists, which is normal when documenting a form while it is still being built.
+- A guide **survives** its surface being removed, renamed, or excluded. The value stays readable and removable in the picker, listed under its raw slug; only the attachment is stale, and the content is still there to reattach.
 - Nothing in the wiki schema depends on the shape of your config, so a field moving never means a migration.
 
-The cost is that a typo attaches a guide to nothing, which the orphan banner catches.
+The cost is that a typo in a field target attaches a guide to nothing, which the orphan banner catches.
 
 ## Orphaned targets
 

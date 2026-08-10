@@ -112,8 +112,8 @@ Two field names are injected into host schemas, both namespaced so they will not
 
 | Name | Where | Opt out by |
 |---|---|---|
-| `adminWikiGuides` | Collection and global sidebars. Exported as `WIKI_GUIDES_FIELD` | Declaring a field with that name, or `triggers.edit` / `triggers.global` |
-| `adminWikiBlockHelp` | Every block's fields | Declaring a field with that name |
+| `adminWikiGuides` | Collection and global sidebars. Exported as `WIKI_GUIDES_FIELD` | Declaring a field with that name, `triggers.edit` / `triggers.global`, or excluding the entity |
+| `adminWikiBlockHelp` | Every covered block's fields. Exported as `WIKI_BLOCK_HELP_FIELD` | Declaring a field with that name, or excluding the block |
 
 An entity that already declares one keeps its own. Both are UI fields, so neither reaches the database or your generated types.
 

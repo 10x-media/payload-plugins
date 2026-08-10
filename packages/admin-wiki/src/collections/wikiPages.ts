@@ -24,6 +24,8 @@ const ORPHAN_BANNER = { path: '@10x-media/admin-wiki/client#WikiOrphanBanner' }
 
 export type BuildWikiPagesArgs = {
 	access: Required<WikiAccessOptions>
+	/** Slugs of every block the walk covered, for the block target picker. */
+	blockSlugs: string[]
 	/** The host config as it stands when the plugin runs, for target enumeration. */
 	config: Config
 	hidden: HiddenOption | undefined
@@ -31,6 +33,7 @@ export type BuildWikiPagesArgs = {
 }
 
 const TARGET_SELECT = '@10x-media/admin-wiki/client#WikiTargetSelect'
+const TARGET_BLOCKS = '@10x-media/admin-wiki/client#WikiTargetBlocks'
 
 /** Slugs of one entity kind the plugin covers, sorted for a stable picker. */
 const coveredSlugs = (entities: undefined | { slug: string }[], excluded: string[]): string[] => {
@@ -47,11 +50,15 @@ const coveredSlugs = (entities: undefined | { slug: string }[], excluded: string
  * endpoint reports it and the authoring UI still shows it, where a real `select`
  * would have dropped an unrecognized value on save.
  *
- * Collections and globals are picked from what the plugin covers, so a guide
- * cannot be attached to an entity the host excluded. Fields and blocks stay
- * free-text; their affordances fill them in.
+ * Collections, globals, and blocks are picked from what the plugin covers, so a
+ * guide cannot be attached to an entity the host excluded. Fields stay
+ * free-text; their write affordances fill them in.
  */
-const targetFields = (config: Config, resolved: ResolvedWikiOptions): Field[] => [
+const targetFields = (
+	config: Config,
+	resolved: ResolvedWikiOptions,
+	blockSlugs: string[]
+): Field[] => [
 	{
 		name: 'targetCollections',
 		type: 'text',
@@ -100,7 +107,12 @@ const targetFields = (config: Config, resolved: ResolvedWikiOptions): Field[] =>
 		type: 'text',
 		hasMany: true,
 		label: labelForKey(keys.targetBlocksLabel),
-		admin: { description: labelForKey(keys.targetBlocksDescription) },
+		admin: {
+			components: {
+				Field: { clientProps: { slugs: blockSlugs }, path: TARGET_BLOCKS },
+			},
+			description: labelForKey(keys.targetBlocksDescription),
+		},
 	},
 ]
 
@@ -117,6 +129,7 @@ const targetFields = (config: Config, resolved: ResolvedWikiOptions): Field[] =>
  */
 export const buildWikiPagesCollection = ({
 	access,
+	blockSlugs,
 	config,
 	hidden,
 	resolved,
@@ -199,7 +212,7 @@ export const buildWikiPagesCollection = ({
 					},
 					{
 						label: labelForKey(keys.tabTargetsLabel),
-						fields: targetFields(config, resolved),
+						fields: targetFields(config, resolved, blockSlugs),
 					},
 				],
 			},

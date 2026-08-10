@@ -56,8 +56,10 @@ export const en: Record<TranslationKey, string> = {
 	[keys.tabTargetsLabel]: 'Targets',
 	[keys.targetsHeading]: 'Covers',
 	[keys.tocHeading]: 'On this page',
-	[keys.targetBlocksDescription]: 'Block slugs this guide covers, e.g. "heroBanner".',
+	[keys.targetBlocksDescription]: 'The blocks this guide covers.',
 	[keys.targetBlocksLabel]: 'Blocks',
+	[keys.targetBlocksPlaceholder]: 'Choose blocks',
+	[keys.targetBlocksSingular]: 'Block',
 	[keys.targetCollectionsDescription]: 'The collections this guide covers.',
 	[keys.targetCollectionsLabel]: 'Collections',
 	[keys.targetFieldsDescription]:

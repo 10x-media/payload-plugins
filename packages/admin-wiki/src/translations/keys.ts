@@ -55,6 +55,8 @@ export const keys = {
 	tocHeading: 'adminWiki:tocHeading',
 	targetBlocksDescription: 'adminWiki:targetBlocksDescription',
 	targetBlocksLabel: 'adminWiki:targetBlocksLabel',
+	targetBlocksPlaceholder: 'adminWiki:targetBlocksPlaceholder',
+	targetBlocksSingular: 'adminWiki:targetBlocksSingular',
 	targetCollectionsDescription: 'adminWiki:targetCollectionsDescription',
 	targetCollectionsLabel: 'adminWiki:targetCollectionsLabel',
 	targetFieldsDescription: 'adminWiki:targetFieldsDescription',

@@ -51,7 +51,13 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		const access = buildWikiAccess(options.access)
 		config.collections = [
 			...(config.collections ?? []),
-			buildWikiPagesCollection({ access, config, hidden: options.hidden?.pages, resolved }),
+			buildWikiPagesCollection({
+				access,
+				blockSlugs: walk.blockSlugs,
+				config,
+				hidden: options.hidden?.pages,
+				resolved,
+			}),
 			buildWikiMediaCollection({ access, config, hidden: options.hidden?.media, resolved }),
 		]
 		config.admin ??= {}

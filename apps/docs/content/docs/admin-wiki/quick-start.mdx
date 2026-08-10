@@ -47,7 +47,7 @@ Create a **Wiki Page**. The form has two tabs:
 - **Guide**: the title, a short summary (shown in hover cards and lists), and the content.
 - **Targets**: four lists naming the surfaces this guide is about.
 
-Give it a title, write a paragraph, and in **Targets** put your collection's slug in **Collections**, for example `posts`. Save and publish.
+Give it a title, write a paragraph, and in **Targets** pick a collection under **Collections**, for example Posts. Save and publish.
 
 <Callout type="info">
 Guides use drafts. Only **published** guides appear on surfaces; a draft is visible to its author in the collection and nowhere else.
@@ -77,7 +77,9 @@ The plugin registers a reading view at `/admin/wiki`: featured guides as cards, 
 
 **The guide is a draft.** Surfaces read published guides only.
 
-**The target does not match.** Collection and global targets are bare slugs (`posts`); field targets are entity-qualified paths (`collection:posts.title`); block targets are bare block slugs (`heroBanner`). The **Wiki Pages** list shows an orphan banner listing every target that no longer resolves against your config.
+**The target does not match.** Field targets are entity-qualified paths (`collection:posts.title`), typed by hand and therefore typo-able. The **Wiki Pages** list shows an orphan banner listing every target that no longer resolves against your config.
+
+**The entity is excluded.** Payload's own bookkeeping collections are out of the wiki by default, along with anything in your [`exclude`](/admin-wiki/configuration#exclusions) option. An excluded entity carries no surfaces and does not appear in the target pickers.
 
 **The plugin ran too early.** A field added by a later plugin was not in the config the walker saw. Move `adminWiki()` after it.
 

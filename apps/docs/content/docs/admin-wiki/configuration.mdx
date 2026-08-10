@@ -11,13 +11,13 @@ import { adminWiki } from '@10x-media/admin-wiki'
 adminWiki({
   access: { create: ({ req }) => req.user?.role === 'editor' },
   editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
+  exclude: { collections: ['users'], globals: ['nav'], blocks: ['spacer'] },
   featured: true,
   hidden: { media: true },
   localeMap: { 'en-US': 'en' },
   slugs: { pages: 'wiki-pages', media: 'wiki-media' },
   triggers: {
     edit: true,
-    exclude: ['users'],
     global: true,
     list: { slot: 'afterListTable' },
   },
@@ -34,6 +34,7 @@ adminWiki({
 | `disabled` | `boolean` | `false` | Return the incoming config untouched. Switch the plugin off per environment without removing the call |
 | `access` | `WikiAccessOptions` | logged-in for all four | Access predicates for the wiki collections. See [Access](#access) |
 | `editor` | `{ blocks }` | `{}` | Project blocks available in the wiki editor, each with its renderer. See [Authoring](/admin-wiki/authoring#your-own-blocks) |
+| `exclude` | `{ blocks, collections, globals }` | Payload's internals | Entities the plugin leaves alone entirely. See [Exclusions](#exclusions) |
 | `featured` | `boolean` | `true` | Lead the list band with the collection's featured guides as cards |
 | `hidden` | `{ media, pages }` | visible | Payload's `admin.hidden` passthrough, per wiki collection |
 | `localeMap` | `Record<string, string>` | `{}` | Map admin UI languages to content locales. See [Targeting](/admin-wiki/targets#localization) |
@@ -44,7 +45,39 @@ adminWiki({
 | `wikiView` | `boolean` | `true` | Register the `/wiki` browsing and reading views |
 | `writeAffordances` | `'always' \| 'editMode' \| 'never'` | `'editMode'` | When "write this guide" renders. See [Write affordances](/admin-wiki/write-affordances) |
 
+## Exclusions
+
+`exclude` names entities the plugin does not touch: no help on their fields, no guides panel, no list band, no block help, and no entry in the target pickers, so a guide cannot be attached to one even in [wiki edit mode](/admin-wiki/write-affordances).
+
+```ts
+adminWiki({
+  exclude: {
+    blocks: ['spacer'],
+    collections: ['users'],
+    globals: ['nav'],
+  },
+})
+```
+
+The three lists are separate because Payload only enforces slug uniqueness within one kind. A collection, a global, and a block may all be called `settings`, and one flat list would exclude three unrelated things at once.
+
+These add to what is already excluded:
+
+| Always excluded | Slugs |
+|---|---|
+| The wiki's own collections | Whatever `slugs.pages` and `slugs.media` resolve to |
+| Payload's bookkeeping collections | `payload-folders`, `payload-jobs`, `payload-locked-documents`, `payload-migrations`, `payload-preferences`, `payload-query-presets` |
+| Payload's bookkeeping globals | `payload-jobs-stats` |
+
+Both built-in lists are exported as `PAYLOAD_INTERNAL_COLLECTIONS` and `PAYLOAD_INTERNAL_GLOBALS`.
+
+Excluding an entity does not remove guides already targeting it. Their targets stop resolving, so the [orphan banner](/admin-wiki/targets#orphaned-targets) lists them until you edit or delete them.
+
+To leave a single **field** out without excluding its whole collection, give that field its own `Description` component; see [Customization](/admin-wiki/customization).
+
 ## Triggers
+
+`triggers` chooses which surfaces carry a guide affordance across everything the plugin covers:
 
 ```ts
 adminWiki({
@@ -52,16 +85,13 @@ adminWiki({
     edit: true,                          // sidebar panel on collection documents
     global: true,                        // sidebar panel on globals
     list: { slot: 'afterListTable' },    // band on collection lists
-    exclude: ['users', 'payload-preferences'],
   },
 })
 ```
 
-`list` accepts `true` (the band at its default slot), `false` (no band), or an object choosing the slot: `beforeList`, `beforeListTable`, `afterListTable`, or `afterList`.
+`list` accepts `true` (the band at its default slot), `false` (no band), or an object choosing the slot: `beforeList`, `beforeListTable`, `afterListTable`, or `afterList`. Only the list band takes a slot option.
 
-`exclude` names collections and globals that get no wiki surface at all. The wiki's own two collections are always excluded. Field and block help come from the config walk and are not affected by `exclude`; see [Surfaces](/admin-wiki/surfaces#scoping).
-
-Only the list band takes a slot option.
+Turning a trigger off keeps the entity in the wiki: its fields still carry help and it is still a valid target. To take an entity out of the wiki altogether, use [`exclude`](#exclusions).
 
 ## Plugin order
 

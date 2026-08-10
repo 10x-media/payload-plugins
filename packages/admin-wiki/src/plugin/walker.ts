@@ -15,6 +15,8 @@ export type WalkResult = {
 	 * locale cannot be resolved at config time, where there is no request.
 	 */
 	blockLabels: Record<string, string>
+	/** Slugs of every block the plugin covers, sorted, for the block target picker. */
+	blockSlugs: string[]
 	/** Named fields that received the injected Description component. */
 	injectedFieldCount: number
 	/** Every target key that resolves against the walked config. */
@@ -237,6 +239,7 @@ export const walkAndInjectFieldHelp = (
 	}
 	return {
 		blockLabels: context.blockLabels,
+		blockSlugs: [...context.helpedBlocks].sort(),
 		injectedFieldCount: context.injected.count,
 		validTargetKeys: [...context.validKeys].sort(),
 	}

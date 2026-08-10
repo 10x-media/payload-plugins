@@ -67,17 +67,29 @@ Payload renders `beforeList` and `afterList` outside the list's own `Gutter`; th
 
 ## Scoping
 
-`triggers.exclude` turns every wiki surface off for the named collections and globals:
+`exclude` takes an entity out of the wiki entirely: no surfaces, no field help, no block help, and no entry in the target pickers.
 
 ```ts
 adminWiki({
-  triggers: {
-    exclude: ['payload-locked-documents', 'payload-preferences', 'users'],
+  exclude: {
+    blocks: ['spacer'],
+    collections: ['users'],
+    globals: ['nav'],
   },
 })
 ```
 
-The wiki's own two collections are always excluded. Field and block help are injected by the config walk and are not affected by `exclude`; to leave a single field out, give it its own `Description` component.
+Payload's own bookkeeping collections and globals, and the wiki's own two collections, are excluded already. See [Exclusions](/admin-wiki/configuration#exclusions) for the full list.
+
+`triggers` is the narrower control: it turns a surface off across everything the plugin covers, while leaving those entities documentable.
+
+```ts
+adminWiki({
+  triggers: { edit: false, global: false, list: false },
+})
+```
+
+To leave a single field out, give it its own `Description` component.
 
 ## The wiki view
 

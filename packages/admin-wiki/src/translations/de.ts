@@ -57,8 +57,10 @@ export const de: Record<TranslationKey, string> = {
 	[keys.tabTargetsLabel]: 'Ziele',
 	[keys.targetsHeading]: 'Gilt für',
 	[keys.tocHeading]: 'Auf dieser Seite',
-	[keys.targetBlocksDescription]: 'Block-Slugs, für die diese Anleitung gilt, z. B. "heroBanner".',
+	[keys.targetBlocksDescription]: 'Die Blöcke, für die diese Anleitung gilt.',
 	[keys.targetBlocksLabel]: 'Blöcke',
+	[keys.targetBlocksPlaceholder]: 'Blöcke auswählen',
+	[keys.targetBlocksSingular]: 'Block',
 	[keys.targetCollectionsDescription]: 'Die Sammlungen, für die diese Anleitung gilt.',
 	[keys.targetCollectionsLabel]: 'Sammlungen',
 	[keys.targetFieldsDescription]:

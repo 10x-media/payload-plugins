@@ -31,6 +31,7 @@ import { UnorderedListFeatureClient as UnorderedListFeatureClient_e70f5e05f09f93
 import { StrikethroughFeatureClient as StrikethroughFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { HeadingFeatureClient as HeadingFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { WikiTargetSelect as WikiTargetSelect_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
+import { WikiTargetBlocks as WikiTargetBlocks_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiOrphanBanner as WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiGuideViewLink as WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiViewLink as WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
@@ -78,6 +79,7 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#StrikethroughFeatureClient": StrikethroughFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#HeadingFeatureClient": HeadingFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@10x-media/admin-wiki/client#WikiTargetSelect": WikiTargetSelect_bd0a8d2193330fdfdceeb64a56ffc89f,
+  "@10x-media/admin-wiki/client#WikiTargetBlocks": WikiTargetBlocks_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiOrphanBanner": WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiGuideViewLink": WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiViewLink": WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,

@@ -8,7 +8,8 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 ## Features
 
-- **Guides attached to surfaces**: one guide targets any number of collections, globals, field schema paths, and block slugs. Targets are plain strings, so a guide can be written before its surface exists and survives it being removed.
+- **Guides attached to surfaces**: one guide targets any number of collections, globals, field schema paths, and block slugs. Collections, globals, and blocks are picked from what the plugin covers; targets are stored as plain strings, so a guide survives its surface being removed.
+- **Scoped to what you document**: Payload's own bookkeeping collections are out of the wiki by default, and `exclude` takes out any other collection, global, or block, surfaces and target pickers alike.
 - **Zero-footprint injection**: field help arrives as a `Description` component, block and document help as UI fields. No data, no database columns, nothing in your generated types, and an undocumented admin looks exactly as it did before.
 - **One request per session**: a compact targets map resolves hundreds of field surfaces with a synchronous lookup. Guide content loads lazily and caches per guide and locale.
 - **Write in place**: "write this guide" opens a create drawer with the target prefilled, behind a per-browser edit mode so the affordances stay out of the way until wanted.
@@ -37,7 +38,7 @@ export default buildConfig({
 })
 ```
 
-Then run `payload generate:importmap`, create a **Wiki Page**, name a collection slug under **Targets**, and publish. The guide appears in that collection's document sidebar and list view.
+Then run `payload generate:importmap`, create a **Wiki Page**, pick a collection under **Targets**, and publish. The guide appears in that collection's document sidebar and list view.
 
 ## Documentation
 

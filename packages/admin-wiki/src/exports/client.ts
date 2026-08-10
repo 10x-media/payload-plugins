@@ -37,6 +37,10 @@ export { WikiGuideCard, type WikiGuideCardProps } from '../components/Surfaces/W
 export { WikiListGuides, type WikiListGuidesProps } from '../components/Surfaces/WikiListGuides'
 export { TargetChips, type TargetChipsProps } from '../components/TargetChips/TargetChips'
 export {
+	WikiTargetBlocks,
+	type WikiTargetBlocksProps,
+} from '../components/TargetSelect/WikiTargetBlocks'
+export {
 	type WikiTargetEntityKind,
 	WikiTargetSelect,
 	type WikiTargetSelectProps,

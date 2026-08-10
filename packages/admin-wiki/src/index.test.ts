@@ -91,6 +91,37 @@ describe('adminWiki factory', () => {
 			clientProps: { entity: 'global', slugs: ['settings'] },
 			path: '@10x-media/admin-wiki/client#WikiTargetSelect',
 		})
+		expect(clientPropsOf('targetBlocks')).toEqual({
+			clientProps: { slugs: [] },
+			path: '@10x-media/admin-wiki/client#WikiTargetBlocks',
+		})
+	})
+
+	it('offers only covered blocks in the block target picker', () => {
+		const cfg = {
+			collections: [
+				{
+					slug: 'pages',
+					fields: [
+						{
+							name: 'layout',
+							type: 'blocks',
+							blocks: [
+								{ slug: 'hero', fields: [] },
+								{ slug: 'spacer', fields: [] },
+							],
+						},
+					],
+				},
+			],
+		} as unknown as Config
+		const out = adminWiki({ exclude: { blocks: ['spacer'] } })(cfg) as Config
+		const pages = out.collections?.find((collection) => collection.slug === 'wiki-pages')
+		const tabs = pages?.fields[0] as { tabs: { fields: Field[] }[] }
+		const blocksField = tabs.tabs[1]?.fields.find(
+			(field) => 'name' in field && field.name === 'targetBlocks'
+		) as unknown as { admin: { components: { Field: { clientProps: { slugs: string[] } } } } }
+		expect(blocksField.admin.components.Field.clientProps.slugs).toEqual(['hero'])
 	})
 
 	it('extends media mimetypes only when video is enabled', () => {
