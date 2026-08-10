@@ -1,0 +1,55 @@
+---
+title: The wiki view
+description: The standalone reading experience at /admin/wiki, and the drawer that renders the same content in place.
+---
+
+## Two routes
+
+The plugin registers two custom admin views:
+
+| Route | View |
+|---|---|
+| `/admin/wiki` | The index: featured guides as cards, every published guide in a searchable list |
+| `/admin/wiki/:slug` | One guide, full width, with a table of contents |
+
+Neither appears in the nav. They are reached from the **Open wiki** action on the wiki pages list view, **Open in wiki** in any guide drawer, and a link on each guide's edit view once it is published.
+
+`wikiView: false` skips registering them, and the "open in wiki" links disappear with the routes they pointed at.
+
+## The index
+
+**Search** matches title, summary, and target keys, so typing a collection slug finds every guide about it.
+
+**Filters** sit behind a toggle beside the search field, as on any Payload list view. The panel is a row of surface pills rather than a query builder. Field targets are excluded from the pills.
+
+**Featured guides** lead the page as cards while neither search nor a filter is active, and give way to results once either is.
+
+The controls use Payload's own `list-controls`, `search-bar`, and `pill-selector` classes, so they follow your admin theme.
+
+## The guide page
+
+The reading view centers its prose in a fixed measure and puts a table of contents beside it when the guide has enough structure.
+
+**The table of contents** lists `h2` and `h3` headings, and renders only from three such headings up. It highlights the current section as you scroll.
+
+Heading ids are derived deterministically from heading text by the same walk the renderer uses to stamp them, so `#publishing` keeps working as long as the heading is called that.
+
+**Edit** appears in the view's header actions for readers whose update permission on the wiki collection resolves true.
+
+## The guide drawer
+
+Every in-place surface opens the same reading drawer, rendering guide content through the same component as the wiki page.
+
+When several guides target one surface, a rail on the left switches between them. With a single guide there is no rail, and the table of contents takes the right side instead. The two are never shown together.
+
+The drawer leads with the guide's summary, then the content, and carries **Open in wiki** and **Edit guide** buttons for readers with the permissions for them. Content loads lazily on open and is cached per guide and locale, so reopening is instant.
+
+## Access
+
+Both views require a logged-in user and redirect to the login screen with a `redirect` parameter pointing back at the guide. Custom admin views bypass the root router's auth redirect, so the views enforce this themselves.
+
+Guides are queried with `overrideAccess: false` as the requesting user, so your [read access](/admin-wiki/configuration#access) applies. A reader who cannot read the wiki collection sees an empty wiki, not an error.
+
+## Next
+
+[Write affordances](/admin-wiki/write-affordances) for the flow that fills this view up.

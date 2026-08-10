@@ -1,0 +1,128 @@
+---
+title: Customization
+description: Adopting the wiki in custom fields and components, and the integration limits worth knowing.
+---
+
+The plugin's surfaces are injected automatically. Everything they are built from is also exported, so a project with custom admin components can put guides wherever it wants.
+
+## Fields with a custom Description
+
+The config walk skips any field that already declares its own `admin.components.Description`, so such a field has no help surface until you add one.
+
+Render `WikiFieldHelp` inside your own description component:
+
+```tsx title="MyDescription.tsx"
+'use client'
+import { WikiFieldHelp } from '@10x-media/admin-wiki/client'
+
+export const MyDescription = ({ schemaPath }: { schemaPath: string }) => (
+  <>
+    <span>My own description text.</span>
+    <WikiFieldHelp schemaPath={schemaPath} />
+  </>
+)
+```
+
+The `schemaPath` is the entity-qualified, index-free path from [Targeting](/admin-wiki/targets): `collection:posts.hero.title`.
+
+For a component that hardcodes its own rendering and wants the data rather than the UI, `useWikiFieldHelp` is the one-line adoption path:
+
+```tsx
+const { canCreate, canWrite, entries, hasGuides } = useWikiFieldHelp('collection:posts.title')
+```
+
+Prefer `canWrite` over `canCreate` when deciding whether to show a write affordance: it already accounts for the configured [`writeAffordances` mode](/admin-wiki/write-affordances), where `canCreate` is the raw permission alone.
+
+## Fields with a function description
+
+A field whose `admin.description` is a function is skipped too, because functions cannot be serialized into client props. Convert it to a static description, or give the field a custom `Description` component as above.
+
+## Any target key
+
+`WikiTargetHelp` is the generic surface. It takes a full target key and renders nothing unless something targets it:
+
+```tsx
+'use client'
+import { WikiTargetHelp } from '@10x-media/admin-wiki/client'
+
+<WikiTargetHelp targetKey="block:heroBanner" />
+<WikiTargetHelp targetKey="collection:posts" showWriteAffordance={false} />
+```
+
+## The context
+
+`useWikiTargets()` exposes everything the provider holds, for components that need more than one surface's worth:
+
+| Member | Type | Notes |
+|---|---|---|
+| `entriesFor(key)` | `WikiTargetEntry[]` | Guides for a target key. Synchronous; never fetches |
+| `loadGuide(id)` | `Promise<WikiGuideDoc \| null>` | Full content, lazily, cached per guide and locale |
+| `canCreate` / `canUpdate` | `boolean` | The reader's evaluated permissions on the wiki collection |
+| `canWrite` | `boolean` | `canCreate` **and** the write-affordance mode allows it here |
+| `editMode` / `setEditMode` | `boolean` / `(on) => void` | The per-browser edit-mode switch |
+| `blockLabels` | `Record<string, string>` | Singular label per block slug, for chips |
+| `locale` | `string \| null` | The content locale guides resolve in for this reader |
+| `pagesSlug` | `string` | The configured wiki pages slug |
+| `refresh()` | `() => void` | Refetch the targets map |
+| `wikiViewEnabled` | `boolean` | Whether the `/wiki` routes are registered |
+
+Entries arrive sorted featured-first, then by title.
+
+## Building your own surface
+
+The pieces the built-in surfaces are made of are all exported from `@10x-media/admin-wiki/client`:
+
+| Component | Purpose |
+|---|---|
+| `WikiGuideCard` | One guide as a card. `href` to navigate, `onClick` to open a drawer, `compact` for narrow columns |
+| `WikiAllGuidesButton` | The overflow affordance into a drawer holding several guides |
+| `GuideDrawer` | The reading drawer. Takes entries, an optional initial guide, and a modal slug |
+| `GuideArticle` | Guide content rendered on its own, without a drawer around it |
+| `TargetChips` | The surfaces a guide covers, as pills, with a `limit` before collapsing to `+N` |
+| `WikiWriteGuide` | The write-in-place affordance, in `inline`, `button`, or `menuItem` shape |
+| `WikiEditModeToggle` | The edit-mode pill. Renders nothing when there is nothing to toggle |
+
+A minimal custom surface:
+
+```tsx
+'use client'
+import { useDrawerSlug, useModal } from '@payloadcms/ui'
+import { GuideDrawer, useWikiTargets, WikiAllGuidesButton } from '@10x-media/admin-wiki/client'
+
+export const MyGuides = () => {
+  const { entriesFor } = useWikiTargets()
+  const { openModal } = useModal()
+  const slug = useDrawerSlug('my-guides')
+  const entries = entriesFor('collection:posts')
+
+  if (entries.length === 0) return null
+
+  return (
+    <>
+      <WikiAllGuidesButton count={entries.length} onClick={() => openModal(slug)} />
+      <GuideDrawer entries={entries} slug={slug} />
+    </>
+  )
+}
+```
+
+## Reserved field names
+
+Two field names are injected into host schemas, both namespaced so they will not collide with a real field:
+
+| Name | Where | Opt out by |
+|---|---|---|
+| `adminWikiGuides` | Collection and global sidebars. Exported as `WIKI_GUIDES_FIELD` | Declaring a field with that name, or `triggers.edit` / `triggers.global` |
+| `adminWikiBlockHelp` | Every block's fields | Declaring a field with that name |
+
+An entity that already declares one keeps its own. Both are UI fields, so neither reaches the database or your generated types.
+
+## Registering components
+
+Client components you hand the plugin (a [video player](/admin-wiki/authoring#video), a [block renderer](/admin-wiki/authoring#your-own-blocks)) are import-map paths. The plugin registers them under `config.admin.dependencies` so `payload generate:importmap` finds them without you referencing them anywhere else.
+
+A path missing from the import map is reported, not swallowed: a block renderer renders a visible placeholder, a video player falls back to the default HTML5 one, both with a warning in the server log.
+
+## The registry
+
+`getWikiRegistry(config)` returns the plugin's resolved options plus config-derived data (`blockLabels`, `validTargetKeys`), read from `config.custom`. Exported from both `@10x-media/admin-wiki` and `@10x-media/admin-wiki/rsc`, for server components and endpoints that need to know how the plugin was configured. Returns `undefined` when the plugin did not run.

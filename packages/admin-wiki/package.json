@@ -1,7 +1,7 @@
 {
 	"name": "@10x-media/admin-wiki",
 	"version": "0.0.0",
-	"description": "",
+	"description": "A living wiki inside the Payload admin panel, with guides attached to the surfaces they explain",
 	"license": "MIT",
 	"repository": {
 		"type": "git",

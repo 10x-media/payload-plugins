@@ -17,8 +17,8 @@ const localizedIf = (localize: boolean): { localized: true } | Record<string, ne
 
 /**
  * The orphan banner sits in `beforeListTable`, directly above the table it
- * explains. The featured band is not here: it belongs on the collections guides
- * are written about, and `registerFeatured` puts it there.
+ * explains. The guides band is not here: it belongs on the collections guides
+ * are written about, and `registerTriggers` puts it there.
  */
 const ORPHAN_BANNER = { path: '@10x-media/admin-wiki/client#WikiOrphanBanner' }
 

@@ -1,0 +1,104 @@
+---
+title: Authoring
+description: The guide collection, the wiki editor, and the blocks available while writing.
+---
+
+## The guide collection
+
+`wiki-pages` is an ordinary Payload collection with drafts enabled. Its form splits across two unnamed tabs.
+
+**Guide**
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | text | Required. Localized when your config declares `localization` |
+| `summary` | textarea | Max 400 characters (`SUMMARY_MAX_LENGTH`). Shown in hover cards, drawers, and lists. Localized |
+| `content` | richText | The [wiki editor](#the-editor). Localized |
+
+**Targets**
+
+Four `text` lists, one per target kind. See [Targeting](/admin-wiki/targets).
+
+**Sidebar**
+
+| Field | Type | Notes |
+|---|---|---|
+| `slug` | text | Unique and indexed. Generated from the title; the identifier in wiki URLs |
+| `featured` | checkbox | Leads the wiki index and the list band |
+| `featuredOrder` | number | Lower first among featured guides. Shown only when `featured` is on |
+
+The tabs are unnamed, so they group the form without adding a level to the stored document. `targetCollections` and friends stay at the top level.
+
+Only **published** guides reach surfaces, the targets map, and the wiki view. A draft is visible to its author in the collection and nowhere else.
+
+## The editor
+
+Guides use their own lexical editor with an explicit feature list. It does not inherit the consuming project's `richText` configuration, in either direction: a project's custom nodes and link customizations never appear in guide content, and changing the project editor never changes what guides can contain.
+
+Enabled:
+
+- Paragraphs, headings `h2` to `h4`, bold, italic, underline, strikethrough, inline code
+- Ordered and unordered lists, blockquotes, horizontal rules, alignment, indentation
+- Links, **external URLs only**. To link another guide, use the guide link block
+- Uploads, scoped to the `wiki-media` collection
+- Fixed and inline toolbars
+
+Headings start at `h2`; the guide title is the `h1` on the page and in the drawer.
+
+## Built-in blocks
+
+**Callout.** Four variants: info, tip, warning, danger. The body is itself rich text (inline formatting and external links), so a callout can hold lists and links but cannot nest blocks or uploads.
+
+**Guide link** (inline). Links one guide to another by relationship, with an optional label. The label defaults to the target guide's title, resolved at read time, so renaming a guide updates every reference to it.
+
+**Video embed.** Only when [video is enabled](#video). Takes a YouTube or Vimeo watch, share, or short URL and validates it at authoring time; the reader gets a privacy-friendly embed (`youtube-nocookie.com`, Vimeo with `dnt=1`).
+
+## Video
+
+Video is off by default. Enabling it makes the `wiki-media` collection accept `video/*` mimetypes alongside images, adds the video embed block to the editor, and lets uploaded videos be dropped into content as a video node.
+
+```ts
+adminWiki({ video: true })
+```
+
+Uploaded video plays through a plain HTML5 player. To use your own:
+
+```ts
+adminWiki({
+  video: { playerComponent: '/components/WikiPlayer#WikiPlayer' },
+})
+```
+
+The component is a client component resolved from the import map, and it receives the `wiki-media` document as `media`. The plugin registers it under `config.admin.dependencies`, so `payload generate:importmap` picks it up without you referencing it anywhere else. A path missing from the import map logs a warning and falls back to the default player.
+
+## Your own blocks
+
+Add project blocks to the wiki editor by pairing each block with the client component that renders it in a published guide:
+
+```ts
+import { tipBlock } from './blocks/tipBlock'
+
+adminWiki({
+  editor: {
+    blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }],
+  },
+})
+```
+
+The renderer receives the block node's field values as `fields`, and is registered as an admin dependency so importmap generation finds it. A renderer declared but missing from the import map renders a visible placeholder and logs a warning, rather than dropping the block silently.
+
+## Wiki media
+
+`wiki-media` is the wiki's own upload collection, used only by wiki content: images always, video mimetypes when video is enabled, plus a localized `alt` field. Guide screenshots therefore stay out of the media picker your editors use for the site itself.
+
+Both collections take an `admin.hidden` passthrough:
+
+```ts
+adminWiki({
+  hidden: { media: true, pages: ({ user }) => !user?.roles?.includes('editor') },
+})
+```
+
+## Next
+
+[Seeding](/admin-wiki/seeding) to write guides from markdown in code, or [The wiki view](/admin-wiki/wiki-view) for how a finished guide reads.

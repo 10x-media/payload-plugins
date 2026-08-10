@@ -1,0 +1,54 @@
+---
+title: i18n
+description: Override or localize the admin wiki's UI strings, and how they relate to localized guide content.
+---
+
+Every admin-facing string the plugin renders is a typed translation under the `adminWiki:` namespace: the collection and field labels, the drawer and view chrome, the callout variants, the edit-mode toggle, and the empty states. English and German ship built in. Override or extend through the `translations` option:
+
+```ts title="payload.config.ts"
+import { adminWiki } from '@10x-media/admin-wiki'
+import { keys } from '@10x-media/admin-wiki/i18n'
+
+adminWiki({
+  translations: {
+    en: {
+      [keys.wikiViewTitle]: 'Handbook',
+      [keys.collectionPagesPlural]: 'Handbook pages',
+    },
+    uk: {
+      [keys.wikiViewTitle]: 'Довідник',
+      [keys.fieldHelpWriteGuide]: 'Написати інструкцію',
+    },
+  },
+})
+```
+
+`@10x-media/admin-wiki/i18n` exports `keys` (constants like `keys.wikiViewTitle`, `keys.fieldHelpWriteGuide`), the built-in `translations`, and the `TranslationKey` / `TranslationsOption` types. Misspell a key and the build fails.
+
+For merge order, adding locales, and app-level overrides, see [Translations](/concepts/translations); the pattern is identical in every plugin.
+
+## Renaming the wiki
+
+To call it a handbook, a playbook, or anything else, override these keys: `collectionPagesSingular`, `collectionPagesPlural`, `collectionMediaSingular`, `collectionMediaPlural`, `wikiViewTitle`, `wikiSubtitle`, and `wikiOpenWiki`.
+
+## UI language and content locale
+
+These are two separate axes.
+
+**UI language** is `i18n.language`: which language the plugin's own chrome renders in.
+
+**Content locale** is which language a *guide* is read in. Guide title, summary, and content are localized when your config declares `localization`; targets are not.
+
+Readers resolve guides through their admin language, so a German admin session reads German guides without choosing anything. When your two axes use different keys, map them:
+
+```ts
+adminWiki({
+  localeMap: { 'en-US': 'en', 'de-DE': 'de' },
+})
+```
+
+Resolution order is the mapped locale, then the admin language itself when it happens to be a content locale, then the default locale. A guide with no translation for the resolved locale falls back to the default locale rather than rendering empty.
+
+## No dependency on @payloadcms/translations
+
+Plugin translations register through `config.i18n.translations` only, so they cannot conflict with the translation packages your app installs.

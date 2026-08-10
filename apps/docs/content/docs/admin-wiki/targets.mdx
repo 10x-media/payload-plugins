@@ -1,0 +1,94 @@
+---
+title: Targeting
+description: How a guide declares which collections, globals, fields, and blocks it explains.
+---
+
+A guide stores what it is about in four string lists, and every surface in the admin resolves itself against them.
+
+## The four target kinds
+
+The **Targets** tab of a wiki page holds one list per kind:
+
+| Field | Kind | Value format | Example |
+|---|---|---|---|
+| `targetCollections` | Collection | Bare slug | `posts` |
+| `targetGlobals` | Global | Bare slug | `settings` |
+| `targetFields` | Field | Entity-qualified schema path | `collection:posts.hero.title` |
+| `targetBlocks` | Block | Bare block slug | `heroBanner` |
+
+One guide may fill all four, and any number of guides may name the same target. A surface with several guides shows them all, ordered featured-first, then by title.
+
+## Field schema paths
+
+Field targets carry the entity they belong to as a prefix:
+
+```
+collection:posts.title
+collection:posts.hero.headline
+global:settings.siteName
+```
+
+The prefix is required. Payload only enforces slug uniqueness within collections, so a collection and a global may both be called `settings`, and an unqualified path would merge their fields.
+
+Paths are **index-free**. A field inside an array or a blocks field is addressed once, by its position in the schema, not per row:
+
+```
+collection:posts.sections.heroBanner.headline
+```
+
+That covers the `headline` field of every `heroBanner` block in every row of `sections`.
+
+Unnamed structural fields add no segment: rows, collapsibles, and unnamed tabs are invisible to the path. Named tabs and named groups add their name.
+
+## Target keys
+
+Internally every target becomes one string, and that string is what surfaces listen on:
+
+```
+collection:posts
+global:settings
+block:heroBanner
+field:collection:posts.title
+```
+
+Field keys carry a double prefix: `field:` plus the entity-qualified path the author stored. These are what the [orphan banner](#orphaned-targets) prints and what the [component API](/admin-wiki/customization) takes.
+
+## Targets are plain strings
+
+The target lists are `text` fields with `hasMany`, not relationships and not `select` fields with generated options. That has three consequences worth knowing:
+
+- A guide can be written **before** the surface exists, which is normal when documenting a block while it is still being built.
+- A guide **survives** its surface being removed or renamed. Only the attachment is stale, and the content is still there to reattach.
+- Nothing in the wiki schema depends on the shape of your config, so a field moving never means a migration.
+
+The cost is that a typo attaches a guide to nothing, which the orphan banner catches.
+
+## Orphaned targets
+
+The **Wiki Pages** list view shows a banner listing every guide whose stored targets no longer resolve against the running config, with the offending keys as pills and a link to the guide's edit view.
+
+Stored targets are compared against the set of keys the walker collected on boot, so it catches renamed fields, removed blocks, and dropped collections. Drafts are included. The banner is visible only to users whose update permission on the wiki collection resolves true.
+
+The underlying endpoint is `GET /api/wiki-pages/orphaned-targets`.
+
+## Prefilled targets
+
+Schema paths do not have to be typed by hand. Every unguided surface can render a "write this guide" affordance that opens a create drawer with the matching target list already filled in. See [Write affordances](/admin-wiki/write-affordances).
+
+## Localization
+
+Targets are **not** localized: a guide points at the same field in every language. Title, summary, and content are localized when your config declares `localization`, so one guide document holds every language's version.
+
+Readers resolve guides through their admin UI language. When your admin languages and content locales use different keys, map them:
+
+```ts
+adminWiki({
+  localeMap: { 'en-US': 'en', 'de-DE': 'de' },
+})
+```
+
+Resolution order is the mapped locale, then the admin language itself when it is a content locale, then the default locale.
+
+## Next
+
+[Surfaces](/admin-wiki/surfaces): where each target kind renders, and how to move or disable it.

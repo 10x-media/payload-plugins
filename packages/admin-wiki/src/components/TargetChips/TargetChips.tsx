@@ -20,7 +20,7 @@ export type TargetChipsProps = {
 /**
  * The surfaces a guide covers, as pills. This is what turns a list of guide
  * titles into something a reader can scan: "Publishing a post" says little,
- * "Publishing a post — Post, Hero" says where it applies.
+ * "Publishing a post: Post, Hero" says where it applies.
  *
  * Collections, globals, and blocks carry their configured label. Field targets
  * are deliberately absent, because a guide covering a form attaches to enough of

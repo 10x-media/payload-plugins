@@ -145,7 +145,7 @@
 }
 
 /* Only the innermost hovered or focused field reveals its own affordance.
-   `.field-type` nests — a tab wraps a blocks field wraps a text field — and both
+   `.field-type` nests (a tab wraps a blocks field wraps a text field) and both
    `:hover` and `:focus-within` match every ancestor, so the plain descendant
    form lit up every affordance in a whole tab the moment one input took focus.
    `:not(:has(.field-type:hover))` is what makes "innermost" expressible. */

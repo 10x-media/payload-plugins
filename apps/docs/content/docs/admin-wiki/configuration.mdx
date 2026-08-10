@@ -1,0 +1,113 @@
+---
+title: Configuration
+description: The complete option reference for adminWiki(), plus access control and the endpoints it registers.
+---
+
+Every option is optional. `adminWiki({})` is a working configuration.
+
+```ts title="payload.config.ts"
+import { adminWiki } from '@10x-media/admin-wiki'
+
+adminWiki({
+  access: { create: ({ req }) => req.user?.role === 'editor' },
+  editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
+  featured: true,
+  hidden: { media: true },
+  localeMap: { 'en-US': 'en' },
+  slugs: { pages: 'wiki-pages', media: 'wiki-media' },
+  triggers: {
+    edit: true,
+    exclude: ['users'],
+    global: true,
+    list: { slot: 'afterListTable' },
+  },
+  video: true,
+  wikiView: true,
+  writeAffordances: 'editMode',
+})
+```
+
+## Options
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `disabled` | `boolean` | `false` | Return the incoming config untouched. Switch the plugin off per environment without removing the call |
+| `access` | `WikiAccessOptions` | logged-in for all four | Access predicates for the wiki collections. See [Access](#access) |
+| `editor` | `{ blocks }` | `{}` | Project blocks available in the wiki editor, each with its renderer. See [Authoring](/admin-wiki/authoring#your-own-blocks) |
+| `featured` | `boolean` | `true` | Lead the list band with the collection's featured guides as cards |
+| `hidden` | `{ media, pages }` | visible | Payload's `admin.hidden` passthrough, per wiki collection |
+| `localeMap` | `Record<string, string>` | `{}` | Map admin UI languages to content locales. See [Targeting](/admin-wiki/targets#localization) |
+| `slugs` | `{ media, pages }` | `wiki-media`, `wiki-pages` | Collection slug overrides |
+| `translations` | `TranslationsOption` | built-ins | Per-locale string overrides. See [i18n](/admin-wiki/i18n) |
+| `triggers` | `WikiTriggersOptions` | all on | Which surfaces carry a guide affordance. See [Triggers](#triggers) |
+| `video` | `boolean \| { playerComponent }` | `false` | Video uploads and YouTube/Vimeo embeds. See [Authoring](/admin-wiki/authoring#video) |
+| `wikiView` | `boolean` | `true` | Register the `/wiki` browsing and reading views |
+| `writeAffordances` | `'always' \| 'editMode' \| 'never'` | `'editMode'` | When "write this guide" renders. See [Write affordances](/admin-wiki/write-affordances) |
+
+## Triggers
+
+```ts
+adminWiki({
+  triggers: {
+    edit: true,                          // sidebar panel on collection documents
+    global: true,                        // sidebar panel on globals
+    list: { slot: 'afterListTable' },    // band on collection lists
+    exclude: ['users', 'payload-preferences'],
+  },
+})
+```
+
+`list` accepts `true` (the band at its default slot), `false` (no band), or an object choosing the slot: `beforeList`, `beforeListTable`, `afterListTable`, or `afterList`.
+
+`exclude` names collections and globals that get no wiki surface at all. The wiki's own two collections are always excluded. Field and block help come from the config walk and are not affected by `exclude`; see [Surfaces](/admin-wiki/surfaces#scoping).
+
+Only the list band takes a slot option.
+
+## Plugin order
+
+The plugin documents the config as it stands when it runs, so it belongs **last** in the `plugins` array, after anything that adds collections or fields:
+
+```ts
+plugins: [
+  fields({ /* ... */ }),
+  adminWiki({}),
+]
+```
+
+If the walk finds no fields at all, the plugin logs a warning on boot rather than failing. In practice that means the plugin ran before the config had any fields to document.
+
+## Access
+
+Both wiki collections default to "any logged-in user" for `create`, `read`, `update`, and `delete`, never public. Restrict authoring in production:
+
+```ts
+adminWiki({
+  access: {
+    create: ({ req }) => req.user?.role === 'editor',
+    update: ({ req }) => req.user?.role === 'editor',
+    delete: ({ req }) => req.user?.role === 'admin',
+    // read: omitted, so any logged-in user can read guides
+  },
+})
+```
+
+Each predicate receives Payload's standard access args including `req`, and therefore `req.locale`, so authoring can be restricted per role and per locale.
+
+These predicates drive the UI as well as the data. The targets map returns the reader's evaluated `create` and `update` results, which is what decides whether "write this guide" and "edit guide" render. Read access is never overridden: the views, the drawers, and the endpoints all query as the requesting user with `overrideAccess: false`.
+
+## Endpoints
+
+Two endpoints are registered on the wiki pages collection:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/wiki-pages/targets-map?language=<lang>` | The map of target key to published guides for one reader, plus their evaluated create and update permissions. Guide content is not included |
+| `GET /api/wiki-pages/orphaned-targets` | Guides whose stored targets no longer resolve against the running config. Requires update access; includes drafts |
+
+Both send `cache-control: no-store` and honor your read access. Paths follow `slugs.pages` when you override it.
+
+## Requirements
+
+Payload `^3.83.0`, React 19, Node 22.18 or newer. `@payloadcms/richtext-lexical` and `@payloadcms/ui` are required peers; `@payloadcms/next` and `next` are optional peers, needed only for the [wiki view](/admin-wiki/wiki-view).
+
+Run `payload generate:importmap` after installing and after upgrading. The plugin's surfaces are import-map component references, and a stale map is the most common reason nothing renders.

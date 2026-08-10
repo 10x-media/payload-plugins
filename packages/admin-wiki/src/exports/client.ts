@@ -48,10 +48,10 @@ export {
 	type WikiTargetsContextValue,
 	type WikiVideoPlayerComponent,
 } from '../components/WikiProvider/WikiProvider'
+export { WikiGuideViewLink } from '../components/WikiView/WikiGuideViewLink'
 export {
 	WikiIndexClient,
 	type WikiIndexClientProps,
 } from '../components/WikiView/WikiIndexClient'
-export { WikiGuideViewLink } from '../components/WikiView/WikiGuideViewLink'
 export { WikiViewLink } from '../components/WikiView/WikiViewLink'
 export { WikiVideoFeatureClient } from '../editor/video/client'

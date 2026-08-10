@@ -14,7 +14,7 @@ import './edit-mode.css'
  * edit view; it is per-browser and persists across reloads.
  *
  * Renders nothing unless the reader can author guides and the plugin is
- * configured for `writeAffordances: 'editMode'` — under `always` or `never`
+ * configured for `writeAffordances: 'editMode'`; under `always` or `never`
  * there is nothing here to toggle.
  *
  * The glyph rides inside the label rather than Pill's `icon` slot: that slot
