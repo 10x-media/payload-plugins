@@ -1,5 +1,6 @@
 import { APIError, type CollectionBeforeValidateHook, type PayloadRequest } from 'payload'
 import type { SubmissionValue } from '../submissions/types'
+import { voteChangeTargetOf } from '../submissions/votedCookie'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { firstHop } from './clientIp'
@@ -32,7 +33,11 @@ const warnRateLimitSkippedOnce = (req: PayloadRequest): void => {
 export const buildSpamGuard =
 	(spam: ResolvedSpamConfig): CollectionBeforeValidateHook =>
 	async ({ data, operation, req }) => {
-		if (operation !== 'create' || !data) {
+		// A flagged vote-change update is an anonymous public write like a create, so the full guard
+		// (rate limit, honeypot, captcha, metadata) applies to it too; other updates stay exempt.
+		const guarded =
+			operation === 'create' || (operation === 'update' && voteChangeTargetOf(req) !== undefined)
+		if (!guarded || !data) {
 			return data
 		}
 		const t = asTranslate(req.i18n.t)

@@ -1,3 +1,4 @@
+import { voteChangeTargetOf } from '../../submissions/votedCookie'
 import { keys } from '../../translations/keys'
 import { defineValidationRule } from '../defineValidationRule'
 
@@ -19,9 +20,15 @@ export const notAlreadySubmittedRule = defineValidationRule<Record<string, never
 		if (value == null || value === '' || !payload || formId == null) {
 			return true
 		}
+		// A vote change validates against everyone else's submissions, never its own stored row:
+		// without the exclusion a re-vote keeping the same value would always collide with itself.
+		const changeTarget = req ? voteChangeTargetOf(req) : undefined
 		const result = await payload.find({
 			collection: FORM_SUBMISSIONS_SLUG,
-			where: { form: { equals: formId } },
+			where:
+				changeTarget !== undefined
+					? { and: [{ form: { equals: formId } }, { id: { not_equals: changeTarget } }] }
+					: { form: { equals: formId } },
 			limit: SCAN_LIMIT,
 			depth: 0,
 			// Trusted internal dedup read: scan every prior submission of this form regardless of the

@@ -18,9 +18,10 @@ import { IDENTITY_CONTEXT_KEY } from '../spam/constants'
 import { keys } from '../translations/keys'
 import { asFieldTranslate, asTranslate } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
+import { formIdOf } from './formIdOf'
 import { runSubmission } from './runSubmission'
 import type { FormFieldInstance, SubmissionValue } from './types'
-import { POLL_CONTEXT_KEY } from './votedCookie'
+import { POLL_CONTEXT_KEY, type PollContextState, voteChangeTargetOf } from './votedCookie'
 
 export type ValidateSubmissionArgs = {
 	registry: FieldTypeRegistry
@@ -42,7 +43,8 @@ export type ValidateSubmissionArgs = {
 }
 
 /**
- * Server-authoritative submission validation. On create it loads the referenced form, re-runs every
+ * Server-authoritative submission validation. On create (and on a vote-change update flagged by the
+ * vote-submit endpoint) it loads the referenced form, re-runs every
  * field's required check, intrinsic validator, and declarative rules through `runSubmission`, threading
  * `req`/`payload` so server-only async rules can hit the DB, and throws a Payload `ValidationError` with
  * per-field paths on any failure. The client is never trusted.
@@ -61,13 +63,23 @@ export const validateSubmission =
 		pollSourceRegistry,
 		strictUploadOwnership,
 	}: ValidateSubmissionArgs): CollectionBeforeValidateHook =>
-	async ({ data, operation, req }) => {
-		if (operation !== 'create' || !data) {
+	async ({ data, operation, originalDoc, req }) => {
+		// Updates run the same create-grade pipeline only when the vote-change endpoint flagged the
+		// request; every other update (host server code with overrideAccess) keeps today's behavior.
+		const changeTarget = operation === 'update' ? voteChangeTargetOf(req) : undefined
+		if ((operation !== 'create' && changeTarget === undefined) || !data) {
 			return data
 		}
 		const formId = data.form
 		if (formId == null) {
 			return data
+		}
+		if (changeTarget !== undefined) {
+			const originalFormId = (originalDoc as { form?: unknown } | undefined)?.form
+			const boundFormId = originalFormId != null ? formIdOf(originalFormId) : null
+			if (boundFormId != null && String(boundFormId) !== String(formId)) {
+				throw new APIError('form-builder: a vote change cannot move a submission across forms', 400)
+			}
 		}
 
 		const form = await req.payload.findByID({
@@ -78,11 +90,14 @@ export const validateSubmission =
 			req,
 		})
 
-		// Stash whether the form is poll-enabled (its top-level `pollEnabled` flag) so the voted-cookie
-		// afterChange hook can skip a second form fetch on the same request.
+		// Stash the form's poll state so the voted-cookie afterChange hook can skip a second form
+		// fetch on the same request.
 		const poll = pollConfigOf(form.poll)
 		const pollEnabled = form.pollEnabled === true
-		req.context[POLL_CONTEXT_KEY] = pollEnabled
+		req.context[POLL_CONTEXT_KEY] = {
+			pollEnabled,
+			allowChange: poll?.allowChange === true,
+		} satisfies PollContextState
 
 		// Form-level lifecycle guard, before any field work: a closed poll accepts no submissions,
 		// regardless of what the client rendered.
