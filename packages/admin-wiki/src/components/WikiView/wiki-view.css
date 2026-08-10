@@ -116,52 +116,11 @@
 
 /* Index ------------------------------------------------------------------- */
 
-/* The shape of the list view's own search bar (packages/ui/src/elements/
-   SearchBar/index.scss): one elevated rounded surface with the glyph inside it,
-   the input transparent on top. Reproduced rather than imported because
-   `SearchFilter` writes the list view's URL query, which this page has none. */
-.wiki-index__search {
-	--icon-width: 40px;
-
-	background: var(--theme-elevation-50);
-	border-radius: var(--style-radius-m, 4px);
-	display: grid;
-	grid-template-columns: auto 1fr;
-	isolation: isolate;
+/* The controls carry Payload's own `list-controls`, `search-bar` and
+   `pill-selector` classes, whose styling ships in `@payloadcms/next/css`.
+   Nothing is restated here; only the gap to the guides below is this view's. */
+.wiki-index__controls {
 	margin-bottom: calc(var(--base) * 1.5);
-	max-width: 32rem;
-	min-height: 46px;
-}
-
-.wiki-index__search .icon--search {
-	align-self: center;
-	grid-area: 1 / 1 / 2 / 2;
-	justify-self: center;
-	pointer-events: none;
-	width: var(--icon-width);
-	z-index: 1;
-}
-
-.wiki-index__search-input {
-	background: transparent;
-	border: 0;
-	border-radius: inherit;
-	color: var(--theme-text);
-	font-family: var(--font-body);
-	font-size: 1rem;
-	grid-area: 1 / 1 / 2 / 3;
-	height: 100%;
-	padding-block: calc(var(--base) * 0.5);
-	padding-inline: var(--icon-width) var(--base);
-	width: 100%;
-}
-
-.wiki-index__search-input:focus {
-	outline: 0;
-}
-
-.wiki-index__search:focus-within {
-	box-shadow: 0 0 0 1px var(--theme-elevation-250);
 }
 
 .wiki-index__section + .wiki-index__section {

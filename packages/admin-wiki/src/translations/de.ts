@@ -82,6 +82,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.wikiEmptyHint]:
 		'Anleitungen hier erklären den Menschen, die damit arbeiten, dieses Admin-Panel.',
 	[keys.wikiFeaturedHeading]: 'Hervorgehoben',
+	[keys.wikiFilterLabel]: 'Filter',
 	[keys.wikiGuideNotFound]: 'Diese Anleitung existiert nicht oder ist nicht veröffentlicht.',
 	[keys.wikiNoResults]: 'Keine Anleitungen entsprechen Ihrer Suche.',
 	[keys.wikiNoResultsHint]: 'Versuchen Sie einen kürzeren Suchbegriff.',

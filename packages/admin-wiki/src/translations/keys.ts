@@ -75,6 +75,7 @@ export const keys = {
 	wikiEmpty: 'adminWiki:wikiEmpty',
 	wikiEmptyHint: 'adminWiki:wikiEmptyHint',
 	wikiFeaturedHeading: 'adminWiki:wikiFeaturedHeading',
+	wikiFilterLabel: 'adminWiki:wikiFilterLabel',
 	wikiGuideNotFound: 'adminWiki:wikiGuideNotFound',
 	wikiNoResults: 'adminWiki:wikiNoResults',
 	wikiNoResultsHint: 'adminWiki:wikiNoResultsHint',

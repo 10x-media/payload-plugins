@@ -1,13 +1,23 @@
 'use client'
 
-import { SearchIcon } from '@payloadcms/ui'
-import { useMemo, useState } from 'react'
+import {
+	AnimateHeight,
+	ChevronIcon,
+	Pill,
+	PillSelector,
+	SearchFilter,
+	SearchIcon,
+	useConfig,
+} from '@payloadcms/ui'
+import { useCallback, useMemo, useState } from 'react'
 
 import type { WikiTargetEntry } from '../../shared/targetKeys'
+import { chipTargetKeys, describeTargets } from '../../shared/targetLabels'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { BookIcon, StarIcon } from '../icons'
 import { TargetChips } from '../TargetChips/TargetChips'
+import { useWikiTargets } from '../WikiProvider/WikiProvider'
 import './wiki-view.css'
 
 export type WikiIndexClientProps = {
@@ -17,28 +27,78 @@ export type WikiIndexClientProps = {
 	entries: WikiTargetEntry[]
 }
 
+/** Ties the toggle pill to the panel it opens, for assistive tech. */
+const FILTERS_ID = 'wiki-index-filters'
+
 const matches = (entry: WikiTargetEntry, query: string): boolean =>
 	(entry.title ?? '').toLowerCase().includes(query) ||
 	(entry.summary ?? '').toLowerCase().includes(query) ||
 	(entry.targetKeys ?? []).some((key) => key.toLowerCase().includes(query))
 
 /**
- * The interactive half of the wiki index: a search box filtering the flat guide
- * list, with featured guides surfaced as cards while no search is active. Data
- * arrives fully resolved from the server view.
+ * The interactive half of the wiki index: a search box and target filters over
+ * the flat guide list, with featured guides surfaced as cards while neither is
+ * active. Data arrives fully resolved from the server view.
  *
- * The search bar reproduces the shape of the list view's own (a rounded
- * elevation surface with the glyph inside it) so the wiki reads as another
- * Payload listing rather than a page with a loose input on it.
+ * The controls reproduce `ListControls` structurally, not just visually: the
+ * same `list-controls` wrapper, `SearchFilter` inside `search-bar`, a toggle
+ * pill in `search-bar__actions`, and the panel behind `AnimateHeight`. Payload's
+ * stylesheet then does the rest, including the rule that spaces a `pill-selector`
+ * below the bar. A panel that is always open and labelled is the one thing a
+ * Payload list never shows, which is why the earlier version read as foreign.
+ *
+ * Filtering is `PillSelector` rather than a where-builder because guides attach
+ * to whole surfaces: picking among those surfaces is the entire query a reader
+ * can express.
  */
 export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 	const { t } = useTranslation()
+	const { config } = useConfig()
+	const { blockLabels } = useWikiTargets()
 	const [query, setQuery] = useState('')
+	const [selectedTargets, setSelectedTargets] = useState<string[]>([])
+	const [filtersOpen, setFiltersOpen] = useState(false)
 	const trimmed = query.trim().toLowerCase()
 	const linkable = useMemo(() => entries.filter((entry) => entry.slug), [entries])
-	const filtered = trimmed ? linkable.filter((entry) => matches(entry, trimmed)) : null
+
+	const onSearchChange = useCallback((search: string) => setQuery(search ?? ''), [])
+
+	/** Every surface some guide covers, labelled and sorted for the pill row. */
+	const targetOptions = useMemo(() => {
+		const unique = new Set<string>()
+		for (const entry of linkable) {
+			for (const key of chipTargetKeys(entry.targetKeys)) {
+				unique.add(key)
+			}
+		}
+		return describeTargets([...unique], {
+			blockLabels,
+			collections: config.collections,
+			globals: config.globals,
+		})
+			.map((target) => ({ key: `${target.kind}:${target.value}`, label: target.label }))
+			.sort((a, b) => a.label.localeCompare(b.label))
+	}, [blockLabels, config.collections, config.globals, linkable])
+
+	const toggleTarget = useCallback(
+		(key: string) =>
+			setSelectedTargets((current) =>
+				current.includes(key) ? current.filter((value) => value !== key) : [...current, key]
+			),
+		[]
+	)
+
+	const hasFilters = targetOptions.length > 1
+	const isFiltering = trimmed.length > 0 || selectedTargets.length > 0
+	const listed = isFiltering
+		? linkable.filter(
+				(entry) =>
+					(trimmed.length === 0 || matches(entry, trimmed)) &&
+					(selectedTargets.length === 0 ||
+						chipTargetKeys(entry.targetKeys).some((key) => selectedTargets.includes(key)))
+			)
+		: linkable
 	const featured = linkable.filter((entry) => entry.featured)
-	const listed = filtered ?? linkable
 
 	const renderRow = (entry: WikiTargetEntry) => (
 		<li className="wiki-index__row" key={entry.id}>
@@ -69,18 +129,40 @@ export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 
 	return (
 		<div className="wiki-index">
-			<div className="wiki-index__search">
-				<SearchIcon />
-				<input
-					aria-label={t(keys.wikiSearchPlaceholder)}
-					className="wiki-index__search-input"
-					onChange={(event) => setQuery(event.target.value)}
-					placeholder={t(keys.wikiSearchPlaceholder)}
-					type="search"
-					value={query}
-				/>
+			<div className="list-controls wiki-index__controls">
+				<div className="search-bar">
+					<SearchIcon />
+					<SearchFilter handleChange={onSearchChange} label={t(keys.wikiSearchPlaceholder)} />
+					{hasFilters ? (
+						<div className="search-bar__actions">
+							<Pill
+								aria-controls={FILTERS_ID}
+								aria-expanded={filtersOpen}
+								className="list-controls__toggle-where"
+								icon={<ChevronIcon direction={filtersOpen ? 'up' : 'down'} />}
+								onClick={() => setFiltersOpen((open) => !open)}
+								pillStyle="light"
+								size="small"
+							>
+								{t(keys.wikiFilterLabel)}
+							</Pill>
+						</div>
+					) : null}
+				</div>
+				{hasFilters ? (
+					<AnimateHeight height={filtersOpen ? 'auto' : 0} id={FILTERS_ID}>
+						<PillSelector
+							onClick={({ pill }) => toggleTarget(pill.key ?? pill.name)}
+							pills={targetOptions.map((option) => ({
+								key: option.key,
+								name: option.label,
+								selected: selectedTargets.includes(option.key),
+							}))}
+						/>
+					</AnimateHeight>
+				) : null}
 			</div>
-			{filtered === null && featured.length > 0 ? (
+			{!isFiltering && featured.length > 0 ? (
 				<section className="wiki-index__section">
 					<h2 className="wiki-index__heading">{t(keys.wikiFeaturedHeading)}</h2>
 					<div className="wiki-index__cards">
@@ -105,7 +187,7 @@ export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 			) : null}
 			<section className="wiki-index__section">
 				<h2 className="wiki-index__heading">
-					{filtered === null ? t(keys.wikiAllGuidesHeading) : t(keys.wikiSearchPlaceholder)}
+					{isFiltering ? t(keys.wikiSearchPlaceholder) : t(keys.wikiAllGuidesHeading)}
 					<span className="wiki-index__count">
 						{listed.length === 1
 							? t(keys.guideCountOne)

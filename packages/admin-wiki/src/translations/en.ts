@@ -79,6 +79,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.wikiEmpty]: 'No guides have been published yet.',
 	[keys.wikiEmptyHint]: 'Guides written here explain this admin panel to the people using it.',
 	[keys.wikiFeaturedHeading]: 'Featured',
+	[keys.wikiFilterLabel]: 'Filters',
 	[keys.wikiGuideNotFound]: 'This guide does not exist or is not published.',
 	[keys.wikiNoResults]: 'No guides match your search.',
 	[keys.wikiNoResultsHint]: 'Try a shorter search term.',
