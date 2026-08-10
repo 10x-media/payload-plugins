@@ -1,7 +1,7 @@
 import type { FieldKind, FieldMap } from './buildFieldMap'
 
-// updatedAt is always excluded — it changes on every save and adds noise
-// id is always excluded — it never changes for a document; appears as null in version snapshots
+// updatedAt is always excluded, it changes on every save and adds noise
+// id is always excluded, it never changes for a document; appears as null in version snapshots
 // when diffing against a fetched version (findVersions returns version data without the document id)
 const ALWAYS_EXCLUDED_PATHS = new Set(['updatedAt', 'id'])
 
@@ -21,7 +21,7 @@ const isPolymorphicRelationship = (val: unknown): val is { relationTo: string; v
 /**
  * If the value is a populated Payload document (plain object with `id`), returns its `id`.
  * If the value is a polymorphic relationship object (`{ relationTo, value }`), returns a
- * normalized form `{ relationTo, value: id }` — collapsing any populated `value` to its id.
+ * normalized form `{ relationTo, value: id }`, collapsing any populated `value` to its id.
  * Otherwise returns the value as-is.
  * Used to normalize relationship fields before comparison.
  */
@@ -45,7 +45,7 @@ const isIdTrackedArray = (arr: unknown[]): arr is Array<Record<string, unknown>>
 
 /**
  * Shallow equality check.
- * null and undefined are treated as equal — Payload may return either depending on the DB adapter.
+ * null and undefined are treated as equal, Payload may return either depending on the DB adapter.
  * Arrays and objects are compared by JSON serialization.
  */
 const isEqual = (a: unknown, b: unknown): boolean => {
@@ -76,7 +76,7 @@ const getFieldKind = (path: string, fieldMap: FieldMap): FieldKind | undefined =
 	return undefined
 }
 
-// Forward declaration — diffRecursive and diffArrayByIds call each other
+// Forward declaration, diffRecursive and diffArrayByIds call each other
 let diffRecursive: (
 	before: Record<string, unknown>,
 	after: Record<string, unknown>,
@@ -96,7 +96,7 @@ let diffRecursive: (
  *   Only recorded when the relative order of items present in BOTH arrays changes.
  *   Pure add/remove operations do not trigger `__order__` since item-level diffs already capture them.
  *
- * Supports arbitrarily nested arrays — recursion handles array fields inside array items.
+ * Supports arbitrarily nested arrays, recursion handles array fields inside array items.
  */
 // biome-ignore lint/complexity/useMaxParams: before/after arrays plus path, exclude set, accumulator and field map are all needed by the recursion
 const diffArrayByIds = (
@@ -114,7 +114,7 @@ const diffArrayByIds = (
 	const afterIds = after.map((item) => String(item.id))
 
 	// Detect reorder of items that exist in both arrays.
-	// Pure add/remove does not trigger __order__ — item-level diffs already capture that.
+	// Pure add/remove does not trigger __order__, item-level diffs already capture that.
 	const sharedBeforeOrder = beforeIds.filter((id) => afterMap.has(id))
 	const sharedAfterOrder = afterIds.filter((id) => beforeMap.has(id))
 	if (!isEqual(sharedBeforeOrder, sharedAfterOrder)) {
@@ -164,7 +164,7 @@ diffRecursive = (
 		if (fieldMap) {
 			const kind = getFieldKind(path, fieldMap)
 			// join fields are virtual (not stored in DB) but can appear in hooks when selected.
-			// Skip them entirely — they carry no meaningful audit information.
+			// Skip them entirely, they carry no meaningful audit information.
 			if (kind === 'join') continue
 			if (kind === 'rel-single') {
 				const normBefore = extractId(beforeVal) ?? null
@@ -188,7 +188,7 @@ diffRecursive = (
 
 		// Populated relationship: one side is a raw ID (string/number), the other is a populated
 		// document object. Payload's afterChange hook may provide `doc` at request depth while
-		// `previousDoc` is always at depth 0 — causing this asymmetry.
+		// `previousDoc` is always at depth 0, causing this asymmetry.
 		// Normalize both sides to their IDs before comparing.
 		const beforeIsScalar = typeof beforeVal === 'string' || typeof beforeVal === 'number'
 		const afterIsScalar = typeof afterVal === 'string' || typeof afterVal === 'number'
@@ -219,7 +219,7 @@ diffRecursive = (
 			const beforeIsPopulated = isIdTrackedArray(beforeVal)
 			const afterIsPopulated = isIdTrackedArray(afterVal)
 
-			// Relationship array: one side raw IDs, other side populated objects — normalize to IDs
+			// Relationship array: one side raw IDs, other side populated objects, normalize to IDs
 			if ((beforeIsScalars && afterIsPopulated) || (afterIsScalars && beforeIsPopulated)) {
 				const normBefore = beforeVal.map(extractId)
 				const normAfter = afterVal.map(extractId)
@@ -248,7 +248,7 @@ diffRecursive = (
 /**
  * Walks a fieldMap path into a snapshot object and normalizes the value at the leaf.
  * `*` segments mean "iterate every item in the array at this level".
- * Creates shallow copies of every object/array touched — original is never mutated.
+ * Creates shallow copies of every object/array touched, original is never mutated.
  */
 const applySnapshotNorm = (
 	obj: Record<string, unknown>,
@@ -260,8 +260,8 @@ const applySnapshotNorm = (
 	if (head === undefined) return
 
 	if (rest.length === 0) {
-		// Leaf — normalize in place (obj is already a copy).
-		// Skip if the field is absent — don't inject nulls for fields not present in this doc.
+		// Leaf, normalize in place (obj is already a copy).
+		// Skip if the field is absent, don't inject nulls for fields not present in this doc.
 		if (!(head in obj)) return
 		const val = obj[head]
 		obj[head] =
@@ -298,7 +298,7 @@ const applySnapshotNorm = (
  * Populated relationship objects are collapsed to plain IDs (or arrays of IDs for has-many),
  * matching the format used by `computeDiff`.
  *
- * Returns a new object — the input is never mutated.
+ * Returns a new object, the input is never mutated.
  */
 export const normalizeSnapshot = (
 	doc: Record<string, unknown>,

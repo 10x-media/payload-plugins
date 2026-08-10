@@ -6,10 +6,10 @@ import { useCallback, useEffect, useState } from 'react'
 
 import './index.css'
 
-import { keys } from '../../translations/keys'
-import { useTranslation } from '../../translations/useTranslation'
-import { FilterBar } from './components/FilterBar/index'
-import { LogRow } from './components/LogRow'
+import { keys } from '../translations/keys'
+import { useTranslation } from '../translations/useTranslation'
+import { FilterBar } from './filter-bar'
+import { LogRow } from './LogRow'
 import type { AuditLogDoc, AuditLogsClientProps } from './types'
 import { buildParams } from './utils'
 

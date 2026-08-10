@@ -3,8 +3,8 @@
 import { ReactSelect } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useState } from 'react'
-import { keys } from '../../../../translations/keys'
-import { useTranslation } from '../../../../translations/useTranslation'
+import { keys } from '../../translations/keys'
+import { useTranslation } from '../../translations/useTranslation'
 import { PayloadDocSelect } from './PayloadDocSelect'
 import type { EditorProps, SelectOption } from './types'
 

@@ -1,3 +1,5 @@
+import type { CollectionSlug, GlobalSlug } from 'payload'
+
 import type { AnonymizeFunction } from '../types'
 import { REDACTED } from '../types'
 
@@ -5,7 +7,7 @@ import { REDACTED } from '../types'
 const anonymizeValue = (
 	value: unknown,
 	path: string,
-	collection: string,
+	collection: CollectionSlug | GlobalSlug,
 	documentId: string,
 	operation: 'create' | 'delete' | 'update',
 	anonymize: AnonymizeFunction
@@ -38,12 +40,12 @@ const anonymizeValue = (
 /**
  * Recursively anonymizes a document snapshot using full dot-notation paths.
  * For each field, `anonymize` is called with its full path (e.g. `"address.street"`).
- * Return `REDACTED` to omit a value — nested children are skipped entirely.
+ * Return `REDACTED` to omit a value, nested children are skipped entirely.
  */
 // biome-ignore lint/complexity/useMaxParams: mirrors anonymizeValue, minus the per-value path
 export const anonymizeDoc = (
 	doc: Record<string, unknown>,
-	collection: string,
+	collection: CollectionSlug | GlobalSlug,
 	documentId: string,
 	operation: 'create' | 'delete' | 'update',
 	anonymize: AnonymizeFunction

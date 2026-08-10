@@ -6,14 +6,14 @@
  */
 
 // Is T a "relationship" type? Heuristic: NonNullable<T> includes both a primitive (string/number)
-// and an object — matching the shape Payload generates: `string | User | null`.
+// and an object, matching the shape Payload generates: `string | User | null`.
 type IsRelationship<T> = [Extract<NonNullable<T>, string | number>] extends [never]
 	? false
 	: [Extract<NonNullable<T>, object>] extends [never]
 		? false
 		: true
 
-// Depth counter — incremented on each recursive call. Stops expansion at 8 levels,
+// Depth counter, incremented on each recursive call. Stops expansion at 8 levels,
 // which prevents runaway instantiation on self-referential Payload types (e.g. relatedArticles).
 type _Next = [1, 2, 3, 4, 5, 6, 7, 8, ...never[]]
 
@@ -61,9 +61,9 @@ export type DiffPathValue<T, P extends string> = P extends `${infer K}.${infer R
 					: Rest extends `${string}.${infer SubRest}`
 						? DiffPathValue<Item, SubRest>
 						: Item | null // whole item path (added / removed)
-				: unknown // primitive array — no sub-paths
+				: unknown // primitive array, no sub-paths
 			: DiffPathValue<NonNullable<T[K]>, Rest>
-		: unknown // dynamic segment (array item ID) — caller already narrowed above
+		: unknown // dynamic segment (array item id), caller already narrowed above
 	: P extends keyof T
 		? IsRelationship<T[P]> extends true
 			? string | number
@@ -81,7 +81,7 @@ const toRawDiff = (value: unknown): Record<string, { before: unknown; after: unk
 /**
  * Wraps the `diff` field of an AuditLog document and provides type-safe access.
  *
- * The `diff` field is typed as a wide Payload JSON union — this utility restores precise types
+ * The `diff` field is typed as a wide Payload JSON union, this utility restores precise types
  * without casting the whole object.
  *
  * @example

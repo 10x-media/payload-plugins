@@ -1,3 +1,3 @@
 'use client'
 
-export { AuditRelationshipField } from '../components/AuditRelationshipField/index'
+export { AuditRelationshipField } from '../fields/AuditRelationshipField'

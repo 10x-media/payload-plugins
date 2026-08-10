@@ -31,7 +31,7 @@ export function buildFieldMap(fields: Field[], prefix = '', map: FieldMap = new 
 				break
 
 			case 'group':
-				// groupHasName from payload/shared is typed for client fields only — check inline instead
+				// groupHasName from payload/shared is typed for client fields only, check inline instead
 				if ('name' in field && fieldAffectsData(field)) {
 					buildFieldMap(field.fields, prefix ? `${prefix}.${field.name}` : field.name, map)
 				} else {

@@ -1,6 +1,6 @@
 import { createGzip } from 'node:zlib'
 
-import type { CollectionSlug, Field, TaskConfig, Where } from 'payload'
+import type { CollectionSlug, Field, GlobalSlug, TaskConfig, Where } from 'payload'
 
 import type { AnonymizeFunction, ArchiveJobHooks } from '../types'
 import { REDACTED } from '../types'
@@ -30,7 +30,7 @@ const PLUGIN_COLUMNS = [
 	'userAgent',
 ]
 
-/** Fields managed by Payload internals — never meaningful to include in a CSV export. */
+/** Fields managed by Payload internals, never meaningful to include in a CSV export. */
 const ALWAYS_SKIP = new Set(['archivedAt', 'updatedAt'])
 
 const escapeCell = (val: unknown): string => {
@@ -84,7 +84,7 @@ export const buildArchiveTask = (options: ArchiveTaskOptions): TaskConfig => ({
 
 		await options.hooks?.beforeRun?.({ req, job })
 
-		// Stream-compress rows page by page — never hold more than one page of docs in memory.
+		// Stream-compress rows page by page, never hold more than one page of docs in memory.
 		const gzip = createGzip()
 		const chunks: Buffer[] = []
 		gzip.on('data', (chunk: Buffer) => chunks.push(chunk))
@@ -108,7 +108,7 @@ export const buildArchiveTask = (options: ArchiveTaskOptions): TaskConfig => ({
 			})
 
 			for (const doc of result.docs) {
-				const collection = String(doc.relationTo)
+				const collection = String(doc.relationTo) as CollectionSlug | GlobalSlug
 				const documentId = String(doc.documentId ?? '')
 				const anonymize = options.anonymize?.[collection]
 

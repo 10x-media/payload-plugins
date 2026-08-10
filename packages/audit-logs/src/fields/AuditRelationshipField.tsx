@@ -16,7 +16,7 @@ import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { RelationshipFieldClientComponent, ValueWithRelation } from 'payload'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import './index.css'
+import './AuditRelationshipField.css'
 
 const baseClass = 'audit-relationship-field'
 

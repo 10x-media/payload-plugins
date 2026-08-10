@@ -1,4 +1,4 @@
-import type { CollectionAfterChangeHook } from 'payload'
+import type { CollectionAfterChangeHook, CollectionSlug } from 'payload'
 
 import type { AnonymizeFunction, ShouldLogFunction } from '../types'
 import { REDACTED } from '../types'
@@ -7,10 +7,11 @@ import type { FieldMap } from '../utilities/buildFieldMap'
 import { computeDiff, normalizeSnapshot } from '../utilities/diff'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
+import { writeAuditLog } from '../utilities/writeAuditLog'
 
 export type AuditLogAfterChangeOptions = {
 	anonymize?: AnonymizeFunction
-	collectionSlug: string
+	collectionSlug: CollectionSlug
 	collectIpAddress: boolean
 	collectUserAgent: boolean
 	drafts: 'ignore' | 'log'
@@ -28,7 +29,7 @@ export type AuditLogAfterChangeOptions = {
 // biome-ignore lint/complexity/useMaxParams: the five values are exactly what AnonymizeFunction is called with
 const applyAnonymization = (
 	diff: Record<string, { after: unknown; before: unknown }>,
-	collectionSlug: string,
+	collectionSlug: CollectionSlug,
 	documentId: string,
 	operation: 'create' | 'delete' | 'update',
 	anonymize: AnonymizeFunction
@@ -66,7 +67,7 @@ export const afterChangeCollectionAuditLog =
 
 		// Draft handling: skip autosave draft saves; on publish fetch the last published version
 		// so the diff reflects "previous publish → new publish" rather than "last draft → publish".
-		// Create is always logged regardless — the document coming into existence is a meaningful event.
+		// Create is always logged regardless, the document coming into existence is a meaningful event.
 		if (options.drafts === 'ignore' && operation !== 'create' && doc._status === 'draft') return
 
 		const documentId = String(doc.id)
@@ -138,22 +139,18 @@ export const afterChangeCollectionAuditLog =
 					? normalizeSnapshot(snapshotRaw, options.fieldMap)
 					: snapshotRaw
 
-			await req.payload.create({
-				collection: 'audit-logs',
-				data: {
-					operation: 'create',
-					relationTo: options.collectionSlug,
-					documentId,
-					...(userValue !== undefined && { user: userValue }),
-					...(req.locale && { locale: req.locale }),
-					payloadAPI: req.payloadAPI,
-					...(ipAddress && { ipAddress }),
-					...(userAgent && { userAgent }),
-					...(snapshot && { snapshot }),
-					...(tenantValue != null && { tenant: tenantValue }),
-					...(group && { group }),
-				},
-				overrideAccess: true,
+			await writeAuditLog(req, {
+				operation: 'create',
+				relationTo: options.collectionSlug,
+				documentId,
+				...(userValue !== undefined && { user: userValue }),
+				...(req.locale && { locale: req.locale }),
+				payloadAPI: req.payloadAPI,
+				...(ipAddress && { ipAddress }),
+				...(userAgent && { userAgent }),
+				...(snapshot && { snapshot }),
+				...(tenantValue != null && { tenant: tenantValue }),
+				...(group && { group }),
 			})
 			return
 		}
@@ -165,7 +162,7 @@ export const afterChangeCollectionAuditLog =
 			options.fieldMap
 		)
 
-		// On update with no changes, skip — only excluded fields changed
+		// On update with no changes, skip, only excluded fields changed
 		if (operation === 'update' && changedPaths.length === 0) return
 
 		if (options.shouldLog) {
@@ -184,22 +181,18 @@ export const afterChangeCollectionAuditLog =
 			? applyAnonymization(diff, options.collectionSlug, documentId, operation, options.anonymize)
 			: diff
 
-		await req.payload.create({
-			collection: 'audit-logs',
-			data: {
-				operation,
-				relationTo: options.collectionSlug,
-				documentId,
-				...(userValue !== undefined && { user: userValue }),
-				...(req.locale && { locale: req.locale }),
-				payloadAPI: req.payloadAPI,
-				...(ipAddress && { ipAddress }),
-				...(userAgent && { userAgent }),
-				changedPaths,
-				diff: finalDiff,
-				...(tenantValue != null && { tenant: tenantValue }),
-				...(group && { group }),
-			},
-			overrideAccess: true,
+		await writeAuditLog(req, {
+			operation,
+			relationTo: options.collectionSlug,
+			documentId,
+			...(userValue !== undefined && { user: userValue }),
+			...(req.locale && { locale: req.locale }),
+			payloadAPI: req.payloadAPI,
+			...(ipAddress && { ipAddress }),
+			...(userAgent && { userAgent }),
+			changedPaths,
+			diff: finalDiff,
+			...(tenantValue != null && { tenant: tenantValue }),
+			...(group && { group }),
 		})
 	}

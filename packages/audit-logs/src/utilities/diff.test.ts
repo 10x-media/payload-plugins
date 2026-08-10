@@ -291,7 +291,7 @@ describe('computeDiff', () => {
 			expect(result.diff['steps.abc']).toEqual({ before: { id: 'abc', title: 'A' }, after: null })
 		})
 
-		it('supports nested arrays inside array items — field change', () => {
+		it('supports nested arrays inside array items, field change', () => {
 			const result = computeDiff(
 				{ sections: [{ id: 's1', blocks: [{ id: 'b1', text: 'Old' }] }] },
 				{ sections: [{ id: 's1', blocks: [{ id: 'b1', text: 'New' }] }] }
@@ -301,7 +301,7 @@ describe('computeDiff', () => {
 			})
 		})
 
-		it('supports nested arrays inside array items — item added in inner array', () => {
+		it('supports nested arrays inside array items, item added in inner array', () => {
 			const result = computeDiff(
 				{ sections: [{ id: 's1', blocks: [{ id: 'b1', text: 'A' }] }] },
 				{
@@ -323,7 +323,7 @@ describe('computeDiff', () => {
 			expect(result.diff['sections.s1.blocks.b1']).toBeUndefined()
 		})
 
-		it('supports nested arrays inside array items — item removed in inner array', () => {
+		it('supports nested arrays inside array items, item removed in inner array', () => {
 			const result = computeDiff(
 				{
 					sections: [
@@ -344,7 +344,7 @@ describe('computeDiff', () => {
 			})
 		})
 
-		it('supports nested arrays inside array items — reorder in inner array', () => {
+		it('supports nested arrays inside array items, reorder in inner array', () => {
 			const result = computeDiff(
 				{
 					sections: [
@@ -545,7 +545,7 @@ describe('computeDiff', () => {
 					sections: [{ id: 's1', blocks: [{ id: 'b1', text: 'A' }] }],
 				}
 			)
-			// Entire s2 recorded as removed — does not recurse into a removed item
+			// Entire s2 recorded as removed, does not recurse into a removed item
 			expect(result.diff['sections.s2']).toEqual({
 				before: { id: 's2', blocks: [{ id: 'b2', text: 'B' }] },
 				after: null,
@@ -776,7 +776,7 @@ describe('computeDiff', () => {
 			entries: [string, 'rel-single' | 'rel-many' | 'join'][]
 		): Map<string, 'rel-single' | 'rel-many' | 'join'> => new Map(entries)
 
-		describe('rel-single — top-level', () => {
+		describe('rel-single, top-level', () => {
 			it('no diff when both sides are the same raw ID', () => {
 				const result = computeDiff(
 					{ author: 'id-a' },
@@ -798,7 +798,7 @@ describe('computeDiff', () => {
 			})
 
 			it('no diff when both sides are populated objects with the same ID', () => {
-				// This is the case heuristics can NOT handle — both sides are objects, no scalar asymmetry.
+				// This is the case heuristics can NOT handle, both sides are objects, no scalar asymmetry.
 				// fieldMap normalizes both to IDs before comparing.
 				const result = computeDiff(
 					{ author: { id: 'id-a', name: 'Alice', role: 'admin' } },
@@ -840,7 +840,7 @@ describe('computeDiff', () => {
 			})
 		})
 
-		describe('rel-many — top-level', () => {
+		describe('rel-many, top-level', () => {
 			it('no diff when both sides are the same raw ID arrays', () => {
 				const result = computeDiff(
 					{ tags: ['id-1', 'id-2'] },
@@ -1073,7 +1073,7 @@ describe('computeDiff', () => {
 		})
 
 		describe('fields not in fieldMap use existing logic', () => {
-			it('non-relationship field unchanged — no diff', () => {
+			it('non-relationship field unchanged, no diff', () => {
 				const result = computeDiff(
 					{ title: 'Hello', owner: 'id-a' },
 					{ title: 'Hello', owner: 'id-a' },
@@ -1383,7 +1383,7 @@ describe('normalizeSnapshot', () => {
 	it('skips join fields entirely', () => {
 		const doc = { title: 'Post', related: { docs: [{ id: 'x' }], hasNextPage: false } }
 		const result = normalizeSnapshot(doc, fm([['related', 'join']]))
-		// join fields are not touched — still present in snapshot
+		// join fields are not touched, still present in snapshot
 		expect(result.related).toEqual(doc.related)
 	})
 

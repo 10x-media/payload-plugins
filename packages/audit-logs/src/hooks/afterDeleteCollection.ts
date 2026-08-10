@@ -1,4 +1,4 @@
-import type { CollectionAfterDeleteHook } from 'payload'
+import type { CollectionAfterDeleteHook, CollectionSlug } from 'payload'
 
 import type { AnonymizeFunction, ShouldLogFunction } from '../types'
 import { anonymizeDoc } from '../utilities/anonymize'
@@ -6,10 +6,11 @@ import type { FieldMap } from '../utilities/buildFieldMap'
 import { normalizeSnapshot } from '../utilities/diff'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
+import { writeAuditLog } from '../utilities/writeAuditLog'
 
 export type AuditLogAfterDeleteOptions = {
 	anonymize?: AnonymizeFunction
-	collectionSlug: string
+	collectionSlug: CollectionSlug
 	collectIpAddress: boolean
 	collectUserAgent: boolean
 	fieldMap?: FieldMap
@@ -67,21 +68,17 @@ export const afterDeleteCollectionAuditLog =
 			snapshot = options.fieldMap ? normalizeSnapshot(snapshotRaw, options.fieldMap) : snapshotRaw
 		}
 
-		await req.payload.create({
-			collection: 'audit-logs',
-			data: {
-				operation: 'delete',
-				relationTo: options.collectionSlug,
-				documentId,
-				...(userValue !== undefined && { user: userValue }),
-				...(req.locale && { locale: req.locale }),
-				payloadAPI: req.payloadAPI,
-				...(ipAddress && { ipAddress }),
-				...(userAgent && { userAgent }),
-				...(snapshot && { snapshot }),
-				...(tenantValue != null && { tenant: tenantValue }),
-				...(group && { group }),
-			},
-			overrideAccess: true,
+		await writeAuditLog(req, {
+			operation: 'delete',
+			relationTo: options.collectionSlug,
+			documentId,
+			...(userValue !== undefined && { user: userValue }),
+			...(req.locale && { locale: req.locale }),
+			payloadAPI: req.payloadAPI,
+			...(ipAddress && { ipAddress }),
+			...(userAgent && { userAgent }),
+			...(snapshot && { snapshot }),
+			...(tenantValue != null && { tenant: tenantValue }),
+			...(group && { group }),
 		})
 	}

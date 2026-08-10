@@ -1,4 +1,4 @@
-import type { GlobalAfterChangeHook } from 'payload'
+import type { GlobalAfterChangeHook, GlobalSlug } from 'payload'
 
 import type { AnonymizeFunction, ShouldLogFunction } from '../types'
 import { REDACTED } from '../types'
@@ -6,6 +6,7 @@ import type { FieldMap } from '../utilities/buildFieldMap'
 import { computeDiff } from '../utilities/diff'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
+import { writeAuditLog } from '../utilities/writeAuditLog'
 
 export type AuditLogGlobalAfterChangeOptions = {
 	anonymize?: AnonymizeFunction
@@ -14,7 +15,7 @@ export type AuditLogGlobalAfterChangeOptions = {
 	drafts: 'ignore' | 'log'
 	excludeFields?: string[]
 	fieldMap?: FieldMap
-	globalSlug: string
+	globalSlug: GlobalSlug
 	groupContextKey?: string
 	isUserPolymorphic: boolean
 	shouldLog?: ShouldLogFunction
@@ -23,7 +24,7 @@ export type AuditLogGlobalAfterChangeOptions = {
 
 const applyAnonymization = (
 	diff: Record<string, { after: unknown; before: unknown }>,
-	globalSlug: string,
+	globalSlug: GlobalSlug,
 	anonymize: AnonymizeFunction
 ): Record<string, { after: unknown; before: unknown }> => {
 	const result: Record<string, { after: unknown; before: unknown }> = {}
@@ -116,22 +117,18 @@ export const afterChangeGlobalAuditLog =
 			? applyAnonymization(diff, options.globalSlug, options.anonymize)
 			: diff
 
-		await req.payload.create({
-			collection: 'audit-logs',
-			data: {
-				operation: 'update',
-				relationTo: '__global__',
-				documentId: options.globalSlug,
-				...(userValue !== undefined && { user: userValue }),
-				...(req.locale && { locale: req.locale }),
-				payloadAPI: req.payloadAPI,
-				...(ipAddress && { ipAddress }),
-				...(userAgent && { userAgent }),
-				changedPaths,
-				diff: finalDiff,
-				...(tenantValue != null && { tenant: tenantValue }),
-				...(group && { group }),
-			},
-			overrideAccess: true,
+		await writeAuditLog(req, {
+			operation: 'update',
+			relationTo: '__global__',
+			documentId: options.globalSlug,
+			...(userValue !== undefined && { user: userValue }),
+			...(req.locale && { locale: req.locale }),
+			payloadAPI: req.payloadAPI,
+			...(ipAddress && { ipAddress }),
+			...(userAgent && { userAgent }),
+			changedPaths,
+			diff: finalDiff,
+			...(tenantValue != null && { tenant: tenantValue }),
+			...(group && { group }),
 		})
 	}

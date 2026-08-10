@@ -21,7 +21,7 @@ export const displayUser = (user: unknown, userTitleFields: Record<string, strin
 			const titleField = userTitleFields[u.relationTo] ?? 'id'
 			return String(doc[titleField] ?? doc.id ?? '—')
 		}
-		// Non-polymorphic populated: direct doc — single auth collection
+		// Non-polymorphic populated: direct doc, single auth collection
 		// Read out rather than indexed: a length check does not tell the compiler the element
 		// exists. The single entry condition is unchanged.
 		const entries = Object.entries(userTitleFields)

@@ -83,7 +83,7 @@ export const buildAuditLogsCollection = (
 				index: true,
 			},
 			{
-				// 'GraphQL' | 'local' | 'REST' — useful to distinguish server-side vs user-initiated changes
+				// 'GraphQL' | 'local' | 'REST', useful to distinguish server-side vs user-initiated changes
 				// Note that changes from admin panel are always from REST api
 				name: 'payloadAPI',
 				type: 'select',
@@ -97,7 +97,7 @@ export const buildAuditLogsCollection = (
 				},
 			},
 			{
-				// Client IP — extracted from x-forwarded-for or x-real-ip headers
+				// Client IP, extracted from x-forwarded-for or x-real-ip headers
 				name: 'ipAddress',
 				type: 'text',
 				admin: {
@@ -125,7 +125,7 @@ export const buildAuditLogsCollection = (
 				type: 'json',
 			},
 			{
-				// Full document snapshot — populated on create (snapshotOnCreate) or delete (snapshotOnDelete)
+				// Full document snapshot, populated on create (snapshotOnCreate) or delete (snapshotOnDelete)
 				name: 'snapshot',
 				type: 'json',
 			},

@@ -1,5 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
+import { writeAuditLog } from './writeAuditLog'
+
 export type CreateAuditEventOptions = {
 	/**
 	 * The collection or global slug this event relates to.
@@ -38,7 +40,7 @@ export type CreateAuditEventOptions = {
  * of automatic create/update/delete tracking.
  *
  * `user` and `locale` are auto-populated from `req`. The log `createdAt` reflects
- * when this function is called — use `metadata` to record any domain-specific timestamps
+ * when this function is called, use `metadata` to record any domain-specific timestamps
  * that differ (e.g. the date an infraction actually occurred).
  *
  * @example
@@ -71,21 +73,17 @@ export const createAuditEvent = async (
 			? ((req.context as Record<string, unknown>)?.auditGroup as string | undefined)
 			: undefined)
 
-	await req.payload.create({
-		collection: 'audit-logs',
-		data: {
-			operation: 'custom',
-			eventType: options.eventType,
-			relationTo: options.collection,
-			...(options.documentId != null && { documentId: String(options.documentId) }),
-			...(req.user && {
-				user: isPolymorphic ? { relationTo: req.user.collection, value: req.user.id } : req.user.id,
-			}),
-			...(req.locale && { locale: req.locale }),
-			payloadAPI: req.payloadAPI,
-			...(options.metadata && { metadata: options.metadata }),
-			...(group && { group }),
-		},
-		overrideAccess: true,
+	await writeAuditLog(req, {
+		operation: 'custom',
+		eventType: options.eventType,
+		relationTo: options.collection,
+		...(options.documentId != null && { documentId: String(options.documentId) }),
+		...(req.user && {
+			user: isPolymorphic ? { relationTo: req.user.collection, value: req.user.id } : req.user.id,
+		}),
+		...(req.locale && { locale: req.locale }),
+		payloadAPI: req.payloadAPI,
+		...(options.metadata && { metadata: options.metadata }),
+		...(group && { group }),
 	})
 }

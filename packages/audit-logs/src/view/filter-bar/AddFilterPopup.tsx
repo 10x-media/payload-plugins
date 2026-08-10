@@ -3,9 +3,9 @@
 import { Popup, PopupList } from '@payloadcms/ui'
 import type React from 'react'
 import { useState } from 'react'
-import { keys } from '../../../../translations/keys'
-import { useTranslation } from '../../../../translations/useTranslation'
-import type { Filters, SelectOption } from '../../types'
+import { keys } from '../../translations/keys'
+import { useTranslation } from '../../translations/useTranslation'
+import type { Filters, SelectOption } from '../types'
 import type { AvailableFilter, FilterField } from './types'
 import { ValueEditor } from './ValueEditor'
 

@@ -8,11 +8,10 @@ export default definePluginBuild({
 		'exports/rsc': 'src/exports/rsc.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 	},
+	// The build leaves `import './x.css'` in place, so the stylesheets have to land
+	// next to their compiled component.
 	copy: [
-		{ from: 'src/components/AuditLogsView/index.css', to: 'dist/components/AuditLogsView' },
-		{
-			from: 'src/components/AuditRelationshipField/index.css',
-			to: 'dist/components/AuditRelationshipField',
-		},
+		{ from: 'src/view/index.css', to: 'dist/view' },
+		{ from: 'src/fields/AuditRelationshipField.css', to: 'dist/fields' },
 	],
 })

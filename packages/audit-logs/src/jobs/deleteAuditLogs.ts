@@ -25,7 +25,7 @@ export const buildDeleteTask = (options: DeleteTaskOptions): TaskConfig => ({
 
 		await options.hooks?.beforeRun?.({ req, job })
 
-		// Always re-query page 1 — after each batch is deleted, the next batch shifts up
+		// Always re-query page 1, after each batch is deleted, the next batch shifts up
 		while (true) {
 			const { docs } = await req.payload.find({
 				collection: 'audit-logs',

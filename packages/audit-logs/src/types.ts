@@ -17,7 +17,7 @@ export type ArchiveJobHooks = {
 	 * Called after each page of logs is written to the CSV stream.
 	 * Use this for heartbeats, progress tracking, or per-batch logging.
 	 *
-	 * @example — heartbeat
+	 * @example heartbeat
 	 * afterBatch: async ({ req, job }) => {
 	 *   await updateJobHeartbeat(req.payload, job.id, job.meta)
 	 * }
@@ -74,8 +74,8 @@ export type DataRetentionConfig = {
 	 * or all logs unconditionally (when used without `archive`).
 	 * Should run less frequently than `archive.cron`.
 	 *
-	 * @example '0 3 1 * *'  — first day of each month at 3 AM
-	 * @example '0 3 * * 0'  — every Sunday at 3 AM
+	 * @example '0 3 1 * *' (first day of each month at 3 AM)
+	 * @example '0 3 * * 0' (every Sunday at 3 AM)
 	 */
 	deleteCron: string
 	/**
@@ -106,8 +106,8 @@ export type DataRetentionConfig = {
 		 * Each run archives all logs not yet archived (`archivedAt IS NULL`).
 		 * Should run more frequently than `deleteCron`.
 		 *
-		 * @example '0 2 * * 0'   — every Sunday at 2 AM
-		 * @example '0 2 1,15 * *' — twice a month (1st and 15th) at 2 AM
+		 * @example '0 2 * * 0' (every Sunday at 2 AM)
+		 * @example '0 2 1,15 * *' (twice a month, 1st and 15th, at 2 AM)
 		 */
 		cron: string
 		/**
@@ -141,7 +141,7 @@ export type DataRetentionConfig = {
 		 *
 		 * @example
 		 * populateUploadFields: ({ filename, runDate, logCount }) => ({
-		 *   alt: `Audit archive – ${filename}`,
+		 *   alt: `Audit archive ${filename}`,
 		 *   folder: 'audit-archives',
 		 * })
 		 */
@@ -172,7 +172,7 @@ export type DataRetentionConfig = {
 		hooks?: ArchiveJobHooks
 		/**
 		 * Override the default archive filename base. The `.csv.gz` extension is always appended
-		 * by the plugin — do not include it in the return value.
+		 * by the plugin, do not include it in the return value.
 		 *
 		 * @default `audit-logs-{YYYY-MM-DD}` → `audit-logs-{YYYY-MM-DD}.csv.gz`
 		 *
@@ -191,7 +191,7 @@ export type DataRetentionConfig = {
 
 /**
  * Access function for the audit logs view.
- * Unlike Payload's `Access` type, this cannot return a Where query — only boolean.
+ * Unlike Payload's `Access` type, this cannot return a Where query, only boolean.
  * Only `req` is available (no collection/id/data context).
  */
 export type ViewAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
@@ -206,7 +206,9 @@ export const REDACTED = '__REDACTED__' as const
 export type RedactedValue = typeof REDACTED
 
 export type AnonymizeFunction = (args: {
-	collection: CollectionSlug
+	/** A global slug when the entity being anonymized is a global, matching the `anonymize` map. */
+	collection: CollectionSlug | GlobalSlug
+	/** Empty string for globals, which have no document id. */
 	documentId: number | string
 	operation: 'create' | 'delete' | 'update'
 	path: string
@@ -216,7 +218,7 @@ export type AnonymizeFunction = (args: {
 
 /**
  * Per-event decision function. Return `false` to skip writing the audit log entry.
- * Called after the diff is computed — `changedPaths` is always available for `update`,
+ * Called after the diff is computed, `changedPaths` is always available for `update`,
  * and is an empty array for `create` and `delete`.
  *
  * Entries with no changed paths are already skipped before this function is called,
@@ -238,14 +240,14 @@ export type ShouldLogFunction = (args: {
 	doc: Record<string, unknown>
 	previousDoc: Record<string, unknown> | undefined
 	/** Flat dot-notation diff with normalized values (populated relationships collapsed to IDs).
-	 *  Always `{}` for `create` and `delete` — only meaningful for `update`. */
+	 *  Always `{}` for `create` and `delete`, only meaningful for `update`. */
 	diff: Record<string, { before: unknown; after: unknown }>
 	changedPaths: string[]
 }) => boolean | Promise<boolean>
 
 /**
  * Audit log configuration for globals. Only `drafts`, `excludeFields`, and `shouldLog`
- * are applicable — globals are always `update`-only and never have create/delete snapshots.
+ * are applicable, globals are always `update`-only and never have create/delete snapshots.
  */
 export type GlobalAuditLogConfig = Pick<
 	CollectionAuditLogConfig,
@@ -256,8 +258,8 @@ export type CollectionAuditLogConfig = {
 	/**
 	 * Controls how draft saves are handled when the collection has `versions.drafts` enabled.
 	 *
-	 * - `'log'` — log every save, including autosave drafts (default)
-	 * - `'ignore'` — skip draft saves entirely (but always log `create`); on publish, diff is
+	 * - `'log'`, log every save, including autosave drafts (default)
+	 * - `'ignore'`, skip draft saves entirely (but always log `create`); on publish, diff is
 	 *   computed against the last published version (via `findVersions`) rather than the last draft
 	 *
 	 * Can also be set as a top-level plugin default via `AuditPluginConfig.drafts`.
@@ -376,9 +378,9 @@ type AuditFieldManualOptions = {
 /**
  * Options for a single audit field.
  *
- * - `false` — disables the field entirely
- * - `AuditFieldAutomaticOptions` — plugin creates and manages the field automatically
- * - `AuditFieldManualOptions` — field is defined manually; plugin only writes to it via hooks
+ * - `false`, disables the field entirely
+ * - `AuditFieldAutomaticOptions`, plugin creates and manages the field automatically
+ * - `AuditFieldManualOptions`, field is defined manually; plugin only writes to it via hooks
  */
 export type AuditFieldOptions = AuditFieldAutomaticOptions | AuditFieldManualOptions | false
 
@@ -393,24 +395,24 @@ type AuditFieldsOptions =
 /**
  * Per-collection audit configuration.
  *
- * - `true` — enable both `auditFields` and `auditLog` with defaults
- * - object — opt-in: only what is explicitly set is enabled
+ * - `true`, enable both `auditFields` and `auditLog` with defaults
+ * - object, opt-in: only what is explicitly set is enabled
  */
 export type AuditOptions =
 	| true
 	| {
 			/**
 			 * Configuration for the `createdBy` and `lastModifiedBy` fields.
-			 * - `true` — enable both fields with defaults
-			 * - `false` — disable both fields (same as omitting)
-			 * - object — granular control over each field; omitted fields are disabled
+			 * - `true`, enable both fields with defaults
+			 * - `false`, disable both fields (same as omitting)
+			 * - object, granular control over each field; omitted fields are disabled
 			 */
 			auditFields?: AuditFieldsOptions
 			/**
 			 * Configuration for CRUD audit log entries.
-			 * - `true` — enable with all operations and defaults
-			 * - `false` — disable (same as omitting)
-			 * - object — granular control
+			 * - `true`, enable with all operations and defaults
+			 * - `false`, disable (same as omitting)
+			 * - object, granular control
 			 */
 			auditLog?: true | false | CollectionAuditLogConfig
 	  }
@@ -418,8 +420,8 @@ export type AuditOptions =
 /**
  * Per-global audit configuration.
  *
- * - `true` — enable both `auditFields` and `auditLog` with defaults
- * - object — opt-in: only what is explicitly set is enabled
+ * - `true`, enable both `auditFields` and `auditLog` with defaults
+ * - object, opt-in: only what is explicitly set is enabled
  *
  * Note: globals are always `update`-only. `operations`, `snapshotOnCreate`, and
  * `snapshotOnDelete` from `CollectionAuditLogConfig` do not apply here.
@@ -451,7 +453,7 @@ export type MultiTenancyConfig = {
 	tenantFieldName?: string
 	/**
 	 * Collections to exclude from tenant capture.
-	 * Useful when a collection has a field named after `tenantFieldName` for unrelated reasons —
+	 * Useful when a collection has a field named after `tenantFieldName` for unrelated reasons -
 	 * e.g. a super-admin-only collection that uses a `tenant` field with different semantics.
 	 * Logs for excluded collections will not have a tenant value and won't appear in the tenant view.
 	 */
@@ -490,8 +492,8 @@ export type AuditPluginConfig = {
 	 * Default draft handling for all collections and globals that have `versions.drafts` enabled.
 	 * Can be overridden per-collection/global via `auditLog.drafts`.
 	 *
-	 * - `'log'` — log every save, including autosave drafts (default)
-	 * - `'ignore'` — skip draft saves; on publish, diff is computed against the last published version
+	 * - `'log'`, log every save, including autosave drafts (default)
+	 * - `'ignore'`, skip draft saves; on publish, diff is computed against the last published version
 	 *
 	 * @default 'log'
 	 */
@@ -508,9 +510,9 @@ export type AuditPluginConfig = {
 	/**
 	 * Auth event logging for all auth-enabled collections.
 	 *
-	 * - omitted / not set — all auth events logged for all auth collections (default)
-	 * - `false` — disable all auth event logging globally
-	 * - object — per-collection control; unspecified collections use the default (all on)
+	 * - omitted / not set, all auth events logged for all auth collections (default)
+	 * - `false`, disable all auth event logging globally
+	 * - object, per-collection control; unspecified collections use the default (all on)
 	 *
 	 * @example
 	 * auth: false  // disable globally
@@ -540,7 +542,7 @@ export type AuditPluginConfig = {
 		/**
 		 * Override the generated `audit-logs` collection config.
 		 * Receives the fully built collection and should return the modified version.
-		 * The `slug` is always forced back to `'audit-logs'` — everything else is up to you.
+		 * The `slug` is always forced back to `'audit-logs'`, everything else is up to you.
 		 *
 		 * Use this to add fields, attach hooks, customize access, etc.
 		 *
@@ -594,8 +596,8 @@ export type AuditPluginConfig = {
 		 * req.context.auditGroup = crypto.randomUUID()
 		 * ```
 		 *
-		 * - `true` — enable with the default context key `'auditGroup'`
-		 * - `{ contextKey }` — use a custom key on `req.context`
+		 * - `true`, enable with the default context key `'auditGroup'`
+		 * - `{ contextKey }`, use a custom key on `req.context`
 		 */
 		group?: boolean | { contextKey?: string }
 		/**
@@ -607,7 +609,7 @@ export type AuditPluginConfig = {
 			| {
 					/**
 					 * Access control for the audit-logs view.
-					 * Returns boolean only — cannot return a Where query.
+					 * Returns boolean only, cannot return a Where query.
 					 * Only `req` is available (no collection/id/data context).
 					 * @default ({ req }) => Boolean(req.user)
 					 */
@@ -626,7 +628,7 @@ export type AuditPluginConfig = {
 					 * A Payload `Where` query that is always merged (AND) into every request made by this view,
 					 * regardless of what the user selects in the filter bar.
 					 *
-					 * Use this to scope the built-in view to a subset of logs — for example, to a specific
+					 * Use this to scope the built-in view to a subset of logs, for example, to a specific
 					 * collection, tenant, or event type. For fully custom views, pass `forceWhere` directly
 					 * as a `serverProps` entry when registering the view component.
 					 *
@@ -666,8 +668,8 @@ export type AuditPluginConfig = {
 	 * Multi-tenancy support. Configure when using `@payloadcms/plugin-multi-tenant` or any
 	 * setup where documents have a tenant relationship field.
 	 *
-	 * - `true` — enable with all defaults (`tenantsSlug: 'tenants'`, `tenantFieldName: 'tenant'`)
-	 * - object — explicit configuration
+	 * - `true`, enable with all defaults (`tenantsSlug: 'tenants'`, `tenantFieldName: 'tenant'`)
+	 * - object, explicit configuration
 	 *
 	 * When configured, the plugin reads the tenant from each audited document and stores it
 	 * on the audit log entry. A tenant-scoped view is also registered (unless disabled).
@@ -689,7 +691,7 @@ export type AuditPluginConfig = {
 	 * When configured, registers two tasks: `audit-logs-archive` (if archive is set) and
 	 * `audit-logs-delete`. Both tasks are scheduled via cron and run on the configured queue.
 	 *
-	 * You must configure a job runner (autoRun or bin script) for the same queue name —
+	 * You must configure a job runner (autoRun or bin script) for the same queue name -
 	 * the plugin only registers the tasks, not the runner.
 	 *
 	 * @example

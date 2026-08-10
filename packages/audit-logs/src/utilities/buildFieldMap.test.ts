@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { buildFieldMap } from './buildFieldMap'
 
-// Minimal field constructors — typed correctly to satisfy Payload's discriminated unions
+// Minimal field constructors, typed correctly to satisfy Payload's discriminated unions
 const rel = (name: string, hasMany = false): Field =>
 	({ type: 'relationship', name, relationTo: 'users', hasMany }) as Field
 

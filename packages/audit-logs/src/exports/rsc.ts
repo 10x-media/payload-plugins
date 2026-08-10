@@ -1,1 +1,1 @@
-export { AuditLogsView } from '../components/AuditLogsView/index'
+export { AuditLogsView } from '../view/AuditLogsView'

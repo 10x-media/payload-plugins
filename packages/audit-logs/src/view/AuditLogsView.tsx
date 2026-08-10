@@ -1,10 +1,10 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
-import type { AdminViewServerProps, Where } from 'payload'
+import type { AdminViewServerProps, CollectionSlug, Where } from 'payload'
 import { parseCookies } from 'payload'
-import { keys } from '../../translations'
-import { asTranslate } from '../../translations/server'
-import type { AuditPluginConfig } from '../../types'
+import { keys } from '../translations'
+import { asTranslate } from '../translations/server'
+import type { AuditPluginConfig } from '../types'
 import { AuditLogsClient } from './AuditLogsClient'
 import { GLOBAL_SENTINEL } from './utils'
 
@@ -131,7 +131,8 @@ export async function AuditLogsView({
 	// Fetch tenant options for filter dropdown (super-admin view only)
 	let tenantOptions: { label: string; value: string }[] | undefined
 	if (multiTenancy && !useTenant) {
-		const tenantsSlug = multiTenancy.tenantsSlug ?? 'tenants'
+		// Configured by the host as a plain string, resolved here against the generated union.
+		const tenantsSlug = (multiTenancy.tenantsSlug ?? 'tenants') as CollectionSlug
 		const tenantCol = req.payload.config.collections.find((c) => c.slug === tenantsSlug)
 		const useAsTitle =
 			typeof tenantCol?.admin?.useAsTitle === 'string' ? tenantCol.admin.useAsTitle : 'id'
@@ -142,14 +143,14 @@ export async function AuditLogsView({
 			overrideAccess: true,
 		})
 		tenantOptions = tenantResult.docs.map((d) => ({
-			label: String((d as Record<string, unknown>)[useAsTitle] ?? d.id),
+			label: String((d as unknown as Record<string, unknown>)[useAsTitle] ?? d.id),
 			value: String(d.id),
 		}))
 	}
 
 	const whereConditions: Where[] = []
 
-	// Collection / global filter — OR if both are active
+	// Collection / global filter, OR if both are active
 	if (collections.length > 0 || globals.length > 0) {
 		const parts: Where[] = []
 
@@ -193,7 +194,7 @@ export async function AuditLogsView({
 		}
 	}
 
-	// Tenant filter — locked to cookie in tenant view, URL param in super-admin view
+	// Tenant filter, locked to cookie in tenant view, URL param in super-admin view
 	if (lockedTenantId) {
 		whereConditions.push({ tenant: { equals: lockedTenantId } })
 	} else if (tenants.length === 1) {
@@ -237,7 +238,7 @@ export async function AuditLogsView({
 					adminRoute={req.payload.config.routes?.admin ?? '/admin'}
 					apiRoute={req.payload.config.routes?.api ?? '/api'}
 					collectionSlugs={collectionSlugs}
-					docs={result.docs as Record<string, unknown>[]}
+					docs={result.docs as unknown as Record<string, unknown>[]}
 					filters={{
 						changedPaths: changedPaths.length ? changedPaths : undefined,
 						collections: collections.length ? collections : undefined,

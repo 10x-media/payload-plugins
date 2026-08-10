@@ -2,8 +2,8 @@
 
 import { ReactSelect, useConfig, useDebounce } from '@payloadcms/ui'
 import { useCallback, useEffect, useState } from 'react'
-import { keys } from '../../../../translations/keys'
-import { useTranslation } from '../../../../translations/useTranslation'
+import { keys } from '../../translations/keys'
+import { useTranslation } from '../../translations/useTranslation'
 import type { SelectOption } from './types'
 
 type Props = {

@@ -2,8 +2,8 @@
 
 import { Button, DatePicker } from '@payloadcms/ui'
 import { useCallback, useState } from 'react'
-import { keys } from '../../../../translations/keys'
-import { useTranslation } from '../../../../translations/useTranslation'
+import { keys } from '../../translations/keys'
+import { useTranslation } from '../../translations/useTranslation'
 import type { EditorProps } from './types'
 
 const toISO = (val: Date | string): string | undefined => {

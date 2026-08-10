@@ -4,12 +4,12 @@ import { ChevronIcon, Link } from '@payloadcms/ui'
 
 import { useSearchParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { keys } from '../../../translations/keys'
-import { useTranslation } from '../../../translations/useTranslation'
-import type { AuditLogDoc } from '../types'
-import { displayUser, GLOBAL_SENTINEL, OPERATION_LABELS } from '../utils'
+import { keys } from '../translations/keys'
+import { useTranslation } from '../translations/useTranslation'
 import { DiffViewer } from './DiffViewer'
 import { FormattedDate } from './FormattedDate'
+import type { AuditLogDoc } from './types'
+import { displayUser, GLOBAL_SENTINEL, OPERATION_LABELS } from './utils'
 
 type Props = {
 	adminRoute: string
