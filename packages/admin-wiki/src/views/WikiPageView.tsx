@@ -1,6 +1,6 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
-import { Button, ChevronIcon, Gutter } from '@payloadcms/ui'
+import { Button, ChevronIcon, Gutter, SetStepNav } from '@payloadcms/ui'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug } from 'payload'
 import { formatAdminURL } from 'payload/shared'
@@ -84,24 +84,25 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 			}}
 		>
 			<Gutter className="wiki-view wiki-view--page">
+				<SetStepNav
+					nav={[
+						{
+							label: t(keys.wikiViewTitle),
+							url: context.wikiPath,
+						},
+						{
+							label: doc?.title ?? '',
+							url: `${context.wikiPath}/${doc?.slug}`,
+						},
+					]}
+				/>
 				<div
 					className={['wiki-guide-layout', showToc ? 'wiki-guide-layout--with-toc' : null]
 						.filter(Boolean)
 						.join(' ')}
 				>
+					{/* TODO: Remove this, find where we could potentially place this button */}
 					<div className="wiki-view__breadcrumbs">
-						<Button
-							buttonStyle="pill"
-							el="link"
-							icon={<ChevronIcon direction="left" size="small" />}
-							iconPosition="left"
-							iconStyle="none"
-							margin={false}
-							size="small"
-							to={context.wikiPath}
-						>
-							{t(keys.wikiBackToIndex)}
-						</Button>
 						{doc && context.canUpdate && editUrl ? (
 							<Button
 								buttonStyle="pill"
@@ -121,8 +122,8 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 						<article className="wiki-view__article">
 							<header className="wiki-view__article-header">
 								<h1 className="wiki-view__article-title">
-									{doc.featured === true ? <StarIcon /> : null}
 									{doc.title}
+									{doc.featured === true ? <StarIcon /> : null}
 								</h1>
 								{doc.summary ? <p className="wiki-view__summary">{doc.summary}</p> : null}
 								{targetKeys.length > 0 ? (

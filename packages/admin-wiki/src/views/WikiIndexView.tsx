@@ -1,5 +1,5 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
-import { Button, Gutter } from '@payloadcms/ui'
+import { Button, Gutter, SetStepNav } from '@payloadcms/ui'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug } from 'payload'
 import { formatAdminURL } from 'payload/shared'
@@ -88,6 +88,14 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 			}}
 		>
 			<Gutter className="wiki-view">
+				<SetStepNav
+					nav={[
+						{
+							label: t(keys.wikiViewTitle),
+							url: context.wikiPath,
+						},
+					]}
+				/>
 				<header className="wiki-view__header">
 					<div>
 						<h1 className="wiki-view__title">{t(keys.wikiViewTitle)}</h1>

@@ -26,6 +26,9 @@ test-results/
 # dev app upload storage
 packages/*/dev/uploads/
 
+# admin-wiki wiki media uploads
+packages/admin-wiki/dev/wiki-media/
+
 # env
 .env
 .env.*

@@ -26,7 +26,6 @@ export const keys = {
 	fieldHelpAria: 'adminWiki:fieldHelpAria',
 	fieldHelpMultipleAria: 'adminWiki:fieldHelpMultipleAria',
 	fieldHelpOpenGuide: 'adminWiki:fieldHelpOpenGuide',
-	fieldHelpOpenHint: 'adminWiki:fieldHelpOpenHint',
 	fieldHelpWriteGuide: 'adminWiki:fieldHelpWriteGuide',
 	guideLinkBlockPlural: 'adminWiki:guideLinkBlockPlural',
 	guideLinkBlockSingular: 'adminWiki:guideLinkBlockSingular',

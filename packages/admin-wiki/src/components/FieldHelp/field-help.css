@@ -7,6 +7,7 @@
 	display: inline-block;
 	margin-top: calc(var(--base) / 4);
 	position: relative;
+	width: fit-content;
 }
 
 .wiki-field-help__trigger {
@@ -92,6 +93,7 @@
 	color: var(--theme-elevation-650);
 	display: -webkit-box;
 	-webkit-line-clamp: 8;
+	line-clamp: 8;
 	line-height: 1.5;
 	margin-top: calc(var(--base) / 5);
 	overflow: hidden;
@@ -148,7 +150,8 @@
    form lit up every affordance in a whole tab the moment one input took focus.
    `:not(:has(.field-type:hover))` is what makes "innermost" expressible. */
 .field-type:hover:not(:has(.field-type:hover)) .wiki-write-guide--inline,
-.field-type:focus-within:not(:has(.field-type:focus-within)) .wiki-write-guide--inline,
+.field-type:focus-within:not(:has(.field-type:focus-within))
+	.wiki-write-guide--inline,
 .wiki-write-guide--inline:focus-visible {
 	opacity: 1;
 }

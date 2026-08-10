@@ -28,7 +28,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldHelpAria]: 'Open the guide for this field',
 	[keys.fieldHelpMultipleAria]: 'Open the {{count}} guides for this field',
 	[keys.fieldHelpOpenGuide]: 'Open guide',
-	[keys.fieldHelpOpenHint]: 'Click to read the full guide',
 	[keys.fieldHelpWriteGuide]: 'Write this guide',
 	[keys.guideLinkBlockPlural]: 'Guide links',
 	[keys.guideLinkBlockSingular]: 'Guide link',

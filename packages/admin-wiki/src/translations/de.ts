@@ -28,7 +28,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldHelpAria]: 'Anleitung für dieses Feld öffnen',
 	[keys.fieldHelpMultipleAria]: 'Die {{count}} Anleitungen für dieses Feld öffnen',
 	[keys.fieldHelpOpenGuide]: 'Anleitung öffnen',
-	[keys.fieldHelpOpenHint]: 'Klicken, um die vollständige Anleitung zu lesen',
 	[keys.fieldHelpWriteGuide]: 'Anleitung schreiben',
 	[keys.guideLinkBlockPlural]: 'Anleitungs-Links',
 	[keys.guideLinkBlockSingular]: 'Anleitungs-Link',

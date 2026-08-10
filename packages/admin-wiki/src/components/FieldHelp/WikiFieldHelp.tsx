@@ -1,7 +1,7 @@
 'use client'
 
-import { useDrawerSlug, useModal } from '@payloadcms/ui'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Popup, useDrawerSlug, useModal } from '@payloadcms/ui'
+import { useEffect, useState } from 'react'
 
 import { fieldTargetKey, type WikiTargetEntry } from '../../shared/targetKeys'
 import { keys } from '../../translations/keys'
@@ -11,8 +11,6 @@ import { HelpIcon } from '../icons'
 import { useWikiTargets } from '../WikiProvider/WikiProvider'
 import { WikiWriteGuide } from './WikiWriteGuide'
 import './field-help.css'
-
-const HOVER_CLOSE_DELAY_MS = 150
 
 /**
  * The one-line adoption path for custom fields that hardcode their own
@@ -47,21 +45,6 @@ export const WikiTargetHelp = ({ showWriteAffordance = true, targetKey }: WikiTa
 	const drawerSlug = useDrawerSlug('wiki-field-help')
 	const [open, setOpen] = useState(false)
 	const [initialGuideId, setInitialGuideId] = useState<number | string | undefined>(undefined)
-	const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-	const cancelClose = useCallback(() => {
-		if (closeTimer.current) {
-			clearTimeout(closeTimer.current)
-			closeTimer.current = undefined
-		}
-	}, [])
-
-	const scheduleClose = useCallback(() => {
-		cancelClose()
-		closeTimer.current = setTimeout(() => setOpen(false), HOVER_CLOSE_DELAY_MS)
-	}, [cancelClose])
-
-	useEffect(() => cancelClose, [cancelClose])
 
 	useEffect(() => {
 		if (!open) {
@@ -90,62 +73,32 @@ export const WikiTargetHelp = ({ showWriteAffordance = true, targetKey }: WikiTa
 
 	return (
 		<span className="wiki-field-help">
-			<button
-				aria-expanded={open}
-				aria-label={
-					single ? t(keys.fieldHelpAria) : t(keys.fieldHelpMultipleAria, { count: entries.length })
-				}
-				className="wiki-field-help__trigger"
-				onBlur={scheduleClose}
-				onClick={() => {
-					const first = entries[0]
-					if (first) {
-						openGuide(first)
-					}
-				}}
-				onFocus={() => setOpen(true)}
-				onMouseEnter={() => {
-					cancelClose()
-					setOpen(true)
-				}}
-				onMouseLeave={scheduleClose}
-				type="button"
-			>
-				<HelpIcon size="small" />
-				<span className="wiki-field-help__trigger-label">
-					{single ? single.title : t(keys.guideCount, { count: entries.length })}
-				</span>
-			</button>
-			{open ? (
-				<span
-					className="wiki-field-help__card"
-					onMouseEnter={cancelClose}
-					onMouseLeave={scheduleClose}
-					role="tooltip"
-				>
-					<span className="wiki-field-help__caret" />
-					{entries.map((entry) => (
-						<span className="wiki-field-help__item" key={entry.id}>
-							<span className="wiki-field-help__item-title">{entry.title}</span>
-							{entry.summary ? (
-								<span className="wiki-field-help__item-summary">{entry.summary}</span>
-							) : null}
-							{single ? null : (
-								<button
-									className="wiki-field-help__item-open"
-									onClick={() => openGuide(entry)}
-									type="button"
-								>
-									{t(keys.fieldHelpOpenGuide)}
-								</button>
-							)}
+			<Popup
+				button={
+					<div className="wiki-field-help__trigger">
+						<HelpIcon size="small" />
+						<span className="wiki-field-help__trigger-label">
+							{single ? single.title : t(keys.guideCount, { count: entries.length })}
 						</span>
-					))}
-					{single ? (
-						<span className="wiki-field-help__hint">{t(keys.fieldHelpOpenHint)}</span>
-					) : null}
-				</span>
-			) : null}
+					</div>
+				}
+			>
+				{entries.map((entry) => (
+					<span className="wiki-field-help__item" key={entry.id}>
+						<span className="wiki-field-help__item-title">{entry.title}</span>
+						{entry.summary ? (
+							<span className="wiki-field-help__item-summary">{entry.summary}</span>
+						) : null}
+						<button
+							className="wiki-field-help__item-open"
+							onClick={() => openGuide(entry)}
+							type="button"
+						>
+							{t(keys.fieldHelpOpenGuide)}
+						</button>
+					</span>
+				))}
+			</Popup>
 			<GuideDrawer entries={entries} initialGuideId={initialGuideId} slug={drawerSlug} />
 		</span>
 	)
