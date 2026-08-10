@@ -3,75 +3,75 @@ import type { Filters } from './types.js'
 export const GLOBAL_SENTINEL = '__global__'
 
 export const OPERATION_LABELS: Record<string, string> = {
-  auth: 'Auth',
-  create: 'Create',
-  custom: 'Custom',
-  delete: 'Delete',
-  update: 'Update',
+	auth: 'Auth',
+	create: 'Create',
+	custom: 'Custom',
+	delete: 'Delete',
+	update: 'Update',
 }
 
 export const displayUser = (user: unknown, userTitleFields: Record<string, string>): string => {
-  if (!user) return '—'
-  if (typeof user === 'string' || typeof user === 'number') return String(user)
-  if (typeof user === 'object' && user !== null) {
-    const u = user as Record<string, unknown>
-    // Polymorphic populated: { relationTo: 'users', value: { id, email, ... } }
-    if (typeof u.relationTo === 'string' && u.value && typeof u.value === 'object') {
-      const doc = u.value as Record<string, unknown>
-      const titleField = userTitleFields[u.relationTo] ?? 'id'
-      return String(doc[titleField] ?? doc.id ?? '—')
-    }
-    // Non-polymorphic populated: direct doc — single auth collection
-    const entries = Object.entries(userTitleFields)
-    if (entries.length === 1) {
-      const titleField = entries[0][1]
-      if (titleField !== 'id' && u[titleField]) return String(u[titleField])
-    }
-    if (u.id) return String(u.id)
-  }
-  return String(user)
+	if (!user) return '—'
+	if (typeof user === 'string' || typeof user === 'number') return String(user)
+	if (typeof user === 'object' && user !== null) {
+		const u = user as Record<string, unknown>
+		// Polymorphic populated: { relationTo: 'users', value: { id, email, ... } }
+		if (typeof u.relationTo === 'string' && u.value && typeof u.value === 'object') {
+			const doc = u.value as Record<string, unknown>
+			const titleField = userTitleFields[u.relationTo] ?? 'id'
+			return String(doc[titleField] ?? doc.id ?? '—')
+		}
+		// Non-polymorphic populated: direct doc — single auth collection
+		const entries = Object.entries(userTitleFields)
+		if (entries.length === 1) {
+			const titleField = entries[0][1]
+			if (titleField !== 'id' && u[titleField]) return String(u[titleField])
+		}
+		if (u.id) return String(u.id)
+	}
+	return String(user)
 }
 
 export const formatDate = (iso: string): string => {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      month: 'short',
-      second: '2-digit',
-      year: 'numeric',
-    })
-  } catch {
-    return iso
-  }
+	try {
+		return new Date(iso).toLocaleString(undefined, {
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+			month: 'short',
+			second: '2-digit',
+			year: 'numeric',
+		})
+	} catch {
+		return iso
+	}
 }
 
 export const formatValue = (val: unknown): string => {
-  if (val === null || val === undefined) return '—'
-  if (typeof val === 'string') return val
-  if (typeof val === 'number' || typeof val === 'boolean') return String(val)
-  return JSON.stringify(val, null, 2)
+	if (val === null || val === undefined) return '—'
+	if (typeof val === 'string') return val
+	if (typeof val === 'number' || typeof val === 'boolean') return String(val)
+	return JSON.stringify(val, null, 2)
 }
 
 export const isLongValue = (val: unknown): boolean =>
-  typeof val === 'object' && val !== null && JSON.stringify(val).length > 80
+	typeof val === 'object' && val !== null && JSON.stringify(val).length > 80
 
 export const buildParams = (filters: Filters, page?: number, limit?: number): string => {
-  const params = new URLSearchParams()
-  for (const c of filters.collections ?? []) params.append('collection', c)
-  for (const g of filters.globals ?? []) params.append('global', g)
-  for (const op of filters.operations ?? []) params.append('operation', op)
-  if (filters.documentId) params.set('documentId', filters.documentId)
-  if (filters.eventType) params.set('eventType', filters.eventType)
-  for (const path of filters.changedPaths ?? []) params.append('changedPath', path)
-  for (const t of filters.tenants ?? []) params.append('tenant', t)
-  for (const id of filters.userIds ?? []) params.append('userId', id)
-  if (filters.userCollection) params.set('userCollection', filters.userCollection)
-  if (filters.group) params.set('group', filters.group)
-  if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
-  if (filters.dateTo) params.set('dateTo', filters.dateTo)
-  if (page && page > 1) params.set('page', String(page))
-  if (limit) params.set('limit', String(limit))
-  return params.toString()
+	const params = new URLSearchParams()
+	for (const c of filters.collections ?? []) params.append('collection', c)
+	for (const g of filters.globals ?? []) params.append('global', g)
+	for (const op of filters.operations ?? []) params.append('operation', op)
+	if (filters.documentId) params.set('documentId', filters.documentId)
+	if (filters.eventType) params.set('eventType', filters.eventType)
+	for (const path of filters.changedPaths ?? []) params.append('changedPath', path)
+	for (const t of filters.tenants ?? []) params.append('tenant', t)
+	for (const id of filters.userIds ?? []) params.append('userId', id)
+	if (filters.userCollection) params.set('userCollection', filters.userCollection)
+	if (filters.group) params.set('group', filters.group)
+	if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
+	if (filters.dateTo) params.set('dateTo', filters.dateTo)
+	if (page && page > 1) params.set('page', String(page))
+	if (limit) params.set('limit', String(limit))
+	return params.toString()
 }

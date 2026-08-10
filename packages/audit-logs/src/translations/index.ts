@@ -1,8 +1,7 @@
-import { en } from './en'
 import { de } from './de'
-import { uk } from './uk'
-
+import { en } from './en'
 import type { TranslationKey } from './keys'
+import { uk } from './uk'
 
 export type { TranslationKey } from './keys'
 export { keys } from './keys'
