@@ -43,7 +43,7 @@ export function AuditLogsClient({
 	const { setStepNav } = useStepNav()
 
 	useEffect(() => {
-		setStepNav([{ label: t('auditPlugin:breadcrumb') }])
+		setStepNav([{ label: t(keys.breadcrumb) }])
 	}, [setStepNav, t])
 
 	const triggerJob = useCallback(
@@ -94,13 +94,13 @@ export function AuditLogsClient({
 	return (
 		<div className="al-view">
 			<div className="al-view__header">
-				<h1 className="al-view__title">{t('auditPlugin:title')}</h1>
-				<span className="al-view__count">{t('auditPlugin:entries', { count: totalDocs })}</span>
+				<h1 className="al-view__title">{t(keys.title)}</h1>
+				<span className="al-view__count">{t(keys.entries, { count: totalDocs })}</span>
 			</div>
 
 			{debugMode && (
 				<div className="al-debug-bar">
-					<span className="al-debug-bar__label">{t('auditPlugin:debug')}</span>
+					<span className="al-debug-bar__label">{t(keys.debug)}</span>
 					{hasArchive && (
 						<button
 							className="al-debug-bar__btn"
@@ -109,8 +109,8 @@ export function AuditLogsClient({
 							type="button"
 						>
 							{runningTask === 'audit-logs-archive'
-								? t('auditPlugin:queuing')
-								: t('auditPlugin:runArchive')}
+								? t(keys.queuing)
+								: t(keys.runArchive)}
 						</button>
 					)}
 					<button
@@ -120,8 +120,8 @@ export function AuditLogsClient({
 						type="button"
 					>
 						{runningTask === 'audit-logs-delete'
-							? t('auditPlugin:queuing')
-							: t('auditPlugin:runDelete')}
+							? t(keys.queuing)
+							: t(keys.runDelete)}
 					</button>
 					{lastResult && <span className="al-debug-bar__result">{lastResult}</span>}
 				</div>
@@ -138,7 +138,7 @@ export function AuditLogsClient({
 
 			<div className="al-list">
 				{docs.length === 0 ? (
-					<div className="al-list__empty">{t('auditPlugin:noEntries')}</div>
+					<div className="al-list__empty">{t(keys.noEntries)}</div>
 				) : (
 					docs.map((doc) => (
 						<LogRow
@@ -163,7 +163,7 @@ export function AuditLogsClient({
 						totalPages={totalPages}
 					/>
 					<div className="al-pagination__info">
-						{t('auditPlugin:paginationInfo', { from: pageStart, to: pageEnd, total: totalDocs })}
+						{t(keys.paginationInfo, { from: pageStart, to: pageEnd, total: totalDocs })}
 					</div>
 					<PerPage handleChange={handleLimit} limit={limit} limits={LIMIT_OPTIONS} />
 				</div>

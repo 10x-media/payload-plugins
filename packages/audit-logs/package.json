@@ -75,6 +75,8 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@payloadcms/next": "^3.83.0",
+		"@payloadcms/translations": "^3.83.0",
 		"@payloadcms/ui": "^3.83.0",
 		"next": "^15.2.9 || ^16.2.6",
 		"payload": "^3.83.0",
@@ -88,6 +90,8 @@
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/next": "catalog:",
+		"@payloadcms/translations": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@types/node": "catalog:",

@@ -75,7 +75,7 @@ export function PayloadDocSelect({ collection, onSelect, titleField }: Props) {
 			onInputChange={(input) => setSearch(input)}
 			onMenuScrollToBottom={() => void loadOptions(false)}
 			options={options}
-			placeholder={t('auditPlugin:searchPlaceholder')}
+			placeholder={t(keys.searchPlaceholder)}
 		/>
 	)
 }

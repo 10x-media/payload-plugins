@@ -43,7 +43,7 @@ export function ValueEditor({
 		return (
 			<MultiSelectEditor
 				field="collections"
-				label={t('auditPlugin:filterCollection')}
+				label={t(keys.filterCollection)}
 				onClose={onClose}
 				options={collectionSlugs.map((s) => ({ label: s, value: s }))}
 				setStaged={setStaged}
@@ -56,7 +56,7 @@ export function ValueEditor({
 		return (
 			<MultiSelectEditor
 				field="globals"
-				label={t('auditPlugin:filterGlobal')}
+				label={t(keys.filterGlobal)}
 				onClose={onClose}
 				options={globalSlugs.map((s) => ({ label: s, value: s }))}
 				setStaged={setStaged}
@@ -69,7 +69,7 @@ export function ValueEditor({
 		return (
 			<MultiSelectEditor
 				field="operations"
-				label={t('auditPlugin:filterOperation')}
+				label={t(keys.filterOperation)}
 				onClose={onClose}
 				options={OPERATION_OPTIONS}
 				setStaged={setStaged}
@@ -82,7 +82,7 @@ export function ValueEditor({
 		return (
 			<MultiSelectEditor
 				field="tenants"
-				label={t('auditPlugin:filterTenant')}
+				label={t(keys.filterTenant)}
 				onClose={onClose}
 				options={tenantOptions ?? []}
 				setStaged={setStaged}

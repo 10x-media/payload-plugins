@@ -39,7 +39,7 @@ export function AddFilterPopup({
 		<Popup
 			button={
 				<button className="al-filterbar__add" type="button">
-					{t('auditPlugin:addFilter')}
+					{t(keys.addFilter)}
 				</button>
 			}
 			buttonType="custom"

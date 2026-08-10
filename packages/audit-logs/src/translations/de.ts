@@ -96,6 +96,5 @@ export const de: Record<TranslationKey, string> = {
       // Auth events
       [keys.authEventLogin]: 'Anmeldung',
       [keys.authEventForgotPassword]: 'Passwort vergessen',
-    },
+    }
 
-}

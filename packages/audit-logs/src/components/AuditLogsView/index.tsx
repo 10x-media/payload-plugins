@@ -4,10 +4,12 @@ import { Gutter } from '@payloadcms/ui'
 import type { AdminViewServerProps, Where } from 'payload'
 import { parseCookies } from 'payload'
 import React from 'react'
-import type { CustomTranslationsKeys } from '../../translations/index.js'
+
 import type { AuditPluginConfig } from '../../types'
 import { AuditLogsClient } from './AuditLogsClient.js'
 import { GLOBAL_SENTINEL } from './utils.js'
+import { keys } from '../../translations'
+import { asTranslate } from '../../translations/server'
 
 export async function AuditLogsView({
 	initPageResult,
@@ -45,9 +47,9 @@ export async function AuditLogsView({
 		</DefaultTemplate>
 	)
 
-	const t = req.i18n.t as TFunction<CustomTranslationsKeys>
+const t = asTranslate(req.i18n.t)
 
-	if (!user) return notAllowed(t('auditPlugin:mustBeLoggedIn'))
+	if (!user) return notAllowed(t(keys.mustBeLoggedIn))
 
 	if (useTenant) {
 		const tenantViewConfig = multiTenancy?.tenantView
@@ -57,11 +59,11 @@ export async function AuditLogsView({
 				: undefined
 		if (tenantViewAccess) {
 			const allowed = await tenantViewAccess({ req })
-			if (!allowed) return notAllowed(t('auditPlugin:noPermission'))
+			if (!allowed) return notAllowed(t(keys.noPermission))
 		}
 	} else if (viewAccess) {
 		const allowed = await viewAccess({ req })
-		if (!allowed) return notAllowed(t('auditPlugin:noPermission'))
+		if (!allowed) return notAllowed(t(keys.noPermission))
 	}
 
 	// For tenant-scoped view: read current tenant from cookie
@@ -86,7 +88,7 @@ export async function AuditLogsView({
 				req={req}
 			>
 				<Gutter>
-					<p>{t('auditPlugin:selectTenant')}</p>
+					<p>{t(keys.selectTenant)}</p>
 				</Gutter>
 			</DefaultTemplate>
 		)

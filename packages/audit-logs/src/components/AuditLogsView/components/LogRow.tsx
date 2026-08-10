@@ -79,7 +79,7 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 					{pathCount > 0 && (
 						<span className="al-row__paths-count">
 							{t(
-								pathCount !== 1 ? 'auditPlugin:fieldsChangedPlural' : 'auditPlugin:fieldsChanged',
+								pathCount !== 1 ? keys.fieldsChangedPlural : keys.fieldsChanged,
 								{ count: pathCount }
 							)}
 						</span>
@@ -94,25 +94,25 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 						<div className="al-row__meta">
 							{doc.ipAddress && (
 								<span className="al-row__meta-item">
-									<span className="al-row__meta-label">{t('auditPlugin:metaIp')}</span>{' '}
+									<span className="al-row__meta-label">{t(keys.metaIp)}</span>{' '}
 									{doc.ipAddress}
 								</span>
 							)}
 							{doc.userAgent && (
 								<span className="al-row__meta-item" title={doc.userAgent}>
-									<span className="al-row__meta-label">{t('auditPlugin:metaUa')}</span>{' '}
+									<span className="al-row__meta-label">{t(keys.metaUa)}</span>{' '}
 									<span className="al-row__ua">{doc.userAgent}</span>
 								</span>
 							)}
 							{doc.locale && (
 								<span className="al-row__meta-item">
-									<span className="al-row__meta-label">{t('auditPlugin:metaLocale')}</span>{' '}
+									<span className="al-row__meta-label">{t(keys.metaLocale)}</span>{' '}
 									{doc.locale}
 								</span>
 							)}
 							{doc.group && groupHref && (
 								<span className="al-row__meta-item">
-									<span className="al-row__meta-label">{t('auditPlugin:filterGroup')}</span>{' '}
+									<span className="al-row__meta-label">{t(keys.filterGroup)}</span>{' '}
 									<a className="al-row__meta-group" href={groupHref}>
 										{doc.group}
 									</a>
@@ -134,7 +134,7 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 
 						{hasSnapshot && (
 							<div className="al-row__section">
-								<div className="al-row__section-label">{t('auditPlugin:sectionSnapshot')}</div>
+								<div className="al-row__section-label">{t(keys.sectionSnapshot)}</div>
 								<pre className="al-json-block">{JSON.stringify(doc.snapshot, null, 2)}</pre>
 							</div>
 						)}
@@ -143,8 +143,8 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 							<div className="al-row__section">
 								<div className="al-row__section-label">
 									{doc.operation === 'auth'
-										? t('auditPlugin:sectionAuthEvent')
-										: t('auditPlugin:sectionCustomEvent')}
+										? t(keys.sectionAuthEvent)
+										: t(keys.sectionCustomEvent)}
 								</div>
 								<table className="al-diff">
 									<tbody>
@@ -196,7 +196,7 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 											: `${adminRoute}/collections/${doc.relationTo}/${doc.documentId}`
 									}
 								>
-									{isGlobal ? t('auditPlugin:viewGlobal') : t('auditPlugin:viewDocument')}
+									{isGlobal ? t(keys.viewGlobal) : t(keys.viewDocument)}
 								</Link>
 							</div>
 						)}

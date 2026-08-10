@@ -51,31 +51,31 @@ export function FilterBar({
 
 	const availableToAdd: AvailableFilter[] = [
 		...((staged.collections?.length ?? 0) === 0
-			? [{ key: 'collections' as const, label: t('auditPlugin:filterCollection') }]
+			? [{ key: 'collections' as const, label: t(keys.filterCollection) }]
 			: []),
 		...(globalSlugs.length > 0 && (staged.globals?.length ?? 0) === 0
-			? [{ key: 'globals' as const, label: t('auditPlugin:filterGlobal') }]
+			? [{ key: 'globals' as const, label: t(keys.filterGlobal) }]
 			: []),
 		...((staged.operations?.length ?? 0) === 0
-			? [{ key: 'operations' as const, label: t('auditPlugin:filterOperation') }]
+			? [{ key: 'operations' as const, label: t(keys.filterOperation) }]
 			: []),
 		...(tenantOptions && tenantOptions.length > 0 && (staged.tenants?.length ?? 0) === 0
-			? [{ key: 'tenant' as const, label: t('auditPlugin:filterTenant') }]
+			? [{ key: 'tenant' as const, label: t(keys.filterTenant) }]
 			: []),
 		...(Object.keys(userTitleFields).length > 0 && (staged.userIds?.length ?? 0) === 0
-			? [{ key: 'userId' as const, label: t('auditPlugin:filterUser') }]
+			? [{ key: 'userId' as const, label: t(keys.filterUser) }]
 			: []),
 		// documentId not available when globals filter is active (globals use documentId internally)
 		...(!staged.documentId && !hasGlobals
-			? [{ key: 'documentId' as const, label: t('auditPlugin:filterDocument') }]
+			? [{ key: 'documentId' as const, label: t(keys.filterDocument) }]
 			: []),
 		...(!staged.eventType && hasOperations && (hasAuthOp || hasCustomOp)
-			? [{ key: 'eventType' as const, label: t('auditPlugin:filterEventType') }]
+			? [{ key: 'eventType' as const, label: t(keys.filterEventType) }]
 			: []),
-		{ key: 'changedPath' as const, label: t('auditPlugin:filterChangedPath') },
-		...(!staged.group ? [{ key: 'group' as const, label: t('auditPlugin:filterGroup') }] : []),
+		{ key: 'changedPath' as const, label: t(keys.filterChangedPath) },
+		...(!staged.group ? [{ key: 'group' as const, label: t(keys.filterGroup) }] : []),
 		...(!staged.dateFrom && !staged.dateTo
-			? [{ key: 'dateRange' as const, label: t('auditPlugin:filterDateRange') }]
+			? [{ key: 'dateRange' as const, label: t(keys.filterDateRange) }]
 			: []),
 	]
 
@@ -154,14 +154,14 @@ export function FilterBar({
 					if (!values.length) return null
 					const label =
 						field === 'collections'
-							? t('auditPlugin:filterCollection')
+							? t(keys.filterCollection)
 							: field === 'globals'
-								? t('auditPlugin:filterGlobal')
+								? t(keys.filterGlobal)
 								: field === 'operations'
-									? t('auditPlugin:filterOperation')
+									? t(keys.filterOperation)
 									: field === 'tenants'
-										? t('auditPlugin:filterTenant')
-										: t('auditPlugin:filterUser')
+										? t(keys.filterTenant)
+										: t(keys.filterUser)
 					return (
 						<Popup
 							key={field}
@@ -207,10 +207,10 @@ export function FilterBar({
 					if (!val) return null
 					const label =
 						field === 'documentId'
-							? t('auditPlugin:filterDocument')
+							? t(keys.filterDocument)
 							: field === 'eventType'
-								? t('auditPlugin:filterEventType')
-								: t('auditPlugin:filterGroup')
+								? t(keys.filterEventType)
+								: t(keys.filterGroup)
 					const displayVal = field === 'documentId' ? `#${val.slice(-8)}` : val
 					return (
 						<Popup
@@ -256,7 +256,7 @@ export function FilterBar({
 						key={`cp-${i}`}
 						button={
 							<button className="al-filterpill" type="button">
-								<span className="al-filterpill__label">{t('auditPlugin:filterChangedPath')}</span>
+								<span className="al-filterpill__label">{t(keys.filterChangedPath)}</span>
 								<span className="al-filterpill__sep">:</span>
 								<span className="al-filterpill__value">{path}</span>
 								<span
@@ -294,7 +294,7 @@ export function FilterBar({
 					<Popup
 						button={
 							<button className="al-filterpill" type="button">
-								<span className="al-filterpill__label">{t('auditPlugin:filterDate')}</span>
+								<span className="al-filterpill__label">{t(keys.filterDate)}</span>
 								<span className="al-filterpill__sep">:</span>
 								<span className="al-filterpill__value">{datePillValue}</span>
 								<span
@@ -343,12 +343,12 @@ export function FilterBar({
 
 				{isDirty && (
 					<Button onClick={handleApply} margin={false} buttonStyle="primary" size={'small'}>
-						{t('auditPlugin:apply')}
+						{t(keys.apply)}
 					</Button>
 				)}
 				{hasActiveFilters && (
 					<Button onClick={handleClear} margin={false} buttonStyle="pill" size={'small'}>
-						{t('auditPlugin:clearAll')}
+						{t(keys.clearAll)}
 					</Button>
 				)}
 			</div>

@@ -60,7 +60,7 @@ export function UserFilterEditor({ onClose, setStaged, staged, userTitleFields }
 
 	return (
 		<div className="al-filterpopover__editor" data-popup-prevent-close>
-			<div className="al-filterpopover__editor-label">{t('auditPlugin:filterUser')}</div>
+			<div className="al-filterpopover__editor-label">{t(keys.filterUser)}</div>
 
 			{currentIds.length > 0 && (
 				<div className="al-filterpopover__tags">
@@ -87,7 +87,7 @@ export function UserFilterEditor({ onClose, setStaged, staged, userTitleFields }
 						setSelectedCollection(opt?.value ?? '')
 					}}
 					options={collectionOptions}
-					placeholder={t('auditPlugin:selectCollectionPlaceholder')}
+					placeholder={t(keys.selectCollectionPlaceholder)}
 					value={collectionOptions.find((o) => o.value === selectedCollection) ?? undefined}
 				/>
 			)}
@@ -100,7 +100,7 @@ export function UserFilterEditor({ onClose, setStaged, staged, userTitleFields }
 				/>
 			)}
 
-			<div className="al-filterpopover__divider">{t('auditPlugin:orEnterId')}</div>
+			<div className="al-filterpopover__divider">{t(keys.orEnterId)}</div>
 			<div className="al-filterpopover__input-row">
 				<div className="field-type text" style={{ flex: '1 1 auto' }}>
 					<div className="field-type__wrap">
@@ -111,21 +111,21 @@ export function UserFilterEditor({ onClose, setStaged, staged, userTitleFields }
 								if (e.key === 'Enter') commitManual()
 								if (e.key === 'Escape') onClose()
 							}}
-							placeholder={t('auditPlugin:userIdPlaceholder')}
+							placeholder={t(keys.userIdPlaceholder)}
 							type="text"
 							value={manualId}
 						/>
 					</div>
 				</div>
 				<Button buttonStyle="primary" margin={false} onClick={commitManual}>
-					{t('auditPlugin:add')}
+					{t(keys.add)}
 				</Button>
 			</div>
 
 			{currentIds.length > 0 && (
 				<div className="al-filterpopover__actions">
 					<Button margin={false} onClick={onClose}>
-						{t('auditPlugin:done')}
+						{t(keys.done)}
 					</Button>
 				</div>
 			)}

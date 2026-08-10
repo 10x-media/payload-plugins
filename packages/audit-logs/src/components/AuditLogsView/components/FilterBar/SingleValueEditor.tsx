@@ -66,12 +66,12 @@ export function SingleValueEditor({
 	}
 
 	const label = isChangedPath
-		? t('auditPlugin:filterChangedPath')
+		? t(keys.filterChangedPath)
 		: field === 'documentId'
-			? t('auditPlugin:filterDocument')
+			? t(keys.filterDocument)
 			: field === 'group'
-				? t('auditPlugin:filterGroup')
-				: t('auditPlugin:filterEventType')
+				? t(keys.filterGroup)
+				: t(keys.filterEventType)
 	const stagedCollection = staged.collections?.[0]
 	const hasAuthOp = staged.operations?.includes('auth')
 	const hasCustomOp = staged.operations?.includes('custom')
@@ -92,10 +92,10 @@ export function SingleValueEditor({
 								}}
 								titleField={userTitleFields[stagedCollection] ?? 'id'}
 							/>
-							<div className="al-filterpopover__divider">{t('auditPlugin:orEnterId')}</div>
+							<div className="al-filterpopover__divider">{t(keys.orEnterId)}</div>
 						</>
 					) : (
-						<div className="al-filterpopover__hint">{t('auditPlugin:selectCollectionHint')}</div>
+						<div className="al-filterpopover__hint">{t(keys.selectCollectionHint)}</div>
 					)}
 					<div className="al-filterpopover__input-row">
 						<div className="field-type text" style={{ flex: '1 1 auto' }}>
@@ -104,14 +104,14 @@ export function SingleValueEditor({
 									autoFocus={!stagedCollection}
 									onChange={(e) => setLocal(e.target.value)}
 									onKeyDown={handleKeyDown}
-									placeholder={t('auditPlugin:documentIdPlaceholder')}
+									placeholder={t(keys.documentIdPlaceholder)}
 									type="text"
 									value={local as string}
 								/>
 							</div>
 						</div>
 						<button className="al-filterpopover__confirm" onClick={commitText} type="button">
-							{staged.documentId ? t('auditPlugin:update') : t('auditPlugin:add')}
+							{staged.documentId ? t(keys.update) : t(keys.add)}
 						</button>
 					</div>
 				</>
@@ -121,8 +121,8 @@ export function SingleValueEditor({
 				hasAuthOp &&
 				(() => {
 					const authEventOptions = [
-						{ label: t('auditPlugin:authEventLogin'), value: 'login' },
-						{ label: t('auditPlugin:authEventForgotPassword'), value: 'forgot_password' },
+						{ label: t(keys.authEventLogin), value: 'login' },
+						{ label: t(keys.authEventForgotPassword), value: 'forgot_password' },
 					]
 					return (
 						<ReactSelect
@@ -137,7 +137,7 @@ export function SingleValueEditor({
 								onClose()
 							}}
 							options={authEventOptions}
-							placeholder={t('auditPlugin:selectEventPlaceholder')}
+							placeholder={t(keys.selectEventPlaceholder)}
 							value={authEventOptions.find((o) => o.value === staged.eventType) ?? undefined}
 						/>
 					)
@@ -151,14 +151,14 @@ export function SingleValueEditor({
 								autoFocus
 								onChange={(e) => setLocal(e.target.value)}
 								onKeyDown={handleKeyDown}
-								placeholder={t('auditPlugin:eventTypePlaceholder')}
+								placeholder={t(keys.eventTypePlaceholder)}
 								type="text"
 								value={local as string}
 							/>
 						</div>
 					</div>
 					<button className="al-filterpopover__confirm" onClick={commitText} type="button">
-						{existingValue ? t('auditPlugin:update') : t('auditPlugin:add')}
+						{existingValue ? t(keys.update) : t(keys.add)}
 					</button>
 				</div>
 			)}
@@ -171,14 +171,14 @@ export function SingleValueEditor({
 								autoFocus
 								onChange={(e) => setLocal(e.target.value)}
 								onKeyDown={handleKeyDown}
-								placeholder={t('auditPlugin:fieldPathPlaceholder')}
+								placeholder={t(keys.fieldPathPlaceholder)}
 								type="text"
 								value={local as string}
 							/>
 						</div>
 					</div>
 					<button className="al-filterpopover__confirm" onClick={commitText} type="button">
-						{existingValue ? t('auditPlugin:update') : t('auditPlugin:add')}
+						{existingValue ? t(keys.update) : t(keys.add)}
 					</button>
 				</div>
 			)}
@@ -191,14 +191,14 @@ export function SingleValueEditor({
 								autoFocus
 								onChange={(e) => setLocal(e.target.value)}
 								onKeyDown={handleKeyDown}
-								placeholder={t('auditPlugin:groupPlaceholder')}
+								placeholder={t(keys.groupPlaceholder)}
 								type="text"
 								value={local as string}
 							/>
 						</div>
 					</div>
 					<button className="al-filterpopover__confirm" onClick={commitText} type="button">
-						{existingValue ? t('auditPlugin:update') : t('auditPlugin:add')}
+						{existingValue ? t(keys.update) : t(keys.add)}
 					</button>
 				</div>
 			)}

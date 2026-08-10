@@ -21,9 +21,9 @@ export function DiffViewer({ diff }: Props) {
 		<table className="al-diff">
 			<thead>
 				<tr>
-					<th className="al-diff__th al-diff__col-path">{t('auditPlugin:diffPath')}</th>
-					<th className="al-diff__th al-diff__col-before">{t('auditPlugin:diffBefore')}</th>
-					<th className="al-diff__th al-diff__col-after">{t('auditPlugin:diffAfter')}</th>
+					<th className="al-diff__th al-diff__col-path">{t(keys.diffPath)}</th>
+					<th className="al-diff__th al-diff__col-before">{t(keys.diffBefore)}</th>
+					<th className="al-diff__th al-diff__col-after">{t(keys.diffAfter)}</th>
 				</tr>
 			</thead>
 			<tbody>

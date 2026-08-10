@@ -37,12 +37,12 @@ export function MultiSelectEditor({ field, label, onClose, options, setStaged, s
 					})
 				}}
 				options={options}
-				placeholder={t('auditPlugin:selectPlaceholder')}
+				placeholder={t(keys.selectPlaceholder)}
 				value={options.filter((o) => currentValues.includes(o.value))}
 			/>
 			<div className="al-filterpopover__actions">
 				<Button margin={false} onClick={onClose}>
-					{t('auditPlugin:done')}
+					{t(keys.done)}
 				</Button>
 			</div>
 		</div>

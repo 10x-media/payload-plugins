@@ -32,26 +32,26 @@ export function DateRangeEditor({ onClose, setStaged, staged }: EditorProps) {
 
 	return (
 		<div className="al-filterpopover__editor" data-popup-prevent-close>
-			<div className="al-filterpopover__editor-label">{t('auditPlugin:filterDateRange')}</div>
+			<div className="al-filterpopover__editor-label">{t(keys.filterDateRange)}</div>
 			<div className="al-filterpopover__date-row">
-				<span className="al-filterpopover__date-label">{t('auditPlugin:dateFrom')}</span>
+				<span className="al-filterpopover__date-label">{t(keys.dateFrom)}</span>
 				<DatePicker
 					onChange={(val) => setFrom(val as Date | string)}
-					placeholder={t('auditPlugin:startDate')}
+					placeholder={t(keys.startDate)}
 					value={from}
 				/>
 			</div>
 			<div className="al-filterpopover__date-row">
-				<span className="al-filterpopover__date-label">{t('auditPlugin:dateTo')}</span>
+				<span className="al-filterpopover__date-label">{t(keys.dateTo)}</span>
 				<DatePicker
 					onChange={(val) => setTo(val as Date | string)}
-					placeholder={t('auditPlugin:endDate')}
+					placeholder={t(keys.endDate)}
 					value={to}
 				/>
 			</div>
 			<div className="al-filterpopover__actions">
 				<Button buttonStyle="primary" margin={false} onClick={commit}>
-					{t('auditPlugin:apply')}
+					{t(keys.apply)}
 				</Button>
 			</div>
 		</div>
