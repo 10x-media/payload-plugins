@@ -62,7 +62,7 @@ By default, a poll's results are not read by scanning submissions. Every submiss
 
 **Privacy.** A tally row carries no per-voter data, only a value and a running count. Pair `poll.votes` (on by default) with the form's `persistSubmissions: false` and a poll can count votes while storing zero per-visitor information: nothing links a count back to who cast it, because nothing about the voter was ever kept.
 
-**Permanence.** Votes are counted, never uncounted. Deleting a submission in the admin, editing one, or a `persistSubmissions: false` prune after actions run, none of them decrement the tally: once a vote is counted it stays counted. This is what lets a persist-off poll keep an accurate count with no submissions on disk to recount from.
+**Permanence.** Votes are counted, never uncounted. Deleting a submission in the admin, editing one, or a `persistSubmissions: false` prune after actions run, none of them decrement the tally: once a vote is counted it stays counted. This is what lets a persist-off poll keep an accurate count with no submissions on disk to recount from. The one deliberate exception is a poll with [`allowChange`](#changeable-votes) on: there, updating an already-complete submission's answer moves its vote to the new value (the old value decrements, the new one increments, respondents stay put); delete and prune remain permanent even then.
 
 **Healing drift.** Because the tally is append-only and separate from submissions, it can theoretically drift from what the submissions collection holds (a direct database edit, a restore from backup). `recountPollVotes({ payload, formId })` rebuilds a form's tally from scratch: it scans the form's submissions, deletes the existing tally rows for the results field, and replays the scan into fresh rows. It throws rather than write a knowingly partial count when the scan itself would be truncated (more than 100,000 submissions).
 
@@ -327,4 +327,43 @@ export default async function PollPage({ params }) {
 }
 ```
 
-The cookie is `HttpOnly; SameSite=Lax` with a one-year `Max-Age`, and deliberately not `Secure`: it is a UX marker only (skip re-showing a form the visitor already answered), never an integrity or auth signal, and omitting `Secure` keeps it working on plain-HTTP local development. Do not build any server-side trust on its presence; one-per-identity enforcement is the previous section's territory.
+The cookie is `HttpOnly; SameSite=Lax` with a one-year `Max-Age`, and deliberately not `Secure`: it is a UX marker only (skip re-showing a form the visitor already answered), never an integrity or auth signal, and omitting `Secure` keeps it working on plain-HTTP local development. Do not build any server-side trust on its presence; one-per-identity enforcement is the previous section's territory. On an [`allowChange`](#changeable-votes) poll the cookie's value is a signed submission id instead of `1` (set even without the `votedCookie` option); `hasVotedCookie` reads both forms identically.
+
+## Changeable votes
+
+The **Allow changing votes** checkbox on the Poll tab (`poll.allowChange`, default off) lets a visitor revise their vote while the poll is open. With it off nothing changes anywhere; with it on:
+
+- **One submission per voter, updated in place.** The voted cookie carries the voter's submission id, signed with the Payload secret so only ids the server issued are accepted (a forged or tampered cookie is simply treated as a new voter, never someone else's vote). A repeat submit from that browser, to the same `form-submissions` endpoint the first vote used, updates the existing submission instead of creating another: the submission count for the form does not grow.
+- **The tally follows.** Changing A to B decrements A's counter and increments B's; the respondents count is untouched. An unchanged re-submit is a no-op. See the permanence note under [Vote store](#vote-store).
+- **Closing still wins.** Past `closesAt` a change is rejected exactly like a new vote, and the tally stays as last voted.
+- **Same guards as a vote.** The change runs the full create pipeline: field validation against the poll's effective options, [spam controls](/form-builder/spam) (rate limit, honeypot, captcha), and consent recapture. The `notAlreadySubmitted` rule excludes the voter's own submission, so keeping the same answer never collides with itself.
+- **Cookie-scoped by design.** Clearing cookies (or a different device) makes the browser a new voter; that is the intended granularity for an anonymous fan vote, not a bug. Pair with server-enforced one-per-identity dedup when you need more.
+
+### Showing and changing the current pick
+
+`resolveVotedSubmission` is the server-side read of "what did this browser vote": it verifies the cookie, loads the submission, and returns `{ submissionId, value, pick }` (`value` is the stored answer verbatim for prefilling, `pick` the normalized string values for highlighting), or `null` for anything unusable, absent cookie, legacy `1` marker, pruned submission, wrong form. Hand it to `<Poll currentVote>`:
+
+```tsx title="app/poll/[id]/page.tsx"
+import { resolveVotedSubmission, toFormDocument } from '@10x-media/form-builder/rsc'
+import { Poll } from '@10x-media/form-builder/react'
+import { headers } from 'next/headers'
+
+export default async function PollPage({ params }) {
+  const form = await payload.findByID({ collection: 'forms', id: params.id })
+  const voted = await resolveVotedSubmission({
+    payload,
+    cookieHeader: (await headers()).get('cookie'),
+    formId: form.id,
+  })
+  return (
+    <Poll
+      form={toFormDocument(form)}
+      resultsField="colour"
+      hasVoted={voted != null}
+      currentVote={voted}
+    />
+  )
+}
+```
+
+With `currentVote` set, `<Poll>` treats the visitor as voted, marks their option in the results (`fb-results__bucket--yours` row class plus a translated "Your vote" badge, also available directly as `<FormResults currentValues>`), and, while an `allowChange` poll is open, renders a **Change vote** button (`fb-poll__change`) that reopens the form prefilled with their current answer. After the change it returns to results with the marker on the new option. A client-only host without the server read still gets the button once the localStorage flag marks the browser as voted, just without the prefill or marker, since the pick lives behind the httpOnly cookie. The `VotedSubmission` type is exported from the root, `/rsc`, and `/react`.
