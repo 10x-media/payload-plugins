@@ -1,12 +1,10 @@
 'use client'
 
-import { ReactSelect, useTranslation } from '@payloadcms/ui'
+import { ReactSelect } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useState } from 'react'
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../../translations/index.js'
+import { keys } from '../../../../translations/keys'
+import { useTranslation } from '../../../../translations/useTranslation'
 import { PayloadDocSelect } from './PayloadDocSelect.js'
 import type { EditorProps, SelectOption } from './types.js'
 
@@ -24,7 +22,7 @@ export function SingleValueEditor({
 	staged,
 	userTitleFields,
 }: Props) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const isChangedPath = field === 'changedPath'
 	const existingValue = isChangedPath
 		? index !== undefined && index >= 0
@@ -101,6 +99,7 @@ export function SingleValueEditor({
 						<div className="field-type text" style={{ flex: '1 1 auto' }}>
 							<div className="field-type__wrap">
 								<input
+									// biome-ignore lint/a11y/noAutofocus: the input lives in a filter popup opened by an explicit user action, so focus follows the interaction rather than page load
 									autoFocus={!stagedCollection}
 									onChange={(e) => setLocal(e.target.value)}
 									onKeyDown={handleKeyDown}
@@ -148,6 +147,7 @@ export function SingleValueEditor({
 					<div className="field-type text" style={{ flex: '1 1 auto' }}>
 						<div className="field-type__wrap">
 							<input
+								// biome-ignore lint/a11y/noAutofocus: the input lives in a filter popup opened by an explicit user action, so focus follows the interaction rather than page load
 								autoFocus
 								onChange={(e) => setLocal(e.target.value)}
 								onKeyDown={handleKeyDown}
@@ -168,6 +168,7 @@ export function SingleValueEditor({
 					<div className="field-type text" style={{ flex: '1 1 auto' }}>
 						<div className="field-type__wrap">
 							<input
+								// biome-ignore lint/a11y/noAutofocus: the input lives in a filter popup opened by an explicit user action, so focus follows the interaction rather than page load
 								autoFocus
 								onChange={(e) => setLocal(e.target.value)}
 								onKeyDown={handleKeyDown}
@@ -188,6 +189,7 @@ export function SingleValueEditor({
 					<div className="field-type text" style={{ flex: '1 1 auto' }}>
 						<div className="field-type__wrap">
 							<input
+								// biome-ignore lint/a11y/noAutofocus: the input lives in a filter popup opened by an explicit user action, so focus follows the interaction rather than page load
 								autoFocus
 								onChange={(e) => setLocal(e.target.value)}
 								onKeyDown={handleKeyDown}

@@ -1,11 +1,8 @@
 'use client'
 
-import { useTranslation } from '@payloadcms/ui'
 import type React from 'react'
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../../translations/index'
+import { keys } from '../../../../translations/keys'
+import { useTranslation } from '../../../../translations/useTranslation'
 import type { Filters, SelectOption } from '../../types'
 import { OPERATION_OPTIONS } from './constants'
 import { DateRangeEditor } from './DateRangeEditor'
@@ -37,7 +34,7 @@ export function ValueEditor({
 	tenantOptions,
 	userTitleFields,
 }: Props) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 
 	if (field === 'collections') {
 		return (

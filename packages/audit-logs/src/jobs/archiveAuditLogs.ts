@@ -90,7 +90,7 @@ export const buildArchiveTask = (options: ArchiveTaskOptions): TaskConfig => ({
 		gzip.on('data', (chunk: Buffer) => chunks.push(chunk))
 
 		// Write CSV header before the first page arrives.
-		gzip.write(columns.join(',') + '\n')
+		gzip.write(`${columns.join(',')}\n`)
 
 		let page = 1
 		let hasNextPage = true
@@ -147,7 +147,7 @@ export const buildArchiveTask = (options: ArchiveTaskOptions): TaskConfig => ({
 				}
 
 				const row: Record<string, unknown> = { ...doc, diff, snapshot }
-				gzip.write(columns.map((col) => escapeCell(row[col])).join(',') + '\n')
+				gzip.write(`${columns.map((col) => escapeCell(row[col])).join(',')}\n`)
 				archivedIds.push(String(doc.id))
 			}
 

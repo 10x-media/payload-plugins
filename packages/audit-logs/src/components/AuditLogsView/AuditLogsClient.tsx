@@ -1,13 +1,13 @@
 'use client'
 
-import { Pagination, PerPage, useStepNav, useTranslation } from '@payloadcms/ui'
+import { Pagination, PerPage, useStepNav } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
-import React, { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-import type { CustomTranslationsKeys, CustomTranslationsObject } from '../../translations/index.js'
+import './index.css'
 
-import './index.scss'
-
+import { keys } from '../../translations/keys'
+import { useTranslation } from '../../translations/useTranslation'
 import { FilterBar } from './components/FilterBar/index.js'
 import { LogRow } from './components/LogRow.js'
 import type { AuditLogDoc, AuditLogsClientProps } from './types.js'
@@ -38,7 +38,7 @@ export function AuditLogsClient({
 	)
 	const [lastResult, setLastResult] = useState<string | null>(null)
 
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 
 	const { setStepNav } = useStepNav()
 
@@ -108,9 +108,7 @@ export function AuditLogsClient({
 							onClick={() => triggerJob('audit-logs-archive')}
 							type="button"
 						>
-							{runningTask === 'audit-logs-archive'
-								? t(keys.queuing)
-								: t(keys.runArchive)}
+							{runningTask === 'audit-logs-archive' ? t(keys.queuing) : t(keys.runArchive)}
 						</button>
 					)}
 					<button
@@ -119,9 +117,7 @@ export function AuditLogsClient({
 						onClick={() => triggerJob('audit-logs-delete')}
 						type="button"
 					>
-						{runningTask === 'audit-logs-delete'
-							? t(keys.queuing)
-							: t(keys.runDelete)}
+						{runningTask === 'audit-logs-delete' ? t(keys.queuing) : t(keys.runDelete)}
 					</button>
 					{lastResult && <span className="al-debug-bar__result">{lastResult}</span>}
 				</div>

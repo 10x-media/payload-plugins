@@ -1,12 +1,10 @@
 'use client'
 
-import { Button, Popup, useTranslation } from '@payloadcms/ui'
+import { Button, Popup } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../../translations/index.js'
+import { keys } from '../../../../translations/keys'
+import { useTranslation } from '../../../../translations/useTranslation'
 import type { Filters } from '../../types.js'
 import { OPERATION_LABELS } from '../../utils.js'
 import { AddFilterPopup } from './AddFilterPopup.js'
@@ -22,7 +20,7 @@ export function FilterBar({
 	tenantOptions,
 	userTitleFields,
 }: FilterBarProps) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const [staged, setStaged] = useState<Filters>(filters)
 
 	useEffect(() => {
@@ -170,6 +168,8 @@ export function FilterBar({
 									<span className="al-filterpill__label">{label}</span>
 									<span className="al-filterpill__sep">:</span>
 									<span className="al-filterpill__value">{getMultiPillValue(field)}</span>
+									{/* biome-ignore lint/a11y/useKeyWithClickEvents: the remove control sits inside the Popup trigger button, so it cannot itself be a button; keyboard users remove the filter from inside the popup */}
+									{/* biome-ignore lint/a11y/useSemanticElements: same nested-trigger constraint as the sibling suppression */}
 									<span
 										className="al-filterpill__remove"
 										onClick={removeMulti(field)}
@@ -220,6 +220,8 @@ export function FilterBar({
 									<span className="al-filterpill__label">{label}</span>
 									<span className="al-filterpill__sep">:</span>
 									<span className="al-filterpill__value">{displayVal}</span>
+									{/* biome-ignore lint/a11y/useKeyWithClickEvents: the remove control sits inside the Popup trigger button, so it cannot itself be a button; keyboard users remove the filter from inside the popup */}
+									{/* biome-ignore lint/a11y/useSemanticElements: same nested-trigger constraint as the sibling suppression */}
 									<span
 										className="al-filterpill__remove"
 										onClick={removeScalar(field)}
@@ -253,12 +255,15 @@ export function FilterBar({
 				{/* Changed path pills */}
 				{(staged.changedPaths ?? []).map((path, i) => (
 					<Popup
+						// biome-ignore lint/suspicious/noArrayIndexKey: the same changed path can be staged twice, so the value is not a stable key
 						key={`cp-${i}`}
 						button={
 							<button className="al-filterpill" type="button">
 								<span className="al-filterpill__label">{t(keys.filterChangedPath)}</span>
 								<span className="al-filterpill__sep">:</span>
 								<span className="al-filterpill__value">{path}</span>
+								{/* biome-ignore lint/a11y/useKeyWithClickEvents: the remove control sits inside the Popup trigger button, so it cannot itself be a button; keyboard users remove the filter from inside the popup */}
+								{/* biome-ignore lint/a11y/useSemanticElements: same nested-trigger constraint as the sibling suppression */}
 								<span
 									className="al-filterpill__remove"
 									onClick={removeChangedPath(i)}
@@ -297,6 +302,8 @@ export function FilterBar({
 								<span className="al-filterpill__label">{t(keys.filterDate)}</span>
 								<span className="al-filterpill__sep">:</span>
 								<span className="al-filterpill__value">{datePillValue}</span>
+								{/* biome-ignore lint/a11y/useKeyWithClickEvents: the remove control sits inside the Popup trigger button, so it cannot itself be a button; keyboard users remove the filter from inside the popup */}
+								{/* biome-ignore lint/a11y/useSemanticElements: same nested-trigger constraint as the sibling suppression */}
 								<span
 									className="al-filterpill__remove"
 									onClick={removeDateRange}

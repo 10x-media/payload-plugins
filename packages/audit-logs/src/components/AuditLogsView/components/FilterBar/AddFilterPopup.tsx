@@ -1,14 +1,10 @@
 'use client'
 
-import { Popup, PopupList, useTranslation } from '@payloadcms/ui'
+import { Popup, PopupList } from '@payloadcms/ui'
 import type React from 'react'
 import { useState } from 'react'
-
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../../translations/index.js'
-
+import { keys } from '../../../../translations/keys'
+import { useTranslation } from '../../../../translations/useTranslation'
 import type { Filters, SelectOption } from '../../types.js'
 import type { AvailableFilter, FilterField } from './types.js'
 import { ValueEditor } from './ValueEditor.js'
@@ -32,7 +28,7 @@ export function AddFilterPopup({
 	tenantOptions,
 	userTitleFields,
 }: Props) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const [editing, setEditing] = useState<{ index?: number; key: FilterField } | null>(null)
 
 	return (

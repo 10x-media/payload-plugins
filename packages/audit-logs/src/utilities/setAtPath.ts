@@ -21,5 +21,7 @@ export const setAtPath = (obj: Record<string, unknown>, path: string, value: unk
 		}
 		current = current[key] as Record<string, unknown>
 	}
-	current[keys.at(-1)!] = value
+	const lastKey = keys.at(-1)
+	if (lastKey === undefined) return
+	current[lastKey] = value
 }

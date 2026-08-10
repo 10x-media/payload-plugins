@@ -25,6 +25,7 @@ export type AuditLogAfterChangeOptions = {
 	tenantFieldName?: string
 }
 
+// biome-ignore lint/complexity/useMaxParams: the five values are exactly what AnonymizeFunction is called with
 const applyAnonymization = (
 	diff: Record<string, { after: unknown; before: unknown }>,
 	collectionSlug: string,

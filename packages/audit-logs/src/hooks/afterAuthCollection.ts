@@ -1,4 +1,8 @@
-import type { CollectionAfterForgotPasswordHook, CollectionAfterLoginHook } from 'payload'
+import type {
+	CollectionAfterForgotPasswordHook,
+	CollectionAfterLoginHook,
+	PayloadRequest,
+} from 'payload'
 
 import { getClientIP, getUserAgent } from '../utilities/request'
 
@@ -44,8 +48,11 @@ export const afterLoginAuditLog =
 export const afterForgotPasswordAuditLog =
 	(options: AuthAuditOptions): CollectionAfterForgotPasswordHook =>
 	async ({ args }) => {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const { req, data } = args as any
+		// Payload types `args` loosely for this hook; only `req` and the submitted email are read.
+		const { req, data } = args as {
+			data?: { email?: string }
+			req?: PayloadRequest
+		}
 		if (!req) return
 
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined

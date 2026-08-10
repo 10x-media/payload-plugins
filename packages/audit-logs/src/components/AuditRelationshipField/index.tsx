@@ -14,9 +14,9 @@ import {
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { RelationshipFieldClientComponent, ValueWithRelation } from 'payload'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import './index.scss'
+import './index.css'
 
 const baseClass = 'audit-relationship-field'
 
@@ -34,7 +34,7 @@ const AuditRelationshipFieldComponent: RelationshipFieldClientComponent = (props
 
 	const field = props.field
 	const {
-		customComponents: { Description, Error, Label } = {},
+		customComponents: { Description, Error: ErrorComponent, Label } = {},
 		path,
 		showError,
 		value,
@@ -138,7 +138,7 @@ const AuditRelationshipFieldComponent: RelationshipFieldClientComponent = (props
 			/>
 			<div className={`${baseClass}__wrap`}>
 				<RenderCustomComponent
-					CustomComponent={Error}
+					CustomComponent={ErrorComponent}
 					Fallback={<FieldError path={path} showError={showError} />}
 				/>
 				<div className={`${baseClass}__value`}>

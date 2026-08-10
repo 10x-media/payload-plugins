@@ -111,7 +111,7 @@ describe('computeDiff', () => {
 
 		it('does not recurse when one side is an array', () => {
 			const result = computeDiff({ items: [1, 2] }, { items: { 0: 1, 1: 2 } })
-			expect(result.diff['items']).toBeDefined()
+			expect(result.diff.items).toBeDefined()
 		})
 
 		it('records no diff when nested object is unchanged', () => {
@@ -1179,7 +1179,7 @@ describe('computeDiff', () => {
 					fm([['createdBy', 'rel-single']])
 				)
 				// different relationTo → different normalized objects → diff recorded
-				expect(result.diff['createdBy']).toEqual({
+				expect(result.diff.createdBy).toEqual({
 					before: { relationTo: 'users', value: 'id-a' },
 					after: { relationTo: 'adminUsers', value: 'id-a' },
 				})
@@ -1407,9 +1407,9 @@ describe('normalizeSnapshot', () => {
 			fm([['steps.*.assignee', 'rel-single']])
 		)
 		const steps = result.steps as Record<string, unknown>[]
-		expect(steps[0]!.assignee).toBe('id-a')
-		expect(steps[1]!.assignee).toBe('id-b')
-		expect(steps[0]!.title).toBe('Step 1')
+		expect(steps[0]?.assignee).toBe('id-a')
+		expect(steps[1]?.assignee).toBe('id-b')
+		expect(steps[0]?.title).toBe('Step 1')
 	})
 
 	it('normalizes rel-many inside array items (wildcard)', () => {
@@ -1428,7 +1428,7 @@ describe('normalizeSnapshot', () => {
 			fm([['steps.*.reviewers', 'rel-many']])
 		)
 		const steps = result.steps as Record<string, unknown>[]
-		expect(steps[0]!.reviewers).toEqual(['id-1', 'id-2'])
+		expect(steps[0]?.reviewers).toEqual(['id-1', 'id-2'])
 	})
 
 	it('normalizes rel-single two arrays deep', () => {
@@ -1439,8 +1439,8 @@ describe('normalizeSnapshot', () => {
 			fm([['sections.*.blocks.*.author', 'rel-single']])
 		)
 		const sections = result.sections as Record<string, unknown>[]
-		const blocks = sections[0]!.blocks as Record<string, unknown>[]
-		expect(blocks[0]!.author).toBe('id-a')
+		const blocks = sections[0]?.blocks as Record<string, unknown>[]
+		expect(blocks[0]?.author).toBe('id-a')
 	})
 
 	it('normalizes a polymorphic rel-single populated value to { relationTo, value: id }', () => {

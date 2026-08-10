@@ -5,6 +5,14 @@ export default definePluginBuild({
 		index: 'src/index.ts',
 		'exports/types': 'src/exports/types.ts',
 		'exports/client': 'src/exports/client.ts',
+		'exports/rsc': 'src/exports/rsc.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 	},
+	copy: [
+		{ from: 'src/components/AuditLogsView/index.css', to: 'dist/components/AuditLogsView' },
+		{
+			from: 'src/components/AuditRelationshipField/index.css',
+			to: 'dist/components/AuditRelationshipField',
+		},
+	],
 })

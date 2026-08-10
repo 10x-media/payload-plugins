@@ -1,11 +1,7 @@
 'use client'
 
-import { useTranslation } from '@payloadcms/ui'
-import React from 'react'
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../translations/index.js'
+import { keys } from '../../../translations/keys'
+import { useTranslation } from '../../../translations/useTranslation'
 import { formatValue, isLongValue } from '../utils.js'
 
 type Props = {
@@ -13,7 +9,7 @@ type Props = {
 }
 
 export function DiffViewer({ diff }: Props) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const entries = Object.entries(diff)
 	if (entries.length === 0) return null
 

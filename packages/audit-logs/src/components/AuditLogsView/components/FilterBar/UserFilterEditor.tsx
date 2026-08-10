@@ -1,12 +1,9 @@
 'use client'
 
-import { Button, ReactSelect, useTranslation } from '@payloadcms/ui'
-import React, { useCallback, useState } from 'react'
-
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../../translations/index'
+import { Button, ReactSelect } from '@payloadcms/ui'
+import { useCallback, useState } from 'react'
+import { keys } from '../../../../translations/keys'
+import { useTranslation } from '../../../../translations/useTranslation'
 import { PayloadDocSelect } from './PayloadDocSelect'
 import type { EditorProps, SelectOption } from './types'
 
@@ -15,7 +12,7 @@ type Props = EditorProps & {
 }
 
 export function UserFilterEditor({ onClose, setStaged, staged, userTitleFields }: Props) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const authSlugs = Object.keys(userTitleFields)
 	const [selectedCollection, setSelectedCollection] = useState<string>(
 		staged.userCollection ?? (authSlugs.length === 1 ? (authSlugs[0] ?? '') : '')
@@ -67,14 +64,13 @@ export function UserFilterEditor({ onClose, setStaged, staged, userTitleFields }
 					{currentIds.map((id) => (
 						<span className="al-filterpopover__tag" key={id}>
 							#{id.slice(-8)}
-							<span
+							<button
+								type="button"
 								className="al-filterpopover__tag-remove"
 								onClick={() => removeId(id)}
-								role="button"
-								tabIndex={-1}
 							>
 								×
-							</span>
+							</button>
 						</span>
 					))}
 				</div>
@@ -105,6 +101,7 @@ export function UserFilterEditor({ onClose, setStaged, staged, userTitleFields }
 				<div className="field-type text" style={{ flex: '1 1 auto' }}>
 					<div className="field-type__wrap">
 						<input
+							// biome-ignore lint/a11y/noAutofocus: the input lives in a filter popup opened by an explicit user action, so focus follows the interaction rather than page load
 							autoFocus={authSlugs.length === 0}
 							onChange={(e) => setManualId(e.target.value)}
 							onKeyDown={(e) => {

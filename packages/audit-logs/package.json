@@ -37,6 +37,11 @@
 			"types": "./src/exports/client.ts",
 			"default": "./dist/exports/client.js"
 		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
+		},
 		"./i18n": {
 			"development": "./src/exports/i18n.ts",
 			"types": "./src/exports/i18n.ts",
@@ -123,6 +128,11 @@
 				"types": "./dist/exports/client.d.ts",
 				"import": "./dist/exports/client.js",
 				"default": "./dist/exports/client.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
 			},
 			"./i18n": {
 				"types": "./dist/exports/i18n.d.ts",

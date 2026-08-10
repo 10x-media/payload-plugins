@@ -11,9 +11,21 @@ describe('auditLogs factory', () => {
 		expect(typeof auditLogs({})).toBe('function')
 	})
 
-	it('returns the incoming config when disabled', () => {
+	it('keeps the audit-logs collection in the schema when disabled', () => {
 		const cfg = fakeConfig()
-		expect(auditLogs({ disabled: true })(cfg)).toBe(cfg)
+		const out = auditLogs({ disabled: true, collections: { posts: true } })(cfg) as Config
+		expect(out).toBe(cfg)
+		expect(out.collections?.map((c) => c.slug)).toContain('audit-logs')
+	})
+
+	it('registers no hooks on audited collections when disabled', () => {
+		const cfg = { collections: [{ slug: 'posts', fields: [] }] } as unknown as Config
+		const out = auditLogs({ disabled: true, collections: { posts: true } })(cfg) as Config
+		const posts = out.collections?.find((c) => c.slug === 'posts')
+		expect(posts?.hooks?.beforeChange ?? []).toHaveLength(0)
+		expect(posts?.hooks?.afterChange ?? []).toHaveLength(0)
+		// The fields still exist, which is the point: the schema does not change.
+		expect(posts?.fields.map((f) => 'name' in f && f.name)).toContain('createdBy')
 	})
 
 	it('applies the translations option', () => {

@@ -1,6 +1,7 @@
 import type { AnonymizeFunction } from '../types'
 import { REDACTED } from '../types'
 
+// biome-ignore lint/complexity/useMaxParams: the six values are exactly what AnonymizeFunction is called with, threaded through the recursion
 const anonymizeValue = (
 	value: unknown,
 	path: string,
@@ -39,6 +40,7 @@ const anonymizeValue = (
  * For each field, `anonymize` is called with its full path (e.g. `"address.street"`).
  * Return `REDACTED` to omit a value — nested children are skipped entirely.
  */
+// biome-ignore lint/complexity/useMaxParams: mirrors anonymizeValue, minus the per-value path
 export const anonymizeDoc = (
 	doc: Record<string, unknown>,
 	collection: string,

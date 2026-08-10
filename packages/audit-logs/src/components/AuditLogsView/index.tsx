@@ -1,15 +1,12 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
-import type { TFunction } from '@payloadcms/translations'
 import { Gutter } from '@payloadcms/ui'
 import type { AdminViewServerProps, Where } from 'payload'
 import { parseCookies } from 'payload'
-import React from 'react'
-
+import { keys } from '../../translations'
+import { asTranslate } from '../../translations/server'
 import type { AuditPluginConfig } from '../../types'
 import { AuditLogsClient } from './AuditLogsClient.js'
 import { GLOBAL_SENTINEL } from './utils.js'
-import { keys } from '../../translations'
-import { asTranslate } from '../../translations/server'
 
 export async function AuditLogsView({
 	initPageResult,
@@ -47,7 +44,7 @@ export async function AuditLogsView({
 		</DefaultTemplate>
 	)
 
-const t = asTranslate(req.i18n.t)
+	const t = asTranslate(req.i18n.t)
 
 	if (!user) return notAllowed(t(keys.mustBeLoggedIn))
 
@@ -169,7 +166,8 @@ const t = asTranslate(req.i18n.t)
 			})
 		}
 
-		whereConditions.push(parts.length === 1 ? parts[0]! : { or: parts })
+		const [onlyPart] = parts
+		whereConditions.push(parts.length === 1 && onlyPart ? onlyPart : { or: parts })
 	}
 
 	if (operations.length === 1) whereConditions.push({ operation: { equals: operations[0] } })

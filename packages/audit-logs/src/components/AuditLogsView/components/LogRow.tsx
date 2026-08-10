@@ -1,13 +1,11 @@
 'use client'
 
-import { ChevronIcon, Link, useTranslation } from '@payloadcms/ui'
+import { ChevronIcon, Link } from '@payloadcms/ui'
 
 import { useSearchParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../translations/index.js'
+import { keys } from '../../../translations/keys'
+import { useTranslation } from '../../../translations/useTranslation'
 import type { AuditLogDoc } from '../types.js'
 import { displayUser, GLOBAL_SENTINEL, OPERATION_LABELS } from '../utils.js'
 import { DiffViewer } from './DiffViewer.js'
@@ -20,7 +18,7 @@ type Props = {
 }
 
 export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const [expanded, setExpanded] = useState(false)
 	const searchParams = useSearchParams()
 	const groupHref = useMemo(() => {
@@ -33,7 +31,8 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 	const isGlobal = doc.relationTo === GLOBAL_SENTINEL
 
 	const pathCount = doc.changedPaths?.length ?? 0
-	const hasDiff = doc.diff && Object.keys(doc.diff).length > 0
+	const diff = doc.diff && Object.keys(doc.diff).length > 0 ? doc.diff : undefined
+	const hasDiff = diff !== undefined
 	const hasSnapshot = Boolean(doc.snapshot)
 	const hasMetadata = Boolean(doc.metadata)
 	const isAuthOrCustom = doc.operation === 'auth' || doc.operation === 'custom'
@@ -44,7 +43,12 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 
 	return (
 		<div className={`al-row${expanded ? ' al-row--expanded' : ''}`}>
-			<div className="al-row__summary" onClick={() => isExpandable && setExpanded((v) => !v)}>
+			<button
+				type="button"
+				className="al-row__summary"
+				aria-expanded={isExpandable ? expanded : undefined}
+				onClick={() => isExpandable && setExpanded((v) => !v)}
+			>
 				<span className={`al-row__toggle${!isExpandable ? ' al-row__toggle--hidden' : ''}`}>
 					<ChevronIcon direction={expanded ? 'down' : 'right'} className="al-row__toggle-icon" />
 				</span>
@@ -78,15 +82,14 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 				<span className="al-row__right">
 					{pathCount > 0 && (
 						<span className="al-row__paths-count">
-							{t(
-								pathCount !== 1 ? keys.fieldsChangedPlural : keys.fieldsChanged,
-								{ count: pathCount }
-							)}
+							{t(pathCount !== 1 ? keys.fieldsChangedPlural : keys.fieldsChanged, {
+								count: pathCount,
+							})}
 						</span>
 					)}
 					<FormattedDate iso={doc.createdAt} />
 				</span>
-			</div>
+			</button>
 
 			<div className="al-row__body">
 				<div className="al-row__detail">
@@ -94,8 +97,7 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 						<div className="al-row__meta">
 							{doc.ipAddress && (
 								<span className="al-row__meta-item">
-									<span className="al-row__meta-label">{t(keys.metaIp)}</span>{' '}
-									{doc.ipAddress}
+									<span className="al-row__meta-label">{t(keys.metaIp)}</span> {doc.ipAddress}
 								</span>
 							)}
 							{doc.userAgent && (
@@ -106,8 +108,7 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 							)}
 							{doc.locale && (
 								<span className="al-row__meta-item">
-									<span className="al-row__meta-label">{t(keys.metaLocale)}</span>{' '}
-									{doc.locale}
+									<span className="al-row__meta-label">{t(keys.metaLocale)}</span> {doc.locale}
 								</span>
 							)}
 							{doc.group && groupHref && (
@@ -130,7 +131,7 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 							</div>
 						)}
 
-						{hasDiff && <DiffViewer diff={doc.diff!} />}
+						{diff && <DiffViewer diff={diff} />}
 
 						{hasSnapshot && (
 							<div className="al-row__section">
@@ -142,9 +143,7 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 						{isAuthOrCustom && (
 							<div className="al-row__section">
 								<div className="al-row__section-label">
-									{doc.operation === 'auth'
-										? t(keys.sectionAuthEvent)
-										: t(keys.sectionCustomEvent)}
+									{doc.operation === 'auth' ? t(keys.sectionAuthEvent) : t(keys.sectionCustomEvent)}
 								</div>
 								<table className="al-diff">
 									<tbody>

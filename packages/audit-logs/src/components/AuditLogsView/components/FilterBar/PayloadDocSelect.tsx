@@ -1,13 +1,9 @@
 'use client'
 
-import { ReactSelect, useConfig, useDebounce, useTranslation } from '@payloadcms/ui'
-import React, { useCallback, useEffect, useState } from 'react'
-
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../../translations/index'
-
+import { ReactSelect, useConfig, useDebounce } from '@payloadcms/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { keys } from '../../../../translations/keys'
+import { useTranslation } from '../../../../translations/useTranslation'
 import type { SelectOption } from './types'
 
 type Props = {
@@ -17,7 +13,7 @@ type Props = {
 }
 
 export function PayloadDocSelect({ collection, onSelect, titleField }: Props) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const {
 		config: {
 			routes: { api },
@@ -30,6 +26,7 @@ export function PayloadDocSelect({ collection, onSelect, titleField }: Props) {
 	const [hasLoadedAll, setHasLoadedAll] = useState(false)
 	const [nextPage, setNextPage] = useState(1)
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: ported as is; hasLoadedAll and nextPage are read from a stale closure, so scroll-to-bottom refetches page 1. Tracked as a port follow-up.
 	const loadOptions = useCallback(
 		async (reset: boolean) => {
 			if (!reset && hasLoadedAll) return
@@ -55,10 +52,10 @@ export function PayloadDocSelect({ collection, onSelect, titleField }: Props) {
 				// silently ignore
 			}
 		},
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 		[api, collection, debouncedSearch, titleField]
 	)
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: resetting on a new search must not re-run when the callback identity changes
 	useEffect(() => {
 		setHasLoadedAll(false)
 		setNextPage(1)

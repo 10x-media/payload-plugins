@@ -98,6 +98,7 @@ let diffRecursive: (
  *
  * Supports arbitrarily nested arrays — recursion handles array fields inside array items.
  */
+// biome-ignore lint/complexity/useMaxParams: before/after arrays plus path, exclude set, accumulator and field map are all needed by the recursion
 const diffArrayByIds = (
 	before: Array<Record<string, unknown>>,
 	after: Array<Record<string, unknown>>,
@@ -128,7 +129,8 @@ const diffArrayByIds = (
 		const itemPath = `${path}.${id}`
 
 		if (!beforeItem) {
-			result[itemPath] = { before: null, after: afterItem! }
+			// `id` came from the union of both id lists, so a missing beforeItem means afterMap has it.
+			result[itemPath] = { before: null, after: afterItem ?? null }
 		} else if (!afterItem) {
 			result[itemPath] = { before: beforeItem, after: null }
 		} else {
@@ -137,6 +139,7 @@ const diffArrayByIds = (
 	}
 }
 
+// biome-ignore lint/complexity/useMaxParams: before/after records plus exclude set, prefix, accumulator and field map are all needed by the recursion
 diffRecursive = (
 	before: Record<string, unknown>,
 	after: Record<string, unknown>,
@@ -338,6 +341,7 @@ export type DiffResult = {
  * )
  * // => { changedPaths: ['steps.x.title'], diff: { 'steps.x.title': { before: 'A', after: 'B' } } }
  */
+// biome-ignore lint/complexity/useMaxParams: the public diff surface: before, after, excluded fields and the field map
 export const computeDiff = (
 	before: Record<string, unknown> | null | undefined,
 	after: Record<string, unknown> | null | undefined,

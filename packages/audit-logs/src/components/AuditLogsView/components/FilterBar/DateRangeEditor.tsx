@@ -1,25 +1,21 @@
 'use client'
 
-import { Button, DatePicker, useTranslation } from '@payloadcms/ui'
-import React, { useCallback, useState } from 'react'
-
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../../translations/index.js'
-
+import { Button, DatePicker } from '@payloadcms/ui'
+import { useCallback, useState } from 'react'
+import { keys } from '../../../../translations/keys'
+import { useTranslation } from '../../../../translations/useTranslation'
 import type { EditorProps } from './types.js'
 
+const toISO = (val: Date | string): string | undefined => {
+	if (!val) return undefined
+	if (val instanceof Date) return val.toISOString()
+	return val
+}
+
 export function DateRangeEditor({ onClose, setStaged, staged }: EditorProps) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const [from, setFrom] = useState<Date | string>(staged.dateFrom ?? '')
 	const [to, setTo] = useState<Date | string>(staged.dateTo ?? '')
-
-	const toISO = (val: Date | string): string | undefined => {
-		if (!val) return undefined
-		if (val instanceof Date) return val.toISOString()
-		return val
-	}
 
 	const commit = useCallback(() => {
 		setStaged((f) => ({

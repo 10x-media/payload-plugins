@@ -1,13 +1,8 @@
 'use client'
 
-import { Button, ReactSelect, useTranslation } from '@payloadcms/ui'
-import React from 'react'
-
-import type {
-	CustomTranslationsKeys,
-	CustomTranslationsObject,
-} from '../../../../translations/index.js'
-
+import { Button, ReactSelect } from '@payloadcms/ui'
+import { keys } from '../../../../translations/keys'
+import { useTranslation } from '../../../../translations/useTranslation'
 import type { Filters } from '../../types.js'
 import type { EditorProps, SelectOption } from './types.js'
 
@@ -18,7 +13,7 @@ type Props = EditorProps & {
 }
 
 export function MultiSelectEditor({ field, label, onClose, options, setStaged, staged }: Props) {
-	const { t } = useTranslation<CustomTranslationsObject, CustomTranslationsKeys>()
+	const { t } = useTranslation()
 	const currentValues = staged[field] ?? []
 
 	return (

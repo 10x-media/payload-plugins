@@ -1,5 +1,6 @@
 import type { Access, CollectionConfig, CollectionSlug, RelationshipField } from 'payload'
 
+// biome-ignore lint/complexity/useMaxParams: the collection shape is driven by six independent plugin options; an options object is queued as a port follow-up
 export const buildAuditLogsCollection = (
 	hidden = true,
 	userRelationTo: CollectionSlug | CollectionSlug[] = 'users',

@@ -22,9 +22,12 @@ export const displayUser = (user: unknown, userTitleFields: Record<string, strin
 			return String(doc[titleField] ?? doc.id ?? '—')
 		}
 		// Non-polymorphic populated: direct doc — single auth collection
+		// Read out rather than indexed: a length check does not tell the compiler the element
+		// exists. The single entry condition is unchanged.
 		const entries = Object.entries(userTitleFields)
-		if (entries.length === 1) {
-			const titleField = entries[0][1]
+		const [onlyEntry] = entries
+		if (entries.length === 1 && onlyEntry) {
+			const titleField = onlyEntry[1]
 			if (titleField !== 'id' && u[titleField]) return String(u[titleField])
 		}
 		if (u.id) return String(u.id)

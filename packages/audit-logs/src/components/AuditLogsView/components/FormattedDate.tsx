@@ -1,7 +1,7 @@
 'use client'
 
 import { ShimmerEffect } from '@payloadcms/ui'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { formatDate } from '../utils.js'
 
