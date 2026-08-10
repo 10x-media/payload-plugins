@@ -59,13 +59,12 @@ export const de: Record<TranslationKey, string> = {
 	[keys.tocHeading]: 'Auf dieser Seite',
 	[keys.targetBlocksDescription]: 'Block-Slugs, für die diese Anleitung gilt, z. B. "heroBanner".',
 	[keys.targetBlocksLabel]: 'Blöcke',
-	[keys.targetCollectionsDescription]:
-		'Sammlungs-Slugs, für die diese Anleitung gilt, z. B. "posts".',
+	[keys.targetCollectionsDescription]: 'Die Sammlungen, für die diese Anleitung gilt.',
 	[keys.targetCollectionsLabel]: 'Sammlungen',
 	[keys.targetFieldsDescription]:
 		'Feldpfade mit vorangestellter Entität: "collection:posts.hero.title" oder "global:settings.siteName".',
 	[keys.targetFieldsLabel]: 'Felder',
-	[keys.targetGlobalsDescription]: 'Global-Slugs, für die diese Anleitung gilt, z. B. "settings".',
+	[keys.targetGlobalsDescription]: 'Die globalen Inhalte, für die diese Anleitung gilt.',
 	[keys.targetGlobalsLabel]: 'Globale Inhalte',
 	[keys.videoEmbedBlockPlural]: 'Video-Einbettungen',
 	[keys.videoEmbedBlockSingular]: 'Video-Einbettung',

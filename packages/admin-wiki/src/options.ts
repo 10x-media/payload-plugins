@@ -87,12 +87,32 @@ export type WikiListBandOptions = {
 export type WikiTriggersOptions = {
 	/** Document edit views: a guides panel in the sidebar. Defaults to `true`. */
 	edit?: boolean
-	/** Collection and global slugs to leave every wiki surface off. */
-	exclude?: string[]
 	/** Global edit views: a guides panel in the sidebar. Defaults to `true`. */
 	global?: boolean
 	/** Collection list views: the guides band. Defaults to `true`. */
 	list?: boolean | WikiListBandOptions
+}
+
+/**
+ * Slugs the plugin leaves alone entirely: no help on their fields, no guides
+ * panel, no list band, and no entry in the target pickers, so a guide cannot be
+ * attached to one even in wiki edit mode.
+ *
+ * Kept per entity kind because Payload only enforces slug uniqueness within one
+ * kind. A collection, a global, and a block may all be called `settings`, and a
+ * single flat list would exclude three unrelated things at once.
+ *
+ * These add to the built-in exclusions: Payload's own bookkeeping collections
+ * and globals (`PAYLOAD_INTERNAL_COLLECTIONS`, `PAYLOAD_INTERNAL_GLOBALS`) and
+ * the wiki's own two collections.
+ */
+export type WikiExcludeOptions = {
+	/** Block slugs that get no block help and cannot be targeted. */
+	blocks?: string[]
+	/** Collection slugs the plugin does not touch. */
+	collections?: string[]
+	/** Global slugs the plugin does not touch. */
+	globals?: string[]
 }
 
 export type AdminWikiPluginOptions = {
@@ -115,6 +135,8 @@ export type AdminWikiPluginOptions = {
 	access?: WikiAccessOptions
 	/** Extensions to the wiki editor (consumer blocks with renderers). */
 	editor?: WikiEditorOptions
+	/** Entities the plugin leaves alone entirely. See {@link WikiExcludeOptions}. */
+	exclude?: WikiExcludeOptions
 	/**
 	 * Lead the list band with the collection's featured guides as cards. `false`
 	 * collapses the band to its "all guides" row; the wiki view leads with

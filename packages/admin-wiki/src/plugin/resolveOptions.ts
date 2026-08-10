@@ -6,16 +6,21 @@ import type {
 	WikiVideoOptions,
 	WikiWriteAffordanceMode,
 } from '../options'
+import { type ResolvedWikiExclude, resolveExcluded } from './exclude'
 
 /** Plugin options normalized to their effective values. */
 export type ResolvedWikiOptions = {
 	editorBlocks: WikiEditorBlockOption[]
+	/**
+	 * Slugs the plugin leaves untouched, per entity kind: Payload's internals,
+	 * the wiki's own collections, and the host's `exclude` option.
+	 */
+	exclude: ResolvedWikiExclude
 	featured: boolean
 	localeMap: Record<string, string>
 	slugs: { media: string; pages: string }
 	triggers: {
 		edit: boolean
-		exclude: string[]
 		global: boolean
 		list: false | { slot: WikiListBandSlot }
 	}
@@ -36,21 +41,24 @@ const resolveListBand = (
 }
 
 /** Apply defaults and normalize shorthand option forms. */
-export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOptions => ({
-	editorBlocks: options.editor?.blocks ?? [],
-	featured: options.featured ?? true,
-	localeMap: options.localeMap ?? {},
-	slugs: {
+export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOptions => {
+	const slugs = {
 		media: options.slugs?.media ?? 'wiki-media',
 		pages: options.slugs?.pages ?? 'wiki-pages',
-	},
-	triggers: {
-		edit: options.triggers?.edit ?? true,
-		exclude: options.triggers?.exclude ?? [],
-		global: options.triggers?.global ?? true,
-		list: resolveListBand(options.triggers?.list),
-	},
-	video: options.video === true ? {} : (options.video ?? false),
-	wikiView: options.wikiView ?? true,
-	writeAffordances: options.writeAffordances ?? 'editMode',
-})
+	}
+	return {
+		editorBlocks: options.editor?.blocks ?? [],
+		exclude: resolveExcluded(options.exclude, slugs),
+		featured: options.featured ?? true,
+		localeMap: options.localeMap ?? {},
+		slugs,
+		triggers: {
+			edit: options.triggers?.edit ?? true,
+			global: options.triggers?.global ?? true,
+			list: resolveListBand(options.triggers?.list),
+		},
+		video: options.video === true ? {} : (options.video ?? false),
+		wikiView: options.wikiView ?? true,
+		writeAffordances: options.writeAffordances ?? 'editMode',
+	}
+}

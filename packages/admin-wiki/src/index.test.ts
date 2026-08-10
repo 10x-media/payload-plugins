@@ -1,4 +1,4 @@
-import type { Config, PayloadRequest } from 'payload'
+import type { Config, Field, PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { adminWiki, getWikiRegistry } from './index'
@@ -60,6 +60,37 @@ describe('adminWiki factory', () => {
 		const withoutView = adminWiki({ wikiView: false })(fakeConfig()) as Config
 		expect(withoutView.admin?.components?.views).toBeUndefined()
 		expect(withoutView.collections?.[0]?.admin?.components?.views).toBeUndefined()
+	})
+
+	it('offers only covered entities in the collection and global target pickers', () => {
+		const cfg = {
+			collections: [
+				{ fields: [], slug: 'posts' },
+				{ fields: [], slug: 'users' },
+				{ fields: [], slug: 'payload-preferences' },
+			],
+			globals: [
+				{ fields: [], slug: 'settings' },
+				{ fields: [], slug: 'nav' },
+			],
+		} as unknown as Config
+		const out = adminWiki({ exclude: { collections: ['users'], globals: ['nav'] } })(cfg) as Config
+		const pages = out.collections?.find((collection) => collection.slug === 'wiki-pages')
+		const tabs = pages?.fields[0] as { tabs: { fields: Field[] }[] }
+		const clientPropsOf = (name: string) =>
+			(
+				tabs.tabs[1]?.fields.find((field) => 'name' in field && field.name === name) as unknown as {
+					admin: { components: { Field: { clientProps: unknown; path: string } } }
+				}
+			).admin.components.Field
+		expect(clientPropsOf('targetCollections')).toEqual({
+			clientProps: { entity: 'collection', slugs: ['posts'] },
+			path: '@10x-media/admin-wiki/client#WikiTargetSelect',
+		})
+		expect(clientPropsOf('targetGlobals')).toEqual({
+			clientProps: { entity: 'global', slugs: ['settings'] },
+			path: '@10x-media/admin-wiki/client#WikiTargetSelect',
+		})
 	})
 
 	it('extends media mimetypes only when video is enabled', () => {

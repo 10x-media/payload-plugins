@@ -72,10 +72,25 @@ describe('registerTriggers', () => {
 
 	it('honors the excluded slugs across every surface', () => {
 		const config = makeConfig()
-		registerTriggers(config, resolveOptions({ triggers: { exclude: ['posts', 'settings'] } }))
+		registerTriggers(
+			config,
+			resolveOptions({ exclude: { collections: ['posts'], globals: ['settings'] } })
+		)
 		expect(bandOf(config, 'posts', 'afterListTable')).toBeUndefined()
 		expect(panelOf(config, 'posts')).toBeUndefined()
 		expect(panelOf(config, 'settings')).toBeUndefined()
+	})
+
+	it('keeps collection and global exclusions apart under a shared slug', () => {
+		const config = makeConfig()
+		const collection = (config.collections ?? [])[0] as CollectionConfig
+		collection.slug = 'settings'
+		const global = (config.globals ?? [])[0] as GlobalConfig
+		registerTriggers(config, resolveOptions({ exclude: { globals: ['settings'] } }))
+		const hasPanel = (entity: CollectionConfig | GlobalConfig) =>
+			entity.fields.some((field) => 'name' in field && field.name === WIKI_GUIDES_FIELD)
+		expect(hasPanel(collection)).toBe(true)
+		expect(hasPanel(global)).toBe(false)
 	})
 
 	it('honors the band slot and disabled surfaces', () => {

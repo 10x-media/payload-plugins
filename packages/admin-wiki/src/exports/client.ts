@@ -36,6 +36,11 @@ export {
 export { WikiGuideCard, type WikiGuideCardProps } from '../components/Surfaces/WikiGuideCard'
 export { WikiListGuides, type WikiListGuidesProps } from '../components/Surfaces/WikiListGuides'
 export { TargetChips, type TargetChipsProps } from '../components/TargetChips/TargetChips'
+export {
+	type WikiTargetEntityKind,
+	WikiTargetSelect,
+	type WikiTargetSelectProps,
+} from '../components/TargetSelect/WikiTargetSelect'
 export { GuideVideo, type GuideVideoProps } from '../components/Video/GuideVideo'
 export { useWikiMediaDoc, type WikiMediaDoc } from '../components/Video/useWikiMediaDoc'
 export { VideoEmbed, type VideoEmbedProps } from '../components/Video/VideoEmbed'

@@ -103,6 +103,7 @@ export type {
 	WikiAccessOptions,
 	WikiEditorBlockOption,
 	WikiEditorOptions,
+	WikiExcludeOptions,
 	WikiHiddenOptions,
 	WikiListBandOptions,
 	WikiListBandSlot,
@@ -111,8 +112,10 @@ export type {
 	WikiVideoOptions,
 	WikiWriteAffordanceMode,
 } from './options'
+export { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './plugin/exclude'
 export { WIKI_GUIDES_FIELD } from './plugin/registerTriggers'
 export { getWikiRegistry } from './plugin/registry'
+export { WIKI_BLOCK_HELP_FIELD } from './plugin/walker'
 export { seedWiki } from './seed/seedWiki'
 export { githubAlertsTransformer } from './seed/transformers/githubAlerts'
 export { guideLinksTransformer } from './seed/transformers/guideLinks'

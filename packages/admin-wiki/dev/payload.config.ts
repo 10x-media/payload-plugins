@@ -56,6 +56,7 @@ export default buildConfig({
 		fields({ icon: { adapters: [lucideAdapter()], defaultLibrary: 'lucide' } }),
 		adminWiki({
 			editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
+			exclude: { collections: ['users'] },
 			video: true,
 			triggers: {
 				list: { slot: 'afterListTable' },

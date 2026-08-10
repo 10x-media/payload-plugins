@@ -33,6 +33,7 @@ export const WIKI_BLOCK_HELP_FIELD = 'adminWikiBlockHelp'
 type WalkContext = {
 	blockLabels: Record<string, string>
 	blocksBySlug: Map<string, Block>
+	excludedBlocks: Set<string>
 	helpedBlocks: Set<string>
 	validKeys: Set<string>
 	injected: { count: number }
@@ -164,6 +165,9 @@ const walkFields = (fields: Field[], parentPath: string, context: WalkContext): 
 				const path = `${parentPath}.${field.name}`
 				injectDescription(field, path, context)
 				for (const block of blocksOfField(field, context)) {
+					if (context.excludedBlocks.has(block.slug)) {
+						continue
+					}
 					context.validKeys.add(blockTargetKey(block.slug))
 					injectBlockHelp(block, context)
 					walkFields(block.fields, `${path}.${block.slug}`, context)
@@ -181,9 +185,15 @@ const walkFields = (fields: Field[], parentPath: string, context: WalkContext): 
 }
 
 /**
- * Walk every collection and global (except the wiki's own), injecting the
- * field-help Description component on every named field and collecting the set
- * of valid target keys for orphan detection. One walk, two outputs.
+ * Walk every collection and global the plugin covers, injecting the field-help
+ * Description component on every named field and collecting the set of valid
+ * target keys for orphan detection. One walk, two outputs.
+ *
+ * Excluded entities are skipped whole: no injection, and no target keys, which
+ * is what keeps them out of the target pickers and out of every write
+ * affordance. Blocks are excluded by their own list, since a block slug lives
+ * in a namespace of its own; a block reachable only from an excluded collection
+ * is never walked either, so it ends up unhelped without being named.
  *
  * Schema paths are rooted at `collection:<slug>` or `global:<slug>` rather than
  * the bare slug: Payload only enforces slug uniqueness within collections
@@ -197,23 +207,31 @@ export const walkAndInjectFieldHelp = (
 	const context: WalkContext = {
 		blockLabels: {},
 		blocksBySlug: new Map((config.blocks ?? []).map((block) => [block.slug, block])),
+		excludedBlocks: new Set(resolved.exclude.blocks),
 		injected: { count: 0 },
 		helpedBlocks: new Set<string>(),
 		validKeys: new Set<string>(),
 	}
-	const wikiSlugs = [resolved.slugs.pages, resolved.slugs.media]
+	const excludedCollections = new Set(resolved.exclude.collections)
+	const excludedGlobals = new Set(resolved.exclude.globals)
 	for (const block of config.blocks ?? []) {
+		if (context.excludedBlocks.has(block.slug)) {
+			continue
+		}
 		context.validKeys.add(blockTargetKey(block.slug))
 		injectBlockHelp(block, context)
 	}
 	for (const collection of config.collections ?? []) {
-		if (wikiSlugs.includes(collection.slug)) {
+		if (excludedCollections.has(collection.slug)) {
 			continue
 		}
 		context.validKeys.add(collectionTargetKey(collection.slug))
 		walkFields(collection.fields, `collection:${collection.slug}`, context)
 	}
 	for (const global of config.globals ?? []) {
+		if (excludedGlobals.has(global.slug)) {
+			continue
+		}
 		context.validKeys.add(globalTargetKey(global.slug))
 		walkFields(global.fields, `global:${global.slug}`, context)
 	}

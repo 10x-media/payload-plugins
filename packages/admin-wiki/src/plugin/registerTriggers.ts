@@ -68,18 +68,19 @@ const applyToCollection = (collection: CollectionConfig, resolved: ResolvedWikiO
 }
 
 /**
- * Give every collection and global (except the wiki's own, and any the host
- * excluded) its guide surface: a band on collection lists, a sidebar panel on
- * documents and globals.
+ * Give every collection and global the plugin covers its guide surface: a band
+ * on collection lists, a sidebar panel on documents and globals. Excluded
+ * entities are skipped, matching the walk that decided their fields carry no
+ * help either.
  *
  * There is no slot to choose per surface. Each has one place the affordance
  * belongs, and the previous freedom to put a trigger in a ⋯ menu or beside Save
  * only produced placements that read as something the surface is not.
  */
 export const registerTriggers = (config: Config, resolved: ResolvedWikiOptions): void => {
-	const skip = new Set([resolved.slugs.pages, resolved.slugs.media, ...resolved.triggers.exclude])
+	const excludedCollections = new Set(resolved.exclude.collections)
 	for (const collection of config.collections ?? []) {
-		if (skip.has(collection.slug)) {
+		if (excludedCollections.has(collection.slug)) {
 			continue
 		}
 		applyToCollection(collection, resolved)
@@ -87,8 +88,9 @@ export const registerTriggers = (config: Config, resolved: ResolvedWikiOptions):
 	if (!resolved.triggers.global) {
 		return
 	}
+	const excludedGlobals = new Set(resolved.exclude.globals)
 	for (const global of config.globals ?? []) {
-		if (skip.has(global.slug)) {
+		if (excludedGlobals.has(global.slug)) {
 			continue
 		}
 		appendPanel(global, globalTargetKey(global.slug))

@@ -114,6 +114,32 @@ describe('walkAndInjectFieldHelp', () => {
 		expect(result.validTargetKeys).toContain('field:global:settings.siteName')
 	})
 
+	it('leaves excluded collections and globals entirely untouched', () => {
+		const field: Field = { name: 'title', type: 'text' }
+		const config = makeConfig(
+			[{ slug: 'users', fields: [field] }],
+			[{ slug: 'nav', fields: [{ name: 'label', type: 'text' }] }]
+		)
+		const result = walkAndInjectFieldHelp(
+			config,
+			resolveOptions({ exclude: { collections: ['users'], globals: ['nav'] } })
+		)
+		expect(descriptionOf(field)).toBeUndefined()
+		expect(result.injectedFieldCount).toBe(0)
+		expect(result.validTargetKeys).toEqual([])
+	})
+
+	it('excludes a block by its own list, not by the collection lists', () => {
+		const ctaBlock = { slug: 'cta', fields: [{ name: 'label', type: 'text' }] as Field[] }
+		const config = makeConfig([
+			{ slug: 'pages', fields: [{ name: 'layout', type: 'blocks', blocks: [ctaBlock] }] },
+		])
+		const result = walkAndInjectFieldHelp(config, resolveOptions({ exclude: { blocks: ['cta'] } }))
+		expect(result.validTargetKeys).not.toContain('block:cta')
+		expect(result.validTargetKeys).not.toContain('field:collection:pages.layout.cta.label')
+		expect(ctaBlock.fields).toHaveLength(1)
+	})
+
 	it('preserves an existing static description and skips custom components', () => {
 		const withStatic: Field = {
 			name: 'a',

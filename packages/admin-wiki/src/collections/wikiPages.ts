@@ -30,27 +30,63 @@ export type BuildWikiPagesArgs = {
 	resolved: ResolvedWikiOptions
 }
 
+const TARGET_SELECT = '@10x-media/admin-wiki/client#WikiTargetSelect'
+
+/** Slugs of one entity kind the plugin covers, sorted for a stable picker. */
+const coveredSlugs = (entities: undefined | { slug: string }[], excluded: string[]): string[] => {
+	const skip = new Set(excluded)
+	return (entities ?? [])
+		.map((entity) => entity.slug)
+		.filter((slug) => !skip.has(slug))
+		.sort()
+}
+
 /**
  * One `string[]` field per target kind. Values are stored raw, with no `select`
- * options, so a guide can be attached before its surface exists and survives a
- * surface being removed from the config; the orphan endpoint is what surfaces
- * targets that no longer resolve. Authoring UI is built on top of these, not by
- * Payload's default text inputs.
+ * options, so a target survives its surface leaving the config: the orphan
+ * endpoint reports it and the authoring UI still shows it, where a real `select`
+ * would have dropped an unrecognized value on save.
+ *
+ * Collections and globals are picked from what the plugin covers, so a guide
+ * cannot be attached to an entity the host excluded. Fields and blocks stay
+ * free-text; their affordances fill them in.
  */
-const targetFields = (): Field[] => [
+const targetFields = (config: Config, resolved: ResolvedWikiOptions): Field[] => [
 	{
 		name: 'targetCollections',
 		type: 'text',
 		hasMany: true,
 		label: labelForKey(keys.targetCollectionsLabel),
-		admin: { description: labelForKey(keys.targetCollectionsDescription) },
+		admin: {
+			components: {
+				Field: {
+					clientProps: {
+						entity: 'collection',
+						slugs: coveredSlugs(config.collections, resolved.exclude.collections),
+					},
+					path: TARGET_SELECT,
+				},
+			},
+			description: labelForKey(keys.targetCollectionsDescription),
+		},
 	},
 	{
 		name: 'targetGlobals',
 		type: 'text',
 		hasMany: true,
 		label: labelForKey(keys.targetGlobalsLabel),
-		admin: { description: labelForKey(keys.targetGlobalsDescription) },
+		admin: {
+			components: {
+				Field: {
+					clientProps: {
+						entity: 'global',
+						slugs: coveredSlugs(config.globals, resolved.exclude.globals),
+					},
+					path: TARGET_SELECT,
+				},
+			},
+			description: labelForKey(keys.targetGlobalsDescription),
+		},
 	},
 	{
 		name: 'targetFields',
@@ -163,7 +199,7 @@ export const buildWikiPagesCollection = ({
 					},
 					{
 						label: labelForKey(keys.tabTargetsLabel),
-						fields: targetFields(),
+						fields: targetFields(config, resolved),
 					},
 				],
 			},
