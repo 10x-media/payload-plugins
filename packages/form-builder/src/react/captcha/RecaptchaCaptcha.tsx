@@ -1,6 +1,7 @@
 'use client'
 
 import { type Ref, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
+import type { FormAdapters } from '../adapters'
 import type { CaptchaWidgetHandle } from './types'
 import { useCaptchaScript } from './useCaptchaScript'
 import { getGrecaptcha } from './vendors'
@@ -30,6 +31,8 @@ export type RecaptchaCaptchaProps = {
 	className?: string
 	/** Override the vendor script URL (the version-specific `render` query is not appended). */
 	scriptSrc?: string
+	/** Host-owned effects; only `loadScript` applies here (consent-gated or CSP-nonced script loading). */
+	adapters?: Pick<FormAdapters, 'loadScript'>
 	ref?: Ref<RecaptchaCaptchaHandle>
 }
 
@@ -46,6 +49,7 @@ export const RecaptchaCaptcha = ({
 	options,
 	className,
 	scriptSrc,
+	adapters,
 	ref,
 }: RecaptchaCaptchaProps) => {
 	const src =
@@ -58,7 +62,7 @@ export const RecaptchaCaptcha = ({
 	optionsRef.current = options
 	const actionRef = useRef(action)
 	actionRef.current = action
-	const ready = useCaptchaScript(src)
+	const ready = useCaptchaScript(src, adapters?.loadScript)
 
 	const execute = useCallback(
 		async (overrideAction?: string): Promise<string | null> => {

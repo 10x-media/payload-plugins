@@ -46,6 +46,7 @@ import { keys } from '../translations/keys'
 import { makeTranslate } from '../translations/makeTranslate'
 import { resolveMessage } from '../validation/message'
 import type { AnyValidationRuleDefinition } from '../validation/types'
+import { defaultNavigate, type FormAdapters } from './adapters'
 import { cn } from './cn'
 import type { RendererTranslate } from './contract'
 import { emitFormEvent } from './events'
@@ -183,6 +184,12 @@ export type FormProps = {
 	nextButtonClassName?: string
 	/** CSS class forwarded to the default "Back" `<button>`. Ignored when `renderBack` is provided. */
 	backButtonClassName?: string
+	/**
+	 * Host-owned effects (navigation, vote persistence, script loading). Each member defaults to
+	 * the built-in DOM behavior; see {@link FormAdapters}. Pass a stable reference (module scope or
+	 * `useMemo`), matching the other injectable props.
+	 */
+	adapters?: FormAdapters
 }
 
 const isEmpty = (value: unknown): boolean =>
@@ -262,6 +269,7 @@ export const Form = ({
 	submitButtonClassName,
 	nextButtonClassName,
 	backButtonClassName,
+	adapters,
 }: FormProps) => {
 	const honeypotName = honeypot === false ? null : (honeypot?.name ?? DEFAULT_HONEYPOT_FIELD)
 	const honeypotRef = useRef<HTMLInputElement>(null)
@@ -784,14 +792,12 @@ export const Form = ({
 			}
 			const redirectUrl =
 				form.response?.type === 'redirect' ? form.response.redirect?.url : undefined
-			// Part of submit handling, not rendering: fires on the custom-`children` path too.
-			// Browser-only: no-op during SSR or in non-DOM test environments.
-			if (
-				typeof redirectUrl === 'string' &&
-				redirectUrl.length > 0 &&
-				typeof window !== 'undefined'
-			) {
-				window.location.assign(redirectUrl)
+			// Part of submit handling, not rendering: fires on the custom-`children` path too. With a
+			// host `navigate` adapter the plugin never touches window.location (no fallback, a throw
+			// propagates); push semantics stay the default, passed as intent so the adapter decides how.
+			if (typeof redirectUrl === 'string' && redirectUrl.length > 0) {
+				const navigate = adapters?.navigate ?? defaultNavigate
+				navigate(redirectUrl, { replace: false })
 			}
 		} else {
 			if (result.fieldErrors) {

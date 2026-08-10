@@ -1,6 +1,7 @@
 'use client'
 
 import { type Ref, useEffect, useImperativeHandle, useRef } from 'react'
+import type { FormAdapters } from '../adapters'
 import type { CaptchaWidgetHandle } from './types'
 import { useCaptchaScript } from './useCaptchaScript'
 import { getHcaptcha } from './vendors'
@@ -17,6 +18,8 @@ export type HcaptchaCaptchaProps = {
 	className?: string
 	/** Override the vendor script URL. */
 	scriptSrc?: string
+	/** Host-owned effects; only `loadScript` applies here (consent-gated or CSP-nonced script loading). */
+	adapters?: Pick<FormAdapters, 'loadScript'>
 	ref?: Ref<CaptchaWidgetHandle>
 }
 
@@ -30,6 +33,7 @@ export const HcaptchaCaptcha = ({
 	options,
 	className,
 	scriptSrc = HCAPTCHA_SCRIPT_URL,
+	adapters,
 	ref,
 }: HcaptchaCaptchaProps) => {
 	const containerRef = useRef<HTMLDivElement>(null)
@@ -38,7 +42,7 @@ export const HcaptchaCaptcha = ({
 	onTokenRef.current = onToken
 	const optionsRef = useRef(options)
 	optionsRef.current = options
-	const ready = useCaptchaScript(scriptSrc)
+	const ready = useCaptchaScript(scriptSrc, adapters?.loadScript)
 
 	useImperativeHandle(
 		ref,

@@ -293,6 +293,24 @@ import { Poll } from '@10x-media/form-builder/react'
 
 The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/form-builder/spam) caps anonymous repeat voting per identity.
 
+## Vote storage
+
+localStorage is only the default backing for the voted flag. The [`adapters`](/form-builder/rendering#host-adapters) prop redirects it to your own store (cookies, IndexedDB, a state manager, a consent-gated wrapper), or turns it off entirely:
+
+```tsx
+// Custom store: read and write receive the resolved storageKey (default fb-poll-{form.id}).
+<Poll
+  form={form}
+  resultsField="colour"
+  adapters={{ voteStorage: { read: (key) => myStore.has(key), write: (key) => myStore.add(key) } }}
+/>
+
+// No client persistence: the server-set voted cookie is the single source of truth.
+<Poll form={form} resultsField="colour" hasVoted={voted} adapters={{ voteStorage: false }} />
+```
+
+`voteStorage: false` performs neither the read nor the write; `hasVoted` still marks the visitor as voted, so pairing it with the `votedCookie` option (next section) drops the weaker duplicate of state the server already owns.
+
 ## SSR voted state
 
 The plugin option `poll: { votedCookie: true }` sets an httpOnly `fb-voted-{formId}=1` cookie on every successful submission to a poll-enabled form. Being httpOnly it is invisible to client JS; read it server-side with `hasVotedCookie` and pass the result to `<Poll hasVoted>`. `hasVoted: true` ORs with the localStorage guard (either marks the visitor as voted); `false` or omitted just falls back to localStorage, so passing the cookie read unconditionally is always safe:
