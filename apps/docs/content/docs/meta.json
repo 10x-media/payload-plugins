@@ -9,6 +9,7 @@
 		"jobs",
 		"webhooks",
 		"undo-redo",
+		"audit-logs",
 		"automations"
 	]
 }

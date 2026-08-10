@@ -1,0 +1,117 @@
+---
+title: Configuration
+description: The full option surface, from per-collection opt-in to the audit-logs collection itself.
+---
+
+## Top level
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `collections` | `Record<CollectionSlug, AuditOptions>` | `{}` | Which collections to audit. Opt-in. |
+| `globals` | `Record<GlobalSlug, GlobalAuditOptions>` | `{}` | Which globals to audit. Opt-in. |
+| `auth` | `false \| Record<CollectionSlug, false \| { login?, forgotPassword? }>` | all on | Auth event logging. On for every auth collection unless told otherwise. |
+| `defaults` | `{ createdBy?, lastModifiedBy? }` | none | Defaults applied to every automatic audit field. |
+| `anonymize` | `Record<Slug, AnonymizeFunction>` | none | Per-entity value redaction. See [anonymization](/audit-logs/anonymization). |
+| `drafts` | `'ignore' \| 'log'` | `'log'` | Default draft handling for versioned entities. |
+| `normalizeRelationships` | `boolean` | `true` | Reduce relationship values to plain ids in diffs and snapshots. |
+| `multiTenancy` | `true \| MultiTenancyConfig` | off | See [multi-tenancy](/audit-logs/multi-tenancy). |
+| `retention` | `DataRetentionConfig` | off | See [data retention](/audit-logs/data-retention). |
+| `logs` | `object` | see below | The `audit-logs` collection and its view. |
+| `debug` | `boolean` | `false` | With `retention` set, adds buttons to the view that queue the retention jobs. Development only. |
+| `disabled` | `boolean` | `false` | Stop all behaviour, keep the schema. See below. |
+| `translations` | `TranslationsOption` | none | See [i18n](/audit-logs/i18n). |
+
+## Per collection
+
+`AuditOptions` is `true` (both features, defaults) or an object:
+
+```ts
+posts: {
+  auditFields: true,   // true | false | { createdBy?, lastModifiedBy? }
+  auditLog: true,      // true | false | CollectionAuditLogConfig
+}
+```
+
+An omitted key is off. `auditFields: true` without `auditLog` gives you the two columns and no log; `auditLog: true` without `auditFields` gives you the log and no extra columns.
+
+### CollectionAuditLogConfig
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `operations` | `Array<'create' \| 'update' \| 'delete'>` | all three | Which operations produce an entry. |
+| `excludeFields` | `string[]` | `[]` | Paths kept out of the diff entirely. An update that only touches these writes no entry. |
+| `drafts` | `'ignore' \| 'log'` | inherits | `'ignore'` skips draft saves and diffs a publish against the last published version. |
+| `shouldLog` | `ShouldLogFunction` | none | Last word on whether to write. Runs after the diff. |
+| `snapshotOnCreate` | `boolean` | `false` | Store the whole created document instead of a null-to-value diff per field. |
+| `snapshotOnDelete` | `boolean` | `false` | Store the whole document on delete. What makes recovery possible. |
+
+`shouldLog` receives `{ req, operation, doc, previousDoc, diff, changedPaths }` and returning `false` (or a promise of it) skips the entry. `diff` and `changedPaths` are already normalized, and are empty for `create` and `delete`:
+
+```ts
+shouldLog: ({ req, operation, changedPaths }) => {
+  // Let a sync job write without filling the log with its own bookkeeping.
+  if (operation === 'update' && req.payloadAPI === 'local') {
+    const noise = new Set(['syncedAt', 'externalId'])
+    return changedPaths.some((path) => !noise.has(path))
+  }
+  return true
+},
+```
+
+<Callout type="warn">
+`shouldLog` runs on every write to the collection and is awaited before the entry is written, so anything slow in it slows down every save. It may be async, but a database lookup per write is rarely worth it.
+</Callout>
+
+### Per global
+
+`GlobalAuditOptions` has the same shape minus the parts that cannot apply. Globals are update-only, so `operations`, `snapshotOnCreate` and `snapshotOnDelete` are not accepted.
+
+## The audit-logs collection
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    hidden: false,
+    ipAddress: false,
+    userAgent: false,
+    group: true,
+    access: { read: ({ req }) => Boolean(req.user) },
+    view: { defaultLimit: 50, path: '/change-history' },
+    override: (collection) => ({ ...collection, admin: { ...collection.admin, group: 'Ops' } }),
+  },
+})
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `hidden` | `boolean` | `true` | Hide the collection from admin navigation. The custom view is the intended way in. |
+| `ipAddress` | `boolean` | `true` | Store the requester's IP. |
+| `userAgent` | `boolean` | `true` | Store the requester's user agent. |
+| `group` | `boolean \| { contextKey?: string }` | off | Add an indexed `group` field, filled from `req.context[contextKey]`. Default key `auditGroup`. |
+| `access` | `{ create?, read?, update?, delete? }` | all denied | Access for the collection's own REST and GraphQL endpoints. |
+| `view` | `false \| { path?, defaultLimit?, access?, forceWhere? }` | on | The custom view. See [the admin view](/audit-logs/admin-view). |
+| `override` | `(collection) => CollectionConfig` | none | Modify the generated collection. The slug is always forced back to `audit-logs`. |
+
+All four access rules default to denying everything. The plugin's own writes use `overrideAccess`, so the log fills up regardless; the rules only govern the public API. Open `read` if something outside the admin needs to query entries.
+
+### group
+
+Correlates the entries produced by one workflow. Set the key on `req.context` before triggering operations, and pass the same `req` down so Payload's local API carries the context with it:
+
+```ts
+hooks: {
+  beforeChange: [
+    ({ req }) => {
+      req.context.auditGroup = `import-${runId}`
+    },
+  ],
+}
+```
+
+`req.context` lives for one request. Work that crosses a request boundary (a queued job, a webhook callback) starts with a fresh `req`, so set the value again at the start of each one.
+
+## disabled
+
+`disabled: true` stops every hook and job but leaves the `audit-logs` collection and the audit fields in the schema.
+
+This is deliberately weaker than the `disabled` flag in the other plugins here, which return the config untouched. Removing the collection would make the next migration drop the table and its columns, so a per-environment switch would quietly become a destructive schema change. If you want the schema gone too, remove the plugin.

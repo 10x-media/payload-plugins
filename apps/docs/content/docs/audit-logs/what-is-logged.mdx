@@ -1,0 +1,159 @@
+---
+title: What is logged
+description: The shape of an entry, how the diff is built, and everything deliberately kept out of it.
+---
+
+## An entry
+
+```ts
+{
+  operation:    'create' | 'update' | 'delete' | 'auth' | 'custom'
+  eventType?:   string       // auth sub-type, or your identifier for a custom event
+  relationTo:   string       // collection slug, or '__global__' for a global
+  documentId?:  string       // the document id; for globals, the global slug
+  user?:        relationship // req.user at the time of the write
+  locale?:      string
+  payloadAPI:   'REST' | 'GraphQL' | 'local'
+  ipAddress?:   string
+  userAgent?:   string
+  changedPaths: string[]     // indexed, so this is what you filter on
+  diff:         Record<string, { before: unknown; after: unknown }>
+  snapshot?:    Record<string, unknown>
+  metadata?:    Record<string, unknown>  // custom events only
+  group?:       string
+}
+```
+
+`changedPaths` is indexed and `diff` is not, which is why every query in [querying](/audit-logs/querying) filters on the former.
+
+## When no entry is written
+
+An update whose diff comes out empty writes nothing. That covers the obvious case of saving without changing anything, and the less obvious one where the only changed fields are in `excludeFields`.
+
+Creates and deletes always write, subject to `operations` and `shouldLog`.
+
+## The diff
+
+Flat, keyed by dot-notation path. Nested objects are recursed into, so each changed leaf is its own entry:
+
+```json
+{
+  "changedPaths": ["details.score", "status"],
+  "diff": {
+    "details.score": { "before": 92, "after": 87 },
+    "status": { "before": "active", "after": "disqualified" }
+  }
+}
+```
+
+A missing value is written as `null`, never `undefined`. `null` and absent are treated as equal, so a field that goes from unset to `null` produces no entry.
+
+### Arrays
+
+Plain arrays, and arrays of objects with no `id`, are replaced wholesale at the array path. There is no index-level tracking, and a reorder reads as a replacement:
+
+```json
+{ "tags": { "before": ["a", "b"], "after": ["b", "a"] } }
+```
+
+Payload's own array and blocks fields give each row an `id`, and the diff engine keys off it instead. That gives you a path per changed row rather than a dump of the whole array:
+
+```json
+{ "steps.abc.title": { "before": "Old", "after": "New" } }
+```
+
+An added row has `before: null` and the whole row as `after`; a removed row is the reverse. A reorder produces one `__order__` key holding the id sequence:
+
+```json
+{ "steps.__order__": { "before": ["abc", "xyz"], "after": ["xyz", "abc"] } }
+```
+
+`__order__` only appears when rows that exist on both sides change their relative position. Appending or removing does not produce it, because the row-level entries already say what happened.
+
+Nesting works at any depth: `sections.s1.blocks.b1.text`.
+
+### Relationships
+
+Relationship values are always reduced to plain ids before the diff is computed. That is not cosmetic. Payload returns `doc` populated at the request's depth in `afterChange` and `afterDelete`, while `previousDoc` is always depth 0, so a naive comparison reports a change on every save:
+
+```
+doc.author         = { id: 'abc', email: 'dev@example.com' }
+previousDoc.author = 'abc'
+```
+
+The plugin resolves both sides through the collection's field schema, so this produces no entry. When the id genuinely changes, the diff holds ids and nothing else:
+
+```json
+{
+  "author": { "before": "id-one", "after": "id-two" },
+  "tags": { "before": ["id-1", "id-2"], "after": ["id-1", "id-3"] }
+}
+```
+
+Polymorphic relationships are diffed as two paths, `field.relationTo` and `field.value`.
+
+Set `normalizeRelationships: false` to turn this off globally.
+
+<Callout type="warn">
+Without the schema, the engine falls back to guessing from the shape of the value. That misses cases in both directions: a false diff when both sides are populated objects with the same id, and a full populated blob stored where an id belongs. Only disable it if you specifically need populated objects preserved.
+</Callout>
+
+### Always excluded
+
+| Field | Why |
+|---|---|
+| `updatedAt` | Changes on every save, so it would appear in every diff and say nothing. |
+| `id` | Never changes. |
+| `hash`, `salt` | Auth credentials. Excluded automatically for any collection with `auth`. |
+| `join` fields | Virtual, not stored, and present in hook payloads only when selected. |
+
+### Rich text
+
+Lexical content is deeply nested JSON. The engine recurses into it until it reaches the array of nodes, and because Lexical nodes carry no `id`, that array falls under the rule above: it is stored as a whole-array replacement.
+
+One path comes out of it, `content.root.children`, and its value is the entire document body twice, before and after. Correcting a typo in a 20 KB article writes a 40 KB entry, and with autosave that happens while the editor is still typing.
+
+Exclude the field unless you need it:
+
+```ts
+auditLog: { excludeFields: ['content'] }
+```
+
+That drops it from the log entirely, including the fact that it changed.
+
+## Snapshots
+
+`snapshotOnCreate` stores the whole created document in `snapshot` rather than writing a null-to-value diff entry for every field. On a wide collection that is both smaller and far easier to read.
+
+`snapshotOnDelete` stores the document as it was when deleted, which is what makes partial recovery possible: the log entry outlives the document.
+
+Snapshots go through the same relationship normalization as diffs, so `{ author: { id: 'abc', email: '...' } }` is stored as `{ author: 'abc' }`, at any nesting depth. Anonymized fields are redacted inside snapshots too.
+
+## Drafts
+
+With `drafts: 'log'` (the default) every save is an entry, autosaved drafts included.
+
+With `drafts: 'ignore'`, draft updates are skipped, and on publish the plugin fetches the last published version and diffs against that. The entry then reads as "what changed between these two publishes" rather than "what changed since the last autosave".
+
+A create is logged either way. A document coming into existence is a real event, whether or not it starts as a draft.
+
+## Auth events
+
+Every auth-enabled collection logs logins and password reset requests as `operation: 'auth'`, with `eventType` set to `login` or `forgot_password`. This happens whether or not the collection appears in `collections`.
+
+Only successful events are recorded. A failed login throws before the hook runs, so it never reaches the log.
+
+The forgot-password entry stores the submitted email in `metadata`. The hook only fires when the account exists, so this is not a way to enumerate addresses.
+
+Turn it off globally with `auth: false`, or per collection:
+
+```ts
+auth: {
+  users: false,
+  admins: { login: true, forgotPassword: false },
+}
+```
+
+## Globals
+
+Globals only ever update, so there is no create or delete entry. They are stored with `relationTo: '__global__'` and the global slug in `documentId`, which keeps the collection index usable and is what the view's global filter matches on.

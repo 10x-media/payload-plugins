@@ -1,0 +1,155 @@
+---
+title: Querying
+description: Read the log from code, and get precise types back out of the diff and snapshot JSON.
+---
+
+Entries are an ordinary Payload collection, so `payload.find` is the whole API. The collection denies read access by default, so pass `overrideAccess: true` from server code or open it up through [`logs.access`](/audit-logs/configuration#the-audit-logs-collection).
+
+## What is indexed
+
+`operation`, `eventType`, `relationTo`, `documentId`, `user`, `changedPaths`, `group`, `tenant` and `archivedAt` are indexed. `diff`, `snapshot` and `metadata` are not: they are JSON blobs, and filtering on their contents means reading rows out and filtering in application code.
+
+Design queries around `changedPaths`. It exists precisely so "which entries touched this field" is an index lookup rather than a scan of every diff.
+
+## Common shapes
+
+**Everything that happened to one document**
+
+```ts
+await payload.find({
+  collection: 'audit-logs',
+  where: {
+    and: [{ relationTo: { equals: 'orders' } }, { documentId: { equals: String(order.id) } }],
+  },
+  sort: '-createdAt',
+  overrideAccess: true,
+})
+```
+
+**Every change to one field**
+
+```ts
+await payload.find({
+  collection: 'audit-logs',
+  where: { changedPaths: { contains: 'pricing.amount' } },
+  overrideAccess: true,
+})
+```
+
+`changedPaths` is a `hasMany` text field, so `contains` asks whether the array holds that exact value. Nested fields use the full dot path. For a row inside an array field the path carries the row id, `steps.abc123.title`, so a query for changes to any row's title needs a prefix match in application code rather than `contains`.
+
+**One user's work**
+
+```ts
+await payload.find({
+  collection: 'audit-logs',
+  where: { user: { equals: userId } },
+  sort: '-createdAt',
+  overrideAccess: true,
+})
+```
+
+With more than one auth collection the field is polymorphic, so query `user.value` and, if it matters, `user.relationTo`.
+
+**A global's history**
+
+```ts
+await payload.find({
+  collection: 'audit-logs',
+  where: {
+    and: [{ relationTo: { equals: '__global__' } }, { documentId: { equals: 'site-settings' } }],
+  },
+  overrideAccess: true,
+})
+```
+
+**Combined**
+
+```ts
+const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+await payload.find({
+  collection: 'audit-logs',
+  where: {
+    and: [
+      { relationTo: { equals: 'orders' } },
+      { operation: { equals: 'update' } },
+      { changedPaths: { contains: 'amount' } },
+      { createdAt: { greater_than: since } },
+    ],
+  },
+  sort: '-createdAt',
+  overrideAccess: true,
+})
+```
+
+## Typed reads
+
+Payload generates `diff`, `snapshot` and `metadata` as a wide JSON union:
+
+```ts
+diff?: { [k: string]: unknown } | unknown[] | string | number | boolean | null
+```
+
+Correct, and useless to work with. Two helpers restore the types without casting the whole document.
+
+### typedDiff
+
+```ts
+import { typedDiff } from '@10x-media/audit-logs'
+
+const d = typedDiff<Post>(log.diff)
+
+d.get('title')              // DiffEntry<string> | undefined
+d.get('details.score')      // DiffEntry<number> | undefined
+d.get('steps.abc123.title') // DiffEntry<string> | undefined
+d.get('steps.__order__')    // DiffEntry<(string | number)[]> | undefined
+d.has('status')             // boolean
+d.raw                       // the untyped record, if you need it
+```
+
+`get` returns `undefined` when the field did not change. An invalid path is a compile error, so a renamed field surfaces at build time rather than as a silently empty result.
+
+`DiffEntry<V>` is `{ before: V | null; after: V | null }`.
+
+Relationship fields type as `string | number`, not as the populated document type, because the engine normalizes them to ids before writing. That is the value you will actually find in the diff.
+
+### typedSnapshot
+
+```ts
+import { typedSnapshot } from '@10x-media/audit-logs'
+
+const post = typedSnapshot<Post>(log.snapshot)
+post?.title
+```
+
+Returns `null` when there is no snapshot or it is not an object, so an entry from a collection without `snapshotOnCreate` does not need a guard of its own.
+
+### The path types
+
+`DiffPaths<T>` is the union of valid dot paths for `T`, and `DiffPathValue<T, P>` resolves what lives at one:
+
+```ts
+import type { DiffPaths, DiffPathValue } from '@10x-media/audit-logs'
+
+type PostPath = DiffPaths<Post>
+// 'title' | 'details.score' | `steps.${string}` | `steps.${string}.title` | 'steps.__order__' | ...
+
+type Score = DiffPathValue<Post, 'details.score'> // number
+```
+
+They are useful for constraining a handler, and for making `changedPaths` autocomplete while you iterate it:
+
+```ts
+const paths = (log.changedPaths ?? []) as DiffPaths<Post>[]
+
+for (const path of paths) {
+  const entry = d.get(path)
+}
+```
+
+### Two limits
+
+**Relationships are detected by shape.** A field counts as a relationship when its non-null type is a primitive union with an object, which is exactly what Payload generates (`string | User | null`). A field you happened to type as `string | { foo: string }` is misread. This only affects the type `get` reports; runtime is unaffected.
+
+**Row ids are not known at compile time.** `steps.abc123.title` is checked against `` `steps.${string}.title` ``, so any string passes in the id position. TypeScript cannot know which rows exist.

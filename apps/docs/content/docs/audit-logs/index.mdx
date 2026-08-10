@@ -1,0 +1,57 @@
+---
+title: Audit Logs
+description: Who changed what, with a field-level diff per change, stored in a queryable collection and browsable from the admin.
+---
+
+`@10x-media/audit-logs` answers the question every compliance review eventually asks: who changed this document, when, and what exactly did they change.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { auditLogs } from '@10x-media/audit-logs'
+
+export default buildConfig({
+  plugins: [
+    auditLogs({
+      collections: { posts: true },
+    }),
+  ],
+})
+```
+
+Unlike `collections` in most plugins, this one is opt-*in*: nothing is audited until you list it. Logging every collection in a busy project produces a great deal of data, so the decision is left to you.
+
+## Two features, one plugin
+
+**Audit fields** add `createdBy` and `lastModifiedBy` relationship fields to a collection or global and keep them stamped. They answer "who owns this document right now" from the document itself, with no join.
+
+**Audit logs** record a separate entry per change in an `audit-logs` collection, each carrying a field-level diff. They answer "what happened to this document over time".
+
+They are independent. Enable either, or both, per collection.
+
+## How it works
+
+The plugin attaches Payload hooks to the collections you list. `beforeChange` stamps the audit fields; `afterChange` and `afterDelete` compute a diff between `previousDoc` and `doc` and write an entry. Auth collections additionally get `afterLogin` and `afterForgotPassword`.
+
+Three consequences are worth knowing before you enable it.
+
+**Every write produces an entry.** Including writes from other plugins' hooks, from migration scripts, and from bulk imports. A nightly job that touches 50,000 documents writes 50,000 log entries. Scope with `operations`, `excludeFields`, and `shouldLog`, and plan for [data retention](/audit-logs/data-retention) from the start rather than after the collection has grown.
+
+**The diff is computed, not stored twice.** Only changed paths are written, in dot notation, so an entry for a one-word edit stays small no matter how large the document is. Relationships are normalized to plain ids, so a populated hook payload does not turn into a fake change. See [what is logged](/audit-logs/what-is-logged).
+
+**It is not document versions.** Payload's versions answer "what did this document look like after each save" and can restore it. This answers "who changed which field, and from what", including deletes, logins, and events that never touched a document at all. The two are complementary.
+
+## What gets recorded
+
+Beyond the diff, each entry carries the acting user, the locale, which API the write came through (`REST`, `GraphQL` or `local`), and by default the IP address and user agent. Both of those can be switched off for GDPR reasons, as can any field value through [anonymization](/audit-logs/anonymization).
+
+Deletes and creates can additionally store a full document [snapshot](/audit-logs/what-is-logged#snapshots), which is what makes partial recovery possible.
+
+## Reading the log
+
+A custom admin view at `/admin/audit-logs` lists entries newest first, expands each row to show its diff, and filters by collection, global, operation, user, changed path, date range and more. See [the admin view](/audit-logs/admin-view).
+
+For anything programmatic, the entries are an ordinary Payload collection. [Querying](/audit-logs/querying) covers the common shapes plus the typed helpers that restore precise types to the `diff` and `snapshot` JSON fields.
+
+## Next
+
+Start with the [quick start](/audit-logs/quick-start), then read [what is logged](/audit-logs/what-is-logged) before turning it on for a busy collection.

@@ -1,0 +1,188 @@
+---
+title: Data retention
+description: Archive the log to compressed CSV and delete what has been archived, on a schedule.
+---
+
+An audit log only grows. Every write to every audited collection adds a row, including writes from other plugins' hooks, from migrations, and from bulk imports. On a busy project the log outgrows the data it describes.
+
+`retention` registers two Payload jobs to deal with that:
+
+- **`audit-logs-archive`** exports every entry not yet archived to a gzipped CSV, uploads it to an upload collection, and stamps each exported entry with `archivedAt`.
+- **`audit-logs-delete`** removes entries that have been archived, or every entry when no archive is configured.
+
+```ts title="payload.config.ts"
+auditLogs({
+  collections: { posts: true },
+  retention: {
+    deleteCron: '0 3 1 * *',
+    archive: {
+      cron: '0 2 * * 0',
+      uploadCollection: 'media',
+    },
+  },
+})
+```
+
+Archive more often than you delete. Anything not archived yet is not eligible for deletion, so a weekly archive and a monthly delete means nothing leaves without a copy.
+
+## You still need a runner
+
+<Callout type="warn">
+The plugin registers the tasks and their cron schedules. It does not run them. Without a job runner on the same queue, nothing happens, and the log keeps growing exactly as before.
+</Callout>
+
+On a long-lived server, `autoRun` is enough:
+
+```ts title="payload.config.ts"
+export default buildConfig({
+  jobs: {
+    autoRun: [{ cron: '* * * * *', queue: 'audit-retention' }],
+  },
+})
+```
+
+`autoRun` does not work on serverless, where nothing is alive between requests. Point an external scheduler at the endpoint instead:
+
+```
+GET /api/payload-jobs/run?queue=audit-retention
+```
+
+The queue name has to match `retention.queue`, which defaults to `audit-retention`.
+
+## Options
+
+| Option | Type | Description |
+|---|---|---|
+| `deleteCron` | `string` | Required. Cron for the delete job. |
+| `deleteWhere` | `Where` | Extra filter, merged into the base condition. |
+| `deleteHooks` | `DeleteJobHooks` | See below. |
+| `queue` | `string` | Queue for both tasks. Default `audit-retention`. |
+| `archive.cron` | `string` | Required when `archive` is set. |
+| `archive.uploadCollection` | `CollectionSlug` | Where the `.csv.gz` lands. |
+| `archive.where` | `Where` | Extra filter, merged with `archivedAt IS NULL`. |
+| `archive.anonymize` | `Record<Slug, AnonymizeFunction>` | Extra redaction for the CSV only. |
+| `archive.excludeFields` | `string[]` | Columns to omit. Default `['ipAddress', 'userAgent']`. |
+| `archive.generateFilename` | `({ runDate, logCount }) => string` | Filename base. `.csv.gz` is always appended. |
+| `archive.populateUploadFields` | `({ filename, runDate, logCount }) => object` | Extra fields for the upload document. |
+| `archive.hooks` | `ArchiveJobHooks` | See below. |
+
+## Scoping
+
+Both jobs cover every entry by default. Use `where` and `deleteWhere` when part of the log must never be swept:
+
+```ts title="payload.config.ts"
+retention: {
+  deleteCron: '0 3 1 * *',
+  deleteWhere: { relationTo: { not_in: ['contracts'] } },
+  archive: {
+    cron: '0 2 * * 0',
+    uploadCollection: 'media',
+    where: { relationTo: { not_in: ['contracts'] } },
+  },
+}
+```
+
+Your filter is merged with `and` on top of the job's own condition, which always applies. Scope both jobs the same way: archiving a collection you never delete just burns storage twice.
+
+## archivedAt
+
+Configuring `archive` adds an indexed, hidden `archivedAt` date field to the collection. The archive job sets it after a successful upload, and the delete job only touches entries that have it.
+
+That ordering is the safety property worth understanding: if an archive run fails partway through, say the upload errors, the affected entries never get stamped. They are retried on the next run, and the delete job cannot reach them in the meantime.
+
+## The CSV
+
+One file per run, gzipped, named `audit-logs-{date}.csv.gz` unless `generateFilename` says otherwise.
+
+Columns come out in a fixed order for the built-in fields (`id`, `operation`, `eventType`, `relationTo`, `documentId`, `user`, `locale`, `payloadAPI`, `changedPaths`, `diff`, `snapshot`, `metadata`, `tenant`, `createdAt`, `ipAddress`, `userAgent`), followed by any fields you added through `logs.override`, alphabetically. JSON-valued columns are serialized and escaped.
+
+Anything in `excludeFields` is dropped from the header and every row. The default drops `ipAddress` and `userAgent`; pass `[]` to keep everything.
+
+### Required fields on the upload collection
+
+The job creates the upload document with the file and nothing else, so a collection with required fields rejects it. Fill them in:
+
+```ts
+archive: {
+  cron: '0 2 * * 0',
+  uploadCollection: 'media',
+  populateUploadFields: ({ filename, logCount }) => ({
+    alt: `Audit archive ${filename} (${logCount} entries)`,
+    folder: 'audit-archives',
+  }),
+}
+```
+
+The returned object is shallow-merged into `data`. The file itself is always the plugin's and cannot be overridden here.
+
+## GDPR
+
+A CSV in object storage is effectively immutable, and an erasure request cannot reach it. Decide what goes into the archive before you start writing them, not after:
+
+- Redact PII with `archive.anonymize`, which is additive on top of whatever [anonymization](/audit-logs/anonymization) already ran at write time.
+- Keep `ipAddress` and `userAgent` excluded, which is the default.
+- Better still, never collect them: `logs.ipAddress: false` and `logs.userAgent: false`.
+- Remember snapshots. `snapshotOnDelete` stores a whole document, and if that document was a user, the archive now holds a copy of them.
+
+Get this right and an erasure request only has to touch live records.
+
+## Job hooks
+
+Both jobs expose lifecycle hooks, mainly for progress and heartbeats on long runs. All receive `{ req, job }`, and `job.id` works with Payload's `updateJobHeartbeat`.
+
+| Archive hook | Extra args |
+|---|---|
+| `beforeRun` | none |
+| `afterBatch` | `page`, `docsInBatch`, `totalProcessed` |
+| `afterRun` | `archived`, `filename` (null when nothing was archived) |
+
+| Delete hook | Extra args |
+|---|---|
+| `beforeRun` | none |
+| `afterBatch` | `docsInBatch`, `totalDeleted` |
+| `afterRun` | `deleted` |
+
+```ts
+archive: {
+  cron: '0 2 * * 0',
+  uploadCollection: 'media',
+  hooks: {
+    afterBatch: async ({ job, req, totalProcessed }) => {
+      await updateJobHeartbeat(req.payload, job.id, job.meta)
+      req.payload.logger.info(`[audit-archive] ${totalProcessed} processed`)
+    },
+    afterRun: ({ archived, filename, req }) => {
+      req.payload.logger.info(
+        archived === 0 ? '[audit-archive] nothing to do' : `[audit-archive] ${archived} to ${filename}`
+      )
+    },
+  },
+}
+```
+
+## Delete only
+
+Drop `archive` and the entries are simply deleted:
+
+```ts
+retention: { deleteCron: '0 3 1 * *' }
+```
+
+No `archivedAt` field is added and no archive task is registered, so every run removes everything matching `deleteWhere`. Suitable when the log is an operational aid rather than a record you have to keep.
+
+## Running them by hand
+
+For development, `debug: true` puts Run buttons on the view. See [the admin view](/audit-logs/admin-view#debug-buttons), and note the warning there about who is allowed to press them.
+
+From code:
+
+```ts
+await payload.jobs.queue({ task: 'audit-logs-archive', input: undefined, queue: 'audit-retention' })
+await payload.jobs.run({ queue: 'audit-retention' })
+```
+
+## Multi-tenancy
+
+Both jobs run across every tenant at once. `tenant` is a CSV column, so splitting per tenant is a read-time concern, or something you do in an `afterChange` hook on the upload collection.
+
+Offboarding a tenant is not handled for you. Delete their entries yourself, filtered by `tenant`, from a hook on the tenants collection.

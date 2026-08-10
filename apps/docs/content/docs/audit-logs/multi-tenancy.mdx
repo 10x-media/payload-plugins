@@ -1,0 +1,119 @@
+---
+title: Multi-tenancy
+description: Tag every entry with its tenant and give each tenant a view that only shows their own.
+---
+
+Turn it on and every audit log entry records the tenant its document belongs to, and a second, tenant-scoped view appears next to the global one.
+
+```ts title="payload.config.ts"
+auditLogs({
+  multiTenancy: true,
+  collections: {
+    posts: { auditLog: true },
+    orders: { auditLog: true },
+  },
+})
+```
+
+The defaults match [`@payloadcms/plugin-multi-tenant`](https://github.com/payloadcms/payload/tree/main/packages/plugin-multi-tenant) exactly, so `true` is usually the whole configuration. Set them explicitly when your setup differs:
+
+```ts title="payload.config.ts"
+auditLogs({
+  multiTenancy: {
+    tenantsSlug: 'organizations',
+    tenantFieldName: 'organization',
+    excludeCollections: ['payments'],
+    tenantView: {
+      path: '/audit-logs-tenant',
+      access: ({ req }) => req.user?.role === 'tenant-admin',
+    },
+  },
+})
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `tenantsSlug` | `tenants` | The tenants collection. |
+| `tenantFieldName` | `tenant` | The tenant relationship field on audited documents. |
+| `excludeCollections` | `[]` | Collections to skip tenant capture for. |
+| `excludeGlobals` | `[]` | Globals to skip tenant capture for. |
+| `tenantView` | mounted | `false` to skip the second view, or an object for its path and access. |
+
+## What it does
+
+A `tenant` relationship field, indexed, is added to `audit-logs`. Every hook reads `doc[tenantFieldName]` and writes the id onto the entry, normalizing a populated object down to its id first.
+
+A document with no tenant value produces an entry with no tenant. Those show up in the global view only, which is the right behaviour for shared resources: a collection with no tenant field at all needs no configuration to stay out of tenant views.
+
+## The two views
+
+`/admin/audit-logs` shows everything, with a Tenant filter populated from the tenants collection. Intended for super-admins, gated by `logs.view.access`.
+
+`/admin/audit-logs-tenant` shows one tenant, read from the `payload-tenant` cookie, the same cookie the multi-tenant plugin sets when a user picks a tenant in the nav. The tenant filter is hidden, because the tenant is not a choice here. With no tenant selected the view asks the user to pick one. Gated by `multiTenancy.tenantView.access`.
+
+Both default to any logged-in user, which is almost never what you want in a multi-tenant install. Set both.
+
+## The tenants collection itself
+
+Changes to a tenant record matter as much as changes to its documents, but the tenants collection has no tenant field: the document is the tenant.
+
+The plugin recognises this. List the tenants collection and its entries are scoped by `doc.id`, so they appear in that tenant's own view alongside everything else:
+
+```ts
+auditLogs({
+  multiTenancy: true,
+  collections: {
+    tenants: { auditLog: true },
+    posts: { auditLog: true },
+  },
+})
+```
+
+## When a field named tenant is not a tenant
+
+If a collection has a field matching `tenantFieldName` for unrelated reasons, a super-admin-only `payments` collection with a `tenant` reference for reporting, its entries get tagged and leak into that tenant's view.
+
+`excludeCollections` stops the field being read:
+
+```ts
+multiTenancy: { excludeCollections: ['payments', 'internal-reports'] }
+```
+
+Those collections are still audited normally. Only the tenant value is skipped, so the entries stay in the global view. `excludeGlobals` does the same for globals.
+
+## Embedding the tenant view
+
+The tenant view is mounted for you at `tenantView.path`. Mount it yourself only to put it somewhere else, for example inside a per-tenant dashboard:
+
+```ts title="payload.config.ts"
+views: {
+  tenantDashboardAudit: {
+    Component: {
+      path: '@10x-media/audit-logs/rsc#AuditLogsView',
+      serverProps: { pluginOptions, useTenant: true },
+    },
+    path: '/my-tenant-dashboard/audit',
+  },
+}
+```
+
+`useTenant: true` is what switches the behaviour: the cookie is read server side, the query is locked to that tenant, and the filter is hidden.
+
+## Querying
+
+```ts
+await payload.find({
+  collection: 'audit-logs',
+  where: {
+    and: [{ tenant: { equals: tenantId } }, { relationTo: { equals: 'posts' } }],
+  },
+  sort: '-createdAt',
+  overrideAccess: true,
+})
+```
+
+## Retention across tenants
+
+The archive and delete jobs run globally, over every tenant in one pass. `tenant` is a CSV column, so per-tenant splitting is a read-time job or something you do after the upload lands.
+
+Deleting a departing tenant's entries is not automatic. Do it from a hook on the tenants collection, filtered by `tenant`. See [data retention](/audit-logs/data-retention#multi-tenancy).

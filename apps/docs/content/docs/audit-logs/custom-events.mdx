@@ -1,0 +1,89 @@
+---
+title: Custom events
+description: Record something that matters to the business but is not a field change.
+---
+
+Automatic logging covers writes. Some things worth auditing are not writes: an approval, a manual override, a compliance review, a status change decided by business logic somewhere other than the document form. `createAuditEvent` puts those in the same log.
+
+```ts
+import { createAuditEvent } from '@10x-media/audit-logs'
+
+await createAuditEvent(req, {
+  collection: 'athletes',
+  documentId: athlete.id,
+  eventType: 'score_adjustment',
+  metadata: {
+    reason: 'doping_disqualification',
+    adjustedScore: -5,
+    effectiveDate: '2026-02-15',
+    notes: 'Test result received 2026-03-20',
+  },
+})
+```
+
+That writes an entry with `operation: 'custom'`. The user comes from `req.user`, and the group from `req.context` when [grouping](/audit-logs/configuration#group) is enabled.
+
+## Options
+
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `collection` | `string` | yes | Which collection the event is about. |
+| `documentId` | `string \| number` | no | The specific document. Omit for a collection-level event. |
+| `eventType` | `string` | yes | Your identifier, for example `score_adjustment`. This is what you filter on. |
+| `metadata` | `Record<string, unknown>` | no | Anything you want to keep. The shape is yours. |
+| `group` | `string` | no | Overrides the value read from `req.context`. |
+
+## Two timestamps
+
+`createdAt` is when the function ran. That is not always when the thing happened: a disqualification recorded on 20 March may take effect from 15 February.
+
+The log deliberately does not let you forge `createdAt`, because an audit log whose timestamps can be set by the caller is not evidence of anything. Put the domain date in `metadata` and you keep both facts: when it happened, and when someone wrote it down.
+
+## Where to call it
+
+Anywhere you hold a `req`: a collection hook, a custom endpoint, a server action, a job.
+
+```ts title="collections/Athletes.ts"
+hooks: {
+  afterChange: [
+    async ({ req, doc, previousDoc, operation }) => {
+      if (operation !== 'update') return
+      if (doc.status === previousDoc?.status) return
+      if (doc.status !== 'disqualified') return
+
+      await createAuditEvent(req, {
+        collection: 'athletes',
+        documentId: doc.id,
+        eventType: 'disqualified',
+        metadata: { previousStatus: previousDoc?.status },
+      })
+    },
+  ],
+}
+```
+
+Passing `req` matters for more than the user: Payload's local API carries `req.context` down, which is what keeps the custom event in the same group as the write that triggered it.
+
+<Callout type="warn">
+A custom event called from an `afterChange` hook on an audited collection lands next to the automatic entry for the same save, not instead of it. Reach for this when the automatic diff cannot express the event, not to annotate one.
+</Callout>
+
+## Querying
+
+Custom events live in the same collection, so the same queries work. Narrow by `eventType`:
+
+```ts
+const adjustments = await payload.find({
+  collection: 'audit-logs',
+  where: {
+    and: [
+      { operation: { equals: 'custom' } },
+      { eventType: { equals: 'score_adjustment' } },
+      { relationTo: { equals: 'athletes' } },
+    ],
+  },
+  overrideAccess: true,
+})
+```
+
+`eventType` is indexed. `metadata` is not, so filtering on what is inside it means reading the rows out and filtering in application code. If you expect to query by something, promote it to a field with `logs.override` rather than burying it in `metadata`.
