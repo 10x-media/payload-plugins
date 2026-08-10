@@ -1,7 +1,7 @@
 import type { Field } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { buildFieldMap } from './buildFieldMap.js'
+import { buildFieldMap } from './buildFieldMap'
 
 // Minimal field constructors — typed correctly to satisfy Payload's discriminated unions
 const rel = (name: string, hasMany = false): Field =>

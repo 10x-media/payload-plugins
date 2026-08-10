@@ -1,6 +1,6 @@
 import type { TaskConfig, Where } from 'payload'
 
-import type { DeleteJobHooks } from '../types.js'
+import type { DeleteJobHooks } from '../types'
 
 export type DeleteTaskOptions = {
 	cron: string

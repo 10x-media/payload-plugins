@@ -1,1 +1,1 @@
-export { AuditLogsView } from '../components/AuditLogsView/index.js'
+export { AuditLogsView } from '../components/AuditLogsView/index'

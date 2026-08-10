@@ -3,7 +3,7 @@
 import { ShimmerEffect } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
 
-import { formatDate } from '../utils.js'
+import { formatDate } from '../utils'
 
 export function FormattedDate({ iso }: { iso: string }) {
 	const [label, setLabel] = useState<string | null>(null)

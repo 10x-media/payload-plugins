@@ -1,9 +1,6 @@
 import type { GlobalBeforeChangeHook } from 'payload'
-import { getAtPath, setAtPath } from '../utilities/setAtPath.js'
-import type {
-	AuditHookFieldConfig,
-	BeforeChangeAuditFieldOptions,
-} from './beforeChangeCollection.js'
+import { getAtPath, setAtPath } from '../utilities/setAtPath'
+import type { AuditHookFieldConfig, BeforeChangeAuditFieldOptions } from './beforeChangeCollection'
 
 const resolveUserValue = (
 	config: AuditHookFieldConfig,

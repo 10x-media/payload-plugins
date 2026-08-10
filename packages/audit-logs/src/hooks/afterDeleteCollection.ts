@@ -1,11 +1,11 @@
 import type { CollectionAfterDeleteHook } from 'payload'
 
-import type { AnonymizeFunction, ShouldLogFunction } from '../types.js'
-import { anonymizeDoc } from '../utilities/anonymize.js'
-import type { FieldMap } from '../utilities/buildFieldMap.js'
-import { normalizeSnapshot } from '../utilities/diff.js'
-import { getClientIP, getUserAgent } from '../utilities/request.js'
-import { extractTenantId } from '../utilities/tenant.js'
+import type { AnonymizeFunction, ShouldLogFunction } from '../types'
+import { anonymizeDoc } from '../utilities/anonymize'
+import type { FieldMap } from '../utilities/buildFieldMap'
+import { normalizeSnapshot } from '../utilities/diff'
+import { getClientIP, getUserAgent } from '../utilities/request'
+import { extractTenantId } from '../utilities/tenant'
 
 export type AuditLogAfterDeleteOptions = {
 	anonymize?: AnonymizeFunction

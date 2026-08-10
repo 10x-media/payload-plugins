@@ -13,7 +13,7 @@ const buildAuditRelationshipField = (
 			...options.admin,
 			components: {
 				...(!options.disableCustomComponent && {
-					Field: '@10xmedia/payload-audit/client#AuditRelationshipField',
+					Field: '@10x-media/audit-logs/client#AuditRelationshipField',
 				}),
 				...options.admin?.components,
 			},

@@ -6,10 +6,10 @@ import { useSearchParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
-import type { AuditLogDoc } from '../types.js'
-import { displayUser, GLOBAL_SENTINEL, OPERATION_LABELS } from '../utils.js'
-import { DiffViewer } from './DiffViewer.js'
-import { FormattedDate } from './FormattedDate.js'
+import type { AuditLogDoc } from '../types'
+import { displayUser, GLOBAL_SENTINEL, OPERATION_LABELS } from '../utils'
+import { DiffViewer } from './DiffViewer'
+import { FormattedDate } from './FormattedDate'
 
 type Props = {
 	adminRoute: string

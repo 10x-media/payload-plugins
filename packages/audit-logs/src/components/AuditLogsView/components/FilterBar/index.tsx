@@ -5,12 +5,12 @@ import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { keys } from '../../../../translations/keys'
 import { useTranslation } from '../../../../translations/useTranslation'
-import type { Filters } from '../../types.js'
-import { OPERATION_LABELS } from '../../utils.js'
-import { AddFilterPopup } from './AddFilterPopup.js'
-import type { AvailableFilter, FilterBarProps } from './types.js'
-import { formatDatePill } from './utils.js'
-import { ValueEditor } from './ValueEditor.js'
+import type { Filters } from '../../types'
+import { OPERATION_LABELS } from '../../utils'
+import { AddFilterPopup } from './AddFilterPopup'
+import type { AvailableFilter, FilterBarProps } from './types'
+import { formatDatePill } from './utils'
+import { ValueEditor } from './ValueEditor'
 
 export function FilterBar({
 	collectionSlugs,

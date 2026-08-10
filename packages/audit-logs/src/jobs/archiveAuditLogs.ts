@@ -2,9 +2,9 @@ import { createGzip } from 'node:zlib'
 
 import type { CollectionSlug, Field, TaskConfig, Where } from 'payload'
 
-import type { AnonymizeFunction, ArchiveJobHooks } from '../types.js'
-import { REDACTED } from '../types.js'
-import { anonymizeDoc } from '../utilities/anonymize.js'
+import type { AnonymizeFunction, ArchiveJobHooks } from '../types'
+import { REDACTED } from '../types'
+import { anonymizeDoc } from '../utilities/anonymize'
 
 /**
  * Ordered list of all fields the plugin writes to the audit-logs collection.

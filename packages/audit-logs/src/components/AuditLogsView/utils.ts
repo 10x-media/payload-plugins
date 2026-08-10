@@ -1,4 +1,4 @@
-import type { Filters } from './types.js'
+import type { Filters } from './types'
 
 export const GLOBAL_SENTINEL = '__global__'
 

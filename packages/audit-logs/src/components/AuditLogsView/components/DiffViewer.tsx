@@ -2,7 +2,7 @@
 
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
-import { formatValue, isLongValue } from '../utils.js'
+import { formatValue, isLongValue } from '../utils'
 
 type Props = {
 	diff: Record<string, { after: unknown; before: unknown }>

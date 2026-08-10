@@ -8,10 +8,10 @@ import './index.css'
 
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
-import { FilterBar } from './components/FilterBar/index.js'
-import { LogRow } from './components/LogRow.js'
-import type { AuditLogDoc, AuditLogsClientProps } from './types.js'
-import { buildParams } from './utils.js'
+import { FilterBar } from './components/FilterBar/index'
+import { LogRow } from './components/LogRow'
+import type { AuditLogDoc, AuditLogsClientProps } from './types'
+import { buildParams } from './utils'
 
 const LIMIT_OPTIONS = [10, 25, 50, 100]
 

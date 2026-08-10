@@ -1,4 +1,4 @@
-import type { Filters, SelectOption } from '../../types.js'
+import type { Filters, SelectOption } from '../../types'
 
 export type { SelectOption }
 

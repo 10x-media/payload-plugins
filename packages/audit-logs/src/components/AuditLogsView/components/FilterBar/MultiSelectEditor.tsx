@@ -3,8 +3,8 @@
 import { Button, ReactSelect } from '@payloadcms/ui'
 import { keys } from '../../../../translations/keys'
 import { useTranslation } from '../../../../translations/useTranslation'
-import type { Filters } from '../../types.js'
-import type { EditorProps, SelectOption } from './types.js'
+import type { Filters } from '../../types'
+import type { EditorProps, SelectOption } from './types'
 
 type Props = EditorProps & {
 	field: 'collections' | 'globals' | 'operations' | 'tenants'

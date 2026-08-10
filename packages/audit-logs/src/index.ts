@@ -446,22 +446,26 @@ export const auditLogs = definePlugin<AuditLogsPluginOptions>({
 						tenantFieldName: collectionTenantFieldName,
 					}),
 				]
-				hooks.afterDelete = [
-					...(hooks.afterDelete ?? []),
-					afterDeleteCollectionAuditLog({
-						anonymize,
-						collectionSlug: collection.slug,
-						collectIpAddress,
-						collectUserAgent,
-						fieldMap,
-						groupContextKey,
-						isUserPolymorphic,
-						isSelfTenant,
-						shouldLog: auditLogConfig.shouldLog,
-						snapshotOnDelete: auditLogConfig.snapshotOnDelete,
-						tenantFieldName: collectionTenantFieldName,
-					}),
-				]
+				// afterChange filters on `operations` inside the hook; afterDelete has no such
+				// check, so the option has to be honoured at registration time.
+				if (auditLogConfig.operations.includes('delete')) {
+					hooks.afterDelete = [
+						...(hooks.afterDelete ?? []),
+						afterDeleteCollectionAuditLog({
+							anonymize,
+							collectionSlug: collection.slug,
+							collectIpAddress,
+							collectUserAgent,
+							fieldMap,
+							groupContextKey,
+							isUserPolymorphic,
+							isSelfTenant,
+							shouldLog: auditLogConfig.shouldLog,
+							snapshotOnDelete: auditLogConfig.snapshotOnDelete,
+							tenantFieldName: collectionTenantFieldName,
+						}),
+					]
+				}
 			}
 
 			// Auth hooks — independent from auditLog, only for auth-enabled collections

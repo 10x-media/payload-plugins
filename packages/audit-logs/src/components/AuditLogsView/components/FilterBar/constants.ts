@@ -1,4 +1,4 @@
-import type { SelectOption } from './types.js'
+import type { SelectOption } from './types'
 
 export const OPERATION_OPTIONS: SelectOption[] = [
 	{ label: 'Create', value: 'create' },

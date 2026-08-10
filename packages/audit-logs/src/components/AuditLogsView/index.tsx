@@ -5,8 +5,8 @@ import { parseCookies } from 'payload'
 import { keys } from '../../translations'
 import { asTranslate } from '../../translations/server'
 import type { AuditPluginConfig } from '../../types'
-import { AuditLogsClient } from './AuditLogsClient.js'
-import { GLOBAL_SENTINEL } from './utils.js'
+import { AuditLogsClient } from './AuditLogsClient'
+import { GLOBAL_SENTINEL } from './utils'
 
 export async function AuditLogsView({
 	initPageResult,

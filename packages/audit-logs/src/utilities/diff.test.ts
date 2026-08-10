@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { computeDiff, normalizeSnapshot } from './diff.js'
+import { computeDiff, normalizeSnapshot } from './diff'
 
 describe('computeDiff', () => {
 	// ---------- Basic primitives ----------

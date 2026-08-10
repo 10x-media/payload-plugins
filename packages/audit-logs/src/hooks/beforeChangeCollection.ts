@@ -1,6 +1,6 @@
 import type { CollectionBeforeChangeHook } from 'payload'
 
-import { setAtPath } from '../utilities/setAtPath.js'
+import { setAtPath } from '../utilities/setAtPath'
 
 export type AuditHookFieldConfig = {
 	isPolymorphic: boolean

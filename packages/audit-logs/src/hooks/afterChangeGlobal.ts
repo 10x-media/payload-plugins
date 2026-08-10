@@ -1,11 +1,11 @@
 import type { GlobalAfterChangeHook } from 'payload'
 
-import type { AnonymizeFunction, ShouldLogFunction } from '../types.js'
-import { REDACTED } from '../types.js'
-import type { FieldMap } from '../utilities/buildFieldMap.js'
-import { computeDiff } from '../utilities/diff.js'
-import { getClientIP, getUserAgent } from '../utilities/request.js'
-import { extractTenantId } from '../utilities/tenant.js'
+import type { AnonymizeFunction, ShouldLogFunction } from '../types'
+import { REDACTED } from '../types'
+import type { FieldMap } from '../utilities/buildFieldMap'
+import { computeDiff } from '../utilities/diff'
+import { getClientIP, getUserAgent } from '../utilities/request'
+import { extractTenantId } from '../utilities/tenant'
 
 export type AuditLogGlobalAfterChangeOptions = {
 	anonymize?: AnonymizeFunction
