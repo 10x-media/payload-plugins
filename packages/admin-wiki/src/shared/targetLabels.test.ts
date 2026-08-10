@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { describeTarget, describeTargets, parseTargetKey } from './targetLabels'
+import { chipTargetKeys, describeTarget, describeTargets, parseTargetKey } from './targetLabels'
 
 const sources = {
 	collections: [{ labels: { singular: 'Post' }, slug: 'posts' }, { slug: 'products' }],
@@ -47,8 +47,14 @@ describe('describeTarget', () => {
 		expect(describeTarget('field:collection:gone.title', sources)?.label).toBe('gone · title')
 	})
 
-	it('shows unqualified field paths and block slugs verbatim', () => {
+	it('shows unqualified field paths verbatim', () => {
 		expect(describeTarget('field:posts.title', sources)?.label).toBe('posts.title')
+	})
+
+	it('resolves a block label when the walker collected one, else the slug', () => {
+		const withBlocks = { ...sources, blockLabels: { heroBanner: 'Hero banner' } }
+		expect(describeTarget('block:heroBanner', withBlocks)?.label).toBe('Hero banner')
+		expect(describeTarget('block:quote', withBlocks)?.label).toBe('quote')
 		expect(describeTarget('block:heroBanner', sources)?.label).toBe('heroBanner')
 	})
 })
@@ -58,5 +64,23 @@ describe('describeTargets', () => {
 		expect(describeTargets(['collection:posts', 'nonsense'], sources)).toEqual([
 			{ kind: 'collection', label: 'Post', value: 'posts' },
 		])
+	})
+})
+
+describe('chipTargetKeys', () => {
+	it('drops field targets and keeps everything else', () => {
+		expect(
+			chipTargetKeys([
+				'collection:posts',
+				'field:collection:posts.title',
+				'global:settings',
+				'block:heroBanner',
+			])
+		).toEqual(['collection:posts', 'global:settings', 'block:heroBanner'])
+	})
+
+	it('tolerates undefined and unparseable keys', () => {
+		expect(chipTargetKeys(undefined)).toEqual([])
+		expect(chipTargetKeys(['nonsense'])).toEqual(['nonsense'])
 	})
 })

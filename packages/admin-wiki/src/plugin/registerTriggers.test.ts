@@ -1,7 +1,7 @@
-import type { CollectionConfig, Config, GlobalConfig } from 'payload'
+import type { CollectionConfig, Config, CustomComponent, Field, GlobalConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { registerTriggers } from './registerTriggers'
+import { registerTriggers, WIKI_GUIDES_FIELD } from './registerTriggers'
 import { resolveOptions } from './resolveOptions'
 
 const makeConfig = (): Config =>
@@ -13,47 +13,96 @@ const makeConfig = (): Config =>
 		globals: [{ fields: [], slug: 'settings' }],
 	}) as unknown as Config
 
-type AnyComponents = {
-	beforeListTable?: unknown[]
-	edit?: { beforeDocumentControls?: unknown[]; editMenuItems?: unknown[] }
-	elements?: { beforeDocumentControls?: unknown[] }
-	listMenuItems?: unknown[]
-	views?: { list?: { actions?: unknown[] } }
-}
+const entityOf = (config: Config, slug: string): CollectionConfig | GlobalConfig =>
+	[...(config.collections ?? []), ...(config.globals ?? [])].find(
+		(entity) => entity.slug === slug
+	) as CollectionConfig | GlobalConfig
 
-const componentsOf = (entity: CollectionConfig | GlobalConfig): AnyComponents =>
-	(entity.admin?.components ?? {}) as AnyComponents
+const bandOf = (config: Config, slug: string, slot: string): CustomComponent[] | undefined =>
+	(entityOf(config, slug) as CollectionConfig).admin?.components?.[slot as 'afterListTable'] as
+		| CustomComponent[]
+		| undefined
+
+const panelOf = (config: Config, slug: string): Field | undefined =>
+	entityOf(config, slug).fields.find((field) => 'name' in field && field.name === WIKI_GUIDES_FIELD)
 
 describe('registerTriggers', () => {
-	it('registers defaults: list actions + beforeDocumentControls, globals included', () => {
+	it('registers the band on collection lists, keyed per collection', () => {
 		const config = makeConfig()
 		registerTriggers(config, resolveOptions({}))
-		const posts = componentsOf((config.collections ?? [])[0] as CollectionConfig)
-		expect(posts.views?.list?.actions).toHaveLength(1)
-		expect(posts.edit?.beforeDocumentControls).toHaveLength(1)
-		const settings = componentsOf((config.globals ?? [])[0] as GlobalConfig)
-		expect(settings.elements?.beforeDocumentControls).toHaveLength(1)
+		const band = bandOf(config, 'posts', 'afterListTable')
+		expect(band).toHaveLength(1)
+		expect(band?.[0]).toEqual({
+			clientProps: { featured: true, slot: 'afterListTable', targetKey: 'collection:posts' },
+			path: '@10x-media/admin-wiki/client#WikiListGuides',
+		})
+	})
+
+	it('registers the guides panel as a sidebar UI field on collections and globals', () => {
+		const config = makeConfig()
+		registerTriggers(config, resolveOptions({}))
+		const cases: Array<[string, string]> = [
+			['posts', 'collection:posts'],
+			['settings', 'global:settings'],
+		]
+		for (const [slug, targetKey] of cases) {
+			expect(panelOf(config, slug)).toEqual({
+				name: WIKI_GUIDES_FIELD,
+				type: 'ui',
+				admin: {
+					components: {
+						Field: {
+							clientProps: { targetKey },
+							path: '@10x-media/admin-wiki/client#WikiDocumentGuides',
+						},
+					},
+					disableListColumn: true,
+					position: 'sidebar',
+				},
+			})
+		}
 	})
 
 	it('skips the wiki collections', () => {
 		const config = makeConfig()
 		registerTriggers(config, resolveOptions({}))
-		const wiki = componentsOf((config.collections ?? [])[1] as CollectionConfig)
-		expect(wiki.views?.list?.actions).toBeUndefined()
-		expect(wiki.edit).toBeUndefined()
+		expect(bandOf(config, 'wiki-pages', 'afterListTable')).toBeUndefined()
+		expect(panelOf(config, 'wiki-pages')).toBeUndefined()
 	})
 
-	it('honors menu slots and disabled surfaces', () => {
+	it('honors the excluded slugs across every surface', () => {
+		const config = makeConfig()
+		registerTriggers(config, resolveOptions({ triggers: { exclude: ['posts', 'settings'] } }))
+		expect(bandOf(config, 'posts', 'afterListTable')).toBeUndefined()
+		expect(panelOf(config, 'posts')).toBeUndefined()
+		expect(panelOf(config, 'settings')).toBeUndefined()
+	})
+
+	it('honors the band slot and disabled surfaces', () => {
 		const config = makeConfig()
 		registerTriggers(
 			config,
-			resolveOptions({ triggers: { edit: 'menu', global: false, list: 'menu' } })
+			resolveOptions({ triggers: { edit: false, global: false, list: { slot: 'beforeList' } } })
 		)
-		const posts = componentsOf((config.collections ?? [])[0] as CollectionConfig)
-		expect(posts.listMenuItems).toHaveLength(1)
-		expect(posts.edit?.editMenuItems).toHaveLength(1)
-		expect(posts.views).toBeUndefined()
-		const settings = componentsOf((config.globals ?? [])[0] as GlobalConfig)
-		expect(settings.elements).toBeUndefined()
+		expect(bandOf(config, 'posts', 'beforeList')).toHaveLength(1)
+		expect(bandOf(config, 'posts', 'afterListTable')).toBeUndefined()
+		expect(panelOf(config, 'posts')).toBeUndefined()
+		expect(panelOf(config, 'settings')).toBeUndefined()
+	})
+
+	it('passes the featured flag through to the band', () => {
+		const config = makeConfig()
+		registerTriggers(config, resolveOptions({ featured: false }))
+		const band = bandOf(config, 'posts', 'afterListTable')
+		expect((band?.[0] as { clientProps: { featured: boolean } }).clientProps.featured).toBe(false)
+	})
+
+	it('leaves a host field named like the panel alone', () => {
+		const config = makeConfig()
+		const posts = (config.collections ?? [])[0] as CollectionConfig
+		posts.fields = [{ name: WIKI_GUIDES_FIELD, type: 'text' }]
+		registerTriggers(config, resolveOptions({}))
+		expect(posts.fields).toHaveLength(1)
+		expect(posts.fields[0]?.type).toBe('text')
 	})
 })

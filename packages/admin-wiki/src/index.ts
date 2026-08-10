@@ -32,7 +32,11 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		registerTranslations(config, options.translations)
 		const resolved = resolveOptions(options)
 		const walk = walkAndInjectFieldHelp(config, resolved)
-		setWikiRegistry(config, { ...resolved, validTargetKeys: walk.validTargetKeys })
+		setWikiRegistry(config, {
+			...resolved,
+			blockLabels: walk.blockLabels,
+			validTargetKeys: walk.validTargetKeys,
+		})
 		if (walk.injectedFieldCount === 0) {
 			const priorOnInit = config.onInit
 			config.onInit = async (payload) => {
@@ -99,14 +103,15 @@ export type {
 	WikiAccessOptions,
 	WikiEditorBlockOption,
 	WikiEditorOptions,
-	WikiFeaturedOptions,
-	WikiFeaturedSlot,
 	WikiHiddenOptions,
+	WikiListBandOptions,
+	WikiListBandSlot,
 	WikiSlugsOptions,
 	WikiTriggersOptions,
 	WikiVideoOptions,
 	WikiWriteAffordanceMode,
 } from './options'
+export { WIKI_GUIDES_FIELD } from './plugin/registerTriggers'
 export { getWikiRegistry } from './plugin/registry'
 export { seedWiki } from './seed/seedWiki'
 export { githubAlertsTransformer } from './seed/transformers/githubAlerts'

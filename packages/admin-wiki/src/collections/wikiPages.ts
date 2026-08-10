@@ -15,26 +15,12 @@ export const SUMMARY_MAX_LENGTH = 400
 const localizedIf = (localize: boolean): { localized: true } | Record<string, never> =>
 	localize ? { localized: true } : {}
 
-const ORPHAN_BANNER = { path: '@10x-media/admin-wiki/client#WikiOrphanBanner' }
-const FEATURED_LIST = { path: '@10x-media/admin-wiki/client#WikiFeaturedList' }
-
 /**
- * The list-view slot components, with the featured section placed at the
- * configured slot. The orphan banner always sits in `beforeListTable`, directly
- * above the table it explains, so the two can land in the same slot.
+ * The orphan banner sits in `beforeListTable`, directly above the table it
+ * explains. The featured band is not here: it belongs on the collections guides
+ * are written about, and `registerFeatured` puts it there.
  */
-const listSlotComponents = (
-	resolved: ResolvedWikiOptions
-): Record<string, Array<{ path: string }>> => {
-	const slots: Record<string, Array<{ path: string }>> = {
-		beforeListTable: [ORPHAN_BANNER],
-	}
-	if (resolved.featured !== false) {
-		const { slot } = resolved.featured
-		slots[slot] = slot === 'beforeListTable' ? [FEATURED_LIST, ORPHAN_BANNER] : [FEATURED_LIST]
-	}
-	return slots
-}
+const ORPHAN_BANNER = { path: '@10x-media/admin-wiki/client#WikiOrphanBanner' }
 
 export type BuildWikiPagesArgs = {
 	access: Required<WikiAccessOptions>
@@ -87,6 +73,11 @@ const targetFields = (): Field[] => [
  * content; featured flag with ordering; and four non-localized target lists
  * attaching one guide to any number of surfaces (collections, globals, field
  * schema paths, block slugs).
+ *
+ * Authoring splits across unnamed tabs, which group the form without adding a
+ * level to the stored document: a named tab would nest every target list under
+ * its own key and break every reader of `targetCollections` and friends. The
+ * sidebar fields stay outside the tabs, where Payload looks for them.
  */
 export const buildWikiPagesCollection = ({
 	access,
@@ -117,9 +108,14 @@ export const buildWikiPagesCollection = ({
 			useAsTitle: 'title',
 			...(hidden !== undefined ? { hidden } : {}),
 			components: {
-				...listSlotComponents(resolved),
+				beforeListTable: [ORPHAN_BANNER],
 				...(resolved.wikiView
 					? {
+							edit: {
+								beforeDocumentControls: [
+									{ path: '@10x-media/admin-wiki/client#WikiGuideViewLink' },
+								],
+							},
 							views: {
 								list: {
 									actions: [{ path: '@10x-media/admin-wiki/client#WikiViewLink' }],
@@ -131,11 +127,45 @@ export const buildWikiPagesCollection = ({
 		},
 		fields: [
 			{
-				name: 'title',
-				type: 'text',
-				label: labelForKey(keys.fieldTitleLabel),
-				required: true,
-				...localizedIf(localize),
+				type: 'tabs',
+				tabs: [
+					{
+						label: labelForKey(keys.tabGuideLabel),
+						fields: [
+							{
+								name: 'title',
+								type: 'text',
+								label: labelForKey(keys.fieldTitleLabel),
+								required: true,
+								...localizedIf(localize),
+							},
+							{
+								name: 'summary',
+								type: 'textarea',
+								label: labelForKey(keys.fieldSummaryLabel),
+								maxLength: SUMMARY_MAX_LENGTH,
+								...localizedIf(localize),
+								admin: { description: labelForKey(keys.fieldSummaryDescription) },
+							},
+							{
+								name: 'content',
+								type: 'richText',
+								label: labelForKey(keys.fieldContentLabel),
+								editor: buildWikiEditor({
+									blocks: resolved.editorBlocks.map((option) => option.block),
+									mediaSlug: resolved.slugs.media,
+									pagesSlug: resolved.slugs.pages,
+									video: resolved.video,
+								}),
+								...localizedIf(localize),
+							},
+						],
+					},
+					{
+						label: labelForKey(keys.tabTargetsLabel),
+						fields: targetFields(),
+					},
+				],
 			},
 			{
 				name: 'slug',
@@ -148,26 +178,6 @@ export const buildWikiPagesCollection = ({
 					description: labelForKey(keys.fieldSlugDescription),
 					position: 'sidebar',
 				},
-			},
-			{
-				name: 'summary',
-				type: 'textarea',
-				label: labelForKey(keys.fieldSummaryLabel),
-				maxLength: SUMMARY_MAX_LENGTH,
-				...localizedIf(localize),
-				admin: { description: labelForKey(keys.fieldSummaryDescription) },
-			},
-			{
-				name: 'content',
-				type: 'richText',
-				label: labelForKey(keys.fieldContentLabel),
-				editor: buildWikiEditor({
-					blocks: resolved.editorBlocks.map((option) => option.block),
-					mediaSlug: resolved.slugs.media,
-					pagesSlug: resolved.slugs.pages,
-					video: resolved.video,
-				}),
-				...localizedIf(localize),
 			},
 			{
 				name: 'featured',
@@ -189,7 +199,6 @@ export const buildWikiPagesCollection = ({
 					position: 'sidebar',
 				},
 			},
-			...targetFields(),
 		],
 	}
 }

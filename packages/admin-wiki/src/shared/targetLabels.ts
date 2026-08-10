@@ -14,6 +14,8 @@ export type LabelledEntity = {
 }
 
 export type EntityLabelSources = {
+	/** Singular label per block slug, collected by the config walker. */
+	blockLabels?: Record<string, string>
 	collections?: LabelledEntity[]
 	globals?: LabelledEntity[]
 }
@@ -85,11 +87,12 @@ const parseFieldTarget = (
 }
 
 /**
- * Describe one target key for display. Collections and globals resolve to their
- * configured labels, and a field target resolves the entity half of its path
- * the same way, so a chip reads "Post · branding.color" rather than the stored
- * `collection:posts.branding.color`. Block slugs have no label in the config and
- * show verbatim, which is what an author typed and recognizes.
+ * Describe one target key for display. Collections, globals, and blocks resolve
+ * to their configured labels; a field target resolves the entity half of its
+ * path the same way, so it reads "Post · branding.color" rather than the stored
+ * `collection:posts.branding.color`. A block whose label is keyed by locale is
+ * not in `blockLabels` and falls back to its slug, which is what an author typed
+ * and recognizes.
  */
 export const describeTarget = (
 	key: string,
@@ -100,6 +103,8 @@ export const describeTarget = (
 		return null
 	}
 	switch (parsed.kind) {
+		case 'block':
+			return { ...parsed, label: sources.blockLabels?.[parsed.value] ?? parsed.value }
 		case 'collection':
 			return { ...parsed, label: findLabel(sources.collections, parsed.value) ?? parsed.value }
 		case 'global':
@@ -124,3 +129,15 @@ export const describeTargets = (keys: string[], sources: EntityLabelSources): De
 		const described = describeTarget(key, sources)
 		return described ? [described] : []
 	})
+
+/**
+ * The target keys worth showing as chips: everything except field targets.
+ *
+ * A guide written about a form usually attaches to many of its fields, so field
+ * chips both crowd out the entity chips beside them and say nothing a reader can
+ * act on: "Post · branding.color" names a place they are already looking at, and
+ * twelve of those name it twelve times. The field surfaces carry their own help,
+ * which is where a field target earns its keep.
+ */
+export const chipTargetKeys = (keys: string[] | undefined): string[] =>
+	(keys ?? []).filter((key) => parseTargetKey(key)?.kind !== 'field')

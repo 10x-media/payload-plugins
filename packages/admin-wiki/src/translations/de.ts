@@ -53,6 +53,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.orphanedHeading]: 'Verwaiste Anleitungsziele',
 	[keys.orphanedIntro]: 'Diese Anleitungen verweisen auf Oberflächen, die nicht mehr existieren:',
 	[keys.surfaceTriggerLabel]: 'Anleitungen',
+	[keys.tabGuideLabel]: 'Anleitung',
+	[keys.tabTargetsLabel]: 'Ziele',
 	[keys.targetsHeading]: 'Gilt für',
 	[keys.tocHeading]: 'Auf dieser Seite',
 	[keys.targetBlocksDescription]: 'Block-Slugs, für die diese Anleitung gilt, z. B. "heroBanner".',

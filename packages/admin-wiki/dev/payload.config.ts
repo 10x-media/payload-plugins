@@ -57,6 +57,9 @@ export default buildConfig({
 		adminWiki({
 			editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
 			video: true,
+			triggers: {
+				list: { slot: 'afterListTable' },
+			},
 		}),
 	],
 	telemetry: false,

@@ -1,6 +1,6 @@
 'use client'
 
-export { WikiBlockLabelClient } from '../components/BlockHelp/WikiBlockLabelClient'
+export { WikiBlockHelp, type WikiBlockHelpProps } from '../components/BlockHelp/WikiBlockHelp'
 export { WikiEditModeToggle } from '../components/EditMode/WikiEditModeToggle'
 export {
 	WikiFieldDescription,
@@ -24,12 +24,17 @@ export { GuideLink, type GuideLinkFields } from '../components/GuideArticle/Guid
 export { GuideLinkBlockLabel } from '../components/GuideArticle/GuideLinkBlockLabel'
 export { MissingBlockRenderer } from '../components/GuideArticle/MissingBlockRenderer'
 export { GuideDrawer, type GuideDrawerProps } from '../components/GuideDrawer/GuideDrawer'
-export { WikiFeaturedList } from '../components/ListExtras/WikiFeaturedList'
 export { WikiOrphanBanner } from '../components/ListExtras/WikiOrphanBanner'
 export {
-	WikiSurfaceTrigger,
-	type WikiSurfaceTriggerProps,
-} from '../components/SurfaceTrigger/WikiSurfaceTrigger'
+	WikiAllGuidesButton,
+	type WikiAllGuidesButtonProps,
+} from '../components/Surfaces/WikiAllGuidesButton'
+export {
+	WikiDocumentGuides,
+	type WikiDocumentGuidesProps,
+} from '../components/Surfaces/WikiDocumentGuides'
+export { WikiGuideCard, type WikiGuideCardProps } from '../components/Surfaces/WikiGuideCard'
+export { WikiListGuides, type WikiListGuidesProps } from '../components/Surfaces/WikiListGuides'
 export { TargetChips, type TargetChipsProps } from '../components/TargetChips/TargetChips'
 export { GuideVideo, type GuideVideoProps } from '../components/Video/GuideVideo'
 export { useWikiMediaDoc, type WikiMediaDoc } from '../components/Video/useWikiMediaDoc'
@@ -47,5 +52,6 @@ export {
 	WikiIndexClient,
 	type WikiIndexClientProps,
 } from '../components/WikiView/WikiIndexClient'
+export { WikiGuideViewLink } from '../components/WikiView/WikiGuideViewLink'
 export { WikiViewLink } from '../components/WikiView/WikiViewLink'
 export { WikiVideoFeatureClient } from '../editor/video/client'

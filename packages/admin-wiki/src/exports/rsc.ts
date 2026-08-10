@@ -1,4 +1,3 @@
-export { WikiBlockLabel } from '../components/BlockHelp/WikiBlockLabel'
 export {
 	WikiProviderServer,
 	type WikiProviderServerProps,

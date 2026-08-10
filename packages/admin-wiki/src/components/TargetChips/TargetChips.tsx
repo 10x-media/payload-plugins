@@ -2,28 +2,35 @@
 
 import { Pill, useConfig } from '@payloadcms/ui'
 
-import { describeTargets } from '../../shared/targetLabels'
+import { chipTargetKeys, describeTargets } from '../../shared/targetLabels'
+import { useWikiTargets } from '../WikiProvider/WikiProvider'
 import './target-chips.css'
 
 export type TargetChipsProps = {
 	className?: string
 	/** How many chips to show before collapsing the rest into a `+N`. */
 	limit?: number
-	/** The guide's target keys, e.g. `['collection:posts', 'field:collection:posts.title']`. */
+	/**
+	 * The guide's target keys, e.g. `['collection:posts', 'block:hero']`. Field
+	 * targets may be passed and are filtered out; see `chipTargetKeys`.
+	 */
 	targetKeys: string[] | undefined
 }
 
 /**
  * The surfaces a guide covers, as pills. This is what turns a list of guide
  * titles into something a reader can scan: "Publishing a post" says little,
- * "Publishing a post — Post, posts.title" says where it applies.
+ * "Publishing a post — Post, Hero" says where it applies.
  *
- * Collection, global, and field chips carry their entity's configured label;
- * block slugs show verbatim, which is what the author typed.
+ * Collections, globals, and blocks carry their configured label. Field targets
+ * are deliberately absent, because a guide covering a form attaches to enough of
+ * them to drown out the entities beside them.
  */
 export const TargetChips = ({ className, limit = 4, targetKeys }: TargetChipsProps) => {
 	const { config } = useConfig()
-	const described = describeTargets(targetKeys ?? [], {
+	const { blockLabels } = useWikiTargets()
+	const described = describeTargets(chipTargetKeys(targetKeys), {
+		blockLabels,
 		collections: config.collections,
 		globals: config.globals,
 	})

@@ -52,6 +52,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.orphanedHeading]: 'Orphaned guide targets',
 	[keys.orphanedIntro]: 'These guides point at surfaces that no longer exist:',
 	[keys.surfaceTriggerLabel]: 'Guides',
+	[keys.tabGuideLabel]: 'Guide',
+	[keys.tabTargetsLabel]: 'Targets',
 	[keys.targetsHeading]: 'Covers',
 	[keys.tocHeading]: 'On this page',
 	[keys.targetBlocksDescription]: 'Block slugs this guide covers, e.g. "heroBanner".',

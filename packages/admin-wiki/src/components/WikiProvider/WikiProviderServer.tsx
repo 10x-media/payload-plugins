@@ -46,6 +46,7 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 	}
 	return (
 		<WikiProvider
+			blockLabels={registry.blockLabels}
 			blockRenderers={blockRenderers}
 			pagesSlug={registry.slugs.pages}
 			videoPlayer={videoPlayer}

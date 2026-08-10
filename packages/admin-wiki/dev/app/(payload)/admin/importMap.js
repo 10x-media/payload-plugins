@@ -1,10 +1,11 @@
 import { WikiFieldDescription as WikiFieldDescription_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { ColorCell as ColorCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ColorFieldServer as ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
-import { WikiBlockLabel as WikiBlockLabel_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
+import { WikiBlockHelp as WikiBlockHelp_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { IconCell as IconCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { IconFieldServer as IconFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
-import { WikiSurfaceTrigger as WikiSurfaceTrigger_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
+import { WikiDocumentGuides as WikiDocumentGuides_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
+import { WikiListGuides as WikiListGuides_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -29,8 +30,8 @@ import { OrderedListFeatureClient as OrderedListFeatureClient_e70f5e05f09f93e00b
 import { UnorderedListFeatureClient as UnorderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { StrikethroughFeatureClient as StrikethroughFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { HeadingFeatureClient as HeadingFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
-import { WikiFeaturedList as WikiFeaturedList_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiOrphanBanner as WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
+import { WikiGuideViewLink as WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiViewLink as WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiProviderServer as WikiProviderServer_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
 import { WikiIndexView as WikiIndexView_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
@@ -46,10 +47,11 @@ export const importMap = {
   "@10x-media/admin-wiki/client#WikiFieldDescription": WikiFieldDescription_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/fields/rsc#ColorCell": ColorCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#ColorFieldServer": ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12,
-  "@10x-media/admin-wiki/rsc#WikiBlockLabel": WikiBlockLabel_11f6523fe2b636ccac41524a0a270462,
+  "@10x-media/admin-wiki/client#WikiBlockHelp": WikiBlockHelp_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/fields/rsc#IconCell": IconCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#IconFieldServer": IconFieldServer_cf1583332d9c5fb967cd4249af29ce12,
-  "@10x-media/admin-wiki/client#WikiSurfaceTrigger": WikiSurfaceTrigger_bd0a8d2193330fdfdceeb64a56ffc89f,
+  "@10x-media/admin-wiki/client#WikiDocumentGuides": WikiDocumentGuides_bd0a8d2193330fdfdceeb64a56ffc89f,
+  "@10x-media/admin-wiki/client#WikiListGuides": WikiListGuides_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -74,8 +76,8 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#UnorderedListFeatureClient": UnorderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#StrikethroughFeatureClient": StrikethroughFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#HeadingFeatureClient": HeadingFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
-  "@10x-media/admin-wiki/client#WikiFeaturedList": WikiFeaturedList_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiOrphanBanner": WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f,
+  "@10x-media/admin-wiki/client#WikiGuideViewLink": WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiViewLink": WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/rsc#WikiProviderServer": WikiProviderServer_11f6523fe2b636ccac41524a0a270462,
   "@10x-media/admin-wiki/rsc#WikiIndexView": WikiIndexView_11f6523fe2b636ccac41524a0a270462,

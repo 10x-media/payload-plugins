@@ -10,6 +10,8 @@ export const ADMIN_WIKI_REGISTRY_KEY = '@10x-media/admin-wiki'
  * plugin's endpoints and server components need after sanitization.
  */
 export type AdminWikiRegistry = ResolvedWikiOptions & {
+	/** Singular label per block slug, for chips that would otherwise show a slug. */
+	blockLabels: Record<string, string>
 	/** Target keys resolving against the walked config, for orphan detection. */
 	validTargetKeys: string[]
 }

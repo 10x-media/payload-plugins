@@ -9,6 +9,12 @@ import {
 import type { ResolvedWikiOptions } from './resolveOptions'
 
 export type WalkResult = {
+	/**
+	 * Singular label per block slug, for chips that would otherwise show a raw
+	 * slug. Only blocks declaring a plain-string label appear; a label keyed by
+	 * locale cannot be resolved at config time, where there is no request.
+	 */
+	blockLabels: Record<string, string>
 	/** Named fields that received the injected Description component. */
 	injectedFieldCount: number
 	/** Every target key that resolves against the walked config. */
@@ -16,11 +22,18 @@ export type WalkResult = {
 }
 
 const DESCRIPTION_COMPONENT = '@10x-media/admin-wiki/client#WikiFieldDescription'
-const BLOCK_LABEL_COMPONENT = '@10x-media/admin-wiki/rsc#WikiBlockLabel'
+const BLOCK_HELP_COMPONENT = '@10x-media/admin-wiki/client#WikiBlockHelp'
+
+/**
+ * Name of the UI field carrying a block's guides. Namespaced because it lands
+ * in host block schemas; a block already declaring it keeps its own.
+ */
+export const WIKI_BLOCK_HELP_FIELD = 'adminWikiBlockHelp'
 
 type WalkContext = {
+	blockLabels: Record<string, string>
 	blocksBySlug: Map<string, Block>
-	labeledBlocks: Set<string>
+	helpedBlocks: Set<string>
 	validKeys: Set<string>
 	injected: { count: number }
 }
@@ -60,30 +73,50 @@ const injectDescription = (field: Field, schemaPath: string, context: WalkContex
 }
 
 /**
- * Inject the guide trigger into a block's row label, keeping the default label
- * text via the server-provided `rowLabel`. Shared block configs (from
- * `config.blocks` / `blockReferences`) are mutated once; a block that already
- * carries a custom Label component is left alone (documented limitation).
+ * Give a block its guides as a UI field, appended after its own fields.
+ *
+ * Not the row label, which is where this used to live: `Block.admin.components`
+ * offers only `Label` and `Block`, the second replaces the header and
+ * collapsible wholesale, and the first is the one slot consumers reach for when
+ * they want computed row labels. Losing that race meant a block silently had no
+ * guides at all, and winning it would have put a popup trigger inside the
+ * collapsible's own click target. A field competes with nobody.
+ *
+ * Appended rather than prepended because a block whose first field is `tabs`
+ * puts the whole tab bar below anything above it, and a stray line hanging over
+ * a tab bar reads as broken layout. The cost is that the guide sits at the
+ * bottom, where it is less obvious.
+ *
+ * Shared block configs (`config.blocks` / `blockReferences`) are mutated once.
  */
-const injectBlockLabel = (block: Block, context: WalkContext): void => {
-	if (context.labeledBlocks.has(block.slug)) {
+const injectBlockHelp = (block: Block, context: WalkContext): void => {
+	if (context.helpedBlocks.has(block.slug)) {
 		return
 	}
-	context.labeledBlocks.add(block.slug)
-	const components = block.admin?.components as { Label?: unknown } | undefined
-	if (components?.Label !== undefined) {
+	context.helpedBlocks.add(block.slug)
+	const singular = block.labels?.singular
+	if (typeof singular === 'string') {
+		context.blockLabels[block.slug] = singular
+	}
+	const taken = block.fields.some(
+		(field) => 'name' in field && field.name === WIKI_BLOCK_HELP_FIELD
+	)
+	if (taken) {
 		return
 	}
-	block.admin = {
-		...block.admin,
-		components: {
-			...block.admin?.components,
-			Label: {
-				clientProps: { blockSlug: block.slug },
-				path: BLOCK_LABEL_COMPONENT,
+	block.fields = [
+		...block.fields,
+		{
+			name: WIKI_BLOCK_HELP_FIELD,
+			type: 'ui',
+			admin: {
+				components: {
+					Field: { clientProps: { blockSlug: block.slug }, path: BLOCK_HELP_COMPONENT },
+				},
+				disableListColumn: true,
 			},
 		},
-	}
+	]
 }
 
 const blocksOfField = (
@@ -132,7 +165,7 @@ const walkFields = (fields: Field[], parentPath: string, context: WalkContext): 
 				injectDescription(field, path, context)
 				for (const block of blocksOfField(field, context)) {
 					context.validKeys.add(blockTargetKey(block.slug))
-					injectBlockLabel(block, context)
+					injectBlockHelp(block, context)
 					walkFields(block.fields, `${path}.${block.slug}`, context)
 				}
 				break
@@ -162,15 +195,16 @@ export const walkAndInjectFieldHelp = (
 	resolved: ResolvedWikiOptions
 ): WalkResult => {
 	const context: WalkContext = {
+		blockLabels: {},
 		blocksBySlug: new Map((config.blocks ?? []).map((block) => [block.slug, block])),
 		injected: { count: 0 },
-		labeledBlocks: new Set<string>(),
+		helpedBlocks: new Set<string>(),
 		validKeys: new Set<string>(),
 	}
 	const wikiSlugs = [resolved.slugs.pages, resolved.slugs.media]
 	for (const block of config.blocks ?? []) {
 		context.validKeys.add(blockTargetKey(block.slug))
-		injectBlockLabel(block, context)
+		injectBlockHelp(block, context)
 	}
 	for (const collection of config.collections ?? []) {
 		if (wikiSlugs.includes(collection.slug)) {
@@ -184,6 +218,7 @@ export const walkAndInjectFieldHelp = (
 		walkFields(global.fields, `global:${global.slug}`, context)
 	}
 	return {
+		blockLabels: context.blockLabels,
 		injectedFieldCount: context.injected.count,
 		validTargetKeys: [...context.validKeys].sort(),
 	}

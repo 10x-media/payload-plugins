@@ -211,7 +211,6 @@ export interface User {
 export interface WikiPage {
   id: string;
   title: string;
-  slug?: string | null;
   summary?: string | null;
   content?: {
     root: {
@@ -228,12 +227,13 @@ export interface WikiPage {
     };
     [k: string]: unknown;
   } | null;
-  featured?: boolean | null;
-  featuredOrder?: number | null;
   targetCollections?: string[] | null;
   targetGlobals?: string[] | null;
   targetFields?: string[] | null;
   targetBlocks?: string[] | null;
+  slug?: string | null;
+  featured?: boolean | null;
+  featuredOrder?: number | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -424,15 +424,15 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface WikiPagesSelect<T extends boolean = true> {
   title?: T;
-  slug?: T;
   summary?: T;
   content?: T;
-  featured?: T;
-  featuredOrder?: T;
   targetCollections?: T;
   targetGlobals?: T;
   targetFields?: T;
   targetBlocks?: T;
+  slug?: T;
+  featured?: T;
+  featuredOrder?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;

@@ -33,14 +33,6 @@
 
 /* Guide page --------------------------------------------------------------- */
 
-.wiki-view__breadcrumbs {
-	align-items: center;
-	display: flex;
-	gap: var(--base);
-	justify-content: space-between;
-	margin-bottom: var(--base);
-}
-
 .wiki-view__article-header {
 	border-bottom: 1px solid var(--theme-elevation-100);
 	margin-bottom: calc(var(--base) * 1.25);
@@ -82,10 +74,9 @@
 
 /* The guide page centers its reading column rather than pinning it to the left:
    the view is as wide as the window, the prose deliberately is not, and
-   left-aligning left most of a widescreen empty. The breadcrumb row shares
-   column one so the actions sit over the text instead of spanning the viewport.
-   Note that 1rem is 13px here (Payload sets `$baseline-body-size: 13px` on
-   html), so this measure is ~728px, not ~896px.
+   left-aligning left most of a widescreen empty. Note that 1rem is 13px here
+   (Payload sets `$baseline-body-size: 13px` on html), so this measure is
+   ~728px, not ~896px.
 
    The second column exists only when a table of contents fills it: a reserved
    but empty column would push the prose off-centre on every guide too short to
@@ -102,7 +93,6 @@
 	grid-template-columns: minmax(0, 56rem) 16rem;
 }
 
-.wiki-guide-layout > .wiki-view__breadcrumbs,
 .wiki-guide-layout > .wiki-view__article,
 .wiki-guide-layout > .wiki-view__status {
 	grid-column: 1;
@@ -111,7 +101,7 @@
 
 .wiki-guide-layout > .wiki-toc {
 	grid-column: 2;
-	grid-row: 2;
+	grid-row: 1;
 }
 
 @media (max-width: 1100px) {

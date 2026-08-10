@@ -2,7 +2,7 @@ import type { CollectionConfig, Config, Field, GlobalConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { resolveOptions } from './resolveOptions'
-import { walkAndInjectFieldHelp } from './walker'
+import { WIKI_BLOCK_HELP_FIELD, walkAndInjectFieldHelp } from './walker'
 
 const resolved = resolveOptions({})
 
@@ -48,7 +48,7 @@ describe('walkAndInjectFieldHelp', () => {
 		expect(result.injectedFieldCount).toBe(5)
 	})
 
-	it('collects block slugs, walks block fields, and injects block labels', () => {
+	it('collects block slugs, walks block fields, and injects block help', () => {
 		const ctaBlock = { slug: 'cta', fields: [{ name: 'label', type: 'text' }] as Field[] }
 		const labeledBlock = {
 			slug: 'custom',
@@ -70,9 +70,25 @@ describe('walkAndInjectFieldHelp', () => {
 		const result = walkAndInjectFieldHelp(config, resolved)
 		expect(result.validTargetKeys).toContain('block:cta')
 		expect(result.validTargetKeys).toContain('field:collection:pages.layout.cta.label')
-		const injectedLabel = (ctaBlock as { admin?: { components?: { Label?: unknown } } }).admin
-			?.components?.Label
-		expect(injectedLabel).toMatchObject({ clientProps: { blockSlug: 'cta' } })
+		expect(ctaBlock.fields[0]).toMatchObject({ name: 'label' })
+		expect(ctaBlock.fields[1]).toMatchObject({
+			name: WIKI_BLOCK_HELP_FIELD,
+			type: 'ui',
+			admin: { components: { Field: { clientProps: { blockSlug: 'cta' } } } },
+		})
+	})
+
+	it('helps a block that declares its own row label, which the old slot could not', () => {
+		const labeledBlock = {
+			slug: 'custom',
+			admin: { components: { Label: '/custom#Label' } },
+			fields: [] as Field[],
+		}
+		const config = makeConfig([
+			{ slug: 'pages', fields: [{ name: 'layout', type: 'blocks', blocks: [labeledBlock] }] },
+		])
+		walkAndInjectFieldHelp(config, resolved)
+		expect(labeledBlock.fields.at(-1)).toMatchObject({ name: WIKI_BLOCK_HELP_FIELD })
 		expect(labeledBlock.admin.components.Label).toBe('/custom#Label')
 	})
 

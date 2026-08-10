@@ -46,6 +46,8 @@ export type WikiBlockRenderer = ComponentType<{ fields: Record<string, unknown> 
 export type WikiVideoPlayerComponent = ComponentType<{ media: WikiMediaDoc }>
 
 export type WikiTargetsContextValue = {
+	/** Singular label per block slug, for chips that would otherwise show a slug. */
+	blockLabels: Record<string, string>
 	/** Consumer block renderers resolved from the import map, keyed by slug. */
 	blockRenderers: Record<string, WikiBlockRenderer>
 	/** The reader's evaluated create permission (drives "write this guide"). */
@@ -85,6 +87,7 @@ export type WikiTargetsContextValue = {
 const EMPTY: WikiTargetEntry[] = []
 
 const WikiTargetsContext = createContext<WikiTargetsContextValue>({
+	blockLabels: {},
 	blockRenderers: {},
 	canCreate: false,
 	canUpdate: false,
@@ -103,6 +106,7 @@ const WikiTargetsContext = createContext<WikiTargetsContextValue>({
 })
 
 export type WikiProviderProps = {
+	blockLabels?: Record<string, string>
 	blockRenderers?: Record<string, WikiBlockRenderer>
 	children?: ReactNode
 	pagesSlug?: string
@@ -117,6 +121,7 @@ export type WikiProviderProps = {
  * guide-existence with a synchronous map lookup and never fetch per field.
  */
 export const WikiProvider = ({
+	blockLabels,
 	blockRenderers,
 	children,
 	pagesSlug = 'wiki-pages',
@@ -212,6 +217,7 @@ export const WikiProvider = ({
 
 	const value = useMemo<WikiTargetsContextValue>(
 		() => ({
+			blockLabels: blockLabels ?? {},
 			blockRenderers: blockRenderers ?? {},
 			canCreate,
 			canUpdate: data?.canUpdate ?? false,
@@ -231,6 +237,7 @@ export const WikiProvider = ({
 			writeAffordancesToggleable: canCreate && writeAffordances === 'editMode',
 		}),
 		[
+			blockLabels,
 			blockRenderers,
 			canCreate,
 			data,

@@ -22,8 +22,8 @@ export default definePluginBuild({
 			to: 'dist/components/FieldHelp',
 		},
 		{
-			from: 'src/components/SurfaceTrigger/surface-trigger.css',
-			to: 'dist/components/SurfaceTrigger',
+			from: 'src/components/Surfaces/surfaces.css',
+			to: 'dist/components/Surfaces',
 		},
 		{
 			from: 'src/components/WikiView/wiki-view.css',
@@ -34,7 +34,7 @@ export default definePluginBuild({
 			to: 'dist/components/Video',
 		},
 		{
-			from: 'src/components/BlockHelp/block-label.css',
+			from: 'src/components/BlockHelp/block-help.css',
 			to: 'dist/components/BlockHelp',
 		},
 		{

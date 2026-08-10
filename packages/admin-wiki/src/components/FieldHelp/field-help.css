@@ -150,8 +150,7 @@
    form lit up every affordance in a whole tab the moment one input took focus.
    `:not(:has(.field-type:hover))` is what makes "innermost" expressible. */
 .field-type:hover:not(:has(.field-type:hover)) .wiki-write-guide--inline,
-.field-type:focus-within:not(:has(.field-type:focus-within))
-	.wiki-write-guide--inline,
+.field-type:focus-within:not(:has(.field-type:focus-within)) .wiki-write-guide--inline,
 .wiki-write-guide--inline:focus-visible {
 	opacity: 1;
 }

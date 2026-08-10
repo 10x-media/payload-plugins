@@ -66,31 +66,33 @@ export type WikiEditorOptions = {
  */
 export type WikiWriteAffordanceMode = 'always' | 'editMode' | 'never'
 
-/** List-view slot the featured-guides section renders in. */
-export type WikiFeaturedSlot = 'afterList' | 'afterListTable' | 'beforeList' | 'beforeListTable'
+/** List-view slot the guides band renders in. */
+export type WikiListBandSlot = 'afterList' | 'afterListTable' | 'beforeList' | 'beforeListTable'
 
-/** The featured-guides section above the wiki pages list; `false` disables it. */
-export type WikiFeaturedOptions = {
-	/** Which list slot to render in. Defaults to `beforeList`. */
-	slot?: WikiFeaturedSlot
+/** The guides band on collection list views. */
+export type WikiListBandOptions = {
+	/** Which list slot to render in. Defaults to `afterListTable`. */
+	slot?: WikiListBandSlot
 }
 
-export type WikiListTriggerSlot = 'actions' | 'beforeListTable' | 'menu'
-export type WikiEditTriggerSlot = 'beforeDocumentControls' | 'menu'
-export type WikiGlobalTriggerSlot = 'beforeDocumentControls'
-
 /**
- * Where the guide trigger renders on each surface; `false` disables the surface.
- * Globals have no `editMenuItems` slot in Payload, so only
- * `beforeDocumentControls` is offered there.
+ * Which surfaces carry a guide affordance; `false` disables one.
+ *
+ * There is no slot to choose per surface, because each has exactly one place the
+ * affordance belongs: documents and globals put it in the sidebar, beside the
+ * other document-scoped facts, and lists have no sidebar so they get a band.
+ * Only the band's slot is configurable, because where a block of content sits on
+ * a list is a real layout question.
  */
 export type WikiTriggersOptions = {
-	/** Document edit views. Defaults to `beforeDocumentControls`. */
-	edit?: false | WikiEditTriggerSlot
-	/** Global edit views. Defaults to `beforeDocumentControls`. */
-	global?: false | WikiGlobalTriggerSlot
-	/** Collection list views. Defaults to `actions` (header, top right). */
-	list?: false | WikiListTriggerSlot
+	/** Document edit views: a guides panel in the sidebar. Defaults to `true`. */
+	edit?: boolean
+	/** Collection and global slugs to leave every wiki surface off. */
+	exclude?: string[]
+	/** Global edit views: a guides panel in the sidebar. Defaults to `true`. */
+	global?: boolean
+	/** Collection list views: the guides band. Defaults to `true`. */
+	list?: boolean | WikiListBandOptions
 }
 
 export type AdminWikiPluginOptions = {
@@ -114,10 +116,11 @@ export type AdminWikiPluginOptions = {
 	/** Extensions to the wiki editor (consumer blocks with renderers). */
 	editor?: WikiEditorOptions
 	/**
-	 * The featured-guides section on the wiki pages list view. `false` removes
-	 * it; the wiki view leads with featured guides either way.
+	 * Lead the list band with the collection's featured guides as cards. `false`
+	 * collapses the band to its "all guides" row; the wiki view leads with
+	 * featured guides either way. Defaults to `true`.
 	 */
-	featured?: false | WikiFeaturedOptions
+	featured?: boolean
 	/** Per-collection `admin.hidden` passthrough. */
 	hidden?: WikiHiddenOptions
 	/**

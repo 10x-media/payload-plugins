@@ -6,13 +6,14 @@ describe('resolveOptions', () => {
 	it('applies defaults', () => {
 		expect(resolveOptions({})).toEqual({
 			editorBlocks: [],
-			featured: { slot: 'beforeList' },
+			featured: true,
 			localeMap: {},
 			slugs: { media: 'wiki-media', pages: 'wiki-pages' },
 			triggers: {
-				edit: 'beforeDocumentControls',
-				global: 'beforeDocumentControls',
-				list: 'actions',
+				edit: true,
+				exclude: [],
+				global: true,
+				list: { slot: 'afterListTable' },
 			},
 			video: false,
 			wikiView: true,
@@ -20,10 +21,17 @@ describe('resolveOptions', () => {
 		})
 	})
 
-	it('honors the featured slot and disables the section', () => {
-		expect(resolveOptions({ featured: { slot: 'afterListTable' } }).featured).toEqual({
+	it('normalizes the list band shorthands', () => {
+		expect(resolveOptions({ triggers: { list: true } }).triggers.list).toEqual({
 			slot: 'afterListTable',
 		})
+		expect(resolveOptions({ triggers: { list: { slot: 'beforeList' } } }).triggers.list).toEqual({
+			slot: 'beforeList',
+		})
+		expect(resolveOptions({ triggers: { list: false } }).triggers.list).toBe(false)
+	})
+
+	it('honors the featured flag', () => {
 		expect(resolveOptions({ featured: false }).featured).toBe(false)
 	})
 
@@ -45,14 +53,15 @@ describe('resolveOptions', () => {
 	it('honors slug, trigger, and view overrides', () => {
 		const resolved = resolveOptions({
 			slugs: { pages: 'guides' },
-			triggers: { edit: false, list: 'menu' },
+			triggers: { edit: false, exclude: ['users'] },
 			wikiView: false,
 		})
 		expect(resolved.slugs).toEqual({ media: 'wiki-media', pages: 'guides' })
 		expect(resolved.triggers).toEqual({
 			edit: false,
-			global: 'beforeDocumentControls',
-			list: 'menu',
+			exclude: ['users'],
+			global: true,
+			list: { slot: 'afterListTable' },
 		})
 		expect(resolved.wikiView).toBe(false)
 	})

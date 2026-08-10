@@ -1,6 +1,6 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
-import { Button, ChevronIcon, Gutter, SetStepNav } from '@payloadcms/ui'
+import { Gutter, SetStepNav } from '@payloadcms/ui'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug } from 'payload'
 import { formatAdminURL } from 'payload/shared'
@@ -9,8 +9,10 @@ import { GuideArticle } from '../components/GuideArticle/GuideArticle'
 import { StarIcon } from '../components/icons'
 import { TargetChips } from '../components/TargetChips/TargetChips'
 import { WikiToc } from '../components/Toc/WikiToc'
+import { WikiViewActions } from '../components/WikiView/WikiViewActions'
 import { collectGuideHeadings, hasTocHeadings } from '../shared/headings'
 import { targetKeysForDoc, type WikiGuideDoc, type WikiTargetDoc } from '../shared/targetKeys'
+import { chipTargetKeys } from '../shared/targetLabels'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { buildWikiViewContext, wikiLoginRedirectUrl } from './shared'
@@ -64,7 +66,7 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 				path: `/collections/${context.registry.slugs.pages}/${doc.id}`,
 			})
 		: null
-	const targetKeys = targetKeysForDoc(doc)
+	const targetKeys = chipTargetKeys(targetKeysForDoc(doc))
 	const { headings } = collectGuideHeadings(content)
 	const showToc = hasTocHeadings(headings)
 	return (
@@ -96,28 +98,12 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 						},
 					]}
 				/>
+				{doc && context.canUpdate && editUrl ? <WikiViewActions editUrl={editUrl} /> : null}
 				<div
 					className={['wiki-guide-layout', showToc ? 'wiki-guide-layout--with-toc' : null]
 						.filter(Boolean)
 						.join(' ')}
 				>
-					{/* TODO: Remove this, find where we could potentially place this button */}
-					<div className="wiki-view__breadcrumbs">
-						{doc && context.canUpdate && editUrl ? (
-							<Button
-								buttonStyle="pill"
-								el="link"
-								icon="edit"
-								iconPosition="left"
-								iconStyle="none"
-								margin={false}
-								size="small"
-								to={editUrl}
-							>
-								{t(keys.drawerEditGuide)}
-							</Button>
-						) : null}
-					</div>
 					{doc ? (
 						<article className="wiki-view__article">
 							<header className="wiki-view__article-header">

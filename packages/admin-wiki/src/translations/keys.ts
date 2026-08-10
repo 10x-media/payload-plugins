@@ -49,6 +49,8 @@ export const keys = {
 	orphanedHeading: 'adminWiki:orphanedHeading',
 	orphanedIntro: 'adminWiki:orphanedIntro',
 	surfaceTriggerLabel: 'adminWiki:surfaceTriggerLabel',
+	tabGuideLabel: 'adminWiki:tabGuideLabel',
+	tabTargetsLabel: 'adminWiki:tabTargetsLabel',
 	targetsHeading: 'adminWiki:targetsHeading',
 	tocHeading: 'adminWiki:tocHeading',
 	targetBlocksDescription: 'adminWiki:targetBlocksDescription',

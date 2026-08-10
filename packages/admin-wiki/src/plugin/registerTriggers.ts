@@ -1,101 +1,96 @@
-import type { CollectionConfig, Config, CustomComponent, GlobalConfig } from 'payload'
+import type { CollectionConfig, Config, Field, GlobalConfig } from 'payload'
 
 import { collectionTargetKey, globalTargetKey } from '../shared/targetKeys'
 import type { ResolvedWikiOptions } from './resolveOptions'
 
-const TRIGGER_COMPONENT = '@10x-media/admin-wiki/client#WikiSurfaceTrigger'
+const BAND_COMPONENT = '@10x-media/admin-wiki/client#WikiListGuides'
+const PANEL_COMPONENT = '@10x-media/admin-wiki/client#WikiDocumentGuides'
 
-const trigger = (targetKey: string, variant: 'button' | 'menuItem'): CustomComponent => ({
-	clientProps: { targetKey, variant },
-	path: TRIGGER_COMPONENT,
-})
+/**
+ * Name of the injected sidebar field. Namespaced because it lands in host
+ * schemas: a bare `guides` would collide with a real field sooner or later, and
+ * a collection that already has this name keeps its own (see `appendPanel`).
+ */
+export const WIKI_GUIDES_FIELD = 'adminWikiGuides'
 
 type CollectionComponents = NonNullable<NonNullable<CollectionConfig['admin']>['components']>
 
-const applyToCollection = (collection: CollectionConfig, resolved: ResolvedWikiOptions): void => {
-	const targetKey = collectionTargetKey(collection.slug)
-	collection.admin ??= {}
-	collection.admin.components ??= {}
-	const components = collection.admin.components as CollectionComponents
-	switch (resolved.triggers.list) {
-		case 'actions': {
-			components.views ??= {}
-			components.views.list ??= {}
-			components.views.list.actions = [
-				...(components.views.list.actions ?? []),
-				trigger(targetKey, 'button'),
-			]
-			break
-		}
-		case 'beforeListTable':
-			components.beforeListTable = [
-				...(components.beforeListTable ?? []),
-				trigger(targetKey, 'button'),
-			]
-			break
-		case 'menu':
-			components.listMenuItems = [
-				...(components.listMenuItems ?? []),
-				trigger(targetKey, 'menuItem'),
-			]
-			break
-		default:
-			break
-	}
-	switch (resolved.triggers.edit) {
-		case 'beforeDocumentControls': {
-			components.edit ??= {}
-			components.edit.beforeDocumentControls = [
-				...(components.edit.beforeDocumentControls ?? []),
-				trigger(targetKey, 'button'),
-			]
-			break
-		}
-		case 'menu': {
-			components.edit ??= {}
-			components.edit.editMenuItems = [
-				...(components.edit.editMenuItems ?? []),
-				trigger(targetKey, 'menuItem'),
-			]
-			break
-		}
-		default:
-			break
-	}
-}
+/**
+ * The guides panel as a sidebar UI field.
+ *
+ * A UI field carries no data, is excluded from generated types, and never
+ * reaches the database, so this adds a surface without touching the host's
+ * schema. `disableListColumn` keeps it out of the list view's column selector,
+ * where a panel of guides would be meaningless.
+ */
+const panelField = (targetKey: string): Field => ({
+	name: WIKI_GUIDES_FIELD,
+	type: 'ui',
+	admin: {
+		components: {
+			Field: { clientProps: { targetKey }, path: PANEL_COMPONENT },
+		},
+		disableListColumn: true,
+		position: 'sidebar',
+	},
+})
 
-const applyToGlobal = (global: GlobalConfig, resolved: ResolvedWikiOptions): void => {
-	if (resolved.triggers.global !== 'beforeDocumentControls') {
+/**
+ * Append the panel unless the entity already declares a field by that name,
+ * which would make two fields share a path and is the host's field to keep.
+ */
+const appendPanel = (entity: CollectionConfig | GlobalConfig, targetKey: string): void => {
+	const taken = entity.fields.some((field) => 'name' in field && field.name === WIKI_GUIDES_FIELD)
+	if (taken) {
 		return
 	}
-	const targetKey = globalTargetKey(global.slug)
-	global.admin ??= {}
-	global.admin.components ??= {}
-	const components = global.admin.components as {
-		elements?: { beforeDocumentControls?: CustomComponent[] }
+	entity.fields = [...entity.fields, panelField(targetKey)]
+}
+
+const applyToCollection = (collection: CollectionConfig, resolved: ResolvedWikiOptions): void => {
+	const targetKey = collectionTargetKey(collection.slug)
+	if (resolved.triggers.list !== false) {
+		const { slot } = resolved.triggers.list
+		collection.admin ??= {}
+		collection.admin.components ??= {}
+		const components = collection.admin.components as CollectionComponents
+		components[slot] = [
+			...(components[slot] ?? []),
+			{
+				clientProps: { featured: resolved.featured, slot, targetKey },
+				path: BAND_COMPONENT,
+			},
+		]
 	}
-	components.elements ??= {}
-	components.elements.beforeDocumentControls = [
-		...(components.elements.beforeDocumentControls ?? []),
-		trigger(targetKey, 'button'),
-	]
+	if (resolved.triggers.edit) {
+		appendPanel(collection, targetKey)
+	}
 }
 
 /**
- * Inject the guide trigger into every collection and global (except the
- * wiki's own collections) at the slots chosen by `options.triggers`.
- * Globals only offer `beforeDocumentControls`; Payload has no `editMenuItems`
- * slot for them.
+ * Give every collection and global (except the wiki's own, and any the host
+ * excluded) its guide surface: a band on collection lists, a sidebar panel on
+ * documents and globals.
+ *
+ * There is no slot to choose per surface. Each has one place the affordance
+ * belongs, and the previous freedom to put a trigger in a ⋯ menu or beside Save
+ * only produced placements that read as something the surface is not.
  */
 export const registerTriggers = (config: Config, resolved: ResolvedWikiOptions): void => {
-	const wikiSlugs = [resolved.slugs.pages, resolved.slugs.media]
+	const skip = new Set([resolved.slugs.pages, resolved.slugs.media, ...resolved.triggers.exclude])
 	for (const collection of config.collections ?? []) {
-		if (wikiSlugs.includes(collection.slug)) {
+		if (skip.has(collection.slug)) {
 			continue
 		}
 		applyToCollection(collection, resolved)
 	}
+	if (!resolved.triggers.global) {
+		return
+	}
 	for (const global of config.globals ?? []) {
-		applyToGlobal(global, resolved)
+		if (skip.has(global.slug)) {
+			continue
+		}
+		appendPanel(global, globalTargetKey(global.slug))
 	}
 }
