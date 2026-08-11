@@ -9,10 +9,9 @@ description: The full option surface, from per-collection opt-in to the audit-lo
 |---|---|---|---|
 | `collections` | `Record<CollectionSlug, AuditOptions>` | `{}` | Which collections to audit. Opt-in. |
 | `globals` | `Record<GlobalSlug, GlobalAuditOptions>` | `{}` | Which globals to audit. Opt-in. |
-| `auth` | `false \| Record<CollectionSlug, false \| { login?, forgotPassword? }>` | all on | Auth event logging. On for every auth collection unless told otherwise. |
 | `defaults` | `{ createdBy?, lastModifiedBy? }` | none | Defaults applied to every automatic audit field. |
 | `anonymize` | `Record<Slug, AnonymizeFunction>` | none | Per-entity value redaction. See [anonymization](/audit-logs/anonymization). |
-| `drafts` | `'ignore' \| 'log'` | `'log'` | Default draft handling for versioned entities. |
+| `drafts` | `'ignore' \| 'log'` | `'ignore'` | Default draft handling for versioned entities. |
 | `normalizeRelationships` | `boolean` | `true` | Reduce relationship values to plain ids in diffs and snapshots. |
 | `multiTenancy` | `true \| MultiTenancyConfig` | off | See [multi-tenancy](/audit-logs/multi-tenancy). |
 | `retention` | `DataRetentionConfig` | off | See [data retention](/audit-logs/data-retention). |
@@ -29,8 +28,12 @@ description: The full option surface, from per-collection opt-in to the audit-lo
 posts: {
   auditFields: true,   // true | false | { createdBy?, lastModifiedBy? }
   auditLog: true,      // true | false | CollectionAuditLogConfig
+  auth: true,          // true | false | { login?, forgotPassword? }
 }
 ```
+
+`auth` only means anything on a collection with `auth` enabled in Payload. It logs
+logins and password resets, and like everything else here it is off until asked for.
 
 An omitted key is off. `auditFields: true` without `auditLog` gives you the two columns and no log; `auditLog: true` without `auditFields` gives you the log and no extra columns.
 
@@ -40,7 +43,7 @@ An omitted key is off. `auditFields: true` without `auditLog` gives you the two 
 |---|---|---|---|
 | `operations` | `Array<'create' \| 'update' \| 'delete'>` | all three | Which operations produce an entry. |
 | `excludeFields` | `string[]` | `[]` | Paths kept out of the diff entirely. An update that only touches these writes no entry. |
-| `drafts` | `'ignore' \| 'log'` | inherits | `'ignore'` skips draft saves and diffs a publish against the last published version. |
+| `drafts` | `'ignore' \| 'log'` | inherits, `'ignore'` at the root | `'log'` records every draft save, autosave included. |
 | `shouldLog` | `ShouldLogFunction` | none | Last word on whether to write. Runs after the diff. |
 | `snapshotOnCreate` | `boolean` | `false` | Store the whole created document instead of a null-to-value diff per field. |
 | `snapshotOnDelete` | `boolean` | `false` | Store the whole document on delete. What makes recovery possible. |

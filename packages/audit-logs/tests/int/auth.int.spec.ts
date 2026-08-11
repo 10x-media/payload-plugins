@@ -3,18 +3,49 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { auditLogs } from '../../src/index'
 import { posts, readLogs, seedUser, TEST_EMAIL, TEST_PASSWORD, tags, users } from './fixtures'
 
-describe('auth event logging', () => {
+const boot = (options: Parameters<typeof auditLogs>[0]) =>
+	bootPayload({
+		plugin: auditLogs(options),
+		db: 'mongo',
+		collections: [posts, tags, users],
+		seed: async (payload) => {
+			await seedUser(payload)
+		},
+	})
+
+const login = (booted: BootedPayload) =>
+	booted.payload.login({
+		collection: 'users',
+		data: { email: TEST_EMAIL, password: TEST_PASSWORD },
+	})
+
+describe('auth events are opt-in', () => {
+	it('logs nothing when the collection is not listed', async () => {
+		const booted = await boot({ collections: { posts: { auditLog: true } } })
+		try {
+			await login(booted)
+			expect(await readLogs(booted.payload)).toHaveLength(0)
+		} finally {
+			await booted.stop()
+		}
+	})
+
+	it('logs nothing when the collection is listed without auth', async () => {
+		const booted = await boot({ collections: { users: { auditLog: true } } })
+		try {
+			await login(booted)
+			expect(await readLogs(booted.payload, { operation: { equals: 'auth' } })).toHaveLength(0)
+		} finally {
+			await booted.stop()
+		}
+	})
+})
+
+describe('auth: true', () => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		booted = await bootPayload({
-			plugin: auditLogs({ collections: { posts: { auditLog: true } } }),
-			db: 'mongo',
-			collections: [posts, tags, users],
-			seed: async (payload) => {
-				await seedUser(payload)
-			},
-		})
+		booted = await boot({ collections: { users: { auth: true } } })
 	})
 
 	afterAll(async () => {
@@ -22,10 +53,7 @@ describe('auth event logging', () => {
 	})
 
 	it('logs a successful login', async () => {
-		await booted.payload.login({
-			collection: 'users',
-			data: { email: TEST_EMAIL, password: TEST_PASSWORD },
-		})
+		await login(booted)
 
 		const logs = await readLogs(booted.payload, { operation: { equals: 'auth' } })
 		expect(logs.map((l) => l.eventType)).toContain('login')
@@ -59,17 +87,12 @@ describe('auth event logging', () => {
 	})
 })
 
-describe('auth logging disabled', () => {
+describe('auth as an object picks per event', () => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		booted = await bootPayload({
-			plugin: auditLogs({ auth: false, collections: { posts: { auditLog: true } } }),
-			db: 'mongo',
-			collections: [posts, tags, users],
-			seed: async (payload) => {
-				await seedUser(payload)
-			},
+		booted = await boot({
+			collections: { users: { auth: { login: true, forgotPassword: false } } },
 		})
 	})
 
@@ -77,13 +100,32 @@ describe('auth logging disabled', () => {
 		await booted.stop()
 	})
 
-	it('writes no entry for a login when auth is false', async () => {
-		await booted.payload.login({
+	it('logs the login', async () => {
+		await login(booted)
+		expect(await readLogs(booted.payload, { eventType: { equals: 'login' } })).toHaveLength(1)
+	})
+
+	it('leaves the forgot-password event out', async () => {
+		await booted.payload.forgotPassword({
 			collection: 'users',
-			data: { email: TEST_EMAIL, password: TEST_PASSWORD },
+			data: { email: TEST_EMAIL },
+			disableEmail: true,
 		})
 
-		const logs = await readLogs(booted.payload, { operation: { equals: 'auth' } })
-		expect(logs).toHaveLength(0)
+		expect(
+			await readLogs(booted.payload, { eventType: { equals: 'forgot_password' } })
+		).toHaveLength(0)
+	})
+})
+
+describe('shorthand', () => {
+	it('enables auth events along with everything else', async () => {
+		const booted = await boot({ collections: { users: true } })
+		try {
+			await login(booted)
+			expect(await readLogs(booted.payload, { eventType: { equals: 'login' } })).toHaveLength(1)
+		} finally {
+			await booted.stop()
+		}
 	})
 })

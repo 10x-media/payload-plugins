@@ -131,28 +131,30 @@ Snapshots go through the same relationship normalization as diffs, so `{ author:
 
 ## Drafts
 
-With `drafts: 'log'` (the default) every save is an entry, autosaved drafts included.
+With `drafts: 'ignore'` (the default) draft updates are skipped, and on publish the plugin fetches the last published version and diffs against that. The entry then reads as "what changed between these two publishes" rather than "what changed since the last autosave".
 
-With `drafts: 'ignore'`, draft updates are skipped, and on publish the plugin fetches the last published version and diffs against that. The entry then reads as "what changed between these two publishes" rather than "what changed since the last autosave".
+With `drafts: 'log'` every save is an entry, autosaved drafts included. On a collection with autosave that is a row every few seconds while somebody types, so reach for it only when the draft history itself is what you are auditing.
 
 A create is logged either way. A document coming into existence is a real event, whether or not it starts as a draft.
 
 ## Auth events
 
-Every auth-enabled collection logs logins and password reset requests as `operation: 'auth'`, with `eventType` set to `login` or `forgot_password`. This happens whether or not the collection appears in `collections`.
+Logins and password reset requests are recorded as `operation: 'auth'`, with `eventType` set to `login` or `forgot_password`. They are opted into on the collection, next to everything else about it:
+
+```ts title="payload.config.ts"
+auditLogs({
+  collections: {
+    admins: { auditLog: true, auth: true },
+    editors: { auth: { login: true, forgotPassword: false } },
+  },
+})
+```
+
+`auth: true` records both events. A collection you never list records neither, which matters when the config has a customer-facing auth collection alongside the admin one: logging every storefront login is rarely what anybody wanted.
 
 Only successful events are recorded. A failed login throws before the hook runs, so it never reaches the log.
 
 The forgot-password entry stores the submitted email in `metadata`. The hook only fires when the account exists, so this is not a way to enumerate addresses.
-
-Turn it off globally with `auth: false`, or per collection:
-
-```ts
-auth: {
-  users: false,
-  admins: { login: true, forgotPassword: false },
-}
-```
 
 ## Globals
 

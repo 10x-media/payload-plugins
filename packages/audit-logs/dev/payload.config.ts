@@ -57,11 +57,12 @@ export default buildConfig({
 				},
 				// Opted in for the log only: no createdBy / lastModifiedBy columns.
 				tags: { auditLog: true },
-				// Drafts are noisy; only the published save is worth an entry.
+				// `drafts: 'ignore'` is the default; spelled out here because this is the
+				// only collection with drafts enabled and the behaviour is worth seeing.
 				pages: { auditFields: true, auditLog: { drafts: 'ignore' } },
-				// `users` is audited for its auth events (see `auth` below) but its own
-				// document edits are not logged, which is the common shape for an auth
-				// collection: password hashes and login counters would flood the log.
+				// Auth events only. Document edits stay out, which is the common shape for
+				// an auth collection: password hashes and login counters would flood the log.
+				users: { auth: true },
 			},
 			globals: {
 				'site-settings': true,
@@ -69,9 +70,6 @@ export default buildConfig({
 			anonymize: {
 				posts: ({ path: fieldPath, redacted, value }) =>
 					fieldPath === 'apiKey' ? redacted : value,
-			},
-			auth: {
-				users: { login: true, forgotPassword: true },
 			},
 			logs: {
 				// Off by default. Visible here so the raw documents can be inspected

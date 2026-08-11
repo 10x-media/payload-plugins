@@ -26,6 +26,7 @@ export type {
 	AuditFieldsCreateOptions,
 	AuditOptions,
 	AuditPluginConfig,
+	AuthEventsOptions,
 	CollectionAuditLogConfig,
 	DataRetentionConfig,
 	DeleteJobHooks,

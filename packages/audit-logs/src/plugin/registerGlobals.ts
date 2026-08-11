@@ -48,7 +48,7 @@ const registerGlobal = (
 				anonymize: pluginOptions.anonymize?.[slug],
 				collectIpAddress: ctx.collectIpAddress,
 				collectUserAgent: ctx.collectUserAgent,
-				drafts: auditLogConfig.drafts ?? pluginOptions.drafts ?? 'log',
+				drafts: auditLogConfig.drafts ?? pluginOptions.drafts ?? 'ignore',
 				excludeFields: auditLogConfig.excludeFields,
 				fieldMap,
 				globalSlug: slug,

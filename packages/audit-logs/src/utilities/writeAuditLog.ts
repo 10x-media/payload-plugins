@@ -33,5 +33,6 @@ export const writeAuditLog = async (req: PayloadRequest, data: AuditLogData): Pr
 		collection: 'audit-logs',
 		data: data as never,
 		overrideAccess: true,
+		req,
 	})
 }

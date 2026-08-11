@@ -4,7 +4,6 @@ import type {
 	AuditFieldDefaultOptions,
 	AuditFieldOptions,
 	AuditOptions,
-	AuditPluginConfig,
 	CollectionAuditLogConfig,
 	GlobalAuditOptions,
 	ShouldLogFunction,
@@ -109,19 +108,20 @@ export const resolveAuditLogConfig = (
 }
 
 /**
- * Auth logging is on for every auth collection unless the option says otherwise,
- * which is the opposite default to `collections` and `globals`.
+ * Login and password-reset logging is opt-in per collection, exactly like every other
+ * option: `true` enables both events, an object picks between them, anything else is off.
  */
 export const resolveAuthConfig = (
-	pluginAuth: AuditPluginConfig['auth'],
-	collectionSlug: CollectionSlug
+	auditOptions: AuditOptions | undefined
 ): { forgotPassword: boolean; login: boolean } | false => {
-	if (pluginAuth === false) return false
-	if (!pluginAuth) return { forgotPassword: true, login: true }
-	const collectionAuth = pluginAuth[collectionSlug]
-	if (collectionAuth === false) return false
+	if (auditOptions === undefined) return false
+	if (auditOptions === true) return { forgotPassword: true, login: true }
+
+	const { auth } = auditOptions
+	if (!auth) return false
+	if (auth === true) return { forgotPassword: true, login: true }
 	return {
-		forgotPassword: collectionAuth?.forgotPassword ?? true,
-		login: collectionAuth?.login ?? true,
+		forgotPassword: auth.forgotPassword ?? true,
+		login: auth.login ?? true,
 	}
 }

@@ -398,9 +398,28 @@ type AuditFieldsOptions =
  * - `true`, enable both `auditFields` and `auditLog` with defaults
  * - object, opt-in: only what is explicitly set is enabled
  */
+/**
+ * Login and password-reset logging for an auth-enabled collection.
+ *
+ * - `true`, log both events
+ * - `false` or omitted, log neither
+ * - object, pick per event
+ */
+export type AuthEventsOptions =
+	| boolean
+	| {
+			forgotPassword?: boolean
+			login?: boolean
+	  }
+
 export type AuditOptions =
 	| true
 	| {
+			/**
+			 * Login and password-reset events. Only meaningful on a collection with `auth`.
+			 * Omitted means neither is logged, in line with every other option here.
+			 */
+			auth?: AuthEventsOptions
 			/**
 			 * Configuration for the `createdBy` and `lastModifiedBy` fields.
 			 * - `true`, enable both fields with defaults
@@ -492,10 +511,11 @@ export type AuditPluginConfig = {
 	 * Default draft handling for all collections and globals that have `versions.drafts` enabled.
 	 * Can be overridden per-collection/global via `auditLog.drafts`.
 	 *
-	 * - `'log'`, log every save, including autosave drafts (default)
-	 * - `'ignore'`, skip draft saves; on publish, diff is computed against the last published version
+	 * - `'ignore'`, skip draft saves; on publish, diff is computed against the last
+	 *   published version (default)
+	 * - `'log'`, log every save, including autosave drafts
 	 *
-	 * @default 'log'
+	 * @default 'ignore'
 	 */
 	drafts?: 'ignore' | 'log'
 	/**
@@ -507,34 +527,6 @@ export type AuditPluginConfig = {
 	 * @default true
 	 */
 	normalizeRelationships?: boolean
-	/**
-	 * Auth event logging for all auth-enabled collections.
-	 *
-	 * - omitted / not set, all auth events logged for all auth collections (default)
-	 * - `false`, disable all auth event logging globally
-	 * - object, per-collection control; unspecified collections use the default (all on)
-	 *
-	 * @example
-	 * auth: false  // disable globally
-	 *
-	 * @example
-	 * auth: {
-	 *   users: false,                                  // disable for users entirely
-	 *   admins: { login: true, forgotPassword: false }, // only log logins for admins
-	 * }
-	 */
-	auth?:
-		| false
-		| Partial<
-				Record<
-					CollectionSlug,
-					| false
-					| {
-							forgotPassword?: boolean
-							login?: boolean
-					  }
-				>
-		  >
 	/**
 	 * Configuration for the audit-logs collection itself.
 	 */

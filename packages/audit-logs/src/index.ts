@@ -57,6 +57,7 @@ export type {
 	AuditFieldsCreateOptions,
 	AuditOptions,
 	AuditPluginConfig,
+	AuthEventsOptions,
 	CollectionAuditLogConfig,
 	DataRetentionConfig,
 	GlobalAuditLogConfig,

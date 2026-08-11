@@ -4,7 +4,7 @@ import { afterForgotPasswordAuditLog, afterLoginAuditLog } from '../hooks/afterA
 import { afterChangeCollectionAuditLog } from '../hooks/afterChangeCollection'
 import { afterDeleteCollectionAuditLog } from '../hooks/afterDeleteCollection'
 import { beforeChangeCollectionAuditField } from '../hooks/beforeChangeCollection'
-import type { AuditPluginConfig } from '../types'
+import type { AuditOptions, AuditPluginConfig } from '../types'
 import { buildFieldMap } from '../utilities/buildFieldMap'
 import { buildAuditConfig } from './auditFields'
 import type { PluginContext } from './context'
@@ -12,23 +12,19 @@ import { resolveAuditLogConfig, resolveAuthConfig } from './resolveOptions'
 
 type CollectionHooks = NonNullable<CollectionConfig['hooks']>
 
-/**
- * Attaches login and forgot-password logging. Auth events are independent of the
- * `collections` map: a collection nobody opted in still gets them, which is why this
- * runs for both the configured and the unconfigured branch.
- */
+/** Attaches login and forgot-password logging when the collection asked for it. */
 const withAuthHooks = ({
+	auditOptions,
 	ctx,
 	hooks,
-	pluginAuth,
 	slug,
 }: {
+	auditOptions: AuditOptions
 	ctx: PluginContext
 	hooks: CollectionHooks
-	pluginAuth: AuditPluginConfig['auth']
 	slug: CollectionSlug
 }): CollectionHooks => {
-	const authConfig = resolveAuthConfig(pluginAuth, slug)
+	const authConfig = resolveAuthConfig(auditOptions)
 	if (authConfig === false) return hooks
 
 	const authOptions = {
@@ -62,18 +58,8 @@ const registerCollection = (
 	const slug = collection.slug as CollectionSlug
 	const collectionOptions = pluginOptions.collections?.[slug]
 
-	if (!collectionOptions) {
-		if (pluginOptions.disabled || !collection.auth) return collection
-		return {
-			...collection,
-			hooks: withAuthHooks({
-				ctx,
-				hooks: collection.hooks ?? {},
-				pluginAuth: pluginOptions.auth,
-				slug,
-			}),
-		}
-	}
+	// Not listed means not audited, auth events included.
+	if (!collectionOptions) return collection
 
 	const { createdByHookConfig, fields, hasActiveFields, lastModifiedByHookConfig } =
 		buildAuditConfig(
@@ -114,7 +100,7 @@ const registerCollection = (
 				collectionSlug: slug,
 				collectIpAddress: ctx.collectIpAddress,
 				collectUserAgent: ctx.collectUserAgent,
-				drafts: auditLogConfig.drafts ?? pluginOptions.drafts ?? 'log',
+				drafts: auditLogConfig.drafts ?? pluginOptions.drafts ?? 'ignore',
 				excludeFields: [
 					// Credentials would otherwise land in the diff on every password change.
 					...(collection.auth ? ['hash', 'salt'] : []),
@@ -154,7 +140,7 @@ const registerCollection = (
 	}
 
 	if (!pluginOptions.disabled && collection.auth) {
-		hooks = withAuthHooks({ ctx, hooks, pluginAuth: pluginOptions.auth, slug })
+		hooks = withAuthHooks({ auditOptions: collectionOptions, ctx, hooks, slug })
 	}
 
 	return { ...collection, fields, hooks }

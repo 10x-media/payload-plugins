@@ -13,7 +13,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **A diff per change**, flat and dot-notated, so only what changed is stored. Array and blocks rows are keyed by row id, so a reorder is one `__order__` entry rather than a rewritten array.
 - **Relationships normalized to ids** from the collection schema, so a populated hook payload never reads as a change.
 - **`createdBy` / `lastModifiedBy`** as read-only relationship fields, added automatically or placed by hand inside a group or tab, polymorphic when you have several auth collections.
-- **Auth events**: logins and password resets on every auth collection, whether or not it is otherwise audited.
+- **Auth events**: logins and password resets, opted into per collection alongside its other options.
 - **Custom events** through `createAuditEvent`, for the things that matter but are not field changes.
 - **Anonymization** per collection: keep the changed path, drop the value, in diffs and snapshots alike.
 - **Snapshots** on create and delete, which is what makes a deleted document recoverable from its log entry.

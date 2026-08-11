@@ -72,7 +72,17 @@ auditLogs({
 })
 ```
 
-A collection you never list is not audited, with one exception: auth collections still log logins and password resets, because those are events about the collection rather than changes to a document. Turn that off with `auth: false`.
+A collection you never list is not audited at all, auth collections included. Logins and password resets are opted into on the collection itself:
+
+```ts title="payload.config.ts"
+auditLogs({
+  collections: {
+    admins: { auth: true },                            // both events
+    editors: { auth: { login: true } },                // logins only
+    customers: { auditLog: true },                     // no auth events
+  },
+})
+```
 
 ## Keep it from growing forever
 
