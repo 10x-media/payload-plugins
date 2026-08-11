@@ -55,6 +55,7 @@
 		"analytics-uniques-breakdowns",
 		"analytics-widget-foundation",
 		"analytics-write-buffer",
+		"color-linked-alpha",
 		"fb-captcha-adapters",
 		"fb-client-i18n-fallback",
 		"fb-condition-builder-ui",
