@@ -75,4 +75,4 @@ parsePresetReference('#3b82f6')             // null
 
 ## Guarantees
 
-The engine is unit-tested against reference conversion vectors, and the field's server `validate` uses these exact functions. If `parseColor` accepts a value, the field accepts it; if it returns `null`, the field rejects it.
+The engine is unit-tested against reference conversion vectors, and the field's server `validate` uses these exact functions. For concrete color values, if `parseColor` accepts a value the field accepts it; if it returns `null`, the field rejects it. Linked preset references like `preset:brand` never pass through `parseColor`; they follow the reference grammar above and the validation rules described in [linked mode](/fields/color/linked-mode).
