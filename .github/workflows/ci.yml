@@ -55,6 +55,13 @@ jobs:
       - run: pnpm exec turbo run build --filter='./packages/*'
       - name: Verify published dist output (directives, externals, exports, publint)
         run: pnpm check:dist
+      # The bundle gates below run every dev app's `next build` in parallel, and page-data
+      # collection boots an in-memory Mongo per app: without this, all of them race the same
+      # cold binary download and trip mongodb-memory-server's lockfile bug.
+      - name: Pre-cache the Mongo binary (avoid a parallel-download lockfile race)
+        run: >-
+          pnpm --filter @10x-media/payload-test-harness exec node -e
+          "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
       - name: Bundle isolation gates
         run: pnpm exec turbo run test:dist
       - name: Registry parity (rebuild shadcn registry, fail if drifted from source)
