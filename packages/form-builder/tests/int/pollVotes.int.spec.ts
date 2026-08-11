@@ -82,6 +82,9 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 				return await vote(formId, value)
 			} catch (error) {
 				if (attempt >= 4 || !isTransientConflict(error)) throw error
+				// Jitter decorrelates two losers retrying at once, which would otherwise keep
+				// re-colliding on the same shard pick under slow CI interleaving.
+				await new Promise((resolve) => setTimeout(resolve, 5 + Math.random() * 25))
 			}
 		}
 	}
