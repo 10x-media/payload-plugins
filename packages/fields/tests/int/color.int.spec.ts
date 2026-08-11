@@ -84,6 +84,12 @@ const swatches: CollectionConfig = {
 			presets: throwingResolver,
 		}),
 		...colorField({ linked: true, name: 'linkedBrand', presets: tenantPresets }),
+		...colorField({
+			alpha: false,
+			linked: true,
+			name: 'linkedOpaque',
+			presets: [{ key: 'brand', value: '#7c3aed' }],
+		}),
 	],
 }
 
@@ -200,6 +206,46 @@ describeForDb('fields color', {}, (db) => {
 		for (const item of found.docs) {
 			expect(item.linkedThrowingResolved).toBe('#fa11ba')
 		}
+	})
+
+	it('stores an alpha-suffixed reference and resolves it at the stored alpha', async () => {
+		const doc = await create({ linkedStatic: 'preset:brand/40' })
+		expect(doc.linkedStatic).toBe('preset:brand/40')
+		expect(doc.linkedStaticResolved).toBe('#7c3aed66')
+		const fetched = await booted.payload.findByID({ collection: 'swatches', id: doc.id })
+		expect(fetched.linkedStatic).toBe('preset:brand/40')
+		expect(fetched.linkedStaticResolved).toBe('#7c3aed66')
+	})
+
+	it('accepts the alpha grammar bounds and keeps zero distinct from bare', async () => {
+		const zero = await create({ linkedStatic: 'preset:brand/0' })
+		expect(zero.linkedStatic).toBe('preset:brand/0')
+		expect(zero.linkedStaticResolved).toBe('#7c3aed00')
+	})
+
+	it('normalizes an explicit /100 suffix to the bare canonical reference', async () => {
+		const doc = await create({ linkedStatic: 'preset:brand/100' })
+		expect(doc.linkedStatic).toBe('preset:brand')
+		expect(doc.linkedStaticResolved).toBe('#7c3aed')
+	})
+
+	it('strips a reference alpha suffix when the field disables alpha', async () => {
+		const doc = await create({ linkedOpaque: 'preset:brand/40' })
+		expect(doc.linkedOpaque).toBe('preset:brand')
+		expect(doc.linkedOpaqueResolved).toBe('#7c3aed')
+	})
+
+	it('rejects malformed or dangling alpha suffixes', async () => {
+		await expect(create({ linkedStatic: 'preset:/40' })).rejects.toThrow()
+		await expect(create({ linkedStatic: 'preset:ghost/40' })).rejects.toThrow()
+		await expect(create({ linkedStatic: 'preset:brand/101' })).rejects.toThrow()
+		await expect(create({ linkedStatic: 'preset:brand/4.5' })).rejects.toThrow()
+	})
+
+	it('resolves an alpha suffix against a slash-containing key off the last slash', async () => {
+		const doc = await create({ linkedBrand: 'preset:acme/surface/40' })
+		expect(doc.linkedBrand).toBe('preset:acme/surface/40')
+		expect(doc.linkedBrandResolved).toBe('#f5f3ff66')
 	})
 
 	it('supports querying by preset reference', async () => {
