@@ -136,6 +136,75 @@ test.describe('color field', () => {
 		await saveDoc(page)
 	})
 
+	test('the alpha slider rewrites the reference suffix instead of flattening the preset', async ({
+		page,
+	}) => {
+		await openShowcaseDoc(page)
+		await swatchButton(page, FIXTURES.schemeField).click()
+		await popover(page)
+			.locator(`.fields-color__preset[aria-label="${FIXTURES.schemePresetLabel}"]`)
+			.click()
+
+		// Picking closes the popover; reopen to reach the alpha slider
+		await swatchButton(page, FIXTURES.schemeField).click()
+		await popover(page).locator('.fields-color__slider--alpha').fill('40')
+
+		const field = page
+			.locator('.fields-color')
+			.filter({ has: page.locator(`#field-${FIXTURES.schemeField}`) })
+		await expect(field.locator('.fields-color__chip-label')).toHaveText(FIXTURES.schemePresetLabel)
+		await expect(field.locator('.fields-color__chip-alpha')).toHaveText('40%')
+
+		await page.keyboard.press('Escape')
+		await saveDoc(page)
+		await page.reload()
+		await expect(field.locator('.fields-color__chip-alpha')).toHaveText('40%')
+
+		const res = await page.request.get(
+			`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
+		)
+		const { docs } = (await res.json()) as { docs: Record<string, unknown>[] }
+		expect(docs[0]?.[FIXTURES.schemeField]).toBe(`preset:${FIXTURES.schemePresetKey}/40`)
+
+		// Returning the slider to 100 restores the bare canonical reference
+		await swatchButton(page, FIXTURES.schemeField).click()
+		await popover(page).locator('.fields-color__slider--alpha').fill('100')
+		await expect(field.locator('.fields-color__chip-alpha')).toHaveCount(0)
+		await page.keyboard.press('Escape')
+		await saveDoc(page)
+		const restored = await page.request.get(
+			`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
+		)
+		const { docs: restoredDocs } = (await restored.json()) as { docs: Record<string, unknown>[] }
+		expect(restoredDocs[0]?.[FIXTURES.schemeField]).toBe(`preset:${FIXTURES.schemePresetKey}`)
+	})
+
+	test('hue interaction with a preset active still converts to a concrete color', async ({
+		page,
+	}) => {
+		const res = await page.request.get(
+			`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
+		)
+		const { docs } = (await res.json()) as { docs: { id: string }[] }
+		const doc = docs[0]
+		if (!doc) throw new Error(`no ${FIXTURES.collection} doc titled ${FIXTURES.docTitle}`)
+		const patched = await page.request.patch(`/api/${FIXTURES.collection}/${doc.id}`, {
+			data: { [FIXTURES.schemeField]: `preset:${FIXTURES.schemePresetKey}/40` },
+		})
+		expect(patched.ok()).toBeTruthy()
+
+		await openShowcaseDoc(page)
+		await swatchButton(page, FIXTURES.schemeField).click()
+		const area = popover(page).locator('.fields-color__sv')
+		const box = await area.boundingBox()
+		if (!box) throw new Error('saturation area not visible')
+		await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.3)
+
+		const input = page.locator(`#field-${FIXTURES.schemeField}`)
+		await expect(input).not.toHaveValue('')
+		expect(await input.inputValue()).toMatch(/^#[0-9a-f]{6,8}$/i)
+	})
+
 	test('the list cell renders a split swatch for a scheme reference', async ({ page }) => {
 		// Set the reference over the API so this does not depend on another test having saved it
 		const res = await page.request.get(

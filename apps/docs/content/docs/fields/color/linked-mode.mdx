@@ -20,6 +20,7 @@ Linked mode returns a tuple, the stored field plus its resolved virtual sibling,
 ## What gets stored
 
 - Picking a preset stores `preset:<key>` (for example `preset:brand`).
+- Moving the alpha slider with a preset active stores `preset:<key>/<alpha>` (for example `preset:brand/40`), keeping the reference; see [opacity on references](#opacity-on-references).
 - Picking a custom color stores the plain CSS string, exactly like default mode.
 
 Both live in the same text column, so `where: { accent: { equals: 'preset:brand' } }` finds every document linked to a preset, which makes "where is this brand color used" a one-query answer.
@@ -71,6 +72,39 @@ To render a pair, `lightDark()` from [the color utilities](/fields/color/utils) 
 
 ```tsx
 <div style={{ colorScheme: 'light dark', background: lightDark(doc.accentResolved) }} />
+```
+
+## Opacity on references
+
+A reference can carry an opacity without giving up the link. With a preset active, the picker's alpha slider rewrites the stored reference instead of committing a concrete color:
+
+```
+preset:<key>            reference at full opacity (canonical for alpha 100)
+preset:<key>/<alpha>    reference at <alpha> percent
+```
+
+`<alpha>` is an integer 0 to 100, no percent sign, no decimals: `preset:brand/40`. The suffix is read off the **last** slash and only counts as an alpha when it matches that grammar, so keys containing slashes (as produced by `keyPrefix`) keep working: `preset:acme/surface` is a key, `preset:acme/surface/40` is that key at 40%. Alpha 100 always stores as the bare reference; a hand-typed `/100` is accepted and normalized on commit.
+
+In the picker:
+
+- The alpha slider keeps the reference and rewrites the suffix; returning it to 100 restores the bare reference.
+- Hue and saturation interactions still convert to a concrete color; only alpha keeps the link.
+- The preset chip shows the opacity next to the label when it is below 100, and the swatch renders the resolved color at the stored alpha.
+- Typing `preset:brand/40` into the text input is valid and commits as such.
+- `alpha: false` on the field disables reference alpha too: the slider is hidden and a hand-typed suffix is stripped on commit.
+
+Everywhere a reference resolves, the alpha applies to the result: both `resolve` shapes carry it in the field's configured format (8-digit hex under `format: 'hex'`), on both members of a scheme pair, multiplied into any alpha the preset color itself carries (the same math as CSS `color-mix` toward `transparent`).
+
+Validation accepts the grammar above and rejects near-misses: an empty key (`preset:/40`), a valid suffix on a key that does not exist (`preset:ghost/40`), and numeric suffixes outside the grammar (`preset:brand/101`, `preset:brand/4.5`) all fail. Bare references without a suffix stay lenient, preserving the [missing-preset fallback flow](#missing-presets).
+
+To consume references in presentation code, `parsePresetReference` from [the color utilities](/fields/color/utils) splits a stored value without hand-rolled regexes:
+
+```ts
+import { parsePresetReference } from '@10x-media/fields/color/utils'
+
+parsePresetReference('preset:brand/40')  // { key: 'brand', alpha: 40 }
+parsePresetReference('preset:brand')     // { key: 'brand', alpha: 100 }
+parsePresetReference('#3b82f6')          // null
 ```
 
 ## Scheme presets in non-linked fields

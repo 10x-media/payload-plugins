@@ -10,20 +10,47 @@ import {
 	type ColorFieldOptions,
 	type ColorFieldServerOptions,
 	type ColorLinkedOptions,
+	type ColorPresetsSource,
 	PRESET_PREFIX,
 } from './options'
+import {
+	applyReferenceAlpha,
+	formatPresetReference,
+	parsePresetReference,
+	presetReferenceIssue,
+	presetReferenceParts,
+} from './presetReference'
 import { resolveColorFormat } from './resolveFormat'
 import { resolvePresets } from './resolvePresets'
 import { flatValue } from './schemeValue'
 
 const buildValidate =
-	(opts: { linked: boolean }): TextFieldValidation =>
-	(value, args) => {
+	(opts: {
+		linked: boolean
+		memoKey: symbol
+		presets: ColorPresetsSource | undefined
+	}): TextFieldValidation =>
+	async (value, args) => {
 		if (typeof value === 'string' && value !== '') {
 			if (opts.linked && value.startsWith(PRESET_PREFIX)) {
-				if (value.length === PRESET_PREFIX.length) {
-					return asTranslate(args.req.t)(keys.missingPreset)
+				let hasKey: ((key: string) => boolean) | null = null
+				if (presetReferenceParts(value)?.explicit) {
+					try {
+						const all = await resolvePresets({
+							memoKey: opts.memoKey,
+							req: args.req,
+							source: opts.presets,
+						})
+						// An empty list means no presets are configured (or none resolved);
+						// skip the existence check rather than rejecting every reference
+						if (all.length > 0) hasKey = (key) => all.some((preset) => preset.key === key)
+					} catch {
+						// A broken resolver must not block writes; reads degrade and log separately
+					}
 				}
+				const issue = presetReferenceIssue(value, hasKey)
+				if (issue === 'invalidAlpha') return asTranslate(args.req.t)(keys.invalidColor)
+				if (issue !== null) return asTranslate(args.req.t)(keys.missingPreset)
 			} else if (!parseColor(value)) {
 				return asTranslate(args.req.t)(keys.invalidColor)
 			}
@@ -35,7 +62,12 @@ const buildNormalizeHook =
 	(opts: { alpha: boolean; format: ColorFormat | undefined; linked: boolean }): FieldHook =>
 	({ req, value }) => {
 		if (typeof value !== 'string' || value === '') return value
-		if (opts.linked && value.startsWith(PRESET_PREFIX)) return value
+		if (opts.linked && value.startsWith(PRESET_PREFIX)) {
+			const parts = presetReferenceParts(value)
+			// Empty keys pass through so validate rejects them with a proper message
+			if (!parts) return value
+			return formatPresetReference(parts.key, opts.alpha ? parts.alpha : 100)
+		}
 		const parsed = parseColor(value)
 		// Unparseable input passes through so validate rejects it with a proper message
 		if (!parsed) return value
@@ -110,7 +142,7 @@ export function colorField(
 		},
 		custom: { [COLOR_CUSTOM_KEY]: custom },
 		hooks: { beforeValidate: [buildNormalizeHook({ alpha, format, linked })] },
-		validate: buildValidate({ linked }),
+		validate: buildValidate({ linked, memoKey, presets }),
 	}
 
 	const field = typeof overrides === 'function' ? overrides({ field: base }) : base
@@ -131,15 +163,28 @@ export function colorField(
 		return isColorSchemeValue(value) ? value : { dark: value, light: value }
 	}
 
+	/** The stored reference alpha, applied to whatever the reference resolved to. */
+	const withAlpha = (
+		resolved: null | string | ColorSchemeValue,
+		refAlpha: number,
+		req: PayloadRequest
+	): null | string | ColorSchemeValue => {
+		const effective = alpha ? refAlpha : 100
+		if (resolved === null || effective === 100) return resolved
+		return applyReferenceAlpha(resolved, effective, resolveColorFormat(format, req))
+	}
+
 	const resolveHook: FieldHook = async ({ collection, global, req, siblingData }) => {
 		const raw = siblingData?.[field.name]
 		if (typeof raw !== 'string' || raw === '') return null
 		if (!raw.startsWith(PRESET_PREFIX)) return shape(raw)
-		const key = raw.slice(PRESET_PREFIX.length)
+		const ref = parsePresetReference(raw)
+		const key = ref?.key ?? raw.slice(PRESET_PREFIX.length)
+		const refAlpha = ref?.alpha ?? 100
 		try {
 			const all = await resolvePresets({ memoKey, req, source: presets })
 			const match = all.find((preset) => preset.key === key)
-			return shape(match ? match.value : linkedFallback)
+			return withAlpha(shape(match ? match.value : linkedFallback), refAlpha, req)
 		} catch (error) {
 			// A broken resolver must not take down reads; degrade like a missing preset
 			if (!loggedRequests.has(req)) {
@@ -150,7 +195,7 @@ export function colorField(
 					`colorField preset resolver failed for ${slug}.${field.name}`
 				)
 			}
-			return shape(linkedFallback)
+			return withAlpha(shape(linkedFallback), refAlpha, req)
 		}
 	}
 

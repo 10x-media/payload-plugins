@@ -11,7 +11,7 @@ describe('derivePresetChip', () => {
 	it('maps a known ref to the preset label and value', () => {
 		expect(
 			derivePresetChip({ editing: false, linked: true, presets, value: 'preset:brand' })
-		).toEqual({ key: 'brand', label: 'Brand blue', missing: false, value: '#0ea5e9' })
+		).toEqual({ alpha: 100, key: 'brand', label: 'Brand blue', missing: false, value: '#0ea5e9' })
 	})
 
 	it('returns a scheme preset value intact', () => {
@@ -23,19 +23,31 @@ describe('derivePresetChip', () => {
 				presets: [{ key: 'scheme', label: 'Scheme', value }],
 				value: 'preset:scheme',
 			})
-		).toEqual({ key: 'scheme', label: 'Scheme', missing: false, value })
+		).toEqual({ alpha: 100, key: 'scheme', label: 'Scheme', missing: false, value })
 	})
 
 	it('keeps the stored ref key intact for value-keyed shorthand presets', () => {
 		expect(
 			derivePresetChip({ editing: false, linked: true, presets, value: 'preset:#f8fafc' })
-		).toEqual({ key: '#f8fafc', label: '#f8fafc', missing: false, value: '#f8fafc' })
+		).toEqual({ alpha: 100, key: '#f8fafc', label: '#f8fafc', missing: false, value: '#f8fafc' })
 	})
 
 	it('chips a dangling ref with the key as label and missing flagged', () => {
 		expect(
 			derivePresetChip({ editing: false, linked: true, presets, value: 'preset:gone' })
-		).toEqual({ key: 'gone', label: 'gone', missing: true, value: null })
+		).toEqual({ alpha: 100, key: 'gone', label: 'gone', missing: true, value: null })
+	})
+
+	it('carries the parsed alpha for suffixed references', () => {
+		expect(
+			derivePresetChip({ editing: false, linked: true, presets, value: 'preset:brand/40' })
+		).toEqual({ alpha: 40, key: 'brand', label: 'Brand blue', missing: false, value: '#0ea5e9' })
+	})
+
+	it('folds a malformed suffix into the key like the parser does', () => {
+		expect(
+			derivePresetChip({ editing: false, linked: true, presets, value: 'preset:brand/101' })
+		).toEqual({ alpha: 100, key: 'brand/101', label: 'brand/101', missing: true, value: null })
 	})
 
 	it('returns null while editing so typing exits chip mode', () => {

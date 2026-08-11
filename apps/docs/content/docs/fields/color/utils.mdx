@@ -14,6 +14,7 @@ import {
   relativeLuminance,
   lightDark,
   isColorSchemeValue,
+  parsePresetReference,
 } from '@10x-media/fields/color/utils'
 ```
 
@@ -62,6 +63,16 @@ isColorSchemeValue(doc.accentResolved)  // narrows to { light: string; dark: str
 
 `isColorSchemeValue` is the type guard for narrowing a `string | ColorSchemeValue` union, which is what preset values and resolved siblings hold.
 
+## Preset references
+
+```ts
+parsePresetReference('preset:brand/40')     // { key: 'brand', alpha: 40 }
+parsePresetReference('preset:acme/surface') // { key: 'acme/surface', alpha: 100 }
+parsePresetReference('#3b82f6')             // null
+```
+
+`parsePresetReference` splits a [linked field's](/fields/color/linked-mode) stored value into its preset key and opacity. It returns `null` for anything that is not a reference; `alpha` defaults to `100` when the value carries no suffix. The suffix is read off the last slash and only counts as an alpha when it is an integer 0 to 100, so slash-containing keys parse correctly. Use it wherever presentation code maps stored references onto CSS custom properties instead of regexing the raw string.
+
 ## Guarantees
 
-The engine is unit-tested against reference conversion vectors, and the field's server `validate` uses these exact functions. If `parseColor` accepts a value, the field accepts it; if it returns `null`, the field rejects it.
+The engine is unit-tested against reference conversion vectors, and the field's server `validate` uses these exact functions. For concrete color values, if `parseColor` accepts a value the field accepts it; if it returns `null`, the field rejects it. Linked preset references like `preset:brand` never pass through `parseColor`; they follow the reference grammar above and the validation rules described in [linked mode](/fields/color/linked-mode).

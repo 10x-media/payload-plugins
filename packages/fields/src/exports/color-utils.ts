@@ -27,4 +27,5 @@ export {
 	toOklch,
 	toRgb,
 } from '../fields/color/engine'
+export { type PresetReference, parsePresetReference } from '../fields/color/presetReference'
 export type { ColorSchemeValue } from '../types'

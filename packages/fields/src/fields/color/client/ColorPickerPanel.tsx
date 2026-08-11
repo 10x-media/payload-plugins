@@ -6,6 +6,7 @@ import { useTranslation } from '../../../translations/useTranslation'
 import type { ColorFormat } from '../../../types'
 import { formatColor, hsvToRgb } from '../engine'
 import type { ResolvedColorPreset } from '../options'
+import type { PresetReference } from '../presetReference'
 import { swatchBackground } from '../schemeValue'
 import { EyedropperIcon } from './icons'
 
@@ -24,12 +25,14 @@ const getEyeDropper = (): EyeDropperConstructor | null => {
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value))
 
 export type ColorPickerPanelProps = {
-	activePresetKey: null | string
+	/** The stored preset reference when one is active; alpha edits then keep the reference. */
+	activeReference: null | PresetReference
 	alphaEnabled: boolean
 	close: () => void
 	displayFormat: ColorFormat
 	enableEyedropper: boolean
 	initial: Hsva | null
+	onPickAlpha: (alpha: number) => void
 	onPickCss: (css: string) => void
 	onPickPreset: (preset: ResolvedColorPreset) => void
 	presetMissing: boolean
@@ -40,12 +43,13 @@ export type ColorPickerPanelProps = {
 
 export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 	const {
-		activePresetKey,
+		activeReference,
 		alphaEnabled,
 		close,
 		displayFormat,
 		enableEyedropper,
 		initial,
+		onPickAlpha,
 		onPickCss,
 		onPickPreset,
 		presetMissing,
@@ -55,7 +59,11 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 	} = props
 	const { t } = useTranslation()
 
-	const [hsva, setHsva] = useState<Hsva>(initial ?? { a: 1, h: 0, s: 1, v: 1 })
+	// A missing preset resolves no color (initial is null) but its stored alpha
+	// must still seed the slider so dragging it edits the reference in place
+	const [hsva, setHsva] = useState<Hsva>(
+		initial ?? { a: activeReference ? activeReference.alpha / 100 : 1, h: 0, s: 1, v: 1 }
+	)
 	const hsvaRef = useRef(hsva)
 	hsvaRef.current = hsva
 	const draggingRef = useRef(false)
@@ -84,9 +92,13 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 		setHsva(initial)
 	}, [initialKey])
 
+	const alphaRafRef = useRef<null | number>(null)
+	const pendingAlphaRef = useRef(100)
+
 	useEffect(
 		() => () => {
 			if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+			if (alphaRafRef.current !== null) cancelAnimationFrame(alphaRafRef.current)
 		},
 		[]
 	)
@@ -122,6 +134,28 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 			commit(next)
 		},
 		[commit]
+	)
+
+	// Reference-preserving alpha path: while a preset is active, the slider
+	// rewrites the stored `/<alpha>` suffix instead of committing a concrete
+	// color. Same rAF throttling and echo suppression as the concrete path
+	// (the opaque css is unchanged by alpha, so the resync effect skips it).
+	const commitReferenceAlpha = useCallback(
+		(next: Hsva) => {
+			setHsva(next)
+			pendingAlphaRef.current = Math.round(next.a * 100)
+			if (alphaRafRef.current !== null) return
+			alphaRafRef.current = requestAnimationFrame(() => {
+				alphaRafRef.current = null
+				const current = hsvaRef.current
+				lastEmittedRef.current = formatColor(
+					hsvToRgb({ h: current.h, s: current.s, v: current.v }, 1),
+					'rgb'
+				)
+				onPickAlpha(pendingAlphaRef.current)
+			})
+		},
+		[onPickAlpha]
 	)
 
 	const svPointer = useCallback(
@@ -215,7 +249,11 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 					className={`${baseClass}__slider ${baseClass}__slider--alpha`}
 					max={100}
 					min={0}
-					onChange={(event) => applyPartial({ a: Number(event.target.value) / 100 })}
+					onChange={(event) => {
+						const a = Number(event.target.value) / 100
+						if (activeReference) commitReferenceAlpha({ ...hsvaRef.current, a })
+						else applyPartial({ a })
+					}}
 					onKeyDown={stopArrowKeys}
 					onLostPointerCapture={endDrag}
 					step={1}
@@ -271,7 +309,7 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 						{presets.map((preset) => (
 							<button
 								aria-label={preset.label}
-								aria-pressed={preset.key === activePresetKey}
+								aria-pressed={preset.key === activeReference?.key}
 								className={`${baseClass}__preset ${baseClass}__checker`}
 								key={preset.key}
 								onClick={() => {
