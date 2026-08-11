@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { basename } from 'node:path'
 import type { CollectionSlug, Payload } from 'payload'
 
+import { asLocale } from '../shared/resolveLocale'
 import { splitLocalized } from './localized'
 import type { WikiSeedMediaDef, WikiSeedResult } from './types'
 
@@ -114,7 +115,7 @@ export const ensureSeedMedia = async ({
 				collection: mediaSlug as CollectionSlug,
 				data: { alt: value },
 				id,
-				locale,
+				locale: asLocale(locale),
 			})
 		}
 		media[def.key] = { id, relationTo: mediaSlug }

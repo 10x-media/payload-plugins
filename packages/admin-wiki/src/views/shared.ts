@@ -1,8 +1,8 @@
-import type { AdminViewServerProps } from 'payload'
+import type { AdminViewServerProps, TypedLocale } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 
 import { type AdminWikiRegistry, getWikiRegistry } from '../plugin/registry'
-import { resolveReaderLocale } from '../shared/resolveLocale'
+import { asLocale, resolveReaderLocale } from '../shared/resolveLocale'
 
 /** Everything both wiki views derive from their server props before querying. */
 export type WikiViewContext = {
@@ -10,9 +10,9 @@ export type WikiViewContext = {
 	canCreate: boolean
 	/** The reader's evaluated update permission on wiki pages. */
 	canUpdate: boolean
-	fallbackLocale: string | undefined
+	fallbackLocale: TypedLocale | undefined
 	/** The content locale guides load in; undefined when not localized. */
-	locale: string | undefined
+	locale: TypedLocale | undefined
 	registry: AdminWikiRegistry
 	/** Admin-prefixed wiki index URL, e.g. `/admin/wiki`. */
 	wikiPath: string
@@ -41,8 +41,8 @@ export const buildWikiViewContext = (props: AdminViewServerProps): null | WikiVi
 	return {
 		canCreate: Boolean(pagePermissions?.create),
 		canUpdate: Boolean(pagePermissions?.update),
-		fallbackLocale: localization ? localization.defaultLocale : undefined,
-		locale,
+		fallbackLocale: localization ? asLocale(localization.defaultLocale) : undefined,
+		locale: locale ? asLocale(locale) : undefined,
 		registry,
 		wikiPath: formatAdminURL({ adminRoute: config.routes.admin, path: '/wiki' }),
 	}

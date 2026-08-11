@@ -4,6 +4,7 @@ import type { CollectionSlug, Payload } from 'payload'
 
 import { buildWikiEditor } from '../editor/wikiEditor'
 import { getWikiRegistry } from '../plugin/registry'
+import { asLocale } from '../shared/resolveLocale'
 import { splitLocalized } from './localized'
 import { ensureSeedMedia } from './media'
 import { githubAlertsTransformer } from './transformers/githubAlerts'
@@ -129,7 +130,12 @@ export const seedWiki = async (
 				const title = splitLocalized(def.title, defaultLocale, `${def.slug}.title`)
 				const created = await payload.create({
 					collection: pagesSlug as CollectionSlug,
-					data: { _status: 'draft', slug: def.slug, title: title.base ?? def.slug },
+					// `draft: true` is what sets `_status`; the collection always has
+					// drafts enabled, so passing it here as well is redundant. The data
+					// is asserted because a host that generated its types narrows draft
+					// data to the fields every collection shares, and the slug this
+					// writes to is only known at runtime.
+					data: { slug: def.slug, title: title.base ?? def.slug } as never,
 					draft: true,
 				})
 				runtime.context.guideIdsBySlug[def.slug] = created.id as number | string
@@ -193,7 +199,7 @@ export const seedWiki = async (
 					},
 					draft: false,
 					id,
-					locale,
+					locale: asLocale(locale),
 				})
 			}
 			results.push({ action, id, slug: def.slug })

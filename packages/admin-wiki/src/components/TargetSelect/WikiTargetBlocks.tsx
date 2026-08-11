@@ -19,7 +19,7 @@ import { useCallback, useMemo } from 'react'
 
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
-import { collectClientBlocks, resolveClientLabel } from './clientBlocks'
+import { collectClientBlocks, registryBlock, resolveClientLabel } from './clientBlocks'
 
 export type WikiTargetBlocksProps = {
 	/**
@@ -62,7 +62,7 @@ export const WikiTargetBlocks = ({
 			collectClientBlocks(global.fields, found, config.blocksMap)
 		}
 		return slugs.flatMap((slug) => {
-			const block = found.get(slug) ?? config.blocksMap[slug]
+			const block = found.get(slug) ?? registryBlock(config.blocksMap, slug)
 			return block ? [block] : []
 		})
 	}, [config, slugs])

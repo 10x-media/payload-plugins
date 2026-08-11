@@ -1,6 +1,17 @@
 import type { ClientBlock, ClientField } from 'payload'
 
-type BlocksMap = Record<string, ClientBlock>
+export type BlocksMap = Record<string, ClientBlock>
+
+/**
+ * One block from the client config's registry, by slug.
+ *
+ * A host that generated its types keys `config.blocksMap` by a union of its own
+ * block slugs, which no stored target can be narrowed to, so every read of it
+ * goes through the same widened view. Returns undefined for a slug the registry
+ * does not hold, which is the normal case for a block declared inline.
+ */
+export const registryBlock = (blocksMap: BlocksMap, slug: string): ClientBlock | undefined =>
+	blocksMap[slug]
 
 const remember = (
 	block: ClientBlock | undefined,

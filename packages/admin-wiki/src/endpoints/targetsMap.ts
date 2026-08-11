@@ -1,7 +1,7 @@
 import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
 
 import type { WikiAccessOptions } from '../options'
-import { resolveReaderLocale } from '../shared/resolveLocale'
+import { asLocale, resolveReaderLocale } from '../shared/resolveLocale'
 import {
 	compareTargetEntries,
 	targetKeysForDoc,
@@ -46,7 +46,7 @@ export const buildTargetsMapEndpoint = ({
 			localeMap,
 		})
 		if (locale) {
-			req.locale = locale
+			req.locale = asLocale(locale)
 		}
 		try {
 			const result = await req.payload.find({
@@ -68,8 +68,8 @@ export const buildTargetsMapEndpoint = ({
 				where: { _status: { equals: 'published' } },
 				...(locale
 					? {
-							fallbackLocale: localization ? localization.defaultLocale : undefined,
-							locale,
+							fallbackLocale: localization ? asLocale(localization.defaultLocale) : undefined,
+							locale: asLocale(locale),
 						}
 					: {}),
 			})

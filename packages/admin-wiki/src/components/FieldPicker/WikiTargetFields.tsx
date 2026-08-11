@@ -22,7 +22,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { keys, type TranslationKey } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
-import { collectClientBlocks } from '../TargetSelect/clientBlocks'
+import { collectClientBlocks, registryBlock } from '../TargetSelect/clientBlocks'
 import { useWikiTargets } from '../WikiProvider/WikiProvider'
 import { collectBlockUsages } from './blockUsages'
 import { resolveFieldPathCrumbs } from './fieldPathLabels'
@@ -176,7 +176,7 @@ export const WikiTargetFields = ({
 		return (group: WikiFieldTargetGroup): ClientField[] | undefined => {
 			switch (group.kind) {
 				case 'block':
-					return (blocks.get(group.slug) ?? config.blocksMap[group.slug])?.fields
+					return (blocks.get(group.slug) ?? registryBlock(config.blocksMap, group.slug))?.fields
 				case 'collection':
 					return config.collections.find((entity) => entity.slug === group.slug)?.fields
 				case 'global':

@@ -1,3 +1,16 @@
+import type { TypedLocale } from 'payload'
+
+/**
+ * A locale code resolved at runtime, seen as the host's locale union.
+ *
+ * Every locale the plugin handles comes from the running config, the request,
+ * or seed input, so it is a string. A project that generated its types narrows
+ * each Payload locale argument to a union of its own locales, which no runtime
+ * value can be narrowed to, so the assertion lives here once instead of at
+ * every call.
+ */
+export const asLocale = (locale: string): TypedLocale => locale as TypedLocale
+
 export type ResolveLocaleArgs = {
 	/** Content locale codes the project declares, empty when not localized. */
 	contentLocales: string[]

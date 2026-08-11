@@ -19,6 +19,7 @@ import {
 import { useLexicalComposerContext } from '@payloadcms/richtext-lexical/lexical/react/LexicalComposerContext'
 import { $insertNodeToNearestRoot, mergeRegister } from '@payloadcms/richtext-lexical/lexical/utils'
 import type { ListDrawerProps } from '@payloadcms/ui'
+import type { CollectionSlug } from 'payload'
 import { useCallback, useEffect } from 'react'
 
 import { GuideVideo } from '../../components/Video/GuideVideo'
@@ -97,7 +98,9 @@ const WikiVideoIcon = () => (
  */
 const WikiVideoPlugin: PluginComponent<WikiVideoClientProps> = ({ clientProps }) => {
 	const [editor] = useLexicalComposerContext()
-	const mediaSlug = clientProps.mediaSlug
+	// The configured slug is a runtime string, which a host that generated its
+	// types narrows every collection argument away from.
+	const mediaSlug = clientProps.mediaSlug as CollectionSlug
 	const { closeListDrawer, ListDrawer, openListDrawer } = useLexicalListDrawer({
 		collectionSlugs: [mediaSlug],
 		filterOptions: { [mediaSlug]: { mimeType: { like: 'video' } } },
