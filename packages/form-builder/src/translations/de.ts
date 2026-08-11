@@ -248,6 +248,11 @@ export const de: Record<TranslationKey, string> = {
 	[keys.pollVisibilityAfterVote]: 'Nach der Abstimmung',
 	[keys.pollVisibilityAfterClose]: 'Nach Ende der Umfrage',
 	[keys.pollClosesAt]: 'Endet am',
+	[keys.pollAllowChange]: 'Stimmänderung erlauben',
+	[keys.pollAllowChangeDescription]:
+		'Wiederkehrende Teilnehmer aktualisieren ihre bestehende Stimme, statt eine weitere abzugeben. Die Zuordnung erfolgt pro Browser über das Abstimmungs-Cookie.',
+	[keys.pollAllowChangeNeedsPersistedSubmissions]:
+		'Stimmänderungen benötigen gespeicherte Einsendungen: Aufbewahrung wieder aktivieren oder Stimmänderung deaktivieren.',
 	[keys.pollClosed]: 'Diese Umfrage ist beendet.',
 	[keys.pollResultsAfterClose]: 'Die Ergebnisse werden nach Ende der Umfrage angezeigt.',
 	[keys.pollOptionSource]: 'Optionsquelle',
@@ -282,6 +287,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.pollFinalResult]: 'Endergebnis',
 	[keys.pollResultsError]: 'Ergebnisse konnten nicht geladen werden.',
 	[keys.resultsWinner]: 'Gewinner',
+	[keys.resultsYourVote]: 'Deine Stimme',
+	[keys.pollChangeVote]: 'Stimme ändern',
 	[keys.validationFileMissing]: 'Datei hochladen',
 	[keys.validationFileMimeType]: 'Dateityp nicht erlaubt',
 	[keys.validationFileTooLarge]: 'Datei ist zu groß',

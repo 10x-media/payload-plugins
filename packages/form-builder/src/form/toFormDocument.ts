@@ -107,6 +107,7 @@ export function toFormDocument(
 			resultsField?: string | null
 			resultsVisibility?: string | null
 			closesAt?: string | null
+			allowChange?: boolean | null
 			outcome?: { winningValues?: (string | null)[] | null } | null
 		} | null
 		/**
@@ -137,6 +138,7 @@ export function toFormDocument(
 					| 'afterClose'
 					| undefined,
 				closesAt: form.poll.closesAt ?? undefined,
+				...(form.poll.allowChange === true ? { allowChange: true } : {}),
 				...(winningValues.length > 0 ? { outcome: { winningValues } } : {}),
 			}
 		: undefined

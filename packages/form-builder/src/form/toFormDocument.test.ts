@@ -143,6 +143,15 @@ describe('toFormDocument', () => {
 			expect(Object.keys(doc.poll ?? {})).toEqual(['resultsVisibility', 'closesAt'])
 		})
 
+		it('passes poll.allowChange through only when enabled', () => {
+			const on = toFormDocument({ id: 1, poll: { allowChange: true } })
+			expect(on.poll?.allowChange).toBe(true)
+			const off = toFormDocument({ id: 1, poll: { resultsField: 'colour' } })
+			expect('allowChange' in (off.poll ?? {})).toBe(false)
+			const explicitOff = toFormDocument({ id: 1, poll: { allowChange: false } })
+			expect('allowChange' in (explicitOff.poll ?? {})).toBe(false)
+		})
+
 		it('drops unknown keys on poll.outcome, keeping winningValues alone', () => {
 			const doc = toFormDocument({
 				id: 1,
