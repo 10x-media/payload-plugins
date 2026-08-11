@@ -7,7 +7,7 @@ A surface is a place in the admin where a guide can appear. Each target kind has
 
 ## Field help
 
-Every named field in every collection and global gets a help trigger below its description. It shows the guide's title (or a count when several target the field), reveals each summary in a hover card, and opens the full guide in a reading drawer on click.
+Every named field in every collection, global, and block gets a help trigger below its description. It shows the guide's title (or a count when several target the field), reveals each summary in a hover card, and opens the full guide in a reading drawer on click.
 
 It is injected as `admin.components.Description` during the config walk, and renders your original description above it, untouched. Two kinds of field are skipped:
 
@@ -18,7 +18,7 @@ It is injected as `admin.components.Description` during the config walk, and ren
 
 Every block reachable from any blocks field gets its guides as a UI field, **appended after the block's own fields**. It is not the block's row label, so it does not compete with an `admin.components.Label` of your own.
 
-Shared block configs (`config.blocks` and `blockReferences`) are handled once, so a block used in six places carries one guide surface, not six.
+Shared block configs (`config.blocks` and `blockReferences`) are handled once, so a block used in six places carries one guide surface, not six. The same holds for the help on the block's **own fields**: they are [targeted through the block](/admin-wiki/targets#fields-inside-blocks), not through whichever collection is on screen, so one guide covers every usage.
 
 The injected field is named `adminWikiBlockHelp`. A block that already declares a field by that name keeps its own.
 

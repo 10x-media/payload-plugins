@@ -65,7 +65,10 @@ export interface Config {
   auth: {
     users: UserAuthOperations;
   };
-  blocks: {};
+  blocks: {
+    cta: Cta;
+    heroBanner: HeroBanner;
+  };
   collections: {
     posts: Post;
     products: Product;
@@ -129,6 +132,28 @@ export interface UserAuthOperations {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cta".
+ */
+export interface Cta {
+  label?: string | null;
+  style?: ('primary' | 'secondary') | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'cta';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "heroBanner".
+ */
+export interface HeroBanner {
+  heading?: string | null;
+  background?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'heroBanner';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "posts".
  */
 export interface Post {
@@ -138,24 +163,7 @@ export interface Post {
    * Shown above the fold.
    */
   intro?: string | null;
-  layout?:
-    | (
-        | {
-            heading?: string | null;
-            background?: string | null;
-            id?: string | null;
-            blockName?: string | null;
-            blockType: 'heroBanner';
-          }
-        | {
-            label?: string | null;
-            url?: string | null;
-            id?: string | null;
-            blockName?: string | null;
-            blockType: 'cta';
-          }
-      )[]
-    | null;
+  layout?: HeroBanner[] | null;
   meta?: {
     seoTitle?: string | null;
   };
@@ -176,6 +184,7 @@ export interface Product {
   name: string;
   price?: number | null;
   description?: string | null;
+  layout?: (HeroBanner | Cta)[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -350,26 +359,7 @@ export interface PayloadMigration {
 export interface PostsSelect<T extends boolean = true> {
   title?: T;
   intro?: T;
-  layout?:
-    | T
-    | {
-        heroBanner?:
-          | T
-          | {
-              heading?: T;
-              background?: T;
-              id?: T;
-              blockName?: T;
-            };
-        cta?:
-          | T
-          | {
-              label?: T;
-              url?: T;
-              id?: T;
-              blockName?: T;
-            };
-      };
+  layout?: T | {};
   meta?:
     | T
     | {
@@ -393,6 +383,7 @@ export interface ProductsSelect<T extends boolean = true> {
   name?: T;
   price?: T;
   description?: T;
+  layout?: T | {};
   updatedAt?: T;
   createdAt?: T;
 }
@@ -509,6 +500,15 @@ export interface Setting {
         id?: string | null;
       }[]
     | null;
+  sections?:
+    | {
+        label?: string | null;
+        url?: string | null;
+        id?: string | null;
+        blockName?: string | null;
+        blockType: 'cta';
+      }[]
+    | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -524,6 +524,18 @@ export interface SettingsSelect<T extends boolean = true> {
         platform?: T;
         url?: T;
         id?: T;
+      };
+  sections?:
+    | T
+    | {
+        cta?:
+          | T
+          | {
+              label?: T;
+              url?: T;
+              id?: T;
+              blockName?: T;
+            };
       };
   updatedAt?: T;
   createdAt?: T;

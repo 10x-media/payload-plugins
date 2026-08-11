@@ -63,7 +63,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.targetCollectionsDescription]: 'The collections this guide covers.',
 	[keys.targetCollectionsLabel]: 'Collections',
 	[keys.targetFieldsDescription]:
-		'Field paths, prefixed with the entity they belong to: "collection:posts.hero.title" or "global:settings.siteName".',
+		'Field paths, prefixed with what they belong to: "collection:posts.hero.title", "global:settings.siteName", or "block:heroBanner.heading" for a field inside a block.',
 	[keys.targetFieldsLabel]: 'Fields',
 	[keys.targetGlobalsDescription]: 'The globals this guide covers.',
 	[keys.targetGlobalsLabel]: 'Globals',

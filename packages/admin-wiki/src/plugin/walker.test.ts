@@ -69,7 +69,9 @@ describe('walkAndInjectFieldHelp', () => {
 		])
 		const result = walkAndInjectFieldHelp(config, resolved)
 		expect(result.validTargetKeys).toContain('block:cta')
-		expect(result.validTargetKeys).toContain('field:collection:pages.layout.cta.label')
+		expect(result.validTargetKeys).toContain('field:collection:pages.layout')
+		expect(result.validTargetKeys).toContain('field:block:cta.label')
+		expect(result.validTargetKeys).not.toContain('field:collection:pages.layout.cta.label')
 		expect(result.blockSlugs).toEqual(['cta', 'custom'])
 		expect(ctaBlock.fields[0]).toMatchObject({ name: 'label' })
 		expect(ctaBlock.fields[1]).toMatchObject({
@@ -77,6 +79,95 @@ describe('walkAndInjectFieldHelp', () => {
 			type: 'ui',
 			admin: { components: { Field: { clientProps: { blockSlug: 'cta' } } } },
 		})
+	})
+
+	it('gives a shared block one key and one injection from every usage', () => {
+		const heroBlock = { slug: 'hero', fields: [{ name: 'headline', type: 'text' }] as Field[] }
+		const config = makeConfig(
+			[
+				{ slug: 'pages', fields: [{ name: 'layout', type: 'blocks', blocks: [heroBlock] }] },
+				{ slug: 'posts', fields: [{ name: 'sections', type: 'blocks', blocks: [heroBlock] }] },
+			],
+			[{ slug: 'home', fields: [{ name: 'body', type: 'blocks', blocks: [heroBlock] }] }]
+		)
+		const result = walkAndInjectFieldHelp(config, resolved)
+		expect(result.validTargetKeys.filter((key) => key.includes('hero'))).toEqual([
+			'block:hero',
+			'field:block:hero.headline',
+		])
+		const injected = descriptionOf(heroBlock.fields[0] as Field) as {
+			clientProps: { schemaPath: string }
+		}
+		expect(injected.clientProps.schemaPath).toBe('block:hero.headline')
+		expect(heroBlock.fields.filter((field) => 'name' in field)).toHaveLength(2)
+		expect(result.warnings).toEqual([])
+	})
+
+	it('resolves blockReferences and roots a nested block at its own slug', () => {
+		const innerBlock = { slug: 'inner', fields: [{ name: 'text', type: 'text' }] as Field[] }
+		const outerBlock = {
+			slug: 'outer',
+			fields: [
+				{ name: 'children', type: 'blocks', blocks: [], blockReferences: ['inner'] },
+			] as Field[],
+		}
+		const config = {
+			blocks: [innerBlock, outerBlock],
+			collections: [
+				{
+					slug: 'pages',
+					fields: [{ name: 'layout', type: 'blocks', blocks: [], blockReferences: ['outer'] }],
+				},
+			],
+		} as unknown as Config
+		const result = walkAndInjectFieldHelp(config, resolved)
+		expect(result.validTargetKeys).toContain('field:collection:pages.layout')
+		expect(result.validTargetKeys).toContain('field:block:outer.children')
+		expect(result.validTargetKeys).toContain('field:block:inner.text')
+		expect(result.validTargetKeys).not.toContain('field:block:outer.children.inner.text')
+	})
+
+	it('merges two blocks sharing a slug, helps both, and warns once about the divergence', () => {
+		const registryBlock = {
+			slug: 'quote',
+			labels: { plural: 'Quotes', singular: 'Quote' },
+			fields: [{ name: 'body', type: 'text' }] as Field[],
+		}
+		const inlineBlock = {
+			slug: 'quote',
+			labels: { plural: 'Inline quotes', singular: 'Inline quote' },
+			fields: [
+				{ name: 'body', type: 'text' },
+				{ name: 'author', type: 'text' },
+			] as Field[],
+		}
+		const config = {
+			blocks: [registryBlock],
+			collections: [
+				{ slug: 'pages', fields: [{ name: 'layout', type: 'blocks', blocks: [inlineBlock] }] },
+			],
+		} as unknown as Config
+		const result = walkAndInjectFieldHelp(config, resolved)
+		expect(result.validTargetKeys).toContain('field:block:quote.body')
+		expect(result.validTargetKeys).toContain('field:block:quote.author')
+		expect(result.blockSlugs).toEqual(['quote'])
+		expect(result.blockLabels.quote).toBe('Quote')
+		expect(registryBlock.fields.at(-1)).toMatchObject({ name: WIKI_BLOCK_HELP_FIELD })
+		expect(inlineBlock.fields.at(-1)).toMatchObject({ name: WIKI_BLOCK_HELP_FIELD })
+		expect(result.warnings).toHaveLength(1)
+		expect(result.warnings[0]).toContain('"quote"')
+		expect(result.warnings[0]).toContain('config.blocks')
+		expect(result.warnings[0]).toContain('collection:pages.layout')
+	})
+
+	it('stays quiet when two objects sharing a slug declare the same fields', () => {
+		const first = { slug: 'quote', fields: [{ name: 'body', type: 'text' }] as Field[] }
+		const second = { slug: 'quote', fields: [{ name: 'body', type: 'text' }] as Field[] }
+		const config = makeConfig([
+			{ slug: 'pages', fields: [{ name: 'layout', type: 'blocks', blocks: [first] }] },
+			{ slug: 'posts', fields: [{ name: 'layout', type: 'blocks', blocks: [second] }] },
+		])
+		expect(walkAndInjectFieldHelp(config, resolved).warnings).toEqual([])
 	})
 
 	it('helps a block that declares its own row label, which the old slot could not', () => {
@@ -137,7 +228,7 @@ describe('walkAndInjectFieldHelp', () => {
 		])
 		const result = walkAndInjectFieldHelp(config, resolveOptions({ exclude: { blocks: ['cta'] } }))
 		expect(result.validTargetKeys).not.toContain('block:cta')
-		expect(result.validTargetKeys).not.toContain('field:collection:pages.layout.cta.label')
+		expect(result.validTargetKeys).not.toContain('field:block:cta.label')
 		expect(result.blockSlugs).toEqual([])
 		expect(ctaBlock.fields).toHaveLength(1)
 	})

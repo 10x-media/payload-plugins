@@ -7,8 +7,9 @@ export type WikiSeedTargets = {
 	/** Collection slugs, e.g. `posts`. */
 	collections?: string[]
 	/**
-	 * Entity-qualified field schema paths, e.g. `collection:posts.hero.title` or
-	 * `global:settings.siteName`.
+	 * Owner-qualified field schema paths, e.g. `collection:posts.hero.title`,
+	 * `global:settings.siteName`, or `block:heroBanner.heading` for a field
+	 * inside a block.
 	 */
 	fields?: string[]
 	/** Global slugs, e.g. `settings`. */

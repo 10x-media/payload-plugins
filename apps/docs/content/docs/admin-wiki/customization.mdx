@@ -23,7 +23,7 @@ export const MyDescription = ({ schemaPath }: { schemaPath: string }) => (
 )
 ```
 
-The `schemaPath` is the entity-qualified, index-free path from [Targeting](/admin-wiki/targets): `collection:posts.hero.title`.
+The `schemaPath` is the owner-qualified, index-free path from [Targeting](/admin-wiki/targets): `collection:posts.hero.title`, or `block:heroBanner.heading` when the field lives inside a block.
 
 For a component that hardcodes its own rendering and wants the data rather than the UI, `useWikiFieldHelp` is the one-line adoption path:
 

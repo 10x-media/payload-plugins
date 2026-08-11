@@ -106,8 +106,9 @@ export const WikiTargetHelp = ({ showWriteAffordance = true, targetKey }: WikiTa
 
 export type WikiFieldHelpProps = {
 	/**
-	 * Index-free schema path of the field, rooted at the entity that owns it:
-	 * `collection:posts.hero.title`, `global:settings.siteName`. This is exactly
+	 * Index-free schema path of the field, rooted at whatever owns it:
+	 * `collection:posts.hero.title`, `global:settings.siteName`, or
+	 * `block:heroBanner.heading` for a field inside a block. This is exactly
 	 * what the plugin injects as `clientProps.schemaPath`, so a custom field that
 	 * forwards its own props needs no construction of its own.
 	 */

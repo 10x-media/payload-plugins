@@ -13,7 +13,7 @@ The **Targets** tab of a wiki page holds one list per kind:
 |---|---|---|---|---|
 | `targetCollections` | Collection | Bare slug | `posts` | Picking from the collections the plugin covers |
 | `targetGlobals` | Global | Bare slug | `settings` | Picking from the globals the plugin covers |
-| `targetFields` | Field | Entity-qualified schema path | `collection:posts.hero.title` | Typing, or a [write affordance](#prefilled-targets) |
+| `targetFields` | Field | Owner-qualified schema path | `collection:posts.hero.title` | Typing, or a [write affordance](#prefilled-targets) |
 | `targetBlocks` | Block | Bare block slug | `heroBanner` | Picking from the blocks the plugin covers |
 
 One guide may fill all four, and any number of guides may name the same target. A surface with several guides shows them all, ordered featured-first, then by title.
@@ -22,7 +22,7 @@ One guide may fill all four, and any number of guides may name the same target. 
 
 ## Field schema paths
 
-Field targets carry the entity they belong to as a prefix:
+Field targets carry the thing they belong to as a prefix:
 
 ```
 collection:posts.title
@@ -32,15 +32,45 @@ global:settings.siteName
 
 The prefix is required. Payload only enforces slug uniqueness within collections, so a collection and a global may both be called `settings`, and an unqualified path would merge their fields.
 
-Paths are **index-free**. A field inside an array or a blocks field is addressed once, by its position in the schema, not per row:
+Paths are **index-free**. A field inside an array is addressed once, by its position in the schema, not per row:
 
 ```
-collection:posts.sections.heroBanner.headline
+collection:posts.gallery.caption
 ```
 
-That covers the `headline` field of every `heroBanner` block in every row of `sections`.
+That covers the `caption` field of every row of `gallery`.
 
 Unnamed structural fields add no segment: rows, collapsibles, and unnamed tabs are invisible to the path. Named tabs and named groups add their name.
+
+### Fields inside blocks
+
+A block is its own root. Fields inside one are rooted at the **block slug**, not at the collection or global the block happens to be used in:
+
+```
+block:heroBanner.heading
+block:heroBanner.cta.label
+```
+
+That is deliberate: a block is shared, so a guide about its `heading` follows the block into every collection, global, and enclosing block that uses it. Writing it once is the whole point; the entity a reader happens to be editing does not change what the field means.
+
+The blocks **field itself** still belongs to its entity, since that is where the field lives:
+
+```
+collection:posts.layout       the blocks field on posts
+block:heroBanner.heading      a field inside the block
+```
+
+Nested blocks work the same way. A block inside a block is rooted at its own slug, however deep it is used:
+
+```
+block:accordion.panels        a blocks field inside the accordion block
+block:panel.title             a field inside the block that field allows
+```
+
+Two consequences worth knowing:
+
+- Targeting a block's field **in one collection only** is not expressible. If you need that, document the whole surface with a collection or field target on the enclosing form instead.
+- Block slugs are a global namespace here, exactly as they are for [whole-block targets](#the-four-target-kinds). If two different block configs share a slug, their fields merge under the one root and the plugin logs a warning on boot naming the slug and where each was found. Payload permits the collision (its duplicate check runs per blocks field, not across the config) and resolves it registry-first in parts of its own admin, so the wiki follows that precedence.
 
 ## Target keys
 
@@ -51,9 +81,10 @@ collection:posts
 global:settings
 block:heroBanner
 field:collection:posts.title
+field:block:heroBanner.heading
 ```
 
-Field keys carry a double prefix: `field:` plus the entity-qualified path the author stored. These are what the [orphan banner](#orphaned-targets) prints and what the [component API](/admin-wiki/customization) takes.
+Field keys carry a double prefix: `field:` plus the owner-qualified path the author stored. These are what the [orphan banner](#orphaned-targets) prints and what the [component API](/admin-wiki/customization) takes.
 
 ## Targets are stored as plain strings
 

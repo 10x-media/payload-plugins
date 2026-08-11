@@ -64,7 +64,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.targetCollectionsDescription]: 'Die Sammlungen, für die diese Anleitung gilt.',
 	[keys.targetCollectionsLabel]: 'Sammlungen',
 	[keys.targetFieldsDescription]:
-		'Feldpfade mit vorangestellter Entität: "collection:posts.hero.title" oder "global:settings.siteName".',
+		'Feldpfade mit vorangestelltem Besitzer: "collection:posts.hero.title", "global:settings.siteName" oder "block:heroBanner.heading" für ein Feld in einem Block.',
 	[keys.targetFieldsLabel]: 'Felder',
 	[keys.targetGlobalsDescription]: 'Die globalen Inhalte, für die diese Anleitung gilt.',
 	[keys.targetGlobalsLabel]: 'Globale Inhalte',

@@ -77,7 +77,7 @@ The plugin registers a reading view at `/admin/wiki`: featured guides as cards, 
 
 **The guide is a draft.** Surfaces read published guides only.
 
-**The target does not match.** Field targets are entity-qualified paths (`collection:posts.title`), typed by hand and therefore typo-able. The **Wiki Pages** list shows an orphan banner listing every target that no longer resolves against your config.
+**The target does not match.** Field targets are owner-qualified paths (`collection:posts.title`, and `block:heroBanner.heading` for a field inside a block), typed by hand and therefore typo-able. The **Wiki Pages** list shows an orphan banner listing every target that no longer resolves against your config.
 
 **The entity is excluded.** Payload's own bookkeeping collections are out of the wiki by default, along with anything in your [`exclude`](/admin-wiki/configuration#exclusions) option. An excluded entity carries no surfaces and does not appear in the target pickers.
 

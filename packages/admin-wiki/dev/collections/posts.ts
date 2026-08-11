@@ -3,9 +3,10 @@ import { iconField } from '@10x-media/fields/icon'
 import type { CollectionConfig } from 'payload'
 
 /**
- * The kitchen-sink collection for wiki targeting: nested tabs, a group, layout
- * blocks, and `@10x-media/fields` fields proving the third-party integration
- * contract (their Description slot surfaces the field help unchanged).
+ * The kitchen-sink collection for wiki targeting: nested tabs, a group, a layout
+ * referencing the shared `heroBanner` block, and `@10x-media/fields` fields
+ * proving the third-party integration contract (their Description slot surfaces
+ * the field help unchanged).
  */
 export const posts: CollectionConfig = {
 	slug: 'posts',
@@ -27,22 +28,8 @@ export const posts: CollectionConfig = {
 						{
 							name: 'layout',
 							type: 'blocks',
-							blocks: [
-								{
-									slug: 'heroBanner',
-									fields: [
-										{ name: 'heading', type: 'text', localized: true },
-										colorField({ name: 'background' }),
-									],
-								},
-								{
-									slug: 'cta',
-									fields: [
-										{ name: 'label', type: 'text', localized: true },
-										{ name: 'url', type: 'text' },
-									],
-								},
-							],
+							blockReferences: ['heroBanner'],
+							blocks: [],
 						},
 					],
 				},

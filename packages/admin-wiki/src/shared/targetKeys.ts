@@ -9,8 +9,9 @@ export type WikiTargetType = 'block' | 'collection' | 'field' | 'global'
 /**
  * The four `string[]` fields a guide stores its attachments in, one per target
  * kind. Every value is a bare slug except `targetFields`, which stores an
- * entity-qualified schema path (`collection:posts.title`) because a collection
- * and a global may share a slug.
+ * owner-qualified schema path (`collection:posts.title`,
+ * `block:heroBanner.heading`) because a collection and a global may share a
+ * slug, and because a field inside a block belongs to the block.
  */
 export type WikiTargetDoc = {
 	targetBlocks?: null | string[]
@@ -65,8 +66,9 @@ export const globalTargetKey = (slug: string): string => `global:${slug}`
 export const blockTargetKey = (slug: string): string => `block:${slug}`
 
 /**
- * `schemaPath` is entity-qualified, as the walker emits it and as
- * `targetFields` stores it: `collection:posts.title`, `global:settings.name`.
+ * `schemaPath` is owner-qualified, as the walker emits it and as `targetFields`
+ * stores it: `collection:posts.title`, `global:settings.name`,
+ * `block:heroBanner.heading`.
  */
 export const fieldTargetKey = (schemaPath: string): string => `field:${schemaPath}`
 

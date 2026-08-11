@@ -9,6 +9,8 @@ import { de } from '@payloadcms/translations/languages/de'
 import { en } from '@payloadcms/translations/languages/en'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { adminWiki } from '../src/index'
+import { ctaBlock } from './blocks/cta'
+import { heroBannerBlock } from './blocks/heroBanner'
 import { tipBlock } from './blocks/tipBlock'
 import { posts } from './collections/posts'
 import { products } from './collections/products'
@@ -47,6 +49,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
+	blocks: [ctaBlock, heroBannerBlock],
 	collections: [posts, products, users],
 	globals: [settings],
 	i18n: { supportedLanguages: { de, en } },

@@ -88,11 +88,11 @@ The **accent color** and **icon** in the branding group come from the
 
 /**
  * Seed the dev app: an admin login plus wiki guides exercising every surface
- * kind (collection, field, block, global), GitHub-alert callouts, media and
- * guide-link placeholders, consumer transformers (devTip block, video embed),
- * localized en/de content, and one deliberately orphaned target for the
- * orphan banner. Idempotent by design; a seed failure logs loudly but never
- * blocks the dev boot.
+ * kind (collection, entity field, block, block field, global), GitHub-alert
+ * callouts, media and guide-link placeholders, consumer transformers (devTip
+ * block, video embed), localized en/de content, and one deliberately orphaned
+ * target for the orphan banner. Idempotent by design; a seed failure logs
+ * loudly but never blocks the dev boot.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
 	const userCount = await payload.count({ collection: 'users' })
@@ -153,6 +153,26 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					summary: 'How to use the hero banner block well.',
 					targets: { blocks: ['heroBanner'] },
 					title: 'Hero banner',
+				},
+				{
+					content: {
+						markdown:
+							'Lead with the promise, not the product name. Under sixty characters keeps it on one line at every breakpoint.\n\nThe hero banner is shared by posts and products, and this guide is attached to the block, not to either collection: `block:heroBanner.heading` surfaces it at both.',
+					},
+					slug: 'hero-headline',
+					summary: 'One guide on a shared block field, shown wherever the block is used.',
+					targets: { fields: ['block:heroBanner.heading'] },
+					title: 'Hero headline',
+				},
+				{
+					content: {
+						markdown:
+							'Say what happens next, in two or three words. "Get started", not "Click here".\n\nThe `cta` slug is declared twice in this app on purpose: once in `config.blocks` (with a `style`) and once inline on the settings global (with a `url`). Both variants are walked under `block:cta`, so this one guide on `block:cta.label` shows in the product layout and in the global, and the boot log carries the divergence warning.',
+					},
+					slug: 'cta-label',
+					summary: 'One target across two blocks that share a slug.',
+					targets: { fields: ['block:cta.label'] },
+					title: 'Call to action label',
 				},
 				{
 					content: {

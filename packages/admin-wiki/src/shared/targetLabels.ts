@@ -65,17 +65,22 @@ const findLabel = (entities: LabelledEntity[] | undefined, slug: string): null |
 	return entity ? singularLabel(entity) : null
 }
 
+type FieldTargetRoot = 'block' | 'collection' | 'global'
+
+const FIELD_TARGET_ROOTS = new Set<string>(['block', 'collection', 'global'])
+
 /**
- * Split a stored field target (`collection:posts.branding.color`) into the
- * entity that owns it and the path inside that entity. Null when the value
- * carries no entity prefix, in which case it is shown verbatim.
+ * Split a stored field target (`collection:posts.branding.color`,
+ * `block:heroBanner.headline`) into the owner it is rooted at and the path
+ * inside it. Null when the value carries no owner prefix, in which case it is
+ * shown verbatim.
  */
 const parseFieldTarget = (
 	value: string
-): null | { entitySlug: string; entityType: 'collection' | 'global'; path: string } => {
+): null | { ownerSlug: string; ownerType: FieldTargetRoot; path: string } => {
 	const separator = value.indexOf(':')
-	const entityType = value.slice(0, separator)
-	if (separator < 1 || (entityType !== 'collection' && entityType !== 'global')) {
+	const ownerType = value.slice(0, separator)
+	if (separator < 1 || !FIELD_TARGET_ROOTS.has(ownerType)) {
 		return null
 	}
 	const rest = value.slice(separator + 1)
@@ -83,16 +88,32 @@ const parseFieldTarget = (
 	if (dot < 1) {
 		return null
 	}
-	return { entitySlug: rest.slice(0, dot), entityType, path: rest.slice(dot + 1) }
+	return {
+		ownerSlug: rest.slice(0, dot),
+		ownerType: ownerType as FieldTargetRoot,
+		path: rest.slice(dot + 1),
+	}
+}
+
+/** The label of whatever a field target is rooted at: a block, or an entity. */
+const fieldOwnerLabel = (
+	owner: { ownerSlug: string; ownerType: FieldTargetRoot },
+	sources: EntityLabelSources
+): string => {
+	if (owner.ownerType === 'block') {
+		return sources.blockLabels?.[owner.ownerSlug] ?? owner.ownerSlug
+	}
+	const entities = owner.ownerType === 'collection' ? sources.collections : sources.globals
+	return findLabel(entities, owner.ownerSlug) ?? owner.ownerSlug
 }
 
 /**
  * Describe one target key for display. Collections, globals, and blocks resolve
- * to their configured labels; a field target resolves the entity half of its
- * path the same way, so it reads "Post · branding.color" rather than the stored
- * `collection:posts.branding.color`. A block whose label is keyed by locale is
- * not in `blockLabels` and falls back to its slug, which is what an author typed
- * and recognizes.
+ * to their configured labels; a field target resolves the owner half of its path
+ * the same way, so it reads "Post · branding.color" rather than the stored
+ * `collection:posts.branding.color`, and "Hero banner · headline" for a field
+ * inside a block. A block whose label is keyed by locale is not in `blockLabels`
+ * and falls back to its slug, which is what an author typed and recognizes.
  */
 export const describeTarget = (
 	key: string,
@@ -114,9 +135,7 @@ export const describeTarget = (
 			if (!field) {
 				return { ...parsed, label: parsed.value }
 			}
-			const entities = field.entityType === 'collection' ? sources.collections : sources.globals
-			const entityLabel = findLabel(entities, field.entitySlug) ?? field.entitySlug
-			return { ...parsed, label: `${entityLabel} · ${field.path}` }
+			return { ...parsed, label: `${fieldOwnerLabel(field, sources)} · ${field.path}` }
 		}
 		default:
 			return { ...parsed, label: parsed.value }

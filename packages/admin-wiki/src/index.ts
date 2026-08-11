@@ -37,13 +37,19 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 			blockLabels: walk.blockLabels,
 			validTargetKeys: walk.validTargetKeys,
 		})
+		const warnings = [...walk.warnings]
 		if (walk.injectedFieldCount === 0) {
+			warnings.push(
+				'@10x-media/admin-wiki: the config walker found no fields to attach help to. ' +
+					'Register adminWiki() after any plugin that adds collections or fields.'
+			)
+		}
+		if (warnings.length > 0) {
 			const priorOnInit = config.onInit
 			config.onInit = async (payload) => {
-				payload.logger.warn(
-					'@10x-media/admin-wiki: the config walker found no fields to attach help to. ' +
-						'Register adminWiki() after any plugin that adds collections or fields.'
-				)
+				for (const warning of warnings) {
+					payload.logger.warn(warning)
+				}
 				await priorOnInit?.(payload)
 			}
 		}

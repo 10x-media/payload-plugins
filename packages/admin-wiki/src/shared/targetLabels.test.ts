@@ -47,6 +47,16 @@ describe('describeTarget', () => {
 		expect(describeTarget('field:collection:gone.title', sources)?.label).toBe('gone · title')
 	})
 
+	it('resolves the block half of a block-scoped field path', () => {
+		const withBlocks = { ...sources, blockLabels: { heroBanner: 'Hero banner' } }
+		expect(describeTarget('field:block:heroBanner.headline', withBlocks)).toEqual({
+			kind: 'field',
+			label: 'Hero banner · headline',
+			value: 'block:heroBanner.headline',
+		})
+		expect(describeTarget('field:block:quote.body', withBlocks)?.label).toBe('quote · body')
+	})
+
 	it('shows unqualified field paths verbatim', () => {
 		expect(describeTarget('field:posts.title', sources)?.label).toBe('posts.title')
 	})

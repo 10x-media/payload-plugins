@@ -1,7 +1,6 @@
 import { WikiFieldDescription as WikiFieldDescription_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { ColorCell as ColorCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ColorFieldServer as ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
-import { WikiBlockHelp as WikiBlockHelp_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { IconCell as IconCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { IconFieldServer as IconFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { WikiDocumentGuides as WikiDocumentGuides_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
@@ -35,6 +34,7 @@ import { WikiTargetBlocks as WikiTargetBlocks_bd0a8d2193330fdfdceeb64a56ffc89f }
 import { WikiOrphanBanner as WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiGuideViewLink as WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiViewLink as WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
+import { WikiBlockHelp as WikiBlockHelp_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiProviderServer as WikiProviderServer_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
 import { WikiIndexView as WikiIndexView_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
 import { WikiPageView as WikiPageView_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
@@ -49,7 +49,6 @@ export const importMap = {
   "@10x-media/admin-wiki/client#WikiFieldDescription": WikiFieldDescription_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/fields/rsc#ColorCell": ColorCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#ColorFieldServer": ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12,
-  "@10x-media/admin-wiki/client#WikiBlockHelp": WikiBlockHelp_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/fields/rsc#IconCell": IconCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#IconFieldServer": IconFieldServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/admin-wiki/client#WikiDocumentGuides": WikiDocumentGuides_bd0a8d2193330fdfdceeb64a56ffc89f,
@@ -83,6 +82,7 @@ export const importMap = {
   "@10x-media/admin-wiki/client#WikiOrphanBanner": WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiGuideViewLink": WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiViewLink": WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
+  "@10x-media/admin-wiki/client#WikiBlockHelp": WikiBlockHelp_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/rsc#WikiProviderServer": WikiProviderServer_11f6523fe2b636ccac41524a0a270462,
   "@10x-media/admin-wiki/rsc#WikiIndexView": WikiIndexView_11f6523fe2b636ccac41524a0a270462,
   "@10x-media/admin-wiki/rsc#WikiPageView": WikiPageView_11f6523fe2b636ccac41524a0a270462,
