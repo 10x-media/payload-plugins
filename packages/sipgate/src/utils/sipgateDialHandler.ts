@@ -163,6 +163,10 @@ export const createSipgateDialHandler =
 
 		if (!response.ok) {
 			const text = await response.text()
+			req.payload.logger.error(
+				{ detail: text, callee, deviceId, channelId },
+				'[sipgate:dial] dial failed'
+			)
 			return Response.json({ error: 'Failed to dial', detail: text }, { status: response.status })
 		}
 		return Response.json({ success: true }, { status: 200 })
@@ -298,6 +302,10 @@ const handleOAuth2Dial = async ({
 
 	if (!response.ok) {
 		const text = await response.text()
+		req.payload.logger.error(
+			{ detail: text, callee, deviceId, channelId },
+			'[sipgate:dial] oauth dial failed'
+		)
 		return Response.json({ error: 'Failed to dial', detail: text }, { status: response.status })
 	}
 	return Response.json({ success: true }, { status: 200 })
