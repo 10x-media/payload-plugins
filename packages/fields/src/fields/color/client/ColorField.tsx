@@ -103,7 +103,9 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 	const stringValue = typeof value === 'string' ? value : ''
 	const reference = linked ? parsePresetReference(stringValue) : null
 	const presetKey = reference?.key ?? null
-	const referenceAlpha = reference?.alpha ?? 100
+	// With alpha disabled a stored suffix still parses, but renders at full
+	// opacity so the field matches server resolution until commit strips it
+	const referenceAlpha = alpha ? (reference?.alpha ?? 100) : 100
 	const activePreset =
 		presetKey !== null ? resolvedPresets.find((preset) => preset.key === presetKey) : undefined
 	const presetMissing = presetKey !== null && !activePreset
@@ -366,7 +368,7 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 								) : null}
 							</span>
 							<span className={`${baseClass}__chip-label`}>{chip.label}</span>
-							{chip.alpha !== 100 ? (
+							{alpha && chip.alpha !== 100 ? (
 								<span className={`${baseClass}__chip-alpha`}>{chip.alpha}%</span>
 							) : null}
 						</span>
