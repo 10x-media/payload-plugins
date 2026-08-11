@@ -10,6 +10,7 @@ export {
 	PRESET_PREFIX,
 	type ResolvedColorPreset,
 } from '../fields/color/options'
+export { type PresetReference, parsePresetReference } from '../fields/color/presetReference'
 export { type PresetsFromArrayArgs, presetsFromArray } from '../fields/color/presetsFromArray'
 export { type PresetsFromDocArgs, presetsFromDoc } from '../fields/color/presetsFromDoc'
 export { normalizePresets, resolvePresets } from '../fields/color/resolvePresets'
