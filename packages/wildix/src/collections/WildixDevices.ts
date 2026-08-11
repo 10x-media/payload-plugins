@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { deepMerge } from 'payload'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
+import { authenticatedCollectionAccess } from '../utils/access'
 
 type CreateWildixDevicesCollectionOptions = {
 	slug: string
@@ -16,6 +17,7 @@ export const createWildixDevicesCollection = ({
 }: CreateWildixDevicesCollectionOptions): CollectionConfig => {
 	const defaults: CollectionConfig = {
 		slug,
+		access: authenticatedCollectionAccess,
 		labels: {
 			singular: labelForKey(keys.wildixDevicesSingular),
 			plural: labelForKey(keys.wildixDevicesPlural),

@@ -1,6 +1,14 @@
 'use client'
 
-import { Button, Drawer, DrawerToggler, FieldLabel, TextInput, useField } from '@payloadcms/ui'
+import {
+	Button,
+	Drawer,
+	DrawerToggler,
+	FieldLabel,
+	TextInput,
+	useField,
+	useModal,
+} from '@payloadcms/ui'
 import type { ChangeEvent } from 'react'
 import { useState } from 'react'
 import { PhoneIcon } from './PhoneIcon'
@@ -36,9 +44,11 @@ export const ClickToDialFieldClient = ({
 	const { value, setValue, showError } = useField<string>({ path })
 	const [dialState, setDialState] = useState<'idle' | 'dialing' | 'success' | 'error'>('idle')
 	const [devices] = useState<WildixDevice[]>(initialDevices ?? [])
+	const { closeModal } = useModal()
 
 	const dial = async (deviceId: string) => {
 		if (!value) return
+		closeModal(DRAWER_SLUG)
 		setDialState('dialing')
 		try {
 			const res = await fetch('/api/wildix/dial', {
