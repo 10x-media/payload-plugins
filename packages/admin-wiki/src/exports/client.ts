@@ -33,6 +33,7 @@ export {
 export {
 	WikiFieldPickerDrawer,
 	type WikiFieldPickerDrawerProps,
+	type WikiFieldPickerKind,
 } from '../components/FieldPicker/WikiFieldPickerDrawer'
 export {
 	WikiFieldPickTarget,

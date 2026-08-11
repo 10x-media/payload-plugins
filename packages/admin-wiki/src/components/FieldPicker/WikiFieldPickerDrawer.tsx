@@ -23,11 +23,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { resolveClientLabel } from '../TargetSelect/clientBlocks'
-import { collectBlockUsages } from './blockUsages'
+import { collectBlockUsages, type WikiBlockUsage } from './blockUsages'
 import { buildPrefillData } from './buildPrefillData'
 import { toggleFieldTarget } from './fieldTargetGroups'
 import { WikiFieldPickerProvider } from './WikiPickerContext'
 import './field-picker.css'
+
+/** Which kind of thing this drawer picks fields from. One drawer per kind. */
+export type WikiFieldPickerKind = 'block' | 'collection' | 'global'
 
 /**
  * What the drawer is showing, as one string. Deliberately the same grammar the
@@ -46,20 +49,21 @@ type ResolvedTarget = {
 	schemaPath: string
 }
 
-const splitSelection = (selection: string): { kind: string; slug: string } => {
-	const separator = selection.indexOf(':')
-	return { kind: selection.slice(0, separator), slug: selection.slice(separator + 1) }
-}
-
 export type WikiFieldPickerDrawerProps = {
 	/** Covered block slugs, in display order. */
 	blockSlugs: string[]
+	/**
+	 * The renderable block usages, when the caller already walked the config for
+	 * them. Walked here when omitted.
+	 */
+	blockUsages?: Map<string, WikiBlockUsage>
 	/** Covered collection slugs, in display order. */
 	collectionSlugs: string[]
 	/** Covered global slugs, in display order. */
 	globalSlugs: string[]
-	/** What to open on, as `collection:posts` or `block:hero`; defaults to the first covered. */
+	/** What to open on, as `collection:posts` or `block:hero`; must match `kind`. */
 	initialSelection?: string
+	kind: WikiFieldPickerKind
 	/** Called with the full new target list when the author confirms. */
 	onConfirm: (next: string[]) => void
 	/** Modal slug the drawer is registered under (from `useDrawerSlug`). */
@@ -68,7 +72,7 @@ export type WikiFieldPickerDrawerProps = {
 	value: string[]
 }
 
-type LoadState = 'error' | 'loading' | 'ready'
+type LoadState = 'empty' | 'error' | 'loading' | 'ready'
 
 /**
  * The field picker: the host's own fields, rendered for real, with a select
@@ -86,12 +90,14 @@ type LoadState = 'error' | 'loading' | 'ready'
  * field components, their labels in their language, and their layout; a list of
  * `branding.color` strings is a different skill.
  *
- * A block is the third thing that can be shown, and it is shown the same way,
- * because after block-scoping a field inside a block is a target in its own
- * right rather than one per usage. The only asymmetry is invisible to the
- * author: a block's fields are keyed in the schema map per usage, so the drawer
- * borrows one usage's path and the entity that owns it (see `collectBlockUsages`)
- * and hands both to the same request.
+ * One drawer per kind. The kind is chosen before the drawer opens, from the menu
+ * on the field's button, so the drawer carries exactly one control: switch to
+ * another collection, another global, or another block, never across. A block is
+ * shown the same way an entity is, because after block-scoping a field inside a
+ * block is a target in its own right rather than one per usage. The only
+ * asymmetry is invisible to the author: a block's fields are keyed in the schema
+ * map per usage, so the drawer borrows one usage's path and the entity that owns
+ * it (see `collectBlockUsages`) and hands both to the same request.
  *
  * Arrays are seeded with one empty row each (see `buildPrefillData`), so their
  * interiors are clickable. Blocks fields are deliberately left empty: their
@@ -99,13 +105,15 @@ type LoadState = 'error' | 'loading' | 'ready'
  * of every allowed block's form at once. What stays out of reach is a field
  * hidden by a condition that is false on empty data, since conditions are
  * evaluated server-side while state is built and a failing field is never
- * rendered at all; the manual path input beside the picker button covers it.
+ * rendered at all; the path input under the field target list covers it.
  */
 export const WikiFieldPickerDrawer = ({
 	blockSlugs,
+	blockUsages: usagesFromProps,
 	collectionSlugs,
 	globalSlugs,
 	initialSelection,
+	kind,
 	onConfirm,
 	slug,
 	value,
@@ -120,12 +128,16 @@ export const WikiFieldPickerDrawer = ({
 	const isOpen = Boolean(modalState[slug]?.isOpen)
 	const wasOpen = useRef(false)
 
+	const isBlockPicker = kind === 'block'
+
+	/** A block has no default: the grid is the way in, and it opens on its own. */
 	const fallbackSelection = useMemo<string | undefined>(() => {
-		if (collectionSlugs[0]) {
-			return `collection:${collectionSlugs[0]}`
+		if (isBlockPicker) {
+			return undefined
 		}
-		return globalSlugs[0] ? `global:${globalSlugs[0]}` : undefined
-	}, [collectionSlugs, globalSlugs])
+		const slugs = kind === 'collection' ? collectionSlugs : globalSlugs
+		return slugs[0] ? `${kind}:${slugs[0]}` : undefined
+	}, [collectionSlugs, globalSlugs, isBlockPicker, kind])
 
 	const [selection, setSelection] = useState<PickerSelection | undefined>(fallbackSelection)
 	const [working, setWorking] = useState<string[]>(value)
@@ -133,27 +145,19 @@ export const WikiFieldPickerDrawer = ({
 	const [status, setStatus] = useState<LoadState>('loading')
 
 	/**
-	 * The working list is seeded on the open transition only. Seeding it from
-	 * `value` on every change would undo the author's picks the moment confirming
-	 * writes them back, while the drawer is still mounted.
-	 */
-	useEffect(() => {
-		if (isOpen && !wasOpen.current) {
-			setWorking(value)
-			setSelection(initialSelection ?? fallbackSelection)
-		}
-		wasOpen.current = isOpen
-	}, [fallbackSelection, initialSelection, isOpen, value])
-
-	/**
 	 * Every block the picker can actually render, by slug. Computed from the
 	 * client config alone, so it costs one walk per config change and nothing per
 	 * selection.
 	 */
-	const blockUsages = useMemo(
-		() => collectBlockUsages(config, { collections: collectionSlugs, globals: globalSlugs }),
-		[collectionSlugs, config, globalSlugs]
-	)
+	const blockUsages = useMemo<Map<string, WikiBlockUsage>>(() => {
+		if (!isBlockPicker) {
+			return new Map()
+		}
+		return (
+			usagesFromProps ??
+			collectBlockUsages(config, { collections: collectionSlugs, globals: globalSlugs })
+		)
+	}, [collectionSlugs, config, globalSlugs, isBlockPicker, usagesFromProps])
 
 	/**
 	 * A covered block with nowhere to render it has no schema path, so it is left
@@ -168,12 +172,31 @@ export const WikiFieldPickerDrawer = ({
 		[blockSlugs, blockUsages]
 	)
 
+	const browseBlocks = useCallback(() => openModal(blocksDrawerSlug), [blocksDrawerSlug, openModal])
+
+	/**
+	 * The working list is seeded on the open transition only. Seeding it from
+	 * `value` on every change would undo the author's picks the moment confirming
+	 * writes them back, while the drawer is still mounted.
+	 */
+	useEffect(() => {
+		if (isOpen && !wasOpen.current) {
+			const next = initialSelection ?? fallbackSelection
+			setWorking(value)
+			setSelection(next)
+			if (isBlockPicker && !next) {
+				browseBlocks()
+			}
+		}
+		wasOpen.current = isOpen
+	}, [browseBlocks, fallbackSelection, initialSelection, isBlockPicker, isOpen, value])
+
 	const target = useMemo<ResolvedTarget | undefined>(() => {
 		if (!selection) {
 			return undefined
 		}
-		const { kind, slug: selectedSlug } = splitSelection(selection)
-		if (kind === 'block') {
+		const selectedSlug = selection.slice(selection.indexOf(':') + 1)
+		if (isBlockPicker) {
 			const usage = blockUsages.get(selectedSlug)
 			return usage
 				? {
@@ -197,10 +220,15 @@ export const WikiFieldPickerDrawer = ({
 					schemaPath: selectedSlug,
 				}
 			: undefined
-	}, [blockUsages, getEntityConfig, selection])
+	}, [blockUsages, getEntityConfig, isBlockPicker, kind, selection])
 
 	useEffect(() => {
 		if (!isOpen) {
+			return
+		}
+		if (!selection) {
+			setFormState(null)
+			setStatus('empty')
 			return
 		}
 		if (!target || target.fields.length === 0) {
@@ -235,57 +263,41 @@ export const WikiFieldPickerDrawer = ({
 			setStatus(state ? 'ready' : 'error')
 		})
 		return () => controller.abort()
-	}, [getFormState, isOpen, locale, target])
+	}, [getFormState, isOpen, locale, selection, target])
 
-	const entityOptions = useMemo(() => {
-		const group = (
-			label: string,
-			slugs: string[],
-			kind: 'collection' | 'global'
-		): { label: string; options: ReactSelectOption[] }[] => {
-			if (slugs.length === 0) {
-				return []
-			}
-			const labels = new Map<string, unknown>(
-				kind === 'collection'
-					? config.collections.map((collection) => [collection.slug, collection.labels?.plural])
-					: config.globals.map((global) => [global.slug, global.label])
-			)
-			return [
-				{
-					label,
-					options: slugs.map((entitySlug) => ({
-						label: resolveClientLabel(labels.get(entitySlug), i18n.language, entitySlug),
-						value: `${kind}:${entitySlug}`,
-					})),
-				},
-			]
+	/** One kind per drawer, so the menu is a flat list rather than groups. */
+	const entityOptions = useMemo<ReactSelectOption[]>(() => {
+		if (isBlockPicker) {
+			return []
 		}
-		return [
-			...group(t(keys.targetCollectionsLabel), collectionSlugs, 'collection'),
-			...group(t(keys.targetGlobalsLabel), globalSlugs, 'global'),
-		]
-	}, [collectionSlugs, config, globalSlugs, i18n.language, t])
+		const labels = new Map<string, unknown>(
+			kind === 'collection'
+				? config.collections.map((collection) => [collection.slug, collection.labels?.singular])
+				: config.globals.map((global) => [global.slug, global.label])
+		)
+		return (kind === 'collection' ? collectionSlugs : globalSlugs).map((entitySlug) => ({
+			label: resolveClientLabel(labels.get(entitySlug), i18n.language, entitySlug),
+			value: `${kind}:${entitySlug}`,
+		}))
+	}, [collectionSlugs, config, globalSlugs, i18n.language, isBlockPicker, kind])
 
-	const entityValue = useMemo(
-		() =>
-			entityOptions
-				.flatMap((entry) => entry.options)
-				.find((option) => option.value === selection) ?? null,
-		[entityOptions, selection]
-	)
-
-	const blockValue = useMemo<null | ReactSelectOption>(() => {
-		if (!selection?.startsWith('block:')) {
+	const selectValue = useMemo<null | ReactSelectOption>(() => {
+		if (!selection) {
 			return null
 		}
-		const blockSlug = selection.slice('block:'.length)
-		const usage = blockUsages.get(blockSlug)
-		return {
-			label: resolveClientLabel(usage?.block.labels?.singular, i18n.language, blockSlug),
-			value: selection,
+		if (isBlockPicker) {
+			const blockSlug = selection.slice('block:'.length)
+			return {
+				label: resolveClientLabel(
+					blockUsages.get(blockSlug)?.block.labels?.singular,
+					i18n.language,
+					blockSlug
+				),
+				value: selection,
+			}
 		}
-	}, [blockUsages, i18n.language, selection])
+		return entityOptions.find((option) => option.value === selection) ?? null
+	}, [blockUsages, entityOptions, i18n.language, isBlockPicker, selection])
 
 	const picker = useMemo(
 		() => ({
@@ -320,31 +332,29 @@ export const WikiFieldPickerDrawer = ({
 				<div className="wiki-field-picker__switcher">
 					<div className="wiki-field-picker__source">
 						<span className="wiki-field-picker__source-label">{t(keys.pickerEntityLabel)}</span>
-						<ReactSelect
-							isClearable={false}
-							isMulti={false}
-							onChange={onEntityChange}
-							options={entityOptions}
-							placeholder={t(keys.pickerEntityLabel)}
-							value={entityValue ?? undefined}
-						/>
-					</div>
-					{availableBlocks.length > 0 ? (
-						<div className="wiki-field-picker__source">
-							<span className="wiki-field-picker__source-label">{t(keys.pickerBlockLabel)}</span>
+						{isBlockPicker ? (
 							<ReactSelect
 								isClearable={false}
 								isMulti={false}
 								isSearchable={false}
 								menuIsOpen={false}
 								onChange={() => undefined}
-								onMenuOpen={() => openModal(blocksDrawerSlug)}
+								onMenuOpen={browseBlocks}
 								options={[]}
 								placeholder={t(keys.targetBlocksPlaceholder)}
-								value={blockValue ?? undefined}
+								value={selectValue ?? undefined}
 							/>
-						</div>
-					) : null}
+						) : (
+							<ReactSelect
+								isClearable={false}
+								isMulti={false}
+								onChange={onEntityChange}
+								options={entityOptions}
+								placeholder={t(keys.pickerEntityLabel)}
+								value={selectValue ?? undefined}
+							/>
+						)}
+					</div>
 				</div>
 				<div className="wiki-field-picker__body">
 					{status === 'loading' ? (
@@ -352,6 +362,16 @@ export const WikiFieldPickerDrawer = ({
 							<ShimmerEffect height="2rem" />
 							<ShimmerEffect height="2rem" width="80%" />
 							<ShimmerEffect height="2rem" width="90%" />
+						</div>
+					) : null}
+					{status === 'empty' ? (
+						<div className="wiki-field-picker__empty">
+							<p className="wiki-field-picker__status">{t(keys.pickerNoBlock)}</p>
+							{isBlockPicker ? (
+								<Button buttonStyle="secondary" margin={false} onClick={browseBlocks} size="small">
+									{t(keys.pickerChooseBlock)}
+								</Button>
+							) : null}
 						</div>
 					) : null}
 					{status === 'error' ? (
@@ -388,7 +408,7 @@ export const WikiFieldPickerDrawer = ({
 					</Button>
 				</div>
 			</div>
-			{availableBlocks.length > 0 ? (
+			{isBlockPicker ? (
 				<BlocksDrawer
 					addRow={onBlockSelect}
 					addRowIndex={0}

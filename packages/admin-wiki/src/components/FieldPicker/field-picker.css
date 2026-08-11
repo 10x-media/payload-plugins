@@ -52,19 +52,6 @@
 	width: 100%;
 }
 
-/* The path is the value that ends up stored, so it is worth showing, but it is
-   reference rather than instruction: mono, faint, and the first thing to be
-   dropped when the plate runs out of room. */
-.wiki-field-pick__path {
-	color: var(--theme-elevation-400);
-	font-family: var(--font-mono);
-	font-size: 0.85em;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
 /* Whole-field highlight while a field is covered. `:has()` is progressive
    enhancement: without it the plate alone still says so. */
 .field-type:has(> .field-type__wrap > .wiki-field-pick--selected),
@@ -101,21 +88,28 @@
 	z-index: 2;
 }
 
-/* The two sources are one choice with two shapes: entities come from a plain
-   menu, blocks from Payload's own block drawer, which is the only picker that
-   shows a block's thumbnail and its label in the reader's language. Choosing
-   from either replaces whatever the other was showing. */
+/* One control, because the kind was already chosen from the menu on the field's
+   button. Collections and globals switch through a plain menu; a block switches
+   through Payload's own block drawer, the only picker that shows a block's
+   thumbnail and its label in the reader's language. */
 .wiki-field-picker__source {
 	display: flex;
 	flex-direction: column;
 	gap: calc(var(--base) / 4);
 	min-width: calc(var(--base) * 10);
-	width: calc(var(--base) * 14);
+	width: calc(var(--base) * 16);
 }
 
 .wiki-field-picker__source-label {
 	color: var(--theme-elevation-600);
 	font-size: 0.9em;
+}
+
+.wiki-field-picker__empty {
+	align-items: start;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
 }
 
 .wiki-field-picker__body {
@@ -150,9 +144,9 @@
 	margin-inline-end: auto;
 }
 
-/* One section per owner. The header is the whole clickable row, so the count and
-   the chevron are part of the same target; the edit shortcut sits outside it,
-   since it goes somewhere else. */
+/* One section per owner, as Payload's own `Collapsible`, so a group of field
+   targets reads like an array row rather than like something this plugin
+   invented. Only the pieces core sizes for icon-only actions are overridden. */
 .wiki-target-fields__groups,
 .wiki-target-fields__paths {
 	list-style: none;
@@ -160,41 +154,49 @@
 	padding: 0;
 }
 
-.wiki-target-fields__groups {
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m, 4px);
+.wiki-target-fields__header {
+	align-items: center;
+	display: flex;
+	gap: calc(var(--base) / 2);
+	justify-content: space-between;
+	margin-bottom: calc(var(--base) / 2);
 }
 
-.wiki-target-fields__group + .wiki-target-fields__group {
-	border-top: 1px solid var(--theme-elevation-150);
+.wiki-target-fields__header .field-label {
+	margin: 0;
+	padding-bottom: 0;
+}
+
+.wiki-target-fields__groups {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 4);
+}
+
+/* `collapsible__toggle` is a full-size absolute overlay, so it paints over the
+   actions unless they are lifted into the same layer. Core sizes the actions
+   slot for a single icon button, which the text shortcut has to opt out of. */
+.wiki-target-fields__group .collapsible__actions {
+	height: auto;
+	pointer-events: all;
+	position: relative;
+	width: auto;
+	z-index: 1;
+}
+
+.wiki-target-fields__group .collapsible__content {
+	padding: calc(var(--base) / 2) calc(var(--base) / 1.5);
 }
 
 .wiki-target-fields__group-header {
 	align-items: center;
 	display: flex;
 	gap: calc(var(--base) / 4);
-	padding-inline-end: calc(var(--base) / 3);
-}
-
-.wiki-target-fields__group-toggle {
-	align-items: center;
-	background: none;
-	border: 0;
-	color: var(--theme-text);
-	cursor: pointer;
-	display: flex;
-	flex: 1;
-	font: inherit;
-	gap: calc(var(--base) / 4);
 	min-width: 0;
-	padding: calc(var(--base) / 3);
-	text-align: start;
+	padding-inline-end: calc(var(--base) / 2);
 }
 
-.wiki-target-fields__group-icon {
-	align-items: center;
-	color: var(--theme-elevation-500);
-	display: inline-flex;
+.wiki-target-fields__group-kind {
 	flex-shrink: 0;
 }
 
@@ -205,29 +207,45 @@
 	white-space: nowrap;
 }
 
-.wiki-target-fields__group-kind {
-	color: var(--theme-elevation-400);
-	font-size: 0.85em;
-}
-
+/* Beside the name rather than at the far edge: the header stretches to whatever
+   width the tab has, and a number alone out there belongs to nothing. */
 .wiki-target-fields__group-count {
-	color: var(--theme-elevation-500);
+	flex-shrink: 0;
 	font-variant-numeric: tabular-nums;
-	margin-inline-start: auto;
-}
-
-.wiki-target-fields__paths {
-	padding: 0 calc(var(--base) / 3) calc(var(--base) / 3);
 }
 
 .wiki-target-fields__path {
-	align-items: center;
+	align-items: baseline;
 	display: flex;
 	gap: calc(var(--base) / 4);
-	padding: calc(var(--base) / 8) 0 calc(var(--base) / 8) calc(var(--base) * 1.1);
+	padding: calc(var(--base) / 8) 0;
 }
 
-.wiki-target-fields__path-label {
+/* The breadcrumb reads as the admin reads: the field's own label carries the
+   weight, and the containers it sits in stay behind it. The stored path is on
+   the row's `title`, for the one moment it is the thing being checked. */
+.wiki-target-fields__crumbs {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-target-fields__crumb {
+	color: var(--theme-elevation-500);
+}
+
+.wiki-target-fields__crumb--leaf {
+	color: var(--theme-text);
+}
+
+.wiki-target-fields__crumb + .wiki-target-fields__crumb::before {
+	color: var(--theme-elevation-350);
+	content: "›";
+	padding: 0 calc(var(--base) / 6);
+}
+
+.wiki-target-fields__raw {
 	font-family: var(--font-mono);
 	font-size: 0.9em;
 	min-width: 0;
@@ -256,30 +274,22 @@
 	margin: 0;
 }
 
-.wiki-target-fields__actions {
+/* The way in for everything the rendered form cannot offer: a field behind a
+   condition, a field that does not exist yet. It sits under the list because
+   that is where it applies, and it carries its own button, since a bare input
+   that only responds to Enter reads as a search box. */
+.wiki-target-fields__manual {
 	align-items: center;
 	display: flex;
-	flex-wrap: wrap;
 	gap: calc(var(--base) / 2);
 	margin-top: calc(var(--base) / 2);
 }
 
-/* The manual path is the developer's way in and the fallback for everything the
-   rendered form cannot offer, so it is present but quiet: an underline rather
-   than an input box, at the same height as the button beside it. */
-.wiki-target-fields__manual {
-	background: none;
-	border: 0;
-	border-bottom: 1px solid var(--theme-elevation-150);
-	color: var(--theme-text);
+.wiki-target-fields__manual-input {
 	flex: 1;
-	font-family: var(--font-mono);
-	font-size: 0.9em;
 	min-width: calc(var(--base) * 8);
-	padding: calc(var(--base) / 6) 0;
 }
 
-.wiki-target-fields__manual:focus-visible {
-	border-bottom-color: var(--theme-elevation-500);
-	outline: none;
+.wiki-target-fields__manual-input input {
+	font-family: var(--font-mono);
 }

@@ -2,13 +2,14 @@
 
 import {
 	Button,
-	ChevronIcon,
-	DocumentIcon,
+	Collapsible,
 	FieldDescription,
 	FieldError,
 	FieldLabel,
 	fieldBaseClass,
-	GearIcon,
+	Pill,
+	Popup,
+	PopupList,
 	RenderCustomComponent,
 	useConfig,
 	useDrawerSlug,
@@ -16,25 +17,92 @@ import {
 	useModal,
 	XIcon,
 } from '@payloadcms/ui'
-import type { TextFieldClientProps } from 'payload'
-import { type ReactNode, useCallback, useMemo, useState } from 'react'
+import type { ClientBlock, ClientField, TextFieldClientProps } from 'payload'
+import { useCallback, useMemo, useState } from 'react'
 
-import { keys } from '../../translations/keys'
+import { keys, type TranslationKey } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
-import { BlockIcon, CalloutIcon } from '../icons'
+import { collectClientBlocks } from '../TargetSelect/clientBlocks'
 import { useWikiTargets } from '../WikiProvider/WikiProvider'
+import { collectBlockUsages } from './blockUsages'
+import { resolveFieldPathCrumbs } from './fieldPathLabels'
 import { addFieldTarget, groupFieldTargets, type WikiFieldTargetGroup } from './fieldTargetGroups'
-import { WikiFieldPickerDrawer } from './WikiFieldPickerDrawer'
+import { WikiFieldPickerDrawer, type WikiFieldPickerKind } from './WikiFieldPickerDrawer'
 import './field-picker.css'
 
 /** Above this, a group is collapsed until the author asks for it. */
 const COLLAPSE_THRESHOLD = 5
 
-const GROUP_ICONS: Record<WikiFieldTargetGroup['kind'], ReactNode> = {
-	block: <BlockIcon size="small" />,
-	collection: <DocumentIcon />,
-	global: <GearIcon />,
-	unresolved: <CalloutIcon size="small" variant="warning" />,
+/** What a group is rooted at, said in words rather than in an icon. */
+const KIND_KEYS: Record<WikiFieldTargetGroup['kind'], TranslationKey> = {
+	block: keys.targetBlocksSingular,
+	collection: keys.targetFieldsKindCollection,
+	global: keys.targetFieldsKindGlobal,
+	unresolved: keys.targetFieldsUnresolved,
+}
+
+/**
+ * The way into the picker: one drawer per kind, so the kind is chosen before the
+ * drawer opens rather than switched inside it. With one kind covered there is
+ * nothing to choose, and the menu collapses to a plain button.
+ */
+const WikiPickFieldsButton = ({
+	kinds,
+	label,
+	onPick,
+	optionLabel,
+}: {
+	kinds: WikiFieldPickerKind[]
+	label: string
+	onPick: (kind: WikiFieldPickerKind) => void
+	optionLabel: (kind: WikiFieldPickerKind) => string
+}) => {
+	const [only] = kinds
+
+	if (!only) {
+		return null
+	}
+
+	if (kinds.length === 1) {
+		return (
+			<Button
+				className="wiki-target-fields__open"
+				margin={false}
+				onClick={() => onPick(only)}
+				size="small"
+			>
+				{label}
+			</Button>
+		)
+	}
+
+	return (
+		<Popup
+			button={
+				<Button className="wiki-target-fields__open" margin={false} size="small">
+					{label}
+				</Button>
+			}
+			buttonType="custom"
+			horizontalAlign="right"
+			render={({ close }) => (
+				<PopupList.ButtonGroup>
+					{kinds.map((kind) => (
+						<PopupList.Button
+							key={kind}
+							onClick={() => {
+								close()
+								onPick(kind)
+							}}
+						>
+							{optionLabel(kind)}
+						</PopupList.Button>
+					))}
+				</PopupList.ButtonGroup>
+			)}
+			size="medium"
+		/>
+	)
 }
 
 export type WikiTargetFieldsProps = {
@@ -71,10 +139,12 @@ export const WikiTargetFields = ({
 	readOnly,
 }: WikiTargetFieldsProps) => {
 	const { config } = useConfig()
-	const { t } = useTranslation()
+	const { i18n, t } = useTranslation()
 	const { blockLabels } = useWikiTargets()
 	const { openModal } = useModal()
-	const drawerSlug = useDrawerSlug('wiki-field-picker')
+	const blockDrawerSlug = useDrawerSlug('wiki-field-picker-block')
+	const collectionDrawerSlug = useDrawerSlug('wiki-field-picker-collection')
+	const globalDrawerSlug = useDrawerSlug('wiki-field-picker-global')
 
 	const {
 		customComponents: { Description, Error: ErrorComponent, Label } = {},
@@ -87,9 +157,35 @@ export const WikiTargetFields = ({
 
 	const isReadOnly = Boolean(readOnly) || disabled
 	const values = useMemo(() => value ?? [], [value])
-	const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 	const [draft, setDraft] = useState('')
 	const [pickerSelection, setPickerSelection] = useState<string | undefined>(undefined)
+
+	/**
+	 * The field list each group's paths are resolved against. Blocks are reached
+	 * through the same walk the Blocks picker uses, so a block declared inline on
+	 * a field resolves as well as one from the registry.
+	 */
+	const ownerFields = useMemo(() => {
+		const blocks = new Map<string, ClientBlock>()
+		for (const collection of config.collections) {
+			collectClientBlocks(collection.fields, blocks, config.blocksMap)
+		}
+		for (const global of config.globals) {
+			collectClientBlocks(global.fields, blocks, config.blocksMap)
+		}
+		return (group: WikiFieldTargetGroup): ClientField[] | undefined => {
+			switch (group.kind) {
+				case 'block':
+					return (blocks.get(group.slug) ?? config.blocksMap[group.slug])?.fields
+				case 'collection':
+					return config.collections.find((entity) => entity.slug === group.slug)?.fields
+				case 'global':
+					return config.globals.find((entity) => entity.slug === group.slug)?.fields
+				default:
+					return undefined
+			}
+		}
+	}, [config])
 
 	const groups = useMemo(
 		() =>
@@ -97,8 +193,26 @@ export const WikiTargetFields = ({
 				values,
 				{ blockLabels, collections: config.collections, globals: config.globals },
 				{ blocks: blockSlugs, collections: collectionSlugs, globals: globalSlugs }
-			),
-		[blockLabels, blockSlugs, collectionSlugs, config, globalSlugs, values]
+			).map((group) => {
+				const fields = ownerFields(group)
+				return {
+					...group,
+					targets: group.targets.map((target) => ({
+						...target,
+						crumbs: resolveFieldPathCrumbs(target.label, fields, i18n.language),
+					})),
+				}
+			}),
+		[
+			blockLabels,
+			blockSlugs,
+			collectionSlugs,
+			config,
+			globalSlugs,
+			i18n.language,
+			ownerFields,
+			values,
+		]
 	)
 
 	const remove = useCallback(
@@ -119,12 +233,46 @@ export const WikiTargetFields = ({
 		setDraft('')
 	}, [draft, isReadOnly, setValue, values])
 
+	const drawerSlugs = useMemo<Record<WikiFieldPickerKind, string>>(
+		() => ({
+			block: blockDrawerSlug,
+			collection: collectionDrawerSlug,
+			global: globalDrawerSlug,
+		}),
+		[blockDrawerSlug, collectionDrawerSlug, globalDrawerSlug]
+	)
+
+	/**
+	 * A block that renders nowhere has no schema path, so it cannot be a source.
+	 * Walked here rather than in the drawer so the menu offers Blocks only when
+	 * one is actually pickable, and the drawer reuses the same result.
+	 */
+	const blockUsages = useMemo(
+		() => collectBlockUsages(config, { collections: collectionSlugs, globals: globalSlugs }),
+		[collectionSlugs, config, globalSlugs]
+	)
+
+	/** The kinds worth offering: a menu of one is a button. */
+	const availableKinds = useMemo<WikiFieldPickerKind[]>(() => {
+		const kinds: WikiFieldPickerKind[] = []
+		if (collectionSlugs.length > 0) {
+			kinds.push('collection')
+		}
+		if (globalSlugs.length > 0) {
+			kinds.push('global')
+		}
+		if (blockSlugs.some((blockSlug) => blockUsages.has(blockSlug))) {
+			kinds.push('block')
+		}
+		return kinds
+	}, [blockSlugs, blockUsages, collectionSlugs, globalSlugs])
+
 	const openPicker = useCallback(
-		(selection?: string) => {
+		(pickerKind: WikiFieldPickerKind, selection?: string) => {
 			setPickerSelection(selection)
-			openModal(drawerSlug)
+			openModal(drawerSlugs[pickerKind])
 		},
-		[drawerSlug, openModal]
+		[drawerSlugs, openModal]
 	)
 
 	return (
@@ -139,10 +287,23 @@ export const WikiTargetFields = ({
 				.join(' ')}
 			id={`field-${path.replace(/\./g, '__')}`}
 		>
-			<RenderCustomComponent
-				CustomComponent={Label}
-				Fallback={<FieldLabel label={field?.label} path={path} />}
-			/>
+			{/* Label on the left, the way in on the right: the same header shape a
+			    join field uses, so the button reads as belonging to this list rather
+			    than to whatever follows it. */}
+			<div className="wiki-target-fields__header">
+				<RenderCustomComponent
+					CustomComponent={Label}
+					Fallback={<FieldLabel label={field?.label} path={path} />}
+				/>
+				{isReadOnly ? null : (
+					<WikiPickFieldsButton
+						kinds={availableKinds}
+						label={t(keys.pickerOpen)}
+						onPick={openPicker}
+						optionLabel={(pickerKind) => t(KIND_KEYS[pickerKind])}
+					/>
+				)}
+			</div>
 			<div className={`${fieldBaseClass}__wrap`}>
 				<RenderCustomComponent
 					CustomComponent={ErrorComponent}
@@ -153,48 +314,75 @@ export const WikiTargetFields = ({
 				) : (
 					<ul className="wiki-target-fields__groups">
 						{groups.map((group) => {
-							const open = expanded[group.id] ?? group.targets.length <= COLLAPSE_THRESHOLD
+							/** A group is editable when its own kind has a drawer to open. */
+							const editKind =
+								!isReadOnly && group.kind !== 'unresolved' && availableKinds.includes(group.kind)
+									? group.kind
+									: undefined
 							return (
 								<li className="wiki-target-fields__group" key={group.id}>
-									<div className="wiki-target-fields__group-header">
-										<button
-											aria-expanded={open}
-											className="wiki-target-fields__group-toggle"
-											onClick={() => setExpanded((current) => ({ ...current, [group.id]: !open }))}
-											type="button"
-										>
-											<ChevronIcon direction={open ? 'down' : 'right'} />
-											<span aria-hidden="true" className="wiki-target-fields__group-icon">
-												{GROUP_ICONS[group.kind]}
-											</span>
-											<span className="wiki-target-fields__group-label">
-												{group.kind === 'unresolved' ? t(keys.targetFieldsUnresolved) : group.label}
-											</span>
-											{group.kind === 'block' ? (
-												<span className="wiki-target-fields__group-kind">
-													{t(keys.targetBlocksSingular)}
-												</span>
-											) : null}
-											<span className="wiki-target-fields__group-count">
-												{group.targets.length}
-											</span>
-										</button>
-										{!isReadOnly && group.kind !== 'unresolved' ? (
-											<Button
-												buttonStyle="none"
-												className="wiki-target-fields__group-edit"
-												margin={false}
-												onClick={() => openPicker(group.id)}
-											>
-												{t(keys.pickerEdit)}
-											</Button>
-										) : null}
-									</div>
-									{open ? (
+									<Collapsible
+										actions={
+											editKind ? (
+												<Button
+													buttonStyle="subtle"
+													className="wiki-target-fields__group-edit"
+													margin={false}
+													onClick={() => openPicker(editKind, group.id)}
+													size="small"
+												>
+													{t(keys.pickerEdit)}
+												</Button>
+											) : undefined
+										}
+										header={
+											<div className="wiki-target-fields__group-header">
+												<Pill
+													className="wiki-target-fields__group-kind"
+													pillStyle={group.kind === 'unresolved' ? 'warning' : 'white'}
+													size="small"
+												>
+													{t(KIND_KEYS[group.kind])}
+												</Pill>
+												{group.kind === 'unresolved' ? null : (
+													<span className="wiki-target-fields__group-label">{group.label}</span>
+												)}
+												<Pill
+													className="wiki-target-fields__group-count"
+													pillStyle="light-gray"
+													size="small"
+												>
+													{group.targets.length}
+												</Pill>
+											</div>
+										}
+										initCollapsed={group.targets.length > COLLAPSE_THRESHOLD}
+									>
 										<ul className="wiki-target-fields__paths">
 											{group.targets.map((target) => (
 												<li className="wiki-target-fields__path" key={target.value}>
-													<code className="wiki-target-fields__path-label">{target.label}</code>
+													{target.crumbs.length > 0 ? (
+														<span className="wiki-target-fields__crumbs" title={target.value}>
+															{target.crumbs.map((crumb, index) => (
+																<span
+																	className={[
+																		'wiki-target-fields__crumb',
+																		index === target.crumbs.length - 1 &&
+																			'wiki-target-fields__crumb--leaf',
+																	]
+																		.filter(Boolean)
+																		.join(' ')}
+																	key={target.crumbs.slice(0, index + 1).join('›')}
+																>
+																	{crumb}
+																</span>
+															))}
+														</span>
+													) : (
+														<code className="wiki-target-fields__raw" title={target.value}>
+															{target.label}
+														</code>
+													)}
 													{isReadOnly ? null : (
 														<button
 															aria-label={t(keys.targetFieldsRemove, { path: target.value })}
@@ -208,39 +396,39 @@ export const WikiTargetFields = ({
 												</li>
 											))}
 										</ul>
-									) : null}
+									</Collapsible>
 								</li>
 							)
 						})}
 					</ul>
 				)}
 				{isReadOnly ? null : (
-					<div className="wiki-target-fields__actions">
+					<div className="wiki-target-fields__manual">
+						{/* `field-type text` is Payload's own input skin, so the manual path
+						    matches every other text input in the form, theming included. */}
+						<div className="wiki-target-fields__manual-input field-type text">
+							<input
+								aria-label={t(keys.targetFieldsManualLabel)}
+								onChange={(event) => setDraft(event.target.value)}
+								onKeyDown={(event) => {
+									if (event.key === 'Enter') {
+										event.preventDefault()
+										addDraft()
+									}
+								}}
+								placeholder={t(keys.targetFieldsManualPlaceholder)}
+								type="text"
+								value={draft}
+							/>
+						</div>
 						<Button
 							buttonStyle="secondary"
-							icon="plus"
-							iconPosition="left"
-							iconStyle="none"
+							disabled={draft.trim().length === 0}
 							margin={false}
-							onClick={() => openPicker(undefined)}
-							size="small"
+							onClick={addDraft}
 						>
-							{t(keys.pickerOpen)}
+							{t(keys.targetFieldsManualAdd)}
 						</Button>
-						<input
-							aria-label={t(keys.targetFieldsManualLabel)}
-							className="wiki-target-fields__manual"
-							onChange={(event) => setDraft(event.target.value)}
-							onKeyDown={(event) => {
-								if (event.key === 'Enter') {
-									event.preventDefault()
-									addDraft()
-								}
-							}}
-							placeholder={t(keys.targetFieldsManualPlaceholder)}
-							type="text"
-							value={draft}
-						/>
 					</div>
 				)}
 			</div>
@@ -248,17 +436,24 @@ export const WikiTargetFields = ({
 				CustomComponent={Description}
 				Fallback={<FieldDescription description={field?.admin?.description} path={path} />}
 			/>
-			{isReadOnly ? null : (
-				<WikiFieldPickerDrawer
-					blockSlugs={blockSlugs}
-					collectionSlugs={collectionSlugs}
-					globalSlugs={globalSlugs}
-					initialSelection={pickerSelection}
-					onConfirm={setValue}
-					slug={drawerSlug}
-					value={values}
-				/>
-			)}
+			{isReadOnly
+				? null
+				: availableKinds.map((availableKind) => (
+						<WikiFieldPickerDrawer
+							blockSlugs={blockSlugs}
+							blockUsages={blockUsages}
+							collectionSlugs={collectionSlugs}
+							globalSlugs={globalSlugs}
+							initialSelection={
+								pickerSelection?.startsWith(`${availableKind}:`) ? pickerSelection : undefined
+							}
+							key={availableKind}
+							kind={availableKind}
+							onConfirm={setValue}
+							slug={drawerSlugs[availableKind]}
+							value={values}
+						/>
+					))}
 		</div>
 	)
 }

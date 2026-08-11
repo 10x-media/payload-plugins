@@ -76,24 +76,26 @@ Two consequences worth knowing:
 
 ## Picking fields
 
-The **Fields** list is grouped by what each target is rooted at: one section per collection, global, and block, with a count and the paths underneath. Sections holding more than five paths start collapsed.
+The **Fields** list is grouped by what each target is rooted at: one collapsible section per collection, global, and block, labelled with its kind and carrying a count. Sections holding more than five paths start collapsed.
 
-Targets that no longer resolve against the running config are listed in a final **Unresolved** section under their raw stored value, still readable and still removable.
+Each path reads as a breadcrumb of field labels, in the reader's admin language: `collection:posts.branding.links.url` shows as **Branding › Links › URL**. The stored value is on the row's tooltip. Named groups, named tabs, and arrays contribute a crumb; rows and unnamed tabs contribute none; a collapsible contributes its label. A path that no longer resolves against the running config is shown verbatim instead.
+
+Targets whose owner no longer resolves are listed in a final **Unresolved** section under their raw stored value, still readable and still removable.
 
 ### The picker
 
-**Pick fields** opens a drawer rendering the **real fields** of whatever you choose: your labels, your custom field components, your layout, in your admin language.
+**Pick fields**, above the list, opens a menu of what to pick from: **Collection**, **Global**, **Block**. A kind the plugin covers nothing of is left out, and when only one kind is covered the button opens it directly.
 
-Two controls at the top choose what is shown:
+Each kind has its own drawer, rendering the **real fields** of whatever is selected: your labels, your custom field components, your layout, in your admin language. One control at the top switches within that kind:
 
-- a menu of the collections and globals the plugin covers
-- a block picker, which is Payload's own block drawer with thumbnails, groups, and search
+- collections and globals switch through a menu
+- a block switches through Payload's own block drawer, with thumbnails, groups, and search
 
-Choosing a block shows that block's own form, and the paths it produces are block-scoped (`block:heroBanner.heading`).
+**Block** opens that block drawer straight away, since a block has no default. The paths a block produces are block-scoped (`block:heroBanner.heading`).
 
 Each field carries a **Cover this field** plate in place of its help surface. Selecting is a toggle, and the drawer opens with the guide's existing targets already selected. **Apply** writes the result into the form; nothing is stored until you save the guide.
 
-Every section header in the Fields list has an **Edit** shortcut opening the picker on that collection, global, or block.
+Every section header in the Fields list has an **Edit** shortcut, opening that kind's drawer on that collection, global, or block.
 
 The drawer reads only. It is not a document view: no save, no autosave, no draft, no document lock, and no write to the entity whose fields it shows.
 
@@ -101,16 +103,16 @@ The drawer reads only. It is not a document view: no save, no autosave, no draft
 
 Every array opens with one empty row, recursively. Paths stay [index-free](#field-schema-paths): picking `caption` in the first row of `gallery` targets that field in every row.
 
-A **blocks field** is shown as itself and stays empty. Its fields are reached by picking the block from the block picker.
+A **blocks field** is shown as itself and stays empty. Its fields are reached by picking the block from the **Block** drawer.
 
 ### What the picker cannot show
 
 - **Fields hidden by a condition.** A field whose `admin.condition` is false against empty data is not rendered.
 - **Custom field components with no Description slot.** See [Customization](/admin-wiki/customization).
-- **Blocks that render nowhere.** A block declared in `config.blocks` and referenced by no `blocks` field is left out of the block picker.
+- **Blocks that render nowhere.** A block declared in `config.blocks` and referenced by no `blocks` field is left out of the block drawer. When no covered block renders anywhere, **Block** is absent from the menu.
 - **Blocks that only a rich text editor renders.** See [Blocks in lexical editors](#blocks-in-lexical-editors).
 
-The **or type a path** input beside the button accepts any owner-qualified path and appends it on <kbd>Enter</kbd>. It reaches every case above except a block declared only inside an editor, and it is how you attach a guide to a field that does not exist yet.
+The **path input** under the list accepts any owner-qualified path and appends it on **Add** or <kbd>Enter</kbd>. It reaches every case above except a block declared only inside an editor, and it is how you attach a guide to a field that does not exist yet.
 
 ### Blocks in lexical editors
 
@@ -127,7 +129,7 @@ The config walk finds blocks through fields of type `blocks`, plus everything in
 - Walked, like everything in `config.blocks`. `block:<slug>` and its field paths are valid targets.
 - `block:<slug>` is selectable in the **Blocks** list.
 - Field paths such as `block:<slug>.<field>` work when typed into the Fields list, and the help surfaces render inside the editor.
-- Only the picker is unavailable: the block is absent from the block picker's grid.
+- Only the picker is unavailable: the block is absent from the block drawer's grid.
 
 ## Target keys
 
@@ -147,7 +149,7 @@ Field keys carry a double prefix: `field:` plus the owner-qualified path the aut
 
 All four lists are `text` fields with `hasMany`, not relationships and not `select` fields with stored options. Every picker is a UI over the same string storage. That has three consequences worth knowing:
 
-- A field guide can be written **before** the field exists, which is normal when documenting a form while it is still being built. The picker cannot offer a field that does not exist; the manual path input can.
+- A field guide can be written **before** the field exists, which is normal when documenting a form while it is still being built. The picker cannot offer a field that does not exist; the path input can.
 - A guide **survives** its surface being removed, renamed, or excluded. The value stays readable and removable in the picker, listed under its raw slug or in the **Unresolved** group; only the attachment is stale, and the content is still there to reattach.
 - Nothing in the wiki schema depends on the shape of your config, so a field moving never means a migration.
 

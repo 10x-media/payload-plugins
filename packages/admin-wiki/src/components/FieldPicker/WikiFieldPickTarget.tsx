@@ -49,7 +49,6 @@ export const WikiFieldPickTarget = ({ schemaPath }: WikiFieldPickTargetProps) =>
 			<span className="wiki-field-pick__label">
 				{selected ? t(keys.pickerSelected) : t(keys.pickerSelect)}
 			</span>
-			<code className="wiki-field-pick__path">{schemaPath}</code>
 		</button>
 	)
 }

@@ -55,7 +55,7 @@ export const MyDescription = ({ schemaPath }: { schemaPath: string }) => {
 }
 ```
 
-`WikiFieldPickTarget` renders nothing outside a picker, so the branch is optional. A component that ignores picker mode keeps working: its fields carry no plate in the drawer, and their paths stay reachable through the picker's manual path input.
+`WikiFieldPickTarget` renders nothing outside a picker, so the branch is optional. A component that ignores picker mode keeps working: its fields carry no plate in the drawer, and their paths stay reachable through the path input under the Fields list.
 
 ## Fields with a function description
 
@@ -106,7 +106,7 @@ The pieces the built-in surfaces are made of are all exported from `@10x-media/a
 | `WikiWriteGuide` | The write-in-place affordance, in `inline`, `button`, or `menuItem` shape |
 | `WikiEditModeToggle` | The edit-mode pill. Renders nothing when there is nothing to toggle |
 | `WikiTargetFields` | The grouped field-target list, as the Targets tab renders it |
-| `WikiFieldPickerDrawer` | The picker drawer on its own. Takes covered slugs, the current value, and an `onConfirm` |
+| `WikiFieldPickerDrawer` | One kind's picker drawer. Takes a `kind`, the covered slugs, the current value, and an `onConfirm` |
 | `WikiFieldPickTarget` | The select plate. Renders nothing outside a picker |
 
 A minimal custom surface:
