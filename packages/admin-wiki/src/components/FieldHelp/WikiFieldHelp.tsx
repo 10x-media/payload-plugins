@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { fieldTargetKey, type WikiTargetEntry } from '../../shared/targetKeys'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
+import { useWikiFieldPicker } from '../FieldPicker/WikiPickerContext'
 import { GuideDrawer } from '../GuideDrawer/GuideDrawer'
 import { HelpIcon } from '../icons'
 import { useWikiTargets } from '../WikiProvider/WikiProvider'
@@ -18,11 +19,19 @@ import './field-help.css'
  * plus the two permissions an empty state needs. Prefer `canWrite` for
  * rendering a write affordance: it already accounts for the configured
  * `writeAffordances` mode, where `canCreate` is the raw permission alone.
+ *
+ * `picker` is non-null only while the field is being rendered inside the field
+ * target picker's drawer, where the help surface is not what belongs there. A
+ * custom field that renders its own surface should render a select affordance
+ * instead when it is set, which is what `WikiFieldPickTarget` does; a field that
+ * ignores it stays picker-blind, and its paths are still reachable through the
+ * picker's manual input.
  */
 export const useWikiFieldHelp = (schemaPath: string) => {
 	const { canCreate, canWrite, entriesFor } = useWikiTargets()
+	const picker = useWikiFieldPicker()
 	const entries = entriesFor(fieldTargetKey(schemaPath))
-	return { canCreate, canWrite, entries, hasGuides: entries.length > 0 }
+	return { canCreate, canWrite, entries, hasGuides: entries.length > 0, picker }
 }
 
 export type WikiTargetHelpProps = {

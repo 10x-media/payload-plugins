@@ -60,6 +60,14 @@ export const HelpIcon = (props: WikiIconProps) => (
 	</Glyph>
 )
 
+/** Two stacked plates: a block, where Payload's own icon set has none. */
+export const BlockIcon = (props: WikiIconProps) => (
+	<Glyph {...props} name="block">
+		<rect className="stroke" height="5" rx="1" width="12.5" x="3.75" y="3.5" />
+		<rect className="stroke" height="5" rx="1" width="12.5" x="3.75" y="11.5" />
+	</Glyph>
+)
+
 /** A filled star: the featured flag, on cards and rows. */
 export const StarIcon = (props: WikiIconProps) => (
 	<Glyph {...props} name="star">

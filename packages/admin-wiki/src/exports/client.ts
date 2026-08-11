@@ -17,6 +17,36 @@ export {
 	WikiWriteGuide,
 	type WikiWriteGuideProps,
 } from '../components/FieldHelp/WikiWriteGuide'
+export {
+	collectBlockUsages,
+	type WikiBlockUsage,
+} from '../components/FieldPicker/blockUsages'
+export { buildPrefillData } from '../components/FieldPicker/buildPrefillData'
+export {
+	addFieldTarget,
+	groupFieldTargets,
+	toggleFieldTarget,
+	type WikiCoveredSlugs,
+	type WikiFieldTargetGroup,
+	type WikiFieldTargetItem,
+} from '../components/FieldPicker/fieldTargetGroups'
+export {
+	WikiFieldPickerDrawer,
+	type WikiFieldPickerDrawerProps,
+} from '../components/FieldPicker/WikiFieldPickerDrawer'
+export {
+	WikiFieldPickTarget,
+	type WikiFieldPickTargetProps,
+} from '../components/FieldPicker/WikiFieldPickTarget'
+export {
+	useWikiFieldPicker,
+	type WikiFieldPickerContextValue,
+	WikiFieldPickerProvider,
+} from '../components/FieldPicker/WikiPickerContext'
+export {
+	WikiTargetFields,
+	type WikiTargetFieldsProps,
+} from '../components/FieldPicker/WikiTargetFields'
 export { Callout, type CalloutProps } from '../components/GuideArticle/Callout'
 export { CalloutBlockLabel } from '../components/GuideArticle/CalloutBlockLabel'
 export { GuideArticle, type GuideArticleProps } from '../components/GuideArticle/GuideArticle'

@@ -13,12 +13,14 @@ The **Targets** tab of a wiki page holds one list per kind:
 |---|---|---|---|---|
 | `targetCollections` | Collection | Bare slug | `posts` | Picking from the collections the plugin covers |
 | `targetGlobals` | Global | Bare slug | `settings` | Picking from the globals the plugin covers |
-| `targetFields` | Field | Owner-qualified schema path | `collection:posts.hero.title` | Typing, or a [write affordance](#prefilled-targets) |
+| `targetFields` | Field | Owner-qualified schema path | `collection:posts.hero.title` | [Picking fields](#picking-fields) from a rendered form, typing a path, or a [write affordance](#prefilled-targets) |
 | `targetBlocks` | Block | Bare block slug | `heroBanner` | Picking from the blocks the plugin covers |
 
 One guide may fill all four, and any number of guides may name the same target. A surface with several guides shows them all, ordered featured-first, then by title.
 
 **Collections** and **Globals** are multi-selects. **Blocks** is a select whose menu is Payload's own block drawer, with thumbnails, groups, and search, so blocks are chosen by their label rather than by slug. All three list only what the plugin covers, so an [excluded](/admin-wiki/configuration#exclusions) entity cannot be targeted. Labels follow the reader's admin language wherever the entity declares one per locale.
+
+**Fields** is a grouped list. See [Picking fields](#picking-fields).
 
 ## Field schema paths
 
@@ -72,6 +74,61 @@ Two consequences worth knowing:
 - Targeting a block's field **in one collection only** is not expressible. If you need that, document the whole surface with a collection or field target on the enclosing form instead.
 - Block slugs are a global namespace here, exactly as they are for [whole-block targets](#the-four-target-kinds). If two different block configs share a slug, their fields merge under the one root and the plugin logs a warning on boot naming the slug and where each was found. Payload permits the collision (its duplicate check runs per blocks field, not across the config) and resolves it registry-first in parts of its own admin, so the wiki follows that precedence.
 
+## Picking fields
+
+The **Fields** list is grouped by what each target is rooted at: one section per collection, global, and block, with a count and the paths underneath. Sections holding more than five paths start collapsed.
+
+Targets that no longer resolve against the running config are listed in a final **Unresolved** section under their raw stored value, still readable and still removable.
+
+### The picker
+
+**Pick fields** opens a drawer rendering the **real fields** of whatever you choose: your labels, your custom field components, your layout, in your admin language.
+
+Two controls at the top choose what is shown:
+
+- a menu of the collections and globals the plugin covers
+- a block picker, which is Payload's own block drawer with thumbnails, groups, and search
+
+Choosing a block shows that block's own form, and the paths it produces are block-scoped (`block:heroBanner.heading`).
+
+Each field carries a **Cover this field** plate in place of its help surface. Selecting is a toggle, and the drawer opens with the guide's existing targets already selected. **Apply** writes the result into the form; nothing is stored until you save the guide.
+
+Every section header in the Fields list has an **Edit** shortcut opening the picker on that collection, global, or block.
+
+The drawer reads only. It is not a document view: no save, no autosave, no draft, no document lock, and no write to the entity whose fields it shows.
+
+### Arrays and blocks in the picker
+
+Every array opens with one empty row, recursively. Paths stay [index-free](#field-schema-paths): picking `caption` in the first row of `gallery` targets that field in every row.
+
+A **blocks field** is shown as itself and stays empty. Its fields are reached by picking the block from the block picker.
+
+### What the picker cannot show
+
+- **Fields hidden by a condition.** A field whose `admin.condition` is false against empty data is not rendered.
+- **Custom field components with no Description slot.** See [Customization](/admin-wiki/customization).
+- **Blocks that render nowhere.** A block declared in `config.blocks` and referenced by no `blocks` field is left out of the block picker.
+- **Blocks that only a rich text editor renders.** See [Blocks in lexical editors](#blocks-in-lexical-editors).
+
+The **or type a path** input beside the button accepts any owner-qualified path and appends it on <kbd>Enter</kbd>. It reaches every case above except a block declared only inside an editor, and it is how you attach a guide to a field that does not exist yet.
+
+### Blocks in lexical editors
+
+The config walk finds blocks through fields of type `blocks`, plus everything in `config.blocks`. A block used by a rich text editor's `BlocksFeature` falls into one of two cases.
+
+**Declared inline in the feature** — `BlocksFeature({ blocks: [...] })` — and present in no `blocks` field and not in `config.blocks`:
+
+- Not walked. No target keys, no help surfaces.
+- Absent from the **Blocks** list and from the field picker.
+- A path typed by hand resolves to nothing and is reported by the [orphan banner](#orphaned-targets).
+
+**Referenced from the registry** — `BlocksFeature({ blockReferences: [...] })` with the block in `config.blocks` — and present in no `blocks` field:
+
+- Walked, like everything in `config.blocks`. `block:<slug>` and its field paths are valid targets.
+- `block:<slug>` is selectable in the **Blocks** list.
+- Field paths such as `block:<slug>.<field>` work when typed into the Fields list, and the help surfaces render inside the editor.
+- Only the picker is unavailable: the block is absent from the block picker's grid.
+
 ## Target keys
 
 Internally every target becomes one string, and that string is what surfaces listen on:
@@ -90,8 +147,8 @@ Field keys carry a double prefix: `field:` plus the owner-qualified path the aut
 
 All four lists are `text` fields with `hasMany`, not relationships and not `select` fields with stored options. Every picker is a UI over the same string storage. That has three consequences worth knowing:
 
-- A field guide can be written **before** the field exists, which is normal when documenting a form while it is still being built.
-- A guide **survives** its surface being removed, renamed, or excluded. The value stays readable and removable in the picker, listed under its raw slug; only the attachment is stale, and the content is still there to reattach.
+- A field guide can be written **before** the field exists, which is normal when documenting a form while it is still being built. The picker cannot offer a field that does not exist; the manual path input can.
+- A guide **survives** its surface being removed, renamed, or excluded. The value stays readable and removable in the picker, listed under its raw slug or in the **Unresolved** group; only the attachment is stale, and the content is still there to reattach.
 - Nothing in the wiki schema depends on the shape of your config, so a field moving never means a migration.
 
 The cost is that a typo in a field target attaches a guide to nothing, which the orphan banner catches.
@@ -106,7 +163,7 @@ The underlying endpoint is `GET /api/wiki-pages/orphaned-targets`.
 
 ## Prefilled targets
 
-Schema paths do not have to be typed by hand. Every unguided surface can render a "write this guide" affordance that opens a create drawer with the matching target list already filled in. See [Write affordances](/admin-wiki/write-affordances).
+Schema paths do not have to be typed by hand, and the [picker](#picking-fields) is not the only way to avoid it. Every unguided surface can render a "write this guide" affordance that opens a create drawer with the matching target list already filled in, so a guide started from the field it is about arrives with that field already targeted. See [Write affordances](/admin-wiki/write-affordances).
 
 ## Localization
 

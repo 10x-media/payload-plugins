@@ -167,10 +167,30 @@ export interface Post {
   meta?: {
     seoTitle?: string | null;
   };
+  specs?:
+    | {
+        label?: string | null;
+        values?:
+          | {
+              value?: string | null;
+              unit?: string | null;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
   branding?: {
     accent?: string | null;
     icon?: string | null;
     tagline?: string | null;
+    links?:
+      | {
+          label?: string | null;
+          href?: string | null;
+          id?: string | null;
+        }[]
+      | null;
   };
   updatedAt: string;
   createdAt: string;
@@ -365,12 +385,32 @@ export interface PostsSelect<T extends boolean = true> {
     | {
         seoTitle?: T;
       };
+  specs?:
+    | T
+    | {
+        label?: T;
+        values?:
+          | T
+          | {
+              value?: T;
+              unit?: T;
+              id?: T;
+            };
+        id?: T;
+      };
   branding?:
     | T
     | {
         accent?: T;
         icon?: T;
         tagline?: T;
+        links?:
+          | T
+          | {
+              label?: T;
+              href?: T;
+              id?: T;
+            };
       };
   updatedAt?: T;
   createdAt?: T;

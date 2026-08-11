@@ -28,10 +28,34 @@ The `schemaPath` is the owner-qualified, index-free path from [Targeting](/admin
 For a component that hardcodes its own rendering and wants the data rather than the UI, `useWikiFieldHelp` is the one-line adoption path:
 
 ```tsx
-const { canCreate, canWrite, entries, hasGuides } = useWikiFieldHelp('collection:posts.title')
+const { canCreate, canWrite, entries, hasGuides, picker } = useWikiFieldHelp('collection:posts.title')
 ```
 
 Prefer `canWrite` over `canCreate` when deciding whether to show a write affordance: it already accounts for the configured [`writeAffordances` mode](/admin-wiki/write-affordances), where `canCreate` is the raw permission alone.
+
+### Picker mode
+
+The [field picker](/admin-wiki/targets#picking-fields) renders your real fields, so your custom component appears there too. `picker` is non-null while a field is rendered inside the picker's drawer, and `null` everywhere else.
+
+The injected description handles this already. A component rendering its own surface branches the same way:
+
+```tsx title="MyDescription.tsx"
+'use client'
+import { WikiFieldHelp, WikiFieldPickTarget, useWikiFieldPicker } from '@10x-media/admin-wiki/client'
+
+export const MyDescription = ({ schemaPath }: { schemaPath: string }) => {
+  const picker = useWikiFieldPicker()
+
+  return (
+    <>
+      <span>My own description text.</span>
+      {picker ? <WikiFieldPickTarget schemaPath={schemaPath} /> : <WikiFieldHelp schemaPath={schemaPath} />}
+    </>
+  )
+}
+```
+
+`WikiFieldPickTarget` renders nothing outside a picker, so the branch is optional. A component that ignores picker mode keeps working: its fields carry no plate in the drawer, and their paths stay reachable through the picker's manual path input.
 
 ## Fields with a function description
 
@@ -81,6 +105,9 @@ The pieces the built-in surfaces are made of are all exported from `@10x-media/a
 | `TargetChips` | The surfaces a guide covers, as pills, with a `limit` before collapsing to `+N` |
 | `WikiWriteGuide` | The write-in-place affordance, in `inline`, `button`, or `menuItem` shape |
 | `WikiEditModeToggle` | The edit-mode pill. Renders nothing when there is nothing to toggle |
+| `WikiTargetFields` | The grouped field-target list, as the Targets tab renders it |
+| `WikiFieldPickerDrawer` | The picker drawer on its own. Takes covered slugs, the current value, and an `onConfirm` |
+| `WikiFieldPickTarget` | The select plate. Renders nothing outside a picker |
 
 A minimal custom surface:
 

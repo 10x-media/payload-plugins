@@ -20,7 +20,9 @@ Every block reachable from any blocks field gets its guides as a UI field, **app
 
 Shared block configs (`config.blocks` and `blockReferences`) are handled once, so a block used in six places carries one guide surface, not six. The same holds for the help on the block's **own fields**: they are [targeted through the block](/admin-wiki/targets#fields-inside-blocks), not through whichever collection is on screen, so one guide covers every usage.
 
-The injected field is named `adminWikiBlockHelp`. A block that already declares a field by that name keeps its own.
+"Reachable" means through a field of type `blocks`, plus everything in `config.blocks`. A block declared only inside a rich text editor's `BlocksFeature` is not walked and carries no surfaces; see [Blocks in lexical editors](/admin-wiki/targets#blocks-in-lexical-editors).
+
+The injected field is named `adminWikiBlockHelp`. A block that already declares a field by that name keeps its own. It renders nothing inside the [field picker](/admin-wiki/targets#picking-fields).
 
 ## Document and global sidebar
 

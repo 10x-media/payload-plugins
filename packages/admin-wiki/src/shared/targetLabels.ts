@@ -65,7 +65,15 @@ const findLabel = (entities: LabelledEntity[] | undefined, slug: string): null |
 	return entity ? singularLabel(entity) : null
 }
 
-type FieldTargetRoot = 'block' | 'collection' | 'global'
+/** What a field target can be rooted at: an entity, or a block. */
+export type FieldTargetRoot = 'block' | 'collection' | 'global'
+
+/** A stored field target split into its owner and the path inside it. */
+export type ParsedFieldTarget = {
+	ownerSlug: string
+	ownerType: FieldTargetRoot
+	path: string
+}
 
 const FIELD_TARGET_ROOTS = new Set<string>(['block', 'collection', 'global'])
 
@@ -75,9 +83,7 @@ const FIELD_TARGET_ROOTS = new Set<string>(['block', 'collection', 'global'])
  * inside it. Null when the value carries no owner prefix, in which case it is
  * shown verbatim.
  */
-const parseFieldTarget = (
-	value: string
-): null | { ownerSlug: string; ownerType: FieldTargetRoot; path: string } => {
+export const parseFieldTarget = (value: string): null | ParsedFieldTarget => {
 	const separator = value.indexOf(':')
 	const ownerType = value.slice(0, separator)
 	if (separator < 1 || !FIELD_TARGET_ROOTS.has(ownerType)) {
@@ -96,8 +102,8 @@ const parseFieldTarget = (
 }
 
 /** The label of whatever a field target is rooted at: a block, or an entity. */
-const fieldOwnerLabel = (
-	owner: { ownerSlug: string; ownerType: FieldTargetRoot },
+export const fieldOwnerLabel = (
+	owner: Pick<ParsedFieldTarget, 'ownerSlug' | 'ownerType'>,
 	sources: EntityLabelSources
 ): string => {
 	if (owner.ownerType === 'block') {

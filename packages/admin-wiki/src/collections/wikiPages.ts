@@ -34,6 +34,7 @@ export type BuildWikiPagesArgs = {
 
 const TARGET_SELECT = '@10x-media/admin-wiki/client#WikiTargetSelect'
 const TARGET_BLOCKS = '@10x-media/admin-wiki/client#WikiTargetBlocks'
+const TARGET_FIELDS = '@10x-media/admin-wiki/client#WikiTargetFields'
 
 /** Slugs of one entity kind the plugin covers, sorted for a stable picker. */
 const coveredSlugs = (entities: undefined | { slug: string }[], excluded: string[]): string[] => {
@@ -51,70 +52,78 @@ const coveredSlugs = (entities: undefined | { slug: string }[], excluded: string
  * would have dropped an unrecognized value on save.
  *
  * Collections, globals, and blocks are picked from what the plugin covers, so a
- * guide cannot be attached to an entity the host excluded. Fields stay
- * free-text; their write affordances fill them in.
+ * guide cannot be attached to an entity the host excluded. Fields are picked the
+ * same way, from a drawer rendering the chosen entity's real form, with a text
+ * input beside it for the paths a rendered form cannot offer.
  */
 const targetFields = (
 	config: Config,
 	resolved: ResolvedWikiOptions,
 	blockSlugs: string[]
-): Field[] => [
-	{
-		name: 'targetCollections',
-		type: 'text',
-		hasMany: true,
-		label: labelForKey(keys.targetCollectionsLabel),
-		admin: {
-			components: {
-				Field: {
-					clientProps: {
-						entity: 'collection',
-						slugs: coveredSlugs(config.collections, resolved.exclude.collections),
+): Field[] => {
+	const collectionSlugs = coveredSlugs(config.collections, resolved.exclude.collections)
+	const globalSlugs = coveredSlugs(config.globals, resolved.exclude.globals)
+
+	return [
+		{
+			name: 'targetCollections',
+			type: 'text',
+			hasMany: true,
+			label: labelForKey(keys.targetCollectionsLabel),
+			admin: {
+				components: {
+					Field: {
+						clientProps: { entity: 'collection', slugs: collectionSlugs },
+						path: TARGET_SELECT,
 					},
-					path: TARGET_SELECT,
 				},
+				description: labelForKey(keys.targetCollectionsDescription),
 			},
-			description: labelForKey(keys.targetCollectionsDescription),
 		},
-	},
-	{
-		name: 'targetGlobals',
-		type: 'text',
-		hasMany: true,
-		label: labelForKey(keys.targetGlobalsLabel),
-		admin: {
-			components: {
-				Field: {
-					clientProps: {
-						entity: 'global',
-						slugs: coveredSlugs(config.globals, resolved.exclude.globals),
+		{
+			name: 'targetGlobals',
+			type: 'text',
+			hasMany: true,
+			label: labelForKey(keys.targetGlobalsLabel),
+			admin: {
+				components: {
+					Field: {
+						clientProps: { entity: 'global', slugs: globalSlugs },
+						path: TARGET_SELECT,
 					},
-					path: TARGET_SELECT,
 				},
+				description: labelForKey(keys.targetGlobalsDescription),
 			},
-			description: labelForKey(keys.targetGlobalsDescription),
 		},
-	},
-	{
-		name: 'targetFields',
-		type: 'text',
-		hasMany: true,
-		label: labelForKey(keys.targetFieldsLabel),
-		admin: { description: labelForKey(keys.targetFieldsDescription) },
-	},
-	{
-		name: 'targetBlocks',
-		type: 'text',
-		hasMany: true,
-		label: labelForKey(keys.targetBlocksLabel),
-		admin: {
-			components: {
-				Field: { clientProps: { slugs: blockSlugs }, path: TARGET_BLOCKS },
+		{
+			name: 'targetFields',
+			type: 'text',
+			hasMany: true,
+			label: labelForKey(keys.targetFieldsLabel),
+			admin: {
+				components: {
+					Field: {
+						clientProps: { blockSlugs, collectionSlugs, globalSlugs },
+						path: TARGET_FIELDS,
+					},
+				},
+				description: labelForKey(keys.targetFieldsDescription),
 			},
-			description: labelForKey(keys.targetBlocksDescription),
 		},
-	},
-]
+		{
+			name: 'targetBlocks',
+			type: 'text',
+			hasMany: true,
+			label: labelForKey(keys.targetBlocksLabel),
+			admin: {
+				components: {
+					Field: { clientProps: { slugs: blockSlugs }, path: TARGET_BLOCKS },
+				},
+				description: labelForKey(keys.targetBlocksDescription),
+			},
+		},
+	]
+}
 
 /**
  * The guide pages collection: drafts enabled; localized title, summary, and

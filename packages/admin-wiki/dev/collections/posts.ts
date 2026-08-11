@@ -7,6 +7,10 @@ import type { CollectionConfig } from 'payload'
  * referencing the shared `heroBanner` block, and `@10x-media/fields` fields
  * proving the third-party integration contract (their Description slot surfaces
  * the field help unchanged).
+ *
+ * `specs` is the field picker's fixture: an array holding a second array, one of
+ * them behind a named group, so the drawer's prefill has to build
+ * `{ specs: [{ values: [{}] }] }` before anything inside is clickable.
  */
 export const posts: CollectionConfig = {
 	slug: 'posts',
@@ -41,12 +45,35 @@ export const posts: CollectionConfig = {
 			],
 		},
 		{
+			name: 'specs',
+			type: 'array',
+			fields: [
+				{ name: 'label', type: 'text' },
+				{
+					name: 'values',
+					type: 'array',
+					fields: [
+						{ name: 'value', type: 'text' },
+						{ name: 'unit', type: 'text' },
+					],
+				},
+			],
+		},
+		{
 			name: 'branding',
 			type: 'group',
 			fields: [
 				colorField({ name: 'accent' }),
 				iconField({ name: 'icon' }),
 				{ name: 'tagline', type: 'text', localized: true },
+				{
+					name: 'links',
+					type: 'array',
+					fields: [
+						{ name: 'label', type: 'text' },
+						{ name: 'href', type: 'text' },
+					],
+				},
 			],
 		},
 	],
