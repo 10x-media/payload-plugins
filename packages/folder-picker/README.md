@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/folder-picker
 
 Folder browsing inside Payload's list drawer, so any field picks documents by folder. Payload has had folders since 3.39, but only on the collection route: open the same collection from an upload field's "choose from existing" and you get a flat, paginated list. This plugin puts the folders back, for every field that opens a drawer.
