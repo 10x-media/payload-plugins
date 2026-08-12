@@ -69,6 +69,7 @@ export interface Config {
   collections: {
     posts: Post;
     pages: Page;
+    articles: Article;
     tags: Tag;
     media: Media;
     users: User;
@@ -83,6 +84,7 @@ export interface Config {
   collectionsSelect: {
     posts: PostsSelect<false> | PostsSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
+    articles: ArticlesSelect<false> | ArticlesSelect<true>;
     tags: TagsSelect<false> | TagsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
@@ -219,6 +221,21 @@ export interface User {
  * via the `definition` "pages".
  */
 export interface Page {
+  id: string;
+  title: string;
+  slug?: string | null;
+  body?: string | null;
+  createdBy?: (string | null) | User;
+  lastModifiedBy?: (string | null) | User;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "articles".
+ */
+export interface Article {
   id: string;
   title: string;
   slug?: string | null;
@@ -430,6 +447,10 @@ export interface PayloadLockedDocument {
         value: string | Page;
       } | null)
     | ({
+        relationTo: 'articles';
+        value: string | Article;
+      } | null)
+    | ({
         relationTo: 'tags';
         value: string | Tag;
       } | null)
@@ -524,6 +545,20 @@ export interface PostsSelect<T extends boolean = true> {
  * via the `definition` "pages_select".
  */
 export interface PagesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  body?: T;
+  createdBy?: T;
+  lastModifiedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "articles_select".
+ */
+export interface ArticlesSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
   body?: T;

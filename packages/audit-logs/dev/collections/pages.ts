@@ -1,14 +1,16 @@
 import type { CollectionConfig } from 'payload'
 
 /**
- * Drafts are enabled here and nowhere else. The stand configures this collection
- * with `auditLog.drafts: 'ignore'`, so autosaved drafts stay out of the log and
- * publishing produces a single entry diffed against the last published version.
+ * One half of the drafts comparison, against `articles`. This one runs on the default
+ * `auditLog.drafts: 'ignore'`, so draft saves stay out of the log and publishing produces
+ * a single entry diffed against the last published version.
+ *
+ * Autosave matches `articles` so the two are compared on equal terms.
  */
 export const pages: CollectionConfig = {
 	slug: 'pages',
 	admin: { useAsTitle: 'title', group: 'Audit logs' },
-	versions: { drafts: true },
+	versions: { drafts: { autosave: { interval: 2000 } } },
 	fields: [
 		{ name: 'title', type: 'text', required: true },
 		{ name: 'slug', type: 'text' },

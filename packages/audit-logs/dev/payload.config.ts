@@ -5,6 +5,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig } from 'payload'
 import { auditLogs } from '../src/index'
+import { articles } from './collections/articles'
 import { media } from './collections/media'
 import { pages } from './collections/pages'
 import { posts } from './collections/posts'
@@ -38,7 +39,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [posts, pages, tags, media, users],
+	collections: [posts, pages, articles, tags, media, users],
 	globals: [siteSettings],
 	plugins: [
 		auditLogs({
@@ -57,9 +58,10 @@ export default buildConfig({
 				},
 				// Opted in for the log only: no createdBy / lastModifiedBy columns.
 				tags: { auditLog: true },
-				// `drafts: 'ignore'` is the default; spelled out here because this is the
-				// only collection with drafts enabled and the behaviour is worth seeing.
+				// Two collections with drafts and autosave, differing only in `drafts`.
+				// Type into each, wait for the autosave, then compare the log.
 				pages: { auditFields: true, auditLog: { drafts: 'ignore' } },
+				articles: { auditFields: true, auditLog: { drafts: 'log' } },
 				// Auth events only. Document edits stay out, which is the common shape for
 				// an auth collection: password hashes and login counters would flood the log.
 				users: { auth: true },

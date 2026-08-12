@@ -117,6 +117,15 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		req,
 	})
 
+	// The other half of the drafts comparison. Same content as the page above, but this
+	// collection logs every draft save, so editing the two side by side shows the split.
+	await payload.create({
+		collection: 'articles',
+		data: { title: 'Draft article', slug: 'draft-article', body: 'Draft body' },
+		draft: true,
+		req,
+	})
+
 	// Globals take a separate hook path and are stored under the `__global__`
 	// sentinel with the global slug as documentId.
 	await payload.updateGlobal({
