@@ -70,11 +70,7 @@ describeForDb(
 			return { status: response.status, doc: body.doc, req }
 		}
 
-		/**
-		 * Same drive, but through a REAL fetch Request with a live one-shot body stream, the shape
-		 * every browser submission has. `submitViaRest` presets `req.data` with no stream at all, so
-		 * it can never catch a double body read; this can (beta.15 500'd every REST create this way).
-		 */
+		/** Drives the endpoint through a real fetch Request whose one-shot body catches double reads (`submitViaRest` presets `req.data` and cannot). */
 		const submitViaRealRest = async (
 			data: Record<string, unknown>,
 			cookieHeader?: string
@@ -140,8 +136,7 @@ describeForDb(
 		})
 
 		it('a live-body REST create succeeds for an ordinary non-poll form', async () => {
-			// The beta.15 blocker: delegation re-read the already-consumed body and 500'd every
-			// browser submission, poll or not.
+			// The beta.15 blocker: delegation re-read the consumed body and 500'd every browser submit.
 			const form = await makeForm({ pollEnabled: false })
 			const { status, doc } = await submitViaRealRest({
 				form: form.id,
@@ -181,6 +176,13 @@ describeForDb(
 			expect(second.status).toBe(200)
 			expect(String(second.doc?.id)).toBe(String(first.doc?.id))
 			expect(await submissionCount(form.id)).toBe(1)
+
+			const stored = await booted.payload.findByID({
+				collection: 'form-submissions',
+				id: first.doc?.id as number | string,
+				depth: 0,
+			})
+			expect(stored.values).toEqual([{ field: 'vote', value: 'b' }])
 		})
 
 		it('creates on first vote and sets a signed submission-id cookie', async () => {

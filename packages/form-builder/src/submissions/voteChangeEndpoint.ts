@@ -89,9 +89,9 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 		if (!target) {
 			const endpoints = req.payload.collections[FORM_SUBMISSIONS_SLUG]?.config.endpoints
 			const registered: Endpoint[] = Array.isArray(endpoints) ? endpoints : []
-			// Excluded by this endpoint's own tag, not handler identity: a host that wraps the
-			// registered handler changes its identity, and an identity check would then find the
-			// wrapper itself and recurse forever.
+			// Next root-POST match excluding our own tag (never handler identity: a host-wrapped
+			// handler would find itself and recurse). First-match mirrors handleEndpoints routing,
+			// so another plugin's interceptor still wins exactly as it would without us.
 			const stockCreate = registered.find(
 				(endpoint) =>
 					endpoint.method === 'post' &&
@@ -101,12 +101,9 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 			if (!stockCreate) {
 				throw new APIError('form-builder: stock create endpoint not found', 500)
 			}
-			// Payload wraps its own endpoints in addDataAndFileToRequest, whose only skip condition
-			// is a falsy `req.body`. A consumed fetch body stays non-null (only `bodyUsed` flips), so
-			// delegating with the spent stream visible makes that wrapper re-read it and throw
-			// "Body is unusable" as a 500. `req.data`/`req.file` are already populated above, so
-			// hiding the stream hands the stock handler everything it needs. `defineProperty` because
-			// `body` is a getter-only prototype accessor (plain assignment throws in strict mode).
+			// A consumed fetch body stays non-null, so Payload's addDataAndFileToRequest wrapper
+			// would re-read it and 500; req.data/req.file are already populated, so hide the spent
+			// stream (defineProperty: `body` is a getter-only prototype accessor).
 			if (req.body) {
 				Object.defineProperty(req, 'body', { configurable: true, value: null })
 			}
