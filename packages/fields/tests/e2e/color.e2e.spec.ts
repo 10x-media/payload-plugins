@@ -250,12 +250,8 @@ test.describe('color field', () => {
 			.filter({ has: page.locator(`#field-${FIXTURES.schemeField}`) })
 		const content = field.locator('.fields-color__content')
 
-		// Full width: room to spare, so the fade must be off and the badge crisp
-		await expect(content).not.toHaveClass(/fields-color__content--fade/)
-		await expect(content).toHaveCSS('mask-image', 'none')
-
 		// Simulates admin.width squeezing the field inside a row
-		await page.addStyleTag({
+		const narrowStyle = await page.addStyleTag({
 			content: `.fields-color:has(#field-${FIXTURES.schemeField}) { max-width: 210px; }`,
 		})
 
@@ -268,8 +264,16 @@ test.describe('color field', () => {
 		const contentBox = await content.boundingBox()
 		if (!containerBox || !clearBox || !contentBox) throw new Error('layout boxes not resolved')
 		// The clear control never escapes the input border, and the clipped run ends before it
+		expect(clearBox.x).toBeGreaterThanOrEqual(containerBox.x)
+		expect(contentBox.x).toBeGreaterThanOrEqual(containerBox.x)
 		expect(clearBox.x + clearBox.width).toBeLessThanOrEqual(containerBox.x + containerBox.width)
 		expect(contentBox.x + contentBox.width).toBeLessThanOrEqual(clearBox.x)
+
+		// Widening back must drop the fade; asserting absence only after it was
+		// provably on keeps this from passing vacuously before the measurement runs
+		await narrowStyle.evaluate((el) => el.remove())
+		await expect(content).not.toHaveClass(/fields-color__content--fade/)
+		await expect(content).toHaveCSS('mask-image', 'none')
 	})
 
 	test('keyboard: enter opens the popover, escape closes it and restores trigger focus', async ({
