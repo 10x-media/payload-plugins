@@ -44,7 +44,5 @@ export const WikiFieldDescriptionServer = ({
 			? (description as DescriptionFn)({ i18n, t: i18n.t })
 			: undefined
 
-	return (
-		<WikiFieldDescription description={resolved ?? null} path={path} schemaPath={schemaPath} />
-	)
+	return <WikiFieldDescription description={resolved ?? null} path={path} schemaPath={schemaPath} />
 }

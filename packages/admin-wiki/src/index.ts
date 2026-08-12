@@ -17,6 +17,27 @@ declare module 'payload' {
 }
 
 /**
+ * Browser-tab metadata for the two wiki views. Without it Payload titles every
+ * custom view `Payload`, which its own `titleSuffix` then renders as
+ * `Payload - Payload`.
+ *
+ * English literals rather than translation keys because Payload resolves view
+ * metadata in `generateCustomViewMetadata`, which is handed only the config and
+ * the view config: no `t`, and no route params either, which is why a guide page
+ * cannot be titled after the guide it shows. Both shipped locales spell this
+ * word the same, and the config's own `admin.meta.titleSuffix` still applies.
+ */
+const WIKI_INDEX_META = {
+	description: 'Guides for working in this admin panel.',
+	title: 'Wiki',
+}
+
+const WIKI_PAGE_META = {
+	description: 'A guide from the admin wiki.',
+	title: 'Wiki guide',
+}
+
+/**
  * Admin Wiki plugin for Payload v3: a living wiki inside the admin panel.
  * Registers the wiki collections (guide pages + media), the plugin registry,
  * and translations. Must run after any plugin that adds collections or fields,
@@ -102,11 +123,13 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 				adminWikiIndex: {
 					Component: '@10x-media/admin-wiki/rsc#WikiIndexView',
 					exact: true,
+					meta: WIKI_INDEX_META,
 					path: '/wiki',
 				},
 				adminWikiPage: {
 					Component: '@10x-media/admin-wiki/rsc#WikiPageView',
 					exact: true,
+					meta: WIKI_PAGE_META,
 					path: '/wiki/:slug',
 				},
 			}

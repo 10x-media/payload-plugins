@@ -5,7 +5,7 @@ import { $getNodeByKey } from '@payloadcms/richtext-lexical/lexical'
 import { useLexicalComposerContext } from '@payloadcms/richtext-lexical/lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@payloadcms/richtext-lexical/lexical/react/useLexicalEditable'
 import { Button, useConfig } from '@payloadcms/ui'
-import type { CollectionSlug } from 'payload'
+import type { CollectionSlug, DefaultDocumentIDType } from 'payload'
 import { useCallback, useReducer } from 'react'
 
 import { resolveClientLabel } from '../../components/TargetSelect/clientBlocks'
@@ -41,8 +41,16 @@ export const WikiVideoNodeView = ({ data, nodeKey }: WikiVideoNodeViewProps) => 
 	const [cacheBust, bustCache] = useReducer((count: number) => count + 1, 0)
 	const { doc } = useWikiMediaDoc(data.relationTo, data.value, cacheBust)
 
+	/**
+	 * `id` is typed as the host project's `DefaultDocumentIDType`, which its
+	 * generated types narrow to whichever its database uses. The node stores
+	 * `number | string` because the plugin ships for both, so the cast is what
+	 * hands the wider stored value to the narrower project-local type. It is a
+	 * no-op in a project whose ids are numbers and in this package's own
+	 * typecheck, where no generated types exist to narrow it.
+	 */
 	const { closeDocumentDrawer, DocumentDrawer, DocumentDrawerToggler } = useLexicalDocumentDrawer({
-		id: data.value,
+		id: data.value as DefaultDocumentIDType,
 		collectionSlug: data.relationTo as CollectionSlug,
 	})
 
