@@ -7,6 +7,7 @@ import { buildConfig } from 'payload'
 import { auditLogs } from '../src/index'
 import { articles } from './collections/articles'
 import { media } from './collections/media'
+import { orderEvents, orders } from './collections/orders'
 import { pages } from './collections/pages'
 import { posts } from './collections/posts'
 import { tags } from './collections/tags'
@@ -39,7 +40,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [posts, pages, articles, tags, media, users],
+	collections: [posts, pages, articles, orders, orderEvents, tags, media, users],
 	globals: [siteSettings],
 	plugins: [
 		auditLogs({
@@ -62,6 +63,10 @@ export default buildConfig({
 				// Type into each, wait for the autosave, then compare the log.
 				pages: { auditFields: true, auditLog: { drafts: 'ignore' } },
 				articles: { auditFields: true, auditLog: { drafts: 'log' } },
+				// Both audited, so one save on an order produces two entries: the order itself
+				// and the event its afterChange hook writes.
+				orders: { auditFields: true, auditLog: true },
+				'order-events': { auditLog: true },
 				// Auth events only. Document edits stay out, which is the common shape for
 				// an auth collection: password hashes and login counters would flood the log.
 				users: { auth: true },

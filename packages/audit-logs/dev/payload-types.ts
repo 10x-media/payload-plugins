@@ -70,6 +70,8 @@ export interface Config {
     posts: Post;
     pages: Page;
     articles: Article;
+    orders: Order;
+    'order-events': OrderEvent;
     tags: Tag;
     media: Media;
     users: User;
@@ -85,6 +87,8 @@ export interface Config {
     posts: PostsSelect<false> | PostsSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
     articles: ArticlesSelect<false> | ArticlesSelect<true>;
+    orders: OrdersSelect<false> | OrdersSelect<true>;
+    'order-events': OrderEventsSelect<false> | OrderEventsSelect<true>;
     tags: TagsSelect<false> | TagsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
@@ -245,6 +249,39 @@ export interface Article {
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "orders".
+ */
+export interface Order {
+  id: string;
+  reference: string;
+  status?: ('open' | 'paid' | 'shipped') | null;
+  lines?:
+    | {
+        sku?: string | null;
+        price?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  total?: number | null;
+  lastTouchedBy?: (string | null) | User;
+  createdBy?: (string | null) | User;
+  lastModifiedBy?: (string | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "order-events".
+ */
+export interface OrderEvent {
+  id: string;
+  order?: (string | null) | Order;
+  kind?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -451,6 +488,14 @@ export interface PayloadLockedDocument {
         value: string | Article;
       } | null)
     | ({
+        relationTo: 'orders';
+        value: string | Order;
+      } | null)
+    | ({
+        relationTo: 'order-events';
+        value: string | OrderEvent;
+      } | null)
+    | ({
         relationTo: 'tags';
         value: string | Tag;
       } | null)
@@ -567,6 +612,37 @@ export interface ArticlesSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "orders_select".
+ */
+export interface OrdersSelect<T extends boolean = true> {
+  reference?: T;
+  status?: T;
+  lines?:
+    | T
+    | {
+        sku?: T;
+        price?: T;
+        id?: T;
+      };
+  total?: T;
+  lastTouchedBy?: T;
+  createdBy?: T;
+  lastModifiedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "order-events_select".
+ */
+export interface OrderEventsSelect<T extends boolean = true> {
+  order?: T;
+  kind?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
