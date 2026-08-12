@@ -11,4 +11,4 @@ Initial beta of `@10x-media/admin-wiki`: an in-admin wiki that attaches guides t
 - **Write affordances**: an edit mode that turns every unguided surface into a "write this guide" link opening a create drawer with the target already filled in.
 - **Orphan banner**: the wiki pages list reports every stored target that no longer resolves against the running config.
 - **Collection overrides**: `overrides.pages.tabs` appends tabs to the guide form, and `overrides.pages.collection` / `overrides.media` hand you the finished collection to return your own.
-- **Seeding** from markdown in code, localized guide content, and typed translations (en, de).
+- **Seeding** from markdown in code, localized guide content, and typed translations (en, de). A guide's `additionalData` (an object, or a function handed `payload`) fills the fields a project added through `overrides`.

@@ -27,7 +27,13 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 			collections: fixtureCollections,
 			configOverrides: fixtureConfig,
 			db,
-			plugin: adminWiki({}),
+			// An unnamed tab writes its fields at the document root, which is what
+			// gives `additionalData` a field to reach that the plugin does not own.
+			plugin: adminWiki({
+				overrides: {
+					pages: { tabs: [{ fields: [{ name: 'audience', type: 'text' }], label: 'Editorial' }] },
+				},
+			}),
 		})
 	})
 
@@ -215,6 +221,55 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 				},
 			])
 		).rejects.toThrow(/broken-link-guide/)
+	})
+
+	it('writes a field the project added to the collection', async () => {
+		await seed([
+			{
+				additionalData: { audience: 'editors' },
+				content: { markdown: 'Body.' },
+				slug: 'additional-data-guide',
+				title: 'Additional data guide',
+			},
+		])
+
+		const [doc] = await guideBySlug('additional-data-guide')
+		expect(doc?.audience).toBe('editors')
+	})
+
+	it('resolves the function form against the running payload', async () => {
+		await seed([
+			{
+				// The whole reason the function form exists: a value that is not known
+				// until something has been read off the instance.
+				additionalData: async (instance) => {
+					const { totalDocs } = await instance.count({ collection: PAGES })
+					return { audience: totalDocs > 0 ? 'not the first guide' : 'the first guide' }
+				},
+				content: { markdown: 'Body.' },
+				slug: 'resolved-data-guide',
+				title: 'Resolved data guide',
+			},
+		])
+
+		const [doc] = await guideBySlug('resolved-data-guide')
+		expect(doc?.audience).toBe('not the first guide')
+	})
+
+	it('refuses to write a field the seed owns, naming the guide and the field', async () => {
+		const error = await seed([
+			{
+				additionalData: { slug: 'hijacked' },
+				content: { markdown: 'Body.' },
+				slug: 'reserved-data-guide',
+				title: 'Reserved data guide',
+			},
+		]).catch((thrown: unknown) => thrown)
+
+		// Every guide failure is wrapped with the guide it happened on, so what
+		// went wrong is one level down, on the cause.
+		expect(String(error)).toMatch(/reserved-data-guide/)
+		expect(String((error as { cause?: unknown }).cause)).toMatch(/slug/)
 	})
 
 	it('runs a consumer transformer after the built-in pipeline', async () => {

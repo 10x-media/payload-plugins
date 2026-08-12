@@ -90,6 +90,41 @@ await seedWiki(payload, guides, {
 
 A transformer receives the state and a context holding `guideIdsBySlug` and the seeded `media` handles, and returns the state to pass on.
 
+## Your own fields
+
+A project that [extended the wiki pages collection](/admin-wiki/configuration#collection-overrides) has fields `seedWiki()` knows nothing about. `additionalData` is how a seed definition fills them:
+
+```ts
+{
+  slug: 'publishing-a-post',
+  title: 'Publishing a post',
+  content: { markdown },
+  additionalData: { audience: 'editors', reviewedAt: '2026-01-01' },
+}
+```
+
+For a value that has to be looked up first, pass a function instead. It receives the running `payload` and may be async:
+
+```ts
+{
+  slug: 'publishing-a-post',
+  title: 'Publishing a post',
+  content: { markdown },
+  additionalData: async (payload) => {
+    const { docs } = await payload.find({
+      collection: 'wiki-categories',
+      where: { slug: { equals: 'editorial' } },
+    })
+    return { category: docs[0]?.id }
+  },
+}
+```
+
+Two limits worth knowing:
+
+- **The seed's own fields are off limits.** Naming `slug`, `title`, `summary`, `content`, `featured`, `featuredOrder`, `_status`, or any `target*` list throws, with the guide and the offending field in the message. `slug` is the reason it is an error rather than a merge: it is the identity the next run matches on, so overwriting it would create a second guide instead of updating this one.
+- **It is written with the default-locale pass only.** A localized extra field gets its value in the default locale and falls back for the rest; per-locale extra data is not expressible.
+
 ## Localization
 
 Any of `title`, `summary`, and `content` may be a plain value or a record keyed by content locale:

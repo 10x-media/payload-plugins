@@ -5,6 +5,7 @@ import type { CollectionSlug, Payload } from 'payload'
 import { buildWikiEditor } from '../editor/wikiEditor'
 import { getWikiRegistry } from '../plugin/registry'
 import { asLocale } from '../shared/resolveLocale'
+import { resolveAdditionalData } from './additionalData'
 import { splitLocalized } from './localized'
 import { ensureSeedMedia } from './media'
 import { githubAlertsTransformer } from './transformers/githubAlerts'
@@ -67,9 +68,10 @@ const resolveContent = (
  * updates instead of duplicating), media by file path or URL is uploaded into
  * the wiki media collection, markdown converts through the wiki editor and a
  * transformer pipeline (GitHub alerts to callouts, media placeholders to
- * upload and video nodes, then any consumer transformers). Failures throw with
- * the offending guide or media key in the message; nothing is silently
- * skipped.
+ * upload and video nodes, then any consumer transformers). Fields a project
+ * added to the collection itself are reached through each guide's
+ * `additionalData`. Failures throw with the offending guide or media key in the
+ * message; nothing is silently skipped.
  */
 export const seedWiki = async (
 	payload: Payload,
@@ -155,7 +157,15 @@ export const seedWiki = async (
 			const summary = splitLocalized(def.summary, defaultLocale, `${def.slug}.summary`)
 			const content = splitLocalized(def.content, defaultLocale, `${def.slug}.content`)
 			const status = def.publish === false ? 'draft' : 'published'
+			// Spread first, so the fields the seed owns read as the authoritative
+			// tail. Colliding with one of them has already thrown by this point.
+			const additional = await resolveAdditionalData(
+				def.additionalData,
+				payload,
+				`${def.slug}.additionalData`
+			)
 			const baseData = {
+				...additional,
 				_status: status,
 				featured: def.featured ?? false,
 				// Written even when absent, because this pass updates existing guides:

@@ -1,5 +1,7 @@
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
 
+import type { WikiSeedAdditionalData } from './additionalData'
+
 /** The surfaces a seeded guide attaches to, one list per target kind. */
 export type WikiSeedTargets = {
 	/** Block slugs, e.g. `heroBanner`. */
@@ -54,6 +56,16 @@ export type WikiSeedMediaDef = {
 }
 
 export type WikiSeedGuideDef = {
+	/**
+	 * Fields this plugin does not own, for a project that extended the wiki pages
+	 * collection through `overrides`. An object, or a function handed the running
+	 * `payload` for values that have to be looked up.
+	 *
+	 * Written with the default-locale pass only, so a localized extra field gets
+	 * its value there and falls back for the rest. Naming a field the seed writes
+	 * itself (`slug`, `title`, `content`, `target*`, …) throws.
+	 */
+	additionalData?: WikiSeedAdditionalData
 	content: WikiSeedLocalized<WikiSeedContent>
 	featured?: boolean
 	featuredOrder?: number

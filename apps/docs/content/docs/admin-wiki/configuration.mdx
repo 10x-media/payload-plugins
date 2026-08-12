@@ -99,6 +99,8 @@ Turning a trigger off keeps the entity in the wiki: its fields still carry help 
 
 Guides are Payload documents, so projects eventually want their own fields on them: review state, owners, a category. `overrides` reshapes the two collections the plugin registers, after they are fully built and before Payload sees them.
 
+Fields added this way are filled at seed time through [`additionalData`](/admin-wiki/seeding#your-own-fields).
+
 ### Tabs on the guide pages
 
 Guide authoring is already split into a **Guide** tab and a **Targets** tab, so extra fields belong in tabs of their own rather than loose at the end of the form. `overrides.pages.tabs` appends to that list:
