@@ -58,15 +58,22 @@ const textOf = (node: LexicalNode): string => {
 export const collectGuideHeadings = (data: unknown): GuideHeadings => {
 	const headings: WikiHeading[] = []
 	const idsByNode = new Map<object, string>()
-	const used = new Map<string, number>()
+	const assigned = new Set<string>()
 
 	const visit = (node: LexicalNode): void => {
 		if (node.type === 'heading') {
 			const text = textOf(node).trim()
 			const base = slugify(text) || 'section'
-			const seen = used.get(base) ?? 0
-			used.set(base, seen + 1)
-			const id = seen === 0 ? base : `${base}-${seen + 1}`
+			// Counting per base is not enough: a guide with two "Section" headings and
+			// one "Section 2" would hand the same `section-2` to two of them, and a
+			// duplicate id sends every link to whichever comes first in the document.
+			let id = base
+			let suffix = 1
+			while (assigned.has(id)) {
+				suffix += 1
+				id = `${base}-${suffix}`
+			}
+			assigned.add(id)
 			idsByNode.set(node as object, id)
 			headings.push({ id, level: HEADING_LEVELS[String(node.tag)] ?? 0, text })
 			return

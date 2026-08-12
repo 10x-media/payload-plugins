@@ -40,22 +40,32 @@ export const GuideLink = ({ fields }: { fields: GuideLinkFields }) => {
 		: typeof raw === 'object'
 			? null
 			: (raw ?? null)
-	const [guide, setGuide] = useState<null | WikiGuideDoc>(populated)
+	/**
+	 * Only the lazily loaded guide is state; a populated one is read straight off
+	 * the field. Keeping both in one state variable meant a field that changed
+	 * from an id to a populated document (or to a different id) kept rendering the
+	 * document fetched for the previous one, because the effect returns early as
+	 * soon as a populated value is present.
+	 */
+	const [loaded, setLoaded] = useState<null | WikiGuideDoc>(null)
 
 	useEffect(() => {
+		setLoaded(null)
 		if (populated || guideId === null) {
 			return
 		}
 		let cancelled = false
-		void loadGuide(guideId).then((loaded) => {
+		void loadGuide(guideId).then((next) => {
 			if (!cancelled) {
-				setGuide(loaded)
+				setLoaded(next)
 			}
 		})
 		return () => {
 			cancelled = true
 		}
 	}, [guideId, loadGuide, populated])
+
+	const guide = populated ?? loaded
 
 	const label = fields.label || guide?.title || null
 

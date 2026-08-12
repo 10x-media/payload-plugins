@@ -55,7 +55,10 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 			doc =
 				(result.docs[0] as undefined | (WikiGuideDoc & WikiTargetDoc & { featured?: unknown })) ??
 				null
-		} catch {
+		} catch (error) {
+			// A missing guide and a failed query both render "not found", so the
+			// difference is only recoverable from the log.
+			payload.logger.error(error, `@10x-media/admin-wiki: failed to load guide "${slug}"`)
 			doc = null
 		}
 	}
@@ -92,10 +95,16 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 							label: t(keys.wikiViewTitle),
 							url: context.wikiPath,
 						},
-						{
-							label: doc?.title ?? '',
-							url: `${context.wikiPath}/${doc?.slug}`,
-						},
+						// A missing guide has no crumb of its own: the fallbacks produced an
+						// empty label pointing at `/wiki/undefined`.
+						...(doc
+							? [
+									{
+										label: doc.title ?? '',
+										url: `${context.wikiPath}/${encodeURIComponent(doc.slug ?? '')}`,
+									},
+								]
+							: []),
 					]}
 				/>
 				{doc && context.canUpdate && editUrl ? <WikiViewActions editUrl={editUrl} /> : null}

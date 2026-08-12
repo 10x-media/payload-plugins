@@ -158,7 +158,10 @@ export const seedWiki = async (
 			const baseData = {
 				_status: status,
 				featured: def.featured ?? false,
-				...(def.featuredOrder !== undefined ? { featuredOrder: def.featuredOrder } : {}),
+				// Written even when absent, because this pass updates existing guides:
+				// omitting the key would leave a previously seeded order in place and
+				// make the seed definition no longer describe the result.
+				featuredOrder: def.featuredOrder ?? null,
 				slug: def.slug,
 				...targetData(def.targets),
 				...(title.base !== undefined ? { title: title.base } : {}),

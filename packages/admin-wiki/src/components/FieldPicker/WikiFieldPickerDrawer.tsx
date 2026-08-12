@@ -255,13 +255,21 @@ export const WikiFieldPickerDrawer = ({
 			schemaPath: target.schemaPath,
 			signal: controller.signal,
 			skipValidation: true,
-		}).then(({ state }) => {
-			if (controller.signal.aborted) {
-				return
-			}
-			setFormState(state ?? null)
-			setStatus(state ? 'ready' : 'error')
 		})
+			.then(({ state }) => {
+				if (controller.signal.aborted) {
+					return
+				}
+				setFormState(state ?? null)
+				setStatus(state ? 'ready' : 'error')
+			})
+			.catch(() => {
+				// Changing the selection aborts the request in flight, which rejects.
+				// That is this effect's own doing, not a failure to report.
+				if (!controller.signal.aborted) {
+					setStatus('error')
+				}
+			})
 		return () => controller.abort()
 	}, [getFormState, isOpen, locale, selection, target])
 

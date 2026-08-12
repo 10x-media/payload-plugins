@@ -88,7 +88,7 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 	const showToc = !hasRail && hasTocHeadings(headings)
 	const wikiHref =
 		wikiViewEnabled && activeEntry?.slug
-			? `${config.routes.admin}/wiki/${activeEntry.slug}`
+			? `${config.routes.admin}/wiki/${encodeURIComponent(activeEntry.slug)}`
 			: undefined
 	const editHref =
 		canUpdate && resolvedActiveId !== undefined

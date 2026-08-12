@@ -118,13 +118,13 @@ The **path input** under the list accepts any owner-qualified path and appends i
 
 The config walk finds blocks through fields of type `blocks`, plus everything in `config.blocks`. A block used by a rich text editor's `BlocksFeature` falls into one of two cases.
 
-**Declared inline in the feature** — `BlocksFeature({ blocks: [...] })` — and present in no `blocks` field and not in `config.blocks`:
+**Declared inline in the feature** (`BlocksFeature({ blocks: [...] })`), present in no `blocks` field and not in `config.blocks`:
 
 - Not walked. No target keys, no help surfaces.
 - Absent from the **Blocks** list and from the field picker.
 - A path typed by hand resolves to nothing and is reported by the [orphan banner](#orphaned-targets).
 
-**Referenced from the registry** — `BlocksFeature({ blockReferences: [...] })` with the block in `config.blocks` — and present in no `blocks` field:
+**Referenced from the registry** (`BlocksFeature({ blockReferences: [...] })` with the block in `config.blocks`), present in no `blocks` field:
 
 - Walked, like everything in `config.blocks`. `block:<slug>` and its field paths are valid targets.
 - `block:<slug>` is selectable in the **Blocks** list.

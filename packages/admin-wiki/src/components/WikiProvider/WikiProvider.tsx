@@ -207,6 +207,15 @@ export const WikiProvider = ({
 			})
 				.then((response) => (response.ok ? (response.json() as Promise<WikiGuideDoc>) : null))
 				.catch(() => null)
+				.then((doc) => {
+					// Only successes are worth keeping: a guide that failed to load once
+					// would otherwise read as unavailable every time its drawer is
+					// reopened, for the rest of the session.
+					if (doc === null) {
+						guideCache.current.delete(cacheKey)
+					}
+					return doc
+				})
 			guideCache.current.set(cacheKey, promise)
 			return promise
 		},
@@ -230,7 +239,12 @@ export const WikiProvider = ({
 			loading,
 			locale,
 			pagesSlug,
-			refresh: () => void load(),
+			// Guide bodies are cached per id and locale for the session, so a refresh
+			// that only refetched the targets map would keep serving pre-edit content.
+			refresh: () => {
+				guideCache.current.clear()
+				void load()
+			},
 			setEditMode,
 			videoPlayer,
 			wikiViewEnabled: wikiView,

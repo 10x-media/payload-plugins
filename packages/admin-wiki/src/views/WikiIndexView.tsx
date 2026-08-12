@@ -64,7 +64,10 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 				title: typeof doc.title === 'string' ? doc.title : null,
 			}))
 			.sort(compareTargetEntries)
-	} catch {
+	} catch (error) {
+		// An empty index and a failed query look identical to the reader, so the
+		// difference is only recoverable from the log.
+		payload.logger.error(error, '@10x-media/admin-wiki: failed to load the wiki index')
 		entries = []
 	}
 	const createUrl = formatAdminURL({

@@ -47,6 +47,15 @@ export const useWikiMediaDoc = (
 			promise = fetch(`${base}/${relationTo}/${value}?depth=0`, { credentials: 'include' })
 				.then((response) => (response.ok ? (response.json() as Promise<WikiMediaDoc>) : null))
 				.catch(() => null)
+				.then((doc) => {
+					// Only successes are worth keeping: a document that failed to load
+					// once (offline, a 403 before permissions settled) would otherwise
+					// stay unavailable for the rest of the session.
+					if (doc === null) {
+						cache.delete(cacheKey)
+					}
+					return doc
+				})
 			cache.set(cacheKey, promise)
 		}
 		let cancelled = false

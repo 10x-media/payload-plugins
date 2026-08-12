@@ -102,7 +102,12 @@ export const buildTargetsMapEndpoint = ({
 			}
 			return Response.json(body, { headers: { 'cache-control': 'no-store' } })
 		} catch (error) {
+			// A thrown value is not guaranteed to be an object, so the shape is
+			// checked before the property is read: a `throw null` here would
+			// otherwise fail inside the handler that exists to report failures.
 			const status =
+				typeof error === 'object' &&
+				error !== null &&
 				typeof (error as { status?: unknown }).status === 'number'
 					? (error as { status: number }).status
 					: 500

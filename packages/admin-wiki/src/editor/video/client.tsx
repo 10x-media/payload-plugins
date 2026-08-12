@@ -21,6 +21,7 @@ import type { ListDrawerProps } from '@payloadcms/ui'
 import type { CollectionSlug } from 'payload'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { keys, type TranslationKey } from '../../translations/keys'
 import {
 	INSERT_WIKI_VIDEO_COMMAND,
 	OPEN_WIKI_VIDEO_DRAWER_COMMAND,
@@ -151,10 +152,16 @@ const WikiVideoPlugin: PluginComponent<WikiVideoClientProps> = ({ clientProps })
 	return <ListDrawer onSelect={onSelect} />
 }
 
+/**
+ * The slash-menu and toolbar label. Lexical hands each item an `i18n` rather
+ * than letting it call a hook, so the key goes through `keys` by hand; the
+ * previous `lexical:wikiVideo:label` belonged to a namespace this plugin never
+ * registers, and rendered as the raw key.
+ */
 const featureLabel =
 	() =>
 	({ i18n }: { i18n: { t: unknown } }) =>
-		(i18n.t as (key: string) => string)('lexical:wikiVideo:label')
+		(i18n.t as (key: TranslationKey) => string)(keys.videoFeatureLabel)
 
 export const WikiVideoFeatureClient = createClientFeature<WikiVideoClientProps>({
 	nodes: [WikiVideoNode],

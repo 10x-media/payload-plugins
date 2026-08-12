@@ -14,9 +14,12 @@ export const GuideLinkBlockLabel = () => {
 	const formData = context?.formData
 	const label = typeof formData?.label === 'string' && formData.label ? formData.label : null
 	const guide = formData?.guide
-	const guideTitle =
+	// An empty string is not nullish, so a populated guide with no title would
+	// otherwise win the `??` chain below and render a blank chip.
+	const rawTitle =
 		typeof guide === 'object' && guide !== null && 'title' in guide
-			? String((guide as { title?: unknown }).title ?? '')
-			: null
+			? (guide as { title?: unknown }).title
+			: undefined
+	const guideTitle = typeof rawTitle === 'string' && rawTitle ? rawTitle : null
 	return <span>{label ?? guideTitle ?? t(keys.guideLinkBlockSingular)}</span>
 }

@@ -11,6 +11,22 @@ export type WikiProviderServerProps = {
 }
 
 /**
+ * Component paths already reported as missing. This provider renders on every
+ * admin request, and an import map is not going to fix itself between two of
+ * them, so the warning is worth one line per process rather than one per page
+ * view.
+ */
+const warnedPaths = new Set<string>()
+
+const warnOnce = (payload: Payload, path: string, message: string): void => {
+	if (warnedPaths.has(path)) {
+		return
+	}
+	warnedPaths.add(path)
+	payload.logger.warn(message)
+}
+
+/**
  * Server half of the admin-wide provider: resolves consumer block renderers
  * and the optional video player from the import map (client components pass
  * across the RSC boundary as references) and hands them to the client
@@ -29,7 +45,9 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 		if (resolved) {
 			blockRenderers[option.block.slug] = resolved as WikiBlockRenderer
 		} else {
-			payload.logger.warn(
+			warnOnce(
+				payload,
+				option.component,
 				`@10x-media/admin-wiki: block renderer "${option.component}" is not in the import map; run importmap generation`
 			)
 			blockRenderers[option.block.slug] = MissingBlockRenderer
@@ -40,7 +58,9 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 		? (importMap[playerPath] as undefined | WikiVideoPlayerComponent)
 		: undefined
 	if (playerPath && !videoPlayer) {
-		payload.logger.warn(
+		warnOnce(
+			payload,
+			playerPath,
 			`@10x-media/admin-wiki: video player "${playerPath}" is not in the import map; using the default player`
 		)
 	}

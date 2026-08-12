@@ -77,8 +77,11 @@ export const lexicalNode = (
 		if (matches(candidate)) {
 			return candidate
 		}
-		for (const child of (candidate.children as unknown[]) ?? []) {
-			stack.push(child)
+		// Reversed, because the stack pops last-in first: pushing in document order
+		// would visit the last child first and return the last match, not the first.
+		const children = (candidate.children as unknown[]) ?? []
+		for (let index = children.length - 1; index >= 0; index -= 1) {
+			stack.push(children[index])
 		}
 	}
 	return undefined

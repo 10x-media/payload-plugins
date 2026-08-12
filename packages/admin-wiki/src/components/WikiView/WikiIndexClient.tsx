@@ -187,7 +187,7 @@ export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 			) : null}
 			<section className="wiki-index__section">
 				<h2 className="wiki-index__heading">
-					{isFiltering ? t(keys.wikiSearchPlaceholder) : t(keys.wikiAllGuidesHeading)}
+					{isFiltering ? t(keys.wikiResultsHeading) : t(keys.wikiAllGuidesHeading)}
 					<span className="wiki-index__count">
 						{listed.length === 1
 							? t(keys.guideCountOne)
