@@ -53,6 +53,8 @@ block:heroBanner.heading
 block:heroBanner.cta.label
 ```
 
+<Video alt="The same two block guides showing on the same hero banner block in a post and in a product" src="/videos/admin-wiki/shared-block.mp4" />
+
 That is deliberate: a block is shared, so a guide about its `heading` follows the block into every collection, global, and enclosing block that uses it. Writing it once is the whole point; the entity a reader happens to be editing does not change what the field means.
 
 The blocks **field itself** still belongs to its entity, since that is where the field lives:
@@ -75,6 +77,8 @@ Two consequences worth knowing:
 - Block slugs are a global namespace here, exactly as they are for [whole-block targets](#the-four-target-kinds). If two different block configs share a slug, their fields merge under the one root and the plugin logs a warning on boot naming the slug and where each was found. Payload permits the collision (its duplicate check runs per blocks field, not across the config) and resolves it registry-first in parts of its own admin, so the wiki follows that precedence.
 
 ## Picking fields
+
+<Video alt="Picking a field target off the real post form in the picker drawer, and the result landing in the Fields list" src="/videos/admin-wiki/field-picker.mp4" />
 
 The **Fields** list is grouped by what each target is rooted at: one collapsible section per collection, global, and block, labelled with its kind and carrying a count. Sections holding more than five paths start collapsed.
 

@@ -23,6 +23,10 @@ coverage/
 playwright-report/
 test-results/
 
+# clipwright's default output directory; the showcase clips are rendered
+# straight into apps/docs/public/videos and committed from there
+packages/*/videos/out/
+
 # dev app upload storage
 packages/*/dev/uploads/
 

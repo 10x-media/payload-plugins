@@ -61,6 +61,7 @@ const REQUIRE_TARGET = new Set([
 	'generate:types',
 	'generate:importmap',
 	'test:e2e',
+	'videos',
 	...MIGRATE_TASKS,
 ])
 const TURBO_TASKS = new Set([

@@ -9,6 +9,8 @@ A surface is a place in the admin where a guide can appear. Each target kind has
 
 Every named field in every collection, global, and block gets a help trigger below its description. It shows the guide's title (or a count when several target the field), reveals each summary in a hover card, and opens the full guide in a reading drawer on click.
 
+<Video alt="Hovering a field's help trigger to read the summary, then opening the full guide in a drawer" src="/videos/admin-wiki/field-help.mp4" />
+
 It is injected as `admin.components.Description` during the config walk, and renders your original description above it, untouched. Static descriptions, descriptions keyed by locale, and function descriptions are all preserved.
 
 One kind of field is skipped: a field that already declares its own `Description` component. The plugin never replaces a consumer component. See [Customization](/admin-wiki/customization#fields-with-a-custom-description) to add the surface back.

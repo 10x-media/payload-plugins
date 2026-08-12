@@ -35,6 +35,9 @@ pnpm test:int [name]
 pnpm test:matrix [name]
 pnpm test:container [name]
 pnpm test:e2e <name>
+
+# Docs showcase clips (needs `pnpm dev <name>` already running)
+pnpm videos <name>
 ```
 
 `<name>` is the directory name under `packages/` (e.g. `automations`).
