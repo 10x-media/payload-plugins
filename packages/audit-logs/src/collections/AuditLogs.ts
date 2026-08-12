@@ -15,6 +15,20 @@ export const buildAuditLogsCollection = (
 			hidden,
 			defaultColumns: ['relationTo', 'operation', 'user', 'createdAt'],
 		},
+		/**
+		 * Every query the view makes combines a filter with `sort: '-createdAt'`, and a
+		 * single-field index can serve only one of the two. These pairs cover the filters
+		 * the view actually offers as a first condition; anything rarer falls back to the
+		 * per-field indexes below.
+		 *
+		 * Deliberately short. Each index is paid for on every write, and this collection is
+		 * almost all writes.
+		 */
+		indexes: [
+			{ fields: ['relationTo', 'documentId', 'createdAt'] },
+			{ fields: ['user', 'createdAt'] },
+			...(tenantsSlug ? [{ fields: ['tenant', 'createdAt'] }] : []),
+		],
 		access: {
 			create: access?.create ?? (() => false),
 			delete: access?.delete ?? (() => false),

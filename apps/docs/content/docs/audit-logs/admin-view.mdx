@@ -55,6 +55,10 @@ auditLogs({
 
 The plugin's own writes use `overrideAccess`, so tightening either of these never stops entries being recorded.
 
+### Being turned away
+
+Payload skips its own auth redirect for custom admin views, so the plugin does it: opening the view without a session sends you to the login page, and opening it while signed in without permission sends you to the unauthorized page. Signing in returns you to the view with your filters intact, because the path and its query string travel along in `redirect`.
+
 ## Scoping the view
 
 To narrow what a view can ever show, use `forceWhere`. It is merged with `AND` into every request the view makes and the user cannot remove it:

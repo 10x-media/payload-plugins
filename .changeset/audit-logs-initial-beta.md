@@ -14,7 +14,7 @@ Initial beta of `@10x-media/audit-logs`: audit fields and change logging for Pay
 - **Custom events**: `createAuditEvent(req, ...)` records business events that are not field changes, with arbitrary `metadata`.
 - **Retention**: `audit-logs-archive` exports unarchived entries to a gzipped CSV in an upload collection and stamps `archivedAt`; `audit-logs-delete` removes what was archived. Both are Payload jobs with cron schedules, lifecycle hooks and `Where` scoping.
 - **Multi-tenancy**: a `tenant` field on every entry plus a tenant-scoped view reading the `payload-tenant` cookie, matching `@payloadcms/plugin-multi-tenant` defaults. The tenants collection is recognised as its own tenant.
-- **Admin view**: a browsable log at `/admin/audit-logs` with URL-held filters on collection, global, operation, user, changed path, event type, group and date range, and `forceWhere` for scoping it.
+- **Admin view**: a browsable log at `/admin/audit-logs` with URL-held filters on collection, global, operation, user, changed path, event type, group and date range, and `forceWhere` for scoping it. Compound indexes pair each of those filters with the sort key, and the list populates only the field it displays. Opening it without a session redirects to the login page and returns to the same filtered list afterwards.
 - **Typed reads**: `typedDiff<T>` and `typedSnapshot<T>` restore precise types to Payload's wide JSON fields, with `DiffPaths<T>` and `DiffPathValue<T, P>`.
 - **Typed translations** shipping `en`, `de` and `uk`, with per-key overrides via `@10x-media/audit-logs/i18n`.
 - **Cross-DB**: tested on MongoDB and PostgreSQL via the matrix integration suite.

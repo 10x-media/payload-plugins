@@ -15,8 +15,6 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.breadcrumb]: 'Журнал аудиту',
 
 	// Access messages (server-rendered)
-	[keys.mustBeLoggedIn]: 'Ви повинні увійти в систему для перегляду журналу аудиту.',
-	[keys.noPermission]: 'У вас немає дозволу для перегляду журналу аудиту.',
 	[keys.selectTenant]: 'Оберіть тенант для перегляду журналу аудиту.',
 
 	// Empty state

@@ -9,8 +9,6 @@ export const keys = {
 	entries: 'auditLogs:entries',
 	breadcrumb: 'auditLogs:breadcrumb',
 
-	mustBeLoggedIn: 'auditLogs:mustBeLoggedIn',
-	noPermission: 'auditLogs:noPermission',
 	selectTenant: 'auditLogs:selectTenant',
 
 	noEntries: 'auditLogs:noEntries',

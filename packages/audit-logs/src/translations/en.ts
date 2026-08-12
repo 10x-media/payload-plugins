@@ -15,8 +15,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.breadcrumb]: 'Audit logs',
 
 	// Access messages (server-rendered)
-	[keys.mustBeLoggedIn]: 'You must be logged in to view audit logs.',
-	[keys.noPermission]: 'You do not have permission to view audit logs.',
 	[keys.selectTenant]: 'Select a tenant to view audit logs.',
 
 	// Empty state

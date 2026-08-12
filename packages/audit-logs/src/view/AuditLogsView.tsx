@@ -1,11 +1,13 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
-import type { AdminViewServerProps, CollectionSlug, Where } from 'payload'
+import { redirect } from 'next/navigation'
+import type { AdminViewServerProps, CollectionSlug, Params, PopulateType, Where } from 'payload'
 import { parseCookies } from 'payload'
 import { keys } from '../translations'
 import { asTranslate } from '../translations/server'
 import type { AuditPluginConfig } from '../types'
 import { AuditLogsClient } from './AuditLogsClient'
+import { authRedirectUrl } from './authRedirect'
 import { GLOBAL_SENTINEL } from './utils'
 
 export async function AuditLogsView({
@@ -27,26 +29,14 @@ export async function AuditLogsView({
 	const configDefaultLimit = viewConfig?.defaultLimit ?? 25
 	const multiTenancy = pluginOptions.multiTenancy === true ? {} : pluginOptions.multiTenancy
 
-	const notAllowed = (message: string) => (
-		<DefaultTemplate
-			i18n={req.i18n}
-			locale={initPageResult.locale}
-			params={params}
-			payload={req.payload}
-			permissions={initPageResult.permissions}
-			searchParams={searchParams}
-			visibleEntities={initPageResult.visibleEntities}
-			req={req}
-		>
-			<Gutter>
-				<p>{message}</p>
-			</Gutter>
-		</DefaultTemplate>
-	)
-
 	const t = asTranslate(req.i18n.t)
+	// Payload resolves both before rendering the view, so these are plain objects.
+	const sp: Params = searchParams ?? {}
 
-	if (!user) return notAllowed(t(keys.mustBeLoggedIn))
+	const authRedirect: () => never = () =>
+		redirect(authRedirectUrl({ config: req.payload.config, params, searchParams: sp, user }))
+
+	if (!user) authRedirect()
 
 	if (useTenant) {
 		const tenantViewConfig = multiTenancy?.tenantView
@@ -56,11 +46,11 @@ export async function AuditLogsView({
 				: undefined
 		if (tenantViewAccess) {
 			const allowed = await tenantViewAccess({ req })
-			if (!allowed) return notAllowed(t(keys.noPermission))
+			if (!allowed) authRedirect()
 		}
 	} else if (viewAccess) {
 		const allowed = await viewAccess({ req })
-		if (!allowed) return notAllowed(t(keys.noPermission))
+		if (!allowed) authRedirect()
 	}
 
 	// For tenant-scoped view: read current tenant from cookie
@@ -90,8 +80,6 @@ export async function AuditLogsView({
 			</DefaultTemplate>
 		)
 	}
-
-	const sp = ((await Promise.resolve(searchParams)) ?? {}) as Record<string, string | string[]>
 
 	const getString = (v: string | string[] | undefined): string | undefined =>
 		Array.isArray(v) ? v[0] : v
@@ -211,12 +199,19 @@ export async function AuditLogsView({
 
 	const where: Where = whereConditions.length > 0 ? { and: whereConditions } : {}
 
+	// `depth: 1` alone returns every field of the related user, hashed password and
+	// sessions included, to render one label. Narrow it to the field actually shown.
+	const populate = Object.fromEntries(
+		Object.entries(userTitleFields).map(([slug, titleField]) => [slug, { [titleField]: true }])
+	) as PopulateType
+
 	const result = await req.payload.find({
 		collection: 'audit-logs',
 		depth: 1,
 		sort: '-createdAt',
 		limit,
 		page,
+		populate,
 		where,
 		overrideAccess: true,
 	})

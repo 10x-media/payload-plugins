@@ -7,7 +7,13 @@ Entries are an ordinary Payload collection, so `payload.find` is the whole API. 
 
 ## What is indexed
 
-`operation`, `eventType`, `relationTo`, `documentId`, `user`, `changedPaths`, `group`, `tenant` and `archivedAt` are indexed. `diff`, `snapshot` and `metadata` are not: they are JSON blobs, and filtering on their contents means reading rows out and filtering in application code.
+`operation`, `eventType`, `relationTo`, `documentId`, `user`, `changedPaths`, `group`, `tenant` and `archivedAt` each carry their own index, and Payload indexes `createdAt` for you.
+
+On top of those there are three compound indexes, because a single-field index cannot serve a filter and a sort at once: `[relationTo, documentId, createdAt]`, `[user, createdAt]`, and `[tenant, createdAt]` when multi-tenancy is on. Sorting by `-createdAt` while filtering on one of those leading fields is an index read rather than a sort in memory.
+
+The list is deliberately short. Every index is paid for on each write, and this collection is almost all writes.
+
+`diff`, `snapshot` and `metadata` are not indexed: they are JSON blobs, and filtering on their contents means reading rows out and filtering in application code.
 
 Design queries around `changedPaths`. It exists precisely so "which entries touched this field" is an index lookup rather than a scan of every diff.
 

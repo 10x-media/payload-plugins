@@ -15,8 +15,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.breadcrumb]: 'Audit-Protokoll',
 
 	// Access messages (server-rendered)
-	[keys.mustBeLoggedIn]: 'Sie müssen angemeldet sein, um das Audit-Protokoll anzuzeigen.',
-	[keys.noPermission]: 'Sie haben keine Berechtigung, das Audit-Protokoll anzuzeigen.',
 	[keys.selectTenant]: 'Wählen Sie einen Mandanten aus, um das Audit-Protokoll anzuzeigen.',
 
 	// Empty state
