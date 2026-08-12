@@ -98,8 +98,11 @@
 	display: none;
 }
 
+/* Sized with the prose it introduces: a lede set smaller than its own body text
+   reads as a caption. */
 .wiki-guide-drawer__summary {
 	color: var(--theme-elevation-650);
+	font-size: var(--wiki-prose-size);
 	line-height: 1.5;
 	margin: 0;
 	max-width: 34rem;

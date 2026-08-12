@@ -14,6 +14,13 @@
 	text-transform: uppercase;
 }
 
+/* Positioned so the track and the list items share one coordinate space: the
+   items' `offsetTop` is measured against this box, and the track is placed in
+   the same one. */
+.wiki-toc__body {
+	position: relative;
+}
+
 .wiki-toc__list {
 	border-inline-start: 1px solid var(--theme-elevation-100);
 	list-style: none;
@@ -21,17 +28,41 @@
 	padding: 0;
 }
 
+/* One box covering every heading currently on screen, rather than a mark per
+   active item. Moving and resizing a single element is what lets the range tween
+   between states instead of blinking from one set of marks to another; the
+   negative inline start straddles the list's rule so the two read as one line.
+
+   `transform` rather than `top` because it is the one of the two the compositor
+   can animate without laying the column out again on every scroll tick. */
+.wiki-toc__track {
+	background: var(--theme-elevation-800);
+	border-radius: 1px;
+	height: var(--wiki-toc-track-height, 0);
+	inset-inline-start: -1px;
+	opacity: 0;
+	position: absolute;
+	top: 0;
+	transform: translateY(var(--wiki-toc-track-top, 0));
+	transition:
+		height 0.15s ease,
+		opacity 0.15s ease,
+		transform 0.15s ease;
+	width: 2px;
+}
+
+.wiki-toc__track--visible {
+	opacity: 1;
+}
+
 .wiki-toc__link {
-	border-inline-start: 2px solid transparent;
 	color: var(--theme-elevation-500);
 	display: block;
 	font-size: 1rem;
 	line-height: 1.4;
-	/* The negative inline start pulls the active marker over the list's rule so
-	   the two read as one line rather than two parallel ones. */
-	margin-inline-start: -1px;
 	padding: calc(var(--base) / 4) calc(var(--base) / 2);
 	text-decoration: none;
+	transition: color 0.15s ease;
 }
 
 .wiki-toc__item--h3 .wiki-toc__link {
@@ -42,7 +73,12 @@
 	color: var(--theme-text);
 }
 
-.wiki-toc__link[aria-current] {
-	border-inline-start-color: var(--theme-elevation-800);
+.wiki-toc__link[data-active] {
 	color: var(--theme-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wiki-toc__track {
+		transition: opacity 0.15s ease;
+	}
 }

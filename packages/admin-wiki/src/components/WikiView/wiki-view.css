@@ -46,9 +46,12 @@
 	margin: 0;
 }
 
+/* Sized with the prose it introduces: this was already nudged above Payload's
+   root size for the same reason, and now it tracks the guide's own reading size
+   instead of drifting under it. */
 .wiki-view__summary {
 	color: var(--theme-elevation-650);
-	font-size: 1.0625rem;
+	font-size: var(--wiki-prose-size);
 	line-height: 1.5;
 	margin: calc(var(--base) / 2) 0 0;
 }

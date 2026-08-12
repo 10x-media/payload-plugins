@@ -1,13 +1,33 @@
+/* One reading size for every guide surface, and the single knob a project turns
+   to change it. Payload sets its root size to 13px, which is right for form
+   chrome and too small for prose, so guides opt up from it.
+
+   Declared on the article as well as on the two surfaces that frame it, because
+   `GuideArticle` is exported and a consumer may render it somewhere else
+   entirely. */
+.wiki-guide-article,
+.wiki-guide-drawer,
+.wiki-view {
+	--wiki-prose-size: 1.15rem;
+}
+
 /* Leading is a touch looser than Payload's form defaults because the measure is
    wide: long lines need the extra leading to stay trackable back to the start. */
 .wiki-guide-article {
 	color: var(--theme-text);
-	font-size: 1rem;
+	font-size: var(--wiki-prose-size);
 	line-height: 1.7;
 	max-width: 100%;
 }
 
-/* `scroll-margin-top` keeps a heading clear of the top edge when the table of
+/* Headings are sized in `em` off the prose rather than inherited from Payload's
+   UI scale, so the article is one typographic system: raising the reading size
+   moves the whole hierarchy with it instead of letting the body catch up to
+   `h4`, which Payload sets to 16px and prose at this size would nearly meet.
+   The multipliers land the common headings on the sizes Payload already gives
+   them, so nothing jumps for guides written against the old scale.
+
+   `scroll-margin-top` keeps a heading clear of the top edge when the table of
    contents jumps to it, in the window and inside a drawer alike. */
 .wiki-guide-article h2,
 .wiki-guide-article h3,
@@ -17,11 +37,23 @@
 	scroll-margin-top: calc(var(--base) * 1.5);
 }
 
+.wiki-guide-article h2 {
+	font-size: 1.75em;
+}
+
+.wiki-guide-article h3 {
+	font-size: 1.35em;
+}
+
+.wiki-guide-article h4 {
+	font-size: 1.15em;
+}
+
 /* The view and the drawer both print the guide title above the content, so an h1
-   inside the content is a second title. Rendered at h2 weight so authors who
-   open a guide with one do not end up with two page headings. */
+   inside the content is a second title. Rendered at the article's own h2 size so
+   authors who open a guide with one do not end up with two page headings. */
 .wiki-guide-article h1 {
-	font-size: 1.3rem;
+	font-size: 1.75em;
 	line-height: 1.3;
 	margin: 1.5em 0 0.5em;
 }
@@ -124,7 +156,7 @@
 	align-items: center;
 	color: var(--wiki-callout-accent);
 	display: flex;
-	font-size: 0.8125rem;
+	font-size: 0.8125em;
 	font-weight: 600;
 	gap: 0.35em;
 	letter-spacing: 0.03em;
@@ -157,6 +189,6 @@
 	border: 1px dashed var(--theme-warning-500);
 	border-radius: 4px;
 	color: var(--theme-elevation-650);
-	font-size: 0.875rem;
+	font-size: 0.875em;
 	padding: 0.5rem 0.75rem;
 }
