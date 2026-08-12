@@ -8,19 +8,21 @@ import { WikiVideoPlayer } from './WikiVideoPlayer'
 import './video.css'
 
 export type GuideVideoProps = {
+	/** Bumped by the editor card after a re-save, to refetch the document. */
+	cacheBust?: number
 	relationTo: string
 	value: number | string | undefined
 }
 
 /**
  * Read renderer for an uploaded-video node: loads the referenced wiki media
- * document and plays it with the default player. A missing or unreadable
- * document degrades to a quiet status line.
+ * document and plays it with the configured player, or the default HTML5 one. A
+ * missing or unreadable document degrades to a quiet status line.
  */
-export const GuideVideo = ({ relationTo, value }: GuideVideoProps) => {
+export const GuideVideo = ({ cacheBust, relationTo, value }: GuideVideoProps) => {
 	const { t } = useTranslation()
 	const { videoPlayer } = useWikiTargets()
-	const { doc, loading } = useWikiMediaDoc(relationTo, value)
+	const { doc, loading } = useWikiMediaDoc(relationTo, value, cacheBust)
 
 	if (loading) {
 		return <p className="wiki-video__status">{t(keys.videoLoading)}</p>

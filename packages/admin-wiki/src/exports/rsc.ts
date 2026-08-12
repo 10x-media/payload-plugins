@@ -1,4 +1,8 @@
 export {
+	WikiFieldDescriptionServer,
+	type WikiFieldDescriptionServerProps,
+} from '../components/FieldHelp/WikiFieldDescriptionServer'
+export {
 	WikiProviderServer,
 	type WikiProviderServerProps,
 } from '../components/WikiProvider/WikiProviderServer'

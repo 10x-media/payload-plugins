@@ -45,6 +45,11 @@ export class WikiVideoServerNode extends DecoratorNode<null | React.ReactElement
 		})
 	}
 
+	/**
+	 * The host element Lexical mounts `decorate` into, and the styled card block:
+	 * the client view renders its contents straight into this, with no wrapper of
+	 * its own, so there is exactly one bordered card per node.
+	 */
 	override createDOM(): HTMLElement {
 		const element = document.createElement('div')
 		element.className = 'wiki-video-node'

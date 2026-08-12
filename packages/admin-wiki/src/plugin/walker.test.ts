@@ -244,19 +244,41 @@ describe('walkAndInjectFieldHelp', () => {
 			type: 'text',
 			admin: { components: { Description: '/custom#X' } },
 		}
+		const localized: Field = {
+			name: 'c',
+			type: 'text',
+			admin: { description: { de: 'behalte mich', en: 'keep me' } },
+		}
+		const config = makeConfig([{ slug: 'posts', fields: [withStatic, withComponent, localized] }])
+		const result = walkAndInjectFieldHelp(config, resolved)
+		const injected = descriptionOf(withStatic) as { clientProps: { description: unknown } }
+		expect(injected.clientProps.description).toBe('keep me')
+		expect(descriptionOf(withComponent)).toBe('/custom#X')
+		expect(
+			(descriptionOf(localized) as { clientProps: { description: unknown } }).clientProps
+				.description
+		).toEqual({ de: 'behalte mich', en: 'keep me' })
+		expect(result.injectedFieldCount).toBe(2)
+	})
+
+	/**
+	 * The function cannot go into client props, so the field takes the server
+	 * variant, which evaluates it against the request's i18n instead.
+	 */
+	it('routes a function description to the server component and drops it from client props', () => {
 		const withFunction: Field = {
 			name: 'c',
 			type: 'text',
 			admin: { description: () => 'dynamic' },
 		}
-		const config = makeConfig([
-			{ slug: 'posts', fields: [withStatic, withComponent, withFunction] },
-		])
+		const config = makeConfig([{ slug: 'posts', fields: [withFunction] }])
 		const result = walkAndInjectFieldHelp(config, resolved)
-		const injected = descriptionOf(withStatic) as { clientProps: { description: unknown } }
-		expect(injected.clientProps.description).toBe('keep me')
-		expect(descriptionOf(withComponent)).toBe('/custom#X')
-		expect(descriptionOf(withFunction)).toBeUndefined()
+		const injected = descriptionOf(withFunction) as {
+			clientProps: Record<string, unknown>
+			path: string
+		}
+		expect(injected.path).toBe('@10x-media/admin-wiki/rsc#WikiFieldDescriptionServer')
+		expect(injected.clientProps).toEqual({ schemaPath: 'collection:posts.c' })
 		expect(result.validTargetKeys).toContain('field:collection:posts.c')
 		expect(result.injectedFieldCount).toBe(1)
 	})

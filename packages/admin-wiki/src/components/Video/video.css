@@ -25,27 +25,3 @@
 	color: var(--theme-elevation-600);
 	font-size: 0.875rem;
 }
-
-.wiki-video-editor {
-	margin-block: 0.5rem;
-	position: relative;
-}
-
-.wiki-video-editor__remove {
-	background: var(--theme-elevation-100);
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: 4px;
-	color: var(--theme-elevation-650);
-	cursor: pointer;
-	font-size: 0.75rem;
-	padding: 0.25rem 0.5rem;
-	position: absolute;
-	right: 0.5rem;
-	top: 0.5rem;
-	z-index: 1;
-}
-
-.wiki-video-editor__remove:hover {
-	background: var(--theme-elevation-150);
-	color: var(--theme-text);
-}

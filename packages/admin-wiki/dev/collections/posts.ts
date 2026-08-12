@@ -42,6 +42,28 @@ export const posts: CollectionConfig = {
 					label: 'Meta',
 					fields: [{ name: 'seoTitle', type: 'text', localized: true }],
 				},
+				{
+					name: 'Localized',
+					fields: [
+						{
+							name: 'objectDescription',
+							type: 'text',
+							admin: {
+								description: {
+									en: 'This is the object description in English',
+									de: 'This is the object description in German',
+								},
+							},
+						},
+						{
+							name: 'functionDescription',
+							type: 'text',
+							admin: {
+								description: ({ i18n }) => `This is function description in ${i18n.language}`,
+							},
+						},
+					],
+				},
 			],
 		},
 		{

@@ -62,9 +62,16 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 				blockSlugs: walk.blockSlugs,
 				config,
 				hidden: options.hidden?.pages,
+				override: options.overrides?.pages,
 				resolved,
 			}),
-			buildWikiMediaCollection({ access, config, hidden: options.hidden?.media, resolved }),
+			buildWikiMediaCollection({
+				access,
+				config,
+				hidden: options.hidden?.media,
+				override: options.overrides?.media,
+				resolved,
+			}),
 		]
 		config.admin ??= {}
 		config.admin.components ??= {}
@@ -113,12 +120,15 @@ export type {
 	AdminWikiPluginOptions,
 	AdminWikiPluginOptions as PluginOptions,
 	WikiAccessOptions,
+	WikiCollectionOverride,
 	WikiEditorBlockOption,
 	WikiEditorOptions,
 	WikiExcludeOptions,
 	WikiHiddenOptions,
 	WikiListBandOptions,
 	WikiListBandSlot,
+	WikiOverridesOptions,
+	WikiPagesOverride,
 	WikiSlugsOptions,
 	WikiTriggersOptions,
 	WikiVideoOptions,

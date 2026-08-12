@@ -61,6 +61,30 @@ export default buildConfig({
 			editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
 			exclude: { collections: ['users'] },
 			video: true,
+			// Exercises both entry points: an appended tab and the escape hatch.
+			overrides: {
+				pages: {
+					tabs: [
+						{
+							label: 'Editorial',
+							fields: [{ name: 'tags', type: 'text', hasMany: true }],
+						},
+					],
+					collection: (collection) => ({
+						...collection,
+						fields: [
+							...collection.fields,
+							{
+								name: 'users',
+								type: 'relationship',
+								relationTo: 'users',
+								hasMany: true,
+								admin: { position: 'sidebar' },
+							},
+						],
+					}),
+				},
+			},
 			triggers: {
 				list: { slot: 'afterListTable' },
 			},

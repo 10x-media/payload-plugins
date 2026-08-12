@@ -14,13 +14,14 @@
 }
 
 /* Payload's Drawer supplies the title and close button; everything below is the
-   reading surface. Centered because a single guide has no rail and would
-   otherwise hug the left edge of the panel. */
+   reading surface. The drawer header and this row share one Gutter, so the row
+   starts at the gutter edge: the prose lines up under the title, and the table
+   of contents is pushed to the far edge under the close button (see the
+   `.wiki-toc` rule). Centering the columns instead left both edges floating
+   inside a header that stayed pinned. */
 .wiki-guide-drawer {
 	display: flex;
 	gap: calc(var(--base) * 1.5);
-	justify-content: center;
-	/* min-height: 100%; */
 	padding-bottom: var(--base);
 }
 
@@ -123,9 +124,12 @@
 }
 
 /* The TOC only ever renders here when there is no rail (see GuideDrawer), so the
-   drawer is never three columns and the existing cap still fits. */
+   drawer is never three columns and the existing cap still fits. The auto
+   margin takes whatever the capped pane leaves over, pinning the column under
+   the drawer's close button. */
 .wiki-guide-drawer > .wiki-toc {
 	flex-shrink: 0;
+	margin-inline-start: auto;
 	width: 16rem;
 }
 

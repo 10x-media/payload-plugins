@@ -1,4 +1,4 @@
-import type { Access, Block, CollectionConfig } from 'payload'
+import type { Access, Block, CollectionConfig, Tab } from 'payload'
 
 import type { TranslationsOption } from './translations'
 
@@ -115,6 +115,46 @@ export type WikiExcludeOptions = {
 	globals?: string[]
 }
 
+/**
+ * Receives the collection exactly as the plugin built it and returns the one
+ * Payload registers. Nothing is merged afterwards, so the plugin's own slug,
+ * endpoints, access, and target fields are yours to keep or break.
+ */
+export type WikiCollectionOverride = (collection: CollectionConfig) => CollectionConfig
+
+/**
+ * Two ways into the guide pages collection, meant to be reached for in order.
+ *
+ * `tabs` is the one most projects want: guide authoring is already organized
+ * into tabs, so extra editorial fields belong in tabs of their own rather than
+ * loose at the end of the form. `collection` is the escape hatch for everything
+ * else (hooks, sidebar fields, admin components, access).
+ */
+export type WikiPagesOverride = {
+	/**
+	 * Tabs appended after the plugin's own **Guide** and **Targets** tabs. Named
+	 * tabs nest their fields under the tab name, unnamed tabs write theirs at the
+	 * document root; either is fine, as long as no field collides with the
+	 * plugin's own (`title`, `summary`, `content`, `target*`, `slug`, `featured`,
+	 * `featuredOrder`).
+	 */
+	tabs?: Tab[]
+	/** Applied last, after {@link WikiPagesOverride.tabs} has been appended. */
+	collection?: WikiCollectionOverride
+}
+
+/**
+ * Overrides for the two collections the plugin registers. Both run after the
+ * collection is fully built, which means after the target fields have been
+ * populated from the walked config.
+ */
+export type WikiOverridesOptions = {
+	/** The wiki media upload collection. */
+	media?: WikiCollectionOverride
+	/** The guide pages collection. */
+	pages?: WikiPagesOverride
+}
+
 export type AdminWikiPluginOptions = {
 	/**
 	 * Disable the plugin entirely (incoming config returned untouched).
@@ -145,6 +185,11 @@ export type AdminWikiPluginOptions = {
 	featured?: boolean
 	/** Per-collection `admin.hidden` passthrough. */
 	hidden?: WikiHiddenOptions
+	/**
+	 * Reshape the collections the plugin registers. See
+	 * {@link WikiOverridesOptions}.
+	 */
+	overrides?: WikiOverridesOptions
 	/**
 	 * Maps admin UI languages (`i18n.language`) to content locales for projects
 	 * whose two axes use different keys. Readers resolve guides through their

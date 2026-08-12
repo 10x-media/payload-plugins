@@ -1,9 +1,12 @@
 export type {
 	AdminWikiPluginOptions,
 	WikiAccessOptions,
+	WikiCollectionOverride,
 	WikiEditorBlockOption,
 	WikiEditorOptions,
 	WikiHiddenOptions,
+	WikiOverridesOptions,
+	WikiPagesOverride,
 	WikiSlugsOptions,
 	WikiTriggersOptions,
 	WikiVideoOptions,

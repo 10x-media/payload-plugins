@@ -59,7 +59,7 @@ export const MyDescription = ({ schemaPath }: { schemaPath: string }) => {
 
 ## Fields with a function description
 
-A field whose `admin.description` is a function is skipped too, because functions cannot be serialized into client props. Convert it to a static description, or give the field a custom `Description` component as above.
+Nothing to do: `admin.description` as a function is supported, and so is a description keyed by locale. The function cannot travel in client props, so such a field gets a server Description that evaluates it with the request's `i18n` and hands the result down, exactly as Payload's own renderer would. Fields with a static description skip that hop, so the extra server component is paid for only where it is needed.
 
 ## Any target key
 
@@ -143,6 +143,8 @@ Two field names are injected into host schemas, both namespaced so they will not
 | `adminWikiBlockHelp` | Every covered block's fields. Exported as `WIKI_BLOCK_HELP_FIELD` | Declaring a field with that name, or excluding the block |
 
 An entity that already declares one keeps its own. Both are UI fields, so neither reaches the database or your generated types.
+
+Adding your own fields to the wiki's collections goes the other way: see [Collection overrides](/admin-wiki/configuration#collection-overrides).
 
 ## Registering components
 

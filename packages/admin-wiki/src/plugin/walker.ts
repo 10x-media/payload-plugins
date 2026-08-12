@@ -26,6 +26,7 @@ export type WalkResult = {
 }
 
 const DESCRIPTION_COMPONENT = '@10x-media/admin-wiki/client#WikiFieldDescription'
+const DESCRIPTION_SERVER_COMPONENT = '@10x-media/admin-wiki/rsc#WikiFieldDescriptionServer'
 const BLOCK_HELP_COMPONENT = '@10x-media/admin-wiki/client#WikiBlockHelp'
 
 /**
@@ -55,9 +56,14 @@ type WalkContext = {
 }
 
 /**
- * Skip fields that already carry a custom Description component (we never
- * replace consumer components) and function descriptions (not serializable
- * into client props); both cases are documented integration limitations.
+ * Skip fields that already carry a custom Description component: we never
+ * replace a consumer's own, which is the one documented integration limitation.
+ *
+ * A function description takes the server variant instead of being skipped. The
+ * function itself cannot go into `clientProps`, but it does not need to: the
+ * field config travels to server Descriptions on its own, so the component
+ * evaluates it there. Static descriptions keep the plain client component, which
+ * is the overwhelmingly common case and the cheaper render.
  */
 const injectDescription = (field: Field, schemaPath: string, context: WalkContext): void => {
 	const key = fieldTargetKey(schemaPath)
@@ -68,9 +74,7 @@ const injectDescription = (field: Field, schemaPath: string, context: WalkContex
 	if (components?.Description !== undefined) {
 		return
 	}
-	if (typeof admin?.description === 'function') {
-		return
-	}
+	const isFunction = typeof admin?.description === 'function'
 	const target = field as {
 		admin?: { components?: Record<string, unknown>; description?: unknown }
 	}
@@ -80,10 +84,10 @@ const injectDescription = (field: Field, schemaPath: string, context: WalkContex
 			...target.admin?.components,
 			Description: {
 				clientProps: {
-					description: target.admin?.description ?? null,
+					...(isFunction ? {} : { description: target.admin?.description ?? null }),
 					schemaPath,
 				},
-				path: DESCRIPTION_COMPONENT,
+				path: isFunction ? DESCRIPTION_SERVER_COMPONENT : DESCRIPTION_COMPONENT,
 			},
 		},
 	}

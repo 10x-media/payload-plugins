@@ -2,7 +2,7 @@ import type { CollectionConfig, Config, Field } from 'payload'
 import { buildWikiEditor } from '../editor/wikiEditor'
 import { buildOrphanedTargetsEndpoint } from '../endpoints/orphanedTargets'
 import { buildTargetsMapEndpoint } from '../endpoints/targetsMap'
-import type { HiddenOption, WikiAccessOptions } from '../options'
+import type { HiddenOption, WikiAccessOptions, WikiPagesOverride } from '../options'
 import type { ResolvedWikiOptions } from '../plugin/resolveOptions'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
@@ -29,6 +29,7 @@ export type BuildWikiPagesArgs = {
 	/** The host config as it stands when the plugin runs, for target enumeration. */
 	config: Config
 	hidden: HiddenOption | undefined
+	override: undefined | WikiPagesOverride
 	resolved: ResolvedWikiOptions
 }
 
@@ -135,17 +136,22 @@ const targetFields = (
  * level to the stored document: a named tab would nest every target list under
  * its own key and break every reader of `targetCollections` and friends. The
  * sidebar fields stay outside the tabs, where Payload looks for them.
+ *
+ * `override.tabs` extends that first field, and `override.collection` then gets
+ * the whole thing. Both run here rather than in the plugin body so the consumer
+ * sees the finished collection, target fields and endpoints included.
  */
 export const buildWikiPagesCollection = ({
 	access,
 	blockSlugs,
 	config,
 	hidden,
+	override,
 	resolved,
 }: BuildWikiPagesArgs): CollectionConfig => {
 	const localize = Boolean(config.localization)
 
-	return {
+	const collection: CollectionConfig = {
 		slug: resolved.slugs.pages,
 		labels: {
 			singular: labelForKey(keys.collectionPagesSingular),
@@ -223,6 +229,7 @@ export const buildWikiPagesCollection = ({
 						label: labelForKey(keys.tabTargetsLabel),
 						fields: targetFields(config, resolved, blockSlugs),
 					},
+					...(override?.tabs ?? []),
 				],
 			},
 			{
@@ -259,4 +266,6 @@ export const buildWikiPagesCollection = ({
 			},
 		],
 	}
+
+	return override?.collection ? override.collection(collection) : collection
 }

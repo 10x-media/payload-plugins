@@ -167,6 +167,13 @@ export interface Post {
   meta?: {
     seoTitle?: string | null;
   };
+  Localized?: {
+    /**
+     * This is the object description in English
+     */
+    objectDescription?: string | null;
+    functionDescription?: string | null;
+  };
   specs?:
     | {
         label?: string | null;
@@ -260,9 +267,11 @@ export interface WikiPage {
   targetGlobals?: string[] | null;
   targetFields?: string[] | null;
   targetBlocks?: string[] | null;
+  tags?: string[] | null;
   slug?: string | null;
   featured?: boolean | null;
   featuredOrder?: number | null;
+  users?: (string | User)[] | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -385,6 +394,12 @@ export interface PostsSelect<T extends boolean = true> {
     | {
         seoTitle?: T;
       };
+  Localized?:
+    | T
+    | {
+        objectDescription?: T;
+        functionDescription?: T;
+      };
   specs?:
     | T
     | {
@@ -461,9 +476,11 @@ export interface WikiPagesSelect<T extends boolean = true> {
   targetGlobals?: T;
   targetFields?: T;
   targetBlocks?: T;
+  tags?: T;
   slug?: T;
   featured?: T;
   featuredOrder?: T;
+  users?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;

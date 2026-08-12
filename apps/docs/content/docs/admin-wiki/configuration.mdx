@@ -15,6 +15,7 @@ adminWiki({
   featured: true,
   hidden: { media: true },
   localeMap: { 'en-US': 'en' },
+  overrides: { pages: { tabs: [reviewTab] } },
   slugs: { pages: 'wiki-pages', media: 'wiki-media' },
   triggers: {
     edit: true,
@@ -38,6 +39,7 @@ adminWiki({
 | `featured` | `boolean` | `true` | Lead the list band with the collection's featured guides as cards |
 | `hidden` | `{ media, pages }` | visible | Payload's `admin.hidden` passthrough, per wiki collection |
 | `localeMap` | `Record<string, string>` | `{}` | Map admin UI languages to content locales. See [Targeting](/admin-wiki/targets#localization) |
+| `overrides` | `{ media, pages }` | `{}` | Reshape the collections the plugin registers. See [Collection overrides](#collection-overrides) |
 | `slugs` | `{ media, pages }` | `wiki-media`, `wiki-pages` | Collection slug overrides |
 | `translations` | `TranslationsOption` | built-ins | Per-locale string overrides. See [i18n](/admin-wiki/i18n) |
 | `triggers` | `WikiTriggersOptions` | all on | Which surfaces carry a guide affordance. See [Triggers](#triggers) |
@@ -92,6 +94,73 @@ adminWiki({
 `list` accepts `true` (the band at its default slot), `false` (no band), or an object choosing the slot: `beforeList`, `beforeListTable`, `afterListTable`, or `afterList`. Only the list band takes a slot option.
 
 Turning a trigger off keeps the entity in the wiki: its fields still carry help and it is still a valid target. To take an entity out of the wiki altogether, use [`exclude`](#exclusions).
+
+## Collection overrides
+
+Guides are Payload documents, so projects eventually want their own fields on them: review state, owners, a category. `overrides` reshapes the two collections the plugin registers, after they are fully built and before Payload sees them.
+
+### Tabs on the guide pages
+
+Guide authoring is already split into a **Guide** tab and a **Targets** tab, so extra fields belong in tabs of their own rather than loose at the end of the form. `overrides.pages.tabs` appends to that list:
+
+```ts
+adminWiki({
+  overrides: {
+    pages: {
+      tabs: [
+        {
+          label: 'Editorial',
+          fields: [
+            { name: 'tags', type: 'text', hasMany: true },
+            { name: 'reviewedAt', type: 'date' },
+          ],
+        },
+      ],
+    },
+  },
+})
+```
+
+Named and unnamed tabs both work. An unnamed tab writes its fields at the document root; a named tab nests them under the tab name, which is the safer choice if you are worried about colliding with a future plugin field.
+
+### The whole collection
+
+`overrides.pages.collection` and `overrides.media` are plain functions: they receive the finished collection and return the one Payload registers. Nothing is merged afterwards, so this is the way to add sidebar fields, hooks, admin components, or list columns:
+
+```ts
+adminWiki({
+  overrides: {
+    pages: {
+      collection: (collection) => ({
+        ...collection,
+        admin: { ...collection.admin, defaultColumns: ['title', 'owners', 'updatedAt'] },
+        fields: [
+          ...collection.fields,
+          {
+            name: 'owners',
+            type: 'relationship',
+            relationTo: 'users',
+            hasMany: true,
+            admin: { position: 'sidebar' },
+          },
+        ],
+      }),
+    },
+    media: (collection) => ({
+      ...collection,
+      upload: { ...collection.upload, imageSizes: [{ name: 'thumb', width: 400 }] },
+    }),
+  },
+})
+```
+
+Both run last, after the target fields have been populated from the walked config and the endpoints attached, so `collection.fields` includes everything the plugin built (`tabs` included, appended tabs and all).
+
+<Callout type="warn">
+  Nothing is validated on the way out. Returning a collection without the plugin's `slug`, `endpoints`, `versions.drafts`, or `target*` fields will break the wiki, and the plugin will not warn you. Spread the collection you were given and add to it.
+</Callout>
+
+The media collection takes only the function form. An upload collection is one `alt` field and a file, so a tab shorthand would have nothing to organize.
 
 ## Plugin order
 
