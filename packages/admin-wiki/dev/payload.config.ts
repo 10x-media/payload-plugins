@@ -60,6 +60,7 @@ export default buildConfig({
 		adminWiki({
 			editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
 			exclude: { collections: ['users'] },
+			// video: { playerComponent: '/components/DevVideoPlayer#DevVideoPlayer' },
 			video: true,
 			// Exercises both entry points: an appended tab and the escape hatch.
 			overrides: {
