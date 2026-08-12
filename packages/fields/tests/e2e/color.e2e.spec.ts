@@ -271,7 +271,7 @@ test.describe('color field', () => {
 
 		// Widening back must drop the fade; asserting absence only after it was
 		// provably on keeps this from passing vacuously before the measurement runs
-		await narrowStyle.evaluate((el) => el.remove())
+		await narrowStyle.evaluate((el) => el.parentNode?.removeChild(el))
 		await expect(content).not.toHaveClass(/fields-color__content--fade/)
 		await expect(content).toHaveCSS('mask-image', 'none')
 	})
