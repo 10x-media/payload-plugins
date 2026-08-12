@@ -22,9 +22,12 @@
 		"@10x-media/fields": "0.0.0",
 		"@10x-media/fields-dev": "0.0.0",
 		"@10x-media/undo-redo": "0.0.0",
-		"@10x-media/undo-redo-dev": "0.0.0"
+		"@10x-media/undo-redo-dev": "0.0.0",
+		"@10x-media/admin-wiki": "0.0.0",
+		"@10x-media/admin-wiki-dev": "0.0.0"
 	},
 	"changesets": [
+		"admin-wiki-initial-beta",
 		"analytics-api-feedback",
 		"analytics-breakdown-widgets",
 		"analytics-chart-redesign",
@@ -74,6 +77,7 @@
 		"fb-round-three",
 		"fb-submission-status",
 		"fb-ux-review-round",
+		"fields-color-chip-overflow",
 		"fields-color-schemes",
 		"fields-v1",
 		"form-builder-actions-consolidation",
