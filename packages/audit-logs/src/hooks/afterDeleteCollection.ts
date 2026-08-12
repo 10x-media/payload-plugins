@@ -12,6 +12,7 @@ export type AuditLogAfterDeleteOptions = {
 	anonymize?: AnonymizeFunction
 	collectionSlug: CollectionSlug
 	collectIpAddress: boolean
+	fastWrite: boolean
 	collectUserAgent: boolean
 	fieldMap?: FieldMap
 	groupContextKey?: string
@@ -68,17 +69,21 @@ export const afterDeleteCollectionAuditLog =
 			snapshot = options.fieldMap ? normalizeSnapshot(snapshotRaw, options.fieldMap) : snapshotRaw
 		}
 
-		await writeAuditLog(req, {
-			operation: 'delete',
-			relationTo: options.collectionSlug,
-			documentId,
-			...(userValue !== undefined && { user: userValue }),
-			...(req.locale && { locale: req.locale }),
-			payloadAPI: req.payloadAPI,
-			...(ipAddress && { ipAddress }),
-			...(userAgent && { userAgent }),
-			...(snapshot && { snapshot }),
-			...(tenantValue != null && { tenant: tenantValue }),
-			...(group && { group }),
+		await writeAuditLog({
+			req,
+			fastWrite: options.fastWrite,
+			data: {
+				operation: 'delete',
+				relationTo: options.collectionSlug,
+				documentId,
+				...(userValue !== undefined && { user: userValue }),
+				...(req.locale && { locale: req.locale }),
+				payloadAPI: req.payloadAPI,
+				...(ipAddress && { ipAddress }),
+				...(userAgent && { userAgent }),
+				...(snapshot && { snapshot }),
+				...(tenantValue != null && { tenant: tenantValue }),
+				...(group && { group }),
+			},
 		})
 	}

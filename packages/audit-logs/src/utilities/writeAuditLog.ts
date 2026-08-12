@@ -20,15 +20,40 @@ export type AuditLogData = {
 }
 
 /**
- * Writes one entry, always with `overrideAccess`: the collection denies every operation
- * by default, and the log has to fill regardless of who is writing.
+ * Writes one entry, always threading `req` so the write joins the transaction of the
+ * operation that triggered it. Without it Postgres takes a second connection and waits
+ * on a lock the caller holds.
  *
- * The cast is the reason this helper exists. `user` is a polymorphic relationship when
- * the host has several auth collections and a plain one otherwise, so the generated
- * `AuditLog` type only ever matches one of the two shapes the plugin can write. Keeping
- * it here means one unchecked boundary instead of one per hook.
+ * Two paths. The direct one skips Payload's operation pipeline: there is nothing to
+ * validate, since the plugin assembles the data itself, and access is overridden anyway.
+ * It is only safe while the log collection carries no hooks, which is why the caller
+ * decides. The adapters still shape the data, default the timestamps, and fill the side
+ * tables Postgres keeps for `changedPaths` and the user relationship.
+ *
+ * The cast is unavoidable. `user` is a polymorphic relationship when the host has several
+ * auth collections and a plain one otherwise, so the generated `AuditLog` type only ever
+ * matches one of the two shapes the plugin can write.
  */
-export const writeAuditLog = async (req: PayloadRequest, data: AuditLogData): Promise<void> => {
+export const writeAuditLog = async ({
+	data,
+	fastWrite,
+	req,
+}: {
+	data: AuditLogData
+	/** False once `logs.override` attaches hooks, which a direct write would skip. */
+	fastWrite: boolean
+	req: PayloadRequest
+}): Promise<void> => {
+	if (fastWrite) {
+		await req.payload.db.create({
+			collection: 'audit-logs',
+			data: data as never,
+			req,
+			returning: false,
+		})
+		return
+	}
+
 	await req.payload.create({
 		collection: 'audit-logs',
 		data: data as never,

@@ -47,6 +47,7 @@ const registerGlobal = (
 			afterChangeGlobalAuditLog({
 				anonymize: pluginOptions.anonymize?.[slug],
 				collectIpAddress: ctx.collectIpAddress,
+				fastWrite: ctx.fastWrite,
 				collectUserAgent: ctx.collectUserAgent,
 				drafts: auditLogConfig.drafts ?? pluginOptions.drafts ?? 'ignore',
 				excludeFields: auditLogConfig.excludeFields,

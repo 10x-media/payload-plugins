@@ -73,17 +73,23 @@ export const createAuditEvent = async (
 			? ((req.context as Record<string, unknown>)?.auditGroup as string | undefined)
 			: undefined)
 
-	await writeAuditLog(req, {
-		operation: 'custom',
-		eventType: options.eventType,
-		relationTo: options.collection,
-		...(options.documentId != null && { documentId: String(options.documentId) }),
-		...(req.user && {
-			user: isPolymorphic ? { relationTo: req.user.collection, value: req.user.id } : req.user.id,
-		}),
-		...(req.locale && { locale: req.locale }),
-		payloadAPI: req.payloadAPI,
-		...(options.metadata && { metadata: options.metadata }),
-		...(group && { group }),
+	await writeAuditLog({
+		req,
+		// One deliberate call per business event, not a per-write hot path, so it takes the
+		// pipeline and any hooks an override attached fire as the host expects.
+		fastWrite: false,
+		data: {
+			operation: 'custom',
+			eventType: options.eventType,
+			relationTo: options.collection,
+			...(options.documentId != null && { documentId: String(options.documentId) }),
+			...(req.user && {
+				user: isPolymorphic ? { relationTo: req.user.collection, value: req.user.id } : req.user.id,
+			}),
+			...(req.locale && { locale: req.locale }),
+			payloadAPI: req.payloadAPI,
+			...(options.metadata && { metadata: options.metadata }),
+			...(group && { group }),
+		},
 	})
 }

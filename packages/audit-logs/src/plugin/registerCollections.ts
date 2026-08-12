@@ -30,6 +30,7 @@ const withAuthHooks = ({
 	const authOptions = {
 		collectionSlug: slug,
 		collectIpAddress: ctx.collectIpAddress,
+		fastWrite: ctx.fastWrite,
 		collectUserAgent: ctx.collectUserAgent,
 		groupContextKey: ctx.groupContextKey,
 		isUserPolymorphic: ctx.isUserPolymorphic,
@@ -99,6 +100,7 @@ const registerCollection = (
 				anonymize,
 				collectionSlug: slug,
 				collectIpAddress: ctx.collectIpAddress,
+				fastWrite: ctx.fastWrite,
 				collectUserAgent: ctx.collectUserAgent,
 				drafts: auditLogConfig.drafts ?? pluginOptions.drafts ?? 'ignore',
 				excludeFields: [
@@ -126,6 +128,7 @@ const registerCollection = (
 					anonymize,
 					collectionSlug: slug,
 					collectIpAddress: ctx.collectIpAddress,
+					fastWrite: ctx.fastWrite,
 					collectUserAgent: ctx.collectUserAgent,
 					fieldMap,
 					groupContextKey: ctx.groupContextKey,

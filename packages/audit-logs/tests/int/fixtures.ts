@@ -61,10 +61,15 @@ export const seedUser = async (payload: Payload) => {
 	})
 }
 
-/** Reads every audit log entry, newest last, bypassing the collection's closed access. */
+/**
+ * Reads every audit log entry, newest last, bypassing the collection's closed access.
+ * `depth: 0` so relationships stay the plain ids the plugin stored, which is what the
+ * assertions are about.
+ */
 export const readLogs = async (payload: Payload, where: Where = {}) => {
 	const result = await payload.find({
 		collection: 'audit-logs',
+		depth: 0,
 		where,
 		sort: 'createdAt',
 		limit: 200,

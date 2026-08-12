@@ -69,6 +69,30 @@ describeForDb('auditLogs cross-db', {}, (db) => {
 		expect(log?.user).toBeTruthy()
 	})
 
+	it('has an id and both timestamps, none of which the plugin sets', async () => {
+		const doc = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'Stamped' },
+			req,
+		})
+
+		const [entry] = (
+			await booted.payload.find({
+				collection: 'audit-logs',
+				depth: 0,
+				where: { documentId: { equals: String(doc.id) } },
+				overrideAccess: true,
+			})
+		).docs as unknown as { createdAt?: string; id?: unknown; updatedAt?: string }[]
+
+		// The id comes from the column default or mongoose, `createdAt` from the adapter's
+		// own create, `updatedAt` from the write transform on Mongo and the column default
+		// on Postgres. The operation pipeline is not involved in any of the three.
+		expect(entry?.id).toBeTruthy()
+		expect(Date.parse(entry?.createdAt ?? '')).not.toBeNaN()
+		expect(Date.parse(entry?.updatedAt ?? '')).not.toBeNaN()
+	})
+
 	it('round-trips changedPaths and diff on update', async () => {
 		const doc = await booted.payload.create({
 			collection: 'posts',

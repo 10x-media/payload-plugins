@@ -40,6 +40,7 @@ export const auditLogs = definePlugin<AuditLogsPluginOptions>({
 		const ctx = buildPluginContext(config, pluginOptions)
 
 		registerTranslations(config, pluginOptions.translations)
+		// Settles ctx.fastWrite, so it has to run before anything that writes entries.
 		registerLogsCollection(config, ctx, pluginOptions)
 		registerViews(config, ctx, pluginOptions)
 		registerCollections(config, ctx, pluginOptions)

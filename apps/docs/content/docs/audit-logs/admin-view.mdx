@@ -131,3 +131,13 @@ auditLogs({
 <Callout type="warn">
 Removing a built-in field will not break writing: entries are written with `overrideAccess` and Payload drops what it does not recognise. It will break reading. Drop `changedPaths` and the changed-path filter goes with it, along with every query that depends on the index.
 </Callout>
+
+## How entries are written
+
+Entries normally go straight to the database adapter (`payload.db.create`) rather than through `payload.create`. The pipeline exists to validate input, check access and run hooks, and an audit entry needs none of that: the plugin builds every field itself, and the collection ships with no hooks of its own.
+
+That changes if your `override` attaches hooks. A direct write would skip them, so the plugin checks the finished collection for hooks and falls back to `payload.create` when it finds any. You do not configure this, and the example above keeps working.
+
+The gap is worth the branch. Over 200 000 documents on Mongo the audit overhead per document was a third of the pipeline's, and over 100 000 on Postgres it was under half. Memory matters more: the same runs through the pipeline retained 178 MB and 119 MB after a forced collection, writing directly retained under 2 MB. On a long migration that growth is what breaks first, well before write speed does.
+
+`createAuditEvent` always takes the pipeline. It is one deliberate call per business event rather than a hot path, so hooks firing there is what a host expects.

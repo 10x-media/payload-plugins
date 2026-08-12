@@ -10,6 +10,7 @@ import { writeAuditLog } from '../utilities/writeAuditLog'
 export type AuthAuditOptions = {
 	collectionSlug: string
 	collectIpAddress: boolean
+	fastWrite: boolean
 	collectUserAgent: boolean
 	groupContextKey?: string
 	isUserPolymorphic: boolean
@@ -28,17 +29,21 @@ export const afterLoginAuditLog =
 			? ((req.context as Record<string, unknown>)?.[options.groupContextKey] as string | undefined)
 			: undefined
 
-		await writeAuditLog(req, {
-			operation: 'auth',
-			eventType: 'login',
-			relationTo: options.collectionSlug,
-			documentId: String(user.id),
-			user: userValue,
-			...(req.locale && { locale: req.locale }),
-			payloadAPI: req.payloadAPI,
-			...(ipAddress && { ipAddress }),
-			...(userAgent && { userAgent }),
-			...(group && { group }),
+		await writeAuditLog({
+			req,
+			fastWrite: options.fastWrite,
+			data: {
+				operation: 'auth',
+				eventType: 'login',
+				relationTo: options.collectionSlug,
+				documentId: String(user.id),
+				user: userValue,
+				...(req.locale && { locale: req.locale }),
+				payloadAPI: req.payloadAPI,
+				...(ipAddress && { ipAddress }),
+				...(userAgent && { userAgent }),
+				...(group && { group }),
+			},
 		})
 	}
 
@@ -58,16 +63,20 @@ export const afterForgotPasswordAuditLog =
 			? ((req.context as Record<string, unknown>)?.[options.groupContextKey] as string | undefined)
 			: undefined
 
-		await writeAuditLog(req, {
-			operation: 'auth',
-			eventType: 'forgot_password',
-			relationTo: options.collectionSlug,
-			...(req.locale && { locale: req.locale }),
-			payloadAPI: req.payloadAPI,
-			...(ipAddress && { ipAddress }),
-			...(userAgent && { userAgent }),
-			// The hook only fires for an existing account, so storing the email cannot enumerate addresses.
-			metadata: { email: data?.email },
-			...(group && { group }),
+		await writeAuditLog({
+			req,
+			fastWrite: options.fastWrite,
+			data: {
+				operation: 'auth',
+				eventType: 'forgot_password',
+				relationTo: options.collectionSlug,
+				...(req.locale && { locale: req.locale }),
+				payloadAPI: req.payloadAPI,
+				...(ipAddress && { ipAddress }),
+				...(userAgent && { userAgent }),
+				// The hook only fires for an existing account, so storing the email cannot enumerate addresses.
+				metadata: { email: data?.email },
+				...(group && { group }),
+			},
 		})
 	}

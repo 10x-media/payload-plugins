@@ -11,6 +11,7 @@ import { writeAuditLog } from '../utilities/writeAuditLog'
 export type AuditLogGlobalAfterChangeOptions = {
 	anonymize?: AnonymizeFunction
 	collectIpAddress: boolean
+	fastWrite: boolean
 	collectUserAgent: boolean
 	drafts: 'ignore' | 'log'
 	excludeFields?: string[]
@@ -117,18 +118,22 @@ export const afterChangeGlobalAuditLog =
 			? applyAnonymization(diff, options.globalSlug, options.anonymize)
 			: diff
 
-		await writeAuditLog(req, {
-			operation: 'update',
-			relationTo: '__global__',
-			documentId: options.globalSlug,
-			...(userValue !== undefined && { user: userValue }),
-			...(req.locale && { locale: req.locale }),
-			payloadAPI: req.payloadAPI,
-			...(ipAddress && { ipAddress }),
-			...(userAgent && { userAgent }),
-			changedPaths,
-			diff: finalDiff,
-			...(tenantValue != null && { tenant: tenantValue }),
-			...(group && { group }),
+		await writeAuditLog({
+			req,
+			fastWrite: options.fastWrite,
+			data: {
+				operation: 'update',
+				relationTo: '__global__',
+				documentId: options.globalSlug,
+				...(userValue !== undefined && { user: userValue }),
+				...(req.locale && { locale: req.locale }),
+				payloadAPI: req.payloadAPI,
+				...(ipAddress && { ipAddress }),
+				...(userAgent && { userAgent }),
+				changedPaths,
+				diff: finalDiff,
+				...(tenantValue != null && { tenant: tenantValue }),
+				...(group && { group }),
+			},
 		})
 	}

@@ -15,6 +15,11 @@ export type PluginContext = {
 	/** Key read off `req.context` to group entries written by one operation. */
 	groupContextKey: string | undefined
 	groupEnabled: boolean
+	/**
+	 * Whether entries may be written straight to the database. Set by
+	 * `registerLogsCollection`, because it depends on what `logs.override` returned.
+	 */
+	fastWrite: boolean
 	/** True when more than one auth collection exists, so `user` stores `{ relationTo, value }`. */
 	isUserPolymorphic: boolean
 	multiTenancy: MultiTenancyConfig | undefined
@@ -49,6 +54,8 @@ export const buildPluginContext = (
 
 	return {
 		collectIpAddress: pluginOptions.logs?.ipAddress !== false,
+		// Corrected once the log collection is built and any override has run.
+		fastWrite: true,
 		collectUserAgent: pluginOptions.logs?.userAgent !== false,
 		defaultRelationTo,
 		groupContextKey: groupEnabled
