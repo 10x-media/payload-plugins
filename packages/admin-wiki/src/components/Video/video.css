@@ -1,0 +1,27 @@
+.wiki-video {
+	margin-block: 1rem;
+}
+
+.wiki-video__player {
+	background: var(--theme-elevation-100);
+	border-radius: 6px;
+	display: block;
+	max-width: 100%;
+	width: 100%;
+}
+
+.wiki-video--embed {
+	aspect-ratio: 16 / 9;
+}
+
+.wiki-video__iframe {
+	border: 0;
+	border-radius: 6px;
+	height: 100%;
+	width: 100%;
+}
+
+.wiki-video__status {
+	color: var(--theme-elevation-600);
+	font-size: 0.875rem;
+}

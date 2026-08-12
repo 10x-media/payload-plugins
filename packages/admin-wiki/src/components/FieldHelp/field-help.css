@@ -1,0 +1,175 @@
+/* The trigger sits in Payload's field Description slot, so it carries the
+   typography of a native field description (packages/ui/src/fields/
+   FieldDescription/index.scss: elevation-400, 1rem, base/4 top margin) rather
+   than inventing a smaller, greyer weight of its own. What marks it as an
+   action is the glyph and the hover state, not a different size. */
+.wiki-field-help {
+	display: inline-block;
+	margin-top: calc(var(--base) / 4);
+	position: relative;
+	width: fit-content;
+}
+
+.wiki-field-help__trigger {
+	align-items: center;
+	background: none;
+	border: 0;
+	color: var(--theme-elevation-400);
+	cursor: pointer;
+	display: inline-flex;
+	font: inherit;
+	gap: calc(var(--base) / 5);
+	padding: 0;
+	text-align: start;
+}
+
+.wiki-field-help__trigger:hover,
+.wiki-field-help__trigger:focus-visible {
+	color: var(--theme-elevation-800);
+}
+
+.wiki-field-help__trigger-label {
+	max-width: 24rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-field-help__trigger:hover .wiki-field-help__trigger-label,
+.wiki-field-help__trigger:focus-visible .wiki-field-help__trigger-label {
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+/* The card is Payload's own popup surface, reproduced: the same elevation, the
+   same radius, the shadow-lg from scss/vars.scss, and a caret drawn out of
+   borders exactly as .popup__caret does. It is absolutely positioned rather
+   than portalled, so it can still be clipped by an ancestor that hides
+   overflow; moving it into a portal is a follow-up. */
+.wiki-field-help__card {
+	background: var(--theme-input-bg);
+	border-radius: var(--style-radius-m, 4px);
+	box-shadow: 0 -2px 16px -2px rgb(0 0 0 / 0.2);
+	color: var(--theme-text);
+	display: block;
+	inset-inline-start: 0;
+	max-height: calc(var(--base) * 14);
+	max-width: calc(100vw - var(--base));
+	overflow-y: auto;
+	padding: calc(var(--base) * 0.5);
+	position: absolute;
+	top: calc(100% + 10px);
+	width: calc(var(--base) * 17);
+	z-index: var(--z-popup, 60);
+}
+
+.wiki-field-help__caret {
+	border: 8px solid transparent;
+	border-bottom-color: var(--theme-input-bg);
+	height: 0;
+	inset-inline-start: 16px;
+	position: absolute;
+	top: -16px;
+	width: 0;
+}
+
+.wiki-field-help__item {
+	display: block;
+}
+
+.wiki-field-help__item + .wiki-field-help__item {
+	border-top: 1px solid var(--theme-elevation-100);
+	margin-top: calc(var(--base) / 2);
+	padding-top: calc(var(--base) / 2);
+}
+
+.wiki-field-help__item-title {
+	display: block;
+	font-weight: 600;
+}
+
+.wiki-field-help__item-summary {
+	-webkit-box-orient: vertical;
+	color: var(--theme-elevation-650);
+	display: -webkit-box;
+	-webkit-line-clamp: 8;
+	line-clamp: 8;
+	line-height: 1.5;
+	margin-top: calc(var(--base) / 5);
+	overflow: hidden;
+}
+
+.wiki-field-help__item-open {
+	background: none;
+	border: 0;
+	color: var(--theme-text);
+	cursor: pointer;
+	display: inline-block;
+	font: inherit;
+	margin-top: calc(var(--base) / 4);
+	padding: 0;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+/* With one guide the whole trigger is the action, so the card only has to say
+   so; with several, each entry carries its own button instead. */
+.wiki-field-help__hint {
+	border-top: 1px solid var(--theme-elevation-100);
+	color: var(--theme-elevation-450);
+	display: block;
+	margin-top: calc(var(--base) / 2);
+	padding-top: calc(var(--base) / 3);
+}
+
+/* The write affordance is one line next to a field that has no guide, and on an
+   edit view with hundreds of fields there could be hundreds of them. It is held
+   at the faintest readable weight and only comes forward on hover of the field
+   it belongs to. */
+.wiki-write-guide {
+	background: none;
+	border: 0;
+	color: var(--theme-elevation-400);
+	cursor: pointer;
+	font: inherit;
+	padding: 0;
+	text-align: start;
+}
+
+.wiki-write-guide--inline {
+	display: inline-flex;
+	gap: calc(var(--base) / 6);
+	margin-top: calc(var(--base) / 4);
+	opacity: 0;
+	transition: opacity 100ms cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+/* Only the innermost hovered or focused field reveals its own affordance.
+   `.field-type` nests (a tab wraps a blocks field wraps a text field) and both
+   `:hover` and `:focus-within` match every ancestor, so the plain descendant
+   form lit up every affordance in a whole tab the moment one input took focus.
+   `:not(:has(.field-type:hover))` is what makes "innermost" expressible. */
+.field-type:hover:not(:has(.field-type:hover)) .wiki-write-guide--inline,
+.field-type:focus-within:not(:has(.field-type:focus-within)) .wiki-write-guide--inline,
+.wiki-write-guide--inline:focus-visible {
+	opacity: 1;
+}
+
+/* Touch and keyboard users get no hover, so the affordance must not be
+   permanently invisible for them. */
+@media (hover: none) {
+	.wiki-write-guide--inline {
+		opacity: 1;
+	}
+}
+
+.wiki-write-guide:hover,
+.wiki-write-guide:focus-visible {
+	color: var(--theme-elevation-800);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.wiki-write-guide__plus {
+	font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,7 @@
+/* The block's guides sit after its last field rather than beside its label, so
+   they take the spacing of a field rather than of a row header. The wrapper
+   collapses to nothing when no guide targets the block, which is why the margin
+   lives on the trigger and not here. */
+.wiki-block-help .wiki-field-help {
+	margin-block: 0;
+}

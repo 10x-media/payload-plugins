@@ -1,0 +1,168 @@
+---
+title: Seeding
+description: Write guides from markdown in code, idempotently, with media and cross-references resolved for you.
+---
+
+`seedWiki()` writes guides into the wiki from code: markdown in, published guides out, the same result every run. Use it for documentation that belongs in your repository, or for a baseline set every new environment should start with.
+
+```ts title="payload.config.ts"
+import { seedWiki } from '@10x-media/admin-wiki'
+
+export default buildConfig({
+  // ...
+  onInit: async (payload) => {
+    await seedWiki(payload, [
+      {
+        slug: 'publishing-a-post',
+        title: 'Publishing a post',
+        summary: 'From draft to published, step by step.',
+        featured: true,
+        featuredOrder: 1,
+        targets: {
+          collections: ['posts'],
+          fields: ['collection:posts.title'],
+        },
+        content: { markdown: '## Write the draft\n\nGive the post a clear **title**.' },
+      },
+    ])
+  },
+})
+```
+
+## Idempotency
+
+Guides are keyed by `slug`. A re-run updates the existing guide rather than creating a second one, so calling it on every boot is safe.
+
+Targets are always written in full, all four lists, so dropping a target from a seed definition clears it rather than leaving it behind. `publish: false` leaves the guide as a draft; the default is published.
+
+## Content
+
+Content is either markdown or raw lexical:
+
+```ts
+{ content: { markdown: '## Heading\n\nText.' } }
+{ content: { lexical: someSerializedEditorState } }
+```
+
+Markdown converts through the **wiki editor's** own configuration, so exactly the features [available while authoring](/admin-wiki/authoring#the-editor) are available here, including any blocks you registered.
+
+## Transformers
+
+After conversion, the lexical state passes through a pipeline. Three transformers are built in and always run first:
+
+**GitHub alerts to callouts.** Blockquotes written in GitHub's alert syntax become the plugin's callout blocks:
+
+```md
+> [!NOTE]
+> Callouts come in info, tip, warning, and danger variants.
+```
+
+`[!NOTE]` maps to info, `[!TIP]` to tip, `[!WARNING]` and `[!IMPORTANT]` to warning, `[!CAUTION]` to danger. An unrecognized marker stays a plain blockquote, and only top-level blockquotes are considered.
+
+**Guide links.** An inline `{{wiki:guide:<slug>}}` placeholder becomes a guide-link inline block:
+
+```md
+Layout blocks are covered in {{wiki:guide:hero-banner-guide}}.
+```
+
+Slugs resolve against every guide in the same seed run, forward references included, so guides may link to each other regardless of definition order. An unknown slug throws.
+
+**Media placeholders.** A paragraph containing only `{{wiki:media:<key>}}` becomes an upload node, and `{{wiki:video:<key>}}` becomes a video node, both pointing at media declared in the same run:
+
+```ts
+await seedWiki(payload, guides, {
+  media: [
+    { key: 'diagram', file: path.resolve(dirname, 'fixtures/diagram.png'), alt: 'Example diagram' },
+    { key: 'tour', url: 'https://example.com/tour.mp4' },
+  ],
+})
+```
+
+Each media definition takes exactly one of `file` (a local path) or `url` (fetched at seed time), and is keyed for stability across runs. An unknown key throws.
+
+Add your own transformers after the built-ins:
+
+```ts
+await seedWiki(payload, guides, {
+  transformers: [myTransformer],
+})
+```
+
+A transformer receives the state and a context holding `guideIdsBySlug` and the seeded `media` handles, and returns the state to pass on.
+
+## Your own fields
+
+A project that [extended the wiki pages collection](/admin-wiki/configuration#collection-overrides) has fields `seedWiki()` knows nothing about. `additionalData` is how a seed definition fills them:
+
+```ts
+{
+  slug: 'publishing-a-post',
+  title: 'Publishing a post',
+  content: { markdown },
+  additionalData: { audience: 'editors', reviewedAt: '2026-01-01' },
+}
+```
+
+For a value that has to be looked up first, pass a function instead. It receives the running `payload` and may be async:
+
+```ts
+{
+  slug: 'publishing-a-post',
+  title: 'Publishing a post',
+  content: { markdown },
+  additionalData: async (payload) => {
+    const { docs } = await payload.find({
+      collection: 'wiki-categories',
+      where: { slug: { equals: 'editorial' } },
+    })
+    return { category: docs[0]?.id }
+  },
+}
+```
+
+Two limits worth knowing:
+
+- **The seed's own fields are off limits.** Naming `slug`, `title`, `summary`, `content`, `featured`, `featuredOrder`, `_status`, or any `target*` list throws, with the guide and the offending field in the message. `slug` is the reason it is an error rather than a merge: it is the identity the next run matches on, so overwriting it would create a second guide instead of updating this one.
+- **It is written with the default-locale pass only.** A localized extra field gets its value in the default locale and falls back for the rest; per-locale extra data is not expressible.
+
+## Localization
+
+Any of `title`, `summary`, and `content` may be a plain value or a record keyed by content locale:
+
+```ts
+{
+  slug: 'publishing-a-post',
+  title: { en: 'Publishing a post', de: 'Beitrag veröffentlichen' },
+  summary: { en: 'From draft to published.', de: 'Vom Entwurf zur Veröffentlichung.' },
+  content: { en: { markdown: enMarkdown }, de: { markdown: deMarkdown } },
+}
+```
+
+A plain value is written to the default locale. Every other locale is written in its own pass, so a guide can be seeded in one language now and gain another later without touching the first.
+
+Targets and `featured` are not localized and are written once.
+
+## Failure behavior
+
+Nothing is skipped silently. A guide that fails throws with its slug in the message and the original error as `cause`; an unresolvable media key or guide slug throws with the offending key named. Wrap the call if a broken seed should not stop your boot:
+
+```ts
+onInit: async (payload) => {
+  try {
+    await seedWiki(payload, guides, options)
+  } catch (error) {
+    payload.logger.error({ err: error }, 'wiki seed failed')
+  }
+}
+```
+
+## The return value
+
+```ts
+{
+  guides: [{ action: 'created' | 'updated', id, slug }],
+  media: { diagram: { id, relationTo: 'wiki-media' } },
+}
+```
+
+Useful for logging what a run actually did, and for chaining further writes against seeded media.
