@@ -9,6 +9,7 @@ import type { ConsentSourcesResolver } from '../consent/types'
 import { resolveEventSink } from '../events/resolveEventSink'
 import type { FormEventSink } from '../events/types'
 import type { FieldTypeRegistry } from '../fields/registry'
+import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
 import type { PollOptionSourceRegistry } from '../poll/registry'
@@ -18,7 +19,15 @@ import type { ResolvedSpamConfig } from '../spam/types'
 import { formIdOf } from '../submissions/formIdOf'
 import { validateSubmission } from '../submissions/validateSubmission'
 import { verifyContext } from '../submissions/verifyContext'
-import { POLL_CONTEXT_KEY, votedCookieName } from '../submissions/votedCookie'
+import { buildVoteSubmitEndpoint } from '../submissions/voteChangeEndpoint'
+import {
+	POLL_CONTEXT_KEY,
+	type PollContextState,
+	signVotedCookieValue,
+	VOTED_COOKIE_MAX_AGE_SECONDS,
+	voteChangeTargetOf,
+	votedCookieName,
+} from '../submissions/votedCookie'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
@@ -47,7 +56,10 @@ type BuildSubmissionsCollectionArgs = {
 	uploadSlug?: string
 	/** Resolved spam config; when active, prepends the spam guard before validation. `false` disables it. */
 	spam?: ResolvedSpamConfig | false
-	/** Opt-in (`poll.votedCookie`): set an httpOnly `fb-voted-{formId}` cookie on poll submission creates. */
+	/**
+	 * Opt-in (`poll.votedCookie`): set an httpOnly `fb-voted-{formId}` cookie on poll submission
+	 * creates. An `allowChange` poll sets its signed-id cookie regardless of this flag.
+	 */
 	votedCookie?: boolean
 	/** Registered poll option sources; submission validation resolves allowed values through them. */
 	pollSourceRegistry?: PollOptionSourceRegistry
@@ -127,17 +139,27 @@ const makeAfterChange =
 		return doc
 	}
 
+const isPollContextState = (value: unknown): value is PollContextState =>
+	value != null &&
+	typeof value === 'object' &&
+	typeof (value as PollContextState).pollEnabled === 'boolean'
+
 /**
- * Opt-in (`poll.votedCookie`) hook: after a submission to a poll-enabled form is created, appends
- * an httpOnly `fb-voted-{formId}=1` cookie via `req.responseHeaders`, Payload's supported channel
- * for hook-set response headers (its own auth strategies use it; `handleEndpoints` merges it into
- * every REST response). Reads the poll config `validateSubmission` stashed on `req.context`,
- * falling back to a form fetch when absent. httpOnly keeps the marker readable only server-side
- * (`hasVotedCookie`); the client `<Poll>` keeps its localStorage guard.
+ * Voted-cookie hook: after a submission to a poll-enabled form is created (or updated through the
+ * vote-change path), appends an httpOnly `fb-voted-{formId}` cookie via `req.responseHeaders`,
+ * Payload's supported channel for hook-set response headers (its own auth strategies use it;
+ * `handleEndpoints` merges it into every REST response). The value stays the legacy `1` marker
+ * under the `poll.votedCookie` plugin option; an `allowChange` poll instead carries the signed
+ * submission id (set regardless of the option, because re-vote identification depends on it) and
+ * refreshes it on every change. Reads the poll state `validateSubmission` stashed on
+ * `req.context`, falling back to a form fetch when absent. httpOnly keeps the marker readable
+ * only server-side (`hasVotedCookie`/`resolveVotedSubmission`); the client `<Poll>` keeps its
+ * localStorage guard.
  */
-const makeVotedCookieHook = (): CollectionAfterChangeHook => {
+const makeVotedCookieHook = (args: { votedCookie: boolean }): CollectionAfterChangeHook => {
 	return async ({ doc, operation, req }) => {
-		if (operation !== 'create') {
+		const changing = operation === 'update' && voteChangeTargetOf(req) != null
+		if (operation !== 'create' && !changing) {
 			return doc
 		}
 		const formId = formIdOf(doc.form)
@@ -145,20 +167,38 @@ const makeVotedCookieHook = (): CollectionAfterChangeHook => {
 			return doc
 		}
 		const stashed = req.context?.[POLL_CONTEXT_KEY]
-		let pollEnabled = typeof stashed === 'boolean' ? stashed : undefined
-		if (pollEnabled === undefined) {
+		let state = isPollContextState(stashed) ? stashed : undefined
+		if (state === undefined) {
 			const form = await req.payload
 				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
 				.catch(() => null)
-			pollEnabled = form?.pollEnabled === true
+			state = {
+				pollEnabled: form?.pollEnabled === true,
+				allowChange: pollConfigOf(form?.poll)?.allowChange === true,
+			}
 		}
-		if (!pollEnabled) {
+		if (!state.pollEnabled || !(args.votedCookie || state.allowChange)) {
 			return doc
 		}
+		const value = state.allowChange
+			? signVotedCookieValue(req.payload, doc.id as number | string)
+			: '1'
+		// A signed id is a bearer capability (it authorizes changing that vote), so it follows the
+		// host's Payload auth-cookie transport policy: `Secure` whenever the admin user collection's
+		// `auth.cookies.secure` is on. The legacy `1` marker stays a plain UX flag either way.
+		const adminUserSlug = req.payload.config.admin?.user
+		// String-indexed cast: a host's generated types key `collections` to its own slugs, which
+		// this framework-level read cannot know.
+		const collections = req.payload.collections as Record<
+			string,
+			{ config: { auth?: { cookies?: { secure?: boolean } } } } | undefined
+		>
+		const authCookies = adminUserSlug ? collections[adminUserSlug]?.config.auth?.cookies : undefined
+		const secure = state.allowChange && authCookies?.secure === true ? '; Secure' : ''
 		req.responseHeaders ??= new Headers()
 		req.responseHeaders.append(
 			'Set-Cookie',
-			`${votedCookieName(formId)}=1; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax`
+			`${votedCookieName(formId)}=${value}; Path=/; Max-Age=${VOTED_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`
 		)
 		return doc
 	}
@@ -278,10 +318,17 @@ export const buildSubmissionsCollection = ({
 				// rather than being absorbed by the dispatch hook's swallow-all error boundary below.
 				...(pollVotes !== false ? [makeVoteTallyHook()] : []),
 				makeAfterChange({ actionRegistry, events, hasRunner, richText }),
-				...(votedCookie ? [makeVotedCookieHook()] : []),
+				// Always registered: it self-gates on the option and on the form's allowChange flag.
+				makeVotedCookieHook({ votedCookie }),
 				...(overrides?.hooks?.afterChange ?? []),
 			],
 		},
+		// The vote-submit endpoint must stay first so it shadows the stock REST create (custom
+		// endpoints match before built-ins); `endpoints: false` from a host disables ours too.
+		endpoints:
+			overrides?.endpoints === false
+				? false
+				: [buildVoteSubmitEndpoint(), ...(overrides?.endpoints ?? [])],
 		fields: overrides?.fields ? overrides.fields({ defaultFields }) : defaultFields,
 	}
 }

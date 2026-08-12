@@ -103,6 +103,7 @@ export const colors: CollectionConfig = {
 		}),
 		colorField({ name: 'localizedColor', localized: true }),
 		...colorField({ linked: true, name: 'linkedStatic', presets: staticPresets }),
+		...colorField({ alpha: false, linked: true, name: 'linkedNoAlpha', presets: staticPresets }),
 		...colorField({
 			linked: { fallback: '#94a3b8' },
 			name: 'linkedTenant',

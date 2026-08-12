@@ -101,6 +101,35 @@ describe('FormResults', () => {
 		expect(text.some((entry) => entry.includes('Blue'))).toBe(true)
 	})
 
+	it("marks the voter's own pick with class and a translated badge", () => {
+		const { container } = render(
+			createElement(FormResults, { results: agg(), currentValues: ['blue'], t: (k) => k })
+		)
+		const yours = container.querySelector('.fb-results__bucket--yours')
+		expect(yours).not.toBeNull()
+		expect(yours?.textContent).toContain('Blue')
+		expect(yours?.querySelector('.fb-results__your-vote-badge')?.textContent).toBe(
+			'formBuilder:results.yourVote'
+		)
+		expect(container.querySelectorAll('.fb-results__bucket--yours')).toHaveLength(1)
+	})
+
+	it('marks no pick without currentValues and combines with a winner highlight', () => {
+		const plain = render(createElement(FormResults, { results: agg() }))
+		expect(plain.container.querySelector('.fb-results__bucket--yours')).toBeNull()
+		cleanup()
+		const combined = render(
+			createElement(FormResults, {
+				results: agg(),
+				winningValues: ['red'],
+				currentValues: ['red'],
+				t: (k) => k,
+			})
+		)
+		const bucket = combined.container.querySelector('.fb-results__bucket--winner')
+		expect(bucket?.classList.contains('fb-results__bucket--yours')).toBe(true)
+	})
+
 	it('marks no winner without winningValues or when none matches a bucket', () => {
 		const plain = render(createElement(FormResults, { results: agg() }))
 		expect(plain.container.querySelector('.fb-results__bucket--winner')).toBeNull()

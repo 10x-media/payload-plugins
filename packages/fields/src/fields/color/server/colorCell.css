@@ -26,6 +26,11 @@
 	display: block;
 }
 
+.fields-color-cell__alpha {
+	color: var(--theme-elevation-500);
+	font-size: 0.75rem;
+}
+
 .fields-color-cell__missing {
 	color: var(--theme-error-500);
 	font-size: 0.75rem;

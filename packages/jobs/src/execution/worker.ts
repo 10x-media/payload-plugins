@@ -63,12 +63,16 @@ export type Worker = {
 /**
  * A test-only handle for accessing `stop()`, which clears timers and signal handlers
  * without releasing leadership leases, then resolves once any in-flight tick has
- * settled (so no worker write can race the test's subsequent DB operations). Do not
- * use in production; drain() is the correct shutdown path. Cast a `Worker` to this
- * type in tests to call stop().
+ * settled (so no worker write can race the test's subsequent DB operations), and
+ * `settle()`, which resolves once every currently in-flight tick has completed while
+ * the loops keep running (deterministic barrier: any tick that began before a state
+ * write the test just awaited has finished, and every later tick reads that state).
+ * Do not use in production; drain() is the correct shutdown path. Cast a `Worker` to
+ * this type in tests.
  */
 export type WorkerTestHandle = Worker & {
 	stop: () => Promise<void>
+	settle: () => Promise<void>
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -229,6 +233,10 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		await stopLoops()
 	}
 
+	const settleLoops = async (): Promise<void> => {
+		await Promise.all(timers.map((loop) => loop.settle()))
+	}
+
 	const worker: Worker = {
 		drain,
 		isLeader: (role) =>
@@ -265,9 +273,10 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		},
 	}
 
-	// Attach stop() as a non-enumerable property so tests can access it via WorkerTestHandle
-	// without it appearing on the public Worker type.
+	// Attach stop() and settle() as non-enumerable properties so tests can access them via
+	// WorkerTestHandle without them appearing on the public Worker type.
 	Object.defineProperty(worker, 'stop', { value: stopWorker, enumerable: false })
+	Object.defineProperty(worker, 'settle', { value: settleLoops, enumerable: false })
 
 	if (args.installSignals !== false) {
 		if (areHandlersInstalled()) {

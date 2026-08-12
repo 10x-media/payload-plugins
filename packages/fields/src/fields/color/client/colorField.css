@@ -173,6 +173,13 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 	text-overflow: ellipsis;
 }
 
+.fields-color__chip-alpha {
+	flex-shrink: 0;
+	color: var(--theme-elevation-500);
+	font-size: 0.75rem;
+	line-height: 1;
+}
+
 .fields-color__input {
 	flex: 1 1 auto;
 	width: 100%;

@@ -32,6 +32,7 @@ export const clientRuntimeKeys: readonly TranslationKey[] = [
 	keys.fileUploadMisconfigured,
 	keys.fileHintAccepted,
 	keys.fileHintMaxSize,
+	keys.pollChangeVote,
 	keys.pollClosed,
 	keys.pollFinalResult,
 	keys.pollResultsAfterClose,
@@ -40,4 +41,5 @@ export const clientRuntimeKeys: readonly TranslationKey[] = [
 	keys.resultsResponses,
 	keys.resultsTruncated,
 	keys.resultsWinner,
+	keys.resultsYourVote,
 ]

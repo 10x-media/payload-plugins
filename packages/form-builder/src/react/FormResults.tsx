@@ -17,6 +17,8 @@ export type FormResultsProps = {
 	showCounts?: boolean
 	/** The recorded outcome's stable option values; every matching bucket is highlighted as a winner (a tie highlights more than one). */
 	winningValues?: string[]
+	/** The viewing voter's own pick (e.g. `resolveVotedSubmission().pick`); every matching bucket carries a "your vote" marker. */
+	currentValues?: string[]
 }
 
 const OneResult = ({
@@ -24,11 +26,13 @@ const OneResult = ({
 	t,
 	showCounts,
 	winningValues,
+	currentValues,
 }: {
 	result: FieldAggregation
 	t: RendererTranslate
 	showCounts: boolean
 	winningValues?: string[]
+	currentValues?: string[]
 }): ReactNode => {
 	if (result.total === 0) {
 		return (
@@ -44,17 +48,21 @@ const OneResult = ({
 			<ul className="fb-results__list">
 				{result.buckets.map((bucket) => {
 					const isWinner = winningValues?.includes(bucket.value) ?? false
+					const isYours = currentValues?.includes(bucket.value) ?? false
+					const rowClass = [
+						'fb-results__row',
+						...(isWinner ? ['fb-results__bucket--winner'] : []),
+						...(isYours ? ['fb-results__bucket--yours'] : []),
+					].join(' ')
 					return (
-						<li
-							key={bucket.value}
-							className={
-								isWinner ? 'fb-results__row fb-results__bucket--winner' : 'fb-results__row'
-							}
-						>
+						<li key={bucket.value} className={rowClass}>
 							<span className="fb-results__option">
 								{bucket.label}
 								{isWinner ? (
 									<span className="fb-results__winner-badge">{t(keys.resultsWinner)}</span>
+								) : null}
+								{isYours ? (
+									<span className="fb-results__your-vote-badge">{t(keys.resultsYourVote)}</span>
 								) : null}
 							</span>
 							<span className="fb-results__bar">
@@ -90,6 +98,7 @@ export const FormResults = ({
 	t,
 	showCounts = true,
 	winningValues,
+	currentValues,
 }: FormResultsProps): ReactNode => {
 	const translate: RendererTranslate = t ?? makeTranslate(en)
 	const list = Array.isArray(results) ? results : [results]
@@ -102,6 +111,7 @@ export const FormResults = ({
 					t={translate}
 					showCounts={showCounts}
 					winningValues={winningValues}
+					currentValues={currentValues}
 				/>
 			))}
 		</div>

@@ -1,0 +1,62 @@
+/* Authoring identity for the callout block. The level's colour rides a custom
+   property set on the label, which is inside the block container, so the
+   container itself is reached with :has() rather than by duplicating the four
+   levels onto it. `LexicalEditorTheme__block-wikiCallout` is the class the
+   blocks feature puts on every block container (`${baseClass}-${blockType}`,
+   packages/richtext-lexical/src/features/blocks/client/component/index.tsx). */
+.wiki-callout-label {
+	--wiki-callout-accent: var(--theme-elevation-500);
+
+	align-items: center;
+	display: inline-flex;
+	min-width: 0;
+}
+
+.wiki-callout-label--tip {
+	--wiki-callout-accent: var(--theme-success-600);
+}
+
+.wiki-callout-label--warning {
+	--wiki-callout-accent: var(--theme-warning-600);
+}
+
+.wiki-callout-label--danger {
+	--wiki-callout-accent: var(--theme-error-600);
+}
+
+.wiki-callout-label__pill {
+	color: var(--wiki-callout-accent);
+}
+
+.wiki-callout-label__pill .pill__label {
+	align-items: center;
+	display: inline-flex;
+	gap: calc(var(--base) / 4);
+}
+
+.wiki-callout-label__variant {
+	color: var(--theme-elevation-500);
+}
+
+.wiki-callout-label__variant::before {
+	content: "·";
+	margin-inline-end: calc(var(--base) / 5);
+}
+
+.LexicalEditorTheme__block-wikiCallout:has(.wiki-callout-label) {
+	border-inline-start: 3px solid var(--wiki-callout-accent, var(--theme-elevation-300));
+	border-radius: var(--style-radius-m, 4px);
+	padding-inline-start: calc(var(--base) / 2);
+}
+
+.LexicalEditorTheme__block-wikiCallout:has(.wiki-callout-label--tip) {
+	--wiki-callout-accent: var(--theme-success-600);
+}
+
+.LexicalEditorTheme__block-wikiCallout:has(.wiki-callout-label--warning) {
+	--wiki-callout-accent: var(--theme-warning-600);
+}
+
+.LexicalEditorTheme__block-wikiCallout:has(.wiki-callout-label--danger) {
+	--wiki-callout-accent: var(--theme-error-600);
+}

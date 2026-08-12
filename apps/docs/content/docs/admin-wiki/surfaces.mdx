@@ -1,0 +1,115 @@
+---
+title: Surfaces
+description: Where guides render in the admin, and how to move, scope, or disable each surface.
+---
+
+A surface is a place in the admin where a guide can appear. Each target kind has one, and each renders nothing when no guide targets it.
+
+## Field help
+
+Every named field in every collection, global, and block gets a help trigger below its description. It shows the guide's title (or a count when several target the field), reveals each summary in a hover card, and opens the full guide in a reading drawer on click.
+
+<Video alt="Hovering a field's help trigger to read the summary, then opening the full guide in a drawer" src="/videos/admin-wiki/field-help.mp4" />
+
+It is injected as `admin.components.Description` during the config walk, and renders your original description above it, untouched. Static descriptions, descriptions keyed by locale, and function descriptions are all preserved.
+
+One kind of field is skipped: a field that already declares its own `Description` component. The plugin never replaces a consumer component. See [Customization](/admin-wiki/customization#fields-with-a-custom-description) to add the surface back.
+
+## Block help
+
+Every block reachable from any blocks field gets its guides as a UI field, **appended after the block's own fields**. It is not the block's row label, so it does not compete with an `admin.components.Label` of your own.
+
+Shared block configs (`config.blocks` and `blockReferences`) are handled once, so a block used in six places carries one guide surface, not six. The same holds for the help on the block's **own fields**: they are [targeted through the block](/admin-wiki/targets#fields-inside-blocks), not through whichever collection is on screen, so one guide covers every usage.
+
+"Reachable" means through a field of type `blocks`, plus everything in `config.blocks`. A block declared only inside a rich text editor's `BlocksFeature` is not walked and carries no surfaces; see [Blocks in lexical editors](/admin-wiki/targets#blocks-in-lexical-editors).
+
+The injected field is named `adminWikiBlockHelp`. A block that already declares a field by that name keeps its own. It renders nothing inside the [field picker](/admin-wiki/targets#picking-fields).
+
+## Document and global sidebar
+
+Collections and globals get a **Guides** panel in the edit view sidebar: up to two guides as compact cards, then an overflow button opening the rest in a drawer.
+
+It is a UI field: no data, no database column, excluded from your generated types. When it renders nothing, Payload collapses the sidebar to zero width, so a collection with no guides keeps its full-width edit view.
+
+The injected field is named `adminWikiGuides`, exported as `WIKI_GUIDES_FIELD`. A collection or global that already declares a field by that name keeps its own.
+
+```ts
+adminWiki({
+  triggers: {
+    edit: false,   // no panel on collection documents
+    global: false, // no panel on globals
+  },
+})
+```
+
+## Collection list band
+
+Collection list views get a band: the collection's featured guides as cards, then an overflow row for everything else. `featured: false` collapses it to the overflow row alone; the [wiki view](/admin-wiki/wiki-view) still leads with featured guides either way.
+
+The band's slot is configurable:
+
+```ts
+adminWiki({
+  featured: true,
+  triggers: {
+    list: { slot: 'beforeListTable' },
+  },
+})
+```
+
+| Slot | Position |
+|---|---|
+| `beforeList` | Above the list, outside its gutter |
+| `beforeListTable` | Above the table, inside the gutter |
+| `afterListTable` | Below the table, inside the gutter. **Default** |
+| `afterList` | Below the list, outside its gutter |
+
+Payload renders `beforeList` and `afterList` outside the list's own `Gutter`; the band supplies its own horizontal padding there, so all four slots line up with the table.
+
+`triggers: { list: false }` removes the band. The other surfaces take no slot option.
+
+## Scoping
+
+`exclude` takes an entity out of the wiki entirely: no surfaces, no field help, no block help, and no entry in the target pickers.
+
+```ts
+adminWiki({
+  exclude: {
+    blocks: ['spacer'],
+    collections: ['users'],
+    globals: ['nav'],
+  },
+})
+```
+
+Payload's own bookkeeping collections and globals, and the wiki's own two collections, are excluded already. See [Exclusions](/admin-wiki/configuration#exclusions) for the full list.
+
+`triggers` is the narrower control: it turns a surface off across everything the plugin covers, while leaving those entities documentable.
+
+```ts
+adminWiki({
+  triggers: { edit: false, global: false, list: false },
+})
+```
+
+To leave a single field out, give it its own `Description` component.
+
+## The wiki view
+
+The standalone reading view at `/admin/wiki` is the surface for guides that are not about any one place. See [The wiki view](/admin-wiki/wiki-view).
+
+## Requests
+
+One request per admin session fetches the targets map:
+
+```
+GET /api/wiki-pages/targets-map?language=<admin language>
+```
+
+It returns a map of target key to guide summaries, plus the reader's evaluated create and update permissions. Guide content is not included and loads lazily when a drawer opens, cached per guide and locale.
+
+Every surface then resolves guide-existence with a synchronous map lookup, so no surface fetches on its own. The map refreshes on window focus when it is more than a minute old, and immediately after a guide is saved through a write drawer.
+
+## Next
+
+[Authoring](/admin-wiki/authoring) for the editor and the guide collection, or [Write affordances](/admin-wiki/write-affordances) for the write-in-place flow.

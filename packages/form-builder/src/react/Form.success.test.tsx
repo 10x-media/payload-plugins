@@ -45,6 +45,24 @@ describe('Form success handling', () => {
 		expect(result?.response?.html).toContain('Thanks Ada')
 	})
 
+	it('passes the submitted answer values to onSuccess, without reserved keys', async () => {
+		const onSuccess = vi.fn()
+		render(
+			<Form
+				form={doc(oneField)}
+				onSubmit={vi.fn().mockResolvedValue({ ok: true, submissionId: 's1' })}
+				onSuccess={onSuccess}
+				captchaToken="tok"
+			/>
+		)
+		fireEvent.change(screen.getByLabelText('First'), { target: { value: 'Ada' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+		await waitFor(() => expect(onSuccess).toHaveBeenCalled())
+		const result = (onSuccess.mock.calls[0] ?? [])[1]
+		expect(result?.values).toEqual([{ field: 'first', value: 'Ada' }])
+	})
+
 	it('reports a redirect response to onSuccess', async () => {
 		const onSuccess = vi.fn()
 		const form = doc(oneField, {

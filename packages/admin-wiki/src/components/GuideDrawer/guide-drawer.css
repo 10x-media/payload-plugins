@@ -1,0 +1,168 @@
+/* Payload sizes a drawer to the viewport through an inline `width` on
+   `.drawer__content`. A guide is a reading surface, not a full-screen takeover,
+   so the panel is capped instead: `max-width` constrains that inline width
+   without having to fight it with `!important`, and the close strip
+   (`flex-grow: 1`) absorbs the rest, which has the side benefit of making the
+   empty space click-to-close. Nested drawers keep a gutter of peek so a stacked
+   guide still reads as stacked. */
+.wiki-guide-drawer-modal .drawer__content {
+	max-width: 85rem;
+}
+
+.wiki-guide-drawer-modal.drawer--nested .drawer__content {
+	max-width: 80rem;
+}
+
+/* Payload's Drawer supplies the title and close button; everything below is the
+   reading surface. The drawer header and this row share one Gutter, so the row
+   starts at the gutter edge: the prose lines up under the title, and the table
+   of contents is pushed to the far edge under the close button (see the
+   `.wiki-toc` rule). Centering the columns instead left both edges floating
+   inside a header that stayed pinned. */
+.wiki-guide-drawer {
+	display: flex;
+	gap: calc(var(--base) * 1.5);
+	padding-bottom: var(--base);
+}
+
+.wiki-guide-drawer__rail {
+	border-inline-end: 1px solid var(--theme-elevation-100);
+	display: flex;
+	flex-direction: column;
+	flex-shrink: 0;
+	gap: 2px;
+	padding-inline-end: var(--base);
+	width: calc(var(--base) * 11);
+}
+
+.wiki-guide-drawer__rail-heading {
+	color: var(--theme-elevation-450);
+	font-size: 0.8125rem;
+	letter-spacing: 0.04em;
+	margin: 0 0 calc(var(--base) / 3);
+	padding-inline: calc(var(--base) / 2);
+	text-transform: uppercase;
+}
+
+.wiki-guide-drawer__rail-item {
+	align-items: center;
+	background: none;
+	border: 0;
+	border-radius: var(--style-radius-s, 3px);
+	color: var(--theme-elevation-650);
+	cursor: pointer;
+	display: flex;
+	font: inherit;
+	gap: calc(var(--base) / 3);
+	min-width: 0;
+	padding: calc(var(--base) / 3) calc(var(--base) / 2);
+	text-align: start;
+}
+
+.wiki-guide-drawer__rail-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-guide-drawer__rail-item:hover {
+	background: var(--theme-elevation-50);
+	color: var(--theme-text);
+}
+
+.wiki-guide-drawer__rail-item[aria-current] {
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+	font-weight: 600;
+}
+
+.wiki-guide-drawer__pane {
+	flex-grow: 1;
+	max-width: 56rem;
+	min-width: 0;
+}
+
+/* The summary is the lede the drawer title needs to be worth opening, so it
+   shares a rule with the actions rather than sitting loose above the prose. */
+.wiki-guide-drawer__header {
+	align-items: flex-start;
+	border-bottom: 1px solid var(--theme-elevation-100);
+	display: flex;
+	gap: var(--base);
+	justify-content: space-between;
+	margin-bottom: var(--base);
+	padding-bottom: calc(var(--base) / 2);
+}
+
+.wiki-guide-drawer__header:empty {
+	display: none;
+}
+
+/* Sized with the prose it introduces: a lede set smaller than its own body text
+   reads as a caption. */
+.wiki-guide-drawer__summary {
+	color: var(--theme-elevation-650);
+	font-size: var(--wiki-prose-size);
+	line-height: 1.5;
+	margin: 0;
+	max-width: 34rem;
+}
+
+.wiki-guide-drawer__actions {
+	display: flex;
+	flex-shrink: 0;
+	gap: calc(var(--base) / 3);
+}
+
+.wiki-guide-drawer__loading {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+	max-width: 32rem;
+}
+
+.wiki-guide-drawer__status {
+	color: var(--theme-elevation-500);
+	margin: 0;
+}
+
+/* The TOC only ever renders here when there is no rail (see GuideDrawer), so the
+   drawer is never three columns and the existing cap still fits. The auto
+   margin takes whatever the capped pane leaves over, pinning the column under
+   the drawer's close button. */
+.wiki-guide-drawer > .wiki-toc {
+	flex-shrink: 0;
+	margin-inline-start: auto;
+	width: 16rem;
+}
+
+@media (max-width: 1100px) {
+	.wiki-guide-drawer > .wiki-toc {
+		display: none;
+	}
+}
+
+@media (max-width: 1024px) {
+	.wiki-guide-drawer {
+		flex-direction: column;
+		gap: var(--base);
+	}
+
+	.wiki-guide-drawer__rail {
+		border-bottom: 1px solid var(--theme-elevation-100);
+		border-inline-end: 0;
+		flex-direction: row;
+		flex-wrap: wrap;
+		padding: 0 0 calc(var(--base) / 2);
+		width: 100%;
+	}
+
+	.wiki-guide-drawer__rail-heading {
+		flex-basis: 100%;
+		margin-bottom: 0;
+	}
+
+	.wiki-guide-drawer__header {
+		flex-direction: column;
+	}
+}

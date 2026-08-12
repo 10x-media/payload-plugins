@@ -1,0 +1,90 @@
+---
+title: Quick start
+description: Install the plugin, write your first guide, and see it appear on the field it explains.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/admin-wiki
+```
+
+## Configure
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { adminWiki } from '@10x-media/admin-wiki'
+
+export default buildConfig({
+  // ...
+  plugins: [
+    // Field-adding plugins first, so the wiki walker sees their fields.
+    adminWiki({}),
+  ],
+})
+```
+
+Then regenerate the import map, which is how Payload resolves the plugin's client components:
+
+```bash
+payload generate:importmap
+```
+
+<Callout type="warn">
+Order matters. `adminWiki()` documents the config as it stands when it runs, so it belongs after every plugin that adds collections or fields. If the walk finds no fields at all, the plugin logs a warning on boot rather than failing silently.
+</Callout>
+
+## What appeared
+
+Two collections in the admin: **Wiki Pages** (the guides) and **Wiki Media** (uploads used by guide content). Both are readable and writable by any logged-in user until you [restrict access](/admin-wiki/configuration#access).
+
+Nothing else changed visibly. Every other collection now carries help surfaces, but they render nothing until a guide targets them.
+
+## Write your first guide
+
+Create a **Wiki Page**. The form has two tabs:
+
+- **Guide**: the title, a short summary (shown in hover cards and lists), and the content.
+- **Targets**: four lists naming the surfaces this guide is about.
+
+Give it a title, write a paragraph, and in **Targets** pick a collection under **Collections**, for example Posts. Save and publish.
+
+<Callout type="info">
+Guides use drafts. Only **published** guides appear on surfaces; a draft is visible to its author in the collection and nowhere else.
+</Callout>
+
+## Verify
+
+Open any `posts` document. The sidebar now carries a **Guides** panel with your guide in it; clicking opens it in a reading drawer without leaving the document. Open the `posts` list view and the guide is there too, as a band under the table.
+
+Now attach it to a field. Back in the guide's **Targets** tab, press **Pick fields** above the **Fields** list and choose **Collection**. The drawer renders the real form of whatever is selected: pick Posts, click the plate under the **Title** field, and press **Apply**. Save the guide, then reload a post: the title field's description now carries a help trigger that shows the summary on hover and opens the full guide on click.
+
+The stored value is `collection:posts.title`. Field targets are owner-qualified because a collection and a global may share a slug. See [Targeting](/admin-wiki/targets) for the full key format and for the [picker](/admin-wiki/targets#picking-fields) in detail.
+
+## Skip the typing entirely
+
+There is a second way in that skips the Targets tab as well. Turn on **wiki edit mode** from the toggle on the wiki pages list view, then open a document: every field without a guide grows a "write this guide" line. Click it and a create drawer opens with that field already targeted.
+
+Edit mode is per browser and persists across reloads. See [Write affordances](/admin-wiki/write-affordances).
+
+## Open the wiki
+
+The plugin registers a reading view at `/admin/wiki`: featured guides as cards, everything else in a searchable list filtered by surface. It does not appear in the nav; reach it from the **Open wiki** action on the wiki pages list, or from **Open in wiki** in any guide drawer.
+
+## If nothing appears
+
+**The import map is stale.** Run `payload generate:importmap` after installing and after upgrading.
+
+**The guide is a draft.** Surfaces read published guides only.
+
+**The target does not match.** Field targets are owner-qualified paths (`collection:posts.title`, and `block:heroBanner.heading` for a field inside a block). A path typed by hand can be a typo, and any path goes stale when the field moves. The **Wiki Pages** list shows an orphan banner listing every target that no longer resolves against your config.
+
+**The block is declared inside a lexical editor.** A block declared in a rich text `BlocksFeature` and nowhere else is not walked. See [Blocks in lexical editors](/admin-wiki/targets#blocks-in-lexical-editors).
+
+**The entity is excluded.** Payload's own bookkeeping collections are out of the wiki by default, along with anything in your [`exclude`](/admin-wiki/configuration#exclusions) option. An excluded entity carries no surfaces and does not appear in the target pickers.
+
+**The plugin ran too early.** A field added by a later plugin was not in the config the walker saw. Move `adminWiki()` after it.
+
+## Next
+
+[Targeting](/admin-wiki/targets) is the concept the rest of the plugin is built on. Then [Surfaces](/admin-wiki/surfaces) for where guides render and how to move or disable them.

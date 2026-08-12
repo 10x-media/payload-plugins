@@ -25,6 +25,7 @@
 		"test:container": "tsx scripts/run.ts test:container",
 		"test:dist": "tsx scripts/run.ts test:dist",
 		"test:e2e": "tsx scripts/run.ts test:e2e",
+		"videos": "tsx scripts/run.ts videos",
 		"generate": "tsx scripts/run.ts generate",
 		"generate:types": "tsx scripts/run.ts generate:types",
 		"generate:importmap": "tsx scripts/run.ts generate:importmap",

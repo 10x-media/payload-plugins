@@ -43,6 +43,10 @@ export const aggregateFromVotes = async (args: {
 		}
 	}
 
+	// Clamp at read: a concurrent double-change can transiently double-decrement one value (see
+	// the tally hook's drift note), and a negative bucket count must never surface to a reader.
+	total = Math.max(0, total)
+
 	const optionValues = new Set(options.map((option) => option.value))
 	const leftovers = [...counts.keys()]
 		.filter((value) => !optionValues.has(value))
@@ -50,7 +54,7 @@ export const aggregateFromVotes = async (args: {
 	const labelByValue = new Map(options.map((option) => [option.value, option.label]))
 
 	const buckets = [...options.map((option) => option.value), ...leftovers].map((value) => {
-		const count = counts.get(value) ?? 0
+		const count = Math.max(0, counts.get(value) ?? 0)
 		return {
 			value,
 			label: labelByValue.get(value) ?? value,

@@ -1,0 +1,295 @@
+/* The select plate takes the Description slot, so it starts from the same
+   metrics as the help trigger next to it (field-help.css) and earns its
+   affordance from the box and the border, not from a louder type size. */
+.wiki-field-pick {
+	align-items: center;
+	background: var(--theme-elevation-50);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s, 3px);
+	color: var(--theme-elevation-600);
+	cursor: pointer;
+	display: inline-flex;
+	font: inherit;
+	gap: calc(var(--base) / 4);
+	margin-top: calc(var(--base) / 4);
+	max-width: 100%;
+	padding: calc(var(--base) / 6) calc(var(--base) / 3);
+	text-align: start;
+}
+
+.wiki-field-pick:hover,
+.wiki-field-pick:focus-visible {
+	border-color: var(--theme-elevation-400);
+	color: var(--theme-elevation-800);
+}
+
+.wiki-field-pick--selected {
+	background: var(--theme-success-50, var(--theme-elevation-100));
+	border-color: var(--theme-success-500, var(--theme-elevation-500));
+	color: var(--theme-elevation-800);
+}
+
+.wiki-field-pick__box {
+	align-items: center;
+	background: var(--theme-input-bg);
+	border: 1px solid var(--theme-elevation-250);
+	border-radius: var(--style-radius-s, 3px);
+	display: inline-flex;
+	flex-shrink: 0;
+	height: calc(var(--base) / 1.5);
+	justify-content: center;
+	width: calc(var(--base) / 1.5);
+}
+
+.wiki-field-pick--selected .wiki-field-pick__box {
+	background: var(--theme-success-500, var(--theme-elevation-800));
+	border-color: transparent;
+	color: var(--theme-base-0);
+}
+
+.wiki-field-pick__box .icon {
+	height: 100%;
+	width: 100%;
+}
+
+/* Whole-field highlight while a field is covered. `:has()` is progressive
+   enhancement: without it the plate alone still says so. */
+.field-type:has(> .field-type__wrap > .wiki-field-pick--selected),
+.field-type:has(> .wiki-field-pick--selected) {
+	outline: 1px solid var(--theme-success-500, var(--theme-elevation-400));
+	outline-offset: calc(var(--base) / 4);
+}
+
+/* The drawer keeps Payload's own width. A guide drawer is a reading surface and
+   is capped to a measure; this one holds the host's real edit form, which is
+   laid out for the width the admin gives it, so narrowing it would only reflow
+   the form into something the author does not recognise.
+
+   `.drawer__content-children` owns the scrolling, so the switcher and the
+   footer stick to it rather than the panel being split into three panes. The
+   confirm button has to stay reachable however long the entity's form is, and a
+   form that scrolls under its own header is what the edit view does anyway. */
+.wiki-field-picker {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+	padding-bottom: var(--base);
+}
+
+.wiki-field-picker__switcher {
+	align-items: end;
+	background: var(--theme-bg);
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) / 2);
+	padding-bottom: calc(var(--base) / 2);
+	position: sticky;
+	top: 0;
+	z-index: 2;
+}
+
+/* One control, because the kind was already chosen from the menu on the field's
+   button. Collections and globals switch through a plain menu; a block switches
+   through Payload's own block drawer, the only picker that shows a block's
+   thumbnail and its label in the reader's language. */
+.wiki-field-picker__source {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 4);
+	min-width: calc(var(--base) * 10);
+	width: calc(var(--base) * 16);
+}
+
+.wiki-field-picker__source-label {
+	color: var(--theme-elevation-600);
+	font-size: 0.9em;
+}
+
+.wiki-field-picker__empty {
+	align-items: start;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+}
+
+.wiki-field-picker__body {
+	border-top: 1px solid var(--theme-elevation-100);
+	padding-top: calc(var(--base) / 2);
+}
+
+.wiki-field-picker__loading {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+}
+
+.wiki-field-picker__status {
+	color: var(--theme-elevation-600);
+}
+
+.wiki-field-picker__footer {
+	align-items: center;
+	background: var(--theme-bg);
+	border-top: 1px solid var(--theme-elevation-100);
+	bottom: 0;
+	display: flex;
+	gap: calc(var(--base) / 2);
+	padding: calc(var(--base) / 2) 0;
+	position: sticky;
+	z-index: 2;
+}
+
+.wiki-field-picker__count {
+	color: var(--theme-elevation-600);
+	margin-inline-end: auto;
+}
+
+/* One section per owner, as Payload's own `Collapsible`, so a group of field
+   targets reads like an array row rather than like something this plugin
+   invented. Only the pieces core sizes for icon-only actions are overridden. */
+.wiki-target-fields__groups,
+.wiki-target-fields__paths {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.wiki-target-fields__header {
+	align-items: center;
+	display: flex;
+	gap: calc(var(--base) / 2);
+	justify-content: space-between;
+	margin-bottom: calc(var(--base) / 2);
+}
+
+.wiki-target-fields__header .field-label {
+	margin: 0;
+	padding-bottom: 0;
+}
+
+.wiki-target-fields__groups {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 4);
+}
+
+/* `collapsible__toggle` is a full-size absolute overlay, so it paints over the
+   actions unless they are lifted into the same layer. Core sizes the actions
+   slot for a single icon button, which the text shortcut has to opt out of. */
+.wiki-target-fields__group .collapsible__actions {
+	height: auto;
+	pointer-events: all;
+	position: relative;
+	width: auto;
+	z-index: 1;
+}
+
+.wiki-target-fields__group .collapsible__content {
+	padding: calc(var(--base) / 2) calc(var(--base) / 1.5);
+}
+
+.wiki-target-fields__group-header {
+	align-items: center;
+	display: flex;
+	gap: calc(var(--base) / 4);
+	min-width: 0;
+	padding-inline-end: calc(var(--base) / 2);
+}
+
+.wiki-target-fields__group-kind {
+	flex-shrink: 0;
+}
+
+.wiki-target-fields__group-label {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Beside the name rather than at the far edge: the header stretches to whatever
+   width the tab has, and a number alone out there belongs to nothing. */
+.wiki-target-fields__group-count {
+	flex-shrink: 0;
+	font-variant-numeric: tabular-nums;
+}
+
+.wiki-target-fields__path {
+	align-items: baseline;
+	display: flex;
+	gap: calc(var(--base) / 4);
+	padding: calc(var(--base) / 8) 0;
+}
+
+/* The breadcrumb reads as the admin reads: the field's own label carries the
+   weight, and the containers it sits in stay behind it. The stored path is on
+   the row's `title`, for the one moment it is the thing being checked. */
+.wiki-target-fields__crumbs {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-target-fields__crumb {
+	color: var(--theme-elevation-500);
+}
+
+.wiki-target-fields__crumb--leaf {
+	color: var(--theme-text);
+}
+
+.wiki-target-fields__crumb + .wiki-target-fields__crumb::before {
+	color: var(--theme-elevation-350);
+	content: "›";
+	padding: 0 calc(var(--base) / 6);
+}
+
+.wiki-target-fields__raw {
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-target-fields__remove {
+	background: none;
+	border: 0;
+	color: var(--theme-elevation-400);
+	cursor: pointer;
+	display: inline-flex;
+	margin-inline-start: auto;
+	padding: 0;
+}
+
+.wiki-target-fields__remove:hover,
+.wiki-target-fields__remove:focus-visible {
+	color: var(--theme-error-500, var(--theme-elevation-800));
+}
+
+.wiki-target-fields__empty {
+	color: var(--theme-elevation-500);
+	margin: 0;
+}
+
+/* The way in for everything the rendered form cannot offer: a field behind a
+   condition, a field that does not exist yet. It sits under the list because
+   that is where it applies, and it carries its own button, since a bare input
+   that only responds to Enter reads as a search box. */
+.wiki-target-fields__manual {
+	align-items: center;
+	display: flex;
+	gap: calc(var(--base) / 2);
+	margin-top: calc(var(--base) / 2);
+}
+
+.wiki-target-fields__manual-input {
+	flex: 1;
+	min-width: calc(var(--base) * 8);
+}
+
+.wiki-target-fields__manual-input input {
+	font-family: var(--font-mono);
+}
