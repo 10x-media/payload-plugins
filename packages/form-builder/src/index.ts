@@ -390,6 +390,8 @@ export type {
 } from './spam/types'
 export type { CreatedSubmission, CreateSubmissionArgs } from './submissions/createSubmission'
 export { createSubmission } from './submissions/createSubmission'
+export type { VotedSubmission } from './submissions/resolveVotedSubmission'
+export { resolveVotedSubmission } from './submissions/resolveVotedSubmission'
 export { hasVotedCookie, votedCookieName } from './submissions/votedCookie'
 export { captureFileRef } from './uploads/captureFileRef'
 export { formatBytes } from './uploads/formatBytes'

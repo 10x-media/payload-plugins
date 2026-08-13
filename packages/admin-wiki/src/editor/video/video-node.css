@@ -1,0 +1,123 @@
+/* Deliberately close to Payload's own upload node (`.LexicalEditorTheme__upload`):
+   a bordered card that lifts on hover, with round actions floating in from the
+   top right. Written against the same tokens so the two nodes stay siblings when
+   the theme changes under them. */
+.wiki-video-node {
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m, 4px);
+	font-family: var(--font-body);
+	margin-block: calc(var(--base) / 2);
+	position: relative;
+}
+
+.wiki-video-node:hover {
+	border-color: var(--theme-elevation-150);
+}
+
+.wiki-video-node__card {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+}
+
+.wiki-video-node__media {
+	position: relative;
+}
+
+/* The player is the card's own top edge, so its wrapper margin has to go and its
+   corners have to follow the card's. */
+.wiki-video-node__media .wiki-video {
+	margin-block: 0;
+}
+
+.wiki-video-node__media .wiki-video__player {
+	border-radius: var(--style-radius-m, 4px) var(--style-radius-m, 4px) 0 0;
+}
+
+.wiki-video-node__media .wiki-video__status {
+	margin: 0;
+	padding: var(--base);
+}
+
+/* Hidden until the card is hovered or something inside it takes focus, the same
+   reveal core uses, so a guide full of videos is not a wall of buttons. */
+.wiki-video-node__actions {
+	align-items: center;
+	background: var(--theme-elevation-50);
+	border-radius: var(--style-radius-m, 4px);
+	display: flex;
+	gap: calc(var(--base) * 0.3);
+	opacity: 0;
+	padding: calc(var(--base) * 0.2);
+	pointer-events: none;
+	position: absolute;
+	right: calc(var(--base) * 0.5);
+	top: calc(var(--base) * 0.5);
+	transform: translateY(-6px);
+	transition:
+		opacity 0.15s ease,
+		transform 0.15s ease;
+}
+
+.wiki-video-node:hover .wiki-video-node__actions,
+.wiki-video-node__media:focus-within .wiki-video-node__actions {
+	opacity: 1;
+	pointer-events: auto;
+	transform: translateY(0);
+}
+
+.wiki-video-node__actions .btn {
+	margin: 0;
+}
+
+.wiki-video-node__actions .btn:hover {
+	background: var(--theme-elevation-100);
+}
+
+/* Always on, and below the player rather than over it: core can float this strip
+   because an image has nothing underneath, where a video keeps its transport
+   controls exactly there. */
+.wiki-video-node__meta {
+	align-items: baseline;
+	background: var(--theme-elevation-50);
+	border-radius: 0 0 var(--style-radius-m, 4px) var(--style-radius-m, 4px);
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) * 0.5);
+	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.75);
+	row-gap: 0;
+}
+
+.wiki-video-node__filename-toggler {
+	background: none;
+	border: 0;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	min-width: 0;
+	padding: 0;
+	text-align: start;
+}
+
+.wiki-video-node__filename {
+	overflow: hidden;
+	text-decoration: underline;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-video-node__collection {
+	color: var(--theme-elevation-500);
+	font-size: 0.9em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+	.wiki-video-node__meta {
+		flex-direction: column;
+		gap: 0;
+		padding: calc(var(--base) * 0.5) calc(var(--base) * 0.6);
+	}
+}

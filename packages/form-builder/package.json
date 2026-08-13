@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/form-builder",
-	"version": "0.1.0-beta.14",
+	"version": "0.1.0-beta.15",
 	"description": "End-to-end forms platform for Payload: author, validate, render, collect, aggregate, and act.",
 	"license": "MIT",
 	"repository": {
@@ -70,7 +70,7 @@
 		"test": "vitest run",
 		"test:unit": "vitest run src",
 		"test:int": "vitest run tests/int",
-		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/messageResponse.int.spec.ts tests/int/pollAutoClose.int.spec.ts tests/int/pollVotes.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/messageResponse.int.spec.ts tests/int/pollAutoClose.int.spec.ts tests/int/pollVotes.int.spec.ts",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/messageResponse.int.spec.ts tests/int/pollAllowChange.int.spec.ts tests/int/pollAutoClose.int.spec.ts tests/int/pollVotes.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/messageResponse.int.spec.ts tests/int/pollAllowChange.int.spec.ts tests/int/pollAutoClose.int.spec.ts tests/int/pollVotes.int.spec.ts",
 		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/form-builder-dev dev",

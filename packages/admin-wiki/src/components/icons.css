@@ -1,0 +1,25 @@
+/* Mirrors packages/ui/src/icons/*: currentColor strokes and fills, a
+   non-scaling stroke so the 1px weight survives any box size, and --base as the
+   default so the glyphs track Payload's own icon sizing at every breakpoint. */
+.wiki-icon {
+	flex-shrink: 0;
+	height: var(--base);
+	width: var(--base);
+}
+
+.wiki-icon--small {
+	height: 12px;
+	width: 12px;
+}
+
+.wiki-icon .stroke {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1px;
+	vector-effect: non-scaling-stroke;
+}
+
+.wiki-icon .fill {
+	fill: currentColor;
+	stroke: none;
+}

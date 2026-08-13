@@ -1,0 +1,157 @@
+---
+title: Customization
+description: Adopting the wiki in custom fields and components, and the integration limits worth knowing.
+---
+
+The plugin's surfaces are injected automatically. Everything they are built from is also exported, so a project with custom admin components can put guides wherever it wants.
+
+## Fields with a custom Description
+
+The config walk skips any field that already declares its own `admin.components.Description`, so such a field has no help surface until you add one.
+
+Render `WikiFieldHelp` inside your own description component:
+
+```tsx title="MyDescription.tsx"
+'use client'
+import { WikiFieldHelp } from '@10x-media/admin-wiki/client'
+
+export const MyDescription = ({ schemaPath }: { schemaPath: string }) => (
+  <>
+    <span>My own description text.</span>
+    <WikiFieldHelp schemaPath={schemaPath} />
+  </>
+)
+```
+
+The `schemaPath` is the owner-qualified, index-free path from [Targeting](/admin-wiki/targets): `collection:posts.hero.title`, or `block:heroBanner.heading` when the field lives inside a block.
+
+For a component that hardcodes its own rendering and wants the data rather than the UI, `useWikiFieldHelp` is the one-line adoption path:
+
+```tsx
+const { canCreate, canWrite, entries, hasGuides, picker } = useWikiFieldHelp('collection:posts.title')
+```
+
+Prefer `canWrite` over `canCreate` when deciding whether to show a write affordance: it already accounts for the configured [`writeAffordances` mode](/admin-wiki/write-affordances), where `canCreate` is the raw permission alone.
+
+### Picker mode
+
+The [field picker](/admin-wiki/targets#picking-fields) renders your real fields, so your custom component appears there too. `picker` is non-null while a field is rendered inside the picker's drawer, and `null` everywhere else.
+
+The injected description handles this already. A component rendering its own surface branches the same way:
+
+```tsx title="MyDescription.tsx"
+'use client'
+import { WikiFieldHelp, WikiFieldPickTarget, useWikiFieldPicker } from '@10x-media/admin-wiki/client'
+
+export const MyDescription = ({ schemaPath }: { schemaPath: string }) => {
+  const picker = useWikiFieldPicker()
+
+  return (
+    <>
+      <span>My own description text.</span>
+      {picker ? <WikiFieldPickTarget schemaPath={schemaPath} /> : <WikiFieldHelp schemaPath={schemaPath} />}
+    </>
+  )
+}
+```
+
+`WikiFieldPickTarget` renders nothing outside a picker, so the branch is optional. A component that ignores picker mode keeps working: its fields carry no plate in the drawer, and their paths stay reachable through the path input under the Fields list.
+
+## Fields with a function description
+
+Nothing to do: `admin.description` as a function is supported, and so is a description keyed by locale. The function cannot travel in client props, so such a field gets a server Description that evaluates it with the request's `i18n` and hands the result down, exactly as Payload's own renderer would. Fields with a static description skip that hop, so the extra server component is paid for only where it is needed.
+
+## Any target key
+
+`WikiTargetHelp` is the generic surface. It takes a full target key and renders nothing unless something targets it:
+
+```tsx
+'use client'
+import { WikiTargetHelp } from '@10x-media/admin-wiki/client'
+
+<WikiTargetHelp targetKey="block:heroBanner" />
+<WikiTargetHelp targetKey="collection:posts" showWriteAffordance={false} />
+```
+
+## The context
+
+`useWikiTargets()` exposes everything the provider holds, for components that need more than one surface's worth:
+
+| Member | Type | Notes |
+|---|---|---|
+| `entriesFor(key)` | `WikiTargetEntry[]` | Guides for a target key. Synchronous; never fetches |
+| `loadGuide(id)` | `Promise<WikiGuideDoc \| null>` | Full content, lazily, cached per guide and locale |
+| `canCreate` / `canUpdate` | `boolean` | The reader's evaluated permissions on the wiki collection |
+| `canWrite` | `boolean` | `canCreate` **and** the write-affordance mode allows it here |
+| `editMode` / `setEditMode` | `boolean` / `(on) => void` | The per-browser edit-mode switch |
+| `blockLabels` | `Record<string, string>` | Singular label per block slug, for chips |
+| `locale` | `string \| null` | The content locale guides resolve in for this reader |
+| `pagesSlug` | `string` | The configured wiki pages slug |
+| `refresh()` | `() => void` | Refetch the targets map |
+| `wikiViewEnabled` | `boolean` | Whether the `/wiki` routes are registered |
+
+Entries arrive sorted featured-first, then by title.
+
+## Building your own surface
+
+The pieces the built-in surfaces are made of are all exported from `@10x-media/admin-wiki/client`:
+
+| Component | Purpose |
+|---|---|
+| `WikiGuideCard` | One guide as a card. `href` to navigate, `onClick` to open a drawer, `compact` for narrow columns |
+| `WikiAllGuidesButton` | The overflow affordance into a drawer holding several guides |
+| `GuideDrawer` | The reading drawer. Takes entries, an optional initial guide, and a modal slug |
+| `GuideArticle` | Guide content rendered on its own, without a drawer around it |
+| `TargetChips` | The surfaces a guide covers, as pills, with a `limit` before collapsing to `+N` |
+| `WikiWriteGuide` | The write-in-place affordance, in `inline`, `button`, or `menuItem` shape |
+| `WikiEditModeToggle` | The edit-mode pill. Renders nothing when there is nothing to toggle |
+| `WikiTargetFields` | The grouped field-target list, as the Targets tab renders it |
+| `WikiFieldPickerDrawer` | One kind's picker drawer. Takes a `kind`, the covered slugs, the current value, and an `onConfirm` |
+| `WikiFieldPickTarget` | The select plate. Renders nothing outside a picker |
+
+A minimal custom surface:
+
+```tsx
+'use client'
+import { useDrawerSlug, useModal } from '@payloadcms/ui'
+import { GuideDrawer, useWikiTargets, WikiAllGuidesButton } from '@10x-media/admin-wiki/client'
+
+export const MyGuides = () => {
+  const { entriesFor } = useWikiTargets()
+  const { openModal } = useModal()
+  const slug = useDrawerSlug('my-guides')
+  const entries = entriesFor('collection:posts')
+
+  if (entries.length === 0) return null
+
+  return (
+    <>
+      <WikiAllGuidesButton count={entries.length} onClick={() => openModal(slug)} />
+      <GuideDrawer entries={entries} slug={slug} />
+    </>
+  )
+}
+```
+
+## Reserved field names
+
+Two field names are injected into host schemas, both namespaced so they will not collide with a real field:
+
+| Name | Where | Opt out by |
+|---|---|---|
+| `adminWikiGuides` | Collection and global sidebars. Exported as `WIKI_GUIDES_FIELD` | Declaring a field with that name, `triggers.edit` / `triggers.global`, or excluding the entity |
+| `adminWikiBlockHelp` | Every covered block's fields. Exported as `WIKI_BLOCK_HELP_FIELD` | Declaring a field with that name, or excluding the block |
+
+An entity that already declares one keeps its own. Both are UI fields, so neither reaches the database or your generated types.
+
+Adding your own fields to the wiki's collections goes the other way: see [Collection overrides](/admin-wiki/configuration#collection-overrides).
+
+## Registering components
+
+Client components you hand the plugin (a [video player](/admin-wiki/authoring#video), a [block renderer](/admin-wiki/authoring#your-own-blocks)) are import-map paths. The plugin registers them under `config.admin.dependencies` so `payload generate:importmap` finds them without you referencing them anywhere else.
+
+A path missing from the import map is reported, not swallowed: a block renderer renders a visible placeholder, a video player falls back to the default HTML5 one, both with a warning in the server log.
+
+## The registry
+
+`getWikiRegistry(config)` returns the plugin's resolved options plus config-derived data (`blockLabels`, `validTargetKeys`), read from `config.custom`. Exported from both `@10x-media/admin-wiki` and `@10x-media/admin-wiki/rsc`, for server components and endpoints that need to know how the plugin was configured. Returns `undefined` when the plugin did not run.

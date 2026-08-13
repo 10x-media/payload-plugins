@@ -63,6 +63,9 @@ catalogs:
     axe-core:
       specifier: ^4.12.1
       version: 4.12.1
+    clipwright:
+      specifier: ^0.0.4
+      version: 0.0.4
     dompurify:
       specifier: ^3.2.7
       version: 3.2.7
@@ -211,6 +214,136 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.7(@types/node@22.19.19)(happy-dom@20.10.6)(jsdom@25.0.1)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.77.4)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/admin-wiki:
+    devDependencies:
+      '@10x-media/payload-test-harness':
+        specifier: workspace:*
+        version: link:../../tooling/test-harness
+      '@10x-media/tsconfig':
+        specifier: workspace:*
+        version: link:../../config/typescript
+      '@10x-media/tsdown-config':
+        specifier: workspace:*
+        version: link:../../config/tsdown
+      '@10x-media/vitest-config':
+        specifier: workspace:*
+        version: link:../../config/vitest
+      '@payloadcms/db-mongodb':
+        specifier: 'catalog:'
+        version: 3.85.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@payloadcms/db-postgres':
+        specifier: 'catalog:'
+        version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@payloadcms/next':
+        specifier: 'catalog:'
+        version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      '@payloadcms/richtext-lexical':
+        specifier: 'catalog:'
+        version: 3.85.0(@faceless-ui/modal@3.0.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@faceless-ui/scroll-info@2.0.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@payloadcms/next@3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3))(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(yjs@13.6.31)
+      '@payloadcms/ui':
+        specifier: 'catalog:'
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.60.0
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.19
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.15)
+      clipwright:
+        specifier: 'catalog:'
+        version: 0.0.4
+      next:
+        specifier: 'catalog:'
+        version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
+      payload:
+        specifier: 'catalog:'
+        version: 3.85.0(graphql@16.14.0)(typescript@5.9.3)
+      playwright:
+        specifier: 'catalog:'
+        version: 1.60.0
+      react:
+        specifier: 'catalog:'
+        version: 19.2.6
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.6(react@19.2.6)
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.1(publint@0.3.21)(tsx@4.22.3)(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.7(@types/node@22.19.19)(happy-dom@20.10.6)(jsdom@25.0.1)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.77.4)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/admin-wiki/dev:
+    dependencies:
+      '@10x-media/admin-wiki':
+        specifier: workspace:*
+        version: link:..
+      '@10x-media/fields':
+        specifier: workspace:*
+        version: link:../../fields
+      '@payloadcms/db-mongodb':
+        specifier: 'catalog:'
+        version: 3.85.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@payloadcms/db-postgres':
+        specifier: 'catalog:'
+        version: 3.85.0(@electric-sql/pglite@0.3.16)(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
+      '@payloadcms/next':
+        specifier: 'catalog:'
+        version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      '@payloadcms/richtext-lexical':
+        specifier: 'catalog:'
+        version: 3.85.0(@faceless-ui/modal@3.0.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@faceless-ui/scroll-info@2.0.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@payloadcms/next@3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3))(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(yjs@13.6.31)
+      '@payloadcms/translations':
+        specifier: 'catalog:'
+        version: 3.85.0
+      '@payloadcms/ui':
+        specifier: 'catalog:'
+        version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 0.561.0(react@19.2.6)
+      next:
+        specifier: 'catalog:'
+        version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
+      payload:
+        specifier: 'catalog:'
+        version: 3.85.0(graphql@16.14.0)(typescript@5.9.3)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.6
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@10x-media/tsconfig':
+        specifier: workspace:*
+        version: link:../../../config/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.19
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.15)
+      mongodb-memory-server:
+        specifier: ^10.1.0
+        version: 10.4.3
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
 
   packages/analytics:
     devDependencies:
@@ -1514,8 +1647,16 @@ packages:
     resolution: {integrity: sha512-fT1qHVGAag4IEkrupZ6lRRbNCs1vS9P01KB/sG8zKgvUztbYtFBtQpjSITNwooDZ83tpsPzP0mRNs1/KVszCRA==}
     engines: {node: '>= 20.12.0'}
 
+  '@clack/core@1.4.3':
+    resolution: {integrity: sha512-/kr3UWNtdJfxZtPgDqUOmG2pvwlmcLGheex5yiZKdwbzZJxhV+HMNR9QNmyY5cGwTNV6LrR7Jtp+KjhUAP1qBQ==}
+    engines: {node: '>= 20.12.0'}
+
   '@clack/prompts@1.4.0':
     resolution: {integrity: sha512-S0My7XPGIgpRWMDG8uRqalbgT+a6FmCUdOW+HaIOVVpUPHOb7RrpvjTjiODadKp06fsrVDJZlIzc6yCTp4AnxA==}
+    engines: {node: '>= 20.12.0'}
+
+  '@clack/prompts@1.7.0':
+    resolution: {integrity: sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A==}
     engines: {node: '>= 20.12.0'}
 
   '@commitlint/cli@19.8.1':
@@ -4253,6 +4394,16 @@ packages:
   client-only@0.0.1:
     resolution: {integrity: sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA==}
 
+  clipwright@0.0.4:
+    resolution: {integrity: sha512-qnogn1jZte6Sxy3+DJOHNnYgA0griopkDG2EaXfOQYkJ8VHcBjFqiGu/UH5MiQRJOssr/wxCjkzzd28jlH5xyg==}
+    engines: {node: '>=20'}
+    hasBin: true
+    peerDependencies:
+      ffmpeg-static: ^5.2.0
+    peerDependenciesMeta:
+      ffmpeg-static:
+        optional: true
+
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
     engines: {node: '>=12'}
@@ -5173,7 +5324,7 @@ packages:
   git-raw-commits@4.0.0:
     resolution: {integrity: sha512-ICsMM1Wk8xSGMowkOmPrzo2Fgmfo4bMHLNX6ytHjajRJUqvHOw/TFapQ+QG75c3X/tTDDhOSRPGC52dDbNM8FQ==}
     engines: {node: '>=16'}
-    deprecated: This package is no longer maintained. For the JavaScript API, please use @conventional-changelog/git-client instead.
+    deprecated: Deprecated and no longer maintained. Use @conventional-changelog/git-client instead.
     hasBin: true
 
   github-slugger@2.0.0:
@@ -8175,9 +8326,21 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
+  '@clack/core@1.4.3':
+    dependencies:
+      fast-wrap-ansi: 0.2.2
+      sisteransi: 1.0.5
+
   '@clack/prompts@1.4.0':
     dependencies:
       '@clack/core': 1.3.1
+      fast-string-width: 3.0.2
+      fast-wrap-ansi: 0.2.2
+      sisteransi: 1.0.5
+
+  '@clack/prompts@1.7.0':
+    dependencies:
+      '@clack/core': 1.4.3
       fast-string-width: 3.0.2
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
@@ -10797,6 +10960,13 @@ snapshots:
   cli-width@4.1.0: {}
 
   client-only@0.0.1: {}
+
+  clipwright@0.0.4:
+    dependencies:
+      '@clack/prompts': 1.7.0
+      picocolors: 1.1.1
+      playwright: 1.60.0
+      tsx: 4.22.3
 
   cliui@8.0.1:
     dependencies:

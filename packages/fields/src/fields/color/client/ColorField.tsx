@@ -18,9 +18,23 @@ import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import type { ColorFormat } from '../../../types'
 import { resolveCommitValue } from '../commitValue'
-import { formatColor, parseColor, rgbToHsv, salvageColor, toRgb } from '../engine'
+import {
+	formatColor,
+	isColorSchemeValue,
+	parseColor,
+	rgbToHsv,
+	salvageColor,
+	toRgb,
+} from '../engine'
 import { type ColorFieldClientOptions, PRESET_PREFIX, type ResolvedColorPreset } from '../options'
 import { derivePresetChip } from '../presetChip'
+import {
+	applyReferenceAlpha,
+	formatPresetReference,
+	parsePresetReference,
+	presetReferenceIssue,
+	presetReferenceParts,
+} from '../presetReference'
 import { flatValue, swatchBackground } from '../schemeValue'
 import { ColorPickerPanel, type Hsva } from './ColorPickerPanel'
 import './colorField.css'
@@ -56,14 +70,20 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		(value, options) => {
 			if (typeof value === 'string' && value !== '') {
 				if (linked && value.startsWith(PRESET_PREFIX)) {
-					if (value.length === PRESET_PREFIX.length) return t(keys.missingPreset)
+					const hasKey =
+						resolvedPresets.length > 0
+							? (key: string) => resolvedPresets.some((preset) => preset.key === key)
+							: null
+					const issue = presetReferenceIssue(value, hasKey)
+					if (issue === 'invalidAlpha') return t(keys.invalidColor)
+					if (issue !== null) return t(keys.missingPreset)
 				} else if (!parseColor(value)) {
 					return t(keys.invalidColor)
 				}
 			}
 			return text(value, { ...options, name, required, type: 'text' })
 		},
-		[linked, name, required, t]
+		[linked, name, required, resolvedPresets, t]
 	)
 
 	const {
@@ -81,8 +101,11 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 	const isReadOnly = Boolean(readOnlyFromProps || disabled || readOnlyFromAdmin)
 
 	const stringValue = typeof value === 'string' ? value : ''
-	const presetKey =
-		linked && stringValue.startsWith(PRESET_PREFIX) ? stringValue.slice(PRESET_PREFIX.length) : null
+	const reference = linked ? parsePresetReference(stringValue) : null
+	const presetKey = reference?.key ?? null
+	// With alpha disabled a stored suffix still parses, but renders at full
+	// opacity so the field matches server resolution until commit strips it
+	const referenceAlpha = alpha ? (reference?.alpha ?? 100) : 100
 	const activePreset =
 		presetKey !== null ? resolvedPresets.find((preset) => preset.key === presetKey) : undefined
 	const presetMissing = presetKey !== null && !activePreset
@@ -138,7 +161,12 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		(raw: string): boolean => {
 			let normalized: null | string = null
 			if (linked && raw.startsWith(PRESET_PREFIX)) {
-				if (raw.length > PRESET_PREFIX.length) normalized = raw
+				const parts = presetReferenceParts(raw)
+				// Canonical form: /100 collapses to the bare reference, and a disabled
+				// alpha channel strips any hand-typed suffix. Empty keys commit raw so
+				// validation surfaces the missing-preset error.
+				if (parts) normalized = formatPresetReference(parts.key, alpha ? parts.alpha : 100)
+				else if (raw.length > PRESET_PREFIX.length) normalized = raw
 			} else {
 				const parsedRaw = parseColor(raw)
 				// Unparseable input commits raw so validation surfaces the error
@@ -222,15 +250,55 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		[alpha, format, setValue]
 	)
 
+	// With a reference active the slider represents the reference alpha, not the
+	// resolved color's own channel, so returning it to 100 restores the bare ref
 	const initialHsva = useMemo<Hsva | null>(() => {
 		if (!parsed) return null
 		const rgb = toRgb(parsed)
 		const hsv = rgbToHsv(rgb)
-		return { a: rgb.alpha, h: hsv.h, s: hsv.s, v: hsv.v }
-	}, [parsed])
+		return {
+			a: presetKey !== null ? referenceAlpha / 100 : rgb.alpha,
+			h: hsv.h,
+			s: hsv.s,
+			v: hsv.v,
+		}
+	}, [parsed, presetKey, referenceAlpha])
+
+	const commitReferenceAlpha = useCallback(
+		(alpha100: number) => {
+			if (presetKey === null) return
+			setValue(formatPresetReference(presetKey, alpha100))
+		},
+		[presetKey, setValue]
+	)
+
+	// The fade must track real overflow, not chip presence: the badge always hugs
+	// the content run's right edge (the input's flex-grow pushes it there), so an
+	// unconditional mask would fade it even in a full-width field with room to spare
+	const contentRef = useRef<HTMLDivElement>(null)
+	const [contentClipped, setContentClipped] = useState(false)
+	const measureClip = useCallback(() => {
+		const el = contentRef.current
+		// +1 absorbs subpixel rounding between scrollWidth (int) and clientWidth
+		if (el) setContentClipped(el.scrollWidth > el.clientWidth + 1)
+	}, [])
+	// No dependency array on purpose: chip mount and label changes alter
+	// scrollWidth without resizing the observed box, so re-measure every render
+	useEffect(measureClip)
+	useEffect(() => {
+		const el = contentRef.current
+		if (!el) return
+		const observer = new ResizeObserver(measureClip)
+		observer.observe(el)
+		return () => observer.disconnect()
+	}, [measureClip])
 
 	const styles = useMemo(() => mergeFieldStyles(field), [field])
-	const swatchCss = swatchBackground(rawValue)
+	const swatchValue =
+		referenceAlpha !== 100 && (typeof rawValue === 'string' || isColorSchemeValue(rawValue))
+			? applyReferenceAlpha(rawValue, referenceAlpha, 'rgb')
+			: rawValue
+	const swatchCss = swatchBackground(swatchValue)
 
 	const swatch = (
 		<span className={`${baseClass}__swatch ${baseClass}__checker`}>
@@ -284,12 +352,13 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 							horizontalAlign="left"
 							render={({ close }) => (
 								<ColorPickerPanel
-									activePresetKey={activePreset?.key ?? null}
+									activeReference={reference}
 									alphaEnabled={alpha}
 									close={close}
 									displayFormat={displayFormat}
 									enableEyedropper={enableEyedropper}
 									initial={initialHsva}
+									onPickAlpha={commitReferenceAlpha}
 									onPickCss={commitCss}
 									onPickPreset={(preset) => {
 										if (linked) setValue(`${PRESET_PREFIX}${preset.key}`)
@@ -309,34 +378,47 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 							verticalAlign="bottom"
 						/>
 					)}
-					{chip ? (
-						<span className={`${baseClass}__chip`}>
-							<span className={`${baseClass}__chip-swatch ${baseClass}__checker`}>
-								{swatchCss ? (
-									<span className={`${baseClass}__chip-color`} style={{ background: swatchCss }} />
-								) : null}
-								{chip.missing && !swatchCss ? (
-									<span className={`${baseClass}__chip-color`} data-missing="true" />
+					<div
+						className={[`${baseClass}__content`, contentClipped && `${baseClass}__content--fade`]
+							.filter(Boolean)
+							.join(' ')}
+						ref={contentRef}
+					>
+						{chip ? (
+							<span className={`${baseClass}__chip`}>
+								<span className={`${baseClass}__chip-swatch ${baseClass}__checker`}>
+									{swatchCss ? (
+										<span
+											className={`${baseClass}__chip-color`}
+											style={{ background: swatchCss }}
+										/>
+									) : null}
+									{chip.missing && !swatchCss ? (
+										<span className={`${baseClass}__chip-color`} data-missing="true" />
+									) : null}
+								</span>
+								<span className={`${baseClass}__chip-label`}>{chip.label}</span>
+								{alpha && chip.alpha !== 100 ? (
+									<span className={`${baseClass}__chip-alpha`}>{chip.alpha}%</span>
 								) : null}
 							</span>
-							<span className={`${baseClass}__chip-label`}>{chip.label}</span>
+						) : null}
+						<input
+							className={`${baseClass}__input`}
+							id={`field-${path?.replace(/\./g, '__')}`}
+							name={path}
+							onBlur={onTextBlur}
+							onChange={onTextChange}
+							onKeyDown={onTextKeyDown}
+							placeholder={chip || typeof placeholder !== 'string' ? undefined : placeholder}
+							readOnly={isReadOnly}
+							type="text"
+							value={chip ? '' : draft}
+						/>
+						<span aria-hidden="true" className={`${baseClass}__badge`}>
+							{chip ? t(keys.preset) : displayFormat}
 						</span>
-					) : null}
-					<input
-						className={`${baseClass}__input`}
-						id={`field-${path?.replace(/\./g, '__')}`}
-						name={path}
-						onBlur={onTextBlur}
-						onChange={onTextChange}
-						onKeyDown={onTextKeyDown}
-						placeholder={chip || typeof placeholder !== 'string' ? undefined : placeholder}
-						readOnly={isReadOnly}
-						type="text"
-						value={chip ? '' : draft}
-					/>
-					<span aria-hidden="true" className={`${baseClass}__badge`}>
-						{chip ? t(keys.preset) : displayFormat}
-					</span>
+					</div>
 					{isClearable && !required && !isReadOnly && stringValue !== '' ? (
 						<button
 							aria-label={t(keys.clearColor)}

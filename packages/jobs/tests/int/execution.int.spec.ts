@@ -291,6 +291,11 @@ describeForDb('worker run loop', {}, (db) => {
 
 			// A global pause must suppress the next job (the default store reads it from KV).
 			await pauseStore.pause()
+			// Deterministic barrier: a tick that read the pre-pause state may still be mid-scan
+			// (seen running a just-queued job on slow CI Postgres). settle() resolves once every
+			// in-flight tick has completed; the pause write above is committed, so every tick
+			// starting after this line reads the paused state before scanning.
+			await worker.settle()
 			await booted.payload.jobs.queue({ input: {}, task: 'count' })
 			await new Promise((r) => setTimeout(r, 500))
 			expect(ran).toBe(afterLive)

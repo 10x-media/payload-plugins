@@ -96,7 +96,11 @@ export type FormSuccessResponse =
 	| { type: 'redirect'; url?: string }
 
 /** The second argument to `onSuccess`: the resolved success response (an object, so it can grow). */
-export type FormSuccessResult = { response?: FormSuccessResponse }
+export type FormSuccessResult = {
+	response?: FormSuccessResponse
+	/** The submitted answers (reserved keys like the honeypot and captcha token excluded), e.g. for `<Poll>` to track the voter's pick. */
+	values?: SubmissionValue[]
+}
 
 export type FormProps = {
 	form: FormDocument
@@ -740,6 +744,9 @@ export const Form = ({
 		}
 		rawDispatch({ type: 'SUBMIT_START' })
 		const values: SubmissionValue[] = answeredValues()
+		// Snapshot before the reserved keys (honeypot, captcha, context) are appended below, so the
+		// success result reports answers only.
+		const answers = [...values]
 		if (honeypotName) {
 			const decoy = honeypotRef.current?.value ?? ''
 			if (decoy !== '') {
@@ -768,7 +775,7 @@ export const Form = ({
 				submissionId: result.submissionId,
 			})
 			// Resolve the response before a reset clears the answers the recall reads from.
-			onSuccess?.(result.submissionId, { response: resolveSuccessResponse() })
+			onSuccess?.(result.submissionId, { response: resolveSuccessResponse(), values: answers })
 			if (successBehavior === 'reset') {
 				// Reset in place: the host handles feedback (e.g. a toast via onSuccess); no success screen.
 				rawDispatch({

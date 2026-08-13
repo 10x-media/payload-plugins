@@ -47,6 +47,9 @@ pnpm test:matrix [name]                 # cross-DB run; Mongo in-memory + Postgr
 pnpm test:container [name]              # both DBs via testcontainers (Mongo container + Postgres container)
 pnpm test:e2e <name>                    # docker compose + build + Playwright
 
+# Docs showcase clips (clipwright; needs `pnpm dev <name>` running on :3000)
+pnpm videos <name>                      # render packages/<name>/videos/*.video.ts
+
 # Generation (manual; agent contexts skip auto-gen via env var, see below)
 pnpm generate <name>                         # regenerate types + importmap for one plugin
 pnpm generate:types <name>
@@ -92,6 +95,14 @@ Modeled after Payload's own monorepo test pattern: Mongo runs in-memory via `mon
 | E2E | Production build + Playwright + docker compose | `pnpm test:e2e <name>` |
 
 Postgres-touching tiers (matrix, container, e2e) require Docker locally and on CI. This mirrors Payload's own monorepo test pattern (Mongo in-memory, Postgres in real Docker).
+
+## Docs showcase clips
+
+A plugin may carry `packages/<slug>/videos/*.video.ts`: clipwright scenes driving that plugin's own dev app, rendered to MP4 for the docs site. They are showcases rather than tutorials, so they carry no captions and no audio, and the docs play them muted and looping through `<Video>` (`apps/docs/components/video.tsx`).
+
+`pnpm videos <name>` renders them, and needs `pnpm dev <name>` already serving on `:3000` (override with `WIKI_DEV_URL`). Output goes straight into `apps/docs/public/videos/<slug>/`, one MP4 plus a poster PNG per scene, and those files are committed. Nothing renders them in CI: they are binaries in git, so re-render only when the UI they show actually changed.
+
+Scenes are linted and typechecked with the rest of the package. Whatever fixtures a scene needs it creates through the REST API in `beforeScene`, which is off camera and free.
 
 ## Adding a plugin
 

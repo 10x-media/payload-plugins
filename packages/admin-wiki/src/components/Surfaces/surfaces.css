@@ -1,0 +1,144 @@
+/* All-guides overflow ------------------------------------------------------- */
+
+/* Shared by the list band and the document panel: the same affordance, so the
+   same shape. Styled as a quiet link rather than a Payload pill, because it is
+   the tail of a list of guides, not a control competing with Save. */
+.wiki-all-guides {
+	align-items: center;
+	background: none;
+	border: 0;
+	color: var(--theme-elevation-650);
+	cursor: pointer;
+	display: inline-flex;
+	font-size: 0.9375rem;
+	gap: calc(var(--base) / 3);
+	padding: calc(var(--base) / 4) 0;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.wiki-all-guides:hover,
+.wiki-all-guides:focus-visible {
+	color: var(--theme-text);
+}
+
+/* List band ----------------------------------------------------------------- */
+
+/* Spacing is per slot because the neighbours are: the outer slots butt against
+   the view's own edges and need to breathe on both sides, while the table slots
+   sit inside the list wrap and only need separating from the table. Horizontal
+   padding is never set here; the component adds Payload's `Gutter` in exactly
+   the two slots that render outside the list's own. */
+.wiki-list-guides--afterList,
+.wiki-list-guides--beforeList {
+	padding-block: var(--base);
+}
+
+.wiki-list-guides--beforeListTable {
+	margin-bottom: calc(var(--base) * 1.5);
+}
+
+.wiki-list-guides--afterListTable {
+	margin-top: calc(var(--base) * 1.5);
+}
+
+.wiki-list-guides__heading {
+	color: var(--theme-elevation-650);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	margin: 0 0 calc(var(--base) / 2);
+	text-transform: uppercase;
+}
+
+.wiki-list-guides__cards {
+	display: grid;
+	gap: calc(var(--base) / 2);
+	grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+	margin-bottom: calc(var(--base) / 2);
+}
+
+/* Guide card ---------------------------------------------------------------- */
+
+/* Shared by the list band and the document sidebar. Payload sets 1rem to 13px,
+   so the sizes here are read as 13px body and 12px secondary rather than the
+   16px scale they look like. Nothing here drops below 12px: the sidebar is
+   already a narrow column and shrinking the type to fit it is how a panel stops
+   being read at all. */
+.wiki-guide-card {
+	background: var(--theme-elevation-50);
+	border: 1px solid var(--theme-border-color);
+	border-radius: var(--style-radius-m, 4px);
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	font-family: inherit;
+	gap: calc(var(--base) / 3);
+	padding: calc(var(--base) * 0.75);
+	text-align: start;
+	text-decoration: none;
+	transition-duration: 100ms;
+	transition-property: border, box-shadow, background;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+	width: 100%;
+}
+
+.wiki-guide-card:hover,
+.wiki-guide-card:focus-visible {
+	border-color: var(--theme-elevation-250);
+	box-shadow: 0 4px 8px -2px rgb(0 0 0 / 0.05);
+}
+
+.wiki-guide-card__title {
+	align-items: center;
+	color: var(--theme-text);
+	display: flex;
+	font-size: 1rem;
+	font-weight: 600;
+	gap: calc(var(--base) / 4);
+	line-height: 1.3;
+}
+
+.wiki-guide-card__summary {
+	-webkit-box-orient: vertical;
+	color: var(--theme-elevation-650);
+	display: -webkit-box;
+	font-size: 0.9375rem;
+	line-clamp: 3;
+	-webkit-line-clamp: 3;
+	line-height: 1.45;
+	overflow: hidden;
+}
+
+/* Narrower padding and a shorter clamp, but the same type: a sidebar card is
+   the same object seen in a smaller column, not a smaller object. */
+.wiki-guide-card--compact {
+	gap: calc(var(--base) / 4);
+	padding: calc(var(--base) / 2);
+}
+
+.wiki-guide-card--compact .wiki-guide-card__summary {
+	line-clamp: 2;
+	-webkit-line-clamp: 2;
+}
+
+/* Document panel ------------------------------------------------------------ */
+
+/* Reads as one of Payload's sidebar fields, because that is what it is: the
+   label matches `.field-label`, and the rows sit in the same rhythm as the
+   values beside them. */
+.wiki-doc-guides__label {
+	color: var(--theme-elevation-800);
+	font-size: 1rem;
+	font-weight: 600;
+	margin: 0 0 calc(var(--base) / 2);
+}
+
+.wiki-doc-guides__list {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+	list-style: none;
+	margin: 0 0 calc(var(--base) / 4);
+	padding: 0;
+}

@@ -3,6 +3,7 @@ export type PollConfigLike = {
 	resultsField?: string | null
 	resultsVisibility?: string | null
 	closesAt?: string | null
+	allowChange?: boolean | null
 	/** The outcome-resolution strategy slug (`poll.types` registry). Absent is treated as `manual`. */
 	type?: string | null
 	optionSource?: string | null

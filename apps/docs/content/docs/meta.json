@@ -8,6 +8,7 @@
 		"fields",
 		"jobs",
 		"webhooks",
+		"admin-wiki",
 		"undo-redo",
 		"audit-logs",
 		"automations"

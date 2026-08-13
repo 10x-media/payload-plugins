@@ -17,7 +17,7 @@
 			"persistent": true
 		},
 		"lint": {
-			"inputs": ["src/**", "tests/**", "dev/**", "registry/**", "biome.json"],
+			"inputs": ["src/**", "tests/**", "dev/**", "registry/**", "videos/**", "biome.json"],
 			"outputs": []
 		},
 		"typecheck": {

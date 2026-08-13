@@ -113,6 +113,17 @@ describeForDb('fields color schemes', {}, (db) => {
 		expect(half.fromRowsResolved).toEqual({ dark: '#22c55e', light: '#22c55e' })
 	})
 
+	it('carries a reference alpha onto both members of the schemes sibling', async () => {
+		const doc = await create({ surface: 'preset:brand/40', title: 'Brand at 40' })
+		expect(doc.surface).toBe('preset:brand/40')
+		expect(doc.surfaceResolved).toEqual({ dark: '#0369a166', light: '#0ea5e966' })
+	})
+
+	it('carries a reference alpha onto a resolve-value sibling', async () => {
+		const doc = await create({ legacy: 'preset:brand/40', title: 'Legacy at 40' })
+		expect(doc.legacyResolved).toBe('#0ea5e966')
+	})
+
 	it('leaves the stored reference untouched through an update round trip', async () => {
 		const doc = await create({ surface: 'preset:brand', title: 'Round trip' })
 		const updated = await booted.payload.update({

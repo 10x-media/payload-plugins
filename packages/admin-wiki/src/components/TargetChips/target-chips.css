@@ -1,0 +1,25 @@
+.wiki-target-chips {
+	align-items: center;
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) / 5);
+	min-width: 0;
+}
+
+.wiki-target-chips__chip {
+	max-width: 16rem;
+}
+
+.wiki-target-chips__chip .pill__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Field and block paths are code the author typed, so they read as code; the
+   collection and global chips carry human labels and stay in the body face. */
+.wiki-target-chips__chip--block .pill__label,
+.wiki-target-chips__chip--field .pill__label {
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+}

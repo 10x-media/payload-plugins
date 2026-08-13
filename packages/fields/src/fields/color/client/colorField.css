@@ -131,6 +131,29 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 	filter: none;
 }
 
+/* Clips the chip/input/badge run so fixed-size flex items can never escape the
+   container at narrow widths; the swatch and clear button stay outside it, so
+   the clear control keeps its place at the right edge. The fade is a mask, not
+   a background-colored gradient overlay, so it stays correct over every
+   container background (error, read-only, hover transitions, both themes).
+   The modifier is toggled from a measured scrollWidth overflow, never applied
+   statically: the badge always sits at the run's right edge, so a static mask
+   would fade it even with room to spare. */
+.fields-color__content {
+	display: flex;
+	flex: 1 1 auto;
+	min-width: 0;
+	align-items: center;
+	gap: 7px;
+	height: 100%;
+	overflow: hidden;
+}
+
+.fields-color__content--fade {
+	-webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+	mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+
 /* The sibling input's width: 100% basis would otherwise squeeze the chip to nothing;
    the max-width keeps runaway labels ellipsizing instead of overflowing */
 .fields-color__chip {
@@ -171,6 +194,13 @@ html[data-theme="dark"] .fields-color.error .fields-color__container:hover {
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
+}
+
+.fields-color__chip-alpha {
+	flex-shrink: 0;
+	color: var(--theme-elevation-500);
+	font-size: 0.75rem;
+	line-height: 1;
 }
 
 .fields-color__input {

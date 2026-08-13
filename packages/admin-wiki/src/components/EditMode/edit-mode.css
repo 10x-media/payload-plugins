@@ -1,0 +1,26 @@
+/* Payload's pill lays its label out as one nowrap run, which the glyph and the
+   state suffix have to opt out of to get any spacing at all. */
+.wiki-edit-mode__pill .pill__label {
+	align-items: center;
+	display: inline-flex;
+	gap: calc(var(--base) / 4);
+}
+
+/* Off is a mode that is available rather than one that is on, so it says so in
+   a quieter voice beside a label whose width never changes. */
+.wiki-edit-mode__state {
+	opacity: 0.7;
+}
+
+.wiki-edit-mode__state::before {
+	content: "·";
+	margin-inline-end: calc(var(--base) / 4);
+}
+
+.wiki-edit-mode__pill[aria-checked="false"] {
+	color: var(--theme-elevation-500);
+}
+
+.wiki-edit-mode__pill[aria-checked="false"]:hover {
+	color: var(--theme-elevation-800);
+}

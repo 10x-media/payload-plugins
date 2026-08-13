@@ -1,0 +1,194 @@
+/* One reading size for every guide surface, and the single knob a project turns
+   to change it. Payload sets its root size to 13px, which is right for form
+   chrome and too small for prose, so guides opt up from it.
+
+   Declared on the article as well as on the two surfaces that frame it, because
+   `GuideArticle` is exported and a consumer may render it somewhere else
+   entirely. */
+.wiki-guide-article,
+.wiki-guide-drawer,
+.wiki-view {
+	--wiki-prose-size: 1.15rem;
+}
+
+/* Leading is a touch looser than Payload's form defaults because the measure is
+   wide: long lines need the extra leading to stay trackable back to the start. */
+.wiki-guide-article {
+	color: var(--theme-text);
+	font-size: var(--wiki-prose-size);
+	line-height: 1.7;
+	max-width: 100%;
+}
+
+/* Headings are sized in `em` off the prose rather than inherited from Payload's
+   UI scale, so the article is one typographic system: raising the reading size
+   moves the whole hierarchy with it instead of letting the body catch up to
+   `h4`, which Payload sets to 16px and prose at this size would nearly meet.
+   The multipliers land the common headings on the sizes Payload already gives
+   them, so nothing jumps for guides written against the old scale.
+
+   `scroll-margin-top` keeps a heading clear of the top edge when the table of
+   contents jumps to it, in the window and inside a drawer alike. */
+.wiki-guide-article h2,
+.wiki-guide-article h3,
+.wiki-guide-article h4 {
+	line-height: 1.3;
+	margin: 1.5em 0 0.5em;
+	scroll-margin-top: calc(var(--base) * 1.5);
+}
+
+.wiki-guide-article h2 {
+	font-size: 1.75em;
+}
+
+.wiki-guide-article h3 {
+	font-size: 1.35em;
+}
+
+.wiki-guide-article h4 {
+	font-size: 1.15em;
+}
+
+/* The view and the drawer both print the guide title above the content, so an h1
+   inside the content is a second title. Rendered at the article's own h2 size so
+   authors who open a guide with one do not end up with two page headings. */
+.wiki-guide-article h1 {
+	font-size: 1.75em;
+	line-height: 1.3;
+	margin: 1.5em 0 0.5em;
+}
+
+.wiki-guide-article h1:first-child,
+.wiki-guide-article h2:first-child,
+.wiki-guide-article h3:first-child,
+.wiki-guide-article p:first-child {
+	margin-top: 0;
+}
+
+.wiki-guide-article p {
+	margin: 1em 0;
+}
+
+.wiki-guide-article ul,
+.wiki-guide-article ol {
+	margin: 1em 0;
+	padding-inline-start: 1.5em;
+}
+
+.wiki-guide-article li {
+	margin: 0.25em 0;
+}
+
+.wiki-guide-article a {
+	color: var(--theme-text);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.wiki-guide-article blockquote {
+	border-inline-start: 3px solid var(--theme-elevation-200);
+	color: var(--theme-elevation-650);
+	margin: 1em 0;
+	padding: 0.25em 0 0.25em 1em;
+}
+
+.wiki-guide-article hr {
+	border: 0;
+	border-top: 1px solid var(--theme-elevation-150);
+	margin: 1.5em 0;
+}
+
+.wiki-guide-article code {
+	background: var(--theme-elevation-100);
+	border-radius: 4px;
+	font-size: 0.875em;
+	padding: 0.1em 0.35em;
+}
+
+.wiki-guide-article img,
+.wiki-guide-article video {
+	border-radius: 4px;
+	height: auto;
+	max-width: 100%;
+}
+
+.wiki-guide-link {
+	background: none;
+	border: 0;
+	color: var(--theme-text);
+	cursor: pointer;
+	display: inline;
+	font: inherit;
+	padding: 0;
+	text-decoration: underline;
+	text-decoration-style: dotted;
+	text-underline-offset: 2px;
+}
+
+.wiki-guide-link:hover {
+	text-decoration-style: solid;
+}
+
+.wiki-guide-link--dead {
+	color: var(--theme-elevation-450);
+	cursor: default;
+	text-decoration: line-through;
+}
+
+/* Callouts take their level's colour from a single custom property, so the label,
+   the glyph and the rule all agree without four copies of each rule. */
+.wiki-callout {
+	--wiki-callout-accent: var(--theme-elevation-400);
+	--wiki-callout-bg: var(--theme-elevation-50);
+
+	background: var(--wiki-callout-bg);
+	border-inline-start: 3px solid var(--wiki-callout-accent);
+	border-radius: var(--style-radius-m, 4px);
+	margin: 1.25em 0;
+	padding: 0.75rem 1rem;
+}
+
+.wiki-callout p {
+	margin: 0.25em 0;
+}
+
+.wiki-callout__label {
+	align-items: center;
+	color: var(--wiki-callout-accent);
+	display: flex;
+	font-size: 0.8125em;
+	font-weight: 600;
+	gap: 0.35em;
+	letter-spacing: 0.03em;
+	margin: 0 0 0.35em;
+	text-transform: uppercase;
+}
+
+.wiki-callout--info {
+	--wiki-callout-accent: var(--theme-elevation-500);
+	--wiki-callout-bg: var(--theme-elevation-50);
+}
+
+.wiki-callout--tip {
+	--wiki-callout-accent: var(--theme-success-600);
+	--wiki-callout-bg: var(--theme-success-50);
+}
+
+.wiki-callout--warning {
+	--wiki-callout-accent: var(--theme-warning-600);
+	--wiki-callout-bg: var(--theme-warning-50);
+}
+
+.wiki-callout--danger {
+	--wiki-callout-accent: var(--theme-error-600);
+	--wiki-callout-bg: var(--theme-error-50);
+}
+
+.wiki-guide-article__missing-block {
+	background: var(--theme-warning-50);
+	border: 1px dashed var(--theme-warning-500);
+	border-radius: 4px;
+	color: var(--theme-elevation-650);
+	font-size: 0.875em;
+	padding: 0.5rem 0.75rem;
+}

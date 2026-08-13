@@ -1,0 +1,16 @@
+{
+	"title": "Admin Wiki",
+	"pages": [
+		"index",
+		"quick-start",
+		"targets",
+		"surfaces",
+		"authoring",
+		"wiki-view",
+		"write-affordances",
+		"seeding",
+		"customization",
+		"configuration",
+		"i18n"
+	]
+}

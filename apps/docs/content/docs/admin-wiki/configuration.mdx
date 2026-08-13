@@ -1,0 +1,214 @@
+---
+title: Configuration
+description: The complete option reference for adminWiki(), plus access control and the endpoints it registers.
+---
+
+Every option is optional. `adminWiki({})` is a working configuration.
+
+```ts title="payload.config.ts"
+import { adminWiki } from '@10x-media/admin-wiki'
+
+adminWiki({
+  access: { create: ({ req }) => req.user?.role === 'editor' },
+  editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
+  exclude: { collections: ['users'], globals: ['nav'], blocks: ['spacer'] },
+  featured: true,
+  hidden: { media: true },
+  localeMap: { 'en-US': 'en' },
+  overrides: { pages: { tabs: [reviewTab] } },
+  slugs: { pages: 'wiki-pages', media: 'wiki-media' },
+  triggers: {
+    edit: true,
+    global: true,
+    list: { slot: 'afterListTable' },
+  },
+  video: true,
+  wikiView: true,
+  writeAffordances: 'editMode',
+})
+```
+
+## Options
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `disabled` | `boolean` | `false` | Return the incoming config untouched. Switch the plugin off per environment without removing the call |
+| `access` | `WikiAccessOptions` | logged-in for all four | Access predicates for the wiki collections. See [Access](#access) |
+| `editor` | `{ blocks }` | `{}` | Project blocks available in the wiki editor, each with its renderer. See [Authoring](/admin-wiki/authoring#your-own-blocks) |
+| `exclude` | `{ blocks, collections, globals }` | Payload's internals | Entities the plugin leaves alone entirely. See [Exclusions](#exclusions) |
+| `featured` | `boolean` | `true` | Lead the list band with the collection's featured guides as cards |
+| `hidden` | `{ media, pages }` | visible | Payload's `admin.hidden` passthrough, per wiki collection |
+| `localeMap` | `Record<string, string>` | `{}` | Map admin UI languages to content locales. See [Targeting](/admin-wiki/targets#localization) |
+| `overrides` | `{ media, pages }` | `{}` | Reshape the collections the plugin registers. See [Collection overrides](#collection-overrides) |
+| `slugs` | `{ media, pages }` | `wiki-media`, `wiki-pages` | Collection slug overrides |
+| `translations` | `TranslationsOption` | built-ins | Per-locale string overrides. See [i18n](/admin-wiki/i18n) |
+| `triggers` | `WikiTriggersOptions` | all on | Which surfaces carry a guide affordance. See [Triggers](#triggers) |
+| `video` | `boolean \| { playerComponent }` | `false` | Video uploads and YouTube/Vimeo embeds. See [Authoring](/admin-wiki/authoring#video) |
+| `wikiView` | `boolean` | `true` | Register the `/wiki` browsing and reading views |
+| `writeAffordances` | `'always' \| 'editMode' \| 'never'` | `'editMode'` | When "write this guide" renders. See [Write affordances](/admin-wiki/write-affordances) |
+
+## Exclusions
+
+`exclude` names entities the plugin does not touch: no help on their fields, no guides panel, no list band, no block help, and no entry in the target pickers, so a guide cannot be attached to one even in [wiki edit mode](/admin-wiki/write-affordances).
+
+```ts
+adminWiki({
+  exclude: {
+    blocks: ['spacer'],
+    collections: ['users'],
+    globals: ['nav'],
+  },
+})
+```
+
+The three lists are separate because Payload only enforces slug uniqueness within one kind. A collection, a global, and a block may all be called `settings`, and one flat list would exclude three unrelated things at once.
+
+These add to what is already excluded:
+
+| Always excluded | Slugs |
+|---|---|
+| The wiki's own collections | Whatever `slugs.pages` and `slugs.media` resolve to |
+| Payload's bookkeeping collections | `payload-folders`, `payload-jobs`, `payload-locked-documents`, `payload-migrations`, `payload-preferences`, `payload-query-presets` |
+| Payload's bookkeeping globals | `payload-jobs-stats` |
+
+Both built-in lists are exported as `PAYLOAD_INTERNAL_COLLECTIONS` and `PAYLOAD_INTERNAL_GLOBALS`.
+
+Excluding an entity does not remove guides already targeting it. Their targets stop resolving, so the [orphan banner](/admin-wiki/targets#orphaned-targets) lists them until you edit or delete them.
+
+To leave a single **field** out without excluding its whole collection, give that field its own `Description` component; see [Customization](/admin-wiki/customization).
+
+## Triggers
+
+`triggers` chooses which surfaces carry a guide affordance across everything the plugin covers:
+
+```ts
+adminWiki({
+  triggers: {
+    edit: true,                          // sidebar panel on collection documents
+    global: true,                        // sidebar panel on globals
+    list: { slot: 'afterListTable' },    // band on collection lists
+  },
+})
+```
+
+`list` accepts `true` (the band at its default slot), `false` (no band), or an object choosing the slot: `beforeList`, `beforeListTable`, `afterListTable`, or `afterList`. Only the list band takes a slot option.
+
+Turning a trigger off keeps the entity in the wiki: its fields still carry help and it is still a valid target. To take an entity out of the wiki altogether, use [`exclude`](#exclusions).
+
+## Collection overrides
+
+Guides are Payload documents, so projects eventually want their own fields on them: review state, owners, a category. `overrides` reshapes the two collections the plugin registers, after they are fully built and before Payload sees them.
+
+Fields added this way are filled at seed time through [`additionalData`](/admin-wiki/seeding#your-own-fields).
+
+### Tabs on the guide pages
+
+Guide authoring is already split into a **Guide** tab and a **Targets** tab, so extra fields belong in tabs of their own rather than loose at the end of the form. `overrides.pages.tabs` appends to that list:
+
+```ts
+adminWiki({
+  overrides: {
+    pages: {
+      tabs: [
+        {
+          label: 'Editorial',
+          fields: [
+            { name: 'tags', type: 'text', hasMany: true },
+            { name: 'reviewedAt', type: 'date' },
+          ],
+        },
+      ],
+    },
+  },
+})
+```
+
+Named and unnamed tabs both work. An unnamed tab writes its fields at the document root; a named tab nests them under the tab name, which is the safer choice if you are worried about colliding with a future plugin field.
+
+### The whole collection
+
+`overrides.pages.collection` and `overrides.media` are plain functions: they receive the finished collection and return the one Payload registers. Nothing is merged afterwards, so this is the way to add sidebar fields, hooks, admin components, or list columns:
+
+```ts
+adminWiki({
+  overrides: {
+    pages: {
+      collection: (collection) => ({
+        ...collection,
+        admin: { ...collection.admin, defaultColumns: ['title', 'owners', 'updatedAt'] },
+        fields: [
+          ...collection.fields,
+          {
+            name: 'owners',
+            type: 'relationship',
+            relationTo: 'users',
+            hasMany: true,
+            admin: { position: 'sidebar' },
+          },
+        ],
+      }),
+    },
+    media: (collection) => ({
+      ...collection,
+      upload: { ...collection.upload, imageSizes: [{ name: 'thumb', width: 400 }] },
+    }),
+  },
+})
+```
+
+Both run last, after the target fields have been populated from the walked config and the endpoints attached, so `collection.fields` includes everything the plugin built (`tabs` included, appended tabs and all).
+
+<Callout type="warn">
+  Nothing is validated on the way out. Returning a collection without the plugin's `slug`, `endpoints`, `versions.drafts`, or `target*` fields will break the wiki, and the plugin will not warn you. Spread the collection you were given and add to it.
+</Callout>
+
+The media collection takes only the function form. An upload collection is one `alt` field and a file, so a tab shorthand would have nothing to organize.
+
+## Plugin order
+
+The plugin documents the config as it stands when it runs, so it belongs **last** in the `plugins` array, after anything that adds collections or fields:
+
+```ts
+plugins: [
+  fields({ /* ... */ }),
+  adminWiki({}),
+]
+```
+
+If the walk finds no fields at all, the plugin logs a warning on boot rather than failing. In practice that means the plugin ran before the config had any fields to document.
+
+## Access
+
+Both wiki collections default to "any logged-in user" for `create`, `read`, `update`, and `delete`, never public. Restrict authoring in production:
+
+```ts
+adminWiki({
+  access: {
+    create: ({ req }) => req.user?.role === 'editor',
+    update: ({ req }) => req.user?.role === 'editor',
+    delete: ({ req }) => req.user?.role === 'admin',
+    // read: omitted, so any logged-in user can read guides
+  },
+})
+```
+
+Each predicate receives Payload's standard access args including `req`, and therefore `req.locale`, so authoring can be restricted per role and per locale.
+
+These predicates drive the UI as well as the data. The targets map returns the reader's evaluated `create` and `update` results, which is what decides whether "write this guide" and "edit guide" render. Read access is never overridden: the views, the drawers, and the endpoints all query as the requesting user with `overrideAccess: false`.
+
+## Endpoints
+
+Two endpoints are registered on the wiki pages collection:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/wiki-pages/targets-map?language=<lang>` | The map of target key to published guides for one reader, plus their evaluated create and update permissions. Guide content is not included |
+| `GET /api/wiki-pages/orphaned-targets` | Guides whose stored targets no longer resolve against the running config. Requires update access; includes drafts |
+
+Both send `cache-control: no-store` and honor your read access. Paths follow `slugs.pages` when you override it.
+
+## Requirements
+
+Payload `^3.83.0`, React 19, Node 22.18 or newer. `@payloadcms/richtext-lexical` and `@payloadcms/ui` are required peers; `@payloadcms/next` and `next` are optional peers, needed only for the [wiki view](/admin-wiki/wiki-view).
+
+Run `payload generate:importmap` after installing and after upgrading. The plugin's surfaces are import-map component references, and a stale map is the most common reason nothing renders.

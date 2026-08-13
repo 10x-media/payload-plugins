@@ -1,7 +1,9 @@
 import type { ColorSchemeValue } from '../../types'
-import { PRESET_PREFIX, type ResolvedColorPreset } from './options'
+import type { ResolvedColorPreset } from './options'
+import { parsePresetReference } from './presetReference'
 
 export type PresetChip = {
+	alpha: number
 	key: string
 	label: string
 	missing: boolean
@@ -9,8 +11,8 @@ export type PresetChip = {
 }
 
 /**
- * Derives the chip shown in place of a raw `preset:<key>` ref in the color
- * input. Returns null outside chip mode: non-linked fields, active text
+ * Derives the chip shown in place of a raw `preset:<key>[/<alpha>]` ref in the
+ * color input. Returns null outside chip mode: non-linked fields, active text
  * editing, non-ref values, or an empty key (which validate rejects anyway).
  * A ref whose key no longer resolves still chips (missing: true, label falls
  * back to the key) so the stored ref stays visible without leaking raw text.
@@ -23,13 +25,14 @@ export const derivePresetChip = (args: {
 }): null | PresetChip => {
 	const { editing, linked, presets, value } = args
 	if (!linked || editing) return null
-	if (typeof value !== 'string' || !value.startsWith(PRESET_PREFIX)) return null
-	const key = value.slice(PRESET_PREFIX.length)
-	if (key === '') return null
-	const preset = presets.find((entry) => entry.key === key)
+	if (typeof value !== 'string') return null
+	const ref = parsePresetReference(value)
+	if (!ref) return null
+	const preset = presets.find((entry) => entry.key === ref.key)
 	return {
-		key,
-		label: preset?.label ?? key,
+		alpha: ref.alpha,
+		key: ref.key,
+		label: preset?.label ?? ref.key,
 		missing: !preset,
 		value: preset?.value ?? null,
 	}

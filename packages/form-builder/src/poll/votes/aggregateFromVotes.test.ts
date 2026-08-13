@@ -119,4 +119,25 @@ describe('aggregateFromVotes', () => {
 		const result = await aggregateFromVotes({ payload, formId: 'f1', field: 'color', options })
 		expect(result.truncated).toBe(false)
 	})
+
+	it('clamps a drift-negative value sum and total to zero', async () => {
+		// A concurrent double-change can double-decrement one value across shard rows; the reader
+		// must never surface a negative count.
+		find.mockResolvedValue({
+			docs: [
+				row('red', 1),
+				row('red', -2),
+				row('blue', 2),
+				row(RESPONDENTS_VALUE, 2),
+				row(RESPONDENTS_VALUE, -3),
+			],
+		})
+		const result = await aggregateFromVotes({ payload, formId: 'f1', field: 'color', options })
+		expect(result.total).toBe(0)
+		expect(result.buckets.map((bucket) => [bucket.value, bucket.count])).toEqual([
+			['red', 0],
+			['blue', 2],
+			['green', 0],
+		])
+	})
 })

@@ -1,0 +1,51 @@
+/* Orphan banner ------------------------------------------------------------ */
+
+/* Payload's Banner carries the error surface, radius and spacing; the content
+   here is a heading plus a list, which its single-line default does not lay out. */
+.wiki-orphan-banner {
+	align-items: flex-start;
+	gap: calc(var(--base) / 2);
+}
+
+.wiki-orphan-banner__body {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 4);
+	min-width: 0;
+}
+
+.wiki-orphan-banner__heading {
+	font-weight: 600;
+}
+
+.wiki-orphan-banner__intro {
+	opacity: 0.85;
+}
+
+.wiki-orphan-banner__list {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 4);
+	list-style: none;
+	margin: calc(var(--base) / 4) 0 0;
+	padding: 0;
+}
+
+.wiki-orphan-banner__item {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) / 3);
+}
+
+.wiki-orphan-banner__link {
+	color: inherit;
+	font-weight: 500;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.wiki-orphan-banner__key .pill__label {
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+}

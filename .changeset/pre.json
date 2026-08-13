@@ -22,9 +22,12 @@
 		"@10x-media/fields": "0.0.0",
 		"@10x-media/fields-dev": "0.0.0",
 		"@10x-media/undo-redo": "0.0.0",
-		"@10x-media/undo-redo-dev": "0.0.0"
+		"@10x-media/undo-redo-dev": "0.0.0",
+		"@10x-media/admin-wiki": "0.0.0",
+		"@10x-media/admin-wiki-dev": "0.0.0"
 	},
 	"changesets": [
+		"admin-wiki-initial-beta",
 		"analytics-api-feedback",
 		"analytics-breakdown-widgets",
 		"analytics-chart-redesign",
@@ -55,6 +58,7 @@
 		"analytics-uniques-breakdowns",
 		"analytics-widget-foundation",
 		"analytics-write-buffer",
+		"color-linked-alpha",
 		"fb-captcha-adapters",
 		"fb-client-i18n-fallback",
 		"fb-condition-builder-ui",
@@ -73,9 +77,11 @@
 		"fb-round-three",
 		"fb-submission-status",
 		"fb-ux-review-round",
+		"fields-color-chip-overflow",
 		"fields-color-schemes",
 		"fields-v1",
 		"form-builder-actions-consolidation",
+		"form-builder-changeable-votes",
 		"form-builder-composition-consent-recipients",
 		"form-builder-conditions-flow",
 		"form-builder-consent-upload-options",
