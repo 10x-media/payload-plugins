@@ -53,7 +53,7 @@ auditLogs({
 })
 ```
 
-The plugin's own writes use `overrideAccess`, so tightening either of these never stops entries being recorded.
+The plugin's own writes never go through access control, so tightening either of these stops reads, never recording.
 
 ### Being turned away
 
@@ -129,7 +129,7 @@ auditLogs({
 ```
 
 <Callout type="warn">
-Removing a built-in field will not break writing: entries are written with `overrideAccess` and Payload drops what it does not recognise. It will break reading. Drop `changedPaths` and the changed-path filter goes with it, along with every query that depends on the index.
+Removing a built-in field will not break writing: the entry is stored without it, on both adapters. It will break reading. Drop `changedPaths` and the changed-path filter goes with it, along with every query that depends on the index.
 </Callout>
 
 ## How entries are written

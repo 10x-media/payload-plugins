@@ -95,7 +95,7 @@ auditLogs({
 | `view` | `false \| { path?, defaultLimit?, access?, forceWhere? }` | on | The custom view. See [the admin view](/audit-logs/admin-view). |
 | `override` | `(collection) => CollectionConfig` | none | Modify the generated collection. The slug is always forced back to `audit-logs`. |
 
-All four access rules default to denying everything. The plugin's own writes use `overrideAccess`, so the log fills up regardless; the rules only govern the public API. Open `read` if something outside the admin needs to query entries.
+All four access rules default to denying everything. The plugin's own writes never go through them, so the log fills up regardless; the rules only govern the public API. Open `read` if something outside the admin needs to query entries.
 
 ### group
 

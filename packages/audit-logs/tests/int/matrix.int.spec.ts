@@ -1,6 +1,6 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { PayloadRequest } from 'payload'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import type { CollectionConfig, PayloadRequest } from 'payload'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { auditLogs } from '../../src/index'
 import {
 	posts,
@@ -166,5 +166,54 @@ describeForDb('auditLogs cross-db', {}, (db) => {
 		})
 
 		expect(await readLogs(booted.payload, { group: { equals: 'batch-1' } })).toHaveLength(1)
+	})
+	describe('a collection stripped by logs.override', () => {
+		let stripped: BootedPayload
+
+		beforeAll(async () => {
+			stripped = await bootPayload({
+				plugin: auditLogs({
+					collections: { posts: { auditLog: true } },
+					logs: {
+						override: (collection: CollectionConfig) => ({
+							...collection,
+							fields: collection.fields.filter(
+								(field) => !('name' in field) || field.name !== 'changedPaths'
+							),
+						}),
+					},
+				}),
+				db,
+				collections: [posts, tags, users],
+				seed: async (payload) => {
+					await seedUser(payload)
+				},
+			})
+		})
+
+		afterAll(async () => {
+			await stripped.stop()
+		})
+
+		// Documented under "Changing the collection": dropping a built-in field costs you the
+		// reads that depend on it, never the write. Worth pinning per adapter, since the
+		// dropped field is a row in a side table on Postgres and a key in the document on Mongo.
+		it('keeps writing entries, without the dropped field', async () => {
+			const doc = await stripped.payload.create({ collection: 'posts', data: { title: 'before' } })
+			await stripped.payload.update({
+				collection: 'posts',
+				id: doc.id,
+				data: { title: 'after' },
+			})
+
+			const found = await stripped.payload.find({
+				collection: 'audit-logs',
+				depth: 0,
+				overrideAccess: true,
+			})
+
+			expect(found.totalDocs).toBe(2)
+			expect(found.docs.some((entry) => 'changedPaths' in (entry as object))).toBe(false)
+		})
 	})
 })

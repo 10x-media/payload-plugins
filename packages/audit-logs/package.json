@@ -81,7 +81,6 @@
 	},
 	"peerDependencies": {
 		"@payloadcms/next": "^3.83.0",
-		"@payloadcms/translations": "^3.83.0",
 		"@payloadcms/ui": "^3.83.0",
 		"next": "^15.2.9 || ^16.2.6",
 		"payload": "^3.83.0",
