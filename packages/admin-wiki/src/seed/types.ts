@@ -31,6 +31,12 @@ export type WikiSeedContent = { lexical: SerializedEditorState } | { markdown: s
 export type WikiSeedContext = {
 	/** Every seeded guide's id by slug (resolved before content is written). */
 	guideIdsBySlug: Record<string, number | string>
+	/**
+	 * Every seeded guide's title by slug, resolved for the locale whose content is
+	 * being transformed, falling back to the default-locale title. This is what a
+	 * guide link with no text of its own is given to say.
+	 */
+	guideTitlesBySlug: Record<string, string>
 	/** Seeded media handles by media key. */
 	media: Record<string, { id: number | string; relationTo: string }>
 }

@@ -1,13 +1,16 @@
 'use client'
 
-import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
+import type {
+	SerializedEditorState,
+	SerializedLexicalNode,
+} from '@payloadcms/richtext-lexical/lexical'
 import { type JSXConvertersFunction, RichText } from '@payloadcms/richtext-lexical/react'
 import { useMemo } from 'react'
 
 import {
 	CALLOUT_BLOCK_SLUG,
-	GUIDE_LINK_BLOCK_SLUG,
 	VIDEO_EMBED_BLOCK_SLUG,
+	WIKI_GUIDE_LINK_NODE_TYPE,
 	WIKI_VIDEO_NODE_TYPE,
 } from '../../editor/constants'
 import { collectGuideHeadings } from '../../shared/headings'
@@ -15,7 +18,7 @@ import { GuideVideo } from '../Video/GuideVideo'
 import { VideoEmbed } from '../Video/VideoEmbed'
 import { useWikiTargets, type WikiBlockRenderer } from '../WikiProvider/WikiProvider'
 import { Callout } from './Callout'
-import { GuideLink, type GuideLinkFields } from './GuideLink'
+import { GuideLink } from './GuideLink'
 import './guide-article.css'
 
 export type { WikiBlockRenderer } from '../WikiProvider/WikiProvider'
@@ -70,10 +73,17 @@ const buildConverters =
 			const video = node as { relationTo?: string; value?: number | string }
 			return <GuideVideo relationTo={video.relationTo ?? ''} value={video.value} />
 		},
-		inlineBlocks: {
-			[GUIDE_LINK_BLOCK_SLUG]: ({ node }: { node: { fields: Record<string, unknown> } }) => (
-				<GuideLink fields={node.fields as GuideLinkFields} />
-			),
+		/**
+		 * An element node, so its children are the link text and the converter has
+		 * to descend into them; the block converters above take no children at all.
+		 */
+		[WIKI_GUIDE_LINK_NODE_TYPE]: ({ node, nodesToJSX }) => {
+			const link = node as { children?: SerializedLexicalNode[]; guide?: null | number | string }
+			return (
+				<GuideLink guide={link.guide ?? null}>
+					{nodesToJSX({ nodes: link.children ?? [] })}
+				</GuideLink>
+			)
 		},
 		link: ({ node, nodesToJSX }) => (
 			<a

@@ -36,15 +36,22 @@ const targetData = (targets: WikiSeedTargets | undefined) => ({
 type SanitizedEditorConfig = Awaited<ReturnType<typeof editorConfigFactory.fromEditor>>
 
 type SeedRuntime = {
-	context: WikiSeedContext
+	context: Omit<WikiSeedContext, 'guideTitlesBySlug'>
 	editorConfig: SanitizedEditorConfig
+	/** Every seeded guide's title in one locale, falling back to the default one. */
+	titlesFor: (locale?: string) => Record<string, string>
 	transformers: WikiSeedTransformer[]
 }
 
+/**
+ * Resolve one guide's content for one locale. The context is rebuilt per call
+ * rather than shared, because guide titles are localized: a link with no text of
+ * its own has to say the German title in the German pass.
+ */
 const resolveContent = (
 	content: WikiSeedContent,
 	runtime: SeedRuntime,
-	label: string
+	{ label, locale }: { label: string; locale?: string }
 ): SerializedEditorState => {
 	let state: SerializedEditorState
 	if ('markdown' in content) {
@@ -57,8 +64,12 @@ const resolveContent = (
 	} else {
 		throw new Error(`@10x-media/admin-wiki seed: "${label}" has neither markdown nor lexical`)
 	}
+	const context: WikiSeedContext = {
+		...runtime.context,
+		guideTitlesBySlug: runtime.titlesFor(locale),
+	}
 	for (const transformer of runtime.transformers) {
-		state = transformer(state, runtime.context)
+		state = transformer(state, context)
 	}
 	return state
 }
@@ -103,9 +114,23 @@ export const seedWiki = async (
 		payload,
 	})
 
+	// Split ahead of every write, so a guide link resolves its target's title
+	// regardless of the order the guides are defined in.
+	const titles = new Map(
+		guides.map((def) => [def.slug, splitLocalized(def.title, defaultLocale, `${def.slug}.title`)])
+	)
+	const titlesFor = (locale?: string): Record<string, string> =>
+		Object.fromEntries(
+			[...titles].map(([slug, title]) => [
+				slug,
+				(locale === undefined ? undefined : title.rest[locale]) ?? title.base ?? slug,
+			])
+		)
+
 	const runtime: SeedRuntime = {
 		context: { guideIdsBySlug: {}, media },
 		editorConfig,
+		titlesFor,
 		transformers: [
 			githubAlertsTransformer,
 			guideLinksTransformer,
@@ -129,7 +154,7 @@ export const seedWiki = async (
 				runtime.context.guideIdsBySlug[def.slug] = existing.docs[0].id as number | string
 				actions[def.slug] = 'updated'
 			} else {
-				const title = splitLocalized(def.title, defaultLocale, `${def.slug}.title`)
+				const title = titles.get(def.slug)
 				const created = await payload.create({
 					collection: pagesSlug as CollectionSlug,
 					// `draft: true` is what sets `_status`; the collection always has
@@ -137,7 +162,7 @@ export const seedWiki = async (
 					// is asserted because a host that generated its types narrows draft
 					// data to the fields every collection shares, and the slug this
 					// writes to is only known at runtime.
-					data: { slug: def.slug, title: title.base ?? def.slug } as never,
+					data: { slug: def.slug, title: title?.base ?? def.slug } as never,
 					draft: true,
 				})
 				runtime.context.guideIdsBySlug[def.slug] = created.id as number | string
@@ -153,7 +178,7 @@ export const seedWiki = async (
 	const results: WikiSeedResult['guides'] = []
 	for (const def of guides) {
 		try {
-			const title = splitLocalized(def.title, defaultLocale, `${def.slug}.title`)
+			const title = titles.get(def.slug) ?? { base: undefined, rest: {} }
 			const summary = splitLocalized(def.summary, defaultLocale, `${def.slug}.summary`)
 			const content = splitLocalized(def.content, defaultLocale, `${def.slug}.content`)
 			const status = def.publish === false ? 'draft' : 'published'
@@ -177,7 +202,11 @@ export const seedWiki = async (
 				...(title.base !== undefined ? { title: title.base } : {}),
 				...(summary.base !== undefined ? { summary: summary.base } : {}),
 				...(content.base !== undefined
-					? { content: resolveContent(content.base, runtime, `${def.slug}.content`) }
+					? {
+							content: resolveContent(content.base, runtime, {
+								label: `${def.slug}.content`,
+							}),
+						}
 					: {}),
 			}
 			const id = runtime.context.guideIdsBySlug[def.slug]
@@ -206,7 +235,10 @@ export const seedWiki = async (
 						...(summary.rest[locale] !== undefined ? { summary: summary.rest[locale] } : {}),
 						...(localeContent !== undefined
 							? {
-									content: resolveContent(localeContent, runtime, `${def.slug}.content.${locale}`),
+									content: resolveContent(localeContent, runtime, {
+										label: `${def.slug}.content.${locale}`,
+										locale,
+									}),
 								}
 							: {}),
 					},

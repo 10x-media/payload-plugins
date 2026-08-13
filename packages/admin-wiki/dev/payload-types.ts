@@ -650,17 +650,6 @@ export interface WikiVideoEmbedBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "WikiGuideLinkBlock".
- */
-export interface WikiGuideLinkBlock {
-  guide: string | WikiPage;
-  label?: string | null;
-  id?: string | null;
-  blockName?: string | null;
-  blockType: 'wikiGuideLink';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "auth".
  */
 export interface Auth {

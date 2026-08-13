@@ -4,7 +4,8 @@
  */
 export const CALLOUT_BLOCK_SLUG = 'wikiCallout'
 
-export const GUIDE_LINK_BLOCK_SLUG = 'wikiGuideLink'
+/** Lexical node type of the guide-to-guide link, an inline ElementNode wrapping its text. */
+export const WIKI_GUIDE_LINK_NODE_TYPE = 'wikiGuideLink'
 
 /** Lexical node type of the uploaded-video DecoratorNode. */
 export const WIKI_VIDEO_NODE_TYPE = 'wikiVideo'

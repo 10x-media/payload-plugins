@@ -193,7 +193,9 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 
 	it('resolves a guide link to a guide seeded later in the same run', async () => {
 		// The ensure pass creates every guide before any content is written, which
-		// is what lets a guide link forward to one declared after it.
+		// is what lets a guide link forward to one declared after it. The bare
+		// placeholder also has to reach that guide's title, which is resolved in the
+		// same pass rather than read back from the database.
 		const result = await seed([
 			{
 				content: { markdown: 'See {{wiki:guide:link-target}} for the rest.' },
@@ -205,10 +207,27 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 
 		const targetId = result.guides.find((guide) => guide.slug === 'link-target')?.id
 		const [doc] = await guideBySlug('link-source')
-		const link = lexicalNode(doc?.content, (node) => node.type === 'inlineBlock')
-		const fields = link?.fields as Record<string, unknown>
-		expect(fields?.blockType).toBe('wikiGuideLink')
-		expect(String(fields?.guide)).toBe(String(targetId))
+		const link = lexicalNode(doc?.content, (node) => node.type === 'wikiGuideLink')
+		expect(String(link?.guide)).toBe(String(targetId))
+		expect((link?.children as Array<{ text?: string }>)?.[0]?.text).toBe('Link target')
+	})
+
+	it('keeps the author text when the placeholder is a link target', async () => {
+		const result = await seed([
+			{
+				content: { markdown: 'See [the rest of it]({{wiki:guide:link-target}}) first.' },
+				slug: 'link-source',
+				title: 'Link source',
+			},
+			{ content: { markdown: 'The target.' }, slug: 'link-target', title: 'Link target' },
+		])
+
+		const targetId = result.guides.find((guide) => guide.slug === 'link-target')?.id
+		const [doc] = await guideBySlug('link-source')
+		const link = lexicalNode(doc?.content, (node) => node.type === 'wikiGuideLink')
+		expect(String(link?.guide)).toBe(String(targetId))
+		expect((link?.children as Array<{ text?: string }>)?.[0]?.text).toBe('the rest of it')
+		expect(lexicalNode(doc?.content, (node) => node.type === 'link')).toBeUndefined()
 	})
 
 	it('fails loudly on a link to an unknown guide, naming the guide that carries it', async () => {

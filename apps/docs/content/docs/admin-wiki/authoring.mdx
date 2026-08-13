@@ -39,17 +39,23 @@ Enabled:
 
 - Paragraphs, headings `h2` to `h4`, bold, italic, underline, strikethrough, inline code
 - Ordered and unordered lists, blockquotes, horizontal rules, alignment, indentation
-- Links, **external URLs only**. To link another guide, use the guide link block
+- Links, **external URLs only**; guide-to-guide links are a feature of their own beside them
 - Uploads, scoped to the `wiki-media` collection
 - Fixed and inline toolbars
 
 Headings start at `h2`; the guide title is the `h1` on the page and in the drawer.
 
+## Guide links
+
+A guide link wraps text the way a link does, rather than sitting in the sentence as a chip: select the words, press the guide-link button in either toolbar, and pick the target from the guides list. The words stay yours to edit afterwards.
+
+With the cursor inside a guide link, a small panel names the guide it points at and offers the two things there are to do: point it at a different guide, or take the link off and keep the text. The toolbar button is lit while the cursor is in a link, and pressing it there removes the link as well.
+
+The link stores the target guide's id and nothing else. A reader clicking one opens that guide in a drawer stacked on the current one, so following a reference never leaves the page; a link whose target was deleted degrades to dimmed plain text, and the sentence still reads.
+
 ## Built-in blocks
 
 **Callout.** Four variants: info, tip, warning, danger. The body is itself rich text (inline formatting and external links), so a callout can hold lists and links but cannot nest blocks or uploads.
-
-**Guide link** (inline). Links one guide to another by relationship, with an optional label. The label defaults to the target guide's title, resolved at read time, so renaming a guide updates every reference to it.
 
 **Video embed.** Only when [video is enabled](#video). Takes a YouTube or Vimeo watch, share, or short URL and validates it at authoring time; the reader gets a privacy-friendly embed (`youtube-nocookie.com`, Vimeo with `dnt=1`).
 

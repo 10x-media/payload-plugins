@@ -1,0 +1,71 @@
+/* The link as it reads while authoring. Underlined rather than coloured like the
+   rendered one: inside the editor it has to be legible as "these words carry a
+   link" without competing with the external-link styling the stock feature
+   gives its own, which is the other kind of link in the same paragraph. */
+.wiki-guide-link-node {
+	border-bottom: 1px solid var(--theme-elevation-400);
+	border-radius: 2px;
+	cursor: text;
+	padding: 0 1px;
+}
+
+.wiki-guide-link-node:hover {
+	background: var(--theme-elevation-100);
+	border-bottom-color: var(--theme-elevation-600);
+}
+
+/* Positioned by `setFloatingElemPositionForLinkEditor`, which writes `transform`
+   and `opacity`, so both start neutralized and neither is transitioned from a
+   value this stylesheet owns. */
+.wiki-guide-link-editor {
+	background: var(--theme-input-bg);
+	border-radius: 4px;
+	box-shadow:
+		0 1px 2px 1px rgb(0 0 0 / 10%),
+		0 4px 16px 0 rgb(0 0 0 / 10%);
+	display: flex;
+	left: 0;
+	opacity: 0;
+	padding: 4px 4px 4px 12px;
+	position: absolute;
+	top: 0;
+	transition: opacity 0.2s;
+	will-change: transform;
+	z-index: 1;
+}
+
+.wiki-guide-link-editor__content {
+	align-items: center;
+	display: flex;
+	font-size: 13px;
+	min-height: 28px;
+	min-width: 0;
+}
+
+.wiki-guide-link-editor__title {
+	color: var(--theme-elevation-800);
+	margin-inline-end: calc(var(--base) / 2);
+	max-width: calc(var(--base) * 12);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-guide-link-editor button {
+	align-items: center;
+	background: none;
+	border: 0;
+	border-radius: 4px;
+	color: var(--theme-elevation-600);
+	cursor: pointer;
+	display: flex;
+	height: 30px;
+	justify-content: center;
+	padding: 0;
+	width: 30px;
+}
+
+.wiki-guide-link-editor button:hover {
+	background-color: var(--theme-elevation-100);
+	color: var(--theme-elevation-800);
+}

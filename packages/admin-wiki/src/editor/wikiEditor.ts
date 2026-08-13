@@ -23,7 +23,7 @@ import type { Block, CollectionSlug, UploadCollectionSlug } from 'payload'
 
 import type { WikiVideoOptions } from '../options'
 import { buildCalloutBlock } from './calloutBlock'
-import { buildGuideLinkBlock } from './guideLinkBlock'
+import { WikiGuideLinkFeature } from './guideLink/server'
 import { WikiVideoFeature } from './video/server'
 import { buildVideoEmbedBlock } from './videoEmbedBlock'
 
@@ -41,8 +41,9 @@ export type BuildWikiEditorArgs = {
 /**
  * The plugin's self-contained editor: an explicit, closed feature list that
  * never inherits the consuming project's editor or its link customizations.
- * Links are external-URL only (`enabledCollections: []` removes internal doc
- * links); uploads are scoped to the wiki media collection.
+ * Stock links are external-URL only (`enabledCollections: []` removes internal
+ * doc links) and guide-to-guide links are their own feature beside them; uploads
+ * are scoped to the wiki media collection.
  */
 export const buildWikiEditor = ({
 	blocks = [],
@@ -66,6 +67,7 @@ export const buildWikiEditor = ({
 			AlignFeature(),
 			IndentFeature(),
 			LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
+			WikiGuideLinkFeature({ pagesSlug }),
 			UploadFeature({ enabledCollections: [mediaSlug] as UploadCollectionSlug[] }),
 			BlocksFeature({
 				blocks: [
@@ -73,7 +75,6 @@ export const buildWikiEditor = ({
 					...(video !== false ? [buildVideoEmbedBlock()] : []),
 					...blocks,
 				],
-				inlineBlocks: [buildGuideLinkBlock(pagesSlug)],
 			}),
 			...(video !== false ? [WikiVideoFeature({ mediaSlug })] : []),
 			FixedToolbarFeature(),

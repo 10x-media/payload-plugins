@@ -72,7 +72,9 @@ Standard formatting, lists, quotes, and links work as expected.
 
 ## Linking guides
 
-Cross-reference other guides inline, like {{wiki:guide:publishing-a-post}}.
+Cross-reference other guides inline, like {{wiki:guide:publishing-a-post}}, or under
+[words of your own]({{wiki:guide:hero-banner-guide}}) when the guide's title does not
+read as part of the sentence.
 `
 
 const postFieldsGuide = `## Post fields
@@ -147,7 +149,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				{
 					content: {
 						markdown:
-							'The hero banner opens the page. Keep headings short and pick a background with enough contrast.\n\nSee {{wiki:guide:publishing-a-post}} for the publishing flow.',
+							'The hero banner opens the page. Keep headings short and pick a background with enough contrast.\n\nSee [the publishing flow]({{wiki:guide:publishing-a-post}}) for what happens next.',
 					},
 					slug: 'hero-banner-guide',
 					summary: 'How to use the hero banner block well.',
