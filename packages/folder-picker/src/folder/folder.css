@@ -71,9 +71,6 @@
    Payload's own field descriptions so it reads as part of the admin rather than as an
    addition to it. */
 .collection-folder-list__pick-many-hint {
-	/* margin: calc(var(--base) * 0.25) 0 0; */
-	color: var(--theme-elevation-800);
-	/* Payload's own scale is 0.8, 0.944, 1 and 1.44rem. One step below body text keeps the
-	   hint quieter than the header it sits under without dropping to the smallest size. */
+	color: var(--theme-elevation-400);
 	font-size: 1rem;
 }
