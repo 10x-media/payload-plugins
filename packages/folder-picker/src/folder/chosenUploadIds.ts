@@ -1,12 +1,13 @@
-/**
- * Separator for packing ids into one string. `useFormFields` compares what its selector
- * returns, so the ids travel as a string rather than a fresh array, which would count as a
- * change on every render. A comma would not do: Payload allows custom ids, including text
- * ones, and a comma inside an id is legal. A NUL byte is not.
- */
-export const ID_SEPARATOR = '\u0000'
-
 type PolymorphicPair = { relationTo: unknown; value: unknown }
+
+/** An id as a string, or nothing when the candidate cannot stand for one. */
+const readId = (candidate: unknown): string | undefined => {
+	if (candidate === null || candidate === undefined) {
+		return undefined
+	}
+	const id = String(candidate)
+	return id === '' ? undefined : id
+}
 
 /**
  * The ids an upload field's value refers to, narrowed to one collection.
@@ -28,33 +29,52 @@ export const chosenUploadIds = (value: unknown, collectionSlug: string): string[
 	const entries = Array.isArray(value) ? value : [value]
 	const ids: string[] = []
 
+	const collect = (candidate: unknown) => {
+		const id = readId(candidate)
+		if (id !== undefined) {
+			ids.push(id)
+		}
+	}
+
 	for (const entry of entries) {
 		if (entry === null || entry === undefined) {
 			continue
 		}
 
 		if (typeof entry !== 'object') {
-			ids.push(String(entry))
+			collect(entry)
 			continue
 		}
 
 		if ('relationTo' in entry && 'value' in entry) {
 			const pair = entry as PolymorphicPair
 			if (pair.relationTo === collectionSlug) {
-				ids.push(String(pair.value))
+				collect(pair.value)
 			}
 			continue
 		}
 
 		if ('id' in entry) {
-			ids.push(String((entry as { id: unknown }).id))
+			collect((entry as { id: unknown }).id)
 			continue
 		}
 
 		if ('value' in entry) {
-			ids.push(String((entry as { value: unknown }).value))
+			collect((entry as { value: unknown }).value)
 		}
 	}
 
-	return ids.filter(Boolean)
+	return ids
 }
+
+/**
+ * The ids as one string, for `useFormFields`: its selector compares what it returns, so a
+ * fresh array would count as a change on every render.
+ *
+ * JSON rather than a separator, because Payload allows custom text ids and any character a
+ * separator could use is legal inside one.
+ */
+export const packChosenIds = (ids: string[]): string => JSON.stringify(ids)
+
+/** The inverse of {@link packChosenIds}. */
+export const unpackChosenIds = (packed: string): string[] => JSON.parse(packed) as string[]

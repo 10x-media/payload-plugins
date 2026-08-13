@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { chosenUploadIds, ID_SEPARATOR } from './chosenUploadIds'
+import { chosenUploadIds, packChosenIds, unpackChosenIds } from './chosenUploadIds'
 
 const MEDIA = 'media'
 
@@ -69,10 +69,23 @@ describe('chosenUploadIds', () => {
 		expect(chosenUploadIds([null, undefined, {}, ''], MEDIA)).toEqual([])
 	})
 
-	it('survives a round trip through the separator', () => {
-		// Payload allows custom text ids, where a comma is a legal character.
-		const ids = chosenUploadIds(['a,b', 'c'], MEDIA)
+	it('drops an entry whose id is missing rather than reading it as a word', () => {
+		// `String(null)` is `'null'`, which would stand in for an id and hide whatever
+		// carries that id.
+		expect(chosenUploadIds([{ relationTo: MEDIA, value: null }], MEDIA)).toEqual([])
+		expect(chosenUploadIds([{ id: null }], MEDIA)).toEqual([])
+		expect(chosenUploadIds([{ value: undefined }], MEDIA)).toEqual([])
+	})
 
-		expect(ids.join(ID_SEPARATOR).split(ID_SEPARATOR)).toEqual(['a,b', 'c'])
+	it('keeps a numeric id of zero', () => {
+		expect(chosenUploadIds([{ relationTo: MEDIA, value: 0 }], MEDIA)).toEqual(['0'])
+	})
+
+	it('survives a round trip through the packed form', () => {
+		// Payload allows custom text ids, so any character a separator could use is legal
+		// inside one.
+		const ids = chosenUploadIds(['a,b', 'a\u0000b', 'c'], MEDIA)
+
+		expect(unpackChosenIds(packChosenIds(ids))).toEqual(['a,b', 'a\u0000b', 'c'])
 	})
 })

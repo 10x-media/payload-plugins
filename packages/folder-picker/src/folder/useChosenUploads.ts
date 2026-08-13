@@ -1,7 +1,7 @@
 import { useFieldPath, useFormFields } from '@payloadcms/ui'
 import React from 'react'
 
-import { chosenUploadIds, ID_SEPARATOR } from './chosenUploadIds'
+import { chosenUploadIds, packChosenIds, unpackChosenIds } from './chosenUploadIds'
 
 /**
  * The ids the upload field already holds, for one collection.
@@ -20,8 +20,8 @@ export const useChosenUploads = (collectionSlug: string): Set<string> => {
 	const path = useFieldPath()
 
 	const packed = useFormFields(([fields]) =>
-		chosenUploadIds(path ? fields?.[path]?.value : undefined, collectionSlug).join(ID_SEPARATOR)
+		packChosenIds(chosenUploadIds(path ? fields?.[path]?.value : undefined, collectionSlug))
 	)
 
-	return React.useMemo(() => new Set(packed ? packed.split(ID_SEPARATOR) : []), [packed])
+	return React.useMemo(() => new Set(packed ? unpackChosenIds(packed) : []), [packed])
 }
