@@ -61,6 +61,8 @@ Standard formatting, lists, quotes, and links work as expected.
 
 > [!NOTE]
 > Callouts come in info, tip, warning, and danger variants.
+> A second line stays a second line, and a guide link works here too:
+> see {{wiki:guide:publishing-a-post}}.
 
 ### Consumer blocks
 

@@ -73,6 +73,13 @@ It is written into the link as ordinary text, once, at seed time. A guide rename
 
 Slugs resolve against every guide in the same seed run, forward references included, so guides may link to each other regardless of definition order. An unknown slug throws.
 
+Placeholders inside a callout are rewritten too, so a cross-reference reads where it usually belongs:
+
+```md
+> [!TIP]
+> Read {{wiki:guide:publishing-a-post}} before you touch this.
+```
+
 **Media placeholders.** A paragraph containing only `{{wiki:media:<key>}}` becomes an upload node, and `{{wiki:video:<key>}}` becomes a video node, both pointing at media declared in the same run:
 
 ```ts
@@ -95,6 +102,8 @@ await seedWiki(payload, guides, {
 ```
 
 A transformer receives the state and a context holding `guideIdsBySlug`, `guideTitlesBySlug` (the same guides' titles, resolved for the locale being written), and the seeded `media` handles, and returns the state to pass on.
+
+Once the pipeline has run, a `{{wiki:...}}` placeholder left anywhere in the content fails the seed, naming the guide and the placeholder. There is no shape in which one is meant to survive: it would either print as literal text or, in the link form, become a link pointing at a URL that goes nowhere. The two ways to strand one are a `{{wiki:media:...}}` that does not stand alone in a top-level paragraph, and a placeholder inside a block a consumer transformer created, since those run last. Inline code is exempt, so a guide can spell the syntax out while documenting it.
 
 ## Your own fields
 

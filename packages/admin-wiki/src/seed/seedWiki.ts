@@ -6,6 +6,7 @@ import { buildWikiEditor } from '../editor/wikiEditor'
 import { getWikiRegistry } from '../plugin/registry'
 import { asLocale } from '../shared/resolveLocale'
 import { resolveAdditionalData } from './additionalData'
+import { assertPlaceholdersResolved } from './assertPlaceholdersResolved'
 import { splitLocalized } from './localized'
 import { ensureSeedMedia } from './media'
 import { githubAlertsTransformer } from './transformers/githubAlerts'
@@ -71,6 +72,7 @@ const resolveContent = (
 	for (const transformer of runtime.transformers) {
 		state = transformer(state, context)
 	}
+	assertPlaceholdersResolved(state, label)
 	return state
 }
 

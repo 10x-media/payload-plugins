@@ -1,16 +1,12 @@
 'use client'
 
-import type {
-	SerializedEditorState,
-	SerializedLexicalNode,
-} from '@payloadcms/richtext-lexical/lexical'
+import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
 import { type JSXConvertersFunction, RichText } from '@payloadcms/richtext-lexical/react'
 import { useMemo } from 'react'
 
 import {
 	CALLOUT_BLOCK_SLUG,
 	VIDEO_EMBED_BLOCK_SLUG,
-	WIKI_GUIDE_LINK_NODE_TYPE,
 	WIKI_VIDEO_NODE_TYPE,
 } from '../../editor/constants'
 import { collectGuideHeadings } from '../../shared/headings'
@@ -18,7 +14,7 @@ import { GuideVideo } from '../Video/GuideVideo'
 import { VideoEmbed } from '../Video/VideoEmbed'
 import { useWikiTargets, type WikiBlockRenderer } from '../WikiProvider/WikiProvider'
 import { Callout } from './Callout'
-import { GuideLink } from './GuideLink'
+import { inlineConverters } from './inlineConverters'
 import './guide-article.css'
 
 export type { WikiBlockRenderer } from '../WikiProvider/WikiProvider'
@@ -39,8 +35,8 @@ const buildConverters =
 		blockRenderers: Record<string, WikiBlockRenderer>,
 		idsByNode: Map<object, string>
 	): JSXConvertersFunction =>
-	({ defaultConverters }) => ({
-		...defaultConverters,
+	(args) => ({
+		...inlineConverters(args),
 		/**
 		 * The default converter renders the tag and nothing else. Headings need an
 		 * id for the table of contents to link to, and the id comes from the same
@@ -73,27 +69,6 @@ const buildConverters =
 			const video = node as { relationTo?: string; value?: number | string }
 			return <GuideVideo relationTo={video.relationTo ?? ''} value={video.value} />
 		},
-		/**
-		 * An element node, so its children are the link text and the converter has
-		 * to descend into them; the block converters above take no children at all.
-		 */
-		[WIKI_GUIDE_LINK_NODE_TYPE]: ({ node, nodesToJSX }) => {
-			const link = node as { children?: SerializedLexicalNode[]; guide?: null | number | string }
-			return (
-				<GuideLink guide={link.guide ?? null}>
-					{nodesToJSX({ nodes: link.children ?? [] })}
-				</GuideLink>
-			)
-		},
-		link: ({ node, nodesToJSX }) => (
-			<a
-				href={typeof node.fields.url === 'string' ? node.fields.url : undefined}
-				rel="noopener noreferrer"
-				target="_blank"
-			>
-				{nodesToJSX({ nodes: node.children })}
-			</a>
-		),
 	})
 
 /**

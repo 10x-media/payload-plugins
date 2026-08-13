@@ -9,8 +9,19 @@ const PLACEHOLDER_URL = /^\{\{wiki:guide:([\w-]+)\}\}$/
 
 type SeedNode = SerializedLexicalNode & {
 	children?: SeedNode[]
-	fields?: { url?: unknown }
+	fields?: Record<string, unknown> & { url?: unknown }
 	text?: string
+}
+
+/** A block field holding a nested editor state, as `{ root: { children } }`. */
+type NestedState = { root: SeedNode }
+
+const isNestedState = (value: unknown): value is NestedState => {
+	if (typeof value !== 'object' || value === null || !('root' in value)) {
+		return false
+	}
+	const { root } = value as { root: unknown }
+	return typeof root === 'object' && root !== null && Array.isArray((root as SeedNode).children)
 }
 
 const resolveId = (
@@ -79,11 +90,34 @@ const guideSlugOfLink = (node: SeedNode): null | string => {
 	return typeof url === 'string' ? (PLACEHOLDER_URL.exec(url)?.[1] ?? null) : null
 }
 
+/**
+ * A block's own richText fields are editor states of their own, and the nodes
+ * this transformer runs after put content there: a GitHub alert becomes a
+ * callout whose body holds everything the blockquote said. Walking only the
+ * outer tree would leave those placeholders behind as raw text, or, for the
+ * `[words](placeholder)` form, as a plain link pointing at `{{wiki:guide:...}}`.
+ */
+const walkBlockFields = (
+	node: SeedNode,
+	guideIdsBySlug: Record<string, number | string>,
+	guideTitlesBySlug: Record<string, string>
+): void => {
+	if (node.type !== 'block' || !node.fields) {
+		return
+	}
+	for (const value of Object.values(node.fields)) {
+		if (isNestedState(value)) {
+			walk(value.root, guideIdsBySlug, guideTitlesBySlug)
+		}
+	}
+}
+
 const walk = (
 	node: SeedNode,
 	guideIdsBySlug: Record<string, number | string>,
 	guideTitlesBySlug: Record<string, string>
 ): void => {
+	walkBlockFields(node, guideIdsBySlug, guideTitlesBySlug)
 	if (!node.children) {
 		return
 	}

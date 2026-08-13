@@ -1,6 +1,5 @@
 import {
 	AlignFeature,
-	BlockquoteFeature,
 	BlocksFeature,
 	BoldFeature,
 	FixedToolbarFeature,
@@ -22,6 +21,7 @@ import {
 import type { Block, CollectionSlug, UploadCollectionSlug } from 'payload'
 
 import type { WikiEditorFeature, WikiEditorFeaturesOption, WikiVideoOptions } from '../options'
+import { WikiBlockquoteFeature } from './blockquoteFeature'
 import { buildCalloutBlock } from './calloutBlock'
 import { WikiGuideLinkFeature } from './guideLink/server'
 import { WikiVideoFeature } from './video/server'
@@ -71,7 +71,7 @@ export const buildWikiEditor = ({
 				InlineCodeFeature(),
 				UnorderedListFeature(),
 				OrderedListFeature(),
-				BlockquoteFeature(),
+				WikiBlockquoteFeature(),
 				HorizontalRuleFeature(),
 				AlignFeature(),
 				IndentFeature(),
@@ -80,7 +80,7 @@ export const buildWikiEditor = ({
 				UploadFeature({ enabledCollections: [mediaSlug] as UploadCollectionSlug[] }),
 				BlocksFeature({
 					blocks: [
-						buildCalloutBlock(),
+						buildCalloutBlock({ pagesSlug }),
 						...(video !== false ? [buildVideoEmbedBlock()] : []),
 						...blocks,
 					],
