@@ -99,6 +99,7 @@
 		"form-builder-repeater-correctness",
 		"form-builder-standard-schema-dep",
 		"form-builder-v1",
+		"form-builder-vote-endpoint-delegation",
 		"icon-async-libraries",
 		"icon-manifest-label-annotation",
 		"jobs-admin-ux",
