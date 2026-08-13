@@ -2,8 +2,8 @@ import type { CollectionConfig } from 'payload'
 
 /**
  * One document that opens the list drawer from every direction the plugin claims to cover with a
- * single view swap: a plain upload, a hasMany upload, a polymorphic upload, a relationship, and a
- * lexical upload node. The last two upload fields point at the control collections, so the same
+ * single view swap: a plain upload, a hasMany upload, a polymorphic upload, single and hasMany
+ * relationships, and a lexical upload node. The last two upload fields point at the control collections, so the same
  * document also shows what the plugin deliberately leaves untouched.
  */
 export const posts: CollectionConfig = {
@@ -22,6 +22,16 @@ export const posts: CollectionConfig = {
 			name: 'relationshipSingle',
 			type: 'relationship',
 			relationTo: 'media',
+			admin: { appearance: 'drawer' },
+		},
+		// The drawer sets `enableRowSelections` from `hasMany`, and a relationship reaches that
+		// through a different field than an upload does, so the multi-select path needs its own
+		// field to be exercised at all.
+		{
+			name: 'relationshipMany',
+			type: 'relationship',
+			relationTo: 'media',
+			hasMany: true,
 			admin: { appearance: 'drawer' },
 		},
 		{ name: 'richText', type: 'richText' },

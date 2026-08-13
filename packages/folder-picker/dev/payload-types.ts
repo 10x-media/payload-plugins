@@ -286,6 +286,7 @@ export interface Post {
   uploadWithoutFolders?: (string | null) | Attachment;
   uploadCurated?: (string | null) | Curated;
   relationshipSingle?: (string | null) | Media;
+  relationshipMany?: (string | Media)[] | null;
   richText?: {
     root: {
       type: string;
@@ -503,6 +504,7 @@ export interface PostsSelect<T extends boolean = true> {
   uploadWithoutFolders?: T;
   uploadCurated?: T;
   relationshipSingle?: T;
+  relationshipMany?: T;
   richText?: T;
   updatedAt?: T;
   createdAt?: T;

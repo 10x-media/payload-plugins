@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { de } from '@payloadcms/translations/languages/de'
+import { en } from '@payloadcms/translations/languages/en'
+import { uk } from '@payloadcms/translations/languages/uk'
 import { buildConfig } from 'payload'
 import { folderPicker } from '../src/index'
 import { posts } from './collections/posts'
@@ -46,6 +49,7 @@ export default buildConfig({
 	],
 	// The plugin is a no-op without this; `payload-folders` is created by Payload itself.
 	folders: { browseByFolder: true },
+	i18n: { supportedLanguages: { de, en, uk } },
 	editor: lexicalEditor(),
 	plugins: [folderPicker({})],
 	telemetry: false,
