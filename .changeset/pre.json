@@ -27,6 +27,7 @@
 		"@10x-media/admin-wiki-dev": "0.0.0"
 	},
 	"changesets": [
+		"admin-wiki-guide-link-feature",
 		"admin-wiki-initial-beta",
 		"analytics-api-feedback",
 		"analytics-breakdown-widgets",
