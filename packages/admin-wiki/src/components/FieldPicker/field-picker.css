@@ -117,6 +117,35 @@
 	padding-top: calc(var(--base) / 2);
 }
 
+/* The form is laid out by `DocumentFields`, the edit view's own component, so a
+   sidebar field reads as one here too. Two things about that column are written
+   for a page rather than for a drawer: it sticks under document controls this
+   drawer does not have, and it claims a viewport-tall column that a short form
+   leaves standing empty. Core exposes both as custom properties, so the column
+   goes static and sizes to its content without overriding a rule. */
+.wiki-field-picker .document-fields__sidebar-wrap {
+	--sidebar-wrap-height: auto;
+	--sidebar-wrap-position: static;
+	--sidebar-wrap-top: auto;
+}
+
+/* The drawer already pays the outer gutter and owns the scrolling, so all that
+   is left for the form is the gap between its two columns. Written as logical
+   properties because core mirrors those gutters for RTL. */
+.wiki-field-picker .document-fields__edit {
+	padding-block: 0;
+	padding-inline-start: 0;
+}
+
+.wiki-field-picker .document-fields--no-sidebar .document-fields__edit {
+	padding-inline-end: 0;
+}
+
+.wiki-field-picker .document-fields__sidebar-fields {
+	padding-block: 0;
+	padding-inline-end: 0;
+}
+
 .wiki-field-picker__loading {
 	display: flex;
 	flex-direction: column;

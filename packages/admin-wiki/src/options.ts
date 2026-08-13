@@ -1,3 +1,4 @@
+import type { LexicalEditorProps } from '@payloadcms/richtext-lexical'
 import type { Access, Block, CollectionConfig, Tab } from 'payload'
 
 import type { TranslationsOption } from './translations'
@@ -48,9 +49,36 @@ export type WikiEditorBlockOption = {
 	component: string
 }
 
+/**
+ * One lexical feature, exactly as `lexicalEditor` takes them. Derived from its
+ * own props rather than spelled out, because the feature type is generic over
+ * three prop types this plugin has no business naming.
+ */
+export type WikiEditorFeature = Extract<
+	NonNullable<LexicalEditorProps['features']>,
+	readonly unknown[]
+>[number]
+
+/**
+ * Lexical features added to the wiki editor, for the extension a block cannot
+ * express: a custom node, a toolbar item, a keyboard shortcut.
+ *
+ * The array form appends to the plugin's own features, which is what almost
+ * every project wants. The function form is handed those same features as
+ * `defaultFeatures` and returns the whole list, so it can also reorder or drop
+ * one; dropping `wikiGuideLink` or the blocks feature takes the guide links or
+ * the callouts with it, which is the caller's to decide and the caller's to
+ * live with.
+ */
+export type WikiEditorFeaturesOption =
+	| ((args: { defaultFeatures: WikiEditorFeature[] }) => WikiEditorFeature[])
+	| WikiEditorFeature[]
+
 /** Extensions to the plugin's self-contained editor. */
 export type WikiEditorOptions = {
 	blocks?: WikiEditorBlockOption[]
+	/** Lexical features beside the plugin's own. See {@link WikiEditorFeaturesOption}. */
+	features?: WikiEditorFeaturesOption
 }
 
 /**

@@ -1,6 +1,7 @@
 import type {
 	AdminWikiPluginOptions,
 	WikiEditorBlockOption,
+	WikiEditorFeaturesOption,
 	WikiListBandOptions,
 	WikiListBandSlot,
 	WikiVideoOptions,
@@ -11,6 +12,13 @@ import { type ResolvedWikiExclude, resolveExcluded } from './exclude'
 /** Plugin options normalized to their effective values. */
 export type ResolvedWikiOptions = {
 	editorBlocks: WikiEditorBlockOption[]
+	/**
+	 * Left in whichever form the host gave it, array or function: normalizing the
+	 * array into a function here would build the feature list at option-resolution
+	 * time, and the list is only knowable once `buildWikiEditor` has assembled its
+	 * own. `undefined` means the editor is the plugin's alone.
+	 */
+	editorFeatures: undefined | WikiEditorFeaturesOption
 	/**
 	 * Slugs the plugin leaves untouched, per entity kind: Payload's internals,
 	 * the wiki's own collections, and the host's `exclude` option.
@@ -48,6 +56,7 @@ export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOpt
 	}
 	return {
 		editorBlocks: options.editor?.blocks ?? [],
+		editorFeatures: options.editor?.features,
 		exclude: resolveExcluded(options.exclude, slugs),
 		featured: options.featured ?? true,
 		localeMap: options.localeMap ?? {},

@@ -27,7 +27,7 @@ const state = (...children: unknown[]): SerializedEditorState =>
 		root: { children, direction: null, format: '', indent: 0, type: 'root', version: 1 },
 	}) as unknown as SerializedEditorState
 
-const context = { guideIdsBySlug: {}, media: {} }
+const context = { guideIdsBySlug: {}, guideTitlesBySlug: {}, media: {} }
 
 describe('githubAlertsTransformer', () => {
 	it('rewrites markdown-shaped quotes (inline children) into callout blocks', () => {

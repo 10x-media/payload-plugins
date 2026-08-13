@@ -51,8 +51,7 @@ export {
 export { Callout, type CalloutProps } from '../components/GuideArticle/Callout'
 export { CalloutBlockLabel } from '../components/GuideArticle/CalloutBlockLabel'
 export { GuideArticle, type GuideArticleProps } from '../components/GuideArticle/GuideArticle'
-export { GuideLink, type GuideLinkFields } from '../components/GuideArticle/GuideLink'
-export { GuideLinkBlockLabel } from '../components/GuideArticle/GuideLinkBlockLabel'
+export { GuideLink, type GuideLinkProps } from '../components/GuideArticle/GuideLink'
 export { MissingBlockRenderer } from '../components/GuideArticle/MissingBlockRenderer'
 export { GuideDrawer, type GuideDrawerProps } from '../components/GuideDrawer/GuideDrawer'
 export { WikiOrphanBanner } from '../components/ListExtras/WikiOrphanBanner'
@@ -94,4 +93,5 @@ export {
 	type WikiIndexClientProps,
 } from '../components/WikiView/WikiIndexClient'
 export { WikiViewLink } from '../components/WikiView/WikiViewLink'
+export { WikiGuideLinkFeatureClient } from '../editor/guideLink/client'
 export { WikiVideoFeatureClient } from '../editor/video/client'

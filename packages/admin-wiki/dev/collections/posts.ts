@@ -11,6 +11,10 @@ import type { CollectionConfig } from 'payload'
  * `specs` is the field picker's fixture: an array holding a second array, one of
  * them behind a named group, so the drawer's prefill has to build
  * `{ specs: [{ values: [{}] }] }` before anything inside is clickable.
+ *
+ * `slug` is the picker's other fixture, and the only sidebar field on a
+ * targetable entity here: the drawer has to split the form into two columns the
+ * way the edit view does, rather than dropping it into the middle of the main one.
  */
 export const posts: CollectionConfig = {
 	slug: 'posts',
@@ -80,6 +84,11 @@ export const posts: CollectionConfig = {
 					],
 				},
 			],
+		},
+		{
+			name: 'slug',
+			type: 'text',
+			admin: { description: 'The URL segment for this post.', position: 'sidebar' },
 		},
 		{
 			name: 'branding',

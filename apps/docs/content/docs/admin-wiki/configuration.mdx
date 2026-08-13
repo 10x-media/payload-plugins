@@ -34,7 +34,7 @@ adminWiki({
 |---|---|---|---|
 | `disabled` | `boolean` | `false` | Return the incoming config untouched. Switch the plugin off per environment without removing the call |
 | `access` | `WikiAccessOptions` | logged-in for all four | Access predicates for the wiki collections. See [Access](#access) |
-| `editor` | `{ blocks }` | `{}` | Project blocks available in the wiki editor, each with its renderer. See [Authoring](/admin-wiki/authoring#your-own-blocks) |
+| `editor` | `{ blocks, features }` | `{}` | Project blocks available in the wiki editor, each with its renderer, and lexical features beside the plugin's own. See [Authoring](/admin-wiki/authoring#your-own-blocks) |
 | `exclude` | `{ blocks, collections, globals }` | Payload's internals | Entities the plugin leaves alone entirely. See [Exclusions](#exclusions) |
 | `featured` | `boolean` | `true` | Lead the list band with the collection's featured guides as cards |
 | `hidden` | `{ media, pages }` | visible | Payload's `admin.hidden` passthrough, per wiki collection |
