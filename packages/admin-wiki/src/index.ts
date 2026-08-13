@@ -145,6 +145,8 @@ export type {
 	WikiAccessOptions,
 	WikiCollectionOverride,
 	WikiEditorBlockOption,
+	WikiEditorFeature,
+	WikiEditorFeaturesOption,
 	WikiEditorOptions,
 	WikiExcludeOptions,
 	WikiHiddenOptions,

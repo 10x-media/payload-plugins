@@ -93,6 +93,41 @@ adminWiki({
 
 The renderer receives the block node's field values as `fields`, and is registered as an admin dependency so importmap generation finds it. A renderer declared but missing from the import map renders a visible placeholder and logs a warning, rather than dropping the block silently.
 
+## Your own features
+
+A block covers content that sits in the document as a unit. For everything else a lexical feature can do — a custom node, a toolbar item, a keyboard shortcut, a markdown transform — pass the feature itself:
+
+```ts
+import { MyFeature } from './lexical/MyFeature'
+
+adminWiki({
+  editor: {
+    features: [MyFeature({ /* ... */ })],
+  },
+})
+```
+
+An array is appended to the plugin's own features. A feature's client half is resolved through the import map like any other, so nothing has to be declared twice.
+
+The function form is handed the plugin's features as `defaultFeatures` and returns the whole list, which is the way to reorder or drop one:
+
+```ts
+adminWiki({
+  editor: {
+    features: ({ defaultFeatures }) => [
+      ...defaultFeatures.filter((feature) => feature.key !== 'align'),
+      MyFeature(),
+    ],
+  },
+})
+```
+
+<Callout type="warn">
+  The list you return is the editor. Dropping `wikiGuideLink` takes guide links with it, and dropping `blocks` takes the callout, the video embed, and your own blocks. The plugin does not put anything back.
+</Callout>
+
+Features reach the seed as well: `seedWiki` builds the same editor the collection uses, so markdown converts through your features too.
+
 ## Wiki media
 
 `wiki-media` is the wiki's own upload collection, used only by wiki content: images always, video mimetypes when video is enabled, plus a localized `alt` field. Guide screenshots therefore stay out of the media picker your editors use for the site itself.

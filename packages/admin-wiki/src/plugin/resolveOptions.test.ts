@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { WikiEditorFeature } from '../options'
 import { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './exclude'
 import { resolveOptions } from './resolveOptions'
 
@@ -7,6 +8,7 @@ describe('resolveOptions', () => {
 	it('applies defaults', () => {
 		expect(resolveOptions({})).toEqual({
 			editorBlocks: [],
+			editorFeatures: undefined,
 			exclude: {
 				blocks: [],
 				collections: [...PAYLOAD_INTERNAL_COLLECTIONS, 'wiki-media', 'wiki-pages'].sort(),
@@ -57,6 +59,16 @@ describe('resolveOptions', () => {
 			slot: 'beforeList',
 		})
 		expect(resolveOptions({ triggers: { list: false } }).triggers.list).toBe(false)
+	})
+
+	it('passes editor features through in whichever form they arrived', () => {
+		// Left alone on purpose: normalizing the array into a function here would
+		// need the plugin's own feature list, which only `buildWikiEditor` has.
+		const array: WikiEditorFeature[] = []
+		expect(resolveOptions({ editor: { features: array } }).editorFeatures).toBe(array)
+
+		const fn = ({ defaultFeatures }: { defaultFeatures: WikiEditorFeature[] }) => defaultFeatures
+		expect(resolveOptions({ editor: { features: fn } }).editorFeatures).toBe(fn)
 	})
 
 	it('honors the featured flag', () => {

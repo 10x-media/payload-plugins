@@ -217,6 +217,7 @@ export const buildWikiPagesCollection = ({
 								label: labelForKey(keys.fieldContentLabel),
 								editor: buildWikiEditor({
 									blocks: resolved.editorBlocks.map((option) => option.block),
+									features: resolved.editorFeatures,
 									mediaSlug: resolved.slugs.media,
 									pagesSlug: resolved.slugs.pages,
 									video: resolved.video,
