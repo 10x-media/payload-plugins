@@ -70,6 +70,31 @@ describeForDb(
 			return { status: response.status, doc: body.doc, req }
 		}
 
+		/** Drives the endpoint through a real fetch Request whose one-shot body catches double reads (`submitViaRest` presets `req.data` and cannot). */
+		const submitViaRealRest = async (
+			data: Record<string, unknown>,
+			cookieHeader?: string
+		): Promise<{ status: number; doc?: { id: number | string }; req: PayloadRequest }> => {
+			const [endpoint] = rootPostEndpoints()
+			if (!endpoint) throw new Error('no root POST endpoint registered')
+			const request = new Request('http://localhost/api/form-submissions', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					...(cookieHeader ? { cookie: cookieHeader } : {}),
+				},
+				body: JSON.stringify(data),
+			})
+			const req = await createLocalReq(
+				{ req: request as unknown as Partial<PayloadRequest> },
+				booted.payload
+			)
+			req.routeParams = { collection: 'form-submissions' }
+			const response = await endpoint.handler(req)
+			const body = (await response.json()) as { doc?: { id: number | string } }
+			return { status: response.status, doc: body.doc, req }
+		}
+
 		const setCookieOf = (req: PayloadRequest): string | null =>
 			req.responseHeaders?.get('set-cookie') ?? null
 
@@ -108,6 +133,56 @@ describeForDb(
 			// First match wins in handleEndpoints, so index 0 must be ours, not the stock create.
 			expect(posts[0]?.custom).toEqual({ formBuilder: 'vote-submit' })
 			expect(posts[1]?.custom).toBeUndefined()
+		})
+
+		it('a live-body REST create succeeds for an ordinary non-poll form', async () => {
+			// The beta.15 blocker: delegation re-read the consumed body and 500'd every browser submit.
+			const form = await makeForm({ pollEnabled: false })
+			const { status, doc } = await submitViaRealRest({
+				form: form.id,
+				values: [{ field: 'vote', value: 'a' }],
+			})
+			expect(status).toBe(201)
+			expect(doc?.id).toBeDefined()
+			expect(await submissionCount(form.id)).toBe(1)
+		})
+
+		it('a live-body REST create sets the signed cookie on an allowChange poll', async () => {
+			const form = await makeForm()
+			const { status, doc, req } = await submitViaRealRest({
+				form: form.id,
+				values: [{ field: 'vote', value: 'a' }],
+			})
+			expect(status).toBe(201)
+			const parsed = votedSubmissionIdFromCookie(
+				asCookieHeader(setCookieOf(req) ?? ''),
+				form.id,
+				booted.payload.secret
+			)
+			expect(parsed).toBe(String(doc?.id))
+		})
+
+		it('a live-body REST re-vote updates the same submission', async () => {
+			const form = await makeForm()
+			const first = await submitViaRealRest({
+				form: form.id,
+				values: [{ field: 'vote', value: 'a' }],
+			})
+			const cookie = asCookieHeader(setCookieOf(first.req) ?? '')
+			const second = await submitViaRealRest(
+				{ form: form.id, values: [{ field: 'vote', value: 'b' }] },
+				cookie
+			)
+			expect(second.status).toBe(200)
+			expect(String(second.doc?.id)).toBe(String(first.doc?.id))
+			expect(await submissionCount(form.id)).toBe(1)
+
+			const stored = await booted.payload.findByID({
+				collection: 'form-submissions',
+				id: first.doc?.id as number | string,
+				depth: 0,
+			})
+			expect(stored.values).toEqual([{ field: 'vote', value: 'b' }])
 		})
 
 		it('creates on first vote and sets a signed submission-id cookie', async () => {
