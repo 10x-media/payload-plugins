@@ -80,7 +80,10 @@ const GuideLinkEditor = ({
 	 */
 	const loadTitle = useCallback(
 		(guide: number | string) => {
-			const key = String(guide)
+			// Keyed by language as well as by guide: the title is localized, so a
+			// reader switching languages has to refetch rather than keep reading the
+			// previous locale's.
+			const key = `${i18n.language}:${guide}`
 			if (fetchedRef.current === key) {
 				return
 			}
@@ -88,7 +91,7 @@ const GuideLinkEditor = ({
 			setTitle(null)
 			void requests
 				.get(
-					`${config.serverURL ?? ''}${config.routes.api}/${pagesSlug}/${encodeURIComponent(key)}`,
+					`${config.serverURL ?? ''}${config.routes.api}/${pagesSlug}/${encodeURIComponent(String(guide))}`,
 					{
 						headers: { 'Accept-Language': i18n.language },
 						params: { depth: 0, draft: true },

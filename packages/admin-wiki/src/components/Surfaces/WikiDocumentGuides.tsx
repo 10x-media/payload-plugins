@@ -31,12 +31,9 @@ export type WikiDocumentGuidesProps = {
  * sidebar to nothing when this renders null, so a collection nobody has written
  * about keeps its full-width edit view.
  *
- * Nothing inside the field picker, the same way `WikiBlockHelp` is silent there.
- * The picker renders an entity's own fields to attach field targets to them, and
- * this panel is about the whole-entity target, which the Collections and Globals
- * lists on the same tab already own. Silencing it here rather than filtering the
- * field out keeps the field indexes the schema paths are computed from exactly as
- * Payload built them.
+ * Nothing inside the field picker, the same way `WikiBlockHelp` is silent there:
+ * silencing it rather than filtering the field out keeps the field indexes the
+ * schema paths are computed from exactly as Payload built them.
  */
 export const WikiDocumentGuides = ({ targetKey }: WikiDocumentGuidesProps) => {
 	const { t } = useTranslation()

@@ -63,8 +63,10 @@ const guideLinkLabel =
 /**
  * One button, in both toolbars, doing what a link button does: with text
  * selected it opens the guide picker, and with the cursor inside a guide link it
- * is lit and takes the link back off. Disabled on an empty selection, because a
- * link with no words to sit on is the one thing this node cannot be.
+ * is lit and takes the link back off. Disabled only on a selection that is
+ * neither, because a link with no words to sit on is the one thing this node
+ * cannot be; a bare cursor inside an existing link still has words, so removing
+ * one never asks the author to select it first.
  */
 const toolbarGroups: ToolbarGroup[] = [
 	toolbarFeatureButtonsGroupWithItems([
@@ -73,8 +75,15 @@ const toolbarGroups: ToolbarGroup[] = [
 			isActive: ({ selection }) =>
 				$isRangeSelection(selection) &&
 				$findMatchingParent(getSelectedNode(selection), $isWikiGuideLinkNode) !== null,
-			isEnabled: ({ selection }) =>
-				$isRangeSelection(selection) && selection.getTextContent().length > 0,
+			isEnabled: ({ selection }) => {
+				if (!$isRangeSelection(selection)) {
+					return false
+				}
+				return (
+					$findMatchingParent(getSelectedNode(selection), $isWikiGuideLinkNode) !== null ||
+					selection.getTextContent().length > 0
+				)
+			},
 			key: 'wikiGuideLink',
 			label: guideLinkLabel(),
 			onSelect: ({ editor, isActive }) => {

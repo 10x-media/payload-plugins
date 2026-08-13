@@ -69,6 +69,8 @@ Layout blocks are covered in {{wiki:guide:hero-banner-guide}}.
 
 The title used by the bare form is the one in the seed definition, resolved for the locale being written, so a localized guide links its German title in the German pass.
 
+It is written into the link as ordinary text, once, at seed time. A guide renamed in the admin afterwards does not change the wording of links pointing at it; re-running the seed with the new title in the definition does.
+
 Slugs resolve against every guide in the same seed run, forward references included, so guides may link to each other regardless of definition order. An unknown slug throws.
 
 **Media placeholders.** A paragraph containing only `{{wiki:media:<key>}}` becomes an upload node, and `{{wiki:video:<key>}}` becomes a video node, both pointing at media declared in the same run:
@@ -92,7 +94,7 @@ await seedWiki(payload, guides, {
 })
 ```
 
-A transformer receives the state and a context holding `guideIdsBySlug` and the seeded `media` handles, and returns the state to pass on.
+A transformer receives the state and a context holding `guideIdsBySlug`, `guideTitlesBySlug` (the same guides' titles, resolved for the locale being written), and the seeded `media` handles, and returns the state to pass on.
 
 ## Your own fields
 

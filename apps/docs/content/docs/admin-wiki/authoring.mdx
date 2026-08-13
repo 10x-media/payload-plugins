@@ -53,6 +53,8 @@ With the cursor inside a guide link, a small panel names the guide it points at 
 
 The link stores the target guide's id and nothing else. A reader clicking one opens that guide in a drawer stacked on the current one, so following a reference never leaves the page; a link whose target was deleted degrades to dimmed plain text, and the sentence still reads.
 
+The words are content, not a rendering of the target's title. Renaming a guide therefore leaves the links pointing at it saying what their authors wrote, which is usually what a sentence needs, and occasionally something to go back and reword.
+
 ## Built-in blocks
 
 **Callout.** Four variants: info, tip, warning, danger. The body is itself rich text (inline formatting and external links), so a callout can hold lists and links but cannot nest blocks or uploads.
@@ -95,7 +97,7 @@ The renderer receives the block node's field values as `fields`, and is register
 
 ## Your own features
 
-A block covers content that sits in the document as a unit. For everything else a lexical feature can do — a custom node, a toolbar item, a keyboard shortcut, a markdown transform — pass the feature itself:
+A block covers content that sits in the document as a unit. For everything else a lexical feature can do (a custom node, a toolbar item, a keyboard shortcut, a markdown transform), pass the feature itself:
 
 ```ts
 import { MyFeature } from './lexical/MyFeature'

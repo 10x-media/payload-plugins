@@ -19,19 +19,16 @@ const entryFromGuide = (guide: WikiGuideDoc): WikiTargetEntry => ({
 })
 
 export type GuideLinkProps = {
-	/** The link text, which is the node's own children rather than a stored label. */
 	children?: ReactNode
-	/** The target guide's id, as the node stores it. */
 	guide?: null | number | string
 }
 
 /**
  * A guide-to-guide link inside rendered content: opens the target guide in a
- * drawer stacked on top of the current one, so the reader never leaves the page.
- *
- * The words are the node's children, so a link whose target was deleted still
- * reads as the sentence the author wrote; only the affordance goes away, leaving
- * the text dimmed and titled with why.
+ * drawer stacked on top of the current one. The words are the node's children,
+ * so a link whose target no longer resolves still reads as the sentence the
+ * author wrote, dimmed and titled with why; that verdict waits for the lookup,
+ * since a link that is merely still loading is not a dead one.
  */
 export const GuideLink = ({ children, guide: guideId = null }: GuideLinkProps) => {
 	const { t } = useTranslation()
@@ -39,16 +36,20 @@ export const GuideLink = ({ children, guide: guideId = null }: GuideLinkProps) =
 	const { openModal } = useModal()
 	const drawerSlug = useDrawerSlug('wiki-guide-link')
 	const [guide, setGuide] = useState<null | WikiGuideDoc>(null)
+	const [loading, setLoading] = useState(guideId !== null)
 
 	useEffect(() => {
 		setGuide(null)
 		if (guideId === null) {
+			setLoading(false)
 			return
 		}
+		setLoading(true)
 		let cancelled = false
 		void loadGuide(guideId).then((next) => {
 			if (!cancelled) {
 				setGuide(next)
+				setLoading(false)
 			}
 		})
 		return () => {
@@ -58,7 +59,10 @@ export const GuideLink = ({ children, guide: guideId = null }: GuideLinkProps) =
 
 	if (!guide) {
 		return (
-			<span className="wiki-guide-link wiki-guide-link--dead" title={t(keys.guideUnavailable)}>
+			<span
+				className={loading ? 'wiki-guide-link' : 'wiki-guide-link wiki-guide-link--dead'}
+				title={loading ? undefined : t(keys.guideUnavailable)}
+			>
 				{children}
 			</span>
 		)
