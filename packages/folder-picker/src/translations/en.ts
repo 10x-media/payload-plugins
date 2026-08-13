@@ -9,6 +9,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.gridView]: 'Show as grid',
 	[keys.listView]: 'Show as list',
 	[keys.orderLabel]: 'Order',
+	[keys.pickManyHint]: 'Hold {{modifier}} to pick more than one, {{range}} to pick a range.',
 	[keys.pluginName]: 'Folder Picker',
 	[keys.retry]: 'Try again',
 	[keys.sortByLabel]: 'Sort by',

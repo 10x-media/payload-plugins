@@ -35,6 +35,7 @@ const SELECTORS = {
 	selectCollection: '.list-drawer__select-collection-wrap',
 	// The dark pill in the search bar row, which is what makes confirming the obvious action.
 	confirm: '.search-bar .pill--style-dark',
+	pickManyHint: '.collection-folder-list__pick-many-hint',
 	tab: '.default-list-view-tabs__button',
 	table: '.table',
 }
@@ -297,6 +298,29 @@ test.describe('folder picker', () => {
 
 		await save(page)
 		expect(await fieldValue(page, id, 'uploadSingle')).toBeTruthy()
+	})
+
+	test('tells the reader how to pick several, but only where several fit', async ({ page }) => {
+		const id = await openShowcase(page)
+		await clearField(page, id, 'uploadMany')
+
+		const many = await openUploadDrawer(page, 'uploadMany')
+		await byFolderTab(many).click()
+		const hint = many.locator(SELECTORS.pickManyHint)
+		await expect(hint).toBeVisible()
+		// Chromium on Linux, so the hint spells the keys out rather than drawing Apple glyphs.
+		await expect(hint).toContainText('Ctrl')
+		await expect(hint).toContainText('Shift')
+		await page.keyboard.press('Escape')
+		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
+
+		// A single-value field cannot hold several, and multi-selection is off there, so the
+		// hint would be describing keys that do nothing. Emptied first: a filled single upload
+		// hides the toggler this opens the drawer with.
+		await clearField(page, id, 'uploadSingle')
+		const single = await openUploadDrawer(page, 'uploadSingle')
+		await byFolderTab(single).click()
+		await expect(single.locator(SELECTORS.pickManyHint)).toHaveCount(0)
 	})
 
 	test('a single upload field never selects more than one file', async ({ page }) => {

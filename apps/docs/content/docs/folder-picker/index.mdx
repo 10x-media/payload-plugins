@@ -37,6 +37,20 @@ No field is patched, and no lexical feature is registered. See [How it works](/f
 - move, rename and delete folders
 - bulk upload straight into the folder being viewed, for `hasMany` fields
 
+## Picking documents
+
+One click selects a card, **Select** confirms, and a double click picks the file outright.
+Folders open on a double click.
+
+A `hasMany` field can hold several, so its selection responds to Ctrl or Cmd for one more
+and Shift for a range, and a hint under the header says so. A single-value field cannot,
+so the modifiers do nothing there and no hint is drawn.
+
+Documents the field already holds are left out of the folder, exactly as they are left out
+of the list tab. Payload's upload field hides them from the list by filtering on the ids it
+holds; the folder tab applies the same rule to its own results. Remove a value and the
+document is offered again.
+
 ## What it leaves alone
 
 - **The collection's list route.** Outside a drawer the swapped view defers to Payload's own, so `/admin/collections/media` is byte-for-byte what it was.

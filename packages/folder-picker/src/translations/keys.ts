@@ -7,6 +7,7 @@ export const keys = {
 	gridView: 'folderPicker:gridView',
 	listView: 'folderPicker:listView',
 	orderLabel: 'folderPicker:orderLabel',
+	pickManyHint: 'folderPicker:pickManyHint',
 	pluginName: 'folderPicker:pluginName',
 	retry: 'folderPicker:retry',
 	sortByLabel: 'folderPicker:sortByLabel',

@@ -30,6 +30,7 @@ import { useTranslation } from '../translations/useTranslation'
 import { BulkUploadButton, SelectFolderItems } from './BulkUploadButton'
 import type { FolderActionHandlers } from './FolderActions'
 import { FolderActionsMenu, FolderSelectionBar } from './FolderActions'
+import { isMacPlatform, modifierLabels } from './isMacPlatform'
 import {
 	CloseModalButton,
 	DndEventListener,
@@ -115,6 +116,13 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 		? getEntityConfig({ collectionSlug: folderCollectionSlug })
 		: undefined
 	const targetConfig = getEntityConfig({ collectionSlug })
+
+	// Read after mount: `navigator` does not exist while the tree is rendered on the server,
+	// and branching on it during the first client render would not match what was sent.
+	const [isMac, setIsMac] = React.useState(false)
+	React.useEffect(() => {
+		setIsMac(isMacPlatform(navigator.userAgent))
+	}, [])
 
 	const [folderID, setFolderID] = React.useState<null | number | string>(null)
 	const [breadcrumbs, setBreadcrumbs] = React.useState<FolderBreadcrumb[]>([])
@@ -456,7 +464,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 								/>,
 							].filter(Boolean)}
 						/>
-
 						<SearchBar
 							Actions={[
 								<SelectFolderItems
@@ -497,8 +504,12 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 							label={t('general:searchBy', { label: t('general:name') })}
 							onSearchChange={setSearchInput}
 							search={searchInput}
-						/>
-
+						/>{' '}
+						{enableRowSelections ? (
+							<p className={`${baseClass}__pick-many-hint`}>
+								{t(keys.pickManyHint, modifierLabels(isMac))}
+							</p>
+						) : null}
 						{isSwitchingCollection ? (
 							<LoadingOverlay />
 						) : loadError ? (
@@ -552,7 +563,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 								}
 							/>
 						)}
-
 						{/* Mirrors ListCreateNewDocInFolderButton: a new folder lands in the folder being
 					viewed and is typed to the collection this drawer is picking for, so the editor
 					never has to set Folder Type by hand. */}
@@ -572,7 +582,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 							}}
 							redirectAfterCreate={false}
 						/>
-
 						<FolderDragLayer onMoved={reload} />
 					</Gutter>
 				</FolderProvider>

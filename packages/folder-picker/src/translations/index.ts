@@ -1,5 +1,7 @@
+import { de } from './de'
 import { en } from './en'
 import type { TranslationKey } from './keys'
+import { uk } from './uk'
 
 export type { TranslationKey } from './keys'
 export { keys } from './keys'
@@ -36,7 +38,9 @@ export const toNested = (flat: {
 	return out
 }
 
-/** Per-locale messages merged into `config.i18n.translations`. English only for now. */
+/** Per-locale messages merged into `config.i18n.translations`. */
 export const translations = {
+	de: toNested(de),
 	en: toNested(en),
+	uk: toNested(uk),
 }
