@@ -227,6 +227,56 @@ test.describe('folder picker', () => {
 		expect(Array.isArray(value) ? value.length : 0).toBeGreaterThan(1)
 	})
 
+	test('hides a file the field already holds, so it cannot be stored twice', async ({ page }) => {
+		const id = await openShowcase(page)
+		await clearField(page, id, 'uploadMany')
+
+		const drawer = await openUploadDrawer(page, 'uploadMany')
+		await byFolderTab(drawer).click()
+		await openFolder(page, drawer, FIXTURES.rootFolder)
+		await activateCard(page, drawer, FIXTURES.rootFile)
+		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
+
+		// Payload's list tab drops what the field already holds through `filterOptions`, and the
+		// upload field appends whatever it is handed, so a folder that still offered the file
+		// would let it be stored a second time.
+		const again = await openUploadDrawer(page, 'uploadMany')
+		await byFolderTab(again).click()
+		await openFolder(page, again, FIXTURES.rootFolder)
+		await expect(again.locator(SELECTORS.card).filter({ hasText: FIXTURES.rootFile })).toHaveCount(
+			0
+		)
+
+		// Everything else in the same folder is still there and still pickable.
+		await activateCard(page, again, FIXTURES.rootFileSecond)
+		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
+
+		await save(page)
+		const value = await fieldValue(page, id, 'uploadMany')
+		expect(Array.isArray(value) ? value.length : 0).toBe(2)
+	})
+
+	test('offers the same held file again once it is removed from the field', async ({ page }) => {
+		const id = await openShowcase(page)
+		await clearField(page, id, 'uploadMany')
+
+		const drawer = await openUploadDrawer(page, 'uploadMany')
+		await byFolderTab(drawer).click()
+		await openFolder(page, drawer, FIXTURES.rootFolder)
+		await drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.rootFile }).first().click()
+		await drawer.locator(SELECTORS.confirm).click()
+		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
+		await save(page)
+
+		// Emptying the field puts the file back among the options, so the rule follows the value
+		// rather than being a one-way hide.
+		await clearField(page, id, 'uploadMany')
+		const again = await openUploadDrawer(page, 'uploadMany')
+		await byFolderTab(again).click()
+		await openFolder(page, again, FIXTURES.rootFolder)
+		await expect(again.locator(SELECTORS.card).filter({ hasText: FIXTURES.rootFile })).toBeVisible()
+	})
+
 	test('picks a file with one click and the selection bar, without a double click', async ({
 		page,
 	}) => {
@@ -247,6 +297,35 @@ test.describe('folder picker', () => {
 
 		await save(page)
 		expect(await fieldValue(page, id, 'uploadSingle')).toBeTruthy()
+	})
+
+	test('a single upload field never selects more than one file', async ({ page }) => {
+		const id = await openShowcase(page)
+		await clearField(page, id, 'uploadSingle')
+		const drawer = await openUploadDrawer(page, 'uploadSingle')
+
+		await byFolderTab(drawer).click()
+		await openFolder(page, drawer, FIXTURES.rootFolder)
+
+		await drawer.locator(SELECTORS.card).filter({ hasText: FIXTURES.rootFile }).first().click()
+		// Ctrl builds a multi-selection on a `hasMany` field. A single-value field cannot take
+		// one, so the modifier has to be inert rather than promising files it will drop.
+		await drawer
+			.locator(SELECTORS.card)
+			.filter({ hasText: FIXTURES.rootFileSecond })
+			.first()
+			.click({ modifiers: ['ControlOrMeta'] })
+
+		// The pill counts what it is about to hand over, and only shows a number above one.
+		await expect(drawer.locator(SELECTORS.confirm)).not.toHaveText(/\d/)
+
+		await drawer.locator(SELECTORS.confirm).click()
+		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
+
+		await save(page)
+		const value = await fieldValue(page, id, 'uploadSingle')
+		expect(Array.isArray(value)).toBe(false)
+		expect(value).toBeTruthy()
 	})
 
 	test('confirms several files at once for a hasMany field', async ({ page }) => {

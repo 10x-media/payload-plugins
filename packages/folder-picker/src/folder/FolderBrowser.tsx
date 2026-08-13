@@ -41,6 +41,7 @@ import {
 	SortByPill,
 	ToggleViewButtons,
 } from './native'
+import { useChosenUploads } from './useChosenUploads'
 
 const baseClass = 'collection-folder-list'
 
@@ -103,6 +104,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 	const { i18n, t } = useTranslation()
 	const { getFolderResultsComponentAndData } = useServerFunctions()
 	const { drawerSlug, onSelect } = useListDrawerContext()
+	const alreadyChosen = useChosenUploads(collectionSlug)
 	const {
 		breakpoints: { s: smallBreak },
 	} = useWindowInfo()
@@ -251,7 +253,20 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 			.toLowerCase()
 			.includes(term)
 	const visibleSubfolders = subfolders.filter(matches)
-	const visibleDocuments = documents.filter(matches)
+	/**
+	 * A document the field already holds is dropped, the way Payload's own list tab drops it:
+	 * the upload field builds `filterOptions` with `id: { not_in: [...] }` from its value, so a
+	 * file that is already attached never appears among the options. The folder server function
+	 * takes no filter argument, so the same rule is applied to what came back.
+	 *
+	 * Without it the file can be picked a second time, and the upload field appends whatever it
+	 * is handed, storing the same upload twice.
+	 */
+	const visibleDocuments = documents.filter(
+		(item) =>
+			matches(item) &&
+			!(item.relationTo === collectionSlug && alreadyChosen.has(String(item.value.id)))
+	)
 	const totalVisible = visibleSubfolders.length + visibleDocuments.length
 
 	const folderLabel = getTranslation(folderCollectionConfig?.labels?.singular ?? '', i18n)
@@ -386,7 +401,10 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 				<FolderProvider
 					allCollectionFolderSlugs={[folderCollectionSlug]}
 					allowCreateCollectionSlugs={canCreateFolder ? [folderCollectionSlug] : []}
-					allowMultiSelection
+					// Only a `hasMany` field can take more than one document. Left on, Ctrl and Shift
+					// build a selection the field cannot accept, and the confirm pill counts files
+					// that will never be added.
+					allowMultiSelection={Boolean(enableRowSelections)}
 					breadcrumbs={breadcrumbs}
 					documents={visibleDocuments}
 					folderFieldName={folderFieldName}
