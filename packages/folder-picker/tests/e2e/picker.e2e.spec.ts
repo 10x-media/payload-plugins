@@ -248,7 +248,6 @@ test.describe('folder picker', () => {
 			0
 		)
 
-		// Everything else in the same folder is still there and still pickable.
 		await activateCard(page, again, FIXTURES.rootFileSecond)
 		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
 
@@ -269,8 +268,6 @@ test.describe('folder picker', () => {
 		await expect(page.locator(SELECTORS.drawer)).toHaveCount(0)
 		await save(page)
 
-		// Emptying the field puts the file back among the options, so the rule follows the value
-		// rather than being a one-way hide.
 		await clearField(page, id, 'uploadMany')
 		const again = await openUploadDrawer(page, 'uploadMany')
 		await byFolderTab(again).click()

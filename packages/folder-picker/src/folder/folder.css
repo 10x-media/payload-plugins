@@ -66,10 +66,8 @@
 	gap: calc(var(--base) * 0.5);
 }
 
-/* The hint under the header, telling the reader that more than one file can be picked. Only
-   drawn for a hasMany field, where the selection can actually hold several. Styled like
-   Payload's own field descriptions so it reads as part of the admin rather than as an
-   addition to it. */
+/* Styled like Payload's own field descriptions so the hint reads as part of the admin
+   rather than as an addition to it. */
 .collection-folder-list__pick-many-hint {
 	color: var(--theme-elevation-400);
 	font-size: 1rem;
