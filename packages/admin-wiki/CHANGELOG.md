@@ -1,5 +1,29 @@
 # @10x-media/admin-wiki
 
+## 0.1.0-beta.2
+
+### Minor Changes
+
+- Block targets can be left out of the "Covers" chips.
+
+  - Added: `chips: { blocks: false }` drops `block:` targets from the chips on the wiki index and the guide page. Blocks are chipped by default, as before. A guide attached to a dozen blocks chips a dozen times, and a block whose `labels` are a function is not in the label map, so it chips its slug: a project can now keep the collections and globals a reader navigates by and leave the rest out.
+  - The index's filter pills follow the chips, so a surface no row displays is not offered as a filter either. Blocks stay full targets everywhere else: block help, the target pickers, and the guides they resolve to are untouched.
+  - `useWikiTargets()` exposes the setting as `blockChips`, and the exported `TargetChips` component honors it, so a custom surface built on either agrees with the built-in ones.
+
+- Three component slots on the wiki index view.
+
+  - Added: `wikiView` now takes an object as well as a boolean, and `wikiView.components` holds one array of components per slot, exactly as a collection's `admin.components` takes them. `beforeControls` renders in the header actions row, ahead of the edit mode toggle and the create button; `beforeTable` sits between the search controls and the guide list; `afterTable` below it. `wikiView: true` and omitting it are the views with every slot empty, and `wikiView: false` still skips the routes.
+  - Slot components receive `slot`, `wikiPath`, `guideCount`, and `canCreate` as client props, and server components additionally receive `payload`, `req`, `i18n`, `locale`, `params`, and `searchParams`, so a slot can query for whatever the index does not carry. Both prop types are exported as `WikiViewSlotClientProps` and `WikiViewSlotServerProps`.
+  - Each slot component is registered under `config.admin.dependencies`, so `payload generate:importmap` finds it the same way it finds a block renderer or a video player. A reference that names its export in `exportName` is registered under the key the runtime lookup asks for.
+
+### Patch Changes
+
+- Seeded callouts keep their line breaks, and guide links inside them resolve.
+
+  - Fixed: a multi-line GitHub alert seeded as one run of glued-together words. Payload's blockquote markdown transformer splices each `> ` continuation line onto the quote before it with nothing in between, so `> Draft first.\n> Publish after review.` imported as `Draft first.Publish after review.`. The wiki editor now registers Lexical's own `QUOTE` transformer in its place, which is the same code with the line break it forgets.
+  - Fixed: a `{{wiki:guide:slug}}` placeholder inside a callout was left behind, because the transformer walked only the outer tree and the alert had already moved the content into the callout block's own editor state. In the `[words]({{wiki:guide:slug}})` form that surfaced as an ordinary link pointing at the raw placeholder. Block fields are now walked too, and callout bodies render and accept guide links.
+  - A placeholder still left anywhere after every transformer has run now fails the seed, naming the guide and the placeholder, rather than saving a guide that reads wrong. Inline code is exempt, so a guide can spell the syntax out while documenting it.
+
 ## 0.1.0-beta.1
 
 ### Minor Changes

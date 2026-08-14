@@ -27,8 +27,11 @@
 		"@10x-media/admin-wiki-dev": "0.0.0"
 	},
 	"changesets": [
+		"admin-wiki-block-chips",
 		"admin-wiki-guide-link-feature",
 		"admin-wiki-initial-beta",
+		"admin-wiki-seed-callouts-links",
+		"admin-wiki-view-slots",
 		"analytics-api-feedback",
 		"analytics-breakdown-widgets",
 		"analytics-chart-redesign",
