@@ -66,11 +66,12 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 	}
 	return (
 		<WikiProvider
+			blockChips={registry.chips.blocks}
 			blockLabels={registry.blockLabels}
 			blockRenderers={blockRenderers}
 			pagesSlug={registry.slugs.pages}
 			videoPlayer={videoPlayer}
-			wikiView={registry.wikiView}
+			wikiView={registry.wikiView !== false}
 			writeAffordances={registry.writeAffordances}
 		>
 			{children}

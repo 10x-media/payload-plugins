@@ -69,7 +69,12 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 				path: `/collections/${context.registry.slugs.pages}/${doc.id}`,
 			})
 		: null
-	const targetKeys = chipTargetKeys(targetKeysForDoc(doc))
+	// Filtered here as well as in the chips, because this is what decides whether
+	// the "Covers" label renders at all: a guide covering only blocks with the
+	// block chips off has nothing to label.
+	const targetKeys = chipTargetKeys(targetKeysForDoc(doc), {
+		blocks: context.registry.chips.blocks,
+	})
 	const { headings } = collectGuideHeadings(content)
 	const showToc = hasTocHeadings(headings)
 	return (

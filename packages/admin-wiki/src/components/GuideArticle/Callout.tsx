@@ -7,6 +7,7 @@ import { CALLOUT_VARIANTS, type CalloutVariant } from '../../editor/constants'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { CalloutIcon } from '../icons'
+import { inlineConverters } from './inlineConverters'
 
 export type CalloutProps = {
 	body?: SerializedEditorState | null
@@ -39,7 +40,7 @@ export const Callout = ({ body, variant }: CalloutProps) => {
 				<CalloutIcon size="small" variant={resolved} />
 				{t(VARIANT_LABEL_KEYS[resolved])}
 			</p>
-			{body ? <RichText data={body} disableContainer /> : null}
+			{body ? <RichText converters={inlineConverters} data={body} disableContainer /> : null}
 		</aside>
 	)
 }

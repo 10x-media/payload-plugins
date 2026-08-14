@@ -155,14 +155,31 @@ export const describeTargets = (keys: string[], sources: EntityLabelSources): De
 		return described ? [described] : []
 	})
 
+/** Which kinds a caller wants chipped; blocks are the only optional one. */
+export type ChipKindOptions = {
+	/** Keep `block:` targets. Defaults to true, matching the plugin default. */
+	blocks?: boolean
+}
+
 /**
- * The target keys worth showing as chips: everything except field targets.
+ * The target keys worth showing as chips: everything except field targets, and
+ * except blocks when the host turned those off.
  *
  * A guide written about a form usually attaches to many of its fields, so field
  * chips both crowd out the entity chips beside them and say nothing a reader can
  * act on: "Post · branding.color" names a place they are already looking at, and
  * twelve of those name it twelve times. The field surfaces carry their own help,
  * which is where a field target earns its keep.
+ *
+ * Blocks are the same argument one step weaker, which is why they are a choice
+ * rather than a rule. A key that parses as nothing is kept: it is what an author
+ * typed, and hiding it would hide the mistake with it.
  */
-export const chipTargetKeys = (keys: string[] | undefined): string[] =>
-	(keys ?? []).filter((key) => parseTargetKey(key)?.kind !== 'field')
+export const chipTargetKeys = (keys: string[] | undefined, options?: ChipKindOptions): string[] =>
+	(keys ?? []).filter((key) => {
+		const kind = parseTargetKey(key)?.kind
+		if (kind === 'field') {
+			return false
+		}
+		return !(kind === 'block' && options?.blocks === false)
+	})

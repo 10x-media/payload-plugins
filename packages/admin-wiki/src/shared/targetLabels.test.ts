@@ -89,8 +89,16 @@ describe('chipTargetKeys', () => {
 		).toEqual(['collection:posts', 'global:settings', 'block:heroBanner'])
 	})
 
+	it('drops block targets only when asked to', () => {
+		const keys = ['collection:posts', 'block:heroBanner', 'global:settings']
+		expect(chipTargetKeys(keys, { blocks: false })).toEqual(['collection:posts', 'global:settings'])
+		expect(chipTargetKeys(keys, { blocks: true })).toEqual(keys)
+		expect(chipTargetKeys(keys, {})).toEqual(keys)
+	})
+
 	it('tolerates undefined and unparseable keys', () => {
 		expect(chipTargetKeys(undefined)).toEqual([])
 		expect(chipTargetKeys(['nonsense'])).toEqual(['nonsense'])
+		expect(chipTargetKeys(['nonsense'], { blocks: false })).toEqual(['nonsense'])
 	})
 })

@@ -1,8 +1,20 @@
-import type { AdminViewServerProps, TypedLocale } from 'payload'
+import type { AdminViewServerProps, PayloadComponent, TypedLocale } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 
+import type { WikiViewSlot } from '../options'
 import { type AdminWikiRegistry, getWikiRegistry } from '../plugin/registry'
 import { asLocale, resolveReaderLocale } from '../shared/resolveLocale'
+
+/**
+ * Every index slot empty. Reached only when a view renders with `wikiView:
+ * false` in the registry, which means the route came from somewhere other than
+ * this plugin's own registration.
+ */
+const NO_SLOTS: Record<WikiViewSlot, PayloadComponent[]> = {
+	afterTable: [],
+	beforeControls: [],
+	beforeTable: [],
+}
 
 /** Everything both wiki views derive from their server props before querying. */
 export type WikiViewContext = {
@@ -14,6 +26,8 @@ export type WikiViewContext = {
 	/** The content locale guides load in; undefined when not localized. */
 	locale: TypedLocale | undefined
 	registry: AdminWikiRegistry
+	/** Consumer components per index slot, each array possibly empty. */
+	slots: Record<WikiViewSlot, PayloadComponent[]>
 	/** Admin-prefixed wiki index URL, e.g. `/admin/wiki`. */
 	wikiPath: string
 }
@@ -44,6 +58,7 @@ export const buildWikiViewContext = (props: AdminViewServerProps): null | WikiVi
 		fallbackLocale: localization ? asLocale(localization.defaultLocale) : undefined,
 		locale: locale ? asLocale(locale) : undefined,
 		registry,
+		slots: registry.wikiView === false ? NO_SLOTS : registry.wikiView.components,
 		wikiPath: formatAdminURL({ adminRoute: config.routes.admin, path: '/wiki' }),
 	}
 }

@@ -93,6 +93,19 @@ test.describe('wiki surfaces', () => {
 		await expect(page.locator('.wiki-guide-article')).toContainText('Write the draft')
 	})
 
+	test('renders the dev app components in all three wiki index slots', async ({ page }) => {
+		await page.goto('/admin/wiki')
+
+		// The dev app wires a client component into the header actions and into
+		// the slot below the list, and a server component above it: the server one
+		// counts drafts, which only the server props can reach.
+		await expect(
+			page.locator('.wiki-view__header-actions a', { hasText: 'Dev link' })
+		).toBeVisible()
+		await expect(page.locator('.wiki-index__slot--before-table')).toContainText('in draft')
+		await expect(page.locator('.wiki-index__slot--after-table')).toContainText('guides listed')
+	})
+
 	test('offers a write affordance on an unguided field once edit mode is on', async ({ page }) => {
 		postId = await createDoc(page, 'posts', { title: 'Edit mode' })
 

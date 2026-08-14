@@ -85,6 +85,7 @@ import { WikiTargetHelp } from '@10x-media/admin-wiki/client'
 | `canWrite` | `boolean` | `canCreate` **and** the write-affordance mode allows it here |
 | `editMode` / `setEditMode` | `boolean` / `(on) => void` | The per-browser edit-mode switch |
 | `blockLabels` | `Record<string, string>` | Singular label per block slug, for chips |
+| `blockChips` | `boolean` | Whether the ["Covers" chips](/admin-wiki/wiki-view#the-covers-chips) include blocks |
 | `locale` | `string \| null` | The content locale guides resolve in for this reader |
 | `pagesSlug` | `string` | The configured wiki pages slug |
 | `refresh()` | `() => void` | Refetch the targets map |
@@ -102,7 +103,7 @@ The pieces the built-in surfaces are made of are all exported from `@10x-media/a
 | `WikiAllGuidesButton` | The overflow affordance into a drawer holding several guides |
 | `GuideDrawer` | The reading drawer. Takes entries, an optional initial guide, and a modal slug |
 | `GuideArticle` | Guide content rendered on its own, without a drawer around it |
-| `TargetChips` | The surfaces a guide covers, as pills, with a `limit` before collapsing to `+N` |
+| `TargetChips` | The surfaces a guide covers, as pills, with a `limit` before collapsing to `+N`. Honors `chips.blocks` |
 | `WikiWriteGuide` | The write-in-place affordance, in `inline`, `button`, or `menuItem` shape |
 | `WikiEditModeToggle` | The edit-mode pill. Renders nothing when there is nothing to toggle |
 | `WikiTargetFields` | The grouped field-target list, as the Targets tab renders it |
@@ -148,9 +149,9 @@ Adding your own fields to the wiki's collections goes the other way: see [Collec
 
 ## Registering components
 
-Client components you hand the plugin (a [video player](/admin-wiki/authoring#video), a [block renderer](/admin-wiki/authoring#your-own-blocks)) are import-map paths. The plugin registers them under `config.admin.dependencies` so `payload generate:importmap` finds them without you referencing them anywhere else.
+Components you hand the plugin (a [video player](/admin-wiki/authoring#video), a [block renderer](/admin-wiki/authoring#your-own-blocks), a [wiki view slot](/admin-wiki/wiki-view#slots-on-the-index)) are import-map paths. The plugin registers them under `config.admin.dependencies` so `payload generate:importmap` finds them without you referencing them anywhere else.
 
-A path missing from the import map is reported, not swallowed: a block renderer renders a visible placeholder, a video player falls back to the default HTML5 one, both with a warning in the server log.
+A path missing from the import map is reported, not swallowed: a block renderer renders a visible placeholder, a video player falls back to the default HTML5 one, both with a warning in the server log. A slot component renders nothing and logs the missing key.
 
 ## The registry
 

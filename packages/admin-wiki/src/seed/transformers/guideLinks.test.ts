@@ -87,6 +87,45 @@ describe('guideLinksTransformer', () => {
 		expect(childrenOf(out)?.[0]).toMatchObject({ type: 'link' })
 	})
 
+	it('rewrites placeholders inside a block field, in either form', () => {
+		const out = guideLinksTransformer(
+			state({
+				fields: {
+					blockType: 'wikiCallout',
+					body: {
+						root: {
+							children: [
+								paragraphWith(
+									text('Bare {{wiki:guide:other-guide}} and '),
+									linkTo('{{wiki:guide:other-guide}}', text('linked'))
+								),
+							],
+							type: 'root',
+							version: 1,
+						},
+					},
+				},
+				type: 'block',
+				version: 2,
+			}),
+			context
+		)
+		const block = (
+			out.root.children as unknown as Array<{ fields: { body: SerializedEditorState } }>
+		)[0]
+		const children = childrenOf(block?.fields.body as SerializedEditorState)
+		expect(children?.[1]).toMatchObject({
+			children: [{ text: 'The other guide' }],
+			guide: 42,
+			type: 'wikiGuideLink',
+		})
+		expect(children?.[3]).toMatchObject({
+			children: [{ text: 'linked' }],
+			guide: 42,
+			type: 'wikiGuideLink',
+		})
+	})
+
 	it('throws loudly on an unknown guide slug', () => {
 		expect(() =>
 			guideLinksTransformer(state(paragraphWith(text('{{wiki:guide:missing}}'))), context)
