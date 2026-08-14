@@ -20,6 +20,7 @@ export type ResolvedWikiViewOptions = {
 
 /** Plugin options normalized to their effective values. */
 export type ResolvedWikiOptions = {
+	chips: { blocks: boolean }
 	editorBlocks: WikiEditorBlockOption[]
 	/**
 	 * Left in whichever form the host gave it, array or function: normalizing the
@@ -81,6 +82,7 @@ export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOpt
 		pages: options.slugs?.pages ?? 'wiki-pages',
 	}
 	return {
+		chips: { blocks: options.chips?.blocks ?? true },
 		editorBlocks: options.editor?.blocks ?? [],
 		editorFeatures: options.editor?.features,
 		exclude: resolveExcluded(options.exclude, slugs),

@@ -1,6 +1,7 @@
 export type {
 	AdminWikiPluginOptions,
 	WikiAccessOptions,
+	WikiChipsOptions,
 	WikiCollectionOverride,
 	WikiEditorBlockOption,
 	WikiEditorOptions,

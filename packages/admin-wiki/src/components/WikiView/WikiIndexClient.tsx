@@ -66,7 +66,7 @@ export const WikiIndexClient = ({
 }: WikiIndexClientProps) => {
 	const { t } = useTranslation()
 	const { config } = useConfig()
-	const { blockLabels } = useWikiTargets()
+	const { blockChips, blockLabels } = useWikiTargets()
 	const [query, setQuery] = useState('')
 	const [selectedTargets, setSelectedTargets] = useState<string[]>([])
 	const [filtersOpen, setFiltersOpen] = useState(false)
@@ -75,11 +75,15 @@ export const WikiIndexClient = ({
 
 	const onSearchChange = useCallback((search: string) => setQuery(search ?? ''), [])
 
-	/** Every surface some guide covers, labelled and sorted for the pill row. */
+	/**
+	 * Every surface some guide covers, labelled and sorted for the pill row. The
+	 * filters offer exactly what the chips show: a pill for a surface no row
+	 * displays would filter the list by something invisible.
+	 */
 	const targetOptions = useMemo(() => {
 		const unique = new Set<string>()
 		for (const entry of linkable) {
-			for (const key of chipTargetKeys(entry.targetKeys)) {
+			for (const key of chipTargetKeys(entry.targetKeys, { blocks: blockChips })) {
 				unique.add(key)
 			}
 		}
@@ -90,7 +94,7 @@ export const WikiIndexClient = ({
 		})
 			.map((target) => ({ key: `${target.kind}:${target.value}`, label: target.label }))
 			.sort((a, b) => a.label.localeCompare(b.label))
-	}, [blockLabels, config.collections, config.globals, linkable])
+	}, [blockChips, blockLabels, config.collections, config.globals, linkable])
 
 	const toggleTarget = useCallback(
 		(key: string) =>
@@ -107,7 +111,9 @@ export const WikiIndexClient = ({
 				(entry) =>
 					(trimmed.length === 0 || matches(entry, trimmed)) &&
 					(selectedTargets.length === 0 ||
-						chipTargetKeys(entry.targetKeys).some((key) => selectedTargets.includes(key)))
+						chipTargetKeys(entry.targetKeys, { blocks: blockChips }).some((key) =>
+							selectedTargets.includes(key)
+						))
 			)
 		: linkable
 	const featured = linkable.filter((entry) => entry.featured)

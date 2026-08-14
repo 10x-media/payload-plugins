@@ -66,6 +66,7 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 	}
 	return (
 		<WikiProvider
+			blockChips={registry.chips.blocks}
 			blockLabels={registry.blockLabels}
 			blockRenderers={blockRenderers}
 			pagesSlug={registry.slugs.pages}

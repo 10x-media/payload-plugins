@@ -103,6 +103,21 @@ export type WikiEditorOptions = {
  */
 export type WikiWriteAffordanceMode = 'always' | 'editMode' | 'never'
 
+/**
+ * Which target kinds the "Covers" chips show on the wiki index and the guide
+ * pages. Field targets are never chipped: a guide written about a form attaches
+ * to enough of them to drown out the entities beside them.
+ */
+export type WikiChipsOptions = {
+	/**
+	 * Chip the blocks a guide covers. Defaults to `true`. A guide attached to a
+	 * dozen blocks chips a dozen times, and a block whose label is a function
+	 * chips its slug, so a project can leave blocks out and keep the collections
+	 * and globals a reader navigates by.
+	 */
+	blocks?: boolean
+}
+
 /** List-view slot the guides band renders in. */
 export type WikiListBandSlot = 'afterList' | 'afterListTable' | 'beforeList' | 'beforeListTable'
 
@@ -278,6 +293,8 @@ export type AdminWikiPluginOptions = {
 	 * user to read AND author; restrict authoring in production projects.
 	 */
 	access?: WikiAccessOptions
+	/** What the "Covers" chips show. See {@link WikiChipsOptions}. */
+	chips?: WikiChipsOptions
 	/** Extensions to the wiki editor (consumer blocks with renderers). */
 	editor?: WikiEditorOptions
 	/** Entities the plugin leaves alone entirely. See {@link WikiExcludeOptions}. */

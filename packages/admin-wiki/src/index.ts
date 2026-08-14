@@ -167,6 +167,7 @@ export type {
 	AdminWikiPluginOptions,
 	AdminWikiPluginOptions as PluginOptions,
 	WikiAccessOptions,
+	WikiChipsOptions,
 	WikiCollectionOverride,
 	WikiEditorBlockOption,
 	WikiEditorFeature,

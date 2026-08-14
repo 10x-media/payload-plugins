@@ -85,6 +85,7 @@ import { WikiTargetHelp } from '@10x-media/admin-wiki/client'
 | `canWrite` | `boolean` | `canCreate` **and** the write-affordance mode allows it here |
 | `editMode` / `setEditMode` | `boolean` / `(on) => void` | The per-browser edit-mode switch |
 | `blockLabels` | `Record<string, string>` | Singular label per block slug, for chips |
+| `blockChips` | `boolean` | Whether the ["Covers" chips](/admin-wiki/wiki-view#the-covers-chips) include blocks |
 | `locale` | `string \| null` | The content locale guides resolve in for this reader |
 | `pagesSlug` | `string` | The configured wiki pages slug |
 | `refresh()` | `() => void` | Refetch the targets map |
@@ -102,7 +103,7 @@ The pieces the built-in surfaces are made of are all exported from `@10x-media/a
 | `WikiAllGuidesButton` | The overflow affordance into a drawer holding several guides |
 | `GuideDrawer` | The reading drawer. Takes entries, an optional initial guide, and a modal slug |
 | `GuideArticle` | Guide content rendered on its own, without a drawer around it |
-| `TargetChips` | The surfaces a guide covers, as pills, with a `limit` before collapsing to `+N` |
+| `TargetChips` | The surfaces a guide covers, as pills, with a `limit` before collapsing to `+N`. Honors `chips.blocks` |
 | `WikiWriteGuide` | The write-in-place affordance, in `inline`, `button`, or `menuItem` shape |
 | `WikiEditModeToggle` | The edit-mode pill. Renders nothing when there is nothing to toggle |
 | `WikiTargetFields` | The grouped field-target list, as the Targets tab renders it |

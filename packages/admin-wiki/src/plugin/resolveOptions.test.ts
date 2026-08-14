@@ -7,6 +7,7 @@ import { resolveOptions } from './resolveOptions'
 describe('resolveOptions', () => {
 	it('applies defaults', () => {
 		expect(resolveOptions({})).toEqual({
+			chips: { blocks: true },
 			editorBlocks: [],
 			editorFeatures: undefined,
 			exclude: {
@@ -84,6 +85,10 @@ describe('resolveOptions', () => {
 
 		const fn = ({ defaultFeatures }: { defaultFeatures: WikiEditorFeature[] }) => defaultFeatures
 		expect(resolveOptions({ editor: { features: fn } }).editorFeatures).toBe(fn)
+	})
+
+	it('honors the block chips opt-out', () => {
+		expect(resolveOptions({ chips: { blocks: false } }).chips).toEqual({ blocks: false })
 	})
 
 	it('honors the featured flag', () => {

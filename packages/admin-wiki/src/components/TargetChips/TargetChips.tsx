@@ -24,12 +24,13 @@ export type TargetChipsProps = {
  *
  * Collections, globals, and blocks carry their configured label. Field targets
  * are deliberately absent, because a guide covering a form attaches to enough of
- * them to drown out the entities beside them.
+ * them to drown out the entities beside them; blocks are absent too where the
+ * host set `chips.blocks` to false.
  */
 export const TargetChips = ({ className, limit = 4, targetKeys }: TargetChipsProps) => {
 	const { config } = useConfig()
-	const { blockLabels } = useWikiTargets()
-	const described = describeTargets(chipTargetKeys(targetKeys), {
+	const { blockChips, blockLabels } = useWikiTargets()
+	const described = describeTargets(chipTargetKeys(targetKeys, { blocks: blockChips }), {
 		blockLabels,
 		collections: config.collections,
 		globals: config.globals,

@@ -10,6 +10,7 @@ import { adminWiki } from '@10x-media/admin-wiki'
 
 adminWiki({
   access: { create: ({ req }) => req.user?.role === 'editor' },
+  chips: { blocks: true },
   editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
   exclude: { collections: ['users'], globals: ['nav'], blocks: ['spacer'] },
   featured: true,
@@ -34,6 +35,7 @@ adminWiki({
 |---|---|---|---|
 | `disabled` | `boolean` | `false` | Return the incoming config untouched. Switch the plugin off per environment without removing the call |
 | `access` | `WikiAccessOptions` | logged-in for all four | Access predicates for the wiki collections. See [Access](#access) |
+| `chips` | `{ blocks }` | blocks on | What the "Covers" chips show on the wiki views. See [The wiki view](/admin-wiki/wiki-view#the-covers-chips) |
 | `editor` | `{ blocks, features }` | `{}` | Project blocks available in the wiki editor, each with its renderer, and lexical features beside the plugin's own. See [Authoring](/admin-wiki/authoring#your-own-blocks) |
 | `exclude` | `{ blocks, collections, globals }` | Payload's internals | Entities the plugin leaves alone entirely. See [Exclusions](#exclusions) |
 | `featured` | `boolean` | `true` | Lead the list band with the collection's featured guides as cards |
