@@ -1,4 +1,4 @@
-import { type Config, definePlugin } from 'payload'
+import { type Config, definePlugin, type PayloadComponent } from 'payload'
 
 import { buildWikiMediaCollection } from './collections/wikiMedia'
 import { buildWikiPagesCollection } from './collections/wikiPages'
@@ -35,6 +35,24 @@ const WIKI_INDEX_META = {
 const WIKI_PAGE_META = {
 	description: 'A guide from the admin wiki.',
 	title: 'Wiki guide',
+}
+
+/**
+ * Import-map key for one component reference. `admin.dependencies` takes a bare
+ * path string, and Payload reads the export after `#`, defaulting to the default
+ * export; a reference that spells its export in `exportName` instead would
+ * otherwise register under a key the runtime lookup never asks for.
+ */
+const componentImportPath = (component: PayloadComponent): string | undefined => {
+	if (component === false) {
+		return undefined
+	}
+	if (typeof component === 'string') {
+		return component
+	}
+	return component.exportName && !component.path.includes('#')
+		? `${component.path}#${component.exportName}`
+		: component.path
 }
 
 /**
@@ -105,6 +123,12 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 			...(resolved.video !== false && resolved.video.playerComponent
 				? [resolved.video.playerComponent]
 				: []),
+			...(resolved.wikiView === false
+				? []
+				: Object.values(resolved.wikiView.components)
+						.flat()
+						.map(componentImportPath)
+						.filter((path): path is string => path !== undefined)),
 		]
 		if (consumerComponents.length > 0) {
 			config.admin.dependencies = {
@@ -157,6 +181,11 @@ export type {
 	WikiSlugsOptions,
 	WikiTriggersOptions,
 	WikiVideoOptions,
+	WikiViewComponents,
+	WikiViewOptions,
+	WikiViewSlot,
+	WikiViewSlotClientProps,
+	WikiViewSlotServerProps,
 	WikiWriteAffordanceMode,
 } from './options'
 export { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './plugin/exclude'

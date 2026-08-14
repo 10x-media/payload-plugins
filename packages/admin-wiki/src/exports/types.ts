@@ -10,5 +10,10 @@ export type {
 	WikiSlugsOptions,
 	WikiTriggersOptions,
 	WikiVideoOptions,
+	WikiViewComponents,
+	WikiViewOptions,
+	WikiViewSlot,
+	WikiViewSlotClientProps,
+	WikiViewSlotServerProps,
 } from '../options'
-export type { ResolvedWikiOptions } from '../plugin/resolveOptions'
+export type { ResolvedWikiOptions, ResolvedWikiViewOptions } from '../plugin/resolveOptions'

@@ -1,11 +1,14 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Button, Gutter, SetStepNav } from '@payloadcms/ui'
+import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug } from 'payload'
 import { formatAdminURL } from 'payload/shared'
+import type { ReactNode } from 'react'
 
 import { WikiEditModeToggle } from '../components/EditMode/WikiEditModeToggle'
 import { WikiIndexClient } from '../components/WikiView/WikiIndexClient'
+import type { WikiViewSlot, WikiViewSlotClientProps, WikiViewSlotServerProps } from '../options'
 import {
 	compareTargetEntries,
 	targetKeysForDoc,
@@ -74,6 +77,36 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 		adminRoute: payload.config.routes.admin,
 		path: `/collections/${context.registry.slugs.pages}/create`,
 	})
+	/**
+	 * A slot's components, or null when it holds none, so the callers can leave
+	 * their wrapper out entirely rather than spacing an empty element.
+	 */
+	const renderSlot = (slot: WikiViewSlot): null | ReactNode => {
+		const components = context.slots[slot]
+		if (components.length === 0) {
+			return null
+		}
+		const clientProps: WikiViewSlotClientProps = {
+			canCreate: context.canCreate,
+			guideCount: entries.length,
+			slot,
+			wikiPath: context.wikiPath,
+		}
+		const serverProps: WikiViewSlotServerProps = {
+			i18n,
+			locale: context.locale,
+			params,
+			payload,
+			req,
+			searchParams,
+		}
+		return RenderServerComponent({
+			clientProps,
+			Component: components,
+			importMap: payload.importMap,
+			serverProps,
+		})
+	}
 	return (
 		<DefaultTemplate
 			i18n={i18n}
@@ -105,6 +138,7 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 						<p className="wiki-view__subtitle">{t(keys.wikiSubtitle)}</p>
 					</div>
 					<div className="wiki-view__header-actions">
+						{renderSlot('beforeControls')}
 						<WikiEditModeToggle />
 						{context.canCreate ? (
 							<Button
@@ -122,7 +156,12 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 						) : null}
 					</div>
 				</header>
-				<WikiIndexClient baseUrl={context.wikiPath} entries={entries} />
+				<WikiIndexClient
+					afterTable={renderSlot('afterTable')}
+					baseUrl={context.wikiPath}
+					beforeTable={renderSlot('beforeTable')}
+					entries={entries}
+				/>
 			</Gutter>
 		</DefaultTemplate>
 	)

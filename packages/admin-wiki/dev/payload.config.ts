@@ -89,6 +89,14 @@ export default buildConfig({
 			triggers: {
 				list: { slot: 'afterListTable' },
 			},
+			// Exercises all three index slots, server and client components both.
+			wikiView: {
+				components: {
+					afterTable: ['/components/WikiSlotsClient#DevWikiFooter'],
+					beforeControls: ['/components/WikiSlotsClient#DevWikiHeaderLink'],
+					beforeTable: ['/components/WikiSlots#DevWikiNotice'],
+				},
+			},
 		}),
 	],
 	telemetry: false,

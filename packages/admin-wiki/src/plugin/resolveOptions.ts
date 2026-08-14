@@ -1,3 +1,5 @@
+import type { PayloadComponent } from 'payload'
+
 import type {
 	AdminWikiPluginOptions,
 	WikiEditorBlockOption,
@@ -5,9 +7,16 @@ import type {
 	WikiListBandOptions,
 	WikiListBandSlot,
 	WikiVideoOptions,
+	WikiViewOptions,
+	WikiViewSlot,
 	WikiWriteAffordanceMode,
 } from '../options'
 import { type ResolvedWikiExclude, resolveExcluded } from './exclude'
+
+/** The wiki views registered, with every index slot present as an array. */
+export type ResolvedWikiViewOptions = {
+	components: Record<WikiViewSlot, PayloadComponent[]>
+}
 
 /** Plugin options normalized to their effective values. */
 export type ResolvedWikiOptions = {
@@ -33,7 +42,7 @@ export type ResolvedWikiOptions = {
 		list: false | { slot: WikiListBandSlot }
 	}
 	video: false | WikiVideoOptions
-	wikiView: boolean
+	wikiView: false | ResolvedWikiViewOptions
 	writeAffordances: WikiWriteAffordanceMode
 }
 
@@ -46,6 +55,23 @@ const resolveListBand = (
 	}
 	const slot = typeof list === 'object' ? list.slot : undefined
 	return { slot: slot ?? 'afterListTable' }
+}
+
+/** `true` and omission are the views without slot components; `false` skips them. */
+const resolveWikiView = (
+	wikiView: boolean | undefined | WikiViewOptions
+): false | ResolvedWikiViewOptions => {
+	if (wikiView === false) {
+		return false
+	}
+	const components = typeof wikiView === 'object' ? wikiView.components : undefined
+	return {
+		components: {
+			afterTable: components?.afterTable ?? [],
+			beforeControls: components?.beforeControls ?? [],
+			beforeTable: components?.beforeTable ?? [],
+		},
+	}
 }
 
 /** Apply defaults and normalize shorthand option forms. */
@@ -67,7 +93,7 @@ export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOpt
 			list: resolveListBand(options.triggers?.list),
 		},
 		video: options.video === true ? {} : (options.video ?? false),
-		wikiView: options.wikiView ?? true,
+		wikiView: resolveWikiView(options.wikiView),
 		writeAffordances: options.writeAffordances ?? 'editMode',
 	}
 }

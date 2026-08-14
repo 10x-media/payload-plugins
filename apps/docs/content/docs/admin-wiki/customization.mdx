@@ -148,9 +148,9 @@ Adding your own fields to the wiki's collections goes the other way: see [Collec
 
 ## Registering components
 
-Client components you hand the plugin (a [video player](/admin-wiki/authoring#video), a [block renderer](/admin-wiki/authoring#your-own-blocks)) are import-map paths. The plugin registers them under `config.admin.dependencies` so `payload generate:importmap` finds them without you referencing them anywhere else.
+Components you hand the plugin (a [video player](/admin-wiki/authoring#video), a [block renderer](/admin-wiki/authoring#your-own-blocks), a [wiki view slot](/admin-wiki/wiki-view#slots-on-the-index)) are import-map paths. The plugin registers them under `config.admin.dependencies` so `payload generate:importmap` finds them without you referencing them anywhere else.
 
-A path missing from the import map is reported, not swallowed: a block renderer renders a visible placeholder, a video player falls back to the default HTML5 one, both with a warning in the server log.
+A path missing from the import map is reported, not swallowed: a block renderer renders a visible placeholder, a video player falls back to the default HTML5 one, both with a warning in the server log. A slot component renders nothing and logs the missing key.
 
 ## The registry
 

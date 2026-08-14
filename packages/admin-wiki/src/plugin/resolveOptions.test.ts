@@ -23,7 +23,7 @@ describe('resolveOptions', () => {
 				list: { slot: 'afterListTable' },
 			},
 			video: false,
-			wikiView: true,
+			wikiView: { components: { afterTable: [], beforeControls: [], beforeTable: [] } },
 			writeAffordances: 'editMode',
 		})
 	})
@@ -59,6 +59,21 @@ describe('resolveOptions', () => {
 			slot: 'beforeList',
 		})
 		expect(resolveOptions({ triggers: { list: false } }).triggers.list).toBe(false)
+	})
+
+	it('fills the wiki view slots that were left out', () => {
+		const resolved = resolveOptions({
+			wikiView: { components: { beforeControls: ['/x#Export'] } },
+		})
+		expect(resolved.wikiView).toEqual({
+			components: { afterTable: [], beforeControls: ['/x#Export'], beforeTable: [] },
+		})
+	})
+
+	it('keeps the slots empty for the wiki view shorthands', () => {
+		const empty = { afterTable: [], beforeControls: [], beforeTable: [] }
+		expect(resolveOptions({ wikiView: true }).wikiView).toEqual({ components: empty })
+		expect(resolveOptions({ wikiView: {} }).wikiView).toEqual({ components: empty })
 	})
 
 	it('passes editor features through in whichever form they arrived', () => {

@@ -44,7 +44,7 @@ adminWiki({
 | `translations` | `TranslationsOption` | built-ins | Per-locale string overrides. See [i18n](/admin-wiki/i18n) |
 | `triggers` | `WikiTriggersOptions` | all on | Which surfaces carry a guide affordance. See [Triggers](#triggers) |
 | `video` | `boolean \| { playerComponent }` | `false` | Video uploads and YouTube/Vimeo embeds. See [Authoring](/admin-wiki/authoring#video) |
-| `wikiView` | `boolean` | `true` | Register the `/wiki` browsing and reading views |
+| `wikiView` | `boolean \| { components }` | `true` | The `/wiki` browsing and reading views, and your own components in the index slots. See [The wiki view](/admin-wiki/wiki-view#slots-on-the-index) |
 | `writeAffordances` | `'always' \| 'editMode' \| 'never'` | `'editMode'` | When "write this guide" renders. See [Write affordances](/admin-wiki/write-affordances) |
 
 ## Exclusions
