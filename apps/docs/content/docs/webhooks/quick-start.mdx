@@ -33,7 +33,7 @@ The plugin adds a **Webhooks** group to the admin with two collections: **Subscr
 
 ## Create a subscription
 
-In the admin, create a Subscription: a name, the receiver URL, and which events it listens to (`posts.created`, `posts.updated`, `posts.deleted`). Saving generates a 48-character signing secret and shows it once, on that create response only. Copy it to your receiver now; it is masked forever after. See [Signing](/webhooks/signing).
+In the admin, create a Subscription: a name, the receiver URL, and which events it listens to (`posts.created`, `posts.updated`, `posts.deleted`). Saving generates a signing secret in `whsec_...` form and shows it once, on that create response only. Copy it to your receiver now; it is masked forever after, and stored encrypted. See [Signing](/webhooks/signing).
 
 ## Verify
 
@@ -51,6 +51,28 @@ Create a `posts` document. The plugin's `afterChange` hook records a delivery an
 ```
 
 Open **Webhook Deliveries** in the admin: the row shows the event, status (`success`, or `failed`/`dead` on errors), HTTP response code, and duration. The **Redeliver** button replays the exact payload.
+
+## Verify the signature
+
+Deliveries are signed with [Standard Webhooks](https://www.standardwebhooks.com/), so your receiver can use an off-the-shelf verifier:
+
+```ts title="receiver.ts"
+import { Webhook } from 'standardwebhooks'
+
+const wh = new Webhook(process.env.WEBHOOK_SECRET!) // the whsec_... value
+
+export async function POST(req: Request) {
+  const raw = await req.text() // the raw body, before any JSON parsing
+  const payload = wh.verify(raw, {
+    'webhook-id': req.headers.get('webhook-id')!,
+    'webhook-timestamp': req.headers.get('webhook-timestamp')!,
+    'webhook-signature': req.headers.get('webhook-signature')!,
+  })
+  return Response.json({ ok: true })
+}
+```
+
+`verify` throws on a bad signature or a timestamp outside its five-minute tolerance. See [Signing](/webhooks/signing) for the scheme itself and for verifying without a library.
 
 ## If nothing is delivered
 

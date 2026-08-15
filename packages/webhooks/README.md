@@ -13,7 +13,9 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Opt-in collections** with per-collection operations, `previousData` on updates, and a `transform` to reshape or redact payloads.
 - **Two subscription sources**: admin-managed records and hard-coded code subscriptions, merged at delivery time.
 - **Delivery modes**: queued through Payload jobs (retries, timeouts) or inline; `auto` detects whether a runner exists.
-- **HMAC-SHA256 signing** with reveal-once secrets and id/event/timestamp headers on every request.
+- **[Standard Webhooks](https://www.standardwebhooks.com/) signing**: HMAC-SHA256 over `${id}.${timestamp}.${body}`, base64, under `webhook-signature`, so receivers verify with an off-the-shelf library.
+- **Secrets encrypted at rest**, revealed once on create, masked on every read.
+- **Secret rotation** with a grace period that signs with both secrets until receivers have switched over.
 - **Delivery log** with status, response code, duration, the exact body sent, and one-click redelivery.
 - **Jobs family interop**: installing `@10x-media/jobs` switches delivery to the queue automatically.
 - **Typed translations** with per-key overrides via `@10x-media/webhooks/i18n`.

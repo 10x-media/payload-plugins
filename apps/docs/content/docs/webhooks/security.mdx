@@ -1,6 +1,6 @@
 ---
 title: Security model
-description: Trust boundaries, SSRF exposure, and what to tighten in hostile environments.
+description: Trust boundaries, secret storage, key management, and SSRF exposure.
 ---
 
 The plugin's security posture is simple to state: **admin access is the trust boundary**. Everything below follows from it.
@@ -16,16 +16,89 @@ Deliveries POST to whatever URL a subscription specifies, including private and 
 ## Access defaults
 
 - Both collections require a logged-in user for every permitted operation; delivery rows additionally refuse create and update from any user (server-only writes).
-- The redeliver endpoint authorizes by login only: any authenticated user may redeliver any delivery.
+- The redeliver and rotate-secret endpoints authorize by login only: any authenticated user may redeliver any delivery or rotate any subscription's secret.
 
 Tighten either with your own access control by overriding the collections through standard Payload config if you need role-based rules.
 
-## Secrets
+## Secrets at rest
 
-Signing secrets are reveal-once and masked on every read, but stored unencrypted at rest for now. See [Signing](/webhooks/signing). Keep code-subscription secrets in your secret manager, not in the config file.
+Signing secrets are encrypted before they reach the database, using Payload's own `encrypt`, whose key derives from your `PAYLOAD_SECRET`. A database dump, a backup, or a read replica contains ciphertext rather than usable signing keys.
+
+Reads stay masked. The plaintext leaves the server on exactly two paths:
+
+- the create response and the rotation response, each revealing the new secret once
+- internal delivery signing, which decrypts in memory to compute the HMAC
+
+Everything else, admin, REST, GraphQL, exports, sees `__redacted__`.
+
+### What this does and does not protect
+
+Encryption at rest defends against **read** exposure of the database: dumps, backups, replicas, a stolen disk.
+
+It is not a defence against an attacker who can **write** to your database. Such an attacker can already point a subscription at their own URL and receive your events. They can also copy one subscription's encrypted secret into another row, since the ciphertext is not bound to the row it sits in, and so receive deliveries signed with a secret they cannot read. If your database is writable by an untrusted party, the webhook secrets are not the first thing to worry about, and encryption at rest does not change that.
+
+The cipher (`aes-256-ctr`) carries no authentication tag. A decrypt that does not yield a well-formed `whsec_` secret is treated as a failure: the plugin logs and sends the delivery **unsigned** rather than signing with a garbage key. If you see that error, see below.
+
+## PAYLOAD_SECRET and stored secrets
+
+Because the encryption key derives from `PAYLOAD_SECRET`, **changing `PAYLOAD_SECRET` makes every stored webhook secret unreadable.** Deliveries then go out unsigned, with an error in the logs for each affected subscription.
+
+`PAYLOAD_SECRET` also keys other Payload internals, so this is not a webhooks-specific hazard, but webhook signing fails loudly and is easy to miss in staging.
+
+To change `PAYLOAD_SECRET` safely, decrypt before the switch and re-encrypt after:
+
+1. **Before changing it**, record the current plaintext secrets while the old key still works:
+
+   ```ts
+   const subs = await payload.find({
+     collection: 'webhook-subscriptions',
+     limit: 0,
+     overrideAccess: true,
+     context: { webhooksRevealSecretForSigning: true },
+   })
+   // subs.docs[].secret is plaintext here; store it somewhere safe, briefly
+   ```
+
+2. Change `PAYLOAD_SECRET` and restart.
+
+3. **After the switch**, write each secret back. The `beforeChange` hook re-encrypts it under the new key:
+
+   ```ts
+   await payload.update({
+     collection: 'webhook-subscriptions',
+     id,
+     data: { secret: recordedPlaintext },
+     overrideAccess: true,
+   })
+   ```
+
+If you did not capture the secrets first, they are gone: [rotate](/webhooks/signing#rotation) each subscription and distribute the new secrets to receivers. Set `graceSeconds: 0` for those, since the old secret is already unusable and there is nothing to overlap with.
+
+## Migrating subscriptions created before encryption
+
+Subscriptions created before this release hold plaintext secrets. Run the adoption utility once, ideally after a dry run:
+
+```ts
+import { encryptExistingSecrets } from '@10x-media/webhooks'
+
+const report = await encryptExistingSecrets(payload, { dryRun: true })
+// { scanned, migrated, alreadyEncrypted, failed: [{ id, reason }] }
+```
+
+Drop `dryRun` to write. It is idempotent, so re-running is safe.
+
+The utility does not invent new secrets: a legacy 48-character hex secret is already valid base64, so it keeps its characters and gains a `whsec_` prefix. Anything it cannot normalize is reported by row id rather than rewritten; rotate those.
+
+<Callout type="warn">
+Receivers must be updated regardless of this migration. The signature format, the header names, and the key derivation all changed, so an unchanged receiver will reject every delivery. See [Signing](/webhooks/signing).
+</Callout>
 
 ## Receiver-side checklist
 
-- Verify the signature and enforce a timestamp tolerance ([example](/webhooks/signing#verifying-in-your-receiver)).
+- Prefer an off-the-shelf Standard Webhooks library over hand-rolled verification.
+- Verify against the raw body, before any JSON parsing.
+- Enforce a timestamp tolerance (300 seconds is the usual choice).
+- Accept any of the signatures in the header, so rotation does not break you.
+- Compare in constant time, never with `===`.
 - Treat `data` as untrusted input; it is whatever the document (or your `transform`) contained.
 - Respond quickly and process async. The sender aborts at `timeoutMs` (default 10s) and a slow receiver burns retry attempts.

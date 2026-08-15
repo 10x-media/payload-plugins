@@ -38,8 +38,9 @@ The **Webhook Subscriptions** collection (slug `webhook-subscriptions` by defaul
 
 - `name`, `url`, and an `enabled` toggle
 - `events`: a multi-select of every event the opted-in collections can emit
-- `secret`: generated on create, revealed once, then masked. See [Signing](/webhooks/signing)
-- `headers`: extra key/value headers injected on every delivery to this subscription
+- `secret`: generated on create (or supply your own), revealed once, then masked and stored encrypted. A **Rotate secret** button replaces it in place. See [Signing](/webhooks/signing)
+- `previousSecretExpiresAt`: set while a rotation grace period is open, when deliveries carry two signatures
+- `headers`: extra key/value headers injected on every delivery to this subscription. The names the plugin sets (`webhook-id`, `webhook-timestamp`, `webhook-signature`, `X-Webhook-Event`) are reserved and rejected here
 - `description`: free-form notes
 
 All operations on the collection require a logged-in user.
@@ -64,6 +65,8 @@ webhooks({
 ```
 
 `CodeSubscription` fields: `id`, `url`, `events`, plus optional `secret`, `headers`, and `enabled` (default on). Code and admin subscriptions are merged at delivery time; each matching subscription gets its own delivery row.
+
+`secret` must be in `whsec_<base64>` form, the same as an admin-managed one. A malformed value fails at startup, naming the subscription, rather than silently producing signatures no receiver can verify. Code subscriptions are not stored, so they are neither encrypted nor rotatable: change the environment variable and redeploy.
 
 ## Renaming or hiding the collections
 
