@@ -4,29 +4,20 @@ import {
 	type CollectionBeforeChangeHook,
 	type CollectionConfig,
 	type FieldHook,
+	type Payload,
 } from 'payload'
 
 import { ADMIN_GROUP, SECRET_MASK, SECRET_REVEAL_CONTEXT } from '../constants'
 import { isReservedHeader } from '../delivery/headers'
+import { decryptSecret, encryptSecret, isEncryptedSecret } from '../secrets/crypto'
 import { generateSecret, InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 
-/**
- * Give every create a normalized `whsec_` secret, generated or customer-supplied, and open the
- * one-time reveal window for both. A supplied secret is normalized rather than trusted so a
- * doubly-prefixed or non-base64 value can never reach the HMAC.
- */
-const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => {
-	if (operation !== 'create') {
-		return data
-	}
-	req.context[SECRET_REVEAL_CONTEXT.once] = true
-	if (!data.secret) {
-		return { ...data, secret: generateSecret() }
-	}
+/** Normalize a customer-supplied secret, surfacing a malformed one as a 400 rather than a 500. */
+const normalizeOr400 = (value: unknown): string => {
 	try {
-		return { ...data, secret: normalizeSecret(String(data.secret)) }
+		return normalizeSecret(String(value))
 	} catch (err) {
 		if (err instanceof InvalidSecretError) {
 			throw new APIError(err.message, 400)
@@ -35,20 +26,62 @@ const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => 
 	}
 }
 
+/** The storable form of an incoming secret: already-encrypted values pass through untouched. */
+const toStoredSecret = (payload: Payload, value: unknown): string =>
+	isEncryptedSecret(value) ? value : encryptSecret(payload, normalizeOr400(value))
+
 /**
- * The DB always stores the raw secret; this mask only shapes read output. It runs even under
- * `overrideAccess` (field hooks are not gated by access), so the raw value reaches a reader only
- * when a reveal flag is set: `once` on the create response, `forSigning` on internal delivery reads.
+ * Give every create a normalized `whsec_` secret, generated or customer-supplied, encrypt it
+ * before it reaches the database, and open the one-time reveal window for both paths. The
+ * plaintext is stashed on the request because the create response reads back ciphertext and
+ * cannot recover it otherwise.
+ */
+const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => {
+	if (operation === 'create') {
+		const plaintext = data.secret ? normalizeOr400(data.secret) : generateSecret()
+		req.context[SECRET_REVEAL_CONTEXT.once] = true
+		req.context[SECRET_REVEAL_CONTEXT.plaintext] = plaintext
+		return { ...data, secret: encryptSecret(req.payload, plaintext) }
+	}
+	if (data.secret === undefined) {
+		return data
+	}
+	if (data.secret === SECRET_MASK) {
+		// A masked read written back would persist the placeholder as the signing key.
+		const { secret: _masked, ...rest } = data
+		return rest
+	}
+	return { ...data, secret: toStoredSecret(req.payload, data.secret) }
+}
+
+/**
+ * The database stores ciphertext; this hook shapes read output. It runs even under
+ * `overrideAccess` (field hooks are not gated by access), so plaintext reaches a reader only
+ * when a reveal flag is set: `once` returns the stashed create-time plaintext, `forSigning`
+ * decrypts for internal delivery reads. Every other read, admin, REST, or GraphQL, sees the mask.
  */
 const maskSecret: FieldHook = ({ value, req }) => {
-	if (req.context[SECRET_REVEAL_CONTEXT.forSigning] || req.context[SECRET_REVEAL_CONTEXT.once]) {
+	if (value == null) {
 		return value
 	}
-	return value == null ? value : SECRET_MASK
+	if (req.context[SECRET_REVEAL_CONTEXT.once]) {
+		return req.context[SECRET_REVEAL_CONTEXT.plaintext] ?? SECRET_MASK
+	}
+	if (req.context[SECRET_REVEAL_CONTEXT.forSigning]) {
+		const plaintext = decryptSecret(req.payload, String(value))
+		if (!plaintext) {
+			req.payload.logger.error(
+				`@10x-media/webhooks: a stored signing secret could not be decrypted. Deliveries for this subscription will go out unsigned. This usually means PAYLOAD_SECRET changed after the secret was stored; rotate the subscription's secret to recover.`
+			)
+		}
+		return plaintext
+	}
+	return SECRET_MASK
 }
 
 const clearRevealOnce: CollectionAfterChangeHook = ({ doc, req }) => {
 	req.context[SECRET_REVEAL_CONTEXT.once] = false
+	req.context[SECRET_REVEAL_CONTEXT.plaintext] = undefined
 	return doc
 }
 
