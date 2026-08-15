@@ -50,20 +50,41 @@ const rowHeaders = (
 	return Object.keys(out).length ? out : undefined
 }
 
+/**
+ * Whether a rotated-out secret is still inside its grace window. Expiry is decided here, at
+ * resolve time, rather than by a scheduled job: the stored timestamp is the whole state, so the
+ * window is correct across restarts and the old secret stops signing the moment it lapses.
+ */
+const withinGrace = (expiresAt: string | Date | null | undefined, now: number): boolean => {
+	if (!expiresAt) {
+		return false
+	}
+	const expires = expiresAt instanceof Date ? expiresAt.getTime() : Date.parse(expiresAt)
+	return Number.isFinite(expires) && now < expires
+}
+
 /** Normalize a subscriptions-collection document. */
-export const fromCollectionRow = (row: {
-	id: string | number
-	url: string
-	events?: string[] | null
-	secret?: string | null
-	headers?: { key?: string | null; value?: string | null }[] | null
-	enabled?: boolean | null
-}): ResolvedSubscription => ({
+export const fromCollectionRow = (
+	row: {
+		id: string | number
+		url: string
+		events?: string[] | null
+		secret?: string | null
+		previousSecret?: string | null
+		previousSecretExpiresAt?: string | Date | null
+		headers?: { key?: string | null; value?: string | null }[] | null
+		enabled?: boolean | null
+	},
+	now = Date.now()
+): ResolvedSubscription => ({
 	id: String(row.id),
 	source: 'collection',
 	url: row.url,
 	events: row.events ?? [],
-	secrets: signable([row.secret]),
+	secrets: signable([
+		row.secret,
+		withinGrace(row.previousSecretExpiresAt, now) ? row.previousSecret : undefined,
+	]),
 	headers: rowHeaders(row.headers),
 	enabled: row.enabled !== false,
 })

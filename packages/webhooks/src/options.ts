@@ -1,6 +1,11 @@
 import type { PayloadRequest } from 'payload'
 
-import { DEFAULT_DELIVERY_QUEUE, DEFAULT_RETRIES, DEFAULT_TIMEOUT_MS } from './constants'
+import {
+	DEFAULT_DELIVERY_QUEUE,
+	DEFAULT_RETRIES,
+	DEFAULT_ROTATION_GRACE_SECONDS,
+	DEFAULT_TIMEOUT_MS,
+} from './constants'
 import type { TranslationsOption } from './translations'
 
 export type WebhookOperation = 'create' | 'update' | 'delete'
@@ -41,6 +46,14 @@ export type DeliveryOptions = {
 	queue?: string
 }
 
+export type SecretRotationOptions = {
+	/**
+	 * Seconds a rotated-out secret keeps signing alongside its replacement, giving receivers time
+	 * to pick up the new one. Zero retires the old secret immediately.
+	 */
+	graceSeconds?: number
+}
+
 export type WebhooksPluginOptions = {
 	disabled?: boolean
 	/**
@@ -55,6 +68,23 @@ export type WebhooksPluginOptions = {
 	delivery?: DeliveryMode | DeliveryOptions
 	subscriptionsCollection?: { slug?: string; hidden?: boolean }
 	deliveriesLog?: { slug?: string; hidden?: boolean }
+	secretRotation?: SecretRotationOptions
+}
+
+export type ResolvedSecretRotationOptions = {
+	graceSeconds: number
+}
+
+export const resolveSecretRotationOptions = (
+	rotation: WebhooksPluginOptions['secretRotation']
+): ResolvedSecretRotationOptions => {
+	const graceSeconds = rotation?.graceSeconds ?? DEFAULT_ROTATION_GRACE_SECONDS
+	if (!Number.isFinite(graceSeconds) || graceSeconds < 0) {
+		throw new Error(
+			`@10x-media/webhooks: secretRotation.graceSeconds must be a non-negative number, got ${graceSeconds}.`
+		)
+	}
+	return { graceSeconds }
 }
 
 export type ResolvedDeliveryOptions = {

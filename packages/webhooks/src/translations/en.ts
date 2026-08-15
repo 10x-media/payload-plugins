@@ -18,6 +18,12 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldSecret]: 'Signing secret',
 	[keys.fieldSecretHelp]:
 		'Shown in full once on create, masked afterward. Used to sign deliveries; copy it to the receiver now.',
+	[keys.fieldPreviousSecretExpires]: 'Previous secret valid until',
+	[keys.fieldPreviousSecretExpiresHelp]:
+		'While set, deliveries carry a signature from both the current and the previous secret. After this time only the current one signs.',
+	[keys.rotateSecret]: 'Rotate secret',
+	[keys.rotateSecretDone]: 'New secret, shown once. Copy it to your receiver now',
+	[keys.rotateSecretFailed]: 'Could not rotate the secret',
 	[keys.fieldHeaders]: 'Custom headers',
 	[keys.fieldDescription]: 'Description',
 	[keys.statusPending]: 'Pending',

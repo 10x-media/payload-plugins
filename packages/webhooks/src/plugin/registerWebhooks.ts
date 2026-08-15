@@ -12,9 +12,11 @@ import {
 	type CodeSubscription,
 	type CollectionWebhookConfig,
 	resolveDeliveryOptions,
+	resolveSecretRotationOptions,
 	type WebhooksPluginOptions,
 } from '../options'
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
+import { rotateSubscriptionSecret } from '../secrets/rotate'
 import { resolveMode } from './resolveMode'
 
 /**
@@ -66,6 +68,7 @@ export const registerWebhooks = (args: {
 	const reserved = new Set<string>([...RESERVED_SLUGS, subscriptionsSlug, deliveriesSlug])
 	const sourceSlugs = Object.keys(sources).filter((s) => !reserved.has(s))
 	const delivery = resolveDeliveryOptions(options.delivery)
+	const rotation = resolveSecretRotationOptions(options.secretRotation)
 	const codeSubscriptions = options.subscriptions ?? []
 	assertCodeSubscriptionSecrets(codeSubscriptions)
 	assertCodeSubscriptionHeaders(codeSubscriptions)
@@ -80,13 +83,48 @@ export const registerWebhooks = (args: {
 	})
 
 	config.collections ??= []
-	config.collections.push(
-		buildSubscriptionsCollection({
-			slug: subscriptionsSlug,
-			events: catalog,
-			hidden: options.subscriptionsCollection?.hidden ?? false,
-		})
-	)
+	const subscriptions = buildSubscriptionsCollection({
+		slug: subscriptionsSlug,
+		events: catalog,
+		hidden: options.subscriptionsCollection?.hidden ?? false,
+	})
+
+	const rotateSecretEndpoint: Endpoint = {
+		path: '/:id/rotate-secret',
+		method: 'post',
+		handler: async (req) => {
+			// coarse auth: matches the subscriptions collection, where any logged-in user may write
+			if (!req.user) {
+				return Response.json({ error: 'unauthorized' }, { status: 401 })
+			}
+			const id = req.routeParams?.id
+			if (typeof id !== 'string') {
+				return Response.json({ error: 'missing id' }, { status: 400 })
+			}
+			const body = (await req.json?.().catch(() => ({}))) as {
+				secret?: string
+				graceSeconds?: number
+			}
+			try {
+				const result = await rotateSubscriptionSecret({
+					payload: req.payload,
+					req,
+					subscriptionsSlug,
+					id,
+					secret: body?.secret,
+					graceSeconds: body?.graceSeconds ?? rotation.graceSeconds,
+				})
+				return Response.json(result, { status: 200 })
+			} catch (err) {
+				if (err instanceof InvalidSecretError) {
+					return Response.json({ error: err.message }, { status: 400 })
+				}
+				throw err
+			}
+		},
+	}
+	subscriptions.endpoints = [...(subscriptions.endpoints || []), rotateSecretEndpoint]
+	config.collections.push(subscriptions)
 	const deliveries = buildDeliveriesCollection({
 		slug: deliveriesSlug,
 		hidden: options.deliveriesLog?.hidden ?? false,

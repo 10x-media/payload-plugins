@@ -31,10 +31,31 @@ const toStoredSecret = (payload: Payload, value: unknown): string =>
 	isEncryptedSecret(value) ? value : encryptSecret(payload, normalizeOr400(value))
 
 /**
+ * Encrypt one incoming secret field in place. A null clears it (rotation retiring the previous
+ * secret), and a masked value is dropped rather than persisted as the signing key.
+ */
+const withStoredSecret = (
+	payload: Payload,
+	data: Record<string, unknown>,
+	field: 'secret' | 'previousSecret'
+): Record<string, unknown> => {
+	const value = data[field]
+	if (value === undefined || value === null) {
+		return data
+	}
+	if (value === SECRET_MASK) {
+		const { [field]: _masked, ...rest } = data
+		return rest
+	}
+	return { ...data, [field]: toStoredSecret(payload, value) }
+}
+
+/**
  * Give every create a normalized `whsec_` secret, generated or customer-supplied, encrypt it
  * before it reaches the database, and open the one-time reveal window for both paths. The
  * plaintext is stashed on the request because the create response reads back ciphertext and
- * cannot recover it otherwise.
+ * cannot recover it otherwise. Rotation writes plaintext into both secret fields, so updates
+ * encrypt whichever ones are present.
  */
 const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => {
 	if (operation === 'create') {
@@ -43,15 +64,11 @@ const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => 
 		req.context[SECRET_REVEAL_CONTEXT.plaintext] = plaintext
 		return { ...data, secret: encryptSecret(req.payload, plaintext) }
 	}
-	if (data.secret === undefined) {
-		return data
-	}
-	if (data.secret === SECRET_MASK) {
-		// A masked read written back would persist the placeholder as the signing key.
-		const { secret: _masked, ...rest } = data
-		return rest
-	}
-	return { ...data, secret: toStoredSecret(req.payload, data.secret) }
+	return withStoredSecret(
+		req.payload,
+		withStoredSecret(req.payload, data, 'secret'),
+		'previousSecret'
+	)
 }
 
 /**
@@ -131,6 +148,25 @@ export const buildSubscriptionsCollection = (args: {
 			admin: { readOnly: true, description: labelForKey(keys.fieldSecretHelp) },
 			access: { update: () => false },
 			hooks: { afterRead: [maskSecret] },
+		},
+		{
+			name: 'previousSecret',
+			type: 'text',
+			admin: { readOnly: true, hidden: true },
+			access: { update: () => false },
+			hooks: { afterRead: [maskSecret] },
+		},
+		{
+			name: 'previousSecretExpiresAt',
+			type: 'date',
+			label: labelForKey(keys.fieldPreviousSecretExpires),
+			admin: { readOnly: true, description: labelForKey(keys.fieldPreviousSecretExpiresHelp) },
+			access: { update: () => false },
+		},
+		{
+			name: 'rotateSecret',
+			type: 'ui',
+			admin: { components: { Field: '@10x-media/webhooks/client#RotateSecretButton' } },
 		},
 		{
 			name: 'headers',

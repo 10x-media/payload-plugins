@@ -6,6 +6,12 @@ export const DEFAULT_DELIVERY_QUEUE = 'default'
 export const DEFAULT_TIMEOUT_MS = 10_000
 export const DEFAULT_RETRIES = 4
 
+/**
+ * How long a rotated-out secret keeps signing alongside its replacement. Expiry is evaluated at
+ * send time from the stored timestamp, so the window survives restarts without a scheduler.
+ */
+export const DEFAULT_ROTATION_GRACE_SECONDS = 86_400
+
 /** Placeholder returned for the signing secret on every read after its single create reveal. */
 export const SECRET_MASK = '__redacted__'
 
