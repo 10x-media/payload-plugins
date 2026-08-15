@@ -4,7 +4,11 @@ import { signatureHeader, signPayload } from './sign'
 
 const USER_AGENT = '10x-media-webhooks'
 
-/** Assemble headers (+ signature) and POST the body to the subscription's URL. */
+/**
+ * Assemble headers (+ signatures) and POST the body to the subscription's URL. The `body` string
+ * is signed and sent unchanged: the Standard Webhooks MAC covers the exact transmitted bytes, so
+ * nothing may parse and re-serialize it between here and the wire.
+ */
 export const sendDelivery = (args: {
 	subscription: ResolvedSubscription
 	deliveryId: string
@@ -18,14 +22,14 @@ export const sendDelivery = (args: {
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 		'User-Agent': USER_AGENT,
-		'X-Webhook-Id': deliveryId,
+		'webhook-id': deliveryId,
+		'webhook-timestamp': String(timestamp),
 		'X-Webhook-Event': event,
-		'X-Webhook-Timestamp': String(timestamp),
 		...subscription.headers,
 	}
-	if (subscription.secret) {
-		headers['X-Webhook-Signature'] = signatureHeader(
-			signPayload({ secret: subscription.secret, timestamp, body })
+	if (subscription.secrets.length) {
+		headers['webhook-signature'] = signatureHeader(
+			subscription.secrets.map((secret) => signPayload({ secret, id: deliveryId, timestamp, body }))
 		)
 	}
 	return deliver({ url: subscription.url, body, headers, timeoutMs })

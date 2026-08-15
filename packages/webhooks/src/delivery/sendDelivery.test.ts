@@ -1,6 +1,7 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { fromCodeSubscription } from '../plugin/resolveSubscriptions'
+import { generateSecret } from '../secrets/format'
 import { sendDelivery } from './sendDelivery'
 import { signatureHeader, signPayload } from './sign'
 
@@ -33,16 +34,19 @@ afterAll(async () => {
 })
 
 describe('sendDelivery', () => {
-	it('signs the body and sets identifying headers', async () => {
+	const secret = generateSecret()
+
+	it('sets the Standard Webhooks headers and signs id.timestamp.body', async () => {
 		const sub = fromCodeSubscription({
 			id: 's',
 			url,
 			events: [],
-			secret: 'k',
+			secret,
 			headers: { 'X-Custom': 'c' },
 		})
 		const body = '{"id":"d1"}'
 		const now = 1_700_000_000_000
+		const timestamp = Math.floor(now / 1000)
 		const r = await sendDelivery({
 			subscription: sub,
 			deliveryId: 'd1',
@@ -53,12 +57,59 @@ describe('sendDelivery', () => {
 		})
 		expect(r.ok).toBe(true)
 		expect(received?.body).toBe(body)
-		expect(received?.headers['x-webhook-id']).toBe('d1')
-		expect(received?.headers['x-webhook-event']).toBe('posts.created')
-		expect(received?.headers['x-webhook-timestamp']).toBe(String(Math.floor(now / 1000)))
+		expect(received?.headers['webhook-id']).toBe('d1')
+		expect(received?.headers['webhook-timestamp']).toBe(String(timestamp))
+		expect(received?.headers['webhook-signature']).toBe(
+			signatureHeader([signPayload({ secret, id: 'd1', timestamp, body })])
+		)
 		expect(received?.headers['x-custom']).toBe('c')
-		expect(received?.headers['x-webhook-signature']).toBe(
-			signatureHeader(signPayload({ secret: 'k', timestamp: Math.floor(now / 1000), body }))
+	})
+
+	it('retains X-Webhook-Event alongside the standard headers', async () => {
+		expect(received?.headers['x-webhook-event']).toBe('posts.created')
+	})
+
+	it('no longer sends the pre-standard signing headers', async () => {
+		expect(received?.headers['x-webhook-id']).toBeUndefined()
+		expect(received?.headers['x-webhook-timestamp']).toBeUndefined()
+		expect(received?.headers['x-webhook-signature']).toBeUndefined()
+	})
+
+	it('emits one v1 signature per secret, space separated', async () => {
+		const older = generateSecret()
+		const sub = { ...fromCodeSubscription({ id: 's', url, events: [] }), secrets: [secret, older] }
+		const body = '{"id":"d3"}'
+		const now = 1_700_000_500_000
+		const timestamp = Math.floor(now / 1000)
+		await sendDelivery({
+			subscription: sub,
+			deliveryId: 'd3',
+			event: 'posts.updated',
+			body,
+			timeoutMs: 1000,
+			now,
+		})
+		const header = String(received?.headers['webhook-signature'])
+		expect(header.split(' ')).toEqual([
+			`v1,${signPayload({ secret, id: 'd3', timestamp, body })}`,
+			`v1,${signPayload({ secret: older, id: 'd3', timestamp, body })}`,
+		])
+	})
+
+	it('signs the body bytes it sends, unchanged', async () => {
+		const body = '{"spacing":  1,"unicode":"café"}'
+		const now = 1_700_000_900_000
+		await sendDelivery({
+			subscription: fromCodeSubscription({ id: 's', url, events: [], secret }),
+			deliveryId: 'd4',
+			event: 'posts.created',
+			body,
+			timeoutMs: 1000,
+			now,
+		})
+		expect(received?.body).toBe(body)
+		expect(received?.headers['webhook-signature']).toBe(
+			signatureHeader([signPayload({ secret, id: 'd4', timestamp: Math.floor(now / 1000), body })])
 		)
 	})
 
@@ -72,6 +123,7 @@ describe('sendDelivery', () => {
 			timeoutMs: 1000,
 			now: 1,
 		})
-		expect(received?.headers['x-webhook-signature']).toBeUndefined()
+		expect(received?.headers['webhook-signature']).toBeUndefined()
+		expect(received?.headers['webhook-id']).toBe('d2')
 	})
 })

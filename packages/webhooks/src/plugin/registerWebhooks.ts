@@ -8,11 +8,32 @@ import { redeliverDelivery } from '../delivery/redeliver'
 import { eventCatalog } from '../events/eventTypes'
 import { makeAfterChange, makeAfterDelete } from '../events/hooks'
 import {
+	type CodeSubscription,
 	type CollectionWebhookConfig,
 	resolveDeliveryOptions,
 	type WebhooksPluginOptions,
 } from '../options'
+import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { resolveMode } from './resolveMode'
+
+/**
+ * Reject a malformed code-subscription secret at config build rather than at delivery. A secret
+ * that is not valid `whsec_<base64>` derives a different HMAC key than any Standard Webhooks
+ * verifier expects, which would otherwise surface as receivers silently rejecting every delivery.
+ */
+const assertCodeSubscriptionSecrets = (subscriptions: CodeSubscription[]): void => {
+	for (const subscription of subscriptions) {
+		if (subscription.secret === undefined) {
+			continue
+		}
+		try {
+			normalizeSecret(subscription.secret)
+		} catch (err) {
+			const reason = err instanceof InvalidSecretError ? err.reason : String(err)
+			throw new InvalidSecretError(reason, `code subscription '${subscription.id}' is unusable`)
+		}
+	}
+}
 
 /** Register collections, the delivery task, source hooks, and the redeliver endpoint. */
 export const registerWebhooks = (args: {
@@ -28,6 +49,7 @@ export const registerWebhooks = (args: {
 	const sourceSlugs = Object.keys(sources).filter((s) => !reserved.has(s))
 	const delivery = resolveDeliveryOptions(options.delivery)
 	const codeSubscriptions = options.subscriptions ?? []
+	assertCodeSubscriptionSecrets(codeSubscriptions)
 	const catalog = eventCatalog(Object.fromEntries(sourceSlugs.map((s) => [s, sources[s] ?? true])))
 
 	const mode = resolveMode({

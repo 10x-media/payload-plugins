@@ -2,6 +2,7 @@ import type { Payload, PayloadRequest } from 'payload'
 
 import { SECRET_REVEAL_CONTEXT } from '../constants'
 import type { CodeSubscription } from '../options'
+import { normalizeSecret } from '../secrets/format'
 
 /** A subscription resolved from either source, ready to deliver to. */
 export type ResolvedSubscription = {
@@ -9,10 +10,30 @@ export type ResolvedSubscription = {
 	source: 'collection' | 'code'
 	url: string
 	events: string[]
-	secret?: string
+	/** Every secret a delivery must be signed with, active first. Empty means send unsigned. */
+	secrets: string[]
 	headers?: Record<string, string>
 	enabled: boolean
 }
+
+/**
+ * Normalize the secrets a delivery can sign with, dropping anything unusable. A read that never
+ * opened a reveal window yields the mask instead of key material, and a failed decrypt yields
+ * null; either would otherwise reach the HMAC as a bogus key and produce signatures no receiver
+ * can verify. Dropping is safe here because malformed configured secrets are rejected loudly at
+ * plugin registration, so a value that fails this late is a masked or undecryptable read.
+ */
+const signable = (values: (string | null | undefined)[]): string[] =>
+	values.flatMap((value) => {
+		if (typeof value !== 'string') {
+			return []
+		}
+		try {
+			return [normalizeSecret(value)]
+		} catch {
+			return []
+		}
+	})
 
 const rowHeaders = (
 	headers?: { key?: string | null; value?: string | null }[] | null
@@ -42,7 +63,7 @@ export const fromCollectionRow = (row: {
 	source: 'collection',
 	url: row.url,
 	events: row.events ?? [],
-	secret: row.secret ?? undefined,
+	secrets: signable([row.secret]),
 	headers: rowHeaders(row.headers),
 	enabled: row.enabled !== false,
 })
@@ -53,7 +74,7 @@ export const fromCodeSubscription = (sub: CodeSubscription): ResolvedSubscriptio
 	source: 'code',
 	url: sub.url,
 	events: sub.events,
-	secret: sub.secret,
+	secrets: signable([sub.secret]),
 	headers: sub.headers,
 	enabled: sub.enabled !== false,
 })

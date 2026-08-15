@@ -1,21 +1,37 @@
-import { randomBytes } from 'node:crypto'
-import type {
-	CollectionAfterChangeHook,
-	CollectionBeforeChangeHook,
-	CollectionConfig,
-	FieldHook,
+import {
+	APIError,
+	type CollectionAfterChangeHook,
+	type CollectionBeforeChangeHook,
+	type CollectionConfig,
+	type FieldHook,
 } from 'payload'
 
 import { ADMIN_GROUP, SECRET_MASK, SECRET_REVEAL_CONTEXT } from '../constants'
+import { generateSecret, InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 
-const generateSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => {
-	if (operation === 'create' && !data.secret) {
-		req.context[SECRET_REVEAL_CONTEXT.once] = true
-		return { ...data, secret: randomBytes(24).toString('hex') }
+/**
+ * Give every create a normalized `whsec_` secret, generated or customer-supplied, and open the
+ * one-time reveal window for both. A supplied secret is normalized rather than trusted so a
+ * doubly-prefixed or non-base64 value can never reach the HMAC.
+ */
+const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => {
+	if (operation !== 'create') {
+		return data
 	}
-	return data
+	req.context[SECRET_REVEAL_CONTEXT.once] = true
+	if (!data.secret) {
+		return { ...data, secret: generateSecret() }
+	}
+	try {
+		return { ...data, secret: normalizeSecret(String(data.secret)) }
+	} catch (err) {
+		if (err instanceof InvalidSecretError) {
+			throw new APIError(err.message, 400)
+		}
+		throw err
+	}
 }
 
 /**
@@ -55,7 +71,7 @@ export const buildSubscriptionsCollection = (args: {
 		hidden: args.hidden,
 	},
 	access: { read: loggedIn, create: loggedIn, update: loggedIn, delete: loggedIn },
-	hooks: { beforeChange: [generateSecret], afterChange: [clearRevealOnce] },
+	hooks: { beforeChange: [prepareSecret], afterChange: [clearRevealOnce] },
 	fields: [
 		{ name: 'name', type: 'text', required: true, label: labelForKey(keys.fieldName) },
 		{ name: 'url', type: 'text', required: true, label: labelForKey(keys.fieldUrl) },

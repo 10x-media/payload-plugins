@@ -3,15 +3,16 @@ import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { SECRET_MASK } from '../../src/constants'
+import { SECRET_MASK, SECRET_PREFIX } from '../../src/constants'
 import { webhooks } from '../../src/index'
+import { secretKey } from '../../src/secrets/format'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
 type Hit = { headers: IncomingHttpHeaders; body: string }
 
-const RAW_SECRET = /^[0-9a-f]{48}$/
-const SIGNATURE = /^v1=([0-9a-f]{64})$/
+const RAW_SECRET = /^whsec_[A-Za-z0-9+/]+={0,2}$/
+const SIGNATURE = /^v1,([A-Za-z0-9+/]+={0,2})$/
 
 describe('subscription secret reveal-once', () => {
 	let booted: BootedPayload
@@ -84,22 +85,24 @@ describe('subscription secret reveal-once', () => {
 			throw new Error('no delivery captured')
 		}
 
-		const header = hit.headers['x-webhook-signature']
-		const timestamp = hit.headers['x-webhook-timestamp']
+		const header = hit.headers['webhook-signature']
+		const timestamp = hit.headers['webhook-timestamp']
+		const deliveryId = hit.headers['webhook-id']
 		expect(typeof header).toBe('string')
 		expect(typeof timestamp).toBe('string')
+		expect(typeof deliveryId).toBe('string')
 		const match = SIGNATURE.exec(String(header))
 		expect(match).not.toBeNull()
 		const received = match?.[1] ?? ''
 
-		const expectedRaw = createHmac('sha256', rawSecret)
-			.update(`${timestamp}.${hit.body}`)
-			.digest('hex')
+		const expectedRaw = createHmac('sha256', secretKey(rawSecret))
+			.update(`${deliveryId}.${timestamp}.${hit.body}`)
+			.digest('base64')
 		expect(received).toBe(expectedRaw)
 
-		const expectedMasked = createHmac('sha256', SECRET_MASK)
-			.update(`${timestamp}.${hit.body}`)
-			.digest('hex')
-		expect(received).not.toBe(expectedMasked)
+		const expectedAscii = createHmac('sha256', rawSecret.slice(SECRET_PREFIX.length))
+			.update(`${deliveryId}.${timestamp}.${hit.body}`)
+			.digest('base64')
+		expect(received).not.toBe(expectedAscii)
 	})
 })

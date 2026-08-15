@@ -1,11 +1,13 @@
-import type {
-	CollectionAfterChangeHook,
-	CollectionBeforeChangeHook,
-	FieldHook,
-	RequestContext,
+import {
+	APIError,
+	type CollectionAfterChangeHook,
+	type CollectionBeforeChangeHook,
+	type FieldHook,
+	type RequestContext,
 } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { SECRET_MASK, SECRET_REVEAL_CONTEXT } from '../constants'
+import { SECRET_BYTES, SECRET_MASK, SECRET_PREFIX, SECRET_REVEAL_CONTEXT } from '../constants'
+import { generateSecret, isNormalizedSecret, secretKey } from '../secrets/format'
 import { buildSubscriptionsCollection } from './subscriptions'
 
 const find = (c: ReturnType<typeof buildSubscriptionsCollection>, name: string) =>
@@ -49,22 +51,64 @@ describe('buildSubscriptionsCollection', () => {
 		)
 	})
 
-	it('generates a secret on create only and flags the one-time reveal', async () => {
-		const hook = c.hooks?.beforeChange?.[0] as CollectionBeforeChangeHook
+	const beforeChange = () => c.hooks?.beforeChange?.[0] as CollectionBeforeChangeHook
+
+	it('generates a whsec_ secret on create only and flags the one-time reveal', async () => {
 		const context: RequestContext = {}
-		const created = await hook({ data: {}, operation: 'create', req: { context } } as never)
-		expect(typeof created.secret).toBe('string')
-		expect((created.secret as string).length).toBe(48)
+		const created = await beforeChange()({
+			data: {},
+			operation: 'create',
+			req: { context },
+		} as never)
+		expect(isNormalizedSecret(created.secret)).toBe(true)
+		expect(secretKey(created.secret as string)).toHaveLength(SECRET_BYTES)
 		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(true)
 
 		const updateContext: RequestContext = {}
-		const updated = await hook({
+		const updated = await beforeChange()({
 			data: { secret: 'keep' },
 			operation: 'update',
 			req: { context: updateContext },
 		} as never)
 		expect(updated.secret).toBe('keep')
 		expect(updateContext[SECRET_REVEAL_CONTEXT.once]).toBeUndefined()
+	})
+
+	it('normalizes a customer-supplied secret and reveals it once, like a generated one', async () => {
+		const context: RequestContext = {}
+		const bare = generateSecret().slice(SECRET_PREFIX.length)
+		const created = await beforeChange()({
+			data: { secret: bare },
+			operation: 'create',
+			req: { context },
+		} as never)
+		expect(created.secret).toBe(`${SECRET_PREFIX}${bare}`)
+		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(true)
+	})
+
+	it('collapses a doubly-prefixed customer secret', async () => {
+		const bare = generateSecret().slice(SECRET_PREFIX.length)
+		const created = await beforeChange()({
+			data: { secret: `${SECRET_PREFIX}${SECRET_PREFIX}${bare}` },
+			operation: 'create',
+			req: { context: {} },
+		} as never)
+		expect(created.secret).toBe(`${SECRET_PREFIX}${bare}`)
+	})
+
+	it('rejects a malformed customer secret with a 400', () => {
+		let thrown: unknown
+		try {
+			beforeChange()({
+				data: { secret: 'not base64!' },
+				operation: 'create',
+				req: { context: {} },
+			} as never)
+		} catch (err) {
+			thrown = err
+		}
+		expect(thrown).toBeInstanceOf(APIError)
+		expect((thrown as APIError).status).toBe(400)
 	})
 
 	it('masks the secret on a plain read', () => {
