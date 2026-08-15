@@ -113,6 +113,28 @@ describe('sendDelivery', () => {
 		)
 	})
 
+	it('refuses to let a custom header clobber the signature it just computed', async () => {
+		const sub = {
+			...fromCodeSubscription({ id: 's', url, events: [], secret }),
+			headers: { 'Webhook-Signature': 'v1,forged', 'webhook-id': 'spoofed', 'X-Kept': 'yes' },
+		}
+		const body = '{"id":"d5"}'
+		const now = 1_700_001_000_000
+		await sendDelivery({
+			subscription: sub,
+			deliveryId: 'd5',
+			event: 'posts.created',
+			body,
+			timeoutMs: 1000,
+			now,
+		})
+		expect(received?.headers['webhook-id']).toBe('d5')
+		expect(received?.headers['webhook-signature']).toBe(
+			signatureHeader([signPayload({ secret, id: 'd5', timestamp: Math.floor(now / 1000), body })])
+		)
+		expect(received?.headers['x-kept']).toBe('yes')
+	})
+
 	it('omits the signature when no secret', async () => {
 		const sub = fromCodeSubscription({ id: 's', url, events: [] })
 		await sendDelivery({

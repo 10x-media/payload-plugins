@@ -7,6 +7,7 @@ import {
 } from 'payload'
 
 import { ADMIN_GROUP, SECRET_MASK, SECRET_REVEAL_CONTEXT } from '../constants'
+import { isReservedHeader } from '../delivery/headers'
 import { generateSecret, InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
@@ -103,7 +104,15 @@ export const buildSubscriptionsCollection = (args: {
 			type: 'array',
 			label: labelForKey(keys.fieldHeaders),
 			fields: [
-				{ name: 'key', type: 'text', required: true },
+				{
+					name: 'key',
+					type: 'text',
+					required: true,
+					validate: (value: string | null | undefined) =>
+						typeof value === 'string' && isReservedHeader(value)
+							? `'${value}' is set by the plugin on every delivery and cannot be overridden.`
+							: true,
+				},
 				{ name: 'value', type: 'text' },
 			],
 		},

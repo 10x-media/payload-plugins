@@ -1,5 +1,6 @@
 import type { ResolvedSubscription } from '../plugin/resolveSubscriptions'
 import { type DeliverResult, deliver } from './deliver'
+import { withoutReservedHeaders } from './headers'
 import { signatureHeader, signPayload } from './sign'
 
 const USER_AGENT = '10x-media-webhooks'
@@ -25,7 +26,7 @@ export const sendDelivery = (args: {
 		'webhook-id': deliveryId,
 		'webhook-timestamp': String(timestamp),
 		'X-Webhook-Event': event,
-		...subscription.headers,
+		...withoutReservedHeaders(subscription.headers),
 	}
 	if (subscription.secrets.length) {
 		headers['webhook-signature'] = signatureHeader(

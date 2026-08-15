@@ -4,6 +4,7 @@ import { buildDeliveriesCollection } from '../collections/deliveries'
 import { buildSubscriptionsCollection } from '../collections/subscriptions'
 import { DEFAULT_DELIVERIES_SLUG, DEFAULT_SUBSCRIPTIONS_SLUG, RESERVED_SLUGS } from '../constants'
 import { buildDeliverTask } from '../delivery/deliverTask'
+import { isReservedHeader, RESERVED_HEADER_NAMES } from '../delivery/headers'
 import { redeliverDelivery } from '../delivery/redeliver'
 import { eventCatalog } from '../events/eventTypes'
 import { makeAfterChange, makeAfterDelete } from '../events/hooks'
@@ -35,6 +36,23 @@ const assertCodeSubscriptionSecrets = (subscriptions: CodeSubscription[]): void 
 	}
 }
 
+/**
+ * Refuse a code subscription that tries to set a header the delivery pipeline owns. Runtime
+ * filtering already drops these, so failing here is about telling the author rather than
+ * letting a silently ignored header look like it worked.
+ */
+const assertCodeSubscriptionHeaders = (subscriptions: CodeSubscription[]): void => {
+	for (const subscription of subscriptions) {
+		for (const key of Object.keys(subscription.headers ?? {})) {
+			if (isReservedHeader(key)) {
+				throw new Error(
+					`@10x-media/webhooks: code subscription '${subscription.id}' sets the reserved header '${key}'. The plugin sets ${RESERVED_HEADER_NAMES.join(', ')} on every delivery.`
+				)
+			}
+		}
+	}
+}
+
 /** Register collections, the delivery task, source hooks, and the redeliver endpoint. */
 export const registerWebhooks = (args: {
 	config: Config
@@ -50,6 +68,7 @@ export const registerWebhooks = (args: {
 	const delivery = resolveDeliveryOptions(options.delivery)
 	const codeSubscriptions = options.subscriptions ?? []
 	assertCodeSubscriptionSecrets(codeSubscriptions)
+	assertCodeSubscriptionHeaders(codeSubscriptions)
 	const catalog = eventCatalog(Object.fromEntries(sourceSlugs.map((s) => [s, sources[s] ?? true])))
 
 	const mode = resolveMode({

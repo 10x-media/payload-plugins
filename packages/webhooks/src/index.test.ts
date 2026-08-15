@@ -11,6 +11,24 @@ describe('webhooks factory', () => {
 		expect(typeof webhooks({})).toBe('function')
 	})
 
+	it('rejects a code subscription whose secret is not usable whsec_ material', () => {
+		expect(() =>
+			webhooks({ subscriptions: [{ id: 'crm', url: 'https://x', events: [], secret: 'nope!' }] })(
+				fakeConfig()
+			)
+		).toThrow(/code subscription 'crm'/)
+	})
+
+	it('rejects a code subscription that sets a reserved header', () => {
+		expect(() =>
+			webhooks({
+				subscriptions: [
+					{ id: 'crm', url: 'https://x', events: [], headers: { 'Webhook-Id': 'mine' } },
+				],
+			})(fakeConfig())
+		).toThrow(/reserved header/)
+	})
+
 	it('applies the translations option', () => {
 		const out = webhooks({ translations: { de: { [keys.pluginName]: 'Webhooks (DE)' } } })(
 			fakeConfig()
