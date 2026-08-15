@@ -53,6 +53,12 @@ export const SECRET_REVEAL_CONTEXT = {
 	forSigning: 'webhooksRevealSecretForSigning',
 	once: 'webhooksRevealSecretOnce',
 	plaintext: 'webhooksRevealSecretPlaintext',
+	/**
+	 * Returns the stored value verbatim, encrypted or not. Only the adoption utility needs this,
+	 * to tell an unmigrated plaintext secret from ciphertext; `forSigning` cannot serve it because
+	 * a legacy secret fails the decrypt path's `whsec_` check and reads back as null.
+	 */
+	raw: 'webhooksRevealSecretRaw',
 } as const
 export const RESERVED_SLUGS = [
 	'payload-jobs',

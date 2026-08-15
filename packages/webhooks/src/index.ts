@@ -5,6 +5,14 @@ import { registerTranslations } from './plugin/registerTranslations'
 import { registerWebhooks } from './plugin/registerWebhooks'
 
 export type { WebhooksPluginOptions } from './options'
+export type {
+	EncryptExistingSecretsOptions,
+	SecretMigrationReport,
+} from './secrets/encryptExistingSecrets'
+export { encryptExistingSecrets } from './secrets/encryptExistingSecrets'
+export { InvalidSecretError } from './secrets/format'
+export type { RotateSecretResult } from './secrets/rotate'
+export { rotateSubscriptionSecret } from './secrets/rotate'
 
 declare module 'payload' {
 	interface RegisteredPlugins {

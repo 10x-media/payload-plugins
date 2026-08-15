@@ -81,6 +81,9 @@ const maskSecret: FieldHook = ({ value, req }) => {
 	if (value == null) {
 		return value
 	}
+	if (req.context[SECRET_REVEAL_CONTEXT.raw]) {
+		return value
+	}
 	if (req.context[SECRET_REVEAL_CONTEXT.once]) {
 		return req.context[SECRET_REVEAL_CONTEXT.plaintext] ?? SECRET_MASK
 	}
