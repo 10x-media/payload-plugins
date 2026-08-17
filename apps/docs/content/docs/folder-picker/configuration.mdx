@@ -1,0 +1,74 @@
+---
+title: Configuration
+description: Every option, the package exports, and what to check when the drawer is not what you expect.
+---
+
+## Options
+
+```ts title="payload.config.ts"
+folderPicker({
+  translations: {},
+  disabled: false,
+})
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `translations` | `{}` | Per-locale overrides for the plugin's own strings. See [i18n](/folder-picker/i18n). |
+| `disabled` | `false` | Returns the incoming config untouched. |
+
+There is nothing else to set. What the picker applies to is Payload's own configuration: `folders: { browseByFolder: true }` at the root, and `folders: true` on each collection that should have them.
+
+`disabled` exists so an environment can opt out without removing the plugin call:
+
+```ts
+folderPicker({ disabled: process.env.NODE_ENV === 'test' })
+```
+
+## Exports
+
+| Import | What it gives |
+|---|---|
+| `@10x-media/folder-picker` | `folderPicker`, and `FolderPickerPluginOptions` (also exported as `PluginOptions`) |
+| `@10x-media/folder-picker/client` | `FolderListView`, the list view the plugin registers |
+| `@10x-media/folder-picker/i18n` | `keys`, `translations`, `TranslationKey`, `TranslationsOption` |
+| `@10x-media/folder-picker/types` | `FolderPickerPluginOptions` |
+
+## Rendering the view yourself
+
+A collection that already declares its own list view is [skipped](/folder-picker/limits#collections-with-a-custom-list-view-are-skipped). To keep both, render `FolderListView` from your view:
+
+```tsx title="MyListView.tsx"
+'use client'
+
+import { FolderListView } from '@10x-media/folder-picker/client'
+import type { ListViewClientProps } from 'payload'
+
+export const MyListView: React.FC<ListViewClientProps> = (props) => (
+  <FolderListView {...props} />
+)
+```
+
+Declaring the component is only half of it. It has to be the collection's list view, which is the same declaration that made the plugin skip the collection in the first place:
+
+```ts title="payload.config.ts"
+export const Media: CollectionConfig = {
+  slug: 'media',
+  admin: {
+    components: {
+      views: {
+        list: { Component: '/components/MyListView#MyListView' },
+      },
+    },
+  },
+  upload: true,
+}
+```
+
+## When the drawer is not what you expect
+
+**A flat list, and the server log says `getFromImportMap: PayloadComponent not found`.** The import map is stale. Run `payload generate:importmap` and rebuild; see [Quick start](/folder-picker/quick-start#regenerate-the-import-map).
+
+**A flat list with nothing in the log.** The collection has no `folders: true`, or it declares its own list view.
+
+**The drawer looks wrong after a Payload upgrade.** Its header reuses Payload's internal markup and class names, which semver does not cover. Nothing throws and no test catches it, so open a drawer and look at it once.

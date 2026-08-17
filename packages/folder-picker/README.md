@@ -45,8 +45,9 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/folder-picker)
 
 - [Overview](https://docs.10xmedia.de/folder-picker)
 - [Quick start](https://docs.10xmedia.de/folder-picker/quick-start)
-- [How it works](https://docs.10xmedia.de/folder-picker/internals)
+- [Configuration](https://docs.10xmedia.de/folder-picker/configuration)
 - [Limits](https://docs.10xmedia.de/folder-picker/limits)
+- [i18n](https://docs.10xmedia.de/folder-picker/i18n)
 
 ## License
 

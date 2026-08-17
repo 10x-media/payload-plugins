@@ -43,7 +43,7 @@ Payload creates the `payload-folders` collection itself; you do not declare it.
 payload generate:importmap
 ```
 
-The swapped view is referenced by string, so Payload resolves it through the import map. Development regenerates it on boot; a production build uses the committed file. Skip this and the drawer silently falls back to the default list, with `getFromImportMap: PayloadComponent not found` in the server log.
+Development regenerates it on boot; a production build uses the committed file. Skip this and the drawer silently falls back to the default list, with `getFromImportMap: PayloadComponent not found` in the server log.
 
 ## Try it
 
@@ -62,3 +62,7 @@ folderPicker({ disabled: process.env.NODE_ENV === 'test' })
 ```
 
 Per collection, drop `folders: true`. There is no per-field switch; see [Limits](/folder-picker/limits).
+
+## Next
+
+[Configuration](/folder-picker/configuration) for the options, the exports, and what to check when the drawer is not what you expect.

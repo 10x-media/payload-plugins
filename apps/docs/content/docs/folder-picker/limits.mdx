@@ -1,13 +1,11 @@
 ---
 title: Limits
-description: What the plugin deliberately does not do, and why.
+description: What the plugin does not do.
 ---
 
 ## No per-field opt-out
 
-Folders are switched on or off per collection, through Payload's own `folders: true`. There is no way to say "folders in this field, but not in that one".
-
-This is a consequence of the design rather than an omission. The list drawer carries no information about which field opened it: an upload field calls `useListDrawer({ collectionSlugs, filterOptions })` and the drawer slug is `list-drawer_<depth>_<uuid>`. The swapped list view therefore cannot tell one caller from another.
+Folders are switched on or off per collection, through Payload's own `folders: true`. There is no way to say "folders in this field, but not in that one", because the list drawer carries no information about which field opened it.
 
 Turning the picker off for a collection means removing `folders: true` from it, which also removes Payload's own **By folder** tab on the route.
 
@@ -25,34 +23,4 @@ For a polymorphic upload field (`relationTo: ['media', 'files']`) this means one
 
 ## Collections with a custom list view are skipped
 
-If a collection already declares `admin.components.views.list.Component`, the plugin leaves it alone rather than overwrite a deliberate customization. Such a collection keeps the stock drawer.
-
-To get both, render the plugin's view from your own:
-
-```tsx title="MyListView.tsx"
-'use client'
-
-import { FolderListView } from '@10x-media/folder-picker/client'
-import type { ListViewClientProps } from 'payload'
-
-export const MyListView: React.FC<ListViewClientProps> = (props) => (
-  <FolderListView {...props} />
-)
-```
-
-Declaring the component is only half of it. It has to be the collection's list view, which is the
-same declaration that made the plugin skip the collection in the first place:
-
-```ts title="payload.config.ts"
-export const Media: CollectionConfig = {
-  slug: 'media',
-  admin: {
-    components: {
-      views: {
-        list: { Component: '/components/MyListView#MyListView' },
-      },
-    },
-  },
-  upload: true,
-}
-```
+If a collection already declares `admin.components.views.list.Component`, the plugin leaves it alone and the collection keeps the stock drawer. To get both, [render the plugin's view from your own](/folder-picker/configuration#rendering-the-view-yourself).

@@ -1,4 +1,4 @@
 {
 	"title": "Folder Picker",
-	"pages": ["index", "quick-start", "internals", "limits", "i18n"]
+	"pages": ["index", "quick-start", "configuration", "limits", "i18n"]
 }

@@ -5,7 +5,7 @@ description: Folder browsing inside Payload's list drawer, so any field picks do
 
 `@10x-media/folder-picker` puts folders into the drawer that opens when a field picks an existing document. Payload has had folders since 3.39, but only on the collection route: from an upload field's "choose from existing" you get a flat, paginated list with no folders in sight.
 
-The plugin replaces one thing, the list view of each folder-enabled collection, and that single swap covers every field that opens a drawer.
+![The list drawer with All Media and By Folder tabs, browsing the Media / Brand folder with one file selected and the move and delete actions in the header](/images/folder-picker/overview.png)
 
 ```ts title="payload.config.ts"
 import { buildConfig } from 'payload'
@@ -20,14 +20,12 @@ export default buildConfig({
 
 ## What it covers
 
-Anything that opens a list drawer, because they all render the same collection list view:
+Anything that opens a list drawer:
 
 - upload fields, single and `hasMany`
 - polymorphic upload fields, one tab per collection
 - relationship fields with `admin: { appearance: 'drawer' }`
 - the lexical upload node
-
-No field is patched, and no lexical feature is registered. See [How it works](/folder-picker/internals) for why one swap is enough.
 
 ## What it adds inside the drawer
 
@@ -39,24 +37,22 @@ No field is patched, and no lexical feature is registered. See [How it works](/f
 
 ## Picking documents
 
-One click selects a card, **Select** confirms, and a double-click picks the file outright.
-Folders open on a double-click.
+Double-click opens a folder, and double-clicking a file picks it outright. A single click selects, and **Select** in the search bar confirms.
 
-A `hasMany` field can hold several, so its selection responds to Ctrl or Cmd for one more
-and Shift for a range, and a hint under the header says so. A single-value field cannot,
-so the modifiers do nothing there and no hint is drawn.
+A `hasMany` field takes Ctrl or Cmd for one more and Shift for a range, with a hint under the header saying so. A single-value field ignores the modifiers and draws no hint.
 
-Documents the field already holds are left out of the folder, exactly as they are left out
-of the list tab. Payload's upload field hides them from the list by filtering on the ids it
-holds; the folder tab applies the same rule to its own results. Remove a value and the
-document is offered again.
+Documents the field already holds are left out of the folder, exactly as they are left out of the list tab. Remove a value and the document is offered again.
 
 ## What it leaves alone
 
-- **The collection's list route.** Outside a drawer the swapped view defers to Payload's own, so `/admin/collections/media` is byte-for-byte what it was.
+- **The collection's list route.** Outside a drawer nothing changes: `/admin/collections/media` is byte-for-byte what it was.
 - **Collections without `folders: true`.** Their drawer stays the stock flat list.
 - **Collections that already declare a list view.** A host customization is never overwritten.
 
 ## Requirements
 
-Payload `^3.83.0`, React 19, with folders enabled in the config and on at least one collection. The drawer's header is rebuilt from copies of Payload's internal markup, so an upgrade is worth a quick look at the drawer; see [How it works](/folder-picker/internals).
+Payload `^3.83.0`, React 19, with folders enabled in the config and on at least one collection.
+
+## Next
+
+[Quick start](/folder-picker/quick-start), then [Configuration](/folder-picker/configuration) for the options and exports.
