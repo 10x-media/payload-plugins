@@ -1,3 +1,5 @@
+'use client'
+
 import { useFieldPath, useFormFields } from '@payloadcms/ui'
 import React from 'react'
 
