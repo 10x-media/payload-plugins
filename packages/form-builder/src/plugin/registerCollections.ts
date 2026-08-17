@@ -1,6 +1,6 @@
 import type { CollectionSlug, Config } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
-import type { FromAddressesResolver } from '../actions/fromAddresses'
+import type { FromAddressesResolver, FromAddressSourceRegistry } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
 import { registerActionsTask } from '../actions/task'
 import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
@@ -59,6 +59,7 @@ type RegisterCollectionsArgs = {
 	settings?: SettingsOption
 	response?: ResponseOption
 	fromAddresses?: FromAddressesResolver
+	fromSources?: FromAddressSourceRegistry
 	departments?: DepartmentEmailsResolver
 	redirectRelationships?: CollectionSlug[]
 	overrides?: {
@@ -95,6 +96,7 @@ export const registerCollections = ({
 	settings,
 	response,
 	fromAddresses,
+	fromSources,
 	departments,
 	redirectRelationships,
 	overrides,
@@ -134,6 +136,7 @@ export const registerCollections = ({
 			settings,
 			response,
 			fromAddresses,
+			fromSources,
 			departments,
 			redirectRelationships,
 			overrides: overrides?.forms,

@@ -1,5 +1,9 @@
 import type { CollectionConfig, PayloadRequest } from 'payload'
-import { type FromAddressesResolver, resolveFromAddressesRequest } from '../actions/fromAddresses'
+import {
+	type FromAddressesResolver,
+	type FromAddressSourceRegistry,
+	resolveFromAddressesRequest,
+} from '../actions/fromAddresses'
 import {
 	type FormResultsAccess,
 	resolveFormResultsRequest,
@@ -19,8 +23,10 @@ type FormsEndpointDeps = {
 	pollVotesEnabled: boolean
 	/** The plugin `consent.sources` option; present registers the `/:id/consent-sources` endpoint. */
 	consentSources?: ConsentSourcesResolver
-	/** The plugin `email.fromAddresses` option; present registers the `/:id/from-addresses` endpoint. */
+	/** The plugin `email.fromAddresses` option; this or `fromSources` present registers the `/:id/from-addresses` endpoint. */
 	fromAddresses?: FromAddressesResolver
+	/** The plugin `email.fromSources` option; served ahead of the resolver's literals. */
+	fromSources?: FromAddressSourceRegistry
 	/** The plugin `email.departments` option; present registers the `/:id/departments` endpoint. */
 	departments?: DepartmentEmailsResolver
 }
@@ -38,6 +44,7 @@ export const buildFormsEndpoints = ({
 	pollVotesEnabled,
 	consentSources,
 	fromAddresses,
+	fromSources,
 	departments,
 }: FormsEndpointDeps): Exclude<CollectionConfig['endpoints'], false | undefined> => [
 	{
@@ -108,7 +115,7 @@ export const buildFormsEndpoints = ({
 	// The route id is unused: the from-addresses set is request-scoped (e.g. per tenant), not
 	// per-form. Registered as a doc-scoped route only so the admin field can reuse
 	// EndpointOptionsSelect unmodified (see buildFromField).
-	...(fromAddresses
+	...(fromAddresses || fromSources
 		? [
 				{
 					path: '/:id/from-addresses',
@@ -118,6 +125,7 @@ export const buildFormsEndpoints = ({
 							isAuthed: Boolean(req.user),
 							req,
 							resolver: fromAddresses,
+							sources: fromSources,
 						})
 						return Response.json(body, { status })
 					},

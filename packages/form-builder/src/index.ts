@@ -73,12 +73,14 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		const registry = resolveFieldTypes(defaultFieldDefinitions, options.fields)
 		const ruleRegistry = resolveValidationRules(defaultValidationRules, options.rules)
 		const fromAddresses = options.email?.fromAddresses
+		const fromSources = options.email?.fromSources
 		const departments = options.email?.departments
 		const actionRegistry = resolveActions(
 			buildDefaultActionDefinitions({
 				localize: localizeContent,
 				editor: options.richText?.bodyEditor ?? options.richText?.editor,
 				fromAddresses,
+				fromSources,
 				departments,
 				recipients: options.email?.recipients,
 				recipientSources: options.email?.recipientSources,
@@ -131,6 +133,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			settings: options.settings,
 			response: options.response,
 			fromAddresses,
+			fromSources,
 			departments,
 			redirectRelationships: options.redirectRelationships,
 			overrides: options.overrides,
@@ -157,7 +160,12 @@ export { renderAllValues, renderAllValuesTable } from './actions/body/wildcards'
 export { buildDefaultActionDefinitions, defaultActionDefinitions } from './actions/builtin'
 export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
 export { defineAction } from './actions/defineAction'
-export type { FromAddressesResolver, FromAddressOption } from './actions/fromAddresses'
+export type {
+	FromAddressesResolver,
+	FromAddressOption,
+	FromAddressSource,
+	FromAddressSourceRegistry,
+} from './actions/fromAddresses'
 export type {
 	RecipientResolveArgs,
 	RecipientSource,

@@ -11,7 +11,12 @@ import {
 	type RecipientsConfig,
 	resolveRecipientEntries,
 } from '../emailRecipients'
-import { buildFromField, type FromAddressesResolver } from '../fromAddresses'
+import {
+	buildFromField,
+	type FromAddressesResolver,
+	type FromAddressSourceRegistry,
+	resolveSendFrom,
+} from '../fromAddresses'
 import {
 	type RecipientResolveArgs,
 	type RecipientSource,
@@ -24,6 +29,8 @@ export type EmailActionOptions = {
 	localize: boolean
 	editor?: RichTextField['editor']
 	fromAddresses?: FromAddressesResolver
+	/** Send-time-resolved senders offered in the from select (plugin option `email.fromSources`). */
+	fromSources?: FromAddressSourceRegistry
 	departments?: DepartmentEmailsResolver
 	recipients?: RecipientsConfig
 	/** Server-resolved recipient sources offered in every recipient list (plugin option `email.recipientSources`). */
@@ -82,7 +89,18 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 	options: EmailActionOptions,
 	spec: EmailActionSpec<TConfig>
 ): ActionDefinition<TConfig> => {
-	const { localize, editor, fromAddresses, departments, recipients, recipientSources } = options
+	const {
+		localize,
+		editor,
+		fromAddresses,
+		fromSources,
+		departments,
+		recipients,
+		recipientSources,
+	} = options
+	const fromSourcesByValue = new Map(
+		Object.values(fromSources ?? {}).map((source) => [source.value, source])
+	)
 	const endpoint = departments ? 'departments' : undefined
 	const recip: RecipientFieldBuilder = (name, labelKey) =>
 		buildRecipientField(name, labelKey, localize, {
@@ -100,7 +118,7 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 				type: 'row',
 				fields: [spec.target(recip), recip('replyTo', keys.actionConfigReplyTo)],
 			},
-			...(fromAddresses ? [buildFromField(fromAddresses)] : []),
+			...(fromAddresses || fromSources ? [buildFromField(fromAddresses, fromSources)] : []),
 			{
 				type: 'row',
 				fields: [recip('cc', keys.actionConfigCc), recip('bcc', keys.actionConfigBcc)],
@@ -159,14 +177,21 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 				await resolveRecipientEntries(config.replyTo, { resolve, sources, sourceArgs })
 			).join(', ')
 
-			// `from` was validated at save time against `fromAddresses(req)`; not re-checked here
-			// (the job's `req` may differ from the authoring admin's, and the config is admin-authored,
-			// not visitor-controlled), so the stored value is forwarded verbatim.
+			// A literal `from` was validated at save time against `fromAddresses(req)`; not re-checked
+			// here (the job's `req` may differ from the authoring admin's, and the config is
+			// admin-authored, not visitor-controlled), so it is forwarded verbatim. A stored source
+			// value instead resolves freshly on every send, so the sender follows the host (e.g. a
+			// tenant that changed its address) rather than freezing at authoring time.
+			const from = await resolveSendFrom({
+				configured: config.from,
+				sources: fromSourcesByValue,
+				sourceArgs,
+			})
 			await args.payload.sendEmail({
 				to,
 				subject,
 				html,
-				...(config.from ? { from: config.from } : {}),
+				...(from ? { from } : {}),
 				...(cc ? { cc } : {}),
 				...(bcc ? { bcc } : {}),
 				...(replyTo ? { replyTo } : {}),

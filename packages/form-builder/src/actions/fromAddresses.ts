@@ -1,9 +1,71 @@
 import type { PayloadRequest, TextField } from 'payload'
-import { keys } from '../translations/keys'
+import { keys, type TranslationKey } from '../translations/keys'
 import { asTranslate, labelFor } from '../translations/server'
+import { isPlausibleEmail } from './emailRecipients'
+import type { RecipientResolveArgs } from './recipientSources'
 
 /** One selectable "from" address for the built-in email actions. */
 export type FromAddressOption = { label: string; value: string }
+
+/**
+ * A sender the plugin resolves server-side at send time (plugin option `email.fromSources`), the
+ * from-side counterpart of a `RecipientSource`. `value` is the namespaced string stored on the
+ * action (e.g. `tenant:default`), so it cannot collide with a literal address and stays
+ * audit-stable while the address it resolves to follows the host; `label` is what the editor sees
+ * in the from select. `resolve` returns the address to send from right now (reduced to a single
+ * address), or null/empty to send with the email adapter's default sender. A throw fails the
+ * action loudly (and retries on the queued path) rather than sending as the wrong identity.
+ */
+export type FromAddressSource = {
+	value: string
+	label: string | Record<string, string>
+	resolve: (args: RecipientResolveArgs) => Promise<string | null> | string | null
+}
+
+export type FromAddressSourceRegistry = Record<string, FromAddressSource>
+
+/**
+ * The `from` handed to `payload.sendEmail`: a stored source value re-resolves through its source
+ * with the run-time args; anything else (a literal picked from `fromAddresses`, which never
+ * touches a source at send) is forwarded verbatim, and no configured value means no `from` at
+ * all. Mirrors `resolveRecipientEntries`: a throwing source propagates.
+ */
+export const resolveSendFrom = async (opts: {
+	configured: string | undefined
+	sources?: Map<string, FromAddressSource>
+	sourceArgs?: RecipientResolveArgs
+}): Promise<string | undefined> => {
+	const { configured, sources, sourceArgs } = opts
+	if (!configured) {
+		return undefined
+	}
+	const source = sources?.get(configured)
+	if (!source) {
+		return configured
+	}
+	// A source only resolves with the run-time args; there are none at authoring/validation time.
+	const resolved = sourceArgs ? await source.resolve(sourceArgs) : null
+	if (!resolved) {
+		return undefined
+	}
+	return firstSender(resolved) || undefined
+}
+
+/**
+ * The sender-side counterpart of `firstAddress`: one sender only (anything past a separator or
+ * CR/LF is cut, closing header injection), but `Name <addr>` display form survives because that is
+ * the documented shape of a `from`. An implausible result becomes empty (send with the adapter
+ * default) rather than a broken header.
+ */
+const firstSender = (value: string): string => {
+	const [first] = value.split(/[,;\n\r]+/)
+	const cleaned = (first ?? '').trim()
+	if (isPlausibleEmail(cleaned)) {
+		return cleaned
+	}
+	const bracketed = /^[^<>]*<([^<>\s]+)>$/.exec(cleaned)
+	return bracketed?.[1] && isPlausibleEmail(bracketed[1]) ? cleaned : ''
+}
 
 /**
  * Host seam resolving the selectable `from` addresses for `emailTeam`/`confirmation`
@@ -32,10 +94,17 @@ const FROM_FIELD_REF = '@10x-media/form-builder/client#EndpointOptionsSelect'
  * A resolver reaching a flaky upstream should cache or fall back internally rather than throw.
  */
 export const validateFromField =
-	(resolver: FromAddressesResolver) =>
+	(resolver: FromAddressesResolver | undefined, sourceValues?: Set<string>) =>
 	async (value: unknown, { req }: { req: PayloadRequest }): Promise<string | true> => {
 		if (typeof value !== 'string' || value.length === 0) {
 			return true
+		}
+		// A registered source value validates by membership alone, no resolver round trip.
+		if (sourceValues?.has(value)) {
+			return true
+		}
+		if (!resolver) {
+			return asTranslate(req.t)(keys.validationFromUnknown)
 		}
 		let options: FromAddressOption[]
 		try {
@@ -54,11 +123,17 @@ export const validateFromField =
  * is set). That route's document id goes unused server-side: the option set is request-scoped, not
  * per-form, so this reuses the existing doc-scoped component as-is instead of adding an id-less mode.
  */
-export const buildFromField = (resolver: FromAddressesResolver): TextField => ({
+export const buildFromField = (
+	resolver: FromAddressesResolver | undefined,
+	sources?: FromAddressSourceRegistry
+): TextField => ({
 	name: 'from',
 	type: 'text',
 	label: labelFor(keys.actionConfigFrom),
-	validate: validateFromField(resolver),
+	validate: validateFromField(
+		resolver,
+		sources ? new Set(Object.values(sources).map((source) => source.value)) : undefined
+	),
 	admin: {
 		components: {
 			Field: {
@@ -76,7 +151,22 @@ export type ResolveFromAddressesRequestArgs = {
 	/** Whether the caller is authenticated (an admin/user). */
 	isAuthed: boolean
 	req: PayloadRequest
-	resolver: FromAddressesResolver
+	resolver?: FromAddressesResolver
+	sources?: FromAddressSourceRegistry
+}
+
+/** A source entry as the from select shows it: label localized to the request's admin language. */
+const sourceOption = (source: FromAddressSource, req: PayloadRequest): FromAddressOption => {
+	if (typeof source.label === 'string') {
+		return { label: asTranslate(req.t)(source.label as TranslationKey), value: source.value }
+	}
+	const language = (req.i18n as { language?: string } | undefined)?.language
+	const label =
+		(language ? source.label[language] : undefined) ??
+		source.label.en ??
+		Object.values(source.label)[0] ??
+		source.value
+	return { label, value: source.value }
 }
 
 export type ResolveFromAddressesRequestResult = {
@@ -93,13 +183,16 @@ export type ResolveFromAddressesRequestResult = {
 export const resolveFromAddressesRequest = async (
 	args: ResolveFromAddressesRequestArgs
 ): Promise<ResolveFromAddressesRequestResult> => {
-	const { isAuthed, req, resolver } = args
+	const { isAuthed, req, resolver, sources } = args
 	if (!isAuthed) {
 		return { status: 403, body: { errors: [{ message: 'Forbidden' }] } }
 	}
 	try {
-		const options = await resolver({ req })
-		return { status: 200, body: { options } }
+		// Sources lead: the send-time-resolved sender is the tenant identity, static literals are
+		// the exceptions an editor picks deliberately.
+		const sourceOptions = Object.values(sources ?? {}).map((source) => sourceOption(source, req))
+		const resolved = resolver ? await resolver({ req }) : []
+		return { status: 200, body: { options: [...sourceOptions, ...resolved] } }
 	} catch {
 		return { status: 503, body: { errors: [{ message: 'From addresses unavailable' }] } }
 	}
