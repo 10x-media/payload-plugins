@@ -1,9 +1,10 @@
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, PayloadRequest } from 'payload'
+import { type CollectionConfig, Forbidden, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { MAX_ROTATION_GRACE_SECONDS, SECRET_MASK } from '../../src/constants'
 import { webhooks } from '../../src/index'
 import { resolveSecretRotationOptions } from '../../src/options'
+import { generateSecret } from '../../src/secrets/format'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
@@ -113,8 +114,67 @@ describe('rotation hardening', () => {
 	})
 })
 
-describe('rotate-secret endpoint respects collection update access', () => {
+/**
+ * These drive the registered handler itself rather than `rotateSubscriptionSecret` underneath it,
+ * because the guards under test (authorization, body validation, status mapping) live only in the
+ * handler. Asserting that the endpoint is registered and that the collection has an access function
+ * would leave every one of them unexercised.
+ */
+describe('the rotate-secret endpoint handler', () => {
 	let booted: BootedPayload
+
+	const handler = () => {
+		const endpoints = booted.payload.collections?.['webhook-subscriptions']?.config?.endpoints
+		const endpoint = (Array.isArray(endpoints) ? endpoints : []).find(
+			(e) => e.path === '/:id/rotate-secret' && e.method === 'post'
+		)
+		if (!endpoint) {
+			throw new Error('rotate-secret endpoint is not registered')
+		}
+		return endpoint.handler
+	}
+
+	/** A request shaped like the one Payload hands a custom endpoint. */
+	const request = (args: {
+		id?: string
+		user?: unknown
+		body?: unknown
+		access?: (args: unknown) => unknown
+	}) => {
+		const collection = booted.payload.collections?.['webhook-subscriptions']
+		if (args.access && collection) {
+			// biome-ignore lint/suspicious/noExplicitAny: swapping the configured access for one case
+			;(collection.config.access as any).update = args.access
+		}
+		return {
+			context: {},
+			json: () => Promise.resolve(args.body ?? {}),
+			payload: booted.payload,
+			routeParams: args.id === undefined ? {} : { id: args.id },
+			user: 'user' in args ? args.user : { collection: 'users', id: 'u1' },
+		} as never
+	}
+
+	const call = async (args: Parameters<typeof request>[0]) => {
+		const res = await handler()(request(args))
+		return { body: (await res.json()) as Record<string, unknown>, status: res.status }
+	}
+
+	const restoreAccess = () => {
+		const collection = booted.payload.collections?.['webhook-subscriptions']
+		if (collection) {
+			// biome-ignore lint/suspicious/noExplicitAny: restoring the configured access
+			;(collection.config.access as any).update = ({ req }: { req: { user?: unknown } }) =>
+				Boolean(req.user)
+		}
+	}
+
+	const subscribe = async (name: string) =>
+		booted.payload.create({
+			collection: 'webhook-subscriptions',
+			data: { name, url: 'https://example.test', enabled: true, events: [] },
+			overrideAccess: true,
+		})
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -128,16 +188,117 @@ describe('rotate-secret endpoint respects collection update access', () => {
 		await booted.stop()
 	})
 
-	it('exposes the collection update access the endpoint consults', () => {
-		const access = booted.payload.collections?.['webhook-subscriptions']?.config?.access?.update
-		expect(typeof access).toBe('function')
-		expect(access?.({ req: { user: undefined } } as never)).toBe(false)
-		expect(access?.({ req: { user: { id: '1' } } } as never)).toBe(true)
+	it('rotates and reveals the new secret once for a permitted caller', async () => {
+		restoreAccess()
+		const created = await subscribe('endpoint-ok')
+		const { status, body } = await call({ id: String(created.id) })
+		expect(status).toBe(200)
+		expect(String(body.secret)).toMatch(/^whsec_/)
+		expect(body.previousSecretExpiresAt).toBeTruthy()
 	})
 
-	it('registers the rotate endpoint on the subscriptions collection', () => {
-		const endpoints = booted.payload.collections?.['webhook-subscriptions']?.config?.endpoints
-		const paths = Array.isArray(endpoints) ? endpoints.map((e) => e.path) : []
-		expect(paths).toContain('/:id/rotate-secret')
+	it('refuses an anonymous caller with 401', async () => {
+		restoreAccess()
+		const created = await subscribe('endpoint-anon')
+		expect(await call({ id: String(created.id), user: undefined })).toMatchObject({ status: 401 })
+	})
+
+	it('rejects a missing id with 400', async () => {
+		restoreAccess()
+		expect(await call({})).toMatchObject({ status: 400 })
+	})
+
+	it('returns 403 when the collection update access denies this document', async () => {
+		const created = await subscribe('endpoint-denied')
+		const { status } = await call({ access: () => false, id: String(created.id) })
+		restoreAccess()
+		expect(status).toBe(403)
+	})
+
+	it('returns 403 when the access function throws Forbidden rather than returning false', async () => {
+		const created = await subscribe('endpoint-throws')
+		const { status } = await call({
+			access: () => {
+				throw new Forbidden()
+			},
+			id: String(created.id),
+		})
+		restoreAccess()
+		expect(status).toBe(403)
+	})
+
+	it('honours a Where result by checking the document matches it', async () => {
+		const mine = await subscribe('endpoint-mine')
+		const theirs = await subscribe('endpoint-theirs')
+		const scoped = () => ({ name: { equals: 'endpoint-mine' } })
+
+		const allowed = await call({ access: scoped, id: String(mine.id) })
+		const denied = await call({ access: scoped, id: String(theirs.id) })
+		restoreAccess()
+		expect(allowed.status).toBe(200)
+		expect(denied.status).toBe(403)
+	})
+
+	it('rejects a non-numeric graceSeconds with 400 instead of silently retiring the old secret', async () => {
+		restoreAccess()
+		const created = await subscribe('endpoint-nan')
+		const { status, body } = await call({
+			body: { graceSeconds: '3600' },
+			id: String(created.id),
+		})
+		expect(status).toBe(400)
+		expect(String(body.error)).toMatch(/finite number/)
+	})
+
+	it('rejects a graceSeconds beyond the ceiling with 400', async () => {
+		restoreAccess()
+		const created = await subscribe('endpoint-huge')
+		const { status, body } = await call({ body: { graceSeconds: 1e12 }, id: String(created.id) })
+		expect(status).toBe(400)
+		expect(String(body.error)).toMatch(/at most/)
+	})
+
+	it('rejects a non-string secret with 400', async () => {
+		restoreAccess()
+		const created = await subscribe('endpoint-badtype')
+		expect(await call({ body: { secret: 42 }, id: String(created.id) })).toMatchObject({
+			status: 400,
+		})
+	})
+
+	it('rejects a malformed secret with 400 and leaves the subscription alone', async () => {
+		restoreAccess()
+		const created = await subscribe('endpoint-badsecret')
+		const { status, body } = await call({
+			body: { secret: 'not base64!' },
+			id: String(created.id),
+		})
+		expect(status).toBe(400)
+		expect(String(body.error)).toMatch(/invalid signing secret/)
+
+		const reread = await booted.payload.findByID({
+			collection: 'webhook-subscriptions',
+			context: { webhooksRevealSecretForSigning: true },
+			id: String(created.id),
+			overrideAccess: true,
+		})
+		expect(String(reread.secret)).toMatch(/^whsec_/)
+	})
+
+	it('accepts a customer-supplied secret and returns it', async () => {
+		restoreAccess()
+		const created = await subscribe('endpoint-supplied')
+		const chosen = generateSecret()
+		const { status, body } = await call({ body: { secret: chosen }, id: String(created.id) })
+		expect(status).toBe(200)
+		expect(body.secret).toBe(chosen)
+	})
+
+	it('accepts graceSeconds: 0 and retires the old secret immediately', async () => {
+		restoreAccess()
+		const created = await subscribe('endpoint-zero')
+		const { status, body } = await call({ body: { graceSeconds: 0 }, id: String(created.id) })
+		expect(status).toBe(200)
+		expect(body.previousSecretExpiresAt).toBeNull()
 	})
 })

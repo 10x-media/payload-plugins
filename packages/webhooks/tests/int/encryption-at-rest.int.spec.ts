@@ -112,6 +112,64 @@ describe('webhook secrets are encrypted at rest', () => {
 		expect(after.secret).toBe(before.secret)
 	})
 
+	/**
+	 * Payload's duplicate action resubmits a document it read, so the create sees the mask where a
+	 * secret would be. Treating that as customer-supplied key material rejected the whole duplicate.
+	 */
+	it('gives a duplicated subscription its own fresh secret', async () => {
+		const created = await booted.payload.create({
+			collection: 'webhook-subscriptions',
+			data: { name: 'original', url: 'https://example.test', events: [] },
+			overrideAccess: true,
+		})
+		const original = String(created.secret)
+
+		const copy = await booted.payload.duplicate({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			overrideAccess: true,
+		})
+
+		expect(String(copy.secret)).toMatch(/^whsec_/)
+		expect(copy.secret).not.toBe(original)
+		expect(copy.secret).not.toBe(SECRET_MASK)
+
+		const raw = await rawDocument(booted, String(copy.name))
+		expect(isEncryptedSecret(raw.secret)).toBe(true)
+		expect(JSON.stringify(raw)).not.toContain(String(copy.secret).slice(SECRET_PREFIX.length))
+	})
+
+	it('clears a retired secret whose grace window has closed on the next write', async () => {
+		const created = await booted.payload.create({
+			collection: 'webhook-subscriptions',
+			data: { name: 'lapsed-cleanup', url: 'https://example.test', events: [] },
+			overrideAccess: true,
+		})
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			data: {
+				previousSecret: generateSecret(),
+				previousSecretExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+			},
+			overrideAccess: true,
+		})
+		expect((await rawDocument(booted, 'lapsed-cleanup')).previousSecret).toBeTruthy()
+
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			data: { name: 'lapsed-cleanup renamed' },
+			overrideAccess: true,
+		})
+
+		const raw = await rawDocument(booted, 'lapsed-cleanup renamed')
+		expect(raw.previousSecret).toBeNull()
+		expect(raw.previousSecretExpiresAt).toBeNull()
+		// The active secret is untouched by the cleanup.
+		expect(isEncryptedSecret(raw.secret)).toBe(true)
+	})
+
 	it('survives a fresh Payload initialization against the same database', async () => {
 		const created = await booted.payload.create({
 			collection: 'webhook-subscriptions',

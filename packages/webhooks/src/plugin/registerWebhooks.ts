@@ -1,4 +1,4 @@
-import type { Config, Endpoint, PayloadRequest } from 'payload'
+import { type Config, type Endpoint, Forbidden, type PayloadRequest } from 'payload'
 
 import { buildDeliveriesCollection } from '../collections/deliveries'
 import { buildSubscriptionsCollection } from '../collections/subscriptions'
@@ -79,6 +79,10 @@ const parseRotateBody = (body: unknown): { secret?: string; graceSeconds?: numbe
  * Evaluate the subscriptions collection's configured `update` access for one document, honouring
  * a `Where` result by checking that the target actually matches it. Read from the runtime config
  * so a consumer's override of the collection governs this endpoint too.
+ *
+ * Throwing `Forbidden` is as valid a denial as returning false, and Payload's own `executeAccess`
+ * lets it propagate, so an access function written that way would otherwise reach the handler's
+ * generic catch and be reported as a 500.
  */
 const canUpdateSubscription = async (args: {
 	req: PayloadRequest
@@ -90,7 +94,15 @@ const canUpdateSubscription = async (args: {
 	if (!access) {
 		return true
 	}
-	const result = await access({ req, id })
+	let result: Awaited<ReturnType<typeof access>>
+	try {
+		result = await access({ req, id })
+	} catch (err) {
+		if (err instanceof Forbidden) {
+			return false
+		}
+		throw err
+	}
 	if (typeof result === 'boolean') {
 		return result
 	}

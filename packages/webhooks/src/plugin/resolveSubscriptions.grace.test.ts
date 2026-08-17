@@ -87,7 +87,12 @@ describe('unusable secrets', () => {
 		expect(resolved.secrets).toEqual([])
 	})
 
-	it('flags an unusable previous secret inside an open window', () => {
+	/**
+	 * The retired slot is tracked separately on purpose. Folding it into `secretUnusable` would let
+	 * an unreadable secret nobody needs any more block deliveries the current secret signs fine,
+	 * trading a correctly signed delivery for none at all.
+	 */
+	it('drops an unusable previous secret inside an open window without failing the delivery', () => {
 		const resolved = fromCollectionRow(
 			row({
 				previousSecret: SECRET_UNUSABLE,
@@ -95,8 +100,10 @@ describe('unusable secrets', () => {
 			}),
 			NOW
 		)
-		expect(resolved.secretUnusable).toBe(true)
+		expect(resolved.secretUnusable).toBe(false)
+		expect(resolved.retiredSecretUnusable).toBe(true)
 		expect(resolved.secrets).toEqual([current])
+		expect(decideDelivery(resolved).deliverable).toBe(true)
 	})
 
 	it('ignores an unusable previous secret whose window already closed', () => {
@@ -107,6 +114,33 @@ describe('unusable secrets', () => {
 			}),
 			NOW
 		)
+		expect(resolved.secretUnusable).toBe(false)
+		expect(resolved.retiredSecretUnusable).toBe(false)
+		expect(resolved.secrets).toEqual([current])
+	})
+
+	it('still refuses when the active secret is the unusable one, whatever the retired slot holds', () => {
+		const resolved = fromCollectionRow(
+			row({
+				secret: SECRET_UNUSABLE,
+				previousSecretExpiresAt: new Date(NOW + 60_000).toISOString(),
+			}),
+			NOW
+		)
+		expect(resolved.secretUnusable).toBe(true)
+		expect(resolved.secrets).toEqual([previous])
+		expect(decideDelivery(resolved).deliverable).toBe(false)
+	})
+
+	it('flags a retired secret that will not normalize, like the sentinel', () => {
+		const resolved = fromCollectionRow(
+			row({
+				previousSecret: 'not base64!',
+				previousSecretExpiresAt: new Date(NOW + 60_000).toISOString(),
+			}),
+			NOW
+		)
+		expect(resolved.retiredSecretUnusable).toBe(true)
 		expect(resolved.secretUnusable).toBe(false)
 		expect(resolved.secrets).toEqual([current])
 	})

@@ -6,12 +6,21 @@ import { InvalidSecretError, normalizeSecret } from './format'
 
 export type SecretMigrationReport = {
 	scanned: number
-	/** Rows whose plaintext secrets were normalized and encrypted. */
+	/**
+	 * Rows with at least one plaintext secret normalized and encrypted. Under `dryRun` this counts
+	 * the rows that would change rather than rows that did.
+	 */
 	migrated: number
-	/** Rows already holding ciphertext, left untouched. */
+	/** Rows already holding ciphertext in every populated secret field, left untouched. */
 	alreadyEncrypted: number
-	/** Rows whose secret could not be normalized; each needs a manual rotation. */
-	failed: { id: string; reason: string }[]
+	/** Rows carrying no secret at all, so there was nothing to encrypt. */
+	noSecret: number
+	/**
+	 * Secrets that could not be normalized, one entry per field, each needing a manual rotation. A
+	 * row whose other secret field migrated fine appears in `migrated` as well: one unusable field
+	 * is no reason to leave a recoverable one in plaintext.
+	 */
+	failed: { field: (typeof SECRET_FIELDS)[number]; id: string; reason: string }[]
 }
 
 export type EncryptExistingSecretsOptions = {
@@ -34,7 +43,9 @@ const SECRET_FIELDS = ['secret', 'previousSecret'] as const
  * be updated regardless, because the signature scheme itself changed.
  *
  * A secret that cannot be normalized (a customer-supplied value that is not base64) is reported
- * rather than rewritten, since guessing at it would silently break signing. Rotate those.
+ * rather than rewritten, since guessing at it would silently break signing. Rotate those. It is
+ * reported per field, and a row's other secret field still migrates: one unusable value is no
+ * reason to leave a recoverable one sitting in plaintext.
  */
 export const encryptExistingSecrets = async (
 	payload: Payload,
@@ -46,6 +57,7 @@ export const encryptExistingSecrets = async (
 		scanned: 0,
 		migrated: 0,
 		alreadyEncrypted: 0,
+		noSecret: 0,
 		failed: [],
 	}
 
@@ -65,31 +77,40 @@ export const encryptExistingSecrets = async (
 			report.scanned += 1
 			const id = String((doc as { id: string | number }).id)
 			const patch: Record<string, string> = {}
-			let alreadyDone = true
-			let failure: string | undefined
+			let populated = 0
+			let failures = 0
 
 			for (const field of SECRET_FIELDS) {
 				const value = (doc as Record<string, unknown>)[field]
 				if (typeof value !== 'string' || value === '') {
 					continue
 				}
+				populated += 1
 				if (isEncryptedSecret(value)) {
 					continue
 				}
-				alreadyDone = false
 				try {
 					patch[field] = normalizeSecret(value)
 				} catch (err) {
-					failure = err instanceof InvalidSecretError ? err.reason : String(err)
+					failures += 1
+					report.failed.push({
+						field,
+						id,
+						reason: err instanceof InvalidSecretError ? err.reason : String(err),
+					})
 				}
 			}
 
-			if (failure) {
-				report.failed.push({ id, reason: failure })
+			if (!populated) {
+				report.noSecret += 1
 				continue
 			}
-			if (alreadyDone) {
-				report.alreadyEncrypted += 1
+			if (!Object.keys(patch).length) {
+				// Nothing to write: either every populated field is already ciphertext, or the only
+				// plaintext ones are unusable and have been reported for rotation.
+				if (!failures) {
+					report.alreadyEncrypted += 1
+				}
 				continue
 			}
 			if (!options.dryRun) {

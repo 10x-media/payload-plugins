@@ -47,7 +47,10 @@ const documentedReceiver = (args: {
 		.digest('base64')
 
 	return signatureHeader.split(' ').some((part) => {
-		const signature = part.split(',')[1] ?? ''
+		const [version, signature] = part.split(',')
+		if (version !== 'v1' || !signature) {
+			return false
+		}
 		const a = Buffer.from(signature)
 		const b = Buffer.from(expected)
 		return a.length === b.length && timingSafeEqual(a, b)
@@ -272,6 +275,29 @@ describe('interoperability with the standardwebhooks verifier', () => {
 		it('accepts a timestamp just inside the tolerance', async () => {
 			expect(await atOffset('inside', 299)).toBe(true)
 			expect(await atOffset('inside-past', -299)).toBe(true)
+		})
+
+		it('ignores a signature carrying an unknown version tag', async () => {
+			await clear()
+			const created = await subscribe('tagged')
+			const hit = await captureDelivery('tagged')
+			const real = String(hit.headers['webhook-signature'])
+
+			const verify = (signatureHeader: string) =>
+				documentedReceiver({
+					secret: String(created.secret),
+					id: String(hit.headers['webhook-id']),
+					timestamp: String(hit.headers['webhook-timestamp']),
+					rawBody: hit.body,
+					signatureHeader,
+				})
+
+			// The same bytes under a different scheme tag must not be accepted as v1.
+			expect(verify(real.replace('v1,', 'v2,'))).toBe(false)
+			// A malformed entry alongside the real one must not stop the real one matching.
+			expect(verify(`v2,${real.split(',')[1]} ${real}`)).toBe(true)
+			expect(verify('v1, garbage')).toBe(false)
+			expect(verify('')).toBe(false)
 		})
 
 		it('rejects a non-numeric timestamp', async () => {

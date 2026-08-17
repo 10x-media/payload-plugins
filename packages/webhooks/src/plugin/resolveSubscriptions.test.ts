@@ -25,6 +25,7 @@ describe('fromCollectionRow', () => {
 			events: ['posts.created'],
 			secrets: [secret],
 			secretUnusable: false,
+			retiredSecretUnusable: false,
 			headers: { 'X-A': '1' },
 			enabled: true,
 		})

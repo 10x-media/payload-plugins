@@ -63,16 +63,21 @@ const wh = new Webhook(process.env.WEBHOOK_SECRET!) // the whsec_... value
 
 export async function POST(req: Request) {
   const raw = await req.text() // the raw body, before any JSON parsing
-  const payload = wh.verify(raw, {
-    'webhook-id': req.headers.get('webhook-id')!,
-    'webhook-timestamp': req.headers.get('webhook-timestamp')!,
-    'webhook-signature': req.headers.get('webhook-signature')!,
-  })
-  return Response.json({ ok: true })
+  try {
+    const payload = wh.verify(raw, {
+      'webhook-id': req.headers.get('webhook-id') ?? '',
+      'webhook-timestamp': req.headers.get('webhook-timestamp') ?? '',
+      'webhook-signature': req.headers.get('webhook-signature') ?? '',
+    })
+    // payload is the parsed body, already verified
+    return Response.json({ ok: true })
+  } catch {
+    return new Response('bad signature', { status: 400 })
+  }
 }
 ```
 
-`verify` throws on a bad signature or a timestamp outside its five-minute tolerance. See [Signing](/webhooks/signing) for the scheme itself and for verifying without a library.
+`verify` **throws** on a bad signature or a timestamp outside its five-minute tolerance, so catch it and answer 400. Without the `try`, a forged or stale request becomes an unhandled 500, which is harder to tell apart from your own bugs. See [Signing](/webhooks/signing) for the scheme itself and for verifying without a library.
 
 ## If nothing is delivered
 

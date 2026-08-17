@@ -33,23 +33,55 @@ const toStoredSecret = (payload: Payload, value: unknown): string =>
 	isEncryptedSecret(value) ? value : encryptSecret(payload, normalizeOr400(value))
 
 /**
+ * A read-shaped stand-in rather than key material. Both are what a read hands back in place of a
+ * secret, so a caller that round-trips a document it read is writing one of these, not a secret,
+ * and it must never be persisted as the signing key.
+ */
+const isPlaceholderSecret = (value: unknown): boolean =>
+	value === SECRET_MASK || value === SECRET_UNUSABLE
+
+/**
  * Encrypt one incoming secret field in place. A null clears it (rotation retiring the previous
- * secret), and a masked value is dropped rather than persisted as the signing key.
+ * secret), and a placeholder is dropped rather than persisted as the signing key.
  */
 const withStoredSecret = (
 	payload: Payload,
 	data: Record<string, unknown>,
-	field: 'secret' | 'previousSecret'
+	field: 'previousSecret' | 'secret'
 ): Record<string, unknown> => {
 	const value = data[field]
 	if (value === undefined || value === null) {
 		return data
 	}
-	if (value === SECRET_MASK) {
-		const { [field]: _masked, ...rest } = data
+	if (isPlaceholderSecret(value)) {
+		const { [field]: _placeholder, ...rest } = data
 		return rest
 	}
 	return { ...data, [field]: toStoredSecret(payload, value) }
+}
+
+/**
+ * Retired key material whose grace window has closed is inert (the resolver ignores a lapsed
+ * window), but there is no reason to keep it. Clearing it on the next write of the row is free,
+ * needs no scheduler, and cannot race a delivery the way a write from the delivery path could.
+ */
+const withLapsedRotationCleared = (
+	data: Record<string, unknown>,
+	originalDoc: Record<string, unknown> | undefined,
+	now: number
+): Record<string, unknown> => {
+	if (!originalDoc || data.previousSecret !== undefined) {
+		return data
+	}
+	const expiresAt = originalDoc.previousSecretExpiresAt
+	if (originalDoc.previousSecret == null || expiresAt == null) {
+		return data
+	}
+	const expires = expiresAt instanceof Date ? expiresAt.getTime() : Date.parse(String(expiresAt))
+	if (!Number.isFinite(expires) || now < expires) {
+		return data
+	}
+	return { ...data, previousSecret: null, previousSecretExpiresAt: null }
 }
 
 /**
@@ -59,9 +91,13 @@ const withStoredSecret = (
  * cannot recover it otherwise. Rotation writes plaintext into both secret fields, so updates
  * encrypt whichever ones are present.
  */
-const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => {
+const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, originalDoc, req }) => {
 	if (operation === 'create') {
-		const plaintext = data.secret ? normalizeOr400(data.secret) : generateSecret()
+		// A placeholder here is a document that was read and resubmitted, which is exactly what
+		// Payload's duplicate action does: it carries the mask, not key material. Treating it as
+		// absent gives the copy its own fresh secret, which is what a duplicate should have anyway.
+		const supplied = isPlaceholderSecret(data.secret) ? undefined : data.secret
+		const plaintext = supplied ? normalizeOr400(supplied) : generateSecret()
 		const ciphertext = encryptSecret(req.payload, plaintext)
 		req.context[SECRET_REVEAL_CONTEXT.once] = true
 		// Bound to the exact ciphertext this create produced. Every encryption uses a fresh IV, so
@@ -72,19 +108,36 @@ const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => 
 		// ordinary create, but an `overrideAccess` create would otherwise persist it in plaintext.
 		return withStoredSecret(req.payload, { ...data, secret: ciphertext }, 'previousSecret')
 	}
-	return withStoredSecret(
-		req.payload,
-		withStoredSecret(req.payload, data, 'secret'),
-		'previousSecret'
+	return withLapsedRotationCleared(
+		withStoredSecret(req.payload, withStoredSecret(req.payload, data, 'secret'), 'previousSecret'),
+		originalDoc as Record<string, unknown> | undefined,
+		Date.now()
 	)
 }
 
 /** The create-time reveal stash: plaintext bound to the ciphertext it was stored as. */
 type RevealStash = { ciphertext: string; plaintext: string }
 
-const stashedPlaintextFor = (req: PayloadRequest, value: string): string | null => {
+const clearReveal = (req: PayloadRequest): void => {
+	req.context[SECRET_REVEAL_CONTEXT.once] = false
+	req.context[SECRET_REVEAL_CONTEXT.plaintext] = undefined
+}
+
+/**
+ * Hand back the create-time plaintext for one value, and close the window in the same step.
+ *
+ * The stash is bound to the exact ciphertext the create produced, so it can only ever match the
+ * document it came from. Consuming it on the first match makes the reveal literally once, enforced
+ * at the read rather than by a later hook: Payload only runs collection `afterError` from its HTTP
+ * layer, so a Local API create that throws after `beforeChange` never reaches any cleanup hook.
+ */
+const takeStashedPlaintext = (req: PayloadRequest, value: string): string | null => {
 	const stash = req.context[SECRET_REVEAL_CONTEXT.plaintext] as RevealStash | undefined
-	return stash?.ciphertext === value ? stash.plaintext : null
+	if (stash?.ciphertext !== value) {
+		return null
+	}
+	clearReveal(req)
+	return stash.plaintext
 }
 
 /**
@@ -96,9 +149,13 @@ const stashedPlaintextFor = (req: PayloadRequest, value: string): string | null 
  *
  * `reveals` is false for `previousSecret`: only a newly created secret has a create reveal, and
  * echoing the stash there would return the new secret a second time under the wrong field.
+ *
+ * `slot` only shapes the failure message. Which secret failed to decrypt decides what happens to
+ * the delivery, and saying "deliveries will fail" for a retired secret that merely loses its
+ * rotation overlap would send an operator hunting the wrong problem.
  */
 const maskSecret =
-	(options: { reveals: boolean }): FieldHook =>
+	(options: { reveals: boolean; slot: 'active' | 'retired' }): FieldHook =>
 	({ value, req }) => {
 		if (value == null) {
 			return value
@@ -107,13 +164,15 @@ const maskSecret =
 			return value
 		}
 		if (options.reveals && req.context[SECRET_REVEAL_CONTEXT.once]) {
-			return stashedPlaintextFor(req, String(value)) ?? SECRET_MASK
+			return takeStashedPlaintext(req, String(value)) ?? SECRET_MASK
 		}
 		if (req.context[SECRET_REVEAL_CONTEXT.forSigning]) {
 			const plaintext = decryptSecret(req.payload, String(value))
 			if (!plaintext) {
 				req.payload.logger.error(
-					`@10x-media/webhooks: a stored signing secret could not be decrypted, so deliveries for this subscription will fail instead of being sent unsigned. Either PAYLOAD_SECRET changed after the secret was stored, or the subscription predates encryption at rest and needs encryptExistingSecrets(). Rotating the secret also recovers it.`
+					options.slot === 'active'
+						? `@10x-media/webhooks: a stored signing secret could not be decrypted, so deliveries for this subscription will fail instead of being sent unsigned. Either PAYLOAD_SECRET changed after the secret was stored, or the subscription predates encryption at rest and needs encryptExistingSecrets(). Rotating the secret also recovers it.`
+						: `@10x-media/webhooks: a retired signing secret still inside its rotation grace window could not be decrypted, so it has been dropped. Deliveries continue, signed with the current secret; receivers that have not moved off the retired secret lose their overlap early.`
 				)
 				return SECRET_UNUSABLE
 			}
@@ -122,22 +181,18 @@ const maskSecret =
 		return SECRET_MASK
 	}
 
-const clearReveal = (req: PayloadRequest): void => {
-	req.context[SECRET_REVEAL_CONTEXT.once] = false
-	req.context[SECRET_REVEAL_CONTEXT.plaintext] = undefined
-}
-
+/**
+ * Belt to the reveal's suspenders. A successful create closes its own window when the response
+ * read consumes the stash, so this only matters for a write whose response never reads the secret
+ * back, and for a create that threw before it: Payload runs collection `afterError` from its HTTP
+ * layer only, so a failed Local API create reaches neither hook. The ciphertext binding is what
+ * makes a leftover stash harmless in that case; these two just keep a long-lived request tidy.
+ */
 const clearRevealOnce: CollectionAfterChangeHook = ({ doc, req }) => {
 	clearReveal(req)
 	return doc
 }
 
-/**
- * A create that throws after `beforeChange` never reaches `afterChange`, so the reveal window
- * would otherwise stay open for the rest of the request. The stash is ciphertext-bound and so
- * cannot reveal another document's secret regardless, but a long-lived request (a job run, a
- * nested Local API call) has no reason to carry it.
- */
 const clearRevealOnError: CollectionAfterErrorHook = ({ req }) => {
 	clearReveal(req)
 	return undefined
@@ -192,7 +247,7 @@ export const buildSubscriptionsCollection = (args: {
 			label: labelForKey(keys.fieldSecret),
 			admin: { readOnly: true, description: labelForKey(keys.fieldSecretHelp) },
 			access: { update: () => false },
-			hooks: { afterRead: [maskSecret({ reveals: true })] },
+			hooks: { afterRead: [maskSecret({ reveals: true, slot: 'active' })] },
 		},
 		{
 			name: 'previousSecret',
@@ -203,7 +258,7 @@ export const buildSubscriptionsCollection = (args: {
 			// GraphQL create from planting a second signing key, in plaintext, on a new
 			// subscription: `admin.hidden` only hides the field in the UI.
 			access: { create: () => false, update: () => false },
-			hooks: { afterRead: [maskSecret({ reveals: false })] },
+			hooks: { afterRead: [maskSecret({ reveals: false, slot: 'retired' })] },
 		},
 		{
 			name: 'previousSecretExpiresAt',

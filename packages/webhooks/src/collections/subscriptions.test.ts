@@ -51,12 +51,18 @@ const stash = (context: RequestContext) =>
 
 const runBeforeChange = (
 	c: ReturnType<typeof buildSubscriptionsCollection>,
-	args: { data: Record<string, unknown>; operation: 'create' | 'update'; context: RequestContext }
+	args: {
+		data: Record<string, unknown>
+		operation: 'create' | 'update'
+		context: RequestContext
+		originalDoc?: Record<string, unknown>
+	}
 ) => {
 	const hook = c.hooks?.beforeChange?.[0] as CollectionBeforeChangeHook
 	return hook({
 		data: args.data,
 		operation: args.operation,
+		originalDoc: args.originalDoc,
 		req: fakeReq(args.context),
 	} as never) as Promise<Record<string, unknown>> | Record<string, unknown>
 }
@@ -280,5 +286,94 @@ describe('buildSubscriptionsCollection', () => {
 		hook({ doc: { id: '1' }, req: { context } } as never)
 		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(false)
 		expect(context[SECRET_REVEAL_CONTEXT.plaintext]).toBeUndefined()
+	})
+
+	/**
+	 * Payload runs collection `afterError` from its HTTP layer only, so a Local API create that
+	 * throws after `beforeChange` reaches no cleanup hook. The reveal has to close itself.
+	 */
+	it('consumes the reveal on the first matching read, so a second read is masked', async () => {
+		const context: RequestContext = {}
+		const created = await runBeforeChange(c, { data: {}, operation: 'create', context })
+		const hook = secretAfterRead(c)
+		const plaintext = stash(context)?.plaintext
+
+		expect(runMask(hook, created.secret, context)).toBe(plaintext)
+		expect(runMask(hook, created.secret, context)).toBe(SECRET_MASK)
+		expect(context[SECRET_REVEAL_CONTEXT.plaintext]).toBeUndefined()
+	})
+
+	it('generates a fresh secret when a read document is resubmitted, as duplicate does', async () => {
+		for (const placeholder of [SECRET_MASK, SECRET_UNUSABLE]) {
+			const context: RequestContext = {}
+			const created = await runBeforeChange(c, {
+				data: { name: 'copy', secret: placeholder },
+				operation: 'create',
+				context,
+			})
+			expect(isEncryptedSecret(created.secret)).toBe(true)
+			expect(isNormalizedSecret(stash(context)?.plaintext)).toBe(true)
+		}
+	})
+
+	it('drops a resubmitted placeholder on update rather than storing it as the key', async () => {
+		for (const placeholder of [SECRET_MASK, SECRET_UNUSABLE]) {
+			const updated = await runBeforeChange(c, {
+				data: { name: 'n', secret: placeholder },
+				operation: 'update',
+				context: {},
+			})
+			expect('secret' in updated).toBe(false)
+		}
+	})
+
+	describe('lapsed rotation cleanup', () => {
+		const lapsed = { previousSecret: 'whenc1_abc', previousSecretExpiresAt: '2020-01-01T00:00:00Z' }
+
+		it('clears a retired secret whose window has closed on the next write', async () => {
+			const updated = await runBeforeChange(c, {
+				data: { name: 'renamed' },
+				operation: 'update',
+				context: {},
+				originalDoc: lapsed,
+			})
+			expect(updated.previousSecret).toBeNull()
+			expect(updated.previousSecretExpiresAt).toBeNull()
+		})
+
+		it('leaves an open window alone', async () => {
+			const updated = await runBeforeChange(c, {
+				data: { name: 'renamed' },
+				operation: 'update',
+				context: {},
+				originalDoc: {
+					previousSecret: 'whenc1_abc',
+					previousSecretExpiresAt: new Date(Date.now() + 60_000),
+				},
+			})
+			expect('previousSecret' in updated).toBe(false)
+		})
+
+		it('does not fight a rotation writing the fields in the same operation', async () => {
+			const incoming = generateSecret()
+			const updated = await runBeforeChange(c, {
+				data: { previousSecret: incoming, previousSecretExpiresAt: 'later' },
+				operation: 'update',
+				context: {},
+				originalDoc: lapsed,
+			})
+			expect(isEncryptedSecret(updated.previousSecret)).toBe(true)
+			expect(updated.previousSecretExpiresAt).toBe('later')
+		})
+
+		it('leaves a row with no retired secret untouched', async () => {
+			const updated = await runBeforeChange(c, {
+				data: { name: 'renamed' },
+				operation: 'update',
+				context: {},
+				originalDoc: { previousSecret: null, previousSecretExpiresAt: null },
+			})
+			expect('previousSecret' in updated).toBe(false)
+		})
 	})
 })

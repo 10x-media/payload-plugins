@@ -16,43 +16,64 @@ export type ResolvedSubscription = {
 	 */
 	secrets: string[]
 	/**
-	 * A secret is configured but could not be recovered, so this subscription must not be
-	 * delivered at all. Falling back to an unsigned POST would be accepted by any receiver that
+	 * The *active* secret is configured but could not be recovered, so this subscription must not
+	 * be delivered at all. Falling back to an unsigned POST would be accepted by any receiver that
 	 * verifies only when a signature header is present.
 	 */
 	secretUnusable: boolean
+	/**
+	 * A retired secret inside its rotation grace window could not be recovered and was dropped.
+	 * The delivery still goes out, signed with the active secret: refusing here would trade a
+	 * correctly signed delivery for none at all, which is worse on every axis. Receivers that have
+	 * not yet moved off the retired secret lose their overlap early.
+	 */
+	retiredSecretUnusable: boolean
 	headers?: Record<string, string>
 	enabled: boolean
 }
 
+/** One stored secret value sorted into a usable key, a hard failure, or nothing at all. */
+type SecretSlot = { secret: string | null; unusable: boolean }
+
 /**
- * Sort stored secret values into usable keys and a hard failure flag.
+ * Classify one stored secret value.
  *
  * `SECRET_UNUSABLE` and a value that will not normalize both mean a secret exists that cannot
- * sign, which has to fail the delivery rather than silently drop the signature. The mask is
- * different: it means this read never opened a reveal window, so it carries no information about
- * whether a secret is usable and is skipped without raising the flag.
+ * sign. The mask is different: it means this read never opened a reveal window, so it carries no
+ * information about whether a secret is usable and is skipped without raising the flag.
  */
-const resolveSecrets = (
-	values: (string | Date | null | undefined)[]
-): { secrets: string[]; secretUnusable: boolean } => {
-	const secrets: string[] = []
-	let secretUnusable = false
-	for (const value of values) {
-		if (typeof value !== 'string' || value === '' || value === SECRET_MASK) {
-			continue
-		}
-		if (value === SECRET_UNUSABLE) {
-			secretUnusable = true
-			continue
-		}
-		try {
-			secrets.push(normalizeSecret(value))
-		} catch {
-			secretUnusable = true
-		}
+const resolveSlot = (value: string | Date | null | undefined): SecretSlot => {
+	if (typeof value !== 'string' || value === '' || value === SECRET_MASK) {
+		return { secret: null, unusable: false }
 	}
-	return { secrets, secretUnusable }
+	if (value === SECRET_UNUSABLE) {
+		return { secret: null, unusable: true }
+	}
+	try {
+		return { secret: normalizeSecret(value), unusable: false }
+	} catch {
+		return { secret: null, unusable: true }
+	}
+}
+
+/**
+ * Resolve both secret slots, keeping their failures apart. Which slot failed decides what happens:
+ * an unusable *active* secret means the signature the receiver expects cannot be produced at all
+ * and the delivery is refused, while an unusable *retired* one only costs the rotation overlap.
+ * Collapsing the two would let a stale, unreadable retired secret block deliveries that the
+ * current secret can sign perfectly well.
+ */
+const resolveSecrets = (args: {
+	active: string | Date | null | undefined
+	retired?: string | Date | null | undefined
+}): Pick<ResolvedSubscription, 'retiredSecretUnusable' | 'secrets' | 'secretUnusable'> => {
+	const active = resolveSlot(args.active)
+	const retired = resolveSlot(args.retired)
+	return {
+		secrets: [active.secret, retired.secret].filter((s): s is string => s !== null),
+		secretUnusable: active.unusable,
+		retiredSecretUnusable: retired.unusable,
+	}
 }
 
 const rowHeaders = (
@@ -101,10 +122,10 @@ export const fromCollectionRow = (
 	source: 'collection',
 	url: row.url,
 	events: row.events ?? [],
-	...resolveSecrets([
-		row.secret,
-		withinGrace(row.previousSecretExpiresAt, now) ? row.previousSecret : undefined,
-	]),
+	...resolveSecrets({
+		active: row.secret,
+		retired: withinGrace(row.previousSecretExpiresAt, now) ? row.previousSecret : undefined,
+	}),
 	headers: rowHeaders(row.headers),
 	enabled: row.enabled !== false,
 })
@@ -115,19 +136,21 @@ export const fromCodeSubscription = (sub: CodeSubscription): ResolvedSubscriptio
 	source: 'code',
 	url: sub.url,
 	events: sub.events,
-	...resolveSecrets([sub.secret]),
+	...resolveSecrets({ active: sub.secret }),
 	headers: sub.headers,
 	enabled: sub.enabled !== false,
 })
 
 export type DeliveryDecision =
-	| { deliverable: true; subscription: ResolvedSubscription }
 	| { deliverable: false; reason: string }
+	| { deliverable: true; subscription: ResolvedSubscription }
 
 /**
  * Whether a resolved subscription may be delivered to, and why not when it may not. An
- * unrecoverable secret is a refusal rather than a downgrade to unsigned: a receiver that verifies
- * only when a signature header is present would accept an unsigned delivery unconditionally.
+ * unrecoverable *active* secret is a refusal rather than a downgrade to unsigned: a receiver that
+ * verifies only when a signature header is present would accept an unsigned delivery
+ * unconditionally. An unrecoverable *retired* secret is not a refusal, because the delivery can
+ * still be signed with the active secret, which is strictly better than not delivering.
  */
 export const decideDelivery = (subscription: ResolvedSubscription | null): DeliveryDecision => {
 	if (!subscription) {

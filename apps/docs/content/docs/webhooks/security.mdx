@@ -44,6 +44,8 @@ The cipher (`aes-256-ctr`) carries no authentication tag. A decrypt that does no
 A subscription that is supposed to be signed is never downgraded to an unsigned delivery. Receivers commonly verify only when a signature header is present, so an unsigned POST would sail through that check. A refused delivery is a visible failure you can act on; a silently unsigned one is not.
 </Callout>
 
+That refusal is about the **current** secret. If only a retired secret inside an open [rotation window](/webhooks/signing#rotation) is unreadable, the delivery still goes out signed with the current secret and a warning names what was dropped: a correctly signed delivery beats no delivery, and the only loss is the overlap for receivers that have not switched over yet.
+
 This applies to subscriptions that predate encryption at rest, too: until [migrated](#migrating-subscriptions-created-before-encryption) or rotated, their deliveries fail rather than going out unsigned. Subscriptions with no secret at all are unaffected and continue to deliver unsigned, which is what they always did.
 
 ## PAYLOAD_SECRET and stored secrets
@@ -52,7 +54,7 @@ Because the encryption key derives from `PAYLOAD_SECRET`, **changing `PAYLOAD_SE
 
 `PAYLOAD_SECRET` also keys other Payload internals, so this is not a webhooks-specific hazard, but webhook signing fails loudly and is easy to miss in staging.
 
-To change `PAYLOAD_SECRET` safely, decrypt before the switch and re-encrypt after:
+To change `PAYLOAD_SECRET` safely, decrypt before the switch and re-encrypt after. Capture **both** secret fields: a subscription in an open [rotation grace period](/webhooks/signing#rotation) has a retired secret encrypted under the old key too, and restoring only the current one leaves receivers that have not switched over failing for the rest of the window.
 
 1. **Before changing it**, record the current plaintext secrets while the old key still works:
 
@@ -63,21 +65,36 @@ To change `PAYLOAD_SECRET` safely, decrypt before the switch and re-encrypt afte
      overrideAccess: true,
      context: { webhooksRevealSecretForSigning: true },
    })
-   // subs.docs[].secret is plaintext here; store it somewhere safe, briefly
+   // secret and previousSecret are both plaintext here; store them somewhere safe, briefly
+   const recorded = subs.docs.map((doc) => ({
+     id: doc.id,
+     secret: doc.secret,
+     previousSecret: doc.previousSecret,
+     previousSecretExpiresAt: doc.previousSecretExpiresAt,
+   }))
    ```
 
 2. Change `PAYLOAD_SECRET` and restart.
 
-3. **After the switch**, write each secret back. The `beforeChange` hook re-encrypts it under the new key:
+3. **After the switch**, write each secret back. The `beforeChange` hook re-encrypts under the new key:
 
    ```ts
-   await payload.update({
-     collection: 'webhook-subscriptions',
-     id,
-     data: { secret: recordedPlaintext },
-     overrideAccess: true,
-   })
+   for (const row of recorded) {
+     await payload.update({
+       collection: 'webhook-subscriptions',
+       id: row.id,
+       data: {
+         secret: row.secret,
+         // Carry the rotation window across too, or drop both to end it early.
+         previousSecret: row.previousSecret ?? null,
+         previousSecretExpiresAt: row.previousSecretExpiresAt ?? null,
+       },
+       overrideAccess: true,
+     })
+   }
    ```
+
+   Restoring only `secret` still leaves deliveries working, because an unreadable retired secret is dropped rather than failing the delivery. It just ends the rotation overlap early, and logs a warning naming that.
 
 If you did not capture the secrets first, they are gone: [rotate](/webhooks/signing#rotation) each subscription and distribute the new secrets to receivers. Set `graceSeconds: 0` for those, since the old secret is already unusable and there is nothing to overlap with.
 
@@ -89,12 +106,12 @@ Subscriptions created before this release hold plaintext secrets, and **their de
 import { encryptExistingSecrets } from '@10x-media/webhooks'
 
 const report = await encryptExistingSecrets(payload, { dryRun: true })
-// { scanned, migrated, alreadyEncrypted, failed: [{ id, reason }] }
+// { scanned, migrated, alreadyEncrypted, noSecret, failed: [{ id, field, reason }] }
 ```
 
 Drop `dryRun` to write. It is idempotent, so re-running is safe.
 
-The utility does not invent new secrets: a legacy 48-character hex secret is already valid base64, so it keeps its characters and gains a `whsec_` prefix. Anything it cannot normalize is reported by row id rather than rewritten; rotate those.
+The utility does not invent new secrets: a legacy 48-character hex secret is already valid base64, so it keeps its characters and gains a `whsec_` prefix. Anything it cannot normalize is reported by row id and field name rather than rewritten; rotate those. A row's other secret field still migrates, so one unusable value does not strand a recoverable one in plaintext, which is why a row can appear in both `migrated` and `failed`.
 
 <Callout type="warn">
 Receivers must be updated regardless of this migration. The signature format, the header names, and the key derivation all changed, so an unchanged receiver will reject every delivery. See [Signing](/webhooks/signing).

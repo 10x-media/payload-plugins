@@ -2,8 +2,13 @@ import { randomBytes } from 'node:crypto'
 
 import { MIN_SECRET_BYTES, SECRET_BYTES, SECRET_PREFIX } from '../constants'
 
-/** Base64 with optional padding, the only body a `whsec_` secret may carry. */
-const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
+/**
+ * Canonical base64, the only body a `whsec_` secret may carry: full four-character groups, with a
+ * correctly padded final group. Accepting a ragged length instead would decode leftover bits away,
+ * so a truncated paste would be taken as a valid, shorter key, and two different secret strings
+ * could decode to the very same HMAC key.
+ */
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
 /** Raised for a malformed customer-supplied secret; callers map it to a 400 or a boot failure. */
 export class InvalidSecretError extends Error {
@@ -39,7 +44,7 @@ export const normalizeSecret = (input: string): string => {
 	}
 	if (!BASE64.test(body)) {
 		throw new InvalidSecretError(
-			`the value after '${SECRET_PREFIX}' must be base64 (the Standard Webhooks verifier base64-decodes it into the HMAC key)`
+			`the value after '${SECRET_PREFIX}' must be padded base64 with no stray characters (the Standard Webhooks verifier base64-decodes it into the HMAC key, and a ragged length would silently decode to a shorter one)`
 		)
 	}
 	const bytes = Buffer.from(body, 'base64')

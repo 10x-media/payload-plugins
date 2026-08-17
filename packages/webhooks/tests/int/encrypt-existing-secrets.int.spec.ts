@@ -141,6 +141,49 @@ describe('encryptExistingSecrets', () => {
 		}
 	})
 
+	it('counts a row carrying no secret separately from one already encrypted', async () => {
+		await clear()
+		await makeLegacy('empty')
+		await collection().updateOne({ name: 'empty' }, { $unset: { secret: '' } })
+
+		const report = await encryptExistingSecrets(booted.payload)
+		expect(report).toMatchObject({
+			alreadyEncrypted: 0,
+			migrated: 0,
+			noSecret: 1,
+			scanned: 1,
+		})
+	})
+
+	/**
+	 * One unusable field is no reason to leave a recoverable one in plaintext, so the row migrates
+	 * what it can and reports the rest by field.
+	 */
+	it('migrates the fields it can when a sibling field is unusable, reporting that field', async () => {
+		await clear()
+		await makeLegacy('partial')
+		await collection().updateOne({ name: 'partial' }, { $set: { previousSecret: 'not base64!!' } })
+
+		const report = await encryptExistingSecrets(booted.payload)
+		expect(report.migrated).toBe(1)
+		expect(report.failed).toEqual([
+			{ field: 'previousSecret', id: expect.any(String), reason: expect.stringMatching(/base64/) },
+		])
+
+		const row = await collection().findOne({ name: 'partial' })
+		expect(isEncryptedSecret(row?.secret)).toBe(true)
+		expect(row?.previousSecret).toBe('not base64!!')
+	})
+
+	it('names the field on a failure so an operator knows which one to rotate', async () => {
+		await clear()
+		await makeLegacy('named', 'not base64!!')
+
+		const report = await encryptExistingSecrets(booted.payload)
+		expect(report.failed[0]?.field).toBe('secret')
+		expect(report).toMatchObject({ alreadyEncrypted: 0, migrated: 0, noSecret: 0 })
+	})
+
 	it('keeps reads masked after migrating', async () => {
 		await clear()
 		const created = await makeLegacy('masked-after')

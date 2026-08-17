@@ -57,8 +57,32 @@ describe('normalizeSecret', () => {
 	})
 
 	it('rejects non-base64 material', () => {
-		expect(() => normalizeSecret('__redacted__')).toThrow(/must be base64/)
-		expect(() => normalizeSecret(`${SECRET_PREFIX}not base64!`)).toThrow(/must be base64/)
+		expect(() => normalizeSecret('__redacted__')).toThrow(/padded base64/)
+		expect(() => normalizeSecret(`${SECRET_PREFIX}not base64!`)).toThrow(/padded base64/)
+	})
+
+	it('rejects a ragged length rather than decoding the leftover bits away', () => {
+		// 33 base64 characters: a group of three plus one stray, which `Buffer.from` would happily
+		// truncate. Accepting it would mean a mistyped or clipped paste silently becomes a shorter
+		// key, and that two different strings can derive the very same one.
+		expect(() => normalizeSecret('A'.repeat(33))).toThrow(/padded base64/)
+		expect(() => normalizeSecret(`${SECRET_PREFIX}${'A'.repeat(43)}`)).toThrow(/padded base64/)
+	})
+
+	it('rejects misplaced or over-long padding', () => {
+		expect(() => normalizeSecret(`${'A'.repeat(24)}===`)).toThrow(/padded base64/)
+		expect(() => normalizeSecret(`${'A'.repeat(22)}=A`)).toThrow(/padded base64/)
+	})
+
+	it('accepts both padded final-group shapes', () => {
+		// 22 characters + '==' decodes to 16 bytes, 23 + '=' to 17: the two legal tail shapes.
+		expect(secretKey(normalizeSecret(`${'A'.repeat(22)}==`))).toHaveLength(16)
+		expect(secretKey(normalizeSecret(`${'A'.repeat(23)}=`))).toHaveLength(17)
+	})
+
+	it('accepts a legacy 48-character hex secret, which is already canonical base64', () => {
+		const legacy = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718'
+		expect(normalizeSecret(legacy)).toBe(`${SECRET_PREFIX}${legacy}`)
 	})
 
 	it('rejects material below the byte floor', () => {

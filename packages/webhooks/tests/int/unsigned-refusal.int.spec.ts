@@ -162,6 +162,54 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 		expect(delivery?.status).toBe('success')
 	})
 
+	/**
+	 * The refusal exists so a subscription meant to be signed is never sent unsigned. That reasoning
+	 * covers the active secret only: when the retired one in an open grace window is unreadable, a
+	 * fully valid signature is still available, and refusing would trade a correctly signed delivery
+	 * for no delivery at all. This is the shape a `PAYLOAD_SECRET` change leaves behind when the
+	 * operator restores `secret` but not `previousSecret`.
+	 */
+	it('delivers signed with the active secret when only the retired one is unreadable', async () => {
+		await clear()
+		await subscribe('half-broken')
+		await raw().updateOne(
+			{ name: 'half-broken' },
+			{
+				$set: {
+					previousSecret: CORRUPT_CIPHERTEXT,
+					previousSecretExpiresAt: new Date(Date.now() + 3_600_000),
+				},
+			}
+		)
+
+		const { hit, delivery } = await deliver('half-broken')
+		expect(hit).toBeDefined()
+		expect(delivery?.status).toBe('success')
+		// One signature, from the active secret: the unreadable retired one is dropped, not signed.
+		expect(String(hit?.headers['webhook-signature']).split(' ')).toHaveLength(1)
+		expect(hit?.headers['webhook-signature']).toMatch(/^v1,/)
+	})
+
+	it('refuses when the active secret is unreadable even if a retired one still works', async () => {
+		await clear()
+		const created = await subscribe('active-broken')
+		const usable = generateSecret()
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			data: {
+				previousSecret: usable,
+				previousSecretExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+			},
+			overrideAccess: true,
+		})
+		await raw().updateOne({ name: 'active-broken' }, { $set: { secret: CORRUPT_CIPHERTEXT } })
+
+		const { hit, delivery } = await deliver('active-broken')
+		expect(hit).toBeUndefined()
+		expect(delivery?.status).toBe('dead')
+	})
+
 	it('marks the row dead through the queue path too', async () => {
 		const queued = await bootPayload({
 			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'queue', retries: 0 } }),

@@ -103,7 +103,8 @@ export function verifyWebhook(args: {
 
   // The header may carry several space-separated signatures during a rotation.
   return signatureHeader.split(' ').some((part) => {
-    const signature = part.split(',')[1] ?? ''
+    const [version, signature] = part.split(',')
+    if (version !== 'v1' || !signature) return false
     const a = Buffer.from(signature)
     const b = Buffer.from(expected)
     return a.length === b.length && timingSafeEqual(a, b)
@@ -111,10 +112,11 @@ export function verifyWebhook(args: {
 }
 ```
 
-Three details that are easy to get wrong:
+Four details that are easy to get wrong:
 
 - **Decode the secret.** `Buffer.from(secret, 'base64')` after stripping the prefix, not the prefix-stripped string itself.
 - **Accept any listed signature.** During rotation the header holds more than one; matching only the first breaks mid-rotation.
+- **Check the version tag.** Only compare entries tagged `v1`. Ignoring the tag means a future scheme's signature would be checked as if it were `v1` rather than skipped.
 - **Compare in constant time.** Never `===` on signatures, and check lengths before `timingSafeEqual`.
 
 ## Secrets are reveal-once
