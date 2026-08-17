@@ -187,6 +187,10 @@ export interface Post {
         id?: string | null;
       }[]
     | null;
+  /**
+   * The URL segment for this post.
+   */
+  slug?: string | null;
   branding?: {
     accent?: string | null;
     icon?: string | null;
@@ -413,6 +417,7 @@ export interface PostsSelect<T extends boolean = true> {
             };
         id?: T;
       };
+  slug?: T;
   branding?:
     | T
     | {
@@ -642,17 +647,6 @@ export interface WikiVideoEmbedBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'wikiVideoEmbed';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "WikiGuideLinkBlock".
- */
-export interface WikiGuideLinkBlock {
-  guide: string | WikiPage;
-  label?: string | null;
-  id?: string | null;
-  blockName?: string | null;
-  blockType: 'wikiGuideLink';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

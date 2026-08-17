@@ -6,7 +6,6 @@ import { useMemo } from 'react'
 
 import {
 	CALLOUT_BLOCK_SLUG,
-	GUIDE_LINK_BLOCK_SLUG,
 	VIDEO_EMBED_BLOCK_SLUG,
 	WIKI_VIDEO_NODE_TYPE,
 } from '../../editor/constants'
@@ -15,7 +14,7 @@ import { GuideVideo } from '../Video/GuideVideo'
 import { VideoEmbed } from '../Video/VideoEmbed'
 import { useWikiTargets, type WikiBlockRenderer } from '../WikiProvider/WikiProvider'
 import { Callout } from './Callout'
-import { GuideLink, type GuideLinkFields } from './GuideLink'
+import { inlineConverters } from './inlineConverters'
 import './guide-article.css'
 
 export type { WikiBlockRenderer } from '../WikiProvider/WikiProvider'
@@ -36,8 +35,8 @@ const buildConverters =
 		blockRenderers: Record<string, WikiBlockRenderer>,
 		idsByNode: Map<object, string>
 	): JSXConvertersFunction =>
-	({ defaultConverters }) => ({
-		...defaultConverters,
+	(args) => ({
+		...inlineConverters(args),
 		/**
 		 * The default converter renders the tag and nothing else. Headings need an
 		 * id for the table of contents to link to, and the id comes from the same
@@ -70,20 +69,6 @@ const buildConverters =
 			const video = node as { relationTo?: string; value?: number | string }
 			return <GuideVideo relationTo={video.relationTo ?? ''} value={video.value} />
 		},
-		inlineBlocks: {
-			[GUIDE_LINK_BLOCK_SLUG]: ({ node }: { node: { fields: Record<string, unknown> } }) => (
-				<GuideLink fields={node.fields as GuideLinkFields} />
-			),
-		},
-		link: ({ node, nodesToJSX }) => (
-			<a
-				href={typeof node.fields.url === 'string' ? node.fields.url : undefined}
-				rel="noopener noreferrer"
-				target="_blank"
-			>
-				{nodesToJSX({ nodes: node.children })}
-			</a>
-		),
 	})
 
 /**

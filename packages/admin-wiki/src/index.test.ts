@@ -62,6 +62,28 @@ describe('adminWiki factory', () => {
 		expect(withoutView.collections?.[0]?.admin?.components?.views).toBeUndefined()
 	})
 
+	it('registers the wiki view slot components as import map dependencies', () => {
+		const out = adminWiki({
+			wikiView: {
+				components: {
+					afterTable: [{ path: '/components/Footer', exportName: 'Footer' }],
+					beforeControls: ['/components/Export#ExportButton'],
+					beforeTable: [{ path: '/components/Notice#Notice', clientProps: { tone: 'warn' } }],
+				},
+			},
+		})(fakeConfig()) as Config
+		// The generator reads the export after `#` and defaults to the default
+		// export, so an `exportName` has to be folded into the registered path.
+		expect(Object.values(out.admin?.dependencies ?? {})).toEqual([
+			{ path: '/components/Footer#Footer', type: 'component' },
+			{ path: '/components/Export#ExportButton', type: 'component' },
+			{ path: '/components/Notice#Notice', type: 'component' },
+		])
+		expect(getWikiRegistry(out)?.wikiView).toMatchObject({
+			components: { beforeControls: ['/components/Export#ExportButton'] },
+		})
+	})
+
 	it('offers only covered entities in the collection and global target pickers', () => {
 		const cfg = {
 			collections: [

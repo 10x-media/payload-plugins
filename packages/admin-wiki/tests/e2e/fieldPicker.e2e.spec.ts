@@ -161,6 +161,47 @@ test.describe('field target picker', () => {
 		await expect(firstRow(settings)).toHaveAttribute('title', 'global:settings.siteName')
 	})
 
+	test('lays the picked form out with a sidebar, and picks off it', async ({ page }) => {
+		guideId = await createGuide(page, 'Picker sidebar')
+		await openGuideTargets(page, guideId)
+
+		await pickFields(page, 'Collection')
+		await pickerReady(page)
+
+		// `slug` is the collection's one sidebar field. It belongs in the sidebar
+		// column here exactly as it does on the document, and it is a target like
+		// any other once it is there.
+		await expect(picker(page).locator('.document-fields__sidebar #field-slug')).toBeVisible()
+		await expect(picker(page).locator('.document-fields__main #field-slug')).toHaveCount(0)
+
+		await pickField(page, 'slug')
+		await applyPicker(page)
+
+		expect(await crumbsOf(pathsOfGroup(group(page, 'Post')).first())).toEqual(['Slug'])
+		await expect(firstRow(group(page, 'Post'))).toHaveAttribute('title', 'collection:posts.slug')
+	})
+
+	test('keeps the entity guides panel out of the picked form', async ({ page }) => {
+		guideId = await createGuide(page, 'Picker panel')
+		await openGuideTargets(page, guideId)
+
+		// Both covered collections and the one global carry a seeded entity-level
+		// guide, so the injected sidebar panel has something to render everywhere
+		// the picker can open: it is silenced by the picker, not by having no guide.
+		await pickFields(page, 'Collection')
+		await pickerReady(page)
+		await expect(picker(page).locator('.wiki-doc-guides')).toHaveCount(0)
+		await chooseEntity(page, 'Product')
+		await expect(plate(page, 'description')).toBeVisible({ timeout: 30_000 })
+		await expect(picker(page).locator('.wiki-doc-guides')).toHaveCount(0)
+		await cancelPicker(page)
+
+		await pickFields(page, 'Global')
+		await pickerReady(page)
+		await expect(picker(page).locator('.wiki-doc-guides')).toHaveCount(0)
+		await cancelPicker(page)
+	})
+
 	test('discards the working selection on cancel', async ({ page }) => {
 		guideId = await createGuide(page, 'Picker cancel', ['collection:posts.intro'])
 		await openGuideTargets(page, guideId)

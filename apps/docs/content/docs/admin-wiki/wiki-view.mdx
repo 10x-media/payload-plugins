@@ -28,6 +28,87 @@ Neither appears in the nav. They are reached from the **Open wiki** action on th
 
 The controls use Payload's own `list-controls`, `search-bar`, and `pill-selector` classes, so they follow your admin theme.
 
+## The "Covers" chips
+
+Each guide carries the surfaces it covers as pills, on its row and card in the index and under its title on the guide page. Collections, globals, and blocks carry their configured label; field targets are never chipped, because a guide written about a form attaches to enough of them to drown out the entities beside them.
+
+Blocks are the same argument one step weaker, so they are a choice:
+
+```ts title="payload.config.ts"
+adminWiki({
+  chips: { blocks: false },
+})
+```
+
+A guide attached to a dozen blocks chips a dozen times, and a block whose `labels` are a function is not in the label map at all, so it chips its slug. Turning blocks off keeps the collections and globals a reader actually navigates by.
+
+The index's filter pills follow the chips: with blocks off, no block pill is offered either, since filtering by a surface no row displays would sort the list by something invisible. Blocks remain full targets throughout, with their own [block help](/admin-wiki/surfaces) and their entry in the target pickers; only the chips change.
+
+## Slots on the index
+
+Three slots take your own components, in the same form a collection's `admin.components` takes them: an array of import-map paths per slot, each rendering in order.
+
+```ts title="payload.config.ts"
+adminWiki({
+  wikiView: {
+    components: {
+      beforeControls: ['/components/wiki/ExportGuides#ExportGuides'],
+      beforeTable: ['/components/wiki/OnboardingNotice#OnboardingNotice'],
+      afterTable: [{ path: '/components/wiki/AskTheTeam#AskTheTeam', clientProps: { team: 'docs' } }],
+    },
+  },
+})
+```
+
+| Slot | Where it renders |
+|---|---|
+| `beforeControls` | The header actions row, ahead of the edit mode toggle and **Create guide** |
+| `beforeTable` | Between the search controls and the guide list |
+| `afterTable` | Below the guide list |
+
+`wikiView: true` and omitting it altogether are the views with every slot empty; `wikiView: false` skips the routes, and the slots with them.
+
+Slots render whether or not the wiki has guides yet, so an onboarding notice in `beforeTable` is there for the empty wiki it is written for.
+
+### What a slot component receives
+
+Every component, client or server, is handed these on top of whatever `clientProps` its own entry declares:
+
+| Prop | Type | Notes |
+|---|---|---|
+| `slot` | `WikiViewSlot` | Which slot this instance renders in, for a component wired into more than one |
+| `wikiPath` | `string` | Admin-prefixed index URL, e.g. `/admin/wiki` |
+| `guideCount` | `number` | Published guides this reader can see, before search and filters |
+| `canCreate` | `boolean` | The reader's evaluated create permission on the guide collection |
+
+A **server** component also receives `payload`, `req`, `i18n`, `locale` (the content locale the guides were loaded in), `params`, and `searchParams`, so it can query for whatever the index does not carry. The two prop types are exported as `WikiViewSlotClientProps` and `WikiViewSlotServerProps`:
+
+```tsx title="OnboardingNotice.tsx"
+import type { WikiViewSlotClientProps, WikiViewSlotServerProps } from '@10x-media/admin-wiki/types'
+
+export const OnboardingNotice = async ({
+  guideCount,
+  payload,
+  req,
+}: WikiViewSlotClientProps & WikiViewSlotServerProps) => {
+  const drafts = await payload.count({
+    collection: 'wiki-pages',
+    overrideAccess: false,
+    req,
+    user: req.user,
+    where: { _status: { not_equals: 'published' } },
+  })
+
+  return <p>{guideCount} published, {drafts.totalDocs} waiting for review.</p>
+}
+```
+
+<Callout type="warn">
+  Slot components are not reachable by Payload's import map walk, so the plugin registers each one under `admin.dependencies` for you. Run `payload generate:importmap` after adding or renaming one, or the slot renders nothing and logs a missing-component error.
+</Callout>
+
+The plugin wraps `beforeTable` and `afterTable` in a spacing element and leaves it out when the slot is empty. `beforeControls` renders bare, inside the flex row that already spaces the header buttons.
+
 ## The guide page
 
 The reading view centers its prose in a fixed measure and puts a table of contents beside it when the guide has enough structure.

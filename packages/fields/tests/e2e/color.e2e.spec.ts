@@ -230,6 +230,52 @@ test.describe('color field', () => {
 		await expect(cell.locator('.fields-color-cell__missing')).toHaveCount(0)
 	})
 
+	test('a narrow field clips the chip run with a fade and keeps the clear control inside', async ({
+		page,
+	}) => {
+		const res = await page.request.get(
+			`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
+		)
+		const { docs } = (await res.json()) as { docs: { id: string }[] }
+		const doc = docs[0]
+		if (!doc) throw new Error(`no ${FIXTURES.collection} doc titled ${FIXTURES.docTitle}`)
+		const patched = await page.request.patch(`/api/${FIXTURES.collection}/${doc.id}`, {
+			data: { [FIXTURES.schemeField]: `preset:${FIXTURES.schemePresetKey}` },
+		})
+		expect(patched.ok()).toBeTruthy()
+
+		await openShowcaseDoc(page)
+		const field = page
+			.locator('.fields-color')
+			.filter({ has: page.locator(`#field-${FIXTURES.schemeField}`) })
+		const content = field.locator('.fields-color__content')
+
+		// Simulates admin.width squeezing the field inside a row
+		const narrowStyle = await page.addStyleTag({
+			content: `.fields-color:has(#field-${FIXTURES.schemeField}) { max-width: 210px; }`,
+		})
+
+		await expect(content).toHaveClass(/fields-color__content--fade/)
+		await expect(content).toHaveCSS('mask-image', /linear-gradient/)
+		await expect(content).toHaveCSS('overflow', 'hidden')
+
+		const containerBox = await field.locator('.fields-color__container').boundingBox()
+		const clearBox = await field.locator('.fields-color__clear').boundingBox()
+		const contentBox = await content.boundingBox()
+		if (!containerBox || !clearBox || !contentBox) throw new Error('layout boxes not resolved')
+		// The clear control never escapes the input border, and the clipped run ends before it
+		expect(clearBox.x).toBeGreaterThanOrEqual(containerBox.x)
+		expect(contentBox.x).toBeGreaterThanOrEqual(containerBox.x)
+		expect(clearBox.x + clearBox.width).toBeLessThanOrEqual(containerBox.x + containerBox.width)
+		expect(contentBox.x + contentBox.width).toBeLessThanOrEqual(clearBox.x)
+
+		// Widening back must drop the fade; asserting absence only after it was
+		// provably on keeps this from passing vacuously before the measurement runs
+		await narrowStyle.evaluate((el) => el.parentNode?.removeChild(el))
+		await expect(content).not.toHaveClass(/fields-color__content--fade/)
+		await expect(content).toHaveCSS('mask-image', 'none')
+	})
+
 	test('keyboard: enter opens the popover, escape closes it and restores trigger focus', async ({
 		page,
 	}) => {

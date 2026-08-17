@@ -13,6 +13,7 @@ import { InlineToolbarFeatureClient as InlineToolbarFeatureClient_e70f5e05f09f93
 import { FixedToolbarFeatureClient as FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { WikiVideoFeatureClient as WikiVideoFeatureClient_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { BlocksFeatureClient as BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { WikiGuideLinkFeatureClient as WikiGuideLinkFeatureClient_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { LinkFeatureClient as LinkFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { InlineCodeFeatureClient as InlineCodeFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { UnderlineFeatureClient as UnderlineFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
@@ -20,7 +21,6 @@ import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864
 import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ParagraphFeatureClient as ParagraphFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { CalloutBlockLabel as CalloutBlockLabel_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
-import { GuideLinkBlockLabel as GuideLinkBlockLabel_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { UploadFeatureClient as UploadFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { IndentFeatureClient as IndentFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { AlignFeatureClient as AlignFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
@@ -45,6 +45,9 @@ import { LucideAdapterIcon as LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087
 import { LucideAdapterAssets as LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
 import { LucideAdapterNodes as LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
 import { TipBlock as TipBlock_c426dff9a53db9c82f385a6b49c712ac } from '../../../components/TipBlock'
+import { DevWikiFooter as DevWikiFooter_11e8e95b5d0d9379cf226322fe5b25e7 } from '../../../components/WikiSlotsClient'
+import { DevWikiHeaderLink as DevWikiHeaderLink_11e8e95b5d0d9379cf226322fe5b25e7 } from '../../../components/WikiSlotsClient'
+import { DevWikiNotice as DevWikiNotice_1fd8d133534d362bbfb4ddbacfaedd8e } from '../../../components/WikiSlots'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -63,6 +66,7 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#FixedToolbarFeatureClient": FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@10x-media/admin-wiki/client#WikiVideoFeatureClient": WikiVideoFeatureClient_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@payloadcms/richtext-lexical/client#BlocksFeatureClient": BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@10x-media/admin-wiki/client#WikiGuideLinkFeatureClient": WikiGuideLinkFeatureClient_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@payloadcms/richtext-lexical/client#LinkFeatureClient": LinkFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#InlineCodeFeatureClient": InlineCodeFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#UnderlineFeatureClient": UnderlineFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
@@ -70,7 +74,6 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#ItalicFeatureClient": ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#ParagraphFeatureClient": ParagraphFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@10x-media/admin-wiki/client#CalloutBlockLabel": CalloutBlockLabel_bd0a8d2193330fdfdceeb64a56ffc89f,
-  "@10x-media/admin-wiki/client#GuideLinkBlockLabel": GuideLinkBlockLabel_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@payloadcms/richtext-lexical/client#UploadFeatureClient": UploadFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#IndentFeatureClient": IndentFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#AlignFeatureClient": AlignFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
@@ -94,5 +97,8 @@ export const importMap = {
   "@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon": LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087,
   "@10x-media/fields/icon/adapters/lucide#LucideAdapterAssets": LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087,
   "@10x-media/fields/icon/adapters/lucide#LucideAdapterNodes": LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087,
-  "/components/TipBlock#TipBlock": TipBlock_c426dff9a53db9c82f385a6b49c712ac
+  "/components/TipBlock#TipBlock": TipBlock_c426dff9a53db9c82f385a6b49c712ac,
+  "/components/WikiSlotsClient#DevWikiFooter": DevWikiFooter_11e8e95b5d0d9379cf226322fe5b25e7,
+  "/components/WikiSlotsClient#DevWikiHeaderLink": DevWikiHeaderLink_11e8e95b5d0d9379cf226322fe5b25e7,
+  "/components/WikiSlots#DevWikiNotice": DevWikiNotice_1fd8d133534d362bbfb4ddbacfaedd8e
 }

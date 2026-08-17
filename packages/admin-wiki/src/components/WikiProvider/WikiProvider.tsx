@@ -46,6 +46,8 @@ export type WikiBlockRenderer = ComponentType<{ fields: Record<string, unknown> 
 export type WikiVideoPlayerComponent = ComponentType<{ media: WikiMediaDoc }>
 
 export type WikiTargetsContextValue = {
+	/** Whether the "Covers" chips include the blocks a guide covers. */
+	blockChips: boolean
 	/** Singular label per block slug, for chips that would otherwise show a slug. */
 	blockLabels: Record<string, string>
 	/** Consumer block renderers resolved from the import map, keyed by slug. */
@@ -87,6 +89,7 @@ export type WikiTargetsContextValue = {
 const EMPTY: WikiTargetEntry[] = []
 
 const WikiTargetsContext = createContext<WikiTargetsContextValue>({
+	blockChips: true,
 	blockLabels: {},
 	blockRenderers: {},
 	canCreate: false,
@@ -106,6 +109,7 @@ const WikiTargetsContext = createContext<WikiTargetsContextValue>({
 })
 
 export type WikiProviderProps = {
+	blockChips?: boolean
 	blockLabels?: Record<string, string>
 	blockRenderers?: Record<string, WikiBlockRenderer>
 	children?: ReactNode
@@ -121,6 +125,7 @@ export type WikiProviderProps = {
  * guide-existence with a synchronous map lookup and never fetch per field.
  */
 export const WikiProvider = ({
+	blockChips = true,
 	blockLabels,
 	blockRenderers,
 	children,
@@ -226,6 +231,7 @@ export const WikiProvider = ({
 
 	const value = useMemo<WikiTargetsContextValue>(
 		() => ({
+			blockChips,
 			blockLabels: blockLabels ?? {},
 			blockRenderers: blockRenderers ?? {},
 			canCreate,
@@ -251,6 +257,7 @@ export const WikiProvider = ({
 			writeAffordancesToggleable: canCreate && writeAffordances === 'editMode',
 		}),
 		[
+			blockChips,
 			blockLabels,
 			blockRenderers,
 			canCreate,

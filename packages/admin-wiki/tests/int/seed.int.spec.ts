@@ -115,6 +115,67 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 		expect((block?.fields as Record<string, unknown>)?.variant).toBe('tip')
 	})
 
+	it('keeps a multi-line alert on separate lines inside the callout', async () => {
+		await seed([
+			{
+				content: { markdown: '> [!TIP]\n> Draft first.\n> Publish after review.' },
+				slug: 'multiline-callout-guide',
+				title: 'Multiline callout guide',
+			},
+		])
+
+		const [doc] = await guideBySlug('multiline-callout-guide')
+		const block = lexicalNode(doc?.content, (node) => node.type === 'block')
+		const body = (block?.fields as { body: unknown }).body
+		// Payload's own blockquote markdown transformer splices continuation lines
+		// on with nothing between them, which reads as "Draft first.Publish after".
+		expect(lexicalNode(body, (node) => node.type === 'linebreak')).toBeDefined()
+		expect(lexicalText(body)).toBe('Draft first. Publish after review.')
+	})
+
+	it('rewrites a guide link inside a callout, in either form', async () => {
+		const result = await seed([
+			{
+				content: {
+					markdown:
+						'> [!NOTE]\n> See {{wiki:guide:link-target}} and [this one]({{wiki:guide:link-target}}).',
+				},
+				slug: 'callout-link-guide',
+				title: 'Callout link guide',
+			},
+			{ content: { markdown: 'The target.' }, slug: 'link-target', title: 'Link target' },
+		])
+
+		const targetId = result.guides.find((guide) => guide.slug === 'link-target')?.id
+		const [doc] = await guideBySlug('callout-link-guide')
+		const block = lexicalNode(doc?.content, (node) => node.type === 'block')
+		const body = (block?.fields as { body: unknown }).body
+		const link = lexicalNode(body, (node) => node.type === 'wikiGuideLink')
+		expect(String(link?.guide)).toBe(String(targetId))
+		expect(lexicalNode(body, (node) => node.type === 'link')).toBeUndefined()
+		expect(lexicalText(body)).not.toContain('{{wiki:guide:')
+	})
+
+	it('fails loudly on a placeholder no transformer reached', async () => {
+		const error = await seed([
+			{
+				// An upload node cannot live in a callout body, so the media
+				// transformer leaves this one where it is rather than rewriting it.
+				content: { markdown: '> [!NOTE]\n> {{wiki:media:diagram}}' },
+				slug: 'stranded-placeholder-guide',
+				title: 'Stranded placeholder guide',
+			},
+		]).then(
+			() => undefined,
+			(thrown: unknown) => thrown as Error
+		)
+
+		expect(error?.message).toMatch(/stranded-placeholder-guide/)
+		expect((error?.cause as Error).message).toMatch(
+			/still holds the placeholder \{\{wiki:media:diagram\}\}/
+		)
+	})
+
 	it('updates the same document on a second run instead of duplicating', async () => {
 		const def: WikiSeedGuideDef = {
 			content: { markdown: 'First body.' },
@@ -193,7 +254,9 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 
 	it('resolves a guide link to a guide seeded later in the same run', async () => {
 		// The ensure pass creates every guide before any content is written, which
-		// is what lets a guide link forward to one declared after it.
+		// is what lets a guide link forward to one declared after it. The bare
+		// placeholder also has to reach that guide's title, which is resolved in the
+		// same pass rather than read back from the database.
 		const result = await seed([
 			{
 				content: { markdown: 'See {{wiki:guide:link-target}} for the rest.' },
@@ -205,10 +268,27 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 
 		const targetId = result.guides.find((guide) => guide.slug === 'link-target')?.id
 		const [doc] = await guideBySlug('link-source')
-		const link = lexicalNode(doc?.content, (node) => node.type === 'inlineBlock')
-		const fields = link?.fields as Record<string, unknown>
-		expect(fields?.blockType).toBe('wikiGuideLink')
-		expect(String(fields?.guide)).toBe(String(targetId))
+		const link = lexicalNode(doc?.content, (node) => node.type === 'wikiGuideLink')
+		expect(String(link?.guide)).toBe(String(targetId))
+		expect((link?.children as Array<{ text?: string }>)?.[0]?.text).toBe('Link target')
+	})
+
+	it('keeps the author text when the placeholder is a link target', async () => {
+		const result = await seed([
+			{
+				content: { markdown: 'See [the rest of it]({{wiki:guide:link-target}}) first.' },
+				slug: 'link-source',
+				title: 'Link source',
+			},
+			{ content: { markdown: 'The target.' }, slug: 'link-target', title: 'Link target' },
+		])
+
+		const targetId = result.guides.find((guide) => guide.slug === 'link-target')?.id
+		const [doc] = await guideBySlug('link-source')
+		const link = lexicalNode(doc?.content, (node) => node.type === 'wikiGuideLink')
+		expect(String(link?.guide)).toBe(String(targetId))
+		expect((link?.children as Array<{ text?: string }>)?.[0]?.text).toBe('the rest of it')
+		expect(lexicalNode(doc?.content, (node) => node.type === 'link')).toBeUndefined()
 	})
 
 	it('fails loudly on a link to an unknown guide, naming the guide that carries it', async () => {

@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FieldAggregation } from '../aggregation/types'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
@@ -10,7 +11,7 @@ import { keys } from '../translations/keys'
 import { makeTranslate } from '../translations/makeTranslate'
 import type { VoteStorage } from './adapters'
 import { Form, type FormProps } from './Form'
-import { FormResults } from './FormResults'
+import { FormResults, type FormResultsProps } from './FormResults'
 import { type FetchResultsResult, fetchFormResults } from './fetchResults'
 
 export type PollProps = FormProps & {
@@ -39,6 +40,13 @@ export type PollProps = FormProps & {
 	 * tracks the new pick itself.
 	 */
 	currentVote?: Pick<VotedSubmission, 'value' | 'pick'> | null
+	/**
+	 * Replaces the built-in `<FormResults>` wherever the poll shows results (after voting, when
+	 * closed, and for a recorded outcome). Receives exactly what `<FormResults>` receives at that
+	 * site, so the default is `(props) => <FormResults {...props} />`; surrounding chrome (the
+	 * closed/final notices, the change-vote button) stays the poll's.
+	 */
+	renderResults?: (props: FormResultsProps) => ReactNode
 }
 
 const localStorageVoteStorage: VoteStorage = {
@@ -88,8 +96,11 @@ export const Poll = ({
 	apiRoute,
 	onSuccess,
 	currentVote,
+	renderResults,
 	...formProps
 }: PollProps) => {
+	const renderResultsView =
+		renderResults ?? ((props: FormResultsProps): ReactNode => <FormResults {...props} />)
 	const key = storageKey ?? `fb-poll-${formProps.form.id}`
 	const poll = formProps.form.poll
 	const closed = isPollClosed(poll)
@@ -174,17 +185,17 @@ export const Poll = ({
 		return (
 			<div className="fb-poll fb-poll--final">
 				<p className="fb-poll__final">{translate(keys.pollFinalResult)}</p>
-				{loadFailed ? (
-					resultsError
-				) : results ? (
-					<FormResults
-						results={results}
-						winningValues={winningValues}
-						currentValues={pick}
-						t={formProps.t}
-						locale={formProps.locale}
-					/>
-				) : null}
+				{loadFailed
+					? resultsError
+					: results
+						? renderResultsView({
+								results,
+								winningValues,
+								currentValues: pick,
+								t: formProps.t,
+								locale: formProps.locale,
+							})
+						: null}
 			</div>
 		)
 	}
@@ -193,16 +204,16 @@ export const Poll = ({
 		return (
 			<div className="fb-poll fb-poll--closed">
 				<p className="fb-poll__closed">{translate(keys.pollClosed)}</p>
-				{loadFailed ? (
-					resultsError
-				) : results ? (
-					<FormResults
-						results={results}
-						currentValues={pick}
-						t={formProps.t}
-						locale={formProps.locale}
-					/>
-				) : null}
+				{loadFailed
+					? resultsError
+					: results
+						? renderResultsView({
+								results,
+								currentValues: pick,
+								t: formProps.t,
+								locale: formProps.locale,
+							})
+						: null}
 			</div>
 		)
 	}
@@ -216,12 +227,12 @@ export const Poll = ({
 		}
 		return results ? (
 			<div className="fb-poll fb-poll--voted">
-				<FormResults
-					results={results}
-					currentValues={pick}
-					t={formProps.t}
-					locale={formProps.locale}
-				/>
+				{renderResultsView({
+					results,
+					currentValues: pick,
+					t: formProps.t,
+					locale: formProps.locale,
+				})}
 				{allowChange && changeReady ? (
 					<button className="fb-poll__change" type="button" onClick={() => setChanging(true)}>
 						{translate(keys.pollChangeVote)}

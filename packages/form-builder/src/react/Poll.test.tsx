@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/re
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FetchResultsResult } from './fetchResults'
-import { Poll } from './Poll'
+import { Poll, type PollProps } from './Poll'
 
 afterEach(() => {
 	cleanup()
@@ -470,6 +470,94 @@ describe('Poll', () => {
 		fireEvent.click(within(container).getByRole('button', { name: 'Change vote' }))
 		const select = within(container).getByRole('combobox') as HTMLSelectElement
 		expect(select.value).toBe('blue')
+	})
+
+	it('renderResults replaces the built-in results with host rows fed by host data', async () => {
+		// The handoff case: option values key into data only the host holds (athlete headshots).
+		const athletes: Record<string, { name: string; photo: string }> = {
+			red: { name: 'Jessica Fox', photo: '/img/fox.jpg' },
+			blue: { name: 'Ana Satila', photo: '/img/satila.jpg' },
+		}
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const { container } = render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				hasVoted: true,
+				fetchResultsImpl,
+				renderResults: (props) => {
+					const list = Array.isArray(props.results) ? props.results : [props.results]
+					return list[0]?.buckets.map((bucket) => (
+						<figure key={bucket.value} data-testid="athlete-row">
+							<img src={athletes[bucket.value]?.photo} alt="" />
+							<figcaption>
+								{athletes[bucket.value]?.name}: {bucket.count}
+							</figcaption>
+						</figure>
+					))
+				},
+			})
+		)
+		await waitFor(() => expect(within(container).getAllByTestId('athlete-row')).toHaveLength(2))
+		expect(within(container).getByText('Jessica Fox: 1')).toBeInTheDocument()
+		expect(container.querySelector('img[src="/img/fox.jpg"]')).not.toBeNull()
+		expect(container.querySelector('.fb-results')).toBeNull()
+	})
+
+	it('renderResults receives the same props FormResults would at every site', async () => {
+		const seen: Array<{ winning?: string[]; current?: string[] }> = []
+		const capture = (props: Parameters<NonNullable<PollProps['renderResults']>>[0]) => {
+			seen.push({ winning: props.winningValues, current: props.currentValues })
+			return <p data-testid="captured">captured</p>
+		}
+		const votedOpen = render(
+			createElement(Poll, {
+				form: { ...form, poll: { allowChange: true } },
+				resultsField: 'colour',
+				currentVote: { value: 'red', pick: ['red'] },
+				fetchResultsImpl: vi.fn().mockResolvedValue(resultsOk()),
+				renderResults: capture,
+			})
+		)
+		await waitFor(() =>
+			expect(within(votedOpen.container).getByTestId('captured')).toBeInTheDocument()
+		)
+		// The change affordance is chrome around the seam, not part of it.
+		expect(
+			within(votedOpen.container).getByRole('button', { name: 'Change vote' })
+		).toBeInTheDocument()
+		expect(seen.at(-1)).toEqual({ winning: undefined, current: ['red'] })
+		cleanup()
+
+		const closed = render(
+			createElement(Poll, {
+				form: {
+					...form,
+					poll: { closesAt: new Date(Date.now() - 60_000).toISOString() },
+				},
+				resultsField: 'colour',
+				fetchResultsImpl: vi.fn().mockResolvedValue(resultsOk()),
+				renderResults: capture,
+			})
+		)
+		await waitFor(() =>
+			expect(within(closed.container).getByTestId('captured')).toBeInTheDocument()
+		)
+		expect(seen.at(-1)).toEqual({ winning: undefined, current: undefined })
+		cleanup()
+
+		const finalized = render(
+			createElement(Poll, {
+				form: { ...form, poll: { outcome: { winningValues: ['red'] } } },
+				resultsField: 'colour',
+				fetchResultsImpl: vi.fn().mockResolvedValue(resultsOk()),
+				renderResults: capture,
+			})
+		)
+		await waitFor(() =>
+			expect(within(finalized.container).getByTestId('captured')).toBeInTheDocument()
+		)
+		expect(seen.at(-1)).toEqual({ winning: ['red'], current: undefined })
 	})
 
 	it('shows the wait notice after voting on an open afterClose poll', async () => {

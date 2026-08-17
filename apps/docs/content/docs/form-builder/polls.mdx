@@ -293,6 +293,37 @@ import { Poll } from '@10x-media/form-builder/react'
 
 The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/form-builder/spam) caps anonymous repeat voting per identity.
 
+### Custom results rendering
+
+A results row often needs data only your app holds. A poll over people wants a photo and a properly ordered name next to each count; the aggregation carries `{ label, value, count, percentage }` and nothing else, and CSS cannot add an `<img>` for data that never reaches the DOM. `renderResults` replaces the built-in `<FormResults>` wherever the poll shows results (after voting, when closed, and for a recorded outcome), so each bucket's `value` can key into whatever the host knows:
+
+```tsx
+<Poll
+  form={form}
+  resultsField="athlete"
+  renderResults={({ results, currentValues }) => {
+    const list = Array.isArray(results) ? results : [results]
+    return list.map((field) =>
+      field.buckets.map((bucket) => {
+        const athlete = athletesByCode[bucket.value]
+        return (
+          <AthleteRow
+            key={bucket.value}
+            photo={athlete?.headshot}
+            name={athlete?.displayName}
+            count={bucket.count}
+            percentage={bucket.percentage}
+            isYourVote={currentValues?.includes(bucket.value)}
+          />
+        )
+      })
+    )
+  }}
+/>
+```
+
+The callback receives exactly what `<FormResults>` receives at that site (`FormResultsProps`: `results`, plus `winningValues` on a finalized poll, `currentValues` when the voter's pick is known, `t`, `locale`), so the default is equivalent to `(props) => <FormResults {...props} />`. Wrapping instead of replacing works the same way: render `<FormResults {...props} />` inside your own layout, or vary by state (a podium once `winningValues` is present, bars before). The chrome around the results stays the poll's own: the closed and final notices, the wait notice, the error state, and the [change-vote button](#changeable-votes) all render regardless of what the callback returns.
+
 ## Vote storage
 
 localStorage is only the default backing for the voted flag. The [`adapters`](/form-builder/rendering#host-adapters) prop redirects it to your own store (cookies, IndexedDB, a state manager, a consent-gated wrapper), or turns it off entirely:

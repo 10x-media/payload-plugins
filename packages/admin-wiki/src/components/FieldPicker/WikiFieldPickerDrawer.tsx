@@ -3,13 +3,13 @@
 import {
 	BlocksDrawer,
 	Button,
+	DocumentFields,
 	Drawer,
 	EditDepthProvider,
 	Form,
 	OperationProvider,
 	ReactSelect,
 	type ReactSelectOption,
-	RenderFields,
 	ShimmerEffect,
 	useConfig,
 	useDrawerSlug,
@@ -17,7 +17,7 @@ import {
 	useModal,
 	useServerFunctions,
 } from '@payloadcms/ui'
-import type { ClientBlock, ClientField, FormState } from 'payload'
+import type { ClientBlock, ClientField, FormState, SanitizedDocumentPermissions } from 'payload'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { keys } from '../../translations/keys'
@@ -45,9 +45,21 @@ type ResolvedTarget = {
 	entityKind: 'collection' | 'global'
 	entitySlug: string
 	fields: ClientField[]
-	/** Key into the field schema map, and `parentSchemaPath` for `RenderFields`. */
+	/** Key into the field schema map, and the schema path the fields render under. */
 	schemaPath: string
 }
+
+/**
+ * Every field readable, which is what the picker needs: it renders the form to
+ * be read and pointed at, never to be written, and a field the reader cannot
+ * read is dropped by `RenderFields` before it can be offered as a target.
+ *
+ * The real per-document permissions are not available here and would be the
+ * wrong question anyway: they answer whether *this* reader may edit *that*
+ * document, where a guide is attached to a schema path rather than to any
+ * document at all.
+ */
+const PICKER_PERMISSIONS: SanitizedDocumentPermissions = { fields: true }
 
 export type WikiFieldPickerDrawerProps = {
 	/** Covered block slugs, in display order. */
@@ -80,7 +92,7 @@ type LoadState = 'empty' | 'error' | 'loading' | 'ready'
  *
  * It is not a document view and not a `DocumentDrawer`. The form is built by
  * calling Payload's `form-state` server function directly and mounting `<Form
- * initialState>` around `<RenderFields>`, which is what makes this safe: no
+ * initialState>` around `<DocumentFields>`, which is what makes this safe: no
  * document controls means no save and no autosave, no `returnLockStatus` means
  * no lock row (which would otherwise be created for globals), and with no `id`
  * there is nothing to write to. Every request is a read.
@@ -88,7 +100,11 @@ type LoadState = 'empty' | 'error' | 'loading' | 'ready'
  * Rendering the real fields rather than a schema tree is the point. An author
  * recognises the form they were just looking at, including their own custom
  * field components, their labels in their language, and their layout; a list of
- * `branding.color` strings is a different skill.
+ * `branding.color` strings is a different skill. `DocumentFields` is what buys
+ * the last of those: it is the edit view's own layout component, so a sidebar
+ * field lands in a sidebar here too instead of in the middle of the main column,
+ * and the split keeps a null in each column for the other's fields, which is how
+ * the index paths the schema paths are computed from stay untouched.
  *
  * One drawer per kind. The kind is chosen before the drawer opens, from the menu
  * on the field's button, so the drawer carries exactly one control: switch to
@@ -390,13 +406,11 @@ export const WikiFieldPickerDrawer = ({
 							<EditDepthProvider>
 								<OperationProvider operation="create">
 									<Form el="div" initialState={formState} key={selection}>
-										<RenderFields
+										<DocumentFields
+											docPermissions={PICKER_PERMISSIONS}
 											fields={target.fields}
-											parentIndexPath=""
-											parentPath=""
-											parentSchemaPath={target.schemaPath}
-											permissions={true}
 											readOnly
+											schemaPathSegments={[target.schemaPath]}
 										/>
 									</Form>
 								</OperationProvider>

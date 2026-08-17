@@ -272,6 +272,27 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 		[presetKey, setValue]
 	)
 
+	// The fade must track real overflow, not chip presence: the badge always hugs
+	// the content run's right edge (the input's flex-grow pushes it there), so an
+	// unconditional mask would fade it even in a full-width field with room to spare
+	const contentRef = useRef<HTMLDivElement>(null)
+	const [contentClipped, setContentClipped] = useState(false)
+	const measureClip = useCallback(() => {
+		const el = contentRef.current
+		// +1 absorbs subpixel rounding between scrollWidth (int) and clientWidth
+		if (el) setContentClipped(el.scrollWidth > el.clientWidth + 1)
+	}, [])
+	// No dependency array on purpose: chip mount and label changes alter
+	// scrollWidth without resizing the observed box, so re-measure every render
+	useEffect(measureClip)
+	useEffect(() => {
+		const el = contentRef.current
+		if (!el) return
+		const observer = new ResizeObserver(measureClip)
+		observer.observe(el)
+		return () => observer.disconnect()
+	}, [measureClip])
+
 	const styles = useMemo(() => mergeFieldStyles(field), [field])
 	const swatchValue =
 		referenceAlpha !== 100 && (typeof rawValue === 'string' || isColorSchemeValue(rawValue))
@@ -357,37 +378,47 @@ export const ColorField: React.FC<ColorFieldProps> = (props) => {
 							verticalAlign="bottom"
 						/>
 					)}
-					{chip ? (
-						<span className={`${baseClass}__chip`}>
-							<span className={`${baseClass}__chip-swatch ${baseClass}__checker`}>
-								{swatchCss ? (
-									<span className={`${baseClass}__chip-color`} style={{ background: swatchCss }} />
-								) : null}
-								{chip.missing && !swatchCss ? (
-									<span className={`${baseClass}__chip-color`} data-missing="true" />
+					<div
+						className={[`${baseClass}__content`, contentClipped && `${baseClass}__content--fade`]
+							.filter(Boolean)
+							.join(' ')}
+						ref={contentRef}
+					>
+						{chip ? (
+							<span className={`${baseClass}__chip`}>
+								<span className={`${baseClass}__chip-swatch ${baseClass}__checker`}>
+									{swatchCss ? (
+										<span
+											className={`${baseClass}__chip-color`}
+											style={{ background: swatchCss }}
+										/>
+									) : null}
+									{chip.missing && !swatchCss ? (
+										<span className={`${baseClass}__chip-color`} data-missing="true" />
+									) : null}
+								</span>
+								<span className={`${baseClass}__chip-label`}>{chip.label}</span>
+								{alpha && chip.alpha !== 100 ? (
+									<span className={`${baseClass}__chip-alpha`}>{chip.alpha}%</span>
 								) : null}
 							</span>
-							<span className={`${baseClass}__chip-label`}>{chip.label}</span>
-							{alpha && chip.alpha !== 100 ? (
-								<span className={`${baseClass}__chip-alpha`}>{chip.alpha}%</span>
-							) : null}
+						) : null}
+						<input
+							className={`${baseClass}__input`}
+							id={`field-${path?.replace(/\./g, '__')}`}
+							name={path}
+							onBlur={onTextBlur}
+							onChange={onTextChange}
+							onKeyDown={onTextKeyDown}
+							placeholder={chip || typeof placeholder !== 'string' ? undefined : placeholder}
+							readOnly={isReadOnly}
+							type="text"
+							value={chip ? '' : draft}
+						/>
+						<span aria-hidden="true" className={`${baseClass}__badge`}>
+							{chip ? t(keys.preset) : displayFormat}
 						</span>
-					) : null}
-					<input
-						className={`${baseClass}__input`}
-						id={`field-${path?.replace(/\./g, '__')}`}
-						name={path}
-						onBlur={onTextBlur}
-						onChange={onTextChange}
-						onKeyDown={onTextKeyDown}
-						placeholder={chip || typeof placeholder !== 'string' ? undefined : placeholder}
-						readOnly={isReadOnly}
-						type="text"
-						value={chip ? '' : draft}
-					/>
-					<span aria-hidden="true" className={`${baseClass}__badge`}>
-						{chip ? t(keys.preset) : displayFormat}
-					</span>
+					</div>
 					{isClearable && !required && !isReadOnly && stringValue !== '' ? (
 						<button
 							aria-label={t(keys.clearColor)}

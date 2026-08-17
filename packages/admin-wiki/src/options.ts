@@ -1,4 +1,14 @@
-import type { Access, Block, CollectionConfig, Tab } from 'payload'
+import type { LexicalEditorProps } from '@payloadcms/richtext-lexical'
+import type {
+	Access,
+	AdminViewServerProps,
+	Block,
+	CollectionConfig,
+	PayloadComponent,
+	PayloadRequest,
+	Tab,
+	TypedLocale,
+} from 'payload'
 
 import type { TranslationsOption } from './translations'
 
@@ -48,9 +58,36 @@ export type WikiEditorBlockOption = {
 	component: string
 }
 
+/**
+ * One lexical feature, exactly as `lexicalEditor` takes them. Derived from its
+ * own props rather than spelled out, because the feature type is generic over
+ * three prop types this plugin has no business naming.
+ */
+export type WikiEditorFeature = Extract<
+	NonNullable<LexicalEditorProps['features']>,
+	readonly unknown[]
+>[number]
+
+/**
+ * Lexical features added to the wiki editor, for the extension a block cannot
+ * express: a custom node, a toolbar item, a keyboard shortcut.
+ *
+ * The array form appends to the plugin's own features, which is what almost
+ * every project wants. The function form is handed those same features as
+ * `defaultFeatures` and returns the whole list, so it can also reorder or drop
+ * one; dropping `wikiGuideLink` or the blocks feature takes the guide links or
+ * the callouts with it, which is the caller's to decide and the caller's to
+ * live with.
+ */
+export type WikiEditorFeaturesOption =
+	| ((args: { defaultFeatures: WikiEditorFeature[] }) => WikiEditorFeature[])
+	| WikiEditorFeature[]
+
 /** Extensions to the plugin's self-contained editor. */
 export type WikiEditorOptions = {
 	blocks?: WikiEditorBlockOption[]
+	/** Lexical features beside the plugin's own. See {@link WikiEditorFeaturesOption}. */
+	features?: WikiEditorFeaturesOption
 }
 
 /**
@@ -66,6 +103,21 @@ export type WikiEditorOptions = {
  */
 export type WikiWriteAffordanceMode = 'always' | 'editMode' | 'never'
 
+/**
+ * Which target kinds the "Covers" chips show on the wiki index and the guide
+ * pages. Field targets are never chipped: a guide written about a form attaches
+ * to enough of them to drown out the entities beside them.
+ */
+export type WikiChipsOptions = {
+	/**
+	 * Chip the blocks a guide covers. Defaults to `true`. A guide attached to a
+	 * dozen blocks chips a dozen times, and a block whose label is a function
+	 * chips its slug, so a project can leave blocks out and keep the collections
+	 * and globals a reader navigates by.
+	 */
+	blocks?: boolean
+}
+
 /** List-view slot the guides band renders in. */
 export type WikiListBandSlot = 'afterList' | 'afterListTable' | 'beforeList' | 'beforeListTable'
 
@@ -73,6 +125,74 @@ export type WikiListBandSlot = 'afterList' | 'afterListTable' | 'beforeList' | '
 export type WikiListBandOptions = {
 	/** Which list slot to render in. Defaults to `afterListTable`. */
 	slot?: WikiListBandSlot
+}
+
+/**
+ * A slot on the wiki index view (`/admin/wiki`).
+ *
+ * - `beforeControls`: the header actions row, ahead of the edit mode toggle and
+ *   the create button.
+ * - `beforeTable`: between the search controls and the guide list.
+ * - `afterTable`: below the guide list.
+ *
+ * Named after what the reader sees on this view rather than after Payload's
+ * list slots, because the wiki index has one header row, one control bar, and
+ * one list, where a collection list has four injection points around a table.
+ */
+export type WikiViewSlot = 'afterTable' | 'beforeControls' | 'beforeTable'
+
+/**
+ * Consumer components on the wiki index, one array per slot, exactly as a
+ * collection's `admin.components` takes them: import-map paths, optionally with
+ * their own `clientProps` and `serverProps`. Every entry in a slot renders in
+ * array order.
+ *
+ * Slot components are not reachable by Payload's import map walk, which only
+ * traverses the config shapes it knows, so the plugin registers each one under
+ * `admin.dependencies`. Run `payload generate:importmap` after adding one.
+ */
+export type WikiViewComponents = {
+	/** Below the guide list. */
+	afterTable?: PayloadComponent[]
+	/** The header actions row, before the edit mode toggle and the create button. */
+	beforeControls?: PayloadComponent[]
+	/** Between the search controls and the guide list. */
+	beforeTable?: PayloadComponent[]
+}
+
+/** The wiki index and guide views, and what a project adds to the index. */
+export type WikiViewOptions = {
+	/** Consumer components per index slot. See {@link WikiViewComponents}. */
+	components?: WikiViewComponents
+}
+
+/**
+ * Client props every slot component receives, on top of whatever the entry
+ * declares for itself. A client component gets these and nothing else.
+ */
+export type WikiViewSlotClientProps = {
+	/** The reader's evaluated create permission on the guide collection. */
+	canCreate: boolean
+	/** Published guides the reader can see, before search and filters. */
+	guideCount: number
+	/** The slot this instance renders in, for a component wired into several. */
+	slot: WikiViewSlot
+	/** Admin-prefixed wiki index URL, e.g. `/admin/wiki`. */
+	wikiPath: string
+}
+
+/**
+ * Server props a slot component receives in addition to
+ * {@link WikiViewSlotClientProps} when it is a server component. `locale` is the
+ * content locale the guides on screen were loaded in, undefined when the config
+ * is not localized.
+ */
+export type WikiViewSlotServerProps = Pick<
+	AdminViewServerProps,
+	'i18n' | 'params' | 'payload' | 'searchParams'
+> & {
+	locale: TypedLocale | undefined
+	req: PayloadRequest
 }
 
 /**
@@ -173,6 +293,8 @@ export type AdminWikiPluginOptions = {
 	 * user to read AND author; restrict authoring in production projects.
 	 */
 	access?: WikiAccessOptions
+	/** What the "Covers" chips show. See {@link WikiChipsOptions}. */
+	chips?: WikiChipsOptions
 	/** Extensions to the wiki editor (consumer blocks with renderers). */
 	editor?: WikiEditorOptions
 	/** Entities the plugin leaves alone entirely. See {@link WikiExcludeOptions}. */
@@ -205,8 +327,13 @@ export type AdminWikiPluginOptions = {
 	 * Vimeo embeds in the editor. `true` uses the default HTML5 player.
 	 */
 	video?: boolean | WikiVideoOptions
-	/** Register the `/wiki` browsing and reading views. Defaults to `true`. */
-	wikiView?: boolean
+	/**
+	 * The `/wiki` browsing and reading views. `false` skips registering them,
+	 * `true` (the default) registers them as the plugin ships them, and an object
+	 * registers them with your own components in the index slots. See
+	 * {@link WikiViewOptions}.
+	 */
+	wikiView?: boolean | WikiViewOptions
 	/**
 	 * When the "write this guide" affordances render. Defaults to `editMode`,
 	 * which keeps edit views clean until a reader turns wiki edit mode on.

@@ -14,7 +14,11 @@ const state = (...children: unknown[]): SerializedEditorState =>
 		root: { children, direction: null, format: '', indent: 0, type: 'root', version: 1 },
 	}) as unknown as SerializedEditorState
 
-const context = { guideIdsBySlug: {}, media: { demo: { id: 7, relationTo: 'wiki-media' } } }
+const context = {
+	guideIdsBySlug: {},
+	guideTitlesBySlug: {},
+	media: { demo: { id: 7, relationTo: 'wiki-media' } },
+}
 
 describe('mediaPlaceholdersTransformer', () => {
 	it('replaces media placeholders with upload nodes', () => {
