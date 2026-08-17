@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 
-import { SECRET_REVEAL_CONTEXT } from '../constants'
+import { SECRET_REVEAL_CONTEXT, SECRET_UNUSABLE } from '../constants'
 import { generateSecret, normalizeSecret } from './format'
 
 export type RotateSecretResult = {
@@ -31,7 +31,12 @@ const currentPlaintextSecret = async (args: {
 			overrideAccess: true,
 			req: args.req,
 		})
-		return typeof doc.secret === 'string' ? doc.secret : null
+		// An undecryptable secret reads back as the unusable sentinel. There is nothing to carry
+		// into a grace period, and rotation is the documented recovery for exactly that state.
+		if (typeof doc.secret !== 'string' || doc.secret === SECRET_UNUSABLE) {
+			return null
+		}
+		return doc.secret
 	} finally {
 		args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = false
 	}

@@ -7,7 +7,7 @@ import {
 	type Payload,
 } from 'payload'
 
-import { ADMIN_GROUP, SECRET_MASK, SECRET_REVEAL_CONTEXT } from '../constants'
+import { ADMIN_GROUP, SECRET_MASK, SECRET_REVEAL_CONTEXT, SECRET_UNUSABLE } from '../constants'
 import { isReservedHeader } from '../delivery/headers'
 import { decryptSecret, encryptSecret, isEncryptedSecret } from '../secrets/crypto'
 import { generateSecret, InvalidSecretError, normalizeSecret } from '../secrets/format'
@@ -62,7 +62,13 @@ const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => 
 		const plaintext = data.secret ? normalizeOr400(data.secret) : generateSecret()
 		req.context[SECRET_REVEAL_CONTEXT.once] = true
 		req.context[SECRET_REVEAL_CONTEXT.plaintext] = plaintext
-		return { ...data, secret: encryptSecret(req.payload, plaintext) }
+		// `previousSecret` still goes through the encrypt path: field access blocks it from an
+		// ordinary create, but an `overrideAccess` create would otherwise persist it in plaintext.
+		return withStoredSecret(
+			req.payload,
+			{ ...data, secret: encryptSecret(req.payload, plaintext) },
+			'previousSecret'
+		)
 	}
 	return withStoredSecret(
 		req.payload,
@@ -91,8 +97,9 @@ const maskSecret: FieldHook = ({ value, req }) => {
 		const plaintext = decryptSecret(req.payload, String(value))
 		if (!plaintext) {
 			req.payload.logger.error(
-				`@10x-media/webhooks: a stored signing secret could not be decrypted. Deliveries for this subscription will go out unsigned. This usually means PAYLOAD_SECRET changed after the secret was stored; rotate the subscription's secret to recover.`
+				`@10x-media/webhooks: a stored signing secret could not be decrypted, so deliveries for this subscription will fail instead of being sent unsigned. Either PAYLOAD_SECRET changed after the secret was stored, or the subscription predates encryption at rest and needs encryptExistingSecrets(). Rotating the secret also recovers it.`
 			)
+			return SECRET_UNUSABLE
 		}
 		return plaintext
 	}
@@ -156,7 +163,11 @@ export const buildSubscriptionsCollection = (args: {
 			name: 'previousSecret',
 			type: 'text',
 			admin: { readOnly: true, hidden: true },
-			access: { update: () => false },
+			// Rotation and the adoption utility write these under `overrideAccess`, which bypasses
+			// field access. Denying create as well as update is what stops an ordinary REST or
+			// GraphQL create from planting a second signing key, in plaintext, on a new
+			// subscription: `admin.hidden` only hides the field in the UI.
+			access: { create: () => false, update: () => false },
 			hooks: { afterRead: [maskSecret] },
 		},
 		{
@@ -164,7 +175,7 @@ export const buildSubscriptionsCollection = (args: {
 			type: 'date',
 			label: labelForKey(keys.fieldPreviousSecretExpires),
 			admin: { readOnly: true, description: labelForKey(keys.fieldPreviousSecretExpiresHelp) },
-			access: { update: () => false },
+			access: { create: () => false, update: () => false },
 		},
 		{
 			name: 'rotateSecret',

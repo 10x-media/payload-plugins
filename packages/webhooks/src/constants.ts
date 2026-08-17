@@ -16,6 +16,14 @@ export const DEFAULT_ROTATION_GRACE_SECONDS = 86_400
 export const SECRET_MASK = '__redacted__'
 
 /**
+ * Returned by a signing read when a secret is present but cannot be recovered (wrong
+ * `PAYLOAD_SECRET`, corrupted ciphertext, an unmigrated legacy value). Distinct from a null read,
+ * which means no secret is configured: a subscription that is supposed to be signed must fail its
+ * delivery rather than fall back to sending unsigned, so the two cases cannot share a value.
+ */
+export const SECRET_UNUSABLE = '__unusable__'
+
+/**
  * Standard Webhooks secret prefix. Stripped before the remainder is base64-decoded into the
  * HMAC key, matching the reference verifier (`standardwebhooks`), which does the same.
  */

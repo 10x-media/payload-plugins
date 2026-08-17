@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 
-import { SECRET_REVEAL_CONTEXT } from '../constants'
+import { SECRET_MASK, SECRET_REVEAL_CONTEXT, SECRET_UNUSABLE } from '../constants'
 import type { CodeSubscription } from '../options'
 import { normalizeSecret } from '../secrets/format'
 
@@ -10,30 +10,50 @@ export type ResolvedSubscription = {
 	source: 'collection' | 'code'
 	url: string
 	events: string[]
-	/** Every secret a delivery must be signed with, active first. Empty means send unsigned. */
+	/**
+	 * Every secret a delivery must be signed with, active first. Empty with `secretUnusable`
+	 * false means the subscription has no secret and is meant to be sent unsigned.
+	 */
 	secrets: string[]
+	/**
+	 * A secret is configured but could not be recovered, so this subscription must not be
+	 * delivered at all. Falling back to an unsigned POST would be accepted by any receiver that
+	 * verifies only when a signature header is present.
+	 */
+	secretUnusable: boolean
 	headers?: Record<string, string>
 	enabled: boolean
 }
 
 /**
- * Normalize the secrets a delivery can sign with, dropping anything unusable. A read that never
- * opened a reveal window yields the mask instead of key material, and a failed decrypt yields
- * null; either would otherwise reach the HMAC as a bogus key and produce signatures no receiver
- * can verify. Dropping is safe here because malformed configured secrets are rejected loudly at
- * plugin registration, so a value that fails this late is a masked or undecryptable read.
+ * Sort stored secret values into usable keys and a hard failure flag.
+ *
+ * `SECRET_UNUSABLE` and a value that will not normalize both mean a secret exists that cannot
+ * sign, which has to fail the delivery rather than silently drop the signature. The mask is
+ * different: it means this read never opened a reveal window, so it carries no information about
+ * whether a secret is usable and is skipped without raising the flag.
  */
-const signable = (values: (string | null | undefined)[]): string[] =>
-	values.flatMap((value) => {
-		if (typeof value !== 'string') {
-			return []
+const resolveSecrets = (
+	values: (string | Date | null | undefined)[]
+): { secrets: string[]; secretUnusable: boolean } => {
+	const secrets: string[] = []
+	let secretUnusable = false
+	for (const value of values) {
+		if (typeof value !== 'string' || value === '' || value === SECRET_MASK) {
+			continue
+		}
+		if (value === SECRET_UNUSABLE) {
+			secretUnusable = true
+			continue
 		}
 		try {
-			return [normalizeSecret(value)]
+			secrets.push(normalizeSecret(value))
 		} catch {
-			return []
+			secretUnusable = true
 		}
-	})
+	}
+	return { secrets, secretUnusable }
+}
 
 const rowHeaders = (
 	headers?: { key?: string | null; value?: string | null }[] | null
@@ -81,7 +101,7 @@ export const fromCollectionRow = (
 	source: 'collection',
 	url: row.url,
 	events: row.events ?? [],
-	secrets: signable([
+	...resolveSecrets([
 		row.secret,
 		withinGrace(row.previousSecretExpiresAt, now) ? row.previousSecret : undefined,
 	]),
@@ -95,10 +115,35 @@ export const fromCodeSubscription = (sub: CodeSubscription): ResolvedSubscriptio
 	source: 'code',
 	url: sub.url,
 	events: sub.events,
-	secrets: signable([sub.secret]),
+	...resolveSecrets([sub.secret]),
 	headers: sub.headers,
 	enabled: sub.enabled !== false,
 })
+
+export type DeliveryDecision =
+	| { deliverable: true; subscription: ResolvedSubscription }
+	| { deliverable: false; reason: string }
+
+/**
+ * Whether a resolved subscription may be delivered to, and why not when it may not. An
+ * unrecoverable secret is a refusal rather than a downgrade to unsigned: a receiver that verifies
+ * only when a signature header is present would accept an unsigned delivery unconditionally.
+ */
+export const decideDelivery = (subscription: ResolvedSubscription | null): DeliveryDecision => {
+	if (!subscription) {
+		return { deliverable: false, reason: 'subscription not found' }
+	}
+	if (!subscription.enabled) {
+		return { deliverable: false, reason: 'subscription disabled' }
+	}
+	if (subscription.secretUnusable) {
+		return {
+			deliverable: false,
+			reason: 'signing secret could not be decrypted; refused rather than sent unsigned',
+		}
+	}
+	return { deliverable: true, subscription }
+}
 
 /** Enabled subscriptions listening for `event`. */
 export const matchSubscriptions = (

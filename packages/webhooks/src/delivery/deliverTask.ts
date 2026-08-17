@@ -2,7 +2,7 @@ import type { TaskConfig } from 'payload'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription } from '../options'
-import { resolveSubscriptionById } from '../plugin/resolveSubscriptions'
+import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import { deriveDeliveryStatus } from './deriveDeliveryStatus'
 import { sendDelivery } from './sendDelivery'
 
@@ -37,14 +37,14 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 				payload,
 				req,
 			})
-			if (!subscription?.enabled) {
+			// Includes an undecryptable secret: retrying cannot fix a key problem, so the row dies
+			// here rather than throwing, and is never POSTed unsigned.
+			const decision = decideDelivery(subscription)
+			if (!decision.deliverable) {
 				await payload.update({
 					collection: deps.deliveriesSlug,
 					id: deliveryId,
-					data: {
-						status: 'dead',
-						error: subscription ? 'subscription disabled' : 'subscription not found',
-					},
+					data: { status: 'dead', error: decision.reason },
 					overrideAccess: true,
 					req,
 				})
@@ -53,7 +53,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 
 			const attempt = Number(job.totalTried ?? 0) + 1
 			const result = await sendDelivery({
-				subscription,
+				subscription: decision.subscription,
 				deliveryId,
 				event: String(delivery.event),
 				body: JSON.stringify(delivery.payload),

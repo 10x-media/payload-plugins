@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { SECRET_MASK, SECRET_UNUSABLE } from '../constants'
 import { generateSecret } from '../secrets/format'
-import { fromCollectionRow } from './resolveSubscriptions'
+import { decideDelivery, fromCollectionRow } from './resolveSubscriptions'
 
 const NOW = Date.parse('2026-01-01T00:00:00.000Z')
 const current = generateSecret()
@@ -76,5 +77,85 @@ describe('rotation grace window', () => {
 			NOW
 		)
 		expect(resolved.secrets).toEqual([previous])
+	})
+})
+
+describe('unusable secrets', () => {
+	it('flags a row whose secret could not be decrypted', () => {
+		const resolved = fromCollectionRow(row({ secret: SECRET_UNUSABLE }), NOW)
+		expect(resolved.secretUnusable).toBe(true)
+		expect(resolved.secrets).toEqual([])
+	})
+
+	it('flags an unusable previous secret inside an open window', () => {
+		const resolved = fromCollectionRow(
+			row({
+				previousSecret: SECRET_UNUSABLE,
+				previousSecretExpiresAt: new Date(NOW + 60_000).toISOString(),
+			}),
+			NOW
+		)
+		expect(resolved.secretUnusable).toBe(true)
+		expect(resolved.secrets).toEqual([current])
+	})
+
+	it('ignores an unusable previous secret whose window already closed', () => {
+		const resolved = fromCollectionRow(
+			row({
+				previousSecret: SECRET_UNUSABLE,
+				previousSecretExpiresAt: new Date(NOW - 1).toISOString(),
+			}),
+			NOW
+		)
+		expect(resolved.secretUnusable).toBe(false)
+		expect(resolved.secrets).toEqual([current])
+	})
+
+	it('flags a legacy plaintext secret that will not normalize', () => {
+		const resolved = fromCollectionRow(row({ secret: 'not base64!' }), NOW)
+		expect(resolved.secretUnusable).toBe(true)
+	})
+
+	it('does not flag a subscription that simply has no secret', () => {
+		const resolved = fromCollectionRow({ id: 1, url: 'https://x' }, NOW)
+		expect(resolved.secretUnusable).toBe(false)
+		expect(resolved.secrets).toEqual([])
+	})
+
+	it('does not flag a masked read, which says nothing about usability', () => {
+		const resolved = fromCollectionRow(row({ secret: SECRET_MASK }), NOW)
+		expect(resolved.secretUnusable).toBe(false)
+	})
+})
+
+describe('decideDelivery', () => {
+	const base = fromCollectionRow(row({ previousSecretExpiresAt: null }), NOW)
+
+	it('allows a healthy subscription and narrows it', () => {
+		const decision = decideDelivery(base)
+		expect(decision.deliverable).toBe(true)
+		if (decision.deliverable) {
+			expect(decision.subscription.secrets).toEqual([current])
+		}
+	})
+
+	it('refuses a subscription whose secret cannot be decrypted', () => {
+		const decision = decideDelivery({ ...base, secretUnusable: true })
+		expect(decision).toEqual({
+			deliverable: false,
+			reason: 'signing secret could not be decrypted; refused rather than sent unsigned',
+		})
+	})
+
+	it('refuses a missing or disabled subscription', () => {
+		expect(decideDelivery(null)).toMatchObject({ reason: 'subscription not found' })
+		expect(decideDelivery({ ...base, enabled: false })).toMatchObject({
+			reason: 'subscription disabled',
+		})
+	})
+
+	it('allows an unsigned subscription that has no secret at all', () => {
+		const unsigned = fromCollectionRow({ id: 2, url: 'https://x' }, NOW)
+		expect(decideDelivery(unsigned).deliverable).toBe(true)
 	})
 })

@@ -11,11 +11,13 @@
 - **Secret rotation**: `POST /api/<subscriptions>/:id/rotate-secret` and a **Rotate secret** button. During the configurable grace period (`secretRotation.graceSeconds`, default 24h) deliveries carry both signatures, space separated, so receivers can switch over without dropping events. The retired secret stops signing the moment the window lapses.
 - **Customer-supplied secrets**: accepted on create and on rotation, normalized to exactly one `whsec_` prefix, and rejected when they are not base64 carrying at least 16 bytes. Malformed code-subscription secrets now fail at startup rather than at delivery.
 - **Reserved headers**: a subscription's custom headers can no longer overwrite `webhook-id`, `webhook-timestamp`, `webhook-signature`, or `X-Webhook-Event`. Previously a custom header of the same name replaced the generated one, including the signature.
+- **Unrecoverable secrets fail the delivery**: if a stored secret cannot be decrypted, the delivery row is marked `dead` with an explicit error and nothing is sent. A subscription that is meant to be signed is never downgraded to an unsigned POST, since receivers commonly verify only when a signature header is present. Subscriptions with no secret continue to deliver unsigned as before.
+- **`previousSecret` is internal**: the rotation fields reject writes from ordinary REST and GraphQL creates and updates, so only rotation and the adoption utility can set them.
 
 **Action required for existing beta users.**
 
 1. Update every receiver to the new headers and signature scheme before deploying. See [Signing](https://docs.10xmedia.de/webhooks/signing).
-2. Run the adoption utility once to encrypt subscriptions created before this release:
+2. Run the adoption utility once to encrypt subscriptions created before this release. **Do this as part of the deploy**: until a legacy secret is migrated or rotated it cannot be decrypted, so those subscriptions' deliveries fail (marked `dead`, with an error logged) rather than being sent unsigned.
 
    ```ts
    import { encryptExistingSecrets } from '@10x-media/webhooks'

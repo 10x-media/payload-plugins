@@ -24,6 +24,7 @@ describe('fromCollectionRow', () => {
 			url: 'https://x',
 			events: ['posts.created'],
 			secrets: [secret],
+			secretUnusable: false,
 			headers: { 'X-A': '1' },
 			enabled: true,
 		})

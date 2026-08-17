@@ -6,7 +6,13 @@ import {
 	type RequestContext,
 } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { SECRET_BYTES, SECRET_MASK, SECRET_PREFIX, SECRET_REVEAL_CONTEXT } from '../constants'
+import {
+	SECRET_BYTES,
+	SECRET_MASK,
+	SECRET_PREFIX,
+	SECRET_REVEAL_CONTEXT,
+	SECRET_UNUSABLE,
+} from '../constants'
 import { isEncryptedSecret } from '../secrets/crypto'
 import { generateSecret, isNormalizedSecret, secretKey } from '../secrets/format'
 import { buildSubscriptionsCollection } from './subscriptions'
@@ -191,9 +197,19 @@ describe('buildSubscriptionsCollection', () => {
 		expect(runMask(hook, stored, { [SECRET_REVEAL_CONTEXT.forSigning]: true })).toBe(plaintext)
 	})
 
-	it('yields null for a signing read it cannot decrypt', () => {
+	it('flags a signing read it cannot decrypt, rather than reading as no secret', () => {
 		const hook = secretAfterRead(c)
-		expect(runMask(hook, '__redacted__', { [SECRET_REVEAL_CONTEXT.forSigning]: true })).toBeNull()
+		const result = runMask(hook, 'not-decryptable', {
+			[SECRET_REVEAL_CONTEXT.forSigning]: true,
+		})
+		expect(result).toBe(SECRET_UNUSABLE)
+		expect(result).not.toBeNull()
+	})
+
+	it('returns the stored value verbatim for a raw read', () => {
+		const hook = secretAfterRead(c)
+		const stored = 'whenc1_deadbeef'
+		expect(runMask(hook, stored, { [SECRET_REVEAL_CONTEXT.raw]: true })).toBe(stored)
 	})
 
 	it('passes through nullish secrets without masking', () => {

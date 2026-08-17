@@ -5,6 +5,7 @@ import { buildPayload } from '../delivery/buildPayload'
 import { sendDelivery } from '../delivery/sendDelivery'
 import type { CodeSubscription, CollectionWebhookConfig, WebhookOperation } from '../options'
 import {
+	decideDelivery,
 	fromCodeSubscription,
 	fromCollectionRow,
 	matchSubscriptions,
@@ -115,6 +116,18 @@ const dispatch = async (args: {
 				task: WEBHOOK_DELIVER_TASK,
 				input: { deliveryId },
 				queue: deps.queue,
+			})
+			continue
+		}
+
+		const decision = decideDelivery(subscription)
+		if (!decision.deliverable) {
+			await payload.update({
+				collection: deps.deliveriesSlug,
+				id: deliveryId,
+				data: { status: 'dead', error: decision.reason },
+				overrideAccess: true,
+				req,
 			})
 			continue
 		}
