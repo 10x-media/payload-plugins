@@ -1,0 +1,12 @@
+---
+'@10x-media/folder-picker': minor
+---
+
+Review round: picking a file is an explicit action, polymorphic fields switch collection without leaving the folder view, and dragging no longer crashes the drawer.
+
+- **Collection select above the folder view.** A polymorphic upload field (`relationTo: ['media', 'files']`) previously stripped its collection picker in the folder tab, so reaching the second collection meant going back to the list tab and forward again. The picker now sits above the folders exactly as it does above the list, and switching re-renders the view for the collection that was chosen. Folder state is keyed to the collection it was loaded for, so a switch never leaves the previous collection's folders under the new collection's title, and the header stays mounted while the new results load.
+- **Selection is confirmed, not double-clicked.** Picking a file used to require a double-click, and the only confirmation was a pale pill that appeared for `hasMany` fields alone. One click now selects and **Select** confirms, from the search bar row Payload's own list tab confirms in, but dark rather than white: the folder view has no row checkboxes to hint that selecting is a thing. A single-value field routes through `onSelect`, which it never had a button for; `hasMany` keeps the bulk path and labels the count. Double-clicking a file still picks it outright, and double-clicking a folder still opens it.
+- **Dragging a card no longer crashes the admin panel.** A document view wraps its children in `LivePreviewProvider`, whose `DndContext` looks up a `live-preview-area` droppable and hands the result to `rectIntersection` unchecked; inside a drawer that area does not exist, so the first pointer move threw. The folder cards now register in their own `DndContext` with the collision detection the admin root uses, and a drag overlay follows the cursor as it does on the route.
+- **`folders.fieldName` is honored when moving a folder.** Moving the folder in view PATCHed a hard-coded `folder` field, so a host that renamed the folder field through `config.folders.fieldName` silently wrote nothing. The configured name is threaded through and used.
+- **Translation keys without a namespace are dropped.** `toNested` split every key at `indexOf(':')`, so an override key with no colon was filed under itself with its last character shaved off. Such keys are skipped instead.
+- **The `translations` option is documented**, alongside which strings belong to the plugin and which come from Payload's own admin locale.

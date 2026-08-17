@@ -5,6 +5,14 @@ packages:
   - 'tooling/*'
   - 'config/*'
 
+# pnpm 10 does not run dependency lifecycle scripts unless the package is listed here. Both of
+# these fetch a platform binary on install; without the allowance mongodb-memory-server falls
+# back to downloading mongod lazily from every test worker at once and they race on one temp file.
+# Lived in package.json's "pnpm" field until pnpm stopped reading it; renamed to allowBuilds in 11.
+onlyBuiltDependencies:
+  - esbuild
+  - mongodb-memory-server
+
 catalog:
   '@axe-core/playwright': ^4.11.3
   '@payloadcms/db-mongodb': 3.85.0

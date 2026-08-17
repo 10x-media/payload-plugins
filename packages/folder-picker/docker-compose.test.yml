@@ -1,0 +1,36 @@
+services:
+  mongo:
+    image: mongo:8
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    ports:
+      - '${MONGO_E2E_PORT:-37017}:27017'
+    healthcheck:
+      # Reports healthy only once a primary has been elected. rs.initiate() returns ok before that
+      # happens, so answering on it alone let Payload start into NotWritablePrimary errors.
+      test: |
+        mongosh --quiet --eval '
+          try {
+            rs.status()
+          } catch (e) {
+            rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})
+          }
+          rs.status().members.some((member) => member.stateStr === "PRIMARY") ? 0 : quit(1)
+        '
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: folder-picker_e2e
+    ports:
+      - '${PG_E2E_PORT:-35432}:5432'
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'e2e', '-d', 'folder-picker_e2e']
+      interval: 2s
+      timeout: 5s
+      retries: 30

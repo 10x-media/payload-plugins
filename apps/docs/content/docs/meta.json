@@ -8,6 +8,7 @@
 		"fields",
 		"jobs",
 		"webhooks",
+		"folder-picker",
 		"admin-wiki",
 		"undo-redo",
 		"automations"

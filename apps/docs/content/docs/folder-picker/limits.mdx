@@ -1,0 +1,26 @@
+---
+title: Limits
+description: What the plugin does not do.
+---
+
+## No per-field opt-out
+
+Folders are switched on or off per collection, through Payload's own `folders: true`. There is no way to say "folders in this field, but not in that one", because the list drawer carries no information about which field opened it.
+
+Turning the picker off for a collection means removing `folders: true` from it, which also removes Payload's own **By folder** tab on the route.
+
+## Documents without a folder are hidden
+
+The folder view only lists documents that have a folder assigned. Unfiled documents are invisible there, exactly as in Payload's own folder view; they are still reachable from the **All** tab.
+
+Assign a folder first if a document must be pickable by folder.
+
+## Folders belong to collections
+
+A folder carries `folderType`, the list of collections whose documents it may hold. A folder created while picking for `media` does not appear when picking for `files`.
+
+For a polymorphic upload field (`relationTo: ['media', 'files']`) this means one folder tree per collection, never a merged one. The drawer's collection select sits above the folder view exactly as it does above the list, so switching between those trees takes one click.
+
+## Collections with a custom list view are skipped
+
+If a collection already declares `admin.components.views.list.Component`, the plugin leaves it alone and the collection keeps the stock drawer. To get both, [render the plugin's view from your own](/folder-picker/configuration#rendering-the-view-yourself).
