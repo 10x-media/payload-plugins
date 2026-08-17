@@ -504,7 +504,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 							label={t('general:searchBy', { label: t('general:name') })}
 							onSearchChange={setSearchInput}
 							search={searchInput}
-						/>{' '}
+						/>
 						{enableRowSelections ? (
 							<p className={`${baseClass}__pick-many-hint`}>
 								{t(keys.pickManyHint, modifierLabels(isMac))}
