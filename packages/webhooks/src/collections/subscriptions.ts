@@ -1,10 +1,12 @@
 import {
 	APIError,
 	type CollectionAfterChangeHook,
+	type CollectionAfterErrorHook,
 	type CollectionBeforeChangeHook,
 	type CollectionConfig,
 	type FieldHook,
 	type Payload,
+	type PayloadRequest,
 } from 'payload'
 
 import { ADMIN_GROUP, SECRET_MASK, SECRET_REVEAL_CONTEXT, SECRET_UNUSABLE } from '../constants'
@@ -60,15 +62,15 @@ const withStoredSecret = (
 const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => {
 	if (operation === 'create') {
 		const plaintext = data.secret ? normalizeOr400(data.secret) : generateSecret()
+		const ciphertext = encryptSecret(req.payload, plaintext)
 		req.context[SECRET_REVEAL_CONTEXT.once] = true
-		req.context[SECRET_REVEAL_CONTEXT.plaintext] = plaintext
+		// Bound to the exact ciphertext this create produced. Every encryption uses a fresh IV, so
+		// the stash can only ever match the document it came from: a stash left behind by a create
+		// that threw after this hook is inert rather than a reveal channel for another document.
+		req.context[SECRET_REVEAL_CONTEXT.plaintext] = { ciphertext, plaintext }
 		// `previousSecret` still goes through the encrypt path: field access blocks it from an
 		// ordinary create, but an `overrideAccess` create would otherwise persist it in plaintext.
-		return withStoredSecret(
-			req.payload,
-			{ ...data, secret: encryptSecret(req.payload, plaintext) },
-			'previousSecret'
-		)
+		return withStoredSecret(req.payload, { ...data, secret: ciphertext }, 'previousSecret')
 	}
 	return withStoredSecret(
 		req.payload,
@@ -77,39 +79,68 @@ const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, req }) => 
 	)
 }
 
+/** The create-time reveal stash: plaintext bound to the ciphertext it was stored as. */
+type RevealStash = { ciphertext: string; plaintext: string }
+
+const stashedPlaintextFor = (req: PayloadRequest, value: string): string | null => {
+	const stash = req.context[SECRET_REVEAL_CONTEXT.plaintext] as RevealStash | undefined
+	return stash?.ciphertext === value ? stash.plaintext : null
+}
+
 /**
  * The database stores ciphertext; this hook shapes read output. It runs even under
  * `overrideAccess` (field hooks are not gated by access), so plaintext reaches a reader only
- * when a reveal flag is set: `once` returns the stashed create-time plaintext, `forSigning`
- * decrypts for internal delivery reads. Every other read, admin, REST, or GraphQL, sees the mask.
+ * when a reveal flag is set: `once` returns the create-time plaintext for the one field and
+ * document it belongs to, `forSigning` decrypts for internal delivery reads. Every other read,
+ * admin, REST, or GraphQL, sees the mask.
+ *
+ * `reveals` is false for `previousSecret`: only a newly created secret has a create reveal, and
+ * echoing the stash there would return the new secret a second time under the wrong field.
  */
-const maskSecret: FieldHook = ({ value, req }) => {
-	if (value == null) {
-		return value
-	}
-	if (req.context[SECRET_REVEAL_CONTEXT.raw]) {
-		return value
-	}
-	if (req.context[SECRET_REVEAL_CONTEXT.once]) {
-		return req.context[SECRET_REVEAL_CONTEXT.plaintext] ?? SECRET_MASK
-	}
-	if (req.context[SECRET_REVEAL_CONTEXT.forSigning]) {
-		const plaintext = decryptSecret(req.payload, String(value))
-		if (!plaintext) {
-			req.payload.logger.error(
-				`@10x-media/webhooks: a stored signing secret could not be decrypted, so deliveries for this subscription will fail instead of being sent unsigned. Either PAYLOAD_SECRET changed after the secret was stored, or the subscription predates encryption at rest and needs encryptExistingSecrets(). Rotating the secret also recovers it.`
-			)
-			return SECRET_UNUSABLE
+const maskSecret =
+	(options: { reveals: boolean }): FieldHook =>
+	({ value, req }) => {
+		if (value == null) {
+			return value
 		}
-		return plaintext
+		if (req.context[SECRET_REVEAL_CONTEXT.raw]) {
+			return value
+		}
+		if (options.reveals && req.context[SECRET_REVEAL_CONTEXT.once]) {
+			return stashedPlaintextFor(req, String(value)) ?? SECRET_MASK
+		}
+		if (req.context[SECRET_REVEAL_CONTEXT.forSigning]) {
+			const plaintext = decryptSecret(req.payload, String(value))
+			if (!plaintext) {
+				req.payload.logger.error(
+					`@10x-media/webhooks: a stored signing secret could not be decrypted, so deliveries for this subscription will fail instead of being sent unsigned. Either PAYLOAD_SECRET changed after the secret was stored, or the subscription predates encryption at rest and needs encryptExistingSecrets(). Rotating the secret also recovers it.`
+				)
+				return SECRET_UNUSABLE
+			}
+			return plaintext
+		}
+		return SECRET_MASK
 	}
-	return SECRET_MASK
+
+const clearReveal = (req: PayloadRequest): void => {
+	req.context[SECRET_REVEAL_CONTEXT.once] = false
+	req.context[SECRET_REVEAL_CONTEXT.plaintext] = undefined
 }
 
 const clearRevealOnce: CollectionAfterChangeHook = ({ doc, req }) => {
-	req.context[SECRET_REVEAL_CONTEXT.once] = false
-	req.context[SECRET_REVEAL_CONTEXT.plaintext] = undefined
+	clearReveal(req)
 	return doc
+}
+
+/**
+ * A create that throws after `beforeChange` never reaches `afterChange`, so the reveal window
+ * would otherwise stay open for the rest of the request. The stash is ciphertext-bound and so
+ * cannot reveal another document's secret regardless, but a long-lived request (a job run, a
+ * nested Local API call) has no reason to carry it.
+ */
+const clearRevealOnError: CollectionAfterErrorHook = ({ req }) => {
+	clearReveal(req)
+	return undefined
 }
 
 const loggedIn = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
@@ -132,7 +163,11 @@ export const buildSubscriptionsCollection = (args: {
 		hidden: args.hidden,
 	},
 	access: { read: loggedIn, create: loggedIn, update: loggedIn, delete: loggedIn },
-	hooks: { beforeChange: [prepareSecret], afterChange: [clearRevealOnce] },
+	hooks: {
+		beforeChange: [prepareSecret],
+		afterChange: [clearRevealOnce],
+		afterError: [clearRevealOnError],
+	},
 	fields: [
 		{ name: 'name', type: 'text', required: true, label: labelForKey(keys.fieldName) },
 		{ name: 'url', type: 'text', required: true, label: labelForKey(keys.fieldUrl) },
@@ -157,7 +192,7 @@ export const buildSubscriptionsCollection = (args: {
 			label: labelForKey(keys.fieldSecret),
 			admin: { readOnly: true, description: labelForKey(keys.fieldSecretHelp) },
 			access: { update: () => false },
-			hooks: { afterRead: [maskSecret] },
+			hooks: { afterRead: [maskSecret({ reveals: true })] },
 		},
 		{
 			name: 'previousSecret',
@@ -168,7 +203,7 @@ export const buildSubscriptionsCollection = (args: {
 			// GraphQL create from planting a second signing key, in plaintext, on a new
 			// subscription: `admin.hidden` only hides the field in the UI.
 			access: { create: () => false, update: () => false },
-			hooks: { afterRead: [maskSecret] },
+			hooks: { afterRead: [maskSecret({ reveals: false })] },
 		},
 		{
 			name: 'previousSecretExpiresAt',

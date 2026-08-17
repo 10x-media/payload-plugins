@@ -20,11 +20,14 @@ import { buildSubscriptionsCollection } from './subscriptions'
 const find = (c: ReturnType<typeof buildSubscriptionsCollection>, name: string) =>
 	c.fields.find((f) => 'name' in f && f.name === name)
 
-const secretAfterRead = (c: ReturnType<typeof buildSubscriptionsCollection>): FieldHook => {
-	const field = find(c, 'secret')
+const secretAfterRead = (
+	c: ReturnType<typeof buildSubscriptionsCollection>,
+	name = 'secret'
+): FieldHook => {
+	const field = find(c, name)
 	const hook = field && 'hooks' in field ? field.hooks?.afterRead?.[0] : undefined
 	if (!hook) {
-		throw new Error('secret afterRead hook missing')
+		throw new Error(`${name} afterRead hook missing`)
 	}
 	return hook
 }
@@ -41,6 +44,10 @@ const fakeReq = (context: RequestContext) => ({
 
 const runMask = (hook: FieldHook, value: unknown, context: RequestContext) =>
 	hook({ value, req: fakeReq(context) } as never)
+
+/** The create-time reveal stash, which binds plaintext to the ciphertext it was stored as. */
+const stash = (context: RequestContext) =>
+	context[SECRET_REVEAL_CONTEXT.plaintext] as { ciphertext: string; plaintext: string } | undefined
 
 const runBeforeChange = (
 	c: ReturnType<typeof buildSubscriptionsCollection>,
@@ -84,7 +91,7 @@ describe('buildSubscriptionsCollection', () => {
 		const context: RequestContext = {}
 		const created = await runBeforeChange(c, { data: {}, operation: 'create', context })
 		expect(isEncryptedSecret(created.secret)).toBe(true)
-		const revealed = context[SECRET_REVEAL_CONTEXT.plaintext] as string
+		const revealed = stash(context)?.plaintext as string
 		expect(isNormalizedSecret(revealed)).toBe(true)
 		expect(secretKey(revealed)).toHaveLength(SECRET_BYTES)
 		expect(String(created.secret)).not.toContain(revealed)
@@ -142,7 +149,8 @@ describe('buildSubscriptionsCollection', () => {
 			context,
 		})
 		expect(isEncryptedSecret(created.secret)).toBe(true)
-		expect(context[SECRET_REVEAL_CONTEXT.plaintext]).toBe(`${SECRET_PREFIX}${bare}`)
+		expect(stash(context)?.plaintext).toBe(`${SECRET_PREFIX}${bare}`)
+		expect(stash(context)?.ciphertext).toBe(created.secret)
 		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(true)
 	})
 
@@ -154,7 +162,7 @@ describe('buildSubscriptionsCollection', () => {
 			operation: 'create',
 			context,
 		})
-		expect(context[SECRET_REVEAL_CONTEXT.plaintext]).toBe(`${SECRET_PREFIX}${bare}`)
+		expect(stash(context)?.plaintext).toBe(`${SECRET_PREFIX}${bare}`)
 	})
 
 	it('rejects a malformed customer secret with a 400', () => {
@@ -176,13 +184,58 @@ describe('buildSubscriptionsCollection', () => {
 	it('reveals the create-time plaintext for the one-time create response', () => {
 		const hook = secretAfterRead(c)
 		const plaintext = generateSecret()
-		const stored = Buffer.from(plaintext, 'utf8').toString('hex')
+		const ciphertext = 'whenc1_stored'
 		expect(
-			runMask(hook, stored, {
+			runMask(hook, ciphertext, {
 				[SECRET_REVEAL_CONTEXT.once]: true,
-				[SECRET_REVEAL_CONTEXT.plaintext]: plaintext,
+				[SECRET_REVEAL_CONTEXT.plaintext]: { ciphertext, plaintext },
 			})
 		).toBe(plaintext)
+	})
+
+	it('masks when the stash belongs to a different document', () => {
+		const hook = secretAfterRead(c)
+		expect(
+			runMask(hook, 'whenc1_this_document', {
+				[SECRET_REVEAL_CONTEXT.once]: true,
+				[SECRET_REVEAL_CONTEXT.plaintext]: {
+					ciphertext: 'whenc1_a_failed_create',
+					plaintext: generateSecret(),
+				},
+			})
+		).toBe(SECRET_MASK)
+	})
+
+	it('never reveals the create stash through previousSecret', () => {
+		const hook = secretAfterRead(c, 'previousSecret')
+		const plaintext = generateSecret()
+		const ciphertext = 'whenc1_stored'
+		expect(
+			runMask(hook, ciphertext, {
+				[SECRET_REVEAL_CONTEXT.once]: true,
+				[SECRET_REVEAL_CONTEXT.plaintext]: { ciphertext, plaintext },
+			})
+		).toBe(SECRET_MASK)
+	})
+
+	it('locks both rotation fields against create as well as update', () => {
+		for (const name of ['previousSecret', 'previousSecretExpiresAt']) {
+			const field = find(c, name)
+			const access = field && 'access' in field ? field.access : undefined
+			expect(access?.create?.({} as never)).toBe(false)
+			expect(access?.update?.({} as never)).toBe(false)
+		}
+	})
+
+	it('clears the reveal window when a create fails after beforeChange', () => {
+		const hook = c.hooks?.afterError?.[0] as (args: never) => unknown
+		const context: RequestContext = {
+			[SECRET_REVEAL_CONTEXT.once]: true,
+			[SECRET_REVEAL_CONTEXT.plaintext]: { ciphertext: 'c', plaintext: generateSecret() },
+		}
+		hook({ req: { context } } as never)
+		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(false)
+		expect(context[SECRET_REVEAL_CONTEXT.plaintext]).toBeUndefined()
 	})
 
 	it('masks rather than leaking ciphertext if the reveal stash is missing', () => {
@@ -222,7 +275,7 @@ describe('buildSubscriptionsCollection', () => {
 		const hook = c.hooks?.afterChange?.[0] as CollectionAfterChangeHook
 		const context: RequestContext = {
 			[SECRET_REVEAL_CONTEXT.once]: true,
-			[SECRET_REVEAL_CONTEXT.plaintext]: generateSecret(),
+			[SECRET_REVEAL_CONTEXT.plaintext]: { ciphertext: 'c', plaintext: generateSecret() },
 		}
 		hook({ doc: { id: '1' }, req: { context } } as never)
 		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(false)

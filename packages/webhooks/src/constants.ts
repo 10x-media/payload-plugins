@@ -68,6 +68,13 @@ export const SECRET_REVEAL_CONTEXT = {
 	 */
 	raw: 'webhooksRevealSecretRaw',
 } as const
+
+/**
+ * Upper bound on a rotation grace period. A window measured in years would keep an exposed secret
+ * signing indefinitely, which defeats the point of rotating, so an out-of-range request is
+ * rejected rather than clamped.
+ */
+export const MAX_ROTATION_GRACE_SECONDS = 2_592_000
 export const RESERVED_SLUGS = [
 	'payload-jobs',
 	'payload-locks',
