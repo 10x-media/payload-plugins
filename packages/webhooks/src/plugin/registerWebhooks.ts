@@ -1,4 +1,4 @@
-import type { Config, Endpoint } from 'payload'
+import type { Config, Endpoint, PayloadRequest } from 'payload'
 
 import { buildDeliveriesCollection } from '../collections/deliveries'
 import { buildSubscriptionsCollection } from '../collections/subscriptions'
@@ -55,6 +55,62 @@ const assertCodeSubscriptionHeaders = (subscriptions: CodeSubscription[]): void 
 	}
 }
 
+/**
+ * Validate a rotate-secret request body. The configured grace period is checked at config build,
+ * but a per-request override arrives from the network: an unbounded value would keep an exposed
+ * secret signing for years, and a non-numeric one would slip past `graceSeconds > 0` and retire
+ * the old secret instantly with no window and no error.
+ */
+const parseRotateBody = (body: unknown): { secret?: string; graceSeconds?: number } => {
+	const raw = (body ?? {}) as Record<string, unknown>
+	if (raw.secret !== undefined && typeof raw.secret !== 'string') {
+		throw new Error('secret must be a string')
+	}
+	if (raw.graceSeconds === undefined) {
+		return { secret: raw.secret as string | undefined }
+	}
+	if (typeof raw.graceSeconds !== 'number' || !Number.isFinite(raw.graceSeconds)) {
+		throw new Error('graceSeconds must be a finite number')
+	}
+	return { secret: raw.secret as string | undefined, graceSeconds: raw.graceSeconds }
+}
+
+/**
+ * Evaluate the subscriptions collection's configured `update` access for one document, honouring
+ * a `Where` result by checking that the target actually matches it. Read from the runtime config
+ * so a consumer's override of the collection governs this endpoint too.
+ */
+const canUpdateSubscription = async (args: {
+	req: PayloadRequest
+	slug: string
+	id: string
+}): Promise<boolean> => {
+	const { req, slug, id } = args
+	const access = req.payload.collections?.[slug]?.config?.access?.update
+	if (!access) {
+		return true
+	}
+	const result = await access({ req, id })
+	if (typeof result === 'boolean') {
+		return result
+	}
+	const scoped = await req.payload.find({
+		collection: slug,
+		where: { and: [{ id: { equals: id } }, result] },
+		limit: 1,
+		depth: 0,
+		overrideAccess: true,
+		req,
+	})
+	return scoped.docs.length > 0
+}
+
+/** A concurrent-write rejection from the database, which the caller should retry. */
+const isWriteConflict = (err: unknown): boolean => {
+	const message = err instanceof Error ? err.message : String(err)
+	return /write conflict|could not serialize|deadlock detected/i.test(message)
+}
+
 /** Register collections, the delivery task, source hooks, and the redeliver endpoint. */
 export const registerWebhooks = (args: {
 	config: Config
@@ -93,7 +149,6 @@ export const registerWebhooks = (args: {
 		path: '/:id/rotate-secret',
 		method: 'post',
 		handler: async (req) => {
-			// coarse auth: matches the subscriptions collection, where any logged-in user may write
 			if (!req.user) {
 				return Response.json({ error: 'unauthorized' }, { status: 401 })
 			}
@@ -101,25 +156,51 @@ export const registerWebhooks = (args: {
 			if (typeof id !== 'string') {
 				return Response.json({ error: 'missing id' }, { status: 400 })
 			}
-			const body = (await req.json?.().catch(() => ({}))) as {
-				secret?: string
-				graceSeconds?: number
+			// Rotation is a privileged write, so it defers to the collection's own update access for
+			// this document rather than accepting any logged-in user. Tightening `access.update`, or
+			// scoping it per tenant, governs the endpoint too.
+			if (!(await canUpdateSubscription({ req, slug: subscriptionsSlug, id }))) {
+				return Response.json({ error: 'forbidden' }, { status: 403 })
 			}
+			const body = (await req.json?.().catch(() => ({}))) as unknown
+
+			let secret: string | undefined
+			let graceSeconds: number
+			try {
+				const parsed = parseRotateBody(body)
+				secret = parsed.secret
+				graceSeconds =
+					parsed.graceSeconds === undefined
+						? rotation.graceSeconds
+						: resolveSecretRotationOptions({ graceSeconds: parsed.graceSeconds }).graceSeconds
+			} catch (err) {
+				return Response.json({ error: (err as Error).message }, { status: 400 })
+			}
+
 			try {
 				const result = await rotateSubscriptionSecret({
 					payload: req.payload,
 					req,
 					subscriptionsSlug,
 					id,
-					secret: body?.secret,
-					graceSeconds: body?.graceSeconds ?? rotation.graceSeconds,
+					secret,
+					graceSeconds,
 				})
 				return Response.json(result, { status: 200 })
 			} catch (err) {
 				if (err instanceof InvalidSecretError) {
 					return Response.json({ error: err.message }, { status: 400 })
 				}
-				throw err
+				if (isWriteConflict(err)) {
+					return Response.json(
+						{ error: 'the subscription was modified concurrently; retry the rotation' },
+						{ status: 409 }
+					)
+				}
+				req.payload.logger.error(
+					`@10x-media/webhooks: rotating the secret for subscription ${id} failed: ${err instanceof Error ? err.message : String(err)}`
+				)
+				return Response.json({ error: 'could not rotate the secret' }, { status: 500 })
 			}
 		},
 	}

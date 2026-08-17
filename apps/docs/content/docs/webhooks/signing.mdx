@@ -143,7 +143,9 @@ The response carries the new secret once:
 }
 ```
 
-Both fields of the body are optional: `secret` supplies your own value instead of a generated one, and `graceSeconds` overrides the configured grace period for this rotation.
+Both fields of the body are optional: `secret` supplies your own value instead of a generated one, and `graceSeconds` overrides the configured grace period for this rotation. A malformed body, an out-of-range `graceSeconds`, or an unusable `secret` returns 400 and changes nothing. A concurrent rotation of the same subscription returns 409; retry it.
+
+The endpoint runs the subscriptions collection's own `update` access for the target document, so tightening or tenant-scoping that access governs rotation too.
 
 During the grace period every delivery is signed with **both** secrets, and the header carries both, space separated:
 
@@ -162,7 +164,11 @@ webhooks({
 })
 ```
 
-`graceSeconds: 0` retires the old secret immediately, with no overlap.
+`graceSeconds: 0` retires the old secret immediately, with no overlap. The maximum is 30 days: rotation usually follows an exposure, and an unbounded window would keep the compromised secret signing. Values outside the range are rejected rather than clamped, on the config and on the request.
+
+<Callout type="warn">
+**Only the most recently retired secret is kept.** There is one previous-secret slot, so rotating twice inside an open window ends the first secret's grace period early: after the second rotation, deliveries carry the newest secret and the one it replaced, and anything still holding the original starts failing. If you rotate by mistake, roll forward by distributing the secret you were just given rather than rotating again to "undo" it.
+</Callout>
 
 Expiry is evaluated when a delivery is signed, from a timestamp stored on the subscription. There is no scheduled job to miss, so the window is correct across restarts and the old secret stops the moment it lapses.
 

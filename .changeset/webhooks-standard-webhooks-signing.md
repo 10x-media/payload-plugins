@@ -13,6 +13,7 @@
 - **Reserved headers**: a subscription's custom headers can no longer overwrite `webhook-id`, `webhook-timestamp`, `webhook-signature`, or `X-Webhook-Event`. Previously a custom header of the same name replaced the generated one, including the signature.
 - **Unrecoverable secrets fail the delivery**: if a stored secret cannot be decrypted, the delivery row is marked `dead` with an explicit error and nothing is sent. A subscription that is meant to be signed is never downgraded to an unsigned POST, since receivers commonly verify only when a signature header is present. Subscriptions with no secret continue to deliver unsigned as before.
 - **`previousSecret` is internal**: the rotation fields reject writes from ordinary REST and GraphQL creates and updates, so only rotation and the adoption utility can set them.
+- **Rotation is access-checked and bounded**: the endpoint runs the subscriptions collection's configured `update` access for the target document rather than accepting any logged-in user, validates the request body, caps `graceSeconds` at 30 days, and runs its read-modify-write in a transaction so concurrent rotations cannot hand a caller a secret that never signs. Only the most recently retired secret is kept: rotating twice inside one window ends the first secret's grace period early.
 
 **Action required for existing beta users.**
 

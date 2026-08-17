@@ -1,4 +1,10 @@
-import type { Payload, PayloadRequest } from 'payload'
+import {
+	commitTransaction,
+	initTransaction,
+	killTransaction,
+	type Payload,
+	type PayloadRequest,
+} from 'payload'
 
 import { SECRET_REVEAL_CONTEXT, SECRET_UNUSABLE } from '../constants'
 import { generateSecret, normalizeSecret } from './format'
@@ -62,22 +68,36 @@ export const rotateSubscriptionSecret = async (args: {
 	const { payload, req, subscriptionsSlug, id, graceSeconds } = args
 	const now = args.now ?? Date.now()
 	const next = args.secret ? normalizeSecret(args.secret) : generateSecret()
-	const outgoing = await currentPlaintextSecret({ payload, req, subscriptionsSlug, id })
 
-	const keepPrevious = graceSeconds > 0 && outgoing !== null && outgoing !== next
-	const expiresAt = keepPrevious ? new Date(now + graceSeconds * 1000).toISOString() : null
+	// Read and write share a transaction: rotation is a read-modify-write, and two concurrent
+	// rotations that both read before either writes would otherwise both retire the same original
+	// secret, leaving the loser's caller holding a secret that never signs anything.
+	const opened = await initTransaction(req)
+	try {
+		const outgoing = await currentPlaintextSecret({ payload, req, subscriptionsSlug, id })
+		const keepPrevious = graceSeconds > 0 && outgoing !== null && outgoing !== next
+		const expiresAt = keepPrevious ? new Date(now + graceSeconds * 1000).toISOString() : null
 
-	await payload.update({
-		collection: subscriptionsSlug,
-		id,
-		data: {
-			secret: next,
-			previousSecret: keepPrevious ? outgoing : null,
-			previousSecretExpiresAt: expiresAt,
-		},
-		overrideAccess: true,
-		req,
-	})
+		await payload.update({
+			collection: subscriptionsSlug,
+			id,
+			data: {
+				secret: next,
+				previousSecret: keepPrevious ? outgoing : null,
+				previousSecretExpiresAt: expiresAt,
+			},
+			overrideAccess: true,
+			req,
+		})
 
-	return { id, secret: next, previousSecretExpiresAt: expiresAt }
+		if (opened) {
+			await commitTransaction(req)
+		}
+		return { id, secret: next, previousSecretExpiresAt: expiresAt }
+	} catch (err) {
+		if (opened) {
+			await killTransaction(req)
+		}
+		throw err
+	}
 }

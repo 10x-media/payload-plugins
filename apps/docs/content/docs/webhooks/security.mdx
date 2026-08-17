@@ -16,7 +16,8 @@ Deliveries POST to whatever URL a subscription specifies, including private and 
 ## Access defaults
 
 - Both collections require a logged-in user for every permitted operation; delivery rows additionally refuse create and update from any user (server-only writes).
-- The redeliver and rotate-secret endpoints authorize by login only: any authenticated user may redeliver any delivery or rotate any subscription's secret.
+- **Rotate secret** runs the subscriptions collection's configured `update` access for the target document. Overriding that access, including scoping it per tenant, governs the endpoint as well, so rotation cannot outlive the rule that guards ordinary writes.
+- **Redeliver** authorizes by login only: any authenticated user may redeliver any delivery. It cannot defer to the deliveries collection's access the way rotation does, because that collection denies create and update to everyone by design. Gate it at the network or reverse-proxy layer if that matters to you.
 
 Tighten either with your own access control by overriding the collections through standard Payload config if you need role-based rules.
 

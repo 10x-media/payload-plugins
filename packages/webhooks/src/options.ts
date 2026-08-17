@@ -5,6 +5,7 @@ import {
 	DEFAULT_RETRIES,
 	DEFAULT_ROTATION_GRACE_SECONDS,
 	DEFAULT_TIMEOUT_MS,
+	MAX_ROTATION_GRACE_SECONDS,
 } from './constants'
 import type { TranslationsOption } from './translations'
 
@@ -82,6 +83,13 @@ export const resolveSecretRotationOptions = (
 	if (!Number.isFinite(graceSeconds) || graceSeconds < 0) {
 		throw new Error(
 			`@10x-media/webhooks: secretRotation.graceSeconds must be a non-negative number, got ${graceSeconds}.`
+		)
+	}
+	// Rotation usually follows an exposure, so an unbounded window would keep the compromised
+	// secret signing for as long as it names. Out of range fails rather than being clamped.
+	if (graceSeconds > MAX_ROTATION_GRACE_SECONDS) {
+		throw new Error(
+			`@10x-media/webhooks: secretRotation.graceSeconds must be at most ${MAX_ROTATION_GRACE_SECONDS} (30 days), got ${graceSeconds}.`
 		)
 	}
 	return { graceSeconds }
