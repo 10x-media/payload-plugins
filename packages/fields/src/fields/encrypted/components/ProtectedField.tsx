@@ -23,6 +23,7 @@ import { EncryptedTextarea } from './EncryptedTextarea'
 import type { EncryptedFieldConfig } from './placement'
 import { placementFor } from './placement'
 import { StructuralField } from './StructuralField'
+import { WriteOnlyField } from './WriteOnlyField'
 import './ProtectedField.css'
 
 /**
@@ -101,6 +102,20 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 
 	const Native = NATIVE[componentKey] ?? (TextField as AnyFieldComponent)
 	const nativeProps = { ...(props as unknown as Record<string, unknown>), field: patchedField }
+
+	if (protection === 'writeOnly') {
+		return (
+			<WriteOnlyField
+				componentKey={componentKey}
+				field={patchedField as unknown as EncryptedFieldConfig}
+				maskDots={maskDots}
+				Native={Native}
+				nativeProps={nativeProps}
+				path={path}
+				setPath={`${path}_set`}
+			/>
+		)
+	}
 
 	if (protection === 'none' || startedEmpty) {
 		return <Native {...nativeProps} />

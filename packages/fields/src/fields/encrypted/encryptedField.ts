@@ -1,4 +1,4 @@
-import type { Field, RichTextField, TextField } from 'payload'
+import type { CheckboxField, Field, RichTextField, TextField } from 'payload'
 import { validateKeysConfig } from './crypto/keys'
 import {
 	makeAfterReadHook,
@@ -7,6 +7,7 @@ import {
 	makeRichTextDecryptHook,
 	makeRichTextSealHook,
 	makeRichTextValidate,
+	makeSetIndicatorHook,
 } from './hooks'
 import { clampMaskDots } from './maskDots'
 import {
@@ -153,11 +154,22 @@ export const encryptedField = (
 		queryable = false,
 	} = options
 	const maskDots = clampMaskDots(maskDotsOption)
+	const writeOnly = protection === 'writeOnly'
 	if (keys) {
 		validateKeysConfig(keys)
 	}
 	const hasMany = 'hasMany' in source && source.hasMany === true
 	const unique = 'unique' in source && source.unique === true
+	if (writeOnly && queryable) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': protection 'writeOnly' cannot be combined with queryable (the blind index is an equality oracle: anyone with list access could probe guesses of the secret)`
+		)
+	}
+	if (writeOnly && source.type === 'richText') {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': protection 'writeOnly' is not supported for richText (editing rich text requires the client to see it; use 'masked' instead)`
+		)
+	}
 	if (queryable && hasMany) {
 		throw new Error(
 			`@10x-media/fields: encryptedField '${source.name}': queryable is not supported with hasMany`
@@ -183,7 +195,9 @@ export const encryptedField = (
 		normalize: source.type === 'email' ? 'email' : 'standard',
 		onDecryptFailure,
 		queryable,
+		setName: writeOnly ? `${source.name}_set` : undefined,
 		sourceType: source.type,
+		writeOnly,
 	}
 
 	// richText returns a virtual editor field plus a hidden ciphertext sibling.
@@ -242,8 +256,13 @@ export const encryptedField = (
 					clientProps: { componentKey: source.type, fieldPatch, maskDots, protection },
 					path: '@10x-media/fields/client#ProtectedField',
 				},
-				...(protection === 'masked'
-					? { Cell: { clientProps: { maskDots }, path: '@10x-media/fields/rsc#ProtectedCell' } }
+				...(protection !== 'none'
+					? {
+							Cell: {
+								clientProps: { maskDots, ...(writeOnly ? { setName: marker.setName } : {}) },
+								path: '@10x-media/fields/rsc#ProtectedCell',
+							},
+						}
 					: {}),
 			},
 		},
@@ -259,6 +278,22 @@ export const encryptedField = (
 
 	if (overrides) {
 		stored = overrides({ field: stored })
+	}
+
+	// Write-only reads strip the stored field from every response, so the admin
+	// (and any API consumer) learns set-ness from this virtual sibling instead: a
+	// never-persisted checkbox computed from the sealed sibling's presence. This
+	// is the mode's one deliberate leak, existence only. admin.hidden keeps it in
+	// form state (Payload renders it as a hidden input) without displaying it.
+	if (writeOnly) {
+		const setField: CheckboxField = {
+			name: marker.setName as string,
+			type: 'checkbox',
+			admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+			hooks: { afterRead: [makeSetIndicatorHook(marker.fieldName)] },
+			virtual: true,
+		}
+		return [stored, setField]
 	}
 
 	if (!queryable) {

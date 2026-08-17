@@ -43,4 +43,12 @@ export const de: Record<TranslationKey, string> = {
 	[keys.showValue]: 'Wert anzeigen',
 	[keys.hideValue]: 'Wert verbergen',
 	[keys.encryptedValue]: 'Verschlüsselter Wert',
+	[keys.secretSet]: 'Gesetzt',
+	[keys.secretNotSet]: 'Nicht gesetzt',
+	[keys.replaceValue]: 'Ersetzen',
+	[keys.clearValue]: 'Entfernen',
+	[keys.cancelReplace]: 'Abbrechen',
+	[keys.undoClear]: 'Rückgängig',
+	[keys.clearedOnSave]: 'Wird beim Speichern entfernt',
+	[keys.writeOnlyValue]: 'Nur schreibbarer verschlüsselter Wert',
 }

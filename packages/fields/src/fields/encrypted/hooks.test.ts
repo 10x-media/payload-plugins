@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { resolveKeys } from './crypto/keys'
 import { isSealed, seal, unseal } from './crypto/wire'
 import {
+	makeAfterReadHook,
 	makeBeforeChangeHook,
 	makeRichTextCiphertextHook,
 	makeRichTextDecryptHook,
 	makeRichTextSealHook,
 	makeRichTextValidate,
+	makeSetIndicatorHook,
 	readAadCandidates,
 	sealAad,
 } from './hooks'
@@ -23,6 +25,7 @@ const marker = (localized: boolean): EncryptedFieldMarker => ({
 	normalize: 'standard',
 	queryable: false,
 	sourceType: 'text',
+	writeOnly: false,
 })
 
 const makeReq = (
@@ -81,6 +84,7 @@ const sealMarker = (overrides: SealMarker): EncryptedFieldMarker => ({
 	normalize: 'standard',
 	queryable: false,
 	sourceType: 'text',
+	writeOnly: false,
 	...overrides,
 })
 
@@ -391,5 +395,55 @@ describe('plaintext stash is collision-free under concurrent bulk writes (shared
 		])
 		expect(outcomes).toHaveLength(4)
 		expect(outcomes.every(Boolean)).toBe(true)
+	})
+})
+
+describe('write-only read behavior', () => {
+	it('afterRead passes the sealed value through untouched (never decrypts)', async () => {
+		const m = sealMarker({ fieldName: 'apiKey', writeOnly: true })
+		const req = hookReq()
+		const sealed = await callSeal(m, 'hunter2', req).result
+		const hook = makeAfterReadHook(m)
+		const result = await hook({
+			collection: { slug: 'users' },
+			context: {},
+			global: null,
+			req,
+			value: sealed,
+		} as unknown as Parameters<typeof hook>[0])
+		expect(result).toBe(sealed)
+		expect(isSealed(result)).toBe(true)
+	})
+})
+
+describe('makeSetIndicatorHook (virtual set-indicator sibling)', () => {
+	const call = (stored: unknown, context: Record<string, unknown> = {}) => {
+		const hook = makeSetIndicatorHook('apiKey')
+		return hook({
+			context,
+			siblingData: { apiKey: stored },
+			value: undefined,
+		} as unknown as Parameters<typeof hook>[0])
+	}
+
+	it('true for a sealed sibling, false for null/undefined', () => {
+		expect(call('pfe1.k.a.b.c')).toBe(true)
+		expect(call(null)).toBe(false)
+		expect(call(undefined)).toBe(false)
+	})
+
+	it('hasMany arrays count as set when any item exists', () => {
+		expect(call(['pfe1.k.a.b.c'])).toBe(true)
+		expect(call([])).toBe(false)
+		expect(call([null])).toBe(false)
+	})
+
+	it('locale maps count as set when any locale holds a value', () => {
+		expect(call({ de: 'pfe1.k.a.b.c', en: null })).toBe(true)
+		expect(call({ de: null, en: null })).toBe(false)
+	})
+
+	it('utility contexts pass through untouched (raw reads see no synthesized data)', () => {
+		expect(call('pfe1.k.a.b.c', { [ENCRYPTED_CONTEXT_KEY]: 'raw' })).toBeUndefined()
 	})
 })

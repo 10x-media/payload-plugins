@@ -78,6 +78,43 @@ describe('encryptedField factory shape', () => {
 		expect(encryptedField({ name: 'c', type: 'number' }, { queryable: true })).toHaveLength(2)
 	})
 
+	it('appends a virtual set-indicator sibling for writeOnly and marks the marker', () => {
+		const fields = encryptedField({ name: 'apiKey', type: 'text' }, { protection: 'writeOnly' })
+		expect(fields).toHaveLength(2)
+		const stored = fields[0] as TextField
+		const setField = fields[1] as { admin?: Record<string, unknown> } & Record<string, unknown>
+		expect(setField.name).toBe('apiKey_set')
+		expect(setField.type).toBe('checkbox')
+		expect(setField.virtual).toBe(true)
+		// admin.hidden (not top-level hidden) keeps the indicator in admin form
+		// state (Payload renders it as a hidden input) so the write-only editor can
+		// read set-ness without the value ever being present.
+		expect(setField.hidden).toBeUndefined()
+		expect(setField.admin?.hidden).toBe(true)
+		const marker = getEncryptedMarker(stored)
+		expect(marker?.writeOnly).toBe(true)
+		expect(marker?.setName).toBe('apiKey_set')
+	})
+
+	it('writeOnly wires the ProtectedCell with the set-indicator name', () => {
+		const fields = encryptedField({ name: 'apiKey', type: 'text' }, { protection: 'writeOnly' })
+		const stored = fields[0] as TextField
+		const cell = stored.admin?.components?.Cell as { clientProps?: Record<string, unknown> }
+		expect(cell.clientProps?.setName).toBe('apiKey_set')
+	})
+
+	it('rejects writeOnly + queryable (the blind index is an equality oracle)', () => {
+		expect(() =>
+			encryptedField({ name: 'apiKey', type: 'text' }, { protection: 'writeOnly', queryable: true })
+		).toThrow(/oracle/)
+	})
+
+	it('rejects writeOnly on richText (editing requires the client to see it)', () => {
+		expect(() =>
+			encryptedField({ name: 'body', type: 'richText' }, { protection: 'writeOnly' })
+		).toThrow(/richText/)
+	})
+
 	it('returns a virtual editor field plus a hidden ciphertext sibling for richText', () => {
 		const fields = encryptedField({ name: 'body', required: true, type: 'richText' })
 		expect(fields).toHaveLength(2)

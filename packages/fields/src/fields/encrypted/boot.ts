@@ -20,8 +20,12 @@ export const validateEncryptedBoot = async (
 	// plugin declared no keys; ringForRequest resolves marker.keys ?? pluginKeys
 	// and falls back to the secret-derived ring only when both are absent.
 	let usesDefault = false
-	for (const collection of payload.config.collections) {
-		for (const [, marker] of scanEncryptedFields(collection.fields)) {
+	const fieldSets = [
+		...payload.config.collections.map((collection) => collection.fields),
+		...payload.config.globals.map((global) => global.fields),
+	]
+	for (const fields of fieldSets) {
+		for (const [, marker] of scanEncryptedFields(fields)) {
 			if (marker.keys) {
 				configs.add(marker.keys)
 			} else if (!pluginKeys) {

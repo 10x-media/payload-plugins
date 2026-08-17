@@ -42,4 +42,12 @@ export const en: Record<TranslationKey, string> = {
 	[keys.showValue]: 'Show value',
 	[keys.hideValue]: 'Hide value',
 	[keys.encryptedValue]: 'Encrypted value',
+	[keys.secretSet]: 'Set',
+	[keys.secretNotSet]: 'Not set',
+	[keys.replaceValue]: 'Replace',
+	[keys.clearValue]: 'Clear',
+	[keys.cancelReplace]: 'Cancel',
+	[keys.undoClear]: 'Undo',
+	[keys.clearedOnSave]: 'Will be removed on save',
+	[keys.writeOnlyValue]: 'Write-only encrypted value',
 }

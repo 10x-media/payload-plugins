@@ -31,7 +31,15 @@ export type EncryptedSourceField =
 
 export type EncryptedSourceType = EncryptedSourceField['type']
 
-export type EncryptedProtection = 'masked' | 'none'
+/**
+ * Confidentiality ladder for the admin and API surface. `'none'` renders the
+ * native component with the value visible; `'masked'` (default) conceals behind
+ * dots with a reveal toggle; `'writeOnly'` additionally strips the field from
+ * every read result (REST, GraphQL, Local API) so the plaintext never leaves
+ * the server. Write-only values are read deliberately via `readEncryptedField`
+ * or `decryptFieldValue`.
+ */
+export type EncryptedProtection = 'masked' | 'none' | 'writeOnly'
 
 export interface EncryptedFieldOptions {
 	keys?: KeysConfig
@@ -67,7 +75,10 @@ export interface EncryptedFieldMarker {
 	normalize: BidxNormalize
 	onDecryptFailure?: DecryptFailurePolicy
 	queryable: boolean
+	/** Name of the virtual set-indicator sibling; present only when `writeOnly`. */
+	setName?: string
 	sourceType: EncryptedSourceType
+	writeOnly: boolean
 }
 
 /** Serializable subset shipped to ProtectedField via clientProps. */

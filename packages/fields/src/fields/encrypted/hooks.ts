@@ -296,6 +296,12 @@ export const makeAfterReadHook = (marker: EncryptedFieldMarker): FieldHook => {
 		if (contextMode(context)) {
 			return value
 		}
+		// Write-only never decrypts on read: the sealed value passes through and the
+		// collection/global strip hook removes the field from the response, so even
+		// standalone usage (no plugin, no strip) exposes ciphertext at worst.
+		if (marker.writeOnly) {
+			return value
+		}
 		const slug = aadSlug(collection, global)
 		const ring = await ringForRequest(req, marker)
 		const openArgs: OpenSealedArgs = {
@@ -307,6 +313,31 @@ export const makeAfterReadHook = (marker: EncryptedFieldMarker): FieldHook => {
 		}
 		const openOne = (item: unknown): unknown => openSealed(item, openArgs)
 		return marker.hasMany && Array.isArray(value) ? value.map(openOne) : openOne(value)
+	}
+}
+
+/**
+ * afterRead on the virtual set-indicator sibling of a write-only field: true
+ * when the stored sibling holds anything (sealed, or pre-adoption plaintext).
+ * A locale-map sibling (locale=all read) counts as set when any locale has a
+ * value. Utility flows pass through so raw reads see no synthesized data.
+ */
+export const makeSetIndicatorHook = (fieldName: string): FieldHook => {
+	return ({ context, siblingData, value }) => {
+		if (contextMode(context)) {
+			return value
+		}
+		const stored = (siblingData as Record<string, unknown>)[fieldName]
+		if (stored == null) {
+			return false
+		}
+		if (Array.isArray(stored)) {
+			return stored.some((item) => item != null)
+		}
+		if (typeof stored === 'object') {
+			return Object.values(stored).some((item) => item != null)
+		}
+		return true
 	}
 }
 
