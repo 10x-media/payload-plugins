@@ -16,7 +16,7 @@ Field-level encryption at rest protects plaintext from parties who obtain your *
 It does **not** protect against:
 
 - a compromised application server: the process holds (or can fetch) the keys and decrypts on every read
-- anyone your access control already authorizes: the API serves them plaintext by design
+- anyone your access control already authorizes: the API serves them plaintext by design ([`protection: 'writeOnly'`](/fields/encrypted/write-only) is the exception, for credentials no caller should read back)
 - traffic interception: that is TLS's job
 - side channels in your own code: logging a decrypted value, indexing it into search, copying it to an unencrypted field
 

@@ -1,4 +1,12 @@
 {
 	"title": "Encrypted",
-	"pages": ["index", "key-management", "querying", "migration", "limitations", "design-rationale"]
+	"pages": [
+		"index",
+		"key-management",
+		"querying",
+		"write-only",
+		"migration",
+		"limitations",
+		"design-rationale"
+	]
 }

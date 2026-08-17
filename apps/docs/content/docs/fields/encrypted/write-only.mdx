@@ -1,0 +1,91 @@
+---
+title: Write-only secrets
+description: A protection mode for credentials, values that are written and used server-side but never returned to any API caller.
+---
+
+Masked fields decrypt on read; the dots are a presentation choice, and any authorized reader (or their network tab) receives the plaintext. That is right for most secrets, where authorized users legitimately need the value back. It is wrong for credentials: an SMTP password, a webhook signing secret, a third-party API key. Those are written once, consumed by server code, and no API caller ever needs to read them.
+
+`protection: 'writeOnly'` makes that contract structural instead of a convention you re-state with field access control on every field:
+
+```ts
+import { encryptedField } from '@10x-media/fields/encrypted'
+
+const smtpSettings: GlobalConfig = {
+  slug: 'smtp-settings',
+  fields: [
+    { name: 'host', type: 'text' },
+    { name: 'user', type: 'text' },
+    ...encryptedField(
+      { name: 'password', type: 'text' },
+      { protection: 'writeOnly' },
+    ),
+  ],
+}
+```
+
+The three `protection` values form a ladder: `'none'` renders the value openly, `'masked'` (default) conceals it behind dots with a reveal toggle, and `'writeOnly'` additionally removes it from every read result. Works on collections and globals alike, for every supported type except `richText` (you cannot edit rich text you cannot see; use `'masked'` there).
+
+## What it guarantees
+
+- **No read result carries the value.** REST, GraphQL, and the Local API all omit the field; the read pipeline never decrypts it, and the response strip removes even the ciphertext. This holds for every caller, regardless of role or access control.
+- **Set-ness is the one thing exposed.** A virtual sibling `<name>_set` (boolean, never persisted) tells the admin UI and API consumers whether a value is stored. Existence is the mode's single deliberate leak; if even that is too much, field access control on the sibling is yours to add.
+- **Writes are unchanged.** Values seal in `beforeChange` like any encrypted field, plaintext validation still runs, `null` still clears. An update that does not mention the field preserves the stored secret.
+- **`queryable` is rejected.** A blind index answers equality, and equality on a secret is a guessing oracle for anyone who can filter a list view. The factory throws on the combination.
+
+## In the admin
+
+There is no reveal, because there is nothing to reveal: the plaintext never reaches the browser.
+
+- **Unset**: the plain native input. Type a value and save.
+- **Set**: a fixed run of dots (`maskDots` applies) with a "Set" badge, plus two actions. **Replace** swaps in an empty native input so an editor can enter a new value without ever seeing the old one; Cancel restores. **Clear** marks the value for removal on save, with Undo.
+- **List view**: the lock badge with dots when set, an em dash when unset. The value itself is never in the list data.
+
+An editor can rotate a credential they were never able to read. That is the point.
+
+## Reading it server-side
+
+Your own server code is the intended reader. Two exports from `@10x-media/fields/encrypted` make that read a deliberate act rather than a side effect of a document fetch:
+
+```ts
+import { readEncryptedField, decryptFieldValue } from '@10x-media/fields/encrypted'
+
+const secret = await readEncryptedField(payload, {
+  global: 'smtp-settings',   // or collection: 'tenants', id
+  path: 'password',          // dot paths reach into groups: 'smtp.password'
+})
+const password = await secret?.decrypt()  // null handle when unset
+```
+
+`readEncryptedField` fetches the stored ciphertext (bypassing the strip) and returns a handle: `ciphertext`, the raw wire string, and `decrypt()`, which resolves keys at call time. For a `hasMany` field the ciphertext is an array and `decrypt()` returns one.
+
+The handle shape is deliberate. A transport factory that caches its settings can hold the ciphertext and decrypt per use, so plaintext exists only for the moment it is used and never sits in a cache:
+
+```ts
+let cached: { host: string; ciphertext: string } | null = null
+
+const sendMail = async (payload: Payload, message: Message) => {
+  if (!cached) {
+    const settings = await payload.findGlobal({ slug: 'smtp-settings' })
+    const secret = await readEncryptedField(payload, { global: 'smtp-settings', path: 'password' })
+    if (!secret) throw new Error('SMTP password not configured')
+    cached = { host: settings.host, ciphertext: secret.ciphertext as string }
+  }
+  const password = await decryptFieldValue(payload, {
+    global: 'smtp-settings',
+    path: 'password',
+    value: cached.ciphertext,
+  })
+  await transportFor(cached.host, password as string).send(message)
+}
+```
+
+`decryptFieldValue` is the primitive underneath: given the field path and a wire string, it resolves the field's keys and binding from your config and returns the plaintext. Both helpers work on any encrypted field, not only write-only ones, and both take a `locale` for localized fields.
+
+Neither helper checks access. They run with the server's full authority, which is what makes calling them the security decision: guard the call sites, and never forward the result to a client.
+
+## Caveats
+
+- **Existence is visible.** `<name>_set` appears in read results so the admin can render the set state. It says a value exists, nothing more.
+- **Version diffs show nothing readable.** Like every encrypted field, versions store ciphertext; a write-only field's history is a sequence of opaque values.
+- **Standalone usage degrades safely.** The response strip is attached by the `fields()` plugin (or `withEncryptedQueryRewrite` / `withEncryptedResponseStrip` if you wire collections and globals yourself). Without it, a write-only field still never decrypts on read; the worst a misconfigured read can expose is ciphertext.
+- **Switching modes is free.** `'masked'` and `'writeOnly'` share the same storage, so changing `protection` is a config edit, no migration.
