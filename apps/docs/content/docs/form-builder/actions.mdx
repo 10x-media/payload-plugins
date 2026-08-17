@@ -122,6 +122,33 @@ Two costs come with the seam being server-resolved and failing closed:
 - **The select is empty until the form's first save.** It loads from a document-scoped endpoint, and an unsaved form has no id to resolve against, so the addresses appear once the form exists. Save the form, then pick the sender.
 - **A resolver that throws blocks saves.** Payload runs the validate on every save, not only when `from` changed, so while the resolver is down every save of a form whose email action has a **From** set is rejected, including edits that never touch the address. It surfaces as a translated "unavailable" save error rather than a raw stack, and a form with no **From** set still saves. This is the deliberate trade: failing open would persist a sender the host can no longer vouch for. A resolver that reaches a flaky upstream should cache or fall back internally instead of throwing.
 
+### Senders resolved at send time
+
+A literal from `fromAddresses` freezes when the form is saved. For a routing target that is the point; for a sender it can be wrong, because the sender is usually tenant identity rather than per-form configuration: a tenant that changes its from-address leaves every saved form sending the old one, with nothing telling the editor. `email.fromSources` covers that case. A source stores a stable, namespaced value on the action and resolves the actual address on every send:
+
+```ts title="payload.config.ts"
+formBuilder({
+  email: {
+    fromSources: {
+      tenant: {
+        value: 'tenant:default',
+        label: 'Tenant default sender',
+        resolve: async ({ form, payload }) => {
+          const tenant = await tenantOfForm(form, payload)
+          return tenant?.fromAddress ?? null
+        },
+      },
+    },
+  },
+})
+```
+
+Sources appear in the same **From** select, listed ahead of the `fromAddresses` literals, and either option can be set without the other. What the editor picks decides the behaviour: a source stores its `value` (`tenant:default` above, audit-stable in the saved form), a literal stores and sends the address as before and never touches a source.
+
+`resolve` receives the same run-time arguments as a [recipient source](#recipient-sources): the form, the submission's values and descriptors, the verified context, `payload`, and the request. Derive the tenant from the form document rather than the request where you can; on the queued path the request is the job runner's, while the form is the same document the action was saved on. The result is reduced to a single sender (`Name <addr@example.com>` form included; anything past a separator or line break is cut), returning `null` or an empty string sends with the adapter's default sender, and a throw fails the action rather than sending as an identity the host no longer vouches for; on the queued path that failure retries.
+
+The namespaced `value` is the whole trick: it cannot collide with a literal address, so the send path can tell "re-resolve this" from "send this" by a map lookup, with no flags stored on the form. Pick values like `tenant:default` and keep them stable. Renaming or removing a source orphans every form that stored its value: the stored string then reads as a literal, reaches the adapter as an invalid sender, and fails the send loudly, which is the intended failure mode, visible rather than silently sending as the wrong identity.
+
 ## Department routing
 
 By default `emailTeam`'s **To** is a plain address your editors type in themselves. Set `email.departments` to turn it into a select over addresses you manage instead, so an editor routes a form to "Sales" or "Support" without ever typing (or mistyping) an address:
