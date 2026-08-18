@@ -8,7 +8,13 @@ export const HINT_MAX_CHARS = 8
  */
 export const HINT_MIN_HIDDEN = 8
 
-const HINT_GAP = '····'
+/**
+ * Canonical gap marker in the STORED hint (`sk_d····9d3f`). Storage stays
+ * compact and length-neutral; display layers swap it for the field's
+ * `maskDots` run via `formatHint` so the concealed span matches the masked
+ * aesthetic everywhere.
+ */
+export const HINT_GAP = '····'
 
 export interface NormalizedHint {
 	prefix: number
@@ -48,4 +54,18 @@ export const makeHint = (plaintext: unknown, hint: NormalizedHint): string | nul
 	const start = hint.prefix > 0 ? plaintext.slice(0, hint.prefix) : ''
 	const end = hint.suffix > 0 ? plaintext.slice(-hint.suffix) : ''
 	return `${start}${HINT_GAP}${end}`
+}
+
+/**
+ * Renders a stored hint for display: the canonical gap becomes `dots` mask
+ * bullets, so `sk_d····9d3f` with maskDots 8 shows as `sk_d••••••••9d3f`,
+ * the same bullet run a hint-less concealed value shows. The dot count stays
+ * cosmetic and says nothing about the hidden length.
+ */
+export const formatHint = (hint: string, dots: number): string => {
+	const index = hint.indexOf(HINT_GAP)
+	if (index === -1) {
+		return hint
+	}
+	return `${hint.slice(0, index)}${'•'.repeat(Math.max(1, Math.trunc(dots)))}${hint.slice(index + HINT_GAP.length)}`
 }

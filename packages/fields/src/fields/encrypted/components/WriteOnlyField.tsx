@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { generateSecret, type NormalizedGenerate } from '../generateSecret'
+import { formatHint } from '../hint'
 import { dotString } from './MaskDots'
 import type { EncryptedFieldConfig, Placement } from './placement'
 import { ActionButton } from './WriteOnlyActions'
@@ -121,7 +122,9 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 			? typeof field.admin?.placeholder === 'string'
 				? field.admin.placeholder
 				: undefined
-			: (hint ?? dotString(maskDots))
+			: hint
+				? formatHint(hint, maskDots)
+				: dotString(maskDots)
 
 	const showClear = typed || (clearable && isSet && !cleared)
 	const inputId = `field-${path.replace(/\./g, '__')}`
@@ -158,12 +161,7 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	const isTextarea = componentKey === 'textarea'
 	const inputProps = {
 		autoComplete: 'off',
-		className: [
-			!typed && isSet && !cleared && !hint && 'tenx-protected-field__masked-input',
-			'tenx-protected-field__wo-input',
-		]
-			.filter(Boolean)
-			.join(' '),
+		className: 'tenx-protected-field__wo-input',
 		id: inputId,
 		name: path,
 		onChange: handleChange,

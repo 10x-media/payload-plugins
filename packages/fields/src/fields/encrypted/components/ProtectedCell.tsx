@@ -1,6 +1,7 @@
 import type { DefaultServerCellComponentProps } from 'payload'
 import { keys } from '../../../translations/keys'
 import { asTranslate } from '../../../translations/server'
+import { formatHint } from '../hint'
 import { clampMaskDots } from '../maskDots'
 
 /**
@@ -32,7 +33,10 @@ export const ProtectedCell = ({
 	const hint = hintName ? row?.[hintName] : undefined
 	return renderLocked({
 		i18n,
-		text: typeof hint === 'string' && hint.length > 0 ? hint : undefined,
+		text:
+			typeof hint === 'string' && hint.length > 0
+				? formatHint(hint, clampMaskDots(maskDots))
+				: undefined,
 		maskDots,
 	})
 }

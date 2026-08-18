@@ -31,7 +31,7 @@ export const writeOnlyStories: CollectionConfig = {
 			{
 				admin: {
 					description:
-						'STORY 2, pasted third-party API key that must stay identifiable (Stripe/SendGrid). hint: { prefix: 4, suffix: 4 } stores an identification slice (here sk_d····9d3f) beside the ciphertext at seal time, so the set state and the list cell show the hint instead of anonymous dots and the API returns it as stripeKey_hint. The full value stays unreadable forever; values shorter than prefix + suffix + 8 store no hint at all.',
+						'STORY 2, pasted third-party API key that must stay identifiable (Stripe/SendGrid). hint: { prefix: 4, suffix: 4 } stores an identification slice beside the ciphertext at seal time; the API returns it as stripeKey_hint (sk_d····9d3f), and the set state and list cell render the gap as the maskDots bullet run (sk_d••••••••9d3f), matching every other concealed span. The full value stays unreadable forever; values shorter than prefix + suffix + 8 store no hint at all.',
 				},
 				name: 'stripeKey',
 				type: 'text',

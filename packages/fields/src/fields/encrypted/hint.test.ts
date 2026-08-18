@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { makeHint, normalizeHint } from './hint'
+import { formatHint, makeHint, normalizeHint } from './hint'
 
 describe('normalizeHint', () => {
 	it('defaults missing sides to zero and keeps given values', () => {
@@ -27,6 +27,13 @@ describe('makeHint', () => {
 		// prefix 4 + suffix 4 + 8 hidden = 16 minimum
 		expect(makeHint('fifteen-chars15'.slice(0, 15), hint)).toBeNull()
 		expect(makeHint('sixteen-chars-16', hint)).toBe('sixt····s-16')
+	})
+
+	it('display formatting swaps the canonical gap for the maskDots bullet run', () => {
+		expect(formatHint('sk_d····9d3f', 8)).toBe('sk_d••••••••9d3f')
+		expect(formatHint('····1b4c', 3)).toBe('•••1b4c')
+		// A string without the gap (defensive) passes through untouched.
+		expect(formatHint('plain', 8)).toBe('plain')
 	})
 
 	it('returns null for non-string plaintext', () => {
