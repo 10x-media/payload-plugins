@@ -1,7 +1,7 @@
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { SECRET_MASK, SECRET_PREFIX } from '../../src/constants'
+import { SECRET_MASK, SECRET_PREFIX, SECRET_REVEAL_CONTEXT } from '../../src/constants'
 import { encryptExistingSecrets, webhooks } from '../../src/index'
 import { isEncryptedSecret } from '../../src/secrets/crypto'
 
@@ -78,7 +78,7 @@ describe('encryptExistingSecrets', () => {
 			collection: 'webhook-subscriptions',
 			id: String(created.id),
 			overrideAccess: true,
-			context: { webhooksRevealSecretForSigning: true },
+			context: { [SECRET_REVEAL_CONTEXT.forSigning]: true },
 		})
 		expect(rotated.secret).toBe(`${SECRET_PREFIX}${LEGACY_SECRET}`)
 	})

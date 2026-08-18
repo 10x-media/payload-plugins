@@ -20,9 +20,13 @@ const standardHeaders = (hit: Hit): Record<string, string> => ({
 })
 
 /**
- * The receiver example the docs publish, kept here verbatim in behaviour so a change to the
- * documented snippet that breaks verification fails the suite. Deliberately hand-rolled: it is
- * what a reader copies when they do not reach for a library.
+ * A copy of the receiver example the docs publish, deliberately hand-rolled because that is what a
+ * reader copies when they do not reach for a library.
+ *
+ * This pins the documented behaviour against real deliveries and against the reference library, so
+ * a change to the *scheme* that breaks the snippet fails here. It cannot detect drift in the other
+ * direction: nothing links this code to the markdown, so editing one and not the other goes
+ * unnoticed. Change them together.
  */
 const documentedReceiver = (args: {
 	secret: string

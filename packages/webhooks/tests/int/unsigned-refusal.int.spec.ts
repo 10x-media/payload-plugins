@@ -246,6 +246,8 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 			const deliveries = await queued.payload.find({
 				collection: 'webhook-deliveries',
 				overrideAccess: true,
+				sort: '-createdAt',
+				limit: 1,
 			})
 			expect(deliveries.docs[0]?.status).toBe('dead')
 			expect(String(deliveries.docs[0]?.error)).toMatch(/could not be decrypted/)

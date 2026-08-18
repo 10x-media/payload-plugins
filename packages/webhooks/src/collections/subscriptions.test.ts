@@ -7,6 +7,7 @@ import {
 } from 'payload'
 import { describe, expect, it } from 'vitest'
 import {
+	CIPHER_PREFIX,
 	SECRET_BYTES,
 	SECRET_MASK,
 	SECRET_PREFIX,
@@ -173,14 +174,10 @@ describe('buildSubscriptionsCollection', () => {
 	})
 
 	it('rejects a malformed customer secret with a 400', () => {
-		let thrown: unknown
-		try {
+		const create = () =>
 			runBeforeChange(c, { data: { secret: 'not base64!' }, operation: 'create', context: {} })
-		} catch (err) {
-			thrown = err
-		}
-		expect(thrown).toBeInstanceOf(APIError)
-		expect((thrown as APIError).status).toBe(400)
+		expect(create).toThrow(APIError)
+		expect(create).toThrow(expect.objectContaining({ status: 400 }))
 	})
 
 	/**
@@ -211,7 +208,7 @@ describe('buildSubscriptionsCollection', () => {
 	it('reveals the create-time plaintext for the one-time create response', () => {
 		const hook = secretAfterRead(c)
 		const plaintext = generateSecret()
-		const ciphertext = 'whenc1_stored'
+		const ciphertext = `${CIPHER_PREFIX}stored`
 		expect(
 			runMask(hook, ciphertext, {
 				[SECRET_REVEAL_CONTEXT.once]: true,
@@ -223,10 +220,10 @@ describe('buildSubscriptionsCollection', () => {
 	it('masks when the stash belongs to a different document', () => {
 		const hook = secretAfterRead(c)
 		expect(
-			runMask(hook, 'whenc1_this_document', {
+			runMask(hook, `${CIPHER_PREFIX}this_document`, {
 				[SECRET_REVEAL_CONTEXT.once]: true,
 				[SECRET_REVEAL_CONTEXT.plaintext]: {
-					ciphertext: 'whenc1_a_failed_create',
+					ciphertext: `${CIPHER_PREFIX}a_failed_create`,
 					plaintext: generateSecret(),
 				},
 			})
@@ -236,7 +233,7 @@ describe('buildSubscriptionsCollection', () => {
 	it('never reveals the create stash through previousSecret', () => {
 		const hook = secretAfterRead(c, 'previousSecret')
 		const plaintext = generateSecret()
-		const ciphertext = 'whenc1_stored'
+		const ciphertext = `${CIPHER_PREFIX}stored`
 		expect(
 			runMask(hook, ciphertext, {
 				[SECRET_REVEAL_CONTEXT.once]: true,
@@ -386,7 +383,10 @@ describe('buildSubscriptionsCollection', () => {
 	})
 
 	describe('lapsed rotation cleanup', () => {
-		const lapsed = { previousSecret: 'whenc1_abc', previousSecretExpiresAt: '2020-01-01T00:00:00Z' }
+		const lapsed = {
+			previousSecret: `${CIPHER_PREFIX}abc`,
+			previousSecretExpiresAt: '2020-01-01T00:00:00Z',
+		}
 
 		it('clears a retired secret whose window has closed on the next write', async () => {
 			const updated = await runBeforeChange(c, {
@@ -405,7 +405,7 @@ describe('buildSubscriptionsCollection', () => {
 				operation: 'update',
 				context: {},
 				originalDoc: {
-					previousSecret: 'whenc1_abc',
+					previousSecret: `${CIPHER_PREFIX}abc`,
 					previousSecretExpiresAt: new Date(Date.now() + 60_000),
 				},
 			})

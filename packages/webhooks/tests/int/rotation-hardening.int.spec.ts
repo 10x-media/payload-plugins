@@ -1,7 +1,7 @@
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import { type CollectionConfig, Forbidden, type PayloadRequest } from 'payload'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MAX_ROTATION_GRACE_SECONDS, SECRET_MASK } from '../../src/constants'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { MAX_ROTATION_GRACE_SECONDS, SECRET_MASK, SECRET_REVEAL_CONTEXT } from '../../src/constants'
 import { webhooks } from '../../src/index'
 import { resolveSecretRotationOptions } from '../../src/options'
 import { generateSecret } from '../../src/secrets/format'
@@ -94,7 +94,7 @@ describe('rotation hardening', () => {
 				collection: 'webhook-subscriptions',
 				id,
 				overrideAccess: true,
-				context: { webhooksRevealSecretForSigning: true },
+				context: { [SECRET_REVEAL_CONTEXT.forSigning]: true },
 			})
 			const promised = fulfilled.map((r) => (r.status === 'fulfilled' ? r.value.secret : undefined))
 			expect(promised).toContain(active.secret)
@@ -160,14 +160,11 @@ describe('the rotate-secret endpoint handler', () => {
 		return { body: (await res.json()) as Record<string, unknown>, status: res.status }
 	}
 
-	const restoreAccess = () => {
-		const collection = booted.payload.collections?.['webhook-subscriptions']
-		if (collection) {
-			// biome-ignore lint/suspicious/noExplicitAny: restoring the configured access
-			;(collection.config.access as any).update = ({ req }: { req: { user?: unknown } }) =>
-				Boolean(req.user)
-		}
-	}
+	/**
+	 * Captured once and restored after every case, so a failing assertion cannot leave a swapped
+	 * access function behind for the tests that follow.
+	 */
+	let configuredAccess: unknown
 
 	const subscribe = async (name: string) =>
 		booted.payload.create({
@@ -182,6 +179,15 @@ describe('the rotate-secret endpoint handler', () => {
 			db: 'mongo',
 			collections: [posts],
 		})
+		configuredAccess = booted.payload.collections?.['webhook-subscriptions']?.config?.access?.update
+	})
+
+	afterEach(() => {
+		const collection = booted.payload.collections?.['webhook-subscriptions']
+		if (collection) {
+			// biome-ignore lint/suspicious/noExplicitAny: restoring the collection's own access
+			;(collection.config.access as any).update = configuredAccess
+		}
 	})
 
 	afterAll(async () => {
@@ -189,7 +195,6 @@ describe('the rotate-secret endpoint handler', () => {
 	})
 
 	it('rotates and reveals the new secret once for a permitted caller', async () => {
-		restoreAccess()
 		const created = await subscribe('endpoint-ok')
 		const { status, body } = await call({ id: String(created.id) })
 		expect(status).toBe(200)
@@ -198,20 +203,17 @@ describe('the rotate-secret endpoint handler', () => {
 	})
 
 	it('refuses an anonymous caller with 401', async () => {
-		restoreAccess()
 		const created = await subscribe('endpoint-anon')
 		expect(await call({ id: String(created.id), user: undefined })).toMatchObject({ status: 401 })
 	})
 
 	it('rejects a missing id with 400', async () => {
-		restoreAccess()
 		expect(await call({})).toMatchObject({ status: 400 })
 	})
 
 	it('returns 403 when the collection update access denies this document', async () => {
 		const created = await subscribe('endpoint-denied')
 		const { status } = await call({ access: () => false, id: String(created.id) })
-		restoreAccess()
 		expect(status).toBe(403)
 	})
 
@@ -223,7 +225,6 @@ describe('the rotate-secret endpoint handler', () => {
 			},
 			id: String(created.id),
 		})
-		restoreAccess()
 		expect(status).toBe(403)
 	})
 
@@ -234,13 +235,11 @@ describe('the rotate-secret endpoint handler', () => {
 
 		const allowed = await call({ access: scoped, id: String(mine.id) })
 		const denied = await call({ access: scoped, id: String(theirs.id) })
-		restoreAccess()
 		expect(allowed.status).toBe(200)
 		expect(denied.status).toBe(403)
 	})
 
 	it('rejects a non-numeric graceSeconds with 400 instead of silently retiring the old secret', async () => {
-		restoreAccess()
 		const created = await subscribe('endpoint-nan')
 		const { status, body } = await call({
 			body: { graceSeconds: '3600' },
@@ -251,7 +250,6 @@ describe('the rotate-secret endpoint handler', () => {
 	})
 
 	it('rejects a graceSeconds beyond the ceiling with 400', async () => {
-		restoreAccess()
 		const created = await subscribe('endpoint-huge')
 		const { status, body } = await call({ body: { graceSeconds: 1e12 }, id: String(created.id) })
 		expect(status).toBe(400)
@@ -259,7 +257,6 @@ describe('the rotate-secret endpoint handler', () => {
 	})
 
 	it('rejects a non-string secret with 400', async () => {
-		restoreAccess()
 		const created = await subscribe('endpoint-badtype')
 		expect(await call({ body: { secret: 42 }, id: String(created.id) })).toMatchObject({
 			status: 400,
@@ -267,7 +264,6 @@ describe('the rotate-secret endpoint handler', () => {
 	})
 
 	it('rejects a malformed secret with 400 and leaves the subscription alone', async () => {
-		restoreAccess()
 		const created = await subscribe('endpoint-badsecret')
 		const { status, body } = await call({
 			body: { secret: 'not base64!' },
@@ -278,7 +274,7 @@ describe('the rotate-secret endpoint handler', () => {
 
 		const reread = await booted.payload.findByID({
 			collection: 'webhook-subscriptions',
-			context: { webhooksRevealSecretForSigning: true },
+			context: { [SECRET_REVEAL_CONTEXT.forSigning]: true },
 			id: String(created.id),
 			overrideAccess: true,
 		})
@@ -286,7 +282,6 @@ describe('the rotate-secret endpoint handler', () => {
 	})
 
 	it('accepts a customer-supplied secret and returns it', async () => {
-		restoreAccess()
 		const created = await subscribe('endpoint-supplied')
 		const chosen = generateSecret()
 		const { status, body } = await call({ body: { secret: chosen }, id: String(created.id) })
@@ -295,7 +290,6 @@ describe('the rotate-secret endpoint handler', () => {
 	})
 
 	it('accepts graceSeconds: 0 and retires the old secret immediately', async () => {
-		restoreAccess()
 		const created = await subscribe('endpoint-zero')
 		const { status, body } = await call({ body: { graceSeconds: 0 }, id: String(created.id) })
 		expect(status).toBe(200)

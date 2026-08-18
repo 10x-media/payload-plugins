@@ -130,7 +130,7 @@ describe('webhook secrets are encrypted at rest', () => {
 			overrideAccess: true,
 		})
 
-		expect(String(copy.secret)).toMatch(/^whsec_/)
+		expect(String(copy.secret).startsWith(SECRET_PREFIX)).toBe(true)
 		expect(copy.secret).not.toBe(original)
 		expect(copy.secret).not.toBe(SECRET_MASK)
 

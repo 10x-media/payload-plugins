@@ -7,7 +7,10 @@ import { signatureHeader, signPayload } from './sign'
 
 let server: Server
 let url: string
-let received: { headers: IncomingHttpHeaders; body: string } | undefined
+type Hit = { headers: IncomingHttpHeaders; body: string }
+let received: Hit | undefined
+/** Read through a call so assigning `undefined` above does not narrow the variable away. */
+const lastHit = (): Hit | undefined => received
 
 beforeAll(async () => {
 	server = createServer((req, res) => {
@@ -65,14 +68,36 @@ describe('sendDelivery', () => {
 		expect(received?.headers['x-custom']).toBe('c')
 	})
 
+	/** Send one delivery and hand back what the sink saw, so each case stands on its own. */
+	const capture = async (event: string) => {
+		received = undefined
+		await sendDelivery({
+			subscription: fromCodeSubscription({ id: 's', url, events: [], secret }),
+			deliveryId: 'd_headers',
+			event,
+			body: '{"id":"d_headers"}',
+			timeoutMs: 1000,
+			now: 1_700_000_000_000,
+		})
+		const hit = lastHit()
+		if (!hit) {
+			throw new Error('no delivery captured')
+		}
+		return hit
+	}
+
 	it('retains X-Webhook-Event alongside the standard headers', async () => {
-		expect(received?.headers['x-webhook-event']).toBe('posts.created')
+		const hit = await capture('posts.created')
+		expect(hit.headers['x-webhook-event']).toBe('posts.created')
+		expect(hit.headers['webhook-id']).toBe('d_headers')
+		expect(hit.headers['webhook-signature']).toMatch(/^v1,/)
 	})
 
 	it('no longer sends the pre-standard signing headers', async () => {
-		expect(received?.headers['x-webhook-id']).toBeUndefined()
-		expect(received?.headers['x-webhook-timestamp']).toBeUndefined()
-		expect(received?.headers['x-webhook-signature']).toBeUndefined()
+		const hit = await capture('posts.updated')
+		expect(hit.headers['x-webhook-id']).toBeUndefined()
+		expect(hit.headers['x-webhook-timestamp']).toBeUndefined()
+		expect(hit.headers['x-webhook-signature']).toBeUndefined()
 	})
 
 	it('emits one v1 signature per secret, space separated', async () => {

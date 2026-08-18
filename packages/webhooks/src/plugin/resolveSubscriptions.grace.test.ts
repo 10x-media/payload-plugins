@@ -63,7 +63,7 @@ describe('rotation grace window', () => {
 	it('drops a masked previous secret inside an open window', () => {
 		const resolved = fromCollectionRow(
 			row({
-				previousSecret: '__redacted__',
+				previousSecret: SECRET_MASK,
 				previousSecretExpiresAt: new Date(NOW + 60_000).toISOString(),
 			}),
 			NOW
