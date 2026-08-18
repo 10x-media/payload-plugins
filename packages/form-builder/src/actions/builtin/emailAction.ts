@@ -98,9 +98,7 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 		recipients,
 		recipientSources,
 	} = options
-	const fromSourcesByValue = new Map(
-		Object.values(fromSources ?? {}).map((source) => [source.value, source])
-	)
+	const fromSourcesByValue = sourcesByValue(fromSources)
 	const endpoint = departments ? 'departments' : undefined
 	const recip: RecipientFieldBuilder = (name, labelKey) =>
 		buildRecipientField(name, labelKey, localize, {
@@ -141,7 +139,7 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 		run: async (args) => {
 			const { config, values } = args
 			const resolve = resolverFor(values)
-			const sources = sourcesByValue(options.recipientSources)
+			const sources = sourcesByValue(recipientSources)
 			const sourceArgs: RecipientResolveArgs = {
 				context: args.context,
 				values,

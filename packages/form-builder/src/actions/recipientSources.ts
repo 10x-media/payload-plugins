@@ -29,11 +29,11 @@ export type RecipientSource = {
 
 export type RecipientSourceRegistry = Record<string, RecipientSource>
 
-/** Index sources by their stored `value` for O(1) lookup during validation and resolution. */
-export const sourcesByValue = (
-	registry?: RecipientSourceRegistry
-): Map<string, RecipientSource> => {
-	const map = new Map<string, RecipientSource>()
+/** Index a source registry (recipient or from) by stored `value` for O(1) lookup during validation and resolution. */
+export const sourcesByValue = <T extends { value: string }>(
+	registry?: Record<string, T>
+): Map<string, T> => {
+	const map = new Map<string, T>()
 	for (const source of Object.values(registry ?? {})) {
 		map.set(source.value, source)
 	}
