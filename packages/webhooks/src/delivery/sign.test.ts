@@ -7,7 +7,8 @@ import { signatureHeader, signPayload } from './sign'
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
 
 describe('signPayload', () => {
-	const secret = `${SECRET_PREFIX}${'a'.repeat(43)}=`
+	// Canonical base64 over fixed bytes: deterministic, and the encoding normalizeSecret accepts.
+	const secret = `${SECRET_PREFIX}${Buffer.alloc(32, 7).toString('base64')}`
 	const args = { secret, id: 'msg_1', timestamp: 1_700_000_000, body: '{"a":1}' }
 
 	it('signs id.timestamp.body with HMAC-SHA256 over the base64-decoded key', () => {

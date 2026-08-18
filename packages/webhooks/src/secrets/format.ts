@@ -48,6 +48,15 @@ export const normalizeSecret = (input: string): string => {
 		)
 	}
 	const bytes = Buffer.from(body, 'base64')
+	// The group structure above still admits aliases: the final group's unused low bits are not
+	// required to be zero, so `AAAAAAAAAAAAAAAAAAAAAA==` and `AAAAAAAAAAAAAAAAAAAAAB==` are
+	// different strings that decode to identical key material. Round-tripping is what pins one
+	// spelling per key, so a secret cannot be stored, compared or rotated under two names.
+	if (bytes.toString('base64') !== body) {
+		throw new InvalidSecretError(
+			`the value after '${SECRET_PREFIX}' is not canonically encoded; re-encode the key material as base64 (its trailing bits must be zero, or two different-looking secrets decode to the same key)`
+		)
+	}
 	if (bytes.length < MIN_SECRET_BYTES) {
 		throw new InvalidSecretError(
 			`the secret decodes to ${bytes.length} bytes; provide at least ${MIN_SECRET_BYTES} (recommend ${SECRET_BYTES})`

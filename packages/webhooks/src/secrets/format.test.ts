@@ -74,6 +74,20 @@ describe('normalizeSecret', () => {
 		expect(() => normalizeSecret(`${'A'.repeat(22)}=A`)).toThrow(/padded base64/)
 	})
 
+	/**
+	 * The group-structure check alone still admits aliases: the final group's unused low bits are
+	 * not required to be zero, so two different strings decode to byte-identical key material.
+	 */
+	it('rejects a non-canonical alias that decodes to the same key', () => {
+		const canonical = `${'A'.repeat(22)}==`
+		const alias = `${'A'.repeat(21)}B==`
+		expect(Buffer.from(alias, 'base64').equals(Buffer.from(canonical, 'base64'))).toBe(true)
+		expect(alias).not.toBe(canonical)
+
+		expect(normalizeSecret(canonical)).toBe(`${SECRET_PREFIX}${canonical}`)
+		expect(() => normalizeSecret(alias)).toThrow(/canonically encoded/)
+	})
+
 	it('accepts both padded final-group shapes', () => {
 		// 22 characters + '==' decodes to 16 bytes, 23 + '=' to 17: the two legal tail shapes.
 		expect(secretKey(normalizeSecret(`${'A'.repeat(22)}==`))).toHaveLength(16)
