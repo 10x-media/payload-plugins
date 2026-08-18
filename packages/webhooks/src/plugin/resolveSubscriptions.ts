@@ -3,6 +3,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { SECRET_MASK, SECRET_REVEAL_CONTEXT, SECRET_UNUSABLE } from '../constants'
 import type { CodeSubscription } from '../options'
 import { normalizeSecret } from '../secrets/format'
+import { withRevealWindow } from '../secrets/revealWindow'
 
 /** A subscription resolved from either source, ready to deliver to. */
 export type ResolvedSubscription = {
@@ -213,9 +214,8 @@ export const resolveSubscriptionById = async (args: {
 	if (code) {
 		return fromCodeSubscription(code)
 	}
-	args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = true
-	try {
-		const res = await args.payload.find({
+	const res = await withRevealWindow(args.req, SECRET_REVEAL_CONTEXT.forSigning, () =>
+		args.payload.find({
 			collection: args.subscriptionsSlug,
 			where: { id: { equals: args.id } },
 			limit: 1,
@@ -223,9 +223,7 @@ export const resolveSubscriptionById = async (args: {
 			overrideAccess: true,
 			req: args.req,
 		})
-		const row = res.docs[0] as Parameters<typeof fromCollectionRow>[0] | undefined
-		return row ? fromCollectionRow(row) : null
-	} finally {
-		args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = false
-	}
+	)
+	const row = res.docs[0] as Parameters<typeof fromCollectionRow>[0] | undefined
+	return row ? fromCollectionRow(row) : null
 }

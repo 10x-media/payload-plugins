@@ -11,6 +11,7 @@ import {
 	matchSubscriptions,
 	type ResolvedSubscription,
 } from '../plugin/resolveSubscriptions'
+import { withRevealWindow } from '../secrets/revealWindow'
 import { eventId } from './eventTypes'
 
 /** Per-collection dispatch dependencies. */
@@ -35,10 +36,8 @@ const resolveListening = async (args: {
 	req: PayloadRequest
 }): Promise<ResolvedSubscription[]> => {
 	const code = args.deps.codeSubscriptions.map(fromCodeSubscription)
-	args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = true
-	let res: Awaited<ReturnType<typeof args.req.payload.find>>
-	try {
-		res = await args.req.payload.find({
+	const res = await withRevealWindow(args.req, SECRET_REVEAL_CONTEXT.forSigning, () =>
+		args.req.payload.find({
 			collection: args.deps.subscriptionsSlug,
 			where: { enabled: { not_equals: false } },
 			limit: SUBSCRIPTION_SCAN_LIMIT,
@@ -46,9 +45,7 @@ const resolveListening = async (args: {
 			overrideAccess: true,
 			req: args.req,
 		})
-	} finally {
-		args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = false
-	}
+	)
 	if (res.docs.length >= SUBSCRIPTION_SCAN_LIMIT) {
 		args.req.payload.logger.warn(
 			`@10x-media/webhooks: subscription scan hit the ${SUBSCRIPTION_SCAN_LIMIT} cap; some subscriptions may be skipped for ${args.event}.`

@@ -10,6 +10,7 @@ import { SECRET_REVEAL_CONTEXT } from '../constants'
 import { resolveSecretRotationOptions } from '../options'
 import { decryptSecret } from './crypto'
 import { generateSecret, normalizeSecret } from './format'
+import { withRevealWindow } from './revealWindow'
 
 /**
  * Raised when the subscription changed between this rotation's read and its write. The endpoint
@@ -47,22 +48,19 @@ const currentSecret = async (args: {
 	subscriptionsSlug: string
 	id: string
 }): Promise<{ stored: string | null; plaintext: string | null }> => {
-	args.req.context[SECRET_REVEAL_CONTEXT.raw] = true
-	try {
-		const doc = await args.payload.findByID({
+	const doc = await withRevealWindow(args.req, SECRET_REVEAL_CONTEXT.raw, () =>
+		args.payload.findByID({
 			collection: args.subscriptionsSlug,
 			id: args.id,
 			depth: 0,
 			overrideAccess: true,
 			req: args.req,
 		})
-		const stored = typeof doc.secret === 'string' && doc.secret !== '' ? doc.secret : null
-		// An unreadable secret has nothing worth carrying into a grace period, and rotation is the
-		// documented recovery for exactly that state. It still serves as the swap token.
-		return { stored, plaintext: stored ? decryptSecret(args.payload, stored) : null }
-	} finally {
-		args.req.context[SECRET_REVEAL_CONTEXT.raw] = false
-	}
+	)
+	const stored = typeof doc.secret === 'string' && doc.secret !== '' ? doc.secret : null
+	// An unreadable secret has nothing worth carrying into a grace period, and rotation is the
+	// documented recovery for exactly that state. It still serves as the swap token.
+	return { stored, plaintext: stored ? decryptSecret(args.payload, stored) : null }
 }
 
 /**
