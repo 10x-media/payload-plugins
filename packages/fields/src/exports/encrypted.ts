@@ -14,6 +14,8 @@ export {
 } from '../fields/encrypted/queryRewrite'
 export type {
 	EncryptedFieldOptions,
+	EncryptedGenerateConfig,
+	EncryptedHintConfig,
 	EncryptedProtection,
 	EncryptedSourceField,
 } from '../fields/encrypted/types'

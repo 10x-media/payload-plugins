@@ -118,36 +118,41 @@
 	display: none;
 }
 
-/* Write-only: facsimile row (dots input + state pill) with an actions row
-   below. The facsimile input keeps the native 40px rhythm; the pill floats
-   inside its right edge so state reads as part of the control. */
-.tenx-protected-field--write-only {
-	margin-bottom: var(--spacing-field);
-}
-
-.tenx-protected-field__wo-row {
-	position: relative;
-	display: flex;
-	align-items: center;
-}
-
-.tenx-protected-field__wo-row .pill {
-	position: absolute;
-	top: 50%;
-	right: calc(var(--base) / 2);
-	transform: translateY(-50%);
-}
-
+/* Write-only: one always-editable input; a stored value is only a placeholder
+   (hint or dots), and every action is an attached segment or label-row icon,
+   so the field never grows past its native height. */
 .tenx-protected-field__wo-input {
 	flex: 1 1 auto;
 	width: 100%;
-	cursor: default;
 }
 
-.tenx-protected-field__wo-actions {
+/* Stored-value placeholder reads as the concealed face, not as a prompt. */
+.tenx-protected-field__wo-input::placeholder {
+	color: var(--theme-elevation-500);
+	letter-spacing: 0.05em;
+}
+
+/* Several attached segments chain like one control: shared borders between
+   neighbours, right rounding only on the last. */
+.tenx-protected-field__eye-wrap--attached .tenx-protected-field__action:not(:last-child) {
+	border-radius: 0;
+}
+
+/* Corner placement (textarea) rows its actions horizontally where the eye sits. */
+.tenx-protected-field__actions--corner {
 	display: flex;
-	gap: calc(var(--base) / 2);
-	margin-top: calc(var(--base) / 2);
+	gap: 2px;
+}
+
+/* Structural face box: an input-rhythm well the label-row dots sit in. */
+.tenx-protected-field__wo-face-box {
+	display: flex;
+	align-items: center;
+	min-height: 40px;
+	padding: 0 calc(var(--base) * 0.75);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
 }
 
 /* Concealed dots. */

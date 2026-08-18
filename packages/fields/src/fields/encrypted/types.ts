@@ -41,6 +41,33 @@ export type EncryptedSourceType = EncryptedSourceField['type']
  */
 export type EncryptedProtection = 'masked' | 'none' | 'writeOnly'
 
+/**
+ * Identification hint for a write-only field: how many leading and trailing
+ * plaintext characters to store beside the ciphertext at seal time (never
+ * derived by decrypting on read). `prefix + suffix` is capped at 8, and a
+ * plaintext shorter than `prefix + suffix + 8` stores no hint at all, so a
+ * hint can identify a long key but never reconstruct a short secret.
+ */
+export interface EncryptedHintConfig {
+	prefix?: number
+	suffix?: number
+}
+
+/**
+ * Generator for a write-only field's admin Generate action. `true` uses the
+ * default: 32 chars of crypto-random base62. Values are generated client-side
+ * in the form, so a generated secret is visible and copyable exactly until
+ * save, then never again.
+ */
+export interface EncryptedGenerateConfig {
+	/** Generated length excluding the prefix. Clamped to [8, 128]; default 32. */
+	length?: number
+	/** Literal prefix, e.g. 'whsec_'. Counts toward the hint but not `length`. */
+	prefix?: string
+	/** Alphabet to sample from; at least 10 distinct chars. Default base62. */
+	charset?: string
+}
+
 export interface EncryptedFieldOptions {
 	keys?: KeysConfig
 	/**
@@ -53,6 +80,16 @@ export interface EncryptedFieldOptions {
 	overrides?: (args: { field: TextField }) => TextField
 	protection?: EncryptedProtection
 	queryable?: boolean
+	/**
+	 * Write-only fields only: whether the admin offers the clear (×) action.
+	 * Defaults to `true` for optional fields and is forced off for `required`
+	 * ones (clearing a required secret could never save).
+	 */
+	clearable?: boolean
+	/** Write-only text/email fields only: store an identification hint. */
+	hint?: EncryptedHintConfig
+	/** Write-only text fields only: enable the admin Generate action. */
+	generate?: true | EncryptedGenerateConfig
 }
 
 /** Request-context modes the encrypted hooks respect (utilities set them). */
@@ -77,6 +114,10 @@ export interface EncryptedFieldMarker {
 	queryable: boolean
 	/** Name of the virtual set-indicator sibling; present only when `writeOnly`. */
 	setName?: string
+	/** Normalized hint config; present only when `writeOnly` with a hint. */
+	hint?: { prefix: number; suffix: number }
+	/** Name of the stored hint sibling; present only when `hint` is. */
+	hintName?: string
 	sourceType: EncryptedSourceType
 	writeOnly: boolean
 }

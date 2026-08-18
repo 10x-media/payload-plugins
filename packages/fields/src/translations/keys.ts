@@ -40,13 +40,10 @@ export const keys = {
 	showValue: 'fields:showValue',
 	hideValue: 'fields:hideValue',
 	encryptedValue: 'fields:encryptedValue',
-	secretSet: 'fields:secretSet',
-	secretNotSet: 'fields:secretNotSet',
 	replaceValue: 'fields:replaceValue',
 	clearValue: 'fields:clearValue',
-	cancelReplace: 'fields:cancelReplace',
 	undoClear: 'fields:undoClear',
-	clearedOnSave: 'fields:clearedOnSave',
+	generateValue: 'fields:generateValue',
 	writeOnlyValue: 'fields:writeOnlyValue',
 } as const
 

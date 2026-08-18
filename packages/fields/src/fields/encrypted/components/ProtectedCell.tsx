@@ -11,24 +11,37 @@ import { clampMaskDots } from '../maskDots'
  * `maskDots` (forwarded via clientProps) for list consistency, defaulting to
  * the same 8 as the field. `setName` (write-only fields) points at the virtual
  * set-indicator sibling in rowData; an unset secret renders an em dash instead
- * of dots that would imply a stored value.
+ * of dots that would imply a stored value. `hintName` points at the stored
+ * identification hint, which replaces the dots when present.
  */
 export const ProtectedCell = ({
+	hintName,
 	i18n,
 	maskDots,
 	rowData,
 	setName,
-}: DefaultServerCellComponentProps & { maskDots?: number; setName?: string }) => {
-	if (setName && (rowData as Record<string, unknown> | undefined)?.[setName] !== true) {
+}: DefaultServerCellComponentProps & {
+	hintName?: string
+	maskDots?: number
+	setName?: string
+}) => {
+	const row = rowData as Record<string, unknown> | undefined
+	if (setName && row?.[setName] !== true) {
 		return <span className="tenx-protected-cell">&mdash;</span>
 	}
-	return renderLockedDots({ i18n, maskDots })
+	const hint = hintName ? row?.[hintName] : undefined
+	return renderLocked({
+		i18n,
+		text: typeof hint === 'string' && hint.length > 0 ? hint : undefined,
+		maskDots,
+	})
 }
 
-const renderLockedDots = ({
+const renderLocked = ({
 	i18n,
 	maskDots,
-}: Pick<DefaultServerCellComponentProps, 'i18n'> & { maskDots?: number }) => (
+	text,
+}: Pick<DefaultServerCellComponentProps, 'i18n'> & { maskDots?: number; text?: string }) => (
 	<span
 		className="tenx-protected-cell"
 		style={{ alignItems: 'center', display: 'inline-flex', gap: '0.4em' }}
@@ -46,7 +59,7 @@ const renderLockedDots = ({
 			<path d="M8 11V7a4 4 0 0 1 8 0v4" />
 		</svg>
 		<span aria-label={asTranslate(i18n.t)(keys.encryptedValue)} role="img">
-			{'•'.repeat(clampMaskDots(maskDots))}
+			{text ?? '•'.repeat(clampMaskDots(maskDots))}
 		</span>
 	</span>
 )

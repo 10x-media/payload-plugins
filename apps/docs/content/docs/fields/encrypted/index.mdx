@@ -13,7 +13,7 @@ fields: [
 ]
 ```
 
-`encryptedField(source, options?)` takes the field config you would have written as its first argument, and encryption options (`queryable`, `protection`, `maskDots`, `keys`, `onDecryptFailure`, `overrides`) as its second. It returns an array (the stored field, plus a blind-index sibling when `queryable`), so spread it into `fields`.
+`encryptedField(source, options?)` takes the field config you would have written as its first argument, and encryption options (`queryable`, `protection`, `maskDots`, `keys`, `onDecryptFailure`, `overrides`, plus the write-only companions `hint`, `generate`, and `clearable`) as its second. It returns an array (the stored field, plus a blind-index sibling when `queryable`), so spread it into `fields`.
 
 Values are encrypted with AES-256-GCM before they reach the database and decrypted on read. The database column holds an opaque versioned string on every adapter (Mongo and Postgres behave identically); your API and admin see plaintext, your database, backups, and dumps do not. With no configuration, keys derive from `PAYLOAD_SECRET`; production setups should configure [explicit keys](/fields/encrypted/key-management).
 

@@ -1,5 +1,7 @@
 import type { CheckboxField, Field, RichTextField, TextField } from 'payload'
 import { validateKeysConfig } from './crypto/keys'
+import { normalizeGenerate } from './generateSecret'
+import { normalizeHint } from './hint'
 import {
 	makeAfterReadHook,
 	makeBeforeChangeHook,
@@ -146,6 +148,9 @@ export const encryptedField = (
 	options: EncryptedFieldOptions = {}
 ): Field[] => {
 	const {
+		clearable,
+		generate,
+		hint,
 		keys,
 		maskDots: maskDotsOption,
 		onDecryptFailure,
@@ -160,6 +165,35 @@ export const encryptedField = (
 	}
 	const hasMany = 'hasMany' in source && source.hasMany === true
 	const unique = 'unique' in source && source.unique === true
+	const required = 'required' in source && source.required === true
+	if (!writeOnly && (hint || generate || clearable !== undefined)) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': hint, generate, and clearable require protection 'writeOnly'`
+		)
+	}
+	if (hint && hasMany) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': hint is not supported with hasMany (one hint cannot identify many values)`
+		)
+	}
+	if (hint && source.type !== 'text' && source.type !== 'email') {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': hint is only supported for text and email fields (a hint slices leading/trailing characters)`
+		)
+	}
+	if (generate && source.type !== 'text') {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': generate is only supported for text fields`
+		)
+	}
+	if (clearable === true && required) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': clearable cannot be enabled on a required field (clearing it could never save)`
+		)
+	}
+	const normalizedHint = hint ? normalizeHint(hint, source.name) : undefined
+	const normalizedGenerate = generate ? normalizeGenerate(generate, source.name) : undefined
+	const resolvedClearable = writeOnly ? (clearable ?? !required) : false
 	if (writeOnly && queryable) {
 		throw new Error(
 			`@10x-media/fields: encryptedField '${source.name}': protection 'writeOnly' cannot be combined with queryable (the blind index is an equality oracle: anyone with list access could probe guesses of the secret)`
@@ -196,6 +230,8 @@ export const encryptedField = (
 		onDecryptFailure,
 		queryable,
 		setName: writeOnly ? `${source.name}_set` : undefined,
+		hint: normalizedHint,
+		hintName: normalizedHint ? `${source.name}_hint` : undefined,
 		sourceType: source.type,
 		writeOnly,
 	}
@@ -253,13 +289,28 @@ export const encryptedField = (
 			components: {
 				...(sourceAdmin?.components ?? {}),
 				Field: {
-					clientProps: { componentKey: source.type, fieldPatch, maskDots, protection },
+					clientProps: {
+						componentKey: source.type,
+						fieldPatch,
+						maskDots,
+						protection,
+						...(writeOnly
+							? {
+									clearable: resolvedClearable,
+									...(normalizedGenerate ? { generate: normalizedGenerate } : {}),
+								}
+							: {}),
+					},
 					path: '@10x-media/fields/client#ProtectedField',
 				},
 				...(protection !== 'none'
 					? {
 							Cell: {
-								clientProps: { maskDots, ...(writeOnly ? { setName: marker.setName } : {}) },
+								clientProps: {
+									maskDots,
+									...(writeOnly ? { setName: marker.setName } : {}),
+									...(marker.hintName ? { hintName: marker.hintName } : {}),
+								},
 								path: '@10x-media/fields/rsc#ProtectedCell',
 							},
 						}
@@ -293,7 +344,20 @@ export const encryptedField = (
 			hooks: { afterRead: [makeSetIndicatorHook(marker.fieldName)] },
 			virtual: true,
 		}
-		return [stored, setField]
+		if (!marker.hintName) {
+			return [stored, setField]
+		}
+		// The hint is real stored data (derived at seal time in the same
+		// beforeChange that encrypts, so the two can never drift) and is the
+		// identification surface API consumers and the admin read; it is
+		// deliberately NOT stripped from responses.
+		const hintField: TextField = {
+			name: marker.hintName,
+			type: 'text',
+			admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+			...(marker.localized ? { localized: true } : {}),
+		}
+		return [stored, setField, hintField]
 	}
 
 	if (!queryable) {

@@ -33,6 +33,10 @@ const credentials: CollectionConfig = {
 	fields: [
 		{ name: 'title', type: 'text' },
 		...encryptedField({ name: 'apiKey', type: 'text' }, { protection: 'writeOnly' }),
+		...encryptedField(
+			{ name: 'hintedKey', type: 'text' },
+			{ hint: { prefix: 4, suffix: 4 }, protection: 'writeOnly' }
+		),
 		...encryptedField({ name: 'config', type: 'json' }, { protection: 'writeOnly' }),
 		...encryptedField({ hasMany: true, name: 'tokens', type: 'text' }, { protection: 'writeOnly' }),
 		...encryptedField(
@@ -178,6 +182,48 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 				path: 'apiKey',
 			})
 			expect(gone).toBeNull()
+		})
+
+		it('maintains the identification hint through set, replace, and clear', async () => {
+			const created = await booted.payload.create({
+				collection: 'credentials',
+				data: { hintedKey: 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f', title: 'hinted' },
+			})
+			// The hint is the identification surface: present in reads, not stripped.
+			expect(created.hintedKey).toBeUndefined()
+			expect(created.hintedKey_hint).toBe('sk_d····9d3f')
+
+			const replaced = await booted.payload.update({
+				collection: 'credentials',
+				data: { hintedKey: 'sk_next_00000000000000000000000000ffff' },
+				id: created.id,
+			})
+			expect(replaced.hintedKey_hint).toBe('sk_n····ffff')
+
+			// An untouched update leaves the hint (and the value) alone.
+			const untouched = await booted.payload.update({
+				collection: 'credentials',
+				data: { title: 'renamed' },
+				id: created.id,
+			})
+			expect(untouched.hintedKey_hint).toBe('sk_n····ffff')
+
+			const cleared = await booted.payload.update({
+				collection: 'credentials',
+				data: { hintedKey: null },
+				id: created.id,
+			})
+			expect(cleared.hintedKey_hint).toBeNull()
+			expect(cleared.hintedKey_set).toBe(false)
+		})
+
+		it('stores no hint for a value too short to hint safely', async () => {
+			const created = await booted.payload.create({
+				collection: 'credentials',
+				data: { hintedKey: 'tiny-secret', title: 'short-hint' },
+			})
+			expect(created.hintedKey_hint).toBeNull()
+			expect(created.hintedKey_set).toBe(true)
 		})
 
 		it('still validates the incoming plaintext', async () => {

@@ -416,6 +416,45 @@ describe('write-only read behavior', () => {
 	})
 })
 
+describe('hint sibling maintenance (seal-time, same hook as the ciphertext)', () => {
+	const hintMarker = sealMarker({
+		fieldName: 'apiKey',
+		hint: { prefix: 4, suffix: 4 },
+		hintName: 'apiKey_hint',
+		writeOnly: true,
+	})
+
+	it('writes the hint beside the sealed value', async () => {
+		const { result, siblingData } = callSeal(
+			hintMarker,
+			'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f',
+			hookReq()
+		)
+		expect(isSealed(await result)).toBe(true)
+		expect(siblingData.apiKey_hint).toBe('sk_d····9d3f')
+	})
+
+	it('stores null for a plaintext too short to hint safely', async () => {
+		const { result, siblingData } = callSeal(hintMarker, 'short-secret', hookReq())
+		expect(isSealed(await result)).toBe(true)
+		expect(siblingData.apiKey_hint).toBeNull()
+	})
+
+	it('nulls the hint when the value clears', async () => {
+		const { result, siblingData } = callSeal(hintMarker, null, hookReq())
+		expect(await result).toBeNull()
+		expect(siblingData.apiKey_hint).toBeNull()
+	})
+
+	it('leaves the hint untouched on a sealed passthrough (unchanged value)', async () => {
+		const sealed = await callSeal(hintMarker, 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f', hookReq())
+			.result
+		const { result, siblingData } = callSeal(hintMarker, sealed, hookReq())
+		expect(await result).toBe(sealed)
+		expect('apiKey_hint' in siblingData).toBe(false)
+	})
+})
+
 describe('makeSetIndicatorHook (virtual set-indicator sibling)', () => {
 	const call = (stored: unknown, context: Record<string, unknown> = {}) => {
 		const hook = makeSetIndicatorHook('apiKey')

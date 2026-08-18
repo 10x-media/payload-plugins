@@ -5,6 +5,7 @@ import { buildAad } from './crypto/aad'
 import { computeBidx } from './crypto/bidx'
 import { type KeyRing, resolveKeys } from './crypto/keys'
 import { isSealed, parseWire, seal, unseal } from './crypto/wire'
+import { makeHint } from './hint'
 import { sealedArrayKey, stashPlaintext } from './plaintextStash'
 import {
 	ENCRYPTED_CONTEXT_KEY,
@@ -133,10 +134,13 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 			return value
 		}
 		// Removal path: store incoming plaintext without sealing, drop the now
-		// meaningless blind index.
+		// meaningless blind index and hint.
 		if (mode === 'decrypt') {
 			if (marker.queryable && marker.bidxName) {
 				siblingData[marker.bidxName] = null
+			}
+			if (marker.hintName) {
+				siblingData[marker.hintName] = null
 			}
 			return value
 		}
@@ -171,6 +175,9 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 			if (marker.queryable && marker.bidxName) {
 				siblingData[marker.bidxName] = null
 			}
+			if (marker.hintName) {
+				siblingData[marker.hintName] = null
+			}
 			return null
 		}
 
@@ -181,6 +188,7 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		// deferred to per-locale writes (covered by Batch E int tests).
 		if (marker.localized && req.locale === 'all' && isLocaleMap(value)) {
 			const sealedMap: Record<string, unknown> = {}
+			const hintMap: Record<string, unknown> = {}
 			for (const [locale, localeValue] of Object.entries(value)) {
 				sealedMap[locale] = sealValueForLocale(localeValue, {
 					aad: buildAad([slug, marker.fieldName, locale]),
@@ -188,6 +196,12 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 					key: activeKey,
 					keyId: ring.activeId,
 				})
+				if (marker.hint && !isSealed(localeValue)) {
+					hintMap[locale] = localeValue == null ? null : makeHint(localeValue, marker.hint)
+				}
+			}
+			if (marker.hintName && Object.keys(hintMap).length > 0) {
+				siblingData[marker.hintName] = hintMap
 			}
 			return sealedMap
 		}
@@ -224,6 +238,12 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		stashPlaintext(req, sealed, value)
 		if (marker.queryable && marker.bidxName) {
 			siblingData[marker.bidxName] = computeBidx(value, ring.indexKey, marker.normalize)
+		}
+		// The hint derives from the same plaintext this seal consumes, so hint and
+		// ciphertext can never drift. A sealed passthrough above never lands here,
+		// which is what keeps an unchanged value's hint intact.
+		if (marker.hint && marker.hintName) {
+			siblingData[marker.hintName] = makeHint(value, marker.hint)
 		}
 		return sealed
 	}

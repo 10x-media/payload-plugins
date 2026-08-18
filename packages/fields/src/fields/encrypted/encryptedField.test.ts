@@ -103,6 +103,86 @@ describe('encryptedField factory shape', () => {
 		expect(cell.clientProps?.setName).toBe('apiKey_set')
 	})
 
+	it('appends a stored hint sibling and marks the marker when hint is configured', () => {
+		const fields = encryptedField(
+			{ name: 'apiKey', type: 'text' },
+			{ hint: { prefix: 4, suffix: 4 }, protection: 'writeOnly' }
+		)
+		expect(fields).toHaveLength(3)
+		const hintField = fields[2] as TextField
+		expect(hintField.name).toBe('apiKey_hint')
+		expect(hintField.admin?.hidden).toBe(true)
+		expect(hintField.virtual).toBeUndefined()
+		const marker = getEncryptedMarker(fields[0] as TextField)
+		expect(marker?.hint).toEqual({ prefix: 4, suffix: 4 })
+		expect(marker?.hintName).toBe('apiKey_hint')
+	})
+
+	it('mirrors localized onto the hint sibling', () => {
+		const fields = encryptedField(
+			{ localized: true, name: 'apiKey', type: 'text' },
+			{ hint: { suffix: 4 }, protection: 'writeOnly' }
+		)
+		expect((fields[2] as TextField).localized).toBe(true)
+	})
+
+	it('forwards clearable and generate through clientProps, defaulting clearable off for required', () => {
+		const optional = encryptedField(
+			{ name: 'a', type: 'text' },
+			{ generate: { prefix: 'k_' }, protection: 'writeOnly' }
+		)[0] as TextField
+		const optionalProps = (
+			optional.admin?.components?.Field as { clientProps: Record<string, unknown> }
+		).clientProps
+		expect(optionalProps.clearable).toBe(true)
+		expect(optionalProps.generate).toMatchObject({ length: 32, prefix: 'k_' })
+
+		const required = encryptedField(
+			{ name: 'b', required: true, type: 'text' },
+			{ protection: 'writeOnly' }
+		)[0] as TextField
+		const requiredProps = (
+			required.admin?.components?.Field as { clientProps: Record<string, unknown> }
+		).clientProps
+		expect(requiredProps.clearable).toBe(false)
+	})
+
+	it('rejects hint, generate, and clearable outside writeOnly', () => {
+		expect(() => encryptedField({ name: 'x', type: 'text' }, { hint: { suffix: 4 } })).toThrow(
+			/writeOnly/
+		)
+		expect(() => encryptedField({ name: 'x', type: 'text' }, { generate: true })).toThrow(
+			/writeOnly/
+		)
+		expect(() => encryptedField({ name: 'x', type: 'text' }, { clearable: false })).toThrow(
+			/writeOnly/
+		)
+	})
+
+	it('rejects hint on hasMany and non-text-family types, generate on non-text', () => {
+		expect(() =>
+			encryptedField(
+				{ hasMany: true, name: 'x', type: 'text' },
+				{ hint: { suffix: 4 }, protection: 'writeOnly' }
+			)
+		).toThrow(/hasMany/)
+		expect(() =>
+			encryptedField({ name: 'x', type: 'json' }, { hint: { suffix: 4 }, protection: 'writeOnly' })
+		).toThrow(/text and email/)
+		expect(() =>
+			encryptedField({ name: 'x', type: 'email' }, { generate: true, protection: 'writeOnly' })
+		).toThrow(/text fields/)
+	})
+
+	it('rejects clearable on a required field', () => {
+		expect(() =>
+			encryptedField(
+				{ name: 'x', required: true, type: 'text' },
+				{ clearable: true, protection: 'writeOnly' }
+			)
+		).toThrow(/required/)
+	})
+
 	it('rejects writeOnly + queryable (the blind index is an equality oracle)', () => {
 		expect(() =>
 			encryptedField({ name: 'apiKey', type: 'text' }, { protection: 'writeOnly', queryable: true })

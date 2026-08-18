@@ -28,19 +28,49 @@ The three `protection` values form a ladder: `'none'` renders the value openly, 
 ## What it guarantees
 
 - **No read result carries the value.** REST, GraphQL, and the Local API all omit the field; the read pipeline never decrypts it, and the response strip removes even the ciphertext. This holds for every caller, regardless of role or access control.
-- **Set-ness is the one thing exposed.** A virtual sibling `<name>_set` (boolean, never persisted) tells the admin UI and API consumers whether a value is stored. Existence is the mode's single deliberate leak; if even that is too much, field access control on the sibling is yours to add.
+- **Set-ness is exposed, and nothing else by default.** A virtual sibling `<name>_set` (boolean, never persisted) tells the admin UI and API consumers whether a value is stored. Configuring a [hint](#identification-hints) adds a second, equally deliberate exposure: a few identifying characters. Both are opt-outs of nothing; field access control on the siblings is yours to add if even existence is too much.
 - **Writes are unchanged.** Values seal in `beforeChange` like any encrypted field, plaintext validation still runs, `null` still clears. An update that does not mention the field preserves the stored secret.
 - **`queryable` is rejected.** A blind index answers equality, and equality on a secret is a guessing oracle for anyone who can filter a list view. The factory throws on the combination.
 
 ## In the admin
 
-There is no reveal, because there is nothing to reveal: the plaintext never reaches the browser.
+There is no reveal, because there is nothing to reveal: the plaintext never reaches the browser. Instead of a separate replace action, the control is one always-editable input, and a stored value is only a placeholder:
 
-- **Unset**: the plain native input. Type a value and save.
-- **Set**: a fixed run of dots (`maskDots` applies) with a "Set" badge, plus two actions. **Replace** swaps in an empty native input so an editor can enter a new value without ever seeing the old one; Cancel restores. **Clear** marks the value for removal on save, with Undo.
-- **List view**: the lock badge with dots when set, an em dash when unset. The value itself is never in the list data.
+- **Unset**: the plain native input. Type (or generate) a value and save.
+- **Set**: the input is empty with the hint, or a run of dots (`maskDots`), as its placeholder. Typing stages a replacement that stays visible until you leave the page; emptying the input reverts to keeping the stored value. An editor rotates a credential they were never able to read.
+- **Clear**: an `×` inside the input, exactly like a clearable select. With a replacement staged it discards the typed text; on a stored value it stages a `null`, and an undo arrow takes it back (a cleared secret cannot be retyped from memory). `clearable: false` removes it, and `required` fields force it off, since clearing them could never save.
+- **Generate**: circular arrows beside the `×` when [configured](#generated-secrets).
+- **List view**: the lock badge with the hint (or dots) when set, an em dash when unset. The value itself is never in the list data.
 
-An editor can rotate a credential they were never able to read. That is the point.
+Every action lives inside the input row (or on the label line for structural types), so a write-only field is exactly the height of a native one.
+
+## Identification hints
+
+A write-only Stripe key raises "which key is configured here, test or live?" months later. `hint` answers it without exposure:
+
+```ts
+...encryptedField(
+  { name: 'stripeKey', type: 'text' },
+  { hint: { prefix: 4, suffix: 4 }, protection: 'writeOnly' },
+)
+```
+
+The hint (`sk_l····9d3f`) is sliced from the plaintext **at seal time** in the same `beforeChange` that encrypts, stored beside the ciphertext in a `<name>_hint` sibling, and shown in the admin placeholder, the list cell, and API responses. Reads never touch the plaintext to display it.
+
+Guard rails: `prefix + suffix` is capped at 8 characters, and a plaintext shorter than `prefix + suffix + 8` stores no hint at all, so a hint can identify a 30-character key but never reconstruct a short secret. Text and email fields only, not `hasMany`. Do not configure hints on passwords (story: identify keys, never sample passwords); the length guard protects against the worst of it, but the right amount of password to expose is zero.
+
+## Generated secrets
+
+For secrets your system issues rather than receives (webhook signing secrets, per-tenant API keys), `generate` adds the create-and-rotate action:
+
+```ts
+...encryptedField(
+  { name: 'webhookSecret', type: 'text' },
+  { generate: { length: 32, prefix: 'whsec_' }, protection: 'writeOnly' },
+)
+```
+
+`generate: true` uses the default (32 chars of crypto-random base62); the config form takes `length` (8-128), `prefix`, and `charset`. Generation happens client-side in the form with `crypto.getRandomValues`, so the value is visible, pre-selected, and copyable exactly until you leave the page, and never again after: the reveal-once window of the GitHub-token model, with no server endpoint that ever returns plaintext. Regenerating later is the same action; combined with a hint, support can talk about "the key ending 9d3f" that nobody can read. A secret created through the API is one the caller supplied, which they therefore already know.
 
 ## Reading it server-side
 
@@ -85,7 +115,7 @@ Neither helper checks access. They run with the server's full authority, which i
 
 ## Caveats
 
-- **Existence is visible.** `<name>_set` appears in read results so the admin can render the set state. It says a value exists, nothing more.
+- **Existence is visible.** `<name>_set` appears in read results so the admin can render the set state. It says a value exists, nothing more. A configured hint additionally exposes its few characters, in responses and at rest (`<name>_hint` is a plaintext column by design; that is what makes it readable without decrypting).
 - **Version diffs show nothing readable.** Like every encrypted field, versions store ciphertext; a write-only field's history is a sequence of opaque values.
 - **Standalone usage degrades safely.** The response strip is attached by the `fields()` plugin (or `withEncryptedQueryRewrite` / `withEncryptedResponseStrip` if you wire collections and globals yourself). Without it, a write-only field still never decrypts on read; the worst a misconfigured read can expose is ciphertext.
 - **Switching modes is free.** `'masked'` and `'writeOnly'` share the same storage, so changing `protection` is a config edit, no migration.

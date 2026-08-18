@@ -70,6 +70,7 @@ export interface Config {
     colors: Color;
     encrypted: Encrypted;
     icons: Icon;
+    'write-only-stories': WriteOnlyStory;
     tenants: Tenant;
     users: User;
     'payload-kv': PayloadKv;
@@ -82,6 +83,7 @@ export interface Config {
     colors: ColorsSelect<false> | ColorsSelect<true>;
     encrypted: EncryptedSelect<false> | EncryptedSelect<true>;
     icons: IconsSelect<false> | IconsSelect<true>;
+    'write-only-stories': WriteOnlyStoriesSelect<false> | WriteOnlyStoriesSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -93,8 +95,12 @@ export interface Config {
     defaultIDType: string;
   };
   fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'de') | ('en' | 'de')[];
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    'smtp-settings': SmtpSetting;
+  };
+  globalsSelect: {
+    'smtp-settings': SmtpSettingsSelect<false> | SmtpSettingsSelect<true>;
+  };
   locale: 'en' | 'de';
   widgets: {
     collections: CollectionsWidget;
@@ -173,6 +179,8 @@ export interface Encrypted {
   fullName: string;
   apiKey?: string;
   notes?: string;
+  webhookSecret?: string;
+  webhookSecret_set?: boolean | null;
   contactEmail?: string;
   contactEmail_bidx?: string | null;
   salary?: number;
@@ -292,6 +300,32 @@ export interface Tenant {
   createdAt: string;
 }
 /**
+ * One field per write-only user story. The input is always editable: a stored value is only a placeholder (hint or dots), typing stages a replacement, emptying the input keeps the stored value, and every action lives inside the input row.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "write-only-stories".
+ */
+export interface WriteOnlyStory {
+  id: string;
+  label: string;
+  smtpPassword?: string;
+  smtpPassword_set?: boolean | null;
+  stripeKey?: string;
+  stripeKey_set?: boolean | null;
+  stripeKey_hint?: string | null;
+  webhookSecret?: string;
+  webhookSecret_set?: boolean | null;
+  tenantApiKey?: string;
+  tenantApiKey_set?: boolean | null;
+  tenantApiKey_hint?: string | null;
+  dbPassword?: string;
+  rotationSecret: string;
+  rotationSecret_set?: boolean | null;
+  rotationSecret_hint?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
@@ -351,6 +385,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'icons';
         value: string | Icon;
+      } | null)
+    | ({
+        relationTo: 'write-only-stories';
+        value: string | WriteOnlyStory;
       } | null)
     | ({
         relationTo: 'tenants';
@@ -442,6 +480,8 @@ export interface EncryptedSelect<T extends boolean = true> {
   fullName?: T;
   apiKey?: T;
   notes?: T;
+  webhookSecret?: T;
+  webhookSecret_set?: T;
   contactEmail?: T;
   contactEmail_bidx?: T;
   salary?: T;
@@ -473,6 +513,29 @@ export interface IconsSelect<T extends boolean = true> {
   iconRequired?: T;
   iconTenantRestricted?: T;
   iconWithForced?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "write-only-stories_select".
+ */
+export interface WriteOnlyStoriesSelect<T extends boolean = true> {
+  label?: T;
+  smtpPassword?: T;
+  smtpPassword_set?: T;
+  stripeKey?: T;
+  stripeKey_set?: T;
+  stripeKey_hint?: T;
+  webhookSecret?: T;
+  webhookSecret_set?: T;
+  tenantApiKey?: T;
+  tenantApiKey_set?: T;
+  tenantApiKey_hint?: T;
+  dbPassword?: T;
+  rotationSecret?: T;
+  rotationSecret_set?: T;
+  rotationSecret_hint?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -558,6 +621,32 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "smtp-settings".
+ */
+export interface SmtpSetting {
+  id: string;
+  host?: string | null;
+  user?: string | null;
+  password?: string;
+  password_set?: boolean | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "smtp-settings_select".
+ */
+export interface SmtpSettingsSelect<T extends boolean = true> {
+  host?: T;
+  user?: T;
+  password?: T;
+  password_set?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
