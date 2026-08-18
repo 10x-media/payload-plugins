@@ -4,4 +4,4 @@ export {
 	type AuthScopeProxyOptions,
 	createAuthScopeProxy,
 	resolveAuthScope,
-} from '../proxy'
+} from '../scope/proxy'

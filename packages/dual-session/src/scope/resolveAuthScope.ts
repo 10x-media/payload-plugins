@@ -1,4 +1,7 @@
-import type { AuthScope } from './types'
+import type { AuthScope } from '../types'
+
+/** Request header carrying the resolved {@link AuthScope} for a request. */
+export const AUTH_SCOPE_HEADER = 'x-payload-auth-scope'
 
 const isWithin = (pathname: string, base: string) =>
 	pathname === base || pathname.startsWith(`${base}/`)

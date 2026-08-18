@@ -1,4 +1,4 @@
-import { getIsolatedCookieName } from '../cookies'
+import { getIsolatedCookieName } from '../auth/cookies'
 import type {
 	DualSessionPluginOptions,
 	IsolatedCollection,

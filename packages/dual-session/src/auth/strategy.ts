@@ -1,10 +1,9 @@
 import { jwtVerify } from 'jose'
 import type { AuthStrategyResult, CollectionSlug, Payload } from 'payload'
 import { parseCookies } from 'payload/shared'
-
+import type { AuthScope, AuthStrategy } from '../types'
 import { hasPrecedingAuthorization } from './authorization'
 import { isCookieAuthAllowed } from './csrf'
-import type { AuthScope, AuthStrategy } from './types'
 
 const NO_USER: AuthStrategyResult = { user: null }
 

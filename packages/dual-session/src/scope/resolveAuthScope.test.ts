@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveAuthScope } from './scope'
+import { resolveAuthScope } from './resolveAuthScope'
 
 describe('resolveAuthScope', () => {
 	it('treats the admin panel and its server actions as admin scope', () => {

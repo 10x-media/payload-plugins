@@ -1,16 +1,17 @@
 import { type CollectionConfig, type Config, definePlugin } from 'payload'
 
-import { AUTH_SCOPE_HEADER, PLUGIN_SLUG } from './constants'
-import { buildIsolatedAuthEndpoints } from './endpoints'
+import { buildIsolatedAuthEndpoints } from './auth/endpoints'
+import { createIsolatedAuthStrategy } from './auth/strategy'
+import { PLUGIN_SLUG } from './plugin/constants'
 import { registerTranslations } from './plugin/registerTranslations'
 import { resolveAdminUserSlug, selectCollections } from './plugin/selectCollections'
-import { createIsolatedAuthStrategy } from './strategy'
+import { AUTH_SCOPE_HEADER } from './scope/resolveAuthScope'
 import type { DualSessionPluginOptions } from './types'
 
-export { AUTH_SCOPE_HEADER, PLUGIN_SLUG } from './constants'
-export { generateIsolatedCookie, getIsolatedCookieName } from './cookies'
-export { generateIsolatedAuthCookie, resolveIsolatedCookieName } from './runtime'
-export { resolveAuthScope } from './scope'
+export { generateIsolatedCookie, getIsolatedCookieName } from './auth/cookies'
+export { generateIsolatedAuthCookie, resolveIsolatedCookieName } from './auth/runtime'
+export { PLUGIN_SLUG } from './plugin/constants'
+export { AUTH_SCOPE_HEADER, resolveAuthScope } from './scope/resolveAuthScope'
 export type {
 	AuthScope,
 	DualSessionPluginOptions,

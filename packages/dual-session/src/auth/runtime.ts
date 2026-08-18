@@ -1,9 +1,9 @@
 import type { CollectionSlug, Payload } from 'payload'
 
-import { PLUGIN_SLUG } from './constants'
+import { PLUGIN_SLUG } from '../plugin/constants'
+import { resolveCollections } from '../plugin/resolveCollections'
+import type { DualSessionPluginOptions, ResolvedIsolatedCollection } from '../types'
 import { generateIsolatedCookie } from './cookies'
-import { resolveCollections } from './plugin/resolveCollections'
-import type { DualSessionPluginOptions, ResolvedIsolatedCollection } from './types'
 
 const findOptions = (payload: Payload): DualSessionPluginOptions | undefined =>
 	payload.config.plugins?.find((plugin) => plugin.slug === PLUGIN_SLUG)?.options as

@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
-
-import { AUTH_SCOPE_HEADER } from './constants'
-import { resolveAuthScope } from './scope'
-import type { AuthScope } from './types'
+import type { AuthScope } from '../types'
+import { AUTH_SCOPE_HEADER, resolveAuthScope } from './resolveAuthScope'
 
 export type AuthScopeProxyOptions = {
 	/** Admin panel route prefix. @default '/admin' */
@@ -53,6 +51,5 @@ export const createAuthScopeProxy =
 		return NextResponse.next({ request: { headers } })
 	}
 
-export { AUTH_SCOPE_HEADER } from './constants'
-export { resolveAuthScope } from './scope'
-export type { AuthScope } from './types'
+export type { AuthScope } from '../types'
+export { AUTH_SCOPE_HEADER, resolveAuthScope } from './resolveAuthScope'
