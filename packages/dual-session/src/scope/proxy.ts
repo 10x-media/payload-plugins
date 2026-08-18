@@ -18,7 +18,9 @@ export type AuthScopeProxyOptions = {
  * request with its auth scope, so the isolated auth strategies know whether they are
  * allowed to authenticate it.
  *
- * The header is always overwritten, never merged — a client cannot choose its own scope.
+ * The header is replaced on every request, never merged, and is removed when the
+ * request cannot be attributed, so the scope a strategy reads is always this proxy's
+ * own answer.
  *
  * ```ts
  * // proxy.ts (Next 16) or middleware.ts (Next 15)
@@ -43,10 +45,19 @@ export const createAuthScopeProxy =
 				apiRoute,
 				pathname: request.nextUrl.pathname,
 				referer: request.headers.get('Referer'),
+				secFetchSite: request.headers.get('Sec-Fetch-Site'),
 			})
 
 		const headers = new Headers(request.headers)
-		headers.set(scopeHeader, scope)
+
+		// An unattributable request carries no scope at all. Stamping a guess here would
+		// override `adminSessionPriority`, which answers the same question better by
+		// looking at whether an admin session actually exists.
+		if (scope) {
+			headers.set(scopeHeader, scope)
+		} else {
+			headers.delete(scopeHeader)
+		}
 
 		return NextResponse.next({ request: { headers } })
 	}

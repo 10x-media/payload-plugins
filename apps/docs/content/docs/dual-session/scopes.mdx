@@ -5,23 +5,70 @@ description: How a request is attributed to the admin panel or the website, and 
 
 A browser holding two sessions makes every REST call ambiguous. `/api/customers/me` is the same URL whether the admin panel asked or the website did, and the right answer differs.
 
-The proxy resolves that per request and writes the answer into a header, `x-payload-auth-scope`. The isolated strategies read it and stand down when the scope is not theirs.
+Something has to attribute each request, and write the answer where the isolated strategies can read it.
+
+## The contract
+
+One request header, `x-payload-auth-scope`, carrying one of two values:
+
+| Value | Meaning |
+| --- | --- |
+| `admin` | This request belongs to the admin panel. Isolated cookies stand down. |
+| `frontend` | This request belongs to the website. Cookies whose `scopes` include `frontend` may authenticate. |
+| *absent* | Unattributed. [`adminSessionPriority`](/dual-session/configuration#adminsessionpriority) decides. |
+
+Two rules for whoever sets it:
+
+**Set it on the request Payload receives**, not on the response. In Next that means `NextResponse.next({ request: { headers } })`.
+
+**Replace it, never merge it.** A request arriving with its own `x-payload-auth-scope` must have that value overwritten or removed, so the value a strategy reads is always yours.
+
+<Callout>
+The scope picks *which of the caller's own sessions* to use. It is not an authorization boundary: forcing `admin` only makes fewer credentials count, and forcing `frontend` only honours a cookie the caller already holds. Do not read it inside your own access control.
+</Callout>
+
+Absent is a state to use, not a failure to avoid. A proxy that cannot attribute a request should send no scope, and the plugin then answers by checking whether an admin session actually exists.
 
 ## The default rule
+
+`createAuthScopeProxy` implements this:
 
 | Request | Scope |
 | --- | --- |
 | Under `adminRoute` (`/admin`) | `admin` |
-| Under `apiRoute` (`/api`) with an admin `Referer` | `admin` |
-| Under `apiRoute` with any other `Referer` | `frontend` |
-| Under `apiRoute` with no usable `Referer` | `admin` |
+| Under `apiRoute` (`/api`), same-origin `Referer` under `adminRoute` | `admin` |
+| Under `apiRoute`, any other `Referer` | `frontend` |
+| Under `apiRoute`, no usable `Referer` | *absent* |
 | Anything else | `frontend` |
 
 Admin pages and their server actions live under `/admin`, so those are unambiguous. REST calls are attributed by `Referer`, which same-origin browser fetches carry in full.
 
-An unattributable API call falls back to `admin`, which reads as "no frontend cookie is honoured". The worst outcome of that fallback is an unauthenticated request, never a wrongly authenticated one.
+A `Referer` only says something about the admin panel when it belongs to the origin the API is served from. A frontend on another origin may have an `/admin` route of its own, and `Sec-Fetch-Site` is what separates the two: `cross-site` or `same-site` means the referring page is not yours, whatever its path looks like. Browsers set that header themselves and a page cannot forge it.
 
-The header is always overwritten, never merged, so a client cannot choose its own scope by sending one.
+## Installing the proxy
+
+```ts title="proxy.ts"
+import { createAuthScopeProxy } from '@10x-media/dual-session/proxy'
+
+export default createAuthScopeProxy()
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+```
+
+Next 16 renamed `middleware.ts` to `proxy.ts`. Either name works on the version that expects it; the file sits next to `app/`.
+
+### The matcher must include `/api`
+
+The widely copied default excludes it:
+
+```ts
+// Wrong for this plugin: REST calls never reach the proxy.
+export const config = { matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'] }
+```
+
+Use the one above instead.
 
 ## Composing with an existing proxy
 
@@ -33,20 +80,27 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 export default function proxy(request: NextRequest) {
   const headers = new Headers(request.headers)
-  headers.set(
-    AUTH_SCOPE_HEADER,
-    resolveAuthScope({
-      pathname: request.nextUrl.pathname,
-      referer: request.headers.get('Referer'),
-    })
-  )
+
+  const scope = resolveAuthScope({
+    pathname: request.nextUrl.pathname,
+    referer: request.headers.get('Referer'),
+    secFetchSite: request.headers.get('Sec-Fetch-Site'),
+  })
+
+  if (scope) {
+    headers.set(AUTH_SCOPE_HEADER, scope)
+  } else {
+    headers.delete(AUTH_SCOPE_HEADER)
+  }
 
   return NextResponse.next({ request: { headers } })
 }
 ```
 
+`resolveAuthScope` returns `undefined` for a request it cannot attribute. Deleting the header in that branch is what keeps a client from sending its own.
+
 <Callout type="warn">
-Anything that returns its own `NextResponse` — next-intl, auth.js, a rate limiter — **drops the header** unless you thread it through `request: { headers }`. The symptom is subtle: no scope means the fallback applies, and frontend sessions are quietly ignored for as long as an admin session is alive.
+Anything that returns its own `NextResponse` — next-intl, auth.js, a rate limiter — **drops the header** unless you thread it through `request: { headers }`. The symptom is subtle: no scope means `adminSessionPriority` decides, and frontend sessions are quietly ignored for as long as an admin session is alive.
 </Callout>
 
 Chaining onto a library's proxy usually means passing the modified request into it:
@@ -56,27 +110,13 @@ const intl = createMiddleware(routing)
 
 export default function proxy(request: NextRequest) {
   const headers = new Headers(request.headers)
-  headers.set(AUTH_SCOPE_HEADER, resolveAuthScope({ ... }))
+  const scope = resolveAuthScope({ ... })
+
+  if (scope) headers.set(AUTH_SCOPE_HEADER, scope)
+  else headers.delete(AUTH_SCOPE_HEADER)
 
   return intl(new NextRequest(request, { headers }))
 }
-```
-
-`createAuthScopeProxy` is a convenience for an empty project. `resolveAuthScope` is the part to build on.
-
-## The matcher must include `/api`
-
-The widely copied default excludes it:
-
-```ts
-// Wrong for this plugin: REST calls never reach the proxy.
-export const config = { matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'] }
-```
-
-Use this instead:
-
-```ts
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] }
 ```
 
 ## Custom rules
@@ -104,13 +144,15 @@ dualSession({
 
 ## Without a proxy
 
-The plugin works without one, using `adminSessionPriority` (on by default): when no scope header is present, an isolated cookie stands down as long as a **valid** admin token is also present. The admin panel therefore stays reachable.
+The plugin works without one, using `adminSessionPriority` (on by default): with no scope header, an isolated cookie stands down as long as a **valid** admin token is also present. The admin panel therefore stays reachable.
 
 The cost is that an admin-and-customer browser resolves as the admin on the website too. Set `adminSessionPriority: false` to invert that, or install the proxy so the scope is read rather than inferred.
 
+An unattributed request lands in this same branch, so a session that works without the proxy keeps working once you install one.
+
 ## Referer stripping breaks attribution
 
-A global `Referrer-Policy: no-referrer`, whether from your own security headers or a CDN, removes the signal API calls are attributed by. Every REST call then falls back to `admin` and frontend sessions stop working entirely.
+A global `Referrer-Policy: no-referrer`, whether from your own security headers or a CDN, removes the signal API calls are attributed by. Every REST call then goes unattributed, and frontend sessions stop working for anyone who also holds an admin session.
 
 Payload's admin panel and this plugin both need the same-origin `Referer`, so the fix is to not strip it same-origin:
 
@@ -127,4 +169,4 @@ headers: async () => [
 
 ## Next
 
-[Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what scopes cannot cover.
+[Frontends and clients](/dual-session/clients) for setups where the website is not this Next app, [Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what scopes cannot cover.

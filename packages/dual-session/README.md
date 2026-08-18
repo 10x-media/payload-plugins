@@ -54,6 +54,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/dual-session):
 - [Overview](https://docs.10xmedia.de/dual-session)
 - [Quick start](https://docs.10xmedia.de/dual-session/quick-start)
 - [Scopes](https://docs.10xmedia.de/dual-session/scopes)
+- [Frontends and clients](https://docs.10xmedia.de/dual-session/clients)
 - [Custom auth](https://docs.10xmedia.de/dual-session/custom-auth)
 - [Configuration](https://docs.10xmedia.de/dual-session/configuration)
 - [Limits](https://docs.10xmedia.de/dual-session/limits)

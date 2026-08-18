@@ -52,7 +52,7 @@ export const config = {
 Next 16 calls this file `proxy.ts`; on Next 15 it is `middleware.ts` with the same contents. It goes next to `app/`.
 
 <Callout type="warn">
-The matcher **must** cover `/api`. The common default `'/((?!api|_next/static).*)'` excludes it, which leaves every REST call unattributed and silently falls back to the admin scope. See [Scopes](/dual-session/scopes).
+The matcher **must** cover `/api`. The common default `'/((?!api|_next/static).*)'` excludes it, which leaves every REST call unattributed, so a visitor holding an admin session sees the admin answer on the website. See [Scopes](/dual-session/scopes).
 </Callout>
 
 Already have a proxy? Compose rather than replace it — [Scopes](/dual-session/scopes#composing-with-an-existing-proxy) has the recipe.

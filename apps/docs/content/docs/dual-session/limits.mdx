@@ -25,6 +25,8 @@ Payload carries two unrelated credentials in the `Authorization` header, and an 
 
 So a request holding an isolated cookie *and* either of those resolves from the header. A frontend that sends an unrelated bearer token on every call therefore suppresses its cookie session, exactly as it would without the plugin. Schemes Payload does not extract from, such as `Basic`, are ignored.
 
+This is the behaviour [mobile and desktop clients](/dual-session/clients#mobile-and-desktop-apps) should lean on: a token in the header is never subject to scopes or cookie CSRF checks.
+
 Reordering `jwtOrder` to put `cookie` first makes the cookie beat `JWT` and `Bearer`. It has no effect on API keys, which win regardless.
 
 ## Live preview needs a decision

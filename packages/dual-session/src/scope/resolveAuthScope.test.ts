@@ -24,11 +24,6 @@ describe('resolveAuthScope', () => {
 		)
 	})
 
-	it('falls back to admin scope for unattributed REST calls', () => {
-		expect(resolveAuthScope({ pathname: '/api/pages' })).toBe('admin')
-		expect(resolveAuthScope({ pathname: '/api/pages', referer: 'not-a-url' })).toBe('admin')
-	})
-
 	it('treats everything else as frontend scope', () => {
 		expect(resolveAuthScope({ pathname: '/' })).toBe('frontend')
 		expect(resolveAuthScope({ pathname: '/members/profile' })).toBe('frontend')
@@ -37,5 +32,59 @@ describe('resolveAuthScope', () => {
 	it('honours custom route prefixes', () => {
 		expect(resolveAuthScope({ adminRoute: '/backoffice', pathname: '/backoffice/x' })).toBe('admin')
 		expect(resolveAuthScope({ adminRoute: '/backoffice', pathname: '/admin' })).toBe('frontend')
+	})
+
+	describe('unattributable REST calls', () => {
+		it('resolves to no scope rather than guessing', () => {
+			expect(resolveAuthScope({ pathname: '/api/pages' })).toBeUndefined()
+			expect(resolveAuthScope({ pathname: '/api/pages', referer: 'not-a-url' })).toBeUndefined()
+		})
+
+		it('leaves pages attributable, since only the api route is shared', () => {
+			expect(resolveAuthScope({ pathname: '/products' })).toBe('frontend')
+			expect(resolveAuthScope({ pathname: '/admin/x' })).toBe('admin')
+		})
+	})
+
+	describe('a referer from another origin', () => {
+		it('is frontend even when its path looks like the admin route', () => {
+			expect(
+				resolveAuthScope({
+					pathname: '/api/orders',
+					referer: 'https://shop.test/admin/orders',
+					secFetchSite: 'cross-site',
+				})
+			).toBe('frontend')
+		})
+
+		it('is frontend across subdomains too', () => {
+			expect(
+				resolveAuthScope({
+					pathname: '/api/orders',
+					referer: 'https://app.site.test/admin/orders',
+					secFetchSite: 'same-site',
+				})
+			).toBe('frontend')
+		})
+
+		it('still reads the path when the request is same-origin', () => {
+			expect(
+				resolveAuthScope({
+					pathname: '/api/orders',
+					referer: 'https://site.test/admin/orders',
+					secFetchSite: 'same-origin',
+				})
+			).toBe('admin')
+		})
+
+		it('falls back to the path when the browser sends no Sec-Fetch-Site', () => {
+			expect(
+				resolveAuthScope({
+					pathname: '/api/orders',
+					referer: 'https://site.test/admin/orders',
+					secFetchSite: null,
+				})
+			).toBe('admin')
+		})
 	})
 })

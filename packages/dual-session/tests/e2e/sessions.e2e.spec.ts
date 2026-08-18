@@ -26,9 +26,9 @@ const cookieValue = async (page: Page, name: string) =>
 
 /**
  * Fetches from inside the loaded document, so the request carries the `Referer` the proxy
- * attributes API calls by. `page.request` sends none, which the proxy correctly treats as
- * unattributable and falls back to the admin scope for — right behaviour, wrong scope for a
- * call that is meant to be the website talking.
+ * attributes API calls by. `page.request` sends none, which leaves the request
+ * unattributed: fine for a lone frontend session, but resolved in the admin's favour as
+ * soon as one is live, which is not what a call from the website means.
  */
 const fetchFromPage = (page: Page, path: string, init?: { method?: string }) =>
 	page.evaluate(
@@ -132,6 +132,27 @@ test('an admin-only browser is still an admin on the website', async ({ page }) 
 	// The shared cookie is never gated by scope, so a browser with no frontend session keeps
 	// working exactly as it did before the plugin was installed.
 	await expect(page.getByTestId('live-user')).toHaveText(`users · ${ADMIN.email}`)
+})
+
+test('an unattributed call still resolves a lone frontend session', async ({ page }) => {
+	await login(page, 'customers', CUSTOMER)
+
+	// No `Referer`, so the proxy sends no scope. With no admin session to defer to, the
+	// customer cookie is the only answer there is. This is what an SSR fetch or a native
+	// client looks like from the server's side.
+	const response = await page.request.get('/api/customers/me')
+
+	expect(response.status()).toBe(200)
+	expect((await response.json()).user?.email).toBe(CUSTOMER.email)
+})
+
+test('an unattributed call defers to a live admin session', async ({ page }) => {
+	await login(page, 'users', ADMIN)
+	await login(page, 'customers', CUSTOMER)
+
+	const response = await page.request.get('/api/customers/me')
+
+	expect((await response.json()).user).toBeFalsy()
 })
 
 test('partners use the cookie name the plugin was configured with', async ({ page }) => {

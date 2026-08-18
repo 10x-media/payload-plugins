@@ -36,7 +36,7 @@ collections: [
 
 ### `adminSessionPriority`
 
-Default `true`. With no scope header on a request, ignore isolated cookies as long as a valid admin token is also present. Keeps the admin panel usable in projects without the proxy. See [Without a proxy](/dual-session/scopes#without-a-proxy).
+Default `true`. With no scope header on a request, ignore isolated cookies as long as a valid admin token is also present. Applies both to projects without a proxy and to single requests the proxy could not attribute. See [Without a proxy](/dual-session/scopes#without-a-proxy).
 
 ### `scopeHeader`
 
@@ -61,7 +61,7 @@ Per-locale overrides keyed by the typed keys from `@10x-media/dual-session/i18n`
 | `resolveIsolatedCookieName({ collection, payload })` | That collection's cookie name, or `undefined` if it is not isolated. |
 | `getIsolatedCookieName({ cookiePrefix, slug })` | The default name, computed without a running Payload. |
 | `generateIsolatedCookie({ authConfig, name, token })` | The low-level builder, when you need a name the plugin does not know about. |
-| `resolveAuthScope` | The scope rule as a pure function. |
+| `resolveAuthScope` | The scope rule as a pure function. Returns `undefined` for a request it cannot attribute. |
 | `AUTH_SCOPE_HEADER`, `PLUGIN_SLUG` | Constants. |
 
 ### `@10x-media/dual-session/proxy`

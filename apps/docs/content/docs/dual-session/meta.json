@@ -1,4 +1,12 @@
 {
 	"title": "Dual Session",
-	"pages": ["index", "quick-start", "scopes", "custom-auth", "configuration", "limits"]
+	"pages": [
+		"index",
+		"quick-start",
+		"scopes",
+		"clients",
+		"custom-auth",
+		"configuration",
+		"limits"
+	]
 }
