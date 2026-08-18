@@ -21,6 +21,18 @@ Deliveries POST to whatever URL a subscription specifies, including private and 
 
 Tighten either with your own access control by overriding the collections through standard Payload config if you need role-based rules.
 
+### Cross-site requests
+
+Both endpoints authenticate the way every other Payload route does, so Payload's own CSRF handling applies before `req.user` is set: a cookie-authenticated request is accepted only if its `Origin` is in `config.csrf`, or, when no `Origin` is sent, if `Sec-Fetch-Site` says it is not cross-site.
+
+That allowlist is **empty by default**, which means any origin is accepted for cookie auth. Set it in your Payload config, and rotation and redelivery are covered along with every ordinary write:
+
+```ts title="payload.config.ts"
+export default buildConfig({
+  csrf: ['https://admin.example.com'],
+})
+```
+
 ## Secrets at rest
 
 Signing secrets are encrypted before they reach the database, using Payload's own `encrypt`, whose key derives from your `PAYLOAD_SECRET`. A database dump, a backup, or a read replica contains ciphertext rather than usable signing keys.
