@@ -1,5 +1,5 @@
 import type { PayloadRequest, TextField } from 'payload'
-import { keys, type TranslationKey } from '../translations/keys'
+import { keys } from '../translations/keys'
 import { asTranslate, labelFor } from '../translations/server'
 import { isPlausibleEmail } from './emailRecipients'
 import type { RecipientResolveArgs } from './recipientSources'
@@ -166,14 +166,17 @@ export type ResolveFromAddressesRequestArgs = {
 	sources?: FromAddressSourceRegistry
 }
 
-/** A source entry as the from select shows it: label localized to the request's admin language. */
+/**
+ * A source entry as the from select shows it. A string label is display text served raw (matching
+ * how `RecipientsSelect` receives source labels); a per-locale record picks the request's admin
+ * language, then English, then any value.
+ */
 const sourceOption = (source: FromAddressSource, req: PayloadRequest): FromAddressOption => {
 	if (typeof source.label === 'string') {
-		return { label: asTranslate(req.t)(source.label as TranslationKey), value: source.value }
+		return { label: source.label, value: source.value }
 	}
-	const language = (req.i18n as { language?: string } | undefined)?.language
 	const label =
-		(language ? source.label[language] : undefined) ??
+		source.label[req.i18n.language] ??
 		source.label.en ??
 		Object.values(source.label)[0] ??
 		source.value
