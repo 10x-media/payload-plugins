@@ -99,6 +99,9 @@ catalogs:
     react-hotkeys-hook:
       specifier: 5.3.3
       version: 5.3.3
+    standardwebhooks:
+      specifier: ^1.0.0
+      version: 1.0.0
     tsdown:
       specifier: 0.22.1
       version: 0.22.1
@@ -1375,7 +1378,7 @@ importers:
         specifier: 'catalog:'
         version: 19.2.6(react@19.2.6)
       standardwebhooks:
-        specifier: ^1.0.0
+        specifier: 'catalog:'
         version: 1.0.0
       tsdown:
         specifier: 'catalog:'
