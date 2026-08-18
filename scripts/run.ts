@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin/noProcessEnv: CLI env boundary (PORT passthrough)
 /**
  * Workspace command router. Turns short positional commands into turbo or pnpm
  * invocations so users never type `--filter @10x-media/...`.
@@ -97,16 +98,52 @@ const usage = (task: string, targets: string[]): never => {
 	process.exit(2)
 }
 
-const run = (command: string, args: string[]): void => {
+const run = (command: string, args: string[], env?: NodeJS.ProcessEnv): void => {
 	const child = spawn(command, args, {
 		stdio: 'inherit',
 		shell: process.platform === 'win32',
+		...(env ? { env: { ...process.env, ...env } } : {}),
 	})
 	child.on('error', (err) => {
 		console.error(`Failed to run "${command}": ${err.message}`)
 		process.exit(1)
 	})
 	child.on('exit', (code) => process.exit(code ?? 0))
+}
+
+/**
+ * Worktree dev servers must never collide with the primary checkout (:3000 and
+ * launch.json's 31xx range) or with other worktrees, so every worktree derives
+ * a stable port from its directory name plus the target: same worktree, same
+ * port, every session, nothing to configure. An explicit PORT always wins.
+ * The 4100-4999 band stays clear of the primary's ports and of sibling repos'
+ * worktree bands.
+ */
+const WORKTREE_PORT_BASE = 4100
+const WORKTREE_PORT_SPAN = 900
+
+const worktreeName = (): string | undefined => /\/\.claude\/worktrees\/([^/]+)/.exec(REPO_ROOT)?.[1]
+
+const derivedWorktreePort = (worktree: string, target: string): number => {
+	// FNV-1a over "<worktree>/<target>", folded into the worktree port band.
+	let hash = 2166136261
+	for (const char of `${worktree}/${target}`) {
+		hash ^= char.charCodeAt(0)
+		hash = Math.imul(hash, 16777619)
+	}
+	return WORKTREE_PORT_BASE + ((hash >>> 0) % WORKTREE_PORT_SPAN)
+}
+
+/** Env for dev/start: inject the derived worktree port unless PORT is set. */
+const serverEnv = (target: string): NodeJS.ProcessEnv | undefined => {
+	if (process.env.PORT) return undefined
+	const worktree = worktreeName()
+	if (!worktree) return undefined
+	const port = derivedWorktreePort(worktree, target)
+	console.log(
+		`[worktree ${worktree}] ${target} server on port ${port} → http://localhost:${port} (stable per worktree; override with PORT)`
+	)
+	return { PORT: String(port) }
 }
 
 const main = (): void => {
@@ -171,7 +208,8 @@ const main = (): void => {
 	// Plugins route dev/start/generate*/migrate* to their `-dev` companion; apps run on themselves.
 	const useDevPackage = isPlugin && DEV_PACKAGE_TASKS.has(task)
 	const filter = useDevPackage ? `${SCOPE}/${bare}-dev` : `${SCOPE}/${bare}`
-	run('pnpm', ['--filter', filter, 'run', task, ...passThrough])
+	const env = task === 'dev' || task === 'start' ? serverEnv(bare) : undefined
+	run('pnpm', ['--filter', filter, 'run', task, ...passThrough], env)
 }
 
 main()
