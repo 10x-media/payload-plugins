@@ -41,6 +41,12 @@ export interface BootedPayload {
 	mode: TestDbMode
 	/** The database connection string, for attaching a second instance or a subprocess. */
 	connectionString: string
+	/**
+	 * The `getPayload` cache key this instance is stored under. Pass it as
+	 * `payloadInstanceCacheKey` to `handleEndpoints` so a REST request resolves to this
+	 * instance instead of booting a second one against the default key.
+	 */
+	cacheKey: string
 	stop: () => Promise<void>
 }
 
@@ -169,6 +175,7 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 		db: options.db,
 		mode,
 		connectionString,
+		cacheKey: key,
 		stop: async () => {
 			// When attached, only this Payload is destroyed; the owning boot stops the DB.
 			await payload.destroy()

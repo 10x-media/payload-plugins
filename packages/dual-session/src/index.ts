@@ -1,14 +1,15 @@
 import { type CollectionConfig, type Config, definePlugin } from 'payload'
 
-import { AUTH_SCOPE_HEADER } from './constants'
+import { AUTH_SCOPE_HEADER, PLUGIN_SLUG } from './constants'
 import { buildIsolatedAuthEndpoints } from './endpoints'
 import { registerTranslations } from './plugin/registerTranslations'
-import { resolveCollections } from './plugin/resolveCollections'
+import { resolveAdminUserSlug, selectCollections } from './plugin/selectCollections'
 import { createIsolatedAuthStrategy } from './strategy'
 import type { DualSessionPluginOptions } from './types'
 
-export { AUTH_SCOPE_HEADER } from './constants'
-export { getIsolatedCookieName } from './cookies'
+export { AUTH_SCOPE_HEADER, PLUGIN_SLUG } from './constants'
+export { generateIsolatedCookie, getIsolatedCookieName } from './cookies'
+export { generateIsolatedAuthCookie, resolveIsolatedCookieName } from './runtime'
 export { resolveAuthScope } from './scope'
 export type {
 	AuthScope,
@@ -43,38 +44,23 @@ declare module 'payload' {
  * see `@10x-media/dual-session/proxy`.
  */
 export const dualSession = definePlugin<DualSessionPluginOptions>({
-	slug: '@10x-media/dual-session',
+	slug: PLUGIN_SLUG,
 	plugin: ({ config: incomingConfig, plugins: _plugins, ...options }): Config => {
 		if (options.disabled === true) {
 			return incomingConfig
 		}
 
 		const cookiePrefix = incomingConfig.cookiePrefix ?? 'payload'
-		const adminUserSlug = incomingConfig.admin?.user ?? 'users'
 		const scopeHeader = options.scopeHeader ?? AUTH_SCOPE_HEADER
 		const adminSessionPriority = options.adminSessionPriority ?? true
-
-		const isolated = resolveCollections({ collections: options.collections, cookiePrefix })
-
-		if (isolated.some(({ slug }) => slug === adminUserSlug)) {
-			throw new Error(
-				`@10x-media/dual-session: "${adminUserSlug}" backs the admin panel and owns the shared "${cookiePrefix}-token" cookie. Isolate the other auth collections instead.`
-			)
-		}
-
 		const incomingCollections = incomingConfig.collections ?? []
 
-		for (const { slug } of isolated) {
-			const collection = incomingCollections.find((entry) => entry.slug === slug)
-
-			if (!collection) {
-				throw new Error(`@10x-media/dual-session: collection "${slug}" is not in the config.`)
-			}
-
-			if (!collection.auth) {
-				throw new Error(`@10x-media/dual-session: collection "${slug}" does not have auth enabled.`)
-			}
-		}
+		const { collections: isolated, warnings } = selectCollections({
+			adminUserSlug: resolveAdminUserSlug(incomingConfig),
+			collections: options.collections,
+			cookiePrefix,
+			incoming: incomingCollections,
+		})
 
 		const collections: CollectionConfig[] = incomingCollections.map((collection) => {
 			const match = isolated.find(({ slug }) => slug === collection.slug)
@@ -116,6 +102,20 @@ export const dualSession = definePlugin<DualSessionPluginOptions>({
 
 		registerTranslations(incomingConfig, options.translations)
 
-		return { ...incomingConfig, collections }
+		const config: Config = { ...incomingConfig, collections }
+
+		if (warnings.length > 0) {
+			// `payload.logger` only exists once Payload has booted, so a config-time problem
+			// has to wait for onInit to be reported through the project's own logger.
+			const priorOnInit = incomingConfig.onInit
+			config.onInit = async (payload) => {
+				for (const warning of warnings) {
+					payload.logger.warn(warning)
+				}
+				await priorOnInit?.(payload)
+			}
+		}
+
+		return config
 	},
 })

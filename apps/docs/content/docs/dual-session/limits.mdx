@@ -1,0 +1,73 @@
+---
+title: Limits
+description: What the plugin does not cover, and the edges to check before you ship it.
+---
+
+## GraphQL auth is not isolated
+
+The plugin replaces REST endpoints. Payload's GraphQL resolvers for `login`, `refreshToken` and `resetPassword` call `generatePayloadCookie` directly, and `me` reads the shared cookie through `extractJWT`. None of that is reachable from a collection config.
+
+So on an isolated collection:
+
+- a GraphQL `login` writes the **shared** cookie, overwriting the admin session
+- a GraphQL `me` reads the shared cookie, so it only ever sees the admin session
+- sessions minted through REST are invisible to GraphQL, because they live in a cookie it does not read
+
+**Use REST for auth on isolated collections.** GraphQL for everything else is unaffected — it authenticates from whatever `req.user` already resolved to.
+
+## Authorization headers win
+
+Payload's `auth.jwtOrder` defaults to `['JWT', 'Bearer', 'cookie']`: an `Authorization` header outranks a cookie. The plugin honours that, so a request carrying both an isolated cookie and an `Authorization: JWT …` or `Bearer …` header, or an API key for that collection, resolves from the header.
+
+So a frontend that sends an unrelated bearer token on every request suppresses the cookie session, exactly as it would without the plugin. Schemes Payload does not extract from, such as `Basic`, are ignored.
+
+Reordering `jwtOrder` to put `cookie` first makes the cookie win here too.
+
+## Live preview needs a decision
+
+The admin panel's preview iframe loads a frontend URL, so the default rule scopes it `frontend`. An editor logged in as both an admin and a customer therefore gets the customer's view inside preview — no drafts, or a 403.
+
+The plugin does not detect this case. Two ways out:
+
+**Route preview through your own endpoint** and set the admin session for it explicitly. Preview is already a dedicated route in most projects, so this keeps the scope explicit.
+
+**Or force the scope in the proxy**, if your preview URLs are recognisable:
+
+```ts
+createAuthScopeProxy({
+  resolveScope: (request) =>
+    request.nextUrl.pathname.startsWith('/preview') ? 'admin' : undefined,
+})
+```
+
+Remember that fetches *from* the preview page carry the preview URL as `Referer`, so they need the same treatment.
+
+## Local API has no headers
+
+`payload.find()` in a server component, a cron job or a job handler has no request behind it, so there is no cookie and no scope. That is unchanged by this plugin: pass `req` or `user` explicitly, as you would anyway.
+
+For `payload.auth({ headers })` in a server component, pass the incoming headers and, if you need a specific answer, set the scope header yourself.
+
+## Cached RSC and ISR
+
+A cached page that calls `payload.auth()` freezes whichever user rendered it. That is true without this plugin too, but two parallel sessions make it likelier to bite. Mark auth-dependent pages `export const dynamic = 'force-dynamic'`.
+
+## The first deploy logs isolated users out
+
+Sessions move from `payload-token` to `payload-customers-token`, and the browser's old cookie no longer matches a name anything reads. Every isolated session ends once, at the deploy. Admin sessions are untouched.
+
+The same happens if you change `cookieName` later, or toggle `disabled`.
+
+## Another plugin could shadow the shadows
+
+The whole mechanism rests on `handleEndpoints` matching the first declared endpoint. If a plugin registered **before** this one declares `POST /login` on the same collection, it wins and the isolated cookie is never written.
+
+None of the `@10x-media` plugins do. If you hit this with a third-party one, order `dualSession` earlier.
+
+## `endpoints: false`
+
+Payload answers 501 for every route on such a collection, so there are no auth endpoints to replace. The plugin warns, keeps the collection, and registers its strategy — the cookie can still be established with [`generateIsolatedAuthCookie`](/dual-session/custom-auth) from a route that does exist.
+
+## Unverified users
+
+Core's JWT strategy falls through to `admin.autoLogin` when a user fails the `verify` check, which on an isolated collection would hand back the *admin* user. The plugin returns no user instead. Only observable if you use `autoLogin`.

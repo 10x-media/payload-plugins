@@ -1,0 +1,4 @@
+{
+	"title": "Dual Session",
+	"pages": ["index", "quick-start", "scopes", "custom-auth", "configuration", "limits"]
+}

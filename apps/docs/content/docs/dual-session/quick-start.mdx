@@ -1,0 +1,92 @@
+---
+title: Quick start
+description: Isolate a collection, install the proxy, and hold two sessions at once.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/dual-session@beta
+```
+
+## Isolate the collections
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { dualSession } from '@10x-media/dual-session'
+
+export default buildConfig({
+  admin: { user: 'users' },
+  collections: [users, customers, partners],
+  plugins: [
+    dualSession({
+      // Order is priority: a visitor holding both resolves as the partner.
+      collections: ['partners', 'customers'],
+    }),
+  ],
+})
+```
+
+Each listed collection gets `${cookiePrefix}-${slug}-token` — here `payload-customers-token` and `payload-partners-token`. Override a name with the object form:
+
+```ts
+dualSession({
+  collections: [{ slug: 'partners', cookieName: 'partner-session' }, 'customers'],
+})
+```
+
+Do not list the collection named by `admin.user`. If you never set `admin.user`, Payload defaults it to the first collection declaring `auth`, and so does this plugin.
+
+## Install the proxy
+
+```ts title="proxy.ts"
+import { createAuthScopeProxy } from '@10x-media/dual-session/proxy'
+
+export default createAuthScopeProxy()
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+```
+
+Next 16 calls this file `proxy.ts`; on Next 15 it is `middleware.ts` with the same contents. It goes next to `app/`.
+
+<Callout type="warn">
+The matcher **must** cover `/api`. The common default `'/((?!api|_next/static).*)'` excludes it, which leaves every REST call unattributed and silently falls back to the admin scope. See [Scopes](/dual-session/scopes).
+</Callout>
+
+Already have a proxy? Compose rather than replace it — [Scopes](/dual-session/scopes#composing-with-an-existing-proxy) has the recipe.
+
+## Try it
+
+1. Log in to `/admin` as an editor.
+2. On your website, `POST /api/customers/login` with a customer's credentials.
+3. Reload `/admin`. It still shows the editor's session.
+4. `GET /api/customers/me` from the website. It answers with the customer.
+
+Before the plugin, step 2 logged the editor out.
+
+## Log in from the frontend
+
+Nothing changes about how you call it. The endpoint is the same, the request is the same, and the response is the same shape — only the `Set-Cookie` name differs:
+
+```ts
+await fetch('/api/customers/login', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, password }),
+})
+```
+
+## Turning it off
+
+```ts
+dualSession({ collections: ['customers'], disabled: process.env.NODE_ENV === 'test' })
+```
+
+`disabled` returns the incoming config untouched. Note that every isolated session is dropped when you flip this, in either direction: the cookie name changes, so the browser's old cookie no longer matches. Admin sessions are unaffected.
+
+## Next
+
+[Scopes](/dual-session/scopes) for how a request is attributed, [Configuration](/dual-session/configuration) for the full options, [Limits](/dual-session/limits) for what is not covered.

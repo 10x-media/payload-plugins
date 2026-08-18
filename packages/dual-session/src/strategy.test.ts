@@ -21,6 +21,8 @@ const authConfig = (overrides: Record<string, unknown> = {}) =>
 
 type FakePayloadArgs = {
 	findByID?: Payload['findByID']
+	jwtOrder?: ('Bearer' | 'cookie' | 'JWT')[]
+	useAPIKey?: boolean
 	useSessions?: boolean
 	verify?: boolean
 }
@@ -31,15 +33,18 @@ type FakePayloadArgs = {
  */
 const createFakePayload = ({
 	findByID,
+	jwtOrder = ['JWT', 'Bearer', 'cookie'],
+	useAPIKey = false,
 	useSessions = true,
 	verify = false,
 }: FakePayloadArgs = {}) =>
 	({
 		collections: {
-			customers: { config: { auth: authConfig({ useSessions, verify }) } },
+			customers: { config: { auth: authConfig({ useAPIKey, useSessions, verify }) } },
 		},
 		config: {
 			admin: { user: 'users' },
+			auth: { jwtOrder },
 			cookiePrefix: 'payload',
 			csrf: [],
 		},
@@ -258,6 +263,48 @@ describe('createIsolatedAuthStrategy', () => {
 			expect(
 				(await lowerPriority.authenticate({ headers, payload: employeePayload() })).user
 			).toMatchObject({ id: 'employee-1' })
+		})
+	})
+
+	describe('precedence against the Authorization header', () => {
+		// Core reads the header before the cookie (`jwtOrder`), and this strategy runs ahead
+		// of both the api-key and local-jwt strategies, so it has to stand down or isolating
+		// a collection would silently invert that order.
+		const withHeader = async (
+			value: string,
+			payload = createFakePayload({ findByID: findCustomer })
+		) => {
+			const headers = headersWithCookies({ [CUSTOMER_COOKIE]: await validToken() })
+			headers.set('Authorization', value)
+			return (await strategy.authenticate({ headers, payload })).user
+		}
+
+		it('stands down for a JWT header', async () => {
+			expect(await withHeader('JWT some-token')).toBeNull()
+		})
+
+		it('stands down for a Bearer header', async () => {
+			expect(await withHeader('Bearer some-token')).toBeNull()
+		})
+
+		it('stands down for an api key issued by this collection', async () => {
+			const payload = createFakePayload({ findByID: findCustomer, useAPIKey: true })
+
+			expect(await withHeader('customers API-Key abc123', payload)).toBeNull()
+		})
+
+		it('ignores an api key header when the collection has no api keys', async () => {
+			expect(await withHeader('customers API-Key abc123')).toMatchObject({ id: 'customer-1' })
+		})
+
+		it('ignores a scheme Payload does not extract from', async () => {
+			expect(await withHeader('Basic dXNlcjpwYXNz')).toMatchObject({ id: 'customer-1' })
+		})
+
+		it('keeps the cookie when the project ranks it above the header', async () => {
+			const payload = createFakePayload({ findByID: findCustomer, jwtOrder: ['cookie', 'JWT'] })
+
+			expect(await withHeader('JWT some-token', payload)).toMatchObject({ id: 'customer-1' })
 		})
 	})
 

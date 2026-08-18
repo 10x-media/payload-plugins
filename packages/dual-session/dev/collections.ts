@@ -1,5 +1,7 @@
 import type { Access, CollectionConfig, GlobalConfig, PayloadRequest } from 'payload'
 
+import { devSsoCallback, devSsoStrategy } from './sso'
+
 /** Only the collection that backs the admin panel passes. */
 export const adminOnly: Access = ({ req }) => req.user?.collection === 'users'
 
@@ -34,13 +36,18 @@ export const partners: CollectionConfig = {
 	fields: [{ name: 'company', type: 'text' }],
 }
 
-/** Isolated onto the default `payload-customers-token`, and keeps a custom endpoint. */
+/**
+ * Isolated onto the default `payload-customers-token`. Also carries a hand-rolled SSO
+ * strategy next to password login, so both routes into one isolated collection are
+ * exercised: the plugin's shadowed `/login` and a callback minting its own cookie.
+ */
 export const customers: CollectionConfig = {
 	slug: 'customers',
-	auth: true,
+	auth: { strategies: [devSsoStrategy] },
 	admin: { useAsTitle: 'email' },
 	fields: [{ name: 'name', type: 'text' }],
 	endpoints: [
+		devSsoCallback,
 		{
 			method: 'get',
 			path: '/ping',

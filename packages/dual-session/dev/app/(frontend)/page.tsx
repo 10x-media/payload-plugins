@@ -150,7 +150,7 @@ export default async function WhoAmIPage() {
 			<h1>Who am I?</h1>
 			<p>
 				This page is served under the website scope, so <code>req.user</code> here is{' '}
-				<strong>{describe(live.user as ResolvedUser)}</strong>.
+				<strong data-testid="live-user">{describe(live.user as ResolvedUser)}</strong>.
 			</p>
 
 			<table style={{ borderCollapse: 'collapse', marginBottom: '2rem', width: '100%' }}>
@@ -164,14 +164,18 @@ export default async function WhoAmIPage() {
 				<tbody>
 					<tr>
 						<td style={cell}>admin</td>
-						<td style={cell}>{describe(asAdmin.user as ResolvedUser)}</td>
+						<td data-testid="scope-admin" style={cell}>
+							{describe(asAdmin.user as ResolvedUser)}
+						</td>
 						<td style={cell}>
 							<code>{ADMIN_COOKIE}</code> {holds(ADMIN_COOKIE) ? '✅' : '—'}
 						</td>
 					</tr>
 					<tr>
 						<td style={cell}>frontend</td>
-						<td style={cell}>{describe(asFrontend.user as ResolvedUser)}</td>
+						<td data-testid="scope-frontend" style={cell}>
+							{describe(asFrontend.user as ResolvedUser)}
+						</td>
 						<td style={cell}>
 							<code>{PARTNER_COOKIE}</code> {holds(PARTNER_COOKIE) ? '✅' : '—'} ·{' '}
 							<code>{CUSTOMER_COOKIE}</code> {holds(CUSTOMER_COOKIE) ? '✅' : '—'}
@@ -201,6 +205,25 @@ export default async function WhoAmIPage() {
 					title="Admin (shared cookie)"
 				/>
 			</div>
+
+			<h2>Custom SSO</h2>
+			<p>
+				<code>customers</code> also carries a hand-rolled auth strategy, the shape a Google or SAML
+				login takes when you write it yourself rather than install a plugin. The strategy needs no
+				changes to work here: isolated collections keep their declared strategies ahead of the
+				cookie one, so yours still gets first refusal.
+			</p>
+			<p>
+				What does change is the callback. A stock one ends with <code>generatePayloadCookie</code>,
+				which writes <code>{ADMIN_COOKIE}</code> and wipes the admin session it finds there. This
+				one calls <code>generateIsolatedAuthCookie</code> instead — see <code>dev/sso.ts</code>. Log
+				in as the admin first, then use the link: the admin session survives.
+			</p>
+			<p>
+				<a data-testid="sso-login" href={`/api/customers/sso/callback?email=${DEV_CUSTOMER.email}`}>
+					Sign in as {DEV_CUSTOMER.email} with fake SSO
+				</a>
+			</p>
 
 			<h2>Reads</h2>
 			<ApiConsole actions={readActions} title="Each collection reports its own cookie" />

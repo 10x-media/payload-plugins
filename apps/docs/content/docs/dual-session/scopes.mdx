@@ -1,0 +1,130 @@
+---
+title: Scopes
+description: How a request is attributed to the admin panel or the website, and how to compose the proxy with your own.
+---
+
+A browser holding two sessions makes every REST call ambiguous. `/api/customers/me` is the same URL whether the admin panel asked or the website did, and the right answer differs.
+
+The proxy resolves that per request and writes the answer into a header, `x-payload-auth-scope`. The isolated strategies read it and stand down when the scope is not theirs.
+
+## The default rule
+
+| Request | Scope |
+| --- | --- |
+| Under `adminRoute` (`/admin`) | `admin` |
+| Under `apiRoute` (`/api`) with an admin `Referer` | `admin` |
+| Under `apiRoute` with any other `Referer` | `frontend` |
+| Under `apiRoute` with no usable `Referer` | `admin` |
+| Anything else | `frontend` |
+
+Admin pages and their server actions live under `/admin`, so those are unambiguous. REST calls are attributed by `Referer`, which same-origin browser fetches carry in full.
+
+An unattributable API call falls back to `admin`, which reads as "no frontend cookie is honoured". The worst outcome of that fallback is an unauthenticated request, never a wrongly authenticated one.
+
+The header is always overwritten, never merged, so a client cannot choose its own scope by sending one.
+
+## Composing with an existing proxy
+
+Next allows exactly one proxy file, so if you already have one, do not replace it. `resolveAuthScope` is a pure function with no `next/server` import, and is the intended integration point:
+
+```ts title="proxy.ts"
+import { AUTH_SCOPE_HEADER, resolveAuthScope } from '@10x-media/dual-session/proxy'
+import { type NextRequest, NextResponse } from 'next/server'
+
+export default function proxy(request: NextRequest) {
+  const headers = new Headers(request.headers)
+  headers.set(
+    AUTH_SCOPE_HEADER,
+    resolveAuthScope({
+      pathname: request.nextUrl.pathname,
+      referer: request.headers.get('Referer'),
+    })
+  )
+
+  return NextResponse.next({ request: { headers } })
+}
+```
+
+<Callout type="warn">
+Anything that returns its own `NextResponse` — next-intl, auth.js, a rate limiter — **drops the header** unless you thread it through `request: { headers }`. The symptom is subtle: no scope means the fallback applies, and frontend sessions are quietly ignored for as long as an admin session is alive.
+</Callout>
+
+Chaining onto a library's proxy usually means passing the modified request into it:
+
+```ts
+const intl = createMiddleware(routing)
+
+export default function proxy(request: NextRequest) {
+  const headers = new Headers(request.headers)
+  headers.set(AUTH_SCOPE_HEADER, resolveAuthScope({ ... }))
+
+  return intl(new NextRequest(request, { headers }))
+}
+```
+
+`createAuthScopeProxy` is a convenience for an empty project. `resolveAuthScope` is the part to build on.
+
+## The matcher must include `/api`
+
+The widely copied default excludes it:
+
+```ts
+// Wrong for this plugin: REST calls never reach the proxy.
+export const config = { matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'] }
+```
+
+Use this instead:
+
+```ts
+export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] }
+```
+
+## Custom rules
+
+`createAuthScopeProxy` takes a `resolveScope` that runs first; return `undefined` to fall through to the default rule.
+
+```ts
+export default createAuthScopeProxy({
+  resolveScope: (request) =>
+    request.nextUrl.pathname.startsWith('/preview') ? 'admin' : undefined,
+})
+```
+
+`adminRoute` and `apiRoute` follow your Payload `routes` config if you have changed them.
+
+## Per-collection scopes
+
+A collection defaults to `scopes: ['frontend']`. Widen it when a collection should also authenticate admin-scoped requests:
+
+```ts
+dualSession({
+  collections: [{ slug: 'partners', scopes: ['frontend', 'admin'] }],
+})
+```
+
+## Without a proxy
+
+The plugin works without one, using `adminSessionPriority` (on by default): when no scope header is present, an isolated cookie stands down as long as a **valid** admin token is also present. The admin panel therefore stays reachable.
+
+The cost is that an admin-and-customer browser resolves as the admin on the website too. Set `adminSessionPriority: false` to invert that, or install the proxy so the scope is read rather than inferred.
+
+## Referer stripping breaks attribution
+
+A global `Referrer-Policy: no-referrer`, whether from your own security headers or a CDN, removes the signal API calls are attributed by. Every REST call then falls back to `admin` and frontend sessions stop working entirely.
+
+Payload's admin panel and this plugin both need the same-origin `Referer`, so the fix is to not strip it same-origin:
+
+```ts title="next.config.ts"
+headers: async () => [
+  {
+    source: '/:path*',
+    headers: [{ key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }],
+  },
+]
+```
+
+`strict-origin-when-cross-origin` is the browser default: full path same-origin, origin only cross-origin, nothing over a downgrade. If your policy is fixed and cannot change, use `resolveScope` to attribute requests by a signal you do control.
+
+## Next
+
+[Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what scopes cannot cover.

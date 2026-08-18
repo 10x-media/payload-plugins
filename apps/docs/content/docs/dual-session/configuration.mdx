@@ -1,0 +1,97 @@
+---
+title: Configuration
+description: Every option, every export, and what the plugin warns about.
+---
+
+## Options
+
+```ts
+dualSession({
+  collections: ['customers'],
+  adminSessionPriority: true,
+  scopeHeader: 'x-payload-auth-scope',
+  disabled: false,
+  translations: {},
+})
+```
+
+### `collections` (required)
+
+The auth collections to move off the shared cookie. A string is shorthand for `{ slug }`.
+
+**Order is priority.** When a visitor holds sessions for more than one isolated collection at once, the earliest listed wins and the rest stand down. This ranking is independent of the order the collections appear in `config.collections`.
+
+```ts
+collections: [
+  { slug: 'partners', cookieName: 'partner-session', scopes: ['frontend', 'admin'] },
+  'customers',
+]
+```
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `slug` | — | The collection to isolate. Must have `auth`, and must not be `admin.user`. |
+| `cookieName` | `` `${cookiePrefix}-${slug}-token` `` | Where this collection's token lives. |
+| `scopes` | `['frontend']` | Which [scopes](/dual-session/scopes) this cookie may authenticate. Only enforced when the proxy is installed. |
+
+### `adminSessionPriority`
+
+Default `true`. With no scope header on a request, ignore isolated cookies as long as a valid admin token is also present. Keeps the admin panel usable in projects without the proxy. See [Without a proxy](/dual-session/scopes#without-a-proxy).
+
+### `scopeHeader`
+
+Default `'x-payload-auth-scope'`. Change it on both sides — the plugin option and the proxy's `scopeHeader` — or they stop agreeing.
+
+### `disabled`
+
+Returns the incoming config untouched. Every isolated session is dropped when this flips, because the cookie name changes; admin sessions are unaffected.
+
+### `translations`
+
+Per-locale overrides keyed by the typed keys from `@10x-media/dual-session/i18n`. The plugin ships one string, `dualSession:pluginName`, and renders no admin UI of its own.
+
+## Exports
+
+### `@10x-media/dual-session`
+
+| Export | Use |
+| --- | --- |
+| `dualSession` | The plugin factory. |
+| `generateIsolatedAuthCookie({ collection, payload, token })` | The `Set-Cookie` value for an isolated login. Replaces `generatePayloadCookie` in your own callbacks. Throws for a collection that is not isolated. |
+| `resolveIsolatedCookieName({ collection, payload })` | That collection's cookie name, or `undefined` if it is not isolated. |
+| `getIsolatedCookieName({ cookiePrefix, slug })` | The default name, computed without a running Payload. |
+| `generateIsolatedCookie({ authConfig, name, token })` | The low-level builder, when you need a name the plugin does not know about. |
+| `resolveAuthScope` | The scope rule as a pure function. |
+| `AUTH_SCOPE_HEADER`, `PLUGIN_SLUG` | Constants. |
+
+### `@10x-media/dual-session/proxy`
+
+`createAuthScopeProxy`, `resolveAuthScope`, `AUTH_SCOPE_HEADER`, and the `AuthScope` / `AuthScopeProxyOptions` types. Edge-safe: it pulls in `NextResponse` and a pure function, nothing else.
+
+### `@10x-media/dual-session/types`
+
+`AuthScope`, `DualSessionPluginOptions`, `IsolatedCollection`.
+
+### `@10x-media/dual-session/i18n`
+
+`keys`, `translations`, and the `TranslationKey` / `TranslationsOption` types.
+
+## Warnings
+
+Config problems are reported through `payload.logger` when Payload boots. They do not throw, so a mistake here never stops the app from starting.
+
+**"collection X is not in the config, so it was skipped."** Plugins run in array order, before sanitization, so a collection contributed by a later plugin is genuinely not there yet. List `dualSession` after whatever adds it.
+
+**"collection X does not have auth enabled, so it was skipped."** Isolation only means anything for an auth collection.
+
+**"collection X sets `endpoints: false`, so it has no REST auth routes to shadow."** Payload answers 501 for every route on such a collection, with or without this plugin, so there is nothing to replace. The collection is kept and its strategy still registered: a session can be established outside REST with [`generateIsolatedAuthCookie`](/dual-session/custom-auth).
+
+## Errors
+
+Listing the collection named by `admin.user` throws. It owns the shared cookie, and isolating it takes the admin panel down.
+
+If `admin.user` is not set, the plugin resolves it the way `sanitizeConfig` does: the first collection declaring `auth`, or `users` if none does.
+
+## Next
+
+[Limits](/dual-session/limits).

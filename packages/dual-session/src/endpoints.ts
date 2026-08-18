@@ -18,6 +18,7 @@ import {
 } from 'payload'
 import { isNumber, parseCookies } from 'payload/shared'
 
+import { extractAuthorizationToken } from './authorization'
 import { generateExpiredIsolatedCookie, generateIsolatedCookie } from './cookies'
 
 type EndpointFactoryArgs = {
@@ -180,7 +181,12 @@ export const buildIsolatedAuthEndpoints = ({
 
 				// The built-in handler reads the token via `extractJWT`, which only knows about
 				// the shared cookie — it would report the admin's token back to a frontend user.
-				const currentToken = parseCookies(req.headers).get(cookieName)
+				// With no isolated cookie the request was authenticated by something else (an
+				// `Authorization` header, a custom strategy), so fall back to core's own
+				// extraction rather than reporting no token at all.
+				const currentToken =
+					parseCookies(req.headers).get(cookieName) ??
+					extractAuthorizationToken({ headers: req.headers, payload: req.payload })
 
 				const result = await meOperation({
 					collection,

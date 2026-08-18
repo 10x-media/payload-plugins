@@ -1,0 +1,47 @@
+---
+title: Dual Session
+description: Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist.
+---
+
+Payload signs every collection's token into one config-wide cookie, `${cookiePrefix}-token`. With a single auth collection that is invisible. With two it is not: a customer logging in on your website overwrites the editor's admin session in the same browser, and logging into the admin panel logs them out of the website.
+
+`@10x-media/dual-session` moves the collections you name onto cookies of their own, so both sessions live at once.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { dualSession } from '@10x-media/dual-session'
+
+export default buildConfig({
+  admin: { user: 'users' },
+  collections: [users, customers],
+  plugins: [dualSession({ collections: ['customers'] })],
+})
+```
+
+A customer now signs in to `payload-customers-token`. `users` keeps `payload-token` and the admin panel never notices the plugin exists.
+
+## How it works
+
+Two pieces:
+
+1. **Shadowed endpoints.** Payload appends a collection's built-in auth endpoints *after* the ones the collection declares, and routes to the first match. The plugin declares replacements for the six that touch the cookie, each delegating to the same core operation the built-in uses. Hooks, lockout, sessions and verification behave exactly as before; only the cookie name differs.
+
+2. **An auth strategy** registered on the collection, which authenticates from that cookie. It mirrors Payload's own JWT strategy step for step, including the CSRF gate, the `verify` check and the session `sid` check.
+
+The endpoints it replaces are `POST /login`, `POST /logout`, `POST /refresh-token`, `GET /me`, `POST /reset-password` and `POST /first-register`. The rest are left alone because they never write a cookie: `/forgot-password`, `/unlock`, `/verify/:id`, `/init`.
+
+## Attributing requests
+
+Payload's REST namespace is shared. `/api/customers/me` looks identical whether the admin panel asked or the website did, but the answer should differ: a browser holding both sessions has two valid users, and the request has to pick one.
+
+The [auth-scope proxy](/dual-session/scopes) stamps each request with the session it is allowed to use, based on where it came from. Without it the plugin still works, falling back to a rule that keeps the admin panel reachable at the cost of precision on the website.
+
+## Requirements
+
+Payload `^3.83.0`. Next is optional and only needed for the proxy; the plugin itself is framework-agnostic.
+
+The collection backing the admin panel (`admin.user`) must not be listed. It owns the shared cookie, and isolating it would take the admin panel down. The plugin refuses to build a config that does.
+
+## Next
+
+[Quick start](/dual-session/quick-start), then [Scopes](/dual-session/scopes) for the proxy and [Custom auth](/dual-session/custom-auth) if you have your own SSO.

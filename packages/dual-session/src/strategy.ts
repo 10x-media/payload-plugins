@@ -2,6 +2,7 @@ import { jwtVerify } from 'jose'
 import type { AuthStrategyResult, CollectionSlug, Payload } from 'payload'
 import { parseCookies } from 'payload/shared'
 
+import { hasPrecedingAuthorization } from './authorization'
 import { isCookieAuthAllowed } from './csrf'
 import type { AuthScope, AuthStrategy } from './types'
 
@@ -101,6 +102,10 @@ export const createIsolatedAuthStrategy = ({
 			// Nothing to do — importantly this also stops this strategy from ever
 			// interfering with requests that only carry the admin cookie.
 			if (!token) {
+				return NO_USER
+			}
+
+			if (hasPrecedingAuthorization({ headers, payload, slug })) {
 				return NO_USER
 			}
 
