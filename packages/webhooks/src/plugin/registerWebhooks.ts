@@ -16,7 +16,7 @@ import {
 	type WebhooksPluginOptions,
 } from '../options'
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
-import { rotateSubscriptionSecret } from '../secrets/rotate'
+import { RotationConflictError, rotateSubscriptionSecret } from '../secrets/rotate'
 import { resolveMode } from './resolveMode'
 
 /**
@@ -117,8 +117,19 @@ const canUpdateSubscription = async (args: {
 	return scoped.docs.length > 0
 }
 
+/**
+ * MongoDB `WriteConflict`, and Postgres `serialization_failure` / `deadlock_detected`. Drivers
+ * carry these as codes, which is the reliable signal; the message check stays as a fallback for
+ * wrappers that re-throw without one.
+ */
+const WRITE_CONFLICT_CODES = new Set<number | string>([112, '40001', '40P01', 40001])
+
 /** A concurrent-write rejection from the database, which the caller should retry. */
 const isWriteConflict = (err: unknown): boolean => {
+	const code = (err as { code?: number | string })?.code
+	if (code !== undefined && WRITE_CONFLICT_CODES.has(code)) {
+		return true
+	}
 	const message = err instanceof Error ? err.message : String(err)
 	return /write conflict|could not serialize|deadlock detected/i.test(message)
 }
@@ -203,7 +214,7 @@ export const registerWebhooks = (args: {
 				if (err instanceof InvalidSecretError) {
 					return Response.json({ error: err.message }, { status: 400 })
 				}
-				if (isWriteConflict(err)) {
+				if (err instanceof RotationConflictError || isWriteConflict(err)) {
 					return Response.json(
 						{ error: 'the subscription was modified concurrently; retry the rotation' },
 						{ status: 409 }

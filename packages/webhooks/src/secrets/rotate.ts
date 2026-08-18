@@ -6,8 +6,24 @@ import {
 	type PayloadRequest,
 } from 'payload'
 
-import { SECRET_REVEAL_CONTEXT, SECRET_UNUSABLE } from '../constants'
+import { SECRET_REVEAL_CONTEXT } from '../constants'
+import { resolveSecretRotationOptions } from '../options'
+import { decryptSecret } from './crypto'
 import { generateSecret, normalizeSecret } from './format'
+
+/**
+ * Raised when the subscription changed between this rotation's read and its write. The endpoint
+ * maps it to 409: the caller retries and reads the winner's secret rather than silently
+ * overwriting it.
+ */
+export class RotationConflictError extends Error {
+	constructor(id: string) {
+		super(
+			`@10x-media/webhooks: subscription ${id} was modified during rotation; no secret was changed. Retry the rotation.`
+		)
+		this.name = 'RotationConflictError'
+	}
+}
 
 export type RotateSecretResult = {
 	id: string
@@ -18,17 +34,20 @@ export type RotateSecretResult = {
 }
 
 /**
- * Read the subscription's current plaintext secret through the existing signing reveal window.
- * Returns null when the row has no secret or its ciphertext cannot be decrypted, in which case
- * there is nothing worth carrying into a grace period.
+ * The subscription's secret exactly as stored, plus the plaintext behind it.
+ *
+ * The stored form is read rather than the decrypted one because it doubles as this rotation's
+ * compare-and-swap token: it is what the write below requires to still be in place. Decrypting it
+ * here rather than through the signing reveal window keeps both from a single read, and keeps the
+ * token and the plaintext guaranteed to describe the same value.
  */
-const currentPlaintextSecret = async (args: {
+const currentSecret = async (args: {
 	payload: Payload
 	req: PayloadRequest
 	subscriptionsSlug: string
 	id: string
-}): Promise<string | null> => {
-	args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = true
+}): Promise<{ stored: string | null; plaintext: string | null }> => {
+	args.req.context[SECRET_REVEAL_CONTEXT.raw] = true
 	try {
 		const doc = await args.payload.findByID({
 			collection: args.subscriptionsSlug,
@@ -37,14 +56,12 @@ const currentPlaintextSecret = async (args: {
 			overrideAccess: true,
 			req: args.req,
 		})
-		// An undecryptable secret reads back as the unusable sentinel. There is nothing to carry
-		// into a grace period, and rotation is the documented recovery for exactly that state.
-		if (typeof doc.secret !== 'string' || doc.secret === SECRET_UNUSABLE) {
-			return null
-		}
-		return doc.secret
+		const stored = typeof doc.secret === 'string' && doc.secret !== '' ? doc.secret : null
+		// An unreadable secret has nothing worth carrying into a grace period, and rotation is the
+		// documented recovery for exactly that state. It still serves as the swap token.
+		return { stored, plaintext: stored ? decryptSecret(args.payload, stored) : null }
 	} finally {
-		args.req.context[SECRET_REVEAL_CONTEXT.forSigning] = false
+		args.req.context[SECRET_REVEAL_CONTEXT.raw] = false
 	}
 }
 
@@ -65,22 +82,37 @@ export const rotateSubscriptionSecret = async (args: {
 	graceSeconds: number
 	now?: number
 }): Promise<RotateSecretResult> => {
-	const { payload, req, subscriptionsSlug, id, graceSeconds } = args
+	const { payload, req, subscriptionsSlug, id } = args
 	const now = args.now ?? Date.now()
+	// Direct callers bypass the endpoint's parsing, so the bounds are enforced here too rather
+	// than only on the request path.
+	const { graceSeconds } = resolveSecretRotationOptions({ graceSeconds: args.graceSeconds })
 	const next = args.secret ? normalizeSecret(args.secret) : generateSecret()
 
-	// Read and write share a transaction: rotation is a read-modify-write, and two concurrent
-	// rotations that both read before either writes would otherwise both retire the same original
-	// secret, leaving the loser's caller holding a secret that never signs anything.
+	// Read and write share a transaction, and the write is conditional on the secret the read saw.
+	// A transaction alone is not enough: under Postgres' default READ COMMITTED, two rotations can
+	// both read the same secret, and the second write simply lands on top of the first, retiring a
+	// secret that is already gone and leaving the first caller holding one that never signs. The
+	// condition turns that into a conflict the caller can retry.
 	const opened = await initTransaction(req)
 	try {
-		const outgoing = await currentPlaintextSecret({ payload, req, subscriptionsSlug, id })
+		const { stored, plaintext: outgoing } = await currentSecret({
+			payload,
+			req,
+			subscriptionsSlug,
+			id,
+		})
 		const keepPrevious = graceSeconds > 0 && outgoing !== null && outgoing !== next
 		const expiresAt = keepPrevious ? new Date(now + graceSeconds * 1000).toISOString() : null
 
-		await payload.update({
+		const result = await payload.update({
 			collection: subscriptionsSlug,
-			id,
+			where: {
+				and: [
+					{ id: { equals: id } },
+					stored === null ? { secret: { exists: false } } : { secret: { equals: stored } },
+				],
+			},
 			data: {
 				secret: next,
 				previousSecret: keepPrevious ? outgoing : null,
@@ -89,6 +121,10 @@ export const rotateSubscriptionSecret = async (args: {
 			overrideAccess: true,
 			req,
 		})
+
+		if (result.docs.length === 0) {
+			throw new RotationConflictError(id)
+		}
 
 		if (opened) {
 			await commitTransaction(req)
