@@ -42,50 +42,85 @@
 	color: var(--theme-elevation-800);
 }
 
-/* The action cluster continues the input's outline with top/right/bottom
-   borders and the right corner radii. The input's OWN right border is removed
-   (rule below), so there is no vertical edge at the junction at all: nothing
-   to divide, nothing to misalign, no subpixel hairline. It stretches to the
-   input's height rather than declaring one, and its transition set is
-   formInput's exactly, so border changes fade at the input's speed. */
+/* Neighbouring actions halve their facing paddings: icons sit close while
+   every pixel of the cluster stays clickable, the hit boundary just moves to
+   the midpoint. Outer edges keep the full padding. */
+.tenx-protected-field__eye-wrap--attached .tenx-protected-field__eye:not(:first-child) {
+	padding-left: calc(var(--base) / 4);
+}
+
+.tenx-protected-field__eye-wrap--attached .tenx-protected-field__eye:not(:last-child) {
+	padding-right: calc(var(--base) / 4);
+}
+
+/* The cluster is a plain flex container: no border, no background of its own.
+   ALL chrome lives on the row (below), so the icons literally sit inside the
+   input's box and no state can ever render them behind a different border. */
 .tenx-protected-field__eye-wrap--attached {
 	display: flex;
 	align-self: stretch;
 	align-items: center;
-	margin-left: -1px;
+}
+
+/* Attached placement: the ROW is the input. It carries the single border,
+   radius, background, shadow, and formInput's exact transition set; the
+   native input inside is stripped of all chrome (rule below), so there is
+   exactly one border around input text and action icons alike, and no
+   combination of states can ever make them differ. */
+.tenx-protected-field__attached-row {
+	display: flex;
+	align-items: center;
+	height: 40px;
 	border: 1px solid var(--theme-elevation-150);
-	border-left: 0;
-	border-radius: 0 var(--style-radius-s) var(--style-radius-s) 0;
+	border-radius: var(--style-radius-s);
 	background: var(--theme-input-bg);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
 	transition-property: border, box-shadow, background-color;
 	transition-duration: 100ms, 100ms, 500ms;
 	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
 }
 
-/* The cluster border mirrors the INPUT's border state and nothing else.
-   Payload's formInput lights the input's own border on :hover (which the
-   browser also sets while its <label> is hovered) and on :focus; :has()
-   reads exactly those states off the input, so the cluster lights whenever
-   and only whenever the input does. Hovering an action animates just the
-   icon (rule above); it never touches the control border. */
-.tenx-protected-field__attached-row:has(input:hover) .tenx-protected-field__eye-wrap--attached {
+/* The row border follows the input's states, replicating formInput's own
+   precedence: hover lights it (the browser sets :hover on the input while
+   its <label> is hovered, and :has() reads that off the input, so hovering
+   an action never lights the border), focus outranks hover (declared later,
+   specificity flattened by :where), and focus-within keeps the control lit
+   while an action button holds focus, the way a clearable select keeps its
+   ring through an indicator click. The row's own shadow deepens on input
+   hover exactly as formInput's inputShadow does. */
+.tenx-protected-field__attached-row:where(:has(input:hover)) {
 	border-color: var(--theme-elevation-250);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
 }
 
-.tenx-protected-field__attached-row:has(input:focus) .tenx-protected-field__eye-wrap--attached {
+.tenx-protected-field__attached-row:where(:focus-within) {
 	border-color: var(--theme-elevation-400);
 }
 
-/* Attached placement: input row with the action cluster appended in flex. */
-.tenx-protected-field__attached-row {
-	display: flex;
-	align-items: center;
+/* The native input inside the row loses every piece of its own chrome; its
+   hover/focus/active styles from formInput now paint nothing, so they cannot
+   disagree with the row. height 100% (38px inside the bordered 40px row)
+   keeps the control at native input height. */
+.tenx-protected-field--attached .tenx-protected-field__attached-row input {
+	height: 100%;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
 }
 
-.tenx-protected-field--attached .tenx-protected-field__attached-row input {
-	border-right: 0;
-	border-top-right-radius: 0;
-	border-bottom-right-radius: 0;
+/* Validation error, mirrored from Payload's light/darkInputError mixins onto
+   the row (the input's own error chrome is stripped with the rest). Declared
+   last and more specific than the state rules, so error wins over hover and
+   focus exactly as it does on a native input. */
+html[data-theme="light"] .tenx-protected-field--attached.error .tenx-protected-field__attached-row {
+	border-color: var(--theme-error-500);
+	background-color: var(--theme-error-50);
+}
+
+html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-field__attached-row {
+	border-color: var(--theme-error-400);
+	background-color: var(--theme-error-100);
 }
 
 /* Corner placement: eye pinned to the top-right of the textarea wrap. */

@@ -1,5 +1,12 @@
 'use client'
-import { FieldDescription, FieldError, FieldLabel, useField, useFormFields } from '@payloadcms/ui'
+import {
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+	useField,
+	useFormFields,
+	useFormSubmitted,
+} from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
@@ -63,6 +70,9 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 		const stored = fields?.[hintPath]?.value
 		return typeof stored === 'string' && stored.length > 0 ? stored : undefined
 	})
+	const submitted = useFormSubmitted()
+	const invalid = useFormFields(([fields]) => fields?.[path]?.valid === false)
+	const showFieldError = submitted && invalid
 	const [cleared, setCleared] = useState(false)
 	const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
 
@@ -174,11 +184,14 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 			className={[
 				'field-type',
 				componentKey,
+				showFieldError && 'error',
 				'tenx-protected-field',
 				placement === 'attached'
 					? 'tenx-protected-field--attached'
 					: 'tenx-protected-field--corner',
-			].join(' ')}
+			]
+				.filter(Boolean)
+				.join(' ')}
 		>
 			<FieldLabel
 				label={field.label}
