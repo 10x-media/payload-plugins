@@ -1,10 +1,4 @@
-import {
-	commitTransaction,
-	initTransaction,
-	killTransaction,
-	type Payload,
-	type PayloadRequest,
-} from 'payload'
+import { commitTransaction, killTransaction, type Payload, type PayloadRequest } from 'payload'
 
 import { SECRET_REVEAL_CONTEXT } from '../constants'
 import { resolveSecretRotationOptions } from '../options'
@@ -32,6 +26,44 @@ export type RotateSecretResult = {
 	secret: string
 	/** When the rotated-out secret stops signing, or null when it was retired immediately. */
 	previousSecretExpiresAt: string | null
+}
+
+/**
+ * Open the rotation's transaction, asking a SQL adapter for snapshot isolation.
+ *
+ * The conditional write below cannot carry this on its own. Payload resolves a `where` to ids with
+ * a SELECT and then updates each by id, so the check and the act are separate statements: under
+ * Postgres' default READ COMMITTED both rotations match the same row, and the second simply
+ * overwrites the first once the first commits. REPEATABLE READ turns that second write into a
+ * serialization failure, which the endpoint already reports as a 409.
+ *
+ * Mongo needs none of this, since its transactions are snapshot-isolated and already abort the
+ * loser, and its adapter takes an unrelated options shape, so it keeps whatever it was configured
+ * with. `drizzle` is the marker for the SQL adapters rather than a list of adapter names.
+ */
+const beginRotation = async (req: PayloadRequest): Promise<boolean> => {
+	if (req.transactionID) {
+		if (req.transactionID instanceof Promise) {
+			await req.transactionID
+		}
+		// Someone up the stack owns the transaction, so this is not ours to commit.
+		return false
+	}
+	const db = req.payload.db as {
+		beginTransaction?: (options?: unknown) => Promise<number | string | null>
+		drizzle?: unknown
+	}
+	if (typeof db.beginTransaction !== 'function') {
+		return false
+	}
+	const id = await db.beginTransaction(
+		db.drizzle ? { isolationLevel: 'repeatable read' } : undefined
+	)
+	if (id === null || id === undefined) {
+		return false
+	}
+	req.transactionID = id
+	return true
 }
 
 /**
@@ -92,7 +124,7 @@ export const rotateSubscriptionSecret = async (args: {
 	// both read the same secret, and the second write simply lands on top of the first, retiring a
 	// secret that is already gone and leaving the first caller holding one that never signs. The
 	// condition turns that into a conflict the caller can retry.
-	const opened = await initTransaction(req)
+	const opened = await beginRotation(req)
 	try {
 		const { stored, plaintext: outgoing } = await currentSecret({
 			payload,

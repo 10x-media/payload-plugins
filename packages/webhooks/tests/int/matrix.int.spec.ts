@@ -55,13 +55,20 @@ describeForDb('webhooks outbound cross-db', {}, (db) => {
 })
 
 /**
- * Rotation is a read-modify-write, and the databases disagree about what protects it. Mongo
- * aborts one side of a contended transaction; Postgres' default READ COMMITTED happily lets the
- * second write land on top of the first. Only the conditional write covers both, so the invariant
- * is asserted against each: a caller handed a new secret must never find it was discarded.
+ * Rotation is a read-modify-write, and the databases disagree about what protects it. Mongo aborts
+ * one side of a contended transaction; Postgres' default READ COMMITTED happily lets the second
+ * write land on top of the first. Only the conditional write covers both.
+ *
+ * The invariant is stated without reference to who won, because completion order is not
+ * observable: `Promise.allSettled` reports results in input order, not commit order. What a lost
+ * update looks like is that both rotations retired the *pre-rotation* secret, because the second
+ * one never saw the first. So the tell is the original still sitting in the grace window after two
+ * rotations succeeded, and that holds whichever of them committed last.
  */
 describeForDb('webhooks rotation concurrency', {}, (db) => {
 	let booted: BootedPayload
+
+	const req = () => ({ context: {}, payload: booted.payload }) as unknown as PayloadRequest
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -75,40 +82,64 @@ describeForDb('webhooks rotation concurrency', {}, (db) => {
 		await booted.stop()
 	})
 
-	it(`never hands out a secret that stopped signing on ${db}`, async () => {
+	it(`never loses a rotation to a concurrent one on ${db}`, async () => {
 		const created = await booted.payload.create({
 			collection: 'webhook-subscriptions',
 			data: { name: `race-${db}`, url: 'https://example.test', enabled: true, events: [] },
 			overrideAccess: true,
 		})
 		const id = String(created.id)
+		const original = String(created.secret)
 
-		const settled = await Promise.allSettled(
-			Array.from({ length: 4 }, () =>
-				rotateSubscriptionSecret({
-					payload: booted.payload,
-					req: { context: {}, payload: booted.payload } as unknown as PayloadRequest,
-					subscriptionsSlug: 'webhook-subscriptions',
-					id,
-					graceSeconds: 3600,
-				})
-			)
-		)
+		// Recorded as each rotation resolves, so this is completion order. `Promise.allSettled`
+		// reports in input order, which says nothing about which rotation committed last, and the
+		// one that committed last is the one whose secret is now active.
+		const completed: string[] = []
+		const rotate = () =>
+			rotateSubscriptionSecret({
+				payload: booted.payload,
+				req: req(),
+				subscriptionsSlug: 'webhook-subscriptions',
+				id,
+				graceSeconds: 3600,
+			}).then((result) => {
+				completed.push(result.secret)
+				return result
+			})
 
-		const issued = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value.secret] : []))
-		expect(issued.length).toBeGreaterThan(0)
+		const settled = await Promise.allSettled([rotate(), rotate()])
+		expect(completed.length).toBeGreaterThan(0)
 
 		const resolved = await resolveSubscriptionById({
 			id,
 			codeSubscriptions: [],
 			subscriptionsSlug: 'webhook-subscriptions',
 			payload: booted.payload,
-			req: { context: {}, payload: booted.payload } as unknown as PayloadRequest,
+			req: req(),
 		})
-
-		// The last caller to be told "this is your new secret" must hold the active one, and no
-		// rotation may have been overwritten without its caller learning through a rejection.
-		expect(resolved?.secrets[0]).toBe(issued[issued.length - 1])
 		expect(resolved?.secretUnusable).toBe(false)
+
+		// The last rotation to finish holds the active secret.
+		expect(resolved?.secrets[0]).toBe(completed[completed.length - 1])
+
+		if (completed.length === 2) {
+			// Both committed, so the second read the first's secret and retired that. The original
+			// still sitting in the window is what a lost update looks like: it would mean the second
+			// rotation never saw the first, and overwrote it while telling its caller otherwise.
+			expect(resolved?.secrets).not.toContain(original)
+			expect(new Set(resolved?.secrets)).toEqual(new Set(completed))
+		} else {
+			// One was refused, so the winner is active and the untouched original is its overlap.
+			expect(resolved?.secrets).toEqual([completed[0], original])
+		}
+
+		// A refusal has to be the conflict, not some unrelated failure dressed up as one.
+		for (const r of settled) {
+			if (r.status === 'rejected') {
+				expect(String(r.reason?.message ?? r.reason)).toMatch(
+					/modified during rotation|conflict|serialize/i
+				)
+			}
+		}
 	})
 })
