@@ -5,21 +5,18 @@ import type React from 'react'
 export type ActionKind = 'clear' | 'edit' | 'generate' | 'undo'
 
 /**
- * Thin-stroke glyphs on the eye's 16x12 canvas so every action inherits the
- * exact size and stroke treatment of the reveal eye beside which they render.
+ * Thin-stroke glyphs on the eye's 16x12 canvas, each drawn centered on
+ * (8, 6) so the mark sits in the middle of its clickable area, matching the
+ * eye beside which they render.
  */
 const GLYPHS: Record<ActionKind, React.ReactNode> = {
 	// × matching react-select's clear indicator.
-	clear: (
-		<>
-			<path className="stroke" d="M5 2.5L11.5 9M11.5 2.5L5 9" />
-		</>
-	),
+	clear: <path className="stroke" d="M4.5 2.5L11.5 9.5M11.5 2.5L4.5 9.5" />,
 	// Pencil.
 	edit: (
 		<path
 			className="stroke"
-			d="M2.5 11.5L3 9L9.5 2.5C10.05 1.95 10.95 1.95 11.5 2.5C12.05 3.05 12.05 3.95 11.5 4.5L5 11L2.5 11.5Z"
+			d="M3.2 11.5L3.7 9L10.2 2.5C10.75 1.95 11.65 1.95 12.2 2.5C12.75 3.05 12.75 3.95 12.2 4.5L5.7 11L3.2 11.5Z"
 			strokeLinejoin="round"
 		/>
 	),
@@ -33,8 +30,8 @@ const GLYPHS: Record<ActionKind, React.ReactNode> = {
 	// Counter-clockwise undo arrow.
 	undo: (
 		<>
-			<path className="stroke" d="M3.5 4.5H9A3.5 3.5 0 0 1 9 11.5H5" />
-			<path className="stroke" d="M6 2L3.5 4.5L6 7" strokeLinejoin="round" />
+			<path className="stroke" d="M3.5 3.75H9A3.5 3.5 0 0 1 9 10.75H5" />
+			<path className="stroke" d="M6 1.25L3.5 3.75L6 6.25" strokeLinejoin="round" />
 		</>
 	),
 }
@@ -69,7 +66,7 @@ export const ActionButton: React.FC<{
 				viewBox="0 0 16 12"
 				xmlns="http://www.w3.org/2000/svg"
 			>
-				<g transform="translate(1.5 0)">{GLYPHS[kind]}</g>
+				{GLYPHS[kind]}
 			</svg>
 		}
 		margin={false}

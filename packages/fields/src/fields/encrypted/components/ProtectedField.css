@@ -21,61 +21,71 @@
 	color: var(--theme-elevation-800);
 }
 
-/* Attached segment (eye and write-only actions), mirroring Payload's API-key
-   toggle button. Background is the input's own --theme-input-bg (not an
-   elevation step) so the segment reads as part of the input. Like Payload's
-   toggle, the segment keeps its FULL border and overlaps the input's right
-   border via -1px margin: the divider zone is double-painted, so subpixel
-   rounding at fractional flex widths can never open a hairline of page
-   background between input and segment. The transition set is formInput's
-   exactly (border/box-shadow at 100ms, background at 500ms), so hover and
-   focus fade in lockstep with the input. Height is a literal 40px to match
-   the native input: Payload compiles its formInput mixin to literal px, while
-   var(--base) is rem-derived and shrinks below 1024px, so a base-derived
-   height renders ~37px next to a 40px input. The doubled class outranks
-   Payload's own `.btn { height: base(2) }`, which otherwise wins by cascade
-   order. */
+/* Attached action buttons (eye and write-only actions): borderless indicators
+   inside the bordered cluster wrap (below), react-select style, muted until
+   hovered. The doubled class outranks Payload's own `.btn { height: base(2) }`,
+   which otherwise wins by cascade order. */
 .tenx-protected-field__eye.tenx-protected-field__eye--attached {
-	align-self: stretch;
-	height: 40px;
-	margin: 0 0 0 -1px;
+	height: 100%;
+	margin: 0;
 	padding: 0 calc(var(--base) / 2);
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	border-top-left-radius: 0;
-	border-bottom-left-radius: 0;
-	background: var(--theme-input-bg);
+	border: 0;
+	border-radius: 0;
+	background: none;
 	box-shadow: none;
+	color: var(--theme-elevation-500);
+	transition: color 100ms cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+.tenx-protected-field__eye--attached:hover {
+	background: none;
 	color: var(--theme-elevation-800);
+}
+
+/* The action cluster is the ONLY bordered element on the right: it continues
+   the input's outline with top/right/bottom borders and the right corner
+   radii, and its background overlaps the input's right border by 2px, so
+   there is no internal divider anywhere and no subpixel width can open a
+   hairline of page background. The transition set is formInput's exactly
+   (border/box-shadow at 100ms, background at 500ms), so hover and focus fade
+   in lockstep with the input. Height is a literal 40px to match the native
+   input: Payload compiles its formInput mixin to literal px, while
+   var(--base) is rem-derived and shrinks below 1024px. */
+.tenx-protected-field__eye-wrap--attached {
+	display: flex;
+	align-self: stretch;
+	align-items: center;
+	height: 40px;
+	margin-left: -2px;
+	border: 1px solid var(--theme-elevation-150);
+	border-left: 0;
+	border-radius: 0 var(--style-radius-s) var(--style-radius-s) 0;
+	background: var(--theme-input-bg);
 	transition-property: border, box-shadow, background-color;
 	transition-duration: 100ms, 100ms, 500ms;
 	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
 }
 
-.tenx-protected-field__eye--attached:hover {
-	background: var(--theme-elevation-100);
-}
-
-/* Hover or focus lights the input and its segments together, so the highlight
-   never cuts off at the seam. Payload shifts an input border to elevation-250
-   on hover and elevation-400 on focus, and the browser propagates :hover from
-   a <label> to its control, which is why hovering the label row highlights a
-   native input. The :has(input:hover) selector rides that same propagation, so
-   the segments follow the input through every path that lights it (label
-   hover included), and the row rules make pointer-over-segment light the
-   input back: one control, one border state. */
+/* Hover or focus lights the input and the action cluster together, so the
+   highlight never cuts off at the seam. Payload shifts an input border to
+   elevation-250 on hover and elevation-400 on focus, and the browser
+   propagates :hover from a <label> to its control, which is why hovering the
+   label row highlights a native input. The :has(input:hover) selector rides
+   that same propagation, so the cluster follows the input through every path
+   that lights it (label hover included), and the row rules make
+   pointer-over-action light the input back: one control, one border state. */
 .tenx-protected-field__attached-row:hover input,
-.tenx-protected-field__attached-row:hover .tenx-protected-field__eye--attached,
-.tenx-protected-field__attached-row:has(input:hover) .tenx-protected-field__eye--attached {
+.tenx-protected-field__attached-row:hover .tenx-protected-field__eye-wrap--attached,
+.tenx-protected-field__attached-row:has(input:hover) .tenx-protected-field__eye-wrap--attached {
 	border-color: var(--theme-elevation-250);
 }
 
 .tenx-protected-field__attached-row:focus-within input,
-.tenx-protected-field__attached-row:focus-within .tenx-protected-field__eye--attached {
+.tenx-protected-field__attached-row:focus-within .tenx-protected-field__eye-wrap--attached {
 	border-color: var(--theme-elevation-400);
 }
 
-/* Attached placement: input row with the eye appended as a flex segment. */
+/* Attached placement: input row with the action cluster appended in flex. */
 .tenx-protected-field__attached-row {
 	display: flex;
 	align-items: center;
@@ -84,11 +94,6 @@
 .tenx-protected-field--attached .tenx-protected-field__attached-row input {
 	border-top-right-radius: 0;
 	border-bottom-right-radius: 0;
-}
-
-.tenx-protected-field__eye-wrap--attached {
-	display: flex;
-	align-self: stretch;
 }
 
 /* Corner placement: eye pinned to the top-right of the textarea wrap. */
@@ -146,12 +151,6 @@
 	color: var(--theme-elevation-500);
 	font-size: 1rem;
 	letter-spacing: 0.15em;
-}
-
-/* Several attached segments chain like one control: shared borders between
-   neighbours, right rounding only on the last. */
-.tenx-protected-field__eye-wrap--attached .tenx-protected-field__action:not(:last-child) {
-	border-radius: 0;
 }
 
 /* Corner placement (textarea) rows its actions horizontally where the eye sits. */
