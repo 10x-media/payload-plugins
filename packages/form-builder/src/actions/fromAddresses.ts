@@ -51,20 +51,31 @@ export const resolveSendFrom = async (opts: {
 	return firstSender(resolved) || undefined
 }
 
+/** A bare plausible address, or a `Name <addr>` display form wrapping one (quotes and commas in the name included). */
+const isPlausibleSender = (value: string): boolean => {
+	if (isPlausibleEmail(value)) {
+		return true
+	}
+	const bracketed = /^[^<>]*<([^<>\s]+)>$/.exec(value)
+	return Boolean(bracketed?.[1] && isPlausibleEmail(bracketed[1]))
+}
+
 /**
- * The sender-side counterpart of `firstAddress`: one sender only (anything past a separator or
- * CR/LF is cut, closing header injection), but `Name <addr>` display form survives because that is
- * the documented shape of a `from`. An implausible result becomes empty (send with the adapter
- * default) rather than a broken header.
+ * The sender-side counterpart of `firstAddress`: one sender only, but `Name <addr>` display form
+ * survives because that is the documented shape of a `from`. Order matters: cut at line breaks
+ * first (the header-injection vector), accept the whole remaining line so a quoted display name
+ * may contain commas, and only then comma-split to clamp a multi-address result to its first
+ * entry. An implausible result becomes empty (send with the adapter default) rather than a
+ * broken header.
  */
 const firstSender = (value: string): string => {
-	const [first] = value.split(/[,;\n\r]+/)
-	const cleaned = (first ?? '').trim()
-	if (isPlausibleEmail(cleaned)) {
-		return cleaned
+	const line = (value.split(/[\n\r]+/)[0] ?? '').trim()
+	if (isPlausibleSender(line)) {
+		return line
 	}
-	const bracketed = /^[^<>]*<([^<>\s]+)>$/.exec(cleaned)
-	return bracketed?.[1] && isPlausibleEmail(bracketed[1]) ? cleaned : ''
+	const [first] = line.split(/[,;]+/)
+	const cleaned = (first ?? '').trim()
+	return isPlausibleSender(cleaned) ? cleaned : ''
 }
 
 /**

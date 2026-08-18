@@ -180,6 +180,21 @@ describe('resolveSendFrom', () => {
 		).toBe('Acme <hello@acme.example>')
 	})
 
+	it('keeps a quoted display name containing a comma intact', async () => {
+		const quoted = new Map([
+			[
+				'tenant:default',
+				{
+					...tenantSource,
+					resolve: () => '"Fox, Jessica" <jfox@acme.example>',
+				} as FromAddressSource,
+			],
+		])
+		expect(
+			await resolveSendFrom({ configured: 'tenant:default', sources: quoted, sourceArgs: sendArgs })
+		).toBe('"Fox, Jessica" <jfox@acme.example>')
+	})
+
 	it('drops an implausible source result instead of sending it', async () => {
 		const garbage = new Map([
 			['tenant:default', { ...tenantSource, resolve: () => 'not-an-address' } as FromAddressSource],
