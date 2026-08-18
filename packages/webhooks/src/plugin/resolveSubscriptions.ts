@@ -28,31 +28,46 @@ export type ResolvedSubscription = {
 	 * not yet moved off the retired secret lose their overlap early.
 	 */
 	retiredSecretUnusable: boolean
+	/**
+	 * The active secret read back as the mask, which means this subscription was resolved without
+	 * opening the signing reveal window. A secret exists and simply was not asked for, so the
+	 * delivery must be refused rather than sent unsigned: the alternative turns a missing
+	 * `SECRET_REVEAL_CONTEXT.forSigning` in some future call site into silently unsigned traffic.
+	 */
+	secretMasked: boolean
 	headers?: Record<string, string>
 	enabled: boolean
 }
 
-/** One stored secret value sorted into a usable key, a hard failure, or nothing at all. */
-type SecretSlot = { secret: string | null; unusable: boolean }
+/**
+ * What one stored secret value turned out to be.
+ *
+ * `absent` is the only state that legitimately yields an unsigned delivery. `masked` is kept
+ * apart from it: a masked value means a secret exists but this read never opened the reveal
+ * window, so treating it as absent would turn a caller's mistake into an unsigned POST.
+ */
+type SecretSlot =
+	| { state: 'absent' | 'masked' | 'unusable'; secret: null }
+	| { state: 'ok'; secret: string }
 
 /**
- * Classify one stored secret value.
- *
- * `SECRET_UNUSABLE` and a value that will not normalize both mean a secret exists that cannot
- * sign. The mask is different: it means this read never opened a reveal window, so it carries no
- * information about whether a secret is usable and is skipped without raising the flag.
+ * Classify one stored secret value. `SECRET_UNUSABLE` and a value that will not normalize both
+ * mean a secret exists that cannot sign.
  */
 const resolveSlot = (value: string | Date | null | undefined): SecretSlot => {
-	if (typeof value !== 'string' || value === '' || value === SECRET_MASK) {
-		return { secret: null, unusable: false }
+	if (typeof value !== 'string' || value === '') {
+		return { secret: null, state: 'absent' }
+	}
+	if (value === SECRET_MASK) {
+		return { secret: null, state: 'masked' }
 	}
 	if (value === SECRET_UNUSABLE) {
-		return { secret: null, unusable: true }
+		return { secret: null, state: 'unusable' }
 	}
 	try {
-		return { secret: normalizeSecret(value), unusable: false }
+		return { secret: normalizeSecret(value), state: 'ok' }
 	} catch {
-		return { secret: null, unusable: true }
+		return { secret: null, state: 'unusable' }
 	}
 }
 
@@ -66,13 +81,19 @@ const resolveSlot = (value: string | Date | null | undefined): SecretSlot => {
 const resolveSecrets = (args: {
 	active: string | Date | null | undefined
 	retired?: string | Date | null | undefined
-}): Pick<ResolvedSubscription, 'retiredSecretUnusable' | 'secrets' | 'secretUnusable'> => {
+}): Pick<
+	ResolvedSubscription,
+	'retiredSecretUnusable' | 'secretMasked' | 'secrets' | 'secretUnusable'
+> => {
 	const active = resolveSlot(args.active)
 	const retired = resolveSlot(args.retired)
 	return {
 		secrets: [active.secret, retired.secret].filter((s): s is string => s !== null),
-		secretUnusable: active.unusable,
-		retiredSecretUnusable: retired.unusable,
+		secretUnusable: active.state === 'unusable',
+		secretMasked: active.state === 'masked',
+		// A masked retired secret is genuinely uninformative: the active secret already carries the
+		// delivery, and the overlap is the only thing at stake.
+		retiredSecretUnusable: retired.state === 'unusable',
 	}
 }
 
@@ -163,6 +184,12 @@ export const decideDelivery = (subscription: ResolvedSubscription | null): Deliv
 		return {
 			deliverable: false,
 			reason: 'signing secret could not be decrypted; refused rather than sent unsigned',
+		}
+	}
+	if (subscription.secretMasked) {
+		return {
+			deliverable: false,
+			reason: 'signing secret was not revealed for signing; refused rather than sent unsigned',
 		}
 	}
 	return { deliverable: true, subscription }

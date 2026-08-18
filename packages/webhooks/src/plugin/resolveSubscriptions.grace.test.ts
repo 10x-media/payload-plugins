@@ -156,9 +156,26 @@ describe('unusable secrets', () => {
 		expect(resolved.secrets).toEqual([])
 	})
 
-	it('does not flag a masked read, which says nothing about usability', () => {
+	/**
+	 * A masked active secret means the subscription was resolved without opening the signing
+	 * reveal window. The secret exists and was simply not asked for, so this must refuse rather
+	 * than fall through to the unsigned path a genuinely secretless subscription takes.
+	 */
+	it('refuses a masked active secret rather than delivering it unsigned', () => {
 		const resolved = fromCollectionRow(row({ secret: SECRET_MASK }), NOW)
+		expect(resolved.secretMasked).toBe(true)
 		expect(resolved.secretUnusable).toBe(false)
+		expect(resolved.secrets).toEqual([])
+		const decision = decideDelivery(resolved)
+		expect(decision.deliverable).toBe(false)
+		expect(decision.deliverable === false && decision.reason).toMatch(/not revealed for signing/)
+	})
+
+	it('leaves a genuinely secretless subscription deliverable and unsigned', () => {
+		const resolved = fromCollectionRow({ id: 3, url: 'https://x' }, NOW)
+		expect(resolved.secretMasked).toBe(false)
+		expect(resolved.secrets).toEqual([])
+		expect(decideDelivery(resolved).deliverable).toBe(true)
 	})
 })
 

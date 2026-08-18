@@ -19,11 +19,16 @@ export const sendDelivery = (args: {
 	now: number
 }): Promise<DeliverResult> => {
 	const { subscription, deliveryId, event, body, timeoutMs, now } = args
+	// Backstop for the dispatchers' own refusal check, so no future call site can reintroduce a
+	// silent downgrade to unsigned by forgetting it.
 	if (subscription.secretUnusable) {
-		// Backstop for the dispatchers' own refusal check, so no future call site can reintroduce
-		// a silent downgrade to unsigned by forgetting it.
 		throw new Error(
 			`@10x-media/webhooks: refusing to send delivery ${deliveryId} for subscription ${subscription.id}: its signing secret could not be decrypted.`
+		)
+	}
+	if (subscription.secretMasked) {
+		throw new Error(
+			`@10x-media/webhooks: refusing to send delivery ${deliveryId} for subscription ${subscription.id}: its signing secret was resolved without the signing reveal window, so it read back masked.`
 		)
 	}
 	const timestamp = Math.floor(now / 1000)

@@ -26,6 +26,7 @@ describe('fromCollectionRow', () => {
 			secrets: [secret],
 			secretUnusable: false,
 			retiredSecretUnusable: false,
+			secretMasked: false,
 			headers: { 'X-A': '1' },
 			enabled: true,
 		})
