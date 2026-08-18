@@ -156,7 +156,7 @@ const takeStashedPlaintext = (req: PayloadRequest, value: string): string | null
  */
 const maskSecret =
 	(options: { reveals: boolean; slot: 'active' | 'retired' }): FieldHook =>
-	({ value, req }) => {
+	({ collection, originalDoc, req, value }) => {
 		if (value == null) {
 			return value
 		}
@@ -169,10 +169,13 @@ const maskSecret =
 		if (req.context[SECRET_REVEAL_CONTEXT.forSigning]) {
 			const plaintext = decryptSecret(req.payload, String(value))
 			if (!plaintext) {
+				// Named, because an install with many subscriptions otherwise gets an error per
+				// delivery with nothing in it to say which row needs migrating or rotating.
+				const subject = `${collection?.slug ?? 'subscription'} ${String(originalDoc?.id ?? 'unknown')}`
 				req.payload.logger.error(
 					options.slot === 'active'
-						? `@10x-media/webhooks: a stored signing secret could not be decrypted, so deliveries for this subscription will fail instead of being sent unsigned. Either PAYLOAD_SECRET changed after the secret was stored, or the subscription predates encryption at rest and needs encryptExistingSecrets(). Rotating the secret also recovers it.`
-						: `@10x-media/webhooks: a retired signing secret still inside its rotation grace window could not be decrypted, so it has been dropped. Deliveries continue, signed with the current secret; receivers that have not moved off the retired secret lose their overlap early.`
+						? `@10x-media/webhooks: the stored signing secret for ${subject} could not be decrypted, so deliveries for this subscription will fail instead of being sent unsigned. Either PAYLOAD_SECRET changed after the secret was stored, or the subscription predates encryption at rest and needs encryptExistingSecrets(). Rotating the secret also recovers it.`
+						: `@10x-media/webhooks: the retired signing secret for ${subject}, still inside its rotation grace window, could not be decrypted, so it has been dropped. Deliveries continue, signed with the current secret; receivers that have not moved off the retired secret lose their overlap early.`
 				)
 				return SECRET_UNUSABLE
 			}
