@@ -24,6 +24,12 @@ export const en: Record<TranslationKey, string> = {
 	[keys.rotateSecret]: 'Rotate secret',
 	[keys.rotateSecretDone]: 'New secret, shown once. Copy it to your receiver now',
 	[keys.rotateSecretFailed]: 'Could not rotate the secret',
+	[keys.rotateSecretConfirm]:
+		'Rotate this signing secret? The current one keeps working for the grace period, then stops. You will see the new secret once.',
+	[keys.rotateSecretForbidden]: 'You do not have permission to rotate this secret',
+	[keys.rotateSecretConflict]:
+		'This subscription changed while rotating. Reload and try again if you still need a new secret',
+	[keys.rotateSecretRejected]: 'The rotation was rejected. Check the secret you supplied',
 	[keys.fieldHeaders]: 'Custom headers',
 	[keys.headerReserved]:
 		"'{{name}}' is set by the plugin on every delivery and cannot be overridden.",
