@@ -22,6 +22,7 @@ const fakePayload = (secret = 'test-secret-for-webhooks'): Payload => {
 			const decipher = createDecipheriv('aes-256-ctr', key, Buffer.from(hash.slice(0, 32), 'hex'))
 			return `${decipher.update(hash.slice(32), 'hex', 'utf8')}${decipher.final('utf8')}`
 		},
+		logger: { warn: () => undefined },
 	} as unknown as Payload
 }
 
@@ -94,8 +95,20 @@ describe('isEncryptedSecret', () => {
 		expect(isEncryptedSecret(null)).toBe(false)
 	})
 
-	it('rejects a value that only looks tagged', () => {
-		expect(isEncryptedSecret(`${CIPHER_PREFIX}short`)).toBe(false)
-		expect(isEncryptedSecret(`${CIPHER_PREFIX}${'z'.repeat(48)}`)).toBe(false)
+	/**
+	 * The tag alone answers "has this already been encrypted?", which is the only question this
+	 * predicate exists for. Whether the body is recoverable is `decryptSecret`'s call: answering
+	 * "not encrypted" here for a tagged but corrupt value would send it back through the cipher a
+	 * second time instead of reporting it as unreadable.
+	 */
+	it('accepts anything carrying the tag, leaving the body to decryptSecret', () => {
+		expect(isEncryptedSecret(`${CIPHER_PREFIX}short`)).toBe(true)
+		expect(isEncryptedSecret(`${CIPHER_PREFIX}${'z'.repeat(48)}`)).toBe(true)
+	})
+
+	it('does not re-encrypt a tagged but corrupt value', () => {
+		const corrupt = `${CIPHER_PREFIX}${'z'.repeat(48)}`
+		expect(encryptSecret(fakePayload(), corrupt)).toBe(corrupt)
+		expect(decryptSecret(fakePayload(), corrupt)).toBeNull()
 	})
 })
