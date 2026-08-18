@@ -96,8 +96,13 @@ const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, originalDo
 		// A placeholder here is a document that was read and resubmitted, which is exactly what
 		// Payload's duplicate action does: it carries the mask, not key material. Treating it as
 		// absent gives the copy its own fresh secret, which is what a duplicate should have anyway.
+		// Only a genuinely absent secret is generated. An empty string is a caller that meant to
+		// supply one, so it is rejected rather than quietly swapped for a generated secret the
+		// caller never learns about. Payload's admin omits the field entirely, so this is API
+		// callers only.
 		const supplied = isPlaceholderSecret(data.secret) ? undefined : data.secret
-		const plaintext = supplied ? normalizeOr400(supplied) : generateSecret()
+		const plaintext =
+			supplied === undefined || supplied === null ? generateSecret() : normalizeOr400(supplied)
 		const ciphertext = encryptSecret(req.payload, plaintext)
 		req.context[SECRET_REVEAL_CONTEXT.once] = true
 		// Bound to the exact ciphertext this create produced. Every encryption uses a fresh IV, so

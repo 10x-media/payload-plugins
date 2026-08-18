@@ -183,6 +183,26 @@ describe('buildSubscriptionsCollection', () => {
 		expect((thrown as APIError).status).toBe(400)
 	})
 
+	/**
+	 * Payload's admin omits the field rather than sending an empty one, so an empty string is an
+	 * API caller who meant to supply a secret. Generating one silently would hand that caller a
+	 * subscription signed with a secret they never saw.
+	 */
+	it('rejects an explicitly empty secret rather than generating one', () => {
+		expect(() =>
+			runBeforeChange(c, { data: { secret: '' }, operation: 'create', context: {} })
+		).toThrow(APIError)
+	})
+
+	it('generates only when the secret is genuinely absent', async () => {
+		for (const data of [{}, { secret: undefined }, { secret: null }]) {
+			const context: RequestContext = {}
+			const created = await runBeforeChange(c, { data, operation: 'create', context })
+			expect(isEncryptedSecret(created.secret)).toBe(true)
+			expect(isNormalizedSecret(stash(context)?.plaintext)).toBe(true)
+		}
+	})
+
 	it('masks the secret on a plain read', () => {
 		const hook = secretAfterRead(c)
 		expect(runMask(hook, 'a'.repeat(48), {})).toBe(SECRET_MASK)
