@@ -11,7 +11,7 @@ import {
 } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
-import type { FromAddressesResolver } from '../actions/fromAddresses'
+import type { FromAddressesResolver, FromAddressSourceRegistry } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
 import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
 import { type CalcAllowed, normalizeCalc } from '../calc/normalizeCalc'
@@ -188,10 +188,13 @@ type BuildFormsCollectionArgs = {
 	/** The plugin `response` option; `redirect.fields` composes the `response.redirect` group from its default fields. */
 	response?: ResponseOption
 	/**
-	 * The plugin `email.fromAddresses` option. Present: both email actions gain a `from` select and
-	 * the `/:id/from-addresses` endpoint is registered. Absent: neither exists.
+	 * The plugin `email.fromAddresses` option. Either this or `fromSources` present: both email
+	 * actions gain a `from` select and the `/:id/from-addresses` endpoint is registered. Both
+	 * absent: neither exists.
 	 */
 	fromAddresses?: FromAddressesResolver
+	/** The plugin `email.fromSources` option: send-time-resolved senders served ahead of the literals. */
+	fromSources?: FromAddressSourceRegistry
 	/**
 	 * The plugin `email.departments` option. Present: the `emailTeam` `to` becomes a department select
 	 * and the `/:id/departments` endpoint backing it is registered. Absent: `to` stays a plain field.
@@ -228,6 +231,7 @@ export const buildFormsCollection = ({
 	settings,
 	response,
 	fromAddresses,
+	fromSources,
 	departments,
 	redirectRelationships,
 }: BuildFormsCollectionArgs): CollectionConfig => {
@@ -828,6 +832,7 @@ export const buildFormsCollection = ({
 		pollVotesEnabled,
 		consentSources,
 		fromAddresses,
+		fromSources,
 		departments,
 	})
 

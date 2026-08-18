@@ -279,6 +279,120 @@ describe('emailTeam', () => {
 		expect(component?.clientProps?.endpoint).toBe('from-addresses')
 	})
 
+	it('adds the from field when only fromSources are given', () => {
+		const field = fromFieldOf(
+			buildEmailTeam({
+				localize: true,
+				fromSources: {
+					tenant: { value: 'tenant:default', label: 'Tenant default', resolve: () => null },
+				},
+			})
+		)
+		expect(field?.type).toBe('text')
+	})
+
+	it('resolves a from source freshly at send time', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+		const resolve = vi.fn().mockResolvedValue('Acme <hello@acme.example>')
+		const action = buildEmailTeam({
+			localize: true,
+			fromSources: { tenant: { value: 'tenant:default', label: 'Tenant default', resolve } },
+		})
+
+		await action.run(
+			baseArgs({
+				config: { to: 'team@example.com', from: 'tenant:default', subject: 'Hi', body: 'body' },
+				values: [],
+				payload,
+			})
+		)
+
+		expect(resolve).toHaveBeenCalledWith(
+			expect.objectContaining({ form, submissionId, locale: 'en' })
+		)
+		expect(sendEmail).toHaveBeenCalledWith(
+			expect.objectContaining({ from: 'Acme <hello@acme.example>' })
+		)
+	})
+
+	it('sends without from when the source resolves empty', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+		const action = buildEmailTeam({
+			localize: true,
+			fromSources: {
+				tenant: { value: 'tenant:default', label: 'Tenant default', resolve: () => null },
+			},
+		})
+
+		await action.run(
+			baseArgs({
+				config: { to: 'team@example.com', from: 'tenant:default', subject: 'Hi', body: 'body' },
+				values: [],
+				payload,
+			})
+		)
+
+		expect(sendEmail).toHaveBeenCalledWith({ to: 'team@example.com', subject: 'Hi', html: 'body' })
+	})
+
+	it('keeps a literal from verbatim even when sources are configured', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+		const resolve = vi.fn()
+		const action = buildEmailTeam({
+			localize: true,
+			fromSources: { tenant: { value: 'tenant:default', label: 'Tenant default', resolve } },
+		})
+
+		await action.run(
+			baseArgs({
+				config: {
+					to: 'team@example.com',
+					from: 'Support <support@example.com>',
+					subject: 'Hi',
+					body: 'body',
+				},
+				values: [],
+				payload,
+			})
+		)
+
+		expect(resolve).not.toHaveBeenCalled()
+		expect(sendEmail).toHaveBeenCalledWith(
+			expect.objectContaining({ from: 'Support <support@example.com>' })
+		)
+	})
+
+	it('fails the action when the from source throws', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+		const action = buildEmailTeam({
+			localize: true,
+			fromSources: {
+				tenant: {
+					value: 'tenant:default',
+					label: 'Tenant default',
+					resolve: () => {
+						throw new Error('tenant lookup down')
+					},
+				},
+			},
+		})
+
+		await expect(
+			action.run(
+				baseArgs({
+					config: { to: 'team@example.com', from: 'tenant:default', subject: 'Hi', body: 'body' },
+					values: [],
+					payload,
+				})
+			)
+		).rejects.toThrow('tenant lookup down')
+		expect(sendEmail).not.toHaveBeenCalled()
+	})
+
 	// Recipient fields live inside presentational rows; flatten to read them by name.
 	const flatFields = (definition: ReturnType<typeof buildEmailTeam>) =>
 		(definition.config ?? []).flatMap((field) => (field.type === 'row' ? field.fields : [field]))

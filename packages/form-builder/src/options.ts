@@ -1,7 +1,7 @@
 import type { CollectionSlug } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
 import type { RecipientsConfig } from './actions/emailRecipients'
-import type { FromAddressesResolver } from './actions/fromAddresses'
+import type { FromAddressesResolver, FromAddressSourceRegistry } from './actions/fromAddresses'
 import type { RecipientSourceRegistry } from './actions/recipientSources'
 import type { ActionsConfig } from './actions/registry'
 import type { FormResultsAccess } from './aggregation/resolveResultsRequest'
@@ -103,6 +103,16 @@ export type FormBuilderPluginOptions = {
 	 */
 	email?: {
 		fromAddresses?: FromAddressesResolver
+		/**
+		 * Senders resolved at send time, offered in the `from` select alongside (and ahead of) the
+		 * `fromAddresses` literals. Where a literal freezes the address an action was saved with, a
+		 * source stores its namespaced `value` (e.g. `tenant:default`) and re-resolves the address on
+		 * every send, so sender identity follows the host: a tenant that changes its from-address
+		 * changes it for every existing form at once. `resolve` receives the same run-time args as a
+		 * recipient source (the form, the submission, the request); the form document is the stable
+		 * tenant handle on the queued path. See {@link FromAddressSource}.
+		 */
+		fromSources?: FromAddressSourceRegistry
 		departments?: DepartmentEmailsResolver
 		/** Narrows the recipient fields' behavior (free-typed emails, field tokens). See {@link RecipientsConfig}. */
 		recipients?: RecipientsConfig
