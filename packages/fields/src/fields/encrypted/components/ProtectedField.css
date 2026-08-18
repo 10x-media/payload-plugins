@@ -42,21 +42,17 @@
 	color: var(--theme-elevation-800);
 }
 
-/* The action cluster is the ONLY bordered element on the right: it continues
-   the input's outline with top/right/bottom borders and the right corner
-   radii, and its background overlaps the input's right border by 2px, so
-   there is no internal divider anywhere and no subpixel width can open a
-   hairline of page background. The transition set is formInput's exactly
-   (border/box-shadow at 100ms, background at 500ms), so hover and focus fade
-   in lockstep with the input. Height is a literal 40px to match the native
-   input: Payload compiles its formInput mixin to literal px, while
-   var(--base) is rem-derived and shrinks below 1024px. */
+/* The action cluster continues the input's outline with top/right/bottom
+   borders and the right corner radii. The input's OWN right border is removed
+   (rule below), so there is no vertical edge at the junction at all: nothing
+   to divide, nothing to misalign, no subpixel hairline. It stretches to the
+   input's height rather than declaring one, and its transition set is
+   formInput's exactly, so border changes fade at the input's speed. */
 .tenx-protected-field__eye-wrap--attached {
 	display: flex;
 	align-self: stretch;
 	align-items: center;
-	height: 40px;
-	margin-left: -2px;
+	margin-left: -1px;
 	border: 1px solid var(--theme-elevation-150);
 	border-left: 0;
 	border-radius: 0 var(--style-radius-s) var(--style-radius-s) 0;
@@ -66,22 +62,17 @@
 	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
 }
 
-/* Hover or focus lights the input and the action cluster together, so the
-   highlight never cuts off at the seam. Payload shifts an input border to
-   elevation-250 on hover and elevation-400 on focus, and the browser
-   propagates :hover from a <label> to its control, which is why hovering the
-   label row highlights a native input. The :has(input:hover) selector rides
-   that same propagation, so the cluster follows the input through every path
-   that lights it (label hover included), and the row rules make
-   pointer-over-action light the input back: one control, one border state. */
-.tenx-protected-field__attached-row:hover input,
-.tenx-protected-field__attached-row:hover .tenx-protected-field__eye-wrap--attached,
+/* The cluster border mirrors the INPUT's border state and nothing else.
+   Payload's formInput lights the input's own border on :hover (which the
+   browser also sets while its <label> is hovered) and on :focus; :has()
+   reads exactly those states off the input, so the cluster lights whenever
+   and only whenever the input does. Hovering an action animates just the
+   icon (rule above); it never touches the control border. */
 .tenx-protected-field__attached-row:has(input:hover) .tenx-protected-field__eye-wrap--attached {
 	border-color: var(--theme-elevation-250);
 }
 
-.tenx-protected-field__attached-row:focus-within input,
-.tenx-protected-field__attached-row:focus-within .tenx-protected-field__eye-wrap--attached {
+.tenx-protected-field__attached-row:has(input:focus) .tenx-protected-field__eye-wrap--attached {
 	border-color: var(--theme-elevation-400);
 }
 
@@ -92,6 +83,7 @@
 }
 
 .tenx-protected-field--attached .tenx-protected-field__attached-row input {
+	border-right: 0;
 	border-top-right-radius: 0;
 	border-bottom-right-radius: 0;
 }
