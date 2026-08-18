@@ -45,12 +45,15 @@ export const extractAuthorizationToken = ({
 /**
  * True when `Authorization` carries credentials Payload would honour ahead of a cookie.
  *
- * Payload's own chain reads the header before the cookie (`auth.jwtOrder` defaults to
- * `['JWT', 'Bearer', 'cookie']`), and a collection's api-key strategy sits directly behind
- * its declared strategies. The isolated strategy runs before both, so without this check
- * moving a collection onto its own cookie would quietly invert that precedence: a request
- * holding both an isolated cookie and an `Authorization` header would resolve to the
- * cookie's user where core resolves to the header's.
+ * Two unrelated credentials share that header. An **API key** (`<slug> API-Key <key>`) is
+ * matched by its own strategy, which sits directly behind a collection's declared ones and
+ * owes nothing to `jwtOrder`. A **JWT** is read by `extractJWT`, where `jwtOrder` ranks the
+ * `JWT` and `Bearer` schemes against the cookie and defaults to putting them first.
+ *
+ * The isolated strategy runs ahead of both, so without this check moving a collection onto
+ * its own cookie would quietly invert that precedence: a request holding both an isolated
+ * cookie and an `Authorization` header would resolve to the cookie's user where core
+ * resolves to the header's.
  */
 export const hasPrecedingAuthorization = ({
 	headers,

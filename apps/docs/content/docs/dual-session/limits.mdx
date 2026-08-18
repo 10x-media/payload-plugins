@@ -17,11 +17,15 @@ So on an isolated collection:
 
 ## Authorization headers win
 
-Payload's `auth.jwtOrder` defaults to `['JWT', 'Bearer', 'cookie']`: an `Authorization` header outranks a cookie. The plugin honours that, so a request carrying both an isolated cookie and an `Authorization: JWT …` or `Bearer …` header, or an API key for that collection, resolves from the header.
+Payload carries two unrelated credentials in the `Authorization` header, and an isolated cookie yields to both.
 
-So a frontend that sends an unrelated bearer token on every request suppresses the cookie session, exactly as it would without the plugin. Schemes Payload does not extract from, such as `Basic`, are ignored.
+**A JWT**, the `token` that `/api/customers/login` returns. It travels as `Authorization: JWT …`, as `Authorization: Bearer …`, or in the cookie, and `auth.jwtOrder` decides which is read first. The default is `['JWT', 'Bearer', 'cookie']`, so a header beats a cookie.
 
-Reordering `jwtOrder` to put `cookie` first makes the cookie win here too.
+**An API key**, which looks like `Authorization: customers API-Key …` and is handled by a separate strategy. `jwtOrder` does not govern it.
+
+So a request holding an isolated cookie *and* either of those resolves from the header. A frontend that sends an unrelated bearer token on every call therefore suppresses its cookie session, exactly as it would without the plugin. Schemes Payload does not extract from, such as `Basic`, are ignored.
+
+Reordering `jwtOrder` to put `cookie` first makes the cookie beat `JWT` and `Bearer`. It has no effect on API keys, which win regardless.
 
 ## Live preview needs a decision
 

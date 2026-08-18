@@ -306,6 +306,18 @@ describe('createIsolatedAuthStrategy', () => {
 
 			expect(await withHeader('JWT some-token', payload)).toMatchObject({ id: 'customer-1' })
 		})
+
+		it('still yields to an api key when the cookie is ranked above the header', async () => {
+			const payload = createFakePayload({
+				findByID: findCustomer,
+				jwtOrder: ['cookie', 'JWT'],
+				useAPIKey: true,
+			})
+
+			// `jwtOrder` governs `extractJWT` only. API keys are a separate strategy sitting
+			// directly behind this one, so reordering it cannot outrank them.
+			expect(await withHeader('customers API-Key abc123', payload)).toBeNull()
+		})
 	})
 
 	it('enforces the same CSRF gate as Payload’s own cookie extraction', async () => {
