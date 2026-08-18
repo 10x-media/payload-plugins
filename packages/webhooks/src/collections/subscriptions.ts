@@ -14,7 +14,7 @@ import { isReservedHeader } from '../delivery/headers'
 import { decryptSecret, encryptSecret, isEncryptedSecret } from '../secrets/crypto'
 import { generateSecret, InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { keys } from '../translations/keys'
-import { labelForKey } from '../translations/server'
+import { asTranslate, labelForKey } from '../translations/server'
 
 /** Normalize a customer-supplied secret, surfacing a malformed one as a 400 rather than a 500. */
 const normalizeOr400 = (value: unknown): string => {
@@ -281,10 +281,23 @@ export const buildSubscriptionsCollection = (args: {
 					name: 'key',
 					type: 'text',
 					required: true,
-					validate: (value: string | null | undefined) =>
-						typeof value === 'string' && isReservedHeader(value)
-							? `'${value}' is set by the plugin on every delivery and cannot be overridden.`
-							: true,
+					/**
+					 * A custom `validate` replaces Payload's built-in field validation rather than
+					 * running alongside it, so `required: true` alone would no longer be enforced:
+					 * the empty-value check below is what keeps it.
+					 */
+					validate: (
+						value: string | null | undefined,
+						{ req }: { req: PayloadRequest }
+					): string | true => {
+						if (typeof value !== 'string' || value.trim() === '') {
+							// Payload's own key, so this reads the same as every other required field.
+							return req.t('validation:required')
+						}
+						return isReservedHeader(value)
+							? asTranslate(req.t)(keys.headerReserved, { name: value })
+							: true
+					},
 				},
 				{ name: 'value', type: 'text' },
 			],

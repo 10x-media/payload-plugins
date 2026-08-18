@@ -21,6 +21,7 @@ export const keys = {
 	rotateSecretDone: 'webhooks:rotateSecretDone',
 	rotateSecretFailed: 'webhooks:rotateSecretFailed',
 	fieldHeaders: 'webhooks:fieldHeaders',
+	headerReserved: 'webhooks:headerReserved',
 	fieldDescription: 'webhooks:fieldDescription',
 	statusPending: 'webhooks:statusPending',
 	statusSuccess: 'webhooks:statusSuccess',

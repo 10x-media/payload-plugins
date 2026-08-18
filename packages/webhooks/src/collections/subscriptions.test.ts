@@ -15,6 +15,7 @@ import {
 } from '../constants'
 import { isEncryptedSecret } from '../secrets/crypto'
 import { generateSecret, isNormalizedSecret, secretKey } from '../secrets/format'
+import { keys } from '../translations/keys'
 import { buildSubscriptionsCollection } from './subscriptions'
 
 const find = (c: ReturnType<typeof buildSubscriptionsCollection>, name: string) =>
@@ -275,6 +276,43 @@ describe('buildSubscriptionsCollection', () => {
 		const hook = secretAfterRead(c)
 		expect(runMask(hook, undefined, {})).toBeUndefined()
 		expect(runMask(hook, null, {})).toBeNull()
+	})
+
+	describe('custom header names', () => {
+		/**
+		 * A custom `validate` replaces Payload's built-in field validation rather than running
+		 * alongside it, so without the empty check `required: true` on this field is inert.
+		 */
+		const validateKey = () => {
+			const headers = find(c, 'headers')
+			const key =
+				headers && 'fields' in headers
+					? headers.fields.find((f) => 'name' in f && f.name === 'key')
+					: undefined
+			if (!key || !('validate' in key) || !key.validate) {
+				throw new Error('header key validate missing')
+			}
+			return (value: unknown) =>
+				(key.validate as (v: unknown, o: unknown) => string | true)(value, {
+					req: { t: (k: string) => k },
+				})
+		}
+
+		it('still rejects an empty or missing name, which required alone no longer covers', () => {
+			const validate = validateKey()
+			expect(validate(undefined)).toBe('validation:required')
+			expect(validate(null)).toBe('validation:required')
+			expect(validate('')).toBe('validation:required')
+			expect(validate('   ')).toBe('validation:required')
+		})
+
+		it('rejects a reserved name through a translation key', () => {
+			expect(validateKey()('webhook-signature')).toBe(keys.headerReserved)
+		})
+
+		it('accepts an ordinary header name', () => {
+			expect(validateKey()('X-Custom')).toBe(true)
+		})
 	})
 
 	it('clears the one-time reveal flag and stashed plaintext after the create write settles', () => {

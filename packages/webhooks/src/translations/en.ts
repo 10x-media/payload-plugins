@@ -25,6 +25,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.rotateSecretDone]: 'New secret, shown once. Copy it to your receiver now',
 	[keys.rotateSecretFailed]: 'Could not rotate the secret',
 	[keys.fieldHeaders]: 'Custom headers',
+	[keys.headerReserved]:
+		"'{{name}}' is set by the plugin on every delivery and cannot be overridden.",
 	[keys.fieldDescription]: 'Description',
 	[keys.statusPending]: 'Pending',
 	[keys.statusSuccess]: 'Delivered',
