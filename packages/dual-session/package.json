@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/dual-session",
-	"version": "0.0.0",
+	"version": "0.1.0-beta.0",
 	"description": "Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist.",
 	"license": "MIT",
 	"repository": {
@@ -10,7 +10,14 @@
 	},
 	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/dual-session",
 	"bugs": "https://github.com/10x-media/payload-plugins/issues",
-	"keywords": ["payload", "payloadcms", "plugin", "auth", "session", "cookie"],
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin",
+		"auth",
+		"session",
+		"cookie"
+	],
 	"author": "10x-media",
 	"engines": {
 		"node": ">=22.18.0"
@@ -44,7 +51,12 @@
 			"default": "./dist/exports/proxy.js"
 		}
 	},
-	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsdown",
 		"lint": "biome check src tests dev",

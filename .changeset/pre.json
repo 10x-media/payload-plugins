@@ -26,7 +26,9 @@
 		"@10x-media/admin-wiki": "0.0.0",
 		"@10x-media/admin-wiki-dev": "0.0.0",
 		"@10x-media/folder-picker": "0.0.0",
-		"@10x-media/folder-picker-dev": "0.0.0"
+		"@10x-media/folder-picker-dev": "0.0.0",
+		"@10x-media/dual-session": "0.0.0",
+		"@10x-media/dual-session-dev": "0.0.0"
 	},
 	"changesets": [
 		"admin-wiki-block-chips",
@@ -65,6 +67,8 @@
 		"analytics-widget-foundation",
 		"analytics-write-buffer",
 		"color-linked-alpha",
+		"dual-session-initial-beta",
+		"dual-session-role-split",
 		"fb-captcha-adapters",
 		"fb-client-i18n-fallback",
 		"fb-condition-builder-ui",
