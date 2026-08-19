@@ -666,7 +666,7 @@ export interface PayloadJobsStatsSelect<T extends boolean = true> {
 export interface AnalyticsMetricWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'events';
+    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
     timeframe:
       | 'today'
       | 'last7days'
@@ -681,6 +681,7 @@ export interface AnalyticsMetricWidget {
       from?: string | null;
       to?: string | null;
     };
+    dataSource?: ('native' | 'memory') | null;
   };
   width: 'x-small' | 'small' | 'medium';
 }
@@ -691,7 +692,7 @@ export interface AnalyticsMetricWidget {
 export interface AnalyticsTrendWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'events';
+    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
     timeframe:
       | 'today'
       | 'last7days'
@@ -706,6 +707,7 @@ export interface AnalyticsTrendWidget {
       from?: string | null;
       to?: string | null;
     };
+    dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }
@@ -718,6 +720,7 @@ export interface AnalyticsRealtimeWidget {
     title?: string | null;
     metric: 'visitors' | 'pageviews';
     windowMinutes?: ('5' | '15' | '30' | '60') | null;
+    dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium';
 }
@@ -728,7 +731,7 @@ export interface AnalyticsRealtimeWidget {
 export interface AnalyticsBreakdownPagesWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'events';
+    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
     timeframe:
       | 'today'
       | 'last7days'
@@ -744,6 +747,7 @@ export interface AnalyticsBreakdownPagesWidget {
       to?: string | null;
     };
     limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -770,6 +774,7 @@ export interface AnalyticsBreakdownSourcesWidget {
       to?: string | null;
     };
     limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -780,7 +785,7 @@ export interface AnalyticsBreakdownSourcesWidget {
 export interface AnalyticsBreakdownDevicesWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'events';
+    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
     timeframe:
       | 'today'
       | 'last7days'
@@ -796,6 +801,7 @@ export interface AnalyticsBreakdownDevicesWidget {
       to?: string | null;
     };
     limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -806,7 +812,7 @@ export interface AnalyticsBreakdownDevicesWidget {
 export interface AnalyticsBreakdownCountriesWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'events';
+    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
     timeframe:
       | 'today'
       | 'last7days'
@@ -822,6 +828,7 @@ export interface AnalyticsBreakdownCountriesWidget {
       to?: string | null;
     };
     limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium' | 'large';
 }
