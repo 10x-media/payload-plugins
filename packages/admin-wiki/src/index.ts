@@ -202,17 +202,6 @@ export { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './plugin
 export { WIKI_GUIDES_FIELD } from './plugin/registerTriggers'
 export { getWikiRegistry } from './plugin/registry'
 export { WIKI_BLOCK_HELP_FIELD } from './plugin/walker'
-export {
-	blockTargetKey,
-	collectionTargetKey,
-	customTargetKey,
-	fieldTargetKey,
-	globalTargetKey,
-	targetFieldNameFor,
-	targetKeysForDoc,
-	type WikiTargetDoc,
-	type WikiTargetType,
-} from './shared/targetKeys'
 export type { WikiSeedAdditionalData } from './seed/additionalData'
 export { seedWiki } from './seed/seedWiki'
 export { githubAlertsTransformer } from './seed/transformers/githubAlerts'
@@ -229,3 +218,14 @@ export type {
 	WikiSeedTargets,
 	WikiSeedTransformer,
 } from './seed/types'
+export {
+	blockTargetKey,
+	collectionTargetKey,
+	customTargetKey,
+	fieldTargetKey,
+	globalTargetKey,
+	targetFieldNameFor,
+	targetKeysForDoc,
+	type WikiTargetDoc,
+	type WikiTargetType,
+} from './shared/targetKeys'

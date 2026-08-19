@@ -61,17 +61,34 @@ export const MyDescription = ({ schemaPath }: { schemaPath: string }) => {
 
 Nothing to do: `admin.description` as a function is supported, and so is a description keyed by locale. The function cannot travel in client props, so such a field gets a server Description that evaluates it with the request's `i18n` and hands the result down, exactly as Payload's own renderer would. Fields with a static description skip that hop, so the extra server component is paid for only where it is needed.
 
+## Your own admin views
+
+A screen the config does not describe, a view registered through `admin.components.views` and anything inside it, is documented with a [custom target](/admin-wiki/targets#custom-targets): declare the key once in the plugin options, then render `WikiCustomHelp` with the bare key.
+
+```tsx
+'use client'
+import { WikiCustomHelp } from '@10x-media/admin-wiki/client'
+
+<WikiCustomHelp target="dashboard" />
+<WikiCustomHelp target="dashboard.attention" showWriteAffordance={false} />
+```
+
+That is the whole integration for a view that wants the plugin's own trigger: the hover card, the guide drawer, and the write affordance, exactly as a field gets them. For a screen that wants its own button or its own placement, see [Building your own surface](#building-your-own-surface).
+
 ## Any target key
 
 `WikiTargetHelp` is the generic surface. It takes a full target key and renders nothing unless something targets it:
 
 ```tsx
 'use client'
-import { WikiTargetHelp } from '@10x-media/admin-wiki/client'
+import { customTargetKey, WikiTargetHelp } from '@10x-media/admin-wiki/client'
 
 <WikiTargetHelp targetKey="block:heroBanner" />
 <WikiTargetHelp targetKey="collection:posts" showWriteAffordance={false} />
+<WikiTargetHelp targetKey={customTargetKey('dashboard')} />
 ```
+
+The four config-derived prefixes are stable and documented, so a literal reads fine for those. A custom key is the one to always build through [`customTargetKey`](#building-your-own-surface), never to type with the namespace on it.
 
 ## The context
 
@@ -85,6 +102,7 @@ import { WikiTargetHelp } from '@10x-media/admin-wiki/client'
 | `canWrite` | `boolean` | `canCreate` **and** the write-affordance mode allows it here |
 | `editMode` / `setEditMode` | `boolean` / `(on) => void` | The per-browser edit-mode switch |
 | `blockLabels` | `Record<string, string>` | Singular label per block slug, for chips |
+| `customLabels` | `Record<string, string>` | Declared label per custom target key, in the reader's admin language |
 | `blockChips` | `boolean` | Whether the ["Covers" chips](/admin-wiki/wiki-view#the-covers-chips) include blocks |
 | `locale` | `string \| null` | The content locale guides resolve in for this reader |
 | `pagesSlug` | `string` | The configured wiki pages slug |
@@ -95,6 +113,18 @@ Entries arrive sorted featured-first, then by title.
 
 ## Building your own surface
 
+Every surface listens on a [target key](/admin-wiki/targets#target-keys), and the key builders are exported alongside the components, so a key is never spelled by hand:
+
+```ts
+collectionTargetKey('posts')                  // collection:posts
+globalTargetKey('settings')                   // global:settings
+blockTargetKey('heroBanner')                  // block:heroBanner
+fieldTargetKey('collection:posts.title')      // field:collection:posts.title
+customTargetKey('dashboard')                  // custom:dashboard
+```
+
+The four config-derived prefixes are stable and documented, so a literal reads fine for those. **A custom key is the one to always build**: the `custom:` namespace is the plugin's to spell, not yours, and a hand-written prefix that drifts attaches the surface to nothing while still looking correct. `WikiCustomHelp` is exactly that call with the builder already inside it.
+
 The pieces the built-in surfaces are made of are all exported from `@10x-media/admin-wiki/client`:
 
 | Component | Purpose |
@@ -104,7 +134,8 @@ The pieces the built-in surfaces are made of are all exported from `@10x-media/a
 | `GuideDrawer` | The reading drawer. Takes entries, an optional initial guide, and a modal slug |
 | `GuideArticle` | Guide content rendered on its own, without a drawer around it |
 | `TargetChips` | The surfaces a guide covers, as pills, with a `limit` before collapsing to `+N`. Honors `chips.blocks` |
-| `WikiWriteGuide` | The write-in-place affordance, in `inline`, `button`, or `menuItem` shape |
+| `WikiWriteGuide` | The write-in-place affordance, in `inline`, `button`, or `menuItem` shape. Takes the target key it should prefill |
+| `WikiCustomHelp` | The full help surface for a declared [custom target](/admin-wiki/targets#custom-targets), by bare key |
 | `WikiEditModeToggle` | The edit-mode pill. Renders nothing when there is nothing to toggle |
 | `WikiTargetFields` | The grouped field-target list, as the Targets tab renders it |
 | `WikiFieldPickerDrawer` | One kind's picker drawer. Takes a `kind`, the covered slugs, the current value, and an `onConfirm` |
@@ -133,6 +164,42 @@ export const MyGuides = () => {
   )
 }
 ```
+
+The same shape on a [custom target](/admin-wiki/targets#custom-targets), with your own trigger and your own empty state. Only the key changes:
+
+```tsx
+'use client'
+import { useDrawerSlug, useModal } from '@payloadcms/ui'
+import {
+  customTargetKey,
+  GuideDrawer,
+  useWikiTargets,
+  WikiWriteGuide,
+} from '@10x-media/admin-wiki/client'
+
+export const DashboardGuides = () => {
+  const { entriesFor } = useWikiTargets()
+  const { openModal } = useModal()
+  const slug = useDrawerSlug('dashboard-guides')
+  const targetKey = customTargetKey('dashboard')
+  const entries = entriesFor(targetKey)
+
+  if (entries.length === 0) {
+    return <WikiWriteGuide targetKey={targetKey} variant="button" />
+  }
+
+  return (
+    <>
+      <button onClick={() => openModal(slug)} type="button">
+        Guides ({entries.length})
+      </button>
+      <GuideDrawer entries={entries} slug={slug} />
+    </>
+  )
+}
+```
+
+`entriesFor` is a synchronous lookup into the targets map the provider already holds, so a surface built this way costs no request of its own. `WikiWriteGuide` takes the same key and prefills the target list it belongs to, so a custom key opens the create drawer with the **Custom targets** list already filled.
 
 ## Reserved field names
 

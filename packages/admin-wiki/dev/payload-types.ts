@@ -271,6 +271,7 @@ export interface WikiPage {
   targetGlobals?: string[] | null;
   targetFields?: string[] | null;
   targetBlocks?: string[] | null;
+  targetCustom?: string[] | null;
   tags?: string[] | null;
   slug?: string | null;
   featured?: boolean | null;
@@ -481,6 +482,7 @@ export interface WikiPagesSelect<T extends boolean = true> {
   targetGlobals?: T;
   targetFields?: T;
   targetBlocks?: T;
+  targetCustom?: T;
   tags?: T;
   slug?: T;
   featured?: T;

@@ -123,9 +123,7 @@ describe('adminWiki factory', () => {
 		const targetNames = (config: Config): string[] => {
 			const pages = config.collections?.find((collection) => collection.slug === 'wiki-pages')
 			const tabs = pages?.fields[0] as { tabs: { fields: Field[] }[] }
-			return (tabs.tabs[1]?.fields ?? []).flatMap((field) =>
-				'name' in field ? [field.name] : []
-			)
+			return (tabs.tabs[1]?.fields ?? []).flatMap((field) => ('name' in field ? [field.name] : []))
 		}
 		expect(targetNames(adminWiki({})(fakeConfig()) as Config)).not.toContain('targetCustom')
 
