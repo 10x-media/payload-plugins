@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/fields
 
 Reusable fields for Payload v3 that look and behave native: a full color picker in a constant-height row, a searchable icon picker over pluggable icon libraries, and encrypted fields with key rotation and opt-in exact-match querying. Built from `@payloadcms/ui` primitives on Payload design tokens, indistinguishable from Payload's own fields.
