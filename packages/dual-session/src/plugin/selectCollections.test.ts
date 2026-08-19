@@ -1,9 +1,13 @@
-import type { CollectionConfig, CollectionSlug, Config } from 'payload'
+import type { CollectionConfig, CollectionSlug, Config, TypedUser } from 'payload'
 import { describe, expect, it } from 'vitest'
 
+import type { DualSessionPluginOptions } from '../types'
 import { resolveAdminUserSlug, selectCollections } from './selectCollections'
 
 const slug = (value: string) => value as CollectionSlug
+
+/** Stands in for `checkRole(['admin'], user)` in a role-split project. */
+const isStaff = (user: TypedUser) => !(user as { roles?: string[] }).roles?.includes('admin')
 
 const incoming: CollectionConfig[] = [
 	{ slug: 'users', auth: true, fields: [] },
@@ -12,7 +16,7 @@ const incoming: CollectionConfig[] = [
 	{ slug: 'kiosks', auth: true, endpoints: false, fields: [] },
 ]
 
-const select = (collections: CollectionSlug[], adminUserSlug = 'users') =>
+const select = (collections: DualSessionPluginOptions['collections'], adminUserSlug = 'users') =>
 	selectCollections({
 		adminUserSlug,
 		collections,
@@ -84,13 +88,36 @@ describe('selectCollections', () => {
 		expect(warnings[0]).toMatch(/no REST auth routes to shadow/)
 	})
 
-	it('refuses to isolate the collection backing the admin panel', () => {
-		expect(() => select([slug('users')])).toThrow(/backs the admin panel/)
+	it('refuses to isolate the collection backing the admin panel wholesale', () => {
+		expect(() => select([slug('users')])).toThrow(/isolate` predicate/)
 	})
 
 	it('resolves the admin collection it protects from the caller, not from the slug', () => {
 		// `admin.user` may name any collection, so the guard has to follow it rather than
 		// assume the conventional name.
 		expect(() => select([slug('customers')], 'customers')).toThrow(/backs the admin panel/)
+	})
+
+	it('accepts the admin collection once an `isolate` predicate says who moves', () => {
+		// Role-split: admins keep the shared cookie, everyone else gets a second one, so the
+		// admin panel is never left without a session to read.
+		const { collections, warnings } = select([{ slug: slug('users'), isolate: isStaff }])
+
+		expect(collections.map(({ slug: entry }) => entry)).toEqual(['users'])
+		expect(warnings).toEqual([])
+	})
+
+	it('refuses to let the admin collection own an admin-scoped isolated cookie', () => {
+		// The isolated strategy runs ahead of core's `local-jwt`, so this would let a staff
+		// cookie answer admin-panel requests in place of the admin's own session.
+		expect(() =>
+			select([{ slug: slug('users'), isolate: isStaff, scopes: ['admin', 'frontend'] }])
+		).toThrow(/must not carry the "admin" scope/)
+	})
+
+	it('leaves the admin scope available to collections that do not back the panel', () => {
+		const { collections } = select([{ slug: slug('customers'), scopes: ['admin', 'frontend'] }])
+
+		expect(collections[0]?.scopes).toEqual(['admin', 'frontend'])
 	})
 })

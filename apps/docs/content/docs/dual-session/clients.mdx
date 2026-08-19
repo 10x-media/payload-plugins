@@ -48,7 +48,7 @@ await fetch('/api/orders', {
 
 An `Authorization` header outranks every cookie, so these requests never touch scopes, cookie CSRF checks or the proxy. Store the token the way the platform expects and treat it as the session.
 
-This is also why an app-only Payload does not need the plugin: with no cookie in play there is nothing to isolate.
+This is also why an app-only Payload does not need the plugin: with no cookie in play there is nothing to isolate. A [role-split](/dual-session/role-split) collection changes nothing here either — both halves log in through the same route and get the same kind of token.
 
 ## Server-side rendering
 
@@ -65,7 +65,7 @@ const me = await fetch(`${PAYLOAD_URL}/api/customers/me`, {
 })
 ```
 
-The cookie name is `` `${cookiePrefix}-${slug}-token` `` unless you set `cookieName`. Inside Payload, `resolveIsolatedCookieName` returns it.
+The cookie name is `` `${cookiePrefix}-${slug}-token` `` unless you set `cookieName`. Inside Payload, `resolveIsolatedCookieName` returns it — though on a [role-split](/dual-session/role-split) collection that call needs the user, because the name depends on which half they are in.
 
 Forwarding the `Cookie` header instead also works, and then the request is subject to the scope rule and to Payload's cookie CSRF gate:
 
@@ -74,6 +74,23 @@ Forwarding the `Cookie` header instead also works, and then the request is subje
 - do not cache the response
 
 Leaving both off is not fatal: with no scope and no admin session, `adminSessionPriority` lets the frontend cookie through. It fails for visitors who also hold an admin session, which usually means it works everywhere except on your own machine.
+
+### With a role-split collection, read both cookies
+
+Reading one cookie name is enough when the collection is isolated whole. On a [role-split](/dual-session/role-split) collection it is not: staff sessions live in the shared cookie, so an SSR server that only looks at `payload-users-token` renders every editor as a signed-out visitor on the website.
+
+Try the isolated cookie first, then fall back to the shared one:
+
+```ts
+const cookies = parseCookie(request.headers.get('Cookie'))
+const token = cookies['payload-users-token'] ?? cookies['payload-token']
+
+const me = await fetch(`${PAYLOAD_URL}/api/users/me`, {
+  headers: token ? { Authorization: `JWT ${token}` } : {},
+})
+```
+
+That order matters and is the same ranking the plugin applies in the browser: a visitor holding both is the website visitor on the website. Forwarding the `Cookie` header wholesale needs no such handling, because the scope rule already decides between the two.
 
 ## Browsers that send no Referer
 
@@ -92,4 +109,4 @@ Any client can send that header. What it buys them is their own frontend session
 
 ## Next
 
-[Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what none of this covers.
+[One collection, two sessions](/dual-session/role-split) if your auth collections are really one collection with roles, [Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what none of this covers.

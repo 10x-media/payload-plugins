@@ -39,7 +39,9 @@ declare module 'payload' {
  *    own built-ins), and
  * 2. registering an auth strategy on the collection that authenticates from that cookie.
  *
- * The admin collection (`admin.user`) keeps the shared cookie and is left untouched.
+ * The admin collection (`admin.user`) keeps the shared cookie. It may only be listed with
+ * an `isolate` predicate, which moves the users it selects onto a second cookie and leaves
+ * everyone else — the admins — exactly where core put them.
  *
  * For `req.user` to be fully deterministic, pair this with the auth-scope proxy —
  * see `@10x-media/dual-session/proxy`.
@@ -91,13 +93,7 @@ export const dualSession = definePlugin<DualSessionPluginOptions>({
 				endpoints:
 					collection.endpoints === false
 						? false
-						: [
-								...buildIsolatedAuthEndpoints({
-									cookieName: match.cookieName,
-									slug: match.slug,
-								}),
-								...(collection.endpoints ?? []),
-							],
+						: [...buildIsolatedAuthEndpoints({ entry: match }), ...(collection.endpoints ?? [])],
 			}
 		})
 

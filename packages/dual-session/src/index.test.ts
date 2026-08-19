@@ -110,6 +110,19 @@ describe('dualSession factory', () => {
 		)
 	})
 
+	it('shadows the admin collection too once an `isolate` predicate splits it', () => {
+		const config = dualSession({
+			collections: [{ slug: slug('users'), isolate: () => true }],
+		})(buildConfig()) as Config
+		const users = getCollection(config, 'users')
+		const auth = users.auth as { strategies: { name: string }[] }
+
+		// Role-split: the endpoints and the strategy are the same ones any isolated
+		// collection gets. What changes is that each of them asks the predicate first.
+		expect(getEndpoints(users)).toHaveLength(6)
+		expect(auth.strategies.map(({ name }) => name)).toEqual(['users-dual-session'])
+	})
+
 	it('boots on past a collection it cannot isolate, leaving the config intact', () => {
 		// A collection contributed by a later plugin is genuinely absent at this point, so
 		// refusing to boot would punish a load-order problem the user can still fix.

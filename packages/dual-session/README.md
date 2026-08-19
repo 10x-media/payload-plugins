@@ -6,6 +6,9 @@ Give each Payload auth collection its own session cookie, so an admin session an
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
+> [!WARNING]
+> **Experimental.** This plugin changes how sessions are established, which is not a place where a subtle bug announces itself. It is covered by unit, integration and end-to-end tests against Payload's real routing on both Mongo and Postgres, but auth surfaces differ a lot between projects and yours may take a path none of those cover. Try it in staging first, and [report anything that looks off](https://github.com/10x-media/payload-plugins/issues).
+
 ## Features
 
 - **One cookie per collection**: `payload-customers-token` alongside `payload-token`, so both sessions are live at once.
@@ -14,7 +17,12 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Request attribution via an optional Next proxy**, so the admin panel and the website get different answers from the same REST URL.
 - **Ranked frontend sessions**: list order decides which one wins when a visitor holds several.
 - **Works with your own SSO**: declared strategies keep first refusal, and `generateIsolatedAuthCookie` is the one-line swap for `generatePayloadCookie` in a custom OAuth callback.
-- **The admin panel is left alone**: the collection behind `admin.user` keeps the shared cookie and is refused as an isolation target.
+- **One collection with roles, too**: an `isolate` predicate splits a single `users` collection so editors keep the shared cookie and website visitors get their own.
+- **The admin panel is left alone**: the collection behind `admin.user` keeps the shared cookie, byte for byte as core writes it.
+
+## Before you install
+
+If another auth plugin is already in the config — OAuth, magic links, passkeys, SSO, 2FA — check it first. This plugin owns a collection's auth endpoints and decides where its cookie is written, so anything that writes the session cookie itself or declares its own `/login` on the same collection conflicts, silently. Plugins that only read `req.user` or add a strategy compose fine. [Other plugins that touch auth](https://docs.10xmedia.de/dual-session/limits#other-plugins-that-touch-auth) has the two-minute check and the ways out.
 
 ## Quick start
 
@@ -47,12 +55,21 @@ export const config = {
 
 The matcher must cover `/api`; the widely copied default excludes it, which leaves every REST call unattributed.
 
+If editors and website visitors are one collection told apart by a `roles` field, split it by user instead of by collection:
+
+```ts
+dualSession({
+  collections: [{ slug: 'users', isolate: (user) => !checkRole(['admin', 'editor'], user) }],
+})
+```
+
 ## Documentation
 
 Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/dual-session):
 
 - [Overview](https://docs.10xmedia.de/dual-session)
 - [Quick start](https://docs.10xmedia.de/dual-session/quick-start)
+- [One collection, two sessions](https://docs.10xmedia.de/dual-session/role-split)
 - [Scopes](https://docs.10xmedia.de/dual-session/scopes)
 - [Frontends and clients](https://docs.10xmedia.de/dual-session/clients)
 - [Custom auth](https://docs.10xmedia.de/dual-session/custom-auth)

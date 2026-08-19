@@ -1,0 +1,122 @@
+---
+title: One collection, two sessions
+description: Split a single auth collection by role, so an editor and a website visitor from the same collection can be logged in together.
+---
+
+Plenty of projects have one `users` collection with a `roles` field and gate the admin panel with `access.admin`. Editors and website visitors are the same collection, told apart by role. That still needs two sessions in one browser — a visitor signing in on the website must not sign the editor out of `/admin` — but the boundary the plugin has to draw is not between two collections.
+
+So the cookie is a function of the **user**, not of the collection:
+
+```ts title="payload.config.ts"
+import { dualSession } from '@10x-media/dual-session'
+import { checkRole } from './access/checkRole'
+
+dualSession({
+  collections: [
+    {
+      slug: 'users',
+      isolate: (user) => !checkRole(['admin', 'editor'], user),
+    },
+  ],
+})
+```
+
+Users the predicate returns `false` for keep the shared `payload-token` cookie. Users it returns `true` for are moved to `payload-users-token`.
+
+This is the only way to list the collection named by `admin.user`. Without a predicate the plugin refuses the config, because moving that collection wholesale takes the admin panel down.
+
+## The admin half is untouched
+
+The shared cookie the plugin writes for a staff login is the same string `generatePayloadCookie` would have written: same name, same attributes, same expiry rule. The admin panel reads it through core's own `local-jwt` strategy, exactly as it does in a project without this plugin.
+
+Nothing is layered over the admin session. The plugin only adds a second slot next to it.
+
+## The predicate
+
+It is asked one question, about one user, at the moment a session is being written:
+
+```ts
+isolate?: (user: TypedUser) => boolean
+```
+
+Roles live in the user document, so read them from there. The predicate is never given a request, and it is deliberately synchronous — a classification that needs a database read is a sign the role is in the wrong place.
+
+**Write it as the inverse of your admin gate**, from the same helper, so the two answers cannot drift apart:
+
+```ts title="collections/Users.ts"
+export const Users: CollectionConfig = {
+  slug: 'users',
+  access: { admin: ({ req: { user } }) => checkRole(['admin', 'editor'], user) },
+  auth: true,
+  fields: [{ name: 'roles', type: 'select', hasMany: true, options: ['admin', 'editor', 'member'] }],
+}
+```
+
+```ts
+isolate: (user) => !checkRole(['admin', 'editor'], user)
+```
+
+A predicate that disagrees with `access.admin` fails quietly: the user lands in a cookie the admin panel does not read, and nothing errors. In development the plugin catches the common half of that for you — when a login is routed to the isolated cookie and the user would have passed `access.admin`, it logs a warning naming the user and the cookie. It only runs on login, and only when the collection defines `access.admin`.
+
+## Access control does the rest
+
+With the boundary inside a collection, `req.user.collection` is the same value for both halves. Checks written as `req.user?.collection === 'users'` stop meaning anything, so they have to ask about the role instead:
+
+```ts
+// Before: the collection was the boundary.
+const adminOnly: Access = ({ req }) => req.user?.collection === 'users'
+
+// After: the role is.
+const adminOnly: Access = ({ req }) => checkRole(['admin', 'editor'], req.user)
+```
+
+This is a real difference from the two-collection setup, where a customer physically cannot read an admin-only field. Here that separation rests entirely on your `access` functions and on `saveToJWT`.
+
+## What each endpoint does
+
+Every shadowed endpoint asks the predicate about the user in front of it, so the two halves stay in their own cookies:
+
+| Endpoint | Asks about | Effect |
+| --- | --- | --- |
+| `POST /login` | the user who just logged in | writes their cookie |
+| `POST /reset-password` | the user who just reset | writes their cookie |
+| `POST /refresh-token` | `req.user` | rotates the cookie the session came from |
+| `POST /logout` | `req.user` | expires only that cookie |
+| `GET /me` | `req.user` | reports that cookie's token |
+| `POST /first-register` | — | always the shared cookie |
+
+`first-register` is the exception: it creates the first user of the system, who exists to get *into* the admin panel and has no roles yet for a predicate to read.
+
+`logout?allSessions=true` ends only the sessions on that user's own document. Core scopes the wipe by user id, so sharing a collection with an admin does not put their sessions in range.
+
+## Custom auth needs the user
+
+Code that mints its own token — an OAuth callback, a server action — has to say who it is minting for, because the cookie name now depends on it:
+
+```ts
+generateIsolatedAuthCookie({ collection: 'users', payload, token, user })
+```
+
+Without `user` the call throws rather than pick a half. Same for `resolveIsolatedCookieName({ collection, payload, user })`. For a collection listed without a predicate, `user` stays optional — there is only one answer. See [Custom auth](/dual-session/custom-auth).
+
+## Scopes
+
+The isolated half keeps the default `scopes: ['frontend']`, and for this collection that is enforced: listing `'admin'` throws. The isolated strategy runs ahead of core's `local-jwt`, so an isolated cookie allowed to answer admin-scoped requests would outrank the admin's own session on the very collection the panel authenticates against.
+
+The staff half is not scoped at all. It is on the shared cookie, which core reads on every request — so an editor browsing the website is still the editor there, exactly as before the plugin.
+
+## A changed role needs a fresh login
+
+Promote a member to editor and their live session is still in the isolated cookie. Going to `/admin` they find the admin scope, where that cookie stands down and the shared one is empty, so they get the login form. Signing in again puts them in the right half.
+
+The plugin deliberately does not re-check the predicate when *reading* a session. Roles come from the document, not from the token, so re-checking buys nothing for security and would log out everyone whose role just changed. Sessions live out their term where they were written.
+
+## What this does not solve
+
+**De-escalation.** One document at two privilege levels — signing in as "yourself the editor" and "yourself the customer" in one browser — is not possible, and not because of this plugin. Payload resolves one user document to one `req.user`, and the roles are in the document. What each session may do is your access control's answer, not the cookie's.
+
+**Separate login pages.** Unrelated to any of this: one form over two collections is a project-level concern, a server action trying one and then the other.
+
+## Next
+
+[Configuration](/dual-session/configuration) for every option, [Limits](/dual-session/limits) for the edges.

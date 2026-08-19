@@ -3,10 +3,14 @@ title: Quick start
 description: Isolate a collection, install the proxy, and hold two sessions at once.
 ---
 
+<Callout type="warn">
+If another auth plugin is already installed — OAuth, magic links, passkeys, SSO, 2FA — read [Other plugins that touch auth](/dual-session/limits#other-plugins-that-touch-auth) before this page. A plugin that writes the session cookie or declares its own `/login` conflicts with this one on the same collection, silently.
+</Callout>
+
 ## Install
 
 ```bash
-pnpm add @10x-media/dual-session@beta
+pnpm add @10x-media/dual-session
 ```
 
 ## Isolate the collections
@@ -35,7 +39,7 @@ dualSession({
 })
 ```
 
-Do not list the collection named by `admin.user`. If you never set `admin.user`, Payload defaults it to the first collection declaring `auth`, and so does this plugin.
+Do not list the collection named by `admin.user` — unless you give it an `isolate` predicate, which is how a single `users` collection with roles backs both sessions. See [One collection, two sessions](/dual-session/role-split). If you never set `admin.user`, Payload defaults it to the first collection declaring `auth`, and so does this plugin.
 
 ## Install the proxy
 
@@ -89,4 +93,4 @@ dualSession({ collections: ['customers'], disabled: process.env.NODE_ENV === 'te
 
 ## Next
 
-[Scopes](/dual-session/scopes) for how a request is attributed, [Configuration](/dual-session/configuration) for the full options, [Limits](/dual-session/limits) for what is not covered.
+[One collection, two sessions](/dual-session/role-split) if your auth collections are really one collection with roles, [Scopes](/dual-session/scopes) for how a request is attributed, [Configuration](/dual-session/configuration) for the full options, [Limits](/dual-session/limits) for what is not covered.

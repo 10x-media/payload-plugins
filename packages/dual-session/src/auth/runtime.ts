@@ -1,9 +1,9 @@
-import type { CollectionSlug, Payload } from 'payload'
+import type { CollectionSlug, Payload, TypedUser } from 'payload'
 
 import { PLUGIN_SLUG } from '../plugin/constants'
 import { resolveCollections } from '../plugin/resolveCollections'
 import type { DualSessionPluginOptions, ResolvedIsolatedCollection } from '../types'
-import { generateIsolatedCookie } from './cookies'
+import { generateIsolatedCookie, getSharedCookieName, resolveSlotCookieName } from './cookies'
 
 const findOptions = (payload: Payload): DualSessionPluginOptions | undefined =>
 	payload.config.plugins?.find((plugin) => plugin.slug === PLUGIN_SLUG)?.options as
@@ -26,19 +26,64 @@ const findEntry = (
 }
 
 /**
+ * Asks an entry which cookie a session belongs in, refusing to guess when it cannot know.
+ *
+ * An entry carrying an `isolate` predicate splits its collection's users across two
+ * cookies, so answering without the user would be a coin flip that silently signs someone
+ * into the wrong session. Better to say so.
+ */
+const slotFor = ({
+	collection,
+	entry,
+	payload,
+	user,
+}: {
+	collection: CollectionSlug
+	entry: ResolvedIsolatedCollection
+	payload: Payload
+	user: null | TypedUser | undefined
+}): string => {
+	if (!entry.isolate) {
+		return entry.cookieName
+	}
+
+	if (!user) {
+		throw new Error(
+			`@10x-media/dual-session: "${collection}" splits its users across two cookies with an \`isolate\` predicate, so the user has to be passed for the right one to be picked.`
+		)
+	}
+
+	return resolveSlotCookieName({
+		entry,
+		sharedName: getSharedCookieName(payload.config.cookiePrefix),
+		user,
+	}) as string
+}
+
+/**
  * The cookie name this collection's sessions live in, or `undefined` when the collection
  * is not isolated (and therefore still uses the shared `${cookiePrefix}-token`).
  *
  * Resolved from the plugin's registered options rather than recomputed, so a `cookieName`
  * override is honoured and callers never hardcode the name.
+ *
+ * @throws when the collection has an `isolate` predicate and no `user` is passed, because
+ * then the name is a function of the user rather than of the collection.
  */
 export const resolveIsolatedCookieName = ({
 	collection,
 	payload,
+	user,
 }: {
 	collection: CollectionSlug
 	payload: Payload
-}): string | undefined => findEntry(payload, collection)?.cookieName
+	/** Required when the collection is configured with an `isolate` predicate. */
+	user?: null | TypedUser
+}): string | undefined => {
+	const entry = findEntry(payload, collection)
+
+	return entry ? slotFor({ collection, entry, payload, user }) : undefined
+}
 
 /**
  * Builds the `Set-Cookie` header value that logs a user into an isolated collection.
@@ -57,6 +102,9 @@ export const resolveIsolatedCookieName = ({
  * )
  * ```
  *
+ * Pass `user` whenever the collection is configured with an `isolate` predicate: there the
+ * cookie is a function of the user, and the call throws rather than pick one blindly.
+ *
  * @throws when the collection is not one this plugin isolates — silently writing the
  * shared cookie instead would reintroduce exactly the bug the plugin exists to fix.
  */
@@ -64,10 +112,13 @@ export const generateIsolatedAuthCookie = ({
 	collection,
 	payload,
 	token,
+	user,
 }: {
 	collection: CollectionSlug
 	payload: Payload
 	token: string
+	/** Required when the collection is configured with an `isolate` predicate. */
+	user?: null | TypedUser
 }): string => {
 	const entry = findEntry(payload, collection)
 
@@ -85,7 +136,7 @@ export const generateIsolatedAuthCookie = ({
 
 	return generateIsolatedCookie({
 		authConfig: registered.config.auth,
-		name: entry.cookieName,
+		name: slotFor({ collection, entry, payload, user }),
 		token,
 	})
 }

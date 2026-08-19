@@ -1,7 +1,13 @@
 import { AUTH_SCOPE_HEADER } from '@10x-media/dual-session'
 import { headers as nextHeaders } from 'next/headers'
 import { getPayload } from 'payload'
-import { DEMO_NOTE_TITLE, DEV_ADMIN, DEV_CUSTOMER, DEV_PARTNER } from '../../helpers/seed'
+import {
+	DEMO_NOTE_TITLE,
+	DEV_ADMIN,
+	DEV_CUSTOMER,
+	DEV_MEMBER,
+	DEV_PARTNER,
+} from '../../helpers/seed'
 import config from '../../payload.config'
 import { type ApiAction, ApiConsole } from './_components/ApiConsole'
 import { SessionPanel } from './_components/SessionPanel'
@@ -10,6 +16,7 @@ export const dynamic = 'force-dynamic'
 
 const ADMIN_COOKIE = 'payload-token'
 const CUSTOMER_COOKIE = 'payload-customers-token'
+const MEMBER_COOKIE = 'payload-users-token'
 const PARTNER_COOKIE = 'partner-session'
 
 type ResolvedUser = { collection?: string; email?: string; id?: number | string } | null
@@ -178,7 +185,8 @@ export default async function WhoAmIPage() {
 						</td>
 						<td style={cell}>
 							<code>{PARTNER_COOKIE}</code> {holds(PARTNER_COOKIE) ? '✅' : '—'} ·{' '}
-							<code>{CUSTOMER_COOKIE}</code> {holds(CUSTOMER_COOKIE) ? '✅' : '—'}
+							<code>{CUSTOMER_COOKIE}</code> {holds(CUSTOMER_COOKIE) ? '✅' : '—'} ·{' '}
+							<code>{MEMBER_COOKIE}</code> {holds(MEMBER_COOKIE) ? '✅' : '—'}
 						</td>
 					</tr>
 				</tbody>
@@ -204,7 +212,29 @@ export default async function WhoAmIPage() {
 					defaults={DEV_ADMIN}
 					title="Admin (shared cookie)"
 				/>
+				<SessionPanel
+					collection="users"
+					cookieName={MEMBER_COOKIE}
+					defaults={DEV_MEMBER}
+					title="Member (same collection, isolated)"
+				/>
 			</div>
+
+			<h2>One collection, two sessions</h2>
+			<p>
+				The two panels above post to the same <code>/api/users/login</code>. Which cookie comes back
+				is decided by the <code>isolate</code> predicate reading the document's <code>roles</code>,
+				not by which collection was asked: staff land on <code>{ADMIN_COOKIE}</code>, byte for byte
+				what Payload would have written without this plugin, and everyone else on{' '}
+				<code>{MEMBER_COOKIE}</code>. So the admin and the member can be signed in together in this
+				browser, out of one collection.
+			</p>
+			<p>
+				What the plugin does <em>not</em> do is decide who may do what. With the boundary inside a
+				collection, <code>req.user.collection</code> is <code>users</code> for both, so the access
+				functions on <code>notes</code> ask about the role instead — see <code>adminOnly</code> in{' '}
+				<code>dev/collections.ts</code>.
+			</p>
 
 			<h2>Custom SSO</h2>
 			<p>
@@ -251,6 +281,8 @@ export default async function WhoAmIPage() {
 						['partner + customer', 'partner (listed first)', '403'],
 						['admin', 'admin, via the untouched shared cookie', '200'],
 						['admin + customer', 'customer, which outranks nothing but runs first', '403'],
+						['member', 'member, same collection as the admin, no staff role', '403'],
+						['admin + member', 'member: the isolated cookie wins a frontend request', '403'],
 					].map(([cookies, resolves, verdict]) => (
 						<tr key={cookies}>
 							<td style={cell}>{cookies}</td>
@@ -289,6 +321,10 @@ export default async function WhoAmIPage() {
 				<li>
 					Log in as both the partner and the customer: the frontend scope resolves to the partner,
 					because it is listed first in the plugin's <code>collections</code>.
+				</li>
+				<li>
+					Log in as the admin, then as the member: both are <code>users</code>, both sessions are
+					live, the admin panel still belongs to the admin, and the website resolves to the member.
 				</li>
 				<li>
 					Log in as the admin only, then run <code>PATCH /api/notes/:id</code>: it succeeds, because

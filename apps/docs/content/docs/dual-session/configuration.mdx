@@ -30,9 +30,16 @@ collections: [
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `slug` | — | The collection to isolate. Must have `auth`, and must not be `admin.user`. |
+| `slug` | — | The collection to isolate. Must have `auth`. May only be `admin.user` together with `isolate`. |
 | `cookieName` | `` `${cookiePrefix}-${slug}-token` `` | Where this collection's token lives. |
+| `isolate` | every session is isolated | `(user) => boolean`. Which of this collection's users get the isolated cookie; the rest keep the shared one. See [One collection, two sessions](/dual-session/role-split). |
 | `scopes` | `['frontend']` | Which [scopes](/dual-session/scopes) this cookie may authenticate. Only enforced when the proxy is installed. |
+
+`isolate` turns one collection into two sessions, which is what a project with a single `users` collection and a `roles` field needs:
+
+```ts
+collections: [{ slug: 'users', isolate: (user) => !checkRole(['admin', 'editor'], user) }]
+```
 
 ### `adminSessionPriority`
 
@@ -57,8 +64,8 @@ Per-locale overrides keyed by the typed keys from `@10x-media/dual-session/i18n`
 | Export | Use |
 | --- | --- |
 | `dualSession` | The plugin factory. |
-| `generateIsolatedAuthCookie({ collection, payload, token })` | The `Set-Cookie` value for an isolated login. Replaces `generatePayloadCookie` in your own callbacks. Throws for a collection that is not isolated. |
-| `resolveIsolatedCookieName({ collection, payload })` | That collection's cookie name, or `undefined` if it is not isolated. |
+| `generateIsolatedAuthCookie({ collection, payload, token, user })` | The `Set-Cookie` value for an isolated login. Replaces `generatePayloadCookie` in your own callbacks. Throws for a collection that is not isolated. `user` is required when the collection has an `isolate` predicate. |
+| `resolveIsolatedCookieName({ collection, payload, user })` | That collection's cookie name, or `undefined` if it is not isolated. Same rule for `user`. |
 | `getIsolatedCookieName({ cookiePrefix, slug })` | The default name, computed without a running Payload. |
 | `generateIsolatedCookie({ authConfig, name, token })` | The low-level builder, when you need a name the plugin does not know about. |
 | `resolveAuthScope` | The scope rule as a pure function. Returns `undefined` for a request it cannot attribute. |
@@ -88,9 +95,17 @@ Config problems are reported through `payload.logger` when Payload boots. They d
 
 ## Errors
 
-Listing the collection named by `admin.user` throws. It owns the shared cookie, and isolating it takes the admin panel down.
+**Listing `admin.user` without `isolate` throws.** It owns the shared cookie, and moving all of it takes the admin panel down. With a predicate it is allowed, and only the users the predicate claims are moved — see [One collection, two sessions](/dual-session/role-split).
+
+**Giving that entry the `admin` scope throws.** The isolated strategy runs ahead of core's `local-jwt`, so an isolated cookie allowed to answer admin-scoped requests would outrank the admin's own session on the very collection the panel authenticates against. Use `scopes: ['frontend']`.
+
+**Calling `generateIsolatedAuthCookie` or `resolveIsolatedCookieName` without a `user`** on a collection that has an `isolate` predicate throws, rather than guess which of the two cookies to write.
 
 If `admin.user` is not set, the plugin resolves it the way `sanitizeConfig` does: the first collection declaring `auth`, or `users` if none does.
+
+## Warnings in development
+
+When a login is written to the isolated cookie and the user would have passed that collection's `access.admin`, the plugin logs a warning naming the user and the cookie: the `isolate` predicate and the admin gate disagree, and the user will not be able to sign in to the admin panel. Development only, on login only, and only for collections that define `access.admin`.
 
 ## Next
 

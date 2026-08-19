@@ -3,6 +3,7 @@ import type { AuthStrategyResult, CollectionSlug, Payload } from 'payload'
 import { parseCookies } from 'payload/shared'
 import type { AuthScope, AuthStrategy } from '../types'
 import { hasPrecedingAuthorization } from './authorization'
+import { getSharedCookieName } from './cookies'
 import { isCookieAuthAllowed } from './csrf'
 
 const NO_USER: AuthStrategyResult = { user: null }
@@ -136,7 +137,7 @@ export const createIsolatedAuthStrategy = ({
 				adminSessionPriority &&
 				(await hasValidSessionCookie({
 					collectionSlug: payload.config.admin.user,
-					cookieName: `${payload.config.cookiePrefix}-token`,
+					cookieName: getSharedCookieName(payload.config.cookiePrefix),
 					headers,
 					payload,
 				}))

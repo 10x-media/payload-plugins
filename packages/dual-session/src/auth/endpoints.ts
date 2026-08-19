@@ -2,7 +2,6 @@ import {
 	type AuthCollectionSlug,
 	addDataAndFileToRequest,
 	addLocalesToRequestFromData,
-	type CollectionSlug,
 	type Endpoint,
 	headersWithCors,
 	loginOperation,
@@ -15,16 +14,19 @@ import {
 	sanitizeJoinParams,
 	sanitizePopulateParam,
 	sanitizeSelectParam,
+	type TypedUser,
 } from 'payload'
 import { isNumber, parseCookies } from 'payload/shared'
 
+import type { ResolvedIsolatedCollection } from '../types'
 import { extractAuthorizationToken } from './authorization'
-import { generateExpiredIsolatedCookie, generateIsolatedCookie } from './cookies'
-
-type EndpointFactoryArgs = {
-	cookieName: string
-	slug: CollectionSlug
-}
+import {
+	generateExpiredIsolatedCookie,
+	generateIsolatedCookie,
+	getSharedCookieName,
+	resolveSlotCookieName,
+} from './cookies'
+import { warnIfAdminMisclassified } from './misclassification'
 
 const getDepth = (req: PayloadRequest) => {
 	const depth = req.query.depth ?? req.searchParams.get('depth')
@@ -45,6 +47,13 @@ const getString = (req: PayloadRequest, key: string) =>
 	typeof req.data?.[key] === 'string' ? (req.data[key] as string) : ''
 
 /**
+ * The core auth operations type the user they return loosely (`Record<string, unknown>` on
+ * some paths, the collection's own doc on others), while `TypedUser` is the union across
+ * every auth collection. It is the same object either way.
+ */
+const asUser = (user: unknown) => user as TypedUser | undefined
+
+/**
  * Replacements for the built-in auth endpoints that read from and write to a
  * collection-scoped cookie. Each one delegates to the same core operation the built-in
  * handler uses, so behaviour (hooks, lockout, sessions, verification) is unchanged —
@@ -53,11 +62,20 @@ const getString = (req: PayloadRequest, key: string) =>
  * Payload appends its built-in endpoints *after* the ones declared on the collection,
  * and `handleEndpoints` matches the first entry that fits. Declaring these on the
  * collection therefore shadows the built-ins.
+ *
+ * Which cookie a handler touches is a question about the user, not about the collection,
+ * so every handler that writes one asks {@link resolveSlotCookieName} first. With no
+ * `isolate` predicate the answer is always the isolated cookie and these behave exactly as
+ * before; with one, the users it rejects are written to the shared cookie in the same bytes
+ * core would have written.
  */
 export const buildIsolatedAuthEndpoints = ({
-	cookieName,
-	slug,
-}: EndpointFactoryArgs): Endpoint[] => {
+	entry,
+}: {
+	entry: ResolvedIsolatedCollection
+}): Endpoint[] => {
+	const { slug } = entry
+
 	const getCollection = (req: PayloadRequest) => {
 		const collection = req.payload.collections[slug]
 		if (!collection) {
@@ -65,6 +83,13 @@ export const buildIsolatedAuthEndpoints = ({
 		}
 		return collection
 	}
+
+	const slotFor = (req: PayloadRequest, user: null | TypedUser | undefined) =>
+		resolveSlotCookieName({
+			entry,
+			sharedName: getSharedCookieName(req.payload.config.cookiePrefix),
+			user,
+		})
 
 	return [
 		{
@@ -93,12 +118,16 @@ export const buildIsolatedAuthEndpoints = ({
 				})
 
 				const headers = headersWithCors({ headers: new Headers(), req })
+				const user = asUser(result.user)
+				const name = slotFor(req, user)
 
-				if (result.token) {
+				if (result.token && name) {
 					headers.set(
 						'Set-Cookie',
-						generateIsolatedCookie({ authConfig, name: cookieName, token: result.token })
+						generateIsolatedCookie({ authConfig, name, token: result.token })
 					)
+
+					await warnIfAdminMisclassified({ collection, cookieName: name, entry, req, user })
 				}
 
 				if (authConfig.removeTokenFromResponses) {
@@ -130,10 +159,16 @@ export const buildIsolatedAuthEndpoints = ({
 					return Response.json({ message: req.t('error:logoutFailed') }, { headers, status: 400 })
 				}
 
-				headers.set(
-					'Set-Cookie',
-					generateExpiredIsolatedCookie({ authConfig: collection.config.auth, name: cookieName })
-				)
+				// `logoutOperation` refuses without a user, so by here `req.user` is this
+				// collection's and the slot is always resolvable.
+				const name = slotFor(req, req.user)
+
+				if (name) {
+					headers.set(
+						'Set-Cookie',
+						generateExpiredIsolatedCookie({ authConfig: collection.config.auth, name })
+					)
+				}
 
 				return Response.json(
 					{ message: req.t('authentication:logoutSuccessful') },
@@ -152,11 +187,12 @@ export const buildIsolatedAuthEndpoints = ({
 				const headers = headersWithCors({ headers: new Headers(), req })
 
 				const { refreshedToken, ...result } = await refreshOperation({ collection, req })
+				const name = slotFor(req, req.user)
 
-				if (result.setCookie && refreshedToken) {
+				if (result.setCookie && refreshedToken && name) {
 					headers.set(
 						'Set-Cookie',
-						generateIsolatedCookie({ authConfig, name: cookieName, token: refreshedToken })
+						generateIsolatedCookie({ authConfig, name, token: refreshedToken })
 					)
 				}
 
@@ -181,11 +217,12 @@ export const buildIsolatedAuthEndpoints = ({
 
 				// The built-in handler reads the token via `extractJWT`, which only knows about
 				// the shared cookie — it would report the admin's token back to a frontend user.
-				// With no isolated cookie the request was authenticated by something else (an
-				// `Authorization` header, a custom strategy), so fall back to core's own
+				// With no cookie in this user's slot the request was authenticated by something
+				// else (an `Authorization` header, a custom strategy), so fall back to core's own
 				// extraction rather than reporting no token at all.
+				const slot = slotFor(req, req.user)
 				const currentToken =
-					parseCookies(req.headers).get(cookieName) ??
+					(slot ? parseCookies(req.headers).get(slot) : undefined) ??
 					extractAuthorizationToken({ headers: req.headers, payload: req.payload })
 
 				const result = await meOperation({
@@ -226,11 +263,12 @@ export const buildIsolatedAuthEndpoints = ({
 				})
 
 				const headers = headersWithCors({ headers: new Headers(), req })
+				const name = slotFor(req, asUser(result.user))
 
-				if (result.token) {
+				if (result.token && name) {
 					headers.set(
 						'Set-Cookie',
-						generateIsolatedCookie({ authConfig, name: cookieName, token: result.token })
+						generateIsolatedCookie({ authConfig, name, token: result.token })
 					)
 				}
 
@@ -270,10 +308,18 @@ export const buildIsolatedAuthEndpoints = ({
 
 				const headers = headersWithCors({ headers: new Headers(), req })
 
-				if (result.token) {
+				// The very first user of the collection that backs the admin panel is created to
+				// get *into* it, and has no roles yet for a predicate to read, so this one always
+				// writes the shared cookie rather than asking.
+				const name =
+					slug === req.payload.config.admin.user
+						? getSharedCookieName(req.payload.config.cookiePrefix)
+						: slotFor(req, asUser(result.user))
+
+				if (result.token && name) {
 					headers.set(
 						'Set-Cookie',
-						generateIsolatedCookie({ authConfig, name: cookieName, token: result.token })
+						generateIsolatedCookie({ authConfig, name, token: result.token })
 					)
 				}
 

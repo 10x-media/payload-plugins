@@ -3,6 +3,7 @@
 	"pages": [
 		"index",
 		"quick-start",
+		"role-split",
 		"scopes",
 		"clients",
 		"custom-auth",

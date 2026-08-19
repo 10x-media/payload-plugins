@@ -5,7 +5,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig } from 'payload'
 import { dualSession } from '../src/index'
-import { customers, notes, partners, siteSettings, users } from './collections'
+import { customers, isolateWebsiteUsers, notes, partners, siteSettings, users } from './collections'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -36,9 +36,15 @@ export default buildConfig({
 	collections: [users, partners, customers, notes],
 	globals: [siteSettings],
 	plugins: [
-		// Order is priority: a visitor holding both isolated sessions resolves as the partner.
+		// Order is priority: a visitor holding several isolated sessions resolves as the first
+		// listed. `users` backs the admin panel, so it may only be listed with a predicate: the
+		// staff half stays on the shared cookie and the panel is untouched.
 		dualSession({
-			collections: [{ slug: 'partners', cookieName: 'partner-session' }, 'customers'],
+			collections: [
+				{ slug: 'partners', cookieName: 'partner-session' },
+				'customers',
+				{ slug: 'users', isolate: isolateWebsiteUsers },
+			],
 		}),
 	],
 	telemetry: false,

@@ -7,6 +7,8 @@ A browser holding two sessions makes every REST call ambiguous. `/api/customers/
 
 Something has to attribute each request, and write the answer where the isolated strategies can read it.
 
+With a [role-split](/dual-session/role-split) collection the ambiguity is sharper still: `/api/users/me` is one URL over one collection with two live sessions, told apart by nothing but which cookie the request carried.
+
 ## The contract
 
 One request header, `x-payload-auth-scope`, carrying one of two values:
@@ -26,6 +28,8 @@ Two rules for whoever sets it:
 <Callout>
 The scope picks *which of the caller's own sessions* to use. It is not an authorization boundary: forcing `admin` only makes fewer credentials count, and forcing `frontend` only honours a cookie the caller already holds. Do not read it inside your own access control.
 </Callout>
+
+**Scopes govern isolated cookies only.** A session on the shared `${cookiePrefix}-token` is read by core's own strategy, which has never heard of scopes and authenticates every request whatever the header says. That is deliberate: it is what keeps the admin panel reachable, and why an editor browsing the website is still the editor there. On a role-split collection it means the staff half is not scoped at all, and only the website half is.
 
 Absent is a state to use, not a failure to avoid. A proxy that cannot attribute a request should send no scope, and the plugin then answers by checking whether an admin session actually exists.
 
@@ -142,6 +146,12 @@ dualSession({
 })
 ```
 
+### Not on the collection backing the admin panel
+
+A [role-split](/dual-session/role-split) entry — the one naming `admin.user` — must keep `scopes: ['frontend']`. Listing `'admin'` there throws at config time.
+
+The isolated strategy runs ahead of core's `local-jwt`, so a cookie allowed to answer admin-scoped requests would be consulted first on the very collection the panel authenticates against: a website visitor's session would win over the admin's, and the panel would lock its own admins out. The staff half needs no scope of its own — it is on the shared cookie, which is never gated.
+
 ## Without a proxy
 
 The plugin works without one, using `adminSessionPriority` (on by default): with no scope header, an isolated cookie stands down as long as a **valid** admin token is also present. The admin panel therefore stays reachable.
@@ -149,6 +159,8 @@ The plugin works without one, using `adminSessionPriority` (on by default): with
 The cost is that an admin-and-customer browser resolves as the admin on the website too. Set `adminSessionPriority: false` to invert that, or install the proxy so the scope is read rather than inferred.
 
 An unattributed request lands in this same branch, so a session that works without the proxy keeps working once you install one.
+
+On a role-split collection the check compares the shared cookie against `admin.user`, which is that collection's own slug. Same slug, different cookie: the website half stands down for a live admin session exactly as a separate collection would.
 
 ## Referer stripping breaks attribution
 
@@ -169,4 +181,4 @@ headers: async () => [
 
 ## Next
 
-[Frontends and clients](/dual-session/clients) for setups where the website is not this Next app, [Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what scopes cannot cover.
+[One collection, two sessions](/dual-session/role-split) if your auth collections are really one collection with roles, [Frontends and clients](/dual-session/clients) for setups where the website is not this Next app, [Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what scopes cannot cover.
