@@ -24,7 +24,9 @@
 		"@10x-media/undo-redo": "0.0.0",
 		"@10x-media/undo-redo-dev": "0.0.0",
 		"@10x-media/admin-wiki": "0.0.0",
-		"@10x-media/admin-wiki-dev": "0.0.0"
+		"@10x-media/admin-wiki-dev": "0.0.0",
+		"@10x-media/folder-picker": "0.0.0",
+		"@10x-media/folder-picker-dev": "0.0.0"
 	},
 	"changesets": [
 		"admin-wiki-block-chips",
@@ -84,6 +86,10 @@
 		"fields-color-chip-overflow",
 		"fields-color-schemes",
 		"fields-v1",
+		"folder-picker-drag-and-edit-target",
+		"folder-picker-initial-beta",
+		"folder-picker-review-fixes",
+		"folder-picker-selection-hints",
 		"form-builder-actions-consolidation",
 		"form-builder-changeable-votes",
 		"form-builder-composition-consent-recipients",
@@ -95,6 +101,7 @@
 		"form-builder-feedback-round2",
 		"form-builder-feedback",
 		"form-builder-file-extraction",
+		"form-builder-from-sources",
 		"form-builder-host-adapters",
 		"form-builder-i18n-defaults",
 		"form-builder-multistep-validation",
