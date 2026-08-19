@@ -3,6 +3,8 @@ export type {
 	WikiAccessOptions,
 	WikiChipsOptions,
 	WikiCollectionOverride,
+	WikiCustomTargetLabel,
+	WikiCustomTargetOption,
 	WikiEditorBlockOption,
 	WikiEditorOptions,
 	WikiHiddenOptions,
@@ -17,4 +19,8 @@ export type {
 	WikiViewSlotClientProps,
 	WikiViewSlotServerProps,
 } from '../options'
-export type { ResolvedWikiOptions, ResolvedWikiViewOptions } from '../plugin/resolveOptions'
+export type {
+	ResolvedWikiCustomTarget,
+	ResolvedWikiOptions,
+	ResolvedWikiViewOptions,
+} from '../plugin/resolveOptions'

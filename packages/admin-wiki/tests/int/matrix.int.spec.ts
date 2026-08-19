@@ -9,9 +9,10 @@ const PAGES = 'wiki-pages' as CollectionSlug
 
 /**
  * The plugin's own collection is the part with a schema: drafts, a localized
- * rich text field, and four `hasMany` text lists. Seeding one guide and reading
- * it back exercises all of them on both databases, which is where a Postgres
- * column or relation problem would surface and Mongo would not.
+ * rich text field, and five `hasMany` text lists, the last of them built only
+ * because this config declares a custom target. Seeding one guide and reading it
+ * back exercises all of them on both databases, which is where a Postgres column
+ * or relation problem would surface and Mongo would not.
  */
 describeForDb('adminWiki cross-db', {}, (db) => {
 	let booted: BootedPayload
@@ -21,7 +22,7 @@ describeForDb('adminWiki cross-db', {}, (db) => {
 			collections: fixtureCollections,
 			configOverrides: fixtureConfig,
 			db,
-			plugin: adminWiki({}),
+			plugin: adminWiki({ customTargets: ['dashboard'] }),
 		})
 	})
 
@@ -45,6 +46,7 @@ describeForDb('adminWiki cross-db', {}, (db) => {
 				targets: {
 					blocks: ['hero'],
 					collections: ['posts'],
+					custom: ['dashboard'],
 					fields: ['collection:posts.title'],
 					globals: ['settings'],
 				},
@@ -69,6 +71,7 @@ describeForDb('adminWiki cross-db', {}, (db) => {
 		expect(en?.title).toBe('Matrix guide')
 		expect(en?.targetBlocks).toEqual(['hero'])
 		expect(en?.targetCollections).toEqual(['posts'])
+		expect(en?.targetCustom).toEqual(['dashboard'])
 		expect(en?.targetFields).toEqual(['collection:posts.title'])
 		expect(en?.targetGlobals).toEqual(['settings'])
 		expect(lexicalText(en?.content)).toContain('English text.')

@@ -119,6 +119,43 @@ describe('adminWiki factory', () => {
 		})
 	})
 
+	it('adds the custom target list only when custom targets are declared', () => {
+		const targetNames = (config: Config): string[] => {
+			const pages = config.collections?.find((collection) => collection.slug === 'wiki-pages')
+			const tabs = pages?.fields[0] as { tabs: { fields: Field[] }[] }
+			return (tabs.tabs[1]?.fields ?? []).flatMap((field) =>
+				'name' in field ? [field.name] : []
+			)
+		}
+		expect(targetNames(adminWiki({})(fakeConfig()) as Config)).not.toContain('targetCustom')
+
+		const withCustom = adminWiki({
+			customTargets: [{ key: 'dashboard', label: 'Dashboard' }, 'traffic'],
+		})(fakeConfig()) as Config
+		expect(targetNames(withCustom)).toContain('targetCustom')
+
+		const pages = withCustom.collections?.find((collection) => collection.slug === 'wiki-pages')
+		const tabs = pages?.fields[0] as { tabs: { fields: Field[] }[] }
+		const customField = tabs.tabs[1]?.fields.find(
+			(field) => 'name' in field && field.name === 'targetCustom'
+		) as unknown as { admin: { components: { Field: { clientProps: unknown; path: string } } } }
+		expect(customField.admin.components.Field).toEqual({
+			clientProps: {
+				targets: [
+					{ key: 'dashboard', label: 'Dashboard' },
+					{ key: 'traffic', label: 'traffic' },
+				],
+			},
+			path: '@10x-media/admin-wiki/client#WikiTargetCustom',
+		})
+	})
+
+	it('counts declared custom targets as valid target keys', () => {
+		const out = adminWiki({ customTargets: ['dashboard'] })(fakeConfig()) as Config
+		expect(getWikiRegistry(out)?.validTargetKeys).toContain('custom:dashboard')
+		expect(getWikiRegistry(out)?.validTargetKeys).not.toContain('custom:traffic')
+	})
+
 	it('offers only covered blocks in the block target picker', () => {
 		const cfg = {
 			collections: [

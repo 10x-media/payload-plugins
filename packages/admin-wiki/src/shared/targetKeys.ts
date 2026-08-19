@@ -4,26 +4,38 @@
  * of server-only imports; the client bundle uses it.
  */
 
-export type WikiTargetType = 'block' | 'collection' | 'field' | 'global'
+export type WikiTargetType = 'block' | 'collection' | 'custom' | 'field' | 'global'
 
 /**
- * The four `string[]` fields a guide stores its attachments in, one per target
- * kind. Every value is a bare slug except `targetFields`, which stores an
+ * The `string[]` fields a guide stores its attachments in, one per target kind.
+ * Every value is a bare slug except `targetFields`, which stores an
  * owner-qualified schema path (`collection:posts.title`,
  * `block:heroBanner.heading`) because a collection and a global may share a
  * slug, and because a field inside a block belongs to the block.
+ *
+ * `targetCustom` holds the bare keys a host declared through `customTargets`,
+ * and exists on the collection only when it declared any.
  */
 export type WikiTargetDoc = {
 	targetBlocks?: null | string[]
 	targetCollections?: null | string[]
+	targetCustom?: null | string[]
 	targetFields?: null | string[]
 	targetGlobals?: null | string[]
 }
 
-/** The `select` shape every query that needs target keys must ask for. */
+/**
+ * The `select` shape every query that needs target keys must ask for.
+ *
+ * `targetCustom` is asked for unconditionally even though the field is only
+ * built when the host declared custom targets: both adapters resolve a select
+ * by walking the collection's own fields and reading the entry for each, so a
+ * key naming no field is never consulted.
+ */
 export const wikiTargetSelect = {
 	targetBlocks: true,
 	targetCollections: true,
+	targetCustom: true,
 	targetFields: true,
 	targetGlobals: true,
 } as const
@@ -72,6 +84,16 @@ export const blockTargetKey = (slug: string): string => `block:${slug}`
  */
 export const fieldTargetKey = (schemaPath: string): string => `field:${schemaPath}`
 
+/**
+ * A surface the config cannot describe: a custom admin view, a panel inside
+ * one, anything a project renders itself and declares through `customTargets`.
+ *
+ * The `custom:` namespace is applied here rather than typed by the host, so a
+ * declared key is a bare slug (`dashboard`, `dashboard.attention`) that can
+ * never collide with a collection, global, block, or field target.
+ */
+export const customTargetKey = (key: string): string => `custom:${key}`
+
 /** The stored field a target kind lives in, for prefill and mapping. */
 export const targetFieldNameFor = (kind: WikiTargetType): keyof WikiTargetDoc => {
 	switch (kind) {
@@ -79,6 +101,8 @@ export const targetFieldNameFor = (kind: WikiTargetType): keyof WikiTargetDoc =>
 			return 'targetBlocks'
 		case 'collection':
 			return 'targetCollections'
+		case 'custom':
+			return 'targetCustom'
 		case 'field':
 			return 'targetFields'
 		case 'global':
@@ -91,6 +115,7 @@ const keyBuilders: Array<[keyof WikiTargetDoc, (value: string) => string]> = [
 	['targetGlobals', globalTargetKey],
 	['targetFields', fieldTargetKey],
 	['targetBlocks', blockTargetKey],
+	['targetCustom', customTargetKey],
 ]
 
 /** Every target key a guide document is attached to, deduplicated. */

@@ -66,7 +66,7 @@ export const WikiIndexClient = ({
 }: WikiIndexClientProps) => {
 	const { t } = useTranslation()
 	const { config } = useConfig()
-	const { blockChips, blockLabels } = useWikiTargets()
+	const { blockChips, blockLabels, customLabels } = useWikiTargets()
 	const [query, setQuery] = useState('')
 	const [selectedTargets, setSelectedTargets] = useState<string[]>([])
 	const [filtersOpen, setFiltersOpen] = useState(false)
@@ -90,11 +90,12 @@ export const WikiIndexClient = ({
 		return describeTargets([...unique], {
 			blockLabels,
 			collections: config.collections,
+			customLabels,
 			globals: config.globals,
 		})
 			.map((target) => ({ key: `${target.kind}:${target.value}`, label: target.label }))
 			.sort((a, b) => a.label.localeCompare(b.label))
-	}, [blockChips, blockLabels, config.collections, config.globals, linkable])
+	}, [blockChips, blockLabels, config.collections, config.globals, customLabels, linkable])
 
 	const toggleTarget = useCallback(
 		(key: string) =>

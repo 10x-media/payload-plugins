@@ -2,6 +2,8 @@ import type { PayloadComponent } from 'payload'
 
 import type {
 	AdminWikiPluginOptions,
+	WikiCustomTargetLabel,
+	WikiCustomTargetOption,
 	WikiEditorBlockOption,
 	WikiEditorFeaturesOption,
 	WikiListBandOptions,
@@ -18,9 +20,18 @@ export type ResolvedWikiViewOptions = {
 	components: Record<WikiViewSlot, PayloadComponent[]>
 }
 
+/** A declared custom target, deduplicated and always carrying a label. */
+export type ResolvedWikiCustomTarget = {
+	/** Bare key, without the `custom:` namespace the target keys carry. */
+	key: string
+	label: WikiCustomTargetLabel
+}
+
 /** Plugin options normalized to their effective values. */
 export type ResolvedWikiOptions = {
 	chips: { blocks: boolean }
+	/** Host-declared surfaces, in declaration order. Empty when none were declared. */
+	customTargets: ResolvedWikiCustomTarget[]
 	editorBlocks: WikiEditorBlockOption[]
 	/**
 	 * Left in whichever form the host gave it, array or function: normalizing the
@@ -58,6 +69,28 @@ const resolveListBand = (
 	return { slot: slot ?? 'afterListTable' }
 }
 
+/**
+ * Normalize declared custom targets: string shorthand to an object, a key
+ * written with the namespace already on it (`custom:dashboard`) back to the bare
+ * one, blanks dropped, first declaration of a repeated key kept.
+ */
+const resolveCustomTargets = (
+	targets: undefined | WikiCustomTargetOption[]
+): ResolvedWikiCustomTarget[] => {
+	const seen = new Set<string>()
+	const resolved: ResolvedWikiCustomTarget[] = []
+	for (const target of targets ?? []) {
+		const declared = typeof target === 'string' ? { key: target, label: undefined } : target
+		const key = declared.key?.trim().replace(/^custom:/, '')
+		if (!key || seen.has(key)) {
+			continue
+		}
+		seen.add(key)
+		resolved.push({ key, label: declared.label ?? key })
+	}
+	return resolved
+}
+
 /** `true` and omission are the views without slot components; `false` skips them. */
 const resolveWikiView = (
 	wikiView: boolean | undefined | WikiViewOptions
@@ -83,6 +116,7 @@ export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOpt
 	}
 	return {
 		chips: { blocks: options.chips?.blocks ?? true },
+		customTargets: resolveCustomTargets(options.customTargets),
 		editorBlocks: options.editor?.blocks ?? [],
 		editorFeatures: options.editor?.features,
 		exclude: resolveExcluded(options.exclude, slugs),

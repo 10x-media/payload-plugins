@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { compareTargetEntries, targetKeysForDoc, type WikiTargetEntry } from './targetKeys'
+import {
+	compareTargetEntries,
+	customTargetKey,
+	targetFieldNameFor,
+	targetKeysForDoc,
+	type WikiTargetEntry,
+} from './targetKeys'
 
 const entry = (overrides: Partial<WikiTargetEntry>): WikiTargetEntry => ({
 	featured: false,
@@ -18,6 +24,7 @@ describe('targetKeysForDoc', () => {
 			targetKeysForDoc({
 				targetBlocks: ['cta'],
 				targetCollections: ['posts', 'products'],
+				targetCustom: ['dashboard'],
 				targetFields: ['collection:posts.hero.title', 'global:settings.siteName'],
 				targetGlobals: ['settings'],
 			})
@@ -28,6 +35,7 @@ describe('targetKeysForDoc', () => {
 			'field:collection:posts.hero.title',
 			'field:global:settings.siteName',
 			'block:cta',
+			'custom:dashboard',
 		])
 	})
 
@@ -40,6 +48,17 @@ describe('targetKeysForDoc', () => {
 		expect(targetKeysForDoc({ targetCollections: ['posts', 'posts'] })).toEqual([
 			'collection:posts',
 		])
+	})
+})
+
+describe('customTargetKey', () => {
+	it('namespaces a declared key, dots and all', () => {
+		expect(customTargetKey('dashboard')).toBe('custom:dashboard')
+		expect(customTargetKey('dashboard.attention')).toBe('custom:dashboard.attention')
+	})
+
+	it('stores custom targets in their own list', () => {
+		expect(targetFieldNameFor('custom')).toBe('targetCustom')
 	})
 })
 

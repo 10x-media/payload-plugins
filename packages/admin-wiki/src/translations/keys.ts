@@ -72,6 +72,8 @@ export const keys = {
 	targetBlocksSingular: 'adminWiki:targetBlocksSingular',
 	targetCollectionsDescription: 'adminWiki:targetCollectionsDescription',
 	targetCollectionsLabel: 'adminWiki:targetCollectionsLabel',
+	targetCustomDescription: 'adminWiki:targetCustomDescription',
+	targetCustomLabel: 'adminWiki:targetCustomLabel',
 	targetFieldsDescription: 'adminWiki:targetFieldsDescription',
 	targetFieldsEmpty: 'adminWiki:targetFieldsEmpty',
 	targetFieldsKindCollection: 'adminWiki:targetFieldsKindCollection',

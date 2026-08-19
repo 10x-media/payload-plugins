@@ -8,6 +8,7 @@ describe('resolveOptions', () => {
 	it('applies defaults', () => {
 		expect(resolveOptions({})).toEqual({
 			chips: { blocks: true },
+			customTargets: [],
 			editorBlocks: [],
 			editorFeatures: undefined,
 			exclude: {
@@ -27,6 +28,30 @@ describe('resolveOptions', () => {
 			wikiView: { components: { afterTable: [], beforeControls: [], beforeTable: [] } },
 			writeAffordances: 'editMode',
 		})
+	})
+
+	it('normalizes declared custom targets and labels every one', () => {
+		expect(
+			resolveOptions({
+				customTargets: [
+					'traffic',
+					{ key: ' dashboard ', label: { de: 'Übersicht', en: 'Dashboard' } },
+					{ key: 'custom:dashboard.attention' },
+				],
+			}).customTargets
+		).toEqual([
+			{ key: 'traffic', label: 'traffic' },
+			{ key: 'dashboard', label: { de: 'Übersicht', en: 'Dashboard' } },
+			{ key: 'dashboard.attention', label: 'dashboard.attention' },
+		])
+	})
+
+	it('drops blank keys and keeps the first declaration of a repeated one', () => {
+		expect(
+			resolveOptions({
+				customTargets: ['', '   ', { key: 'dashboard', label: 'First' }, { key: 'dashboard' }],
+			}).customTargets
+		).toEqual([{ key: 'dashboard', label: 'First' }])
 	})
 
 	it('merges the host exclusions into the built-ins, per entity kind', () => {
