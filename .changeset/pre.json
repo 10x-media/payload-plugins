@@ -32,6 +32,7 @@
 	},
 	"changesets": [
 		"admin-wiki-block-chips",
+		"admin-wiki-custom-targets",
 		"admin-wiki-guide-link-feature",
 		"admin-wiki-initial-beta",
 		"admin-wiki-seed-callouts-links",
