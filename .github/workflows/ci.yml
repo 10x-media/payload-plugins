@@ -44,6 +44,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -63,7 +64,20 @@ jobs:
           pnpm --filter @10x-media/payload-test-harness exec node -e
           "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
       - name: Bundle isolation gates
-        run: pnpm exec turbo run test:dist
+        run: |
+          bash scripts/ci-resource-probe.sh 10 &
+          probe=$!
+          trap 'kill "$probe" 2>/dev/null || true' EXIT
+          pnpm exec turbo run test:dist
+      - name: Probe summary
+        if: always()
+        run: |
+          echo "=== nproc / memory / disk ==="
+          nproc
+          free -m
+          df -h /
+          echo "=== kernel OOM records ==="
+          sudo dmesg 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' | tail -30 || echo "(none)"
       - name: Registry parity (rebuild shadcn registry, fail if drifted from source)
         run: pnpm check:registry
 
