@@ -1,0 +1,123 @@
+---
+title: Custom auth
+description: Use your own SSO strategy, OAuth callback, or server action with an isolated collection.
+---
+
+Hand-rolled auth keeps working on an isolated collection. One thing has to change: not the strategy, but whatever writes the cookie afterwards.
+
+<Callout type="warn">
+**This is the least-tested surface of an [experimental](/dual-session) plugin.** Everything else the plugin does runs against Payload's own auth routes, which are covered end to end. Your strategy and your callback are code it never sees, so the seam between them is exactly where an untested combination lives.
+
+The dev app carries a working SSO example (`packages/dual-session/dev/sso.ts`) that runs in CI, but a real provider does more than it does. Exercise the whole flow before shipping: login, a refresh, a logout, and an admin session surviving all three in the same browser.
+</Callout>
+
+## Your strategy needs no changes
+
+The plugin **appends** its strategy to `auth.strategies`, so anything you declared keeps first refusal on every request:
+
+```ts title="collections/Customers.ts"
+export const Customers: CollectionConfig = {
+  slug: 'customers',
+  auth: { strategies: [googleStrategy] },
+  fields: [],
+}
+```
+
+A strategy that proves identity and returns `{ user }`, the shape Payload's own docs describe, is unaffected. It never touches a cookie, so nothing in it collides with the isolation.
+
+## Your callback does
+
+This is where isolation is lost. A typical OAuth callback ends like this:
+
+```ts
+// Writes payload-token, and wipes whatever admin session was in it.
+headers.append(
+  'Set-Cookie',
+  generatePayloadCookie({ collectionAuthConfig, cookiePrefix, token })
+)
+```
+
+On an isolated collection that writes the shared cookie, which both bypasses the isolation and overwrites the editor's admin session. Swap one call:
+
+```ts title="lib/auth/callback.ts"
+import { generateIsolatedAuthCookie } from '@10x-media/dual-session'
+import { getFieldsToSign, jwtSign } from 'payload'
+
+const collection = payload.collections.customers
+
+const { token } = await jwtSign({
+  fieldsToSign: getFieldsToSign({
+    collectionConfig: collection.config,
+    email: user.email,
+    sid: user._sid,
+    user,
+  }),
+  secret: payload.secret,
+  tokenExpiration: collection.config.auth.tokenExpiration,
+})
+
+headers.append(
+  'Set-Cookie',
+  generateIsolatedAuthCookie({ collection: 'customers', payload, token })
+)
+```
+
+The cookie name is resolved from the plugin's registered options, so a `cookieName` override is honoured and nothing is hardcoded. If the collection is not one the plugin isolates, the call throws rather than silently writing the shared cookie.
+
+`resolveIsolatedCookieName({ collection, payload })` returns just the name, or `undefined` for a collection that is not isolated.
+
+### On a collection split by role
+
+If the collection carries an [`isolate` predicate](/dual-session/role-split), the cookie depends on *which* user is being signed in, so pass them:
+
+```ts
+generateIsolatedAuthCookie({ collection: 'users', payload, token, user })
+```
+
+Without `user` the call throws. Guessing would sign half your users into the wrong session, and an OAuth callback is exactly where that would go unnoticed.
+
+There is a full working example in the plugin's dev app, at `packages/dual-session/dev/sso.ts`.
+
+## Server actions and custom login routes
+
+Same rule, same call. Anything that mints a token itself needs `generateIsolatedAuthCookie` instead of `generatePayloadCookie`:
+
+```ts title="app/actions/login.ts"
+'use server'
+
+import { cookies } from 'next/headers'
+
+const cookie = generateIsolatedAuthCookie({ collection: 'customers', payload, token })
+;(await cookies()).set(...parseSetCookie(cookie))
+```
+
+## Logging out
+
+Clear the isolated cookie by name:
+
+```ts
+import { resolveIsolatedCookieName } from '@10x-media/dual-session'
+
+const name = resolveIsolatedCookieName({ collection: 'customers', payload })
+;(await cookies()).delete(name!)
+```
+
+Pass `user` here too on a collection split by role, or the call throws for the same reason.
+
+Or just call `POST /api/customers/logout`, which the plugin already shadows and which runs the real logout operation, ending the session server-side too.
+
+## What does not work
+
+**A strategy that reads `payload-token` itself.** If your code parses the shared cookie and authorizes an isolated collection from it, the scopes break and the plugin cannot help: it never sees that decision. Read the isolated cookie instead, or let the plugin's strategy handle cookie auth and keep yours to the out-of-band proof.
+
+**Auth plugins in general.** Anything that writes `generatePayloadCookie` from code you do not control bypasses isolation, and anything declaring its own `/login` on the same collection collides with the endpoint this plugin declares there. If the plugin exposes a hook for setting the cookie, use it with `generateIsolatedAuthCookie`; if it does not, that collection cannot be isolated. [Other plugins that touch auth](/dual-session/limits#other-plugins-that-touch-auth) has the full list of what breaks and how to check.
+
+## Where your strategy sits in the chain
+
+Payload builds one flat chain from every collection: each collection's declared strategies, then that collection's api-key strategy, then a single `local-jwt` at the very end. Within a collection the order is the order you declared, with the plugin's appended last.
+
+That is why an `Authorization` header outranks an isolated cookie. See [Limits](/dual-session/limits#authorization-headers-win).
+
+## Next
+
+[Configuration](/dual-session/configuration) for the exports, [Limits](/dual-session/limits) for the edges.
