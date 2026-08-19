@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/dual-session
 
 Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist. Payload signs every collection's token into one config-wide `payload-token`, which means a customer logging in on your website overwrites the editor's admin session in the same browser, and back again. This plugin moves the collections you name onto cookies of their own.
