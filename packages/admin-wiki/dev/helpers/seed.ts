@@ -206,6 +206,16 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				},
 				{
 					content: {
+						markdown:
+							'The dashboard is a custom admin view, so nothing in the config describes it. Its guides hang off the `dashboard` key this app declares through `customTargets`, and the surface beside the heading is `WikiCustomHelp`.',
+					},
+					slug: 'reading-the-dashboard',
+					summary: 'What the dashboard numbers mean.',
+					targets: { custom: ['dashboard'] },
+					title: { de: 'Die Übersicht lesen', en: 'Reading the dashboard' },
+				},
+				{
+					content: {
 						markdown: 'This guide targets a field that no longer exists, on purpose.',
 					},
 					slug: 'orphaned-example',

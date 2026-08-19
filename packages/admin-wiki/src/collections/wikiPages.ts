@@ -35,6 +35,7 @@ export type BuildWikiPagesArgs = {
 
 const TARGET_SELECT = '@10x-media/admin-wiki/client#WikiTargetSelect'
 const TARGET_BLOCKS = '@10x-media/admin-wiki/client#WikiTargetBlocks'
+const TARGET_CUSTOM = '@10x-media/admin-wiki/client#WikiTargetCustom'
 const TARGET_FIELDS = '@10x-media/admin-wiki/client#WikiTargetFields'
 
 /** Slugs of one entity kind the plugin covers, sorted for a stable picker. */
@@ -56,6 +57,9 @@ const coveredSlugs = (entities: undefined | { slug: string }[], excluded: string
  * guide cannot be attached to an entity the host excluded. Fields are picked the
  * same way, from a drawer rendering the chosen entity's real form, with a text
  * input beside it for the paths a rendered form cannot offer.
+ *
+ * The fifth list exists only for a host that declared `customTargets`: a project
+ * with none keeps the collection, and its database schema, exactly as it was.
  */
 const targetFields = (
 	config: Config,
@@ -123,14 +127,34 @@ const targetFields = (
 				description: labelForKey(keys.targetBlocksDescription),
 			},
 		},
+		...(resolved.customTargets.length > 0
+			? [
+					{
+						name: 'targetCustom',
+						type: 'text',
+						hasMany: true,
+						label: labelForKey(keys.targetCustomLabel),
+						admin: {
+							components: {
+								Field: {
+									clientProps: { targets: resolved.customTargets },
+									path: TARGET_CUSTOM,
+								},
+							},
+							description: labelForKey(keys.targetCustomDescription),
+						},
+					} satisfies Field,
+				]
+			: []),
 	]
 }
 
 /**
  * The guide pages collection: drafts enabled; localized title, summary, and
- * content; featured flag with ordering; and four non-localized target lists
+ * content; featured flag with ordering; and the non-localized target lists
  * attaching one guide to any number of surfaces (collections, globals, field
- * schema paths, block slugs).
+ * schema paths, block slugs, and whatever the host declared as a custom
+ * target).
  *
  * Authoring splits across unnamed tabs, which group the form without adding a
  * level to the stored document: a named tab would nest every target list under

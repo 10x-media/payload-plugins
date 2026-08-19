@@ -8,6 +8,8 @@ export {
 } from '../components/FieldHelp/WikiFieldDescription'
 export {
 	useWikiFieldHelp,
+	WikiCustomHelp,
+	type WikiCustomHelpProps,
 	WikiFieldHelp,
 	type WikiFieldHelpProps,
 	WikiTargetHelp,
@@ -71,6 +73,10 @@ export {
 	type WikiTargetBlocksProps,
 } from '../components/TargetSelect/WikiTargetBlocks'
 export {
+	WikiTargetCustom,
+	type WikiTargetCustomProps,
+} from '../components/TargetSelect/WikiTargetCustom'
+export {
 	type WikiTargetEntityKind,
 	WikiTargetSelect,
 	type WikiTargetSelectProps,
@@ -95,3 +101,10 @@ export {
 export { WikiViewLink } from '../components/WikiView/WikiViewLink'
 export { WikiGuideLinkFeatureClient } from '../editor/guideLink/client'
 export { WikiVideoFeatureClient } from '../editor/video/client'
+export {
+	blockTargetKey,
+	collectionTargetKey,
+	customTargetKey,
+	fieldTargetKey,
+	globalTargetKey,
+} from '../shared/targetKeys'

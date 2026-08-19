@@ -3,7 +3,7 @@
 import { Popup, useDrawerSlug, useModal } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
 
-import { fieldTargetKey, type WikiTargetEntry } from '../../shared/targetKeys'
+import { customTargetKey, fieldTargetKey, type WikiTargetEntry } from '../../shared/targetKeys'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { useWikiFieldPicker } from '../FieldPicker/WikiPickerContext'
@@ -127,4 +127,27 @@ export type WikiFieldHelpProps = {
 /** The field help surface: `WikiTargetHelp` keyed by a field schema path. */
 export const WikiFieldHelp = ({ schemaPath }: WikiFieldHelpProps) => (
 	<WikiTargetHelp targetKey={fieldTargetKey(schemaPath)} />
+)
+
+export type WikiCustomHelpProps = {
+	/** Show the "write this guide" affordance when no guide exists yet. */
+	showWriteAffordance?: boolean
+	/**
+	 * A key declared through the plugin's `customTargets` option, bare and
+	 * without the `custom:` namespace: `dashboard`, `dashboard.attention`.
+	 */
+	target: string
+}
+
+/**
+ * The help surface for a custom target: `WikiTargetHelp` keyed by a key the
+ * host declared, so a custom admin view drops one in beside whatever it renders
+ * without knowing how target keys are spelled.
+ *
+ * A key the host never declared renders whatever guides happen to be attached
+ * to it and nothing otherwise, exactly as any other target would; it is the
+ * orphan banner, not this component, that reports the mismatch.
+ */
+export const WikiCustomHelp = ({ showWriteAffordance = true, target }: WikiCustomHelpProps) => (
+	<WikiTargetHelp showWriteAffordance={showWriteAffordance} targetKey={customTargetKey(target)} />
 )

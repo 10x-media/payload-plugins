@@ -23,13 +23,16 @@ import type {
 } from './types'
 
 /**
- * Map the seed's grouped targets onto the four stored lists. Always writes all
- * four, so a guide that drops a target on re-run has it cleared rather than
- * left behind.
+ * Map the seed's grouped targets onto the stored lists. Always writes all of
+ * them, so a guide that drops a target on re-run has it cleared rather than
+ * left behind. `targetCustom` is written unconditionally too: a project that
+ * declared no custom targets has no such field, and Payload drops data naming
+ * a field the collection does not have.
  */
 const targetData = (targets: WikiSeedTargets | undefined) => ({
 	targetBlocks: targets?.blocks ?? [],
 	targetCollections: targets?.collections ?? [],
+	targetCustom: targets?.custom ?? [],
 	targetFields: targets?.fields ?? [],
 	targetGlobals: targets?.globals ?? [],
 })

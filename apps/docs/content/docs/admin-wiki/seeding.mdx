@@ -20,6 +20,7 @@ export default buildConfig({
         featuredOrder: 1,
         targets: {
           collections: ['posts'],
+          custom: ['dashboard'],
           fields: ['collection:posts.title'],
         },
         content: { markdown: '## Write the draft\n\nGive the post a clear **title**.' },
@@ -33,7 +34,7 @@ export default buildConfig({
 
 Guides are keyed by `slug`. A re-run updates the existing guide rather than creating a second one, so calling it on every boot is safe.
 
-Targets are always written in full, all four lists, so dropping a target from a seed definition clears it rather than leaving it behind. `publish: false` leaves the guide as a draft; the default is published.
+Targets are always written in full, every list, so dropping a target from a seed definition clears it rather than leaving it behind. `publish: false` leaves the guide as a draft; the default is published.
 
 ## Content
 

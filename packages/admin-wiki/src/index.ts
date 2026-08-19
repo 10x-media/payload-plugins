@@ -9,6 +9,7 @@ import { registerTriggers } from './plugin/registerTriggers'
 import { setWikiRegistry } from './plugin/registry'
 import { resolveOptions } from './plugin/resolveOptions'
 import { walkAndInjectFieldHelp } from './plugin/walker'
+import { customTargetKey } from './shared/targetKeys'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -74,7 +75,13 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		setWikiRegistry(config, {
 			...resolved,
 			blockLabels: walk.blockLabels,
-			validTargetKeys: walk.validTargetKeys,
+			// Custom targets resolve against the option rather than the config, which
+			// is the whole point of declaring one: the orphan banner then reports a
+			// key whose declaration was removed, exactly as it does a deleted field.
+			validTargetKeys: [
+				...walk.validTargetKeys,
+				...resolved.customTargets.map((target) => customTargetKey(target.key)),
+			],
 		})
 		const warnings = [...walk.warnings]
 		if (walk.injectedFieldCount === 0) {
@@ -169,6 +176,8 @@ export type {
 	WikiAccessOptions,
 	WikiChipsOptions,
 	WikiCollectionOverride,
+	WikiCustomTargetLabel,
+	WikiCustomTargetOption,
 	WikiEditorBlockOption,
 	WikiEditorFeature,
 	WikiEditorFeaturesOption,
@@ -209,3 +218,14 @@ export type {
 	WikiSeedTargets,
 	WikiSeedTransformer,
 } from './seed/types'
+export {
+	blockTargetKey,
+	collectionTargetKey,
+	customTargetKey,
+	fieldTargetKey,
+	globalTargetKey,
+	targetFieldNameFor,
+	targetKeysForDoc,
+	type WikiTargetDoc,
+	type WikiTargetType,
+} from './shared/targetKeys'

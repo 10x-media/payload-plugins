@@ -14,7 +14,9 @@ import {
 } from 'react'
 
 import type { WikiWriteAffordanceMode } from '../../options'
+import type { ResolvedWikiCustomTarget } from '../../plugin/resolveOptions'
 import type { WikiGuideDoc, WikiTargetEntry, WikiTargetsResponse } from '../../shared/targetKeys'
+import { resolveClientLabel } from '../TargetSelect/clientBlocks'
 import type { WikiMediaDoc } from '../Video/useWikiMediaDoc'
 
 const REFRESH_AFTER_MS = 60_000
@@ -57,6 +59,11 @@ export type WikiTargetsContextValue = {
 	/** The reader's evaluated update permission (drives edit shortcuts). */
 	canUpdate: boolean
 	/**
+	 * Label per declared custom target key, resolved for the reader's admin
+	 * language, for the chips that would otherwise show a bare key.
+	 */
+	customLabels: Record<string, string>
+	/**
 	 * Whether "write this guide" affordances should render: create permission
 	 * resolved true AND the configured `writeAffordances` mode allows it here.
 	 */
@@ -95,6 +102,7 @@ const WikiTargetsContext = createContext<WikiTargetsContextValue>({
 	canCreate: false,
 	canUpdate: false,
 	canWrite: false,
+	customLabels: {},
 	editMode: false,
 	entriesFor: () => EMPTY,
 	loadGuide: () => Promise.resolve(null),
@@ -108,11 +116,15 @@ const WikiTargetsContext = createContext<WikiTargetsContextValue>({
 	writeAffordancesToggleable: false,
 })
 
+/** Stable identity for the common case, so the label memo has nothing to redo. */
+const NO_CUSTOM_TARGETS: ResolvedWikiCustomTarget[] = []
+
 export type WikiProviderProps = {
 	blockChips?: boolean
 	blockLabels?: Record<string, string>
 	blockRenderers?: Record<string, WikiBlockRenderer>
 	children?: ReactNode
+	customTargets?: ResolvedWikiCustomTarget[]
 	pagesSlug?: string
 	videoPlayer?: WikiVideoPlayerComponent
 	wikiView?: boolean
@@ -129,6 +141,7 @@ export const WikiProvider = ({
 	blockLabels,
 	blockRenderers,
 	children,
+	customTargets = NO_CUSTOM_TARGETS,
 	pagesSlug = 'wiki-pages',
 	videoPlayer,
 	wikiView = false,
@@ -229,6 +242,19 @@ export const WikiProvider = ({
 
 	const canCreate = data?.canCreate ?? false
 
+	// A declared label may be keyed by admin language, so it resolves here rather
+	// than at config time, where there is no request to read a language from.
+	const customLabels = useMemo(
+		() =>
+			Object.fromEntries(
+				customTargets.map((target) => [
+					target.key,
+					resolveClientLabel(target.label, i18n.language, target.key),
+				])
+			),
+		[customTargets, i18n.language]
+	)
+
 	const value = useMemo<WikiTargetsContextValue>(
 		() => ({
 			blockChips,
@@ -239,6 +265,7 @@ export const WikiProvider = ({
 			canWrite:
 				canCreate &&
 				(writeAffordances === 'always' || (writeAffordances === 'editMode' && editMode)),
+			customLabels,
 			editMode,
 			entriesFor: (key) => data?.targets[key] ?? EMPTY,
 			loadGuide,
@@ -261,6 +288,7 @@ export const WikiProvider = ({
 			blockLabels,
 			blockRenderers,
 			canCreate,
+			customLabels,
 			data,
 			editMode,
 			load,

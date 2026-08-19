@@ -93,6 +93,26 @@ test.describe('wiki surfaces', () => {
 		await expect(page.locator('.wiki-guide-article')).toContainText('Write the draft')
 	})
 
+	test('surfaces a custom target on the dev app custom view', async ({ page }) => {
+		// Nothing in the config describes this view, so its guide is attached to a
+		// declared custom key rather than to anything the walker found.
+		await page.goto('/admin/dashboard')
+
+		const trigger = page.locator('.wiki-field-help__trigger').first()
+		await expect(trigger).toHaveText('Reading the dashboard')
+
+		await trigger.click()
+		await openPopup(page).locator('.wiki-field-help__item-open').click()
+		await expect(page.locator('.wiki-guide-article')).toContainText('custom admin view')
+	})
+
+	test('chips a custom target under its declared label on the wiki index', async ({ page }) => {
+		await page.goto('/admin/wiki')
+
+		const row = page.locator('.wiki-index__row', { hasText: 'Reading the dashboard' }).first()
+		await expect(row.locator('.wiki-target-chips__chip--custom')).toHaveText('Dashboard')
+	})
+
 	test('renders the dev app components in all three wiki index slots', async ({ page }) => {
 		await page.goto('/admin/wiki')
 

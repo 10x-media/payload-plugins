@@ -76,6 +76,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.targetBlocksSingular]: 'Block',
 	[keys.targetCollectionsDescription]: 'Die Sammlungen, für die diese Anleitung gilt.',
 	[keys.targetCollectionsLabel]: 'Sammlungen',
+	[keys.targetCustomDescription]: 'Die eigenen Oberflächen, für die diese Anleitung gilt.',
+	[keys.targetCustomLabel]: 'Eigene Ziele',
 	[keys.targetFieldsDescription]:
 		'Feldpfade mit vorangestelltem Besitzer: "collection:posts.hero.title", "global:settings.siteName" oder "block:heroBanner.heading" für ein Feld in einem Block.',
 	[keys.targetFieldsEmpty]: 'Noch keine Felder.',

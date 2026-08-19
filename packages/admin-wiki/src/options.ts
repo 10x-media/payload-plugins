@@ -90,6 +90,29 @@ export type WikiEditorOptions = {
 	features?: WikiEditorFeaturesOption
 }
 
+/** One label, or one per admin language: `'Dashboard'` or `{ de: '…', en: '…' }`. */
+export type WikiCustomTargetLabel = Record<string, string> | string
+
+/**
+ * A surface the plugin cannot derive from the config: a view registered through
+ * `admin.components.views`, a panel inside one, a report, anything a project
+ * renders itself and wants a guide attached to.
+ *
+ * The key is a bare slug of the project's choosing (`dashboard`,
+ * `dashboard.attention`). The plugin namespaces it to `custom:<key>` on the way
+ * in and out, so it can never collide with a collection, global, block, or
+ * field target, and so a project never types the namespace. The string
+ * shorthand declares a target labelled by its own key.
+ */
+export type WikiCustomTargetOption =
+	| string
+	| {
+			/** Bare key, e.g. `dashboard`. A leading `custom:` is stripped. */
+			key: string
+			/** Shown in the target picker and on the "Covers" chips. Defaults to the key. */
+			label?: WikiCustomTargetLabel
+	  }
+
 /**
  * When the "write this guide" affordances render for users whose create
  * permission resolves true. Field-level surfaces put one affordance next to
@@ -295,6 +318,13 @@ export type AdminWikiPluginOptions = {
 	access?: WikiAccessOptions
 	/** What the "Covers" chips show. See {@link WikiChipsOptions}. */
 	chips?: WikiChipsOptions
+	/**
+	 * Surfaces the config does not describe, so guides can be attached to them
+	 * too. Declaring any adds a fifth target list to the guide pages collection;
+	 * declaring none leaves the collection exactly as it was. See
+	 * {@link WikiCustomTargetOption}.
+	 */
+	customTargets?: WikiCustomTargetOption[]
 	/** Extensions to the wiki editor (consumer blocks with renderers). */
 	editor?: WikiEditorOptions
 	/** Entities the plugin leaves alone entirely. See {@link WikiExcludeOptions}. */

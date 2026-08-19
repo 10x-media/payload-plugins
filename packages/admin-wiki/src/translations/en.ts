@@ -75,6 +75,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.targetBlocksSingular]: 'Block',
 	[keys.targetCollectionsDescription]: 'The collections this guide covers.',
 	[keys.targetCollectionsLabel]: 'Collections',
+	[keys.targetCustomDescription]: 'The custom surfaces this guide covers.',
+	[keys.targetCustomLabel]: 'Custom targets',
 	[keys.targetFieldsDescription]:
 		'Field paths, prefixed with what they belong to: "collection:posts.hero.title", "global:settings.siteName", or "block:heroBanner.heading" for a field inside a block.',
 	[keys.targetFieldsEmpty]: 'No fields yet.',

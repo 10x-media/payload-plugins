@@ -58,6 +58,12 @@ export default buildConfig({
 	plugins: [
 		fields({ icon: { adapters: [lucideAdapter()], defaultLibrary: 'lucide' } }),
 		adminWiki({
+			// Both forms: an object with a localized label, and the string shorthand.
+			customTargets: [
+				{ key: 'dashboard', label: { de: 'Übersicht', en: 'Dashboard' } },
+				{ key: 'dashboard.attention', label: 'Dashboard · Needs attention' },
+				'traffic',
+			],
 			editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
 			exclude: { collections: ['users'] },
 			// video: { playerComponent: '/components/DevVideoPlayer#DevVideoPlayer' },
@@ -105,6 +111,15 @@ export default buildConfig({
 	},
 	typescript: { autoGenerate },
 	admin: {
+		components: {
+			views: {
+				devDashboard: {
+					Component: '/components/DevDashboard#DevDashboard',
+					exact: true,
+					path: '/dashboard',
+				},
+			},
+		},
 		importMap: {
 			autoGenerate,
 			baseDir: path.resolve(dirname),

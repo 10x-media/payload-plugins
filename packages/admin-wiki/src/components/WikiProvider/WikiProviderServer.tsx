@@ -69,6 +69,7 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 			blockChips={registry.chips.blocks}
 			blockLabels={registry.blockLabels}
 			blockRenderers={blockRenderers}
+			customTargets={registry.customTargets}
 			pagesSlug={registry.slugs.pages}
 			videoPlayer={videoPlayer}
 			wikiView={registry.wikiView !== false}

@@ -9,6 +9,11 @@ export type WikiSeedTargets = {
 	/** Collection slugs, e.g. `posts`. */
 	collections?: string[]
 	/**
+	 * Bare custom target keys, e.g. `dashboard`, as declared through the
+	 * plugin's `customTargets` option and without the `custom:` namespace.
+	 */
+	custom?: string[]
+	/**
 	 * Owner-qualified field schema paths, e.g. `collection:posts.hero.title`,
 	 * `global:settings.siteName`, or `block:heroBanner.heading` for a field
 	 * inside a block.

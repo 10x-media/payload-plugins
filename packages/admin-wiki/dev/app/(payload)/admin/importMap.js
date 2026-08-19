@@ -33,11 +33,13 @@ import { HeadingFeatureClient as HeadingFeatureClient_e70f5e05f09f93e00b997edb1e
 import { WikiTargetSelect as WikiTargetSelect_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiTargetFields as WikiTargetFields_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiTargetBlocks as WikiTargetBlocks_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
+import { WikiTargetCustom as WikiTargetCustom_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiOrphanBanner as WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiGuideViewLink as WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiViewLink as WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiBlockHelp as WikiBlockHelp_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiProviderServer as WikiProviderServer_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
+import { DevDashboard as DevDashboard_4983c3fd24b2f1b849f144137ef90983 } from '../../../components/DevDashboard'
 import { WikiIndexView as WikiIndexView_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
 import { WikiPageView as WikiPageView_11f6523fe2b636ccac41524a0a270462 } from '@10x-media/admin-wiki/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
@@ -86,11 +88,13 @@ export const importMap = {
   "@10x-media/admin-wiki/client#WikiTargetSelect": WikiTargetSelect_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiTargetFields": WikiTargetFields_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiTargetBlocks": WikiTargetBlocks_bd0a8d2193330fdfdceeb64a56ffc89f,
+  "@10x-media/admin-wiki/client#WikiTargetCustom": WikiTargetCustom_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiOrphanBanner": WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiGuideViewLink": WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiViewLink": WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiBlockHelp": WikiBlockHelp_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/rsc#WikiProviderServer": WikiProviderServer_11f6523fe2b636ccac41524a0a270462,
+  "/components/DevDashboard#DevDashboard": DevDashboard_4983c3fd24b2f1b849f144137ef90983,
   "@10x-media/admin-wiki/rsc#WikiIndexView": WikiIndexView_11f6523fe2b636ccac41524a0a270462,
   "@10x-media/admin-wiki/rsc#WikiPageView": WikiPageView_11f6523fe2b636ccac41524a0a270462,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,

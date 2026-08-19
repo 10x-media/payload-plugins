@@ -10,7 +10,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 ## Features
 
-- **Guides attached to surfaces**: one guide targets any number of collections, globals, field schema paths, and block slugs. Collections, globals, and blocks are picked from what the plugin covers; targets are stored as plain strings, so a guide survives its surface being removed.
+- **Guides attached to surfaces**: one guide targets any number of collections, globals, field schema paths, and block slugs, plus any custom keys you declare for the screens your config does not describe. Collections, globals, and blocks are picked from what the plugin covers; targets are stored as plain strings, so a guide survives its surface being removed.
 - **Scoped to what you document**: Payload's own bookkeeping collections are out of the wiki by default, and `exclude` takes out any other collection, global, or block, surfaces and target pickers alike.
 - **Zero-footprint injection**: field help arrives as a `Description` component, block and document help as UI fields. No data, no database columns, nothing in your generated types, and an undocumented admin looks exactly as it did before.
 - **One request per session**: a compact targets map resolves hundreds of field surfaces with a synchronous lookup. Guide content loads lazily and caches per guide and locale.
