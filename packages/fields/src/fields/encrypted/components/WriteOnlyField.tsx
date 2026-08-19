@@ -81,7 +81,10 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	// A successful save ends the reveal-once window: the staged plaintext (typed
 	// or generated) is dropped and the field returns to its concealed face
 	// immediately, not on the next page load. The edit view fires reportUpdate
-	// only on success, so a failed save keeps the user's input.
+	// only on success, so a failed save keeps the user's input. This write is
+	// housekeeping, not an edit: disableModifyingForm keeps it from re-dirtying
+	// the form Payload just marked clean, which would resurrect the
+	// leave-without-saving warning on every navigation after a save.
 	const { mostRecentUpdate } = useDocumentEvents()
 	const lastUpdateAt = useRef(mostRecentUpdate?.updatedAt)
 	useEffect(() => {
@@ -90,7 +93,7 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 		}
 		lastUpdateAt.current = mostRecentUpdate.updatedAt
 		const resolved = applySave()
-		setValue(resolved.value)
+		setValue(resolved.value, true)
 		setCleared(resolved.cleared)
 	}, [mostRecentUpdate?.updatedAt, setValue])
 
@@ -278,12 +281,13 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	setPath,
 }) => {
 	const { t } = useTranslation()
-	const { setValue } = useField<unknown>({ path })
+	const { setValue, value } = useField<unknown>({ path })
 	const isSet = useFormFields(([fields]) => fields?.[setPath]?.value === true)
 	const [mode, setMode] = useState<'cleared' | 'editing' | 'idle'>('idle')
 
 	// Mirror of the inline variant's save-conceal: a successful save drops any
-	// staged edit and folds the field back to its concealed face.
+	// staged edit and folds the field back to its concealed face, without
+	// re-dirtying the form Payload just marked clean (disableModifyingForm).
 	const { mostRecentUpdate } = useDocumentEvents()
 	const lastUpdateAt = useRef(mostRecentUpdate?.updatedAt)
 	useEffect(() => {
@@ -291,19 +295,22 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 			return
 		}
 		lastUpdateAt.current = mostRecentUpdate.updatedAt
-		setValue(undefined)
+		setValue(undefined, true)
 		setMode('idle')
 	}, [mostRecentUpdate?.updatedAt, setValue])
 
 	const toggleEdit = useCallback(() => {
-		setMode((prev) => {
-			if (prev === 'editing') {
+		if (mode === 'editing') {
+			// Discard only what was staged: cancelling an untouched editor must not
+			// mark the form modified.
+			if (value !== undefined) {
 				setValue(undefined)
-				return 'idle'
 			}
-			return 'editing'
-		})
-	}, [setValue])
+			setMode('idle')
+			return
+		}
+		setMode('editing')
+	}, [mode, setValue, value])
 
 	const clear = useCallback(() => {
 		setValue(null)
