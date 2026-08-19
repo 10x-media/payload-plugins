@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/automations
 
 A no-code automation engine for Payload v3: editors will compose automations from triggers and actions in the admin panel, with each action running as a Payload task. Beta scaffold; the engine is being built on top of [@10x-media/jobs](https://www.npmjs.com/package/@10x-media/jobs).
