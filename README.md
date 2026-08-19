@@ -15,6 +15,8 @@ Open-source plugins for [Payload v3](https://payloadcms.com) maintained by [10x-
 | [@10x-media/undo-redo](./packages/undo-redo) | Client-side undo/redo for admin document forms, independent of document versions | [![npm](https://img.shields.io/npm/v/@10x-media/undo-redo)](https://www.npmjs.com/package/@10x-media/undo-redo) |
 | [@10x-media/automations](./packages/automations) | No-code automation engine (beta scaffold) | [![npm](https://img.shields.io/npm/v/@10x-media/automations)](https://www.npmjs.com/package/@10x-media/automations) |
 | [@10x-media/folder-picker](./packages/folder-picker) | Folder browsing inside the list drawer, so any field picks documents by folder | [![npm](https://img.shields.io/npm/v/@10x-media/folder-picker)](https://www.npmjs.com/package/@10x-media/folder-picker) |
+| [@10x-media/dual-session](./packages/dual-session) | Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist. | [![npm](https://img.shields.io/npm/v/@10x-media/folder-picker)](https://www.npmjs.com/package/@10x-media/dual-session) |
+
 
 ## Status
 
