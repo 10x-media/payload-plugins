@@ -3,7 +3,7 @@ title: One collection, two sessions
 description: Split a single auth collection by role, so an editor and a website visitor from the same collection can be logged in together.
 ---
 
-Plenty of projects have one `users` collection with a `roles` field and gate the admin panel with `access.admin`. Editors and website visitors are the same collection, told apart by role. That still needs two sessions in one browser — a visitor signing in on the website must not sign the editor out of `/admin` — but the boundary the plugin has to draw is not between two collections.
+Plenty of projects have one `users` collection with a `roles` field and gate the admin panel with `access.admin`. Editors and website visitors are the same collection, told apart by role. That still needs two sessions in one browser, since a visitor signing in on the website must not sign the editor out of `/admin`, but the boundary the plugin has to draw is not between two collections.
 
 So the cookie is a function of the **user**, not of the collection:
 
@@ -39,7 +39,7 @@ It is asked one question, about one user, at the moment a session is being writt
 isolate?: (user: TypedUser) => boolean
 ```
 
-Roles live in the user document, so read them from there. The predicate is never given a request, and it is deliberately synchronous — a classification that needs a database read is a sign the role is in the wrong place.
+Roles live in the user document, so read them from there. The predicate is never given a request, and it is deliberately synchronous, because a classification that needs a database read is a sign the role is in the wrong place.
 
 **Write it as the inverse of your admin gate**, from the same helper, so the two answers cannot drift apart:
 
@@ -56,7 +56,7 @@ export const Users: CollectionConfig = {
 isolate: (user) => !checkRole(['admin', 'editor'], user)
 ```
 
-A predicate that disagrees with `access.admin` fails quietly: the user lands in a cookie the admin panel does not read, and nothing errors. In development the plugin catches the common half of that for you — when a login is routed to the isolated cookie and the user would have passed `access.admin`, it logs a warning naming the user and the cookie. It only runs on login, and only when the collection defines `access.admin`.
+A predicate that disagrees with `access.admin` fails quietly: the user lands in a cookie the admin panel does not read, and nothing errors. In development the plugin catches the common half of that for you: when a login is routed to the isolated cookie and the user would have passed `access.admin`, it logs a warning naming the user and the cookie. It only runs on login, and only when the collection defines `access.admin`.
 
 ## Access control does the rest
 
@@ -80,10 +80,10 @@ Every shadowed endpoint asks the predicate about the user in front of it, so the
 | --- | --- | --- |
 | `POST /login` | the user who just logged in | writes their cookie |
 | `POST /reset-password` | the user who just reset | writes their cookie |
-| `POST /refresh-token` | `req.user` | rotates the cookie the session came from |
+| `POST /refresh-token` | `req.user` | writes the cookie that user belongs in **now** |
 | `POST /logout` | `req.user` | expires only that cookie |
 | `GET /me` | `req.user` | reports that cookie's token |
-| `POST /first-register` | — | always the shared cookie |
+| `POST /first-register` | Nobody | always the shared cookie |
 
 `first-register` is the exception: it creates the first user of the system, who exists to get *into* the admin panel and has no roles yet for a predicate to read.
 
@@ -91,29 +91,40 @@ Every shadowed endpoint asks the predicate about the user in front of it, so the
 
 ## Custom auth needs the user
 
-Code that mints its own token — an OAuth callback, a server action — has to say who it is minting for, because the cookie name now depends on it:
+Code that mints its own token (an OAuth callback, a server action) has to say who it is minting for, because the cookie name now depends on it:
 
 ```ts
 generateIsolatedAuthCookie({ collection: 'users', payload, token, user })
 ```
 
-Without `user` the call throws rather than pick a half. Same for `resolveIsolatedCookieName({ collection, payload, user })`. For a collection listed without a predicate, `user` stays optional — there is only one answer. See [Custom auth](/dual-session/custom-auth).
+Without `user` the call throws rather than pick a half. Same for `resolveIsolatedCookieName({ collection, payload, user })`. For a collection listed without a predicate, `user` stays optional, because there is only one answer. See [Custom auth](/dual-session/custom-auth).
 
 ## Scopes
 
 The isolated half keeps the default `scopes: ['frontend']`, and for this collection that is enforced: listing `'admin'` throws. The isolated strategy runs ahead of core's `local-jwt`, so an isolated cookie allowed to answer admin-scoped requests would outrank the admin's own session on the very collection the panel authenticates against.
 
-The staff half is not scoped at all. It is on the shared cookie, which core reads on every request — so an editor browsing the website is still the editor there, exactly as before the plugin.
+The staff half is not scoped at all. It is on the shared cookie, which core reads on every request, so an editor browsing the website is still the editor there, exactly as before the plugin.
 
 ## A changed role needs a fresh login
 
 Promote a member to editor and their live session is still in the isolated cookie. Going to `/admin` they find the admin scope, where that cookie stands down and the shared one is empty, so they get the login form. Signing in again puts them in the right half.
 
-The plugin deliberately does not re-check the predicate when *reading* a session. Roles come from the document, not from the token, so re-checking buys nothing for security and would log out everyone whose role just changed. Sessions live out their term where they were written.
+The plugin deliberately does not re-check the predicate when *reading* a session. Roles come from the document, not from the token, so re-checking buys nothing for security and would log out everyone whose role just changed.
+
+### Refresh is a write, so it does re-check
+
+`/refresh-token` asks the predicate about the user it just loaded, and after a role change that document answers differently. The replacement token is therefore written to the cookie the user belongs in now, which may not be the cookie the request authenticated from:
+
+- a promoted member refreshes from the isolated cookie and gets the **shared** one back, so they can reach the panel without signing in again
+- a demoted editor refreshes from the shared cookie and gets the **isolated** one back
+
+The cookie it moved out of is not expired. It keeps its own token until that token's own expiry, so for up to `tokenExpiration` the browser holds two live cookies naming the same user.
+
+That is untidy rather than dangerous, because nothing about a session grants anything: `access.admin` and your access functions are re-evaluated from the live document on every request, so a demoted editor holding a stale shared cookie is still refused by the panel. **Do not treat a role change as a way to revoke access.** Clear that user's `sessions` array if you need their existing sessions gone.
 
 ## What this does not solve
 
-**De-escalation.** One document at two privilege levels — signing in as "yourself the editor" and "yourself the customer" in one browser — is not possible, and not because of this plugin. Payload resolves one user document to one `req.user`, and the roles are in the document. What each session may do is your access control's answer, not the cookie's.
+**De-escalation.** One document at two privilege levels, signing in as "yourself the editor" and "yourself the customer" in one browser, is not possible, and not because of this plugin. Payload resolves one user document to one `req.user`, and the roles are in the document. What each session may do is your access control's answer, not the cookie's.
 
 **Separate login pages.** Unrelated to any of this: one form over two collections is a project-level concern, a server action trying one and then the other.
 

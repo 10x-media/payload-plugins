@@ -25,7 +25,7 @@ export type IsolatedCollection = {
 	 * claims are moved onto a second one. It is also the only way to list the collection
 	 * named by `admin.user`.
 	 *
-	 * Roles live in the user document, so the predicate should read them from there — it is
+	 * Roles live in the user document, so the predicate should read them from there. It is
 	 * never asked about a request, only about a user.
 	 *
 	 * @default every session of the collection is isolated
@@ -51,7 +51,7 @@ export type DualSessionPluginOptions = {
 	/**
 	 * Auth collections to move off the shared `${cookiePrefix}-token` cookie.
 	 * The collection configured as `admin.user` may only be listed together with an
-	 * `isolate` predicate — without one it would lose the shared cookie it owns.
+	 * `isolate` predicate. Without one it would lose the shared cookie it owns.
 	 *
 	 * Order is priority: when a visitor holds sessions for more than one of these at
 	 * once, the earliest listed collection wins.

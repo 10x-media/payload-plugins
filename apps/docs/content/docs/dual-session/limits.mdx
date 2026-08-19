@@ -13,7 +13,7 @@ So on an isolated collection:
 - a GraphQL `me` reads the shared cookie, so it only ever sees the admin session
 - sessions minted through REST are invisible to GraphQL, because they live in a cookie it does not read
 
-**Use REST for auth on isolated collections.** GraphQL for everything else is unaffected — it authenticates from whatever `req.user` already resolved to.
+**Use REST for auth on isolated collections.** GraphQL for everything else is unaffected, because it authenticates from whatever `req.user` already resolved to.
 
 ## Authorization headers win
 
@@ -31,7 +31,7 @@ Reordering `jwtOrder` to put `cookie` first makes the cookie beat `JWT` and `Bea
 
 ## Live preview needs a decision
 
-The admin panel's preview iframe loads a frontend URL, so the default rule scopes it `frontend`. An editor logged in as both an admin and a customer therefore gets the customer's view inside preview — no drafts, or a 403.
+The admin panel's preview iframe loads a frontend URL, so the default rule scopes it `frontend`. An editor logged in as both an admin and a customer therefore gets the customer's view inside preview: no drafts, or a 403.
 
 The plugin does not detect this case. Two ways out:
 
@@ -62,12 +62,12 @@ A cached page that calls `payload.auth()` freezes whichever user rendered it. Th
 
 Sessions move from `payload-token` to `payload-customers-token`, and the browser's old cookie no longer matches a name anything reads. Every isolated session ends once, at the deploy. Admin sessions are untouched.
 
-The same happens if you change `cookieName` later, or toggle `disabled`.
+The same happens if you change `cookieName` later. Toggling `disabled` looks the same from the browser but is not: those sessions are only unreadable while it is on, not revoked, and they come back if you flip it off before they expire.
 
 ## Other plugins that touch auth
 
 <Callout type="warn">
-**Assume conflict, and check before you install both.** This plugin works by replacing a collection's auth endpoints and by owning where that collection's cookie is written. Another plugin doing either of those things to the same collection will collide, and the collision is usually silent — a cookie written to the wrong name, or an endpoint that never runs — rather than an error you can see.
+**Assume conflict, and check before you install both.** This plugin works by replacing a collection's auth endpoints and by owning where that collection's cookie is written. Another plugin doing either of those things to the same collection will collide, and the collision is usually silent, a cookie written to the wrong name or an endpoint that never runs, rather than an error you can see.
 </Callout>
 
 None of the `@10x-media` plugins touch auth, so this is about third-party ones: OAuth and social login, magic links, passkeys, SSO, 2FA, impersonation, anything advertising "authentication".
@@ -76,7 +76,7 @@ None of the `@10x-media` plugins touch auth, so this is about third-party ones: 
 
 | What the other plugin does | Result |
 | --- | --- |
-| Only reads `req.user` — access control, audit trails, field UI | **Fine.** Nothing here changes what `req.user` is once it has resolved. |
+| Only reads `req.user`, for access control, audit trails, field UI | **Fine.** Nothing here changes what `req.user` is once it has resolved. |
 | Adds an auth **strategy** and nothing else | **Fine.** A collection's declared strategies run ahead of this plugin's, so it keeps first refusal on every request. |
 | Writes the session cookie itself, via `generatePayloadCookie` | **Broken.** See below. |
 | Declares `/login`, `/logout`, `/refresh-token` or `/me` on an isolated collection | **One of the two silently loses.** See below. |
@@ -86,7 +86,7 @@ None of the `@10x-media` plugins touch auth, so this is about third-party ones: 
 
 ### A plugin that writes the cookie
 
-This is the common one. An OAuth or magic-link callback ends by minting a token and calling `generatePayloadCookie`, which writes the shared `${cookiePrefix}-token`. On an isolated collection that both bypasses the isolation and overwrites whatever admin session the visitor was holding — the exact bug this plugin exists to fix.
+This is the common one. An OAuth or magic-link callback ends by minting a token and calling `generatePayloadCookie`, which writes the shared `${cookiePrefix}-token`. On an isolated collection that both bypasses the isolation and overwrites whatever admin session the visitor was holding, the exact bug this plugin exists to fix.
 
 Nothing here can intercept it. The call happens inside the other plugin's route, which this plugin never sees.
 
@@ -105,10 +105,10 @@ Ordering picks which one loses, not whether one does. If the other plugin's `/lo
 
 In its source, look for:
 
-1. `generatePayloadCookie` — writes the shared cookie, conflict.
-2. `path: '/login'` (or `/logout`, `/refresh-token`, `/me`) on a collection you isolate — endpoint conflict.
-3. `parseCookies` or `extractJWT` used to authorize — reads the shared cookie, conflict.
-4. `auth.strategies = [...]` rather than appending — drops this plugin's strategy.
+1. `generatePayloadCookie`, which writes the shared cookie. Conflict.
+2. `path: '/login'` (or `/logout`, `/refresh-token`, `/me`) on a collection you isolate. Endpoint conflict.
+3. `parseCookies` or `extractJWT` used to authorize, which reads the shared cookie. Conflict.
+4. `auth.strategies = [...]` rather than appending, which drops this plugin's strategy.
 
 None of those, and it only adds strategies or reads `req.user`? It composes.
 
@@ -122,14 +122,16 @@ None of those, and it only adds strategies or reads `req.user`? It composes.
 
 ## `endpoints: false`
 
-Payload answers 501 for every route on such a collection, so there are no auth endpoints to replace. The plugin warns, keeps the collection, and registers its strategy — the cookie can still be established with [`generateIsolatedAuthCookie`](/dual-session/custom-auth) from a route that does exist.
+Payload answers 501 for every route on such a collection, so there are no auth endpoints to replace. The plugin warns, keeps the collection, and registers its strategy, so the cookie can still be established with [`generateIsolatedAuthCookie`](/dual-session/custom-auth) from a route that does exist.
 
 ## Unverified users
 
 Core's JWT strategy falls through to `admin.autoLogin` when a user fails the `verify` check, which on an isolated collection would hand back the *admin* user. The plugin returns no user instead. Only observable if you use `autoLogin`.
 
-## A changed role needs a fresh login
+## A changed role does not revoke anything
 
-On a collection [split by role](/dual-session/role-split), promoting a member to editor does not move their live session: it stays in the isolated cookie until it expires. They sign in again and land in the right half.
+On a collection [split by role](/dual-session/role-split), promoting a member to editor does not move their live session. Reading a session never re-runs the predicate, because roles come from the document rather than from the token, so re-checking would buy nothing for security and would log out everyone whose role just changed. They sign in again and land in the right half.
 
-This is deliberate. The plugin does not re-run the predicate when reading a session, because roles come from the document rather than from the token — re-checking would buy nothing for security and would log out everyone whose role just changed.
+`/refresh-token` is the exception, and it is deliberate: it asks the predicate about the user it just loaded, so it writes the replacement token into whichever half that user belongs in now. It does not expire the cookie it moved out of, so the browser can hold two live cookies for one user until the older token expires.
+
+Neither of those grants anything on its own. `access.admin` and your access functions run against the live document on every request, so a demoted editor still holding a shared cookie is still refused by the panel. If you need existing sessions actually gone, clear that user's `sessions` array. See [Refresh is a write](/dual-session/role-split#refresh-is-a-write-so-it-does-re-check).

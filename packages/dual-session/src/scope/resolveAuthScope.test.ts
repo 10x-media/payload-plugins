@@ -13,15 +13,18 @@ describe('resolveAuthScope', () => {
 	})
 
 	it('attributes REST calls by their referer', () => {
+		const origin = 'https://site.test'
+
 		expect(
 			resolveAuthScope({
+				origin,
 				pathname: '/api/pages',
 				referer: 'https://site.test/admin/collections/pages',
 			})
 		).toBe('admin')
-		expect(resolveAuthScope({ pathname: '/api/pages', referer: 'https://site.test/members' })).toBe(
-			'frontend'
-		)
+		expect(
+			resolveAuthScope({ origin, pathname: '/api/pages', referer: 'https://site.test/members' })
+		).toBe('frontend')
 	})
 
 	it('treats everything else as frontend scope', () => {
@@ -77,14 +80,50 @@ describe('resolveAuthScope', () => {
 			).toBe('admin')
 		})
 
-		it('falls back to the path when the browser sends no Sec-Fetch-Site', () => {
-			expect(
-				resolveAuthScope({
-					pathname: '/api/orders',
-					referer: 'https://site.test/admin/orders',
-					secFetchSite: null,
-				})
-			).toBe('admin')
+		describe('with no Sec-Fetch-Site to go on', () => {
+			it('vets the referer against the origin instead', () => {
+				expect(
+					resolveAuthScope({
+						origin: 'https://site.test',
+						pathname: '/api/orders',
+						referer: 'https://site.test/admin/orders',
+						secFetchSite: null,
+					})
+				).toBe('admin')
+			})
+
+			it('is frontend for another origin whose path looks like the admin route', () => {
+				// The whole attack: a page anywhere can set its own path to `/admin` and, on a
+				// client that sends no `Sec-Fetch-Site`, claim the admin scope with it.
+				expect(
+					resolveAuthScope({
+						origin: 'https://site.test',
+						pathname: '/api/orders',
+						referer: 'https://evil.test/admin/orders',
+						secFetchSite: null,
+					})
+				).toBe('frontend')
+			})
+
+			it('is frontend for a sibling subdomain, which is a different origin', () => {
+				expect(
+					resolveAuthScope({
+						origin: 'https://site.test',
+						pathname: '/api/orders',
+						referer: 'https://app.site.test/admin/orders',
+					})
+				).toBe('frontend')
+			})
+
+			it('will not call it admin when the caller passes no origin either', () => {
+				// Nothing left to verify the referer with, so the path is not evidence.
+				expect(
+					resolveAuthScope({
+						pathname: '/api/orders',
+						referer: 'https://site.test/admin/orders',
+					})
+				).toBe('frontend')
+			})
 		})
 	})
 })

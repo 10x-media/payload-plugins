@@ -43,6 +43,7 @@ export const createAuthScopeProxy =
 			resolveAuthScope({
 				adminRoute,
 				apiRoute,
+				origin: request.nextUrl.origin,
 				pathname: request.nextUrl.pathname,
 				referer: request.headers.get('Referer'),
 				secFetchSite: request.headers.get('Sec-Fetch-Site'),

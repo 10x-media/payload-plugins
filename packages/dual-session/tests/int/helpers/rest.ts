@@ -42,7 +42,7 @@ const parseSetCookie = (raw: string) => {
 /**
  * Drives a booted Payload through its real REST router.
  *
- * The whole plugin rests on core behaviour that is not a public contract — that
+ * The whole plugin rests on core behaviour that is not a public contract: that
  * collection-declared endpoints shadow the built-ins, and that a collection's own auth
  * strategies run before `local-jwt`. Calling `strategy.authenticate` or an endpoint
  * handler directly proves neither, so every routing-sensitive test goes through
@@ -99,11 +99,22 @@ export const createRestClient = (booted: BootedPayload) => {
 			}
 		}
 
-		return {
-			body: (await response.json()) as T,
-			setCookies,
-			status: response.status,
+		// A route that answered with no body, or with an error page, should say so with its
+		// status rather than fail as an opaque parse error three frames deep in the helper.
+		const text = await response.text()
+		let parsed = {} as T
+
+		if (text) {
+			try {
+				parsed = JSON.parse(text) as T
+			} catch {
+				throw new Error(
+					`${method} ${path} answered ${response.status} with a non-JSON body: ${text.slice(0, 200)}`
+				)
+			}
 		}
+
+		return { body: parsed, setCookies, status: response.status }
 	}
 
 	return {

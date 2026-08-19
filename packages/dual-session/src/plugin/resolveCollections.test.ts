@@ -28,6 +28,12 @@ describe('resolveCollections', () => {
 		expect(resolve([slug('customers')])[0]).not.toHaveProperty('isolate')
 	})
 
+	it('keeps an explicit cookieName and scopes instead of defaulting them', () => {
+		expect(
+			resolve([{ slug: slug('partners'), cookieName: 'partner-session', scopes: ['admin'] }])
+		).toEqual([{ slug: 'partners', cookieName: 'partner-session', scopes: ['admin'] }])
+	})
+
 	it('carries a custom predicate through untouched', () => {
 		const isolate = (user: TypedUser) => user.id === 1
 

@@ -6,8 +6,9 @@ import { resolveAdminUserSlug, selectCollections } from './selectCollections'
 
 const slug = (value: string) => value as CollectionSlug
 
-/** Stands in for `checkRole(['admin'], user)` in a role-split project. */
-const isStaff = (user: TypedUser) => !(user as { roles?: string[] }).roles?.includes('admin')
+/** The `isolate` a role-split project writes: the negation of `checkRole(['admin'], user)`. */
+const isolateNonAdmins = (user: TypedUser) =>
+	!(user as { roles?: string[] }).roles?.includes('admin')
 
 const incoming: CollectionConfig[] = [
 	{ slug: 'users', auth: true, fields: [] },
@@ -101,7 +102,7 @@ describe('selectCollections', () => {
 	it('accepts the admin collection once an `isolate` predicate says who moves', () => {
 		// Role-split: admins keep the shared cookie, everyone else gets a second one, so the
 		// admin panel is never left without a session to read.
-		const { collections, warnings } = select([{ slug: slug('users'), isolate: isStaff }])
+		const { collections, warnings } = select([{ slug: slug('users'), isolate: isolateNonAdmins }])
 
 		expect(collections.map(({ slug: entry }) => entry)).toEqual(['users'])
 		expect(warnings).toEqual([])
@@ -111,7 +112,7 @@ describe('selectCollections', () => {
 		// The isolated strategy runs ahead of core's `local-jwt`, so this would let a staff
 		// cookie answer admin-panel requests in place of the admin's own session.
 		expect(() =>
-			select([{ slug: slug('users'), isolate: isStaff, scopes: ['admin', 'frontend'] }])
+			select([{ slug: slug('users'), isolate: isolateNonAdmins, scopes: ['admin', 'frontend'] }])
 		).toThrow(/must not carry the "admin" scope/)
 	})
 

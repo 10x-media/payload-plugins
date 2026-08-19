@@ -36,7 +36,7 @@ const verifyToken = async ({ payload, token }: { payload: Payload; token: string
 /**
  * True when `cookieName` holds a signature-valid token minted for `collectionSlug`.
  *
- * Deliberately stops at the signature and the `collection` claim — no database read.
+ * Deliberately stops at the signature and the `collection` claim, with no database read.
  * This only ever decides *which* session takes precedence; the winning strategy still
  * does the full lookup, so a token for a deleted user resolves to no user rather than
  * to the wrong one.
@@ -69,7 +69,7 @@ const hasValidSessionCookie = async ({
  * Authenticates a request against a collection-scoped cookie instead of the shared
  * `${cookiePrefix}-token`. Mirrors Payload's built-in JWT strategy (verification,
  * email verification gate, session `sid` check) so an isolated collection behaves
- * exactly like a normal auth collection — it just reads a different cookie.
+ * exactly like a normal auth collection. It just reads a different cookie.
  */
 export const createIsolatedAuthStrategy = ({
 	adminSessionPriority,
@@ -83,7 +83,7 @@ export const createIsolatedAuthStrategy = ({
 	cookieName: string
 	/**
 	 * Isolated collections ranked above this one. Payload builds its strategy chain from
-	 * the order collections appear in the config, which is not a meaningful priority —
+	 * the order collections appear in the config, which is not a meaningful priority,
 	 * so when a visitor holds sessions for several isolated collections at once, this
 	 * decides which one wins, independently of config order.
 	 */
@@ -99,7 +99,7 @@ export const createIsolatedAuthStrategy = ({
 		authenticate: async ({ headers, isGraphQL = false, payload, strategyName }) => {
 			const token = parseCookies(headers).get(cookieName)
 
-			// Nothing to do — importantly this also stops this strategy from ever
+			// Nothing to do, and importantly this also stops this strategy from ever
 			// interfering with requests that only carry the admin cookie.
 			if (!token) {
 				return NO_USER
@@ -129,7 +129,7 @@ export const createIsolatedAuthStrategy = ({
 			const scope = headers.get(scopeHeader)
 
 			if (scope) {
-				// The proxy told us what this request is — trust it.
+				// The proxy told us what this request is, so trust it.
 				if (!scopes.includes(scope as AuthScope)) {
 					return NO_USER
 				}

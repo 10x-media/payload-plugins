@@ -8,9 +8,9 @@ Payload signs every collection's token into one config-wide cookie, `${cookiePre
 `@10x-media/dual-session` moves the collections you name onto cookies of their own, so both sessions live at once.
 
 <Callout type="warn">
-**Experimental.** This plugin changes how sessions are established, which is not a place where a subtle bug announces itself. It is covered by unit, integration and end-to-end tests against Payload's real routing on both Mongo and Postgres — but auth surfaces differ a lot between projects, and yours may take a path none of those cover. It ships under the `beta` dist-tag and the API can still change.
+**Experimental.** This plugin changes how sessions are established, which is not a place where a subtle bug announces itself. It is covered by unit, integration and end-to-end tests against Payload's real routing on both Mongo and Postgres, but auth surfaces differ a lot between projects, and yours may take a path none of those cover. It ships under the `beta` dist-tag and the API can still change.
 
-Try it in staging first, and check the thing it exists for: log in to the admin panel and to the website in one browser, and confirm both sessions survive a reload, a refresh and a logout of the other. [Report anything that looks off](https://github.com/10x-media/payload-plugins/issues) — edge cases found in real projects are the point of the beta.
+Try it in staging first, and check the thing it exists for: log in to the admin panel and to the website in one browser, and confirm both sessions survive a reload, a refresh and a logout of the other. [Report anything that looks off](https://github.com/10x-media/payload-plugins/issues): edge cases found in real projects are the point of the beta.
 </Callout>
 
 ```ts title="payload.config.ts"
@@ -27,7 +27,7 @@ export default buildConfig({
 A customer now signs in to `payload-customers-token`. `users` keeps `payload-token` and the admin panel never notices the plugin exists.
 
 <Callout type="warn">
-**Already running another auth plugin? Check compatibility first.** This plugin owns a collection's auth endpoints and decides where its cookie is written. Anything else doing either of those to the same collection — OAuth, magic links, passkeys, SSO, 2FA — collides, and usually collides silently. There is a two-minute check and the ways out in [Other plugins that touch auth](/dual-session/limits#other-plugins-that-touch-auth). Plugins that only read `req.user` or add a strategy are fine.
+**Already running another auth plugin? Check compatibility first.** This plugin owns a collection's auth endpoints and decides where its cookie is written. Anything else doing either of those to the same collection (OAuth, magic links, passkeys, SSO, 2FA) collides, and usually collides silently. There is a two-minute check and the ways out in [Other plugins that touch auth](/dual-session/limits#other-plugins-that-touch-auth). Plugins that only read `req.user` or add a strategy are fine.
 </Callout>
 
 ## How it works

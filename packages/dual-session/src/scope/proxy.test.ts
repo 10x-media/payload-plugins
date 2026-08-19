@@ -13,7 +13,10 @@ const forwardedHeaders = (response: NextResponse) => {
 		response.headers.get('x-middleware-override-headers')?.split(',').filter(Boolean) ?? []
 
 	return new Headers(
-		names.map((name) => [name, response.headers.get(`x-middleware-request-${name}`) ?? ''])
+		names.map((name): [string, string] => [
+			name,
+			response.headers.get(`x-middleware-request-${name}`) ?? '',
+		])
 	)
 }
 

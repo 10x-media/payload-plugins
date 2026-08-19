@@ -9,7 +9,7 @@ import type { ResolvedIsolatedCollection } from '../types'
  * The `isolate` predicate is written by the project, and getting it wrong is silent: an
  * admin classified as a frontend user lands in the wrong cookie, the panel never sees the
  * session, and nothing errors. The two answers are only ever compared here, at login, where
- * a user is being written to a cookie in the first place — checking on every request would
+ * a user is being written to a cookie in the first place. Checking on every request would
  * cost an access call per request to say the same thing.
  *
  * Mirrors `canAccessAdmin`'s first branch: the gate is `access.admin` on the collection the
@@ -50,7 +50,7 @@ export const warnIfAdminMisclassified = async ({
 		req.user = user
 		if (await adminAccess({ req })) {
 			req.payload.logger.warn(
-				`@10x-media/dual-session: "${user.email ?? user.id}" passes ${collection.config.slug}.access.admin, but \`isolate\` sent their session to the "${entry.cookieName}" cookie, which the admin panel does not read. They will not be able to sign in to it. Check the predicate.`
+				`@10x-media/dual-session: user "${user.id}" passes ${collection.config.slug}.access.admin, but \`isolate\` sent their session to the "${entry.cookieName}" cookie, which the admin panel does not read. They will not be able to sign in to it. Check the predicate.`
 			)
 		}
 	} catch {

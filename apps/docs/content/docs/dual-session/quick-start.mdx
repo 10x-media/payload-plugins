@@ -4,7 +4,7 @@ description: Isolate a collection, install the proxy, and hold two sessions at o
 ---
 
 <Callout type="warn">
-If another auth plugin is already installed — OAuth, magic links, passkeys, SSO, 2FA — read [Other plugins that touch auth](/dual-session/limits#other-plugins-that-touch-auth) before this page. A plugin that writes the session cookie or declares its own `/login` conflicts with this one on the same collection, silently.
+If another auth plugin is already installed (OAuth, magic links, passkeys, SSO, 2FA), read [Other plugins that touch auth](/dual-session/limits#other-plugins-that-touch-auth) before this page. A plugin that writes the session cookie or declares its own `/login` conflicts with this one on the same collection, silently.
 </Callout>
 
 ## Install
@@ -31,7 +31,7 @@ export default buildConfig({
 })
 ```
 
-Each listed collection gets `${cookiePrefix}-${slug}-token` — here `payload-customers-token` and `payload-partners-token`. Override a name with the object form:
+Each listed collection gets `${cookiePrefix}-${slug}-token`, so here `payload-customers-token` and `payload-partners-token`. Override a name with the object form:
 
 ```ts
 dualSession({
@@ -39,7 +39,7 @@ dualSession({
 })
 ```
 
-Do not list the collection named by `admin.user` — unless you give it an `isolate` predicate, which is how a single `users` collection with roles backs both sessions. See [One collection, two sessions](/dual-session/role-split). If you never set `admin.user`, Payload defaults it to the first collection declaring `auth`, and so does this plugin.
+Do not list the collection named by `admin.user`, unless you give it an `isolate` predicate, which is how a single `users` collection with roles backs both sessions. See [One collection, two sessions](/dual-session/role-split). If you never set `admin.user`, Payload defaults it to the first collection declaring `auth`, and so does this plugin.
 
 ## Install the proxy
 
@@ -59,7 +59,7 @@ Next 16 calls this file `proxy.ts`; on Next 15 it is `middleware.ts` with the sa
 The matcher **must** cover `/api`. The common default `'/((?!api|_next/static).*)'` excludes it, which leaves every REST call unattributed, so a visitor holding an admin session sees the admin answer on the website. See [Scopes](/dual-session/scopes).
 </Callout>
 
-Already have a proxy? Compose rather than replace it — [Scopes](/dual-session/scopes#composing-with-an-existing-proxy) has the recipe.
+Already have a proxy? Compose rather than replace it. [Scopes](/dual-session/scopes#composing-with-an-existing-proxy) has the recipe.
 
 ## Try it
 
@@ -72,7 +72,7 @@ Before the plugin, step 2 logged the editor out.
 
 ## Log in from the frontend
 
-Nothing changes about how you call it. The endpoint is the same, the request is the same, and the response is the same shape — only the `Set-Cookie` name differs:
+Nothing changes about how you call it. The endpoint is the same, the request is the same, and the response is the same shape. Only the `Set-Cookie` name differs:
 
 ```ts
 await fetch('/api/customers/login', {
@@ -89,7 +89,9 @@ await fetch('/api/customers/login', {
 dualSession({ collections: ['customers'], disabled: process.env.NODE_ENV === 'test' })
 ```
 
-`disabled` returns the incoming config untouched. Note that every isolated session is dropped when you flip this, in either direction: the cookie name changes, so the browser's old cookie no longer matches. Admin sessions are unaffected.
+`disabled` returns the incoming config untouched, so nothing reads the isolated cookies while it is on and those sessions stop resolving. They are not revoked: the cookies stay in the browser, the session rows stay on the user documents, and flipping back restores whatever has not expired in the meantime. Admin sessions are unaffected either way.
+
+If you need people actually logged out, clear their `sessions` array server-side and expire the cookie. `disabled` alone will not do it.
 
 ## Next
 

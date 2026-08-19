@@ -104,7 +104,7 @@ export default function proxy(request: NextRequest) {
 `resolveAuthScope` returns `undefined` for a request it cannot attribute. Deleting the header in that branch is what keeps a client from sending its own.
 
 <Callout type="warn">
-Anything that returns its own `NextResponse` — next-intl, auth.js, a rate limiter — **drops the header** unless you thread it through `request: { headers }`. The symptom is subtle: no scope means `adminSessionPriority` decides, and frontend sessions are quietly ignored for as long as an admin session is alive.
+Anything that returns its own `NextResponse` (next-intl, auth.js, a rate limiter) **drops the header** unless you thread it through `request: { headers }`. The symptom is subtle: no scope means `adminSessionPriority` decides, and frontend sessions are quietly ignored for as long as an admin session is alive.
 </Callout>
 
 Chaining onto a library's proxy usually means passing the modified request into it:
@@ -148,9 +148,9 @@ dualSession({
 
 ### Not on the collection backing the admin panel
 
-A [role-split](/dual-session/role-split) entry — the one naming `admin.user` — must keep `scopes: ['frontend']`. Listing `'admin'` there throws at config time.
+A [role-split](/dual-session/role-split) entry, the one naming `admin.user`, must keep `scopes: ['frontend']`. Listing `'admin'` there throws at config time.
 
-The isolated strategy runs ahead of core's `local-jwt`, so a cookie allowed to answer admin-scoped requests would be consulted first on the very collection the panel authenticates against: a website visitor's session would win over the admin's, and the panel would lock its own admins out. The staff half needs no scope of its own — it is on the shared cookie, which is never gated.
+The isolated strategy runs ahead of core's `local-jwt`, so a cookie allowed to answer admin-scoped requests would be consulted first on the very collection the panel authenticates against: a website visitor's session would win over the admin's, and the panel would lock its own admins out. The staff half needs no scope of its own, because it is on the shared cookie, which is never gated.
 
 ## Without a proxy
 

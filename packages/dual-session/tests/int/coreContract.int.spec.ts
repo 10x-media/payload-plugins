@@ -17,7 +17,7 @@ const collections: CollectionConfig[] = [
 ]
 
 /**
- * The plugin rests on four details of Payload's internals, none of which is a documented
+ * The plugin rests on five details of Payload's internals, none of which is a documented
  * contract. Each is cheap to assert and expensive to discover after a Payload upgrade has
  * already shipped, so they are asserted here directly rather than inferred from behaviour.
  */

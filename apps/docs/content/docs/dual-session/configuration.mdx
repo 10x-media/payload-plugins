@@ -30,10 +30,10 @@ collections: [
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `slug` | — | The collection to isolate. Must have `auth`. May only be `admin.user` together with `isolate`. |
+| `slug` | None | The collection to isolate. Must have `auth`. May only be `admin.user` together with `isolate`. |
 | `cookieName` | `` `${cookiePrefix}-${slug}-token` `` | Where this collection's token lives. |
 | `isolate` | every session is isolated | `(user) => boolean`. Which of this collection's users get the isolated cookie; the rest keep the shared one. See [One collection, two sessions](/dual-session/role-split). |
-| `scopes` | `['frontend']` | Which [scopes](/dual-session/scopes) this cookie may authenticate. Only enforced when the proxy is installed. |
+| `scopes` | `['frontend']` | Which [scopes](/dual-session/scopes) this cookie may authenticate. Enforced on any request that carries the scope header, whoever set it; requests without one fall back to `adminSessionPriority`. |
 
 `isolate` turns one collection into two sessions, which is what a project with a single `users` collection and a `roles` field needs:
 
@@ -47,11 +47,13 @@ Default `true`. With no scope header on a request, ignore isolated cookies as lo
 
 ### `scopeHeader`
 
-Default `'x-payload-auth-scope'`. Change it on both sides — the plugin option and the proxy's `scopeHeader` — or they stop agreeing.
+Default `'x-payload-auth-scope'`. Change it on both sides, the plugin option and the proxy's `scopeHeader`, or they stop agreeing.
 
 ### `disabled`
 
-Returns the incoming config untouched. Every isolated session is dropped when this flips, because the cookie name changes; admin sessions are unaffected.
+Returns the incoming config untouched: no isolated strategies, no shadowed endpoints. Nothing reads the isolated cookies while it is on, so those sessions stop resolving. They are not revoked. The cookies stay in the browser and the session rows stay on the user documents, so flipping back restores every session that has not expired on its own. Admin sessions are unaffected throughout.
+
+`disabled` is a config switch, not a logout. To actually end sessions, clear the user's `sessions` array server-side, and expire the cookie if the browser should stop sending it.
 
 ### `translations`
 
@@ -95,7 +97,7 @@ Config problems are reported through `payload.logger` when Payload boots. They d
 
 ## Errors
 
-**Listing `admin.user` without `isolate` throws.** It owns the shared cookie, and moving all of it takes the admin panel down. With a predicate it is allowed, and only the users the predicate claims are moved — see [One collection, two sessions](/dual-session/role-split).
+**Listing `admin.user` without `isolate` throws.** It owns the shared cookie, and moving all of it takes the admin panel down. With a predicate it is allowed, and only the users the predicate claims are moved. See [One collection, two sessions](/dual-session/role-split).
 
 **Giving that entry the `admin` scope throws.** The isolated strategy runs ahead of core's `local-jwt`, so an isolated cookie allowed to answer admin-scoped requests would outrank the admin's own session on the very collection the panel authenticates against. Use `scopes: ['frontend']`.
 

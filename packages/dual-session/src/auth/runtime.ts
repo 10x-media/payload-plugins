@@ -89,7 +89,7 @@ export const resolveIsolatedCookieName = ({
  * Builds the `Set-Cookie` header value that logs a user into an isolated collection.
  *
  * This is the replacement for Payload's `generatePayloadCookie` in code that mints its own
- * token — an OAuth callback, a server action, a custom login route. Those write the shared
+ * token (an OAuth callback, a server action, a custom login route). Those write the shared
  * `${cookiePrefix}-token` directly, which both bypasses the isolation and overwrites
  * whatever admin session the visitor is holding.
  *
@@ -105,7 +105,7 @@ export const resolveIsolatedCookieName = ({
  * Pass `user` whenever the collection is configured with an `isolate` predicate: there the
  * cookie is a function of the user, and the call throws rather than pick one blindly.
  *
- * @throws when the collection is not one this plugin isolates — silently writing the
+ * @throws when the collection is not one this plugin isolates, because silently writing the
  * shared cookie instead would reintroduce exactly the bug the plugin exists to fix.
  */
 export const generateIsolatedAuthCookie = ({

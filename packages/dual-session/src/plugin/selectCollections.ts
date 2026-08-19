@@ -8,7 +8,7 @@ import { resolveCollections } from './resolveCollections'
  *
  * Mirrors `sanitizeConfig`: an explicit `admin.user` wins, otherwise the first collection
  * declaring `auth`, otherwise the `users` collection core appends for you. Guessing
- * `'users'` outright would miss the case the check exists for — a project whose admin
+ * `'users'` outright would miss the case the check exists for: a project whose admin
  * collection is named something else and never set `admin.user`, where isolating it would
  * take the admin panel down.
  */
@@ -55,7 +55,7 @@ export const selectCollections = ({
 		// is allowed to answer admin-scoped requests would outrank the admin's own shared
 		// cookie on the very collection the panel authenticates against.
 		throw new Error(
-			`@10x-media/dual-session: "${adminUserSlug}" backs the admin panel, so its isolated cookie must not carry the "admin" scope — it would shadow the admin session it is supposed to sit beside. Use \`scopes: ['frontend']\`.`
+			`@10x-media/dual-session: "${adminUserSlug}" backs the admin panel, so its isolated cookie must not carry the "admin" scope. It would shadow the admin session it is supposed to sit beside. Use \`scopes: ['frontend']\`.`
 		)
 	}
 

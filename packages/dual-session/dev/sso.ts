@@ -100,7 +100,7 @@ export const devSsoStrategy: AuthStrategy = {
  *
  * A stock OAuth callback ends with `generatePayloadCookie`, which writes the config-wide
  * `payload-token`. On an isolated collection that both bypasses the isolation and
- * overwrites whatever admin session the visitor is holding — the exact bug the plugin
+ * overwrites whatever admin session the visitor is holding, the exact bug the plugin
  * exists to fix. `generateIsolatedAuthCookie` is the one-line replacement.
  */
 export const devSsoCallback: Endpoint = {

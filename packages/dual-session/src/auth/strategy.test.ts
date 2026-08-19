@@ -209,7 +209,7 @@ describe('createIsolatedAuthStrategy', () => {
 
 	describe('priority between isolated collections', () => {
 		// Config order is not a meaningful priority, so when a visitor holds several
-		// isolated sessions the listed order decides — independently of Payload's chain.
+		// isolated sessions the listed order decides, independently of Payload's chain.
 		const lowerPriority = createIsolatedAuthStrategy({
 			adminSessionPriority: true,
 			cookieName: 'payload-employees-token',

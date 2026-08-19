@@ -15,7 +15,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 - **One cookie per collection**: `payload-customers-token` alongside `payload-token`, so both sessions are live at once.
 - **Core operations, not reimplementations**: the six cookie-writing auth endpoints are shadowed by replacements that delegate to the same Payload operations, so hooks, lockout, sessions and verification are unchanged.
-- **A strategy that mirrors Payload's own**: same CSRF gate, same `verify` check, same session `sid` check — it just reads a different cookie.
+- **A strategy that mirrors Payload's own**: same CSRF gate, same `verify` check, same session `sid` check. It just reads a different cookie.
 - **Request attribution via an optional Next proxy**, so the admin panel and the website get different answers from the same REST URL.
 - **Ranked frontend sessions**: list order decides which one wins when a visitor holds several.
 - **Works with your own SSO**: declared strategies keep first refusal, and `generateIsolatedAuthCookie` is the one-line swap for `generatePayloadCookie` in a custom OAuth callback.
@@ -24,7 +24,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 ## Before you install
 
-If another auth plugin is already in the config — OAuth, magic links, passkeys, SSO, 2FA — check it first. This plugin owns a collection's auth endpoints and decides where its cookie is written, so anything that writes the session cookie itself or declares its own `/login` on the same collection conflicts, silently. Plugins that only read `req.user` or add a strategy compose fine. [Other plugins that touch auth](https://docs.10xmedia.de/dual-session/limits#other-plugins-that-touch-auth) has the two-minute check and the ways out.
+If another auth plugin is already in the config (OAuth, magic links, passkeys, SSO, 2FA), check it first. This plugin owns a collection's auth endpoints and decides where its cookie is written, so anything that writes the session cookie itself or declares its own `/login` on the same collection conflicts, silently. Plugins that only read `req.user` or add a strategy compose fine. [Other plugins that touch auth](https://docs.10xmedia.de/dual-session/limits#other-plugins-that-touch-auth) has the two-minute check and the ways out.
 
 ## Quick start
 

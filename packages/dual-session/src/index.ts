@@ -41,10 +41,10 @@ declare module 'payload' {
  *
  * The admin collection (`admin.user`) keeps the shared cookie. It may only be listed with
  * an `isolate` predicate, which moves the users it selects onto a second cookie and leaves
- * everyone else — the admins — exactly where core put them.
+ * everyone else (the admins) exactly where core put them.
  *
- * For `req.user` to be fully deterministic, pair this with the auth-scope proxy —
- * see `@10x-media/dual-session/proxy`.
+ * For `req.user` to be fully deterministic, pair this with the auth-scope proxy.
+ * See `@10x-media/dual-session/proxy`.
  */
 export const dualSession = definePlugin<DualSessionPluginOptions>({
 	slug: PLUGIN_SLUG,

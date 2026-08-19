@@ -71,7 +71,7 @@ test('the admin panel belongs to the admin while the member session is live', as
 	await expect(page).not.toHaveURL(/\/admin\/(login|unauthorized)/)
 
 	// Attributed to /admin by its Referer. Both users are `users`, so only the cookie tells
-	// them apart — which is the whole mechanism.
+	// them apart, which is the whole mechanism.
 	const me = await fetchFromPage(page, '/api/users/me')
 	expect(JSON.parse(me.body).user?.email).toBe(ADMIN.email)
 })

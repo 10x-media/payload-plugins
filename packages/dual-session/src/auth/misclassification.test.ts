@@ -16,8 +16,10 @@ const entry: ResolvedIsolatedCollection = {
 	scopes: ['frontend'],
 }
 
-const collection = (admin?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>) =>
-	({ config: { slug: 'staff', access: admin ? { admin } : {} } }) as unknown as Collection
+const collection = (adminAccess?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>) =>
+	({
+		config: { slug: 'staff', access: adminAccess ? { admin: adminAccess } : {} },
+	}) as unknown as Collection
 
 const request = () => {
 	const warn = vi.fn()
@@ -39,7 +41,10 @@ describe('warnIfAdminMisclassified', () => {
 
 		expect(warn).toHaveBeenCalledOnce()
 		expect(warn.mock.calls[0]?.[0]).toContain(STAFF_COOKIE)
-		expect(warn.mock.calls[0]?.[0]).toContain('admin@10xmedia.de')
+		// The id, not the email: a warning is not a place to put an address, and a
+		// collection using `loginWithUsername` has none to name.
+		expect(warn.mock.calls[0]?.[0]).toContain('user "1"')
+		expect(warn.mock.calls[0]?.[0]).not.toContain('admin@10xmedia.de')
 	})
 
 	it('says nothing about a user the predicate left on the shared cookie', async () => {

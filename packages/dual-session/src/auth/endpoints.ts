@@ -56,8 +56,8 @@ const asUser = (user: unknown) => user as TypedUser | undefined
 /**
  * Replacements for the built-in auth endpoints that read from and write to a
  * collection-scoped cookie. Each one delegates to the same core operation the built-in
- * handler uses, so behaviour (hooks, lockout, sessions, verification) is unchanged —
- * only the cookie name differs.
+ * handler uses, so behaviour (hooks, lockout, sessions, verification) is unchanged.
+ * Only the cookie name differs.
  *
  * Payload appends its built-in endpoints *after* the ones declared on the collection,
  * and `handleEndpoints` matches the first entry that fits. Declaring these on the
@@ -216,7 +216,7 @@ export const buildIsolatedAuthEndpoints = ({
 				} & Record<string, unknown>
 
 				// The built-in handler reads the token via `extractJWT`, which only knows about
-				// the shared cookie — it would report the admin's token back to a frontend user.
+				// the shared cookie, which would report the admin's token back to a frontend user.
 				// With no cookie in this user's slot the request was authenticated by something
 				// else (an `Authorization` header, a custom strategy), so fall back to core's own
 				// extraction rather than reporting no token at all.

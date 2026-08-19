@@ -110,6 +110,17 @@ describe('dualSession factory', () => {
 		)
 	})
 
+	it('refuses to give the split admin collection the admin scope', () => {
+		// The isolated strategy runs ahead of core's `local-jwt`, so an isolated cookie
+		// allowed to answer admin-scoped requests would outrank the very session the
+		// panel authenticates with.
+		expect(() =>
+			dualSession({
+				collections: [{ slug: slug('users'), isolate: () => true, scopes: ['admin'] }],
+			})(buildConfig())
+		).toThrow(/must not carry the "admin" scope/)
+	})
+
 	it('shadows the admin collection too once an `isolate` predicate splits it', () => {
 		const config = dualSession({
 			collections: [{ slug: slug('users'), isolate: () => true }],

@@ -49,6 +49,22 @@ describe('isolated cookies', () => {
 		expect(cookie).toContain('SameSite=Lax')
 	})
 
+	it('normalises a boolean sameSite the way Payload does', () => {
+		const strict = generateIsolatedCookie({
+			authConfig: authConfig({ cookies: { sameSite: true, secure: false } }),
+			name: CUSTOMER_COOKIE,
+			token: 'a.b.c',
+		})
+		const omitted = generateIsolatedCookie({
+			authConfig: authConfig({ cookies: { sameSite: false, secure: false } }),
+			name: CUSTOMER_COOKIE,
+			token: 'a.b.c',
+		})
+
+		expect(strict).toContain('SameSite=Strict')
+		expect(omitted).not.toContain('SameSite')
+	})
+
 	it('expires in the past when logging out', () => {
 		const cookie = generateExpiredIsolatedCookie({
 			authConfig: authConfig(),

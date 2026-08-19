@@ -8,7 +8,7 @@ Hand-rolled auth keeps working on an isolated collection. One thing has to chang
 <Callout type="warn">
 **This is the least-tested surface of an [experimental](/dual-session) plugin.** Everything else the plugin does runs against Payload's own auth routes, which are covered end to end. Your strategy and your callback are code it never sees, so the seam between them is exactly where an untested combination lives.
 
-The dev app carries a working SSO example (`packages/dual-session/dev/sso.ts`) that runs in CI, but a real provider does more than it does. Exercise the whole flow before shipping — login, a refresh, a logout, and an admin session surviving all three in the same browser.
+The dev app carries a working SSO example (`packages/dual-session/dev/sso.ts`) that runs in CI, but a real provider does more than it does. Exercise the whole flow before shipping: login, a refresh, a logout, and an admin session surviving all three in the same browser.
 </Callout>
 
 ## Your strategy needs no changes
@@ -23,7 +23,7 @@ export const Customers: CollectionConfig = {
 }
 ```
 
-A strategy that proves identity and returns `{ user }` — the shape Payload's own docs describe — is unaffected. It never touches a cookie, so nothing in it collides with the isolation.
+A strategy that proves identity and returns `{ user }`, the shape Payload's own docs describe, is unaffected. It never touches a cookie, so nothing in it collides with the isolation.
 
 ## Your callback does
 
@@ -116,7 +116,7 @@ Or just call `POST /api/customers/logout`, which the plugin already shadows and 
 
 Payload builds one flat chain from every collection: each collection's declared strategies, then that collection's api-key strategy, then a single `local-jwt` at the very end. Within a collection the order is the order you declared, with the plugin's appended last.
 
-That is why an `Authorization` header outranks an isolated cookie — see [Limits](/dual-session/limits#authorization-headers-win).
+That is why an `Authorization` header outranks an isolated cookie. See [Limits](/dual-session/limits#authorization-headers-win).
 
 ## Next
 

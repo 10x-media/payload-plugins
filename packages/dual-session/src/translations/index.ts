@@ -23,6 +23,11 @@ export const toNested = (flat: {
 			continue
 		}
 		const separator = fullKey.indexOf(':')
+		// An unnamespaced key has no bucket to go in, and `slice(0, -1)` would invent one
+		// out of the key with its last character cut off.
+		if (separator < 1) {
+			continue
+		}
 		const namespace = fullKey.slice(0, separator)
 		const bucket = out[namespace] ?? {}
 		bucket[fullKey.slice(separator + 1)] = value

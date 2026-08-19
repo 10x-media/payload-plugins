@@ -15,17 +15,17 @@ export const isCookieAuthAllowed = ({
 }): boolean => {
 	const origin = headers.get('Origin')
 
-	// Origin present — validate against the csrf allowlist
+	// Origin present, validate against the csrf allowlist
 	if (origin) {
 		return payload.config.csrf.length === 0 || payload.config.csrf.includes(origin)
 	}
 
-	// No Origin and no csrf configured — no allowlist to enforce
+	// No Origin and no csrf configured, so there is no allowlist to enforce
 	if (payload.config.csrf.length === 0) {
 		return true
 	}
 
-	// No Origin with csrf configured — fall back to Sec-Fetch-Site
+	// No Origin with csrf configured, fall back to Sec-Fetch-Site
 	const secFetchSite = headers.get('Sec-Fetch-Site')
 
 	// Allow same-origin, same-site, and direct navigations (none)

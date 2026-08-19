@@ -89,6 +89,11 @@ describeForDb('dualSession splitting one collection by role', { dbs: ['mongo'] }
 			const split = await rest.post('/api/staff/login', { body: ADMIN, jar: false })
 			const untouched = await rest.post('/api/auditors/login', { body: AUDITOR, jar: false })
 
+			// Without this the comparison below passes on two empty strings, which is exactly
+			// the regression it exists to catch.
+			expect(split.setCookies[0]).toBeTruthy()
+			expect(untouched.setCookies[0]).toBeTruthy()
+
 			// The whole promise of the role-split mode is that the admin half is byte-identical
 			// to core's. Only the token and the expiry timestamp may differ.
 			expect(shape(split.setCookies[0] ?? '')).toBe(shape(untouched.setCookies[0] ?? ''))
@@ -247,6 +252,40 @@ describeForDb('dualSession splitting one collection by role', { dbs: ['mongo'] }
 			})
 
 			expect(me.body.user).toMatchObject({ email: ADMIN.email })
+		})
+	})
+
+	describe('a role that changes under a live session', () => {
+		it('moves the refreshed token to the half the user now belongs to', async () => {
+			// Its own user, so promoting it cannot disturb the fixtures other tests share.
+			const mover = { email: 'mover@10xmedia.de', password: 'password', roles: ['writer'] }
+			const created = await booted.payload.create({ collection: slug('staff'), data: mover })
+
+			const rest = client()
+			await rest.post('/api/staff/login', { body: mover })
+			expect(rest.cookieNames()).toEqual([STAFF_COOKIE])
+			const isolatedBefore = rest.jar.get(STAFF_COOKIE)
+
+			await booted.payload.update({
+				collection: slug('staff'),
+				id: created.id,
+				data: { roles: ['admin'] },
+			})
+
+			const response = await rest.post('/api/staff/refresh-token', {
+				headers: { 'x-payload-auth-scope': 'frontend' },
+			})
+
+			// `refresh-token` asks the predicate about the user it just loaded, and that
+			// document now says admin, so the replacement lands in the shared cookie rather
+			// than in the one the request authenticated from.
+			expect(response.status).toBe(200)
+			expect(setCookieNames(response)).toEqual([SHARED_COOKIE])
+
+			// The cookie it moved out of is not expired, so it stays live until its own
+			// expiry. Both then name the same user, which is why this is documented rather
+			// than relied on as a way to revoke anything.
+			expect(rest.jar.get(STAFF_COOKIE)).toBe(isolatedBefore)
 		})
 	})
 

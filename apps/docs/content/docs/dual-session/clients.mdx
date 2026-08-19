@@ -14,7 +14,16 @@ The shared cookie belongs to the origin Payload is served from, not to whoever c
 | Website consumes Payload only through a mobile or desktop app | No |
 | Two separate Payload instances | No |
 
-A frontend on `shop.example.com` talking to Payload on `cms.example.com` changes nothing: the login response sets the cookie on `cms.example.com`, and `cms.example.com/admin` reads and overwrites that same cookie. Cross-origin also means the cookie needs `sameSite: 'None'`, `secure`, and a `csrf` entry before it travels at all.
+A frontend on `shop.example.com` talking to Payload on `cms.example.com` changes nothing: the login response sets the cookie on `cms.example.com`, and `cms.example.com/admin` reads and overwrites that same cookie.
+
+### Getting the cookie to travel at all
+
+Cross-origin costs you four separate settings, and each one fails differently:
+
+- **`credentials: 'include'` on every fetch.** Without it the browser sends no cookie and receives none, and the response still looks fine.
+- **The exact origin in `config.cors`.** Payload only adds `Access-Control-Allow-Credentials: true` for an origin it finds in that list. `cors: '*'` answers with `Access-Control-Allow-Origin: '*'` and no credentials header, which the browser refuses to use with cookies.
+- **`sameSite: 'None'` plus `secure`, but only when the two are cross-*site*.** Different registrable domains, `shop.example` and `cms.example`, need it. Subdomains of one registrable domain, `shop.example.com` and `cms.example.com`, are same-site, and the default `Lax` still travels between them.
+- **A `csrf` entry, if you configure `csrf` at all.** The gate is an allowlist: leave it empty and every origin passes, fill it and an origin missing from it is rejected. Cross-origin is exactly when you want it filled.
 
 Two Payload instances do isolate, because there are two cookies on two origins.
 
@@ -48,7 +57,7 @@ await fetch('/api/orders', {
 
 An `Authorization` header outranks every cookie, so these requests never touch scopes, cookie CSRF checks or the proxy. Store the token the way the platform expects and treat it as the session.
 
-This is also why an app-only Payload does not need the plugin: with no cookie in play there is nothing to isolate. A [role-split](/dual-session/role-split) collection changes nothing here either — both halves log in through the same route and get the same kind of token.
+This is also why an app-only Payload does not need the plugin: with no cookie in play there is nothing to isolate. A [role-split](/dual-session/role-split) collection changes nothing here either, because both halves log in through the same route and get the same kind of token.
 
 ## Server-side rendering
 
@@ -65,7 +74,7 @@ const me = await fetch(`${PAYLOAD_URL}/api/customers/me`, {
 })
 ```
 
-The cookie name is `` `${cookiePrefix}-${slug}-token` `` unless you set `cookieName`. Inside Payload, `resolveIsolatedCookieName` returns it — though on a [role-split](/dual-session/role-split) collection that call needs the user, because the name depends on which half they are in.
+The cookie name is `` `${cookiePrefix}-${slug}-token` `` unless you set `cookieName`. Inside Payload, `resolveIsolatedCookieName` returns it, though on a [role-split](/dual-session/role-split) collection that call needs the user, because the name depends on which half they are in.
 
 Forwarding the `Cookie` header instead also works, and then the request is subject to the scope rule and to Payload's cookie CSRF gate:
 

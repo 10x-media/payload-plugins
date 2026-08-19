@@ -175,7 +175,7 @@ export default async function WhoAmIPage() {
 							{describe(asAdmin.user as ResolvedUser)}
 						</td>
 						<td style={cell}>
-							<code>{ADMIN_COOKIE}</code> {holds(ADMIN_COOKIE) ? '✅' : '—'}
+							<code>{ADMIN_COOKIE}</code> {holds(ADMIN_COOKIE) ? '✅' : '❌'}
 						</td>
 					</tr>
 					<tr>
@@ -184,9 +184,9 @@ export default async function WhoAmIPage() {
 							{describe(asFrontend.user as ResolvedUser)}
 						</td>
 						<td style={cell}>
-							<code>{PARTNER_COOKIE}</code> {holds(PARTNER_COOKIE) ? '✅' : '—'} ·{' '}
-							<code>{CUSTOMER_COOKIE}</code> {holds(CUSTOMER_COOKIE) ? '✅' : '—'} ·{' '}
-							<code>{MEMBER_COOKIE}</code> {holds(MEMBER_COOKIE) ? '✅' : '—'}
+							<code>{PARTNER_COOKIE}</code> {holds(PARTNER_COOKIE) ? '✅' : '❌'} ·{' '}
+							<code>{CUSTOMER_COOKIE}</code> {holds(CUSTOMER_COOKIE) ? '✅' : '❌'} ·{' '}
+							<code>{MEMBER_COOKIE}</code> {holds(MEMBER_COOKIE) ? '✅' : '❌'}
 						</td>
 					</tr>
 				</tbody>
@@ -232,7 +232,7 @@ export default async function WhoAmIPage() {
 			<p>
 				What the plugin does <em>not</em> do is decide who may do what. With the boundary inside a
 				collection, <code>req.user.collection</code> is <code>users</code> for both, so the access
-				functions on <code>notes</code> ask about the role instead — see <code>adminOnly</code> in{' '}
+				functions on <code>notes</code> ask about the role instead. See <code>adminOnly</code> in{' '}
 				<code>dev/collections.ts</code>.
 			</p>
 
@@ -246,7 +246,7 @@ export default async function WhoAmIPage() {
 			<p>
 				What does change is the callback. A stock one ends with <code>generatePayloadCookie</code>,
 				which writes <code>{ADMIN_COOKIE}</code> and wipes the admin session it finds there. This
-				one calls <code>generateIsolatedAuthCookie</code> instead — see <code>dev/sso.ts</code>. Log
+				one calls <code>generateIsolatedAuthCookie</code> instead, see <code>dev/sso.ts</code>. Log
 				in as the admin first, then use the link: the admin session survives.
 			</p>
 			<p>
@@ -263,7 +263,7 @@ export default async function WhoAmIPage() {
 				<code>notes</code> and <code>site-settings</code> allow reads to any session but updates
 				only to <code>users</code>. What the plugin decides is <em>which</em> session a request
 				resolves to; access control then does its usual job on that answer. The shared admin cookie
-				is never gated by scope — only isolated cookies are — so an admin-only browser can still
+				is never gated by scope (only isolated cookies are), so an admin-only browser can still
 				write from the website, while adding a frontend session takes that ability away.
 			</p>
 			<table style={{ borderCollapse: 'collapse', marginBottom: '1rem', width: '100%' }}>
@@ -299,16 +299,16 @@ export default async function WhoAmIPage() {
 				The proxy resolves a scope per request and always overwrites{' '}
 				<code>{AUTH_SCOPE_HEADER}</code>, so a client cannot pick its own. An API call it cannot
 				attribute falls back to <code>admin</code>, which can only ever mean "the frontend cookie is
-				not honoured" — never a wrongly authenticated request.
+				not honoured", never a wrongly authenticated request.
 			</p>
 			<ApiConsole actions={scopeActions} title="What a client can and cannot influence" />
 
 			<p>
 				Note: <code>{note?.title}</code> · touchCount <strong>{note?.touchCount ?? 0}</strong> ·
-				last touched by <code>{note?.lastTouchedBy ?? '—'}</code>
+				last touched by <code>{note?.lastTouchedBy ?? 'nobody'}</code>
 				<br />
-				Global headline: <code>{settings.headline ?? '—'}</code> · last touched by{' '}
-				<code>{settings.lastTouchedBy ?? '—'}</code>
+				Global headline: <code>{settings.headline ?? 'none'}</code> · last touched by{' '}
+				<code>{settings.lastTouchedBy ?? 'nobody'}</code>
 			</p>
 
 			<h2>Try this</h2>
