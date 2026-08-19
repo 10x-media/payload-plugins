@@ -13,6 +13,12 @@ jobs:
   snapshot:
     if: github.event.label.name == 'snapshot'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Unfiltered `pnpm build` fans out to eleven concurrent `next build`s, which
+    # exhausts a 4-vCPU runner's memory (see the bundle gates in ci.yml). The
+    # short command forwards extra args to the task, not to turbo, so cap it here.
+    env:
+      TURBO_CONCURRENCY: '3'
     permissions:
       contents: read
       pull-requests: write
