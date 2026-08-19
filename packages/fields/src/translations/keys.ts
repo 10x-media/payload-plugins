@@ -46,6 +46,7 @@ export const keys = {
 	clearedOnSave: 'fields:clearedOnSave',
 	generateValue: 'fields:generateValue',
 	writeOnlyValue: 'fields:writeOnlyValue',
+	secretNotSet: 'fields:secretNotSet',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

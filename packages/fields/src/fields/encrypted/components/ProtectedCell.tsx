@@ -28,7 +28,15 @@ export const ProtectedCell = ({
 }) => {
 	const row = rowData as Record<string, unknown> | undefined
 	if (setName && row?.[setName] !== true) {
-		return <span className="tenx-protected-cell">&mdash;</span>
+		return (
+			<span
+				aria-label={asTranslate(i18n.t)(keys.secretNotSet)}
+				className="tenx-protected-cell"
+				role="img"
+			>
+				&mdash;
+			</span>
+		)
 	}
 	const hint = hintName ? row?.[hintName] : undefined
 	return renderLocked({

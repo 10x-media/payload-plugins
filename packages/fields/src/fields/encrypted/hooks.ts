@@ -341,6 +341,25 @@ export const makeAfterReadHook = (marker: EncryptedFieldMarker): FieldHook => {
 }
 
 /**
+ * Recursive presence check for a stored write-only sibling: arrays count only
+ * when some item is present, locale maps only when some locale's value is,
+ * including a locale map of arrays. `{ en: [] }` and `{ en: [null] }` read as
+ * unset; a sealed string (or pre-adoption scalar) reads as set.
+ */
+const hasStoredValue = (value: unknown): boolean => {
+	if (value == null) {
+		return false
+	}
+	if (Array.isArray(value)) {
+		return value.some(hasStoredValue)
+	}
+	if (typeof value === 'object') {
+		return Object.values(value).some(hasStoredValue)
+	}
+	return true
+}
+
+/**
  * afterRead on the virtual set-indicator sibling of a write-only field: true
  * when the stored sibling holds anything (sealed, or pre-adoption plaintext).
  * A locale-map sibling (locale=all read) counts as set when any locale has a
@@ -351,17 +370,7 @@ export const makeSetIndicatorHook = (fieldName: string): FieldHook => {
 		if (contextMode(context)) {
 			return value
 		}
-		const stored = (siblingData as Record<string, unknown>)[fieldName]
-		if (stored == null) {
-			return false
-		}
-		if (Array.isArray(stored)) {
-			return stored.some((item) => item != null)
-		}
-		if (typeof stored === 'object') {
-			return Object.values(stored).some((item) => item != null)
-		}
-		return true
+		return hasStoredValue((siblingData as Record<string, unknown>)[fieldName])
 	}
 }
 

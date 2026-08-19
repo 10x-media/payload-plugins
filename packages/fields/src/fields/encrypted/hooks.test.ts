@@ -493,6 +493,12 @@ describe('makeSetIndicatorHook (virtual set-indicator sibling)', () => {
 		expect(call({ de: null, en: null })).toBe(false)
 	})
 
+	it('locale maps of arrays recurse: empty and null-only arrays read as unset', () => {
+		expect(call({ en: [] })).toBe(false)
+		expect(call({ en: [null] })).toBe(false)
+		expect(call({ de: [], en: ['pfe1.k.a.b.c'] })).toBe(true)
+	})
+
 	it('utility contexts pass through untouched (raw reads see no synthesized data)', () => {
 		expect(call('pfe1.k.a.b.c', { [ENCRYPTED_CONTEXT_KEY]: 'raw' })).toBeUndefined()
 	})

@@ -33,4 +33,8 @@ Kill every dev server you started (by PID or your own port, never a blind `pkill
 pnpm check:processes
 ```
 
-The dev app's in-memory mongod can outlive the Next process; `pnpm clean:processes` reaps it.
+```bash
+docker ps
+```
+
+The dev app's in-memory mongod can outlive the Next process; `pnpm clean:processes` reaps it. `docker ps` catches leaked test containers (Postgres via testcontainers); only stop containers you started.

@@ -9,6 +9,7 @@ Masked fields decrypt on read; the dots are a presentation choice, and any autho
 
 ```ts
 import { encryptedField } from '@10x-media/fields/encrypted'
+import type { GlobalConfig } from 'payload'
 
 const smtpSettings: GlobalConfig = {
   slug: 'smtp-settings',
@@ -86,7 +87,7 @@ const secret = await readEncryptedField(payload, {
 const password = await secret?.decrypt()  // null handle when unset
 ```
 
-`readEncryptedField` fetches the stored ciphertext (bypassing the strip) and returns a handle: `ciphertext`, the raw wire string, and `decrypt()`, which resolves keys at call time. For a `hasMany` field the ciphertext is an array and `decrypt()` returns one.
+`readEncryptedField` fetches the stored ciphertext (bypassing the strip) and returns a handle: `ciphertext`, the raw wire string, and `decrypt()`, which resolves keys at call time. For a `hasMany` field the ciphertext is an array of wire strings and `decrypt()` resolves an array of decrypted values.
 
 The handle shape is deliberate. A transport factory that caches its settings can hold the ciphertext and decrypt per use, so plaintext exists only for the moment it is used and never sits in a cache:
 

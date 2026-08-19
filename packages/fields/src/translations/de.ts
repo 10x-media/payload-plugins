@@ -49,4 +49,5 @@ export const de: Record<TranslationKey, string> = {
 	[keys.clearedOnSave]: 'Wird beim Speichern entfernt',
 	[keys.generateValue]: 'Neuen Wert generieren',
 	[keys.writeOnlyValue]: 'Nur schreibbarer verschlüsselter Wert',
+	[keys.secretNotSet]: 'Nicht gesetzt',
 }
