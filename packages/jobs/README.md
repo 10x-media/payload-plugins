@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/jobs
 
 An ops dashboard plus reliability, worker, and queue-control layers for Payload v3's built-in jobs queue. See what the queue is doing, recover jobs that die mid-run, run a proper worker process with graceful drain, and pause or drive the queue from the outside. Every layer is opt-in.
