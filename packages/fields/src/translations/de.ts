@@ -46,6 +46,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.replaceValue]: 'Wert ersetzen',
 	[keys.clearValue]: 'Wert entfernen',
 	[keys.undoClear]: 'Entfernen rückgängig machen',
+	[keys.clearedOnSave]: 'Wird beim Speichern entfernt',
 	[keys.generateValue]: 'Neuen Wert generieren',
 	[keys.writeOnlyValue]: 'Nur schreibbarer verschlüsselter Wert',
 }

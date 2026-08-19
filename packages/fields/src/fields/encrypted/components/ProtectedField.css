@@ -186,6 +186,13 @@ html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-fi
 	gap: 2px;
 }
 
+/* Staged-removal notice in the structural face: a prompt about a pending
+   action, so it carries placeholder tone, unmistakably distinct from the
+   text-colored concealed dots. */
+.tenx-protected-field__wo-face-msg {
+	color: var(--theme-elevation-400);
+}
+
 /* Structural face box: an input-rhythm well the label-row dots sit in. */
 .tenx-protected-field__wo-face-box {
 	display: flex;

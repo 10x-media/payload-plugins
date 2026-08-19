@@ -171,7 +171,11 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		if (value === undefined) {
 			return undefined
 		}
-		if (value === null) {
+		// A write-only empty string clears like null: sealing '' would create a
+		// trap state ("set" with an empty credential) that no caller can ever
+		// read back to diagnose. The admin never sends '', so this only guards
+		// direct API writes; other encrypted fields keep sealing '' as before.
+		if (value === null || (marker.writeOnly && value === '')) {
 			if (marker.queryable && marker.bidxName) {
 				siblingData[marker.bidxName] = null
 			}

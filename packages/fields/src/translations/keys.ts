@@ -43,6 +43,7 @@ export const keys = {
 	replaceValue: 'fields:replaceValue',
 	clearValue: 'fields:clearValue',
 	undoClear: 'fields:undoClear',
+	clearedOnSave: 'fields:clearedOnSave',
 	generateValue: 'fields:generateValue',
 	writeOnlyValue: 'fields:writeOnlyValue',
 } as const

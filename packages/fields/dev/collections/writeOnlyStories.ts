@@ -20,7 +20,7 @@ export const writeOnlyStories: CollectionConfig = {
 			{
 				admin: {
 					description:
-						'STORY 1, pasted service password (SMTP/IMAP/FTP). Nobody ever needs it back. Set state shows anonymous dots as placeholder; type to stage a replacement (visible until save), empty the input to keep the stored value, × clears (undo arrow follows), and an untouched save always preserves. No hint, no generate: a password must never be sliced or invented.',
+						'STORY 1, pasted service password (SMTP/IMAP/FTP). Nobody ever needs it back. Set state shows anonymous dots as placeholder; type to stage a replacement (visible until save), and erasing staged text returns to whatever state you started typing from: keep, or a pending clear. × clears the stored value, the input then reads "Will be removed on save" with an undo arrow, so removal is never mistakable for keep. Pasted whitespace trims on blur; an untouched save always preserves. No hint, no generate: a password must never be sliced or invented.',
 				},
 				name: 'smtpPassword',
 				type: 'text',

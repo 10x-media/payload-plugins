@@ -17,6 +17,7 @@ import { formatHint } from '../hint'
 import { dotString } from './MaskDots'
 import type { EncryptedFieldConfig, Placement } from './placement'
 import { ActionButton } from './WriteOnlyActions'
+import { applyBlur, applyClear, applyInput, applySave, applyUndo } from './writeOnlyIntent'
 
 type NativeComponent = React.ComponentType<Record<string, unknown>>
 
@@ -88,69 +89,72 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 			return
 		}
 		lastUpdateAt.current = mostRecentUpdate.updatedAt
-		setValue(undefined)
-		setCleared(false)
+		const resolved = applySave()
+		setValue(resolved.value)
+		setCleared(resolved.cleared)
 	}, [mostRecentUpdate?.updatedAt, setValue])
 
 	const isNumber = componentKey === 'number'
 	const typed = isNumber ? typeof value === 'number' : typeof value === 'string' && value !== ''
 
-	const handleChange = useCallback(
-		(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-			const text = event.target.value
-			if (text === '') {
-				// Emptied input keeps the stored value; the × is how you clear it.
-				setValue(undefined)
-				setCleared(false)
-				return
-			}
-			setCleared(false)
-			if (isNumber) {
-				const parsed = Number.parseFloat(text)
-				setValue(Number.isNaN(parsed) ? undefined : parsed)
-				return
-			}
-			setValue(text)
+	const commit = useCallback(
+		(outcome: { cleared: boolean; value: unknown }) => {
+			setValue(outcome.value)
+			setCleared(outcome.cleared)
 		},
-		[isNumber, setValue]
+		[setValue]
 	)
 
-	const discardOrClear = useCallback(() => {
-		// One ×, clearing what is "in" the control: staged text first, then the
-		// stored value (which flips into the undoable cleared state).
-		if (typed) {
-			setValue(undefined)
-			return
-		}
-		setValue(null)
-		setCleared(true)
-	}, [typed, setValue])
+	const handleChange = useCallback(
+		(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+			commit(applyInput(event.target.value, { cleared, isNumber }))
+		},
+		[cleared, commit, isNumber]
+	)
 
-	const undoClear = useCallback(() => {
-		setValue(undefined)
-		setCleared(false)
-	}, [setValue])
+	const handleBlur = useCallback(() => {
+		const outcome = applyBlur(value, { cleared, isNumber })
+		if (outcome) {
+			commit(outcome)
+		}
+	}, [cleared, commit, isNumber, value])
+
+	const handleClear = useCallback(() => {
+		const outcome = applyClear({ cleared, clearable, isSet, typed })
+		if (outcome) {
+			commit(outcome)
+		}
+	}, [cleared, clearable, commit, isSet, typed])
+
+	const handleUndo = useCallback(() => {
+		commit(applyUndo())
+	}, [commit])
 
 	const runGenerate = useCallback(async () => {
 		if (!generate) return
-		setValue(await generateSecret(generate))
-		setCleared(false)
+		commit({ cleared: false, value: await generateSecret(generate) })
 		// Select the fresh secret so the reveal-once window is one Cmd+C away.
 		requestAnimationFrame(() => {
 			inputRef.current?.focus()
 			inputRef.current?.select?.()
 		})
-	}, [generate, setValue])
+	}, [commit, generate])
 
+	// Three unmistakable staged states: concealed face (text-colored hint/dots)
+	// means keep, visible plaintext means replace, and the muted removal notice
+	// means clear. Erasing typed text returns to whichever of the first and
+	// last the user was in when they started typing.
 	const placeholder = typed
 		? undefined
-		: cleared || !isSet
-			? typeof field.admin?.placeholder === 'string'
-				? field.admin.placeholder
-				: undefined
-			: hint
-				? formatHint(hint, maskDots)
-				: dotString(maskDots)
+		: cleared
+			? t(keys.clearedOnSave)
+			: !isSet
+				? typeof field.admin?.placeholder === 'string'
+					? field.admin.placeholder
+					: undefined
+				: hint
+					? formatHint(hint, maskDots)
+					: dotString(maskDots)
 
 	const showClear = typed || (clearable && isSet && !cleared)
 	const inputId = `field-${path.replace(/\./g, '__')}`
@@ -166,19 +170,19 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 					onClick={runGenerate}
 				/>
 			) : null}
-			{cleared ? (
+			{cleared && !typed ? (
 				<ActionButton
 					attached={placement === 'attached'}
 					kind="undo"
 					label={t(keys.undoClear)}
-					onClick={undoClear}
+					onClick={handleUndo}
 				/>
 			) : showClear ? (
 				<ActionButton
 					attached={placement === 'attached'}
 					kind="clear"
 					label={t(keys.clearValue)}
-					onClick={discardOrClear}
+					onClick={handleClear}
 				/>
 			) : null}
 		</>
@@ -195,6 +199,7 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 			.join(' '),
 		id: inputId,
 		name: path,
+		onBlur: handleBlur,
 		onChange: handleChange,
 		placeholder,
 		value: displayValue,
@@ -329,13 +334,17 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 					<div className="field-type__wrap">
 						<FieldError path={path} />
 						<div className="tenx-protected-field__wo-face-box">
-							<span
-								aria-label={t(keys.writeOnlyValue)}
-								className="tenx-protected-field__dots"
-								role="img"
-							>
-								{mode === 'cleared' ? '—' : dotString(maskDots)}
-							</span>
+							{mode === 'cleared' ? (
+								<span className="tenx-protected-field__wo-face-msg">{t(keys.clearedOnSave)}</span>
+							) : (
+								<span
+									aria-label={t(keys.writeOnlyValue)}
+									className="tenx-protected-field__dots"
+									role="img"
+								>
+									{dotString(maskDots)}
+								</span>
+							)}
 						</div>
 						<FieldDescription description={field.admin?.description} path={path} />
 					</div>

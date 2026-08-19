@@ -446,6 +446,17 @@ describe('hint sibling maintenance (seal-time, same hook as the ciphertext)', ()
 		expect(siblingData.apiKey_hint).toBeNull()
 	})
 
+	it('treats a write-only empty string as a clear (never seals a trap state)', async () => {
+		const { result, siblingData } = callSeal(hintMarker, '', hookReq())
+		expect(await result).toBeNull()
+		expect(siblingData.apiKey_hint).toBeNull()
+	})
+
+	it('still seals an empty string for non-write-only fields (unchanged behavior)', async () => {
+		const out = await callSeal(sealMarker({ fieldName: 'ssn' }), '', hookReq()).result
+		expect(isSealed(out)).toBe(true)
+	})
+
 	it('leaves the hint untouched on a sealed passthrough (unchanged value)', async () => {
 		const sealed = await callSeal(hintMarker, 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f', hookReq())
 			.result

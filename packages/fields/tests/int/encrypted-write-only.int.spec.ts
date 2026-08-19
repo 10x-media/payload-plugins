@@ -226,6 +226,29 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			expect(created.hintedKey_set).toBe(true)
 		})
 
+		it('treats an empty-string write as a clear, like null', async () => {
+			// The admin never submits '' (its empty input means "keep"), so this
+			// covers direct API writers: '' must not become a sealed empty secret
+			// that reads as set but can never be diagnosed.
+			const created = await booted.payload.create({
+				collection: 'credentials',
+				data: { hintedKey: 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f', title: 'empty-string' },
+			})
+			const emptied = await booted.payload.update({
+				collection: 'credentials',
+				data: { hintedKey: '' },
+				id: created.id,
+			})
+			expect(emptied.hintedKey_set).toBe(false)
+			expect(emptied.hintedKey_hint).toBeNull()
+			const gone = await readEncryptedField(booted.payload, {
+				collection: 'credentials',
+				id: created.id,
+				path: 'hintedKey',
+			})
+			expect(gone).toBeNull()
+		})
+
 		it('still validates the incoming plaintext', async () => {
 			// Payload surfaces the field's own validate message inside the
 			// ValidationError's per-field errors, not the generic top-level message.
