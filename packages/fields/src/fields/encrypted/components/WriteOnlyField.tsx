@@ -3,12 +3,13 @@ import {
 	FieldDescription,
 	FieldError,
 	FieldLabel,
+	useDocumentEvents,
 	useField,
 	useFormFields,
 	useFormSubmitted,
 } from '@payloadcms/ui'
 import type React from 'react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { generateSecret, type NormalizedGenerate } from '../generateSecret'
@@ -75,6 +76,21 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	const showFieldError = submitted && invalid
 	const [cleared, setCleared] = useState(false)
 	const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
+
+	// A successful save ends the reveal-once window: the staged plaintext (typed
+	// or generated) is dropped and the field returns to its concealed face
+	// immediately, not on the next page load. The edit view fires reportUpdate
+	// only on success, so a failed save keeps the user's input.
+	const { mostRecentUpdate } = useDocumentEvents()
+	const lastUpdateAt = useRef(mostRecentUpdate?.updatedAt)
+	useEffect(() => {
+		if (!mostRecentUpdate?.updatedAt || mostRecentUpdate.updatedAt === lastUpdateAt.current) {
+			return
+		}
+		lastUpdateAt.current = mostRecentUpdate.updatedAt
+		setValue(undefined)
+		setCleared(false)
+	}, [mostRecentUpdate?.updatedAt, setValue])
 
 	const isNumber = componentKey === 'number'
 	const typed = isNumber ? typeof value === 'number' : typeof value === 'string' && value !== ''
@@ -171,7 +187,12 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	const isTextarea = componentKey === 'textarea'
 	const inputProps = {
 		autoComplete: 'off',
-		className: 'tenx-protected-field__wo-input',
+		className: [
+			'tenx-protected-field__wo-input',
+			!typed && isSet && !cleared && 'tenx-protected-field__wo-input--set',
+		]
+			.filter(Boolean)
+			.join(' '),
 		id: inputId,
 		name: path,
 		onChange: handleChange,
@@ -255,6 +276,19 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	const { setValue } = useField<unknown>({ path })
 	const isSet = useFormFields(([fields]) => fields?.[setPath]?.value === true)
 	const [mode, setMode] = useState<'cleared' | 'editing' | 'idle'>('idle')
+
+	// Mirror of the inline variant's save-conceal: a successful save drops any
+	// staged edit and folds the field back to its concealed face.
+	const { mostRecentUpdate } = useDocumentEvents()
+	const lastUpdateAt = useRef(mostRecentUpdate?.updatedAt)
+	useEffect(() => {
+		if (!mostRecentUpdate?.updatedAt || mostRecentUpdate.updatedAt === lastUpdateAt.current) {
+			return
+		}
+		lastUpdateAt.current = mostRecentUpdate.updatedAt
+		setValue(undefined)
+		setMode('idle')
+	}, [mostRecentUpdate?.updatedAt, setValue])
 
 	const toggleEdit = useCallback(() => {
 		setMode((prev) => {

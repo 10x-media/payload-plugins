@@ -170,12 +170,12 @@ html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-fi
 	width: 100%;
 }
 
-/* Stored-value placeholder reads as the concealed face, not as a prompt:
-   identical color and letter-spacing to the masked value dots, so a
-   write-only placeholder (hint or dots) is indistinguishable in weight from
-   a masked field's concealed run. */
-.tenx-protected-field__wo-input::placeholder {
-	color: var(--theme-elevation-500);
+/* With a stored value, the "placeholder" is not a prompt but the concealed
+   face of real data, so it renders in the input's TEXT color, exactly as
+   typed characters would. Only the unset state shows a true placeholder,
+   which keeps formInput's native muted styling untouched. */
+.tenx-protected-field__wo-input--set::placeholder {
+	color: var(--theme-elevation-800);
 	font-size: 1rem;
 	letter-spacing: 0.15em;
 }
@@ -197,9 +197,10 @@ html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-fi
 	background: var(--theme-input-bg);
 }
 
-/* Concealed dots. */
+/* Concealed dots stand in for real stored data, so they carry the input's
+   text color, not a muted placeholder tone. */
 .tenx-protected-field__dots {
-	color: var(--theme-elevation-500);
+	color: var(--theme-elevation-800);
 	letter-spacing: 0.15em;
 	user-select: none;
 	white-space: nowrap;
@@ -207,7 +208,7 @@ html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-fi
 
 .tenx-protected-field__masked-input,
 .tenx-protected-field__masked-textarea {
-	color: var(--theme-elevation-500);
+	color: var(--theme-elevation-800);
 	letter-spacing: 0.15em;
 	cursor: default;
 }

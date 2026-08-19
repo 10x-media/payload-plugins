@@ -37,7 +37,7 @@ The three `protection` values form a ladder: `'none'` renders the value openly, 
 There is no reveal, because there is nothing to reveal: the plaintext never reaches the browser. Instead of a separate replace action, the control is one always-editable input, and a stored value is only a placeholder:
 
 - **Unset**: the plain native input. Type (or generate) a value and save.
-- **Set**: the input is empty with the hint, or a run of dots (`maskDots`), as its placeholder. Typing stages a replacement that stays visible until you leave the page; emptying the input reverts to keeping the stored value. An editor rotates a credential they were never able to read.
+- **Set**: the input is empty with the hint, or a run of dots (`maskDots`), as its placeholder, rendered in the input's text color, since it stands for real stored data rather than a prompt. Typing stages a replacement that stays visible until the save succeeds, then the field folds back to its concealed face; emptying the input reverts to keeping the stored value. An editor rotates a credential they were never able to read.
 - **Clear**: an `×` inside the input, exactly like a clearable select. With a replacement staged it discards the typed text; on a stored value it stages a `null`, and an undo arrow takes it back (a cleared secret cannot be retyped from memory). `clearable: false` removes it, and `required` fields force it off, since clearing them could never save.
 - **Generate**: circular arrows beside the `×` when [configured](#generated-secrets).
 - **List view**: the lock badge with the hint (or dots) when set, an em dash when unset. The value itself is never in the list data.
@@ -70,7 +70,7 @@ For secrets your system issues rather than receives (webhook signing secrets, pe
 )
 ```
 
-`generate: true` uses the default (32 chars of crypto-random base62); the config form takes `length` (8-128), `prefix`, and `charset`. Generation happens client-side in the form with `crypto.getRandomValues`, so the value is visible, pre-selected, and copyable exactly until you leave the page, and never again after: the reveal-once window of the GitHub-token model, with no server endpoint that ever returns plaintext. Regenerating later is the same action; combined with a hint, support can talk about "the key ending 9d3f" that nobody can read. A secret created through the API is one the caller supplied, which they therefore already know.
+`generate: true` uses the default (32 chars of crypto-random base62); the config form takes `length` (8-128), `prefix`, and `charset`. Generation happens client-side in the form with `crypto.getRandomValues`, so the value is visible, pre-selected, and copyable exactly until the save succeeds, and never again after: the reveal-once window of the GitHub-token model, with no server endpoint that ever returns plaintext. Regenerating later is the same action; combined with a hint, support can talk about "the key ending 9d3f" that nobody can read. A secret created through the API is one the caller supplied, which they therefore already know.
 
 ## Reading it server-side
 
