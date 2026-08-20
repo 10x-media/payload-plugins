@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { resolveKeys } from './crypto/keys'
 import { isSealed, seal, unseal } from './crypto/wire'
 import {
+	makeAfterReadHook,
 	makeBeforeChangeHook,
 	makeRichTextCiphertextHook,
 	makeRichTextDecryptHook,
 	makeRichTextSealHook,
 	makeRichTextValidate,
+	makeSetIndicatorHook,
 	readAadCandidates,
 	sealAad,
 } from './hooks'
@@ -23,6 +25,7 @@ const marker = (localized: boolean): EncryptedFieldMarker => ({
 	normalize: 'standard',
 	queryable: false,
 	sourceType: 'text',
+	writeOnly: false,
 })
 
 const makeReq = (
@@ -81,6 +84,7 @@ const sealMarker = (overrides: SealMarker): EncryptedFieldMarker => ({
 	normalize: 'standard',
 	queryable: false,
 	sourceType: 'text',
+	writeOnly: false,
 	...overrides,
 })
 
@@ -391,5 +395,111 @@ describe('plaintext stash is collision-free under concurrent bulk writes (shared
 		])
 		expect(outcomes).toHaveLength(4)
 		expect(outcomes.every(Boolean)).toBe(true)
+	})
+})
+
+describe('write-only read behavior', () => {
+	it('afterRead passes the sealed value through untouched (never decrypts)', async () => {
+		const m = sealMarker({ fieldName: 'apiKey', writeOnly: true })
+		const req = hookReq()
+		const sealed = await callSeal(m, 'hunter2', req).result
+		const hook = makeAfterReadHook(m)
+		const result = await hook({
+			collection: { slug: 'users' },
+			context: {},
+			global: null,
+			req,
+			value: sealed,
+		} as unknown as Parameters<typeof hook>[0])
+		expect(result).toBe(sealed)
+		expect(isSealed(result)).toBe(true)
+	})
+})
+
+describe('hint sibling maintenance (seal-time, same hook as the ciphertext)', () => {
+	const hintMarker = sealMarker({
+		fieldName: 'apiKey',
+		hint: { prefix: 4, suffix: 4 },
+		hintName: 'apiKey_hint',
+		writeOnly: true,
+	})
+
+	it('writes the hint beside the sealed value', async () => {
+		const { result, siblingData } = callSeal(
+			hintMarker,
+			'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f',
+			hookReq()
+		)
+		expect(isSealed(await result)).toBe(true)
+		expect(siblingData.apiKey_hint).toBe('sk_d····9d3f')
+	})
+
+	it('stores null for a plaintext too short to hint safely', async () => {
+		const { result, siblingData } = callSeal(hintMarker, 'short-secret', hookReq())
+		expect(isSealed(await result)).toBe(true)
+		expect(siblingData.apiKey_hint).toBeNull()
+	})
+
+	it('nulls the hint when the value clears', async () => {
+		const { result, siblingData } = callSeal(hintMarker, null, hookReq())
+		expect(await result).toBeNull()
+		expect(siblingData.apiKey_hint).toBeNull()
+	})
+
+	it('treats a write-only empty string as a clear (never seals a trap state)', async () => {
+		const { result, siblingData } = callSeal(hintMarker, '', hookReq())
+		expect(await result).toBeNull()
+		expect(siblingData.apiKey_hint).toBeNull()
+	})
+
+	it('still seals an empty string for non-write-only fields (unchanged behavior)', async () => {
+		const out = await callSeal(sealMarker({ fieldName: 'ssn' }), '', hookReq()).result
+		expect(isSealed(out)).toBe(true)
+	})
+
+	it('leaves the hint untouched on a sealed passthrough (unchanged value)', async () => {
+		const sealed = await callSeal(hintMarker, 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f', hookReq())
+			.result
+		const { result, siblingData } = callSeal(hintMarker, sealed, hookReq())
+		expect(await result).toBe(sealed)
+		expect('apiKey_hint' in siblingData).toBe(false)
+	})
+})
+
+describe('makeSetIndicatorHook (virtual set-indicator sibling)', () => {
+	const call = (stored: unknown, context: Record<string, unknown> = {}) => {
+		const hook = makeSetIndicatorHook('apiKey')
+		return hook({
+			context,
+			siblingData: { apiKey: stored },
+			value: undefined,
+		} as unknown as Parameters<typeof hook>[0])
+	}
+
+	it('true for a sealed sibling, false for null/undefined', () => {
+		expect(call('pfe1.k.a.b.c')).toBe(true)
+		expect(call(null)).toBe(false)
+		expect(call(undefined)).toBe(false)
+	})
+
+	it('hasMany arrays count as set when any item exists', () => {
+		expect(call(['pfe1.k.a.b.c'])).toBe(true)
+		expect(call([])).toBe(false)
+		expect(call([null])).toBe(false)
+	})
+
+	it('locale maps count as set when any locale holds a value', () => {
+		expect(call({ de: 'pfe1.k.a.b.c', en: null })).toBe(true)
+		expect(call({ de: null, en: null })).toBe(false)
+	})
+
+	it('locale maps of arrays recurse: empty and null-only arrays read as unset', () => {
+		expect(call({ en: [] })).toBe(false)
+		expect(call({ en: [null] })).toBe(false)
+		expect(call({ de: [], en: ['pfe1.k.a.b.c'] })).toBe(true)
+	})
+
+	it('utility contexts pass through untouched (raw reads see no synthesized data)', () => {
+		expect(call('pfe1.k.a.b.c', { [ENCRYPTED_CONTEXT_KEY]: 'raw' })).toBeUndefined()
 	})
 })

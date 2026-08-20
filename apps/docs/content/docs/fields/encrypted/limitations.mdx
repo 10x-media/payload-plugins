@@ -51,7 +51,7 @@ The default `onDecryptFailure` policy is `'throw'`. Because decryption happens i
 
 ## Masked is visual only
 
-Masking is a client-side presentation choice. `afterRead` decrypts server-side, so an authorized admin's browser receives the plaintext regardless of masking; the dots stop casual on-screen display, not an authorized reader (or their network tab). Because the admin form round-trips plaintext, saving a document re-seals its encrypted fields with fresh IVs even when the content did not change, which records a new version on versioned collections.
+Masking is a client-side presentation choice. `afterRead` decrypts server-side, so an authorized admin's browser receives the plaintext regardless of masking; the dots stop casual on-screen display, not an authorized reader (or their network tab). Because the admin form round-trips plaintext, saving a document re-seals its encrypted fields with fresh IVs even when the content did not change, which records a new version on versioned collections. When no reader should ever get the value back, use [`protection: 'writeOnly'`](/fields/encrypted/write-only) instead; its own trade-offs (an existence indicator in responses, no reveal, server-side reads through an explicit helper) are documented on that page.
 
 ## Storage and API surface
 

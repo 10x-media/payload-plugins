@@ -15,6 +15,8 @@ import { colors } from './collections/colors'
 import { encrypted } from './collections/encrypted'
 import { icons } from './collections/icons'
 import { tenants } from './collections/tenants'
+import { writeOnlyStories } from './collections/writeOnlyStories'
+import { smtpSettings } from './globals/smtpSettings'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 import { socialAdapter } from './icon-adapters/social/adapter'
@@ -71,7 +73,8 @@ export default buildConfig({
 	// Payload orders the admin sidebar by this array. Field-example collections
 	// (colors, icons) come first so a reviewer lands on them; infrastructure
 	// collections (tenants, users) sit at the bottom. Each group is alphabetical.
-	collections: [colors, encrypted, icons, tenants, users],
+	collections: [colors, encrypted, icons, writeOnlyStories, tenants, users],
+	globals: [smtpSettings],
 	i18n: { supportedLanguages: { de, en } },
 	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
 	plugins: [

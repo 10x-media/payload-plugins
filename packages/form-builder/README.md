@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/form-builder
 
 An end-to-end forms platform for Payload v3: author forms in the admin, validate server-side, render headless on your frontend, collect typed submissions, aggregate results, and act on them. Simple by default for editors, with a definition seam (`defineFormField`, `defineValidationRule`, `defineAction`, and friends) wherever developers need depth, and 100% native to Payload.

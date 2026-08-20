@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/analytics
 
 Adapter-based analytics for Payload v3. One adapter contract covers a self-hosted native engine and the major providers (GA4, Plausible, Umami, PostHog), surfaced through dashboard widgets and per-document stat fields, with cached reads, an opt-in sync tier, and capability gating so unsupported surfaces never appear.

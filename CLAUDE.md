@@ -83,6 +83,10 @@ pnpm clean:processes                    # kill them
 
 Migrations live at `packages/<plugin>/dev/migrations/`. Each plugin's `dev/payload.config.ts` sets `db.migrationDir` accordingly. Use `pnpm migrate:create <plugin> <migration-name>` in real projects, exactly mirroring Payload v3's standard workflow.
 
+### Worktree dev servers
+
+`pnpm dev <name>` run from a git worktree derives a stable, unique port from the worktree directory name (band 4100-4999) and prints it with the URL; the primary checkout keeps :3000 and the `.claude/launch.json` 31xx ports. Agents: follow the `worktree-dev` skill. In short: run `PAYLOAD_SKIP_AUTOGEN=1 pnpm dev <name>` in the background from the worktree, attach the browser via `preview_start` with the printed URL (never a launch.json name, which boots the primary checkout's code), and never add worktree entries to the primary's launch.json.
+
 ## Test tiers (Payload-aligned)
 
 Modeled after Payload's own monorepo test pattern: Mongo runs in-memory via `mongodb-memory-server` (matches Payload exactly); Postgres always runs in a real container via `testcontainers` (`postgres:16`). There is intentionally **no in-process Postgres** option; Payload's tests use real Postgres in Docker and we follow that pattern.

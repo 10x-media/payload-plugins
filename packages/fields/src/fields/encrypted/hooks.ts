@@ -5,6 +5,7 @@ import { buildAad } from './crypto/aad'
 import { computeBidx } from './crypto/bidx'
 import { type KeyRing, resolveKeys } from './crypto/keys'
 import { isSealed, parseWire, seal, unseal } from './crypto/wire'
+import { makeHint } from './hint'
 import { sealedArrayKey, stashPlaintext } from './plaintextStash'
 import {
 	ENCRYPTED_CONTEXT_KEY,
@@ -133,10 +134,13 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 			return value
 		}
 		// Removal path: store incoming plaintext without sealing, drop the now
-		// meaningless blind index.
+		// meaningless blind index and hint.
 		if (mode === 'decrypt') {
 			if (marker.queryable && marker.bidxName) {
 				siblingData[marker.bidxName] = null
+			}
+			if (marker.hintName) {
+				siblingData[marker.hintName] = null
 			}
 			return value
 		}
@@ -167,9 +171,16 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		if (value === undefined) {
 			return undefined
 		}
-		if (value === null) {
+		// A write-only empty string clears like null: sealing '' would create a
+		// trap state ("set" with an empty credential) that no caller can ever
+		// read back to diagnose. The admin never sends '', so this only guards
+		// direct API writes; other encrypted fields keep sealing '' as before.
+		if (value === null || (marker.writeOnly && value === '')) {
 			if (marker.queryable && marker.bidxName) {
 				siblingData[marker.bidxName] = null
+			}
+			if (marker.hintName) {
+				siblingData[marker.hintName] = null
 			}
 			return null
 		}
@@ -181,6 +192,7 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		// deferred to per-locale writes (covered by Batch E int tests).
 		if (marker.localized && req.locale === 'all' && isLocaleMap(value)) {
 			const sealedMap: Record<string, unknown> = {}
+			const hintMap: Record<string, unknown> = {}
 			for (const [locale, localeValue] of Object.entries(value)) {
 				sealedMap[locale] = sealValueForLocale(localeValue, {
 					aad: buildAad([slug, marker.fieldName, locale]),
@@ -188,6 +200,12 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 					key: activeKey,
 					keyId: ring.activeId,
 				})
+				if (marker.hint && !isSealed(localeValue)) {
+					hintMap[locale] = localeValue == null ? null : makeHint(localeValue, marker.hint)
+				}
+			}
+			if (marker.hintName && Object.keys(hintMap).length > 0) {
+				siblingData[marker.hintName] = hintMap
 			}
 			return sealedMap
 		}
@@ -224,6 +242,12 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 		stashPlaintext(req, sealed, value)
 		if (marker.queryable && marker.bidxName) {
 			siblingData[marker.bidxName] = computeBidx(value, ring.indexKey, marker.normalize)
+		}
+		// The hint derives from the same plaintext this seal consumes, so hint and
+		// ciphertext can never drift. A sealed passthrough above never lands here,
+		// which is what keeps an unchanged value's hint intact.
+		if (marker.hint && marker.hintName) {
+			siblingData[marker.hintName] = makeHint(value, marker.hint)
 		}
 		return sealed
 	}
@@ -296,6 +320,12 @@ export const makeAfterReadHook = (marker: EncryptedFieldMarker): FieldHook => {
 		if (contextMode(context)) {
 			return value
 		}
+		// Write-only never decrypts on read: the sealed value passes through and the
+		// collection/global strip hook removes the field from the response, so even
+		// standalone usage (no plugin, no strip) exposes ciphertext at worst.
+		if (marker.writeOnly) {
+			return value
+		}
 		const slug = aadSlug(collection, global)
 		const ring = await ringForRequest(req, marker)
 		const openArgs: OpenSealedArgs = {
@@ -307,6 +337,40 @@ export const makeAfterReadHook = (marker: EncryptedFieldMarker): FieldHook => {
 		}
 		const openOne = (item: unknown): unknown => openSealed(item, openArgs)
 		return marker.hasMany && Array.isArray(value) ? value.map(openOne) : openOne(value)
+	}
+}
+
+/**
+ * Recursive presence check for a stored write-only sibling: arrays count only
+ * when some item is present, locale maps only when some locale's value is,
+ * including a locale map of arrays. `{ en: [] }` and `{ en: [null] }` read as
+ * unset; a sealed string (or pre-adoption scalar) reads as set.
+ */
+const hasStoredValue = (value: unknown): boolean => {
+	if (value == null) {
+		return false
+	}
+	if (Array.isArray(value)) {
+		return value.some(hasStoredValue)
+	}
+	if (typeof value === 'object') {
+		return Object.values(value).some(hasStoredValue)
+	}
+	return true
+}
+
+/**
+ * afterRead on the virtual set-indicator sibling of a write-only field: true
+ * when the stored sibling holds anything (sealed, or pre-adoption plaintext).
+ * A locale-map sibling (locale=all read) counts as set when any locale has a
+ * value. Utility flows pass through so raw reads see no synthesized data.
+ */
+export const makeSetIndicatorHook = (fieldName: string): FieldHook => {
+	return ({ context, siblingData, value }) => {
+		if (contextMode(context)) {
+			return value
+		}
+		return hasStoredValue((siblingData as Record<string, unknown>)[fieldName])
 	}
 }
 
