@@ -58,13 +58,9 @@ jobs:
       - run: pnpm exec turbo run build --filter='./packages/*'
       - name: Verify published dist output (directives, externals, exports, publint)
         run: pnpm check:dist
-      # Only @10x-media/fields defines `test:dist`, but the task's `dependsOn: ["build"]`
-      # makes turbo schedule `build` in every package that lacks it, so this step is also
-      # the gate that every dev app and the docs site still produce a real `next build`.
-      # Unbounded that is eleven concurrent Next builds, ~67 node processes and more than
-      # 16GB on a 4-vCPU runner: it swaps to death and comes back as a bare "The operation
-      # was canceled". The cap keeps peak memory in budget, and streamed logs plus the
-      # probe heartbeat keep a slow task visibly alive instead of silent for minutes.
+      # turbo runs a task's `dependsOn` even where the task itself is missing, so this gate
+      # also runs all ten dev apps' and the docs site's `next build`. Unbounded that is
+      # eleven at once, which exhausts a 4-vCPU runner and returns as a bare cancel.
       - name: Bundle isolation gates
         run: |
           bash scripts/ci-resource-probe.sh 30 &
