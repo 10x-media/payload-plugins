@@ -13,6 +13,7 @@ export {
 	withEncryptedQueryRewrite,
 	withEncryptedResponseStrip,
 } from '../fields/encrypted/queryRewrite'
+export { withRawEncrypted } from '../fields/encrypted/rawRead'
 export type {
 	EncryptedFieldOptions,
 	EncryptedGenerateConfig,
