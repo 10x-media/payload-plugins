@@ -43,6 +43,7 @@
 		"check:processes": "bash scripts/cleanup.sh --dry-run",
 		"check:dist": "tsx scripts/verify-dist.ts",
 		"check:registry": "pnpm --filter @10x-media/form-builder registry:build && git diff --exit-code -- packages/form-builder/registry/r",
+		"check:template": "tsx scripts/check-template.ts",
 		"changeset": "changeset",
 		"version-packages": "changeset version",
 		"release": "turbo run build --filter='./packages/*' && changeset publish",

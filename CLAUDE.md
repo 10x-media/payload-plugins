@@ -68,6 +68,7 @@ pnpm migrate:fresh <name>                        # drop tables + apply all
 pnpm lint [name] / pnpm lint:fix [name]
 pnpm typecheck [name]
 pnpm format
+pnpm check:template                     # template/package parity for verbatim-shared files
 
 # Scaffolding + release
 pnpm new                                # scaffold a new plugin (interactive)
@@ -108,7 +109,7 @@ Only `@10x-media/fields` defines a `test:dist` script, but the turbo task declar
 pnpm exec turbo run test:dist --dry=json
 ```
 
-Unbounded that peaked at 67 node processes and more than 16 GB on a 4-vCPU CI runner, which swapped the runner to death and surfaced as a `build` job cancelled with no error at all. CI caps it with `--concurrency=3`. Keep that cap, and keep every `packages/*/dev/helpers/memoryDb.ts` returning its placeholder URI under `NEXT_PHASE === 'phase-production-build'` so no dev app spawns a mongod while collecting page data. `tooling/plugin-template` carries the same guard; if you edit one, edit both.
+Unbounded that peaked at 67 node processes and more than 16 GB on a 4-vCPU CI runner, which swapped the runner to death and surfaced as a `build` job cancelled with no error at all. CI caps it with `--concurrency=3`. Keep that cap, and keep every `packages/*/dev/helpers/memoryDb.ts` returning its placeholder URI under `NEXT_PHASE === 'phase-production-build'` so no dev app spawns a mongod while collecting page data. `tooling/plugin-template` carries the same file and `pnpm check:template` fails if they diverge, so edit the template first and copy it over the packages.
 
 Unfiltered `pnpm build` has the same eleven-way fan-out. The short commands forward extra args to the task rather than to turbo, so cap it with the env var instead: `TURBO_CONCURRENCY=3 pnpm build`.
 
@@ -128,6 +129,14 @@ Scenes are linted and typechecked with the rest of the package. Whatever fixture
 4. Add tests in `packages/<slug>/tests/int/` (or co-located `src/**/*.test.ts` for units).
 5. `pnpm test <slug>`: verify smoke tests pass.
 6. `pnpm changeset`: record the release entry.
+
+### Template parity
+
+Most of `tooling/plugin-template` is a starting point each plugin rewrites, but a few files are meant to stay byte-identical everywhere: the Payload route and layout boilerplate, `dev/next.config.ts`, `dev/helpers/memoryDb.ts`, `src/plugin/registerTranslations.ts` and `src/translations/useTranslation.ts`. `pnpm check:template` enforces that list (`TRACKED` in `scripts/check-template.ts`) and runs in the `lint` job.
+
+The template is copied once at `pnpm new` and never consulted again, so a fix applied only to the generated packages never reaches it. That is how the `memoryDb.ts` production-build guard diverged for six weeks while four plugins were scaffolded without it. **Edit the template first, then copy it over the packages.** A long-lived branch that scaffolds a new plugin will go red here after any tracked file changes on `main`; rebasing and recopying the template is the fix.
+
+Tracked files are compared byte for byte, so they cannot contain `{{placeholder}}` tokens; the check says so explicitly if one appears.
 
 ## Release flow
 

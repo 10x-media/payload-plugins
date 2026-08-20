@@ -30,6 +30,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - name: Template parity (files every plugin carries verbatim)
+        run: pnpm check:template
 
   typecheck:
     runs-on: ubuntu-latest
