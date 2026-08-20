@@ -168,6 +168,9 @@ html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-fi
 .tenx-protected-field__wo-input {
 	flex: 1 1 auto;
 	width: 100%;
+	/* Flex min-width:auto would refuse to shrink below the placeholder's width
+	   and push the attached actions out of narrow containers. */
+	min-width: 0;
 }
 
 /* With a stored value, the "placeholder" is not a prompt but the concealed

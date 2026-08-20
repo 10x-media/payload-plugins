@@ -41,8 +41,11 @@ export const normalizeHint = (config: EncryptedHintConfig, fieldName: string): N
 
 /**
  * The stored identification hint for one plaintext, e.g. `sk_l····9d3f`, or
- * null when the value is not a string or too short to hint without giving most
- * of it away. Computed at seal time only; reads never touch the plaintext.
+ * null when the value is not a string, too short to hint without giving most
+ * of it away, or its exposed ends contain the gap glyph themselves (a `·` in
+ * the exposed text would blur where the concealed span starts, so such values
+ * store no hint; real credentials never contain U+00B7). Computed at seal
+ * time only; reads never touch the plaintext.
  */
 export const makeHint = (plaintext: unknown, hint: NormalizedHint): string | null => {
 	if (typeof plaintext !== 'string') {
@@ -53,6 +56,9 @@ export const makeHint = (plaintext: unknown, hint: NormalizedHint): string | nul
 	}
 	const start = hint.prefix > 0 ? plaintext.slice(0, hint.prefix) : ''
 	const end = hint.suffix > 0 ? plaintext.slice(-hint.suffix) : ''
+	if (start.includes('·') || end.includes('·')) {
+		return null
+	}
 	return `${start}${HINT_GAP}${end}`
 }
 

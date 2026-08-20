@@ -58,7 +58,7 @@ A write-only Stripe key raises "which key is configured here, test or live?" mon
 
 The hint is sliced from the plaintext **at seal time** in the same `beforeChange` that encrypts, stored beside the ciphertext in a `<name>_hint` sibling (as `sk_l····9d3f`, with a compact canonical gap), and returned in API responses. Reads never touch the plaintext to display it. The admin placeholder and the list cell render the gap as the field's `maskDots` run of bullets (`sk_l••••••••9d3f` by default), so a hinted value's concealed span looks exactly like every other masked run; the dot count stays cosmetic and says nothing about the hidden length.
 
-Guard rails: `prefix + suffix` is capped at 8 characters, and a plaintext shorter than `prefix + suffix + 8` stores no hint at all, so a hint can identify a 30-character key but never reconstruct a short secret. Text and email fields only, not `hasMany`. Do not configure hints on passwords (story: identify keys, never sample passwords); the length guard protects against the worst of it, but the right amount of password to expose is zero.
+Guard rails: `prefix + suffix` is capped at 8 characters, and a plaintext shorter than `prefix + suffix + 8` (or whose exposed ends contain the mask glyph `·`) stores no hint at all, so a hint can identify a 30-character key but never reconstruct a short secret. Text and email fields only, not `hasMany`. Do not configure hints on passwords (story: identify keys, never sample passwords); the length guard protects against the worst of it, but the right amount of password to expose is zero.
 
 ## Generated secrets
 

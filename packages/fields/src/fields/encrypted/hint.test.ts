@@ -36,6 +36,14 @@ describe('makeHint', () => {
 		expect(formatHint('plain', 8)).toBe('plain')
 	})
 
+	it('returns null when an exposed end contains the gap glyph itself', () => {
+		// A `·` in the exposed text would blur where the concealed span starts,
+		// both for a full marker sequence and for trailing dots adjacent to it.
+		expect(makeHint('····abcdefghijklmnop', hint)).toBeNull()
+		expect(makeHint('abcdefghijklmnop··cd', hint)).toBeNull()
+		expect(makeHint('ab·cdefghijklmnopqrs', hint)).toBeNull()
+	})
+
 	it('returns null for non-string plaintext', () => {
 		expect(makeHint(1234567890123456, hint)).toBeNull()
 		expect(makeHint({ a: 1 }, hint)).toBeNull()

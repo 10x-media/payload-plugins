@@ -60,11 +60,11 @@ export interface EncryptedHintConfig {
  * save, then never again.
  */
 export interface EncryptedGenerateConfig {
-	/** Generated length excluding the prefix. Clamped to [8, 128]; default 32. */
+	/** Generated length excluding the prefix. Integer in [8, 128], rejected otherwise; default 32. */
 	length?: number
 	/** Literal prefix, e.g. 'whsec_'. Counts toward the hint but not `length`. */
 	prefix?: string
-	/** Alphabet to sample from; at least 10 distinct chars. Default base62. */
+	/** Alphabet to sample from: 10 to 256 distinct code points (duplicates collapse). Default base62. */
 	charset?: string
 }
 

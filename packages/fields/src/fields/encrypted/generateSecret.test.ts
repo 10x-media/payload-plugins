@@ -11,6 +11,14 @@ describe('normalizeGenerate', () => {
 		expect(() => normalizeGenerate({ length: 129 }, 'k')).toThrow(/\[8, 128\]/)
 		expect(() => normalizeGenerate({ charset: 'abcab' }, 'k')).toThrow(/distinct/)
 	})
+
+	it('rejects charsets beyond the byte-sampling limit and dedupes code points', () => {
+		const over = Array.from({ length: 257 }, (_, i) => String.fromCodePoint(0x4e00 + i)).join('')
+		expect(() => normalizeGenerate({ charset: over }, 'k')).toThrow(/256/)
+		// Duplicates collapse: 10 distinct chars repeated stay valid and deduped.
+		const deduped = normalizeGenerate({ charset: '0123456789'.repeat(3) }, 'k')
+		expect(deduped.charset).toHaveLength(10)
+	})
 })
 
 describe('generateSecret', () => {
@@ -26,6 +34,16 @@ describe('generateSecret', () => {
 			normalizeGenerate({ charset: '0123456789', length: 16 }, 'k')
 		)
 		expect(/^[0-9]{16}$/.test(secret)).toBe(true)
+	})
+
+	it('samples astral characters whole, never as surrogate halves', async () => {
+		const emoji = '😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗'
+		const normalized = normalizeGenerate({ charset: emoji, length: 16 }, 'k')
+		const secret = await generateSecret(normalized)
+		const points = [...secret]
+		expect(points).toHaveLength(16)
+		const allowed = new Set(normalized.charset)
+		expect(points.every((point) => allowed.has(point))).toBe(true)
 	})
 
 	it('does not repeat across calls', async () => {
