@@ -80,7 +80,7 @@ const rewriteConstraint = async (args: {
 
 /** Recursively rewrites queryable encrypted paths to their blind-index siblings. */
 export const rewriteWhereForMarkers = async (args: {
-	markers: Map<string, EncryptedFieldMarker>
+	markers: ReadonlyMap<string, EncryptedFieldMarker>
 	ringFor: RingResolver
 	warn?: UnsupportedWarn
 	where: Where
@@ -115,7 +115,9 @@ export const rewriteWhereForMarkers = async (args: {
 	return out
 }
 
-const makeHook = (markers: Map<string, EncryptedFieldMarker>): CollectionBeforeOperationHook => {
+const makeHook = (
+	markers: ReadonlyMap<string, EncryptedFieldMarker>
+): CollectionBeforeOperationHook => {
 	return async ({ args, req }) => {
 		if (isPlainObject(args) && 'where' in args && isPlainObject(args.where)) {
 			const payloadReq = req as PayloadRequest
@@ -175,7 +177,7 @@ const makeStripPathsHook = (paths: string[]): CollectionAfterReadHook & GlobalAf
 }
 
 /** Response paths a normal read must not surface, per marker kind. */
-const stripPathsFor = (markers: Map<string, EncryptedFieldMarker>): string[] => {
+const stripPathsFor = (markers: ReadonlyMap<string, EncryptedFieldMarker>): string[] => {
 	const paths: string[] = []
 	for (const [path, marker] of markers) {
 		if (marker.queryable && marker.bidxName) {
