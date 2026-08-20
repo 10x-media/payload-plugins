@@ -2,6 +2,8 @@ import type {
 	CollectionAfterReadHook,
 	CollectionBeforeOperationHook,
 	CollectionConfig,
+	GlobalAfterReadHook,
+	GlobalConfig,
 	PayloadRequest,
 	Where,
 } from 'payload'
@@ -150,12 +152,13 @@ const deleteAtPath = (doc: Record<string, unknown>, path: string): void => {
 
 /**
  * Removes server-only encrypted paths from read results: blind-index hashes (so
- * the keyed index value never leaves the server) and richText ciphertext
- * siblings (opaque strings the virtual editor field replaces). `admin.hidden`
- * keeps both readable by the plugin's own hooks but, unlike top-level `hidden`,
- * does not strip them from responses.
+ * the keyed index value never leaves the server), richText ciphertext siblings
+ * (opaque strings the virtual editor field replaces), and write-only fields
+ * (whose sealed value passes afterRead untouched and must not surface at all).
+ * `admin.hidden` keeps the siblings readable by the plugin's own hooks but,
+ * unlike top-level `hidden`, does not strip them from responses.
  */
-const makeStripPathsHook = (paths: string[]): CollectionAfterReadHook => {
+const makeStripPathsHook = (paths: string[]): CollectionAfterReadHook & GlobalAfterReadHook => {
 	return ({ context, doc }) => {
 		// Bulk utilities (rotate/adopt/remove) read via pageThrough in `raw`
 		// context and need the ciphertext + blind-index siblings; stripping them
@@ -171,6 +174,22 @@ const makeStripPathsHook = (paths: string[]): CollectionAfterReadHook => {
 	}
 }
 
+/** Response paths a normal read must not surface, per marker kind. */
+const stripPathsFor = (markers: Map<string, EncryptedFieldMarker>): string[] => {
+	const paths: string[] = []
+	for (const [path, marker] of markers) {
+		if (marker.queryable && marker.bidxName) {
+			paths.push(bidxPathFor(path, marker.bidxName))
+		}
+		// richText stores its ciphertext under the marker's own scan path
+		// (`${name}_encrypted`); the write-only path IS the stored field itself.
+		if (marker.sourceType === 'richText' || marker.writeOnly) {
+			paths.push(path)
+		}
+	}
+	return paths
+}
+
 /**
  * Attaches the blind-index where-rewrite and response stripper to a collection.
  * The fields() plugin applies this to every collection automatically; call it
@@ -179,16 +198,7 @@ const makeStripPathsHook = (paths: string[]): CollectionAfterReadHook => {
 export const withEncryptedQueryRewrite = (collection: CollectionConfig): CollectionConfig => {
 	const allMarkers = scanEncryptedFields(collection.fields)
 	const queryableMarkers = queryableOnly(allMarkers)
-	const bidxPaths = [...queryableMarkers].map(([path, marker]) =>
-		bidxPathFor(path, marker.bidxName as string)
-	)
-	// richText stores its ciphertext under the marker's own scan path
-	// (`${name}_encrypted`); strip it so the opaque string never surfaces in a
-	// response, mirroring the bidx strip.
-	const ciphertextPaths = [...allMarkers]
-		.filter(([, marker]) => marker.sourceType === 'richText')
-		.map(([path]) => path)
-	const stripPaths = [...bidxPaths, ...ciphertextPaths]
+	const stripPaths = stripPathsFor(allMarkers)
 	if (queryableMarkers.size === 0 && stripPaths.length === 0) {
 		return collection
 	}
@@ -203,4 +213,25 @@ export const withEncryptedQueryRewrite = (collection: CollectionConfig): Collect
 		]
 	}
 	return { ...collection, hooks }
+}
+
+/**
+ * Attaches the response stripper to a global. Globals take no `where`, so this
+ * is the strip alone: blind-index hashes, richText ciphertext siblings, and
+ * write-only fields never surface in a read result. The fields() plugin applies
+ * this to every global automatically; call it directly only when using
+ * encryptedField() standalone without the plugin.
+ */
+export const withEncryptedResponseStrip = (global: GlobalConfig): GlobalConfig => {
+	const stripPaths = stripPathsFor(scanEncryptedFields(global.fields))
+	if (stripPaths.length === 0) {
+		return global
+	}
+	return {
+		...global,
+		hooks: {
+			...global.hooks,
+			afterRead: [...(global.hooks?.afterRead ?? []), makeStripPathsHook(stripPaths)],
+		},
+	}
 }

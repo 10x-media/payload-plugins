@@ -16,6 +16,7 @@ import {
 import type { TextFieldClientProps } from 'payload'
 import type React from 'react'
 import { useMemo, useState } from 'react'
+import type { NormalizedGenerate } from '../generateSecret'
 import { clampMaskDots } from '../maskDots'
 import type { EncryptedFieldPatch, EncryptedProtection } from '../types'
 import { EncryptedInput } from './EncryptedInput'
@@ -23,6 +24,7 @@ import { EncryptedTextarea } from './EncryptedTextarea'
 import type { EncryptedFieldConfig } from './placement'
 import { placementFor } from './placement'
 import { StructuralField } from './StructuralField'
+import { WriteOnlyField } from './WriteOnlyField'
 import './ProtectedField.css'
 
 /**
@@ -46,8 +48,10 @@ const NATIVE: Record<string, AnyFieldComponent> = {
 }
 
 export interface ProtectedFieldProps extends TextFieldClientProps {
+	clearable?: boolean
 	componentKey: string
 	fieldPatch: EncryptedFieldPatch
+	generate?: NormalizedGenerate
 	maskDots?: number
 	protection: EncryptedProtection
 }
@@ -101,6 +105,24 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 
 	const Native = NATIVE[componentKey] ?? (TextField as AnyFieldComponent)
 	const nativeProps = { ...(props as unknown as Record<string, unknown>), field: patchedField }
+
+	if (protection === 'writeOnly') {
+		return (
+			<WriteOnlyField
+				clearable={props.clearable !== false}
+				componentKey={componentKey}
+				field={patchedField as unknown as EncryptedFieldConfig}
+				generate={props.generate}
+				hintPath={`${path}_hint`}
+				maskDots={maskDots}
+				Native={Native}
+				nativeProps={nativeProps}
+				path={path}
+				placement={placementFor(componentKey, fieldPatch.hasMany === true)}
+				setPath={`${path}_set`}
+			/>
+		)
+	}
 
 	if (protection === 'none' || startedEmpty) {
 		return <Native {...nativeProps} />

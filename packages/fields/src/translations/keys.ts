@@ -40,6 +40,13 @@ export const keys = {
 	showValue: 'fields:showValue',
 	hideValue: 'fields:hideValue',
 	encryptedValue: 'fields:encryptedValue',
+	replaceValue: 'fields:replaceValue',
+	clearValue: 'fields:clearValue',
+	undoClear: 'fields:undoClear',
+	clearedOnSave: 'fields:clearedOnSave',
+	generateValue: 'fields:generateValue',
+	writeOnlyValue: 'fields:writeOnlyValue',
+	secretNotSet: 'fields:secretNotSet',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
