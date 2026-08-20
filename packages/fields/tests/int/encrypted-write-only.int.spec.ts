@@ -421,13 +421,16 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 					data: { apiKey: 'sk-invisible', title: 'invisible' },
 					req,
 				})
+				// Specifically not-found. A bare rejection would also be satisfied by the
+				// helper failing for some unrelated reason, which would make this pass
+				// while proving nothing about isolation.
 				await expect(
 					readEncryptedField(booted.payload, {
 						collection: 'credentials',
 						id: created.id,
 						path: 'apiKey',
 					})
-				).rejects.toThrow()
+				).rejects.toMatchObject({ status: 404 })
 			} finally {
 				await killTransaction(req)
 			}

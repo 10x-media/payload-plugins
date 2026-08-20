@@ -135,6 +135,8 @@ const secret = await readEncryptedField(payload, {
 
 Given a request, the read joins its transaction and its locale. Without one it runs on its own request, outside any transaction in progress, so a row written but not yet committed is simply not found. Either way the request comes back exactly as it was handed over.
 
+A request picks the transaction to read in, not which value comes back, so the locale is resolved deliberately: an explicit `locale` wins, then the request's. A request set to `locale: 'all'` is the exception. It asks for a `{ [locale]: value }` map, which a single handle cannot address, so the read falls back to the default locale, the same value it returns with no request at all. Pass `locale` explicitly to read a different one.
+
 ### Reading many rows at once
 
 `readEncryptedField` runs one query per document, which is the wrong shape when a hook or a job needs the same field across every row a query returns, and the rest of each row along with it. Run your own query inside `withRawEncrypted` instead:
