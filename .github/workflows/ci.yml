@@ -20,6 +20,7 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -32,6 +33,7 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -44,6 +46,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -55,20 +58,21 @@ jobs:
       - run: pnpm exec turbo run build --filter='./packages/*'
       - name: Verify published dist output (directives, externals, exports, publint)
         run: pnpm check:dist
-      # The bundle gates below run every dev app's `next build` in parallel, and page-data
-      # collection boots an in-memory Mongo per app: without this, all of them race the same
-      # cold binary download and trip mongodb-memory-server's lockfile bug.
-      - name: Pre-cache the Mongo binary (avoid a parallel-download lockfile race)
-        run: >-
-          pnpm --filter @10x-media/payload-test-harness exec node -e
-          "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
+      # turbo runs a task's `dependsOn` even where the task itself is missing, so this gate
+      # also runs all ten dev apps' and the docs site's `next build`. Unbounded that is
+      # eleven at once, which exhausts a 4-vCPU runner and returns as a bare cancel.
       - name: Bundle isolation gates
-        run: pnpm exec turbo run test:dist
+        run: |
+          bash scripts/ci-resource-probe.sh 30 &
+          probe=$!
+          trap 'kill "$probe" 2>/dev/null || true' EXIT
+          pnpm exec turbo run test:dist --concurrency=3 --log-order=stream
       - name: Registry parity (rebuild shadcn registry, fail if drifted from source)
         run: pnpm check:registry
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         # Current and next Node LTS. Floor is 22.18 (native .ts config support,
@@ -90,6 +94,7 @@ jobs:
 
   test-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -108,6 +113,7 @@ jobs:
   # so main stays fast. test-matrix already covers Postgres-in-Docker on push.
   test-container:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'parity')
     steps:
       - uses: actions/checkout@v6
@@ -121,6 +127,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'e2e')
     steps:
       - uses: actions/checkout@v6
@@ -135,6 +142,7 @@ jobs:
 
   changeset-required:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-release')
     steps:
       - uses: actions/checkout@v6

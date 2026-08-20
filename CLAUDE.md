@@ -100,6 +100,18 @@ Modeled after Payload's own monorepo test pattern: Mongo runs in-memory via `mon
 
 Postgres-touching tiers (matrix, container, e2e) require Docker locally and on CI. This mirrors Payload's own monorepo test pattern (Mongo in-memory, Postgres in real Docker).
 
+### Bundle isolation gates (`test:dist`)
+
+Only `@10x-media/fields` defines a `test:dist` script, but the turbo task declares `dependsOn: ["build"]`, and turbo schedules that dependency in every package that lacks the parent task. `pnpm test:dist` therefore runs **eleven `next build`s** (ten dev apps plus `apps/docs`) alongside the one real gate. Check the fan-out before you change it:
+
+```bash
+pnpm exec turbo run test:dist --dry=json
+```
+
+Unbounded that peaked at 67 node processes and more than 16 GB on a 4-vCPU CI runner, which swapped the runner to death and surfaced as a `build` job cancelled with no error at all. CI caps it with `--concurrency=3`. Keep that cap, and keep every `packages/*/dev/helpers/memoryDb.ts` returning its placeholder URI under `NEXT_PHASE === 'phase-production-build'` so no dev app spawns a mongod while collecting page data. `tooling/plugin-template` carries the same guard; if you edit one, edit both.
+
+Unfiltered `pnpm build` has the same eleven-way fan-out. The short commands forward extra args to the task rather than to turbo, so cap it with the env var instead: `TURBO_CONCURRENCY=3 pnpm build`.
+
 ## Docs showcase clips
 
 A plugin may carry `packages/<slug>/videos/*.video.ts`: clipwright scenes driving that plugin's own dev app, rendered to MP4 for the docs site. They are showcases rather than tutorials, so they carry no captions and no audio, and the docs play them muted and looping through `<Video>` (`apps/docs/components/video.tsx`).
