@@ -54,14 +54,25 @@ const renderLocked = ({
 	maskDots,
 	text,
 }: Pick<DefaultServerCellComponentProps, 'i18n'> & { maskDots?: number; text?: string }) => (
+	// Styled inline rather than through ProtectedField.css: that stylesheet is
+	// imported by the field components, and a list view renders this cell
+	// without mounting one, so a rule living there would not be loaded here.
 	<span
 		className="tenx-protected-cell"
-		style={{ alignItems: 'center', display: 'inline-flex', gap: '0.4em' }}
+		style={{
+			alignItems: 'center',
+			display: 'inline-flex',
+			gap: '0.4em',
+			maxWidth: '100%',
+			minWidth: 0,
+		}}
 	>
 		<svg
 			aria-hidden="true"
 			fill="none"
 			height="12"
+			// Without this the badge squashes to a sliver before the text yields.
+			style={{ flexShrink: 0 }}
 			stroke="currentColor"
 			strokeWidth="2"
 			viewBox="0 0 24 24"
@@ -70,7 +81,11 @@ const renderLocked = ({
 			<rect height="10" rx="2" width="14" x="5" y="11" />
 			<path d="M8 11V7a4 4 0 0 1 8 0v4" />
 		</svg>
-		<span aria-label={asTranslate(i18n.t)(keys.encryptedValue)} role="img">
+		<span
+			aria-label={asTranslate(i18n.t)(keys.encryptedValue)}
+			role="img"
+			style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+		>
 			{text ?? '•'.repeat(clampMaskDots(maskDots))}
 		</span>
 	</span>

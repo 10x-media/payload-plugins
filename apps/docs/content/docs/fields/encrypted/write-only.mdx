@@ -58,7 +58,16 @@ A write-only Stripe key raises "which key is configured here, test or live?" mon
 
 The hint is sliced from the plaintext **at seal time** in the same `beforeChange` that encrypts, stored beside the ciphertext in a `<name>_hint` sibling (as `sk_l····9d3f`, with a compact canonical gap), and returned in API responses. Reads never touch the plaintext to display it. The admin placeholder and the list cell render the gap as the field's `maskDots` run of bullets (`sk_l••••••••9d3f` by default), so a hinted value's concealed span looks exactly like every other masked run; the dot count stays cosmetic and says nothing about the hidden length.
 
-Guard rails: `prefix + suffix` is capped at 8 characters, and a plaintext shorter than `prefix + suffix + 8` (or whose exposed ends contain the mask glyph `·`) stores no hint at all, so a hint can identify a 30-character key but never reconstruct a short secret. Text and email fields only, not `hasMany`. Do not configure hints on passwords (story: identify keys, never sample passwords); the length guard protects against the worst of it, but the right amount of password to expose is zero.
+Guard rails, in the order they bite:
+
+- **`prefix + suffix` is capped at 32 characters.** Wide enough to clear a constant format prefix and still say something: `sk_live_` and `whsec_` identify the format, not the key, so a hint has to get past them before its characters distinguish anything.
+- **The value must keep at least as much hidden as the hint exposes.** This is the guard that matters, because a cap cannot know what it is slicing: 32 characters of a 128-character token is nothing, 32 of a 40-character one is most of it. A config sized for long tokens therefore stores no hint on a short value instead of exposing half of it, which lets one field serve a collection holding both.
+- **At least 8 characters stay hidden regardless**, since a short value is guessable at any ratio.
+- **Exposed ends containing the mask glyph `·` store no hint**, as that would blur where the concealed span starts.
+
+Text and email fields only, not `hasMany`. Do not configure hints on passwords (story: identify keys, never sample passwords); the guards protect against the worst of it, but the right amount of password to expose is zero.
+
+The bullet run is additive, never reduced by the hint: `maskDots` decides the run, the hint's ends wrap it, so `sk_live_51H8xQ····9d3fXQ` with the default 8 renders as `sk_live_51H8xQ••••••••9d3fXQ`. One count everywhere is what keeps a hinted value and a hint-less one reading as the same kind of concealed thing, and it keeps the run a pure presentation choice that says nothing about the value. A hint too wide for a narrow field clamps with an ellipsis, in the input and in the list cell, rather than borrowing space from the run.
 
 ## Generated secrets
 
