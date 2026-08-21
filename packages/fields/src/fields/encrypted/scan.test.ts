@@ -34,10 +34,6 @@ describe('scanEncryptedFields', () => {
 		expect(scanEncryptedFields(undefined).size).toBe(0)
 	})
 
-	/**
-	 * `decryptFieldValue` scans to locate its marker, so a batch decrypting many
-	 * rows of one collection would otherwise walk the whole field tree per row.
-	 */
 	it('reuses the scan for the same field array', () => {
 		const fields = secret('apiKey')
 		expect(scanEncryptedFields(fields)).toBe(scanEncryptedFields(fields))

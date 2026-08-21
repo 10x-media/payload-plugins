@@ -42,10 +42,6 @@ const walk = (fields: Field[] | undefined, prefix: string): Map<string, Encrypte
  * arrays live for the process, so the scan result cannot go stale; a WeakMap
  * keyed on the array lets a discarded config (every booted Payload in a test
  * run) be collected with it.
- *
- * The cache is what makes a per-document server read cheap. `decryptFieldValue`
- * scans to find its marker, so decrypting N rows used to walk the whole field
- * tree N times, on every write that fans out to encrypted rows.
  */
 const cache = new WeakMap<Field[], ReadonlyMap<string, EncryptedFieldMarker>>()
 
