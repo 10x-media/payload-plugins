@@ -2,6 +2,7 @@ export { validateEncryptedBoot } from '../fields/encrypted/boot'
 export { DEFAULT_KEY_ID, InvalidKeysConfigError } from '../fields/encrypted/crypto/keys'
 export {
 	AuthenticationFailedError,
+	CorruptPlaintextError,
 	isSealed,
 	MalformedCiphertextError,
 	UnknownKeyIdError,
@@ -12,6 +13,7 @@ export {
 	withEncryptedQueryRewrite,
 	withEncryptedResponseStrip,
 } from '../fields/encrypted/queryRewrite'
+export { withRawEncrypted } from '../fields/encrypted/rawRead'
 export type {
 	EncryptedFieldOptions,
 	EncryptedGenerateConfig,

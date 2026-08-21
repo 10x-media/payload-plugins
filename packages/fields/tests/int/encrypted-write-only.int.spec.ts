@@ -1,7 +1,13 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, GlobalConfig } from 'payload'
+import { createLocalReq, initTransaction, killTransaction } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { decryptFieldValue, encryptedField, readEncryptedField } from '../../src/exports/encrypted'
+import {
+	decryptFieldValue,
+	encryptedField,
+	readEncryptedField,
+	withRawEncrypted,
+} from '../../src/exports/encrypted'
 import { WIRE_PREFIX } from '../../src/fields/encrypted/crypto/wire'
 import { fields } from '../../src/index'
 
@@ -55,6 +61,14 @@ const credentials: CollectionConfig = {
 	],
 }
 
+const services: CollectionConfig = {
+	slug: 'services',
+	fields: [
+		{ name: 'name', type: 'text' },
+		{ name: 'credential', relationTo: 'credentials', type: 'relationship' },
+	],
+}
+
 const smtp: GlobalConfig = {
 	slug: 'smtp',
 	fields: [
@@ -73,7 +87,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			collections: [credentials],
+			collections: [credentials, services],
 			configOverrides: {
 				globals: [smtp],
 				localization: { defaultLocale: 'en', fallback: true, locales: ['en', 'de'] },
@@ -375,6 +389,320 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 					value: 'pfe1.a.b.c.d',
 				})
 			).rejects.toThrow(/not an encrypted field/)
+		})
+	})
+	describe("reads that join the caller's request", () => {
+		it('sees a secret written in the same open transaction', async () => {
+			const req = await createLocalReq({}, booted.payload)
+			const opened = await initTransaction(req)
+			expect(opened).toBe(true)
+			try {
+				const created = await booted.payload.create({
+					collection: 'credentials',
+					data: { apiKey: 'sk-in-flight', title: 'in-flight' },
+					req,
+				})
+				const handle = await readEncryptedField(booted.payload, {
+					collection: 'credentials',
+					id: created.id,
+					path: 'apiKey',
+					req,
+				})
+				expect(await handle?.decrypt()).toBe('sk-in-flight')
+			} finally {
+				await killTransaction(req)
+			}
+		})
+
+		/**
+		 * Without the request the read runs on its own, outside the transaction, so
+		 * the row it is asked for does not exist yet. That is the failure the `req`
+		 * argument exists to prevent, and pinning it here keeps the two paths from
+		 * quietly converging.
+		 */
+		it('cannot see that same secret without the request', async () => {
+			const req = await createLocalReq({}, booted.payload)
+			const opened = await initTransaction(req)
+			expect(opened).toBe(true)
+			try {
+				const created = await booted.payload.create({
+					collection: 'credentials',
+					data: { apiKey: 'sk-invisible', title: 'invisible' },
+					req,
+				})
+				// Specifically not-found. A bare rejection would also be satisfied by the
+				// helper failing for some unrelated reason, which would make this pass
+				// while proving nothing about isolation.
+				await expect(
+					readEncryptedField(booted.payload, {
+						collection: 'credentials',
+						id: created.id,
+						path: 'apiKey',
+					})
+				).rejects.toMatchObject({ status: 404 })
+			} finally {
+				await killTransaction(req)
+			}
+		})
+
+		/**
+		 * A request reading every locale at once hands documents back as
+		 * `{ [locale]: value }` maps, which a single handle cannot address. Passing
+		 * a request chooses the transaction to read in, so it must not also change
+		 * which value comes back: the read falls back to the default locale, the
+		 * same one it uses with no request at all.
+		 */
+		it('resolves a localized field at the default locale when the request reads all of them', async () => {
+			const created = await booted.payload.create({
+				collection: 'credentials',
+				data: { localSecret: 'english', title: 'all-locales' },
+				locale: 'en',
+			})
+			await booted.payload.update({
+				collection: 'credentials',
+				data: { localSecret: 'deutsch' },
+				id: created.id,
+				locale: 'de',
+			})
+
+			const req = await createLocalReq({ locale: 'all' }, booted.payload)
+			const handle = await readEncryptedField(booted.payload, {
+				collection: 'credentials',
+				id: created.id,
+				path: 'localSecret',
+				req,
+			})
+			expect(await handle?.decrypt()).toBe('english')
+		})
+
+		it("still honours an explicit locale over the request's", async () => {
+			const created = await booted.payload.create({
+				collection: 'credentials',
+				data: { localSecret: 'english', title: 'explicit-locale' },
+				locale: 'en',
+			})
+			await booted.payload.update({
+				collection: 'credentials',
+				data: { localSecret: 'deutsch' },
+				id: created.id,
+				locale: 'de',
+			})
+
+			const req = await createLocalReq({ locale: 'en' }, booted.payload)
+			const handle = await readEncryptedField(booted.payload, {
+				collection: 'credentials',
+				id: created.id,
+				locale: 'de',
+				path: 'localSecret',
+				req,
+			})
+			expect(await handle?.decrypt()).toBe('deutsch')
+		})
+
+		it('leaves the request able to read normally afterwards', async () => {
+			const created = await booted.payload.create({
+				collection: 'credentials',
+				data: { apiKey: 'sk-restored', title: 'restored', visible: 'plain' },
+			})
+			const req = await createLocalReq({}, booted.payload)
+			await readEncryptedField(booted.payload, {
+				collection: 'credentials',
+				id: created.id,
+				path: 'apiKey',
+				req,
+			})
+
+			const after = await booted.payload.findByID({
+				collection: 'credentials',
+				id: created.id,
+				req,
+			})
+			expect(after.apiKey).toBeUndefined()
+			expect(after.apiKey_set).toBe(true)
+			expect(after.visible).toBe('plain')
+		})
+	})
+
+	describe('batch reads through withRawEncrypted', () => {
+		const seed = async (titles: string[]) => {
+			for (const title of titles) {
+				await booted.payload.create({
+					collection: 'credentials',
+					data: { apiKey: `sk-${title}`, title, visible: `v-${title}` },
+				})
+			}
+		}
+
+		it('recovers a write-only field across many rows in one query', async () => {
+			const titles = ['batch-a', 'batch-b', 'batch-c']
+			await seed(titles)
+			const req = await createLocalReq({}, booted.payload)
+
+			const found = await withRawEncrypted(req, () =>
+				booted.payload.find({
+					collection: 'credentials',
+					depth: 0,
+					overrideAccess: true,
+					req,
+					sort: 'title',
+					where: { title: { in: titles } },
+				})
+			)
+
+			expect(found.docs).toHaveLength(3)
+			const recovered = await Promise.all(
+				found.docs.map(async (doc) => ({
+					secret: await decryptFieldValue(booted.payload, {
+						collection: 'credentials',
+						path: 'apiKey',
+						value: doc.apiKey as string,
+					}),
+					// Plain fields ride along, which is the point of running the caller's
+					// own query rather than one lookup per row.
+					title: doc.title,
+				}))
+			)
+			expect(recovered).toEqual(titles.map((title) => ({ secret: `sk-${title}`, title })))
+		})
+
+		/**
+		 * The mode travels on the request, so it suspends decrypt-on-read for every
+		 * encrypted field the query touches, not only the write-only one the caller
+		 * came for. Pinned because a caller reaching for one secret still has to
+		 * decrypt the masked fields it reads alongside it.
+		 */
+		it('leaves masked fields sealed inside the window too', async () => {
+			await seed(['batch-masked-inside'])
+			const req = await createLocalReq({}, booted.payload)
+			const found = await withRawEncrypted(req, () =>
+				booted.payload.find({
+					collection: 'credentials',
+					depth: 0,
+					overrideAccess: true,
+					req,
+					where: { title: { equals: 'batch-masked-inside' } },
+				})
+			)
+			expect(sealedShape(found.docs[0]?.visible)).toBe(true)
+			await expect(
+				decryptFieldValue(booted.payload, {
+					collection: 'credentials',
+					path: 'visible',
+					value: found.docs[0]?.visible as string,
+				})
+			).resolves.toBe('v-batch-masked-inside')
+		})
+
+		it('hands back wire strings, not plaintext, inside the window', async () => {
+			await seed(['batch-wire'])
+			const req = await createLocalReq({}, booted.payload)
+			const found = await withRawEncrypted(req, () =>
+				booted.payload.find({
+					collection: 'credentials',
+					depth: 0,
+					overrideAccess: true,
+					req,
+					where: { title: { equals: 'batch-wire' } },
+				})
+			)
+			expect(sealedShape(found.docs[0]?.apiKey)).toBe(true)
+		})
+
+		it('strips the field again on the same request once the window closes', async () => {
+			await seed(['batch-closed'])
+			const req = await createLocalReq({}, booted.payload)
+			await withRawEncrypted(req, () =>
+				booted.payload.find({
+					collection: 'credentials',
+					depth: 0,
+					overrideAccess: true,
+					req,
+					where: { title: { equals: 'batch-closed' } },
+				})
+			)
+
+			const after = await booted.payload.find({
+				collection: 'credentials',
+				req,
+				where: { title: { equals: 'batch-closed' } },
+			})
+			expect(after.docs[0]?.apiKey).toBeUndefined()
+			expect(after.docs[0]?.apiKey_set).toBe(true)
+		})
+
+		/**
+		 * Relationship population at depth > 0 runs through the request dataloader,
+		 * whose cache key does not include the context. The window swaps the loader
+		 * for a private one, so a document populated inside it is cached as
+		 * ciphertext only there: the normal read before primes the real loader, the
+		 * raw read must not be served from that cache, and the normal read after
+		 * must not be served from the window's.
+		 */
+		it('isolates relationship population from the request dataloader', async () => {
+			const cred = await booted.payload.create({
+				collection: 'credentials',
+				data: { apiKey: 'sk-rel', title: 'rel', visible: 'v-rel' },
+			})
+			const service = await booted.payload.create({
+				collection: 'services',
+				data: { credential: cred.id, name: 'rel-svc' },
+			})
+			const req = await createLocalReq({}, booted.payload)
+
+			const before = await booted.payload.findByID({
+				collection: 'services',
+				depth: 1,
+				id: service.id,
+				req,
+			})
+			const populatedBefore = before.credential as Record<string, unknown>
+			expect(populatedBefore.visible).toBe('v-rel')
+			expect(populatedBefore.apiKey).toBeUndefined()
+
+			const during = await withRawEncrypted(req, () =>
+				booted.payload.findByID({
+					collection: 'services',
+					depth: 1,
+					id: service.id,
+					overrideAccess: true,
+					req,
+				})
+			)
+			const populatedDuring = during.credential as Record<string, unknown>
+			expect(sealedShape(populatedDuring.visible)).toBe(true)
+			expect(sealedShape(populatedDuring.apiKey)).toBe(true)
+
+			const after = await booted.payload.findByID({
+				collection: 'services',
+				depth: 1,
+				id: service.id,
+				req,
+			})
+			const populatedAfter = after.credential as Record<string, unknown>
+			expect(populatedAfter.visible).toBe('v-rel')
+			expect(populatedAfter.apiKey).toBeUndefined()
+			expect(populatedAfter.apiKey_set).toBe(true)
+		})
+
+		it('leaves a masked field decrypting normally after the window', async () => {
+			await seed(['batch-masked'])
+			const req = await createLocalReq({}, booted.payload)
+			await withRawEncrypted(req, () =>
+				booted.payload.find({
+					collection: 'credentials',
+					depth: 0,
+					overrideAccess: true,
+					req,
+					where: { title: { equals: 'batch-masked' } },
+				})
+			)
+
+			const after = await booted.payload.find({
+				collection: 'credentials',
+				req,
+				where: { title: { equals: 'batch-masked' } },
+			})
+			expect(after.docs[0]?.visible).toBe('v-batch-masked')
 		})
 	})
 })
