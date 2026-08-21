@@ -26,6 +26,8 @@ Authenticated encryption binds each ciphertext to its `collection.field` slot (s
 
 Field-level encryption is not a defense against an attacker who already has database write access and stays within one field. Pair it with access control and database write restrictions.
 
+The binding's first component is the slug by default, which makes renaming a collection whose data stays in place a re-keying event: every stored value fails authentication under the new name. A field whose collection slug is configurable (plugin-owned collections) should pin the component instead; see [aadScope](/fields/encrypted/key-management#pinning-the-aad-scope).
+
 ## Blind-index leakage
 
 A [blind index](/fields/encrypted/querying) is deterministic by necessity, which is a real information leak to anyone with database read access:

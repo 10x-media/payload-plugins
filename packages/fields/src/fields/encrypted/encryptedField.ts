@@ -148,6 +148,7 @@ export const encryptedField = (
 	options: EncryptedFieldOptions = {}
 ): Field[] => {
 	const {
+		aadScope,
 		clearable,
 		generate,
 		hint,
@@ -162,6 +163,14 @@ export const encryptedField = (
 	const writeOnly = protection === 'writeOnly'
 	if (keys) {
 		validateKeysConfig(keys)
+	}
+	// Checked here rather than at first write: buildAad rejects a dotted
+	// component at seal time, and an empty scope would silently fall back to the
+	// slug the option exists to escape.
+	if (aadScope !== undefined && (aadScope === '' || aadScope.includes('.'))) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': aadScope must be a non-empty string without '.' ('.' separates AAD components, so a dotted scope would make the binding ambiguous)`
+		)
 	}
 	const hasMany = 'hasMany' in source && source.hasMany === true
 	const unique = 'unique' in source && source.unique === true
@@ -221,6 +230,7 @@ export const encryptedField = (
 	}
 
 	const marker: EncryptedFieldMarker = {
+		aadScope,
 		bidxName: queryable ? `${source.name}_bidx` : undefined,
 		fieldName: source.name,
 		hasMany,

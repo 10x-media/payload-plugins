@@ -49,6 +49,27 @@ A provider must resolve to a `Uint8Array` of key bytes (a string return is rejec
 
 The key behind [queryable](/fields/encrypted/querying) blind indexes is derived from a stable root, a dedicated `keys.indexKey` if you set one, otherwise the Payload secret, and never from the active data key. That decoupling is deliberate: rotating the active data key re-seals ciphertext while the blind index stays byte-identical, so equality queries keep matching rows written under the previous key. Set a dedicated `indexKey` only if you want the index key fully independent of the data keys; changing it later invalidates every existing blind index until they are rebuilt.
 
+## Pinning the AAD scope
+
+Every ciphertext is bound to its `collection.field[.locale]` slot ([why](/fields/encrypted/design-rationale#why-aad-binding)). The first component of that binding is the collection or global slug, which is exactly right until the slug can change: a plugin-owned collection whose slug the consumer configures, or any collection you might rename with its data kept in place (`dbName` pinned, or migrated). Rename the slug and every stored value fails authentication, and no utility can recover them, because reads resolve the binding from the current slug too.
+
+`aadScope` pins that component to a name the slug cannot take with it:
+
+```ts
+...encryptedField(
+  { name: 'signingSecret', type: 'text' },
+  { aadScope: 'acme:subscriptions', protection: 'writeOnly' },
+)
+```
+
+With the scope pinned, the binding is `acme:subscriptions.signingSecret[.locale]` whatever the collection is called, and a later rename costs nothing.
+
+Three rules come with it:
+
+- **Decide it before data exists.** Adding, removing, or changing the scope on a field that already holds values is the same re-keying event a slug rename would have been: the stored values become unreadable.
+- **No dots.** `.` separates AAD components, so a dotted scope is rejected at the factory. Use another separator (`acme:subscriptions`).
+- **Keep it unique per logical schema.** Two same-named fields sharing a scope share a binding, which widens the documented [same-field ciphertext portability](/fields/encrypted/limitations#swap-resistance) across their collections.
+
 ## Rotation
 
 Adding a new active key re-encrypts nothing by itself; old rows stay valid under their embedded key id. To retire an old key, re-encrypt in bulk:

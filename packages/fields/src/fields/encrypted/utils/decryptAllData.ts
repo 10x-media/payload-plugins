@@ -3,7 +3,7 @@ import { getFieldsRegistry } from '../../../plugin/registry'
 import { resolveKeys } from '../crypto/keys'
 import { isSealed, unseal } from '../crypto/wire'
 import { scanEncryptedFields } from '../scan'
-import { ENCRYPTED_CONTEXT_KEY, type EncryptedFieldMarker } from '../types'
+import { aadScopeOf, ENCRYPTED_CONTEXT_KEY, type EncryptedFieldMarker } from '../types'
 import { getAtPath, pageThrough, setAtPath } from './pageThrough'
 import type { RotateOptions, RotateReport } from './rotateEncryptedFields'
 
@@ -48,7 +48,7 @@ export const decryptAllData = async (
 				marker.keys ?? registry?.encrypted?.keys,
 				payload.config.secret
 			)
-			const base = `${slug}.${marker.fieldName}`
+			const base = `${aadScopeOf(marker, slug)}.${marker.fieldName}`
 			const candidates = marker.localized
 				? [
 						...(locale ? [`${base}.${locale}`] : []),
