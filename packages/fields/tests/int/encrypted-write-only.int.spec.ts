@@ -61,6 +61,14 @@ const credentials: CollectionConfig = {
 	],
 }
 
+const services: CollectionConfig = {
+	slug: 'services',
+	fields: [
+		{ name: 'name', type: 'text' },
+		{ name: 'credential', relationTo: 'credentials', type: 'relationship' },
+	],
+}
+
 const smtp: GlobalConfig = {
 	slug: 'smtp',
 	fields: [
@@ -79,7 +87,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			collections: [credentials],
+			collections: [credentials, services],
 			configOverrides: {
 				globals: [smtp],
 				localization: { defaultLocale: 'en', fallback: true, locales: ['en', 'de'] },
@@ -619,6 +627,60 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			})
 			expect(after.docs[0]?.apiKey).toBeUndefined()
 			expect(after.docs[0]?.apiKey_set).toBe(true)
+		})
+
+		/**
+		 * Relationship population at depth > 0 runs through the request dataloader,
+		 * whose cache key does not include the context. The window swaps the loader
+		 * for a private one, so a document populated inside it is cached as
+		 * ciphertext only there: the normal read before primes the real loader, the
+		 * raw read must not be served from that cache, and the normal read after
+		 * must not be served from the window's.
+		 */
+		it('isolates relationship population from the request dataloader', async () => {
+			const cred = await booted.payload.create({
+				collection: 'credentials',
+				data: { apiKey: 'sk-rel', title: 'rel', visible: 'v-rel' },
+			})
+			const service = await booted.payload.create({
+				collection: 'services',
+				data: { credential: cred.id, name: 'rel-svc' },
+			})
+			const req = await createLocalReq({}, booted.payload)
+
+			const before = await booted.payload.findByID({
+				collection: 'services',
+				depth: 1,
+				id: service.id,
+				req,
+			})
+			const populatedBefore = before.credential as Record<string, unknown>
+			expect(populatedBefore.visible).toBe('v-rel')
+			expect(populatedBefore.apiKey).toBeUndefined()
+
+			const during = await withRawEncrypted(req, () =>
+				booted.payload.findByID({
+					collection: 'services',
+					depth: 1,
+					id: service.id,
+					overrideAccess: true,
+					req,
+				})
+			)
+			const populatedDuring = during.credential as Record<string, unknown>
+			expect(sealedShape(populatedDuring.visible)).toBe(true)
+			expect(sealedShape(populatedDuring.apiKey)).toBe(true)
+
+			const after = await booted.payload.findByID({
+				collection: 'services',
+				depth: 1,
+				id: service.id,
+				req,
+			})
+			const populatedAfter = after.credential as Record<string, unknown>
+			expect(populatedAfter.visible).toBe('v-rel')
+			expect(populatedAfter.apiKey).toBeUndefined()
+			expect(populatedAfter.apiKey_set).toBe(true)
 		})
 
 		it('leaves a masked field decrypting normally after the window', async () => {
