@@ -44,9 +44,15 @@ export type EncryptedProtection = 'masked' | 'none' | 'writeOnly'
 /**
  * Identification hint for a write-only field: how many leading and trailing
  * plaintext characters to store beside the ciphertext at seal time (never
- * derived by decrypting on read). `prefix + suffix` is capped at 8, and a
- * plaintext shorter than `prefix + suffix + 8` stores no hint at all, so a
- * hint can identify a long key but never reconstruct a short secret.
+ * derived by decrypting on read). `prefix + suffix` is capped at 32, enough to
+ * carry a constant format prefix (`sk_live_`, `whsec_`) and still say which
+ * key this is.
+ *
+ * The cap is the blunt guard. What decides whether a hint is stored at all is
+ * the value being sliced: it must keep at least as many characters hidden as
+ * the hint exposes, and at least 8 either way. So one config can sit on a
+ * collection holding both long tokens and short ones, hinting the first and
+ * silently declining the second, rather than exposing half of it.
  */
 export interface EncryptedHintConfig {
 	prefix?: number

@@ -171,6 +171,11 @@ html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-fi
 	/* Flex min-width:auto would refuse to shrink below the placeholder's width
 	   and push the attached actions out of narrow containers. */
 	min-width: 0;
+	/* A rendered hint can be wider than a narrow field; browsers clip the
+	   placeholder flush by default, which reads as a value that ends there.
+	   On the input, not ::placeholder: that is where browsers read it from
+	   for placeholder text. */
+	text-overflow: ellipsis;
 }
 
 /* With a stored value, the "placeholder" is not a prompt but the concealed

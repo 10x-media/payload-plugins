@@ -8,8 +8,9 @@ import {
 	useFormFields,
 	useFormSubmitted,
 } from '@payloadcms/ui'
+import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type React from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { generateSecret, type NormalizedGenerate } from '../generateSecret'
@@ -191,6 +192,9 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 		</>
 	)
 
+	// A custom Field component short-circuits the path where Payload applies
+	// admin.width and admin.style, so the field has to carry them itself.
+	const styles = useMemo(() => mergeFieldStyles(field), [field])
 	const isTextarea = componentKey === 'textarea'
 	const inputProps = {
 		autoComplete: 'off',
@@ -221,6 +225,7 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 			]
 				.filter(Boolean)
 				.join(' ')}
+			style={styles}
 		>
 			<FieldLabel
 				label={field.label}
@@ -284,6 +289,9 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	const { setValue, value } = useField<unknown>({ path })
 	const isSet = useFormFields(([fields]) => fields?.[setPath]?.value === true)
 	const [mode, setMode] = useState<'cleared' | 'editing' | 'idle'>('idle')
+	// The concealed face stands in for the native field, so it has to carry the
+	// same width; without it the field would change width as the mode changes.
+	const styles = useMemo(() => mergeFieldStyles(field), [field])
 
 	// Mirror of the inline variant's save-conceal: a successful save drops any
 	// staged edit and folds the field back to its concealed face, without
@@ -331,7 +339,7 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 			{mode === 'editing' ? (
 				<Native {...nativeProps} />
 			) : (
-				<div className="field-type tenx-protected-field__wo-face">
+				<div className="field-type tenx-protected-field__wo-face" style={styles}>
 					<FieldLabel
 						label={field.label}
 						localized={field.localized}

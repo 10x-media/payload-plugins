@@ -1,10 +1,20 @@
 import type { EncryptedHintConfig } from './types'
 
-/** Most plaintext characters a hint may expose across both ends. */
-export const HINT_MAX_CHARS = 8
 /**
- * A hint is only stored when the plaintext keeps at least this many characters
- * hidden; below that, the "hint" would reconstruct most of the secret.
+ * Ceiling on the plaintext characters a hint may expose across both ends.
+ *
+ * A ceiling alone is a poor safety control, because what makes a hint safe is
+ * how much of the value stays hidden, not how much shows: 32 characters of a
+ * 128-character token is nothing, and 32 of a 40-character one is most of it.
+ * `makeHint` enforces the ratio, and this is the blunt upper bound on top of
+ * it, high enough for the prefixed formats credentials actually use
+ * (`sk_live_`, `whsec_`, `ghp_`, `xoxb-`), where a fixed budget would be spent
+ * on a constant that identifies nothing.
+ */
+export const HINT_MAX_CHARS = 32
+/**
+ * Floor on the characters a hint must leave hidden, whatever the ratio allows.
+ * Below this a short value is guessable however small a fraction is exposed.
  */
 export const HINT_MIN_HIDDEN = 8
 
@@ -46,16 +56,31 @@ export const normalizeHint = (config: EncryptedHintConfig, fieldName: string): N
  * the exposed text would blur where the concealed span starts, so such values
  * store no hint; real credentials never contain U+00B7). Computed at seal
  * time only; reads never touch the plaintext.
+ *
+ * Two length guards, because a hint's safety is a property of the value it
+ * slices rather than of the config that asks for the slice. The hidden
+ * remainder must be at least as long as the exposed ends, so a config sized
+ * for long tokens degrades to no hint on a short value instead of exposing
+ * half of it; and it must clear an absolute floor, since a short value stays
+ * guessable at any ratio. A config within the old 8-character ceiling can
+ * never fail the ratio it did not have to satisfy before: it already had to
+ * leave `HINT_MIN_HIDDEN` hidden, which was the same 8.
  */
 export const makeHint = (plaintext: unknown, hint: NormalizedHint): string | null => {
 	if (typeof plaintext !== 'string') {
 		return null
 	}
-	if (plaintext.length < hint.prefix + hint.suffix + HINT_MIN_HIDDEN) {
+	// Code points, not UTF-16 units: slicing units can split a surrogate pair
+	// into an unpaired half, and unit counts make an astral-character value look
+	// twice as long as it is, overstating what the guards think stays hidden.
+	const chars = [...plaintext]
+	const exposed = hint.prefix + hint.suffix
+	const hidden = chars.length - exposed
+	if (hidden < HINT_MIN_HIDDEN || hidden < exposed) {
 		return null
 	}
-	const start = hint.prefix > 0 ? plaintext.slice(0, hint.prefix) : ''
-	const end = hint.suffix > 0 ? plaintext.slice(-hint.suffix) : ''
+	const start = hint.prefix > 0 ? chars.slice(0, hint.prefix).join('') : ''
+	const end = hint.suffix > 0 ? chars.slice(-hint.suffix).join('') : ''
 	if (start.includes('·') || end.includes('·')) {
 		return null
 	}
@@ -63,10 +88,15 @@ export const makeHint = (plaintext: unknown, hint: NormalizedHint): string | nul
 }
 
 /**
- * Renders a stored hint for display: the canonical gap becomes `dots` mask
- * bullets, so `sk_d····9d3f` with maskDots 8 shows as `sk_d••••••••9d3f`,
- * the same bullet run a hint-less concealed value shows. The dot count stays
- * cosmetic and says nothing about the hidden length.
+ * Renders a stored hint for display: the canonical gap becomes the `maskDots`
+ * bullet run, so `sk_d····9d3f` with maskDots 8 shows as `sk_d••••••••9d3f`.
+ *
+ * The run is additive: the hint's ends wrap the exact bullet run a hint-less
+ * concealed value shows, never fewer. One count everywhere is what makes the
+ * bullets legible as "concealed" rather than as information, and it keeps the
+ * count a pure presentation choice, decided by `maskDots` alone. A hint too
+ * wide for its container is the container's problem, and both the input and
+ * the list cell clamp with an ellipsis rather than letting the run absorb it.
  */
 export const formatHint = (hint: string, dots: number): string => {
 	const index = hint.indexOf(HINT_GAP)
