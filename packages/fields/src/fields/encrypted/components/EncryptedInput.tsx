@@ -7,8 +7,9 @@ import {
 	useFormFields,
 	useFormSubmitted,
 } from '@payloadcms/ui'
+import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type React from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { EyeToggle } from './EyeToggle'
 import { dotString } from './MaskDots'
 import type { EncryptedFieldConfig } from './placement'
@@ -59,6 +60,10 @@ export const EncryptedInput: React.FC<EncryptedInputProps> = ({ field, kind, mas
 			? value
 			: ''
 
+	// A custom Field component short-circuits the path where Payload applies
+	// admin.width and admin.style, so the field has to carry them itself.
+	const styles = useMemo(() => mergeFieldStyles(field), [field])
+
 	return (
 		<div
 			className={[
@@ -70,6 +75,7 @@ export const EncryptedInput: React.FC<EncryptedInputProps> = ({ field, kind, mas
 			]
 				.filter(Boolean)
 				.join(' ')}
+			style={styles}
 		>
 			<FieldLabel
 				label={field.label}

@@ -31,7 +31,7 @@ export const writeOnlyStories: CollectionConfig = {
 			{
 				admin: {
 					description:
-						'STORY 2, pasted third-party API key that must stay identifiable (Stripe/SendGrid). hint: { prefix: 4, suffix: 4 } stores an identification slice beside the ciphertext at seal time; the API returns it as stripeKey_hint (sk_d····9d3f), and the set state and list cell render the gap as the maskDots bullet run (sk_d••••••••9d3f), matching every other concealed span. The full value stays unreadable forever; values shorter than prefix + suffix + 8 store no hint at all.',
+						'STORY 2, pasted third-party API key that must stay identifiable (Stripe/SendGrid). hint: { prefix: 4, suffix: 4 } stores an identification slice beside the ciphertext at seal time; the API returns it as stripeKey_hint (sk_d····9d3f), and the set state and list cell render the gap as the maskDots bullet run (sk_d••••••••9d3f), matching every other concealed span. The full value stays unreadable forever; a value that cannot keep at least as much hidden as the hint would expose stores no hint at all.',
 				},
 				name: 'stripeKey',
 				type: 'text',
@@ -86,6 +86,43 @@ export const writeOnlyStories: CollectionConfig = {
 				type: 'text',
 			},
 			{ generate: true, hint: { suffix: 4 }, protection: 'writeOnly' }
+		),
+		{
+			type: 'row',
+			fields: [
+				...encryptedField(
+					{
+						admin: {
+							description:
+								'STORY 7, prefixed key in a NARROW row, the hint width case. hint: { prefix: 14, suffix: 6 } spends 8 characters on the constant sk_live_ and still says which key this is, which the old 8-character budget could not. admin.width only does anything inside a row (Payload reads --field-width there), so this row is what makes the input short enough to test against: the bullet run stays at maskDots with the hint ends added around it (sk_live_51H8xQ••••••••9d3fXQ), and the input ellipsis clamps whatever is too wide for the row. Paste a short key to watch the hint decline itself rather than expose half of it.',
+							width: '35%',
+						},
+						name: 'stripeLiveKey',
+						type: 'text',
+					},
+					{ hint: { prefix: 14, suffix: 6 }, protection: 'writeOnly' }
+				),
+				{
+					admin: {
+						description:
+							'Native neighbour at the same width, for comparison: both inputs must be the same height and the same width, and the encrypted one must not push this one out of the row.',
+						width: '35%',
+					},
+					name: 'rowNeighbour',
+					type: 'text',
+				},
+			],
+		},
+		...encryptedField(
+			{
+				admin: {
+					description:
+						'STORY 8, the exposure cap at full width. hint: { prefix: 16, suffix: 16 } is the widest a hint may be, and the ratio guard means only a value of 64 characters or more gets one at all. Compare its list cell with STORY 2 to see the bullet run give up its space rather than the identifying ends.',
+				},
+				name: 'longLivedToken',
+				type: 'text',
+			},
+			{ hint: { prefix: 16, suffix: 16 }, protection: 'writeOnly' }
 		),
 	],
 }
