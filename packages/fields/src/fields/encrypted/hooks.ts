@@ -69,11 +69,15 @@ export const sealAad = (
 	slug: string,
 	req: PayloadRequest
 ): string => {
-	const scope = aadScopeOf(marker, slug)
-	return buildAad(
-		marker.localized ? [scope, marker.fieldName, operationLocale(req)] : [scope, marker.fieldName]
-	)
+	if (marker.localized) {
+		return localeAad(marker, slug, operationLocale(req))
+	}
+	return buildAad([aadScopeOf(marker, slug), marker.fieldName])
 }
+
+/** The AAD for one locale of a localized field; locale-map writes seal per entry. */
+const localeAad = (marker: EncryptedFieldMarker, slug: string, locale: string): string =>
+	buildAad([aadScopeOf(marker, slug), marker.fieldName, locale])
 
 /**
  * Read-side AAD candidates. Localized fields try the request locale first,
@@ -85,16 +89,15 @@ export const readAadCandidates = (
 	slug: string,
 	req: PayloadRequest
 ): string[] => {
-	const scope = aadScopeOf(marker, slug)
 	if (!marker.localized) {
-		return [buildAad([scope, marker.fieldName])]
+		return [buildAad([aadScopeOf(marker, slug), marker.fieldName])]
 	}
 	const codes = req.payload.config.localization
 		? req.payload.config.localization.localeCodes
 		: [defaultLocale(req.payload.config)]
 	const first = operationLocale(req)
 	const ordered = [first, ...codes.filter((code) => code !== first)]
-	return ordered.map((code) => buildAad([scope, marker.fieldName, code]))
+	return ordered.map((code) => localeAad(marker, slug, code))
 }
 
 /**
@@ -204,7 +207,7 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 			const hintMap: Record<string, unknown> = {}
 			for (const [locale, localeValue] of Object.entries(value)) {
 				sealedMap[locale] = sealValueForLocale(localeValue, {
-					aad: buildAad([aadScopeOf(marker, slug), marker.fieldName, locale]),
+					aad: localeAad(marker, slug, locale),
 					hasMany: marker.hasMany,
 					key: activeKey,
 					keyId: ring.activeId,
@@ -455,7 +458,7 @@ export const makeRichTextSealHook = (
 					localeValue == null || isSealed(localeValue)
 						? localeValue
 						: seal({
-								aad: buildAad([aadScopeOf(marker, slug), marker.fieldName, locale]),
+								aad: localeAad(marker, slug, locale),
 								key: activeKey,
 								keyId: ring.activeId,
 								plaintext: localeValue,

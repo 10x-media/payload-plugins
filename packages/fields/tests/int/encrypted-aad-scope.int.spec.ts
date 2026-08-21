@@ -12,7 +12,8 @@ import { fields } from '../../src/index'
 
 const SCOPE = 'acme:vault'
 
-const vault = (slug: string): CollectionConfig => ({
+// `null` opts the apiKey out of the scope; `undefined` would trip the default.
+const vault = (slug: string, apiKeyScope: null | string = SCOPE): CollectionConfig => ({
 	slug,
 	// The stable storage location: what lets two boots with different slugs see
 	// one collection's rows, which is the shape of a slug rename in production.
@@ -21,7 +22,7 @@ const vault = (slug: string): CollectionConfig => ({
 		{ name: 'title', type: 'text' },
 		...encryptedField(
 			{ name: 'apiKey', type: 'text' },
-			{ aadScope: SCOPE, protection: 'writeOnly' }
+			{ aadScope: apiKeyScope ?? undefined, protection: 'writeOnly' }
 		),
 		...encryptedField({ name: 'unpinned', type: 'text' }, { protection: 'writeOnly' }),
 		...encryptedField({ name: 'pinnedMasked', type: 'text' }, { aadScope: SCOPE }),
@@ -104,22 +105,9 @@ describeForDb('encrypted aadScope', {}, (db) => {
 			collection: 'vault',
 			data: { apiKey: 'sk-bound', title: 'bound' },
 		})
-		const unscoped: CollectionConfig = {
-			...vault('vault'),
-			fields: [
-				{ name: 'title', type: 'text' },
-				...encryptedField({ name: 'apiKey', type: 'text' }, { protection: 'writeOnly' }),
-				...encryptedField({ name: 'unpinned', type: 'text' }, { protection: 'writeOnly' }),
-				...encryptedField({ name: 'pinnedMasked', type: 'text' }, { aadScope: SCOPE }),
-				...encryptedField(
-					{ localized: true, name: 'localSecret', type: 'text' },
-					{ aadScope: SCOPE, protection: 'writeOnly' }
-				),
-			],
-		}
 		const other = await bootPayload({
 			attachTo: booted,
-			collections: [unscoped],
+			collections: [vault('vault', null)],
 			configOverrides: {
 				localization: { defaultLocale: 'en', fallback: true, locales: ['en', 'de'] },
 			},
