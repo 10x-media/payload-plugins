@@ -50,6 +50,30 @@ describe('sealAad binds slug.field[.locale] through buildAad', () => {
 	})
 })
 
+describe('a pinned aadScope replaces the slug component everywhere', () => {
+	const scoped = (localized: boolean): EncryptedFieldMarker => ({
+		...marker(localized),
+		aadScope: 'acme:vault',
+	})
+
+	it('sealAad binds scope.field, ignoring the slug it was handed', () => {
+		expect(sealAad(scoped(false), 'renamed-slug', makeReq(undefined, false))).toBe('acme:vault.ssn')
+	})
+
+	it('sealAad keeps the locale component after the scope', () => {
+		const loc = { defaultLocale: 'en', localeCodes: ['en', 'de'] }
+		expect(sealAad(scoped(true), 'renamed-slug', makeReq('de', loc))).toBe('acme:vault.ssn.de')
+	})
+
+	it('readAadCandidates resolves from the scope, so seal and read cannot disagree', () => {
+		const loc = { defaultLocale: 'en', localeCodes: ['en', 'de'] }
+		expect(readAadCandidates(scoped(true), 'renamed-slug', makeReq('de', loc))).toEqual([
+			'acme:vault.ssn.de',
+			'acme:vault.ssn.en',
+		])
+	})
+})
+
 describe('readAadCandidates (Deviation 3: request locale first, then every configured locale)', () => {
 	it('non-localized fields yield the single slug.field candidate', () => {
 		expect(readAadCandidates(marker(false), 'users', makeReq(undefined, false))).toEqual([

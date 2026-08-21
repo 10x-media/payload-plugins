@@ -75,6 +75,22 @@ export interface EncryptedGenerateConfig {
 }
 
 export interface EncryptedFieldOptions {
+	/**
+	 * Pins the first component of the ciphertext's AAD binding, which otherwise
+	 * is the collection or global slug. For a field on a collection whose slug a
+	 * consumer can configure (a plugin-owned collection), the slug is a poor
+	 * binding: renaming it makes every stored value fail authentication, and no
+	 * utility can recover them because reads resolve the binding from the
+	 * current slug too. A pinned scope survives the rename.
+	 *
+	 * Must not contain `.` (the AAD component separator) and must be unique per
+	 * logical schema: two fields of the same name sharing a scope share a
+	 * binding, which widens the documented same-field ciphertext portability
+	 * across their collections. Decide it before data exists; changing it later
+	 * is a re-keying event, and stored values become unreadable exactly as a
+	 * slug rename would have made them.
+	 */
+	aadScope?: string
 	keys?: KeysConfig
 	/**
 	 * Cosmetic number of dots shown while the field is concealed in the admin.
@@ -110,6 +126,8 @@ export const FIELDS_CUSTOM_KEY = '@10x-media/fields'
  * reach the client. Consumed by the query rewrite, boot check, and utilities.
  */
 export interface EncryptedFieldMarker {
+	/** Pinned AAD scope; the schema slug when absent. See EncryptedFieldOptions. */
+	aadScope?: string
 	bidxName?: string
 	fieldName: string
 	hasMany: boolean
@@ -135,6 +153,15 @@ export interface EncryptedFieldPatch {
 	options?: { label: string; value: string }[]
 	type: EncryptedSourceType
 }
+
+/**
+ * The AAD's first component for one marker: the pinned scope when the field
+ * declares one, else the schema slug the caller resolved. Every construction
+ * site goes through this so a pinned scope cannot be honoured on seal and
+ * missed on read.
+ */
+export const aadScopeOf = (marker: EncryptedFieldMarker, slug: string): string =>
+	marker.aadScope ?? slug
 
 export const getEncryptedMarker = (field: {
 	custom?: Record<string, unknown>

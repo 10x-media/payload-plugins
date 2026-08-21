@@ -8,6 +8,7 @@ import { isSealed, parseWire, seal, unseal } from './crypto/wire'
 import { makeHint } from './hint'
 import { sealedArrayKey, stashPlaintext } from './plaintextStash'
 import {
+	aadScopeOf,
 	ENCRYPTED_CONTEXT_KEY,
 	type EncryptedContextMode,
 	type EncryptedFieldMarker,
@@ -58,14 +59,25 @@ const operationLocale = (req: PayloadRequest): string => {
 }
 
 /**
- * AAD binds a ciphertext to its `${slug}.${field}[.${locale}]` slot via
- * buildAad, which rejects any dotted component so the joined data stays
- * unambiguous (a dotted slug/locale would blur the cross-field binding).
+ * AAD binds a ciphertext to its `${scope}.${field}[.${locale}]` slot, where the
+ * scope is the field's pinned `aadScope` or the schema slug, via buildAad,
+ * which rejects any dotted component so the joined data stays unambiguous (a
+ * dotted scope or locale would blur the cross-field binding).
  */
-export const sealAad = (marker: EncryptedFieldMarker, slug: string, req: PayloadRequest): string =>
-	buildAad(
-		marker.localized ? [slug, marker.fieldName, operationLocale(req)] : [slug, marker.fieldName]
-	)
+export const sealAad = (
+	marker: EncryptedFieldMarker,
+	slug: string,
+	req: PayloadRequest
+): string => {
+	if (marker.localized) {
+		return localeAad(marker, slug, operationLocale(req))
+	}
+	return buildAad([aadScopeOf(marker, slug), marker.fieldName])
+}
+
+/** The AAD for one locale of a localized field; locale-map writes seal per entry. */
+const localeAad = (marker: EncryptedFieldMarker, slug: string, locale: string): string =>
+	buildAad([aadScopeOf(marker, slug), marker.fieldName, locale])
 
 /**
  * Read-side AAD candidates. Localized fields try the request locale first,
@@ -78,14 +90,14 @@ export const readAadCandidates = (
 	req: PayloadRequest
 ): string[] => {
 	if (!marker.localized) {
-		return [buildAad([slug, marker.fieldName])]
+		return [buildAad([aadScopeOf(marker, slug), marker.fieldName])]
 	}
 	const codes = req.payload.config.localization
 		? req.payload.config.localization.localeCodes
 		: [defaultLocale(req.payload.config)]
 	const first = operationLocale(req)
 	const ordered = [first, ...codes.filter((code) => code !== first)]
-	return ordered.map((code) => buildAad([slug, marker.fieldName, code]))
+	return ordered.map((code) => localeAad(marker, slug, code))
 }
 
 /**
@@ -195,7 +207,7 @@ export const makeBeforeChangeHook = (marker: EncryptedFieldMarker): FieldHook =>
 			const hintMap: Record<string, unknown> = {}
 			for (const [locale, localeValue] of Object.entries(value)) {
 				sealedMap[locale] = sealValueForLocale(localeValue, {
-					aad: buildAad([slug, marker.fieldName, locale]),
+					aad: localeAad(marker, slug, locale),
 					hasMany: marker.hasMany,
 					key: activeKey,
 					keyId: ring.activeId,
@@ -446,7 +458,7 @@ export const makeRichTextSealHook = (
 					localeValue == null || isSealed(localeValue)
 						? localeValue
 						: seal({
-								aad: buildAad([slug, marker.fieldName, locale]),
+								aad: localeAad(marker, slug, locale),
 								key: activeKey,
 								keyId: ring.activeId,
 								plaintext: localeValue,

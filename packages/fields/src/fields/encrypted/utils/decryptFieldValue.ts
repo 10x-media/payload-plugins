@@ -4,7 +4,7 @@ import { buildAad } from '../crypto/aad'
 import { resolveKeys } from '../crypto/keys'
 import { isSealed, unseal } from '../crypto/wire'
 import { scanEncryptedFields } from '../scan'
-import type { EncryptedFieldMarker } from '../types'
+import { aadScopeOf, type EncryptedFieldMarker } from '../types'
 
 /** Which document schema an encrypted field lives in: a collection or a global. */
 export interface EncryptedFieldTarget {
@@ -58,12 +58,13 @@ export const aadCandidatesFor = (
 	payload: Payload,
 	{ locale, marker, slug }: ResolvedEncryptedField & { locale?: string }
 ): string[] => {
+	const scope = aadScopeOf(marker, slug)
 	if (!marker.localized) {
-		return [buildAad([slug, marker.fieldName])]
+		return [buildAad([scope, marker.fieldName])]
 	}
 	const codes = payload.config.localization ? payload.config.localization.localeCodes : []
 	const ordered = locale ? [locale, ...codes.filter((code) => code !== locale)] : codes
-	return ordered.map((code) => buildAad([slug, marker.fieldName, code]))
+	return ordered.map((code) => buildAad([scope, marker.fieldName, code]))
 }
 
 /**

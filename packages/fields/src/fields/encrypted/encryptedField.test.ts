@@ -347,3 +347,29 @@ describe('encryptedField factory shape', () => {
 		expect('options' in selectStored).toBe(false)
 	})
 })
+describe('encryptedField aadScope', () => {
+	it('stamps the scope on the marker', () => {
+		const [stored] = encryptedField(
+			{ name: 'apiKey', type: 'text' },
+			{ aadScope: 'acme:vault', protection: 'writeOnly' }
+		)
+		expect(getEncryptedMarker(stored as TextField)?.aadScope).toBe('acme:vault')
+	})
+
+	it('leaves the marker unscoped by default', () => {
+		const [stored] = encryptedField({ name: 'apiKey', type: 'text' })
+		expect(getEncryptedMarker(stored as TextField)?.aadScope).toBeUndefined()
+	})
+
+	it('rejects a dotted scope at the factory rather than at first write', () => {
+		expect(() =>
+			encryptedField({ name: 'apiKey', type: 'text' }, { aadScope: 'acme.vault' })
+		).toThrow(/aadScope/)
+	})
+
+	it('rejects an empty scope, which would silently fall back to the slug', () => {
+		expect(() => encryptedField({ name: 'apiKey', type: 'text' }, { aadScope: '' })).toThrow(
+			/aadScope/
+		)
+	})
+})
