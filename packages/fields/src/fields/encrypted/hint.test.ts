@@ -50,10 +50,30 @@ describe('makeHint', () => {
 	 */
 	it('declines the short values a wide config cannot safely slice', () => {
 		const wide = { prefix: 14, suffix: 6 }
-		expect(makeHint('sk_live_51H8xQ2eZvKYlo2C9d3f', wide)).toBeNull()
-		expect(makeHint(`sk_live_51H8xQ${'2eZvKYlo'.repeat(3)}9d3fXQ`, wide)).toBe(
-			'sk_live_51H8xQ····9d3fXQ'
+		expect(makeHint('sk_demo_51H8xQ2eZvKYlo2C9d3f', wide)).toBeNull()
+		expect(makeHint(`sk_demo_51H8xQ${'2eZvKYlo'.repeat(3)}9d3fXQ`, wide)).toBe(
+			'sk_demo_51H8xQ····9d3fXQ'
 		)
+	})
+
+	it('counts and slices by code point, so astral characters never split', () => {
+		// 12 code points but 24 UTF-16 units; a unit-based guard would think 16
+		// characters stay hidden when only 8 do, and a unit slice at 3 would cut
+		// an emoji in half.
+		const emoji = '\u{1F600}'.repeat(12)
+		const made = makeHint(emoji, { prefix: 2, suffix: 2 })
+		expect(made).toBe(`${'\u{1F600}'.repeat(2)}····${'\u{1F600}'.repeat(2)}`)
+		const odd = makeHint('\u{1F600}'.repeat(13), { prefix: 3, suffix: 2 })
+		expect(odd).toBe(`${'\u{1F600}'.repeat(3)}····${'\u{1F600}'.repeat(2)}`)
+		for (const value of [made, odd]) {
+			expect(value?.includes('\uFFFD')).toBe(false)
+			expect([...(value ?? '')].every((c) => c !== '')).toBe(true)
+		}
+	})
+
+	it('applies the hidden floor to code points, not UTF-16 units', () => {
+		// 11 code points: hidden 7 fails the floor, though 22 units would pass it.
+		expect(makeHint('\u{1F600}'.repeat(11), { prefix: 2, suffix: 2 })).toBeNull()
 	})
 
 	it('still refuses a value shorter than the absolute floor at any ratio', () => {

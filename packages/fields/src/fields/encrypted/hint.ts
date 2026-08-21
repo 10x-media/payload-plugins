@@ -70,24 +70,23 @@ export const makeHint = (plaintext: unknown, hint: NormalizedHint): string | nul
 	if (typeof plaintext !== 'string') {
 		return null
 	}
+	// Code points, not UTF-16 units: slicing units can split a surrogate pair
+	// into an unpaired half, and unit counts make an astral-character value look
+	// twice as long as it is, overstating what the guards think stays hidden.
+	const chars = [...plaintext]
 	const exposed = hint.prefix + hint.suffix
-	const hidden = plaintext.length - exposed
+	const hidden = chars.length - exposed
 	if (hidden < HINT_MIN_HIDDEN || hidden < exposed) {
 		return null
 	}
-	const start = hint.prefix > 0 ? plaintext.slice(0, hint.prefix) : ''
-	const end = hint.suffix > 0 ? plaintext.slice(-hint.suffix) : ''
+	const start = hint.prefix > 0 ? chars.slice(0, hint.prefix).join('') : ''
+	const end = hint.suffix > 0 ? chars.slice(-hint.suffix).join('') : ''
 	if (start.includes('·') || end.includes('·')) {
 		return null
 	}
 	return `${start}${HINT_GAP}${end}`
 }
 
-/**
- * Widest rendered hint, in characters, before the concealed run starts giving
- * up space. Sized so a hint at the full exposure cap still fits a field at a
- * third of the form width, and a table column holding one stays readable.
- */
 /**
  * Renders a stored hint for display: the canonical gap becomes the `maskDots`
  * bullet run, so `sk_d····9d3f` with maskDots 8 shows as `sk_d••••••••9d3f`.
