@@ -15,8 +15,9 @@ export interface ReadEncryptedFieldArgs extends EncryptedFieldTarget {
 	 * Request to read on. Given one, the read joins its transaction and sees the
 	 * caller's uncommitted writes, which is what a secret written and used inside
 	 * the same operation needs. Omitted, the read runs on its own request and
-	 * therefore outside any transaction in progress. The request is left exactly
-	 * as it was found.
+	 * therefore outside any transaction in progress. The request comes back as
+	 * it went in, except that one with no `context` at all gains an empty one,
+	 * which the raw window needs to carry its mode.
 	 */
 	req?: PayloadRequest
 }

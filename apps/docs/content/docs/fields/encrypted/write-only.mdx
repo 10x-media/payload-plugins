@@ -164,7 +164,7 @@ for (const subscription of subscriptions.docs) {
 }
 ```
 
-Inside the window the response strip and the decrypt-on-read step both stand down, so each encrypted field arrives as its stored `pfe1.…` wire string and `decryptFieldValue` turns it back into plaintext. On the way out the request is restored to whatever it was, including a mode an outer window had set, so windows nest.
+Inside the window the response strip and the decrypt-on-read step both stand down, so each encrypted field arrives as its stored `pfe1.…` wire string and `decryptFieldValue` turns it back into plaintext. For a localized field, pass `locale` alongside `value` so the right binding is tried first; `signingSecret` above is not localized, so the path alone is enough. On the way out the request is restored to whatever it was, including a mode an outer window had set, so windows nest.
 
 Three things to know before you reach for it:
 
