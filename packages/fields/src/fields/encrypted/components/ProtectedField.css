@@ -171,12 +171,10 @@ html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-fi
 	/* Flex min-width:auto would refuse to shrink below the placeholder's width
 	   and push the attached actions out of narrow containers. */
 	min-width: 0;
-	/* A hint carrying a format prefix runs wide, and a field sharing a row can
-	   be shorter than it. Browsers clip a placeholder flush by default, which
-	   reads as a value that happens to end there; the ellipsis says the rest is
-	   cut. It belongs on the input rather than on ::placeholder, which is where
-	   browsers actually read it from for placeholder text. `formatHint` keeps
-	   the common case from reaching this by shrinking its own bullet run. */
+	/* A rendered hint can be wider than a narrow field; browsers clip the
+	   placeholder flush by default, which reads as a value that ends there.
+	   On the input, not ::placeholder: that is where browsers read it from
+	   for placeholder text. */
 	text-overflow: ellipsis;
 }
 
