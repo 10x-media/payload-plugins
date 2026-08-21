@@ -422,7 +422,8 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 		 */
 		it('cannot see that same secret without the request', async () => {
 			const req = await createLocalReq({}, booted.payload)
-			await initTransaction(req)
+			const opened = await initTransaction(req)
+			expect(opened).toBe(true)
 			try {
 				const created = await booted.payload.create({
 					collection: 'credentials',
