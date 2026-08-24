@@ -1,5 +1,15 @@
 # @10x-media/analytics
 
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- Scope-aware widget pickers. A new authenticated `GET /api/analytics/sources` endpoint lists the adapters visible to the requesting scope (config adapters plus the scope's runtime providers) with their capabilities, and the widget `dataSource` and `metric` selects now render through client components that consume it: a tenant's own providers finally appear in pickers, labeled by the provider document's name (a generated label stands in when unset), and the metric list narrows to what the selected source can actually serve. Without JavaScript or when the endpoint is unreachable the pickers fall back to the config-time option lists, and stored values the endpoint no longer lists keep the previous behavior of degrading at read time.
+
+  The sources endpoint response now carries a top-level `defaultId` and a `kind: 'config' | 'runtime'` per source, and serialized capabilities are a deliberate allowlist (`metrics`, `dimensions`, `realtime`, `realtimeWindowMinutes`, `perPageQuery`, `comparison`, `minGranularity`, `maxLookbackDays`); adapter internals such as rate limits and TTL recommendations are no longer on the wire. New client reuse surface: `useAnalyticsSources` and the `WireSource` type from `@10x-media/analytics/client`, `SerializedCapabilities` from `/types`, and a `sourceFieldPath` prop on `MetricSelectField` for custom widgets. The widget data source default now follows `defaultAdapter`, and the realtime poller builds its URL from the configured API route instead of a hardcoded `/api`.
+
+- **Breaking:** fail-closed defaults for scoped installs. With a `scopeResolver` configured, `access.platformRead` now defaults to deny instead of any authenticated user; configure it (for example a role check) so platform admins can read cross-scope and manage every tenant's provider documents. Scoped reads through a shared config adapter that cannot filter by scope are now gated behind `platformRead` even when the adapter is not designated as `platformAdapter`; a tenant's own runtime providers are never gated. A `scopeResolver` returning an empty string is now treated as the install-wide scope (fail closed) everywhere, matching ingest and registry semantics. `providers.collection.scopeField` must be a top-level field name; a dotted path now throws at config build. The provider collection's admin duplicate action is disabled (a duplicate could never carry the write-only credentials). Unscoped installs are unchanged.
+
 ## 0.1.0-beta.4
 
 ### Minor Changes
