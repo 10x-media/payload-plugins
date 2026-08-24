@@ -3,6 +3,7 @@ import { type Config, definePlugin, type PayloadRequest } from 'payload'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
+import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
@@ -29,7 +30,7 @@ declare module 'payload' {
 
 export const analytics = definePlugin<AnalyticsPluginOptions>({
 	slug: '@10x-media/analytics',
-	plugin: async ({ config, plugins: _plugins, ...options }): Promise<Config> => {
+	plugin: async ({ config, plugins, ...options }): Promise<Config> => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -62,10 +63,13 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		if (resolved.providers.collection.enabled) {
 			const { encryptedField, withEncryptedQueryRewrite } = await import(
 				'@10x-media/fields/encrypted'
-			).catch(() => {
-				throw new Error(
-					'analytics: providers.collection requires @10x-media/fields (peer). Install it: pnpm add @10x-media/fields'
-				)
+			).catch((err: unknown) => {
+				if (isModuleNotFoundError(err)) {
+					throw new Error(
+						'analytics: providers.collection requires @10x-media/fields (peer). Install it: pnpm add @10x-media/fields'
+					)
+				}
+				throw err
 			})
 			const encryption = resolved.providers.collection.encryption
 			const buildSecret: BuildSecretField = (source) =>
@@ -75,25 +79,27 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 					...(source.type === 'text' ? { hint: { suffix: 4 } } : {}),
 					...(encryption?.keys ? { keys: encryption.keys } : {}),
 				})
+			const providersCollection = buildProvidersCollection({
+				slug: resolved.providers.collection.slug,
+				access: resolved.providers.collection.access,
+				overrides: resolved.providers.collection.overrides,
+				onChange: () => invalidateProviders(),
+				scoped: resolved.scoped,
+				scopeField: resolved.providers.collection.scopeField,
+				resolveScope,
+				platformRead: resolved.access.platformRead,
+				buildSecret,
+			})
+			// encryptedField() is used standalone here (no @10x-media/fields plugin
+			// registered), so the write-only response strip needs wiring by hand or
+			// the sealed ciphertext (not plaintext, but still not nothing) would leak
+			// on every normal read. Skip it when the fields plugin is also registered:
+			// its own plugin body maps withEncryptedQueryRewrite over every collection,
+			// and wrapping twice would append a duplicate afterRead strip hook.
+			const hasFieldsPlugin = Boolean(plugins['@10x-media/fields'])
 			config.collections = [
 				...(config.collections ?? []),
-				// encryptedField() is used standalone here (no @10x-media/fields plugin
-				// registered), so the write-only response strip needs wiring by hand or
-				// the sealed ciphertext (not plaintext, but still not nothing) would
-				// leak on every normal read.
-				withEncryptedQueryRewrite(
-					buildProvidersCollection({
-						slug: resolved.providers.collection.slug,
-						access: resolved.providers.collection.access,
-						overrides: resolved.providers.collection.overrides,
-						onChange: () => invalidateProviders(),
-						scoped: resolved.scoped,
-						scopeField: resolved.providers.collection.scopeField,
-						resolveScope,
-						platformRead: resolved.access.platformRead,
-						buildSecret,
-					})
-				),
+				hasFieldsPlugin ? providersCollection : withEncryptedQueryRewrite(providersCollection),
 			]
 		}
 		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {
