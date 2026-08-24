@@ -165,4 +165,17 @@ describe('resolveOptions', () => {
 		})
 		expect(resolved.wikiView).toBe(false)
 	})
+	it('rejects a block slug declared twice, across both lists', () => {
+		const option = (slug: string) => ({ block: { fields: [], slug }, component: `/x#${slug}` })
+
+		expect(() => resolveOptions({ editor: { blocks: [option('a'), option('a')] } })).toThrow(
+			/duplicate editor block slug: a/
+		)
+		expect(() =>
+			resolveOptions({ editor: { blocks: [option('a')], inlineBlocks: [option('a')] } })
+		).toThrow(/duplicate editor block slug: a/)
+		expect(() =>
+			resolveOptions({ editor: { blocks: [option('a')], inlineBlocks: [option('b')] } })
+		).not.toThrow()
+	})
 })

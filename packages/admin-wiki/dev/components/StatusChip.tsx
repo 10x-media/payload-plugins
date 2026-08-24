@@ -7,6 +7,7 @@
  */
 export const StatusChip = ({ fields }: { fields: Record<string, unknown> }) => (
 	<span
+		className="dev-status-chip"
 		style={{
 			background:
 				fields.tone === 'deprecated' ? 'var(--theme-error-100)' : 'var(--theme-success-100)',

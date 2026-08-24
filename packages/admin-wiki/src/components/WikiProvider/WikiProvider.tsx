@@ -1,5 +1,6 @@
 'use client'
 
+import type { JSXConverterArgs } from '@payloadcms/richtext-lexical/react'
 import { useAuth, useConfig, useTranslation } from '@payloadcms/ui'
 import {
 	type ComponentType,
@@ -42,7 +43,16 @@ const writeStoredEditMode = (enabled: boolean): void => {
 }
 
 /** A consumer block renderer: receives the block node's field values. */
-export type WikiBlockRenderer = ComponentType<{ fields: Record<string, unknown> }>
+/**
+ * A consumer block renderer. `converters` and `nodesToJSX` come straight from the
+ * lexical converter args, so a block holding its own rich text field can render it:
+ * `nodesToJSX({ converters, nodes: fields.body.root.children })`.
+ */
+export type WikiBlockRenderer = ComponentType<{
+	converters?: JSXConverterArgs['converters']
+	fields: Record<string, unknown>
+	nodesToJSX?: JSXConverterArgs['nodesToJSX']
+}>
 
 /** A video player replacing the default HTML5 one; receives the media doc. */
 export type WikiVideoPlayerComponent = ComponentType<{ media: WikiMediaDoc }>

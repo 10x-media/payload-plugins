@@ -35,13 +35,15 @@ const warnOnce = (payload: Payload, path: string, message: string): void => {
  * inside a paragraph, where a block-level element would be invalid markup.
  */
 const resolveRenderers = ({
+	fallback,
 	importMap,
-	kind,
+	label,
 	options,
 	payload,
 }: {
+	fallback: WikiBlockRenderer
 	importMap: Record<string, unknown>
-	kind: 'block' | 'inline block'
+	label: string
 	options: WikiEditorBlockOption[]
 	payload: Payload
 }): Record<string, WikiBlockRenderer> => {
@@ -54,10 +56,9 @@ const resolveRenderers = ({
 			warnOnce(
 				payload,
 				option.component,
-				`@10x-media/admin-wiki: ${kind} renderer "${option.component}" is not in the import map; run importmap generation`
+				`@10x-media/admin-wiki: ${label} renderer "${option.component}" is not in the import map; run importmap generation`
 			)
-			renderers[option.block.slug] =
-				kind === 'block' ? MissingBlockRenderer : MissingInlineBlockRenderer
+			renderers[option.block.slug] = fallback
 		}
 	}
 	return renderers
@@ -76,14 +77,16 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 	}
 	const importMap = payload.importMap as Record<string, unknown>
 	const blockRenderers = resolveRenderers({
+		fallback: MissingBlockRenderer,
 		importMap,
-		kind: 'block',
+		label: 'block',
 		options: registry.editorBlocks,
 		payload,
 	})
 	const inlineBlockRenderers = resolveRenderers({
+		fallback: MissingInlineBlockRenderer,
 		importMap,
-		kind: 'inline block',
+		label: 'inline block',
 		options: registry.editorInlineBlocks,
 		payload,
 	})

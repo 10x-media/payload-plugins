@@ -2,6 +2,8 @@
 
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
 import {
+	type JSXConverter,
+	type JSXConverterArgs,
 	type JSXConverters,
 	type JSXConvertersFunction,
 	RichText,
@@ -48,11 +50,17 @@ type BlockNode = { node: { fields: Record<string, unknown> } }
 
 const renderersToConverters = (
 	renderers: Record<string, WikiBlockRenderer>
-): Record<string, (args: BlockNode) => ReactNode> =>
+): Record<string, JSXConverter> =>
 	Object.fromEntries(
 		Object.entries(renderers).map(([slug, Renderer]) => [
 			slug,
-			({ node }: BlockNode) => <Renderer fields={node.fields} />,
+			({ converters, node, nodesToJSX }: JSXConverterArgs) => (
+				<Renderer
+					converters={converters}
+					fields={(node as unknown as BlockNode['node']).fields}
+					nodesToJSX={nodesToJSX}
+				/>
+			),
 		])
 	)
 
@@ -80,13 +88,20 @@ const buildGuideConverters =
 		},
 		blocks: {
 			...renderersToConverters(blockRenderers),
-			[CALLOUT_BLOCK_SLUG]: ({ converters, node }: BlockNode & { converters: JSXConverters }) => (
-				<Callout
-					body={node.fields.body as SerializedEditorState | null | undefined}
-					converters={converters}
-					variant={node.fields.variant as string | null | undefined}
-				/>
-			),
+			[CALLOUT_BLOCK_SLUG]: ({ converters, node }: BlockNode & { converters: JSXConverters }) => {
+				// A callout body is an inline-only editor. It reaches the consumer's converters,
+				// but not `heading` or `blocks`: headings there get no id, since the table of
+				// contents walk does not descend into a nested editor state, and blocks would
+				// let a callout nest inside a callout.
+				const { blocks: _blocks, heading: _heading, ...inline } = converters
+				return (
+					<Callout
+						body={node.fields.body as SerializedEditorState | null | undefined}
+						converters={inline}
+						variant={node.fields.variant as string | null | undefined}
+					/>
+				)
+			},
 			[VIDEO_EMBED_BLOCK_SLUG]: ({ node }: BlockNode) => (
 				<VideoEmbed url={node.fields.url as string | undefined} />
 			),

@@ -170,6 +170,10 @@ adminWiki({
 
 The module resolves through the import map exactly as a block renderer does, and must be a client module.
 
+<Callout type="warn">
+  `blocks` and `inlineBlocks` are nested maps, replaced whole. Returning `{ ...defaultConverters, blocks: { mine } }` drops the callout, the video embed and every consumer block; spread `defaultConverters.blocks` too.
+</Callout>
+
 Converters apply wherever the plugin renders a guide: the wiki view, the surface drawers, and a node nested inside a callout body. Rendering `GuideArticle` yourself, pass a `converters` function as a prop and it applies over the project's.
 
 ## Wiki media

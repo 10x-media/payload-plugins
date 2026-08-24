@@ -111,8 +111,26 @@ const resolveWikiView = (
 	}
 }
 
+/**
+ * One slug per editor block, across both lists: lexical keys its nodes by slug, so a
+ * duplicate silently resolves to whichever renderer landed last.
+ */
+const assertUniqueBlockSlugs = (
+	blocks: WikiEditorBlockOption[],
+	inlineBlocks: WikiEditorBlockOption[]
+): void => {
+	const seen = new Set<string>()
+	for (const option of [...blocks, ...inlineBlocks]) {
+		if (seen.has(option.block.slug)) {
+			throw new Error(`[admin-wiki] duplicate editor block slug: ${option.block.slug}`)
+		}
+		seen.add(option.block.slug)
+	}
+}
+
 /** Apply defaults and normalize shorthand option forms. */
 export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOptions => {
+	assertUniqueBlockSlugs(options.editor?.blocks ?? [], options.editor?.inlineBlocks ?? [])
 	const slugs = {
 		media: options.slugs?.media ?? 'wiki-media',
 		pages: options.slugs?.pages ?? 'wiki-pages',
