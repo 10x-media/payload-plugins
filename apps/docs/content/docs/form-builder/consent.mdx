@@ -121,4 +121,4 @@ Versions without drafts get no `versionRef` because there is no published/draft 
 
 ## Endpoint
 
-The source picker is backed by `GET /api/forms/:id/consent-sources`, registered only when `consent.sources` is set. It is authenticated (403 otherwise), scoped to the request, and fails closed with a 503 when the resolver throws. Like the other document-scoped selects, it stays empty until the form's first save: it needs a document id to resolve against.
+The source picker is backed by `GET /api/forms/:id/consent-sources`, registered only when `consent.sources` is set. It is authenticated (403 otherwise) and fails closed with a 503 when the resolver throws. Unlike the from-address and department selects, this one is genuinely document-scoped: the resolver receives the form itself (loaded under the caller's own read access, which is what keeps one tenant's editor from resolving against another tenant's form), so it stays empty until the form's first save gives it a document to resolve against.

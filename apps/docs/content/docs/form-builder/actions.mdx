@@ -117,9 +117,10 @@ The resolver runs per request against an authenticated endpoint, so a multi-tena
 
 The chosen `from` is validated against the resolver on save (an address outside the resolved set is a save error), but not re-checked when the action sends: the config is admin-authored, not visitor-controlled, so the stored value is trusted at send time. Leaving **From** empty keeps the adapter default, so adding the option changes nothing for forms that ignore it.
 
-Two costs come with the seam being server-resolved and failing closed:
+The **From** select loads from `GET /api/forms/from-addresses`, an id-less route: the option set depends on the request (who is asking, which tenant), not on the form document, so the addresses are there while the form is still being created. The **To** department select works the same way at `/api/forms/departments`. The old `/:id/`-prefixed paths still answer for anything that hardcoded them.
 
-- **The select is empty until the form's first save.** It loads from a document-scoped endpoint, and an unsaved form has no id to resolve against, so the addresses appear once the form exists. Save the form, then pick the sender.
+One cost comes with the seam being server-resolved and failing closed:
+
 - **A resolver that throws blocks saves.** Payload runs the validate on every save, not only when `from` changed, so while the resolver is down every save of a form whose email action has a **From** set is rejected, including edits that never touch the address. It surfaces as a translated "unavailable" save error rather than a raw stack, and a form with no **From** set still saves. This is the deliberate trade: failing open would persist a sender the host can no longer vouch for. A resolver that reaches a flaky upstream should cache or fall back internally instead of throwing.
 
 ### Senders resolved at send time
@@ -168,7 +169,7 @@ formBuilder({
 
 `departmentsField()` is the array you place on any collection or global you own (a settings global, a tenant document) to hold the addresses: each row is a `label` and an `email`, both localized by default, rendered as condensed flat rows with no per-row collapsible, added and removed with their own buttons. `resolveDepartmentOptions` reads that array back (fetch it at `locale: 'all'` so every locale's addresses are available in one call) and resolves each row for the request's locale with a current-locale -> default-locale -> next-available-locale fallback, so the locale logic never has to be reimplemented per host. Multi-tenancy needs no plugin support: place the field on a tenant-scoped document and scope the resolver's read by the tenant derived from `req`, exactly like `email.fromAddresses`.
 
-With `email.departments` set, **To** becomes a select backed by an authenticated `GET /api/forms/:id/departments` endpoint, validated on save against the resolver's current options (fails closed, the same trade-off as `fromAddresses`: a resolver outage blocks saving a form whose email action has a **To** set, rather than persisting a routing target the host can no longer vouch for). Leave `email.departments` unset and **To** stays the plain text field it always was.
+With `email.departments` set, **To** becomes a select backed by an authenticated `GET /api/forms/departments` endpoint (request-scoped and id-less, so the departments are pickable while the form is still being created), validated on save against the resolver's current options (fails closed, the same trade-off as `fromAddresses`: a resolver outage blocks saving a form whose email action has a **To** set, rather than persisting a routing target the host can no longer vouch for). Leave `email.departments` unset and **To** stays the plain text field it always was.
 
 Either way, **To** is localized: each admin locale stores its own address (or department choice), and a submission routes to the address stored for its own locale, exactly like the subject and body already do. This holds on the queued (job-runner) dispatch path too: the form is loaded at the submission's own stored locale, not the job runner's request locale, so a German visitor's submission still reaches the German department when the job that sends it runs with no locale of its own.
 
