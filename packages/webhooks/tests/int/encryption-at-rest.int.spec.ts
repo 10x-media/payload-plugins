@@ -311,6 +311,38 @@ describe('secretEncryption.keys', () => {
 		}
 	})
 
+	/**
+	 * The `fields()` plugin validates key rings in its own `onInit`; this plugin uses
+	 * `encryptedField` standalone, so it makes the check itself.
+	 *
+	 * A key *provider* is what makes this worth doing. Literal material is checked by the field
+	 * factory at config build, but a provider is a function the factory cannot call: a KMS that is
+	 * unreachable, or an env read that comes back empty, resolves only when the ring does. Without
+	 * the boot check that first surfaces as a refused delivery, which reads like a corrupt secret
+	 * rather than a bad config.
+	 */
+	it('fails at boot when a key provider cannot supply material', async () => {
+		await expect(
+			bootPayload({
+				plugin: webhooks({
+					collections: { posts: true },
+					delivery: { mode: 'inline', retries: 0 },
+					secretEncryption: {
+						keys: {
+							active: 'k1',
+							keys: {
+								k1: () => Promise.reject(new Error('kms unavailable')),
+							},
+						},
+					},
+				}),
+				db: 'mongo',
+				collections: [posts],
+				attachTo: booted,
+			})
+		).rejects.toThrow(/kms unavailable/)
+	})
+
 	it('refuses the delivery when the sealing key is dropped from the ring', async () => {
 		const created = await create(booted, 'dropped-key')
 

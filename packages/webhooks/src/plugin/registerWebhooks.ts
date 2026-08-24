@@ -1,4 +1,4 @@
-import { withEncryptedQueryRewrite } from '@10x-media/fields/encrypted'
+import { validateEncryptedBoot, withEncryptedQueryRewrite } from '@10x-media/fields/encrypted'
 import {
 	type CollectionSlug,
 	type Config,
@@ -323,5 +323,23 @@ export const registerWebhooks = (args: {
 				afterDelete: [...(collection.hooks?.afterDelete ?? []), makeAfterDelete(deps)],
 			},
 		}
+	}
+
+	/**
+	 * Resolve the key ring at boot rather than on the first delivery.
+	 *
+	 * The `fields()` plugin does this for its own consumers; this plugin calls `encryptedField`
+	 * standalone, the same reason it applies `withEncryptedQueryRewrite` itself, so the check is
+	 * its to make. Without it a misconfigured `secretEncryption.keys` (an env var that resolved
+	 * empty, key material under the entropy floor, a provider that throws) boots clean and first
+	 * surfaces as a refused delivery, which reads like a corrupt secret rather than a bad config.
+	 */
+	const previousOnInit = config.onInit
+	config.onInit = async (payload) => {
+		await previousOnInit?.(payload)
+		// No plugin-level keys argument: the factory stamps `secretEncryption.keys` onto each
+		// marker, so the scan already sees them, and passing them again would mask whether any
+		// field still falls back to the PAYLOAD_SECRET-derived ring.
+		await validateEncryptedBoot(payload)
 	}
 }
