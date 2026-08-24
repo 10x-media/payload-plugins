@@ -17,10 +17,12 @@ export type UseFieldResult<TValue = unknown> = {
 export const useField = <TValue = unknown>(name: string): UseFieldResult<TValue> => {
 	const { state, dispatch, validateField, stepIdOfField } = useFormContext()
 	const touched = state.touched[name] ?? false
-	// Reveal is a function of this field's own step, never a single global flag: the field's error shows
-	// once it is touched, or once the step it belongs to has been attempted (a blocked advance or submit).
+	const dirty = state.dirty[name] ?? false
+	// Reveal is a function of this field's own step, never a single global flag: the field's error
+	// shows once it is touched AND dirty (a pristine blur, focus-then-leave, reveals nothing), or
+	// once the step it belongs to has been attempted (a blocked advance or submit).
 	const stepAttempted = state.attemptedSteps.has(stepIdOfField?.(name) ?? DEFAULT_STEP_ID)
-	const showIssues = touched || stepAttempted
+	const showIssues = (touched && dirty) || stepAttempted
 	const value = state.values[name] as TValue | undefined
 
 	const setValue = useCallback(
