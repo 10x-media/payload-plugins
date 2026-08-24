@@ -1,8 +1,10 @@
 import type { TaskConfig } from 'payload'
 
+import type { DeliveryRow } from '../collections/deliveries'
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription } from '../options'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
+import { asRow, asSlug } from '../plugin/slug'
 import { deriveDeliveryStatus } from './deriveDeliveryStatus'
 import { sendDelivery } from './sendDelivery'
 
@@ -24,12 +26,14 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 		handler: async ({ input, job, req }) => {
 			const { payload } = req
 			const deliveryId = (input as { deliveryId: string }).deliveryId
-			const delivery = await payload.findByID({
-				collection: deps.deliveriesSlug,
-				id: deliveryId,
-				overrideAccess: true,
-				req,
-			})
+			const delivery = asRow<DeliveryRow>(
+				await payload.findByID({
+					collection: asSlug(deps.deliveriesSlug),
+					id: deliveryId,
+					overrideAccess: true,
+					req,
+				})
+			)
 			const subscription = await resolveSubscriptionById({
 				id: String(delivery.subscriptionId),
 				codeSubscriptions: deps.codeSubscriptions,
@@ -42,7 +46,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 			const decision = decideDelivery(subscription)
 			if (!decision.deliverable) {
 				await payload.update({
-					collection: deps.deliveriesSlug,
+					collection: asSlug(deps.deliveriesSlug),
 					id: deliveryId,
 					data: { status: 'dead', error: decision.reason },
 					overrideAccess: true,
@@ -62,7 +66,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 			})
 			const status = deriveDeliveryStatus({ ok: result.ok, attempt, maxRetries: deps.retries })
 			await payload.update({
-				collection: deps.deliveriesSlug,
+				collection: asSlug(deps.deliveriesSlug),
 				id: deliveryId,
 				data: {
 					status,

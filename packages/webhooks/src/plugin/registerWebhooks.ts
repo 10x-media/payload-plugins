@@ -20,6 +20,7 @@ import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { RotationConflictError, rotateSubscriptionSecret } from '../secrets/rotate'
 import { applyCollectionOverride } from './applyCollectionOverride'
 import { resolveMode } from './resolveMode'
+import { asSlug } from './slug'
 
 /**
  * Reject a malformed code-subscription secret at config build rather than at delivery. A secret
@@ -92,7 +93,7 @@ const canUpdateSubscription = async (args: {
 	id: string
 }): Promise<boolean> => {
 	const { req, slug, id } = args
-	const access = req.payload.collections?.[slug]?.config?.access?.update
+	const access = req.payload.collections?.[asSlug(slug)]?.config?.access?.update
 	if (!access) {
 		return true
 	}
@@ -109,7 +110,7 @@ const canUpdateSubscription = async (args: {
 		return result
 	}
 	const scoped = await req.payload.find({
-		collection: slug,
+		collection: asSlug(slug),
 		where: { and: [{ id: { equals: id } }, result] },
 		limit: 1,
 		depth: 0,

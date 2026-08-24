@@ -5,6 +5,7 @@ import type { CodeSubscription } from '../options'
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { recoverSecret } from '../secrets/recover'
 import { secretSetName } from '../secrets/secretFields'
+import { asRow, asSlug } from './slug'
 
 /** A subscription resolved from either source, ready to deliver to. */
 export type ResolvedSubscription = {
@@ -286,7 +287,7 @@ export const resolveSubscriptionById = async (args: {
 	}
 	const res = await withRawEncrypted(args.req, () =>
 		args.payload.find({
-			collection: args.subscriptionsSlug,
+			collection: asSlug(args.subscriptionsSlug),
 			where: { id: { equals: args.id } },
 			limit: 1,
 			depth: 0,
@@ -294,7 +295,7 @@ export const resolveSubscriptionById = async (args: {
 			req: args.req,
 		})
 	)
-	const row = res.docs[0] as SubscriptionRow | undefined
+	const row = res.docs[0] ? asRow<SubscriptionRow>(res.docs[0]) : undefined
 	return row
 		? resolveCollectionRow({
 				payload: args.payload,

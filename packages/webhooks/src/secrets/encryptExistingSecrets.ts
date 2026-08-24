@@ -2,6 +2,7 @@ import { isSealed, withRawEncrypted } from '@10x-media/fields/encrypted'
 import { createLocalReq, type Payload } from 'payload'
 
 import { DEFAULT_SUBSCRIPTIONS_SLUG } from '../constants'
+import { asRow, asSlug } from '../plugin/slug'
 import { InvalidSecretError, normalizeSecret } from './format'
 import type { SecretPath } from './secretFields'
 
@@ -75,7 +76,7 @@ export const encryptExistingSecrets = async (
 	while (hasNextPage) {
 		const result = await withRawEncrypted(req, () =>
 			payload.find({
-				collection: slug,
+				collection: asSlug(slug),
 				depth: 0,
 				limit: batchSize,
 				overrideAccess: true,
@@ -92,7 +93,7 @@ export const encryptExistingSecrets = async (
 			let failures = 0
 
 			for (const field of SECRET_FIELDS) {
-				const value = (doc as Record<string, unknown>)[field]
+				const value = asRow<Record<string, unknown>>(doc)[field]
 				if (typeof value !== 'string' || value === '') {
 					continue
 				}
@@ -127,7 +128,7 @@ export const encryptExistingSecrets = async (
 			if (!options.dryRun) {
 				// Written as plaintext, outside the raw window: the encrypted field's beforeChange
 				// validates and seals it.
-				await payload.update({ collection: slug, id, data: patch, overrideAccess: true })
+				await payload.update({ collection: asSlug(slug), id, data: patch, overrideAccess: true })
 			}
 			report.migrated += 1
 		}

@@ -13,6 +13,7 @@ import {
 	resolveCollectionRow,
 	type SubscriptionRow,
 } from '../plugin/resolveSubscriptions'
+import { asRow, asSlug } from '../plugin/slug'
 import { eventId } from './eventTypes'
 
 /** Per-collection dispatch dependencies. */
@@ -52,7 +53,7 @@ const resolveListening = async (args: {
 	const code = args.deps.codeSubscriptions.map(fromCodeSubscription)
 	const read = () =>
 		payload.find({
-			collection: args.deps.subscriptionsSlug,
+			collection: asSlug(args.deps.subscriptionsSlug),
 			where: {
 				and: [{ enabled: { not_equals: false } }, { events: { in: [args.event] } }],
 			},
@@ -72,7 +73,7 @@ const resolveListening = async (args: {
 		res.docs.map((d) =>
 			resolveCollectionRow({
 				payload,
-				row: d as SubscriptionRow,
+				row: asRow<SubscriptionRow>(d),
 				subscriptionsSlug: args.deps.subscriptionsSlug,
 			})
 		)
@@ -101,7 +102,7 @@ const dispatch = async (args: {
 	const occurredAt = new Date().toISOString()
 	for (const subscription of subscriptions) {
 		const created = await payload.create({
-			collection: deps.deliveriesSlug,
+			collection: asSlug(deps.deliveriesSlug),
 			data: {
 				subscriptionId: subscription.id,
 				endpoint: subscription.url,
@@ -124,7 +125,7 @@ const dispatch = async (args: {
 			req,
 		})
 		await payload.update({
-			collection: deps.deliveriesSlug,
+			collection: asSlug(deps.deliveriesSlug),
 			id: deliveryId,
 			data: { payload: body },
 			overrideAccess: true,
@@ -143,7 +144,7 @@ const dispatch = async (args: {
 		const decision = decideDelivery(subscription)
 		if (!decision.deliverable) {
 			await payload.update({
-				collection: deps.deliveriesSlug,
+				collection: asSlug(deps.deliveriesSlug),
 				id: deliveryId,
 				data: { status: 'dead', error: decision.reason },
 				overrideAccess: true,
@@ -163,7 +164,7 @@ const dispatch = async (args: {
 				now: Date.now(),
 			})
 			await payload.update({
-				collection: deps.deliveriesSlug,
+				collection: asSlug(deps.deliveriesSlug),
 				id: deliveryId,
 				data: {
 					status: result.ok ? 'success' : 'dead',
