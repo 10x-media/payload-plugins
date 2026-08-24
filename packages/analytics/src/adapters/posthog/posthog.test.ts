@@ -346,6 +346,50 @@ describe('posthog adapter', () => {
 		expect(body.query?.query).toContain("match(event, '^signup')")
 	})
 
+	it('forces the all-events scan when filtering on the event dimension, so pageviews stays meaningful', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'event', operator: 'eq', value: 'signup' }],
+			}),
+			{}
+		)
+		const sql = body.query?.query ?? ''
+		// A bare `WHERE event = '$pageview'` clause combined with `event = 'signup'` would be
+		// self-contradictory and zero every metric, so the pageview-family metric must fall
+		// back to its conditional aggregate instead.
+		expect(sql).not.toContain("WHERE event = '$pageview'")
+		expect(sql).toContain("countIf(event = '$pageview') AS m0")
+		expect(sql).toContain("event = 'signup'")
+	})
+
+	it('escapes a literal backslash in a contains filter value before the wildcard escapes', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'page', operator: 'contains', value: 'a\\b' }],
+			}),
+			{}
+		)
+		// Raw value: a\b -> escapeLikeValue: a\\b (backslash doubled) -> sqlString doubles
+		// every backslash again for the HogQL string literal: a\\\\b.
+		expect(body.query?.query).toContain("properties.$pathname ILIKE '%a\\\\\\\\b%'")
+	})
+
 	it('drops a filter for a dimension it cannot serve instead of throwing', async () => {
 		let body: { query?: { query?: string } } = {}
 		server.use(

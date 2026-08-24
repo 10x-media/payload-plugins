@@ -66,9 +66,10 @@ const posthogDimensions: ReadonlySet<DimensionKey> = new Set(
 const sqlString = (value: string): string =>
 	`'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 
-// ILIKE treats % and _ as wildcards; backslash-escape them in the raw value before it is
-// wrapped in % ... % and quoted, so a filter value containing them matches literally.
-const escapeLikeValue = (value: string): string => value.replace(/[%_]/g, (c) => `\\${c}`)
+// ILIKE treats % and _ as wildcards and backslash as its own escape char; backslash-escape
+// backslash first (so a raw \ in the value doesn't get read as escaping the next char),
+// then % and _, before the whole thing is wrapped in % ... % and quoted.
+const escapeLikeValue = (value: string): string => value.replace(/[\\%_]/g, (c) => `\\${c}`)
 
 const sqlDateTimeLiteral = (d: Date): string =>
 	sqlString(d.toISOString().slice(0, 19).replace('T', ' '))
@@ -107,9 +108,14 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const breakdownDim = (q.dimensions ?? []).find((d) => DIMENSION_SQL[d])
-			// A total-events metric or an event-name breakdown must scan every event, not
-			// just pageviews; those reads switch to conditional aggregation.
-			const scanAllEvents = q.metrics.includes('events') || breakdownDim === 'event'
+			// A total-events metric, an event-name breakdown, or a filter on the event
+			// dimension must scan every event, not just pageviews (a `$pageview` WHERE
+			// clause combined with an `event = 'x'` filter would be self-contradictory and
+			// zero every metric); those reads switch to conditional aggregation.
+			const scanAllEvents =
+				q.metrics.includes('events') ||
+				breakdownDim === 'event' ||
+				(q.filters ?? []).some((f) => f.dimension === 'event' && DIMENSION_SQL[f.dimension])
 			const metricSql = scanAllEvents ? METRIC_SQL_ALL : METRIC_SQL_PAGEVIEW
 			const wanted = q.metrics.filter((m) => metricSql[m])
 			const exprs = [...new Set(wanted.map((m) => metricSql[m] as string))]
