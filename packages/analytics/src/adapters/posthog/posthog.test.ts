@@ -285,6 +285,133 @@ describe('posthog adapter', () => {
 		expect(seriesSql).toContain("toStartOfDay(timestamp, 'UTC') AS day")
 	})
 
+	it('declares filters as the DIMENSION_SQL key set and hour as minGranularity', () => {
+		const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
+		expect(caps.filters).toEqual(new Set(['page', 'event']))
+		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
+		expect(caps.minGranularity).toBe('hour')
+	})
+
+	it('applies an eq filter as an equality expression', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'page', operator: 'eq', value: '/pricing' }],
+			}),
+			{}
+		)
+		expect(body.query?.query).toContain("properties.$pathname = '/pricing'")
+	})
+
+	it('applies a contains filter as an escaped ILIKE pattern', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'page', operator: 'contains', value: '50%_off' }],
+			}),
+			{}
+		)
+		expect(body.query?.query).toContain("properties.$pathname ILIKE '%50\\\\%\\\\_off%'")
+	})
+
+	it('applies a matches filter via the HogQL match() function', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'event', operator: 'matches', value: '^signup' }],
+			}),
+			{}
+		)
+		expect(body.query?.query).toContain("match(event, '^signup')")
+	})
+
+	it('drops a filter for a dimension it cannot serve instead of throwing', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
+			}),
+			{}
+		)
+		expect(body.query?.query).not.toContain('DE')
+	})
+
+	it('returns a per-hour series plus range totals when granularity is hour', async () => {
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const body = (await request.json()) as { query?: { query?: string } }
+				const sql = body.query?.query ?? ''
+				if (sql.includes('GROUP BY hour')) {
+					return HttpResponse.json({
+						columns: ['hour', 'm0'],
+						types: [],
+						results: [
+							['2026-01-01 00:00:00', 10],
+							['2026-01-01 01:00:00', 25],
+						],
+					})
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[35]] })
+			})
+		)
+		const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'hour' }),
+			{}
+		)
+		expect(result.rows).toEqual([
+			{ timestamp: '2026-01-01T00:00:00.000Z', metrics: { pageviews: 10 } },
+			{ timestamp: '2026-01-01T01:00:00.000Z', metrics: { pageviews: 25 } },
+		])
+		expect(result.totals).toEqual({ pageviews: 35 })
+	})
+
+	it('buckets the hour series in the query timezone when set', async () => {
+		let seriesSql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY hour')) {
+					seriesSql = sql
+					return HttpResponse.json({ columns: ['hour', 'm0'], types: [], results: [] })
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'hour', timezone: 'Europe/Berlin' }),
+			{}
+		)
+		expect(seriesSql).toContain("toStartOfHour(timestamp, 'Europe/Berlin')")
+	})
+
 	it('targets the configured host (EU / self-host)', async () => {
 		server.use(
 			http.post('https://eu.posthog.com/api/projects/9/query/', () =>

@@ -9,7 +9,7 @@ import type {
 	MetricKey,
 } from '../../core/contract'
 import { fetchJson } from '../http/fetchJson'
-import { dayIso } from '../series'
+import { dayIso, hourIso } from '../series'
 
 export interface PosthogConfig {
 	/** PostHog project id (numeric). */
@@ -66,6 +66,10 @@ const posthogDimensions: ReadonlySet<DimensionKey> = new Set(
 const sqlString = (value: string): string =>
 	`'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 
+// ILIKE treats % and _ as wildcards; backslash-escape them in the raw value before it is
+// wrapped in % ... % and quoted, so a filter value containing them matches literally.
+const escapeLikeValue = (value: string): string => value.replace(/[%_]/g, (c) => `\\${c}`)
+
 const sqlDateTimeLiteral = (d: Date): string =>
 	sqlString(d.toISOString().slice(0, 19).replace('T', ' '))
 
@@ -83,12 +87,12 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		perPageQuery: true,
 		realtime: false,
 		comparison: false,
-		minGranularity: 'day',
+		minGranularity: 'hour',
 		maxLookbackDays,
 		metrics: posthogMetrics,
 		dimensions: posthogDimensions,
-		filters: new Set(),
-		filterOperators: new Set(['eq']),
+		filters: posthogDimensions,
+		filterOperators: new Set(['eq', 'contains', 'matches']),
 		batchPageReport: true,
 		rateLimit: { requestsPerMinute: 240, requestsPerHour: 2400 },
 		recommendedTtl: { realtime: 300, aggregate: 3600 },
@@ -127,6 +131,21 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				// Bracket property access with escaped literals: neither the configured
 				// property name nor the scope value can break out of the HogQL string.
 				where.push(`properties[${sqlString(config.scopeProperty)}] = ${sqlString(q.scope)}`)
+			}
+			// Capability gating (filters/filterOperators) is the real contract upstream; an
+			// unsupported dimension is dropped here as the safety net so it never throws.
+			for (const filter of q.filters ?? []) {
+				const expr = DIMENSION_SQL[filter.dimension]
+				if (!expr) {
+					continue
+				}
+				if (filter.operator === 'eq') {
+					where.push(`${expr} = ${sqlString(filter.value)}`)
+				} else if (filter.operator === 'contains') {
+					where.push(`${expr} ILIKE ${sqlString(`%${escapeLikeValue(filter.value)}%`)}`)
+				} else if (filter.operator === 'matches') {
+					where.push(`match(${expr}, ${sqlString(filter.value)})`)
+				}
 			}
 			const selectMetrics = exprs.map((expr, i) => `${expr} AS m${i}`)
 
@@ -168,6 +187,21 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				const rows: AnalyticsRow[] = []
 				for (const row of seriesData.results) {
 					const ts = dayIso(String(row[0] ?? ''))
+					if (ts) {
+						rows.push({ timestamp: ts, metrics: readRow(row, 1) })
+					}
+				}
+				return { rows, totals, meta: { provider: 'posthog', fetchedAt } }
+			}
+
+			if (q.granularity === 'hour' && !breakdownDim) {
+				// Same timezone-bucketing rationale as the day branch above, at hour resolution.
+				const hourExpr = `toStartOfHour(timestamp, ${sqlString(q.timezone ?? 'UTC')})`
+				const seriesSql = `SELECT ${hourExpr} AS hour, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY hour ORDER BY hour`
+				const [seriesData, totals] = await Promise.all([runSql(seriesSql), fetchTotals()])
+				const rows: AnalyticsRow[] = []
+				for (const row of seriesData.results) {
+					const ts = hourIso(String(row[0] ?? ''))
 					if (ts) {
 						rows.push({ timestamp: ts, metrics: readRow(row, 1) })
 					}

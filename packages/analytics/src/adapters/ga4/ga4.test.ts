@@ -125,6 +125,78 @@ describe('ga4 adapter', () => {
 		})
 	})
 
+	it('declares filters as the mapped-dimension key set, eq-only', () => {
+		const caps = ga4(config).capabilities
+		expect(caps.filters).toEqual(caps.dimensions)
+		expect(caps.filterOperators).toEqual(new Set(['eq']))
+	})
+
+	it('adds an eq filter as an additional dimensionFilter expression', async () => {
+		runReport.mockResolvedValue([
+			{
+				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
+				rows: [{ dimensionValues: [], metricValues: [{ value: '1' }] }],
+			},
+		])
+		await ga4(config).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
+			}),
+			{}
+		)
+		expect(sentRequest().dimensionFilter).toEqual({
+			filter: { fieldName: 'countryId', stringFilter: { matchType: 'EXACT', value: 'DE' } },
+		})
+	})
+
+	it('combines the path filter and an eq filter into an andGroup', async () => {
+		runReport.mockResolvedValue([
+			{
+				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
+				rows: [{ dimensionValues: [], metricValues: [{ value: '1' }] }],
+			},
+		])
+		await ga4(config).query(
+			q({
+				metrics: ['pageviews'],
+				path: '/pricing',
+				filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
+			}),
+			{}
+		)
+		expect(sentRequest().dimensionFilter).toEqual({
+			andGroup: {
+				expressions: [
+					{
+						filter: {
+							fieldName: 'pagePath',
+							stringFilter: { matchType: 'EXACT', value: '/pricing' },
+						},
+					},
+					{ filter: { fieldName: 'countryId', stringFilter: { matchType: 'EXACT', value: 'DE' } } },
+				],
+			},
+		})
+	})
+
+	it('drops a filter for an unmapped dimension or unsupported operator', async () => {
+		runReport.mockResolvedValue([
+			{
+				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
+				rows: [{ dimensionValues: [], metricValues: [{ value: '1' }] }],
+			},
+		])
+		await ga4(config).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'country', operator: 'contains', value: 'DE' }],
+			}),
+			{}
+		)
+		expect(sentRequest().dimensionFilter).toBeUndefined()
+	})
+
 	it('converts the bounceRate ratio to a percentage', async () => {
 		runReport.mockResolvedValue([
 			{
