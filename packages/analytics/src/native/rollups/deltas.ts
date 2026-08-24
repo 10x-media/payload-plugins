@@ -64,6 +64,9 @@ export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
 		[event.path, '', ''],
 		['', '', ''],
 	]
+	if (event.type === 'event' && event.name) {
+		buckets.push(['', 'event', event.name])
+	}
 	if (event.country) {
 		buckets.push(['', 'country', event.country])
 	}

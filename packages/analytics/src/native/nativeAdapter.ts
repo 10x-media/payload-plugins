@@ -48,7 +48,13 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'events',
 	'avgDuration',
 ])
-const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'country', 'source', 'device'])
+const dimensions: ReadonlySet<DimensionKey> = new Set([
+	'page',
+	'country',
+	'source',
+	'device',
+	'event',
+])
 
 const REALTIME_EVENT_LIMIT = 50_000
 
