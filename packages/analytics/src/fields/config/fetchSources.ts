@@ -10,13 +10,20 @@ export interface WireSource {
 const cache = new Map<string, Promise<WireSource[]>>()
 
 /**
- * Fetch the caller-scope source list once per admin session and share it
- * between every picker instance on the page; a failed fetch clears its cache
- * entry so a later mount retries instead of pinning the error.
+ * Fetch the caller-scope source list once per user per admin session and share
+ * it between every picker instance on the page; a failed fetch clears its cache
+ * entry so a later mount retries instead of pinning the error. Keying by user
+ * id keeps a soft-navigation logout/login from serving the previous user's
+ * cached sources.
  */
-export const fetchSources = (serverURL: string, apiRoute: string): Promise<WireSource[]> => {
+export const fetchSources = (
+	serverURL: string,
+	apiRoute: string,
+	userKey: string
+): Promise<WireSource[]> => {
 	const url = `${serverURL}${apiRoute}${SOURCES_PATH}`
-	const hit = cache.get(url)
+	const key = `${userKey}:${url}`
+	const hit = cache.get(key)
 	if (hit) return hit
 	const p = fetch(url, { credentials: 'include' })
 		.then((res) => {
@@ -25,9 +32,9 @@ export const fetchSources = (serverURL: string, apiRoute: string): Promise<WireS
 		})
 		.then((body) => body.sources)
 		.catch((err) => {
-			cache.delete(url)
+			cache.delete(key)
 			throw err
 		})
-	cache.set(url, p)
+	cache.set(key, p)
 	return p
 }

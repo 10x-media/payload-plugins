@@ -3,6 +3,7 @@
 import {
 	type ReactSelectOption,
 	SelectInput,
+	useAuth,
 	useConfig,
 	useField,
 	useFormFields,
@@ -30,7 +31,8 @@ export const MetricSelectField = (props: MetricSelectFieldProps) => {
 	const { field, path, readOnly, requires } = props
 	const { i18n } = useTranslation()
 	const locale = i18n.language
-	const { setValue, value } = useField<string>({ path })
+	const { setValue, showError, value } = useField<string>({ path })
+	const { user } = useAuth()
 	const {
 		config: {
 			routes: { api },
@@ -44,10 +46,12 @@ export const MetricSelectField = (props: MetricSelectFieldProps) => {
 		[field.options, locale]
 	)
 	const [sources, setSources] = useState<WireSource[]>([])
+	const userKey = String(user?.id ?? '')
 
 	useEffect(() => {
+		if (!userKey) return
 		let cancelled = false
-		fetchSources(serverURL ?? '', api)
+		fetchSources(serverURL ?? '', api, userKey)
 			.then((fetched) => {
 				if (!cancelled) setSources(fetched)
 			})
@@ -55,7 +59,7 @@ export const MetricSelectField = (props: MetricSelectFieldProps) => {
 		return () => {
 			cancelled = true
 		}
-	}, [api, serverURL])
+	}, [api, serverURL, userKey])
 
 	const options = narrowMetricOptions({ options: staticOptions, requires, sourceId, sources }).map(
 		(option) => ({ label: option.label as string, value: option.value })
@@ -73,6 +77,8 @@ export const MetricSelectField = (props: MetricSelectFieldProps) => {
 			options={options}
 			path={path}
 			readOnly={readOnly}
+			required={field.required}
+			showError={showError}
 			value={value}
 		/>
 	)

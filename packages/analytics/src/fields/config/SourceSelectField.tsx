@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactSelectOption, SelectInput, useConfig, useField } from '@payloadcms/ui'
+import { type ReactSelectOption, SelectInput, useAuth, useConfig, useField } from '@payloadcms/ui'
 import type { SelectFieldClientProps } from 'payload'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '../../translations/useTranslation'
@@ -20,7 +20,8 @@ export const SourceSelectField = (props: SelectFieldClientProps) => {
 	const { field, path, readOnly } = props
 	const { i18n } = useTranslation()
 	const locale = i18n.language
-	const { setValue, value } = useField<string>({ path })
+	const { setValue, showError, value } = useField<string>({ path })
+	const { user } = useAuth()
 	const {
 		config: {
 			routes: { api },
@@ -33,10 +34,12 @@ export const SourceSelectField = (props: SelectFieldClientProps) => {
 		[field.options, locale]
 	)
 	const [sources, setSources] = useState<WireSource[] | null>(null)
+	const userKey = String(user?.id ?? '')
 
 	useEffect(() => {
+		if (!userKey) return
 		let cancelled = false
-		fetchSources(serverURL ?? '', api)
+		fetchSources(serverURL ?? '', api, userKey)
 			.then((fetched) => {
 				if (!cancelled) setSources(fetched)
 			})
@@ -44,11 +47,12 @@ export const SourceSelectField = (props: SelectFieldClientProps) => {
 		return () => {
 			cancelled = true
 		}
-	}, [api, serverURL])
+	}, [api, serverURL, userKey])
 
-	const options = sources
-		? sources.map((source) => ({ value: source.id, label: source.label }))
-		: staticOptions
+	const options =
+		sources && sources.length > 0
+			? sources.map((source) => ({ value: source.id, label: source.label }))
+			: staticOptions
 
 	return (
 		<SelectInput
@@ -62,6 +66,8 @@ export const SourceSelectField = (props: SelectFieldClientProps) => {
 			options={options}
 			path={path}
 			readOnly={readOnly}
+			required={field.required}
+			showError={showError}
 			value={value}
 		/>
 	)

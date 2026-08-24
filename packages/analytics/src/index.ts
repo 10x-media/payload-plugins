@@ -142,9 +142,13 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
 		]
 		if (resolved.widgets.enabled) {
+			const multiProvider =
+				registry.isMultiProvider() ||
+				resolved.providers.collection.enabled ||
+				Boolean(resolved.providers.resolve)
 			registerWidgets(config, {
 				adapters: resolved.adapters,
-				multiProvider: registry.isMultiProvider(),
+				multiProvider,
 				disabled: resolved.widgets.disabled,
 				register: resolved.widgets.register,
 				localizeText: resolved.widgets.localizeText,
