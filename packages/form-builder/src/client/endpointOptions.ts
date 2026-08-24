@@ -25,11 +25,17 @@ export const buildEndpointOptionsUrl = (args: {
 	scope?: EndpointOptionsScope
 }): string => {
 	const endpoint = args.endpoint.replace(/^\/+/, '')
-	const path: `/${string}` =
-		args.scope === 'request'
-			? `/${args.collectionSlug}/${endpoint}`
-			: `/${args.collectionSlug}/${encodeURIComponent(String(args.id))}/${endpoint}`
-	return formatAdminURL({ apiRoute: args.apiRoute, path })
+	if (args.scope === 'request') {
+		return formatAdminURL({ apiRoute: args.apiRoute, path: `/${args.collectionSlug}/${endpoint}` })
+	}
+	if (args.id == null) {
+		// The callers guard on this; throwing keeps a future one from fetching `/undefined/...`.
+		throw new Error(`form-builder: a document-scoped "${endpoint}" URL needs a document id`)
+	}
+	return formatAdminURL({
+		apiRoute: args.apiRoute,
+		path: `/${args.collectionSlug}/${encodeURIComponent(String(args.id))}/${endpoint}`,
+	})
 }
 
 /**
