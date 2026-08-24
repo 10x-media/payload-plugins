@@ -30,6 +30,26 @@ const form = {
 }
 
 describe('resolveConsentStatements', () => {
+	it('serves the notice wording to a notice-display field, and the statement to a checkbox one', async () => {
+		const noticeWording = statement('By subscribing, you agree to the privacy policy')
+		const dual: ConsentSourceEntry = { ...privacy, noticeStatement: noticeWording }
+		const dualForm = {
+			id: 'form-1',
+			fields: [
+				{ blockType: 'consent', name: 'terms', source: 'privacy-id' },
+				{ blockType: 'consent', name: 'news', source: 'privacy-id', display: 'notice' },
+			],
+		}
+		const resolved = await resolveConsentStatements({
+			payload,
+			req: makeReq(),
+			form: dualForm,
+			sources: () => [dual],
+		})
+		expect(resolved.terms?.statement).toBe(dual.statement)
+		expect(resolved.news?.statement).toBe(noticeWording)
+	})
+
 	it('keys the resolved statement and link by consent field name', async () => {
 		const sources = vi.fn().mockResolvedValue(entries)
 		expect(await resolveConsentStatements({ payload, req: makeReq(), form, sources })).toEqual({

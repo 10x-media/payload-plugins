@@ -1,4 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
+import { consentDisplayOf, effectiveConsentStatement } from './effectiveStatement'
 import { resolveConsentEntries } from './resolveConsentEntries'
 import type { ConsentSourcesResolver } from './types'
 
@@ -44,7 +45,7 @@ export const resolveConsentStatements = async (
 ): Promise<ConsentStatements> => {
 	const { payload, req, form, sources } = args
 	const consentFields = (form.fields ?? []).filter(
-		(field): field is { blockType: string; name: string; source?: unknown } =>
+		(field): field is { blockType: string; name: string; source?: unknown; display?: unknown } =>
 			field.blockType === 'consent' && typeof field.name === 'string' && field.name.length > 0
 	)
 	if (consentFields.length === 0) {
@@ -61,8 +62,11 @@ export const resolveConsentStatements = async (
 		// the `id`: the id is a machine identifier, and showing it as the words a visitor clicks is
 		// worse than no link at all. A source with a url and no name simply has no link.
 		const label = typeof entry.name === 'string' && entry.name.trim() !== '' ? entry.name : ''
+		// The wording is selected per the field's display through the same helper the proof path
+		// uses, so what renders is what a submit snapshots. The client only ever sees `statement`.
+		const wording = effectiveConsentStatement(entry, consentDisplayOf(field))
 		statements[field.name] = {
-			...(entry.statement != null ? { statement: entry.statement } : {}),
+			...(wording != null ? { statement: wording } : {}),
 			...(label && typeof entry.url === 'string' && entry.url.length > 0
 				? { link: { label, url: entry.url } }
 				: {}),

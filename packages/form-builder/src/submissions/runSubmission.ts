@@ -4,6 +4,7 @@ import type { CalcResolved } from '../calc/evaluate'
 import { evaluateCondition } from '../conditions/evaluate'
 import type { ConsentProof, ConsentSnapshotMode } from '../consent/captureConsent'
 import { captureConsent } from '../consent/captureConsent'
+import { consentDisplayOf } from '../consent/effectiveStatement'
 import type { ConsentSourceEntry } from '../consent/types'
 import { isNamedField } from '../fields/fieldKey'
 import type { FieldTypeRegistry } from '../fields/registry'
@@ -316,7 +317,9 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		if (instance.blockType === 'consent' && payload) {
 			const proof = await captureConsent({
 				field: instance,
-				agreed: value === true,
+				// A notice display has no control: submitting is the consent, so the server records
+				// agreement regardless of what the client sent.
+				agreed: consentDisplayOf(instance) === 'notice' ? true : value === true,
 				entries: consentEntries ?? [],
 				payload,
 				req,

@@ -23,6 +23,14 @@ export type ConsentSourceEntry = {
 	id: string
 	name?: string
 	statement?: unknown
+	/**
+	 * The wording a `display: 'notice'` consent field shows instead of `statement` ("By
+	 * subscribing, you agree..." rather than "I accept..."). Same consent, same policy, same id in
+	 * every proof; only the sentence differs. Absent or empty falls back to `statement`. A resolver
+	 * mapping `consentSourcesField()` rows must forward the row's `noticeStatement` for notice
+	 * displays to pick it up.
+	 */
+	noticeStatement?: unknown
 	page?: ConsentSourcePage
 	url?: string
 }

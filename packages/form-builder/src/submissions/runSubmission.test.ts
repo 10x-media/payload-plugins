@@ -188,6 +188,14 @@ describe('runSubmission', () => {
 		expect(result.values).toEqual([{ field: 'agree', value: false }])
 	})
 
+	it('treats the submit itself as agreement for a notice-display consent', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'consent', name: 'terms', required: true, display: 'notice' },
+		]
+		const result = await runSubmission({ ...base, fields, values: [] })
+		expect(result.errors).toHaveLength(0)
+	})
+
 	it('rejects a required consent submitted as an unrecognized string, not treating it as agreement', async () => {
 		const fields: FormFieldInstance[] = [{ blockType: 'consent', name: 'terms', required: true }]
 		const result = await runSubmission({

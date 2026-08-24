@@ -219,6 +219,11 @@ export const de: Record<TranslationKey, string> = {
 	[keys.configActions]: 'Aktionen',
 	[keys.fieldTypeConsent]: 'Einwilligung',
 	[keys.consentConfigSource]: 'Quelle',
+	[keys.consentConfigDisplay]: 'Darstellung',
+	[keys.consentConfigDisplayDescription]:
+		'Eine Checkbox zum Ankreuzen oder ein passiver Hinweis, bei dem das Absenden die Einwilligung ist.',
+	[keys.consentDisplayCheckbox]: 'Checkbox',
+	[keys.consentDisplayNotice]: 'Hinweis',
 	[keys.consentConfigSourceDescription]:
 		'Die Erklärung, der Besucher zustimmen. Wortlaut und Rechtsseite gehören zur Quelle: eine Änderung dort gilt für jedes Formular, das sie nutzt.',
 	[keys.consentSourcesField]: 'Einwilligungsquellen',
@@ -228,6 +233,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.consentSourcePlural]: 'Einwilligungsquellen',
 	[keys.consentSourceLabel]: 'Name',
 	[keys.consentSourceStatement]: 'Erklärung',
+	[keys.consentSourceNoticeStatement]: 'Hinweis-Erklärung',
+	[keys.consentSourceNoticeStatementDescription]:
+		'Wird von Einwilligungsfeldern in Hinweis-Darstellung gezeigt ("Mit dem Abonnieren stimmen Sie ... zu"). Leer fällt auf die Erklärung zurück.',
 	[keys.consentSourcePage]: 'Erklärungsquelle',
 	[keys.consentSourcePageDescription]:
 		'Muss gesetzt sein, wenn Formulareinsendungen einen Verweis auf deine Richtlinie speichern sollen.',
