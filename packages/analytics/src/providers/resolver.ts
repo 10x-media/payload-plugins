@@ -87,16 +87,24 @@ export const collectionProvidersSource = (slug: string, scopeField: string): Pro
 		)
 		const adapters: AnalyticsAdapter[] = []
 		for (const raw of docs as Array<Record<string, unknown>>) {
-			const doc = structuredClone(raw) as Record<string, unknown>
-			for (const { path } of SECRET_PATHS) {
-				const value = getAtPath(doc, path)
-				if (typeof value === 'string' && value !== '') {
-					const plain = await decryptFieldValue(payload, { collection: slug, path, value })
-					setAtPath(doc, path, typeof plain === 'string' ? plain : '')
+			try {
+				const doc = structuredClone(raw) as Record<string, unknown>
+				for (const { path } of SECRET_PATHS) {
+					const value = getAtPath(doc, path)
+					if (typeof value === 'string' && value !== '') {
+						const plain = await decryptFieldValue(payload, { collection: slug, path, value })
+						setAtPath(doc, path, typeof plain === 'string' ? plain : '')
+					}
 				}
+				const adapter = adapterFromProviderDoc(doc as ProviderDoc)
+				if (adapter) adapters.push(adapter)
+			} catch (err) {
+				// A corrupted or key-rotated-away ciphertext must not take the whole
+				// scope's registry down; skip just this document's adapter.
+				payload.logger.warn(
+					`analytics: provider document "${String(raw.id)}" (${String(raw.provider)}) failed to decrypt, skipping it: ${String(err)}`
+				)
 			}
-			const adapter = adapterFromProviderDoc(doc as ProviderDoc)
-			if (adapter) adapters.push(adapter)
 		}
 		return adapters
 	}

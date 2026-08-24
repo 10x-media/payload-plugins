@@ -91,15 +91,85 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 	})
 
 	it('the provider source resolves adapters with working decrypted credentials', async () => {
-		const registry = await registryFor(null)
-		const adapter = registry.all().find((a) => a.id === 'posthog')
-		expect(adapter?.isConfigured()).toBe(true)
-		// clears the fixture so later tests' scope/registry assertions stay exact
-		await booted.payload.delete({
+		try {
+			const registry = await registryFor(null)
+			const adapter = registry.all().find((a) => a.id === 'posthog')
+			expect(adapter?.isConfigured()).toBe(true)
+		} finally {
+			// clears the fixture so later tests' scope/registry assertions stay exact,
+			// even if the assertion above fails
+			await booted.payload.delete({
+				collection: SLUG as never,
+				where: { provider: { equals: 'posthog' } },
+				overrideAccess: true,
+			})
+		}
+	})
+
+	it("resolves the scope's healthy providers when another document's ciphertext is corrupted", async () => {
+		const scope = 'corrupt-test'
+		await booted.payload.create({
 			collection: SLUG as never,
-			where: { provider: { equals: 'posthog' } },
+			data: {
+				name: 'Healthy',
+				provider: 'plausible',
+				enabled: true,
+				scope,
+				plausible: { siteId: 'healthy.example', apiKey: 'good-key' },
+			} as never,
 			overrideAccess: true,
 		})
+		const poisoned = await booted.payload.create({
+			collection: SLUG as never,
+			data: {
+				name: 'Poisoned',
+				provider: 'posthog',
+				enabled: true,
+				scope,
+				posthog: { projectId: '123', apiKey: 'about-to-be-corrupted' },
+			} as never,
+			overrideAccess: true,
+		})
+		const poisonedId = (poisoned as { id: string | number }).id
+
+		const { withRawEncrypted } = await import('@10x-media/fields/encrypted')
+		const { createLocalReq } = await import('payload')
+		const req = await createLocalReq({}, booted.payload)
+		const raw = (await withRawEncrypted(req, () =>
+			booted.payload.findByID({
+				collection: SLUG as never,
+				id: poisonedId,
+				req,
+				overrideAccess: true,
+			})
+		)) as { posthog?: { apiKey?: string } }
+		const stored = raw.posthog?.apiKey
+		if (!stored) throw new Error('expected a stored ciphertext to corrupt')
+		// flip the tail of the auth tag segment; same length and charset, so the wire
+		// format still parses, but the GCM tag no longer authenticates
+		const corrupted = `${stored.slice(0, -4)}${stored.endsWith('AAAA') ? 'BBBB' : 'AAAA'}`
+		await withRawEncrypted(req, () =>
+			booted.payload.update({
+				collection: SLUG as never,
+				id: poisonedId,
+				data: { posthog: { projectId: '123', apiKey: corrupted } } as never,
+				req,
+				overrideAccess: true,
+			})
+		)
+
+		try {
+			const registry = await registryFor(scope)
+			expect(registry.all().map((a) => a.id)).toEqual(['memory', 'plausible'])
+		} finally {
+			// clears both fixtures so later tests' scope/registry assertions stay
+			// exact, even if the assertion above fails
+			await booted.payload.delete({
+				collection: SLUG as never,
+				where: { scope: { equals: scope } },
+				overrideAccess: true,
+			})
+		}
 	})
 
 	it('scopes provider documents: a scoped doc joins only its scope registry', async () => {
