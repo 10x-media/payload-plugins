@@ -57,7 +57,7 @@ The words are content, not a rendering of the target's title. Renaming a guide t
 
 ## Built-in blocks
 
-**Callout.** Four variants: info, tip, warning, danger. The body is a nested editor: inline formatting, links, images and video, plus the blocks you marked [`nestable`](#your-own-blocks). It never holds headings or another callout.
+**Callout.** Four variants: info, tip, warning, danger. The body is a [nested editor](#the-editor-inside-your-own-block): inline formatting, links, images, video, and the blocks you marked [`nestable`](#your-own-blocks).
 
 **Video embed.** Only when [video is enabled](#video). Takes a YouTube or Vimeo watch, share, or short URL and validates it at authoring time; the reader gets a privacy-friendly embed (`youtube-nocookie.com`, Vimeo with `dnt=1`).
 
@@ -95,7 +95,7 @@ adminWiki({
 
 The renderer receives the block node's field values as `fields`, and is registered as an admin dependency so importmap generation finds it. A renderer declared but missing from the import map renders a visible placeholder and logs a warning, rather than dropping the block silently.
 
-`nestable: true` also offers the block inside a callout body. Blocks are not nestable by default, inline blocks are:
+`nestable: true` also offers the block inside a [nested editor](#the-editor-inside-your-own-block), a callout body among them. Blocks are not nestable by default, inline blocks are:
 
 ```ts
 blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock', nestable: true }],
@@ -134,7 +134,7 @@ adminWiki({
 
 An array is appended to the plugin's own features. A feature's client half is resolved through the import map like any other, so nothing has to be declared twice.
 
-The function form is handed the plugin's features as `defaultFeatures` and returns the whole list, which is the way to reorder or drop one. It runs once per editor, `nested` telling a callout body apart from the guide body:
+The function form is handed the plugin's features as `defaultFeatures` and returns the whole list, which is the way to reorder or drop one. It runs once per editor, `nested` telling a [nested body](#the-editor-inside-your-own-block) apart from the guide body:
 
 ```ts
 adminWiki({
@@ -185,24 +185,34 @@ Converters apply wherever the plugin renders a guide: the wiki view, the surface
 
 ## The editor inside your own block
 
-A block with a `richText` field of its own can run the wiki editor there. Pass `nested: true`, which leaves out headings and the callout:
+A block with a `richText` field of its own can run the wiki editor there. `nested: true` drops the callout, headings, lists, blockquotes, horizontal rules, indentation and the fixed toolbar.
+
+Everything else comes from the arguments, so hand it the same object you hand `adminWiki` as `editor`:
 
 ```ts title="blocks/accordion.ts"
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { wikiFeatures } from '@10x-media/admin-wiki'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
 
-export const accordionBlock: Block = {
+import { wikiEditorOptions } from '../wikiEditorOptions'
+
+export const accordionBlock = {
   slug: 'accordion',
   fields: [
     { name: 'title', type: 'text' },
     {
       name: 'body',
       type: 'richText',
-      editor: lexicalEditor({ features: () => wikiFeatures({ nested: true }) }),
+      editor: lexicalEditor({
+        features: () => wikiFeatures({ ...wikiEditorOptions, nested: true }),
+      }),
     },
   ],
 }
 ```
+
+<Callout type="warn">
+  Arguments left out fall back to defaults: no blocks of yours, no video, and the stock `wiki-pages` and `wiki-media` slugs. Nothing errors, so an editor missing your blocks, or one pointing at collections you renamed through [`slugs`](/admin-wiki/configuration), looks exactly like one you configured.
+</Callout>
 
 To render the field, take `converters` and `nodesToJSX` beside `fields`:
 
@@ -216,10 +226,6 @@ export const Accordion = ({ converters, fields, nodesToJSX }) => (
   </details>
 )
 ```
-
-<Callout type="warn">
-  `wikiFeatures` falls back to the default `wiki-pages` and `wiki-media` slugs. If you renamed them through [`slugs`](/admin-wiki/configuration), pass the same values as `pagesSlug` and `mediaSlug`, or guide links and uploads inside your block point at collections that do not exist.
-</Callout>
 
 ## Wiki media
 

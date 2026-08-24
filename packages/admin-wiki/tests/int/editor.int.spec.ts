@@ -75,10 +75,8 @@ const guideEditorBlockSlugs = (
 	}
 }
 
-/** The same lists for the editor inside a callout body. */
-const calloutBodyBlockSlugs = (
-	booted: BootedPayload
-): { blocks: string[]; inlineBlocks: string[] } => {
+/** The editor Payload sanitized for the `body` field of the callout block. */
+const calloutBodyEditor = (booted: BootedPayload): LexicalRichTextAdapter | undefined => {
 	const feature = guideEditor(booted)?.editorConfig?.resolvedFeatureMap?.get('blocks') as
 		| undefined
 		| { sanitizedServerFeatureProps?: { blocks?: { fields: Field[]; slug: string }[] } }
@@ -86,8 +84,17 @@ const calloutBodyBlockSlugs = (
 		(block) => block.slug === 'wikiCallout'
 	)
 	const body = callout ? findField(callout.fields, 'body') : undefined
-	const editor = (body as undefined | { editor?: LexicalRichTextAdapter })?.editor
-	const nested = editor?.editorConfig?.resolvedFeatureMap?.get('blocks') as
+	return (body as undefined | { editor?: LexicalRichTextAdapter })?.editor
+}
+
+const calloutBodyFeatureKeys = (booted: BootedPayload): string[] =>
+	(calloutBodyEditor(booted)?.features ?? []).map((feature) => feature.key)
+
+/** The same lists for the editor inside a callout body. */
+const calloutBodyBlockSlugs = (
+	booted: BootedPayload
+): { blocks: string[]; inlineBlocks: string[] } => {
+	const nested = calloutBodyEditor(booted)?.editorConfig?.resolvedFeatureMap?.get('blocks') as
 		| undefined
 		| {
 				sanitizedServerFeatureProps?: {
@@ -253,16 +260,49 @@ describeForDb('callout body editor', { dbs: ['mongo'] }, (db) => {
 	})
 
 	it('leaves headings out of the body', () => {
-		const editor = guideEditor(booted)
-		expect((editor?.features ?? []).map((feature) => feature.key)).toContain('heading')
-		const feature = editor?.editorConfig?.resolvedFeatureMap?.get('blocks') as
-			| undefined
-			| { sanitizedServerFeatureProps?: { blocks?: { fields: Field[]; slug: string }[] } }
-		const callout = feature?.sanitizedServerFeatureProps?.blocks?.find(
-			(block) => block.slug === 'wikiCallout'
-		)
-		const body = callout ? findField(callout.fields, 'body') : undefined
-		const nestedEditor = (body as undefined | { editor?: LexicalRichTextAdapter })?.editor
-		expect((nestedEditor?.features ?? []).map((feature) => feature.key)).not.toContain('heading')
+		expect(guideEditorFeatureKeys(booted)).toContain('heading')
+		expect(calloutBodyFeatureKeys(booted)).not.toContain('heading')
+	})
+
+	it('keeps the formatting the body has room for and drops the rest', () => {
+		const keys = calloutBodyFeatureKeys(booted)
+		expect(keys).toContain('strikethrough')
+		expect(keys).toContain('align')
+		expect(keys).not.toContain('unorderedList')
+		expect(keys).not.toContain('orderedList')
+		expect(keys).not.toContain('blockquote')
+		expect(keys).not.toContain('horizontalRule')
+		expect(keys).not.toContain('indent')
+		expect(keys).not.toContain('toolbarFixed')
+	})
+})
+
+describeForDb('callout body editor with nothing to nest', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: adminWiki({
+				editor: {
+					features: ({ defaultFeatures, nested }) =>
+						nested ? [...defaultFeatures, ConsumerFeature(undefined)] : defaultFeatures,
+				},
+			}),
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('hands the features function the flag telling the two editors apart', () => {
+		expect(calloutBodyFeatureKeys(booted)).toContain('consumerTestFeature')
+		expect(guideEditorFeatureKeys(booted)).not.toContain('consumerTestFeature')
+	})
+
+	it('registers no blocks feature at all, so the toolbar offers no empty insert', () => {
+		expect(guideEditorFeatureKeys(booted)).toContain('blocks')
+		expect(calloutBodyFeatureKeys(booted)).not.toContain('blocks')
 	})
 })

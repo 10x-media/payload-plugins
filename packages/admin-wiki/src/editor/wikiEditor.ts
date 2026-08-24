@@ -56,11 +56,16 @@ const nestableBlocks = (options: WikiEditorBlockOption[], fallback: boolean) =>
 
 /**
  * The plugin's own feature list. A consumer block holding its own rich text
- * field reuses it with `nested: true`, which leaves the callout out.
+ * field reuses it with `nested: true`.
  *
  * Stock links are external-URL only (`enabledCollections: []` removes internal
  * doc links) and guide-to-guide links are their own feature beside them; uploads
  * are scoped to the wiki media collection.
+ *
+ * `nested` drops the callout and headings (the table-of-contents walk does not
+ * descend into a nested editor state, so a heading there would get no id), the
+ * fixed toolbar, and the features the callout body has no vertical room for:
+ * lists, blockquote, horizontal rule and indent.
  */
 export const wikiFeatures = ({
 	blocks = [],
@@ -82,7 +87,9 @@ export const wikiFeatures = ({
 		BoldFeature(),
 		ItalicFeature(),
 		UnderlineFeature(),
+		StrikethroughFeature(),
 		InlineCodeFeature(),
+		AlignFeature(),
 		LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
 		WikiGuideLinkFeature({ pagesSlug }),
 		UploadFeature({ enabledCollections: [mediaSlug] as UploadCollectionSlug[] }),
@@ -91,12 +98,10 @@ export const wikiFeatures = ({
 			? []
 			: [
 					HeadingFeature({ enabledHeadingSizes: ['h2', 'h3', 'h4'] }),
-					StrikethroughFeature(),
 					UnorderedListFeature(),
 					OrderedListFeature(),
 					WikiBlockquoteFeature(),
 					HorizontalRuleFeature(),
-					AlignFeature(),
 					IndentFeature(),
 					FixedToolbarFeature(),
 				]),
