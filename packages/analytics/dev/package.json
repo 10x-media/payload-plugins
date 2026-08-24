@@ -31,6 +31,7 @@
 		"react-dom": "catalog:"
 	},
 	"devDependencies": {
+		"@10x-media/fields": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",

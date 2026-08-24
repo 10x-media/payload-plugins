@@ -9,6 +9,8 @@ export type ProviderId = (typeof PROVIDER_IDS)[number]
 
 /** The provider-settings document shape the adapter factory reads (depth 0, secrets revealed). */
 export type ProviderDoc = {
+	id?: number | string
+	name?: string | null
 	provider?: string | null
 	enabled?: boolean | null
 	scope?: string | null

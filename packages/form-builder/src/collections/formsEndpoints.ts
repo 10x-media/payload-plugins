@@ -38,6 +38,15 @@ type FormsEndpointDeps = {
  * (anonymous callers get a 403 from the helper, not here). Extracted from `buildFormsCollection`
  * so the collection builder stays focused on field and hook composition.
  */
+/** A request-scoped GET route at its id-less path plus the legacy doc-scoped path, one handler. */
+const requestScopedRoutes = (
+	name: string,
+	handler: (req: PayloadRequest) => Promise<Response>
+): Exclude<CollectionConfig['endpoints'], false | undefined> => [
+	{ path: `/${name}`, method: 'get', handler },
+	{ path: `/:id/${name}`, method: 'get', handler },
+]
+
 export const buildFormsEndpoints = ({
 	resultsAccess,
 	pollResultsTypes,
@@ -112,42 +121,29 @@ export const buildFormsEndpoints = ({
 				},
 			]
 		: []),
-	// The route id is unused: the from-addresses set is request-scoped (e.g. per tenant), not
-	// per-form. Registered as a doc-scoped route only so the admin field can reuse
-	// EndpointOptionsSelect unmodified (see buildFromField).
+	// The from-addresses and departments sets are request-scoped (e.g. per tenant), never per-form.
+	// Each lives at the id-less path the selects call (which is what lets their options load while
+	// a form is still being created), with the legacy `/:id/` route kept on the same handler for
+	// integrators that hardcoded it.
 	...(fromAddresses || fromSources
-		? [
-				{
-					path: '/:id/from-addresses',
-					method: 'get' as const,
-					handler: async (req: PayloadRequest) => {
-						const { status, body } = await resolveFromAddressesRequest({
-							isAuthed: Boolean(req.user),
-							req,
-							resolver: fromAddresses,
-							sources: fromSources,
-						})
-						return Response.json(body, { status })
-					},
-				},
-			]
+		? requestScopedRoutes('from-addresses', async (req: PayloadRequest) => {
+				const { status, body } = await resolveFromAddressesRequest({
+					isAuthed: Boolean(req.user),
+					req,
+					resolver: fromAddresses,
+					sources: fromSources,
+				})
+				return Response.json(body, { status })
+			})
 		: []),
-	// Same request-scoped, id-unused shape as from-addresses: registered doc-scoped only so the
-	// recipient selects can fetch it (see RecipientsSelect / buildRecipientField).
 	...(departments
-		? [
-				{
-					path: '/:id/departments',
-					method: 'get' as const,
-					handler: async (req: PayloadRequest) => {
-						const { status, body } = await resolveDepartmentsRequest({
-							isAuthed: Boolean(req.user),
-							req,
-							resolver: departments,
-						})
-						return Response.json(body, { status })
-					},
-				},
-			]
+		? requestScopedRoutes('departments', async (req: PayloadRequest) => {
+				const { status, body } = await resolveDepartmentsRequest({
+					isAuthed: Boolean(req.user),
+					req,
+					resolver: departments,
+				})
+				return Response.json(body, { status })
+			})
 		: []),
 ]

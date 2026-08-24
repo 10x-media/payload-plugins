@@ -3,21 +3,40 @@ import { formatAdminURL } from 'payload/shared'
 export type EndpointOption = { label: string; value: string }
 
 /**
- * URL for a document-scoped collection endpoint (`{api}/{collection}/{id}/{endpoint}`), built the
- * way Payload's own admin components build fetch URLs: `formatAdminURL` over `config.routes.api`,
- * which handles a Next `basePath` and returns a same-origin relative URL so the admin cookie rides
- * along without CORS concerns.
+ * What an endpoint-backed select's options depend on. `'document'` (the default) needs a saved
+ * document: the URL carries the id and the fetch waits for one. `'request'` means the server
+ * resolves options from the request alone (tenant, locale, auth), so the URL has no id segment
+ * and the options load while the document is still being created.
+ */
+export type EndpointOptionsScope = 'document' | 'request'
+
+/**
+ * URL for a collection endpoint serving select options, built the way Payload's own admin
+ * components build fetch URLs: `formatAdminURL` over `config.routes.api`, which handles a Next
+ * `basePath` and returns a same-origin relative URL so the admin cookie rides along without CORS
+ * concerns. Document scope yields `{api}/{collection}/{id}/{endpoint}`; request scope yields
+ * `{api}/{collection}/{endpoint}`.
  */
 export const buildEndpointOptionsUrl = (args: {
 	apiRoute: string
 	collectionSlug: string
-	id: number | string
+	id?: number | string
 	endpoint: string
-}): string =>
-	formatAdminURL({
+	scope?: EndpointOptionsScope
+}): string => {
+	const endpoint = args.endpoint.replace(/^\/+/, '')
+	if (args.scope === 'request') {
+		return formatAdminURL({ apiRoute: args.apiRoute, path: `/${args.collectionSlug}/${endpoint}` })
+	}
+	if (args.id == null) {
+		// The callers guard on this; throwing keeps a future one from fetching `/undefined/...`.
+		throw new Error(`form-builder: a document-scoped "${endpoint}" URL needs a document id`)
+	}
+	return formatAdminURL({
 		apiRoute: args.apiRoute,
-		path: `/${args.collectionSlug}/${encodeURIComponent(String(args.id))}/${args.endpoint.replace(/^\/+/, '')}`,
+		path: `/${args.collectionSlug}/${encodeURIComponent(String(args.id))}/${endpoint}`,
 	})
+}
 
 /**
  * Narrow an endpoint response to `{ options }`. Entries without a string value are dropped and

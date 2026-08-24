@@ -15,6 +15,7 @@ import { useTranslation } from '../translations/useTranslation'
 import {
 	buildEndpointOptionsUrl,
 	type EndpointOption,
+	type EndpointOptionsScope,
 	parseEndpointOptions,
 } from './endpointOptions'
 import { toStaticLabel } from './toStaticLabel'
@@ -31,6 +32,12 @@ export type EndpointOptionsSelectProps = {
 	 * `{ options: { label, value }[] }`.
 	 */
 	endpoint: string
+	/**
+	 * What the options depend on; see {@link EndpointOptionsScope}. Default `'document'`. Pass
+	 * `'request'` for an endpoint registered at the id-less path so options load while the document
+	 * is still being created.
+	 */
+	scope?: EndpointOptionsScope
 	/**
 	 * Field description as a translation key, resolved client-side. Payload drops `admin.description`
 	 * functions from client fields, so a translated description must travel as a key; a static
@@ -51,13 +58,15 @@ type FetchState =
 	| { status: 'loaded'; options: EndpointOption[] }
 
 /**
- * A select whose options load from a document-scoped plugin endpoint, for stored values whose
- * valid choices only the server knows (e.g. a poll's source-resolved options). The pattern: pass
- * `endpoint` via `clientProps`, the component reads the document id from `useDocumentInfo` and the
- * API route from `useConfig`, fetches once per document with the admin cookie, and renders
- * translated loading/error states. The stored value stays selectable even when it is missing from
- * the fetched options (or the fetch failed), so opening an old document never silently drops data;
- * unsaved documents skip the fetch since the server cannot resolve options for them yet.
+ * A select whose options load from a plugin endpoint, for stored values whose valid choices only
+ * the server knows (e.g. a poll's source-resolved options). The pattern: pass `endpoint` via
+ * `clientProps`, the component reads the document id from `useDocumentInfo` and the API route
+ * from `useConfig`, fetches once with the admin cookie, and renders translated loading/error
+ * states. The stored value stays selectable even when it is missing from the fetched options (or
+ * the fetch failed), so opening an old document never silently drops data. Document scope (the
+ * default) skips the fetch until the document is saved, since the server cannot resolve options
+ * for it yet; request scope fetches immediately, create mode included, and ignores the id
+ * entirely so the first save never re-fetches.
  */
 export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
 	const isMulti = props.isMulti === true
@@ -70,17 +79,22 @@ export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
 	const { id, collectionSlug } = useDocumentInfo()
 	const { config } = useConfig()
 	const apiRoute = config.routes.api
+	const scope = props.scope ?? 'document'
+	// Request scope never puts the id in the URL; deriving undefined here keeps the effect from
+	// re-fetching when the first save assigns one.
+	const docId = scope === 'request' ? undefined : id
 	const [state, setState] = useState<FetchState>({ status: 'idle' })
 
 	useEffect(() => {
-		if (id == null || !collectionSlug) {
+		if (!collectionSlug || (scope === 'document' && docId == null)) {
 			return
 		}
 		const controller = new AbortController()
 		const url = buildEndpointOptionsUrl({
 			apiRoute,
 			collectionSlug,
-			id,
+			id: docId,
+			scope,
 			endpoint: props.endpoint,
 		})
 		setState({ status: 'loading' })
@@ -101,7 +115,7 @@ export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
 				}
 			})
 		return () => controller.abort()
-	}, [apiRoute, collectionSlug, id, props.endpoint])
+	}, [apiRoute, collectionSlug, docId, scope, props.endpoint])
 
 	// A missing fetched option (or a failed fetch) must never silently drop a stored value, so every
 	// selected value the options don't cover is kept selectable by its own label.
