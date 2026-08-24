@@ -17,3 +17,9 @@ export const resolveActions = (
 	defaults: Record<string, AnyActionDefinition>,
 	config: ActionsConfig = {}
 ): ActionRegistry => applyRegistryConfig(new Map(Object.entries(defaults)), config)
+
+/** Whether a stored action instance's definition declares its failure to be the submission's failure. */
+export const isEssentialAction = (
+	registry: ActionRegistry,
+	instance: { blockType: string }
+): boolean => registry.get(instance.blockType)?.essential === true

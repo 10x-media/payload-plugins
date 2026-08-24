@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dispatchActions } from './dispatch'
+import { dispatchActions, ESSENTIAL_ACTION_FAILED_CONTEXT_KEY } from './dispatch'
 import type { ActionRegistry } from './registry'
 import { ACTIONS_TASK_SLUG } from './task'
 
@@ -155,6 +155,129 @@ describe('dispatchActions', () => {
 			})
 
 			expect(ran).toEqual(['recorder'])
+		})
+	})
+
+	describe('essential actions', () => {
+		const makeEssentialRegistry = (opts: {
+			fail?: boolean
+			hang?: boolean
+		}): { registry: ActionRegistry; ran: string[] } => {
+			const ran: string[] = []
+			const registry: ActionRegistry = new Map([
+				[
+					'subscribe',
+					{
+						type: 'subscribe',
+						label: 'Subscribe',
+						essential: true,
+						run: async () => {
+							if (opts.hang) {
+								await new Promise(() => {})
+							}
+							if (opts.fail) {
+								throw new Error('provider rejected')
+							}
+							ran.push('subscribe')
+						},
+					},
+				],
+				[
+					'recorder',
+					{
+						type: 'recorder',
+						label: 'Recorder',
+						run: async () => {
+							ran.push('recorder')
+						},
+					},
+				],
+			])
+			return { registry, ran }
+		}
+
+		const actions = [{ blockType: 'subscribe' }, { blockType: 'recorder' }]
+		const makePayload = (queue = vi.fn().mockResolvedValue(undefined)) =>
+			({
+				jobs: { queue },
+				logger: { error: vi.fn(), warn: vi.fn() },
+				findByID: vi
+					.fn()
+					.mockImplementation(({ collection }: { collection: string }) =>
+						collection === 'forms'
+							? Promise.resolve({ id: 'form-1', actions })
+							: Promise.resolve({ id: 'sub-1', values: [], descriptors: [] })
+					),
+			}) as never
+
+		it('runs the essential action inline before queueing the rest, even with a runner', async () => {
+			const queue = vi.fn().mockResolvedValue(undefined)
+			const { registry, ran } = makeEssentialRegistry({})
+			const req = { context: {} } as never
+
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry,
+				payload: makePayload(queue),
+				req,
+				hasRunner: true,
+			})
+
+			expect(ran).toEqual(['subscribe'])
+			expect(queue).toHaveBeenCalledWith({
+				task: ACTIONS_TASK_SLUG,
+				input: { formId: 'form-1', submissionId: 'sub-1', subset: 'rest' },
+				req,
+			})
+			expect((req as { context: Record<string, unknown> }).context).toEqual({})
+		})
+
+		it('marks the request failed and skips the rest when the essential action throws', async () => {
+			const queue = vi.fn()
+			const { registry, ran } = makeEssentialRegistry({ fail: true })
+			const req = { context: {} } as never
+
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry,
+				payload: makePayload(queue),
+				req,
+				hasRunner: true,
+				persistSubmissions: false,
+			})
+
+			expect(
+				(req as { context: Record<string, unknown> }).context[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY]
+			).toBe(true)
+			expect(ran).toEqual([])
+			// Nothing queued: no rest actions, and no prune completion that would delete the kept row.
+			expect(queue).not.toHaveBeenCalled()
+		})
+
+		it('treats an essential action that outlives the deadline as failed', async () => {
+			const queue = vi.fn()
+			const { registry } = makeEssentialRegistry({ hang: true })
+			const req = { context: {} } as never
+
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry,
+				payload: makePayload(queue),
+				req,
+				hasRunner: true,
+				deadlineMs: 20,
+			})
+
+			expect(
+				(req as { context: Record<string, unknown> }).context[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY]
+			).toBe(true)
+			expect(queue).not.toHaveBeenCalled()
 		})
 	})
 

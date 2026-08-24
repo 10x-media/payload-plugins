@@ -86,6 +86,20 @@ describe('useField', () => {
 		expect(screen.getByTestId('err')).toHaveTextContent('')
 	})
 
+	it('a pristine blur reveals nothing, even with a stored error', () => {
+		render(<Harness validateField={vi.fn()} initial={{ errors: { a: ['bad'] } }} />)
+		fireEvent.blur(screen.getByLabelText('a'))
+		expect(screen.getByTestId('err')).toHaveTextContent('')
+	})
+
+	it('a blur on a dirty field reveals its error', () => {
+		render(
+			<Harness validateField={vi.fn()} initial={{ errors: { a: ['bad'] }, dirty: { a: true } }} />
+		)
+		fireEvent.blur(screen.getByLabelText('a'))
+		expect(screen.getByTestId('err')).toHaveTextContent('bad')
+	})
+
 	it('hides a stored error while the field is untouched and its step is unattempted', () => {
 		// The error map holds an entry for `a`, but the field belongs to an unattempted step: no reveal.
 		render(

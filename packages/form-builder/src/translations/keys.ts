@@ -271,6 +271,7 @@ export const keys = {
 	fileUploadFailed: 'formBuilder:file.uploadFailed',
 	fileRemove: 'formBuilder:file.remove',
 	spamRateLimited: 'formBuilder:spam.rateLimited',
+	submissionActionFailed: 'formBuilder:submission.actionFailed',
 	spamRejected: 'formBuilder:spam.rejected',
 	spamCaptchaFailed: 'formBuilder:spam.captchaFailed',
 	contextInvalid: 'formBuilder:context.invalid',

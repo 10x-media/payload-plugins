@@ -314,6 +314,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fileRemove]: 'Entfernen',
 	[keys.spamRateLimited]: 'Du hast zu viele Anfragen gesendet. Bitte versuche es später erneut.',
 	[keys.spamRejected]: 'Deine Übermittlung konnte nicht verarbeitet werden.',
+	[keys.submissionActionFailed]:
+		'Deine Übermittlung konnte nicht abgeschlossen werden. Bitte versuche es gleich noch einmal.',
 	[keys.spamCaptchaFailed]: 'Captcha-Überprüfung fehlgeschlagen. Bitte versuche es erneut.',
 	[keys.contextInvalid]:
 		'Dieses Formular konnte nicht verifiziert werden. Bitte lade die Seite neu und versuche es erneut.',

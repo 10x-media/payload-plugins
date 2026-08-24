@@ -5,7 +5,10 @@ import {
 	type Endpoint,
 	type PayloadRequest,
 } from 'payload'
+import { ESSENTIAL_ACTION_FAILED_CONTEXT_KEY } from '../actions/dispatchContext'
 import { pollConfigOf } from '../form/pollState'
+import { keys } from '../translations/keys'
+import { asTranslate } from '../translations/server'
 import { formIdOf } from './formIdOf'
 import { VOTE_CHANGE_CONTEXT_KEY, votedSubmissionIdFromCookie } from './votedCookie'
 
@@ -107,7 +110,17 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 			if (req.body) {
 				Object.defineProperty(req, 'body', { configurable: true, value: null })
 			}
-			return stockCreate.handler(req)
+			const response = await stockCreate.handler(req)
+			// An essential action's failure is the submission's failure: the row is committed and kept
+			// (see dispatchActions), but the visitor must not be told it worked. 502 because the
+			// upstream the submission exists for rejected or never confirmed it.
+			if (req.context?.[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY] === true && response.ok) {
+				return Response.json(
+					{ errors: [{ message: asTranslate(req.t)(keys.submissionActionFailed) }] },
+					{ status: 502 }
+				)
+			}
+			return response
 		}
 		req.context[VOTE_CHANGE_CONTEXT_KEY] = target.submissionId
 		// Slug-agnostic cast (the `createSubmission` idiom): a host's generated types pin the

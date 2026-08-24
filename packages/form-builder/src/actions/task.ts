@@ -6,14 +6,19 @@ import type { Translate } from '../fields/types'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 import { asFieldTranslate } from '../translations/server'
 import type { RichTextBodyOption } from './body/serializeBody'
-import type { ActionRegistry } from './registry'
+import { type ActionRegistry, isEssentialAction } from './registry'
 import type { ActionInstance, ActionResult } from './runActions'
 import { runActions } from './runActions'
 
 export const ACTIONS_TASK_SLUG = 'form-builder-actions'
 
 /** Input the dispatch path enqueues; the handler re-loads everything else from the DB. */
-export type ActionsTaskInput = { formId: number | string; submissionId: number | string }
+/** `subset` filters by the action definitions' `essential` flag; absent runs everything ('all'). */
+export type ActionsTaskInput = {
+	formId: number | string
+	submissionId: number | string
+	subset?: 'essential' | 'rest'
+}
 
 const asActions = (value: unknown): ActionInstance[] =>
 	Array.isArray(value) ? (value as ActionInstance[]) : []
@@ -89,8 +94,17 @@ export const runActionsForSubmission = async (args: {
 
 	const t: Translate = asFieldTranslate(req?.i18n?.t ?? ((key: string) => key))
 
+	const subset = input.subset ?? 'all'
+	const selected = asActions(form.actions).filter((instance) => {
+		if (subset === 'all') {
+			return true
+		}
+		const isEssential = isEssentialAction(registry, instance)
+		return subset === 'essential' ? isEssential : !isEssential
+	})
+
 	const results = await runActions({
-		actions: asActions(form.actions),
+		actions: selected,
 		registry,
 		richText,
 		form: { id: form.id, title: typeof form.title === 'string' ? form.title : undefined },
@@ -116,7 +130,9 @@ export const runActionsForSubmission = async (args: {
 	// row after the whole action pass, regardless of individual action success (every action already got
 	// the values). Best-effort: a delete failure is logged, never thrown. Uploads referenced in the values
 	// are host-owned and not cascaded (documented).
-	if (form.persistSubmissions === false) {
+	// Never on the essential pass: essential actions run first and their failure keeps the row (the
+	// dispatcher then skips this completion entirely), so pruning belongs to the closing pass alone.
+	if (subset !== 'essential' && form.persistSubmissions === false) {
 		await payload
 			.delete({ collection: FORM_SUBMISSIONS_SLUG, id: submission.id, overrideAccess: true, req })
 			.catch((error) => {

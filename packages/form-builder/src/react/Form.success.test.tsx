@@ -45,6 +45,26 @@ describe('Form success handling', () => {
 		expect(result?.response?.html).toContain('Thanks Ada')
 	})
 
+	it('reveals no required error when blurring a field right after a reset', async () => {
+		const required: FormFieldInstance[] = [
+			{ blockType: 'text', name: 'first', label: 'First', required: true },
+		]
+		render(
+			<Form
+				form={doc(required)}
+				successBehavior="reset"
+				onSubmit={vi.fn().mockResolvedValue({ ok: true, submissionId: 's1' })}
+			/>
+		)
+		const input = screen.getByLabelText('First', { exact: false })
+		fireEvent.change(input, { target: { value: 'Ada' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+		await waitFor(() => expect(input).toHaveValue(''))
+
+		fireEvent.blur(input)
+		expect(screen.queryByText(/required/i)).toBeNull()
+	})
+
 	it('passes the submitted answer values to onSuccess, without reserved keys', async () => {
 		const onSuccess = vi.fn()
 		render(

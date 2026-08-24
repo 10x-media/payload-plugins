@@ -125,3 +125,113 @@ describeForDb('form-builder action dispatch', { dbs: ['mongo'] }, (db) => {
 		})
 	})
 })
+
+describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+	const delivered: string[] = []
+	const events: FormEvent[] = []
+	let providerDown = false
+
+	const subscribe = defineAction({
+		type: 'subscribe',
+		label: 'Subscribe',
+		essential: true,
+		run: ({ values }) => {
+			if (providerDown) {
+				throw new Error('provider rejected')
+			}
+			delivered.push(String(values.find((v) => v.field === 'email')?.value))
+		},
+	})
+
+	const recorder = defineAction({
+		type: 'recorder',
+		label: 'Recorder',
+		run: () => {
+			delivered.push('recorder')
+		},
+	})
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: formBuilder({
+				actions: { subscribe, recorder },
+				events: { emit: (event) => void events.push(event) },
+			}),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const makeForm = () =>
+		booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Newsletter',
+				persistSubmissions: false,
+				fields: [{ blockType: 'email', name: 'email', label: 'Email' }],
+				actions: [{ blockType: 'subscribe' }, { blockType: 'recorder' }],
+			},
+		})
+
+	/** Drive the root POST endpoint the way a browser submit would (custom endpoint first). */
+	const submitViaRest = async (formId: number | string, email: string) => {
+		const endpoints = booted.payload.collections['form-submissions']?.config.endpoints
+		const endpoint = (Array.isArray(endpoints) ? endpoints : []).find(
+			(entry) => entry.method === 'post' && entry.path === '/'
+		)
+		if (!endpoint) throw new Error('no root POST endpoint registered')
+		const { createLocalReq } = await import('payload')
+		const req = await createLocalReq({}, booted.payload)
+		req.data = { form: formId, values: [{ field: 'email', value: email }] }
+		req.routeParams = { collection: 'form-submissions' }
+		const response = await endpoint.handler(req)
+		return { status: response.status, body: (await response.json()) as Record<string, unknown> }
+	}
+
+	const submissionCount = async (formId: number | string) =>
+		(
+			await booted.payload.count({
+				collection: 'form-submissions',
+				where: { form: { equals: formId } },
+			})
+		).totalDocs
+
+	it('delivers, prunes, and returns 201 when the essential action succeeds', async () => {
+		delivered.length = 0
+		events.length = 0
+		providerDown = false
+		const form = await makeForm()
+		const { status } = await submitViaRest(form.id, 'ada@example.com')
+		expect(status).toBe(201)
+		expect(delivered).toContain('ada@example.com')
+		await vi.waitFor(async () => {
+			expect(await submissionCount(form.id)).toBe(0)
+			expect(delivered).toContain('recorder')
+		})
+		expect(events.some((event) => event.type === 'submission.created')).toBe(true)
+	})
+
+	it('fails the response, keeps the row, and skips the rest when the provider rejects', async () => {
+		delivered.length = 0
+		events.length = 0
+		providerDown = true
+		try {
+			const form = await makeForm()
+			const { status, body } = await submitViaRest(form.id, 'lost@example.com')
+			expect(status).toBeGreaterThanOrEqual(500)
+			const message = (body.errors as { message?: string }[] | undefined)?.[0]?.message
+			expect(message).toBeTruthy()
+			expect(delivered).toEqual([])
+			// Kept despite persistSubmissions: false, so the address is recoverable by an operator.
+			expect(await submissionCount(form.id)).toBe(1)
+			// No created event either: a sink-driven automation must not treat a failed signup as one.
+			expect(events.some((event) => event.type === 'submission.created')).toBe(false)
+		} finally {
+			providerDown = false
+		}
+	})
+})

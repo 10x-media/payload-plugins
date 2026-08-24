@@ -5,9 +5,26 @@ import { type FormState, formReducer, initialFormState, seedFieldValues } from '
 const base: FormState = initialFormState({ a: '', b: 0 })
 
 describe('formReducer', () => {
-	it('SET_VALUE updates a field value', () => {
+	it('SET_VALUE updates a field value and marks it dirty', () => {
 		const next = formReducer(base, { type: 'SET_VALUE', name: 'a', value: 'hi' })
 		expect(next.values.a).toBe('hi')
+		expect(next.dirty.a).toBe(true)
+	})
+
+	it('RESET makes every field pristine again', () => {
+		const edited = formReducer(base, { type: 'SET_VALUE', name: 'a', value: 'hi' })
+		const next = formReducer(edited, { type: 'RESET', values: { a: '' } })
+		expect(next.dirty).toEqual({})
+		expect(next.touched).toEqual({})
+	})
+
+	it('REMOVE_REPEATER_ROW reindexes dirty composite keys like errors and touched', () => {
+		const start = {
+			...base,
+			dirty: { 'crew[0].name': true, 'crew[1].name': true, 'crew[2].name': true },
+		}
+		const next = formReducer(start, { type: 'REMOVE_REPEATER_ROW', name: 'crew', index: 1 })
+		expect(next.dirty).toEqual({ 'crew[0].name': true, 'crew[1].name': true })
 	})
 
 	it('TOUCH marks a field touched', () => {

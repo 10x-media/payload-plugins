@@ -302,6 +302,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fileRemove]: 'Remove',
 	[keys.spamRateLimited]: 'You have sent too many requests. Please try again later.',
 	[keys.spamRejected]: 'Your submission could not be processed.',
+	[keys.submissionActionFailed]:
+		'Your submission could not be completed. Please try again in a moment.',
 	[keys.spamCaptchaFailed]: 'Captcha verification failed. Please try again.',
 	[keys.contextInvalid]: 'This form could not be verified. Please reload the page and try again.',
 	[keys.collectionFormSingular]: 'Form',

@@ -61,7 +61,11 @@ export const submitForm = async (input: SubmitFormInput): Promise<SubmitFormResu
 		}
 		return { ok: false, message: body.errors?.[0]?.message ?? 'Validation failed' }
 	}
-	return { ok: false, message: `Request failed (${response.status})` }
+	// A non-400 failure can still carry a server-authored message worth showing verbatim, e.g. the
+	// translated essential-action rejection; fall back to the generic line when there is none.
+	const body = (await response.json().catch(() => ({}))) as ValidationErrorBody
+	const message = body.errors?.[0]?.message
+	return { ok: false, message: message ?? `Request failed (${response.status})` }
 }
 
 /** A consumer override for the transport: given the form id + values, resolve to a submit result. */

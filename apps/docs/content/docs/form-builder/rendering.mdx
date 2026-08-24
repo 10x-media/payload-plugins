@@ -106,7 +106,7 @@ The same shape covers TanStack Router (`navigate({ to: url, replace })`) and Rea
 
 ### Progressive validation
 
-Validation runs on blur, re-validates on change once a field is touched, then validates all visible fields on submit. Hidden fields ([`visibleWhen`](/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.
+Validation reveals on blur only once a field is dirty (its value changed since mount or the last reset), re-validates on change once revealed, then validates all visible fields on submit. Focusing a field and leaving it untouched says nothing, and a `successBehavior: 'reset'` makes every field pristine again, so clicking around a just-submitted form never scolds. Hidden fields ([`visibleWhen`](/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.
 
 Submission is also guarded against double activation: while a submit is in flight, a second click or an Enter-plus-click cannot reach the transport and POST twice. The disabled button is feedback on top of that guard, not the guard itself.
 
