@@ -54,6 +54,26 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 			expect(fromAddressesEndpoint()).toBeDefined()
 		})
 
+		it('registers the id-less route the selects call, sharing the legacy doc-scoped path', async () => {
+			const endpoints = booted.payload.collections.forms?.config.endpoints as
+				| Array<{ path: string; handler: (req: PayloadRequest) => Promise<Response> }>
+				| undefined
+			const idless = endpoints?.find((endpoint) => endpoint.path === '/from-addresses')
+			expect(idless).toBeDefined()
+			const { createLocalReq } = await import('payload')
+			const authed = await createLocalReq(
+				{ req: { user: { id: 1, collection: 'users', tenant: 'acme' } } as never },
+				booted.payload
+			)
+			const response = await idless?.handler(authed)
+			expect(response?.status).toBe(200)
+			const body = (await response?.json()) as { options?: unknown }
+			expect(body.options).toEqual(tenantOptions.acme)
+
+			const anonymous = await createLocalReq({}, booted.payload)
+			expect((await idless?.handler(anonymous))?.status).toBe(403)
+		})
+
 		it('returns 403 for an anonymous request to the endpoint', async () => {
 			const response = await fromAddressesEndpoint()?.handler({
 				user: undefined,

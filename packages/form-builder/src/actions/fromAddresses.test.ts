@@ -50,6 +50,13 @@ describe('buildFromField', () => {
 	it('carries a validate function', () => {
 		expect(typeof field.validate).toBe('function')
 	})
+
+	it('marks the select request-scoped so options load before the first save', () => {
+		const component = field.admin?.components?.Field as
+			| { clientProps?: { scope?: string } }
+			| undefined
+		expect(component?.clientProps?.scope).toBe('request')
+	})
 })
 
 describe('validateFromField', () => {

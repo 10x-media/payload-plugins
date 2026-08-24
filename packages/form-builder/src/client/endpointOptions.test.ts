@@ -23,6 +23,26 @@ describe('buildEndpointOptionsUrl', () => {
 			})
 		).toBe('/api/forms/a%2Fb%20c/poll-options')
 	})
+
+	it('omits the id segment for a request-scoped endpoint, with or without an id', () => {
+		expect(
+			buildEndpointOptionsUrl({
+				apiRoute: '/api',
+				collectionSlug: 'forms',
+				scope: 'request',
+				endpoint: 'from-addresses',
+			})
+		).toBe('/api/forms/from-addresses')
+		expect(
+			buildEndpointOptionsUrl({
+				apiRoute: '/api',
+				collectionSlug: 'forms',
+				scope: 'request',
+				id: 7,
+				endpoint: 'from-addresses',
+			})
+		).toBe('/api/forms/from-addresses')
+	})
 })
 
 describe('parseEndpointOptions', () => {

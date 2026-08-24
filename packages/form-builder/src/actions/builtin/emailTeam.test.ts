@@ -447,6 +447,15 @@ describe('emailTeam', () => {
 		const without = fieldNamed(buildEmailTeam({ localize: true }), 'to') as RecipField | undefined
 		expect(without?.admin?.components?.Field?.clientProps?.endpoint).toBeUndefined()
 	})
+
+	it('marks the departments endpoint request-scoped so options load before the first save', () => {
+		const withDepts = fieldNamed(buildEmailTeam({ localize: true, departments: () => [] }), 'to') as
+			| (RecipField & {
+					admin?: { components?: { Field?: { clientProps?: { scope?: string } } } }
+			  })
+			| undefined
+		expect(withDepts?.admin?.components?.Field?.clientProps?.scope).toBe('request')
+	})
 })
 
 describe('emailTeam recipient sources', () => {

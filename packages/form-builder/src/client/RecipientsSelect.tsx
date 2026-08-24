@@ -21,6 +21,7 @@ import { useTranslation } from '../translations/useTranslation'
 import {
 	buildEndpointOptionsUrl,
 	type EndpointOption,
+	type EndpointOptionsScope,
 	parseEndpointOptions,
 } from './endpointOptions'
 import type { FieldRow } from './synthesizeClientField'
@@ -33,6 +34,8 @@ export type RecipientsSelectProps = {
 	readOnly?: boolean
 	/** Endpoint subpath supplying preset address options (e.g. `'departments'`); omit for none. */
 	endpoint?: string
+	/** What the endpoint's options depend on; see {@link EndpointOptionsScope}. Default `'document'`. */
+	scope?: EndpointOptionsScope
 	/** Allow free-typed emails (default true). */
 	allowCustom?: boolean
 	/** Offer the form's own fields as recipient tokens (default true). */
@@ -108,12 +111,23 @@ export const RecipientsSelect = (props: RecipientsSelectProps) => {
 	const readOnly = props.readOnly === true || disabled === true
 	const [state, setState] = useState<FetchState>({ status: 'idle' })
 
+	const scope = props.scope ?? 'document'
+	// Request scope never puts the id in the URL; deriving undefined here keeps the effect from
+	// re-fetching when the first save assigns one.
+	const docId = scope === 'request' ? undefined : id
+
 	useEffect(() => {
-		if (!props.endpoint || id == null || !collectionSlug) {
+		if (!props.endpoint || !collectionSlug || (scope === 'document' && docId == null)) {
 			return
 		}
 		const controller = new AbortController()
-		const url = buildEndpointOptionsUrl({ apiRoute, collectionSlug, id, endpoint: props.endpoint })
+		const url = buildEndpointOptionsUrl({
+			apiRoute,
+			collectionSlug,
+			id: docId,
+			scope,
+			endpoint: props.endpoint,
+		})
 		setState({ status: 'loading' })
 		fetch(url, {
 			credentials: 'include',
@@ -132,7 +146,7 @@ export const RecipientsSelect = (props: RecipientsSelectProps) => {
 				}
 			})
 		return () => controller.abort()
-	}, [apiRoute, collectionSlug, id, props.endpoint])
+	}, [apiRoute, collectionSlug, docId, scope, props.endpoint])
 
 	const presetOptions: ReactSelectOption[] = state.status === 'loaded' ? state.options : []
 

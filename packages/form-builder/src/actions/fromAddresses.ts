@@ -130,9 +130,9 @@ export const validateFromField =
 
 /**
  * The `from` select shared by `emailTeam` and `confirmation`: an `EndpointOptionsSelect` backed by
- * the forms collection's `/:id/from-addresses` endpoint (registered only when `email.fromAddresses`
- * is set). That route's document id goes unused server-side: the option set is request-scoped, not
- * per-form, so this reuses the existing doc-scoped component as-is instead of adding an id-less mode.
+ * the forms collection's `/from-addresses` endpoint (registered when `email.fromAddresses` or
+ * `email.fromSources` is set). The option set is request-scoped, not per-form, so the select is
+ * marked `scope: 'request'` and its options load while the form is still being created.
  */
 export const buildFromField = (
 	resolver: FromAddressesResolver | undefined,
@@ -151,6 +151,7 @@ export const buildFromField = (
 				path: FROM_FIELD_REF,
 				clientProps: {
 					endpoint: 'from-addresses',
+					scope: 'request',
 					descriptionKey: keys.actionConfigFromDescription,
 				},
 			},
