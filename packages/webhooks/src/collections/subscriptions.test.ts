@@ -209,6 +209,20 @@ describe('buildSubscriptionsCollection', () => {
 			expect(data.previousSecretExpiresAt).toBeNull()
 		})
 
+		/**
+		 * A create that throws between the two hooks leaves its secret on the request. Without the
+		 * reset, the next create on that request would be handed the dead value as its
+		 * `generatedSecret`, and a caller who trusted it would hold a secret that signs nothing.
+		 */
+		it('does not carry the secret of a failed create onto the next one', () => {
+			const context: RequestContext = {}
+			runCreate(c, { data: {}, operation: 'create', context })
+			const supplied = `${SECRET_PREFIX}${'A'.repeat(44)}`
+			runCreate(c, { data: { secret: supplied }, operation: 'create', context })
+			const doc = runAfterChange(c, { doc: { id: '2' }, operation: 'create', context })
+			expect(GENERATED_SECRET_KEY in doc).toBe(false)
+		})
+
 		it('generates nothing on an update', () => {
 			const context: RequestContext = {}
 			const data = runCreate(c, { data: { name: 'n' }, operation: 'update', context })

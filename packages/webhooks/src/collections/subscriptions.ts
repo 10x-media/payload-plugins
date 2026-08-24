@@ -47,11 +47,16 @@ const EMPTY_SECRET_ERROR =
  * It is what Payload's duplicate action resubmits, from the row it copied, and two subscriptions
  * sharing one signing key is exactly what must not happen: the copy is given its own secret, and
  * none of the original's rotation state.
+ *
+ * The stash is cleared first rather than only after a successful create. A create that throws
+ * between here and `revealGeneratedSecret` leaves its secret on the request, and a later create on
+ * the same request would otherwise be handed that dead value as its `generatedSecret`.
  */
 const generateOnCreate: CollectionBeforeValidateHook = ({ collection, data, operation, req }) => {
 	if (operation !== 'create' || !data) {
 		return data
 	}
+	req.context[GENERATED_SECRET_CONTEXT] = undefined
 	const next = { ...data }
 	if (next.secret === '') {
 		throw new ValidationError(
