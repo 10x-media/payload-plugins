@@ -87,6 +87,8 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: posthogMetrics,
 		dimensions: posthogDimensions,
+		filters: new Set(),
+		filterOperators: new Set(['eq']),
 		batchPageReport: true,
 		rateLimit: { requestsPerMinute: 240, requestsPerHour: 2400 },
 		recommendedTtl: { realtime: 300, aggregate: 3600 },

@@ -81,6 +81,8 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: ga4Metrics,
 		dimensions: ga4Dimensions,
+		filters: new Set(),
+		filterOperators: new Set(['eq']),
 		batchPageReport: true,
 		rateLimit: { maxConcurrent: 10, quotaModel: 'tokens', readsCountAsUsage: true },
 		recommendedTtl: { realtime: 300, aggregate: 21600 },

@@ -72,6 +72,8 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: plausibleMetrics,
 		dimensions: plausibleDimensions,
+		filters: new Set(),
+		filterOperators: new Set(['eq']),
 		batchPageReport: true,
 		rateLimit: { requestsPerHour: 600 },
 		recommendedTtl: { realtime: 300, aggregate: 3600 },

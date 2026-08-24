@@ -33,6 +33,8 @@ const capabilities: AnalyticsCapabilities = {
 	maxLookbackDays: null,
 	metrics,
 	dimensions,
+	filters: new Set(),
+	filterOperators: new Set(['eq']),
 	batchPageReport: true,
 	rateLimit: null,
 	recommendedTtl: { realtime: 300, aggregate: 3600 },

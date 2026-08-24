@@ -21,6 +21,8 @@ const caps = (): AnalyticsCapabilities => ({
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(['source']),
+	filters: new Set(),
+	filterOperators: new Set(['eq']),
 	batchPageReport: false,
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },

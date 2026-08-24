@@ -22,6 +22,8 @@ const baseCaps = (minGranularity: Granularity = 'day'): AnalyticsCapabilities =>
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(),
+	filters: new Set(),
+	filterOperators: new Set(['eq']),
 	batchPageReport: false,
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },
