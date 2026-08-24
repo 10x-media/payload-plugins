@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { buildPollPath, toRealtimePoints } from './realtimePoll'
+import { buildPollPath, buildRealtimeEndpoint, toRealtimePoints } from './realtimePoll'
+
+describe('buildRealtimeEndpoint', () => {
+	it('builds the endpoint from the configured server URL and API route, not a hardcoded /api', () => {
+		expect(buildRealtimeEndpoint('https://example.com', '/api')).toBe(
+			'https://example.com/api/analytics/realtime'
+		)
+	})
+	it('respects a custom API route', () => {
+		expect(buildRealtimeEndpoint('https://example.com', '/custom-api')).toBe(
+			'https://example.com/custom-api/analytics/realtime'
+		)
+	})
+	it('omits the server URL when unset (relative fetch)', () => {
+		expect(buildRealtimeEndpoint(undefined, '/api')).toBe('/api/analytics/realtime')
+	})
+})
 
 describe('buildPollPath', () => {
 	it('builds the query string from the poll config', () => {

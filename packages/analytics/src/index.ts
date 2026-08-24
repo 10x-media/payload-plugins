@@ -152,6 +152,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				disabled: resolved.widgets.disabled,
 				register: resolved.widgets.register,
 				localizeText: resolved.widgets.localizeText,
+				defaultId: resolved.defaultAdapter,
 			})
 		}
 		if (resolved.cache.warm.enabled) {

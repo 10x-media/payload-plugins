@@ -4,10 +4,16 @@ import { SOURCES_PATH } from '../../plugin/paths'
 export interface WireSource {
 	id: string
 	label: string
+	kind: 'config' | 'runtime'
 	capabilities: SerializedCapabilities
 }
 
-const cache = new Map<string, Promise<WireSource[]>>()
+export interface SourcesResponse {
+	defaultId: string | null
+	sources: WireSource[]
+}
+
+const cache = new Map<string, Promise<SourcesResponse>>()
 
 /**
  * Fetch the caller-scope source list once per user per admin session and share
@@ -20,7 +26,7 @@ export const fetchSources = (
 	serverURL: string,
 	apiRoute: string,
 	userKey: string
-): Promise<WireSource[]> => {
+): Promise<SourcesResponse> => {
 	const url = `${serverURL}${apiRoute}${SOURCES_PATH}`
 	const key = `${userKey}:${url}`
 	const hit = cache.get(key)
@@ -28,9 +34,8 @@ export const fetchSources = (
 	const p = fetch(url, { credentials: 'include' })
 		.then((res) => {
 			if (!res.ok) throw new Error(`sources ${res.status}`)
-			return res.json() as Promise<{ sources: WireSource[] }>
+			return res.json() as Promise<SourcesResponse>
 		})
-		.then((body) => body.sources)
 		.catch((err) => {
 			cache.delete(key)
 			throw err

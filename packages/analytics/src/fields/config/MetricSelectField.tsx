@@ -1,69 +1,52 @@
 'use client'
 
-import {
-	type ReactSelectOption,
-	SelectInput,
-	useAuth,
-	useConfig,
-	useField,
-	useFormFields,
-} from '@payloadcms/ui'
+import { type ReactSelectOption, SelectInput, useField, useFormFields } from '@payloadcms/ui'
 import type { SelectFieldClientProps } from 'payload'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { CapabilityRequirement } from '../../core/capabilities'
 import { useTranslation } from '../../translations/useTranslation'
-import { fetchSources, type WireSource } from './fetchSources'
 import { narrowMetricOptions } from './narrow'
 import { toSelectOption } from './toSelectOption'
+import { useAnalyticsSources } from './useAnalyticsSources'
 
 export type MetricSelectFieldProps = SelectFieldClientProps & {
 	/** Extra capability requirement (beyond the picked metric) a widget's other config imposes, e.g. a breakdown dimension. */
 	requires?: Omit<CapabilityRequirement, 'metrics'>
+	/**
+	 * Path of the sibling source select this picker narrows against, for
+	 * custom widgets whose source field is named differently. Defaults to
+	 * `'dataSource'`.
+	 */
+	sourceFieldPath?: string
 }
 
 /**
  * Metric picker for scoped widget config: narrows the static option list to
- * what the sibling `dataSource` field's source can actually serve, once the
- * sources endpoint answers. Never clears an already-picked value that
+ * what the sibling source field's selected source can actually serve, once
+ * the sources endpoint answers. Never clears an already-picked value that
  * narrowing filters out; the read path degrades that case on its own.
  */
 export const MetricSelectField = (props: MetricSelectFieldProps) => {
-	const { field, path, readOnly, requires } = props
+	const { field, path, readOnly, requires, sourceFieldPath = 'dataSource' } = props
 	const { i18n } = useTranslation()
 	const locale = i18n.language
 	const { setValue, showError, value } = useField<string>({ path })
-	const { user } = useAuth()
-	const {
-		config: {
-			routes: { api },
-			serverURL,
-		},
-	} = useConfig()
-	const sourceId = useFormFields(([fields]) => fields?.dataSource?.value as string | undefined)
+	const { sources } = useAnalyticsSources()
+	const sourceId = useFormFields(
+		([fields]) => fields?.[sourceFieldPath]?.value as string | undefined
+	)
 
 	const staticOptions = useMemo(
 		() => field.options.map((option) => toSelectOption(option, locale)),
 		[field.options, locale]
 	)
-	const [sources, setSources] = useState<WireSource[]>([])
-	const userKey = String(user?.id ?? '')
 
-	useEffect(() => {
-		if (!userKey) return
-		let cancelled = false
-		fetchSources(serverURL ?? '', api, userKey)
-			.then((fetched) => {
-				if (!cancelled) setSources(fetched)
-			})
-			.catch(() => {})
-		return () => {
-			cancelled = true
-		}
-	}, [api, serverURL, userKey])
-
-	const options = narrowMetricOptions({ options: staticOptions, requires, sourceId, sources }).map(
-		(option) => ({ label: option.label as string, value: option.value })
-	)
+	const options = narrowMetricOptions({
+		options: staticOptions,
+		requires,
+		sourceId,
+		sources: sources ?? [],
+	}).map((option) => ({ label: option.label as string, value: option.value }))
 
 	return (
 		<SelectInput

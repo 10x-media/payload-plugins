@@ -36,6 +36,8 @@ export interface RegisterWidgetsArgs {
 	disabled: string[]
 	register: CustomWidgetDef[]
 	localizeText?: boolean
+	/** The plugin's configured defaultAdapter, when set; falls back to the first adapter. */
+	defaultId?: string
 }
 
 interface WidgetDef {
@@ -136,7 +138,7 @@ const dataSourceField = (args: RegisterWidgetsArgs): Field => ({
 	name: 'dataSource',
 	type: 'select',
 	label: labelForKey(keys.widgetFieldDataSource),
-	defaultValue: args.adapters[0]?.id,
+	defaultValue: args.defaultId ?? args.adapters[0]?.id,
 	admin: {
 		// Clearing would leave no source; the widget always reads through one.
 		isClearable: false,

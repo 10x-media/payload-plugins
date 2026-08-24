@@ -9,6 +9,7 @@ const source = (
 ): WireSource => ({
 	id,
 	label: id,
+	kind: 'config',
 	capabilities: {
 		perPageQuery: true,
 		realtime: false,
@@ -17,9 +18,6 @@ const source = (
 		maxLookbackDays: null,
 		metrics: metrics as WireSource['capabilities']['metrics'],
 		dimensions: [],
-		batchPageReport: true,
-		rateLimit: null,
-		recommendedTtl: { realtime: 300, aggregate: 3600 },
 		...extra,
 	},
 })

@@ -2,7 +2,9 @@
 
 export { BarList, type BarListProps } from '../charts/BarList'
 export { TrendChart, type TrendChartProps } from '../charts/TrendChart'
-export { MetricSelectField } from '../fields/config/MetricSelectField'
+export type { WireSource } from '../fields/config/fetchSources'
+export { MetricSelectField, type MetricSelectFieldProps } from '../fields/config/MetricSelectField'
 export { SourceSelectField } from '../fields/config/SourceSelectField'
+export { useAnalyticsSources } from '../fields/config/useAnalyticsSources'
 export { DateRangeField } from '../fields/dateRange/ui'
 export { RealtimeCounter } from '../widgets/RealtimeCounter'

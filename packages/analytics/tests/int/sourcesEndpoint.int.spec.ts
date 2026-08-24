@@ -56,7 +56,13 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 		({ user, payload: booted.payload }) as unknown as PayloadRequest
 
 	type SourcesBody = {
-		sources: Array<{ id: string; label: string; capabilities: { metrics: unknown } }>
+		defaultId: string | null
+		sources: Array<{
+			id: string
+			label: string
+			kind: 'config' | 'runtime'
+			capabilities: { metrics: unknown }
+		}>
 	}
 
 	it('401s an anonymous request', async () => {
@@ -64,12 +70,14 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(res.status).toBe(401)
 	})
 
-	it('lists config adapters with serialized capabilities', async () => {
+	it('lists config adapters with serialized capabilities and reports the registry default', async () => {
 		const res = await handler(reqFor(userC))
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as SourcesBody
+		expect(body.defaultId).toBe('memory')
 		const memory = body.sources.find((s) => s.id === 'memory')
 		expect(memory).toBeDefined()
+		expect(memory?.kind).toBe('config')
 		expect(Array.isArray(memory?.capabilities.metrics)).toBe(true)
 	})
 
@@ -92,6 +100,7 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 			const source = body.sources.find((s) => s.id === `plausible:${doc.id}`)
 			expect(source).toBeDefined()
 			expect(source?.label).toBe('A plausible')
+			expect(source?.kind).toBe('runtime')
 		} finally {
 			await booted.payload.delete({ collection: SLUG as never, id: doc.id, overrideAccess: true })
 		}

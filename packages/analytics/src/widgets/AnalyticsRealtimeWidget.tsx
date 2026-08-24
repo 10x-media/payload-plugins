@@ -1,12 +1,12 @@
 import type { WidgetServerProps } from 'payload'
 import type { MetricKey } from '../core/contract'
-import { REALTIME_PATH } from '../plugin/realtimeEndpoint'
 import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { cardStyle, labelStyle } from './cardChrome'
 import { RealtimeCounter } from './RealtimeCounter'
 import { readForWidgetRealtime, type WidgetRealtimeStatus } from './readForWidgetRealtime'
+import { buildRealtimeEndpoint } from './realtimePoll'
 
 const STATE_KEY: Record<Exclude<WidgetRealtimeStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
@@ -52,7 +52,10 @@ export default async function AnalyticsRealtimeWidget(props: WidgetServerProps) 
 		<div className="analytics-realtime-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
 			<RealtimeCounter
-				endpoint={`/api${REALTIME_PATH}`}
+				endpoint={buildRealtimeEndpoint(
+					props.req.payload.config.serverURL,
+					props.req.payload.config.routes.api
+				)}
 				intervalMs={POLL_INTERVAL_MS}
 				metric={metric}
 				windowMinutes={windowMinutes}

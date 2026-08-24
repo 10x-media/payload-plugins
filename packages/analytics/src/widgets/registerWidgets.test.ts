@@ -78,6 +78,35 @@ describe('registerWidgets', () => {
 		])
 	})
 
+	it('defaults the data-source field to the first adapter when defaultId is unset', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native(), memoryAdapter()],
+			multiProvider: true,
+			disabled: [],
+			register: [],
+		})
+		const field = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'dataSource')
+		expect(field && 'defaultValue' in field && field.defaultValue).toBe('native')
+	})
+
+	it('defaults the data-source field to defaultId when set', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native(), memoryAdapter()],
+			multiProvider: true,
+			disabled: [],
+			register: [],
+			defaultId: 'memory',
+		})
+		const field = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'dataSource')
+		expect(field && 'defaultValue' in field && field.defaultValue).toBe('memory')
+	})
+
 	it('renders the data-source field through SourceSelectField', () => {
 		const config = bareConfig()
 		registerWidgets(config, {

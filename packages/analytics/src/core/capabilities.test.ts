@@ -31,7 +31,7 @@ describe('satisfiesCapabilities', () => {
 })
 
 describe('serializeCapabilities', () => {
-	it('turns the metric and dimension sets into arrays and keeps everything else', () => {
+	it('turns the metric and dimension sets into arrays and keeps the wire fields', () => {
 		const caps: AnalyticsCapabilities = {
 			perPageQuery: true,
 			realtime: true,
@@ -49,11 +49,11 @@ describe('serializeCapabilities', () => {
 		expect(wire.metrics).toEqual(['pageviews', 'visitors'])
 		expect(wire.dimensions).toEqual(['page'])
 		expect(wire.realtime).toBe(true)
-		expect(wire.recommendedTtl).toEqual({ realtime: 10, aggregate: 300 })
+		expect(wire.realtimeWindowMinutes).toBe(60)
 		expect(JSON.parse(JSON.stringify(wire))).toEqual(wire)
 	})
 
-	it('carries optional flags through', () => {
+	it('serializes to exactly the allowlisted keys, dropping adapter-internal fields', () => {
 		const caps: AnalyticsCapabilities = {
 			perPageQuery: false,
 			realtime: false,
@@ -67,7 +67,38 @@ describe('serializeCapabilities', () => {
 			recommendedTtl: { realtime: 300, aggregate: 3600 },
 			scopedQueries: true,
 		}
-		expect(serializeCapabilities(caps).scopedQueries).toBe(true)
-		expect(serializeCapabilities(caps).metrics).toEqual([])
+		const wire = serializeCapabilities(caps)
+		expect(Object.keys(wire).sort()).toEqual(
+			[
+				'comparison',
+				'dimensions',
+				'maxLookbackDays',
+				'metrics',
+				'minGranularity',
+				'perPageQuery',
+				'realtime',
+			].sort()
+		)
+		expect(wire.metrics).toEqual([])
+		expect((wire as Record<string, unknown>).rateLimit).toBeUndefined()
+		expect((wire as Record<string, unknown>).recommendedTtl).toBeUndefined()
+		expect((wire as Record<string, unknown>).batchPageReport).toBeUndefined()
+		expect((wire as Record<string, unknown>).scopedQueries).toBeUndefined()
+	})
+
+	it('omits realtimeWindowMinutes from the wire object when unset', () => {
+		const caps: AnalyticsCapabilities = {
+			perPageQuery: true,
+			realtime: false,
+			comparison: true,
+			minGranularity: 'day',
+			maxLookbackDays: null,
+			metrics: new Set(),
+			dimensions: new Set(),
+			batchPageReport: true,
+			rateLimit: null,
+			recommendedTtl: { realtime: 300, aggregate: 3600 },
+		}
+		expect('realtimeWindowMinutes' in serializeCapabilities(caps)).toBe(false)
 	})
 })

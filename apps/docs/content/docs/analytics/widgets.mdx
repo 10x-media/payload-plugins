@@ -117,3 +117,5 @@ export default async function TopSourcesWidget(props: WidgetServerProps) {
 ```
 
 Run `payload generate:importmap` after registering. The widget appears only when a configured adapter satisfies its `requires` gate, exactly like the built-ins.
+
+A custom widget's own config fields can reuse the same live pickers: `MetricSelectField` and `SourceSelectField` from `@10x-media/analytics/client`, or the `useAnalyticsSources` hook directly for a bespoke picker. `MetricSelectField` narrows against a sibling source field named `dataSource` by default; pass `sourceFieldPath` when a custom field layout names it something else.

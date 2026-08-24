@@ -18,7 +18,7 @@ export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 	}
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return Response.json({ sources: [] })
+		return Response.json({ defaultId: null, sources: [] })
 	}
 	try {
 		const scope = await resolveScopeFor(runtime, req)
@@ -26,16 +26,18 @@ export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 		const sources = registry.all().map((a) => ({
 			id: a.id,
 			label: a.label,
+			kind: runtime.configAdapterIds.has(a.id) ? ('config' as const) : ('runtime' as const),
 			capabilities: serializeCapabilities(a.capabilities),
 		}))
-		return Response.json({ sources })
+		return Response.json({ defaultId: registry.default().id, sources })
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: sources listing failed: ${String(err)}`)
 		const sources = runtime.registry.all().map((a) => ({
 			id: a.id,
 			label: a.label,
+			kind: 'config' as const,
 			capabilities: serializeCapabilities(a.capabilities),
 		}))
-		return Response.json({ sources })
+		return Response.json({ defaultId: runtime.registry.default().id, sources })
 	}
 }
