@@ -112,6 +112,14 @@ export const consentSourcesField = (options: ConsentSourcesFieldOptions = {}): A
 				...(options.editor ? { editor: options.editor } : {}),
 				...localizedIf(localize),
 			},
+			{
+				name: 'noticeStatement',
+				type: 'richText',
+				label: labelForKey(keys.consentSourceNoticeStatement),
+				admin: { description: labelForKey(keys.consentSourceNoticeStatementDescription) },
+				...(options.editor ? { editor: options.editor } : {}),
+				...localizedIf(localize),
+			},
 			...pageField,
 		],
 	}

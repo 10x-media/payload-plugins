@@ -116,6 +116,14 @@ describe('formReducer', () => {
 })
 
 describe('seedFieldValues', () => {
+	it('seeds a notice-display consent as true, so dependent conditions agree with the server', () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'consent', name: 'news', display: 'notice' },
+			{ blockType: 'consent', name: 'terms' },
+		]
+		expect(seedFieldValues(fields)).toEqual({ news: true, terms: undefined })
+	})
+
 	it('seeds a repeater with a positive minRows as that many empty rows', () => {
 		const fields: FormFieldInstance[] = [
 			{ blockType: 'repeater', name: 'members', minRows: 2, subFields: [] },

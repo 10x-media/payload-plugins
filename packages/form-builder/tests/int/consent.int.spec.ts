@@ -45,6 +45,7 @@ type SettingsRow = {
 	id?: string | number | null
 	name?: string | null
 	statement?: unknown
+	noticeStatement?: unknown
 	page?: { relationTo: string; value: unknown } | null
 }
 
@@ -74,6 +75,7 @@ const sources: ConsentSourcesResolver = async ({ req }) => {
 			id: String(row.id),
 			...(row.name ? { name: row.name } : {}),
 			...(row.statement != null ? { statement: row.statement } : {}),
+			...(row.noticeStatement != null ? { noticeStatement: row.noticeStatement } : {}),
 			...(page ? { page: { relationTo: page.relationTo, id: page.value as number | string } } : {}),
 			url: `https://example.com/${String(row.id)}`,
 		}
@@ -122,6 +124,7 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 				{
 					name: 'Privacy policy',
 					statement: statement('I agree to the privacy policy'),
+					noticeStatement: statement('By subscribing, you agree to the privacy policy'),
 					page: { relationTo: 'pages', value: pageId },
 				},
 				{
@@ -371,6 +374,34 @@ describeForDb('form-builder consent sources', { dbs: ['mongo'] }, (db) => {
 					data: { form: form.id, values: [] },
 				})
 			).rejects.toThrow()
+		})
+
+		it('a notice-display consent consents by submitting and proves the notice wording', async () => {
+			const form = await booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Newsletter signup',
+					fields: [
+						{
+							blockType: 'consent',
+							name: 'terms',
+							source: privacySourceId,
+							required: true,
+							display: 'notice',
+						},
+					],
+				},
+			})
+			const submission = await booted.payload.create({
+				collection: 'form-submissions',
+				depth: 0,
+				data: { form: form.id, values: [] },
+			})
+			const proof = proofOf(submission)
+			expect(proof.agreed).toBe(true)
+			expect(proof.display).toBe('notice')
+			expect(proof.statementText).toBe('By subscribing, you agree to the privacy policy')
+			expect(proof.source).toBe(privacySourceId)
 		})
 
 		it('stores an agreed:false proof for a consent field that is not required', async () => {
