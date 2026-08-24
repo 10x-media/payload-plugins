@@ -1,5 +1,11 @@
 import { withEncryptedQueryRewrite } from '@10x-media/fields/encrypted'
-import { type Config, type Endpoint, Forbidden, type PayloadRequest } from 'payload'
+import {
+	type CollectionSlug,
+	type Config,
+	type Endpoint,
+	Forbidden,
+	type PayloadRequest,
+} from 'payload'
 
 import { buildDeliveriesCollection } from '../collections/deliveries'
 import { buildSubscriptionsCollection } from '../collections/subscriptions'
@@ -20,7 +26,6 @@ import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { RotationConflictError, rotateSubscriptionSecret } from '../secrets/rotate'
 import { applyCollectionOverride } from './applyCollectionOverride'
 import { resolveMode } from './resolveMode'
-import { asSlug } from './slug'
 
 /**
  * Reject a malformed code-subscription secret at config build rather than at delivery. A secret
@@ -93,7 +98,7 @@ const canUpdateSubscription = async (args: {
 	id: string
 }): Promise<boolean> => {
 	const { req, slug, id } = args
-	const access = req.payload.collections?.[asSlug(slug)]?.config?.access?.update
+	const access = req.payload.collections?.[slug as CollectionSlug]?.config?.access?.update
 	if (!access) {
 		return true
 	}
@@ -110,7 +115,7 @@ const canUpdateSubscription = async (args: {
 		return result
 	}
 	const scoped = await req.payload.find({
-		collection: asSlug(slug),
+		collection: slug as CollectionSlug,
 		where: { and: [{ id: { equals: id } }, result] },
 		limit: 1,
 		depth: 0,

@@ -8,18 +8,6 @@ const STATUS_CELL = '@10x-media/webhooks/client#DeliveryStatusCell'
 
 const loggedIn = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
 
-/**
- * The stored fields the delivery pipeline reads back off a row. Payload resolves a document type
- * from the collection slug, which is a runtime option here, so the shape is declared rather than
- * inferred (see `asRow`).
- */
-export type DeliveryRow = {
-	subscriptionId?: string | null
-	endpoint?: string | null
-	event?: string | null
-	payload?: Record<string, unknown> | null
-}
-
 /** Runner-written delivery audit log; read-only in admin, server writes use overrideAccess. */
 export const buildDeliveriesCollection = (args: {
 	slug: string

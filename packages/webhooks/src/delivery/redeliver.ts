@@ -1,10 +1,8 @@
-import type { Payload, PayloadRequest } from 'payload'
+import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payload'
 
-import type { DeliveryRow } from '../collections/deliveries'
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription } from '../options'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
-import { asRow, asSlug } from '../plugin/slug'
 import { sendDelivery } from './sendDelivery'
 
 /** Dependencies for re-dispatching a stored delivery. */
@@ -25,14 +23,14 @@ export const redeliverDelivery = async (args: {
 	req: PayloadRequest
 }): Promise<{ id: string }> => {
 	const { deps, deliveryId, payload, req } = args
-	const original = asRow<DeliveryRow>(
-		await payload.findByID({
-			collection: asSlug(deps.deliveriesSlug),
-			id: deliveryId,
-			overrideAccess: true,
-			req,
-		})
-	)
+	// The slug is a runtime option, so Payload cannot resolve a document type from it; `JsonObject`
+	// is its own shape for exactly that case.
+	const original: JsonObject = await payload.findByID({
+		collection: deps.deliveriesSlug as CollectionSlug,
+		id: deliveryId,
+		overrideAccess: true,
+		req,
+	})
 	// Resolved up front (cheap) so the new row's endpoint reflects the subscription's current URL
 	// rather than whatever was stored at the time of the original delivery.
 	const subscription = await resolveSubscriptionById({
@@ -43,7 +41,7 @@ export const redeliverDelivery = async (args: {
 		req,
 	})
 	const created = await payload.create({
-		collection: asSlug(deps.deliveriesSlug),
+		collection: deps.deliveriesSlug as CollectionSlug,
 		data: {
 			subscriptionId: original.subscriptionId,
 			endpoint: subscription?.url ?? original.endpoint,
@@ -71,7 +69,7 @@ export const redeliverDelivery = async (args: {
 	const decision = decideDelivery(subscription)
 	if (!decision.deliverable) {
 		await payload.update({
-			collection: asSlug(deps.deliveriesSlug),
+			collection: deps.deliveriesSlug as CollectionSlug,
 			id: newId,
 			data: { status: 'dead', error: decision.reason },
 			overrideAccess: true,
@@ -88,7 +86,7 @@ export const redeliverDelivery = async (args: {
 		now: Date.now(),
 	})
 	await payload.update({
-		collection: asSlug(deps.deliveriesSlug),
+		collection: deps.deliveriesSlug as CollectionSlug,
 		id: newId,
 		data: {
 			status: result.ok ? 'success' : 'dead',

@@ -1,5 +1,11 @@
 import { withRawEncrypted } from '@10x-media/fields/encrypted'
-import type { CollectionAfterChangeHook, CollectionAfterDeleteHook, PayloadRequest } from 'payload'
+import type {
+	CollectionAfterChangeHook,
+	CollectionAfterDeleteHook,
+	CollectionSlug,
+	JsonObject,
+	PayloadRequest,
+} from 'payload'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import { buildPayload } from '../delivery/buildPayload'
@@ -13,7 +19,6 @@ import {
 	resolveCollectionRow,
 	type SubscriptionRow,
 } from '../plugin/resolveSubscriptions'
-import { asRow, asSlug } from '../plugin/slug'
 import { eventId } from './eventTypes'
 
 /** Per-collection dispatch dependencies. */
@@ -53,7 +58,7 @@ const resolveListening = async (args: {
 	const code = args.deps.codeSubscriptions.map(fromCodeSubscription)
 	const read = () =>
 		payload.find({
-			collection: asSlug(args.deps.subscriptionsSlug),
+			collection: args.deps.subscriptionsSlug as CollectionSlug,
 			where: {
 				and: [{ enabled: { not_equals: false } }, { events: { in: [args.event] } }],
 			},
@@ -69,11 +74,14 @@ const resolveListening = async (args: {
 			`@10x-media/webhooks: subscription scan hit the ${SUBSCRIPTION_SCAN_LIMIT} cap; some subscriptions may be skipped for ${args.event}.`
 		)
 	}
+	// `JsonObject` is Payload's own shape for a document whose collection is not statically known,
+	// which is the case for every slug this plugin is handed.
+	const docs: JsonObject[] = res.docs
 	const collection = await Promise.all(
-		res.docs.map((d) =>
+		docs.map((row) =>
 			resolveCollectionRow({
 				payload,
-				row: asRow<SubscriptionRow>(d),
+				row: row as SubscriptionRow,
 				subscriptionsSlug: args.deps.subscriptionsSlug,
 			})
 		)
@@ -102,7 +110,7 @@ const dispatch = async (args: {
 	const occurredAt = new Date().toISOString()
 	for (const subscription of subscriptions) {
 		const created = await payload.create({
-			collection: asSlug(deps.deliveriesSlug),
+			collection: deps.deliveriesSlug as CollectionSlug,
 			data: {
 				subscriptionId: subscription.id,
 				endpoint: subscription.url,
@@ -125,7 +133,7 @@ const dispatch = async (args: {
 			req,
 		})
 		await payload.update({
-			collection: asSlug(deps.deliveriesSlug),
+			collection: deps.deliveriesSlug as CollectionSlug,
 			id: deliveryId,
 			data: { payload: body },
 			overrideAccess: true,
@@ -144,7 +152,7 @@ const dispatch = async (args: {
 		const decision = decideDelivery(subscription)
 		if (!decision.deliverable) {
 			await payload.update({
-				collection: asSlug(deps.deliveriesSlug),
+				collection: deps.deliveriesSlug as CollectionSlug,
 				id: deliveryId,
 				data: { status: 'dead', error: decision.reason },
 				overrideAccess: true,
@@ -164,7 +172,7 @@ const dispatch = async (args: {
 				now: Date.now(),
 			})
 			await payload.update({
-				collection: asSlug(deps.deliveriesSlug),
+				collection: deps.deliveriesSlug as CollectionSlug,
 				id: deliveryId,
 				data: {
 					status: result.ok ? 'success' : 'dead',

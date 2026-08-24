@@ -1,8 +1,13 @@
 import { readEncryptedField } from '@10x-media/fields/encrypted'
-import { commitTransaction, killTransaction, type Payload, type PayloadRequest } from 'payload'
+import {
+	type CollectionSlug,
+	commitTransaction,
+	killTransaction,
+	type Payload,
+	type PayloadRequest,
+} from 'payload'
 
 import { resolveSecretRotationOptions } from '../options'
-import { asSlug } from '../plugin/slug'
 import { generateSecret, normalizeSecret } from './format'
 import { recoverSecret } from './recover'
 
@@ -88,7 +93,7 @@ const currentSecret = async (args: {
 	id: string
 }): Promise<{ stored: string | null; plaintext: string | null }> => {
 	const handle = await readEncryptedField(args.payload, {
-		collection: asSlug(args.subscriptionsSlug),
+		collection: args.subscriptionsSlug as CollectionSlug,
 		id: args.id,
 		path: 'secret',
 		req: args.req,
@@ -149,7 +154,7 @@ export const rotateSubscriptionSecret = async (args: {
 		const expiresAt = keepPrevious ? new Date(now + graceSeconds * 1000).toISOString() : null
 
 		const result = await payload.update({
-			collection: asSlug(subscriptionsSlug),
+			collection: subscriptionsSlug as CollectionSlug,
 			where: {
 				and: [
 					{ id: { equals: id } },
@@ -157,7 +162,7 @@ export const rotateSubscriptionSecret = async (args: {
 				],
 			},
 			// Retiring a slot means writing null, which a generated document type models as merely
-			// optional rather than nullable, so the write is passed opaquely (see `asSlug`).
+			// optional rather than nullable, so the write is passed opaquely, as the other plugins do.
 			data: {
 				secret: next,
 				previousSecret: keepPrevious ? outgoing : null,
