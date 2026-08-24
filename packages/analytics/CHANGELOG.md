@@ -1,5 +1,13 @@
 # @10x-media/analytics
 
+## 0.1.0-beta.4
+
+### Minor Changes
+
+- **Breaking:** runtime provider adapters now carry per-document instance ids (`posthog:<docId>`) instead of the plain provider id, so one scope can run several projects of the same provider type. The replace-by-id override rule is gone: runtime adapters append to the scope registry alongside config adapters (config adapters win id collisions), and a tenant preferring their own project selects it as the widget data source. Stored widget `dataSource` values and sync-tier `source` rows that referenced a runtime provider by its old plain id no longer resolve; reselect the source in affected widgets and expect new `source` values in `analytics-daily`. A sync tier filtered to a runtime provider's old plain id via sync.adapters no longer matches it; instance ids are per-document, so filter on config adapter ids or drop the filter. The adapter label shown in pickers is the provider document's `name`.
+
+- **Breaking:** tenant-safe provider store. The `analytics-providers` collection now has scope-aware default access (a tenant only sees and manages their own provider documents; unscoped installs are unchanged), stamps the document scope server-side, requires a `name`, and stores credentials encrypted at rest via `@10x-media/fields` (write-only: secrets never leave the server; a short hint identifies the stored key). `@10x-media/fields` is a new optional peer dependency, required when `providers.collection` is enabled. The secret masking flow (`__redacted__` round-trip) is gone. Existing plaintext credentials keep working and seal on next save; bulk-encrypt with `encryptExistingData` from `@10x-media/fields/encrypted`. The plugin factory is also now async, breaking only for programmatic callers that invoke the plugin function directly outside `buildConfig` (which already awaits plugins).
+
 ## 0.1.0-beta.3
 
 ### Patch Changes
