@@ -222,8 +222,8 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 	it('validates encryption keys at boot', async () => {
 		// Wiring coverage: all healthy boots in this describe block execute onInit with
 		// providers.collection enabled, so onInit failure here would reject the entire
-		// boot above (line 15-19). This test verifies the failure path leak-free by
-		// calling validateEncryptedBoot directly against the booted payload.
+		// boot in this describe block's beforeAll. This test verifies the failure path
+		// leak-free by calling validateEncryptedBoot directly against the booted payload.
 		const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
 		await expect(
 			validateEncryptedBoot(booted.payload, {

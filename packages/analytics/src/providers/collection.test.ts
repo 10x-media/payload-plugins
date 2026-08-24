@@ -7,12 +7,25 @@ import type {
 import { describe, expect, it } from 'vitest'
 import type { BuildProvidersCollectionArgs, BuildSecretField } from './collection'
 import { buildProvidersCollection } from './collection'
+import { SECRET_PATHS } from './secrets'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
 	fields?.find((f) => 'name' in f && f.name === name)
 
 /** Echoes the source field back with a marker so tests can assert delegation. */
 const fakeBuildSecret: BuildSecretField = (source) => [{ ...source, custom: { fake: source.type } }]
+
+type TaggedField = Field & { custom?: { fake?: unknown } }
+
+/** Walks the built field tree and collects `<group>.<field>` paths for every field the fake buildSecret tagged. */
+const collectTaggedPaths = (fields: Field[] | undefined, prefix: string[] = []): string[] =>
+	(fields ?? []).flatMap((field) => {
+		const tagged = field as TaggedField
+		const path = 'name' in field && field.name ? [...prefix, field.name] : prefix
+		const own = tagged.custom?.fake ? [path.join('.')] : []
+		const nested = 'fields' in field ? collectTaggedPaths(field.fields, path) : []
+		return [...own, ...nested]
+	})
 
 const unscopedArgs: Pick<
 	BuildProvidersCollectionArgs,
@@ -74,6 +87,11 @@ describe('buildProvidersCollection', () => {
 		expect((privateKey as { custom?: Record<string, unknown> } | undefined)?.custom).toEqual({
 			fake: 'textarea',
 		})
+	})
+
+	it('keeps SECRET_PATHS in parity with the collection secret fields', () => {
+		const taggedPaths = collectTaggedPaths(collection.fields)
+		expect(new Set(taggedPaths)).toEqual(new Set(SECRET_PATHS.map((s) => s.path)))
 	})
 
 	it('invokes onChange from afterChange and afterDelete hooks', async () => {

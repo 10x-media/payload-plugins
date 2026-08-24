@@ -8,6 +8,7 @@ import { stampScope } from './stampScope'
 
 export const PROVIDERS_SLUG = 'analytics-providers'
 
+/** Builds the sealed variant of a secret source field; injected so the fields peer stays lazy. */
 export type BuildSecretField = (source: TextField | TextareaField) => Field[]
 
 export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
