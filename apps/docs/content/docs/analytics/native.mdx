@@ -12,7 +12,7 @@ import { native } from '@10x-media/analytics/adapters/native'
 analytics({ adapters: [native()] })
 ```
 
-Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`. Dimensions: `page`, `country`, `source`, `device`. Realtime is supported.
+Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`. Dimensions: `page`, `country`, `source`, `device`, `event`. Realtime is supported.
 
 ## The ingest endpoint
 
@@ -61,6 +61,16 @@ mongooseAdapter({ url: process.env.DATABASE_URI, ensureIndexes: true })
 
 On Postgres the unique index comes from migrations; nothing extra is needed once they have run.
 
+## Filters and hour granularity
+
+`AnalyticsQuery.filters` narrows a read to matching raw events, honored on `page`, `country`, `region`, `city`, `device`, `source`, and `event` with the `eq` and `contains` operators (`contains` is case-insensitive on both Mongo and Postgres; a `matches` filter is dropped, since native has no regex engine over stored events). `granularity: 'hour'` buckets a series into UTC hours instead of days.
+
+Both a filtered read and an hour-granularity read bypass the day-bucketed rollups and aggregate raw events directly, so they are bounded by [retention](#retention-pruning): a range reaching further back than `retentionDays` is clamped, and the read is capped at the same 50,000-event window as realtime, past which `meta.sampled` reports `true`. An unfiltered, day-granularity read still comes from the exact rollup buckets and has no such cap. Hour buckets floor to the UTC hour regardless of `reportingTimezone`; day buckets stay timezone-aligned. `binding.hostname` (see [display fields](/analytics/display-fields)) filters both paths.
+
+## Hostname buckets
+
+Rollups are keyed by hostname: every delta write emits both a hostname-less bucket family and a per-hostname family, so `binding.hostname` filters native reads with exact unique counts instead of an approximation. This doubles rollup storage for installs that ingest from more than one hostname, one extra bucket set per distinct hostname.
+
 ## Geo resolution
 
 The engine resolves country, region, and city per event: platform headers first (Vercel, Cloudflare), MaxMind only when headers do not supply a country. Pass `geoDbPath` for MaxMind or `geoResolver` for a custom pipeline. Details on [Geo](/analytics/geo).
@@ -74,6 +84,42 @@ native({ retentionDays: 90 })
 ```
 
 This registers a Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) that deletes raw `analytics-events` and `analytics-seen` rows older than the window. Rollups are untouched, so long-range aggregates survive pruning. Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler).
+
+## Upgrading an existing install
+
+The hostname bucket family above adds a required `hostname` column to `analytics-rollups`; the [sync tier](/analytics/sync) separately adds a required `scope` column to its collection. Existing installs need a migration backfilling both to `''` (the hostname-less / no-scope sentinel):
+
+```ts
+import type { MigrateUpArgs } from '@payloadcms/db-mongodb'
+
+export async function up({ payload }: MigrateUpArgs): Promise<void> {
+  if (payload.db.name === 'mongoose') {
+    const db = payload.db as unknown as {
+      collections: Record<string, { collection: { updateMany: (f: object, u: object) => Promise<unknown> } }>
+    }
+    await db.collections['analytics-rollups']?.collection.updateMany(
+      { hostname: { $exists: false } },
+      { $set: { hostname: '' } }
+    )
+    await db.collections['analytics-daily']?.collection.updateMany(
+      { scope: { $exists: false } },
+      { $set: { scope: '' } }
+    )
+    return
+  }
+  const db = payload.db as unknown as { drizzle: { execute: (q: string) => Promise<unknown> } }
+  await db.drizzle.execute(
+    `ALTER TABLE analytics_rollups ADD COLUMN IF NOT EXISTS hostname varchar NOT NULL DEFAULT ''`
+  )
+  await db.drizzle.execute(
+    `ALTER TABLE analytics_daily ADD COLUMN IF NOT EXISTS scope varchar NOT NULL DEFAULT ''`
+  )
+}
+```
+
+Push-mode dev installs pick up the new columns and the widened unique indexes (rollups gain `hostname`; sync's becomes `source + date + scope`) automatically on next boot; the snippet above is for migrate-mode installs, where a schema push never runs. On Postgres, migrate-mode installs also need to rebuild both unique indexes to include the new column: Payload only creates them from the current config on a fresh index build, so an existing production Postgres install keeps its old `(granularity, period, path, dimension, dimvalue)` and `(source, date)` unique indexes until this migration (or a follow-up one) drops and recreates them with `hostname` and `scope` appended. Until that rebuild runs, writes that only differ by hostname or scope can collide against the stale index.
+
+If your `sync` config sets a custom `collectionSlug`, adjust the `analytics-daily` table/collection name in the snippet above to match; the reference migration only knows the default slug.
 
 ## Options
 
