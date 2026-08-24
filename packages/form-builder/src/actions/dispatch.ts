@@ -1,7 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { RichTextBodyOption } from './body/serializeBody'
 import { ESSENTIAL_ACTION_FAILED_CONTEXT_KEY } from './dispatchContext'
-import type { ActionRegistry } from './registry'
+import { type ActionRegistry, isEssentialAction } from './registry'
 import type { ActionInstance } from './runActions'
 import { ACTIONS_TASK_SLUG, runActionsForSubmission } from './task'
 
@@ -38,14 +38,15 @@ const deadline = (ms: number): Promise<void> =>
  * action work. With no actions, returns immediately. When a job runner is present, enqueues the native
  * `form-builder-actions` task and returns (action work happens out of band). Otherwise runs the actions
  * inline but bounded by a deadline so a missing worker still delivers without hanging the request; any
- * error is swallowed (logged via `payload.logger`). Never rejects.
+ * error is swallowed (logged via `payload.logger`). Never rejects; the return reports whether an
+ * essential pass failed, so the caller can withhold success signals (the created event, the 201).
  */
-export const dispatchActions = async (args: DispatchActionsArgs): Promise<void> => {
+export const dispatchActions = async (
+	args: DispatchActionsArgs
+): Promise<{ essentialFailed: boolean }> => {
 	const { payload, registry, req, formId, submissionId } = args
 	const actions = args.actions ?? []
-	const hasEssential = actions.some(
-		(instance) => registry.get(instance.blockType)?.essential === true
-	)
+	const hasEssential = actions.some((instance) => isEssentialAction(registry, instance))
 
 	// Essential actions run first, inline and awaited, never queued: their failure is the
 	// submission's failure, which the submit endpoint turns into an error response via the context
@@ -84,17 +85,17 @@ export const dispatchActions = async (args: DispatchActionsArgs): Promise<void> 
 			if (req) {
 				req.context = { ...(req.context ?? {}), [ESSENTIAL_ACTION_FAILED_CONTEXT_KEY]: true }
 			}
-			return
+			return { essentialFailed: true }
 		}
 	}
 
 	// Nothing to run and nothing to prune: skip. An action-less form that opted out of persistence still
 	// runs the completion below, so `runActionsForSubmission` can delete the row out of band.
 	const rest = hasEssential
-		? actions.filter((instance) => registry.get(instance.blockType)?.essential !== true)
+		? actions.filter((instance) => !isEssentialAction(registry, instance))
 		: actions
 	if (rest.length === 0 && args.persistSubmissions !== false) {
-		return
+		return { essentialFailed: false }
 	}
 
 	// With an essential pass already run, the closing pass covers only the rest (subset threading
@@ -115,7 +116,7 @@ export const dispatchActions = async (args: DispatchActionsArgs): Promise<void> 
 				}`
 			)
 		}
-		return
+		return { essentialFailed: false }
 	}
 
 	const ms = args.deadlineMs ?? INLINE_DISPATCH_DEADLINE_MS
@@ -134,4 +135,5 @@ export const dispatchActions = async (args: DispatchActionsArgs): Promise<void> 
 		)
 	})
 	await Promise.race([work, deadline(ms)])
+	return { essentialFailed: false }
 }

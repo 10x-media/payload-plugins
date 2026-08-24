@@ -103,7 +103,7 @@ const makeAfterChange =
 				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
 				.catch(() => null)
 
-			await dispatchActions({
+			const { essentialFailed } = await dispatchActions({
 				actions: (form?.actions ?? null) as ActionInstance[] | null,
 				formId,
 				submissionId: doc.id as number | string,
@@ -114,6 +114,11 @@ const makeAfterChange =
 				persistSubmissions: form?.persistSubmissions as boolean | undefined,
 				richText: args.richText,
 			})
+			// A failed-essential submission is kept for recovery but is not a completed signup: no
+			// created event, so a sink-driven automation never treats it as one.
+			if (essentialFailed) {
+				return doc
+			}
 
 			try {
 				await resolveEventSink(args.events).emit({

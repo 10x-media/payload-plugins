@@ -6,7 +6,7 @@ import type { Translate } from '../fields/types'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 import { asFieldTranslate } from '../translations/server'
 import type { RichTextBodyOption } from './body/serializeBody'
-import type { ActionRegistry } from './registry'
+import { type ActionRegistry, isEssentialAction } from './registry'
 import type { ActionInstance, ActionResult } from './runActions'
 import { runActions } from './runActions'
 
@@ -99,7 +99,7 @@ export const runActionsForSubmission = async (args: {
 		if (subset === 'all') {
 			return true
 		}
-		const isEssential = registry.get(instance.blockType)?.essential === true
+		const isEssential = isEssentialAction(registry, instance)
 		return subset === 'essential' ? isEssential : !isEssential
 	})
 

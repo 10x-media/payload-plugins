@@ -129,6 +129,7 @@ describeForDb('form-builder action dispatch', { dbs: ['mongo'] }, (db) => {
 describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 	const delivered: string[] = []
+	const events: FormEvent[] = []
 	let providerDown = false
 
 	const subscribe = defineAction({
@@ -153,7 +154,10 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: formBuilder({ actions: { subscribe, recorder } }),
+			plugin: formBuilder({
+				actions: { subscribe, recorder },
+				events: { emit: (event) => void events.push(event) },
+			}),
 			db,
 		})
 	})
@@ -198,6 +202,7 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 
 	it('delivers, prunes, and returns 201 when the essential action succeeds', async () => {
 		delivered.length = 0
+		events.length = 0
 		providerDown = false
 		const form = await makeForm()
 		const { status } = await submitViaRest(form.id, 'ada@example.com')
@@ -207,10 +212,12 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 			expect(await submissionCount(form.id)).toBe(0)
 			expect(delivered).toContain('recorder')
 		})
+		expect(events.some((event) => event.type === 'submission.created')).toBe(true)
 	})
 
 	it('fails the response, keeps the row, and skips the rest when the provider rejects', async () => {
 		delivered.length = 0
+		events.length = 0
 		providerDown = true
 		try {
 			const form = await makeForm()
@@ -221,6 +228,8 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 			expect(delivered).toEqual([])
 			// Kept despite persistSubmissions: false, so the address is recoverable by an operator.
 			expect(await submissionCount(form.id)).toBe(1)
+			// No created event either: a sink-driven automation must not treat a failed signup as one.
+			expect(events.some((event) => event.type === 'submission.created')).toBe(false)
 		} finally {
 			providerDown = false
 		}
