@@ -117,9 +117,24 @@ export async function up({ payload }: MigrateUpArgs): Promise<void> {
 }
 ```
 
-Push-mode dev installs pick up the new columns and the widened unique indexes (rollups gain `hostname`; sync's becomes `source + date + scope`) automatically on next boot; the snippet above is for migrate-mode installs, where a schema push never runs. On Postgres, migrate-mode installs also need to rebuild both unique indexes to include the new column: Payload only creates them from the current config on a fresh index build, so an existing production Postgres install keeps its old `(granularity, period, path, dimension, dimvalue)` and `(source, date)` unique indexes until this migration (or a follow-up one) drops and recreates them with `hostname` and `scope` appended. Until that rebuild runs, writes that only differ by hostname or scope can collide against the stale index.
+Push-mode dev installs pick up the new columns and the widened unique indexes (rollups gain `hostname`; sync's becomes `source + date + scope`) automatically on next boot; the snippet above is for migrate-mode installs, where a schema push never runs. On Postgres, migrate-mode installs also need to rebuild both unique indexes to include the new column: Payload only creates them from the current config on a fresh index build, so an existing production Postgres install keeps its old `(granularity, period, path, dimension, dimvalue)` and `(source, date)` unique indexes until this migration (or a follow-up one) drops and recreates them with `hostname` and `scope` appended.
 
-If your `sync` config sets a custom `collectionSlug`, adjust the `analytics-daily` table/collection name in the snippet above to match; the reference migration only knows the default slug.
+The two consequences of skipping that rebuild are not the same. Rollups write through `ON CONFLICT`, and the conflict target must match the unique index exactly; once the config declares `hostname` in the target list but the live index still lacks it, Postgres cannot infer an arbiter index for the conflict, and **every** native rollup write fails, not just the ones that would collide, with error `42P10` (`no unique or exclusion constraint matching the ON CONFLICT specification`). The sync collection instead upserts via a find-then-create, so its stale `(source, date)` index does not reject writes outright; rows that only differ by `scope` can still collide against it and stomp on each other's synced values.
+
+Previously-scoped rollups installs already carry `scope` on their old index, so their rebuilt index is `(granularity, period, path, dimension, dimvalue, hostname, scope)`, not just `(..., hostname)`.
+
+Rebuild the indexes explicitly. `payload migrate:create` in the consumer app will typically generate the equivalent DDL automatically once the collection config above is in place; the statements below are the Postgres shape it produces, for reference or for a hand-written migration. Index names are assigned by Payload/Drizzle per install and can differ from the ones below, so confirm the actual name first with `\d analytics_rollups` (or `\d analytics_daily`) before dropping anything:
+
+```sql
+DROP INDEX IF EXISTS analytics_rollups_granularity_period_path_dimension_dimvalue_idx;
+CREATE UNIQUE INDEX analytics_rollups_bucket_idx
+  ON analytics_rollups (granularity, period, path, dimension, dimvalue, hostname);
+DROP INDEX IF EXISTS analytics_daily_source_date_idx;
+CREATE UNIQUE INDEX analytics_daily_source_date_scope_idx
+  ON analytics_daily (source, date, scope);
+```
+
+If your `sync` config sets a custom `collectionSlug`, adjust the `analytics-daily` table/collection name in both the migration snippet and the DDL above to match; the reference migration only knows the default slug.
 
 ## Options
 
