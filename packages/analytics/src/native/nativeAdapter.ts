@@ -168,6 +168,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				granularity: { equals: 'day' },
 				dimension: { equals: '' },
 				path: { equals: totalsPath },
+				hostname: { equals: q.hostname ?? '' },
 				period: periodWhere,
 				...scopeWhere(q),
 			})
@@ -194,6 +195,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 							granularity: { equals: 'day' },
 							dimension: { equals: '' },
 							path: { not_equals: '' },
+							hostname: { equals: q.hostname ?? '' },
 							period: periodWhere,
 							...scopeWhere(q),
 						}
@@ -201,6 +203,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 							granularity: { equals: 'day' },
 							dimension: { equals: dim },
 							path: { equals: '' },
+							hostname: { equals: q.hostname ?? '' },
 							period: periodWhere,
 							...scopeWhere(q),
 						}

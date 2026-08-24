@@ -64,6 +64,7 @@ describeForDb('native rollup atomic apply', {}, (db) => {
 			path: '/p',
 			dimension: '',
 			dimvalue: '',
+			hostname: '',
 		}
 		const delta = { key, inc: { pageviews: 1, events: 0, durationMs: 100, samples: 1 } }
 		await applyRollupDeltas(booted.payload, [delta])
@@ -96,6 +97,7 @@ describeForDb('native bumpRollup baseline', {}, (db) => {
 			path: '/baseline',
 			dimension: '',
 			dimvalue: '',
+			hostname: '',
 		}
 		await bumpRollup(booted.payload, key, { visitors: 1 })
 		const { docs } = await booted.payload.find({
