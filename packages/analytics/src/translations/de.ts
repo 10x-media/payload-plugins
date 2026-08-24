@@ -67,8 +67,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.providerFieldClientEmail]: 'Client-E-Mail',
 	[keys.providerFieldPrivateKey]: 'Privater Schlüssel',
 	[keys.providerFieldProjectId]: 'Projekt-ID',
-	[keys.providerSecretHelp]:
-		'Nach dem Speichern maskiert angezeigt; neuen Wert eingeben zum Ersetzen',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

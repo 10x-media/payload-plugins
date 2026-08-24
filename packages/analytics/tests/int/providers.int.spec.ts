@@ -2,7 +2,6 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { getRuntime, resolveRegistryFor } from '../../src/plugin/runtime'
-import { PROVIDER_SECRET_MASK, PROVIDER_SECRET_REVEAL_CONTEXT } from '../../src/providers/secrets'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
 const SLUG = 'analytics-providers'
@@ -54,56 +53,53 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 		expect(after.default().id).toBe('memory')
 	})
 
-	// rewritten in the next commit: collectionProvidersSource still reads secrets
-	// through a plain find(), and the writeOnly field now strips them from every
-	// normal read; Task 6 rewires it onto readEncryptedField/withRawEncrypted.
-	it.skip('configures the resolved provider adapter from its stored secret', async () => {
+	it('configures the resolved provider adapter from its stored secret', async () => {
 		const after = await registryFor(null)
 		expect(after.get('plausible').isConfigured()).toBe(true)
 	})
 
-	// rewritten in the next commit: the mask/reveal-context flow (PROVIDER_SECRET_MASK,
-	// PROVIDER_SECRET_REVEAL_CONTEXT) belonged to the old afterRead hooks; writeOnly
-	// fields strip on every normal read regardless of context and are opened only via
-	// readEncryptedField/withRawEncrypted, wired up in Task 6.
-	it.skip('masks secrets on reads and reveals them only for the internal context', async () => {
-		const masked = await booted.payload.find({
+	it('stores credentials encrypted and strips them from ordinary reads', async () => {
+		const created = await booted.payload.create({
 			collection: SLUG as never,
+			data: {
+				name: 'PH',
+				provider: 'posthog',
+				enabled: true,
+				posthog: { projectId: '123', apiKey: 'phx_secret_value_abcd' },
+			} as never,
 			overrideAccess: true,
 		})
-		const maskedDoc = masked.docs[0] as unknown as ProviderRow
-		expect(maskedDoc.plausible?.apiKey).toBe(PROVIDER_SECRET_MASK)
+		const read = (await booted.payload.findByID({
+			collection: SLUG as never,
+			id: (created as { id: string | number }).id,
+			overrideAccess: true,
+		})) as { posthog?: { apiKey?: unknown } }
+		expect(read.posthog?.apiKey).toBeUndefined()
 
-		const revealed = await booted.payload.find({
-			collection: SLUG as never,
-			overrideAccess: true,
-			context: { [PROVIDER_SECRET_REVEAL_CONTEXT]: true },
-		})
-		const revealedDoc = revealed.docs[0] as unknown as ProviderRow
-		expect(revealedDoc.plausible?.apiKey).toBe('plausible-key')
+		const { withRawEncrypted } = await import('@10x-media/fields/encrypted')
+		const { createLocalReq } = await import('payload')
+		const req = await createLocalReq({}, booted.payload)
+		const raw = (await withRawEncrypted(req, () =>
+			booted.payload.findByID({
+				collection: SLUG as never,
+				id: (created as { id: string | number }).id,
+				req,
+				overrideAccess: true,
+			})
+		)) as { posthog?: { apiKey?: string } }
+		expect(raw.posthog?.apiKey).toMatch(/^pfe1\./)
 	})
 
-	// rewritten in the next commit: the masked-placeholder round-trip was the old
-	// preserveMaskedSecret hook's contract; encryptedField's writeOnly clearable
-	// semantics replace it, and the read-back here needs Task 6's decrypting read.
-	it.skip('preserves the stored secret when the masked placeholder round-trips on update', async () => {
-		const { docs } = await booted.payload.find({ collection: SLUG as never, overrideAccess: true })
-		const doc = docs[0] as unknown as ProviderRow
-		await booted.payload.update({
-			collection: SLUG as never,
-			id: doc.id,
-			data: { plausible: { siteId: 'example.com', apiKey: PROVIDER_SECRET_MASK } } as never,
-			overrideAccess: true,
-		})
-		const revealed = await booted.payload.find({
-			collection: SLUG as never,
-			overrideAccess: true,
-			context: { [PROVIDER_SECRET_REVEAL_CONTEXT]: true },
-		})
-		const revealedDoc = revealed.docs[0] as unknown as ProviderRow
-		expect(revealedDoc.plausible?.apiKey).toBe('plausible-key')
+	it('the provider source resolves adapters with working decrypted credentials', async () => {
 		const registry = await registryFor(null)
-		expect(registry.get('plausible').isConfigured()).toBe(true)
+		const adapter = registry.all().find((a) => a.id === 'posthog')
+		expect(adapter?.isConfigured()).toBe(true)
+		// clears the fixture so later tests' scope/registry assertions stay exact
+		await booted.payload.delete({
+			collection: SLUG as never,
+			where: { provider: { equals: 'posthog' } },
+			overrideAccess: true,
+		})
 	})
 
 	it('scopes provider documents: a scoped doc joins only its scope registry', async () => {

@@ -1,4 +1,4 @@
-import type { Where } from 'payload'
+import { createLocalReq, type Where } from 'payload'
 import type { AnalyticsAdapter } from '../core/contract'
 import {
 	type AdapterRegistry,
@@ -7,7 +7,7 @@ import {
 	type ResolveRegistryArgs,
 } from '../core/registry'
 import { adapterFromProviderDoc, type ProviderDoc } from './factory'
-import { PROVIDER_SECRET_REVEAL_CONTEXT } from './secrets'
+import { SECRET_PATHS } from './secrets'
 
 export const PROVIDERS_CACHE_TTL_MS = 30_000
 
@@ -43,30 +43,62 @@ export const combineRegistries = (
 	return createRegistry(merged, base.defaultId)
 }
 
+const setAtPath = (doc: Record<string, unknown>, path: string, value: unknown): void => {
+	const [group, field] = path.split('.') as [string, string]
+	const target = doc[group]
+	if (target && typeof target === 'object') {
+		;(target as Record<string, unknown>)[field] = value
+	}
+}
+
+const getAtPath = (doc: Record<string, unknown>, path: string): unknown => {
+	const [group, field] = path.split('.') as [string, string]
+	const target = doc[group]
+	return target && typeof target === 'object'
+		? (target as Record<string, unknown>)[field]
+		: undefined
+}
+
 /**
  * Look up a scope's enabled provider documents and build adapters from them.
- * Reads with `overrideAccess` plus the secret-reveal context (the masking hook
- * runs regardless of access), depth 0, straight through the local API.
+ * Reads raw ciphertext inside a withRawEncrypted window (write-only secrets
+ * are stripped from ordinary reads), then decrypts each credential through
+ * the fields key ring. Legacy plaintext rows pass through decryptFieldValue
+ * unchanged, so pre-encryption documents keep working until re-saved.
  */
 export const collectionProvidersSource = (slug: string, scopeField: string): ProvidersSource => {
-	return async ({ payload, scope }) => {
-		// equals null matches SQL NULL and a missing Mongo key alike; '' covers cleared text.
+	return async ({ payload, req, scope }) => {
+		const { decryptFieldValue, withRawEncrypted } = await import('@10x-media/fields/encrypted')
+		const readReq = req ?? (await createLocalReq({}, payload))
 		const scopeWhere: Where =
 			scope === null
 				? { or: [{ [scopeField]: { equals: null } }, { [scopeField]: { equals: '' } }] }
 				: { [scopeField]: { equals: scope } }
-		const { docs } = await payload.find({
-			collection: slug as never,
-			where: { and: [{ enabled: { equals: true } }, scopeWhere] },
-			limit: 100,
-			pagination: false,
-			depth: 0,
-			overrideAccess: true,
-			context: { [PROVIDER_SECRET_REVEAL_CONTEXT]: true },
-		})
-		return (docs as ProviderDoc[])
-			.map(adapterFromProviderDoc)
-			.filter((a): a is AnalyticsAdapter => a !== null)
+		const { docs } = await withRawEncrypted(readReq, () =>
+			payload.find({
+				collection: slug as never,
+				where: { and: [{ enabled: { equals: true } }, scopeWhere] },
+				limit: 100,
+				pagination: false,
+				depth: 0,
+				overrideAccess: true,
+				req: readReq,
+			})
+		)
+		const adapters: AnalyticsAdapter[] = []
+		for (const raw of docs as Array<Record<string, unknown>>) {
+			const doc = structuredClone(raw) as Record<string, unknown>
+			for (const { path } of SECRET_PATHS) {
+				const value = getAtPath(doc, path)
+				if (typeof value === 'string' && value !== '') {
+					const plain = await decryptFieldValue(payload, { collection: slug, path, value })
+					setAtPath(doc, path, typeof plain === 'string' ? plain : '')
+				}
+			}
+			const adapter = adapterFromProviderDoc(doc as ProviderDoc)
+			if (adapter) adapters.push(adapter)
+		}
+		return adapters
 	}
 }
 

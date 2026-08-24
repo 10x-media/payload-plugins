@@ -69,7 +69,6 @@ export const keys = {
 	providerFieldClientEmail: 'analytics:providerFieldClientEmail',
 	providerFieldPrivateKey: 'analytics:providerFieldPrivateKey',
 	providerFieldProjectId: 'analytics:providerFieldProjectId',
-	providerSecretHelp: 'analytics:providerSecretHelp',
 	providerNamePlausible: 'analytics:providerNamePlausible',
 	providerNameUmami: 'analytics:providerNameUmami',
 	providerNameGa4: 'analytics:providerNameGa4',
