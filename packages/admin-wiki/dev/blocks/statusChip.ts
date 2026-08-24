@@ -1,0 +1,20 @@
+import type { Block } from 'payload'
+
+/** A consumer-supplied inline block, proving `options.editor.inlineBlocks`. */
+export const statusChipBlock: Block = {
+	slug: 'devStatusChip',
+	labels: { singular: 'Status chip', plural: 'Status chips' },
+	fields: [
+		{
+			name: 'tone',
+			type: 'select',
+			required: true,
+			defaultValue: 'new',
+			options: [
+				{ label: 'New', value: 'new' },
+				{ label: 'Deprecated', value: 'deprecated' },
+			],
+		},
+		{ name: 'label', type: 'text', required: true },
+	],
+}

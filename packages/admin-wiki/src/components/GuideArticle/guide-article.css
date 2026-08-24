@@ -184,11 +184,16 @@
 	--wiki-callout-bg: var(--theme-error-50);
 }
 
-.wiki-guide-article__missing-block {
+.wiki-guide-article__missing-block,
+.wiki-guide-article__missing-inline-block {
 	background: var(--theme-warning-50);
 	border: 1px dashed var(--theme-warning-500);
 	border-radius: 4px;
 	color: var(--theme-elevation-650);
 	font-size: 0.875em;
 	padding: 0.5rem 0.75rem;
+}
+
+.wiki-guide-article__missing-inline-block {
+	padding: 0 0.25rem;
 }

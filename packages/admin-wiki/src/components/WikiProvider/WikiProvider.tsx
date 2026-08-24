@@ -13,7 +13,7 @@ import {
 	useState,
 } from 'react'
 
-import type { WikiWriteAffordanceMode } from '../../options'
+import type { WikiConvertersFunction, WikiWriteAffordanceMode } from '../../options'
 import type { ResolvedWikiCustomTarget } from '../../plugin/resolveOptions'
 import type { WikiGuideDoc, WikiTargetEntry, WikiTargetsResponse } from '../../shared/targetKeys'
 import { resolveClientLabel } from '../TargetSelect/clientBlocks'
@@ -59,6 +59,12 @@ export type WikiTargetsContextValue = {
 	/** The reader's evaluated update permission (drives edit shortcuts). */
 	canUpdate: boolean
 	/**
+	 * The consumer's converters function resolved from the import map, applied
+	 * over the plugin's own wherever a guide renders. Undefined when the project
+	 * declared none.
+	 */
+	converters: undefined | WikiConvertersFunction
+	/**
 	 * Label per declared custom target key, resolved for the reader's admin
 	 * language, for the chips that would otherwise show a bare key.
 	 */
@@ -72,6 +78,8 @@ export type WikiTargetsContextValue = {
 	editMode: boolean
 	/** Guides attached to a target key; empty array when none. */
 	entriesFor: (key: string) => WikiTargetEntry[]
+	/** Consumer inline block renderers resolved from the import map, keyed by slug. */
+	inlineBlockRenderers: Record<string, WikiBlockRenderer>
 	/** Lazily load one guide's full document, cached per id and locale. */
 	loadGuide: (id: number | string) => Promise<null | WikiGuideDoc>
 	loading: boolean
@@ -102,9 +110,11 @@ const WikiTargetsContext = createContext<WikiTargetsContextValue>({
 	canCreate: false,
 	canUpdate: false,
 	canWrite: false,
+	converters: undefined,
 	customLabels: {},
 	editMode: false,
 	entriesFor: () => EMPTY,
+	inlineBlockRenderers: {},
 	loadGuide: () => Promise.resolve(null),
 	loading: false,
 	locale: null,
@@ -124,7 +134,9 @@ export type WikiProviderProps = {
 	blockLabels?: Record<string, string>
 	blockRenderers?: Record<string, WikiBlockRenderer>
 	children?: ReactNode
+	converters?: WikiConvertersFunction
 	customTargets?: ResolvedWikiCustomTarget[]
+	inlineBlockRenderers?: Record<string, WikiBlockRenderer>
 	pagesSlug?: string
 	videoPlayer?: WikiVideoPlayerComponent
 	wikiView?: boolean
@@ -141,7 +153,9 @@ export const WikiProvider = ({
 	blockLabels,
 	blockRenderers,
 	children,
+	converters,
 	customTargets = NO_CUSTOM_TARGETS,
+	inlineBlockRenderers,
 	pagesSlug = 'wiki-pages',
 	videoPlayer,
 	wikiView = false,
@@ -265,9 +279,11 @@ export const WikiProvider = ({
 			canWrite:
 				canCreate &&
 				(writeAffordances === 'always' || (writeAffordances === 'editMode' && editMode)),
+			converters,
 			customLabels,
 			editMode,
 			entriesFor: (key) => data?.targets[key] ?? EMPTY,
+			inlineBlockRenderers: inlineBlockRenderers ?? {},
 			loadGuide,
 			loading,
 			locale,
@@ -288,9 +304,11 @@ export const WikiProvider = ({
 			blockLabels,
 			blockRenderers,
 			canCreate,
+			converters,
 			customLabels,
 			data,
 			editMode,
+			inlineBlockRenderers,
 			load,
 			loadGuide,
 			loading,

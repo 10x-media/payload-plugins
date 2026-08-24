@@ -33,6 +33,8 @@ export type ResolvedWikiOptions = {
 	/** Host-declared surfaces, in declaration order. Empty when none were declared. */
 	customTargets: ResolvedWikiCustomTarget[]
 	editorBlocks: WikiEditorBlockOption[]
+	/** Import-map path of the host's converters function; undefined when none. */
+	editorConverters: string | undefined
 	/**
 	 * Left in whichever form the host gave it, array or function: normalizing the
 	 * array into a function here would build the feature list at option-resolution
@@ -40,6 +42,7 @@ export type ResolvedWikiOptions = {
 	 * own. `undefined` means the editor is the plugin's alone.
 	 */
 	editorFeatures: undefined | WikiEditorFeaturesOption
+	editorInlineBlocks: WikiEditorBlockOption[]
 	/**
 	 * Slugs the plugin leaves untouched, per entity kind: Payload's internals,
 	 * the wiki's own collections, and the host's `exclude` option.
@@ -118,7 +121,9 @@ export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOpt
 		chips: { blocks: options.chips?.blocks ?? true },
 		customTargets: resolveCustomTargets(options.customTargets),
 		editorBlocks: options.editor?.blocks ?? [],
+		editorConverters: options.editor?.converters,
 		editorFeatures: options.editor?.features,
+		editorInlineBlocks: options.editor?.inlineBlocks ?? [],
 		exclude: resolveExcluded(options.exclude, slugs),
 		featured: options.featured ?? true,
 		localeMap: options.localeMap ?? {},

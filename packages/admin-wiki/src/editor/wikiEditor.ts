@@ -32,6 +32,8 @@ export type BuildWikiEditorArgs = {
 	blocks?: Block[]
 	/** Consumer lexical features, appended to the plugin's own or replacing the list. */
 	features?: WikiEditorFeaturesOption
+	/** Consumer inline blocks; the plugin ships none of its own. */
+	inlineBlocks?: Block[]
 	/** Slug of the wiki media upload collection the upload feature is scoped to. */
 	mediaSlug: string
 	/** Slug of the wiki pages collection, for guide-to-guide links. */
@@ -55,6 +57,7 @@ export type BuildWikiEditorArgs = {
 export const buildWikiEditor = ({
 	blocks = [],
 	features,
+	inlineBlocks = [],
 	mediaSlug,
 	pagesSlug,
 	video = false,
@@ -84,6 +87,7 @@ export const buildWikiEditor = ({
 						...(video !== false ? [buildVideoEmbedBlock()] : []),
 						...blocks,
 					],
+					inlineBlocks,
 				}),
 				...(video !== false ? [WikiVideoFeature({ mediaSlug })] : []),
 				FixedToolbarFeature(),

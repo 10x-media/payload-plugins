@@ -11,6 +11,7 @@ import { buildConfig, type CollectionConfig } from 'payload'
 import { adminWiki } from '../src/index'
 import { ctaBlock } from './blocks/cta'
 import { heroBannerBlock } from './blocks/heroBanner'
+import { statusChipBlock } from './blocks/statusChip'
 import { tipBlock } from './blocks/tipBlock'
 import { posts } from './collections/posts'
 import { products } from './collections/products'
@@ -64,7 +65,13 @@ export default buildConfig({
 				{ key: 'dashboard.attention', label: 'Dashboard · Needs attention' },
 				'traffic',
 			],
-			editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
+			// Exercises every editor seam: a block, an inline block, and the
+			// converters function that renders what a project's own nodes look like.
+			editor: {
+				blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }],
+				converters: '/components/wikiConverters#wikiConverters',
+				inlineBlocks: [{ block: statusChipBlock, component: '/components/StatusChip#StatusChip' }],
+			},
 			exclude: { collections: ['users'] },
 			// video: { playerComponent: '/components/DevVideoPlayer#DevVideoPlayer' },
 			video: true,

@@ -47,9 +47,11 @@ import { LucideAdapterIcon as LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087
 import { LucideAdapterAssets as LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
 import { LucideAdapterNodes as LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
 import { TipBlock as TipBlock_c426dff9a53db9c82f385a6b49c712ac } from '../../../components/TipBlock'
+import { StatusChip as StatusChip_6732a09e156d190cb034e40e5f1d110b } from '../../../components/StatusChip'
 import { DevWikiFooter as DevWikiFooter_11e8e95b5d0d9379cf226322fe5b25e7 } from '../../../components/WikiSlotsClient'
 import { DevWikiHeaderLink as DevWikiHeaderLink_11e8e95b5d0d9379cf226322fe5b25e7 } from '../../../components/WikiSlotsClient'
 import { DevWikiNotice as DevWikiNotice_1fd8d133534d362bbfb4ddbacfaedd8e } from '../../../components/WikiSlots'
+import { wikiConverters as wikiConverters_11dfbf8344a61b1c952128fd4054c2dc } from '../../../components/wikiConverters'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -102,7 +104,9 @@ export const importMap = {
   "@10x-media/fields/icon/adapters/lucide#LucideAdapterAssets": LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087,
   "@10x-media/fields/icon/adapters/lucide#LucideAdapterNodes": LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087,
   "/components/TipBlock#TipBlock": TipBlock_c426dff9a53db9c82f385a6b49c712ac,
+  "/components/StatusChip#StatusChip": StatusChip_6732a09e156d190cb034e40e5f1d110b,
   "/components/WikiSlotsClient#DevWikiFooter": DevWikiFooter_11e8e95b5d0d9379cf226322fe5b25e7,
   "/components/WikiSlotsClient#DevWikiHeaderLink": DevWikiHeaderLink_11e8e95b5d0d9379cf226322fe5b25e7,
-  "/components/WikiSlots#DevWikiNotice": DevWikiNotice_1fd8d133534d362bbfb4ddbacfaedd8e
+  "/components/WikiSlots#DevWikiNotice": DevWikiNotice_1fd8d133534d362bbfb4ddbacfaedd8e,
+  "/components/wikiConverters#wikiConverters": wikiConverters_11dfbf8344a61b1c952128fd4054c2dc
 }

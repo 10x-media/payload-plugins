@@ -107,6 +107,7 @@ export const seedWiki = async (
 		editor: buildWikiEditor({
 			blocks: registry.editorBlocks.map((option) => option.block),
 			features: registry.editorFeatures,
+			inlineBlocks: registry.editorInlineBlocks.map((option) => option.block),
 			mediaSlug,
 			pagesSlug,
 			video: registry.video,

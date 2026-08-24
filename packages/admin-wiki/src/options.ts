@@ -1,4 +1,5 @@
 import type { LexicalEditorProps } from '@payloadcms/richtext-lexical'
+import type { JSXConverters } from '@payloadcms/richtext-lexical/react'
 import type {
 	Access,
 	AdminViewServerProps,
@@ -59,6 +60,17 @@ export type WikiEditorBlockOption = {
 }
 
 /**
+ * The read side of a lexical node, as a function over the converters already in
+ * place rather than a map merged on top of them.
+ *
+ * `defaultConverters` is the whole map the plugin assembled, Payload's own
+ * defaults included, and the return value is the map that renders. That is the
+ * only shape that can *remove* a converter: a map merged over the defaults can
+ * add and override, never drop.
+ */
+export type WikiConvertersFunction = (args: { defaultConverters: JSXConverters }) => JSXConverters
+
+/**
  * One lexical feature, exactly as `lexicalEditor` takes them. Derived from its
  * own props rather than spelled out, because the feature type is generic over
  * three prop types this plugin has no business naming.
@@ -86,8 +98,10 @@ export type WikiEditorFeaturesOption =
 /** Extensions to the plugin's self-contained editor. */
 export type WikiEditorOptions = {
 	blocks?: WikiEditorBlockOption[]
+	converters?: string
 	/** Lexical features beside the plugin's own. See {@link WikiEditorFeaturesOption}. */
 	features?: WikiEditorFeaturesOption
+	inlineBlocks?: WikiEditorBlockOption[]
 }
 
 /** One label, or one per admin language: `'Dashboard'` or `{ de: '…', en: '…' }`. */
@@ -325,7 +339,7 @@ export type AdminWikiPluginOptions = {
 	 * {@link WikiCustomTargetOption}.
 	 */
 	customTargets?: WikiCustomTargetOption[]
-	/** Extensions to the wiki editor (consumer blocks with renderers). */
+	/** Extensions to the wiki editor: blocks, inline blocks, features, converters. */
 	editor?: WikiEditorOptions
 	/** Entities the plugin leaves alone entirely. See {@link WikiExcludeOptions}. */
 	exclude?: WikiExcludeOptions

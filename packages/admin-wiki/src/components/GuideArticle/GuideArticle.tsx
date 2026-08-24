@@ -1,14 +1,19 @@
 'use client'
 
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
-import { type JSXConvertersFunction, RichText } from '@payloadcms/richtext-lexical/react'
-import { useMemo } from 'react'
+import {
+	type JSXConverters,
+	type JSXConvertersFunction,
+	RichText,
+} from '@payloadcms/richtext-lexical/react'
+import { type ReactNode, useMemo } from 'react'
 
 import {
 	CALLOUT_BLOCK_SLUG,
 	VIDEO_EMBED_BLOCK_SLUG,
 	WIKI_VIDEO_NODE_TYPE,
 } from '../../editor/constants'
+import type { WikiConvertersFunction } from '../../options'
 import { collectGuideHeadings } from '../../shared/headings'
 import { GuideVideo } from '../Video/GuideVideo'
 import { VideoEmbed } from '../Video/VideoEmbed'
@@ -27,12 +32,39 @@ export type GuideArticleProps = {
 	 */
 	blockRenderers?: Record<string, WikiBlockRenderer>
 	className?: string
+	/**
+	 * Converters for this call site, applied after the project's own. Receives
+	 * everything below it as `defaultConverters` and returns the map that renders,
+	 * so it can drop a converter as well as add one.
+	 */
+	converters?: WikiConvertersFunction
 	data: SerializedEditorState
+	/** As {@link GuideArticleProps.blockRenderers}, for inline blocks. */
+	inlineBlockRenderers?: Record<string, WikiBlockRenderer>
 }
 
-const buildConverters =
+/** A block or inline block node, as far as a renderer is concerned. */
+type BlockNode = { node: { fields: Record<string, unknown> } }
+
+const renderersToConverters = (
+	renderers: Record<string, WikiBlockRenderer>
+): Record<string, (args: BlockNode) => ReactNode> =>
+	Object.fromEntries(
+		Object.entries(renderers).map(([slug, Renderer]) => [
+			slug,
+			({ node }: BlockNode) => <Renderer fields={node.fields} />,
+		])
+	)
+
+/**
+ * The plugin's own converters: everything a guide can contain that Payload does
+ * not already render. Consumer layers are applied over this by
+ * {@link composeConverters}.
+ */
+const buildGuideConverters =
 	(
 		blockRenderers: Record<string, WikiBlockRenderer>,
+		inlineBlockRenderers: Record<string, WikiBlockRenderer>,
 		idsByNode: Map<object, string>
 	): JSXConvertersFunction =>
 	(args) => ({
@@ -47,24 +79,19 @@ const buildConverters =
 			return <Tag id={idsByNode.get(node as object)}>{nodesToJSX({ nodes: node.children })}</Tag>
 		},
 		blocks: {
-			...Object.fromEntries(
-				Object.entries(blockRenderers).map(([slug, Renderer]) => [
-					slug,
-					({ node }: { node: { fields: Record<string, unknown> } }) => (
-						<Renderer fields={node.fields} />
-					),
-				])
-			),
-			[CALLOUT_BLOCK_SLUG]: ({ node }: { node: { fields: Record<string, unknown> } }) => (
+			...renderersToConverters(blockRenderers),
+			[CALLOUT_BLOCK_SLUG]: ({ converters, node }: BlockNode & { converters: JSXConverters }) => (
 				<Callout
 					body={node.fields.body as SerializedEditorState | null | undefined}
+					converters={converters}
 					variant={node.fields.variant as string | null | undefined}
 				/>
 			),
-			[VIDEO_EMBED_BLOCK_SLUG]: ({ node }: { node: { fields: Record<string, unknown> } }) => (
+			[VIDEO_EMBED_BLOCK_SLUG]: ({ node }: BlockNode) => (
 				<VideoEmbed url={node.fields.url as string | undefined} />
 			),
 		},
+		inlineBlocks: renderersToConverters(inlineBlockRenderers),
 		[WIKI_VIDEO_NODE_TYPE]: ({ node }: { node: unknown }) => {
 			const video = node as { relationTo?: string; value?: number | string }
 			return <GuideVideo relationTo={video.relationTo ?? ''} value={video.value} />
@@ -75,16 +102,45 @@ const buildConverters =
  * The single read renderer for guide content, shared by hover-card escalation
  * drawers, surface guide drawers, and the wiki view.
  */
-export const GuideArticle = ({ blockRenderers, className, data }: GuideArticleProps) => {
-	const { blockRenderers: providerRenderers } = useWikiTargets()
+export const GuideArticle = ({
+	blockRenderers,
+	className,
+	converters,
+	data,
+	inlineBlockRenderers,
+}: GuideArticleProps) => {
+	const {
+		blockRenderers: providerRenderers,
+		converters: projectConverters,
+		inlineBlockRenderers: providerInlineRenderers,
+	} = useWikiTargets()
 	const { idsByNode } = useMemo(() => collectGuideHeadings(data), [data])
-	const converters = useMemo(
-		() => buildConverters({ ...providerRenderers, ...blockRenderers }, idsByNode),
-		[blockRenderers, idsByNode, providerRenderers]
+	// Layer the converters: the plugin's own, then the project's, then the call site's.
+	// Each layer is handed everything below it and returns the whole map, which is what
+	// lets it drop a converter rather than only add one.
+	const composed = useMemo(
+		() => (args: Parameters<JSXConvertersFunction>[0]) =>
+			[projectConverters, converters].reduce<JSXConverters>(
+				(defaultConverters, layer) => layer?.({ defaultConverters }) ?? defaultConverters,
+				buildGuideConverters(
+					{ ...providerRenderers, ...blockRenderers },
+					{ ...providerInlineRenderers, ...inlineBlockRenderers },
+					idsByNode
+				)(args)
+			),
+		[
+			blockRenderers,
+			converters,
+			idsByNode,
+			inlineBlockRenderers,
+			projectConverters,
+			providerInlineRenderers,
+			providerRenderers,
+		]
 	)
 	return (
 		<div className={['wiki-guide-article', className].filter(Boolean).join(' ')}>
-			<RichText converters={converters} data={data} disableContainer />
+			<RichText converters={composed} data={data} disableContainer />
 		</div>
 	)
 }

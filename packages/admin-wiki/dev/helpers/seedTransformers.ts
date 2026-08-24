@@ -62,3 +62,44 @@ export const embedTransformer: WikiSeedTransformer = (state) => {
 	})
 	return state
 }
+
+/**
+ * Consumer transformer demo: `{{chip:tone:label}}` inside a paragraph becomes
+ * the dev app's own `devStatusChip` inline block, so the seeded content carries
+ * an inline node the same way it carries block ones.
+ */
+export const statusChipTransformer: WikiSeedTransformer = (state) => {
+	const root = state.root as unknown as LooseNode
+	for (const node of root.children ?? []) {
+		if (node.type !== 'paragraph') {
+			continue
+		}
+		node.children = (node.children ?? []).flatMap((child) => {
+			const text = typeof child.text === 'string' ? child.text : null
+			if (!text?.includes('{{chip:')) {
+				return [child]
+			}
+			// Split on the placeholder so the surrounding words stay text nodes and
+			// the chip lands between them, which is the point of an inline block.
+			return text.split(/(\{\{chip:[^:}]+:[^}]+\}\})/).flatMap((part): LooseNode[] => {
+				const match = /^\{\{chip:([^:}]+):([^}]+)\}\}$/.exec(part)
+				if (match) {
+					return [
+						{
+							fields: {
+								blockType: 'devStatusChip',
+								id: blockId(),
+								label: match[2],
+								tone: match[1],
+							},
+							type: 'inlineBlock',
+							version: 1,
+						} as LooseNode,
+					]
+				}
+				return part ? [{ ...child, text: part }] : []
+			})
+		})
+	}
+	return state
+}

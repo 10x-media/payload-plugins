@@ -127,6 +127,7 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		]
 		const consumerComponents = [
 			...resolved.editorBlocks.map((option) => option.component),
+			...resolved.editorInlineBlocks.map((option) => option.component),
 			...(resolved.video !== false && resolved.video.playerComponent
 				? [resolved.video.playerComponent]
 				: []),
@@ -137,15 +138,17 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 						.map(componentImportPath)
 						.filter((path): path is string => path !== undefined)),
 		]
-		if (consumerComponents.length > 0) {
-			config.admin.dependencies = {
-				...config.admin.dependencies,
-				...Object.fromEntries(
-					consumerComponents.map((component) => [
-						`admin-wiki:${component}`,
-						{ path: component, type: 'component' as const },
-					])
-				),
+		config.admin.dependencies ??= {}
+		for (const component of consumerComponents) {
+			config.admin.dependencies[`admin-wiki:${component}`] = {
+				path: component,
+				type: 'component',
+			}
+		}
+		if (resolved.editorConverters !== undefined) {
+			config.admin.dependencies[`admin-wiki:${resolved.editorConverters}`] = {
+				path: resolved.editorConverters,
+				type: 'function',
 			}
 		}
 		if (resolved.wikiView) {
@@ -176,6 +179,7 @@ export type {
 	WikiAccessOptions,
 	WikiChipsOptions,
 	WikiCollectionOverride,
+	WikiConvertersFunction,
 	WikiCustomTargetLabel,
 	WikiCustomTargetOption,
 	WikiEditorBlockOption,

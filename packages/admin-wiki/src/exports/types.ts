@@ -3,6 +3,7 @@ export type {
 	WikiAccessOptions,
 	WikiChipsOptions,
 	WikiCollectionOverride,
+	WikiConvertersFunction,
 	WikiCustomTargetLabel,
 	WikiCustomTargetOption,
 	WikiEditorBlockOption,
