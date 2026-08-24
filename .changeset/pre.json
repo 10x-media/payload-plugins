@@ -105,6 +105,7 @@
 		"form-builder-changeable-votes",
 		"form-builder-composition-consent-recipients",
 		"form-builder-conditions-flow",
+		"form-builder-consent-notice",
 		"form-builder-consent-upload-options",
 		"form-builder-correctness-security",
 		"form-builder-dx-robustness",
