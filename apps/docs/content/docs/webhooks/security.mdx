@@ -144,7 +144,7 @@ Subscriptions created before this release hold plaintext secrets, and **their de
 
 ### Step zero: the schema migration
 
-This release adds columns to the subscriptions collection: `previous_secret`, `previous_secret_expires_at`, `secret_set`, and `secret_hint`. On MongoDB that is free and there is nothing to do. **On any SQL adapter (Postgres, SQLite, Vercel Postgres) the migration has to run first**, or the adoption utility below writes into columns that do not exist yet.
+This release adds columns to the subscriptions collection: `previous_secret`, `previous_secret_expires_at`, and `secret_hint`. (`secret_set` is virtual, computed on read from whether the sealed value is present, so it has no column.) On MongoDB that is free and there is nothing to do. **On any SQL adapter (Postgres, SQLite, Vercel Postgres) the migration has to run first**, or the adoption utility below writes into columns that do not exist yet.
 
 ```bash
 pnpm payload migrate:create add-webhook-secret-columns

@@ -36,7 +36,7 @@ A create that supplies a secret returns nothing extra: the caller already holds 
    pnpm add @10x-media/fields
    ```
 
-2. **Run the schema migration first, on every SQL adapter.** This release adds `previous_secret`, `previous_secret_expires_at`, `secret_set`, and `secret_hint` to the subscriptions collection. On MongoDB that is free. On Postgres, SQLite, and Vercel Postgres those are new columns, and the adoption utility in step 4 writes into them:
+2. **Run the schema migration first, on every SQL adapter.** This release adds `previous_secret`, `previous_secret_expires_at`, and `secret_hint` to the subscriptions collection (`secret_set` is a virtual field and has no column). On MongoDB that is free. On Postgres, SQLite, and Vercel Postgres those are new columns, and the adoption utility in step 4 writes into them:
 
    ```bash
    pnpm payload migrate:create add-webhook-secret-columns
