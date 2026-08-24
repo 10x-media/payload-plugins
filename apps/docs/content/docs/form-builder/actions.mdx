@@ -249,11 +249,30 @@ A custom action's `type` is registered as a Payload block whose slug is that typ
 
 ## Run model
 
-Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most five seconds for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission.
+Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most five seconds for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission, unless the action declared otherwise, below.
+
+### Essential actions
+
+Fire-and-forget is right for a notification: a failed email should not reject a submission that is already stored. It is wrong when the action is the point of the submission, a newsletter signup whose provider is the system of record. `essential: true` on `defineAction` declares that this action's failure is the submission's failure:
+
+```ts
+const subscribe = defineAction({
+  type: 'subscribe',
+  label: 'Subscribe',
+  essential: true,
+  run: async ({ values }) => {
+    await provider.subscribe(addressOf(values)) // a throw fails the submission
+  },
+})
+```
+
+An essential action runs inline before the response, never queued, still bounded by the dispatch deadline so a hanging provider cannot pin the request (outliving the deadline counts as failure; the work is not cancelled, so make the provider call idempotent if a retry could follow). On failure the visitor's submit returns an error with a translated plugin message, no per-form copy to author, and the remaining actions are skipped. The other actions keep today's fire-and-forget behaviour, running after the essential pass succeeds.
+
+One deliberate interaction with [pruning](#pruning-submissions): when an essential action fails on a `persistSubmissions: false` form, the submission is kept, not pruned. The reason not to persist is that the provider holds the record; if the provider never received it, the stored row is the only copy of what the visitor sent, and an operator can recover it. Essentialness is declared on the action type, not per form, on purpose: whether a failed handoff may be silently swallowed is a property of the integration, and a per-form toggle would let an author accidentally demote it. The error surfaces through the REST submit path (what `<Form>` uses); a server-side `payload.create` gets the submission plus a logged failure and the same context flag to inspect.
 
 ## Pruning submissions
 
-Every form stores each submission by default. Uncheck **Store submissions** on a form (the `persistSubmissions` flag) and the plugin deletes the submission once its actions have run, for a pure signup form whose only job is to POST to a provider and leave no stored row. Deletion happens once, after the whole action pass, regardless of whether an individual action failed (every action still received the values first), so a failing action never strands the row. A pruned submission never appears in the submissions list or in poll and analytics counts, by intent. Pruning does not cascade to files: a non-persist form with a `file` field leaves its uploaded file in the uploads collection (newsletter signups have none). If the job runner is down, the submission is retained until the job eventually runs, never dropped unprocessed.
+Every form stores each submission by default. Uncheck **Store submissions** on a form (the `persistSubmissions` flag) and the plugin deletes the submission once its actions have run, for a pure signup form whose only job is to POST to a provider and leave no stored row. Deletion happens once, after the whole action pass, regardless of whether an individual fire-and-forget action failed (every action still received the values first), so a failing notification never strands the row. A failed [essential action](#essential-actions) is the exception: it keeps the row, because the provider never took the handoff. A pruned submission never appears in the submissions list or in poll and analytics counts, by intent. Pruning does not cascade to files: a non-persist form with a `file` field leaves its uploaded file in the uploads collection (newsletter signups have none). If the job runner is down, the submission is retained until the job eventually runs, never dropped unprocessed.
 
 ## Signed webhook verification
 
