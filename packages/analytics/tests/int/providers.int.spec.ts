@@ -258,9 +258,12 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 			const registry = await registryFor(scope)
 			const expectedIdA = `posthog:${idA}`
 			const expectedIdB = `posthog:${idB}`
-			expect(registry.all().map((a) => a.id)).toEqual(
-				expect.arrayContaining([expectedIdA, expectedIdB])
-			)
+			expect(
+				registry
+					.all()
+					.map((a) => a.id)
+					.sort()
+			).toEqual(['memory', expectedIdA, expectedIdB].sort())
 			const adapterA = registry.get(expectedIdA)
 			const adapterB = registry.get(expectedIdB)
 			expect(adapterA.label).toBe('PH A')
