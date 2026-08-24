@@ -7,6 +7,7 @@ interface InspectedField {
 	name?: string
 	type?: string
 	options?: Array<{ value?: string }>
+	admin?: { components?: { Field?: { path?: string } } }
 }
 
 interface RegisteredWidget {
@@ -111,5 +112,13 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-realtime')
 		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'windowMinutes']))
+	})
+
+	it('renders the metric field through MetricSelectField', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
+		const metricField = (widget?.fields ?? []).find((f) => f.name === 'metric')
+		expect(metricField?.admin?.components?.Field?.path).toBe(
+			'@10x-media/analytics/client#MetricSelectField'
+		)
 	})
 })
