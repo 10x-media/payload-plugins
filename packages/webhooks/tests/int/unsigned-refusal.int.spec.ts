@@ -1,8 +1,8 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
+import { isSealed } from '@10x-media/fields/encrypted'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { CIPHER_PREFIX } from '../../src/constants'
 import { encryptExistingSecrets, webhooks } from '../../src/index'
 import { generateSecret } from '../../src/secrets/format'
 
@@ -13,8 +13,15 @@ type Hit = { headers: IncomingHttpHeaders; body: string }
 /** A legacy pre-encryption secret: plaintext, unprefixed, untagged. */
 const LEGACY_SECRET = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718'
 
-/** Tagged as ciphertext but not decryptable under this instance's key. */
-const CORRUPT_CIPHERTEXT = `${CIPHER_PREFIX}${'0'.repeat(32)}${'ab'.repeat(40)}`
+/**
+ * A well-formed wire string whose tag does not verify under the configured key: what a changed
+ * `PAYLOAD_SECRET` leaves behind. `k0` is the default key id, so the ring has a key to try and the
+ * failure is authentication rather than a missing key.
+ */
+const WRONG_KEY_CIPHERTEXT = `pfe1.k0.${'A'.repeat(16)}.${'B'.repeat(24)}.${'C'.repeat(22)}`
+
+/** Same shape, but sealed under a key id no longer in the ring. */
+const UNKNOWN_KEY_CIPHERTEXT = `pfe1.retired.${'A'.repeat(16)}.${'B'.repeat(24)}.${'C'.repeat(22)}`
 
 describe('a secret that cannot be recovered fails the delivery', () => {
 	let booted: BootedPayload
@@ -104,14 +111,28 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 		await new Promise<void>((r) => sink.close(() => r()))
 	})
 
-	it('never POSTs when the stored ciphertext cannot be decrypted', async () => {
+	/**
+	 * Each of these needs a different fix, so each gets a different message. A single "could not be
+	 * decrypted" would send an operator hunting the wrong one.
+	 */
+	it('never POSTs when no configured key authenticates the stored value', async () => {
 		await clear()
-		await subscribe('corrupt', CORRUPT_CIPHERTEXT)
+		await subscribe('wrong-key', WRONG_KEY_CIPHERTEXT)
 
-		const { hit, delivery } = await deliver('corrupt')
+		const { hit, delivery } = await deliver('wrong-key')
 		expect(hit).toBeUndefined()
 		expect(delivery?.status).toBe('dead')
-		expect(String(delivery?.error)).toMatch(/could not be decrypted/)
+		expect(String(delivery?.error)).toMatch(/no configured key authenticates it/)
+	})
+
+	it('names the missing key when the value was sealed under one that is gone', async () => {
+		await clear()
+		await subscribe('unknown-key', UNKNOWN_KEY_CIPHERTEXT)
+
+		const { hit, delivery } = await deliver('unknown-key')
+		expect(hit).toBeUndefined()
+		expect(delivery?.status).toBe('dead')
+		expect(String(delivery?.error)).toMatch(/key id that is not in secretEncryption.keys/)
 	})
 
 	it('never POSTs an unmigrated legacy plaintext secret unsigned', async () => {
@@ -121,7 +142,7 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 		const { hit, delivery } = await deliver('legacy')
 		expect(hit).toBeUndefined()
 		expect(delivery?.status).toBe('dead')
-		expect(String(delivery?.error)).toMatch(/could not be decrypted/)
+		expect(String(delivery?.error)).toMatch(/encryptExistingSecrets/)
 	})
 
 	it('delivers signed again once the legacy row is migrated', async () => {
@@ -136,7 +157,7 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 
 	it('delivers signed again after rotating a broken subscription', async () => {
 		await clear()
-		const created = await subscribe('rotated', CORRUPT_CIPHERTEXT)
+		const created = await subscribe('rotated', WRONG_KEY_CIPHERTEXT)
 
 		const res = await booted.payload.update({
 			collection: 'webhook-subscriptions',
@@ -176,7 +197,7 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 			{ name: 'half-broken' },
 			{
 				$set: {
-					previousSecret: CORRUPT_CIPHERTEXT,
+					previousSecret: WRONG_KEY_CIPHERTEXT,
 					previousSecretExpiresAt: new Date(Date.now() + 3_600_000),
 				},
 			}
@@ -203,7 +224,7 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 			},
 			overrideAccess: true,
 		})
-		await raw().updateOne({ name: 'active-broken' }, { $set: { secret: CORRUPT_CIPHERTEXT } })
+		await raw().updateOne({ name: 'active-broken' }, { $set: { secret: WRONG_KEY_CIPHERTEXT } })
 
 		const { hit, delivery } = await deliver('active-broken')
 		expect(hit).toBeUndefined()
@@ -231,7 +252,7 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 			}
 			await connection
 				.collection('webhook-subscriptions')
-				.updateOne({ name: 'queued' }, { $set: { secret: CORRUPT_CIPHERTEXT } })
+				.updateOne({ name: 'queued' }, { $set: { secret: WRONG_KEY_CIPHERTEXT } })
 			expect(created.id).toBeTruthy()
 
 			hits = []
@@ -250,14 +271,14 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 				limit: 1,
 			})
 			expect(deliveries.docs[0]?.status).toBe('dead')
-			expect(String(deliveries.docs[0]?.error)).toMatch(/could not be decrypted/)
+			expect(String(deliveries.docs[0]?.error)).toMatch(/no configured key authenticates it/)
 		} finally {
 			await queued.stop()
 		}
 	})
 })
 
-describe('previousSecret cannot be injected on create', () => {
+describe('the stored secrets are not editable through the API', () => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -306,6 +327,33 @@ describe('previousSecret cannot be injected on create', () => {
 		expect(JSON.stringify(row)).not.toContain(injected.slice('whsec_'.length))
 	})
 
+	/**
+	 * "You cannot change the secret except by rotating" is a security claim, so it is asserted
+	 * against the stored row rather than against the field config. `overrideAccess: false` is what
+	 * makes this the REST/GraphQL path.
+	 */
+	it('drops a secret an ordinary update tries to replace', async () => {
+		const created = await booted.payload.create({
+			collection: 'webhook-subscriptions',
+			data: { name: 'locked', url: 'https://example.test', events: [] },
+			overrideAccess: true,
+		})
+		const before = await rawRow('locked')
+
+		const replacement = generateSecret()
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			data: { name: 'locked renamed', secret: replacement },
+			overrideAccess: false,
+			user: { id: 'someone', collection: 'users' } as never,
+		})
+
+		const after = await rawRow('locked renamed')
+		expect(after?.secret).toBe(before?.secret)
+		expect(JSON.stringify(after)).not.toContain(replacement.slice('whsec_'.length))
+	})
+
 	it('encrypts previousSecret even on a privileged create that bypasses field access', async () => {
 		const injected = generateSecret()
 		await booted.payload.create({
@@ -320,7 +368,7 @@ describe('previousSecret cannot be injected on create', () => {
 		})
 
 		const row = await rawRow('privileged')
-		expect(String(row?.previousSecret).startsWith(CIPHER_PREFIX)).toBe(true)
+		expect(isSealed(row?.previousSecret)).toBe(true)
 		expect(JSON.stringify(row)).not.toContain(injected.slice('whsec_'.length))
 	})
 })

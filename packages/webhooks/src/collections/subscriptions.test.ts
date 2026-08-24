@@ -1,72 +1,74 @@
-import {
-	APIError,
-	type CollectionAfterChangeHook,
-	type CollectionBeforeChangeHook,
-	type FieldHook,
-	type RequestContext,
+import type {
+	CollectionAfterChangeHook,
+	CollectionBeforeValidateHook,
+	RequestContext,
 } from 'payload'
 import { describe, expect, it } from 'vitest'
-import {
-	CIPHER_PREFIX,
-	SECRET_BYTES,
-	SECRET_MASK,
-	SECRET_PREFIX,
-	SECRET_REVEAL_CONTEXT,
-	SECRET_UNUSABLE,
-} from '../constants'
-import { isEncryptedSecret } from '../secrets/crypto'
-import { generateSecret, isNormalizedSecret, secretKey } from '../secrets/format'
+import { GENERATED_SECRET_KEY, SECRET_BYTES, SECRET_PREFIX } from '../constants'
+import { isNormalizedSecret, secretKey } from '../secrets/format'
+import { secretHintName, secretSetName } from '../secrets/secretFields'
 import { keys } from '../translations/keys'
 import { buildSubscriptionsCollection } from './subscriptions'
+
+/** A wire string in `@10x-media/fields` sealed form, which is what a duplicate resubmits. */
+const SEALED = 'pfe1.k0.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA'
 
 const find = (c: ReturnType<typeof buildSubscriptionsCollection>, name: string) =>
 	c.fields.find((f) => 'name' in f && f.name === name)
 
-const secretAfterRead = (
-	c: ReturnType<typeof buildSubscriptionsCollection>,
-	name = 'secret'
-): FieldHook => {
-	const field = find(c, name)
-	const hook = field && 'hooks' in field ? field.hooks?.afterRead?.[0] : undefined
+const fakeReq = (context: RequestContext) => ({ context })
+
+/** Found by name rather than position, so adding a hook does not silently retarget a test. */
+const hookNamed = <T extends { name: string }>(hooks: T[] | undefined, name: string): T => {
+	const hook = hooks?.find((h) => h.name === name)
 	if (!hook) {
-		throw new Error(`${name} afterRead hook missing`)
+		throw new Error(`no hook named ${name}`)
 	}
 	return hook
 }
 
-/** Reversible stand-in for Payload's aes-256-ctr crypto, enough to exercise the hooks. */
-const fakeReq = (context: RequestContext) => ({
-	context,
-	payload: {
-		encrypt: (text: string) => Buffer.from(text, 'utf8').toString('hex'),
-		decrypt: (hash: string) => Buffer.from(hash, 'hex').toString('utf8'),
-		logger: { error: () => undefined },
-	},
-})
+const runCreate = (
+	c: ReturnType<typeof buildSubscriptionsCollection>,
+	args: { data: Record<string, unknown>; operation?: 'create' | 'update'; context: RequestContext }
+) => {
+	const hook = hookNamed(
+		c.hooks?.beforeValidate,
+		'generateOnCreate'
+	) as CollectionBeforeValidateHook
+	return hook({
+		data: args.data,
+		operation: args.operation ?? 'create',
+		req: fakeReq(args.context),
+	} as never) as Record<string, unknown>
+}
 
-const runMask = (hook: FieldHook, value: unknown, context: RequestContext) =>
-	hook({ value, req: fakeReq(context) } as never)
-
-/** The create-time reveal stash, which binds plaintext to the ciphertext it was stored as. */
-const stash = (context: RequestContext) =>
-	context[SECRET_REVEAL_CONTEXT.plaintext] as { ciphertext: string; plaintext: string } | undefined
+const runAfterChange = (
+	c: ReturnType<typeof buildSubscriptionsCollection>,
+	args: {
+		doc: Record<string, unknown>
+		operation: 'create' | 'update'
+		context: RequestContext
+	}
+) => {
+	const hook = c.hooks?.afterChange?.[0] as CollectionAfterChangeHook
+	return hook({
+		doc: args.doc,
+		operation: args.operation,
+		req: fakeReq(args.context),
+	} as never) as Record<string, unknown>
+}
 
 const runBeforeChange = (
 	c: ReturnType<typeof buildSubscriptionsCollection>,
-	args: {
-		data: Record<string, unknown>
-		operation: 'create' | 'update'
-		context: RequestContext
-		originalDoc?: Record<string, unknown>
-	}
+	args: { data: Record<string, unknown>; originalDoc?: Record<string, unknown> }
 ) => {
-	const hook = c.hooks?.beforeChange?.[0] as CollectionBeforeChangeHook
+	const hook = hookNamed(c.hooks?.beforeChange, 'clearLapsedRotation')
 	return hook({
 		data: args.data,
-		operation: args.operation,
+		operation: 'update',
 		originalDoc: args.originalDoc,
-		req: fakeReq(args.context),
-	} as never) as Promise<Record<string, unknown>> | Record<string, unknown>
+		req: fakeReq({}),
+	} as never) as Record<string, unknown>
 }
 
 describe('buildSubscriptionsCollection', () => {
@@ -95,153 +97,6 @@ describe('buildSubscriptionsCollection', () => {
 		)
 	})
 
-	it('generates a whsec_ secret on create, stores it encrypted, and flags the one-time reveal', async () => {
-		const context: RequestContext = {}
-		const created = await runBeforeChange(c, { data: {}, operation: 'create', context })
-		expect(isEncryptedSecret(created.secret)).toBe(true)
-		const revealed = stash(context)?.plaintext as string
-		expect(isNormalizedSecret(revealed)).toBe(true)
-		expect(secretKey(revealed)).toHaveLength(SECRET_BYTES)
-		expect(String(created.secret)).not.toContain(revealed)
-		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(true)
-	})
-
-	it('leaves an update without a secret untouched', async () => {
-		const updateContext: RequestContext = {}
-		const updated = await runBeforeChange(c, {
-			data: { name: 'renamed' },
-			operation: 'update',
-			context: updateContext,
-		})
-		expect(updated.secret).toBeUndefined()
-		expect(updateContext[SECRET_REVEAL_CONTEXT.once]).toBeUndefined()
-	})
-
-	it('encrypts a plaintext secret supplied on update', async () => {
-		const plaintext = generateSecret()
-		const updated = await runBeforeChange(c, {
-			data: { secret: plaintext },
-			operation: 'update',
-			context: {},
-		})
-		expect(isEncryptedSecret(updated.secret)).toBe(true)
-		expect(String(updated.secret)).not.toContain(plaintext)
-	})
-
-	it('does not re-encrypt an already-encrypted secret on update', async () => {
-		const created = await runBeforeChange(c, { data: {}, operation: 'create', context: {} })
-		const updated = await runBeforeChange(c, {
-			data: { secret: created.secret },
-			operation: 'update',
-			context: {},
-		})
-		expect(updated.secret).toBe(created.secret)
-	})
-
-	it('drops a masked secret written back on update rather than persisting the placeholder', async () => {
-		const updated = await runBeforeChange(c, {
-			data: { name: 'n', secret: SECRET_MASK },
-			operation: 'update',
-			context: {},
-		})
-		expect('secret' in updated).toBe(false)
-		expect(updated.name).toBe('n')
-	})
-
-	it('normalizes a customer-supplied secret and reveals it once, like a generated one', async () => {
-		const context: RequestContext = {}
-		const bare = generateSecret().slice(SECRET_PREFIX.length)
-		const created = await runBeforeChange(c, {
-			data: { secret: bare },
-			operation: 'create',
-			context,
-		})
-		expect(isEncryptedSecret(created.secret)).toBe(true)
-		expect(stash(context)?.plaintext).toBe(`${SECRET_PREFIX}${bare}`)
-		expect(stash(context)?.ciphertext).toBe(created.secret)
-		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(true)
-	})
-
-	it('collapses a doubly-prefixed customer secret', async () => {
-		const context: RequestContext = {}
-		const bare = generateSecret().slice(SECRET_PREFIX.length)
-		await runBeforeChange(c, {
-			data: { secret: `${SECRET_PREFIX}${SECRET_PREFIX}${bare}` },
-			operation: 'create',
-			context,
-		})
-		expect(stash(context)?.plaintext).toBe(`${SECRET_PREFIX}${bare}`)
-	})
-
-	it('rejects a malformed customer secret with a 400', () => {
-		const create = () =>
-			runBeforeChange(c, { data: { secret: 'not base64!' }, operation: 'create', context: {} })
-		expect(create).toThrow(APIError)
-		expect(create).toThrow(expect.objectContaining({ status: 400 }))
-	})
-
-	/**
-	 * Payload's admin omits the field rather than sending an empty one, so an empty string is an
-	 * API caller who meant to supply a secret. Generating one silently would hand that caller a
-	 * subscription signed with a secret they never saw.
-	 */
-	it('rejects an explicitly empty secret rather than generating one', () => {
-		expect(() =>
-			runBeforeChange(c, { data: { secret: '' }, operation: 'create', context: {} })
-		).toThrow(APIError)
-	})
-
-	it('generates only when the secret is genuinely absent', async () => {
-		for (const data of [{}, { secret: undefined }, { secret: null }]) {
-			const context: RequestContext = {}
-			const created = await runBeforeChange(c, { data, operation: 'create', context })
-			expect(isEncryptedSecret(created.secret)).toBe(true)
-			expect(isNormalizedSecret(stash(context)?.plaintext)).toBe(true)
-		}
-	})
-
-	it('masks the secret on a plain read', () => {
-		const hook = secretAfterRead(c)
-		expect(runMask(hook, 'a'.repeat(48), {})).toBe(SECRET_MASK)
-	})
-
-	it('reveals the create-time plaintext for the one-time create response', () => {
-		const hook = secretAfterRead(c)
-		const plaintext = generateSecret()
-		const ciphertext = `${CIPHER_PREFIX}stored`
-		expect(
-			runMask(hook, ciphertext, {
-				[SECRET_REVEAL_CONTEXT.once]: true,
-				[SECRET_REVEAL_CONTEXT.plaintext]: { ciphertext, plaintext },
-			})
-		).toBe(plaintext)
-	})
-
-	it('masks when the stash belongs to a different document', () => {
-		const hook = secretAfterRead(c)
-		expect(
-			runMask(hook, `${CIPHER_PREFIX}this_document`, {
-				[SECRET_REVEAL_CONTEXT.once]: true,
-				[SECRET_REVEAL_CONTEXT.plaintext]: {
-					ciphertext: `${CIPHER_PREFIX}a_failed_create`,
-					plaintext: generateSecret(),
-				},
-			})
-		).toBe(SECRET_MASK)
-	})
-
-	it('never reveals the create stash through previousSecret', () => {
-		const hook = secretAfterRead(c, 'previousSecret')
-		const plaintext = generateSecret()
-		const ciphertext = `${CIPHER_PREFIX}stored`
-		expect(
-			runMask(hook, ciphertext, {
-				[SECRET_REVEAL_CONTEXT.once]: true,
-				[SECRET_REVEAL_CONTEXT.plaintext]: { ciphertext, plaintext },
-			})
-		).toBe(SECRET_MASK)
-	})
-
 	it('locks both rotation fields against create as well as update', () => {
 		for (const name of ['previousSecret', 'previousSecretExpiresAt']) {
 			const field = find(c, name)
@@ -251,48 +106,145 @@ describe('buildSubscriptionsCollection', () => {
 		}
 	})
 
-	it('clears the reveal window when a create fails after beforeChange', () => {
-		const hook = c.hooks?.afterError?.[0] as (args: never) => unknown
-		const context: RequestContext = {
-			[SECRET_REVEAL_CONTEXT.once]: true,
-			[SECRET_REVEAL_CONTEXT.plaintext]: { ciphertext: 'c', plaintext: generateSecret() },
+	/**
+	 * The write-only editor renders Replace and Generate actions and does not consult Payload's
+	 * `readOnly`, so leaving the field on the edit view would put a live control over a write that
+	 * field access drops: the operator would type a new secret, save, see no error, and still be
+	 * signing with the old one. Rotation is the only path, and it has its own button.
+	 */
+	it('renders the secret field on create only, so rotation is the single control', () => {
+		const secret = find(c, 'secret')
+		const condition = secret && 'admin' in secret ? secret.admin?.condition : undefined
+		if (!condition) {
+			throw new Error('secret admin.condition missing')
 		}
-		hook({ req: { context } } as never)
-		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(false)
-		expect(context[SECRET_REVEAL_CONTEXT.plaintext]).toBeUndefined()
+		expect(condition({}, {}, { operation: 'create' } as never)).toBe(true)
+		expect(condition({}, {}, { operation: 'update' } as never)).toBe(false)
 	})
 
-	it('masks rather than leaking ciphertext if the reveal stash is missing', () => {
-		const hook = secretAfterRead(c)
-		expect(runMask(hook, 'ciphertext', { [SECRET_REVEAL_CONTEXT.once]: true })).toBe(SECRET_MASK)
+	/**
+	 * The resolver reads these siblings by name, and they are `encryptedField`'s to define. Pinning
+	 * them against the fields the factory actually emitted is what keeps a rename over there from
+	 * turning into a subscription that silently resolves as having no secret.
+	 */
+	it('emits the set-indicator and hint siblings the resolver reads by name', () => {
+		expect(find(c, secretSetName('secret'))).toBeDefined()
+		expect(find(c, secretSetName('previousSecret'))).toBeDefined()
+		expect(find(c, secretHintName('secret'))).toBeDefined()
 	})
 
-	it('decrypts the stored secret for internal signing reads', () => {
-		const hook = secretAfterRead(c)
-		const plaintext = generateSecret()
-		const stored = `whenc1_${Buffer.from(plaintext, 'utf8').toString('hex')}`
-		expect(runMask(hook, stored, { [SECRET_REVEAL_CONTEXT.forSigning]: true })).toBe(plaintext)
-	})
-
-	it('flags a signing read it cannot decrypt, rather than reading as no secret', () => {
-		const hook = secretAfterRead(c)
-		const result = runMask(hook, 'not-decryptable', {
-			[SECRET_REVEAL_CONTEXT.forSigning]: true,
+	describe('generated secrets', () => {
+		it('generates a whsec_ secret on a create that supplies none', () => {
+			const context: RequestContext = {}
+			const data = runCreate(c, { data: {}, operation: 'create', context })
+			expect(isNormalizedSecret(data.secret)).toBe(true)
+			expect(secretKey(data.secret as string)).toHaveLength(SECRET_BYTES)
 		})
-		expect(result).toBe(SECRET_UNUSABLE)
-		expect(result).not.toBeNull()
+
+		it('returns the generated secret once, under its own key', () => {
+			const context: RequestContext = {}
+			const data = runCreate(c, { data: {}, operation: 'create', context })
+			const doc = runAfterChange(c, { doc: { id: '1' }, operation: 'create', context })
+			expect(doc[GENERATED_SECRET_KEY]).toBe(data.secret)
+		})
+
+		it('closes the reveal after one read, so a second afterChange carries nothing', () => {
+			const context: RequestContext = {}
+			runCreate(c, { data: {}, operation: 'create', context })
+			runAfterChange(c, { doc: { id: '1' }, operation: 'create', context })
+			const second = runAfterChange(c, { doc: { id: '1' }, operation: 'create', context })
+			expect(GENERATED_SECRET_KEY in second).toBe(false)
+		})
+
+		it('leaves a supplied secret alone, and reveals nothing: the caller already holds it', () => {
+			const context: RequestContext = {}
+			const supplied = `${SECRET_PREFIX}${'A'.repeat(44)}`
+			const data = runCreate(c, {
+				data: { secret: supplied },
+				operation: 'create',
+				context,
+			})
+			expect(data.secret).toBe(supplied)
+			const doc = runAfterChange(c, { doc: { id: '1' }, operation: 'create', context })
+			expect(GENERATED_SECRET_KEY in doc).toBe(false)
+		})
+
+		/**
+		 * Payload's admin omits the field rather than sending an empty one, so an empty string is an
+		 * API caller who meant to supply a secret. Generating one silently would hand that caller a
+		 * subscription signed with a secret they never saw; leaving it for the field validator is
+		 * what turns it into a 400 naming the problem.
+		 */
+		it('leaves an explicitly empty secret for the validator rather than generating one', () => {
+			const data = runCreate(c, {
+				data: { secret: '' },
+				operation: 'create',
+				context: {},
+			})
+			expect(data.secret).toBe('')
+		})
+
+		/**
+		 * Payload merges the stored document into `data` before this hook runs, so a duplicate
+		 * arrives carrying the original's ciphertext. Two subscriptions sharing one signing key is
+		 * exactly what must not happen.
+		 */
+		it('treats a sealed value on create as absent, so a duplicate gets its own key', () => {
+			const context: RequestContext = {}
+			const data = runCreate(c, {
+				data: { secret: SEALED, previousSecret: SEALED, previousSecretExpiresAt: 'later' },
+				operation: 'create',
+				context,
+			})
+			expect(isNormalizedSecret(data.secret)).toBe(true)
+			expect(data.secret).not.toBe(SEALED)
+			// A copy inherits no rotation state either: the retired key belongs to the original.
+			expect(data.previousSecret).toBeNull()
+			expect(data.previousSecretExpiresAt).toBeNull()
+		})
+
+		it('generates nothing on an update', () => {
+			const context: RequestContext = {}
+			const data = runCreate(c, { data: { name: 'n' }, operation: 'update', context })
+			expect('secret' in data).toBe(false)
+			const doc = runAfterChange(c, { doc: { id: '1' }, operation: 'update', context })
+			expect(GENERATED_SECRET_KEY in doc).toBe(false)
+		})
 	})
 
-	it('returns the stored value verbatim for a raw read', () => {
-		const hook = secretAfterRead(c)
-		const stored = 'whenc1_deadbeef'
-		expect(runMask(hook, stored, { [SECRET_REVEAL_CONTEXT.raw]: true })).toBe(stored)
-	})
+	describe('lapsed rotation cleanup', () => {
+		const lapsed = { previousSecretExpiresAt: '2020-01-01T00:00:00Z' }
 
-	it('passes through nullish secrets without masking', () => {
-		const hook = secretAfterRead(c)
-		expect(runMask(hook, undefined, {})).toBeUndefined()
-		expect(runMask(hook, null, {})).toBeNull()
+		it('clears a retired secret whose window has closed on the next write', () => {
+			const updated = runBeforeChange(c, { data: { name: 'renamed' }, originalDoc: lapsed })
+			expect(updated.previousSecret).toBeNull()
+			expect(updated.previousSecretExpiresAt).toBeNull()
+		})
+
+		it('leaves an open window alone', () => {
+			const updated = runBeforeChange(c, {
+				data: { name: 'renamed' },
+				originalDoc: { previousSecretExpiresAt: new Date(Date.now() + 60_000) },
+			})
+			expect('previousSecret' in updated).toBe(false)
+		})
+
+		it('does not fight a rotation writing the fields in the same operation', () => {
+			const updated = runBeforeChange(c, {
+				data: { previousSecret: 'incoming', previousSecretExpiresAt: 'later' },
+				originalDoc: lapsed,
+			})
+			expect(updated.previousSecret).toBe('incoming')
+			expect(updated.previousSecretExpiresAt).toBe('later')
+		})
+
+		it('leaves a row with no retired secret untouched', () => {
+			const updated = runBeforeChange(c, {
+				data: { name: 'renamed' },
+				originalDoc: { previousSecretExpiresAt: null },
+			})
+			expect('previousSecret' in updated).toBe(false)
+		})
 	})
 
 	describe('custom header names', () => {
@@ -325,113 +277,22 @@ describe('buildSubscriptionsCollection', () => {
 
 		it('rejects a reserved name through a translation key', () => {
 			expect(validateKey()('webhook-signature')).toBe(keys.headerReserved)
+			expect(validateKey()('Content-Type')).toBe(keys.headerReserved)
+		})
+
+		/**
+		 * A name with a space saves fine and then makes `fetch` throw at delivery time, so the
+		 * operator would find out from a dead delivery row instead of from the form.
+		 */
+		it('rejects a name that is not a valid HTTP token', () => {
+			for (const name of ['X Custom', 'X:Custom', 'X\tCustom', 'Ünicode']) {
+				expect(validateKey()(name)).toBe(keys.headerInvalid)
+			}
 		})
 
 		it('accepts an ordinary header name', () => {
 			expect(validateKey()('X-Custom')).toBe(true)
-		})
-	})
-
-	it('clears the one-time reveal flag and stashed plaintext after the create write settles', () => {
-		const hook = c.hooks?.afterChange?.[0] as CollectionAfterChangeHook
-		const context: RequestContext = {
-			[SECRET_REVEAL_CONTEXT.once]: true,
-			[SECRET_REVEAL_CONTEXT.plaintext]: { ciphertext: 'c', plaintext: generateSecret() },
-		}
-		hook({ doc: { id: '1' }, req: { context } } as never)
-		expect(context[SECRET_REVEAL_CONTEXT.once]).toBe(false)
-		expect(context[SECRET_REVEAL_CONTEXT.plaintext]).toBeUndefined()
-	})
-
-	/**
-	 * Payload runs collection `afterError` from its HTTP layer only, so a Local API create that
-	 * throws after `beforeChange` reaches no cleanup hook. The reveal has to close itself.
-	 */
-	it('consumes the reveal on the first matching read, so a second read is masked', async () => {
-		const context: RequestContext = {}
-		const created = await runBeforeChange(c, { data: {}, operation: 'create', context })
-		const hook = secretAfterRead(c)
-		const plaintext = stash(context)?.plaintext
-
-		expect(runMask(hook, created.secret, context)).toBe(plaintext)
-		expect(runMask(hook, created.secret, context)).toBe(SECRET_MASK)
-		expect(context[SECRET_REVEAL_CONTEXT.plaintext]).toBeUndefined()
-	})
-
-	it('generates a fresh secret when a read document is resubmitted, as duplicate does', async () => {
-		for (const placeholder of [SECRET_MASK, SECRET_UNUSABLE]) {
-			const context: RequestContext = {}
-			const created = await runBeforeChange(c, {
-				data: { name: 'copy', secret: placeholder },
-				operation: 'create',
-				context,
-			})
-			expect(isEncryptedSecret(created.secret)).toBe(true)
-			expect(isNormalizedSecret(stash(context)?.plaintext)).toBe(true)
-		}
-	})
-
-	it('drops a resubmitted placeholder on update rather than storing it as the key', async () => {
-		for (const placeholder of [SECRET_MASK, SECRET_UNUSABLE]) {
-			const updated = await runBeforeChange(c, {
-				data: { name: 'n', secret: placeholder },
-				operation: 'update',
-				context: {},
-			})
-			expect('secret' in updated).toBe(false)
-		}
-	})
-
-	describe('lapsed rotation cleanup', () => {
-		const lapsed = {
-			previousSecret: `${CIPHER_PREFIX}abc`,
-			previousSecretExpiresAt: '2020-01-01T00:00:00Z',
-		}
-
-		it('clears a retired secret whose window has closed on the next write', async () => {
-			const updated = await runBeforeChange(c, {
-				data: { name: 'renamed' },
-				operation: 'update',
-				context: {},
-				originalDoc: lapsed,
-			})
-			expect(updated.previousSecret).toBeNull()
-			expect(updated.previousSecretExpiresAt).toBeNull()
-		})
-
-		it('leaves an open window alone', async () => {
-			const updated = await runBeforeChange(c, {
-				data: { name: 'renamed' },
-				operation: 'update',
-				context: {},
-				originalDoc: {
-					previousSecret: `${CIPHER_PREFIX}abc`,
-					previousSecretExpiresAt: new Date(Date.now() + 60_000),
-				},
-			})
-			expect('previousSecret' in updated).toBe(false)
-		})
-
-		it('does not fight a rotation writing the fields in the same operation', async () => {
-			const incoming = generateSecret()
-			const updated = await runBeforeChange(c, {
-				data: { previousSecret: incoming, previousSecretExpiresAt: 'later' },
-				operation: 'update',
-				context: {},
-				originalDoc: lapsed,
-			})
-			expect(isEncryptedSecret(updated.previousSecret)).toBe(true)
-			expect(updated.previousSecretExpiresAt).toBe('later')
-		})
-
-		it('leaves a row with no retired secret untouched', async () => {
-			const updated = await runBeforeChange(c, {
-				data: { name: 'renamed' },
-				operation: 'update',
-				context: {},
-				originalDoc: { previousSecret: null, previousSecretExpiresAt: null },
-			})
-			expect('previousSecret' in updated).toBe(false)
+			expect(validateKey()('X_Custom.1')).toBe(true)
 		})
 	})
 })

@@ -49,7 +49,7 @@ describe('signPayload', () => {
 	})
 
 	it('rejects a secret that is not valid whsec_ material', () => {
-		expect(() => signPayload({ ...args, secret: '__redacted__' })).toThrow(/invalid signing secret/)
+		expect(() => signPayload({ ...args, secret: 'not-a-secret' })).toThrow(/invalid signing secret/)
 	})
 
 	it('signs the exact body bytes, including whitespace and unicode', () => {

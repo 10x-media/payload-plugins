@@ -1,209 +1,133 @@
-import {
-	APIError,
-	type CollectionAfterChangeHook,
-	type CollectionAfterErrorHook,
-	type CollectionBeforeChangeHook,
-	type CollectionConfig,
-	type FieldHook,
-	type Payload,
-	type PayloadRequest,
+import { isSealed, type KeysConfig } from '@10x-media/fields/encrypted'
+import type {
+	CollectionAfterChangeHook,
+	CollectionBeforeChangeHook,
+	CollectionBeforeValidateHook,
+	CollectionConfig,
+	PayloadRequest,
 } from 'payload'
 
-import { ADMIN_GROUP, SECRET_MASK, SECRET_REVEAL_CONTEXT, SECRET_UNUSABLE } from '../constants'
-import { isReservedHeader } from '../delivery/headers'
-import { decryptSecret, encryptSecret, isEncryptedSecret } from '../secrets/crypto'
-import { generateSecret, InvalidSecretError, normalizeSecret } from '../secrets/format'
+import { ADMIN_GROUP, GENERATED_SECRET_KEY } from '../constants'
+import { isReservedHeader, isValidHeaderName } from '../delivery/headers'
+import { generateSecret, normalizeSecret } from '../secrets/format'
+import { buildSecretFields } from '../secrets/secretFields'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
 
-/** Normalize a customer-supplied secret, surfacing a malformed one as a 400 rather than a 500. */
-const normalizeOr400 = (value: unknown): string => {
-	try {
-		return normalizeSecret(String(value))
-	} catch (err) {
-		if (err instanceof InvalidSecretError) {
-			throw new APIError(err.message, 400)
-		}
-		throw err
-	}
-}
-
-/** The storable form of an incoming secret: already-encrypted values pass through untouched. */
-const toStoredSecret = (payload: Payload, value: unknown): string =>
-	isEncryptedSecret(value) ? value : encryptSecret(payload, normalizeOr400(value))
+/**
+ * Carries a create's generated secret from the hook that made it to the hook that returns it.
+ * Write-only storage strips the field from every read, the create response included, so the
+ * plaintext cannot ride back on the field itself.
+ */
+const GENERATED_SECRET_CONTEXT = 'webhooksGeneratedSecret'
 
 /**
- * A read-shaped stand-in rather than key material. Both are what a read hands back in place of a
- * secret, so a caller that round-trips a document it read is writing one of these, not a secret,
- * and it must never be persisted as the signing key.
+ * Give a create with no secret a generated one, the way Stripe and Svix do: a caller who supplies
+ * a secret already holds it, but one who does not gets a usable subscription rather than an
+ * unsigned one. The value is stashed for the create response, since it is the only moment it can
+ * ever be read back.
+ *
+ * The field's own admin Generate action covers the form, which runs client-side by design; this
+ * covers every API create. Only a genuinely absent secret is generated: an explicitly empty
+ * string is left alone so the field validator can reject it, because a caller who meant to supply
+ * a secret should hear about it rather than be handed a generated one they never learn about.
+ *
+ * A sealed value arriving on a create is never customer input, since a caller supplies plaintext.
+ * It is what Payload's duplicate action resubmits, from the row it copied, and two subscriptions
+ * sharing one signing key is exactly what must not happen: the copy is given its own secret, and
+ * none of the original's rotation state.
  */
-const isPlaceholderSecret = (value: unknown): boolean =>
-	value === SECRET_MASK || value === SECRET_UNUSABLE
-
-/**
- * Encrypt one incoming secret field in place. A null clears it (rotation retiring the previous
- * secret), and a placeholder is dropped rather than persisted as the signing key.
- */
-const withStoredSecret = (
-	payload: Payload,
-	data: Record<string, unknown>,
-	field: 'previousSecret' | 'secret'
-): Record<string, unknown> => {
-	const value = data[field]
-	if (value === undefined || value === null) {
+const generateOnCreate: CollectionBeforeValidateHook = ({ data, operation, req }) => {
+	if (operation !== 'create' || !data) {
 		return data
 	}
-	if (isPlaceholderSecret(value)) {
-		const { [field]: _placeholder, ...rest } = data
-		return rest
+	const next = { ...data }
+	if (isSealed(next.previousSecret)) {
+		next.previousSecret = null
+		next.previousSecretExpiresAt = null
 	}
-	return { ...data, [field]: toStoredSecret(payload, value) }
+	if (isSealed(next.secret)) {
+		next.secret = undefined
+	}
+	if (next.secret !== undefined && next.secret !== null) {
+		return next
+	}
+	const secret = generateSecret()
+	req.context[GENERATED_SECRET_CONTEXT] = secret
+	next.secret = secret
+	return next
+}
+
+const SECRET_FIELDS = ['secret', 'previousSecret'] as const
+
+/**
+ * Normalize whatever plaintext a write carries into canonical `whsec_<base64>` form before the
+ * field seals it, so a stored secret is always in exactly one spelling. Two spellings of the same
+ * key would compare unequal in the rotation swap and would each have to be tried on read.
+ *
+ * A value that will not normalize is left as it is, for the field's own validator to reject with
+ * the reason: rewriting it here would turn a 400 naming the problem into a stored secret the
+ * caller never agreed to.
+ */
+const normalizeSuppliedSecrets: CollectionBeforeChangeHook = ({ data }) => {
+	const next = { ...data }
+	for (const field of SECRET_FIELDS) {
+		const value = next[field]
+		if (typeof value !== 'string' || value === '' || isSealed(value)) {
+			continue
+		}
+		try {
+			next[field] = normalizeSecret(value)
+		} catch {
+			// left for the field validator
+		}
+	}
+	return next
+}
+
+/**
+ * Return a generated secret once, under its own key.
+ *
+ * `secret` itself is stripped from every read, so a create response cannot carry it. A separate
+ * key is the better contract anyway: one field that behaves differently exactly once is the kind
+ * of thing a caller writes code against and then loses when the behaviour is tightened.
+ */
+const revealGeneratedSecret: CollectionAfterChangeHook = ({ doc, operation, req }) => {
+	const generated = req.context[GENERATED_SECRET_CONTEXT]
+	req.context[GENERATED_SECRET_CONTEXT] = undefined
+	if (operation !== 'create' || typeof generated !== 'string') {
+		return doc
+	}
+	return { ...doc, [GENERATED_SECRET_KEY]: generated }
 }
 
 /**
  * Retired key material whose grace window has closed is inert (the resolver ignores a lapsed
- * window), but there is no reason to keep it. Clearing it on the next write of the row is free,
- * needs no scheduler, and cannot race a delivery the way a write from the delivery path could.
+ * window), but there is no reason to keep it. Clearing it on the next privileged write of the row
+ * is free, needs no scheduler, and cannot race a delivery the way a write from the delivery path
+ * could.
+ *
+ * Payload merges the stored document into `data`, so the retired secret is present on every
+ * update as its own ciphertext; presence alone therefore says nothing. Only an unsealed value or
+ * an explicit null is this write actually setting the slot, which is a rotation, and a rotation
+ * owns both fields.
  */
-const withLapsedRotationCleared = (
-	data: Record<string, unknown>,
-	originalDoc: Record<string, unknown> | undefined,
-	now: number
-): Record<string, unknown> => {
-	if (!originalDoc || data.previousSecret !== undefined) {
+const clearLapsedRotation: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
+	const rotating =
+		data.previousSecret === null ||
+		(typeof data.previousSecret === 'string' && !isSealed(data.previousSecret))
+	if (rotating || !originalDoc) {
 		return data
 	}
-	const expiresAt = originalDoc.previousSecretExpiresAt
-	if (originalDoc.previousSecret == null || expiresAt == null) {
+	const expiresAt = (originalDoc as Record<string, unknown>).previousSecretExpiresAt
+	if (expiresAt == null) {
 		return data
 	}
 	const expires = expiresAt instanceof Date ? expiresAt.getTime() : Date.parse(String(expiresAt))
-	if (!Number.isFinite(expires) || now < expires) {
+	if (!Number.isFinite(expires) || Date.now() < expires) {
 		return data
 	}
 	return { ...data, previousSecret: null, previousSecretExpiresAt: null }
-}
-
-/**
- * Give every create a normalized `whsec_` secret, generated or customer-supplied, encrypt it
- * before it reaches the database, and open the one-time reveal window for both paths. The
- * plaintext is stashed on the request because the create response reads back ciphertext and
- * cannot recover it otherwise. Rotation writes plaintext into both secret fields, so updates
- * encrypt whichever ones are present.
- */
-const prepareSecret: CollectionBeforeChangeHook = ({ data, operation, originalDoc, req }) => {
-	if (operation === 'create') {
-		// A placeholder here is a document that was read and resubmitted, which is exactly what
-		// Payload's duplicate action does: it carries the mask, not key material. Treating it as
-		// absent gives the copy its own fresh secret, which is what a duplicate should have anyway.
-		// Only a genuinely absent secret is generated. An empty string is a caller that meant to
-		// supply one, so it is rejected rather than quietly swapped for a generated secret the
-		// caller never learns about. Payload's admin omits the field entirely, so this is API
-		// callers only.
-		const supplied = isPlaceholderSecret(data.secret) ? undefined : data.secret
-		const plaintext =
-			supplied === undefined || supplied === null ? generateSecret() : normalizeOr400(supplied)
-		const ciphertext = encryptSecret(req.payload, plaintext)
-		req.context[SECRET_REVEAL_CONTEXT.once] = true
-		// Bound to the exact ciphertext this create produced. Every encryption uses a fresh IV, so
-		// the stash can only ever match the document it came from: a stash left behind by a create
-		// that threw after this hook is inert rather than a reveal channel for another document.
-		req.context[SECRET_REVEAL_CONTEXT.plaintext] = { ciphertext, plaintext }
-		// `previousSecret` still goes through the encrypt path: field access blocks it from an
-		// ordinary create, but an `overrideAccess` create would otherwise persist it in plaintext.
-		return withStoredSecret(req.payload, { ...data, secret: ciphertext }, 'previousSecret')
-	}
-	return withLapsedRotationCleared(
-		withStoredSecret(req.payload, withStoredSecret(req.payload, data, 'secret'), 'previousSecret'),
-		originalDoc as Record<string, unknown> | undefined,
-		Date.now()
-	)
-}
-
-/** The create-time reveal stash: plaintext bound to the ciphertext it was stored as. */
-type RevealStash = { ciphertext: string; plaintext: string }
-
-const clearReveal = (req: PayloadRequest): void => {
-	req.context[SECRET_REVEAL_CONTEXT.once] = false
-	req.context[SECRET_REVEAL_CONTEXT.plaintext] = undefined
-}
-
-/**
- * Hand back the create-time plaintext for one value, and close the window in the same step.
- *
- * The stash is bound to the exact ciphertext the create produced, so it can only ever match the
- * document it came from. Consuming it on the first match makes the reveal literally once, enforced
- * at the read rather than by a later hook: Payload only runs collection `afterError` from its HTTP
- * layer, so a Local API create that throws after `beforeChange` never reaches any cleanup hook.
- */
-const takeStashedPlaintext = (req: PayloadRequest, value: string): string | null => {
-	const stash = req.context[SECRET_REVEAL_CONTEXT.plaintext] as RevealStash | undefined
-	if (stash?.ciphertext !== value) {
-		return null
-	}
-	clearReveal(req)
-	return stash.plaintext
-}
-
-/**
- * The database stores ciphertext; this hook shapes read output. It runs even under
- * `overrideAccess` (field hooks are not gated by access), so plaintext reaches a reader only
- * when a reveal flag is set: `once` returns the create-time plaintext for the one field and
- * document it belongs to, `forSigning` decrypts for internal delivery reads. Every other read,
- * admin, REST, or GraphQL, sees the mask.
- *
- * `reveals` is false for `previousSecret`: only a newly created secret has a create reveal, and
- * echoing the stash there would return the new secret a second time under the wrong field.
- *
- * `slot` only shapes the failure message. Which secret failed to decrypt decides what happens to
- * the delivery, and saying "deliveries will fail" for a retired secret that merely loses its
- * rotation overlap would send an operator hunting the wrong problem.
- */
-const maskSecret =
-	(options: { reveals: boolean; slot: 'active' | 'retired' }): FieldHook =>
-	({ collection, originalDoc, req, value }) => {
-		if (value == null) {
-			return value
-		}
-		if (req.context[SECRET_REVEAL_CONTEXT.raw]) {
-			return value
-		}
-		if (options.reveals && req.context[SECRET_REVEAL_CONTEXT.once]) {
-			return takeStashedPlaintext(req, String(value)) ?? SECRET_MASK
-		}
-		if (req.context[SECRET_REVEAL_CONTEXT.forSigning]) {
-			const plaintext = decryptSecret(req.payload, String(value))
-			if (!plaintext) {
-				// Named, because an install with many subscriptions otherwise gets an error per
-				// delivery with nothing in it to say which row needs migrating or rotating.
-				const subject = `${collection?.slug ?? 'subscription'} ${String(originalDoc?.id ?? 'unknown')}`
-				req.payload.logger.error(
-					options.slot === 'active'
-						? `@10x-media/webhooks: the stored signing secret for ${subject} could not be decrypted, so deliveries for this subscription will fail instead of being sent unsigned. Either PAYLOAD_SECRET changed after the secret was stored, or the subscription predates encryption at rest and needs encryptExistingSecrets(). Rotating the secret also recovers it.`
-						: `@10x-media/webhooks: the retired signing secret for ${subject}, still inside its rotation grace window, could not be decrypted, so it has been dropped. Deliveries continue, signed with the current secret; receivers that have not moved off the retired secret lose their overlap early.`
-				)
-				return SECRET_UNUSABLE
-			}
-			return plaintext
-		}
-		return SECRET_MASK
-	}
-
-/**
- * Belt to the reveal's suspenders. A successful create closes its own window when the response
- * read consumes the stash, so this only matters for a write whose response never reads the secret
- * back, and for a create that threw before it: Payload runs collection `afterError` from its HTTP
- * layer only, so a failed Local API create reaches neither hook. The ciphertext binding is what
- * makes a leftover stash harmless in that case; these two just keep a long-lived request tidy.
- */
-const clearRevealOnce: CollectionAfterChangeHook = ({ doc, req }) => {
-	clearReveal(req)
-	return doc
-}
-
-const clearRevealOnError: CollectionAfterErrorHook = ({ req }) => {
-	clearReveal(req)
-	return undefined
 }
 
 const loggedIn = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
@@ -213,6 +137,7 @@ export const buildSubscriptionsCollection = (args: {
 	slug: string
 	events: string[]
 	hidden: boolean
+	secretKeys?: KeysConfig
 }): CollectionConfig => ({
 	slug: args.slug,
 	labels: {
@@ -227,9 +152,9 @@ export const buildSubscriptionsCollection = (args: {
 	},
 	access: { read: loggedIn, create: loggedIn, update: loggedIn, delete: loggedIn },
 	hooks: {
-		beforeChange: [prepareSecret],
-		afterChange: [clearRevealOnce],
-		afterError: [clearRevealOnError],
+		beforeValidate: [generateOnCreate],
+		beforeChange: [normalizeSuppliedSecrets, clearLapsedRotation],
+		afterChange: [revealGeneratedSecret],
 	},
 	fields: [
 		{ name: 'name', type: 'text', required: true, label: labelForKey(keys.fieldName) },
@@ -249,25 +174,7 @@ export const buildSubscriptionsCollection = (args: {
 				? args.events.map((e) => ({ label: e, value: e }))
 				: [{ label: '(none)', value: '__none__' }],
 		},
-		{
-			name: 'secret',
-			type: 'text',
-			label: labelForKey(keys.fieldSecret),
-			admin: { readOnly: true, description: labelForKey(keys.fieldSecretHelp) },
-			access: { update: () => false },
-			hooks: { afterRead: [maskSecret({ reveals: true, slot: 'active' })] },
-		},
-		{
-			name: 'previousSecret',
-			type: 'text',
-			admin: { readOnly: true, hidden: true },
-			// Rotation and the adoption utility write these under `overrideAccess`, which bypasses
-			// field access. Denying create as well as update is what stops an ordinary REST or
-			// GraphQL create from planting a second signing key, in plaintext, on a new
-			// subscription: `admin.hidden` only hides the field in the UI.
-			access: { create: () => false, update: () => false },
-			hooks: { afterRead: [maskSecret({ reveals: false, slot: 'retired' })] },
-		},
+		...buildSecretFields({ keys: args.secretKeys }),
 		{
 			name: 'previousSecretExpiresAt',
 			type: 'date',
@@ -302,9 +209,15 @@ export const buildSubscriptionsCollection = (args: {
 							// Payload's own key, so this reads the same as every other required field.
 							return req.t('validation:required')
 						}
-						return isReservedHeader(value)
-							? asTranslate(req.t)(keys.headerReserved, { name: value })
-							: true
+						if (isReservedHeader(value)) {
+							return asTranslate(req.t)(keys.headerReserved, { name: value })
+						}
+						// A name with a space or a colon saves fine and then makes `fetch` throw at
+						// delivery time, so the operator would find out from a dead delivery row rather
+						// than from the form.
+						return isValidHeaderName(value)
+							? true
+							: asTranslate(req.t)(keys.headerInvalid, { name: value })
 					},
 				},
 				{ name: 'value', type: 'text' },

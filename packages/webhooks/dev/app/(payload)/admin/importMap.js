@@ -1,3 +1,5 @@
+import { ProtectedCell as ProtectedCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { ProtectedField as ProtectedField_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
 import { RotateSecretButton as RotateSecretButton_97a5813cc517f30dfcb493eaaa35d74e } from '@10x-media/webhooks/client'
 import { DeliveryStatusCell as DeliveryStatusCell_97a5813cc517f30dfcb493eaaa35d74e } from '@10x-media/webhooks/client'
 import { RedeliverButton as RedeliverButton_97a5813cc517f30dfcb493eaaa35d74e } from '@10x-media/webhooks/client'
@@ -5,6 +7,8 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@10x-media/fields/rsc#ProtectedCell": ProtectedCell_cf1583332d9c5fb967cd4249af29ce12,
+  "@10x-media/fields/client#ProtectedField": ProtectedField_02043ee4f38853ef8c4ef9fd50352514,
   "@10x-media/webhooks/client#RotateSecretButton": RotateSecretButton_97a5813cc517f30dfcb493eaaa35d74e,
   "@10x-media/webhooks/client#DeliveryStatusCell": DeliveryStatusCell_97a5813cc517f30dfcb493eaaa35d74e,
   "@10x-media/webhooks/client#RedeliverButton": RedeliverButton_97a5813cc517f30dfcb493eaaa35d74e,

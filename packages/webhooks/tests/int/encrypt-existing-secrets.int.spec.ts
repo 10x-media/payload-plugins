@@ -1,9 +1,9 @@
+import { isSealed, readEncryptedField } from '@10x-media/fields/encrypted'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { SECRET_MASK, SECRET_PREFIX, SECRET_REVEAL_CONTEXT } from '../../src/constants'
+import { SECRET_PREFIX } from '../../src/constants'
 import { encryptExistingSecrets, webhooks } from '../../src/index'
-import { isEncryptedSecret } from '../../src/secrets/crypto'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -65,7 +65,7 @@ describe('encryptExistingSecrets', () => {
 		expect(report).toMatchObject({ scanned: 1, migrated: 1, alreadyEncrypted: 0, failed: [] })
 
 		const stored = await rawSecret('legacy')
-		expect(isEncryptedSecret(stored)).toBe(true)
+		expect(isSealed(stored)).toBe(true)
 		expect(String(stored)).not.toContain(LEGACY_SECRET)
 	})
 
@@ -74,13 +74,12 @@ describe('encryptExistingSecrets', () => {
 		const created = await makeLegacy('recoverable')
 		await encryptExistingSecrets(booted.payload)
 
-		const rotated = await booted.payload.findByID({
+		const handle = await readEncryptedField(booted.payload, {
 			collection: 'webhook-subscriptions',
 			id: String(created.id),
-			overrideAccess: true,
-			context: { [SECRET_REVEAL_CONTEXT.forSigning]: true },
+			path: 'secret',
 		})
-		expect(rotated.secret).toBe(`${SECRET_PREFIX}${LEGACY_SECRET}`)
+		expect(await handle?.decrypt()).toBe(`${SECRET_PREFIX}${LEGACY_SECRET}`)
 	})
 
 	it('is idempotent, so a repeated run changes nothing', async () => {
@@ -137,7 +136,7 @@ describe('encryptExistingSecrets', () => {
 		const report = await encryptExistingSecrets(booted.payload, { batchSize: 2 })
 		expect(report).toMatchObject({ scanned: 5, migrated: 5, failed: [] })
 		for (let i = 0; i < 5; i++) {
-			expect(isEncryptedSecret(await rawSecret(`batched-${i}`))).toBe(true)
+			expect(isSealed(await rawSecret(`batched-${i}`))).toBe(true)
 		}
 	})
 
@@ -171,8 +170,10 @@ describe('encryptExistingSecrets', () => {
 		])
 
 		const row = await collection().findOne({ name: 'partial' })
-		expect(isEncryptedSecret(row?.secret)).toBe(true)
-		expect(row?.previousSecret).toBe('not base64!!')
+		expect(isSealed(row?.secret)).toBe(true)
+		// The unusable retired value is sealed along with the row rather than left in plaintext: it
+		// cannot sign either way, and the report is what tells the operator its overlap is gone.
+		expect(isSealed(row?.previousSecret)).toBe(true)
 	})
 
 	it('names the field on a failure so an operator knows which one to rotate', async () => {
@@ -184,9 +185,9 @@ describe('encryptExistingSecrets', () => {
 		expect(report).toMatchObject({ alreadyEncrypted: 0, migrated: 0, noSecret: 0 })
 	})
 
-	it('keeps reads masked after migrating', async () => {
+	it('keeps the secret out of every read after migrating', async () => {
 		await clear()
-		const created = await makeLegacy('masked-after')
+		const created = await makeLegacy('stripped-after')
 		await encryptExistingSecrets(booted.payload)
 
 		const reread = await booted.payload.findByID({
@@ -194,6 +195,8 @@ describe('encryptExistingSecrets', () => {
 			id: String(created.id),
 			overrideAccess: true,
 		})
-		expect(reread.secret).toBe(SECRET_MASK)
+		expect(reread.secret).toBeUndefined()
+		expect(reread.secret_set).toBe(true)
+		expect(JSON.stringify(reread)).not.toContain(LEGACY_SECRET)
 	})
 })

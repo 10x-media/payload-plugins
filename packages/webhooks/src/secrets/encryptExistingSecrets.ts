@@ -1,8 +1,9 @@
-import type { Payload } from 'payload'
+import { isSealed, withRawEncrypted } from '@10x-media/fields/encrypted'
+import { createLocalReq, type Payload } from 'payload'
 
-import { DEFAULT_SUBSCRIPTIONS_SLUG, SECRET_REVEAL_CONTEXT } from '../constants'
-import { isEncryptedSecret } from './crypto'
+import { DEFAULT_SUBSCRIPTIONS_SLUG } from '../constants'
 import { InvalidSecretError, normalizeSecret } from './format'
+import type { SecretPath } from './secretFields'
 
 export type SecretMigrationReport = {
 	scanned: number
@@ -20,7 +21,7 @@ export type SecretMigrationReport = {
 	 * row whose other secret field migrated fine appears in `migrated` as well: one unusable field
 	 * is no reason to leave a recoverable one in plaintext.
 	 */
-	failed: { field: (typeof SECRET_FIELDS)[number]; id: string; reason: string }[]
+	failed: { field: SecretPath; id: string; reason: string }[]
 }
 
 export type EncryptExistingSecretsOptions = {
@@ -30,12 +31,16 @@ export type EncryptExistingSecretsOptions = {
 	dryRun?: boolean
 }
 
-const SECRET_FIELDS = ['secret', 'previousSecret'] as const
+const SECRET_FIELDS: SecretPath[] = ['secret', 'previousSecret']
 
 /**
  * Adoption path for subscriptions written before secrets were encrypted at rest. Each plaintext
- * secret is normalized to `whsec_<base64>` and encrypted in place; rows already holding
- * ciphertext are skipped, so the run is idempotent and safe to repeat.
+ * secret is normalized to `whsec_<base64>` and written back through the encrypted field, which
+ * seals it; rows already holding ciphertext are skipped, so the run is idempotent and safe to
+ * repeat.
+ *
+ * On a SQL adapter this needs the schema migration that adds the encrypted field's columns to
+ * have run first. Without it the write has nowhere to put the sealed value.
  *
  * Normalizing does not invent a new secret. A legacy 48-character hex secret is valid base64, so
  * it keeps its characters and simply gains the `whsec_` prefix: the value an operator already
@@ -60,18 +65,24 @@ export const encryptExistingSecrets = async (
 		noSecret: 0,
 		failed: [],
 	}
+	// The raw window rides on a request, and the scan has no caller to borrow one from. Its own
+	// request is also what keeps the write below outside the window, so the field's seal hook runs
+	// normally rather than being told to leave the value alone.
+	const req = await createLocalReq({}, payload)
 
 	let page = 1
 	let hasNextPage = true
 	while (hasNextPage) {
-		const result = await payload.find({
-			collection: slug,
-			depth: 0,
-			limit: batchSize,
-			overrideAccess: true,
-			page,
-			context: { [SECRET_REVEAL_CONTEXT.raw]: true },
-		})
+		const result = await withRawEncrypted(req, () =>
+			payload.find({
+				collection: slug,
+				depth: 0,
+				limit: batchSize,
+				overrideAccess: true,
+				page,
+				req,
+			})
+		)
 
 		for (const doc of result.docs) {
 			report.scanned += 1
@@ -86,7 +97,7 @@ export const encryptExistingSecrets = async (
 					continue
 				}
 				populated += 1
-				if (isEncryptedSecret(value)) {
+				if (isSealed(value)) {
 					continue
 				}
 				try {
@@ -114,7 +125,8 @@ export const encryptExistingSecrets = async (
 				continue
 			}
 			if (!options.dryRun) {
-				// Written as plaintext: the collection's beforeChange encrypts and tags it.
+				// Written as plaintext, outside the raw window: the encrypted field's beforeChange
+				// validates and seals it.
 				await payload.update({ collection: slug, id, data: patch, overrideAccess: true })
 			}
 			report.migrated += 1

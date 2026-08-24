@@ -1,4 +1,5 @@
-import type { PayloadRequest } from 'payload'
+import type { KeysConfig } from '@10x-media/fields/encrypted'
+import type { CollectionConfig, Field, PayloadRequest } from 'payload'
 
 import {
 	DEFAULT_DELIVERY_QUEUE,
@@ -47,6 +48,32 @@ export type DeliveryOptions = {
 	queue?: string
 }
 
+/** Replace the default fields, or transform them (the idiomatic Payload form). */
+export type FieldsOverride = (args: { defaultFields: Field[] }) => Field[]
+
+/**
+ * Override slot for a collection this plugin builds. Spread over our defaults, so any collection
+ * key can be replaced; `fields` additionally accepts a function that receives our default fields
+ * to compose with. The slug is not overridable here: it has its own option, and the plugin wires
+ * it into the delivery task and the endpoints before the override runs.
+ */
+export type CollectionOverride = { fields?: FieldsOverride } & Partial<
+	Omit<CollectionConfig, 'fields' | 'slug'>
+>
+
+export type SecretEncryptionOptions = {
+	/**
+	 * Key ring for the stored signing secrets, passed straight through to `@10x-media/fields`.
+	 * With no keys configured the encryption key derives from `PAYLOAD_SECRET`, so changing that
+	 * makes every stored secret unreadable; pin the current key here first and a `PAYLOAD_SECRET`
+	 * change costs one config line instead of a capture-and-restore script.
+	 *
+	 * This is the *encryption* key ring, unrelated to `secretRotation`, which is about the signing
+	 * secret a receiver verifies with.
+	 */
+	keys?: KeysConfig
+}
+
 export type SecretRotationOptions = {
 	/**
 	 * Seconds a rotated-out secret keeps signing alongside its replacement, giving receivers time
@@ -67,8 +94,9 @@ export type WebhooksPluginOptions = {
 	collections?: Record<string, true | CollectionWebhookConfig>
 	subscriptions?: CodeSubscription[]
 	delivery?: DeliveryMode | DeliveryOptions
-	subscriptionsCollection?: { slug?: string; hidden?: boolean }
-	deliveriesLog?: { slug?: string; hidden?: boolean }
+	subscriptionsCollection?: { slug?: string; hidden?: boolean; overrides?: CollectionOverride }
+	deliveriesLog?: { slug?: string; hidden?: boolean; overrides?: CollectionOverride }
+	secretEncryption?: SecretEncryptionOptions
 	secretRotation?: SecretRotationOptions
 }
 

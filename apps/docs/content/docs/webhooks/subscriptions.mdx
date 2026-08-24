@@ -38,7 +38,7 @@ The **Webhook Subscriptions** collection (slug `webhook-subscriptions` by defaul
 
 - `name`, `url`, and an `enabled` toggle
 - `events`: a multi-select of every event the opted-in collections can emit
-- `secret`: generated on create (or supply your own), revealed once, then masked and stored encrypted. A **Rotate secret** button replaces it in place. See [Signing](/webhooks/signing)
+- `secret`: set on the create form only (generate one or supply your own), then write-only. It is encrypted at rest and stripped from every read; a read carries `secret_set` and `secret_hint` instead. On an existing subscription the **Rotate secret** button is the only way to change it. See [Signing](/webhooks/signing)
 - `previousSecretExpiresAt`: set while a rotation grace period is open, when deliveries carry two signatures
 - `headers`: extra key/value headers injected on every delivery to this subscription. The names the plugin sets (`webhook-id`, `webhook-timestamp`, `webhook-signature`, `X-Webhook-Event`) are reserved and rejected here
 - `description`: free-form notes
@@ -79,3 +79,29 @@ webhooks({
 ```
 
 `hidden: true` keeps a collection out of the admin nav while it continues to function.
+
+<Callout type="warn">
+The subscriptions slug can be renamed freely: the stored secrets are bound to a [pinned scope](/webhooks/security#secrets-at-rest) rather than to the slug, so a rename does not make them unreadable.
+</Callout>
+
+## Collection overrides
+
+Both collections take an `overrides` slot, the same shape the other plugins in this family use. Top-level keys spread over the plugin's defaults, `access` and `admin` merge key by key, your hooks append after the plugin's, and `fields` receives the defaults to compose with. The slug is not overridable here (it has its own option, and the plugin wires it into the delivery task and the endpoints before the override runs).
+
+```ts title="payload.config.ts"
+webhooks({
+  collections: { posts: true },
+  subscriptionsCollection: {
+    overrides: {
+      access: { update: ({ req }) => req.user?.role === 'admin' },
+      admin: { group: 'Integrations' },
+      fields: ({ defaultFields }) => [...defaultFields, { name: 'tenant', type: 'text' }],
+    },
+  },
+  deliveriesLog: {
+    overrides: { admin: { defaultColumns: ['event', 'status', 'createdAt'] } },
+  },
+})
+```
+
+Overriding `access.update` on the subscriptions collection also governs the [rotate-secret endpoint](/webhooks/security#access-defaults), which defers to it.

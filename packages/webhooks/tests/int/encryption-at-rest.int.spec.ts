@@ -1,17 +1,21 @@
+import { isSealed, readEncryptedField } from '@10x-media/fields/encrypted'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { CIPHER_PREFIX, SECRET_MASK, SECRET_PREFIX } from '../../src/constants'
+import { GENERATED_SECRET_KEY, SECRET_HINT_SUFFIX, SECRET_PREFIX } from '../../src/constants'
 import { webhooks } from '../../src/index'
-import { isEncryptedSecret } from '../../src/secrets/crypto'
 import { generateSecret } from '../../src/secrets/format'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
 /**
  * The stored document straight from the mongo driver, bypassing Payload's field hooks entirely.
- * An API response cannot prove encryption at rest: the mask hook shapes it either way. Rows are
- * looked up by their unique `name` so the assertion needs no ObjectId construction.
+ * An API response cannot prove encryption at rest: the write-only strip removes the field either
+ * way. Rows are looked up by their unique `name` so the assertion needs no ObjectId construction.
+ *
+ * This is why the file is Mongo-only: proving what is on disk means reaching past Payload, and
+ * the SQL adapters expose nothing equivalent. The cross-database behaviour that matters (signing,
+ * rotation, the grace window) is covered in `matrix.int.spec.ts` instead.
  */
 const rawDocument = async (
 	booted: BootedPayload,
@@ -31,6 +35,13 @@ const rawDocument = async (
 	return doc
 }
 
+const create = async (booted: BootedPayload, name: string, data: Record<string, unknown> = {}) =>
+	booted.payload.create({
+		collection: 'webhook-subscriptions',
+		data: { name, url: 'https://example.test', events: [], ...data },
+		overrideAccess: true,
+	})
+
 describe('webhook secrets are encrypted at rest', () => {
 	let booted: BootedPayload
 
@@ -46,61 +57,68 @@ describe('webhook secrets are encrypted at rest', () => {
 		await booted.stop()
 	})
 
-	it('stores ciphertext, not the plaintext secret, for a generated secret', async () => {
-		const created = await booted.payload.create({
-			collection: 'webhook-subscriptions',
-			data: { name: 'generated', url: 'https://example.test', events: [] },
-			overrideAccess: true,
-		})
-		const plaintext = String(created.secret)
+	it('stores a sealed value, not the plaintext secret, for a generated secret', async () => {
+		const created = await create(booted, 'generated')
+		const plaintext = String(created[GENERATED_SECRET_KEY])
 		expect(plaintext.startsWith(SECRET_PREFIX)).toBe(true)
 
 		const raw = await rawDocument(booted, 'generated')
-		expect(isEncryptedSecret(raw.secret)).toBe(true)
-		expect(String(raw.secret).startsWith(CIPHER_PREFIX)).toBe(true)
+		expect(isSealed(raw.secret)).toBe(true)
 		expect(raw.secret).not.toBe(plaintext)
 		expect(JSON.stringify(raw)).not.toContain(plaintext)
 		expect(JSON.stringify(raw)).not.toContain(plaintext.slice(SECRET_PREFIX.length))
 	})
 
-	it('stores ciphertext for a customer-supplied secret too', async () => {
+	it('stores a sealed value for a customer-supplied secret too, and reveals nothing', async () => {
 		const supplied = generateSecret()
-		const created = await booted.payload.create({
-			collection: 'webhook-subscriptions',
-			data: { name: 'supplied', url: 'https://example.test', events: [], secret: supplied },
-			overrideAccess: true,
-		})
-		expect(created.secret).toBe(supplied)
+		const created = await create(booted, 'supplied', { secret: supplied })
+		// The caller already holds this one, so there is nothing to hand back.
+		expect(created[GENERATED_SECRET_KEY]).toBeUndefined()
 
 		const raw = await rawDocument(booted, 'supplied')
-		expect(isEncryptedSecret(raw.secret)).toBe(true)
+		expect(isSealed(raw.secret)).toBe(true)
 		expect(JSON.stringify(raw)).not.toContain(supplied.slice(SECRET_PREFIX.length))
 	})
 
-	it('keeps normal reads masked while the row holds ciphertext', async () => {
-		const created = await booted.payload.create({
-			collection: 'webhook-subscriptions',
-			data: { name: 'masked', url: 'https://example.test', events: [] },
-			overrideAccess: true,
-		})
+	/**
+	 * Write-only storage strips the field from every read result, so the one-time reveal cannot
+	 * ride on the field and the create response carries it under its own key instead.
+	 */
+	it('strips the secret from every read while the row holds ciphertext', async () => {
+		const created = await create(booted, 'stripped')
 		const reread = await booted.payload.findByID({
 			collection: 'webhook-subscriptions',
 			id: String(created.id),
 			overrideAccess: true,
 		})
-		expect(reread.secret).toBe(SECRET_MASK)
+		expect(reread.secret).toBeUndefined()
+		expect(reread[GENERATED_SECRET_KEY]).toBeUndefined()
+		// The set indicator is the mode's one deliberate leak: existence, not value.
+		expect(reread.secret_set).toBe(true)
 
-		const raw = await rawDocument(booted, 'masked')
-		expect(raw.secret).not.toBe(SECRET_MASK)
-		expect(isEncryptedSecret(raw.secret)).toBe(true)
+		const raw = await rawDocument(booted, 'stripped')
+		expect(isSealed(raw.secret)).toBe(true)
 	})
 
-	it('does not re-encrypt on an unrelated update', async () => {
-		const created = await booted.payload.create({
+	/**
+	 * Every character of a signing secret is key material rather than an identifier, so the hint
+	 * exposes the least that still tells two keys apart.
+	 */
+	it('stores an identification hint of exactly the configured suffix length', async () => {
+		const supplied = generateSecret()
+		const created = await create(booted, 'hinted', { secret: supplied })
+		const reread = await booted.payload.findByID({
 			collection: 'webhook-subscriptions',
-			data: { name: 'stable', url: 'https://example.test', events: [] },
+			id: String(created.id),
 			overrideAccess: true,
 		})
+		const hint = String(reread.secret_hint)
+		expect(hint).toContain(supplied.slice(-SECRET_HINT_SUFFIX))
+		expect(hint).not.toContain(supplied.slice(SECRET_PREFIX.length, -SECRET_HINT_SUFFIX))
+	})
+
+	it('does not reseal on an unrelated update', async () => {
+		const created = await create(booted, 'stable')
 		const before = await rawDocument(booted, 'stable')
 		await booted.payload.update({
 			collection: 'webhook-subscriptions',
@@ -113,38 +131,69 @@ describe('webhook secrets are encrypted at rest', () => {
 	})
 
 	/**
-	 * Payload's duplicate action resubmits a document it read, so the create sees the mask where a
-	 * secret would be. Treating that as customer-supplied key material rejected the whole duplicate.
+	 * Payload's duplicate action resubmits a document it read. Write-only storage means that read
+	 * carried no secret at all, so the copy is generated a fresh one rather than sharing the
+	 * original's key.
 	 */
 	it('gives a duplicated subscription its own fresh secret', async () => {
-		const created = await booted.payload.create({
-			collection: 'webhook-subscriptions',
-			data: { name: 'original', url: 'https://example.test', events: [] },
-			overrideAccess: true,
-		})
-		const original = String(created.secret)
+		const created = await create(booted, 'original')
+		const originalRaw = await rawDocument(booted, 'original')
 
-		const copy = await booted.payload.duplicate({
+		// Renamed in the same call: `rawDocument` looks rows up by name, and a duplicate otherwise
+		// carries the original's, so the lookup would find the original and prove nothing.
+		await booted.payload.duplicate({
 			collection: 'webhook-subscriptions',
+			data: { name: 'original copy' },
 			id: String(created.id),
 			overrideAccess: true,
 		})
 
-		expect(String(copy.secret).startsWith(SECRET_PREFIX)).toBe(true)
-		expect(copy.secret).not.toBe(original)
-		expect(copy.secret).not.toBe(SECRET_MASK)
+		const raw = await rawDocument(booted, 'original copy')
+		expect(isSealed(raw.secret)).toBe(true)
+		expect(raw.secret).not.toBe(originalRaw.secret)
+	})
 
-		const raw = await rawDocument(booted, String(copy.name))
-		expect(isEncryptedSecret(raw.secret)).toBe(true)
-		expect(JSON.stringify(raw)).not.toContain(String(copy.secret).slice(SECRET_PREFIX.length))
+	it('gives a duplicate none of the original rotation state', async () => {
+		const created = await create(booted, 'mid-rotation')
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			data: {
+				previousSecret: generateSecret(),
+				previousSecretExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+			},
+			overrideAccess: true,
+		})
+
+		await booted.payload.duplicate({
+			collection: 'webhook-subscriptions',
+			data: { name: 'mid-rotation copy' },
+			id: String(created.id),
+			overrideAccess: true,
+		})
+
+		const raw = await rawDocument(booted, 'mid-rotation copy')
+		expect(raw.previousSecret ?? null).toBeNull()
+		expect(raw.previousSecretExpiresAt ?? null).toBeNull()
+
+		// And through the admin's own path, where field access rather than overrideAccess decides
+		// what the write may carry.
+		await booted.payload.duplicate({
+			collection: 'webhook-subscriptions',
+			data: { name: 'mid-rotation copy 2' },
+			id: String(created.id),
+			overrideAccess: false,
+			user: { id: 'someone', collection: 'users' } as never,
+		})
+		const rawUnprivileged = await rawDocument(booted, 'mid-rotation copy 2')
+		expect(rawUnprivileged.previousSecret ?? null).toBeNull()
+		expect(rawUnprivileged.previousSecretExpiresAt ?? null).toBeNull()
+		expect(isSealed(rawUnprivileged.secret)).toBe(true)
+		expect(rawUnprivileged.secret).not.toBe((await rawDocument(booted, 'mid-rotation')).secret)
 	})
 
 	it('clears a retired secret whose grace window has closed on the next write', async () => {
-		const created = await booted.payload.create({
-			collection: 'webhook-subscriptions',
-			data: { name: 'lapsed-cleanup', url: 'https://example.test', events: [] },
-			overrideAccess: true,
-		})
+		const created = await create(booted, 'lapsed-cleanup')
 		await booted.payload.update({
 			collection: 'webhook-subscriptions',
 			id: String(created.id),
@@ -167,16 +216,12 @@ describe('webhook secrets are encrypted at rest', () => {
 		expect(raw.previousSecret).toBeNull()
 		expect(raw.previousSecretExpiresAt).toBeNull()
 		// The active secret is untouched by the cleanup.
-		expect(isEncryptedSecret(raw.secret)).toBe(true)
+		expect(isSealed(raw.secret)).toBe(true)
 	})
 
 	it('survives a fresh Payload initialization against the same database', async () => {
-		const created = await booted.payload.create({
-			collection: 'webhook-subscriptions',
-			data: { name: 'restart', url: 'https://example.test', events: [] },
-			overrideAccess: true,
-		})
-		const plaintext = String(created.secret)
+		const created = await create(booted, 'restart')
+		const plaintext = String(created[GENERATED_SECRET_KEY])
 
 		const restarted = await bootPayload({
 			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
@@ -190,13 +235,95 @@ describe('webhook secrets are encrypted at rest', () => {
 				id: String(created.id),
 				overrideAccess: true,
 			})
-			expect(reread.secret).toBe(SECRET_MASK)
+			expect(reread.secret).toBeUndefined()
+			expect(reread.secret_set).toBe(true)
 
 			const raw = await rawDocument(restarted, 'restart')
-			expect(isEncryptedSecret(raw.secret)).toBe(true)
+			expect(isSealed(raw.secret)).toBe(true)
 			expect(JSON.stringify(raw)).not.toContain(plaintext.slice(SECRET_PREFIX.length))
 		} finally {
 			await restarted.stop()
+		}
+	})
+})
+
+/**
+ * The key ring is what lets an operator change `PAYLOAD_SECRET` without stranding every stored
+ * secret, so the id has to actually reach the wire format and a key that is still in the ring has
+ * to keep opening what it sealed.
+ */
+describe('secretEncryption.keys', () => {
+	let booted: BootedPayload
+
+	const withKeys = (keys: Record<string, string>, active: string) =>
+		bootPayload({
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0 },
+				secretEncryption: { keys: { active, keys } },
+			}),
+			db: 'mongo',
+			collections: [posts],
+			attachTo: booted,
+		})
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0 },
+				secretEncryption: {
+					keys: { active: 'k1', keys: { k1: 'k1-key-material-32-bytes-long!!' } },
+				},
+			}),
+			db: 'mongo',
+			collections: [posts],
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('seals under the configured active key, naming it in the stored value', async () => {
+		await create(booted, 'ringed')
+		const raw = await rawDocument(booted, 'ringed')
+		expect(String(raw.secret).startsWith('pfe1.k1.')).toBe(true)
+	})
+
+	it('keeps opening a value after a newer key becomes active', async () => {
+		const created = await create(booted, 'rotated-ring')
+		const plaintext = String(created[GENERATED_SECRET_KEY])
+
+		const rotated = await withKeys(
+			{ k1: 'k1-key-material-32-bytes-long!!', k2: 'k2-key-material-32-bytes-long!!' },
+			'k2'
+		)
+		try {
+			const handle = await readEncryptedField(rotated.payload, {
+				collection: 'webhook-subscriptions',
+				id: String(created.id),
+				path: 'secret',
+			})
+			expect(await handle?.decrypt()).toBe(plaintext)
+		} finally {
+			await rotated.stop()
+		}
+	})
+
+	it('refuses the delivery when the sealing key is dropped from the ring', async () => {
+		const created = await create(booted, 'dropped-key')
+
+		const withoutK1 = await withKeys({ k2: 'k2-key-material-32-bytes-long!!' }, 'k2')
+		try {
+			const handle = await readEncryptedField(withoutK1.payload, {
+				collection: 'webhook-subscriptions',
+				id: String(created.id),
+				path: 'secret',
+			})
+			await expect(handle?.decrypt()).rejects.toThrow(/no key configured for keyId/)
+		} finally {
+			await withoutK1.stop()
 		}
 	})
 })

@@ -1,3 +1,4 @@
+import { withEncryptedQueryRewrite } from '@10x-media/fields/encrypted'
 import { type Config, type Endpoint, Forbidden, type PayloadRequest } from 'payload'
 
 import { buildDeliveriesCollection } from '../collections/deliveries'
@@ -17,6 +18,7 @@ import {
 } from '../options'
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { RotationConflictError, rotateSubscriptionSecret } from '../secrets/rotate'
+import { applyCollectionOverride } from './applyCollectionOverride'
 import { resolveMode } from './resolveMode'
 
 /**
@@ -162,11 +164,17 @@ export const registerWebhooks = (args: {
 	})
 
 	config.collections ??= []
-	const subscriptions = buildSubscriptionsCollection({
-		slug: subscriptionsSlug,
-		events: catalog,
-		hidden: options.subscriptionsCollection?.hidden ?? false,
-	})
+	// The response strip and the where-rewrite that write-only secrets depend on are attached
+	// here rather than left to the fields() plugin, so the secrets stay off every read result
+	// whether or not the consumer installed it.
+	const subscriptions = withEncryptedQueryRewrite(
+		buildSubscriptionsCollection({
+			slug: subscriptionsSlug,
+			events: catalog,
+			hidden: options.subscriptionsCollection?.hidden ?? false,
+			secretKeys: options.secretEncryption?.keys,
+		})
+	)
 
 	const rotateSecretEndpoint: Endpoint = {
 		path: '/:id/rotate-secret',
@@ -228,7 +236,9 @@ export const registerWebhooks = (args: {
 		},
 	}
 	subscriptions.endpoints = [...(subscriptions.endpoints || []), rotateSecretEndpoint]
-	config.collections.push(subscriptions)
+	config.collections.push(
+		applyCollectionOverride(subscriptions, options.subscriptionsCollection?.overrides)
+	)
 	const deliveries = buildDeliveriesCollection({
 		slug: deliveriesSlug,
 		hidden: options.deliveriesLog?.hidden ?? false,
@@ -263,7 +273,7 @@ export const registerWebhooks = (args: {
 		},
 	}
 	deliveries.endpoints = [...(deliveries.endpoints || []), redeliverEndpoint]
-	config.collections.push(deliveries)
+	config.collections.push(applyCollectionOverride(deliveries, options.deliveriesLog?.overrides))
 
 	config.jobs ??= {}
 	config.jobs.tasks ??= []

@@ -1,6 +1,6 @@
 ---
 title: Signing and secrets
-description: Standard Webhooks signatures, reveal-once secrets, rotation, and verifying in your receiver.
+description: Standard Webhooks signatures, write-only secrets, rotation, and verifying in your receiver.
 ---
 
 Every delivery from a subscription with a secret is signed, so your receiver can prove the request came from your Payload instance and was not replayed with a different body.
@@ -29,12 +29,16 @@ whsec_9ILRk4RIQ1cGqDbXxLKvcRs1kK5N5Qq5j1CQ5R1c2wA=
 
 `whsec_` is a fixed prefix, and everything after it is base64. Generated secrets carry 32 random bytes. You can supply your own on create or on rotation; it is normalized to exactly one prefix and must decode to at least 16 bytes.
 
+The admin form's **Generate** action produces a secret the same shape, from 44 characters of base62. It runs in the browser, so the value is visible and copyable until you save and never again.
+
+The Signing secret field appears on the **create** form only. Once a subscription exists, [rotation](#rotation) is the single way to change its secret, and the **Rotate secret** button is its only control: a stored secret cannot be edited in place, because doing so with no grace window would break every receiver still holding the old one.
+
 ## Request headers
 
 ```
 Content-Type: application/json
 User-Agent: 10x-media-webhooks
-webhook-id: <delivery-id>
+webhook-id: msg_<delivery-id>
 webhook-timestamp: <unix-seconds>
 webhook-signature: v1,<base64>     (only when the subscription has a secret)
 X-Webhook-Event: posts.created
@@ -42,7 +46,9 @@ X-Webhook-Event: posts.created
 
 `webhook-id`, `webhook-timestamp`, and `webhook-signature` are the standard's own header names. `X-Webhook-Event` is ours, kept because routing on the event name before verifying is convenient.
 
-Custom headers configured on a subscription are sent too, except that these four names are reserved: the plugin sets them and a custom header cannot overwrite them.
+`webhook-id` is the delivery row's id behind an opaque `msg_` prefix, stable across retries and the value receivers should dedupe on. The prefix is there because on a SQL adapter the row id is a sequential integer, which would tell every receiver how many deliveries you send and makes a poor dedupe key for anyone consuming webhooks from more than one source. It is covered by the MAC, so verify against the header exactly as sent.
+
+Custom headers configured on a subscription are sent too, except that six names are reserved: the four above plus `Content-Type` and `User-Agent`. The plugin sets all six and a custom header cannot overwrite them. The body is always JSON, so a subscription that relabelled `Content-Type` would mislabel every delivery it sends with nothing for the receiver to notice it by; a code subscription that sets any reserved name fails at config build rather than being silently dropped.
 
 <Callout type="warn">
 Verify against the **raw request body**, byte for byte. Parsing JSON and re-serializing it changes whitespace and key order, and the MAC will not match. Read the body as text first, verify, then parse.
@@ -119,13 +125,44 @@ Four details that are easy to get wrong:
 - **Check the version tag.** Only compare entries tagged `v1`. Ignoring the tag means a future scheme's signature would be checked as if it were `v1` rather than skipped.
 - **Compare in constant time.** Never `===` on signatures, and check lengths before `timingSafeEqual`.
 
-## Secrets are reveal-once
+## Secrets are write-only
 
-Creating a subscription generates a secret and shows it in full exactly once, on that create response. Every later read, through the admin, REST, or GraphQL, returns `__redacted__`. Supplying your own secret on create follows the same rule.
+Creating a subscription without a secret generates one and returns it exactly once, on that create response, under its own key:
 
-Secrets are [encrypted at rest](/webhooks/security#secrets-at-rest); the database holds ciphertext, not the value you copied.
+```json
+{
+  "doc": { "id": "...", "name": "CRM", "secret_set": true, "secret_hint": "····kqA=" },
+  "generatedSecret": "whsec_..."
+}
+```
+
+It is `generatedSecret` rather than `secret` because the `secret` field is **write-only**: it is stripped from every read result, the create response included, through the admin, REST, and GraphQL alike. Supplying your own secret on create returns nothing, since you already hold it.
+
+What a read does carry is `secret_set`, a boolean saying whether a secret is stored, and `secret_hint`, the last six characters of the value. Six, because on a signing secret every character is key material rather than an identifier: the hint is there to tell two keys apart and nothing more.
+
+Secrets are [encrypted at rest](/webhooks/security#secrets-at-rest); the database holds a sealed value, not the string you copied. To use one server-side, read it deliberately:
+
+```ts
+import { readEncryptedField } from '@10x-media/fields/encrypted'
+
+const handle = await readEncryptedField(payload, {
+  collection: 'webhook-subscriptions',
+  id: subscriptionId,
+  path: 'secret',
+})
+const secret = await handle?.decrypt()
+```
+
+## Two different things are called rotation
+
+They are unrelated, and confusing them is easy:
+
+- **Secret rotation**, below, issues a new *signing* secret for one subscription and keeps the old one valid for a grace period. It is what you do after an exposure, or on a schedule your receivers agreed to. Receivers are affected.
+- **[Encryption key rotation](/webhooks/security#rotating-the-encryption-key)** re-seals what is already stored under a new *encryption* key. It changes nothing a receiver can observe: the signing secrets themselves are unchanged.
 
 ## Rotation
+
+Rotating the signing secret. For the encryption key, see [above](#two-different-things-are-called-rotation).
 
 Rotate a secret without recreating the subscription, from the **Rotate secret** button on the subscription, or:
 

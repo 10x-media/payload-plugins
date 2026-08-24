@@ -100,7 +100,7 @@ catalogs:
       specifier: 5.3.3
       version: 5.3.3
     standardwebhooks:
-      specifier: ^1.0.0
+      specifier: 1.0.0
       version: 1.0.0
     tsdown:
       specifier: 0.22.1
@@ -1332,6 +1332,9 @@ importers:
 
   packages/webhooks:
     devDependencies:
+      '@10x-media/fields':
+        specifier: workspace:*
+        version: link:../fields
       '@10x-media/payload-test-harness':
         specifier: workspace:*
         version: link:../../tooling/test-harness
@@ -1365,6 +1368,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      next:
+        specifier: 'catalog:'
+        version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
       payload:
         specifier: 'catalog:'
         version: 3.85.0(graphql@16.14.0)(typescript@5.9.3)
@@ -1392,6 +1398,9 @@ importers:
 
   packages/webhooks/dev:
     dependencies:
+      '@10x-media/fields':
+        specifier: workspace:*
+        version: link:../../fields
       '@10x-media/webhooks':
         specifier: workspace:*
         version: link:..

@@ -1,11 +1,11 @@
 import { createHmac } from 'node:crypto'
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
+import { isSealed } from '@10x-media/fields/encrypted'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { SECRET_MASK } from '../../src/constants'
+import { GENERATED_SECRET_KEY } from '../../src/constants'
 import { webhooks } from '../../src/index'
-import { isEncryptedSecret } from '../../src/secrets/crypto'
 import { generateSecret, secretKey } from '../../src/secrets/format'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
 
@@ -114,7 +114,7 @@ describe('signing secret rotation', () => {
 	it('issues a new secret and keeps the old one signing during the grace period', async () => {
 		await removeAllSubscriptions()
 		const created = await createSubscription('grace')
-		const original = String(created.secret)
+		const original = String(created[GENERATED_SECRET_KEY])
 
 		const result = await rotate({ id: String(created.id), graceSeconds: 3600 })
 		expect(result.secret).not.toBe(original)
@@ -127,7 +127,7 @@ describe('signing secret rotation', () => {
 	it('accepts a customer-supplied rotation secret', async () => {
 		await removeAllSubscriptions()
 		const created = await createSubscription('supplied')
-		const original = String(created.secret)
+		const original = String(created[GENERATED_SECRET_KEY])
 		const chosen = generateSecret()
 
 		const result = await rotate({ id: String(created.id), secret: chosen, graceSeconds: 3600 })
@@ -152,7 +152,7 @@ describe('signing secret rotation', () => {
 	it('stops signing with the old secret once the grace period lapses', async () => {
 		await removeAllSubscriptions()
 		const created = await createSubscription('lapsed')
-		const original = String(created.secret)
+		const original = String(created[GENERATED_SECRET_KEY])
 
 		// Rotate into the past so the window is already closed, no waiting required.
 		const result = await rotate({
@@ -169,7 +169,7 @@ describe('signing secret rotation', () => {
 	it('retires the old secret immediately when the grace period is zero', async () => {
 		await removeAllSubscriptions()
 		const created = await createSubscription('immediate')
-		const original = String(created.secret)
+		const original = String(created[GENERATED_SECRET_KEY])
 
 		const result = await rotate({ id: String(created.id), graceSeconds: 0 })
 		expect(result.previousSecretExpiresAt).toBeNull()
@@ -182,13 +182,13 @@ describe('signing secret rotation', () => {
 	it('stores both secrets encrypted and keeps reads masked', async () => {
 		await removeAllSubscriptions()
 		const created = await createSubscription('stored')
-		const original = String(created.secret)
+		const original = String(created[GENERATED_SECRET_KEY])
 
 		const result = await rotate({ id: String(created.id), graceSeconds: 3600 })
 
 		const raw = await rawRow('stored')
-		expect(isEncryptedSecret(raw.secret)).toBe(true)
-		expect(isEncryptedSecret(raw.previousSecret)).toBe(true)
+		expect(isSealed(raw.secret)).toBe(true)
+		expect(isSealed(raw.previousSecret)).toBe(true)
 		expect(JSON.stringify(raw)).not.toContain(result.secret.slice('whsec_'.length))
 		expect(JSON.stringify(raw)).not.toContain(original.slice('whsec_'.length))
 
@@ -197,14 +197,17 @@ describe('signing secret rotation', () => {
 			id: String(created.id),
 			overrideAccess: true,
 		})
-		expect(reread.secret).toBe(SECRET_MASK)
-		expect(reread.previousSecret).toBe(SECRET_MASK)
+		// Write-only storage removes both from every read rather than substituting a placeholder.
+		expect(reread.secret).toBeUndefined()
+		expect(reread.previousSecret).toBeUndefined()
+		expect(reread.secret_set).toBe(true)
+		expect(reread.previousSecret_set).toBe(true)
 	})
 
 	it('survives a fresh Payload initialization mid-grace', async () => {
 		await removeAllSubscriptions()
 		const created = await createSubscription('restart')
-		const original = String(created.secret)
+		const original = String(created[GENERATED_SECRET_KEY])
 		const result = await rotate({ id: String(created.id), graceSeconds: 3600 })
 
 		const restarted = await bootPayload({

@@ -1,7 +1,8 @@
+import { readEncryptedField } from '@10x-media/fields/encrypted'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, Forbidden, type PayloadRequest } from 'payload'
+import { type CollectionConfig, Forbidden, type Payload, type PayloadRequest } from 'payload'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { MAX_ROTATION_GRACE_SECONDS, SECRET_MASK, SECRET_REVEAL_CONTEXT } from '../../src/constants'
+import { MAX_ROTATION_GRACE_SECONDS } from '../../src/constants'
 import { webhooks } from '../../src/index'
 import { resolveSecretRotationOptions } from '../../src/options'
 import { generateSecret } from '../../src/secrets/format'
@@ -9,8 +10,22 @@ import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
+/**
+ * The plaintext behind a stored secret, read the deliberate way the delivery path does. Nothing
+ * else can see it: write-only storage strips the field from every ordinary read.
+ */
+const activeSecretOf = async (payload: Payload, id: string): Promise<string> => {
+	const handle = await readEncryptedField(payload, {
+		collection: 'webhook-subscriptions',
+		id,
+		path: 'secret',
+	})
+	return String(await handle?.decrypt())
+}
+
 describe('rotation hardening', () => {
 	let booted: BootedPayload
+	const activeSecret = (id: string) => activeSecretOf(booted.payload, id)
 
 	const req = () => ({ context: {}, payload: booted.payload }) as unknown as PayloadRequest
 
@@ -90,17 +105,12 @@ describe('rotation hardening', () => {
 
 			// Whichever rotations reported success must have left the active secret as one of the
 			// values they returned: a caller is never told a secret is theirs when it was discarded.
-			const active = await booted.payload.findByID({
-				collection: 'webhook-subscriptions',
-				id,
-				overrideAccess: true,
-				context: { [SECRET_REVEAL_CONTEXT.forSigning]: true },
-			})
+			const active = await activeSecret(id)
 			const promised = fulfilled.map((r) => (r.status === 'fulfilled' ? r.value.secret : undefined))
-			expect(promised).toContain(active.secret)
+			expect(promised).toContain(active)
 		})
 
-		it('leaves the subscription readable and masked after a contended rotation', async () => {
+		it('leaves the subscription readable, and its secret still recoverable, after a contended rotation', async () => {
 			const created = await subscribe('contended')
 			const id = String(created.id)
 			await Promise.allSettled([rotate({ id, graceSeconds: 60 }), rotate({ id, graceSeconds: 60 })])
@@ -109,7 +119,11 @@ describe('rotation hardening', () => {
 				id,
 				overrideAccess: true,
 			})
-			expect(reread.secret).toBe(SECRET_MASK)
+			// Write-only storage strips the field from the read; the set indicator is what says a
+			// usable secret is still in place.
+			expect(reread.secret).toBeUndefined()
+			expect(reread.secret_set).toBe(true)
+			expect(await activeSecret(id)).toMatch(/^whsec_/)
 		})
 	})
 })
@@ -122,6 +136,7 @@ describe('rotation hardening', () => {
  */
 describe('the rotate-secret endpoint handler', () => {
 	let booted: BootedPayload
+	const activeSecret = (id: string) => activeSecretOf(booted.payload, id)
 
 	const handler = () => {
 		const endpoints = booted.payload.collections?.['webhook-subscriptions']?.config?.endpoints
@@ -272,13 +287,7 @@ describe('the rotate-secret endpoint handler', () => {
 		expect(status).toBe(400)
 		expect(String(body.error)).toMatch(/invalid signing secret/)
 
-		const reread = await booted.payload.findByID({
-			collection: 'webhook-subscriptions',
-			context: { [SECRET_REVEAL_CONTEXT.forSigning]: true },
-			id: String(created.id),
-			overrideAccess: true,
-		})
-		expect(String(reread.secret)).toMatch(/^whsec_/)
+		expect(await activeSecret(String(created.id))).toMatch(/^whsec_/)
 	})
 
 	it('accepts a customer-supplied secret and returns it', async () => {

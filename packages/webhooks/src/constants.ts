@@ -12,17 +12,6 @@ export const DEFAULT_RETRIES = 4
  */
 export const DEFAULT_ROTATION_GRACE_SECONDS = 86_400
 
-/** Placeholder returned for the signing secret on every read after its single create reveal. */
-export const SECRET_MASK = '__redacted__'
-
-/**
- * Returned by a signing read when a secret is present but cannot be recovered (wrong
- * `PAYLOAD_SECRET`, corrupted ciphertext, an unmigrated legacy value). Distinct from a null read,
- * which means no secret is configured: a subscription that is supposed to be signed must fail its
- * delivery rather than fall back to sending unsigned, so the two cases cannot share a value.
- */
-export const SECRET_UNUSABLE = '__unusable__'
-
 /**
  * Standard Webhooks secret prefix. Stripped before the remainder is base64-decoded into the
  * HMAC key, matching the reference verifier (`standardwebhooks`), which does the same.
@@ -33,14 +22,39 @@ export const SECRET_PREFIX = 'whsec_'
 export const SIGNATURE_VERSION = 'v1'
 
 /**
- * Marks a stored secret as ciphertext. Payload's `encrypt` is aes-256-ctr, so its output carries
- * no tag of its own and cannot be told apart from plaintext by trial decryption; this prefix is
- * what makes "already encrypted?" answerable and the encrypt hook idempotent.
+ * Prefix on the `webhook-id` header, so the value receivers dedupe on is opaque rather than the
+ * delivery row's primary key. On a SQL adapter that key is a sequential integer, which would
+ * publish this install's delivery volume to every receiver and make a poor dedupe key for anyone
+ * consuming webhooks from more than one source.
  */
-export const CIPHER_PREFIX = 'whenc1_'
+export const MESSAGE_ID_PREFIX = 'msg_'
 
-/** Random bytes behind a generated secret, base64-encoded after the `whsec_` prefix. */
+/**
+ * Pins the AAD binding of the stored secrets, which otherwise is the subscriptions collection's
+ * slug. That slug is a plugin option, so a consumer renaming the collection would turn every
+ * stored secret into an authentication failure nothing can recover. Never change this once
+ * secrets exist: it is a re-keying event with no migration path.
+ */
+export const SECRET_AAD_SCOPE = '10x-webhooks:subscriptions'
+
+/**
+ * Trailing plaintext characters kept beside a stored secret so an operator can tell which key a
+ * subscription holds. Every character of a signing secret is key material rather than an
+ * identifier, so this is the minimum that still distinguishes two keys.
+ */
+export const SECRET_HINT_SUFFIX = 6
+
+/** Random bytes behind a server-generated secret, base64-encoded after the `whsec_` prefix. */
 export const SECRET_BYTES = 32
+
+/**
+ * Characters after the prefix in an admin-generated secret. The admin's Generate action samples
+ * base62, which is a subset of the base64 alphabet, so a length divisible by four decodes as
+ * canonical base64 (44 characters, 33 bytes) and passes the same wire-format check a supplied
+ * secret does. A length that is not divisible by four would produce a value the validator
+ * rejects the moment the operator tried to save it.
+ */
+export const GENERATED_SECRET_CHARS = 44
 
 /**
  * Floor for the decoded key material of a customer-supplied secret. Base64 will happily decode
@@ -50,24 +64,11 @@ export const SECRET_BYTES = 32
 export const MIN_SECRET_BYTES = 16
 
 /**
- * `req.context` flags that opt a subscription read into seeing the plaintext signing secret.
- * The field `afterRead` mask runs even under `overrideAccess`, so internal signing reads
- * must set `forSigning` to decrypt the stored value; `once` is set by the create `beforeChange`
- * so the create response shows the secret exactly once. `plaintext` carries that create-time
- * value across the write, because the response reads back ciphertext and the mask hook has no
- * other way to recover what was just generated.
+ * Key the create response carries the generated secret under. Write-only storage strips `secret`
+ * from every read, the create response included, so the one-time reveal cannot ride on the field
+ * itself and gets a name of its own.
  */
-export const SECRET_REVEAL_CONTEXT = {
-	forSigning: 'webhooksRevealSecretForSigning',
-	once: 'webhooksRevealSecretOnce',
-	plaintext: 'webhooksRevealSecretPlaintext',
-	/**
-	 * Returns the stored value verbatim, encrypted or not. Only the adoption utility needs this,
-	 * to tell an unmigrated plaintext secret from ciphertext; `forSigning` cannot serve it because
-	 * a legacy secret fails the decrypt path's `whsec_` check and reads back as null.
-	 */
-	raw: 'webhooksRevealSecretRaw',
-} as const
+export const GENERATED_SECRET_KEY = 'generatedSecret'
 
 /**
  * Upper bound on a rotation grace period. A window measured in years would keep an exposed secret

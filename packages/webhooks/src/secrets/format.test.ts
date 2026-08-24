@@ -57,7 +57,7 @@ describe('normalizeSecret', () => {
 	})
 
 	it('rejects non-base64 material', () => {
-		expect(() => normalizeSecret('__redacted__')).toThrow(/padded base64/)
+		expect(() => normalizeSecret('not-a-secret')).toThrow(/padded base64/)
 		expect(() => normalizeSecret(`${SECRET_PREFIX}not base64!`)).toThrow(/padded base64/)
 	})
 
@@ -127,7 +127,7 @@ describe('isNormalizedSecret', () => {
 
 	it('rejects unprefixed, malformed, and non-string values', () => {
 		expect(isNormalizedSecret(randomBytes(SECRET_BYTES).toString('base64'))).toBe(false)
-		expect(isNormalizedSecret('__redacted__')).toBe(false)
+		expect(isNormalizedSecret('not-a-secret')).toBe(false)
 		expect(isNormalizedSecret(undefined)).toBe(false)
 		expect(isNormalizedSecret(null)).toBe(false)
 		expect(isNormalizedSecret(42)).toBe(false)

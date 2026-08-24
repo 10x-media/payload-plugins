@@ -4,7 +4,13 @@ import type { WebhooksPluginOptions } from './options'
 import { registerTranslations } from './plugin/registerTranslations'
 import { registerWebhooks } from './plugin/registerWebhooks'
 
-export type { WebhooksPluginOptions } from './options'
+export { GENERATED_SECRET_KEY } from './constants'
+export type {
+	CollectionOverride,
+	FieldsOverride,
+	SecretEncryptionOptions,
+	WebhooksPluginOptions,
+} from './options'
 export type {
 	EncryptExistingSecretsOptions,
 	SecretMigrationReport,

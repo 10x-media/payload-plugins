@@ -1,5 +1,6 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { MESSAGE_ID_PREFIX } from '../constants'
 import { fromCodeSubscription } from '../plugin/resolveSubscriptions'
 import { generateSecret } from '../secrets/format'
 import { sendDelivery } from './sendDelivery'
@@ -60,10 +61,10 @@ describe('sendDelivery', () => {
 		})
 		expect(r.ok).toBe(true)
 		expect(received?.body).toBe(body)
-		expect(received?.headers['webhook-id']).toBe('d1')
+		expect(received?.headers['webhook-id']).toBe(`${MESSAGE_ID_PREFIX}d1`)
 		expect(received?.headers['webhook-timestamp']).toBe(String(timestamp))
 		expect(received?.headers['webhook-signature']).toBe(
-			signatureHeader([signPayload({ secret, id: 'd1', timestamp, body })])
+			signatureHeader([signPayload({ secret, id: `${MESSAGE_ID_PREFIX}d1`, timestamp, body })])
 		)
 		expect(received?.headers['x-custom']).toBe('c')
 	})
@@ -89,7 +90,7 @@ describe('sendDelivery', () => {
 	it('retains X-Webhook-Event alongside the standard headers', async () => {
 		const hit = await capture('posts.created')
 		expect(hit.headers['x-webhook-event']).toBe('posts.created')
-		expect(hit.headers['webhook-id']).toBe('d_headers')
+		expect(hit.headers['webhook-id']).toBe(`${MESSAGE_ID_PREFIX}d_headers`)
 		expect(hit.headers['webhook-signature']).toMatch(/^v1,/)
 	})
 
@@ -116,8 +117,8 @@ describe('sendDelivery', () => {
 		})
 		const header = String(received?.headers['webhook-signature'])
 		expect(header.split(' ')).toEqual([
-			`v1,${signPayload({ secret, id: 'd3', timestamp, body })}`,
-			`v1,${signPayload({ secret: older, id: 'd3', timestamp, body })}`,
+			`v1,${signPayload({ secret, id: `${MESSAGE_ID_PREFIX}d3`, timestamp, body })}`,
+			`v1,${signPayload({ secret: older, id: `${MESSAGE_ID_PREFIX}d3`, timestamp, body })}`,
 		])
 	})
 
@@ -134,14 +135,27 @@ describe('sendDelivery', () => {
 		})
 		expect(received?.body).toBe(body)
 		expect(received?.headers['webhook-signature']).toBe(
-			signatureHeader([signPayload({ secret, id: 'd4', timestamp: Math.floor(now / 1000), body })])
+			signatureHeader([
+				signPayload({
+					secret,
+					id: `${MESSAGE_ID_PREFIX}d4`,
+					timestamp: Math.floor(now / 1000),
+					body,
+				}),
+			])
 		)
 	})
 
 	it('refuses to let a custom header clobber the signature it just computed', async () => {
 		const sub = {
 			...fromCodeSubscription({ id: 's', url, events: [], secret }),
-			headers: { 'Webhook-Signature': 'v1,forged', 'webhook-id': 'spoofed', 'X-Kept': 'yes' },
+			headers: {
+				'Content-Type': 'text/plain',
+				'User-Agent': 'not-us',
+				'Webhook-Signature': 'v1,forged',
+				'webhook-id': 'spoofed',
+				'X-Kept': 'yes',
+			},
 		}
 		const body = '{"id":"d5"}'
 		const now = 1_700_001_000_000
@@ -153,11 +167,22 @@ describe('sendDelivery', () => {
 			timeoutMs: 1000,
 			now,
 		})
-		expect(received?.headers['webhook-id']).toBe('d5')
+		expect(received?.headers['webhook-id']).toBe(`${MESSAGE_ID_PREFIX}d5`)
 		expect(received?.headers['webhook-signature']).toBe(
-			signatureHeader([signPayload({ secret, id: 'd5', timestamp: Math.floor(now / 1000), body })])
+			signatureHeader([
+				signPayload({
+					secret,
+					id: `${MESSAGE_ID_PREFIX}d5`,
+					timestamp: Math.floor(now / 1000),
+					body,
+				}),
+			])
 		)
 		expect(received?.headers['x-kept']).toBe('yes')
+		// The body is always JSON.stringify output, so a subscription relabelling it would mislabel
+		// every delivery it sends with nothing for the receiver to notice that with.
+		expect(received?.headers['content-type']).toBe('application/json')
+		expect(received?.headers['user-agent']).toBe('10x-media-webhooks')
 	})
 
 	it('omits the signature when no secret', async () => {
@@ -171,6 +196,6 @@ describe('sendDelivery', () => {
 			now: 1,
 		})
 		expect(received?.headers['webhook-signature']).toBeUndefined()
-		expect(received?.headers['webhook-id']).toBe('d2')
+		expect(received?.headers['webhook-id']).toBe(`${MESSAGE_ID_PREFIX}d2`)
 	})
 })

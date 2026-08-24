@@ -4,6 +4,7 @@ import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness
 import type { CollectionConfig, PayloadRequest } from 'payload'
 import { Webhook } from 'standardwebhooks'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { GENERATED_SECRET_KEY } from '../../src/constants'
 import { webhooks } from '../../src/index'
 import { generateSecret } from '../../src/secrets/format'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
@@ -120,7 +121,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 	it('produces a delivery the off-the-shelf verifier accepts', async () => {
 		await clear()
 		const created = await subscribe('interop')
-		const secret = String(created.secret)
+		const secret = String(created[GENERATED_SECRET_KEY])
 
 		const hit = await captureDelivery('verified by the reference library')
 
@@ -134,7 +135,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 		const created = await subscribe('tampered')
 		const hit = await captureDelivery('tamper')
 
-		const verifier = new Webhook(String(created.secret))
+		const verifier = new Webhook(String(created[GENERATED_SECRET_KEY]))
 		const tampered = `${hit.body.slice(0, -1)} `
 		expect(() => verifier.verify(tampered, standardHeaders(hit))).toThrow()
 	})
@@ -153,7 +154,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 		const created = await subscribe('swapped-id')
 		const hit = await captureDelivery('swapped id')
 
-		const verifier = new Webhook(String(created.secret))
+		const verifier = new Webhook(String(created[GENERATED_SECRET_KEY]))
 		expect(() =>
 			verifier.verify(hit.body, { ...standardHeaders(hit), 'webhook-id': 'msg_other' })
 		).toThrow()
@@ -162,7 +163,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 	it('lets verifiers on either secret accept during a rotation grace period', async () => {
 		await clear()
 		const created = await subscribe('rotating')
-		const original = String(created.secret)
+		const original = String(created[GENERATED_SECRET_KEY])
 
 		const rotated = await rotateSubscriptionSecret({
 			payload: booted.payload,
@@ -185,7 +186,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 	it('stops the retired secret verifying once the grace period has lapsed', async () => {
 		await clear()
 		const created = await subscribe('lapsed')
-		const original = String(created.secret)
+		const original = String(created[GENERATED_SECRET_KEY])
 
 		const rotated = await rotateSubscriptionSecret({
 			payload: booted.payload,
@@ -212,7 +213,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 
 			expect(
 				documentedReceiver({
-					secret: String(created.secret),
+					secret: String(created[GENERATED_SECRET_KEY]),
 					id: String(hit.headers['webhook-id']),
 					timestamp: String(hit.headers['webhook-timestamp']),
 					rawBody: hit.body,
@@ -225,7 +226,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 			await clear()
 			const created = await subscribe('agreement')
 			const hit = await captureDelivery('agreement')
-			const secret = String(created.secret)
+			const secret = String(created[GENERATED_SECRET_KEY])
 
 			const byLibrary = (() => {
 				try {
@@ -259,7 +260,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 			const hit = await captureDelivery(name)
 			const timestamp = String(hit.headers['webhook-timestamp'])
 			return documentedReceiver({
-				secret: String(created.secret),
+				secret: String(created[GENERATED_SECRET_KEY]),
 				id: String(hit.headers['webhook-id']),
 				timestamp,
 				rawBody: hit.body,
@@ -289,7 +290,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 
 			const verify = (signatureHeader: string) =>
 				documentedReceiver({
-					secret: String(created.secret),
+					secret: String(created[GENERATED_SECRET_KEY]),
 					id: String(hit.headers['webhook-id']),
 					timestamp: String(hit.headers['webhook-timestamp']),
 					rawBody: hit.body,
@@ -311,7 +312,7 @@ describe('interoperability with the standardwebhooks verifier', () => {
 
 			expect(
 				documentedReceiver({
-					secret: String(created.secret),
+					secret: String(created[GENERATED_SECRET_KEY]),
 					id: String(hit.headers['webhook-id']),
 					timestamp: 'not-a-number',
 					rawBody: hit.body,

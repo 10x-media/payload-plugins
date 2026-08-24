@@ -1,10 +1,9 @@
+import { readEncryptedField } from '@10x-media/fields/encrypted'
 import { commitTransaction, killTransaction, type Payload, type PayloadRequest } from 'payload'
 
-import { SECRET_REVEAL_CONTEXT } from '../constants'
 import { resolveSecretRotationOptions } from '../options'
-import { decryptSecret } from './crypto'
 import { generateSecret, normalizeSecret } from './format'
-import { withRevealWindow } from './revealWindow'
+import { recoverSecret } from './recover'
 
 /**
  * Raised when the subscription changed between this rotation's read and its write. The endpoint
@@ -60,6 +59,14 @@ const beginRotation = async (req: PayloadRequest): Promise<boolean> => {
 		db.drizzle ? { isolationLevel: 'repeatable read' } : undefined
 	)
 	if (id === null || id === undefined) {
+		// `@payloadcms/db-sqlite` no-ops `beginTransaction` unless the consumer sets
+		// `transactionOptions`, and Postgres does the same with `transactionOptions: false`. The
+		// rotation still runs, and the conditional write still catches the common case, but without
+		// a transaction it cannot survive a genuinely concurrent rotation. Say so rather than
+		// degrading silently.
+		req.payload.logger.warn(
+			`@10x-media/webhooks: the database adapter opened no transaction for this rotation, so it runs without snapshot isolation. Two rotations issued at the same moment can both appear to succeed while only one secret survives. Set 'transactionOptions' on the adapter to enable transactions.`
+		)
 		return false
 	}
 	req.transactionID = id
@@ -70,9 +77,8 @@ const beginRotation = async (req: PayloadRequest): Promise<boolean> => {
  * The subscription's secret exactly as stored, plus the plaintext behind it.
  *
  * The stored form is read rather than the decrypted one because it doubles as this rotation's
- * compare-and-swap token: it is what the write below requires to still be in place. Decrypting it
- * here rather than through the signing reveal window keeps both from a single read, and keeps the
- * token and the plaintext guaranteed to describe the same value.
+ * compare-and-swap token: it is what the write below requires to still be in place. The read
+ * joins the caller's request, so it sees this transaction's own view of the row.
  */
 const currentSecret = async (args: {
 	payload: Payload
@@ -80,19 +86,25 @@ const currentSecret = async (args: {
 	subscriptionsSlug: string
 	id: string
 }): Promise<{ stored: string | null; plaintext: string | null }> => {
-	const doc = await withRevealWindow(args.req, SECRET_REVEAL_CONTEXT.raw, () =>
-		args.payload.findByID({
-			collection: args.subscriptionsSlug,
-			id: args.id,
-			depth: 0,
-			overrideAccess: true,
-			req: args.req,
-		})
-	)
-	const stored = typeof doc.secret === 'string' && doc.secret !== '' ? doc.secret : null
+	const handle = await readEncryptedField(args.payload, {
+		collection: args.subscriptionsSlug,
+		id: args.id,
+		path: 'secret',
+		req: args.req,
+	})
+	const stored = typeof handle?.ciphertext === 'string' ? handle.ciphertext : null
+	if (!stored) {
+		return { stored: null, plaintext: null }
+	}
 	// An unreadable secret has nothing worth carrying into a grace period, and rotation is the
 	// documented recovery for exactly that state. It still serves as the swap token.
-	return { stored, plaintext: stored ? decryptSecret(args.payload, stored) : null }
+	const recovered = await recoverSecret({
+		payload: args.payload,
+		path: 'secret',
+		subscriptionsSlug: args.subscriptionsSlug,
+		value: stored,
+	})
+	return { stored, plaintext: recovered.ok ? recovered.secret : null }
 }
 
 /**
@@ -100,8 +112,8 @@ const currentSecret = async (args: {
  * `graceSeconds` so deliveries carry both signatures until receivers have switched over. The
  * caller supplies a secret or one is generated; either way it is normalized before storage.
  *
- * The write stores plaintext into `secret` and `previousSecret`; the collection's `beforeChange`
- * encrypts both, so this never handles ciphertext itself.
+ * The write stores plaintext into `secret` and `previousSecret`; the encrypted field's own
+ * `beforeChange` seals both, so this never handles ciphertext except as the swap token.
  */
 export const rotateSubscriptionSecret = async (args: {
 	payload: Payload
@@ -152,6 +164,15 @@ export const rotateSubscriptionSecret = async (args: {
 			req,
 		})
 
+		// A bulk update reports a matched-but-failed document in `errors`, which is a different
+		// problem from no match at all. Reading it first is what keeps a validation failure or a
+		// hook error from being reported as a conflict and retried forever.
+		const failure = result.errors?.[0]
+		if (failure) {
+			throw new Error(
+				`@10x-media/webhooks: rotating the secret for subscription ${id} was rejected: ${failure.message}`
+			)
+		}
 		if (result.docs.length === 0) {
 			throw new RotationConflictError(id)
 		}

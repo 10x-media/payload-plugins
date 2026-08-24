@@ -1,17 +1,18 @@
+import { withRawEncrypted } from '@10x-media/fields/encrypted'
 import type { CollectionAfterChangeHook, CollectionAfterDeleteHook, PayloadRequest } from 'payload'
 
-import { SECRET_REVEAL_CONTEXT, WEBHOOK_DELIVER_TASK } from '../constants'
+import { WEBHOOK_DELIVER_TASK } from '../constants'
 import { buildPayload } from '../delivery/buildPayload'
 import { sendDelivery } from '../delivery/sendDelivery'
 import type { CodeSubscription, CollectionWebhookConfig, WebhookOperation } from '../options'
 import {
 	decideDelivery,
 	fromCodeSubscription,
-	fromCollectionRow,
 	matchSubscriptions,
 	type ResolvedSubscription,
+	resolveCollectionRow,
+	type SubscriptionRow,
 } from '../plugin/resolveSubscriptions'
-import { withRevealWindow } from '../secrets/revealWindow'
 import { eventId } from './eventTypes'
 
 /** Per-collection dispatch dependencies. */
@@ -30,29 +31,51 @@ export type WebhookDispatchDeps = {
 /** Max collection subscriptions scanned per event (pagination is a future enhancement). */
 const SUBSCRIPTION_SCAN_LIMIT = 1_000
 
+/**
+ * Enabled collection subscriptions listening for one event, plus the code-defined ones.
+ *
+ * The event is part of the query rather than a filter applied afterwards, so an install with
+ * hundreds of subscriptions does not read (and, in `inline` mode, decrypt) every one of them on
+ * every watched write. `matchSubscriptions` still runs over the result: it is the authority on
+ * what a subscription listens for, and the `where` is only a narrowing.
+ *
+ * In `queue` mode the raw window is skipped entirely. The task re-resolves each subscription when
+ * it runs, so decrypting here would recover plaintext only to throw it away; without the window
+ * every stored secret reads back as `hidden`, which is exactly what it is at this point.
+ */
 const resolveListening = async (args: {
 	deps: WebhookDispatchDeps
 	event: string
 	req: PayloadRequest
 }): Promise<ResolvedSubscription[]> => {
+	const { payload } = args.req
 	const code = args.deps.codeSubscriptions.map(fromCodeSubscription)
-	const res = await withRevealWindow(args.req, SECRET_REVEAL_CONTEXT.forSigning, () =>
-		args.req.payload.find({
+	const read = () =>
+		payload.find({
 			collection: args.deps.subscriptionsSlug,
-			where: { enabled: { not_equals: false } },
+			where: {
+				and: [{ enabled: { not_equals: false } }, { events: { in: [args.event] } }],
+			},
 			limit: SUBSCRIPTION_SCAN_LIMIT,
 			depth: 0,
 			overrideAccess: true,
 			req: args.req,
 		})
-	)
+	const res =
+		args.deps.mode === 'queue' ? await read() : await withRawEncrypted(args.req, () => read())
 	if (res.docs.length >= SUBSCRIPTION_SCAN_LIMIT) {
-		args.req.payload.logger.warn(
+		payload.logger.warn(
 			`@10x-media/webhooks: subscription scan hit the ${SUBSCRIPTION_SCAN_LIMIT} cap; some subscriptions may be skipped for ${args.event}.`
 		)
 	}
-	const collection = res.docs.map((d) =>
-		fromCollectionRow(d as Parameters<typeof fromCollectionRow>[0])
+	const collection = await Promise.all(
+		res.docs.map((d) =>
+			resolveCollectionRow({
+				payload,
+				row: d as SubscriptionRow,
+				subscriptionsSlug: args.deps.subscriptionsSlug,
+			})
+		)
 	)
 	return matchSubscriptions([...code, ...collection], args.event)
 }
