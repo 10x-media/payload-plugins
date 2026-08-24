@@ -20,9 +20,11 @@ export interface RegistryBase {
 }
 
 /**
- * Overlay runtime adapters onto the static base: a runtime adapter sharing a base
- * adapter's id replaces it in place (the scope's own configuration wins, including
- * for the default), new ids append after the base.
+ * Append runtime adapters after the static base. Ids are disjoint by
+ * construction (instance ids carry a ':', config ids do not); an extra that
+ * still collides with a base id (a custom providers.resolve returning a plain
+ * provider id) is skipped so config adapters always win, and the default
+ * adapter is always a config adapter.
  */
 export const combineRegistries = (
 	base: RegistryBase,
@@ -31,9 +33,8 @@ export const combineRegistries = (
 	if (extra.length === 0) {
 		return createRegistry(base.adapters, base.defaultId)
 	}
-	const byId = new Map(extra.map((a) => [a.id, a]))
-	const merged = base.adapters.map((a) => byId.get(a.id) ?? a)
-	const seen = new Set(merged.map((a) => a.id))
+	const seen = new Set(base.adapters.map((a) => a.id))
+	const merged = [...base.adapters]
 	for (const adapter of extra) {
 		if (!seen.has(adapter.id)) {
 			merged.push(adapter)
