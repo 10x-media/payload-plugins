@@ -314,6 +314,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fileRemove]: 'Entfernen',
 	[keys.spamRateLimited]: 'Du hast zu viele Anfragen gesendet. Bitte versuche es später erneut.',
 	[keys.spamRejected]: 'Deine Übermittlung konnte nicht verarbeitet werden.',
+	[keys.submissionActionFailedFlag]: 'Aktion fehlgeschlagen',
 	[keys.submissionActionFailed]:
 		'Deine Übermittlung konnte nicht abgeschlossen werden. Bitte versuche es gleich noch einmal.',
 	[keys.spamCaptchaFailed]: 'Captcha-Überprüfung fehlgeschlagen. Bitte versuche es erneut.',
@@ -395,6 +396,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.formMultistep]: 'Mehrstufig',
 	[keys.formPollEnabled]: 'Umfrage',
 	[keys.formPersistSubmissions]: 'Übermittlungen speichern',
+	[keys.formConsentRetentionNotice]:
+		'Dieses Formular speichert keine Übermittlungen, daher werden Einwilligungsnachweise nach den Aktionen verworfen. Behalte diese Kombination nur, wenn der Einwilligungsnachweis an anderer Stelle liegt, etwa bei einem Double-Opt-in-Anbieter.',
 	[keys.formClose]: 'Schließen',
 	[keys.formSuccess]: 'Vielen Dank.',
 	[keys.formSubmitFailed]: 'Übermittlung fehlgeschlagen',

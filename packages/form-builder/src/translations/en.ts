@@ -302,6 +302,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fileRemove]: 'Remove',
 	[keys.spamRateLimited]: 'You have sent too many requests. Please try again later.',
 	[keys.spamRejected]: 'Your submission could not be processed.',
+	[keys.submissionActionFailedFlag]: 'Action failed',
 	[keys.submissionActionFailed]:
 		'Your submission could not be completed. Please try again in a moment.',
 	[keys.spamCaptchaFailed]: 'Captcha verification failed. Please try again.',
@@ -380,6 +381,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.formMultistep]: 'Multi-step',
 	[keys.formPollEnabled]: 'Poll',
 	[keys.formPersistSubmissions]: 'Store submissions',
+	[keys.formConsentRetentionNotice]:
+		'This form does not store submissions, so consent proofs are discarded once actions have run. Keep this setup only when the consent record lives elsewhere, such as a double opt-in provider.',
 	[keys.formClose]: 'Close',
 	[keys.formSuccess]: 'Thank you.',
 	[keys.formSubmitFailed]: 'Submission failed',

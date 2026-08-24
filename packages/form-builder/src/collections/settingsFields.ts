@@ -7,6 +7,8 @@ export type DefaultSettingsFields = {
 	multistep: Field
 	pollEnabled: Field
 	persistSubmissions: Field
+	/** Sidebar notice shown when a non-persisting form carries a consent field: proofs are pruned with the row. */
+	consentRetentionNotice: Field
 }
 
 /**
@@ -49,6 +51,23 @@ export const buildDefaultSettingsFields = (): DefaultSettingsFields => ({
 		label: labelForKey(keys.formPersistSubmissions),
 		admin: { position: 'sidebar' },
 	},
+	// A visible contradiction notice, not a refusal: a consent field on a non-persisting form is
+	// legitimate when the consent record lives elsewhere (a double opt-in provider), but the proof
+	// is pruned with the row, and that must never be silent.
+	consentRetentionNotice: {
+		name: 'consentRetentionNotice',
+		type: 'ui',
+		admin: {
+			position: 'sidebar',
+			condition: (data) =>
+				(data as { persistSubmissions?: unknown })?.persistSubmissions === false &&
+				Array.isArray((data as { fields?: unknown })?.fields) &&
+				((data as { fields: { blockType?: unknown }[] }).fields ?? []).some(
+					(field) => field?.blockType === 'consent'
+				),
+			components: { Field: '@10x-media/form-builder/client#ConsentRetentionNotice' },
+		},
+	},
 })
 
 export const composeSettingsFields = (settings: SettingsOption | undefined): Field[] => {
@@ -56,5 +75,10 @@ export const composeSettingsFields = (settings: SettingsOption | undefined): Fie
 	if (settings?.fields) {
 		return settings.fields({ defaultFields })
 	}
-	return [defaultFields.multistep, defaultFields.pollEnabled, defaultFields.persistSubmissions]
+	return [
+		defaultFields.multistep,
+		defaultFields.pollEnabled,
+		defaultFields.persistSubmissions,
+		defaultFields.consentRetentionNotice,
+	]
 }

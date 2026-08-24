@@ -117,6 +117,8 @@ Each consent field produces a `ConsentProof` on the submission's `consent` array
 
 The source is re-resolved server-side at submit, so the proof reflects what the statement said then, not what the client rendered or claimed. A refusal is recorded, never dropped. If the resolver is down, the submission is rejected rather than recording an agreement the server cannot vouch for.
 
+The proof lives on the submission row, so a `persistSubmissions: false` form discards it when the row is [pruned](/form-builder/actions#pruning-submissions) after actions run. That combination is legitimate exactly when the consent record lives elsewhere, a double opt-in provider being the canonical case, and the admin sidebar shows a notice whenever a non-persisting form carries a consent field so nobody has to discover it from the pruning code. A form that needs its own provable consent must keep its submissions.
+
 ### Version capture
 
 `versionRef` is the published version document's own id, and appears only when the page's collection has **drafts** enabled. It needs no configuration: the plugin detects drafts per collection at submit.
