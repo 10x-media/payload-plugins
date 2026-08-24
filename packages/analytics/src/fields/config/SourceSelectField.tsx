@@ -12,7 +12,9 @@ import { toSelectOption } from './toSelectOption'
  * option list and, once the caller-scope sources endpoint answers, replaces
  * it with the live adapter list so a tenant only ever sees sources it can
  * actually read from. A failed fetch keeps the static list rather than
- * emptying the picker.
+ * emptying the picker. Fetched sources are held on their own (not mirrored
+ * into a synced "options" state), so a later locale change re-derives labels
+ * without reverting an already-successful fetch back to the static list.
  */
 export const SourceSelectField = (props: SelectFieldClientProps) => {
 	const { field, path, readOnly } = props
@@ -30,24 +32,23 @@ export const SourceSelectField = (props: SelectFieldClientProps) => {
 		() => field.options.map((option) => toSelectOption(option, locale)),
 		[field.options, locale]
 	)
-	const [options, setOptions] = useState(staticOptions)
-
-	useEffect(() => {
-		setOptions(staticOptions)
-	}, [staticOptions])
+	const [sources, setSources] = useState<WireSource[] | null>(null)
 
 	useEffect(() => {
 		let cancelled = false
 		fetchSources(serverURL ?? '', api)
-			.then((sources: WireSource[]) => {
-				if (cancelled) return
-				setOptions(sources.map((source) => ({ value: source.id, label: source.label })))
+			.then((fetched) => {
+				if (!cancelled) setSources(fetched)
 			})
 			.catch(() => {})
 		return () => {
 			cancelled = true
 		}
 	}, [api, serverURL])
+
+	const options = sources
+		? sources.map((source) => ({ value: source.id, label: source.label }))
+		: staticOptions
 
 	return (
 		<SelectInput
