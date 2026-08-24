@@ -111,4 +111,43 @@ describe('readForWidgetBreakdown', () => {
 		})
 		expect(result.status).toBe('unavailable')
 	})
+
+	it('forwards filters into the engine query', async () => {
+		let received: AnalyticsQuery | undefined
+		const adapter = breakdownAdapter({
+			capabilities: { ...caps(), filters: new Set(['country']) },
+			async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				received = q
+				return {
+					rows: [{ dimensions: { source: 'google.com' }, metrics: { pageviews: 9 } }],
+					meta: { provider: 'native', fetchedAt: NOW.toISOString() },
+				}
+			},
+		})
+		const result = await readForWidgetBreakdown({
+			req: reqWith([adapter]),
+			metric: 'pageviews',
+			dimension: 'source',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
+		})
+		expect(result.status).toBe('ok')
+		expect(received?.filters).toEqual([{ dimension: 'country', operator: 'eq', value: 'US' }])
+	})
+
+	it('returns unavailable when the adapter lacks the filter dimension', async () => {
+		const result = await readForWidgetBreakdown({
+			req: reqWith([breakdownAdapter()]),
+			metric: 'pageviews',
+			dimension: 'source',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+			// caps() declares no filters at all.
+			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
+		})
+		expect(result.status).toBe('unavailable')
+	})
 })

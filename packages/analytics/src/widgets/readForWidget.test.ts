@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { inMemoryKVAdapter } from 'payload'
+import { describe, expect, it, vi } from 'vitest'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -8,6 +9,8 @@ import type {
 } from '../core/contract'
 import { createRegistry } from '../core/registry'
 import { setRuntime } from '../plugin/runtime'
+import { kvCacheStore } from '../surfacing/cacheStore'
+import { createEngine } from '../surfacing/engine'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { readForWidget } from './readForWidget'
 
@@ -168,5 +171,65 @@ describe('readForWidget', () => {
 		})
 		expect(result.status).toBe('unavailable')
 		expect(result.adapterId).toBe('does-not-exist')
+	})
+
+	it('applies a filter, narrowing totals to the matching events', async () => {
+		const adapter = memoryAdapter()
+		adapter.record({ path: '/a', timestamp: new Date('2026-05-15T12:00:00Z') })
+		adapter.record({ path: '/b', timestamp: new Date('2026-05-16T12:00:00Z') })
+		const result = await readForWidget({
+			req: reqWith([adapter]),
+			metrics: ['pageviews'],
+			timeframe: 'last30days',
+			now: NOW,
+			filters: [{ dimension: 'page', operator: 'eq', value: '/a' }],
+		})
+		expect(result.status).toBe('ok')
+		expect(result.metrics.pageviews).toBe(1)
+	})
+
+	it('returns unavailable when the adapter lacks the filter dimension', async () => {
+		const adapter = memoryAdapter()
+		adapter.record({ path: '/a', timestamp: new Date('2026-05-15T12:00:00Z') })
+		const result = await readForWidget({
+			req: reqWith([adapter]),
+			metrics: ['pageviews'],
+			timeframe: 'last30days',
+			now: NOW,
+			// memoryAdapter's capabilities.filters only declares 'page'.
+			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
+		})
+		expect(result.status).toBe('unavailable')
+	})
+
+	it('forwards filters into the engine query, producing a distinct cache key', async () => {
+		const adapter = memoryAdapter()
+		adapter.record({ path: '/a', timestamp: new Date('2026-05-15T12:00:00Z') })
+		const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+		const engine = createEngine({
+			store,
+			queue: { concurrency: 4 },
+			ttl: { aggregate: 60, realtime: 5 },
+		})
+		const payload = {} as PayloadRequest['payload']
+		setRuntime(payload, {
+			registry: createRegistry([adapter]),
+			configAdapterIds: new Set([adapter.id]),
+			bindings: {},
+			engine,
+			ttl: { aggregate: 3600, realtime: 300 },
+			comparison: false,
+		})
+		const req = { payload } as PayloadRequest
+		const spy = vi.spyOn(adapter, 'query')
+		await readForWidget({ req, metrics: ['pageviews'], timeframe: 'last30days', now: NOW })
+		await readForWidget({
+			req,
+			metrics: ['pageviews'],
+			timeframe: 'last30days',
+			now: NOW,
+			filters: [{ dimension: 'page', operator: 'eq', value: '/a' }],
+		})
+		expect(spy).toHaveBeenCalledTimes(2)
 	})
 })
