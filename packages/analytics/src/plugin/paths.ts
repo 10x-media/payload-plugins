@@ -4,3 +4,4 @@
  * pulling server code into the bundle.
  */
 export const DOCUMENT_PATH = '/analytics/document'
+export const SOURCES_PATH = '/analytics/sources'

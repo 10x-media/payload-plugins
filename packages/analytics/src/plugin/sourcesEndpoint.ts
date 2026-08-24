@@ -1,8 +1,9 @@
 import type { PayloadHandler } from 'payload'
 import { serializeCapabilities } from '../core/capabilities'
+import { SOURCES_PATH } from './paths'
 import { getRuntime, resolveRegistryFor, resolveScopeFor } from './runtime'
 
-export const SOURCES_PATH = '/analytics/sources'
+export { SOURCES_PATH }
 
 /**
  * Authenticated GET listing the adapters visible to the requesting scope, with
