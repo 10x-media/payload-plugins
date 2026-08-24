@@ -174,6 +174,18 @@ describe('resolveOptions providers.collection.scopeField', () => {
 		).toThrow(/scopeField must be a top-level field name/i)
 	})
 
+	it('throws when scopeField is an empty string', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: '' } } })
+		).toThrow(/scopeField must be a non-empty field name/i)
+	})
+
+	it('throws when scopeField is only whitespace', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: '  ' } } })
+		).toThrow(/scopeField must be a non-empty field name/i)
+	})
+
 	it('accepts a flat scopeField', () => {
 		expect(() =>
 			resolveOptions({ adapters, providers: { collection: { scopeField: 'tenant' } } })

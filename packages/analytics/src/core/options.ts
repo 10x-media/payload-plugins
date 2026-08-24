@@ -274,10 +274,15 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 					: { enabled: false, slug: PROVIDERS_SLUG, scopeField: DEFAULT_SCOPE_FIELD },
 		resolve: options.providers?.resolve,
 	}
-	if (providers.collection.enabled && providers.collection.scopeField.includes('.')) {
-		throw new Error(
-			'analytics: providers.collection.scopeField must be a top-level field name (no dots); the scope stamp writes it as a flat key'
-		)
+	if (providers.collection.enabled) {
+		if (providers.collection.scopeField.trim() === '') {
+			throw new Error('analytics: providers.collection.scopeField must be a non-empty field name')
+		}
+		if (providers.collection.scopeField.includes('.')) {
+			throw new Error(
+				'analytics: providers.collection.scopeField must be a top-level field name (no dots); the scope stamp writes it as a flat key'
+			)
+		}
 	}
 	const syncOpt = options.sync
 	const sync =
