@@ -1,3 +1,4 @@
+import type { KeysConfig } from '@10x-media/fields/encrypted'
 import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import { PROVIDERS_SLUG } from '../providers/collection'
@@ -53,6 +54,13 @@ export type ProvidersCollectionOptions = {
 	scopeField?: string
 	overrides?: (collection: CollectionConfig) => CollectionConfig
 	access?: Partial<CollectionConfig['access']>
+	/**
+	 * Dedicated key ring for the stored provider credentials. Unset, the
+	 * fields plugin's global `encrypted.keys` applies, and with neither the
+	 * ring derives from the Payload secret. Configure a dedicated key for
+	 * anything beyond a dev install.
+	 */
+	encryption?: { keys?: KeysConfig }
 }
 
 export type ProvidersOptions = {
@@ -162,6 +170,7 @@ export interface ResolvedOptions {
 			scopeField: string
 			overrides?: (collection: CollectionConfig) => CollectionConfig
 			access?: Partial<CollectionConfig['access']>
+			encryption?: { keys?: KeysConfig }
 		}
 		resolve?: ProvidersResolve
 	}
@@ -258,6 +267,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 							scopeField: collectionOpt.scopeField ?? DEFAULT_SCOPE_FIELD,
 							overrides: collectionOpt.overrides,
 							access: collectionOpt.access,
+							encryption: collectionOpt.encryption,
 						}
 					: { enabled: false, slug: PROVIDERS_SLUG, scopeField: DEFAULT_SCOPE_FIELD },
 		resolve: options.providers?.resolve,
