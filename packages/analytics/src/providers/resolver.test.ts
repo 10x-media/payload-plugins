@@ -15,29 +15,43 @@ describe('combineRegistries', () => {
 		expect(registry.all()).toEqual([a])
 	})
 
-	it('appends new runtime adapters after the base', () => {
-		const a = stub('a')
-		const b = stub('b')
-		const registry = combineRegistries({ adapters: [a] }, [b])
-		expect(registry.all().map((x) => x.id)).toEqual(['a', 'b'])
-		expect(registry.default()).toBe(a)
+	it('appends runtime adapters after the base', () => {
+		const base = stub('memory')
+		const instance = stub('posthog:doc1')
+		const registry = combineRegistries({ adapters: [base] }, [instance])
+		expect(registry.all()).toEqual([base, instance])
+		expect(registry.get('memory')).toBe(base)
+		expect(registry.get('posthog:doc1')).toBe(instance)
 	})
 
-	it('replaces a base adapter in place when ids collide, including the default', () => {
-		const base = stub('plausible')
-		const runtime = stub('plausible')
-		const registry = combineRegistries({ adapters: [base, stub('x')] }, [runtime])
-		expect(registry.get('plausible')).toBe(runtime)
-		expect(registry.default()).toBe(runtime)
-		expect(registry.all()).toHaveLength(2)
+	it('skips an extra whose id collides with a base adapter (base wins)', () => {
+		const base = stub('posthog')
+		const runtime = stub('posthog')
+		const registry = combineRegistries({ adapters: [base] }, [runtime])
+		expect(registry.get('posthog')).toBe(base)
+		expect(registry.all()).toEqual([base])
 	})
 
-	it('keeps an explicit default id pointing at the runtime instance after override', () => {
-		const runtime = stub('b')
+	it('two instance adapters of one provider type both join the registry', () => {
+		const base = stub('memory')
+		const a = stub('posthog:a')
+		const b = stub('posthog:b')
+		const registry = combineRegistries({ adapters: [base] }, [a, b])
+		expect(registry.get('posthog:a')).toBe(a)
+		expect(registry.get('posthog:b')).toBe(b)
+		expect(registry.all()).toEqual([base, a, b])
+	})
+
+	it('the default stays the config default regardless of extras', () => {
 		const registry = combineRegistries({ adapters: [stub('a'), stub('b')], defaultId: 'b' }, [
-			runtime,
+			stub('posthog:doc1'),
 		])
-		expect(registry.default()).toBe(runtime)
+		expect(registry.default().id).toBe('b')
+	})
+
+	it('with no explicit default the first config adapter stays default', () => {
+		const registry = combineRegistries({ adapters: [stub('a'), stub('b')] }, [stub('posthog:doc1')])
+		expect(registry.default().id).toBe('a')
 	})
 })
 

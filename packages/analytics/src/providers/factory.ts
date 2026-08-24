@@ -38,13 +38,21 @@ const orUndefined = (value: string | null | undefined): string | undefined => va
  */
 export const normalizePrivateKey = (key: string): string => key.replace(/\\n/g, '\n')
 
-/**
- * Build an adapter instance from a provider-settings document using the same
- * constructors as config-time adapters. Missing credentials are passed through as
- * empty strings so the adapter reports `isConfigured() === false` instead of the
- * factory throwing; an unknown provider value returns null and is skipped.
- */
-export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | null => {
+const shortId = (id: number | string): string => String(id).slice(-6)
+
+/** Runtime adapters carry a per-document instance id so two projects of one provider type never collide in a registry; config adapters keep their plain ids. */
+const withInstanceIdentity = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter => {
+	if (doc.id === undefined || doc.id === null || doc.id === '') {
+		return adapter
+	}
+	return {
+		...adapter,
+		id: `${doc.provider}:${doc.id}`,
+		label: doc.name || `${adapter.label} ${shortId(doc.id)}`,
+	}
+}
+
+const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
 	switch (doc.provider) {
 		case 'plausible': {
 			const cfg = doc.plausible ?? {}
@@ -85,4 +93,15 @@ export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | nul
 		default:
 			return null
 	}
+}
+
+/**
+ * Build an adapter instance from a provider-settings document using the same
+ * constructors as config-time adapters. Missing credentials are passed through as
+ * empty strings so the adapter reports `isConfigured() === false` instead of the
+ * factory throwing; an unknown provider value returns null and is skipped.
+ */
+export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | null => {
+	const base = buildBaseAdapter(doc)
+	return base ? withInstanceIdentity(base, doc) : null
 }

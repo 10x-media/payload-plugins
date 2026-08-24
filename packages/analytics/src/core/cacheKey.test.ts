@@ -95,4 +95,8 @@ describe('buildCacheKey', () => {
 		const key = buildCacheKey('ga4', { ...base, timezone: 'Europe/Berlin', scope: 'tenant-a' })
 		expect(key.endsWith('|Europe/Berlin|tenant-a')).toBe(true)
 	})
+	it('two instance ids of one provider type produce distinct keys', () => {
+		const q = base
+		expect(buildCacheKey('posthog:a', q)).not.toBe(buildCacheKey('posthog:b', q))
+	})
 })

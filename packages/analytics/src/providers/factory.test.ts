@@ -62,6 +62,71 @@ describe('adapterFromProviderDoc', () => {
 	})
 })
 
+describe('instance ids', () => {
+	it('assigns provider:docId as the adapter id', () => {
+		const adapter = adapterFromProviderDoc({
+			id: 'doc1',
+			name: 'Tenant PH',
+			provider: 'posthog',
+			posthog: { projectId: '123', apiKey: 'phx_k' },
+		})
+		expect(adapter?.id).toBe('posthog:doc1')
+	})
+
+	it('uses the document name as the label', () => {
+		const adapter = adapterFromProviderDoc({
+			id: 'doc1',
+			name: 'Tenant PH',
+			provider: 'posthog',
+			posthog: { projectId: '123', apiKey: 'phx_k' },
+		})
+		expect(adapter?.label).toBe('Tenant PH')
+	})
+
+	it('falls back to the provider label plus a short id when name is empty', () => {
+		const adapter = adapterFromProviderDoc({
+			id: '665f00aa11bb22cc33dd44ee',
+			provider: 'posthog',
+			posthog: { projectId: '123', apiKey: 'phx_k' },
+		})
+		expect(adapter?.label).toBe('PostHog dd44ee')
+	})
+
+	it('keeps the plain provider id when the document has no id', () => {
+		const adapter = adapterFromProviderDoc({
+			provider: 'plausible',
+			plausible: { siteId: 's', apiKey: 'k' },
+		})
+		expect(adapter?.id).toBe('plausible')
+	})
+
+	it('two documents of the same provider type get distinct working adapters', () => {
+		const a = adapterFromProviderDoc({
+			id: 'a',
+			provider: 'posthog',
+			posthog: { projectId: '1', apiKey: 'k1' },
+		})
+		const b = adapterFromProviderDoc({
+			id: 'b',
+			provider: 'posthog',
+			posthog: { projectId: '2', apiKey: 'k2' },
+		})
+		expect(a?.id).toBe('posthog:a')
+		expect(b?.id).toBe('posthog:b')
+		expect(a?.isConfigured()).toBe(true)
+		expect(b?.isConfigured()).toBe(true)
+	})
+
+	it('numeric document ids work (postgres)', () => {
+		const adapter = adapterFromProviderDoc({
+			id: 42,
+			provider: 'umami',
+			umami: { websiteId: 'w', apiKey: 'k' },
+		})
+		expect(adapter?.id).toBe('umami:42')
+	})
+})
+
 describe('normalizePrivateKey', () => {
 	it('converts escaped newlines to real ones', () => {
 		expect(normalizePrivateKey('a\\nb\\nc')).toBe('a\nb\nc')
