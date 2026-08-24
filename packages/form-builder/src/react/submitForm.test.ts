@@ -48,6 +48,21 @@ describe('submitForm', () => {
 		}
 	})
 
+	it('surfaces the server-sent message on a non-400 failure (an essential action rejection)', async () => {
+		const fetchImpl = vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({ errors: [{ message: 'Your submission could not be processed.' }] }),
+					{ status: 502, headers: { 'Content-Type': 'application/json' } }
+				)
+		)
+		const result = await submitForm({ formId: 'f1', values, apiRoute: '/api', fetchImpl })
+		expect(result.ok).toBe(false)
+		if (!result.ok) {
+			expect(result.message).toBe('Your submission could not be processed.')
+		}
+	})
+
 	it('defaults apiRoute to /api', async () => {
 		const fetchImpl = vi.fn<typeof fetch>(
 			async () => new Response(JSON.stringify({ doc: { id: '2' } }), { status: 201 })
