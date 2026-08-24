@@ -70,6 +70,7 @@ export default buildConfig({
 			sync: { hidden: false },
 			reportingTimezone: DEV_REPORTING_TIMEZONE,
 			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
+			providers: { collection: true },
 			widgets: {
 				register: [
 					{

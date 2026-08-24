@@ -447,6 +447,9 @@ importers:
         specifier: 'catalog:'
         version: 19.2.6(react@19.2.6)
     devDependencies:
+      '@10x-media/fields':
+        specifier: workspace:*
+        version: link:../../fields
       '@10x-media/tsconfig':
         specifier: workspace:*
         version: link:../../../config/typescript
