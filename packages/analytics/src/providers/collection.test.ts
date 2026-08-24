@@ -5,20 +5,35 @@ import type {
 	TextField,
 } from 'payload'
 import { describe, expect, it } from 'vitest'
+import type { BuildProvidersCollectionArgs } from './collection'
 import { buildProvidersCollection } from './collection'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
 	fields?.find((f) => 'name' in f && f.name === name)
 
-describe('buildProvidersCollection', () => {
-	const collection = buildProvidersCollection({ slug: 'analytics-providers', onChange: () => {} })
+const unscopedArgs: Pick<
+	BuildProvidersCollectionArgs,
+	'scoped' | 'scopeField' | 'resolveScope' | 'platformRead'
+> = {
+	scoped: false,
+	scopeField: 'scope',
+	resolveScope: async () => null,
+	platformRead: async () => false,
+}
 
-	it('uses the given slug and admin-only access by default', () => {
+describe('buildProvidersCollection', () => {
+	const collection = buildProvidersCollection({
+		slug: 'analytics-providers',
+		onChange: () => {},
+		...unscopedArgs,
+	})
+
+	it('uses the given slug and admin-only access by default', async () => {
 		expect(collection.slug).toBe('analytics-providers')
 		const read = collection.access?.read
 		expect(typeof read).toBe('function')
-		expect(read?.({ req: { user: null } } as never)).toBe(false)
-		expect(read?.({ req: { user: { id: 1 } } } as never)).toBe(true)
+		expect(await read?.({ req: { user: null } } as never)).toBe(false)
+		expect(await read?.({ req: { user: { id: 1 } } } as never)).toBe(true)
 	})
 
 	it('has one conditional config group per provider', () => {
@@ -54,6 +69,7 @@ describe('buildProvidersCollection', () => {
 			onChange: () => {
 				calls++
 			},
+			...unscopedArgs,
 		})
 		const afterChange = withHook.hooks?.afterChange?.[0] as CollectionAfterChangeHook
 		const afterDelete = withHook.hooks?.afterDelete?.[0] as CollectionAfterDeleteHook
@@ -62,14 +78,15 @@ describe('buildProvidersCollection', () => {
 		expect(calls).toBe(2)
 	})
 
-	it('merges access overrides over the defaults per operation', () => {
+	it('merges access overrides over the defaults per operation', async () => {
 		const custom = buildProvidersCollection({
 			slug: 'analytics-providers',
 			access: { read: () => true },
 			onChange: () => {},
+			...unscopedArgs,
 		})
 		expect(custom.access?.read?.({ req: { user: null } } as never)).toBe(true)
-		expect(custom.access?.create?.({ req: { user: null } } as never)).toBe(false)
+		expect(await custom.access?.create?.({ req: { user: null } } as never)).toBe(false)
 	})
 
 	it('applies overrides last so anything can be reshaped', () => {
@@ -77,6 +94,7 @@ describe('buildProvidersCollection', () => {
 			slug: 'analytics-providers',
 			overrides: (c) => ({ ...c, admin: { ...c.admin, hidden: true } }),
 			onChange: () => {},
+			...unscopedArgs,
 		})
 		expect(custom.admin?.hidden).toBe(true)
 	})

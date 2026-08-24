@@ -57,6 +57,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			resolveRegistry = scoped.resolver
 			invalidateProviders = scoped.invalidate
 		}
+		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
 		if (resolved.providers.collection.enabled) {
 			config.collections = [
 				...(config.collections ?? []),
@@ -65,10 +66,13 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 					access: resolved.providers.collection.access,
 					overrides: resolved.providers.collection.overrides,
 					onChange: () => invalidateProviders(),
+					scoped: resolved.scoped,
+					scopeField: resolved.providers.collection.scopeField,
+					resolveScope,
+					platformRead: resolved.access.platformRead,
 				}),
 			]
 		}
-		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
 		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {
 			const opt = resolved.reportingTimezone
 			if (opt === undefined) {
