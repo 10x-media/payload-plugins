@@ -30,7 +30,7 @@ declare module 'payload' {
 
 export const analytics = definePlugin<AnalyticsPluginOptions>({
 	slug: '@10x-media/analytics',
-	plugin: async ({ config, plugins, ...options }): Promise<Config> => {
+	plugin: async ({ config, plugins: _plugins, ...options }): Promise<Config> => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -90,16 +90,15 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				platformRead: resolved.access.platformRead,
 				buildSecret,
 			})
-			// encryptedField() is used standalone here (no @10x-media/fields plugin
-			// registered), so the write-only response strip needs wiring by hand or
-			// the sealed ciphertext (not plaintext, but still not nothing) would leak
-			// on every normal read. Skip it when the fields plugin is also registered:
-			// its own plugin body maps withEncryptedQueryRewrite over every collection,
-			// and wrapping twice would append a duplicate afterRead strip hook.
-			const hasFieldsPlugin = Boolean(plugins['@10x-media/fields'])
+			// Always wrap, even though a consumer's own @10x-media/fields plugin (if
+			// registered) may wrap this collection again later: double application is
+			// inert here (writeOnly forbids queryable, so there are no blind-index
+			// markers to rewrite and the response strip is an idempotent delete),
+			// while skipping would leak ciphertext whenever fields() runs before this
+			// collection exists (e.g. an earlier plugin `order`).
 			config.collections = [
 				...(config.collections ?? []),
-				hasFieldsPlugin ? providersCollection : withEncryptedQueryRewrite(providersCollection),
+				withEncryptedQueryRewrite(providersCollection),
 			]
 		}
 		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {

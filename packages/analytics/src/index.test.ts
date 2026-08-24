@@ -1,3 +1,4 @@
+import { withEncryptedQueryRewrite } from '@10x-media/fields/encrypted'
 import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 
@@ -7,9 +8,6 @@ import { memoryAdapter } from './testing/memoryAdapter'
 import { keys } from './translations'
 
 const fakeConfig = () => ({ collections: [] }) as unknown as Config
-
-/** Minimal stand-in for a registered sibling plugin: definePlugin only needs `.slug`. */
-const fakePlugin = (slug: string) => Object.assign(() => ({}) as Config, { slug })
 
 describe('analytics factory', () => {
 	it('returns a Payload plugin function', () => {
@@ -70,14 +68,29 @@ describe('analytics factory', () => {
 		expect(providers?.hooks?.afterRead?.length).toBeGreaterThan(0)
 	})
 
-	it('skips its own wrap when @10x-media/fields is already registered (it wraps every collection itself)', async () => {
-		const cfg = { ...fakeConfig(), plugins: [fakePlugin('@10x-media/fields')] } as Config
+	it('stays sound when wrapped a second time, as a consumer fields() plugin would', async () => {
 		const out = (await analytics({
 			adapters: [memoryAdapter()],
 			providers: { collection: true },
-		})(cfg)) as Config
+		})(fakeConfig())) as Config
 		const providers = out.collections?.find((c) => c.slug === PROVIDERS_SLUG)
-		expect(providers?.hooks?.afterRead).toBeUndefined()
+		if (!providers) throw new Error('providers collection missing')
+
+		// Simulates a consumer's own @10x-media/fields plugin wrapping this
+		// collection again after analytics() already did (see the "always wrap"
+		// comment in index.ts): double application must not throw, and the strip
+		// stays a no-op past the first pass.
+		const rewrapped = withEncryptedQueryRewrite(providers)
+		expect(rewrapped.hooks?.afterRead).toHaveLength(2)
+
+		let doc: Record<string, unknown> = {
+			plausible: { apiKey: 'pfe1.k0.fake.ciphertext', siteId: 'example.com' },
+		}
+		for (const hook of rewrapped.hooks?.afterRead ?? []) {
+			doc = (await hook({ context: {}, doc } as never)) as Record<string, unknown>
+		}
+		expect((doc.plausible as Record<string, unknown>).apiKey).toBeUndefined()
+		expect((doc.plausible as Record<string, unknown>).siteId).toBe('example.com')
 	})
 })
 
