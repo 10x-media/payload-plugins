@@ -173,6 +173,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		// The runtime is installed before the app's own onInit runs so consumer init code
 		// (seeding, cache warming, sync passes) can already read through the plugin.
 		config.onInit = async (payload) => {
+			if (resolved.providers.collection.enabled) {
+				const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
+				await validateEncryptedBoot(payload, resolved.providers.collection.encryption?.keys)
+			}
 			const engine = createEngine({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },

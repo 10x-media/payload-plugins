@@ -258,3 +258,28 @@ describeForDb('analytics providers.resolve escape hatch', { dbs: ['mongo'] }, (d
 		expect(scopesSeen).toEqual(['t1', null])
 	})
 })
+
+describeForDb('analytics boot-time key validation', { dbs: ['mongo'] }, (db) => {
+	it('rejects boot when a key provider fails', async () => {
+		const promise = bootPayload({
+			plugin: analytics({
+				adapters: [memoryAdapter()],
+				providers: {
+					collection: {
+						encryption: {
+							keys: {
+								active: 'k1',
+								keys: {
+									k1: () => Promise.reject(new Error('kms down')),
+								},
+							},
+						},
+					},
+				},
+			}),
+			db,
+		})
+
+		await expect(promise).rejects.toThrow('kms down')
+	})
+})
