@@ -5,12 +5,31 @@ import {
 	PROVIDER_SECRET_MASK,
 	PROVIDER_SECRET_REVEAL_CONTEXT,
 	preserveMaskedSecret,
+	SECRET_PATHS,
+	secretPathsFor,
 } from './secrets'
 
 type HookArgs = Parameters<typeof maskSecret>[0]
 
 const reqWithContext = (context: Record<string, unknown>): PayloadRequest =>
 	({ context }) as unknown as PayloadRequest
+
+describe('SECRET_PATHS', () => {
+	it('lists every credential field that must be encrypted', () => {
+		expect(SECRET_PATHS).toEqual([
+			{ provider: 'plausible', path: 'plausible.apiKey' },
+			{ provider: 'umami', path: 'umami.apiKey' },
+			{ provider: 'umami', path: 'umami.token' },
+			{ provider: 'ga4', path: 'ga4.privateKey' },
+			{ provider: 'posthog', path: 'posthog.apiKey' },
+		])
+	})
+
+	it('resolves the paths for one provider', () => {
+		expect(secretPathsFor('umami')).toEqual(['umami.apiKey', 'umami.token'])
+		expect(secretPathsFor('nope')).toEqual([])
+	})
+})
 
 describe('maskSecret', () => {
 	it('masks a stored value on a normal read', () => {

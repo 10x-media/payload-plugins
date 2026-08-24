@@ -1,4 +1,5 @@
 import type { FieldHook } from 'payload'
+import type { ProviderId } from './factory'
 
 /** Placeholder returned for provider secrets on every read after save. */
 export const PROVIDER_SECRET_MASK = '__redacted__'
@@ -30,3 +31,19 @@ export const preserveMaskedSecret: FieldHook = ({ value, field, siblingDocWithLo
 	const raw = field.name ? siblingDocWithLocales?.[field.name] : undefined
 	return raw ?? value
 }
+
+/**
+ * Every credential path in the provider collection, the single list Task 5's
+ * field builder and Task 6's decrypting read both derive from so they can
+ * never disagree.
+ */
+export const SECRET_PATHS: ReadonlyArray<{ provider: ProviderId; path: string }> = [
+	{ provider: 'plausible', path: 'plausible.apiKey' },
+	{ provider: 'umami', path: 'umami.apiKey' },
+	{ provider: 'umami', path: 'umami.token' },
+	{ provider: 'ga4', path: 'ga4.privateKey' },
+	{ provider: 'posthog', path: 'posthog.apiKey' },
+]
+
+export const secretPathsFor = (provider: string): string[] =>
+	SECRET_PATHS.filter((s) => s.provider === provider).map((s) => s.path)

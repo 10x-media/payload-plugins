@@ -57,6 +57,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.comparisonNoChange]: 'No change',
 	[keys.providersCollectionSingular]: 'Analytics provider',
 	[keys.providersCollectionPlural]: 'Analytics providers',
+	[keys.providerFieldName]: 'Name',
 	[keys.providerFieldProvider]: 'Provider',
 	[keys.providerFieldEnabled]: 'Enabled',
 	[keys.providerFieldScope]: 'Scope',

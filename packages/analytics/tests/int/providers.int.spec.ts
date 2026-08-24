@@ -41,6 +41,7 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 		await booted.payload.create({
 			collection: SLUG as never,
 			data: {
+				name: 'Test provider',
 				provider: 'plausible',
 				enabled: true,
 				plausible: { siteId: 'example.com', apiKey: 'plausible-key' },
@@ -95,6 +96,7 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 		await booted.payload.create({
 			collection: SLUG as never,
 			data: {
+				name: 'Test provider',
 				provider: 'umami',
 				enabled: true,
 				scope: 't1',

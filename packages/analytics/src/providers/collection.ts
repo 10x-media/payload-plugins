@@ -60,8 +60,8 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			plural: labelForKey(keys.providersCollectionPlural),
 		},
 		admin: {
-			useAsTitle: 'provider',
-			defaultColumns: ['provider', 'enabled'],
+			useAsTitle: 'name',
+			defaultColumns: ['name', 'provider', 'enabled'],
 			group: 'Analytics',
 		},
 		access: {
@@ -86,6 +86,12 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			],
 		},
 		fields: [
+			{
+				name: 'name',
+				type: 'text',
+				required: true,
+				label: labelForKey(keys.providerFieldName),
+			},
 			{
 				type: 'row',
 				fields: [

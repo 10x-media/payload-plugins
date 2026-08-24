@@ -55,6 +55,7 @@ export const keys = {
 	comparisonNoChange: 'analytics:comparisonNoChange',
 	providersCollectionSingular: 'analytics:providersCollectionSingular',
 	providersCollectionPlural: 'analytics:providersCollectionPlural',
+	providerFieldName: 'analytics:providerFieldName',
 	providerFieldProvider: 'analytics:providerFieldProvider',
 	providerFieldEnabled: 'analytics:providerFieldEnabled',
 	providerFieldScope: 'analytics:providerFieldScope',
