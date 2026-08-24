@@ -36,6 +36,7 @@ formBuilder({
         id: row.id,
         name: row.name,
         statement: row.statement,
+        noticeStatement: row.noticeStatement,
         // `page` is an id, so proofs survive a rename; `url` is your routing, only you know it.
         ...(row.page && {
           page: { relationTo: row.page.relationTo, id: row.page.value.id },

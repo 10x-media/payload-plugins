@@ -196,6 +196,44 @@ describe('runSubmission', () => {
 		expect(result.errors).toHaveLength(0)
 	})
 
+	it('evaluates a notice consent as true for a dependent conditional field', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'consent', name: 'news', display: 'notice' },
+			{
+				blockType: 'text',
+				name: 'frequency',
+				label: 'Frequency',
+				visibleWhen: { or: [{ and: [{ news: { equals: true } }] }] },
+			},
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'frequency', value: 'weekly' }],
+		})
+		expect(result.errors).toEqual([])
+		// Stored, which proves the condition saw the notice consent as agreed.
+		expect(result.values).toEqual([{ field: 'frequency', value: 'weekly' }])
+	})
+
+	it('still strips a field dependent on an unticked checkbox consent', async () => {
+		const fields: FormFieldInstance[] = [
+			{ blockType: 'consent', name: 'news', label: 'News' },
+			{
+				blockType: 'text',
+				name: 'frequency',
+				label: 'Frequency',
+				visibleWhen: { or: [{ and: [{ news: { equals: true } }] }] },
+			},
+		]
+		const result = await runSubmission({
+			...base,
+			fields,
+			values: [{ field: 'frequency', value: 'weekly' }],
+		})
+		expect(result.values).toEqual([])
+	})
+
 	it('rejects a required consent submitted as an unrecognized string, not treating it as agreement', async () => {
 		const fields: FormFieldInstance[] = [{ blockType: 'consent', name: 'terms', required: true }]
 		const result = await runSubmission({

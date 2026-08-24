@@ -192,12 +192,19 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		const raw = incoming.get(instance.name)
 		// A consent field's "not agreed" state is semantically meaningful: treat a missing value as
 		// `false` so the intrinsic validate can enforce required-agreement (not optional = must be true).
+		// A notice-display consent is instead `true` no matter what came in, because submitting is the
+		// agreement; the client seeds the same (`seedFieldValues`), so conditions and calc evaluate it
+		// identically on both engines even for a raw REST client that omitted the field.
 		// A repeater with no rows is coerced to [] so validate() can check minRows. The empty-guard
 		// below must not skip repeaters: isEmpty([]) is true, but [] still needs to reach validate()
 		// so a minRows > 0 constraint correctly rejects a zero-row submission.
 		const effectiveRaw =
-			instance.blockType === 'consent' && isEmpty(raw)
-				? false
+			instance.blockType === 'consent'
+				? consentDisplayOf(instance) === 'notice'
+					? true
+					: isEmpty(raw)
+						? false
+						: raw
 				: instance.blockType === 'repeater' && isEmpty(raw)
 					? []
 					: raw

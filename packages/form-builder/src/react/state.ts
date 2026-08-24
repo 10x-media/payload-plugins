@@ -1,3 +1,4 @@
+import { consentDisplayOf } from '../consent/effectiveStatement'
 import { isNamedField } from '../fields/fieldKey'
 import type { FormFieldInstance } from '../submissions/types'
 
@@ -51,6 +52,12 @@ export const seedFieldValues = (fields: FormFieldInstance[]): Record<string, unk
 				if (minRows > 0) {
 					return [field.name, Array.from({ length: minRows }, () => ({}))]
 				}
+			}
+			// A notice-display consent has no control and the submit is the agreement, so its value
+			// is true from the start; the server coerces the same, keeping dependent conditions and
+			// calc in agreement across both engines.
+			if (field.blockType === 'consent' && consentDisplayOf(field) === 'notice') {
+				return [field.name, true]
 			}
 			return [field.name, undefined]
 		})
