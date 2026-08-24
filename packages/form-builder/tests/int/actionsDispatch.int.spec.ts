@@ -230,6 +230,14 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 			expect(await submissionCount(form.id)).toBe(1)
 			// No created event either: a sink-driven automation must not treat a failed signup as one.
 			expect(events.some((event) => event.type === 'submission.created')).toBe(false)
+			// Marked, so an operator can filter the kept rows and clear them once replayed.
+			const kept = await booted.payload.find({
+				collection: 'form-submissions',
+				where: { and: [{ form: { equals: form.id } }, { actionFailed: { equals: true } }] },
+				overrideAccess: true,
+				depth: 0,
+			})
+			expect(kept.totalDocs).toBe(1)
 		} finally {
 			providerDown = false
 		}

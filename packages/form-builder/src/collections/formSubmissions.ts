@@ -1,4 +1,4 @@
-import type { CollectionAfterChangeHook, CollectionConfig, Field } from 'payload'
+import type { CollectionAfterChangeHook, CollectionConfig, Field, PayloadRequest } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
@@ -115,8 +115,26 @@ const makeAfterChange =
 				richText: args.richText,
 			})
 			// A failed-essential submission is kept for recovery but is not a completed signup: no
-			// created event, so a sink-driven automation never treats it as one.
+			// created event, so a sink-driven automation never treats it as one. The stamp is what an
+			// operator filters on to find and clear the kept rows. Field access blocks every API
+			// writer, so the slug-agnostic override write here is the only path that can set it.
 			if (essentialFailed) {
+				const update = payload.update.bind(payload) as unknown as (options: {
+					collection: string
+					id: number | string
+					data: { actionFailed: boolean }
+					depth?: number
+					overrideAccess?: boolean
+					req?: PayloadRequest
+				}) => Promise<unknown>
+				await update({
+					collection: FORM_SUBMISSIONS_SLUG,
+					id: doc.id as number | string,
+					data: { actionFailed: true },
+					depth: 0,
+					overrideAccess: true,
+					req,
+				})
 				return doc
 			}
 
@@ -244,6 +262,17 @@ export const buildSubmissionsCollection = ({
 			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
 			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
 			access: { create: isLoggedIn, update: isLoggedIn },
+		},
+		// Stamped by the dispatcher when an essential action failed and the row was kept: the flag is
+		// what lets an operator filter these ownerless rows and clear them once the provider has been
+		// fixed and the addresses replayed. Hidden while unset; never client-writable.
+		{
+			name: 'actionFailed',
+			type: 'checkbox',
+			index: true,
+			label: labelForKey(keys.submissionActionFailedFlag),
+			access: { create: () => false, update: () => false },
+			admin: { readOnly: true, condition: (data) => data?.actionFailed === true },
 		},
 		// answers UI appears first so it is the dominant view when opening a submission document.
 		{
