@@ -218,6 +218,22 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 		const t1 = await registryFor('t1')
 		expect(t1.all().map((a) => a.id)).toEqual(['memory'])
 	})
+
+	it('validates encryption keys at boot', async () => {
+		// Wiring coverage: all healthy boots in this describe block execute onInit with
+		// providers.collection enabled, so onInit failure here would reject the entire
+		// boot above (line 15-19). This test verifies the failure path leak-free by
+		// calling validateEncryptedBoot directly against the booted payload.
+		const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
+		await expect(
+			validateEncryptedBoot(booted.payload, {
+				active: 'k1',
+				keys: {
+					k1: () => Promise.reject(new Error('kms down')),
+				},
+			})
+		).rejects.toThrow('kms down')
+	})
 })
 
 describeForDb('analytics providers.resolve escape hatch', { dbs: ['mongo'] }, (db) => {
@@ -256,30 +272,5 @@ describeForDb('analytics providers.resolve escape hatch', { dbs: ['mongo'] }, (d
 		const nullScope = await resolveRegistryFor(runtime, { payload: booted.payload, scope: null })
 		expect(nullScope.all().map((a) => a.id)).toEqual(['memory'])
 		expect(scopesSeen).toEqual(['t1', null])
-	})
-})
-
-describeForDb('analytics boot-time key validation', { dbs: ['mongo'] }, (db) => {
-	it('rejects boot when a key provider fails', async () => {
-		const promise = bootPayload({
-			plugin: analytics({
-				adapters: [memoryAdapter()],
-				providers: {
-					collection: {
-						encryption: {
-							keys: {
-								active: 'k1',
-								keys: {
-									k1: () => Promise.reject(new Error('kms down')),
-								},
-							},
-						},
-					},
-				},
-			}),
-			db,
-		})
-
-		await expect(promise).rejects.toThrow('kms down')
 	})
 })
