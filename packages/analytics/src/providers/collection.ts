@@ -1,13 +1,14 @@
-import type { CollectionConfig, Field } from 'payload'
+import type { CollectionConfig, Field, TextareaField, TextField } from 'payload'
 import { keys, type TranslationKey } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ProviderAccessArgs } from './access'
 import { providerCreateAccess, providerRowAccess } from './access'
 import type { ProviderId } from './factory'
-import { maskSecret, preserveMaskedSecret } from './secrets'
 import { stampScope } from './stampScope'
 
 export const PROVIDERS_SLUG = 'analytics-providers'
+
+export type BuildSecretField = (source: TextField | TextareaField) => Field[]
 
 export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	slug: string
@@ -15,6 +16,7 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	overrides?: (collection: CollectionConfig) => CollectionConfig
 	/** Called after any change or delete so the per-scope registry cache drops stale adapters. */
 	onChange: () => void
+	buildSecret: BuildSecretField
 }
 
 const textField = (name: string, label: TranslationKey, width?: string): Field => ({
@@ -24,13 +26,16 @@ const textField = (name: string, label: TranslationKey, width?: string): Field =
 	...(width ? { admin: { width } } : {}),
 })
 
-const secretField = (name: string, label: TranslationKey, width?: string): Field => ({
-	name,
-	type: 'text',
-	label: labelForKey(label),
-	admin: { description: labelForKey(keys.providerSecretHelp), ...(width ? { width } : {}) },
-	hooks: { beforeChange: [preserveMaskedSecret], afterRead: [maskSecret] },
-})
+const secretField = (
+	args: BuildProvidersCollectionArgs,
+	opts: { name: string; label: TranslationKey; width?: string }
+): Field[] =>
+	args.buildSecret({
+		name: opts.name,
+		type: 'text',
+		label: labelForKey(opts.label),
+		...(opts.width ? { admin: { width: opts.width } } : {}),
+	})
 
 const hostField = (): Field => ({
 	name: 'host',
@@ -133,7 +138,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					type: 'row',
 					fields: [
 						textField('siteId', keys.providerFieldSiteId, '50%'),
-						secretField('apiKey', keys.providerFieldApiKey, '50%'),
+						...secretField(args, { name: 'apiKey', label: keys.providerFieldApiKey, width: '50%' }),
 					],
 				},
 				hostField(),
@@ -143,10 +148,10 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					type: 'row',
 					fields: [
 						textField('websiteId', keys.providerFieldWebsiteId, '50%'),
-						secretField('apiKey', keys.providerFieldApiKey, '50%'),
+						...secretField(args, { name: 'apiKey', label: keys.providerFieldApiKey, width: '50%' }),
 					],
 				},
-				secretField('token', keys.providerFieldToken),
+				...secretField(args, { name: 'token', label: keys.providerFieldToken }),
 				hostField(),
 			]),
 			providerGroup('ga4', keys.providerNameGa4, [
@@ -158,20 +163,18 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					],
 				},
 				textField('clientEmail', keys.providerFieldClientEmail),
-				{
+				...args.buildSecret({
 					name: 'privateKey',
 					type: 'textarea',
 					label: labelForKey(keys.providerFieldPrivateKey),
-					admin: { description: labelForKey(keys.providerSecretHelp) },
-					hooks: { beforeChange: [preserveMaskedSecret], afterRead: [maskSecret] },
-				},
+				}),
 			]),
 			providerGroup('posthog', keys.providerNamePosthog, [
 				{
 					type: 'row',
 					fields: [
 						textField('projectId', keys.providerFieldProjectId, '50%'),
-						secretField('apiKey', keys.providerFieldApiKey, '50%'),
+						...secretField(args, { name: 'apiKey', label: keys.providerFieldApiKey, width: '50%' }),
 					],
 				},
 				hostField(),

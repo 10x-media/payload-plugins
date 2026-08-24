@@ -5,20 +5,24 @@ import type {
 	TextField,
 } from 'payload'
 import { describe, expect, it } from 'vitest'
-import type { BuildProvidersCollectionArgs } from './collection'
+import type { BuildProvidersCollectionArgs, BuildSecretField } from './collection'
 import { buildProvidersCollection } from './collection'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
 	fields?.find((f) => 'name' in f && f.name === name)
 
+/** Echoes the source field back with a marker so tests can assert delegation. */
+const fakeBuildSecret: BuildSecretField = (source) => [{ ...source, custom: { fake: source.type } }]
+
 const unscopedArgs: Pick<
 	BuildProvidersCollectionArgs,
-	'scoped' | 'scopeField' | 'resolveScope' | 'platformRead'
+	'scoped' | 'scopeField' | 'resolveScope' | 'platformRead' | 'buildSecret'
 > = {
 	scoped: false,
 	scopeField: 'scope',
 	resolveScope: async () => null,
 	platformRead: async () => false,
+	buildSecret: fakeBuildSecret,
 }
 
 describe('buildProvidersCollection', () => {
@@ -53,13 +57,23 @@ describe('buildProvidersCollection', () => {
 		expect(scope?.admin?.hidden).toBe(true)
 	})
 
-	it('masks secret fields on read and preserves masked round-trips', () => {
+	it('delegates secret fields to buildSecret with the right source shape', () => {
 		const group = named(collection.fields, 'plausible')
 		const fields = group && 'fields' in group ? group.fields : []
 		const row = fields[0]
 		const apiKey = row && 'fields' in row ? named(row.fields, 'apiKey') : undefined
-		expect(apiKey && 'hooks' in apiKey && apiKey.hooks?.afterRead).toHaveLength(1)
-		expect(apiKey && 'hooks' in apiKey && apiKey.hooks?.beforeChange).toHaveLength(1)
+		expect(apiKey?.type).toBe('text')
+		expect((apiKey as { custom?: Record<string, unknown> } | undefined)?.custom).toEqual({
+			fake: 'text',
+		})
+
+		const ga4Group = named(collection.fields, 'ga4')
+		const ga4Fields = ga4Group && 'fields' in ga4Group ? ga4Group.fields : []
+		const privateKey = named(ga4Fields, 'privateKey')
+		expect(privateKey?.type).toBe('textarea')
+		expect((privateKey as { custom?: Record<string, unknown> } | undefined)?.custom).toEqual({
+			fake: 'textarea',
+		})
 	})
 
 	it('invokes onChange from afterChange and afterDelete hooks', async () => {

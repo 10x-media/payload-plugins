@@ -7,6 +7,7 @@ import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
 import { warmTask } from './plugin/warmTask'
+import type { BuildSecretField } from './providers/collection'
 import { buildProvidersCollection } from './providers/collection'
 import {
 	collectionProvidersSource,
@@ -28,7 +29,7 @@ declare module 'payload' {
 
 export const analytics = definePlugin<AnalyticsPluginOptions>({
 	slug: '@10x-media/analytics',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: async ({ config, plugins: _plugins, ...options }): Promise<Config> => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -59,18 +60,40 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		}
 		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
 		if (resolved.providers.collection.enabled) {
+			const { encryptedField, withEncryptedQueryRewrite } = await import(
+				'@10x-media/fields/encrypted'
+			).catch(() => {
+				throw new Error(
+					'analytics: providers.collection requires @10x-media/fields (peer). Install it: pnpm add @10x-media/fields'
+				)
+			})
+			const encryption = resolved.providers.collection.encryption
+			const buildSecret: BuildSecretField = (source) =>
+				encryptedField(source, {
+					protection: 'writeOnly',
+					aadScope: '10x-analytics:providers',
+					...(source.type === 'text' ? { hint: { suffix: 4 } } : {}),
+					...(encryption?.keys ? { keys: encryption.keys } : {}),
+				})
 			config.collections = [
 				...(config.collections ?? []),
-				buildProvidersCollection({
-					slug: resolved.providers.collection.slug,
-					access: resolved.providers.collection.access,
-					overrides: resolved.providers.collection.overrides,
-					onChange: () => invalidateProviders(),
-					scoped: resolved.scoped,
-					scopeField: resolved.providers.collection.scopeField,
-					resolveScope,
-					platformRead: resolved.access.platformRead,
-				}),
+				// encryptedField() is used standalone here (no @10x-media/fields plugin
+				// registered), so the write-only response strip needs wiring by hand or
+				// the sealed ciphertext (not plaintext, but still not nothing) would
+				// leak on every normal read.
+				withEncryptedQueryRewrite(
+					buildProvidersCollection({
+						slug: resolved.providers.collection.slug,
+						access: resolved.providers.collection.access,
+						overrides: resolved.providers.collection.overrides,
+						onChange: () => invalidateProviders(),
+						scoped: resolved.scoped,
+						scopeField: resolved.providers.collection.scopeField,
+						resolveScope,
+						platformRead: resolved.access.platformRead,
+						buildSecret,
+					})
+				),
 			]
 		}
 		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {
