@@ -1,7 +1,8 @@
-import type {
-	CollectionAfterChangeHook,
-	CollectionBeforeValidateHook,
-	RequestContext,
+import {
+	type CollectionAfterChangeHook,
+	type CollectionBeforeValidateHook,
+	type RequestContext,
+	ValidationError,
 } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { GENERATED_SECRET_KEY, SECRET_BYTES, SECRET_PREFIX } from '../constants'
@@ -36,6 +37,7 @@ const runCreate = (
 		'generateOnCreate'
 	) as CollectionBeforeValidateHook
 	return hook({
+		collection: { slug: c.slug },
 		data: args.data,
 		operation: args.operation ?? 'create',
 		req: fakeReq(args.context),
@@ -172,16 +174,20 @@ describe('buildSubscriptionsCollection', () => {
 		/**
 		 * Payload's admin omits the field rather than sending an empty one, so an empty string is an
 		 * API caller who meant to supply a secret. Generating one silently would hand that caller a
-		 * subscription signed with a secret they never saw; leaving it for the field validator is
-		 * what turns it into a 400 naming the problem.
+		 * subscription signed with a secret they never saw, and the field validator cannot catch it:
+		 * `encryptedField` seals before it validates, and its seal hook reads a write-only `''` as a
+		 * clear, so the value reaches the validator as null and the row is stored with no secret at
+		 * all. Refusing here is what turns it into a 400 naming the problem.
 		 */
-		it('leaves an explicitly empty secret for the validator rather than generating one', () => {
-			const data = runCreate(c, {
-				data: { secret: '' },
-				operation: 'create',
-				context: {},
-			})
-			expect(data.secret).toBe('')
+		it('refuses an explicitly empty secret rather than generating or clearing one', () => {
+			let error: unknown
+			try {
+				runCreate(c, { data: { secret: '' }, operation: 'create', context: {} })
+			} catch (err) {
+				error = err
+			}
+			expect(error).toBeInstanceOf(ValidationError)
+			expect((error as ValidationError).data.errors[0]?.path).toBe('secret')
 		})
 
 		/**

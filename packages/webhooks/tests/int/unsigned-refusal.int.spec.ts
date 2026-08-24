@@ -184,6 +184,30 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 	})
 
 	/**
+	 * The one way an unsigned subscription could be created by accident rather than on purpose.
+	 * `encryptedField` reads a write-only empty string as a clear and stores null, so a create
+	 * carrying `secret: ''` used to return 201 with no secret at all and deliver unsigned forever,
+	 * which is the downgrade the whole refusal path exists to prevent. It has to fail at the create.
+	 */
+	it('refuses a create that supplies an empty secret rather than storing none', async () => {
+		await clear()
+		await expect(
+			booted.payload.create({
+				collection: 'webhook-subscriptions',
+				data: { name: 'blank', url: sinkUrl, enabled: true, events: ['posts.created'], secret: '' },
+				overrideAccess: true,
+			} as never)
+		).rejects.toThrow()
+
+		const found = await booted.payload.find({
+			collection: 'webhook-subscriptions',
+			where: { name: { equals: 'blank' } },
+			overrideAccess: true,
+		})
+		expect(found.docs).toHaveLength(0)
+	})
+
+	/**
 	 * The refusal exists so a subscription meant to be signed is never sent unsigned. That reasoning
 	 * covers the active secret only: when the retired one in an open grace window is unreadable, a
 	 * fully valid signature is still available, and refusing would trade a correctly signed delivery

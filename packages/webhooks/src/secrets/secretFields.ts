@@ -18,19 +18,25 @@ export type SecretPath = 'previousSecret' | 'secret'
 /**
  * Names of the siblings `encryptedField` adds beside a write-only value. Both mirror its
  * `${name}_set` / `${name}_hint` convention rather than being read off the marker, because the
- * resolver needs them before it has a config in hand; `secretFields.test.ts` pins them against
- * what the factory actually emits.
+ * resolver needs them before it has a config in hand; `collections/subscriptions.test.ts` pins
+ * them against what the factory actually emits.
  */
 export const secretSetName = (path: SecretPath): string => `${path}_set`
 export const secretHintName = (path: SecretPath): string => `${path}_hint`
 
 /**
- * Validate the plaintext of a supplied secret. `encryptedField` runs this against the value
- * before sealing it, so the wire-format rules stay enforced on exactly the bytes that become the
- * HMAC key.
+ * Validate the plaintext of a supplied secret. `encryptedField` seals first and then runs this
+ * against the plaintext it stashed rather than against the sealed value, so the wire-format rules
+ * stay enforced on exactly the bytes that become the HMAC key.
+ *
+ * An absent secret passes, because a subscription is allowed to have none and deliver unsigned. An
+ * empty string does not, since `encryptedField` reads a write-only `''` as a clear and would store
+ * null. This is only the backstop for admin form state that never ran the seal hook: the hook runs
+ * before validation and has already turned an API create's `''` into null by the time this sees it,
+ * so `generateOnCreate` is what actually refuses that write.
  */
 export const validateWhsec = (value: unknown): string | true => {
-	if (value == null || value === '') {
+	if (value == null) {
 		return true
 	}
 	try {

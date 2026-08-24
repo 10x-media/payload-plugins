@@ -1,10 +1,11 @@
 import { isSealed, type KeysConfig } from '@10x-media/fields/encrypted'
-import type {
-	CollectionAfterChangeHook,
-	CollectionBeforeChangeHook,
-	CollectionBeforeValidateHook,
-	CollectionConfig,
-	PayloadRequest,
+import {
+	type CollectionAfterChangeHook,
+	type CollectionBeforeChangeHook,
+	type CollectionBeforeValidateHook,
+	type CollectionConfig,
+	type PayloadRequest,
+	ValidationError,
 } from 'payload'
 
 import { ADMIN_GROUP, GENERATED_SECRET_KEY } from '../constants'
@@ -21,6 +22,10 @@ import { asTranslate, labelForKey } from '../translations/server'
  */
 const GENERATED_SECRET_CONTEXT = 'webhooksGeneratedSecret'
 
+/** Phrased like the wire-format reasons in `format.ts`, since it is the same class of mistake. */
+const EMPTY_SECRET_ERROR =
+	'the secret is empty; omit the field to have one generated, or supply a whsec_ value'
+
 /**
  * Give a create with no secret a generated one, the way Stripe and Svix do: a caller who supplies
  * a secret already holds it, but one who does not gets a usable subscription rather than an
@@ -28,20 +33,35 @@ const GENERATED_SECRET_CONTEXT = 'webhooksGeneratedSecret'
  * ever be read back.
  *
  * The field's own admin Generate action covers the form, which runs client-side by design; this
- * covers every API create. Only a genuinely absent secret is generated: an explicitly empty
- * string is left alone so the field validator can reject it, because a caller who meant to supply
- * a secret should hear about it rather than be handed a generated one they never learn about.
+ * covers every API create. Only a genuinely absent secret is generated: an explicitly empty string
+ * is refused, because a caller who meant to supply a secret should hear about it rather than be
+ * handed a generated one they never learn about.
+ *
+ * That refusal has to happen here rather than in the field validator. `encryptedField` seals before
+ * it validates, and its seal hook reads a write-only empty string as a clear, so by the time
+ * `validateWhsec` runs the value is null and indistinguishable from a subscription that is meant to
+ * go out unsigned. Left alone, `secret: ''` returned 201 with no secret stored and every delivery
+ * unsigned, which is the one downgrade this plugin refuses everywhere else.
  *
  * A sealed value arriving on a create is never customer input, since a caller supplies plaintext.
  * It is what Payload's duplicate action resubmits, from the row it copied, and two subscriptions
  * sharing one signing key is exactly what must not happen: the copy is given its own secret, and
  * none of the original's rotation state.
  */
-const generateOnCreate: CollectionBeforeValidateHook = ({ data, operation, req }) => {
+const generateOnCreate: CollectionBeforeValidateHook = ({ collection, data, operation, req }) => {
 	if (operation !== 'create' || !data) {
 		return data
 	}
 	const next = { ...data }
+	if (next.secret === '') {
+		throw new ValidationError(
+			{
+				collection: collection.slug,
+				errors: [{ path: 'secret', message: EMPTY_SECRET_ERROR }],
+			},
+			req.t
+		)
+	}
 	if (isSealed(next.previousSecret)) {
 		next.previousSecret = null
 		next.previousSecretExpiresAt = null
