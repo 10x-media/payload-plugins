@@ -311,6 +311,7 @@ describeForDb('native scoped ingest and reads', {}, (db) => {
 			plugin: analytics({
 				adapters: [native()],
 				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				access: { platformRead: ({ req }) => Boolean(req.user) },
 			}),
 			db,
 		})

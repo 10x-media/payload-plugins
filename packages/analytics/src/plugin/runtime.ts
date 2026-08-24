@@ -14,6 +14,12 @@ export interface AnalyticsRuntime {
 	resolveTimezone?: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	/** Id of the config adapter shared by every scope, when one is designated. */
 	platformAdapterId?: string
+	/**
+	 * Ids of the config-time adapters shared by every scope (the ones passed to
+	 * `adapters` in plugin options). Runtime provider adapters (resolved per scope
+	 * from the providers collection or `providers.resolve`) are never in it.
+	 */
+	configAdapterIds: ReadonlySet<string>
 	/** Gate for cross-scope reads; absent runtimes require an authenticated user. */
 	platformRead?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 	bindings: Record<string, ResolvedBinding>

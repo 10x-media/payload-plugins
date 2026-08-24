@@ -51,6 +51,11 @@ describe('providerRowAccess', () => {
 		})
 		expect(await access({ req: req({ id: 1 }) })).toBe(false)
 	})
+
+	it('an empty-string resolved scope without platform grant is denied', async () => {
+		const access = providerRowAccess({ ...base, scoped: true, resolveScope: async () => '' })
+		expect(await access({ req: req({ id: 1 }) })).toBe(false)
+	})
 })
 
 describe('providerCreateAccess', () => {
@@ -82,5 +87,10 @@ describe('providerCreateAccess', () => {
 			platformRead: async () => true,
 		})
 		expect(await access({ req: req({ id: 1 }) })).toBe(true)
+	})
+
+	it('scoped: empty-string scope without platform grant is denied', async () => {
+		const access = providerCreateAccess({ ...base, scoped: true, resolveScope: async () => '' })
+		expect(await access({ req: req({ id: 1 }) })).toBe(false)
 	})
 })

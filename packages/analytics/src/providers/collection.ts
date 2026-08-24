@@ -66,6 +66,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			singular: labelForKey(keys.providersCollectionSingular),
 			plural: labelForKey(keys.providersCollectionPlural),
 		},
+		disableDuplicate: true,
 		admin: {
 			useAsTitle: 'name',
 			defaultColumns: ['name', 'provider', 'enabled'],

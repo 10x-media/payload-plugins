@@ -197,6 +197,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveScope,
 				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
+				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
 				engine,
