@@ -69,6 +69,7 @@ export interface Config {
   collections: {
     users: User;
     pages: Page;
+    'analytics-providers': AnalyticsProvider;
     'analytics-events': AnalyticsEvent;
     'analytics-rollups': AnalyticsRollup;
     'analytics-seen': AnalyticsSeen;
@@ -83,6 +84,7 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
+    'analytics-providers': AnalyticsProvidersSelect<false> | AnalyticsProvidersSelect<true>;
     'analytics-events': AnalyticsEventsSelect<false> | AnalyticsEventsSelect<true>;
     'analytics-rollups': AnalyticsRollupsSelect<false> | AnalyticsRollupsSelect<true>;
     'analytics-seen': AnalyticsSeenSelect<false> | AnalyticsSeenSelect<true>;
@@ -184,6 +186,50 @@ export interface Page {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-providers".
+ */
+export interface AnalyticsProvider {
+  id: string;
+  name: string;
+  provider: 'plausible' | 'umami' | 'ga4' | 'posthog';
+  enabled?: boolean | null;
+  scope?: string | null;
+  plausible?: {
+    siteId?: string | null;
+    apiKey?: string;
+    apiKey_set?: boolean | null;
+    apiKey_hint?: string | null;
+    host?: string | null;
+  };
+  umami?: {
+    websiteId?: string | null;
+    apiKey?: string;
+    apiKey_set?: boolean | null;
+    apiKey_hint?: string | null;
+    token?: string;
+    token_set?: boolean | null;
+    token_hint?: string | null;
+    host?: string | null;
+  };
+  ga4?: {
+    propertyId?: string | null;
+    projectId?: string | null;
+    clientEmail?: string | null;
+    privateKey?: string;
+    privateKey_set?: boolean | null;
+  };
+  posthog?: {
+    projectId?: string | null;
+    apiKey?: string;
+    apiKey_set?: boolean | null;
+    apiKey_hint?: string | null;
+    host?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "analytics-events".
  */
 export interface AnalyticsEvent {
@@ -225,6 +271,7 @@ export interface AnalyticsRollup {
   path: string;
   dimension: string;
   dimvalue: string;
+  hostname: string;
   pageviews: number;
   events: number;
   durationMs: number;
@@ -255,6 +302,7 @@ export interface AnalyticsDaily {
   id: string;
   source: string;
   date: string;
+  scope: string;
   pageviews?: number | null;
   visitors?: number | null;
   sessions?: number | null;
@@ -399,6 +447,10 @@ export interface PayloadLockedDocument {
         value: string | Page;
       } | null)
     | ({
+        relationTo: 'analytics-providers';
+        value: string | AnalyticsProvider;
+      } | null)
+    | ({
         relationTo: 'analytics-events';
         value: string | AnalyticsEvent;
       } | null)
@@ -490,6 +542,57 @@ export interface PagesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-providers_select".
+ */
+export interface AnalyticsProvidersSelect<T extends boolean = true> {
+  name?: T;
+  provider?: T;
+  enabled?: T;
+  scope?: T;
+  plausible?:
+    | T
+    | {
+        siteId?: T;
+        apiKey?: T;
+        apiKey_set?: T;
+        apiKey_hint?: T;
+        host?: T;
+      };
+  umami?:
+    | T
+    | {
+        websiteId?: T;
+        apiKey?: T;
+        apiKey_set?: T;
+        apiKey_hint?: T;
+        token?: T;
+        token_set?: T;
+        token_hint?: T;
+        host?: T;
+      };
+  ga4?:
+    | T
+    | {
+        propertyId?: T;
+        projectId?: T;
+        clientEmail?: T;
+        privateKey?: T;
+        privateKey_set?: T;
+      };
+  posthog?:
+    | T
+    | {
+        projectId?: T;
+        apiKey?: T;
+        apiKey_set?: T;
+        apiKey_hint?: T;
+        host?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "analytics-events_select".
  */
 export interface AnalyticsEventsSelect<T extends boolean = true> {
@@ -521,6 +624,7 @@ export interface AnalyticsRollupsSelect<T extends boolean = true> {
   path?: T;
   dimension?: T;
   dimvalue?: T;
+  hostname?: T;
   pageviews?: T;
   events?: T;
   durationMs?: T;
@@ -549,6 +653,7 @@ export interface AnalyticsSeenSelect<T extends boolean = true> {
 export interface AnalyticsDailySelect<T extends boolean = true> {
   source?: T;
   date?: T;
+  scope?: T;
   pageviews?: T;
   visitors?: T;
   sessions?: T;

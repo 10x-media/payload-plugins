@@ -164,7 +164,12 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		if (resolved.sync.enabled) {
 			config.collections = [
 				...(config.collections ?? []),
-				syncCollection(resolved.sync.collectionSlug, resolved.sync.hidden),
+				syncCollection(resolved.sync.collectionSlug, resolved.sync.hidden, {
+					scoped: resolved.scoped,
+					scopeField: 'scope',
+					resolveScope,
+					platformRead: resolved.access.platformRead,
+				}),
 			]
 			config.jobs = {
 				...config.jobs,
