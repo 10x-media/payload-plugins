@@ -1,7 +1,8 @@
+import type { JSXConvertersFunction } from '@payloadcms/richtext-lexical/react'
 import type { Payload } from 'payload'
 import type { ReactNode } from 'react'
 
-import type { WikiConvertersFunction, WikiEditorBlockOption } from '../../options'
+import type { WikiEditorBlockOption } from '../../options'
 import { getWikiRegistry } from '../../plugin/registry'
 import { MissingBlockRenderer } from '../GuideArticle/MissingBlockRenderer'
 import { MissingInlineBlockRenderer } from '../GuideArticle/MissingInlineBlockRenderer'
@@ -92,7 +93,7 @@ export const WikiProviderServer = ({ children, payload }: WikiProviderServerProp
 	})
 	const convertersPath = registry.editorConverters
 	const converters = convertersPath
-		? (importMap[convertersPath] as undefined | WikiConvertersFunction)
+		? (importMap[convertersPath] as undefined | JSXConvertersFunction)
 		: undefined
 	if (convertersPath && !converters) {
 		warnOnce(

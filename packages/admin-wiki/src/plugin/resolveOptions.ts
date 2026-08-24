@@ -14,6 +14,7 @@ import type {
 	WikiWriteAffordanceMode,
 } from '../options'
 import { type ResolvedWikiExclude, resolveExcluded } from './exclude'
+import { DEFAULT_MEDIA_SLUG, DEFAULT_PAGES_SLUG } from './slugs'
 
 /** The wiki views registered, with every index slot present as an array. */
 export type ResolvedWikiViewOptions = {
@@ -132,8 +133,8 @@ const assertUniqueBlockSlugs = (
 export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOptions => {
 	assertUniqueBlockSlugs(options.editor?.blocks ?? [], options.editor?.inlineBlocks ?? [])
 	const slugs = {
-		media: options.slugs?.media ?? 'wiki-media',
-		pages: options.slugs?.pages ?? 'wiki-pages',
+		media: options.slugs?.media ?? DEFAULT_MEDIA_SLUG,
+		pages: options.slugs?.pages ?? DEFAULT_PAGES_SLUG,
 	}
 	return {
 		chips: { blocks: options.chips?.blocks ?? true },

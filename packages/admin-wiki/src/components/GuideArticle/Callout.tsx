@@ -11,6 +11,10 @@ import { inlineConverters } from './inlineConverters'
 
 export type CalloutProps = {
 	body?: SerializedEditorState | null
+	/**
+	 * Converters for the body. Without them the body falls back to inline
+	 * formatting and links, so consumer nodes render as `unknown node`.
+	 */
 	converters?: JSXConverters
 	variant?: string | null
 }

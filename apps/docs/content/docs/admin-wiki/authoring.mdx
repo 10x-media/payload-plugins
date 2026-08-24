@@ -57,7 +57,7 @@ The words are content, not a rendering of the target's title. Renaming a guide t
 
 ## Built-in blocks
 
-**Callout.** Four variants: info, tip, warning, danger. The body is itself rich text (inline formatting and external links), so a callout can hold lists and links but cannot nest blocks or uploads.
+**Callout.** Four variants: info, tip, warning, danger. The body is a nested editor: inline formatting, links, images and video, plus the blocks you marked [`nestable`](#your-own-blocks). It never holds headings or another callout.
 
 **Video embed.** Only when [video is enabled](#video). Takes a YouTube or Vimeo watch, share, or short URL and validates it at authoring time; the reader gets a privacy-friendly embed (`youtube-nocookie.com`, Vimeo with `dnt=1`).
 
@@ -95,9 +95,16 @@ adminWiki({
 
 The renderer receives the block node's field values as `fields`, and is registered as an admin dependency so importmap generation finds it. A renderer declared but missing from the import map renders a visible placeholder and logs a warning, rather than dropping the block silently.
 
+`nestable: true` also offers the block inside a callout body. Blocks are not nestable by default, inline blocks are:
+
+```ts
+blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock', nestable: true }],
+inlineBlocks: [{ block: heroChip, component: '/components/HeroChip#HeroChip', nestable: false }],
+```
+
 ### Inline blocks
 
-A block sits between paragraphs. For one that sits inside a sentence, a chip or a status badge, use `inlineBlocks`:
+For a block that sits inside a sentence, a chip or a status badge, use `inlineBlocks`:
 
 ```ts title="payload.config.ts"
 import { statusChipBlock } from './blocks/statusChip'
@@ -109,7 +116,7 @@ adminWiki({
 })
 ```
 
-An inline block never appears in the block insert menu, and its renderer has to return inline-level JSX.
+Its renderer has to return inline-level JSX.
 
 ## Your own features
 
@@ -127,7 +134,7 @@ adminWiki({
 
 An array is appended to the plugin's own features. A feature's client half is resolved through the import map like any other, so nothing has to be declared twice.
 
-The function form is handed the plugin's features as `defaultFeatures` and returns the whole list, which is the way to reorder or drop one:
+The function form is handed the plugin's features as `defaultFeatures` and returns the whole list, which is the way to reorder or drop one. It runs once per editor, `nested` telling a callout body apart from the guide body:
 
 ```ts
 adminWiki({
@@ -148,15 +155,15 @@ Features reach the seed as well: `seedWiki` builds the same editor the collectio
 
 ## Your own converters
 
-A feature puts a node in the document; a converter decides what that node renders as in a published guide. Blocks and inline blocks already carry theirs as the `component` each declares, so reach for this when a feature contributes a node type of its own.
+Reach for converters when a feature contributes a node type of its own; a block already carries its renderer as `component`.
 
-Point the plugin at a client module exporting a `WikiConvertersFunction`, the same shape as the `converters` prop on Payload's [`RichText`](https://payloadcms.com/docs/rich-text/converting-jsx):
+Point the plugin at a client module exporting a `JSXConvertersFunction`, the same shape as the `converters` prop on Payload's [`RichText`](https://payloadcms.com/docs/rich-text/converting-jsx):
 
 ```tsx title="wikiConverters.tsx"
 'use client'
-import type { WikiConvertersFunction } from '@10x-media/admin-wiki/types'
+import type { JSXConvertersFunction } from '@payloadcms/richtext-lexical/react'
 
-export const wikiConverters: WikiConvertersFunction = ({ defaultConverters }) => ({
+export const wikiConverters: JSXConvertersFunction = ({ defaultConverters }) => ({
   ...defaultConverters,
   myNode: ({ node, nodesToJSX }) => <MyNode>{nodesToJSX({ nodes: node.children })}</MyNode>,
 })
@@ -168,13 +175,51 @@ adminWiki({
 })
 ```
 
-The module resolves through the import map exactly as a block renderer does, and must be a client module.
+It must be a client module.
 
 <Callout type="warn">
   `blocks` and `inlineBlocks` are nested maps, replaced whole. Returning `{ ...defaultConverters, blocks: { mine } }` drops the callout, the video embed and every consumer block; spread `defaultConverters.blocks` too.
 </Callout>
 
-Converters apply wherever the plugin renders a guide: the wiki view, the surface drawers, and a node nested inside a callout body. Rendering `GuideArticle` yourself, pass a `converters` function as a prop and it applies over the project's.
+Converters apply wherever the plugin renders a guide: the wiki view, the surface drawers, and a callout body.
+
+## The editor inside your own block
+
+A block with a `richText` field of its own can run the wiki editor there. Pass `nested: true`, which leaves out headings and the callout:
+
+```ts title="blocks/accordion.ts"
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { wikiFeatures } from '@10x-media/admin-wiki'
+
+export const accordionBlock: Block = {
+  slug: 'accordion',
+  fields: [
+    { name: 'title', type: 'text' },
+    {
+      name: 'body',
+      type: 'richText',
+      editor: lexicalEditor({ features: () => wikiFeatures({ nested: true }) }),
+    },
+  ],
+}
+```
+
+To render the field, take `converters` and `nodesToJSX` beside `fields`:
+
+```tsx title="components/Accordion.tsx"
+'use client'
+
+export const Accordion = ({ converters, fields, nodesToJSX }) => (
+  <details>
+    <summary>{fields.title as string}</summary>
+    {nodesToJSX?.({ converters, nodes: fields.body.root.children })}
+  </details>
+)
+```
+
+<Callout type="warn">
+  `wikiFeatures` falls back to the default `wiki-pages` and `wiki-media` slugs. If you renamed them through [`slugs`](/admin-wiki/configuration), pass the same values as `pagesSlug` and `mediaSlug`, or guide links and uploads inside your block point at collections that do not exist.
+</Callout>
 
 ## Wiki media
 

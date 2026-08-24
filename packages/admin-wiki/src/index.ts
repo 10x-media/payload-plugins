@@ -173,13 +173,13 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 })
 
 export { SUMMARY_MAX_LENGTH } from './collections/wikiPages'
+export { type WikiFeaturesArgs, wikiFeatures } from './editor/wikiEditor'
 export type {
 	AdminWikiPluginOptions,
 	AdminWikiPluginOptions as PluginOptions,
 	WikiAccessOptions,
 	WikiChipsOptions,
 	WikiCollectionOverride,
-	WikiConvertersFunction,
 	WikiCustomTargetLabel,
 	WikiCustomTargetOption,
 	WikiEditorBlockOption,

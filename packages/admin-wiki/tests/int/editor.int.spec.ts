@@ -75,6 +75,33 @@ const guideEditorBlockSlugs = (
 	}
 }
 
+/** The same lists for the editor inside a callout body. */
+const calloutBodyBlockSlugs = (
+	booted: BootedPayload
+): { blocks: string[]; inlineBlocks: string[] } => {
+	const feature = guideEditor(booted)?.editorConfig?.resolvedFeatureMap?.get('blocks') as
+		| undefined
+		| { sanitizedServerFeatureProps?: { blocks?: { fields: Field[]; slug: string }[] } }
+	const callout = feature?.sanitizedServerFeatureProps?.blocks?.find(
+		(block) => block.slug === 'wikiCallout'
+	)
+	const body = callout ? findField(callout.fields, 'body') : undefined
+	const editor = (body as undefined | { editor?: LexicalRichTextAdapter })?.editor
+	const nested = editor?.editorConfig?.resolvedFeatureMap?.get('blocks') as
+		| undefined
+		| {
+				sanitizedServerFeatureProps?: {
+					blocks?: { slug: string }[]
+					inlineBlocks?: { slug: string }[]
+				}
+		  }
+	const props = nested?.sanitizedServerFeatureProps
+	return {
+		blocks: (props?.blocks ?? []).map((block) => block.slug),
+		inlineBlocks: (props?.inlineBlocks ?? []).map((block) => block.slug),
+	}
+}
+
 describeForDb('wiki editor features', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 
@@ -171,5 +198,71 @@ describeForDb('wiki editor inline blocks', { dbs: ['mongo'] }, (db) => {
 		const registry = getWikiRegistry(booted.payload.config)
 		expect(registry?.editorBlocks.map((option) => option.component)).toEqual(['/Tip#Tip'])
 		expect(registry?.editorInlineBlocks.map((option) => option.component)).toEqual(['/Chip#Chip'])
+	})
+})
+
+describeForDb('callout body editor', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: adminWiki({
+				editor: {
+					blocks: [
+						{
+							block: { slug: 'devTip', fields: [{ name: 'tip', type: 'text' }] },
+							component: '/Tip#Tip',
+							nestable: true,
+						},
+						{
+							block: { slug: 'devHero', fields: [{ name: 'title', type: 'text' }] },
+							component: '/Hero#Hero',
+						},
+					],
+					inlineBlocks: [
+						{
+							block: { slug: 'devChip', fields: [{ name: 'label', type: 'text' }] },
+							component: '/Chip#Chip',
+						},
+						{
+							block: { slug: 'devWide', fields: [{ name: 'label', type: 'text' }] },
+							component: '/Wide#Wide',
+							nestable: false,
+						},
+					],
+				},
+			}),
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('takes the nestable blocks and never the callout itself', () => {
+		const { blocks } = calloutBodyBlockSlugs(booted)
+		expect(blocks).toContain('devTip')
+		expect(blocks).not.toContain('devHero')
+		expect(blocks).not.toContain('wikiCallout')
+	})
+
+	it('keeps inline blocks unless they opt out', () => {
+		const { inlineBlocks } = calloutBodyBlockSlugs(booted)
+		expect(inlineBlocks).toEqual(['devChip'])
+	})
+
+	it('leaves headings out of the body', () => {
+		const editor = guideEditor(booted)
+		expect((editor?.features ?? []).map((feature) => feature.key)).toContain('heading')
+		const feature = editor?.editorConfig?.resolvedFeatureMap?.get('blocks') as
+			| undefined
+			| { sanitizedServerFeatureProps?: { blocks?: { fields: Field[]; slug: string }[] } }
+		const callout = feature?.sanitizedServerFeatureProps?.blocks?.find(
+			(block) => block.slug === 'wikiCallout'
+		)
+		const body = callout ? findField(callout.fields, 'body') : undefined
+		const nestedEditor = (body as undefined | { editor?: LexicalRichTextAdapter })?.editor
+		expect((nestedEditor?.features ?? []).map((feature) => feature.key)).not.toContain('heading')
 	})
 })

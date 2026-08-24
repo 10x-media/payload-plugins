@@ -240,9 +240,9 @@ export const buildWikiPagesCollection = ({
 								type: 'richText',
 								label: labelForKey(keys.fieldContentLabel),
 								editor: buildWikiEditor({
-									blocks: resolved.editorBlocks.map((option) => option.block),
+									blocks: resolved.editorBlocks,
 									features: resolved.editorFeatures,
-									inlineBlocks: resolved.editorInlineBlocks.map((option) => option.block),
+									inlineBlocks: resolved.editorInlineBlocks,
 									mediaSlug: resolved.slugs.media,
 									pagesSlug: resolved.slugs.pages,
 									video: resolved.video,

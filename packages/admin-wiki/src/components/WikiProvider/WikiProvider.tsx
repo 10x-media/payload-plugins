@@ -1,6 +1,6 @@
 'use client'
 
-import type { JSXConverterArgs } from '@payloadcms/richtext-lexical/react'
+import type { JSXConverterArgs, JSXConvertersFunction } from '@payloadcms/richtext-lexical/react'
 import { useAuth, useConfig, useTranslation } from '@payloadcms/ui'
 import {
 	type ComponentType,
@@ -14,9 +14,10 @@ import {
 	useState,
 } from 'react'
 
-import type { WikiConvertersFunction, WikiWriteAffordanceMode } from '../../options'
+import type { WikiWriteAffordanceMode } from '../../options'
 import type { ResolvedWikiCustomTarget } from '../../plugin/resolveOptions'
 import type { WikiGuideDoc, WikiTargetEntry, WikiTargetsResponse } from '../../shared/targetKeys'
+import { buildGuideConverters } from '../GuideArticle/guideConverters'
 import { resolveClientLabel } from '../TargetSelect/clientBlocks'
 import type { WikiMediaDoc } from '../Video/useWikiMediaDoc'
 
@@ -62,18 +63,10 @@ export type WikiTargetsContextValue = {
 	blockChips: boolean
 	/** Singular label per block slug, for chips that would otherwise show a slug. */
 	blockLabels: Record<string, string>
-	/** Consumer block renderers resolved from the import map, keyed by slug. */
-	blockRenderers: Record<string, WikiBlockRenderer>
 	/** The reader's evaluated create permission (drives "write this guide"). */
 	canCreate: boolean
 	/** The reader's evaluated update permission (drives edit shortcuts). */
 	canUpdate: boolean
-	/**
-	 * The consumer's converters function resolved from the import map, applied
-	 * over the plugin's own wherever a guide renders. Undefined when the project
-	 * declared none.
-	 */
-	converters: undefined | WikiConvertersFunction
 	/**
 	 * Label per declared custom target key, resolved for the reader's admin
 	 * language, for the chips that would otherwise show a bare key.
@@ -88,8 +81,12 @@ export type WikiTargetsContextValue = {
 	editMode: boolean
 	/** Guides attached to a target key; empty array when none. */
 	entriesFor: (key: string) => WikiTargetEntry[]
-	/** Consumer inline block renderers resolved from the import map, keyed by slug. */
-	inlineBlockRenderers: Record<string, WikiBlockRenderer>
+	/**
+	 * Converters for one guide. Takes the heading ids of the document being
+	 * rendered: they are assigned per document, so the map cannot be built ahead
+	 * of one.
+	 */
+	guideConverters: (idsByNode: Map<object, string>) => JSXConvertersFunction
 	/** Lazily load one guide's full document, cached per id and locale. */
 	loadGuide: (id: number | string) => Promise<null | WikiGuideDoc>
 	loading: boolean
@@ -116,15 +113,13 @@ const EMPTY: WikiTargetEntry[] = []
 const WikiTargetsContext = createContext<WikiTargetsContextValue>({
 	blockChips: true,
 	blockLabels: {},
-	blockRenderers: {},
 	canCreate: false,
 	canUpdate: false,
 	canWrite: false,
-	converters: undefined,
 	customLabels: {},
 	editMode: false,
 	entriesFor: () => EMPTY,
-	inlineBlockRenderers: {},
+	guideConverters: (idsByNode) => buildGuideConverters({}, {}, idsByNode),
 	loadGuide: () => Promise.resolve(null),
 	loading: false,
 	locale: null,
@@ -144,7 +139,7 @@ export type WikiProviderProps = {
 	blockLabels?: Record<string, string>
 	blockRenderers?: Record<string, WikiBlockRenderer>
 	children?: ReactNode
-	converters?: WikiConvertersFunction
+	converters?: JSXConvertersFunction
 	customTargets?: ResolvedWikiCustomTarget[]
 	inlineBlockRenderers?: Record<string, WikiBlockRenderer>
 	pagesSlug?: string
@@ -279,21 +274,33 @@ export const WikiProvider = ({
 		[customTargets, i18n.language]
 	)
 
+	const guideConverters = useMemo(
+		() =>
+			(idsByNode: Map<object, string>): JSXConvertersFunction =>
+			(args) => {
+				const base = buildGuideConverters(
+					blockRenderers ?? {},
+					inlineBlockRenderers ?? {},
+					idsByNode
+				)(args)
+				return converters?.({ defaultConverters: base }) ?? base
+			},
+		[blockRenderers, converters, inlineBlockRenderers]
+	)
+
 	const value = useMemo<WikiTargetsContextValue>(
 		() => ({
 			blockChips,
 			blockLabels: blockLabels ?? {},
-			blockRenderers: blockRenderers ?? {},
 			canCreate,
 			canUpdate: data?.canUpdate ?? false,
 			canWrite:
 				canCreate &&
 				(writeAffordances === 'always' || (writeAffordances === 'editMode' && editMode)),
-			converters,
 			customLabels,
 			editMode,
 			entriesFor: (key) => data?.targets[key] ?? EMPTY,
-			inlineBlockRenderers: inlineBlockRenderers ?? {},
+			guideConverters,
 			loadGuide,
 			loading,
 			locale,
@@ -312,13 +319,11 @@ export const WikiProvider = ({
 		[
 			blockChips,
 			blockLabels,
-			blockRenderers,
 			canCreate,
-			converters,
 			customLabels,
 			data,
 			editMode,
-			inlineBlockRenderers,
+			guideConverters,
 			load,
 			loadGuide,
 			loading,

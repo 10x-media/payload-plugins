@@ -1,5 +1,4 @@
 import type { LexicalEditorProps } from '@payloadcms/richtext-lexical'
-import type { JSXConverters } from '@payloadcms/richtext-lexical/react'
 import type {
 	Access,
 	AdminViewServerProps,
@@ -57,18 +56,9 @@ export type WikiEditorBlockOption = {
 	block: Block
 	/** Import-map path of the client component rendering this block in guides. */
 	component: string
+	/** Available in nested editors (a callout body). Inline blocks default to true, blocks to false. */
+	nestable?: boolean
 }
-
-/**
- * The read side of a lexical node, as a function over the converters already in
- * place rather than a map merged on top of them.
- *
- * `defaultConverters` is the whole map the plugin assembled, Payload's own
- * defaults included, and the return value is the map that renders. That is the
- * only shape that can *remove* a converter: a map merged over the defaults can
- * add and override, never drop.
- */
-export type WikiConvertersFunction = (args: { defaultConverters: JSXConverters }) => JSXConverters
 
 /**
  * One lexical feature, exactly as `lexicalEditor` takes them. Derived from its
@@ -92,12 +82,13 @@ export type WikiEditorFeature = Extract<
  * live with.
  */
 export type WikiEditorFeaturesOption =
-	| ((args: { defaultFeatures: WikiEditorFeature[] }) => WikiEditorFeature[])
+	| ((args: { defaultFeatures: WikiEditorFeature[]; nested: boolean }) => WikiEditorFeature[])
 	| WikiEditorFeature[]
 
 /** Extensions to the plugin's self-contained editor. */
 export type WikiEditorOptions = {
 	blocks?: WikiEditorBlockOption[]
+	/** Import-map path of a client module exporting a `JSXConvertersFunction`. */
 	converters?: string
 	/** Lexical features beside the plugin's own. See {@link WikiEditorFeaturesOption}. */
 	features?: WikiEditorFeaturesOption
