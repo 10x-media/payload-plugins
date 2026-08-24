@@ -17,3 +17,15 @@ export function satisfiesCapabilities(
 	if (req.dimensions?.some((d) => !caps.dimensions.has(d))) return false
 	return true
 }
+
+/** Wire form of AnalyticsCapabilities: the read-only Sets become plain arrays so the sources endpoint can JSON-serialize them for client pickers. */
+export type SerializedCapabilities = Omit<AnalyticsCapabilities, 'metrics' | 'dimensions'> & {
+	metrics: MetricKey[]
+	dimensions: DimensionKey[]
+}
+
+export const serializeCapabilities = (caps: AnalyticsCapabilities): SerializedCapabilities => ({
+	...caps,
+	metrics: [...caps.metrics],
+	dimensions: [...caps.dimensions],
+})
