@@ -3,7 +3,9 @@
 import {
 	Button,
 	ConfirmationModal,
+	CopyIcon,
 	Modal,
+	TextInput,
 	toast,
 	useConfig,
 	useDocumentInfo,
@@ -11,11 +13,12 @@ import {
 	useModal,
 } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
-import { useRef, useState } from 'react'
+import { type RefObject, useRef, useState } from 'react'
 
 import type { TranslationKey } from '../translations/keys'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
+import './RotateSecretButton.css'
 
 /**
  * Why the rotation was refused, in the caller's terms. A single "could not rotate" hides the
@@ -34,6 +37,9 @@ const FAILURE_BY_STATUS: Record<number, TranslationKey> = {
  * which is imported above.
  */
 const MODAL_CLASS = 'confirmation-modal'
+
+/** Names the input and its label; `TextInput` derives the input's id from it. */
+const SECRET_PATH = 'webhooksRotatedSecret'
 
 /** Doc-view action that rotates the subscription's signing secret and reveals the new one once. */
 export const RotateSecretButton = () => {
@@ -79,8 +85,9 @@ export const RotateSecretButton = () => {
 
 	/**
 	 * `navigator.clipboard` is undefined outside a secure context, which is where a good deal of
-	 * staging lives, and can reject even inside one. Selecting the field first means the fallback
-	 * is one keystroke rather than a hunt, and the last resort says so out loud instead of
+	 * staging lives, and can reject even inside one. Payload's own `CopyToClipboard` calls it
+	 * unguarded, so this keeps its own handler: the field is selected first, which makes the
+	 * fallback one keystroke rather than a hunt, and the last resort says so out loud instead of
 	 * silently doing nothing.
 	 */
 	const copy = async () => {
@@ -130,18 +137,33 @@ export const RotateSecretButton = () => {
 					<div className={`${MODAL_CLASS}__content`}>
 						<h1>{t(keys.rotateSecretRevealTitle)}</h1>
 						<p>{t(keys.rotateSecretRevealBody)}</p>
-						<input
-							aria-label={t(keys.rotateSecretRevealTitle)}
-							onFocus={(e) => e.currentTarget.select()}
-							readOnly
-							ref={secretRef}
+						<TextInput
+							AfterInput={
+								<button
+									aria-label={t(keys.rotateSecretCopy)}
+									className="webhooks-reveal__copy"
+									onClick={copy}
+									title={t(keys.rotateSecretCopy)}
+									type="button"
+								>
+									<CopyIcon />
+								</button>
+							}
+							className="webhooks-reveal__field"
+							// Payload types the prop as a non-null ref, which no `useRef(null)` satisfies
+							// under React 19's types; the ref is only read after mount.
+							inputRef={secretRef as RefObject<HTMLInputElement>}
+							label={t(keys.fieldSecret)}
+							// `readOnly` on TextInput renders the input `disabled`, and a disabled input's
+							// text cannot be selected, which would take the manual-copy fallback away. The
+							// DOM attribute goes on directly instead: not editable, still selectable.
+							htmlAttributes={{ readOnly: true } as { autoComplete?: string }}
+							onChange={() => undefined}
+							path={SECRET_PATH}
 							value={secret ?? ''}
 						/>
 					</div>
 					<div className={`${MODAL_CLASS}__controls`}>
-						<Button buttonStyle="secondary" onClick={copy} size="large" type="button">
-							{t(keys.rotateSecretCopy)}
-						</Button>
 						<Button onClick={acknowledge} size="large" type="button">
 							{t(keys.rotateSecretAcknowledge)}
 						</Button>

@@ -75,8 +75,24 @@ test('rotating a secret confirms first, then reveals the new secret in a dialog'
 	await page.locator('#confirm-action').click()
 
 	await expect(page.getByText('New signing secret')).toBeVisible({ timeout: 15_000 })
-	const revealed = page.getByLabel('New signing secret')
+	const revealed = page.locator('#field-webhooksRotatedSecret')
 	await expect(revealed).toHaveValue(/^whsec_/)
+	// Read-only rather than disabled, so the text stays selectable when the clipboard API is
+	// unavailable and the copy falls back to a manual one.
+	await expect(revealed).toHaveAttribute('readonly', '')
+	await expect(revealed).not.toBeDisabled()
+
+	// The copy action lives inside the input, over its trailing edge.
+	const copy = page.getByRole('button', { name: 'Copy' })
+	await expect(copy).toBeVisible()
+	const field = await revealed.boundingBox()
+	const button = await copy.boundingBox()
+	if (!field || !button) {
+		throw new Error('no bounding box for the revealed secret')
+	}
+	expect(button.x + button.width).toBeLessThanOrEqual(field.x + field.width + 1)
+	expect(button.x).toBeGreaterThan(field.x)
+	await copy.click()
 
 	await page.getByRole('button', { name: "I've saved it" }).click()
 	await expect(page.getByText('New signing secret')).toBeHidden()
