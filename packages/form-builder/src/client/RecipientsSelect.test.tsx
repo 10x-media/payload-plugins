@@ -30,7 +30,10 @@ vi.mock('@payloadcms/ui', () => ({
 		return null
 	},
 }))
-vi.mock('payload/shared', () => ({ reduceFieldsToValues: () => ({ fields: [] }) }))
+vi.mock('payload/shared', () => ({
+	reduceFieldsToValues: () => ({ fields: [] }),
+	formatAdminURL: ({ apiRoute, path }: { apiRoute: string; path: string }) => `${apiRoute}${path}`,
+}))
 vi.mock('../translations/useTranslation', () => ({
 	useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }))
@@ -39,6 +42,38 @@ afterEach(() => {
 	cleanup()
 	vi.clearAllMocks()
 	captured.props = null
+})
+
+describe('RecipientsSelect endpoint scope', () => {
+	it('fetches a request-scoped endpoint at the id-less URL while the document is unsaved', () => {
+		const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ options: [] }) })
+		vi.stubGlobal('fetch', fetchSpy)
+		try {
+			render(
+				<RecipientsSelect
+					path="to"
+					field={{ label: 'To' }}
+					endpoint="departments"
+					scope="request"
+				/>
+			)
+			expect(fetchSpy).toHaveBeenCalledTimes(1)
+			expect(fetchSpy.mock.calls[0]?.[0]).toBe('/api/forms/departments')
+		} finally {
+			vi.unstubAllGlobals()
+		}
+	})
+
+	it('still skips a document-scoped endpoint fetch while the document is unsaved', () => {
+		const fetchSpy = vi.fn()
+		vi.stubGlobal('fetch', fetchSpy)
+		try {
+			render(<RecipientsSelect path="to" field={{ label: 'To' }} endpoint="departments" />)
+			expect(fetchSpy).not.toHaveBeenCalled()
+		} finally {
+			vi.unstubAllGlobals()
+		}
+	})
 })
 
 describe('RecipientsSelect', () => {
