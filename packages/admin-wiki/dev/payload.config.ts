@@ -65,8 +65,6 @@ export default buildConfig({
 				{ key: 'dashboard.attention', label: 'Dashboard · Needs attention' },
 				'traffic',
 			],
-			// Exercises every editor seam: a block, an inline block, and the
-			// converters function that renders what a project's own nodes look like.
 			editor: {
 				blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }],
 				converters: '/components/wikiConverters#wikiConverters',

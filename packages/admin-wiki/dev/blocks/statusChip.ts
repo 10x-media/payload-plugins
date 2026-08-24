@@ -1,6 +1,5 @@
 import type { Block } from 'payload'
 
-/** A consumer-supplied inline block, proving `options.editor.inlineBlocks`. */
 export const statusChipBlock: Block = {
 	slug: 'devStatusChip',
 	labels: { singular: 'Status chip', plural: 'Status chips' },

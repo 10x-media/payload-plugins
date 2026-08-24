@@ -150,5 +150,5 @@ export const wikiFeatures = ({
  * rather than beforehand, so a consumer's function sees it exactly as the
  * resolved options built it, video branch included.
  */
-export const buildWikiEditor = (args: WikiFeaturesArgs) =>
+export const buildWikiEditor = (args: WikiFeaturesArgs): ReturnType<typeof lexicalEditor> =>
 	lexicalEditor({ features: () => wikiFeatures(args) })

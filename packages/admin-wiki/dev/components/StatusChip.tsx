@@ -1,10 +1,6 @@
 'use client'
 
-/**
- * Renderer for the consumer `devStatusChip` inline block. Returns a `<span>`:
- * an inline block renders inside a paragraph, where a block-level element would
- * be invalid markup.
- */
+/** A `<span>`: an inline block renders inside a paragraph, where a block-level element would be invalid markup. */
 export const StatusChip = ({ fields }: { fields: Record<string, unknown> }) => (
 	<span
 		className="dev-status-chip"
