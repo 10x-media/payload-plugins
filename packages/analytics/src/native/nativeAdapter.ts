@@ -108,6 +108,8 @@ async function queryEvents(
 			greater_than_equal: start.toISOString(),
 			less_than_equal: q.dateRange.end.toISOString(),
 		},
+		...(q.hostname ? { hostname: { equals: q.hostname } } : {}),
+		...(q.path ? { path: { equals: q.path } } : {}),
 		...ctx.scopeWhere(q),
 		...filtersToWhere(q.filters ?? []),
 	}
@@ -130,6 +132,8 @@ async function queryEvents(
 		dimension: dim,
 		granularity,
 		timezone: q.timezone,
+		order: q.order,
+		limit: q.limit,
 	})
 	const meta: AnalyticsResult['meta'] = { provider: 'native', fetchedAt }
 	if (clamped) meta.clamped = true

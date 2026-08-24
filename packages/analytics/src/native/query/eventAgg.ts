@@ -38,6 +38,8 @@ const FILTER_OPERATOR: Record<'eq' | 'contains', string> = { eq: 'equals', conta
  * Payload where fragment for supported filters; unsupported dimensions/operators are
  * dropped. Capability gating (`filters`/`filterOperators`) is the real contract upstream,
  * this is just the safety net so a stray unsupported filter never throws.
+ * `contains` is case-insensitive on both DBs; on Postgres its value is a raw ILIKE
+ * pattern (`%`/`_` act as wildcards), while Mongo regex-escapes the value first.
  */
 export const filtersToWhere = (filters: AnalyticsFilter[]): Record<string, unknown> => {
 	const where: Record<string, unknown> = {}
@@ -99,6 +101,10 @@ export interface AggregateEventsArgs {
 	dimension?: DimensionKey
 	granularity?: 'hour' | 'day'
 	timezone?: string
+	/** Sort for dimension breakdown rows; defaults to pageviews desc, same as the rollup path. */
+	order?: { metric: MetricKey; direction: 'asc' | 'desc' }
+	/** Row cap for dimension breakdown rows, applied after sorting. */
+	limit?: number
 }
 
 export interface AggregateEventsResult {
@@ -126,7 +132,14 @@ const bucketKeyFor = (event: EventLike, granularity: 'hour' | 'day', timezone: s
  */
 export const aggregateEvents = (
 	events: EventLike[],
-	{ metrics, dimension, granularity, timezone = DEFAULT_TIMEZONE }: AggregateEventsArgs
+	{
+		metrics,
+		dimension,
+		granularity,
+		timezone = DEFAULT_TIMEZONE,
+		order,
+		limit,
+	}: AggregateEventsArgs
 ): AggregateEventsResult => {
 	const totalsBucket = emptyBucket()
 	for (const event of events) {
@@ -149,10 +162,16 @@ export const aggregateEvents = (
 			}
 			addEvent(bucket, event)
 		}
-		const rows: AnalyticsRow[] = [...groups].map(([value, bucket]) => ({
+		let rows: AnalyticsRow[] = [...groups].map(([value, bucket]) => ({
 			dimensions: { [dimension]: value } as Partial<Record<DimensionKey, string>>,
 			metrics: selectMetrics(bucket, metrics),
 		}))
+		const sortMetric = order?.metric ?? 'pageviews'
+		const direction = (order?.direction ?? 'desc') === 'asc' ? 1 : -1
+		rows.sort((a, b) => ((a.metrics[sortMetric] ?? 0) - (b.metrics[sortMetric] ?? 0)) * direction)
+		if (limit) {
+			rows = rows.slice(0, limit)
+		}
 		return { rows, totals }
 	}
 

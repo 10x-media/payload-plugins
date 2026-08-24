@@ -83,6 +83,20 @@ const events: StoredEvent[] = [
 		visitorHash: 'v6',
 		sessionId: 'v6-s1',
 	},
+	// A second host, so q.hostname has something real to narrow away. `device: 'tablet'`
+	// is otherwise unused in this fixture, which keeps it from touching the device/path/
+	// event-name assertions above; it lands inside the existing H1 bucket (not a pageview,
+	// so it doesn't shift the hour-granularity pageview counts either).
+	{
+		timestamp: new Date(H1 + 40 * MIN_MS),
+		type: 'event',
+		name: 'ping',
+		path: '/other',
+		hostname: 'h2',
+		device: 'tablet',
+		visitorHash: 'v7',
+		sessionId: 'v7-s1',
+	},
 ]
 
 describeForDb('native filtered reads and hour granularity', { dbs: ['mongo'] }, (db) => {
@@ -161,15 +175,57 @@ describeForDb('native filtered reads and hour granularity', { dbs: ['mongo'] }, 
 			},
 			{}
 		)
-		// Same values the events path would compute directly from the fixture above:
-		// 4 pageviews, 2 custom events, 6 distinct visitors/sessions (one each per event),
-		// avgDuration = (1000+2000+500+1500)/4 pageviews.
+		// Same values the events path would compute directly from the fixture above, across
+		// both hosts (the hostname-less rollup family aggregates every host, same as an
+		// unfiltered events-path read would): 4 pageviews, 3 custom events (signup, login,
+		// ping), 7 distinct visitors/sessions (one each per event), avgDuration =
+		// (1000+2000+500+1500)/4 pageviews.
 		expect(result.totals).toEqual({
 			pageviews: 4,
-			visitors: 6,
-			sessions: 6,
-			events: 2,
+			visitors: 7,
+			sessions: 7,
+			events: 3,
 			avgDuration: 1250,
 		})
+	})
+
+	it('narrows to a single path when q.path is set on a filtered read', async () => {
+		// Device "mobile" alone matches the /blog/intro pageviews (C, D) and the /a "login"
+		// event (F); pinning q.path to /blog/intro excludes F, so events drops to 0 while
+		// pageviews (already all /blog/intro) is untouched.
+		const result = await adapter.query(
+			{
+				metrics: ['pageviews', 'events'],
+				dateRange: RANGE,
+				path: '/blog/intro',
+				filters: [{ dimension: 'device', operator: 'eq', value: 'mobile' }],
+			},
+			{}
+		)
+		expect(result.totals).toEqual({ pageviews: 2, events: 0 })
+	})
+
+	it('narrows to a single host when q.hostname is set on a filtered read', async () => {
+		// device: 'tablet' only exists on the second-host fixture event above.
+		const combined = await adapter.query(
+			{
+				metrics: ['events'],
+				dateRange: RANGE,
+				filters: [{ dimension: 'device', operator: 'eq', value: 'tablet' }],
+			},
+			{}
+		)
+		expect(combined.totals).toEqual({ events: 1 })
+
+		const scopedToOtherHost = await adapter.query(
+			{
+				metrics: ['events'],
+				dateRange: RANGE,
+				hostname: 'h',
+				filters: [{ dimension: 'device', operator: 'eq', value: 'tablet' }],
+			},
+			{}
+		)
+		expect(scopedToOtherHost.totals).toEqual({ events: 0 })
 	})
 })

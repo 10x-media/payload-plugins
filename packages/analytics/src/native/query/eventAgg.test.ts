@@ -119,6 +119,50 @@ describe('aggregateEvents dimension breakdown', () => {
 		expect(byName).toEqual({ signup: 2, login: 1 })
 		expect(result.rows).toHaveLength(2)
 	})
+
+	it('sorts breakdown rows by pageviews desc by default', () => {
+		const events: EventLike[] = [
+			pageview({ device: 'desktop' }),
+			pageview({ device: 'tablet' }),
+			pageview({ device: 'tablet' }),
+			pageview({ device: 'mobile' }),
+			pageview({ device: 'mobile' }),
+			pageview({ device: 'mobile' }),
+		]
+		const result = aggregateEvents(events, { metrics: ['pageviews'], dimension: 'device' })
+		expect(result.rows.map((r) => r.dimensions?.device)).toEqual(['mobile', 'tablet', 'desktop'])
+	})
+
+	it('sorts breakdown rows by a given order metric and direction', () => {
+		const events: EventLike[] = [
+			pageview({ device: 'desktop', visitorHash: 'a', sessionId: 'a-s' }),
+			pageview({ device: 'desktop', visitorHash: 'b', sessionId: 'b-s' }),
+			pageview({ device: 'mobile', visitorHash: 'c', sessionId: 'c-s' }),
+		]
+		const result = aggregateEvents(events, {
+			metrics: ['pageviews', 'visitors'],
+			dimension: 'device',
+			order: { metric: 'visitors', direction: 'asc' },
+		})
+		expect(result.rows.map((r) => r.dimensions?.device)).toEqual(['mobile', 'desktop'])
+	})
+
+	it('limits breakdown rows after sorting', () => {
+		const events: EventLike[] = [
+			pageview({ device: 'desktop' }),
+			pageview({ device: 'tablet' }),
+			pageview({ device: 'tablet' }),
+			pageview({ device: 'mobile' }),
+			pageview({ device: 'mobile' }),
+			pageview({ device: 'mobile' }),
+		]
+		const result = aggregateEvents(events, {
+			metrics: ['pageviews'],
+			dimension: 'device',
+			limit: 2,
+		})
+		expect(result.rows.map((r) => r.dimensions?.device)).toEqual(['mobile', 'tablet'])
+	})
 })
 
 describe('aggregateEvents hour/day series', () => {
