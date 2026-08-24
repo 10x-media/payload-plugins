@@ -14,7 +14,8 @@ const resolveOrNull = async (
 	req: PayloadRequest
 ): Promise<string | null> => {
 	try {
-		return await args.resolveScope(req)
+		const scope = await args.resolveScope(req)
+		return scope === '' ? null : scope
 	} catch {
 		return null
 	}

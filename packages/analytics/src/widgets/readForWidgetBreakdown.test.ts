@@ -47,6 +47,7 @@ const reqWith = (adapters: AnalyticsAdapter[]): PayloadRequest => {
 	const payload = {} as PayloadRequest['payload']
 	setRuntime(payload, {
 		registry: createRegistry(adapters),
+		configAdapterIds: new Set(adapters.map((a) => a.id)),
 		bindings: {},
 		engine: { read: async (adapter, query) => adapter.query(query, {}) },
 		ttl: { aggregate: 3600, realtime: 300 },

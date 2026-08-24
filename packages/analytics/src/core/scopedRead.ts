@@ -29,11 +29,12 @@ export interface ResolveReadContextArgs {
  * Resolve one read's scope and adapter: explicit scope wins over the request's
  * resolved scope, the registry is resolved per scope, then the adapter is picked
  * by id (or the registry default). Cross-scope reads fail closed behind
- * `platformRead`: an explicit `'*'` scope always, and a scoped read through the
- * platform adapter when it cannot narrow the query to one scope. Any resolution
- * failure (unknown adapter id, a throwing scopeResolver or provider lookup)
- * degrades to `{ ok: false }` so read paths render their unavailable state
- * instead of throwing.
+ * `platformRead`: an explicit `'*'` scope always, and any scoped read through a
+ * shared config adapter that cannot narrow the query to one scope, whether or
+ * not it is the designated platform adapter. A tenant's own runtime adapters
+ * are never gated. Any resolution failure (unknown adapter id, a throwing
+ * scopeResolver or provider lookup) degrades to `{ ok: false }` so read paths
+ * render their unavailable state instead of throwing.
  */
 export const resolveReadContext = async (args: ResolveReadContextArgs): Promise<ReadContext> => {
 	const { runtime, req, adapterId } = args
@@ -54,7 +55,7 @@ export const resolveReadContext = async (args: ResolveReadContextArgs): Promise<
 		}
 		if (
 			scope !== null &&
-			adapter.id === runtime.platformAdapterId &&
+			runtime.configAdapterIds.has(adapter.id) &&
 			!adapter.capabilities.scopedQueries
 		) {
 			if (!(await platformReadFor(runtime, req))) {

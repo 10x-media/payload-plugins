@@ -63,6 +63,10 @@ describe('buildProvidersCollection', () => {
 		}
 	})
 
+	it('disables duplicate (a duplicate could never carry the write-only credentials)', () => {
+		expect(collection.disableDuplicate).toBe(true)
+	})
+
 	it('keeps the scope field hidden, indexed text', () => {
 		const scope = named(collection.fields, 'scope') as TextField | undefined
 		expect(scope?.type).toBe('text')

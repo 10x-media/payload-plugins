@@ -133,10 +133,28 @@ describe('resolveOptions platformAdapter and access', () => {
 		)
 	})
 
-	it('defaults platformRead to any authenticated user', async () => {
+	it('defaults platformRead to any authenticated user for unscoped installs', async () => {
 		const { platformRead } = resolveOptions({ adapters }).access
 		expect(await platformRead({ req: { user: { id: 1 } } as never })).toBe(true)
 		expect(await platformRead({ req: { user: null } as never })).toBe(false)
+	})
+
+	it('defaults platformRead to deny for scoped installs', async () => {
+		const { platformRead } = resolveOptions({
+			adapters,
+			scopeResolver: () => 'tenant-a',
+		}).access
+		expect(await platformRead({ req: { user: { id: 1 } } as never })).toBe(false)
+	})
+
+	it('lets an explicit platformRead win for a scoped install', async () => {
+		const platformRead = () => true
+		const resolved = resolveOptions({
+			adapters,
+			scopeResolver: () => 'tenant-a',
+			access: { platformRead },
+		})
+		expect(resolved.access.platformRead).toBe(platformRead)
 	})
 
 	it('carries a custom platformRead through', async () => {
@@ -144,6 +162,34 @@ describe('resolveOptions platformAdapter and access', () => {
 		expect(resolveOptions({ adapters, access: { platformRead } }).access.platformRead).toBe(
 			platformRead
 		)
+	})
+})
+
+describe('resolveOptions providers.collection.scopeField', () => {
+	const adapters = [memoryAdapter()]
+
+	it('throws when scopeField contains a dot', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: 'tenant.id' } } })
+		).toThrow(/scopeField must be a top-level field name/i)
+	})
+
+	it('throws when scopeField is an empty string', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: '' } } })
+		).toThrow(/scopeField must be a non-empty field name/i)
+	})
+
+	it('throws when scopeField is only whitespace', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: '  ' } } })
+		).toThrow(/scopeField must be a non-empty field name/i)
+	})
+
+	it('accepts a flat scopeField', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: 'tenant' } } })
+		).not.toThrow()
 	})
 })
 

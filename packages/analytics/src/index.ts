@@ -7,6 +7,7 @@ import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
+import { makeSourcesHandler, SOURCES_PATH } from './plugin/sourcesEndpoint'
 import { warmTask } from './plugin/warmTask'
 import type { BuildSecretField } from './providers/collection'
 import { buildProvidersCollection } from './providers/collection'
@@ -136,13 +137,22 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				{ method: 'get', path: DOCUMENT_PATH, handler: makeDocumentHandler() },
 			]
 		}
+		config.endpoints = [
+			...(config.endpoints ?? []),
+			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
+		]
 		if (resolved.widgets.enabled) {
+			const multiProvider =
+				registry.isMultiProvider() ||
+				resolved.providers.collection.enabled ||
+				Boolean(resolved.providers.resolve)
 			registerWidgets(config, {
 				adapters: resolved.adapters,
-				multiProvider: registry.isMultiProvider(),
+				multiProvider,
 				disabled: resolved.widgets.disabled,
 				register: resolved.widgets.register,
 				localizeText: resolved.widgets.localizeText,
+				defaultId: resolved.defaultAdapter,
 			})
 		}
 		if (resolved.cache.warm.enabled) {
@@ -188,6 +198,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveScope,
 				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
+				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
 				engine,

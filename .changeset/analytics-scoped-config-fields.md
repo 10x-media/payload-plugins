@@ -1,0 +1,7 @@
+---
+"@10x-media/analytics": minor
+---
+
+Scope-aware widget pickers. A new authenticated `GET /api/analytics/sources` endpoint lists the adapters visible to the requesting scope (config adapters plus the scope's runtime providers) with their capabilities, and the widget `dataSource` and `metric` selects now render through client components that consume it: a tenant's own providers finally appear in pickers, labeled by the provider document's name (a generated label stands in when unset), and the metric list narrows to what the selected source can actually serve. Without JavaScript or when the endpoint is unreachable the pickers fall back to the config-time option lists, and stored values the endpoint no longer lists keep the previous behavior of degrading at read time.
+
+The sources endpoint response now carries a top-level `defaultId` and a `kind: 'config' | 'runtime'` per source, and serialized capabilities are a deliberate allowlist (`metrics`, `dimensions`, `realtime`, `realtimeWindowMinutes`, `perPageQuery`, `comparison`, `minGranularity`, `maxLookbackDays`); adapter internals such as rate limits and TTL recommendations are no longer on the wire. New client reuse surface: `useAnalyticsSources` and the `WireSource` type from `@10x-media/analytics/client`, `SerializedCapabilities` from `/types`, and a `sourceFieldPath` prop on `MetricSelectField` for custom widgets. The widget data source default now follows `defaultAdapter`, and the realtime poller builds its URL from the configured API route instead of a hardcoded `/api`.

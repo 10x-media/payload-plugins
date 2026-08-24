@@ -2,7 +2,9 @@ import { AnalyticsPanelField as AnalyticsPanelField_e33bd2cebc5cb3736daaf4c0c56b
 import { ProtectedCell as ProtectedCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ProtectedField as ProtectedField_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
 import { AnalyticsMetricWidget as AnalyticsMetricWidget_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
+import { MetricSelectField as MetricSelectField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { DateRangeField as DateRangeField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
+import { SourceSelectField as SourceSelectField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { AnalyticsTrendWidget as AnalyticsTrendWidget_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
 import { AnalyticsRealtimeWidget as AnalyticsRealtimeWidget_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
 import { AnalyticsBreakdownWidget as AnalyticsBreakdownWidget_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
@@ -15,7 +17,9 @@ export const importMap = {
   "@10x-media/fields/rsc#ProtectedCell": ProtectedCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/client#ProtectedField": ProtectedField_02043ee4f38853ef8c4ef9fd50352514,
   "@10x-media/analytics/rsc#AnalyticsMetricWidget": AnalyticsMetricWidget_e33bd2cebc5cb3736daaf4c0c56bb68c,
+  "@10x-media/analytics/client#MetricSelectField": MetricSelectField_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/client#DateRangeField": DateRangeField_cf3604008f3ebbc369f9463262b1f9eb,
+  "@10x-media/analytics/client#SourceSelectField": SourceSelectField_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/rsc#AnalyticsTrendWidget": AnalyticsTrendWidget_e33bd2cebc5cb3736daaf4c0c56bb68c,
   "@10x-media/analytics/rsc#AnalyticsRealtimeWidget": AnalyticsRealtimeWidget_e33bd2cebc5cb3736daaf4c0c56bb68c,
   "@10x-media/analytics/rsc#AnalyticsBreakdownWidget": AnalyticsBreakdownWidget_e33bd2cebc5cb3736daaf4c0c56bb68c,

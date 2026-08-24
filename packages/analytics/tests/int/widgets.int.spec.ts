@@ -7,6 +7,7 @@ interface InspectedField {
 	name?: string
 	type?: string
 	options?: Array<{ value?: string }>
+	admin?: { components?: { Field?: { path?: string } } }
 }
 
 interface RegisteredWidget {
@@ -112,4 +113,37 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'windowMinutes']))
 	})
+
+	it('renders the metric field through MetricSelectField', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
+		const metricField = (widget?.fields ?? []).find((f) => f.name === 'metric')
+		expect(metricField?.admin?.components?.Field?.path).toBe(
+			'@10x-media/analytics/client#MetricSelectField'
+		)
+	})
 })
+
+describeForDb(
+	'analytics dashboard widgets, one adapter with providers.collection',
+	{ dbs: ['mongo'] },
+	(db) => {
+		let booted: BootedPayload
+
+		beforeAll(async () => {
+			booted = await bootPayload({
+				plugin: analytics({ adapters: [native()], providers: { collection: true } }),
+				db,
+			})
+		})
+
+		afterAll(async () => {
+			await booted.stop()
+		})
+
+		it('registers the dataSource field even with a single static adapter, because providers.collection makes runtime providers selectable', () => {
+			const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
+			const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+			expect(fieldNames).toContain('dataSource')
+		})
+	}
+)
