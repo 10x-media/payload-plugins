@@ -68,3 +68,59 @@ describeForDb('analytics scope seam', { dbs: ['mongo'] }, (db) => {
 		expect(scoped.metrics.pageviews).toBe(unscoped.metrics.pageviews)
 	})
 })
+
+describeForDb(
+	'analytics scope seam: runtime provider instance routing',
+	{ dbs: ['mongo'] },
+	(db) => {
+		const seeded = memoryAdapter()
+		let booted: BootedPayload
+
+		beforeAll(async () => {
+			seeded.record({ path: '/p', timestamp: new Date(), visitor: 'v1' })
+			booted = await bootPayload({
+				plugin: analytics({
+					adapters: [memoryAdapter()],
+					providers: {
+						resolve: async () => [{ ...seeded, id: 'memory:doc9', label: 'Instance' }],
+					},
+				}),
+				db,
+			})
+		})
+
+		afterAll(async () => {
+			await booted.stop()
+		})
+
+		const req = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
+
+		it('resolves an instance-id adapter through the registry and serves a read', async () => {
+			const runtime = getRuntime(booted.payload)
+			if (!runtime) throw new Error('runtime missing')
+			const registry = await resolveRegistryFor(runtime, { payload: booted.payload, scope: null })
+			expect(registry.get('memory:doc9').id).toBe('memory:doc9')
+
+			const result = await readForWidget({
+				req: req(),
+				metrics: ['pageviews'],
+				timeframe: 'last7days',
+				adapterId: 'memory:doc9',
+				now: new Date(),
+			})
+			expect(result.status).toBe('ok')
+			expect(result.adapterId).toBe('memory:doc9')
+		})
+
+		it('degrades an unknown instance id to unavailable instead of throwing', async () => {
+			const result = await readForWidget({
+				req: req(),
+				metrics: ['pageviews'],
+				timeframe: 'last7days',
+				adapterId: 'memory:doc404',
+				now: new Date(),
+			})
+			expect(result.status).toBe('unavailable')
+		})
+	}
+)
