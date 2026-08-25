@@ -14,6 +14,7 @@ import type {
 	WikiWriteAffordanceMode,
 } from '../options'
 import { type ResolvedWikiExclude, resolveExcluded } from './exclude'
+import { DEFAULT_MEDIA_SLUG, DEFAULT_PAGES_SLUG } from './slugs'
 
 /** The wiki views registered, with every index slot present as an array. */
 export type ResolvedWikiViewOptions = {
@@ -33,6 +34,8 @@ export type ResolvedWikiOptions = {
 	/** Host-declared surfaces, in declaration order. Empty when none were declared. */
 	customTargets: ResolvedWikiCustomTarget[]
 	editorBlocks: WikiEditorBlockOption[]
+	/** Import-map path of the host's converters function; undefined when none. */
+	editorConverters: string | undefined
 	/**
 	 * Left in whichever form the host gave it, array or function: normalizing the
 	 * array into a function here would build the feature list at option-resolution
@@ -40,6 +43,7 @@ export type ResolvedWikiOptions = {
 	 * own. `undefined` means the editor is the plugin's alone.
 	 */
 	editorFeatures: undefined | WikiEditorFeaturesOption
+	editorInlineBlocks: WikiEditorBlockOption[]
 	/**
 	 * Slugs the plugin leaves untouched, per entity kind: Payload's internals,
 	 * the wiki's own collections, and the host's `exclude` option.
@@ -108,17 +112,37 @@ const resolveWikiView = (
 	}
 }
 
+/**
+ * One slug per editor block, across both lists: lexical keys its nodes by slug, so a
+ * duplicate silently resolves to whichever renderer landed last.
+ */
+const assertUniqueBlockSlugs = (
+	blocks: WikiEditorBlockOption[],
+	inlineBlocks: WikiEditorBlockOption[]
+): void => {
+	const seen = new Set<string>()
+	for (const option of [...blocks, ...inlineBlocks]) {
+		if (seen.has(option.block.slug)) {
+			throw new Error(`[admin-wiki] duplicate editor block slug: ${option.block.slug}`)
+		}
+		seen.add(option.block.slug)
+	}
+}
+
 /** Apply defaults and normalize shorthand option forms. */
 export const resolveOptions = (options: AdminWikiPluginOptions): ResolvedWikiOptions => {
+	assertUniqueBlockSlugs(options.editor?.blocks ?? [], options.editor?.inlineBlocks ?? [])
 	const slugs = {
-		media: options.slugs?.media ?? 'wiki-media',
-		pages: options.slugs?.pages ?? 'wiki-pages',
+		media: options.slugs?.media ?? DEFAULT_MEDIA_SLUG,
+		pages: options.slugs?.pages ?? DEFAULT_PAGES_SLUG,
 	}
 	return {
 		chips: { blocks: options.chips?.blocks ?? true },
 		customTargets: resolveCustomTargets(options.customTargets),
 		editorBlocks: options.editor?.blocks ?? [],
+		editorConverters: options.editor?.converters,
 		editorFeatures: options.editor?.features,
+		editorInlineBlocks: options.editor?.inlineBlocks ?? [],
 		exclude: resolveExcluded(options.exclude, slugs),
 		featured: options.featured ?? true,
 		localeMap: options.localeMap ?? {},

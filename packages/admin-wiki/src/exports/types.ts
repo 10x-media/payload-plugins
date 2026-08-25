@@ -1,3 +1,4 @@
+export type { WikiFeaturesArgs } from '../editor/wikiEditor'
 export type {
 	AdminWikiPluginOptions,
 	WikiAccessOptions,

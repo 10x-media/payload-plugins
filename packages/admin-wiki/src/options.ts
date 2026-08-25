@@ -56,6 +56,8 @@ export type WikiEditorBlockOption = {
 	block: Block
 	/** Import-map path of the client component rendering this block in guides. */
 	component: string
+	/** Available in nested editors (a callout body). Inline blocks default to true, blocks to false. */
+	nestable?: boolean
 }
 
 /**
@@ -80,14 +82,17 @@ export type WikiEditorFeature = Extract<
  * live with.
  */
 export type WikiEditorFeaturesOption =
-	| ((args: { defaultFeatures: WikiEditorFeature[] }) => WikiEditorFeature[])
+	| ((args: { defaultFeatures: WikiEditorFeature[]; nested: boolean }) => WikiEditorFeature[])
 	| WikiEditorFeature[]
 
 /** Extensions to the plugin's self-contained editor. */
 export type WikiEditorOptions = {
 	blocks?: WikiEditorBlockOption[]
+	/** Import-map path of a client module exporting a `JSXConvertersFunction`. */
+	converters?: string
 	/** Lexical features beside the plugin's own. See {@link WikiEditorFeaturesOption}. */
 	features?: WikiEditorFeaturesOption
+	inlineBlocks?: WikiEditorBlockOption[]
 }
 
 /** One label, or one per admin language: `'Dashboard'` or `{ de: '…', en: '…' }`. */
@@ -325,7 +330,7 @@ export type AdminWikiPluginOptions = {
 	 * {@link WikiCustomTargetOption}.
 	 */
 	customTargets?: WikiCustomTargetOption[]
-	/** Extensions to the wiki editor (consumer blocks with renderers). */
+	/** Extensions to the wiki editor: blocks, inline blocks, features, converters. */
 	editor?: WikiEditorOptions
 	/** Entities the plugin leaves alone entirely. See {@link WikiExcludeOptions}. */
 	exclude?: WikiExcludeOptions

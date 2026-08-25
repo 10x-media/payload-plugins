@@ -93,6 +93,31 @@ test.describe('wiki surfaces', () => {
 		await expect(page.locator('.wiki-guide-article')).toContainText('Write the draft')
 	})
 
+	test('renders an inline block in the sentence and the consumer link converter', async ({
+		page,
+	}) => {
+		await page.goto('/admin/wiki')
+		await page.locator('.wiki-index__card-title', { hasText: 'Editor features tour' }).click()
+
+		const article = page.locator('.wiki-guide-article')
+		// The chip is seeded mid-paragraph, so a renderer returning block-level JSX
+		// would break the sentence apart rather than sit inside it.
+		const chip = article.locator('.dev-status-chip').first()
+		await expect(chip).toBeVisible()
+		await expect(chip.locator('xpath=ancestor::p')).toHaveCount(1)
+
+		// options.editor.converters replaces the plugin's own link converter.
+		await expect(article.locator('a[data-dev-converter="link"]').first()).toBeVisible()
+
+		// The same function wraps the plugin's callout converter, so both survive:
+		// the wrapper is the project's, the callout inside it is the plugin's.
+		const wrapped = article.locator('[data-dev-converter="wikiCallout"]').first()
+		await expect(wrapped.locator('.wiki-callout')).toBeVisible()
+
+		// A block renderer resolved from the import map, the other half of the seam.
+		await expect(article.locator('[data-dev-renderer="devTip"]').first()).toBeVisible()
+	})
+
 	test('surfaces a custom target on the dev app custom view', async ({ page }) => {
 		// Nothing in the config describes this view, so its guide is attached to a
 		// declared custom key rather than to anything the walker found.

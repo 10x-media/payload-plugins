@@ -10,7 +10,9 @@ describe('resolveOptions', () => {
 			chips: { blocks: true },
 			customTargets: [],
 			editorBlocks: [],
+			editorConverters: undefined,
 			editorFeatures: undefined,
+			editorInlineBlocks: [],
 			exclude: {
 				blocks: [],
 				collections: [...PAYLOAD_INTERNAL_COLLECTIONS, 'wiki-media', 'wiki-pages'].sort(),
@@ -112,6 +114,20 @@ describe('resolveOptions', () => {
 		expect(resolveOptions({ editor: { features: fn } }).editorFeatures).toBe(fn)
 	})
 
+	it('keeps blocks and inline blocks apart', () => {
+		const block = { block: { slug: 'tip', fields: [] }, component: '/Tip#Tip' }
+		const inline = { block: { slug: 'chip', fields: [] }, component: '/Chip#Chip' }
+		const resolved = resolveOptions({ editor: { blocks: [block], inlineBlocks: [inline] } })
+		expect(resolved.editorBlocks).toEqual([block])
+		expect(resolved.editorInlineBlocks).toEqual([inline])
+	})
+
+	it('carries the converters path through untouched', () => {
+		expect(
+			resolveOptions({ editor: { converters: '/converters#wikiConverters' } }).editorConverters
+		).toBe('/converters#wikiConverters')
+	})
+
 	it('honors the block chips opt-out', () => {
 		expect(resolveOptions({ chips: { blocks: false } }).chips).toEqual({ blocks: false })
 	})
@@ -148,5 +164,18 @@ describe('resolveOptions', () => {
 			list: { slot: 'afterListTable' },
 		})
 		expect(resolved.wikiView).toBe(false)
+	})
+	it('rejects a block slug declared twice, across both lists', () => {
+		const option = (slug: string) => ({ block: { fields: [], slug }, component: `/x#${slug}` })
+
+		expect(() => resolveOptions({ editor: { blocks: [option('a'), option('a')] } })).toThrow(
+			/duplicate editor block slug: a/
+		)
+		expect(() =>
+			resolveOptions({ editor: { blocks: [option('a')], inlineBlocks: [option('a')] } })
+		).toThrow(/duplicate editor block slug: a/)
+		expect(() =>
+			resolveOptions({ editor: { blocks: [option('a')], inlineBlocks: [option('b')] } })
+		).not.toThrow()
 	})
 })

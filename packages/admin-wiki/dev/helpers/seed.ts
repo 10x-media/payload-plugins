@@ -2,7 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Payload } from 'payload'
 import { seedWiki } from '../../src/index'
-import { devTipTransformer, embedTransformer } from './seedTransformers'
+import { devTipTransformer, embedTransformer, statusChipTransformer } from './seedTransformers'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
@@ -67,6 +67,14 @@ Standard formatting, lists, quotes, and links work as expected.
 ### Consumer blocks
 
 :::tip This box is a consumer-supplied block, rendered by the dev app's own component.
+
+### Inline blocks
+
+An inline block sits in the sentence: this feature is {{chip:new:New}} and the old
+one is {{chip:deprecated:Deprecated}}, both rendered by the dev app's own component.
+
+Links render through the dev app's own converter, so [this one]({{wiki:guide:publishing-a-post}})
+carries an arrow the plugin never puts there.
 
 ## Video
 
@@ -232,7 +240,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 						key: 'diagram',
 					},
 				],
-				transformers: [devTipTransformer, embedTransformer],
+				transformers: [devTipTransformer, embedTransformer, statusChipTransformer],
 			}
 		)
 		payload.logger.info('Seeded wiki guides')

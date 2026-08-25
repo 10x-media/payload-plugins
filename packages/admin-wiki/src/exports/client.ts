@@ -55,6 +55,7 @@ export { CalloutBlockLabel } from '../components/GuideArticle/CalloutBlockLabel'
 export { GuideArticle, type GuideArticleProps } from '../components/GuideArticle/GuideArticle'
 export { GuideLink, type GuideLinkProps } from '../components/GuideArticle/GuideLink'
 export { MissingBlockRenderer } from '../components/GuideArticle/MissingBlockRenderer'
+export { MissingInlineBlockRenderer } from '../components/GuideArticle/MissingInlineBlockRenderer'
 export { GuideDrawer, type GuideDrawerProps } from '../components/GuideDrawer/GuideDrawer'
 export { WikiOrphanBanner } from '../components/ListExtras/WikiOrphanBanner'
 export {
