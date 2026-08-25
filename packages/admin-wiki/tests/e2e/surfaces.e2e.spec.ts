@@ -108,6 +108,14 @@ test.describe('wiki surfaces', () => {
 
 		// options.editor.converters replaces the plugin's own link converter.
 		await expect(article.locator('a[data-dev-converter="link"]').first()).toBeVisible()
+
+		// The same function wraps the plugin's callout converter, so both survive:
+		// the wrapper is the project's, the callout inside it is the plugin's.
+		const wrapped = article.locator('[data-dev-converter="wikiCallout"]').first()
+		await expect(wrapped.locator('.wiki-callout')).toBeVisible()
+
+		// A block renderer resolved from the import map, the other half of the seam.
+		await expect(article.locator('[data-dev-renderer="devTip"]').first()).toBeVisible()
 	})
 
 	test('surfaces a custom target on the dev app custom view', async ({ page }) => {
