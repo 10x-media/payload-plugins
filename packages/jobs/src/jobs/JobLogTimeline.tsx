@@ -3,7 +3,7 @@
 import { Pill, useConfig, useForm } from '@payloadcms/ui'
 import { formatDate } from '@payloadcms/ui/shared'
 import type { ArrayFieldClientProps } from 'payload'
-import type { FC } from 'react'
+import type { FC, ReactNode } from 'react'
 import { useState } from 'react'
 
 import { keys } from '../translations/keys'
@@ -11,20 +11,10 @@ import { useTranslation } from '../translations/useTranslation'
 import { extractErrorMessage } from './extractErrorMessage'
 import { formatDuration } from './formatDuration'
 import { formatRelativeTime } from './formatRelativeTime'
+import type { JobLogEntry, JobLogRenderedEntries, JobLogRenderedSlots } from './logSlotComponents'
+import { logRowKey } from './logSlotComponents'
 
 const DEFAULT_DATE_FORMAT = 'MMMM do yyyy, h:mm a'
-
-interface LogEntry {
-	completedAt?: string
-	error?: unknown
-	executedAt?: string
-	id?: string
-	input?: unknown
-	output?: unknown
-	state?: 'failed' | 'succeeded'
-	taskID?: string
-	taskSlug?: string
-}
 
 const hasKeys = (value: unknown): boolean =>
 	typeof value === 'object' && value !== null && Object.keys(value).length > 0
@@ -60,7 +50,12 @@ const Detail = ({ label, value }: { label: string; value: string }) => (
 	</div>
 )
 
-const JsonBlock = ({ label, value }: { label: string; value: unknown }) => (
+/**
+ * One labelled block of an expanded attempt. `node` is a server-rendered custom
+ * component for this slot; without one the value falls back to a JSON dump. The
+ * label and the surrounding frame stay ours either way.
+ */
+const Block = ({ label, node, value }: { label: string; node?: ReactNode; value: unknown }) => (
 	<div>
 		<div
 			style={{
@@ -72,21 +67,23 @@ const JsonBlock = ({ label, value }: { label: string; value: unknown }) => (
 		>
 			{label}
 		</div>
-		<pre
-			style={{
-				backgroundColor: 'var(--theme-elevation-100)',
-				borderRadius: '4px',
-				fontSize: '0.75rem',
-				margin: 0,
-				maxHeight: '220px',
-				overflow: 'auto',
-				padding: 'calc(var(--base) / 2)',
-				whiteSpace: 'pre-wrap',
-				wordBreak: 'break-word',
-			}}
-		>
-			{JSON.stringify(value, null, 2)}
-		</pre>
+		{node ?? (
+			<pre
+				style={{
+					backgroundColor: 'var(--theme-elevation-100)',
+					borderRadius: '4px',
+					fontSize: '0.75rem',
+					margin: 0,
+					maxHeight: '220px',
+					overflow: 'auto',
+					padding: 'calc(var(--base) / 2)',
+					whiteSpace: 'pre-wrap',
+					wordBreak: 'break-word',
+				}}
+			>
+				{JSON.stringify(value, null, 2)}
+			</pre>
+		)}
 	</div>
 )
 
@@ -94,11 +91,13 @@ const LogRow = ({
 	entry,
 	index,
 	pattern,
+	slots,
 	taskLabels,
 }: {
-	entry: LogEntry
+	entry: JobLogEntry
 	index: number
 	pattern: string
+	slots?: JobLogRenderedSlots
 	taskLabels?: Record<string, string>
 }) => {
 	const { i18n, t } = useTranslation()
@@ -107,6 +106,10 @@ const LogRow = ({
 	const reason = failed ? extractErrorMessage(entry.error) : undefined
 	const duration = formatDuration(entry.executedAt, entry.completedAt)
 	const relative = formatRelativeTime(entry.executedAt ?? null)
+	// A custom renderer relaxes the emptiness gate, so an attempt that returned an
+	// empty object still gets a block, but it never invents one for a value the
+	// attempt does not carry at all.
+	const showOutput = slots?.output ? entry.output != null : hasKeys(entry.output)
 	const absolute = (date?: string): string => (date ? formatDate({ date, i18n, pattern }) : '—')
 
 	return (
@@ -187,12 +190,12 @@ const LogRow = ({
 							<Detail label={t(keys.fieldCompleted)} value={absolute(entry.completedAt)} />
 							{entry.taskID ? <Detail label={t(keys.fieldTaskId)} value={entry.taskID} /> : null}
 						</div>
-						<JsonBlock label={t(keys.fieldInput)} value={entry.input ?? {}} />
-						{hasKeys(entry.output) ? (
-							<JsonBlock label={t(keys.fieldOutput)} value={entry.output} />
+						<Block label={t(keys.fieldInput)} node={slots?.input} value={entry.input ?? {}} />
+						{showOutput ? (
+							<Block label={t(keys.fieldOutput)} node={slots?.output} value={entry.output} />
 						) : null}
 						{entry.error != null ? (
-							<JsonBlock label={t(keys.fieldError)} value={entry.error} />
+							<Block label={t(keys.fieldError)} node={slots?.error} value={entry.error} />
 						) : null}
 					</div>
 				</div>
@@ -205,15 +208,22 @@ const LogRow = ({
  * Field component for a job's `log`: a read-only per-attempt timeline. Each
  * attempt collapses to a one-line summary and expands to reveal its full data
  * (timings, task ID, input, output, error) so nothing is hidden.
+ *
+ * `renderedSlots` carries custom blocks pre-rendered by `JobLogTimelineServer`;
+ * an attempt with no entry there falls back to the default JSON blocks, which is
+ * also what happens when this component is mounted directly.
  */
 export const JobLogTimeline: FC<
-	ArrayFieldClientProps & { taskLabels?: Record<string, string> }
-> = ({ path, taskLabels }) => {
+	ArrayFieldClientProps & {
+		renderedSlots?: JobLogRenderedEntries
+		taskLabels?: Record<string, string>
+	}
+> = ({ path, renderedSlots, taskLabels }) => {
 	const { getDataByPath } = useForm()
 	const { config } = useConfig()
 	const { t } = useTranslation()
 	const pattern = config.admin?.dateFormat ?? DEFAULT_DATE_FORMAT
-	const raw = getDataByPath<LogEntry[]>(path)
+	const raw = getDataByPath<JobLogEntry[]>(path)
 	const entries = Array.isArray(raw) ? raw : []
 
 	if (entries.length === 0) {
@@ -226,8 +236,9 @@ export const JobLogTimeline: FC<
 				<LogRow
 					entry={entry}
 					index={index}
-					key={entry.id ?? index}
+					key={logRowKey(entry, index)}
 					pattern={pattern}
+					slots={renderedSlots?.[logRowKey(entry, index)]}
 					taskLabels={taskLabels}
 				/>
 			))}

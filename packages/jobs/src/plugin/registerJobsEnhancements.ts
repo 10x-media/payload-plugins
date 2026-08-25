@@ -9,6 +9,7 @@ import {
 	type PayloadComponent,
 } from 'payload'
 
+import { collectLogDependencies } from '../jobs/logSlotComponents'
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
@@ -26,7 +27,7 @@ const STATUS_CELL = '@10x-media/jobs/client#JobStatusCell'
 const STATUS_HEADER = '@10x-media/jobs/client#JobStatusHeader'
 const RELATIVE_CELL = '@10x-media/jobs/client#RelativeTimeCell'
 const ERROR_PANEL = '@10x-media/jobs/client#JobErrorPanel'
-const LOG_TIMELINE = '@10x-media/jobs/client#JobLogTimeline'
+const LOG_TIMELINE = '@10x-media/jobs/rsc#JobLogTimelineServer'
 const DOC_DESCRIPTION = '@10x-media/jobs/client#JobDocDescription'
 const HEALTH_BAR = '@10x-media/jobs/rsc#JobsHealthBar'
 const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
@@ -251,6 +252,16 @@ export const registerJobsEnhancements = (
 	options: JobsOptions,
 	extraQueues: string[] = []
 ): void => {
+	// The log renderers are named in plugin options, not in a component slot the
+	// import-map generator walks, so they only reach the import map through here.
+	const logDependencies = collectLogDependencies(options.log?.entryComponents)
+	if (Object.keys(logDependencies).length > 0) {
+		config.admin = {
+			...config.admin,
+			dependencies: { ...config.admin?.dependencies, ...logDependencies },
+		}
+	}
+
 	const existing = config.jobs?.jobsCollectionOverrides
 
 	const enhance = ({
@@ -281,7 +292,11 @@ export const registerJobsEnhancements = (
 		const labels = collectJobLabels(config)
 		const fieldComponents: Record<string, PayloadComponent> = {
 			...FIELD_COMPONENTS,
-			log: { clientProps: { taskLabels: labels.taskLabels }, path: LOG_TIMELINE },
+			log: {
+				clientProps: { taskLabels: labels.taskLabels },
+				path: LOG_TIMELINE,
+				serverProps: { entryComponents: options.log?.entryComponents },
+			},
 		}
 		const withSelects = base.fields.map((field): Field => {
 			const name = fieldName(field)

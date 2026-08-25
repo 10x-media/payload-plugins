@@ -77,6 +77,13 @@ export { type CreateWorkerArgs, createWorker, type Worker } from './execution/wo
 export type { JobStatus, JobStatusInput } from './jobs/deriveJobStatus'
 export { deriveJobStatus } from './jobs/deriveJobStatus'
 export type {
+	JobLogEntry,
+	JobLogEntryComponents,
+	JobLogSlot,
+	JobLogSlotComponents,
+	JobLogSlotProps,
+} from './jobs/logSlotComponents'
+export type {
 	CollectionOverride,
 	FieldsOverride,
 	JobsOptions,

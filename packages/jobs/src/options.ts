@@ -1,5 +1,6 @@
 import type { CollectionConfig, Field, PayloadComponent } from 'payload'
 
+import type { JobLogEntryComponents } from './jobs/logSlotComponents'
 import type { Override } from './plugin/resolve'
 import type { QueueControlOptions } from './queueControl/options'
 import type { ReliabilityOptions } from './reliability/options'
@@ -36,6 +37,17 @@ export type JobsOptions = {
 	cells?: Record<string, PayloadComponent | false>
 	/** The derived Status column. `false` removes it; a component replaces our status cell. */
 	status?: PayloadComponent | false
+	/**
+	 * Custom renderers for the JSON blocks inside an expanded log-attempt row.
+	 * `entryComponents` is keyed by task slug (`'*'` for every task, `inline` for
+	 * Payload's reserved inline steps) and then by block; unset blocks keep the
+	 * default JSON dump. A registered block also renders for an empty value (an
+	 * attempt that returned `{}`), but never for a value the attempt does not
+	 * carry at all, so a succeeded attempt gets no error block. Paths are
+	 * registered with `admin.dependencies`, so adopters re-run
+	 * `payload generate:importmap` after changing them.
+	 */
+	log?: { entryComponents?: JobLogEntryComponents }
 	/**
 	 * Components rendered between the search bar and the table. `false` removes our
 	 * queue-health bar; an array replaces it.

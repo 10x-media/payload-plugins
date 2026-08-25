@@ -1,4 +1,6 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+
+import { login } from './helpers'
 
 test('admin panel loads with jobs plugin enabled', async ({ page }) => {
 	const response = await page.goto('/admin')
@@ -10,14 +12,6 @@ test('payload health endpoint responds', async ({ request }) => {
 	const response = await request.get('/admin')
 	expect(response.status()).toBeLessThan(500)
 })
-
-const login = async (page: Page): Promise<void> => {
-	await page.goto('/admin/login')
-	await page.fill('input[name="email"]', 'dev@10xmedia.de')
-	await page.fill('input[name="password"]', 'password')
-	await page.click('button[type="submit"]')
-	await page.waitForURL((url) => !url.pathname.includes('/login'))
-}
 
 // Doc URLs end in the document id (hex on mongo, numeric on postgres); exclude /create.
 const DOC_URL = /\/collections\/payload-jobs\/(?!create($|\?))[\w%-]+/
@@ -48,17 +42,19 @@ test('total chip clears applied filters', async ({ page }) => {
 	await expect(page.locator('table tbody tr')).toHaveCount(1)
 
 	// The total chip is a button (JobsTotalChip) that clears search + filters in
-	// place via refineListData; the seed creates exactly 7 jobs.
+	// place via refineListData; the seed creates exactly 8 jobs.
 	await page.getByRole('button', { name: /^\d+\+? jobs$/ }).click()
-	await expect(page.locator('table tbody tr')).toHaveCount(7)
+	await expect(page.locator('table tbody tr')).toHaveCount(8)
 })
 
 test('job title column links to the document', async ({ page }) => {
 	await login(page)
 	await page.goto('/admin/collections/payload-jobs')
 
-	const titleLink = page.locator('td.cell-jobTitle a').first()
-	await expect(titleLink).toHaveText('Run automation')
+	// By title rather than by row: the seed's newest job is a `sleep` task, so the
+	// first row is not the automation workflow.
+	const titleLink = page.getByRole('link', { name: 'Run automation' }).first()
+	await expect(titleLink).toBeVisible()
 	await titleLink.click()
 
 	await page.waitForURL(DOC_URL)
