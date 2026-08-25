@@ -1,5 +1,10 @@
 export type { RichTextBodyOption } from '../actions/body/serializeBody'
-export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from '../actions/defineAction'
+export type {
+	ActionDefinition,
+	ActionRunArgs,
+	ActionValidateArgs,
+	AnyActionDefinition,
+} from '../actions/defineAction'
 export type { FromAddressesResolver, FromAddressOption } from '../actions/fromAddresses'
 export type { ActionOption, ActionRegistry, ActionsConfig } from '../actions/registry'
 export type { ActionResult } from '../actions/runActions'
