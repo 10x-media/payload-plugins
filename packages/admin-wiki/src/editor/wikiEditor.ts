@@ -26,7 +26,6 @@ import type {
 	WikiEditorFeaturesOption,
 	WikiVideoOptions,
 } from '../options'
-import { DEFAULT_MEDIA_SLUG, DEFAULT_PAGES_SLUG } from '../plugin/slugs'
 import { WikiBlockquoteFeature } from './blockquoteFeature'
 import { buildCalloutBlock } from './calloutBlock'
 import { WikiGuideLinkFeature } from './guideLink/server'
@@ -40,12 +39,12 @@ export type WikiFeaturesArgs = {
 	features?: WikiEditorFeaturesOption
 	/** Consumer inline blocks; the plugin ships none of its own. */
 	inlineBlocks?: WikiEditorBlockOption[]
-	/** Slug of the wiki media upload collection; pass it when the project renamed it. */
-	mediaSlug?: string
+	/** Slug of the wiki media upload collection the upload feature is scoped to. */
+	mediaSlug: string
 	/** Whether the editor sits inside something: a callout body, or a consumer block. */
 	nested?: boolean
-	/** Slug of the wiki pages collection; pass it when the project renamed it. */
-	pagesSlug?: string
+	/** Slug of the wiki pages collection, for guide-to-guide links. */
+	pagesSlug: string
 	/** Resolved video options; false leaves every video capability unregistered. */
 	video?: false | WikiVideoOptions
 }
@@ -62,18 +61,21 @@ const nestableBlocks = (options: WikiEditorBlockOption[], fallback: boolean) =>
  * doc links) and guide-to-guide links are their own feature beside them; uploads
  * are scoped to the wiki media collection.
  *
- * `nested` drops the callout and headings (the table-of-contents walk does not
- * descend into a nested editor state, so a heading there would get no id), the
- * fixed toolbar, and the features the callout body has no vertical room for:
- * lists, blockquote, horizontal rule and indent.
+ * `nested` drops two things structurally: the callout, which would otherwise
+ * nest inside itself, and headings, which would get no id because the
+ * table-of-contents walk does not descend into a nested editor state. What else
+ * it drops is document furniture that reads wrong inside a framed note:
+ * blockquote, horizontal rule, indent, and the fixed toolbar in favour of the
+ * inline one. Content a note legitimately holds stays, lists and images and
+ * video among it, alongside the blocks a project marked `nestable`.
  */
 export const wikiFeatures = ({
 	blocks = [],
 	features,
 	inlineBlocks = [],
-	mediaSlug = DEFAULT_MEDIA_SLUG,
+	mediaSlug,
 	nested = false,
-	pagesSlug = DEFAULT_PAGES_SLUG,
+	pagesSlug,
 	video = false,
 }: WikiFeaturesArgs): WikiEditorFeature[] => {
 	const nestedBlocks = nested
@@ -89,6 +91,8 @@ export const wikiFeatures = ({
 		UnderlineFeature(),
 		StrikethroughFeature(),
 		InlineCodeFeature(),
+		UnorderedListFeature(),
+		OrderedListFeature(),
 		AlignFeature(),
 		LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
 		WikiGuideLinkFeature({ pagesSlug }),
@@ -98,8 +102,6 @@ export const wikiFeatures = ({
 			? []
 			: [
 					HeadingFeature({ enabledHeadingSizes: ['h2', 'h3', 'h4'] }),
-					UnorderedListFeature(),
-					OrderedListFeature(),
 					WikiBlockquoteFeature(),
 					HorizontalRuleFeature(),
 					IndentFeature(),

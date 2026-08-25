@@ -264,12 +264,13 @@ describeForDb('callout body editor', { dbs: ['mongo'] }, (db) => {
 		expect(calloutBodyFeatureKeys(booted)).not.toContain('heading')
 	})
 
-	it('keeps the formatting the body has room for and drops the rest', () => {
+	it('keeps the content a note holds and drops the document furniture', () => {
 		const keys = calloutBodyFeatureKeys(booted)
 		expect(keys).toContain('strikethrough')
 		expect(keys).toContain('align')
-		expect(keys).not.toContain('unorderedList')
-		expect(keys).not.toContain('orderedList')
+		expect(keys).toContain('unorderedList')
+		expect(keys).toContain('orderedList')
+		expect(keys).toContain('upload')
 		expect(keys).not.toContain('blockquote')
 		expect(keys).not.toContain('horizontalRule')
 		expect(keys).not.toContain('indent')

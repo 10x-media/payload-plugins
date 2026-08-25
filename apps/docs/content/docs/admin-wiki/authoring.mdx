@@ -57,7 +57,7 @@ The words are content, not a rendering of the target's title. Renaming a guide t
 
 ## Built-in blocks
 
-**Callout.** Four variants: info, tip, warning, danger. The body is a [nested editor](#the-editor-inside-your-own-block): inline formatting, links, images, video, and the blocks you marked [`nestable`](#your-own-blocks).
+**Callout.** Four variants: info, tip, warning, danger. The body is a [nested editor](#the-editor-inside-your-own-block): inline formatting, links, lists, images, video, and the blocks you marked [`nestable`](#your-own-blocks).
 
 **Video embed.** Only when [video is enabled](#video). Takes a YouTube or Vimeo watch, share, or short URL and validates it at authoring time; the reader gets a privacy-friendly embed (`youtube-nocookie.com`, Vimeo with `dnt=1`).
 
@@ -185,9 +185,9 @@ Converters apply wherever the plugin renders a guide: the wiki view, the surface
 
 ## The editor inside your own block
 
-A block with a `richText` field of its own can run the wiki editor there. `nested: true` drops the callout, headings, lists, blockquotes, horizontal rules, indentation and the fixed toolbar.
+A block with a `richText` field of its own can run the wiki editor there. `nested: true` drops the callout and headings, then the document furniture a framed body has no use for: blockquotes, horizontal rules, indentation and the fixed toolbar. Lists, images, video and your `nestable` blocks stay.
 
-Everything else comes from the arguments, so hand it the same object you hand `adminWiki` as `editor`:
+Everything else comes from the arguments, so hand it the same object you hand `adminWiki` as `editor`, plus the collection slugs, which live beside `editor` rather than inside it:
 
 ```ts title="blocks/accordion.ts"
 import { wikiFeatures } from '@10x-media/admin-wiki'
@@ -203,7 +203,13 @@ export const accordionBlock = {
       name: 'body',
       type: 'richText',
       editor: lexicalEditor({
-        features: () => wikiFeatures({ ...wikiEditorOptions, nested: true }),
+        features: () =>
+          wikiFeatures({
+            ...wikiEditorOptions,
+            mediaSlug: 'wiki-media',
+            nested: true,
+            pagesSlug: 'wiki-pages',
+          }),
       }),
     },
   ],
@@ -211,8 +217,10 @@ export const accordionBlock = {
 ```
 
 <Callout type="warn">
-  Arguments left out fall back to defaults: no blocks of yours, no video, and the stock `wiki-pages` and `wiki-media` slugs. Nothing errors, so an editor missing your blocks, or one pointing at collections you renamed through [`slugs`](/admin-wiki/configuration), looks exactly like one you configured.
+  A block whose own body runs `wikiFeatures` must not also appear in `blocks` with `nestable: true`. That makes the block reachable from inside itself, and Payload follows the two into each other while sanitizing the config, so the app never finishes booting.
 </Callout>
+
+`mediaSlug` and `pagesSlug` are required, because an editor pointing at collections you renamed through [`slugs`](/admin-wiki/configuration) would look exactly like one you configured. `blocks`, `inlineBlocks` and `video` still default to empty, so an editor missing yours is silent.
 
 To render the field, take `converters` and `nodesToJSX` beside `fields`:
 
