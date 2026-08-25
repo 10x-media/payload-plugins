@@ -245,11 +245,40 @@ formBuilder({ actions: { slackNotify, confirmation: false } })
 
 `config` becomes the block's authoring fields in the form editor. `run` receives the form, submission id, `values`, `descriptors`, the verified form `context` (or `null`), the stored `config`, `payload`, `req`, `locale`, a translate helper, and `renderBody`, an async function that serializes a rich text (or legacy string) body config into channel-ready HTML through the same pipeline the built-in emails use, honoring the plugin's [`richText` option](#custom-nodes-and-non-html-channels). Give a custom action a `richText` config field and call `renderBody(config.body)` to get the built-in templating for free. The `actions` option follows the [opt-in convention](/concepts#the-opt-in-convention).
 
+When a failure has more context than a message, throw an `ActionError` (or any error with a `detail` property): `throw new ActionError('provider rejected', { status: 502, body })`. The `detail` lands on the failed `ActionResult` and in the plugin's failure log as a structured field, so the thrown message can stay free of whatever the provider quoted back.
+
+### Validating action config at save time
+
+Per-field `validate` covers a single config field, but some checks span the whole block: every `{{token}}` in a body template has a mapping, a provider choice matches the credentials configured for it. Worse, an optional array field's `validate` never runs when the array is empty, and empty is usually the case the check cares about. `validateConfig` on the definition is the save-time seam for exactly this:
+
+```ts
+const subscribe = defineAction({
+  type: 'subscribe',
+  label: 'Subscribe',
+  config: [provider, mappings],
+  validateConfig: (config) => {
+    const missing = unmappedTokens(config)
+    return missing.length === 0 ? true : `unmapped tokens: ${missing.join(', ')}`
+  },
+  run: async ({ config, values }) => { /* ... */ },
+})
+```
+
+It runs on every form save, once per stored instance of the action, alongside field validation. `data` is the whole form under validation (merged over the stored document on partial updates), so a check can reach across to the form's fields; `req` enables lookups. Return `true` to accept or a message to refuse; the message is attached to the action block itself (`actions.<index>`), not to whichever config field happened to be required. Stored actions are validated even when a save does not touch them, so deleting a form field that an action's template references is caught on that save, not at send time.
+
 A custom action's `type` is registered as a Payload block whose slug is that type. Because Payload resolves blocks globally by slug, a `type` that matches one of your own content-block slugs would merge the two definitions and pollute the stored action. The plugin throws a clear error at boot if it detects such a collision, so pick an action `type` that no content block shares.
 
 ## Run model
 
-Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most five seconds for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission, unless the action declared otherwise, below.
+Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most the dispatch deadline for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission, unless the action declared otherwise, below.
+
+The deadline defaults to five seconds and is a plugin option, so an action making outbound calls never has to guess at it:
+
+```ts
+formBuilder({ dispatch: { deadlineMs: 8_000 } })
+```
+
+The default is also exported as `INLINE_DISPATCH_DEADLINE_MS`, so an action can derive its own HTTP timeout from the bound it runs under (size it below the deadline, or the dispatch cutoff fires before your timeout does and the failure gets vaguer).
 
 ### Essential actions
 
@@ -266,9 +295,11 @@ const subscribe = defineAction({
 })
 ```
 
-An essential action runs inline before the response, never queued, still bounded by the dispatch deadline so a hanging provider cannot pin the request (outliving the deadline counts as failure; the work is not cancelled, so make the provider call idempotent if a retry could follow). On failure the visitor's submit returns an error with a translated plugin message, no per-form copy to author, and the remaining actions are skipped. The other actions keep today's fire-and-forget behaviour, running after the essential pass succeeds.
+An essential action runs inline before the response, never queued, bounded by the [dispatch deadline](#run-model) so a hanging provider cannot pin the request. On a definite failure (a throw), the visitor's submit returns a 502 with a translated plugin message, no per-form copy to author, and the remaining actions are skipped. The other actions keep today's fire-and-forget behaviour, running after the essential pass succeeds.
 
-One deliberate interaction with [pruning](#pruning-submissions): when an essential action fails on a `persistSubmissions: false` form, the submission is kept, not pruned. The reason not to persist is that the provider holds the record; if the provider never received it, the stored row is the only copy of what the visitor sent, and an operator can recover it. This gives a non-persisting form an unusual retention shape, successes leave nothing while failures accumulate, so every kept row is stamped `actionFailed: true` (indexed, read-only, hidden in the admin until set). Filter on it to find the rows once the provider is fixed, replay the addresses, and delete them; the plugin does not expire them for you, since only the host knows when the replay happened. Essentialness is declared on the action type, not per form, on purpose: whether a failed handoff may be silently swallowed is a property of the integration, and a per-form toggle would let an author accidentally demote it. The error surfaces through the REST submit path (what `<Form>` uses); a server-side `payload.create` gets the submission plus a logged failure, and the same context flag to inspect when a `req` is threaded. A failed-essential submission also emits no `submission.created` event, so a sink-driven automation never counts it as a completed signup.
+Outliving the deadline is treated differently, because it is a different fact: "we could not complete this" and "we are not sure this completed" prompt different visitor behaviour (retry versus wait). A breach returns a 504 with its own message saying the outcome is unknown, and the work is not cancelled; the plugin keeps watching it. When it eventually settles, the real outcome is recorded: a late success reconciles the submission completely, the skipped actions run, the pruning completion runs, and `submission.created` is emitted, converging on the same end state as an on-time success apart from the response the visitor already saw. A late definite failure converges on the failure state below. Because the visitor may have retried in the meantime, make the provider call idempotent; the provider is the one place a duplicate can be collapsed.
+
+One deliberate interaction with [pruning](#pruning-submissions): when an essential action fails on a `persistSubmissions: false` form, the submission is kept, not pruned. The reason not to persist is that the provider holds the record; if the provider never received it, the stored row is the only copy of what the visitor sent, and an operator can recover it. This gives a non-persisting form an unusual retention shape, successes leave nothing while failures accumulate, so every kept row is stamped (indexed, read-only, hidden in the admin until set): `actionFailed: true` for a definite failure, `actionUncertain: true` while a breached pass is still unsettled. Filter on `actionFailed` to find the rows once the provider is fixed, replay the addresses, and delete them; an `actionUncertain` row is still in flight and clears itself (late success) or upgrades to `actionFailed` (late failure), so replay only what has settled. The plugin does not expire kept rows for you, since only the host knows when the replay happened. Essentialness is declared on the action type, not per form, on purpose: whether a failed handoff may be silently swallowed is a property of the integration, and a per-form toggle would let an author accidentally demote it. The error surfaces through the REST submit path (what `<Form>` uses); a server-side `payload.create` gets the submission plus a logged failure, and the same context flags to inspect when a `req` is threaded. A failed-essential submission also emits no `submission.created` event, so a sink-driven automation never counts it as a completed signup.
 
 ## Pruning submissions
 
