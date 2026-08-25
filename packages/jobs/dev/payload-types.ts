@@ -68,7 +68,7 @@ export interface Config {
   blocks: {};
   collections: {
     users: User;
-    automations: Automation;
+    'payload-jobs-locks': PayloadJobsLock;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -78,7 +78,7 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
-    automations: AutomationsSelect<false> | AutomationsSelect<true>;
+    'payload-jobs-locks': PayloadJobsLocksSelect<false> | PayloadJobsLocksSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -89,15 +89,26 @@ export interface Config {
     defaultIDType: string;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    'payload-jobs-stats': PayloadJobsStat;
+  };
+  globalsSelect: {
+    'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
   };
   user: User;
   jobs: {
-    tasks: unknown;
+    tasks: {
+      sleep: TaskSleep;
+      noop: TaskNoop;
+      inline: {
+        input: unknown;
+        output: unknown;
+      };
+    };
     workflows: {
       runAutomation: WorkflowRunAutomation;
     };
@@ -148,63 +159,14 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "automations".
+ * via the `definition` "payload-jobs-locks".
  */
-export interface Automation {
+export interface PayloadJobsLock {
   id: string;
-  name: string;
-  /**
-   * Only enabled automations run.
-   */
-  enabled?: boolean | null;
-  /**
-   * What starts this automation.
-   */
-  trigger: {
-    type: 'collection-change' | 'schedule' | 'webhook';
-    /**
-     * Slug of the collection whose changes fire this automation.
-     */
-    targetCollection?: string | null;
-    /**
-     * Which operations fire this automation.
-     */
-    operations?: ('create' | 'update' | 'delete')[] | null;
-    /**
-     * Cron expression, for example `0 9 * * 1` (Mondays at 09:00).
-     */
-    cron?: string | null;
-    /**
-     * Identifier used in the webhook URL that fires this automation.
-     */
-    webhookSlug?: string | null;
-  };
-  /**
-   * Every condition must pass for the actions to run.
-   */
-  conditions?:
-    | {
-        /**
-         * Dot-path into the trigger payload, for example `status` or `author.id`.
-         */
-        field: string;
-        operator: 'equals' | 'notEquals' | 'exists' | 'contains' | 'gt' | 'lt';
-        value?: string | null;
-        id?: string | null;
-      }[]
-    | null;
-  /**
-   * Actions run top to bottom. A failed action retries, then stops the run.
-   */
-  actions?: unknown[] | null;
-  /**
-   * Optional queue name; defaults to the plugin default.
-   */
-  queue?: string | null;
-  /**
-   * Updated by the scheduler for cron triggers.
-   */
-  lastScheduledRun?: string | null;
+  role: string;
+  owner?: string | null;
+  leaseExpiresAt?: string | null;
+  fenceToken: number;
   updatedAt: string;
   createdAt: string;
 }
@@ -231,6 +193,7 @@ export interface PayloadKv {
  */
 export interface PayloadJob {
   id: string;
+  jobTitle?: string | null;
   /**
    * Input data provided to the job
    */
@@ -277,7 +240,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline';
+        taskSlug: 'inline' | 'sleep' | 'noop';
         taskID: string;
         input?:
           | {
@@ -311,12 +274,26 @@ export interface PayloadJob {
       }[]
     | null;
   workflowSlug?: 'runAutomation' | null;
-  taskSlug?: 'inline' | null;
+  taskSlug?: ('inline' | 'sleep' | 'noop') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
+  meta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   createdAt: string;
   updatedAt: string;
+  startedAt?: string | null;
+  leaseExpiresAt?: string | null;
+  claimedBy?: string | null;
+  fenceToken?: number | null;
+  recoveryAttempts?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -324,15 +301,10 @@ export interface PayloadJob {
  */
 export interface PayloadLockedDocument {
   id: string;
-  document?:
-    | ({
-        relationTo: 'users';
-        value: string | User;
-      } | null)
-    | ({
-        relationTo: 'automations';
-        value: string | Automation;
-      } | null);
+  document?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
@@ -399,31 +371,13 @@ export interface UsersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "automations_select".
+ * via the `definition` "payload-jobs-locks_select".
  */
-export interface AutomationsSelect<T extends boolean = true> {
-  name?: T;
-  enabled?: T;
-  trigger?:
-    | T
-    | {
-        type?: T;
-        targetCollection?: T;
-        operations?: T;
-        cron?: T;
-        webhookSlug?: T;
-      };
-  conditions?:
-    | T
-    | {
-        field?: T;
-        operator?: T;
-        value?: T;
-        id?: T;
-      };
-  actions?: T | {};
-  queue?: T;
-  lastScheduledRun?: T;
+export interface PayloadJobsLocksSelect<T extends boolean = true> {
+  role?: T;
+  owner?: T;
+  leaseExpiresAt?: T;
+  fenceToken?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -440,6 +394,7 @@ export interface PayloadKvSelect<T extends boolean = true> {
  * via the `definition` "payload-jobs_select".
  */
 export interface PayloadJobsSelect<T extends boolean = true> {
+  jobTitle?: T;
   input?: T;
   taskStatus?: T;
   completedAt?: T;
@@ -464,8 +419,14 @@ export interface PayloadJobsSelect<T extends boolean = true> {
   queue?: T;
   waitUntil?: T;
   processing?: T;
+  meta?: T;
   createdAt?: T;
   updatedAt?: T;
+  startedAt?: T;
+  leaseExpiresAt?: T;
+  claimedBy?: T;
+  fenceToken?: T;
+  recoveryAttempts?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -501,6 +462,34 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-stats".
+ */
+export interface PayloadJobsStat {
+  id: string;
+  stats?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-stats_select".
+ */
+export interface PayloadJobsStatsSelect<T extends boolean = true> {
+  stats?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections_widget".
  */
 export interface CollectionsWidget {
@@ -508,6 +497,22 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSleep".
+ */
+export interface TaskSleep {
+  input?: unknown;
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskNoop".
+ */
+export interface TaskNoop {
+  input?: unknown;
+  output?: unknown;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

@@ -11,6 +11,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Features
 
 - **Dashboard**: a derived Status column, a queue-health bar, and error/log panels on the `payload-jobs` collection. On by default.
+- **Custom log blocks**: register your own renderer for an attempt's `input`, `output`, or `error`, per task slug or for every task.
 - **Reliability**: job leases, an orphan sweeper with dead-lettering, leader election with fence tokens, serverless staleness.
 - **Workers**: `createWorker` runs jobs as a standalone process and drains gracefully on SIGTERM.
 - **Queue control**: cluster-wide pause/resume plus hardened `queue-run`, `queue-sweep`, and `queue-status` endpoints with access guards.
