@@ -53,6 +53,14 @@ export type FormBuilderPluginOptions = {
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	actions?: ActionsConfig
 	/**
+	 * How post-submit action work is dispatched. `deadlineMs` bounds every inline action pass: the
+	 * essential pass that runs before the submit response, and the inline fallback used when no job
+	 * runner is present. Defaults to 5000 (exported as `INLINE_DISPATCH_DEADLINE_MS`). An
+	 * `essential` action making outbound calls should size its own timeouts under this bound, and a
+	 * host that cannot fit its provider under the default raises it here instead of guessing.
+	 */
+	dispatch?: { deadlineMs?: number }
+	/**
 	 * Calculation extensions. `sources` registers named value resolvers the calculation field can
 	 * reference: `resolve` supplies one number per render/submission (a tax rate, a member
 	 * discount), `resolveWeights` supplies per-option numbers for a chosen field (a product's

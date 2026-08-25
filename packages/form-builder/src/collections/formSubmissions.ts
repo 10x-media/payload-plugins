@@ -50,6 +50,8 @@ type BuildSubmissionsCollectionArgs = {
 	events?: FormEventSink
 	/** Whether a job runner is likely present; gates the queued vs bounded-inline dispatch path. */
 	hasRunner?: boolean
+	/** Host override for the inline dispatch deadline (plugin option `dispatch.deadlineMs`). */
+	dispatchDeadlineMs?: number
 	/** Body serialization customization forwarded to the inline action dispatch path. */
 	richText?: RichTextBodyOption
 	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
@@ -88,6 +90,7 @@ const makeAfterChange =
 		events?: FormEventSink
 		hasRunner: boolean
 		richText?: RichTextBodyOption
+		dispatchDeadlineMs?: number
 	}): CollectionAfterChangeHook =>
 	async ({ doc, operation, req }) => {
 		if (operation !== 'create' || (doc.status != null && doc.status !== 'complete')) {
@@ -103,6 +106,48 @@ const makeAfterChange =
 				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
 				.catch(() => null)
 
+			// Field access blocks every API writer, so this slug-agnostic override write is the only
+			// path that can set the outcome stamps. `withReq` only while the create transaction is
+			// still open; a late-settlement write happens after the response and passes none.
+			const stamp = async (
+				data: { actionFailed?: boolean; actionUncertain?: boolean },
+				withReq?: PayloadRequest
+			) => {
+				const update = payload.update.bind(payload) as unknown as (options: {
+					collection: string
+					id: number | string
+					data: { actionFailed?: boolean; actionUncertain?: boolean }
+					depth?: number
+					overrideAccess?: boolean
+					req?: PayloadRequest
+				}) => Promise<unknown>
+				await update({
+					collection: FORM_SUBMISSIONS_SLUG,
+					id: doc.id as number | string,
+					data,
+					depth: 0,
+					overrideAccess: true,
+					...(withReq ? { req: withReq } : {}),
+				})
+			}
+
+			const emitCreated = async () => {
+				try {
+					await resolveEventSink(args.events).emit({
+						type: 'submission.created',
+						formId: String(formId),
+						submissionId: String(doc.id),
+						at: new Date().toISOString(),
+					})
+				} catch (error) {
+					payload.logger?.error(
+						`@10x-media/form-builder: submission.created sink threw: ${
+							error instanceof Error ? error.message : String(error)
+						}`
+					)
+				}
+			}
+
 			const { essentialFailed } = await dispatchActions({
 				actions: (form?.actions ?? null) as ActionInstance[] | null,
 				formId,
@@ -113,45 +158,32 @@ const makeAfterChange =
 				hasRunner: args.hasRunner,
 				persistSubmissions: form?.persistSubmissions as boolean | undefined,
 				richText: args.richText,
+				deadlineMs: args.dispatchDeadlineMs,
+				// A definite refusal stamps `actionFailed` (the operator's replay filter); a deadline
+				// breach stamps `actionUncertain` instead, because the work may still land and a
+				// premature failure stamp would invite a duplicate replay.
+				onEssentialFailed: ({ timedOut }) =>
+					stamp(timedOut ? { actionUncertain: true } : { actionFailed: true }, req),
+				// The real outcome of a breached pass, recorded durably once the work settles: a late
+				// success clears the stamp (the row leaves the operator's filter; the dispatcher then
+				// runs the skipped closing pass, prune included) and emits the created event it was
+				// denied at submit; a late failure converges to the definite-failure stamp.
+				onEssentialSettled: async ({ ok }) => {
+					if (ok) {
+						await stamp({ actionUncertain: false })
+						await emitCreated()
+					} else {
+						await stamp({ actionFailed: true, actionUncertain: false })
+					}
+				},
 			})
 			// A failed-essential submission is kept for recovery but is not a completed signup: no
-			// created event, so a sink-driven automation never treats it as one. The stamp is what an
-			// operator filters on to find and clear the kept rows. Field access blocks every API
-			// writer, so the slug-agnostic override write here is the only path that can set it.
+			// created event, so a sink-driven automation never treats it as one.
 			if (essentialFailed) {
-				const update = payload.update.bind(payload) as unknown as (options: {
-					collection: string
-					id: number | string
-					data: { actionFailed: boolean }
-					depth?: number
-					overrideAccess?: boolean
-					req?: PayloadRequest
-				}) => Promise<unknown>
-				await update({
-					collection: FORM_SUBMISSIONS_SLUG,
-					id: doc.id as number | string,
-					data: { actionFailed: true },
-					depth: 0,
-					overrideAccess: true,
-					req,
-				})
 				return doc
 			}
 
-			try {
-				await resolveEventSink(args.events).emit({
-					type: 'submission.created',
-					formId: String(formId),
-					submissionId: String(doc.id),
-					at: new Date().toISOString(),
-				})
-			} catch (error) {
-				payload.logger?.error(
-					`@10x-media/form-builder: submission.created sink threw: ${
-						error instanceof Error ? error.message : String(error)
-					}`
-				)
-			}
+			await emitCreated()
 		} catch (error) {
 			payload.logger?.error(
 				`@10x-media/form-builder: afterChange dispatch failed for submission ${String(doc.id)}: ${
@@ -237,6 +269,7 @@ export const buildSubmissionsCollection = ({
 	actionRegistry = new Map(),
 	events,
 	hasRunner = false,
+	dispatchDeadlineMs,
 	richText,
 	uploadSlug,
 	spam,
@@ -273,6 +306,17 @@ export const buildSubmissionsCollection = ({
 			label: labelForKey(keys.submissionActionFailedFlag),
 			access: { create: () => false, update: () => false },
 			admin: { readOnly: true, condition: (data) => data?.actionFailed === true },
+		},
+		// Stamped instead of `actionFailed` when the essential pass outlived its deadline: the work
+		// may still complete. Cleared once the breached work settles successfully (the row leaves
+		// both filters), or upgraded to `actionFailed` when it settles as a definite failure.
+		{
+			name: 'actionUncertain',
+			type: 'checkbox',
+			index: true,
+			label: labelForKey(keys.submissionActionUncertainFlag),
+			access: { create: () => false, update: () => false },
+			admin: { readOnly: true, condition: (data) => data?.actionUncertain === true },
 		},
 		// answers UI appears first so it is the dominant view when opening a submission document.
 		{
@@ -351,7 +395,7 @@ export const buildSubmissionsCollection = ({
 				// Payload rolls the submission create/update back inside the operation transaction,
 				// rather than being absorbed by the dispatch hook's swallow-all error boundary below.
 				...(pollVotes !== false ? [makeVoteTallyHook()] : []),
-				makeAfterChange({ actionRegistry, events, hasRunner, richText }),
+				makeAfterChange({ actionRegistry, events, hasRunner, richText, dispatchDeadlineMs }),
 				// Always registered: it self-gates on the option and on the form's allowChange flag.
 				makeVotedCookieHook({ votedCookie }),
 				...(overrides?.hooks?.afterChange ?? []),

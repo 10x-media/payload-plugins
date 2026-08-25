@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dispatchActions, ESSENTIAL_ACTION_FAILED_CONTEXT_KEY } from './dispatch'
+import {
+	dispatchActions,
+	ESSENTIAL_ACTION_FAILED_CONTEXT_KEY,
+	ESSENTIAL_ACTION_UNCERTAIN_CONTEXT_KEY,
+} from './dispatch'
 import type { ActionRegistry } from './registry'
 import { ACTIONS_TASK_SLUG } from './task'
 
@@ -258,12 +262,12 @@ describe('dispatchActions', () => {
 			expect(queue).not.toHaveBeenCalled()
 		})
 
-		it('treats an essential action that outlives the deadline as failed', async () => {
+		it('marks a deadline breach uncertain, not failed, and still skips the rest', async () => {
 			const queue = vi.fn()
 			const { registry } = makeEssentialRegistry({ hang: true })
 			const req = { context: {} } as never
 
-			await dispatchActions({
+			const outcome = await dispatchActions({
 				actions,
 				formId: 'form-1',
 				submissionId: 'sub-1',
@@ -274,9 +278,159 @@ describe('dispatchActions', () => {
 				deadlineMs: 20,
 			})
 
-			expect(
-				(req as { context: Record<string, unknown> }).context[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY]
-			).toBe(true)
+			expect(outcome.essentialFailed).toBe(true)
+			const context = (req as { context: Record<string, unknown> }).context
+			expect(context[ESSENTIAL_ACTION_UNCERTAIN_CONTEXT_KEY]).toBe(true)
+			expect(context[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY]).toBeUndefined()
+			expect(queue).not.toHaveBeenCalled()
+		})
+
+		it('does not mark a definite refusal uncertain', async () => {
+			const { registry } = makeEssentialRegistry({ fail: true })
+			const req = { context: {} } as never
+
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry,
+				payload: makePayload(),
+				req,
+				hasRunner: true,
+			})
+
+			const context = (req as { context: Record<string, unknown> }).context
+			expect(context[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY]).toBe(true)
+			expect(context[ESSENTIAL_ACTION_UNCERTAIN_CONTEXT_KEY]).toBeUndefined()
+		})
+
+		it('awaits onEssentialFailed with the timeout distinction before returning', async () => {
+			const seen: { timedOut: boolean }[] = []
+			const { registry } = makeEssentialRegistry({ fail: true })
+
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry,
+				payload: makePayload(),
+				hasRunner: true,
+				onEssentialFailed: async (outcome) => {
+					seen.push(outcome)
+				},
+			})
+			expect(seen).toEqual([{ timedOut: false }])
+
+			const hanging = makeEssentialRegistry({ hang: true })
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry: hanging.registry,
+				payload: makePayload(),
+				hasRunner: true,
+				deadlineMs: 20,
+				onEssentialFailed: async (outcome) => {
+					seen.push(outcome)
+				},
+			})
+			expect(seen).toEqual([{ timedOut: false }, { timedOut: true }])
+		})
+	})
+
+	describe('late settlement after a deadline breach', () => {
+		const makeDeferredRegistry = (): {
+			registry: ActionRegistry
+			settle: { resolve: () => void; reject: (error: Error) => void }
+		} => {
+			const settle = { resolve: () => {}, reject: (_error: Error) => {} }
+			const registry: ActionRegistry = new Map([
+				[
+					'subscribe',
+					{
+						type: 'subscribe',
+						label: 'Subscribe',
+						essential: true,
+						run: () =>
+							new Promise<void>((resolve, reject) => {
+								settle.resolve = resolve
+								settle.reject = reject
+							}),
+					},
+				],
+				['recorder', { type: 'recorder', label: 'Recorder', run: () => {} }],
+			])
+			return { registry, settle }
+		}
+
+		const actions = [{ blockType: 'subscribe' }, { blockType: 'recorder' }]
+		const makePayload = (queue = vi.fn().mockResolvedValue(undefined)) =>
+			({
+				jobs: { queue },
+				logger: { error: vi.fn(), info: vi.fn() },
+				findByID: vi
+					.fn()
+					.mockImplementation(({ collection }: { collection: string }) =>
+						collection === 'forms'
+							? Promise.resolve({ id: 'form-1', actions })
+							: Promise.resolve({ id: 'sub-1', values: [], descriptors: [] })
+					),
+			}) as never
+
+		it('reports late success and runs the skipped closing pass', async () => {
+			const queue = vi.fn().mockResolvedValue(undefined)
+			const { registry, settle } = makeDeferredRegistry()
+			const settled: { ok: boolean }[] = []
+
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry,
+				payload: makePayload(queue),
+				hasRunner: true,
+				persistSubmissions: false,
+				deadlineMs: 20,
+				onEssentialSettled: (outcome) => {
+					settled.push(outcome)
+				},
+			})
+			expect(settled).toEqual([])
+			expect(queue).not.toHaveBeenCalled()
+
+			settle.resolve()
+			await vi.waitFor(() => {
+				expect(settled).toEqual([{ ok: true }])
+				expect(queue).toHaveBeenCalledWith({
+					task: ACTIONS_TASK_SLUG,
+					input: { formId: 'form-1', submissionId: 'sub-1', subset: 'rest' },
+				})
+			})
+		})
+
+		it('reports late failure and never runs the closing pass', async () => {
+			const queue = vi.fn().mockResolvedValue(undefined)
+			const { registry, settle } = makeDeferredRegistry()
+			const settled: { ok: boolean }[] = []
+
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry,
+				payload: makePayload(queue),
+				hasRunner: true,
+				persistSubmissions: false,
+				deadlineMs: 20,
+				onEssentialSettled: (outcome) => {
+					settled.push(outcome)
+				},
+			})
+
+			settle.reject(new Error('provider rejected, late'))
+			await vi.waitFor(() => {
+				expect(settled).toEqual([{ ok: false }])
+			})
 			expect(queue).not.toHaveBeenCalled()
 		})
 	})
