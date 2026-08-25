@@ -1,5 +1,12 @@
 # @10x-media/admin-wiki-dev
 
+## 0.0.1-beta.5
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/admin-wiki@0.1.0-beta.4
+
 ## 0.0.1-beta.4
 
 ### Patch Changes
