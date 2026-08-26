@@ -408,6 +408,33 @@ describe('dispatchActions', () => {
 			})
 		})
 
+		it('runs the closing pass before reporting late success, so the stamp outlives partial reconciliation', async () => {
+			const order: string[] = []
+			const queue = vi.fn().mockImplementation(async () => {
+				order.push('closing')
+			})
+			const { registry, settle } = makeDeferredRegistry()
+
+			await dispatchActions({
+				actions,
+				formId: 'form-1',
+				submissionId: 'sub-1',
+				registry,
+				payload: makePayload(queue),
+				hasRunner: true,
+				persistSubmissions: false,
+				deadlineMs: 20,
+				onEssentialSettled: () => {
+					order.push('settled')
+				},
+			})
+
+			settle.resolve()
+			await vi.waitFor(() => {
+				expect(order).toEqual(['closing', 'settled'])
+			})
+		})
+
 		it('reports late failure and never runs the closing pass', async () => {
 			const queue = vi.fn().mockResolvedValue(undefined)
 			const { registry, settle } = makeDeferredRegistry()

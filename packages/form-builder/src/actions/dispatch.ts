@@ -37,9 +37,10 @@ export type DispatchActionsArgs = {
 	onEssentialFailed?: (outcome: { timedOut: boolean }) => void | Promise<void>
 	/**
 	 * Called when a deadline-breached essential pass later settles, with the real outcome. Runs
-	 * after the response went out (no open transaction); awaited before the late closing pass, so a
-	 * caller clearing the uncertain stamp does it before a `persistSubmissions: false` prune
-	 * deletes the row.
+	 * after the response went out (no open transaction). On success it is awaited AFTER the late
+	 * closing pass (rest actions + prune), so the uncertain stamp outlives any partially completed
+	 * reconciliation and the caller's success signals follow the finished work; a stamp-clearing
+	 * caller must tolerate the row having been pruned. On failure it runs immediately.
 	 */
 	onEssentialSettled?: (outcome: { ok: boolean }) => void | Promise<void>
 }
@@ -171,21 +172,22 @@ export const dispatchActions = async (
 					`@10x-media/form-builder: essential action pass for submission ${String(submissionId)} outlived its ${ms}ms deadline; reporting the submission uncertain (the work may still complete)`
 				)
 				// The breached work is still running: when it settles, record the real outcome instead
-				// of dropping it. On late success the caller reconciles (clears the stamp) and the
-				// closing pass the timeout skipped runs, so the submission converges to the same end
-				// state as an on-time success apart from the response the visitor already saw.
+				// of dropping it. On late success the closing pass the timeout skipped runs FIRST,
+				// then the caller reconciles (clears the stamp, emits its success signals), matching
+				// the on-time order and keeping the uncertain stamp truthful if the process dies
+				// mid-reconciliation: a half-finished recovery stays flagged, never cleared.
 				void work.then(async (late) => {
 					payload.logger?.[late.failed ? 'error' : 'info']?.(
 						`@10x-media/form-builder: essential action pass for submission ${String(submissionId)} settled after its deadline: ${
 							late.failed ? 'failed' : 'succeeded'
 						}`
 					)
-					await guarded(payload, 'onEssentialSettled', () =>
-						args.onEssentialSettled?.({ ok: !late.failed })
-					)
 					if (!late.failed && (rest.length > 0 || args.persistSubmissions === false)) {
 						await runClosingPass(undefined)
 					}
+					await guarded(payload, 'onEssentialSettled', () =>
+						args.onEssentialSettled?.({ ok: !late.failed })
+					)
 				})
 			}
 			return { essentialFailed: true }

@@ -164,13 +164,15 @@ const makeAfterChange =
 				// premature failure stamp would invite a duplicate replay.
 				onEssentialFailed: ({ timedOut }) =>
 					stamp(timedOut ? { actionUncertain: true } : { actionFailed: true }, req),
-				// The real outcome of a breached pass, recorded durably once the work settles: a late
-				// success clears the stamp (the row leaves the operator's filter; the dispatcher then
-				// runs the skipped closing pass, prune included) and emits the created event it was
-				// denied at submit; a late failure converges to the definite-failure stamp.
+				// The real outcome of a breached pass, recorded durably once the work settles. The
+				// dispatcher invokes this AFTER the late closing pass on success, so the stamp only
+				// clears once the skipped work (rest actions, prune) is done and the created event
+				// follows it, mirroring the on-time order; a `persistSubmissions: false` prune has
+				// already deleted the row by then, so the clear tolerates a missing target. A late
+				// failure converges to the definite-failure stamp.
 				onEssentialSettled: async ({ ok }) => {
 					if (ok) {
-						await stamp({ actionUncertain: false })
+						await stamp({ actionUncertain: false }).catch(() => {})
 						await emitCreated()
 					} else {
 						await stamp({ actionFailed: true, actionUncertain: false })

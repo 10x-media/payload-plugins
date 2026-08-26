@@ -211,6 +211,32 @@ type BuildFormsCollectionArgs = {
 	overrides?: CollectionOverrides
 }
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+	if (value == null || typeof value !== 'object') {
+		return false
+	}
+	const proto = Object.getPrototypeOf(value)
+	return proto === Object.prototype || proto === null
+}
+
+/**
+ * Mirror how Payload persists a partial update: plain objects merge recursively (an unsent group
+ * sibling keeps its stored value), arrays and everything else are replaced by the delta, and an
+ * explicit `null` survives as null. A shallow spread would hand `validateConfig` a group missing
+ * the siblings the update did not send.
+ */
+const mergeSavedShape = (
+	original: Record<string, unknown>,
+	delta: Record<string, unknown>
+): Record<string, unknown> => {
+	const merged: Record<string, unknown> = { ...original }
+	for (const [key, value] of Object.entries(delta)) {
+		const base = merged[key]
+		merged[key] = isPlainObject(base) && isPlainObject(value) ? mergeSavedShape(base, value) : value
+	}
+	return merged
+}
+
 export const buildFormsCollection = ({
 	overrides,
 	registry,
@@ -411,7 +437,10 @@ export const buildFormsCollection = ({
 		if (!Array.isArray(instances) || instances.length === 0) {
 			return data
 		}
-		const merged = { ...(originalDoc ?? {}), ...(data ?? {}) } as Record<string, unknown>
+		const merged = mergeSavedShape(
+			(originalDoc ?? {}) as Record<string, unknown>,
+			(data ?? {}) as Record<string, unknown>
+		)
 		const errors: { path: string; message: string }[] = []
 		for (const [index, instance] of instances.entries()) {
 			const validate = actionRegistry.get(instance.blockType)?.validateConfig

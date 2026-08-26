@@ -545,6 +545,44 @@ describe('forms beforeValidate action config validation', () => {
 		expect(seen).toEqual([[{ blockType: 'text', name: 'email' }]])
 	})
 
+	it('deep-merges nested groups so a partial update does not erase stored siblings', async () => {
+		const seen: unknown[] = []
+		const hook = makeHook((_config: unknown, ctx: { data: Record<string, unknown> }) => {
+			seen.push(ctx.data.response)
+			return true
+		})
+		await hook({
+			data: { response: { type: 'redirect' }, actions: [{ blockType: 'subscribe' }] },
+			originalDoc: { response: { type: 'message', message: 'thanks' } },
+			req,
+		} as never)
+		expect(seen).toEqual([{ type: 'redirect', message: 'thanks' }])
+	})
+
+	it('replaces arrays wholesale and keeps explicit null from the delta', async () => {
+		const seen: unknown[] = []
+		const hook = makeHook((_config: unknown, ctx: { data: Record<string, unknown> }) => {
+			seen.push({ fields: ctx.data.fields, title: ctx.data.title })
+			return true
+		})
+		await hook({
+			data: {
+				fields: [{ blockType: 'text', name: 'only' }],
+				title: null,
+				actions: [{ blockType: 'subscribe' }],
+			},
+			originalDoc: {
+				fields: [
+					{ blockType: 'text', name: 'a' },
+					{ blockType: 'text', name: 'b' },
+				],
+				title: 'stored',
+			},
+			req,
+		} as never)
+		expect(seen).toEqual([{ fields: [{ blockType: 'text', name: 'only' }], title: null }])
+	})
+
 	it('validates the stored actions when a partial update does not send them', async () => {
 		const hook = makeHook(() => 'stale config')
 		let thrown: unknown
