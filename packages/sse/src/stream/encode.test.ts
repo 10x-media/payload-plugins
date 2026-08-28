@@ -54,4 +54,20 @@ describe('encodeEvent', () => {
 			.join('\n')
 		expect(encodeEvent(event)).toBe(`id: evt-2\nevent: create\n${dataLines}\n\n`)
 	})
+
+	it('strips CR/LF from id and event so they cannot inject a second data line', () => {
+		const event: RealtimeEvent = {
+			id: 'ts:posts:a\ndata: pwned:update:posts',
+			topic: 'posts',
+			event: 'update\ndata: injected',
+			collection: 'posts',
+			docId: 'a\ndata: pwned',
+			operation: 'update',
+			timestamp: 1,
+		}
+		const encoded = encodeEvent(event)
+		expect(encoded.match(/^data: /gm)).toHaveLength(1)
+		expect(encoded).not.toMatch(/\ndata: pwned/)
+		expect(encoded).not.toMatch(/\ndata: injected/)
+	})
 })

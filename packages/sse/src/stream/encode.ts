@@ -8,11 +8,13 @@ export function encodeComment(text: string): string {
 	return `: ${text}\n\n`
 }
 
+const stripSseBreaks = (value: string): string => value.replace(/[\r\n]+/g, '')
+
 export function encodeEvent(event: RealtimeEvent): string {
 	const json = JSON.stringify(event)
 	const dataLines = json
 		.split('\n')
 		.map((line) => `data: ${line}`)
 		.join('\n')
-	return `id: ${event.id}\nevent: ${event.event}\n${dataLines}\n\n`
+	return `id: ${stripSseBreaks(event.id)}\nevent: ${stripSseBreaks(event.event)}\n${dataLines}\n\n`
 }
