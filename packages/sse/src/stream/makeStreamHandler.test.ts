@@ -58,6 +58,7 @@ const authReq = (opts: {
 	user?: unknown
 	url?: string
 	signal?: AbortSignal
+	findByID?: ReturnType<typeof vi.fn>
 	collections?: Record<string, { config: { slug: string; access?: { read?: () => unknown } } }>
 }): PayloadRequest => {
 	const url = opts.url ?? 'http://localhost/api/realtime/stream?topics=posts'
@@ -69,6 +70,7 @@ const authReq = (opts: {
 				posts: { config: { slug: 'posts', access: { read: () => true } } },
 			},
 			count: vi.fn(async () => ({ totalDocs: 0 })),
+			findByID: opts.findByID ?? vi.fn(async () => null),
 		},
 		...(opts.signal ? { signal: opts.signal } : {}),
 	} as unknown as PayloadRequest
@@ -160,5 +162,117 @@ describe('makeStreamHandler', () => {
 		ac.abort()
 		await drain
 		expect(broker.unsubscribes[0]).toHaveBeenCalled()
+	})
+
+	it('enriches events when topic mode is enriched and findByID returns a doc', async () => {
+		const listeners = new Map<string, (event: RealtimeEvent) => void>()
+		const broker: EventBroker = {
+			publish: vi.fn(),
+			subscribe: (topic, cb) => {
+				listeners.set(topic, cb)
+				return vi.fn()
+			},
+			destroy: vi.fn(async () => undefined),
+		}
+		const doc = { id: 'p1', title: 'hello' }
+		const findByID = vi.fn(async () => doc)
+		const ac = new AbortController()
+		const res = await makeStreamHandler({
+			broker,
+			collections: { posts: { thinEvents: false } },
+			heartbeatMs: 60_000,
+		})(
+			authReq({
+				user: { id: '1' },
+				signal: ac.signal,
+				findByID,
+			})
+		)
+		expect(res.status).toBe(200)
+
+		const reader = res.body?.getReader()
+		if (!reader) throw new Error('missing body')
+		const decoder = new TextDecoder()
+		let buf = ''
+		const readUntil = async (predicate: (s: string) => boolean) => {
+			while (!predicate(buf)) {
+				const { done, value } = await reader.read()
+				if (done) break
+				buf += decoder.decode(value, { stream: true })
+			}
+		}
+		await readUntil((s) => s.includes('event: ready'))
+
+		listeners.get('posts')?.({
+			id: '1',
+			topic: 'posts',
+			event: 'update',
+			collection: 'posts',
+			docId: 'p1',
+			operation: 'update',
+			timestamp: 1,
+		})
+
+		await readUntil((s) => s.includes('"operation":"update"'))
+		expect(buf).toContain('"doc"')
+		expect(buf).toContain('"title":"hello"')
+		expect(findByID).toHaveBeenCalled()
+		ac.abort()
+		await reader.cancel().catch(() => {})
+	})
+
+	it('keeps thin frames when topic mode is thin', async () => {
+		const listeners = new Map<string, (event: RealtimeEvent) => void>()
+		const broker: EventBroker = {
+			publish: vi.fn(),
+			subscribe: (topic, cb) => {
+				listeners.set(topic, cb)
+				return vi.fn()
+			},
+			destroy: vi.fn(async () => undefined),
+		}
+		const findByID = vi.fn(async () => ({ id: 'p1' }))
+		const ac = new AbortController()
+		const res = await makeStreamHandler({
+			broker,
+			collections: { posts: { thinEvents: true } },
+			heartbeatMs: 60_000,
+		})(
+			authReq({
+				user: { id: '1' },
+				signal: ac.signal,
+				findByID,
+			})
+		)
+		expect(res.status).toBe(200)
+
+		const reader = res.body?.getReader()
+		if (!reader) throw new Error('missing body')
+		const decoder = new TextDecoder()
+		let buf = ''
+		const readUntil = async (predicate: (s: string) => boolean) => {
+			while (!predicate(buf)) {
+				const { done, value } = await reader.read()
+				if (done) break
+				buf += decoder.decode(value, { stream: true })
+			}
+		}
+		await readUntil((s) => s.includes('event: ready'))
+
+		listeners.get('posts')?.({
+			id: '1',
+			topic: 'posts',
+			event: 'update',
+			collection: 'posts',
+			docId: 'p1',
+			operation: 'update',
+			timestamp: 1,
+		})
+
+		await readUntil((s) => s.includes('"operation":"update"'))
+		expect(buf).not.toContain('"doc"')
+		expect(findByID).not.toHaveBeenCalled()
+		ac.abort()
+		await reader.cancel().catch(() => {})
 	})
 })

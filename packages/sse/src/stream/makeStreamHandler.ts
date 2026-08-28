@@ -3,6 +3,7 @@ import type { PayloadHandler } from 'payload'
 import type { EventBroker, RealtimeEvent } from '../broker/types'
 import { type AuthorizedTopic, authorizeTopics } from './authorizeTopics'
 import { encodeComment, encodeEvent, encodeRetry } from './encode'
+import { enrichForUser } from './enrichForUser'
 
 export const STREAM_PATH = '/realtime/stream'
 
@@ -90,11 +91,18 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 
 				for (const topic of auth.topics) {
 					const unsub = broker.subscribe(topic.topic, (event: RealtimeEvent) => {
-						try {
-							enqueue(encodeEvent(event))
-						} catch {
-							teardown()
-						}
+						void (async () => {
+							const frame =
+								topic.mode === 'enriched' && event.docId && event.collection
+									? await enrichForUser({
+											event,
+											collection: event.collection,
+											docId: event.docId,
+											req,
+										})
+									: event
+							enqueue(encodeEvent(frame))
+						})().catch(() => teardown())
 					})
 					unsubscribers.push(unsub)
 				}
