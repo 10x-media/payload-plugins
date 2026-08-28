@@ -42,9 +42,9 @@ test('presence chip shows the other viewer', async ({ browser, page }) => {
 
 test('list still updates after stream abort then restore', async ({ page }) => {
 	await login(page)
-	await openCollectionList(page, 'posts')
-
+	// Intercept before the list mounts. An already-open fetch stream is not aborted by route().
 	await page.route('**/api/realtime/stream**', (route) => route.abort())
+	await openCollectionList(page, 'posts')
 
 	const blockedTitle = `blocked-${Date.now()}`
 	await createDoc(page, 'posts', { title: blockedTitle })
