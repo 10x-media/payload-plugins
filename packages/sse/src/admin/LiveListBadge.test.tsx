@@ -1,8 +1,7 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
-import { emitListFlash } from './listFlash'
 import { LiveListBadge } from './LiveListBadge'
+import { emitListFlash } from './listFlash'
 
 vi.mock('@payloadcms/ui', () => ({
 	Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
@@ -20,7 +19,7 @@ const row = (id: string) =>
 		cellData: id,
 		collectionSlug: 'posts',
 		rowData: { id },
-	}) as Parameters<typeof LiveListBadge>[0]
+	}) as unknown as Parameters<typeof LiveListBadge>[0]
 
 describe('LiveListBadge', () => {
 	it('flashes only the row whose id matches the signal docId', () => {

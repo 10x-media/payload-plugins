@@ -222,7 +222,7 @@ describe('createAfterChangeHook', () => {
 				operation: 'create',
 				req,
 				collection: { slug: 'posts' },
-			} as Parameters<typeof hook>[0]),
+			} as Parameters<typeof hook>[0])
 		).resolves.toEqual({ id: 'abc' })
 
 		expect(error).toHaveBeenCalled()

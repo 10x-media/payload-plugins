@@ -558,9 +558,7 @@ describe('makeStreamHandler', () => {
 			maxConnectionsPerUser: 1,
 		})
 		const firstAc = new AbortController()
-		const first = await handler(
-			authReq({ user: { id: 'cap-user' }, signal: firstAc.signal })
-		)
+		const first = await handler(authReq({ user: { id: 'cap-user' }, signal: firstAc.signal }))
 		expect(first.status).toBe(200)
 
 		const second = await handler(authReq({ user: { id: 'cap-user' } }))
@@ -578,17 +576,13 @@ describe('makeStreamHandler', () => {
 			maxConnectionsPerUser: 1,
 		})
 		const firstAc = new AbortController()
-		const first = await handler(
-			authReq({ user: { id: 'cap-user-2' }, signal: firstAc.signal })
-		)
+		const first = await handler(authReq({ user: { id: 'cap-user-2' }, signal: firstAc.signal }))
 		expect(first.status).toBe(200)
 		firstAc.abort()
 		await first.body?.cancel().catch(() => {})
 
 		const thirdAc = new AbortController()
-		const third = await handler(
-			authReq({ user: { id: 'cap-user-2' }, signal: thirdAc.signal })
-		)
+		const third = await handler(authReq({ user: { id: 'cap-user-2' }, signal: thirdAc.signal }))
 		expect(third.status).toBe(200)
 		thirdAc.abort()
 		await third.body?.cancel().catch(() => {})

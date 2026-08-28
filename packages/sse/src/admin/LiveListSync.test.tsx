@@ -1,8 +1,7 @@
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-import { subscribeListFlash } from './listFlash'
 import { LiveListSync } from './LiveListSync'
+import { subscribeListFlash } from './listFlash'
 
 const listState = vi.hoisted(() => ({
 	generation: 0,
@@ -24,9 +23,7 @@ vi.mock('../client/usePayloadList', () => ({
 	usePayloadList: () => ({
 		generation: listState.generation,
 		lastEvent:
-			listState.docId != null
-				? { docId: listState.docId, event: 'update' }
-				: { event: 'delete' },
+			listState.docId != null ? { docId: listState.docId, event: 'update' } : { event: 'delete' },
 		status: 'open',
 	}),
 }))
