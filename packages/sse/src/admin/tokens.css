@@ -1,0 +1,13 @@
+@keyframes sse-live-list-flash {
+	0% {
+		background-color: color-mix(in srgb, var(--theme-success-500) 35%, transparent);
+	}
+	100% {
+		background-color: transparent;
+	}
+}
+
+.sse-live-list-flash {
+	animation: sse-live-list-flash 0.6s ease-out;
+	border-radius: 2px;
+}

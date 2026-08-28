@@ -20,6 +20,12 @@ const users: CollectionConfig = {
 	fields: [],
 }
 
+const posts: CollectionConfig = {
+	slug: 'posts',
+	admin: { useAsTitle: 'title' },
+	fields: [{ name: 'title', type: 'text', required: true }],
+}
+
 const db =
 	useDb === 'postgres'
 		? postgresAdapter({
@@ -38,8 +44,14 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [sse({})],
+	collections: [users, posts],
+	plugins: [
+		sse({
+			collections: { posts: true },
+			presence: true,
+			admin: true,
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

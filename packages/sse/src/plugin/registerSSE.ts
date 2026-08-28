@@ -7,6 +7,7 @@ import type { ResolvedSSEOptions } from '../options'
 import { makePresenceHandler, PRESENCE_PATH } from '../presence/makePresenceHandler'
 import { createPresenceStore } from '../presence/store'
 import { makeStreamHandler, STREAM_PATH } from '../stream/makeStreamHandler'
+import { registerAdmin } from './registerAdmin'
 import { createEmit, getRuntime, type SSERuntime, setRuntime } from './runtime'
 
 export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions }): void => {
@@ -37,6 +38,8 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 			},
 		}
 	}
+
+	registerAdmin({ config, options })
 
 	const streamEndpoint: Endpoint = {
 		method: 'get',

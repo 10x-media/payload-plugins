@@ -1,19 +1,26 @@
 import type { Payload } from 'payload'
 
-const DEV_EMAIL = 'dev@10xmedia.de'
-const DEV_PASSWORD = 'password'
+const DEV_USERS = [
+	{ email: 'dev@10xmedia.de', password: 'password' },
+	{ email: 'viewer@10xmedia.de', password: 'password' },
+] as const
 
 /**
- * Seed the dev Payload app: an admin user to log in with. Idempotent; extend
- * with sample data once the plugin gains feature behavior.
+ * Seed the dev Payload app: two users for live-list and presence e2e.
+ * Idempotent per email.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
-	if (userCount.totalDocs === 0) {
+	for (const user of DEV_USERS) {
+		const existing = await payload.find({
+			collection: 'users',
+			where: { email: { equals: user.email } },
+			limit: 1,
+		})
+		if (existing.totalDocs > 0) continue
 		await payload.create({
 			collection: 'users',
-			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
+			data: { email: user.email, password: user.password },
 		})
-		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
+		payload.logger.info(`Seeded dev user: ${user.email} / ${user.password}`)
 	}
 }

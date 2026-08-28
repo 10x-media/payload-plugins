@@ -1,6 +1,7 @@
 'use client'
 
 export { DocumentPresence } from '../admin/DocumentPresence'
+export { LiveListBadge } from '../admin/LiveListBadge'
 export {
 	type PresencePeerPublic,
 	type UseDocumentPresenceOptions,
