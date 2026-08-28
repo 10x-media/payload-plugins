@@ -36,7 +36,13 @@ export type {
 	SSEPluginOptions,
 	SSEPluginOptions as PluginOptions,
 	SSEPluginOptions as SsePluginOptions,
+	SSEScopeOptions,
 } from './options'
 export { getRuntime, getSSE } from './plugin/runtime'
 export { PRESENCE_PATH } from './presence/makePresenceHandler'
+export type { MultiTenantScopeOptions } from './scope/multiTenantScope'
+export { multiTenantScope } from './scope/multiTenantScope'
+export { publicTopic, scopedTopic } from './scope/resolveScope'
+export type { ResolveDocScope, ResolveRequestScope, ScopeSelection } from './scope/types'
+export { SCOPE_WILDCARD } from './scope/types'
 export { STREAM_PATH } from './stream/makeStreamHandler'

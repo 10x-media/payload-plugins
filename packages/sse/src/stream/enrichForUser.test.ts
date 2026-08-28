@@ -59,7 +59,7 @@ describe('enrichForUser', () => {
 		})
 
 		expect(result).toBe(event)
-		expect(result.data).toBeUndefined()
+		expect(result?.data).toBeUndefined()
 	})
 
 	it('returns the original thin event when findByID throws', async () => {
@@ -84,5 +84,31 @@ describe('enrichForUser', () => {
 				req: reqWithFindByID(findByID),
 			})
 		).resolves.toBe(event)
+	})
+
+	it('returns null when onDeny is drop and findByID misses', async () => {
+		const findByID = vi.fn(async () => null)
+		const result = await enrichForUser({
+			event: thinEvent(),
+			collection: 'posts',
+			docId: 'post-1',
+			req: reqWithFindByID(findByID),
+			onDeny: 'drop',
+		})
+		expect(result).toBeNull()
+	})
+
+	it('returns null when onDeny is drop and findByID throws', async () => {
+		const findByID = vi.fn(async () => {
+			throw new Error('forbidden')
+		})
+		const result = await enrichForUser({
+			event: thinEvent(),
+			collection: 'posts',
+			docId: 'post-1',
+			req: reqWithFindByID(findByID),
+			onDeny: 'drop',
+		})
+		expect(result).toBeNull()
 	})
 })

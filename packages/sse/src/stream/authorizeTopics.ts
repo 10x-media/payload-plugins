@@ -1,10 +1,16 @@
 import type { PayloadRequest, Where } from 'payload'
 
+import { SCOPE_WILDCARD, type ScopeSelection, type SSEScopeOptions } from '../scope/types'
+
 export type AuthorizedTopic = {
 	topic: string
 	collection: string
 	docId?: string
 	mode: 'thin' | 'enriched'
+	/** Concrete scopes (or wildcard) whose broker channels this wide topic should join. */
+	scopes?: string[] | typeof SCOPE_WILDCARD
+	/** Drop events the subscriber cannot read. Set on Where-scoped collection-wide topics. */
+	gate?: 'per-event'
 }
 
 export type AuthorizeTopicsResult =
@@ -15,6 +21,7 @@ export type AuthorizeTopicsDeps = {
 	req: PayloadRequest
 	topics: string[]
 	collections: Record<string, { thinEvents: boolean }>
+	scope?: SSEScopeOptions | false
 }
 
 const MAX_TOPICS = 32
@@ -46,19 +53,51 @@ const parseTopic = (
 const isWhere = (value: unknown): value is Where =>
 	typeof value === 'object' && value !== null && !Array.isArray(value)
 
+const toScopes = (
+	selection: Exclude<ScopeSelection, null>
+): NonNullable<AuthorizedTopic['scopes']> => {
+	if (selection === SCOPE_WILDCARD) return SCOPE_WILDCARD
+	return Array.isArray(selection) ? selection : [selection]
+}
+
+const withWideScope = (
+	topic: AuthorizedTopic,
+	selection: Exclude<ScopeSelection, null>,
+	gate?: 'per-event'
+): AuthorizedTopic => {
+	if (topic.docId !== undefined) return topic
+	return {
+		...topic,
+		scopes: toScopes(selection),
+		...(gate ? { gate } : {}),
+	}
+}
+
 /**
  * Connect-time topic authorization. Returns a result object; never throws HTTP.
  */
 export const authorizeTopics = async (
 	deps: AuthorizeTopicsDeps
 ): Promise<AuthorizeTopicsResult> => {
-	const { req, topics, collections } = deps
+	const { req, topics, collections, scope } = deps
 
 	if (topics.length === 0) {
 		return { ok: false, status: 400, message: 'topics query is required' }
 	}
 	if (topics.length > MAX_TOPICS) {
 		return { ok: false, status: 400, message: `at most ${MAX_TOPICS} topics allowed` }
+	}
+
+	let selection: ScopeSelection = null
+	if (scope) {
+		try {
+			selection = await scope.resolveRequest({ req })
+		} catch {
+			selection = null
+		}
+		if (selection === null) {
+			return { ok: false, status: 403, message: 'scope required' }
+		}
 	}
 
 	const authorized: AuthorizedTopic[] = []
@@ -89,11 +128,16 @@ export const authorizeTopics = async (
 				? 'enriched'
 				: 'thin'
 
+		const stamp = (entry: AuthorizedTopic, gate?: 'per-event'): AuthorizedTopic =>
+			selection === null ? entry : withWideScope(entry, selection, gate)
+
 		if (accessResult === true) {
 			authorized.push(
-				docId === undefined
-					? { topic, collection: slug, mode }
-					: { topic, collection: slug, docId, mode }
+				stamp(
+					docId === undefined
+						? { topic, collection: slug, mode }
+						: { topic, collection: slug, docId, mode }
+				)
 			)
 			continue
 		}
@@ -103,11 +147,15 @@ export const authorizeTopics = async (
 		}
 
 		if (docId === undefined) {
-			return {
-				ok: false,
-				status: 403,
-				message: `collection-wide topic forbidden under Where access: ${topic}`,
+			if (selection === null) {
+				return {
+					ok: false,
+					status: 403,
+					message: `collection-wide topic forbidden under Where access: ${topic}`,
+				}
 			}
+			authorized.push(stamp({ topic, collection: slug, mode }, 'per-event'))
+			continue
 		}
 
 		const counted = await req.payload.count({

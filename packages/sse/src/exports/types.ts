@@ -7,4 +7,7 @@ export type {
 	SSEPluginOptions,
 	SSEPluginOptions as PluginOptions,
 	SSEPluginOptions as SsePluginOptions,
+	SSEScopeOptions,
 } from '../options'
+export type { MultiTenantScopeOptions } from '../scope/multiTenantScope'
+export type { ResolveDocScope, ResolveRequestScope, ScopeSelection } from '../scope/types'

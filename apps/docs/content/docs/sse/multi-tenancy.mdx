@@ -1,0 +1,97 @@
+---
+title: Multi-tenancy
+description: Scope collection-wide SSE topics per tenant without changing the client topic API.
+---
+
+`@10x-media/sse` is tenancy-agnostic. The integration point is **scope**, a string identifying a boundary (a tenant id, a site key). Omit or `false` keeps today's unscoped broker. `true` enables the shipped `@payloadcms/plugin-multi-tenant` adapter. An object supplies your own resolvers.
+
+Client topics stay `{slug}` and `{slug}:{id}`. The plugin namespaces collection-wide broker channels internally as `{scope}::{slug}`.
+
+## Enable
+
+```ts title="payload.config.ts"
+import { sse, multiTenantScope } from '@10x-media/sse'
+import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
+
+export default buildConfig({
+  plugins: [
+    sse({
+      collections: { posts: true },
+      scope: true,
+      // or: scope: multiTenantScope({ userHasAccessToAllTenants: (user) => user.role === 'admin' }),
+    }),
+    multiTenantPlugin({
+      collections: { posts: {} },
+    }),
+  ],
+})
+```
+
+`scope: true` is `multiTenantScope()` with defaults (`tenants` collection, `tenant` field, `payload-tenant` cookie). The adapter does not import the tenant plugin. It reads the cookie through `parseCookies` from `payload/shared`.
+
+Place `multiTenantPlugin` after other plugins, as its own docs recommend. SSE resolves the scope at request time (`onInit` / connect), so it still works when the tenant field is added after the SSE plugin runs. If `scope` is off and an opted-in collection has a relationship to `tenants`, SSE logs a warning at `onInit`.
+
+## Custom resolvers
+
+```ts
+sse({
+  collections: { posts: true },
+  scope: {
+    resolveRequest: ({ req }) => {
+      // Trust req.user or a signed cookie. Never a client-controlled header.
+      return req.user?.tenant ?? null
+    },
+    resolveDoc: ({ doc }) => {
+      const tenant = (doc as { tenant?: unknown }).tenant
+      if (typeof tenant === 'string' || typeof tenant === 'number') return String(tenant)
+      if (tenant && typeof tenant === 'object' && 'id' in tenant) {
+        return String((tenant as { id: unknown }).id)
+      }
+      return null
+    },
+  },
+})
+```
+
+`resolveRequest` may return a string, an array of strings, `'*'` (every scope, for platform admins), or `null`. `null` on a scoped install is **403** for the whole stream.
+
+## What scoping changes
+
+| Surface | Unscoped | Scoped |
+|---|---|---|
+| Collection-wide topic `{slug}` | Broker key `{slug}` | Broker key `{scope}::{slug}` plus `*::{slug}` for wildcard subscribers |
+| Document topic `{slug}:{id}` | Unchanged | Unchanged (ids are unique per collection; connect-time `count` still enforces `access.read`) |
+| Presence topic | Unchanged | Unchanged; still authorized as document read |
+| Client hooks | `{ collection }` / `{ collection, id }` | Same. No tenant argument |
+
+## Where access and the per-event gate
+
+Without scoping, a collection whose `access.read` returns a Where object **refuses** `{slug}` (403). That is still true when `scope` is off.
+
+With scoping on, `{slug}` is allowed. Each event is checked against the subscriber's own read access before it is written to the stream (`payload.count` for thin, `findByID` with `overrideAccess: false` for enriched). Denied frames are dropped, not sent as thin events.
+
+**Delete caveat.** A delete cannot be `count`ed (the row is gone). Deletes on a scoped wide topic are delivered to every subscriber of that scope. A Where that is narrower than the tenant (for example owner-only inside one tenant) will still see the delete. Document topics stay exact.
+
+## `getSSE(payload).emit`
+
+`emit` publishes the `topic` you pass as the broker key. When scoping is on, collection-wide subscribers listen on `{scope}::{slug}`, not `posts`. Use `scopedTopic`:
+
+```ts
+import { getSSE, scopedTopic } from '@10x-media/sse'
+
+getSSE(payload).emit({
+  id: crypto.randomUUID(),
+  topic: scopedTopic(tenantId, 'posts'),
+  event: 'update',
+  collection: 'posts',
+  docId: 'abc',
+  scope: tenantId,
+  timestamp: Date.now(),
+})
+```
+
+The stream rewrites the public topic back to `posts` before it reaches the client.
+
+## Security
+
+Derive `resolveRequest` from `req.user` or a signed cookie. A header the client can set lets a caller claim another tenant's channel. See [Security](/sse/security).

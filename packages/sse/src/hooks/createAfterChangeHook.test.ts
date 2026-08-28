@@ -24,6 +24,7 @@ const makeRuntime = (broker: EventBroker): SSERuntime => ({
 	collections: { posts: { thinEvents: true, events: ['create', 'update', 'delete'] } },
 	heartbeatMs: 15_000,
 	presence: false,
+	scope: false,
 	destroy: async () => {},
 	emit: (event) => {
 		try {
@@ -172,5 +173,54 @@ describe('createAfterChangeHook', () => {
 
 		expect(result).toBe(doc)
 		expect(broker.published).toHaveLength(0)
+	})
+
+	it('publishes scoped wide topics plus an unscoped doc topic', async () => {
+		setRuntime(payload, {
+			...makeRuntime(broker),
+			scope: {
+				resolveRequest: () => 't1',
+				resolveDoc: () => 't1',
+			},
+		})
+		const hook = createAfterChangeHook({ collection: 'posts', events: ['create'] })
+		const doc = { id: 'abc', title: 'Hello' }
+		const req = { payload, context: {} } as unknown as PayloadRequest
+
+		await hook({
+			doc,
+			operation: 'create',
+			req,
+			collection: { slug: 'posts' },
+		} as Parameters<typeof hook>[0])
+
+		const topics = broker.published.map((e) => e.topic).sort()
+		expect(topics).toEqual(['*::posts', 'posts:abc', 't1::posts'])
+		for (const event of broker.published) {
+			expect(event.scope).toBe('t1')
+			expect(event.collection).toBe('posts')
+			expect(event.docId).toBe('abc')
+		}
+	})
+
+	it('skips collection-wide publish when resolveDoc returns null', async () => {
+		setRuntime(payload, {
+			...makeRuntime(broker),
+			scope: {
+				resolveRequest: () => 't1',
+				resolveDoc: () => null,
+			},
+		})
+		const hook = createAfterChangeHook({ collection: 'posts', events: ['create'] })
+		const req = { payload, context: {} } as unknown as PayloadRequest
+
+		await hook({
+			doc: { id: 'abc' },
+			operation: 'create',
+			req,
+			collection: { slug: 'posts' },
+		} as Parameters<typeof hook>[0])
+
+		expect(broker.published.map((e) => e.topic)).toEqual(['posts:abc'])
 	})
 })

@@ -21,6 +21,7 @@ const makeRuntime = (broker: EventBroker): SSERuntime => ({
 	collections: {},
 	heartbeatMs: 15_000,
 	presence: false,
+	scope: false,
 	destroy: async () => {},
 	emit: createEmit(broker),
 })

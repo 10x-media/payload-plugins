@@ -8,6 +8,8 @@ export type ThinRealtimeEvent = {
 	docId?: string
 	operation?: SSEOperation
 	timestamp: number
+	/** Concrete scope this event was published under. Absent when scoping is off. */
+	scope?: string
 }
 
 export type RealtimeEvent<T = unknown> = ThinRealtimeEvent & { data?: T }

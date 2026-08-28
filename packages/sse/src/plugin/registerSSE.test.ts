@@ -12,6 +12,7 @@ const resolvedOptions = (broker: ResolvedSSEOptions['broker']): ResolvedSSEOptio
 	heartbeatMs: 15_000,
 	broker,
 	translations: undefined,
+	scope: false,
 })
 
 describe('registerSSE', () => {

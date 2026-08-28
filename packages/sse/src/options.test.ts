@@ -69,4 +69,28 @@ describe('resolveSSEOptions', () => {
 		})
 		expect(resolved.admin).toEqual({ liveList: true })
 	})
+
+	it('leaves scope off when omitted or false', () => {
+		expect(resolveSSEOptions({}).scope).toBe(false)
+		expect(resolveSSEOptions({ scope: false }).scope).toBe(false)
+	})
+
+	it('resolves scope true to multiTenantScope resolvers', () => {
+		const resolved = resolveSSEOptions({ scope: true })
+		expect(resolved.scope).not.toBe(false)
+		if (resolved.scope === false) {
+			throw new Error('expected scope enabled')
+		}
+		expect(typeof resolved.scope.resolveRequest).toBe('function')
+		expect(typeof resolved.scope.resolveDoc).toBe('function')
+	})
+
+	it('preserves a custom scope object', () => {
+		const scope = {
+			resolveRequest: () => 't1',
+			resolveDoc: () => 't1',
+		}
+		const resolved = resolveSSEOptions({ scope })
+		expect(resolved.scope).toBe(scope)
+	})
 })

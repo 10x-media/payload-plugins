@@ -61,10 +61,11 @@ export const openStream = async (args: {
 	token: string
 	topics: string
 	signal?: AbortSignal
+	headers?: Record<string, string>
 }): Promise<Response> => {
 	const rest = createRestClient(args.booted)
 	return rest.get(`/api/realtime/stream?topics=${encodeURIComponent(args.topics)}`, {
-		headers: { Authorization: `JWT ${args.token}` },
+		headers: { Authorization: `JWT ${args.token}`, ...args.headers },
 		signal: args.signal,
 	})
 }

@@ -1,6 +1,7 @@
 import type { PayloadHandler } from 'payload'
 
 import type { EventBroker, RealtimeEvent } from '../broker/types'
+import type { SSEScopeOptions } from '../scope/types'
 import { authorizeTopics } from '../stream/authorizeTopics'
 import type { PresencePeer, PresenceStore } from './store'
 
@@ -14,6 +15,7 @@ export type PresenceHandlerDeps = {
 	identify: PresenceIdentify
 	/** Plugin opted-in collections; presence is refused outside this map. */
 	collections: Record<string, { thinEvents: boolean }>
+	scope?: SSEScopeOptions | false
 }
 
 type PresenceBody = {
@@ -68,7 +70,7 @@ const publishSafe = (broker: EventBroker, event: RealtimeEvent): void => {
  * Authenticated POST (join/heartbeat) and DELETE (leave) for document presence leases.
  */
 export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler => {
-	const { store, broker, identify, collections } = deps
+	const { store, broker, identify, collections, scope = false } = deps
 
 	return async (req) => {
 		if (!req.user) {
@@ -92,6 +94,7 @@ export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler =
 			req,
 			topics: [topic],
 			collections,
+			scope,
 		})
 		if (!auth.ok) {
 			return Response.json({ message: auth.message }, { status: auth.status })

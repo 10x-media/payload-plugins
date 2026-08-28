@@ -15,6 +15,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Live admin list** flashes rows when documents change.
 - **Client hooks** via `@10x-media/sse/client` (`usePayloadDocument`, `usePayloadList`, `useDocumentPresence`, `usePayloadSubscription`).
 - **`getSSE(payload).emit`** for custom realtime events from your server code.
+- **Scope** (optional): namespaces collection-wide topics per tenant. `scope: true` ships a `@payloadcms/plugin-multi-tenant` adapter; client topic strings do not change.
 - **No job progress UI.** `payload-jobs` has no progress value, so there is no percentage display.
 
 ## Quick start
@@ -34,6 +35,7 @@ export default buildConfig({
       collections: { posts: true },
       presence: true,
       admin: true,
+      // scope: true, // multi-tenant: see docs
     }),
   ],
 })
@@ -69,6 +71,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/sse):
 - [Overview](https://docs.10xmedia.de/sse)
 - [Quick start](https://docs.10xmedia.de/sse/quick-start)
 - [Security model](https://docs.10xmedia.de/sse/security)
+- [Multi-tenancy](https://docs.10xmedia.de/sse/multi-tenancy)
 
 ## License
 

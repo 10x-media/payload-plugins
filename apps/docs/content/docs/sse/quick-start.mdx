@@ -35,6 +35,7 @@ export default buildConfig({
 | `collections` | Opt-in map. `true` enables create/update/delete with thin events. |
 | `presence` | `true` / object enables viewer presence; omit or `false` disables. |
 | `admin` | Omit/`false` off. `true` enables live list + presence chips; or `{ liveList?, presence? }`. |
+| `scope` | Omit/`false` off. `true` uses `multiTenantScope()`; or `{ resolveRequest, resolveDoc }`. |
 | `broker` | Custom `EventBroker` for multi-instance. Default is in-process. |
 | `heartbeatMs` | Stream comment heartbeat interval (default 15s). |
 
@@ -117,4 +118,4 @@ The default broker is in-process. Supply your own `broker` implementing `EventBr
 
 ## Next
 
-Read the [security model](/sse/security) before exposing the stream to untrusted clients.
+Read the [security model](/sse/security) before exposing the stream to untrusted clients. Multi-tenant hosts: [Multi-tenancy](/sse/multi-tenancy).

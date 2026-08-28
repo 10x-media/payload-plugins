@@ -25,6 +25,7 @@ const makeRuntime = (broker: EventBroker): SSERuntime => ({
 	collections: { posts: { thinEvents: true, events: ['create', 'update', 'delete'] } },
 	heartbeatMs: 15_000,
 	presence: false,
+	scope: false,
 	destroy: async () => {},
 	emit: (event) => {
 		try {
@@ -111,5 +112,34 @@ describe('createAfterDeleteHook', () => {
 		} as Parameters<typeof hook>[0])
 
 		expect(result).toBe(doc)
+	})
+
+	it('publishes scoped wide topics plus an unscoped doc topic on delete', async () => {
+		setRuntime(payload, {
+			...makeRuntime(broker),
+			scope: {
+				resolveRequest: () => 't1',
+				resolveDoc: () => 't1',
+			},
+		})
+		const hook = createAfterDeleteHook({ collection: 'posts', events: ['delete'] })
+		const doc = { id: 'gone' }
+		const req = { payload, context: {} } as unknown as PayloadRequest
+
+		await hook({
+			doc,
+			req,
+			collection: { slug: 'posts' },
+		} as Parameters<typeof hook>[0])
+
+		expect(broker.published.map((e) => e.topic).sort()).toEqual([
+			'*::posts',
+			'posts:gone',
+			't1::posts',
+		])
+		for (const event of broker.published) {
+			expect(event.scope).toBe('t1')
+			expect(event.operation).toBe('delete')
+		}
 	})
 })

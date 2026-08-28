@@ -1,6 +1,8 @@
-import type { PayloadHandler } from 'payload'
+import type { PayloadHandler, PayloadRequest } from 'payload'
 
 import type { EventBroker, RealtimeEvent } from '../broker/types'
+import { toBrokerChannels } from '../scope/resolveScope'
+import type { SSEScopeOptions } from '../scope/types'
 import { type AuthorizedTopic, authorizeTopics } from './authorizeTopics'
 import { encodeComment, encodeEvent, encodeRetry } from './encode'
 import { enrichForUser } from './enrichForUser'
@@ -11,6 +13,7 @@ export type StreamHandlerDeps = {
 	broker: EventBroker
 	collections: Record<string, { thinEvents: boolean }>
 	heartbeatMs: number
+	scope?: SSEScopeOptions | false
 }
 
 const parseTopicsParam = (url: string | undefined): string[] => {
@@ -30,12 +33,62 @@ const readyEvent = (topics: AuthorizedTopic[]): RealtimeEvent<{ topics: Authoriz
 	data: { topics },
 })
 
+const subscribeKeys = (topic: AuthorizedTopic): string[] => {
+	if (topic.scopes === undefined) return [topic.topic]
+	return toBrokerChannels(topic.scopes, topic.topic)
+}
+
+const isDelete = (event: RealtimeEvent): boolean =>
+	event.event === 'delete' || event.operation === 'delete'
+
+const prepareFrame = async (args: {
+	event: RealtimeEvent
+	topic: AuthorizedTopic
+	req: PayloadRequest
+}): Promise<RealtimeEvent | null> => {
+	const { event, topic, req } = args
+	const publicEvent: RealtimeEvent = { ...event, topic: topic.topic }
+
+	if (topic.gate === 'per-event') {
+		if (isDelete(event)) return publicEvent
+		if (!event.docId || !event.collection) return publicEvent
+		if (topic.mode === 'enriched') {
+			return enrichForUser({
+				event: publicEvent,
+				collection: event.collection,
+				docId: event.docId,
+				req,
+				onDeny: 'drop',
+			})
+		}
+		const counted = await req.payload.count({
+			collection: event.collection,
+			where: { id: { equals: event.docId } },
+			req,
+			overrideAccess: false,
+		})
+		return counted.totalDocs < 1 ? null : publicEvent
+	}
+
+	if (topic.mode === 'enriched' && event.docId && event.collection) {
+		return (
+			(await enrichForUser({
+				event: publicEvent,
+				collection: event.collection,
+				docId: event.docId,
+				req,
+			})) ?? publicEvent
+		)
+	}
+	return publicEvent
+}
+
 /**
  * Authenticated GET handler for the SSE stream. Authorizes topics at connect,
  * emits retry + ready, heartbeats, and broker events until `req.signal` aborts.
  */
 export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
-	const { broker, collections, heartbeatMs } = deps
+	const { broker, collections, heartbeatMs, scope = false } = deps
 
 	return async (req) => {
 		if (!req.user) {
@@ -43,7 +96,7 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 		}
 
 		const topicNames = parseTopicsParam(req.url)
-		const auth = await authorizeTopics({ req, topics: topicNames, collections })
+		const auth = await authorizeTopics({ req, topics: topicNames, collections, scope })
 		if (!auth.ok) {
 			return Response.json({ message: auth.message }, { status: auth.status })
 		}
@@ -92,27 +145,21 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 				enqueue(encodeRetry(3000) + encodeEvent(readyEvent(auth.topics)))
 
 				for (const topic of auth.topics) {
-					const unsub = broker.subscribe(topic.topic, (event: RealtimeEvent) => {
-						enrichChain = enrichChain
-							.then(async () => {
-								if (closed) return
-								const frame =
-									topic.mode === 'enriched' && event.docId && event.collection
-										? await enrichForUser({
-												event,
-												collection: event.collection,
-												docId: event.docId,
-												req,
-											})
-										: event
-								if (closed) return
-								enqueue(encodeEvent(frame))
-							})
-							.catch(() => {
-								teardown()
-							})
-					})
-					unsubscribers.push(unsub)
+					for (const key of subscribeKeys(topic)) {
+						const unsub = broker.subscribe(key, (event: RealtimeEvent) => {
+							enrichChain = enrichChain
+								.then(async () => {
+									if (closed) return
+									const frame = await prepareFrame({ event, topic, req })
+									if (closed || frame == null) return
+									enqueue(encodeEvent(frame))
+								})
+								.catch(() => {
+									teardown()
+								})
+						})
+						unsubscribers.push(unsub)
+					}
 				}
 
 				heartbeat = setInterval(() => {

@@ -9,6 +9,7 @@ import { createPresenceStore } from '../presence/store'
 import { makeStreamHandler, STREAM_PATH } from '../stream/makeStreamHandler'
 import { registerAdmin } from './registerAdmin'
 import { createEmit, getRuntime, type SSERuntime, setRuntime } from './runtime'
+import { warnMissingScope } from './warnMissingScope'
 
 export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions }): void => {
 	const { config, options } = args
@@ -57,6 +58,7 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 				broker: runtime.broker,
 				collections,
 				heartbeatMs: runtime.heartbeatMs,
+				scope: runtime.scope,
 			})(req)
 		},
 	}
@@ -78,6 +80,7 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 				broker: runtime.broker,
 				identify: runtime.presence.identify,
 				collections,
+				scope: runtime.scope,
 			})(req)
 		}
 		endpoints.push(
@@ -105,6 +108,7 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 			collections: options.collections,
 			heartbeatMs: options.heartbeatMs,
 			presence,
+			scope: options.scope,
 			destroy: async () => {
 				if (ownsBroker) {
 					await broker.destroy()
@@ -113,6 +117,12 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 			emit,
 		}
 		setRuntime(payload, runtime)
+
+		warnMissingScope({
+			payload,
+			sourceSlugs,
+			scopeEnabled: options.scope !== false,
+		})
 
 		const prevDestroy = payload.destroy.bind(payload)
 		payload.destroy = async (...destroyArgs) => {

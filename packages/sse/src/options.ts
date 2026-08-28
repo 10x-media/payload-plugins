@@ -1,6 +1,9 @@
 import type { EventBroker, SSEOperation } from './broker/types'
+import { multiTenantScope } from './scope/multiTenantScope'
+import type { SSEScopeOptions } from './scope/types'
 import type { TranslationsOption } from './translations'
 
+export type { SSEScopeOptions } from './scope/types'
 export type { SSEOperation }
 
 export type CollectionSSEConfig = {
@@ -32,6 +35,11 @@ export type SSEPluginOptions = {
 	/** Stream comment heartbeat interval. Default 15_000. */
 	heartbeatMs?: number
 	broker?: EventBroker
+	/**
+	 * Tenant/site boundary for collection-wide topics. Omit/`false` off.
+	 * `true` uses {@link multiTenantScope} defaults. An object supplies resolvers.
+	 */
+	scope?: boolean | SSEScopeOptions
 }
 
 export type ResolvedCollectionSSEConfig = {
@@ -47,6 +55,8 @@ export type ResolvedSSEOptions = {
 	heartbeatMs: number
 	broker: EventBroker | undefined
 	translations: TranslationsOption | undefined
+	/** Resolved scope resolvers when enabled; `false` when omit/false. */
+	scope: SSEScopeOptions | false
 }
 
 const DEFAULT_EVENTS: SSEOperation[] = ['create', 'update', 'delete']
@@ -68,6 +78,16 @@ const resolvePresence = (
 		leaseMs: opts.leaseMs ?? 30_000,
 		identify: opts.identify ?? defaultIdentify,
 	}
+}
+
+const resolveScope = (scope: boolean | SSEScopeOptions | undefined): SSEScopeOptions | false => {
+	if (scope === undefined || scope === false) {
+		return false
+	}
+	if (scope === true) {
+		return multiTenantScope()
+	}
+	return scope
 }
 
 const resolveCollection = (cfg: true | CollectionSSEConfig): ResolvedCollectionSSEConfig => {
@@ -92,5 +112,6 @@ export const resolveSSEOptions = (options: SSEPluginOptions): ResolvedSSEOptions
 		heartbeatMs: options.heartbeatMs ?? 15_000,
 		broker: options.broker,
 		translations: options.translations,
+		scope: resolveScope(options.scope),
 	}
 }

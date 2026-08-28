@@ -3,6 +3,7 @@
 	"pages": [
 		"index",
 		"quick-start",
-		"security"
+		"security",
+		"multi-tenancy"
 	]
 }

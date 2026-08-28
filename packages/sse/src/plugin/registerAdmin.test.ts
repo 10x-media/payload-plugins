@@ -22,6 +22,7 @@ const baseOptions = (): ResolvedSSEOptions => ({
 	heartbeatMs: 15_000,
 	broker: undefined,
 	translations: undefined,
+	scope: false,
 })
 
 const postsConfig = (): Config =>

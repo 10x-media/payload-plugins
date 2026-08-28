@@ -259,4 +259,73 @@ describe('authorizeTopics', () => {
 			topics: [{ topic: 'posts', collection: 'posts', mode: 'thin' }],
 		})
 	})
+
+	it('returns 403 when scoping is on and resolveRequest returns null', async () => {
+		const result = await authorizeTopics({
+			req: makeReq({
+				collections: {
+					posts: { config: { slug: 'posts', access: { read: () => true } } },
+				},
+			}),
+			topics: ['posts'],
+			collections: { posts: { thinEvents: true } },
+			scope: {
+				resolveRequest: () => null,
+				resolveDoc: () => null,
+			},
+		})
+		expect(result).toEqual({ ok: false, status: 403, message: expect.any(String) })
+	})
+
+	it('stamps scopes on collection-wide topics when scoping is on', async () => {
+		const result = await authorizeTopics({
+			req: makeReq({
+				collections: {
+					posts: { config: { slug: 'posts', access: { read: () => true } } },
+				},
+			}),
+			topics: ['posts', 'posts:abc'],
+			collections: { posts: { thinEvents: true } },
+			scope: {
+				resolveRequest: () => 't1',
+				resolveDoc: () => 't1',
+			},
+		})
+		expect(result).toEqual({
+			ok: true,
+			topics: [
+				{ topic: 'posts', collection: 'posts', mode: 'thin', scopes: ['t1'] },
+				{ topic: 'posts:abc', collection: 'posts', docId: 'abc', mode: 'thin' },
+			],
+		})
+	})
+
+	it('allows Where-scoped collection-wide topics with a per-event gate when scoping is on', async () => {
+		const where = { owner: { equals: 'me' } }
+		const result = await authorizeTopics({
+			req: makeReq({
+				collections: {
+					posts: { config: { slug: 'posts', access: { read: () => where } } },
+				},
+			}),
+			topics: ['posts'],
+			collections: { posts: { thinEvents: true } },
+			scope: {
+				resolveRequest: () => ['t1', 't2'],
+				resolveDoc: () => 't1',
+			},
+		})
+		expect(result).toEqual({
+			ok: true,
+			topics: [
+				{
+					topic: 'posts',
+					collection: 'posts',
+					mode: 'thin',
+					scopes: ['t1', 't2'],
+					gate: 'per-event',
+				},
+			],
+		})
+	})
 })

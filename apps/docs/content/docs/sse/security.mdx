@@ -25,7 +25,13 @@ For each topic the plugin runs the collection's `access.read`:
 
 - **`false`**: topic refused (**403**).
 - **`true`**: topic allowed (collection-wide or document-scoped).
-- **Where object**: collection-wide `{slug}` and presence without a matching id path are **refused**. For `{slug}:{id}` (and `presence:{slug}:{id}`), the plugin `count`s with `and: [where, { id: { equals: docId } }]` and `overrideAccess: false`. Zero matches → **403**.
+- **Where object**: collection-wide `{slug}` is **refused** when `scope` is off. For `{slug}:{id}` (and `presence:{slug}:{id}`), the plugin `count`s with `and: [where, { id: { equals: docId } }]` and `overrideAccess: false`. Zero matches → **403**.
+
+When `scope` is on (`true` or a resolver object):
+
+- `resolveRequest` returning `null` → **403** for the whole connect.
+- Collection-wide `{slug}` under a Where is **allowed**. The stream **drops** events the subscriber cannot read (`count` for thin, `findByID` deny for enriched). Deletes on that channel skip the count (the row is gone) and are delivered to every subscriber of that scope.
+- Broker keys for `{slug}` become `{scope}::{slug}`. The client still sends `topics=posts`. See [Multi-tenancy](/sse/multi-tenancy).
 
 ## Thin is not a security tier
 
@@ -33,7 +39,9 @@ Thin events still carry collection and document ids. If `access.read` is `true` 
 
 ## Enrichment
 
-When `thinEvents: false`, the stream enriches with `findByID` using `overrideAccess: false`. Subscribers only receive a `doc` payload when that find succeeds under their access. Thin updates still go out when enrichment is skipped or denied.
+When `thinEvents: false`, the stream enriches with `findByID` using `overrideAccess: false`. Subscribers only receive a `doc` payload when that find succeeds under their access. On ungated topics, thin updates still go out when enrichment is skipped or denied. On scoped collection-wide topics (`gate: 'per-event'`), a denied enrich is dropped instead.
+
+`getSSE(payload).emit` publishes the `topic` string as the broker key. Under scoping, collection-wide listeners are on `{scope}::{slug}`; pass `scopedTopic(scope, slug)` or those listeners will not see the event.
 
 ## Presence identity
 
@@ -42,6 +50,7 @@ When `thinEvents: false`, the stream enriches with `findByID` using `overrideAcc
 ## Checklist
 
 - Require auth on the stream (already enforced).
-- Prefer Where-scoped `read` when collection-wide id leakage is unacceptable.
+- Prefer Where-scoped `read` when collection-wide id leakage is unacceptable. Enable `scope` for multi-tenant installs so `{slug}` stays usable under a Where.
+- Treat thin events as public signals of "something changed for this id", not as a redaction layer.
 - Treat thin events as public signals of "something changed for this id", not as a redaction layer.
 - Keep `identify` free of email by default.
