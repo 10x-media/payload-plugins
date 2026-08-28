@@ -1,43 +1,40 @@
 import { type Config, definePlugin } from 'payload'
 
+import { resolveSSEOptions, type SSEPluginOptions } from './options'
+import { registerSSE } from './plugin/registerSSE'
 import { registerTranslations } from './plugin/registerTranslations'
-import type { TranslationsOption } from './translations'
-
-export type SsePluginOptions = {
-	/**
-	 * Disable the plugin entirely (incoming config returned untouched).
-	 * Useful for opting out per environment without removing the plugin call.
-	 */
-	disabled?: boolean
-	/**
-	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
-	 * translation keys exported from `@10x-media/sse/i18n`. Values win
-	 * over the built-in locales key-by-key; locales the plugin does not ship are
-	 * added whole. App-level `i18n.translations` still wins over both.
-	 */
-	translations?: TranslationsOption
-}
 
 declare module 'payload' {
 	interface RegisteredPlugins {
-		'@10x-media/sse': SsePluginOptions
+		'@10x-media/sse': SSEPluginOptions
 	}
 }
 
 /**
- * Sse plugin for Payload v3. Currently registers this plugin's
- * translations; future releases will add feature behavior. Authored with
- * `definePlugin` so sibling plugins can detect it by slug.
+ * SSE plugin for Payload v3. Registers collection hooks, the realtime stream
+ * endpoint, and a per-payload runtime exposed via `getSSE`.
  */
-export const sse = definePlugin<SsePluginOptions>({
+export const sse = definePlugin<SSEPluginOptions>({
 	slug: '@10x-media/sse',
 	plugin: ({ config, plugins: _plugins, ...options }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
-		registerTranslations(config, options.translations)
+		const resolved = resolveSSEOptions(options)
+		registerTranslations(config, resolved.translations)
+		registerSSE({ config, options: resolved })
 		return config
 	},
 })
 
-export type { SsePluginOptions as PluginOptions }
+export type { EventBroker, RealtimeEvent, SSEOperation, ThinRealtimeEvent } from './broker/types'
+export { SSE_SKIP } from './hooks/createAfterChangeHook'
+export type {
+	CollectionSSEConfig,
+	PresenceOptions,
+	SSEPluginOptions,
+	SSEPluginOptions as PluginOptions,
+	SSEPluginOptions as SsePluginOptions,
+} from './options'
+export { getRuntime, getSSE } from './plugin/runtime'
+export { STREAM_PATH } from './stream/makeStreamHandler'
