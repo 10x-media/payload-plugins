@@ -11,22 +11,13 @@ export type UsePayloadSubscriptionOptions = {
 	topics: string[]
 	/** Absolute or origin-relative. Default `/api/realtime/stream`. */
 	url?: string
-	/** If set, use fetch + stream parser with `Authorization: Bearer ${token}` instead of EventSource. */
+	/** If set, send `Authorization: Bearer ${token}` on the fetch stream. */
 	token?: string
 	onEvent?: (event: RealtimeEvent) => void
 }
 
 const DEFAULT_URL = '/api/realtime/stream'
 const DEFAULT_RETRY_MS = 3000
-
-const NAMED_EVENTS = [
-	'ready',
-	'create',
-	'update',
-	'delete',
-	'presence:join',
-	'presence:leave',
-] as const
 
 function parseEventData(raw: string | undefined, eventName?: string): RealtimeEvent | null {
 	if (!raw) {
@@ -66,7 +57,6 @@ export const usePayloadSubscription = (
 		let disposed = false
 		let retryMs = DEFAULT_RETRY_MS
 		let reconnectTimer: ReturnType<typeof setTimeout> | undefined
-		let eventSource: EventSource | null = null
 		let abortController: AbortController | null = null
 
 		const deliver = (event: RealtimeEvent) => {
@@ -99,45 +89,25 @@ export const usePayloadSubscription = (
 			}, retryMs)
 		}
 
-		const connectEventSource = (streamUrl: string) => {
-			const es = new EventSource(streamUrl, { withCredentials: true })
-			eventSource = es
-
-			es.onopen = () => {
-				if (!disposed) {
-					setStatus('open')
-				}
+		const connect = async () => {
+			if (disposed) {
+				return
 			}
-
-			es.onerror = () => {
-				if (disposed) {
-					return
-				}
-				setStatus('connecting')
-			}
-
-			const onNamed = (type: string) => (ev: MessageEvent) => {
-				handleRaw(typeof ev.data === 'string' ? ev.data : undefined, type)
-			}
-
-			for (const type of NAMED_EVENTS) {
-				es.addEventListener(type, onNamed(type) as EventListener)
-			}
-
-			es.onmessage = (ev) => {
-				handleRaw(typeof ev.data === 'string' ? ev.data : undefined, 'message')
-			}
-		}
-
-		const connectFetch = async (streamUrl: string) => {
+			setStatus('connecting')
+			const streamUrl = buildStreamUrl(url, topicsRef.current)
 			abortController = new AbortController()
+
+			const headers: Record<string, string> = {
+				Accept: 'text/event-stream',
+			}
+			if (token) {
+				headers.Authorization = `Bearer ${token}`
+			}
+
 			try {
 				const response = await fetch(streamUrl, {
 					credentials: 'include',
-					headers: {
-						Accept: 'text/event-stream',
-						Authorization: `Bearer ${token}`,
-					},
+					headers,
 					signal: abortController.signal,
 				})
 
@@ -189,30 +159,12 @@ export const usePayloadSubscription = (
 			}
 		}
 
-		const connect = () => {
-			if (disposed) {
-				return
-			}
-			setStatus('connecting')
-			const streamUrl = buildStreamUrl(url, topicsRef.current)
-
-			if (token) {
-				void connectFetch(streamUrl)
-			} else {
-				connectEventSource(streamUrl)
-			}
-		}
-
-		connect()
+		void connect()
 
 		return () => {
 			disposed = true
 			if (reconnectTimer !== undefined) {
 				clearTimeout(reconnectTimer)
-			}
-			if (eventSource) {
-				eventSource.close()
-				eventSource = null
 			}
 			if (abortController) {
 				abortController.abort()

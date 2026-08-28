@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { RealtimeEvent } from '../broker/types'
 import { type SubscriptionStatus, usePayloadSubscription } from './usePayloadSubscription'
@@ -23,6 +23,13 @@ export const usePayloadDocument = <T = unknown>(
 	const { collection, id, token, url } = options
 	const [doc, setDoc] = useState<T | null>(null)
 	const [revision, setRevision] = useState(0)
+
+	useEffect(() => {
+		void collection
+		void id
+		setDoc(null)
+		setRevision(0)
+	}, [collection, id])
 
 	const { status, lastEvent } = usePayloadSubscription({
 		topics: [`${collection}:${id}`],

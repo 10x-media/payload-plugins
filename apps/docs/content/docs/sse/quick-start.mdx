@@ -34,7 +34,7 @@ export default buildConfig({
 |---|---|
 | `collections` | Opt-in map. `true` enables create/update/delete with thin events. |
 | `presence` | `true` / object enables viewer presence; omit or `false` disables. |
-| `admin` | `true` enables live list + presence chips; or `{ liveList?, presence? }`. |
+| `admin` | Omit/`false` off. `true` enables live list + presence chips; or `{ liveList?, presence? }`. |
 | `broker` | Custom `EventBroker` for multi-instance. Default is in-process. |
 | `heartbeatMs` | Stream comment heartbeat interval (default 15s). |
 
@@ -71,8 +71,8 @@ import {
 
 - **`usePayloadDocument({ collection, id })`**: document topic; bumps `revision` on thin events, sets `doc` when enriched.
 - **`usePayloadList({ collection })`**: collection topic; bumps `generation` on create/update/delete so you refetch the list.
-- **`useDocumentPresence({ collection, id })`**: join/leave and peer list for viewers.
-- **`usePayloadSubscription({ topics, onEvent })`**: low-level EventSource wrapper.
+- **`useDocumentPresence(collection, id)`**: join/leave and peer list for viewers.
+- **`usePayloadSubscription({ topics, onEvent })`**: low-level fetch SSE wrapper.
 
 Pass `token` when the browser cannot rely on cookies alone.
 

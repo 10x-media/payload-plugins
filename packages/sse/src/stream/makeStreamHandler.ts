@@ -56,6 +56,7 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 		const stream = new ReadableStream<Uint8Array>({
 			start(controller) {
 				const encoder = new TextEncoder()
+				let enrichChain: Promise<void> = Promise.resolve()
 				const enqueue = (chunk: string) => {
 					if (closed) return
 					try {
@@ -68,6 +69,7 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 				const teardown = () => {
 					if (closed) return
 					closed = true
+					enrichChain = Promise.resolve()
 					if (heartbeat !== undefined) {
 						clearInterval(heartbeat)
 						heartbeat = undefined
@@ -91,18 +93,24 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 
 				for (const topic of auth.topics) {
 					const unsub = broker.subscribe(topic.topic, (event: RealtimeEvent) => {
-						void (async () => {
-							const frame =
-								topic.mode === 'enriched' && event.docId && event.collection
-									? await enrichForUser({
-											event,
-											collection: event.collection,
-											docId: event.docId,
-											req,
-										})
-									: event
-							enqueue(encodeEvent(frame))
-						})().catch(() => teardown())
+						enrichChain = enrichChain
+							.then(async () => {
+								if (closed) return
+								const frame =
+									topic.mode === 'enriched' && event.docId && event.collection
+										? await enrichForUser({
+												event,
+												collection: event.collection,
+												docId: event.docId,
+												req,
+											})
+										: event
+								if (closed) return
+								enqueue(encodeEvent(frame))
+							})
+							.catch(() => {
+								teardown()
+							})
 					})
 					unsubscribers.push(unsub)
 				}

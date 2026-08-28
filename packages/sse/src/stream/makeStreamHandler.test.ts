@@ -275,4 +275,87 @@ describe('makeStreamHandler', () => {
 		ac.abort()
 		await reader.cancel().catch(() => {})
 	})
+
+	it('serializes overlapping enrichForUser so frames enqueue in publish order', async () => {
+		const listeners = new Map<string, (event: RealtimeEvent) => void>()
+		const broker: EventBroker = {
+			publish: vi.fn(),
+			subscribe: (topic, cb) => {
+				listeners.set(topic, cb)
+				return vi.fn()
+			},
+			destroy: vi.fn(async () => undefined),
+		}
+
+		let releaseFirst: (() => void) | undefined
+		const firstGate = new Promise<void>((resolve) => {
+			releaseFirst = resolve
+		})
+		const findByID = vi.fn(async ({ id }: { id: string }) => {
+			if (id === 'slow') {
+				await firstGate
+				return { id: 'slow', title: 'first' }
+			}
+			return { id: 'fast', title: 'second' }
+		})
+
+		const ac = new AbortController()
+		const res = await makeStreamHandler({
+			broker,
+			collections: { posts: { thinEvents: false } },
+			heartbeatMs: 60_000,
+		})(
+			authReq({
+				user: { id: '1' },
+				signal: ac.signal,
+				findByID,
+			})
+		)
+		expect(res.status).toBe(200)
+
+		const reader = res.body?.getReader()
+		if (!reader) throw new Error('missing body')
+		const decoder = new TextDecoder()
+		let buf = ''
+		const readUntil = async (predicate: (s: string) => boolean) => {
+			while (!predicate(buf)) {
+				const { done, value } = await reader.read()
+				if (done) break
+				buf += decoder.decode(value, { stream: true })
+			}
+		}
+		await readUntil((s) => s.includes('event: ready'))
+
+		listeners.get('posts')?.({
+			id: '1',
+			topic: 'posts',
+			event: 'update',
+			collection: 'posts',
+			docId: 'slow',
+			operation: 'update',
+			timestamp: 1,
+		})
+		listeners.get('posts')?.({
+			id: '2',
+			topic: 'posts',
+			event: 'update',
+			collection: 'posts',
+			docId: 'fast',
+			operation: 'update',
+			timestamp: 2,
+		})
+
+		await Promise.resolve()
+		expect(findByID).toHaveBeenCalled()
+		releaseFirst?.()
+
+		await readUntil((s) => s.includes('"title":"second"'))
+		const firstIdx = buf.indexOf('"title":"first"')
+		const secondIdx = buf.indexOf('"title":"second"')
+		expect(firstIdx).toBeGreaterThan(-1)
+		expect(secondIdx).toBeGreaterThan(firstIdx)
+
+		ac.abort()
+		await reader.cancel().catch(() => {})
+	})
 })

@@ -58,34 +58,32 @@ export const useDocumentPresence = (
 	const tokenRef = useRef(token)
 	tokenRef.current = token
 
-	const heartbeat = useCallback(async () => {
-		const headers: Record<string, string> = {
-			'Content-Type': 'application/json',
-			Accept: 'application/json',
-		}
-		if (tokenRef.current) {
-			headers.Authorization = `Bearer ${tokenRef.current}`
-		}
-		const res = await fetch(url, {
-			method: 'POST',
-			credentials: 'include',
-			headers,
-			body: JSON.stringify({ collection, id }),
-		})
-		if (!res.ok) {
-			return
-		}
-		const json = (await res.json()) as {
-			peers?: PresencePeerPublic[]
-			self?: PresencePeerPublic
-		}
-		if (Array.isArray(json.peers)) {
-			setPeers(json.peers)
-		}
-		if (json.self) {
-			setSelf(json.self)
-		}
-	}, [collection, id, url])
+	const heartbeat = useCallback(
+		async (signal?: AbortSignal) => {
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json',
+				Accept: 'application/json',
+			}
+			if (tokenRef.current) {
+				headers.Authorization = `Bearer ${tokenRef.current}`
+			}
+			const res = await fetch(url, {
+				method: 'POST',
+				credentials: 'include',
+				headers,
+				body: JSON.stringify({ collection, id }),
+				signal,
+			})
+			if (!res.ok) {
+				return null
+			}
+			return (await res.json()) as {
+				peers?: PresencePeerPublic[]
+				self?: PresencePeerPublic
+			}
+		},
+		[collection, id, url]
+	)
 
 	useEffect(() => {
 		if (!collection || !id) {
@@ -94,10 +92,24 @@ export const useDocumentPresence = (
 
 		let disposed = false
 		let interval: ReturnType<typeof setInterval> | undefined
+		const abortController = new AbortController()
 
 		const run = async () => {
 			if (disposed) return
-			await heartbeat()
+			try {
+				const json = await heartbeat(abortController.signal)
+				if (disposed || !json) return
+				if (Array.isArray(json.peers)) {
+					setPeers(json.peers)
+				}
+				if (json.self) {
+					setSelf(json.self)
+				}
+			} catch (err) {
+				if (err instanceof DOMException && err.name === 'AbortError') {
+					return
+				}
+			}
 		}
 
 		void run()
@@ -107,6 +119,7 @@ export const useDocumentPresence = (
 
 		return () => {
 			disposed = true
+			abortController.abort()
 			if (interval !== undefined) {
 				clearInterval(interval)
 			}

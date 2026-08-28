@@ -7,7 +7,7 @@ The stream is authenticated. Everything below is connect-time topic authorizatio
 
 ## Authentication
 
-`GET /api/realtime/stream` requires a logged-in user (`req.user`). Anonymous requests return **401**. Presence `POST` / `DELETE` likewise require auth.
+`GET /api/realtime/stream` requires a logged-in user (`req.user`). Anonymous requests return **401**. Presence `POST` / `DELETE` likewise require auth, and apply the same document-read rules as the `presence:{collection}:{id}` topic (plus the collection must be opted into the plugin).
 
 ## Topics
 

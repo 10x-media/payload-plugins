@@ -1,39 +1,45 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { latestEventSource, MockEventSource, resetMockEventSource } from './mockEventSource'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { createControllableSseFetch } from './controllableSseFetch'
 import { usePayloadList } from './usePayloadList'
 
 afterEach(() => {
 	cleanup()
 	vi.unstubAllGlobals()
-	resetMockEventSource()
-})
-
-beforeEach(() => {
-	resetMockEventSource()
-	vi.stubGlobal('EventSource', MockEventSource)
 })
 
 describe('usePayloadList', () => {
-	it('subscribes to the collection topic', () => {
-		renderHook(() => usePayloadList({ collection: 'posts' }))
-		expect(latestEventSource().url).toBe(
-			`/api/realtime/stream?topics=${encodeURIComponent('posts')}`
-		)
+	it('subscribes to the collection topic', async () => {
+		const sse = createControllableSseFetch()
+		vi.stubGlobal('fetch', sse.fetchMock)
+
+		const { unmount } = renderHook(() => usePayloadList({ collection: 'posts' }))
+
+		await waitFor(() => {
+			expect(sse.fetchMock).toHaveBeenCalledWith(
+				`/api/realtime/stream?topics=${encodeURIComponent('posts')}`,
+				expect.objectContaining({ credentials: 'include' })
+			)
+		})
+		unmount()
 	})
 
 	it('increments generation on create, update, and delete', async () => {
+		const sse = createControllableSseFetch()
+		vi.stubGlobal('fetch', sse.fetchMock)
+
 		const { result } = renderHook(() => usePayloadList({ collection: 'posts' }))
 
 		expect(result.current.generation).toBe(0)
 
-		act(() => {
-			latestEventSource().emitOpen()
+		await waitFor(() => {
+			expect(sse.fetchMock).toHaveBeenCalled()
 		})
 
 		for (const event of ['create', 'update', 'delete'] as const) {
 			act(() => {
-				latestEventSource().emit(
+				sse.emit(
 					event,
 					JSON.stringify({
 						id: event,
@@ -51,11 +57,17 @@ describe('usePayloadList', () => {
 	})
 
 	it('does not increment generation on ready', async () => {
+		const sse = createControllableSseFetch()
+		vi.stubGlobal('fetch', sse.fetchMock)
+
 		const { result } = renderHook(() => usePayloadList({ collection: 'posts' }))
 
+		await waitFor(() => {
+			expect(sse.fetchMock).toHaveBeenCalled()
+		})
+
 		act(() => {
-			latestEventSource().emitOpen()
-			latestEventSource().emit(
+			sse.emit(
 				'ready',
 				JSON.stringify({
 					id: 'r',

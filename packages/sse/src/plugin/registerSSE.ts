@@ -69,10 +69,15 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 			if (!runtime || runtime.presence === false) {
 				return Response.json({ message: 'presence not enabled' }, { status: 503 })
 			}
+			const collections: Record<string, { thinEvents: boolean }> = {}
+			for (const [slug, cfg] of Object.entries(runtime.collections)) {
+				collections[slug] = { thinEvents: cfg.thinEvents }
+			}
 			return makePresenceHandler({
 				store: runtime.presence.store,
 				broker: runtime.broker,
 				identify: runtime.presence.identify,
+				collections,
 			})(req)
 		}
 		endpoints.push(
@@ -85,6 +90,7 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 
 	const prevOnInit = config.onInit
 	config.onInit = async (payload: Payload) => {
+		const ownsBroker = options.broker === undefined
 		const broker = options.broker ?? new InProcessBroker()
 		const emit = createEmit(broker)
 		const presence =
@@ -100,7 +106,9 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 			heartbeatMs: options.heartbeatMs,
 			presence,
 			destroy: async () => {
-				await broker.destroy()
+				if (ownsBroker) {
+					await broker.destroy()
+				}
 			},
 			emit,
 		}

@@ -1,6 +1,7 @@
 import type { PayloadHandler } from 'payload'
 
 import type { EventBroker, RealtimeEvent } from '../broker/types'
+import { authorizeTopics } from '../stream/authorizeTopics'
 import type { PresencePeer, PresenceStore } from './store'
 
 export const PRESENCE_PATH = '/realtime/presence'
@@ -11,6 +12,8 @@ export type PresenceHandlerDeps = {
 	store: PresenceStore
 	broker: EventBroker
 	identify: PresenceIdentify
+	/** Plugin opted-in collections; presence is refused outside this map. */
+	collections: Record<string, { thinEvents: boolean }>
 }
 
 type PresenceBody = {
@@ -65,7 +68,7 @@ const publishSafe = (broker: EventBroker, event: RealtimeEvent): void => {
  * Authenticated POST (join/heartbeat) and DELETE (leave) for document presence leases.
  */
 export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler => {
-	const { store, broker, identify } = deps
+	const { store, broker, identify, collections } = deps
 
 	return async (req) => {
 		if (!req.user) {
@@ -77,9 +80,25 @@ export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler =
 			return Response.json({ message: 'collection and id are required' }, { status: 400 })
 		}
 
+		if (!(target.collection in collections)) {
+			return Response.json(
+				{ message: `collection not enabled for sse: ${target.collection}` },
+				{ status: 403 }
+			)
+		}
+
+		const topic = `presence:${target.collection}:${target.id}`
+		const auth = await authorizeTopics({
+			req,
+			topics: [topic],
+			collections,
+		})
+		if (!auth.ok) {
+			return Response.json({ message: auth.message }, { status: auth.status })
+		}
+
 		const self = identify(req.user)
 		const method = (req.method ?? 'POST').toUpperCase()
-		const topic = `presence:${target.collection}:${target.id}`
 
 		if (method === 'DELETE') {
 			const peers = await store.leave({

@@ -11,7 +11,7 @@ const FLASH_MS = 600
 
 /**
  * List cell that flashes when LiveListSync signals a collection mutation.
- * Does not open an EventSource; one stream lives on LiveListSync per list.
+ * Does not open a stream; one subscription lives on LiveListSync per list.
  */
 export const LiveListBadge = ({
 	cellData,

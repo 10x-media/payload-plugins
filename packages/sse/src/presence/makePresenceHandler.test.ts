@@ -28,42 +28,99 @@ const makeReq = (opts: {
 	body?: unknown
 	url?: string
 	json?: () => Promise<unknown>
+	readAccess?: boolean | (() => unknown)
+	countTotalDocs?: number
+	payloadCollections?: Record<string, { config: { slug: string; access?: { read?: unknown } } }>
 }): PayloadRequest => {
 	const body = opts.body
+	const slug = 'posts'
+	const readAccess = opts.readAccess ?? true
 	return {
 		user: opts.user,
 		method: opts.method ?? 'POST',
 		url: opts.url ?? 'http://localhost/api/realtime/presence',
 		json: opts.json ?? (async () => body),
 		headers: new Headers(body === undefined ? {} : { 'content-type': 'application/json' }),
+		payload: {
+			collections: opts.payloadCollections ?? {
+				[slug]: {
+					config: {
+						slug,
+						access: { read: typeof readAccess === 'function' ? readAccess : readAccess },
+					},
+				},
+			},
+			count: vi.fn(async () => ({ totalDocs: opts.countTotalDocs ?? 0 })),
+		},
 	} as unknown as PayloadRequest
+}
+
+const defaultDeps = (overrides?: Partial<Parameters<typeof makePresenceHandler>[0]>) => {
+	const kv = inMemoryKVAdapter().init({} as never)
+	const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
+	return {
+		store,
+		broker: makeBroker(),
+		identify: () => ({ id: 'u1', label: 'u1' }),
+		collections: { posts: { thinEvents: true } },
+		...overrides,
+	}
 }
 
 describe('makePresenceHandler', () => {
 	it('returns 401 for anonymous POST', async () => {
-		const kv = inMemoryKVAdapter().init({} as never)
-		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
-		const handler = makePresenceHandler({
-			store,
-			broker: makeBroker(),
-			identify: () => ({ id: 'x', label: 'x' }),
-		})
+		const handler = makePresenceHandler(defaultDeps({ identify: () => ({ id: 'x', label: 'x' }) }))
 		const res = await handler(makeReq({ user: undefined, body: { collection: 'posts', id: '1' } }))
 		expect(res.status).toBe(401)
 	})
 
+	it('returns 403 when access.read is false', async () => {
+		const handler = makePresenceHandler(defaultDeps())
+		const res = await handler(
+			makeReq({
+				user: { id: 'u1' },
+				body: { collection: 'posts', id: '1' },
+				readAccess: false,
+			})
+		)
+		expect(res.status).toBe(403)
+	})
+
+	it('returns 403 when Where access does not own the id', async () => {
+		const handler = makePresenceHandler(defaultDeps())
+		const res = await handler(
+			makeReq({
+				user: { id: 'u1' },
+				body: { collection: 'posts', id: 'unowned' },
+				readAccess: () => ({ owner: { equals: 'me' } }),
+				countTotalDocs: 0,
+			})
+		)
+		expect(res.status).toBe(403)
+	})
+
+	it('returns 403 for a collection not opted into the plugin', async () => {
+		const handler = makePresenceHandler(defaultDeps({ collections: {} }))
+		const res = await handler(
+			makeReq({
+				user: { id: 'u1' },
+				body: { collection: 'posts', id: '1' },
+			})
+		)
+		expect(res.status).toBe(403)
+	})
+
 	it('POST joins and returns peers without email', async () => {
-		const kv = inMemoryKVAdapter().init({} as never)
-		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
 		const broker = makeBroker()
-		const handler = makePresenceHandler({
-			store,
-			broker,
-			identify: (user) => ({
-				id: String((user as { id: string }).id),
-				label: String((user as { id: string }).id),
-			}),
-		})
+		const handler = makePresenceHandler(
+			defaultDeps({
+				broker,
+				identify: (user) => ({
+					id: String((user as { id: string }).id),
+					label: String((user as { id: string }).id),
+				}),
+			})
+		)
 
 		const res = await handler(
 			makeReq({
@@ -85,16 +142,14 @@ describe('makePresenceHandler', () => {
 	})
 
 	it('second user POST sees both peers', async () => {
-		const kv = inMemoryKVAdapter().init({} as never)
-		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
-		const handler = makePresenceHandler({
-			store,
-			broker: makeBroker(),
-			identify: (user) => ({
-				id: String((user as { id: string }).id),
-				label: String((user as { name?: string }).name ?? (user as { id: string }).id),
-			}),
-		})
+		const handler = makePresenceHandler(
+			defaultDeps({
+				identify: (user) => ({
+					id: String((user as { id: string }).id),
+					label: String((user as { name?: string }).name ?? (user as { id: string }).id),
+				}),
+			})
+		)
 
 		await handler(
 			makeReq({ user: { id: 'u1', name: 'Alice' }, body: { collection: 'posts', id: '1' } })
@@ -107,17 +162,16 @@ describe('makePresenceHandler', () => {
 	})
 
 	it('DELETE leaves and publishes presence:leave', async () => {
-		const kv = inMemoryKVAdapter().init({} as never)
-		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
 		const broker = makeBroker()
-		const handler = makePresenceHandler({
-			store,
-			broker,
-			identify: (user) => ({
-				id: String((user as { id: string }).id),
-				label: 'x',
-			}),
-		})
+		const handler = makePresenceHandler(
+			defaultDeps({
+				broker,
+				identify: (user) => ({
+					id: String((user as { id: string }).id),
+					label: 'x',
+				}),
+			})
+		)
 
 		await handler(makeReq({ user: { id: 'u1' }, body: { collection: 'posts', id: '1' } }))
 		const res = await handler(
@@ -137,16 +191,14 @@ describe('makePresenceHandler', () => {
 	})
 
 	it('DELETE accepts collection and id from query', async () => {
-		const kv = inMemoryKVAdapter().init({} as never)
-		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
-		const handler = makePresenceHandler({
-			store,
-			broker: makeBroker(),
-			identify: (user) => ({
-				id: String((user as { id: string }).id),
-				label: 'x',
-			}),
-		})
+		const handler = makePresenceHandler(
+			defaultDeps({
+				identify: (user) => ({
+					id: String((user as { id: string }).id),
+					label: 'x',
+				}),
+			})
+		)
 
 		await handler(makeReq({ user: { id: 'u1' }, body: { collection: 'posts', id: '1' } }))
 		const res = await handler(
@@ -162,29 +214,17 @@ describe('makePresenceHandler', () => {
 	})
 
 	it('returns 400 when collection or id is missing', async () => {
-		const kv = inMemoryKVAdapter().init({} as never)
-		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
-		const handler = makePresenceHandler({
-			store,
-			broker: makeBroker(),
-			identify: () => ({ id: 'u1', label: 'u1' }),
-		})
+		const handler = makePresenceHandler(defaultDeps())
 		const res = await handler(makeReq({ user: { id: 'u1' }, body: { collection: 'posts' } }))
 		expect(res.status).toBe(400)
 	})
 
 	it('does not fail the response when broker.publish throws', async () => {
-		const kv = inMemoryKVAdapter().init({} as never)
-		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
 		const broker = makeBroker()
 		broker.publish = () => {
 			throw new Error('boom')
 		}
-		const handler = makePresenceHandler({
-			store,
-			broker,
-			identify: () => ({ id: 'u1', label: 'u1' }),
-		})
+		const handler = makePresenceHandler(defaultDeps({ broker }))
 		const res = await handler(
 			makeReq({ user: { id: 'u1' }, body: { collection: 'posts', id: '1' } })
 		)

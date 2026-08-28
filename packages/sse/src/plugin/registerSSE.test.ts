@@ -1,6 +1,7 @@
 import type { Config, Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 
+import { InProcessBroker } from '../broker/InProcessBroker'
 import type { ResolvedSSEOptions } from '../options'
 import { registerSSE } from './registerSSE'
 
@@ -14,43 +15,49 @@ const resolvedOptions = (broker: ResolvedSSEOptions['broker']): ResolvedSSEOptio
 })
 
 describe('registerSSE', () => {
-	it('wraps payload.destroy to tear down broker before the previous destroy', async () => {
-		const order: string[] = []
+	it('does not destroy a host-supplied broker on payload.destroy', async () => {
 		const broker = {
 			publish: vi.fn(),
 			subscribe: vi.fn(() => () => {}),
-			destroy: vi.fn(async () => {
-				order.push('broker')
-			}),
+			destroy: vi.fn(async () => {}),
 		}
-		const prevDestroy = vi.fn(async () => {
-			order.push('prevDestroy')
-		})
+		const prevDestroy = vi.fn(async () => {})
 		const payload = {
 			destroy: prevDestroy,
 			kv: { get: vi.fn(), set: vi.fn(), delete: vi.fn() },
 		} as unknown as Payload
-		const prevOnInit = vi.fn(async () => {
-			order.push('prevOnInit')
-		})
-		const config = { onInit: prevOnInit } as unknown as Config
+		const config = {} as Config
 
 		registerSSE({ config, options: resolvedOptions(broker) })
-
-		expect(config.onInit).not.toBe(prevOnInit)
 		if (!config.onInit) {
 			throw new Error('expected wrapped onInit')
 		}
 		await config.onInit(payload)
-
-		expect(prevOnInit).toHaveBeenCalledWith(payload)
-		expect(order).toEqual(['prevOnInit'])
-
 		await payload.destroy()
 
-		expect(broker.destroy).toHaveBeenCalledOnce()
+		expect(broker.destroy).not.toHaveBeenCalled()
 		expect(prevDestroy).toHaveBeenCalledOnce()
-		expect(order).toEqual(['prevOnInit', 'broker', 'prevDestroy'])
+	})
+
+	it('destroys an InProcessBroker the plugin created on payload.destroy', async () => {
+		const destroySpy = vi.spyOn(InProcessBroker.prototype, 'destroy').mockResolvedValue(undefined)
+		const prevDestroy = vi.fn(async () => {})
+		const payload = {
+			destroy: prevDestroy,
+			kv: { get: vi.fn(), set: vi.fn(), delete: vi.fn() },
+		} as unknown as Payload
+		const config = {} as Config
+
+		registerSSE({ config, options: resolvedOptions(undefined) })
+		if (!config.onInit) {
+			throw new Error('expected wrapped onInit')
+		}
+		await config.onInit(payload)
+		await payload.destroy()
+
+		expect(destroySpy).toHaveBeenCalledOnce()
+		expect(prevDestroy).toHaveBeenCalledOnce()
+		destroySpy.mockRestore()
 	})
 
 	it('registers presence POST and DELETE only when presence is enabled', () => {

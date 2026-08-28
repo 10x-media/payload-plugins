@@ -1,23 +1,24 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { latestEventSource, MockEventSource, resetMockEventSource } from './mockEventSource'
+import { createControllableSseFetch } from './controllableSseFetch'
 import { useDocumentPresence } from './useDocumentPresence'
 
 afterEach(() => {
 	cleanup()
 	vi.unstubAllGlobals()
 	vi.useRealTimers()
-	resetMockEventSource()
 })
 
-beforeEach(() => {
-	resetMockEventSource()
-	vi.stubGlobal('EventSource', MockEventSource)
-})
+const hangStream = () =>
+	new Response(new ReadableStream<Uint8Array>({ start() {} }), {
+		status: 200,
+		headers: { 'Content-Type': 'text/event-stream' },
+	})
 
 describe('useDocumentPresence', () => {
 	it('POSTs join, returns peers and self, and DELETEs on unmount', async () => {
+		const sse = createControllableSseFetch()
 		const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 			const method = init?.method ?? 'GET'
 			if (method === 'POST') {
@@ -35,7 +36,7 @@ describe('useDocumentPresence', () => {
 			if (method === 'DELETE') {
 				return new Response(JSON.stringify({ peers: [] }), { status: 200 })
 			}
-			throw new Error(`unexpected ${method} ${String(input)}`)
+			return sse.fetchMock(input, init)
 		})
 		vi.stubGlobal('fetch', fetchMock)
 
@@ -58,7 +59,13 @@ describe('useDocumentPresence', () => {
 			})
 		)
 
-		expect(latestEventSource().url).toContain(encodeURIComponent('presence:posts:1'))
+		await waitFor(() => {
+			expect(
+				fetchMock.mock.calls.some(
+					(c) => typeof c[0] === 'string' && c[0].includes(encodeURIComponent('presence:posts:1'))
+				)
+			).toBe(true)
+		})
 
 		unmount()
 
@@ -83,7 +90,10 @@ describe('useDocumentPresence', () => {
 					{ status: 200 }
 				)
 			}
-			return new Response(JSON.stringify({ peers: [] }), { status: 200 })
+			if (method === 'DELETE') {
+				return new Response(JSON.stringify({ peers: [] }), { status: 200 })
+			}
+			return hangStream()
 		})
 		vi.stubGlobal('fetch', fetchMock)
 
@@ -104,14 +114,18 @@ describe('useDocumentPresence', () => {
 	})
 
 	it('updates peers from presence:join event data', async () => {
-		const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+		const sse = createControllableSseFetch()
+		const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 			if ((init?.method ?? 'GET') === 'POST') {
 				return new Response(
 					JSON.stringify({ peers: [{ id: 'u1', label: 'u1' }], self: { id: 'u1', label: 'u1' } }),
 					{ status: 200 }
 				)
 			}
-			return new Response(JSON.stringify({ peers: [] }), { status: 200 })
+			if ((init?.method ?? 'GET') === 'DELETE') {
+				return new Response(JSON.stringify({ peers: [] }), { status: 200 })
+			}
+			return sse.fetchMock(input, init)
 		})
 		vi.stubGlobal('fetch', fetchMock)
 
@@ -121,9 +135,12 @@ describe('useDocumentPresence', () => {
 			expect(result.current.self).toEqual({ id: 'u1', label: 'u1' })
 		})
 
+		await waitFor(() => {
+			expect(sse.fetchMock).toHaveBeenCalled()
+		})
+
 		act(() => {
-			latestEventSource().emitOpen()
-			latestEventSource().emit(
+			sse.emit(
 				'presence:join',
 				JSON.stringify({
 					id: 'e1',
@@ -146,5 +163,45 @@ describe('useDocumentPresence', () => {
 				{ id: 'u2', label: 'Bob' },
 			])
 		})
+	})
+
+	it('aborts in-flight POST on unmount and DELETEs without applying late join', async () => {
+		const methods: string[] = []
+		let postSignal: AbortSignal | undefined
+		const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+			const method = init?.method ?? 'GET'
+			methods.push(method)
+			if (method === 'POST') {
+				postSignal = init?.signal ?? undefined
+				return new Promise<Response>((_resolve, reject) => {
+					init?.signal?.addEventListener('abort', () => {
+						reject(new DOMException('Aborted', 'AbortError'))
+					})
+				})
+			}
+			if (method === 'DELETE') {
+				return new Response(JSON.stringify({ peers: [] }), { status: 200 })
+			}
+			return hangStream()
+		})
+		vi.stubGlobal('fetch', fetchMock)
+
+		const { result, unmount } = renderHook(() => useDocumentPresence('posts', '1'))
+
+		await waitFor(() => {
+			expect(methods).toContain('POST')
+		})
+
+		unmount()
+
+		await waitFor(() => {
+			expect(methods.at(-1)).toBe('DELETE')
+		})
+
+		expect(postSignal?.aborted).toBe(true)
+		expect(result.current.self).toBeNull()
+		expect(result.current.peers).toEqual([])
+		expect(methods.filter((m) => m === 'POST')).toHaveLength(1)
+		expect(methods.filter((m) => m === 'DELETE')).toHaveLength(1)
 	})
 })

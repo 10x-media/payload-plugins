@@ -64,6 +64,15 @@ describe('registerAdmin', () => {
 		expect(beforeControls(config)).toContainEqual({ path: DOCUMENT_PRESENCE_PATH })
 	})
 
+	it('registers nothing when admin is omitted', () => {
+		const config = postsConfig()
+		registerAdmin({ config, options: { ...baseOptions(), admin: undefined } })
+
+		expect(titleCell(config)).toBeUndefined()
+		expect(beforeListTable(config)).toEqual([])
+		expect(beforeControls(config)).toEqual([])
+	})
+
 	it('registers nothing when admin is false', () => {
 		const config = postsConfig()
 		registerAdmin({ config, options: { ...baseOptions(), admin: false } })

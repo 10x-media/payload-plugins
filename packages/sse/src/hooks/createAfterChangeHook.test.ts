@@ -118,6 +118,26 @@ describe('createAfterChangeHook', () => {
 		expect(broker.published).toHaveLength(0)
 	})
 
+	it('skips when req.query.autosave is truthy', async () => {
+		const hook = createAfterChangeHook({ collection: 'posts', events: ['create', 'update'] })
+		const doc = { id: '1' }
+		const req = {
+			payload,
+			context: {},
+			query: { autosave: 'true' },
+		} as unknown as PayloadRequest
+
+		const result = await hook({
+			doc,
+			operation: 'update',
+			req,
+			collection: { slug: 'posts' },
+		} as Parameters<typeof hook>[0])
+
+		expect(result).toBe(doc)
+		expect(broker.published).toHaveLength(0)
+	})
+
 	it('returns doc when publish throws', async () => {
 		broker.publish = () => {
 			throw new Error('boom')

@@ -44,6 +44,7 @@ export const createAfterChangeHook = (deps: AfterChangeHookDeps): CollectionAfte
 		const op: SSEOperation = operation === 'create' ? 'create' : 'update'
 		if (!events.includes(op)) return doc
 		if (req.context?.[SSE_SKIP]) return doc
+		if (req.query?.autosave) return doc
 
 		const runtime = getRuntime(req.payload)
 		if (!runtime) return doc

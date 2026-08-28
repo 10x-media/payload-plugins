@@ -105,10 +105,10 @@ const resolveAdminFlags = (
 	admin: ResolvedSSEOptions['admin'],
 	presenceEnabled: boolean
 ): { liveList: boolean; presence: boolean } => {
-	if (admin === false) {
+	if (admin === false || admin === undefined) {
 		return { liveList: false, presence: false }
 	}
-	const opts = admin === true || admin === undefined ? {} : admin
+	const opts = admin === true ? {} : admin
 	return {
 		liveList: opts.liveList !== false,
 		presence: presenceEnabled && opts.presence !== false,
@@ -117,7 +117,7 @@ const resolveAdminFlags = (
 
 /**
  * Mount LiveListSync (one stream per list), live-list cells, and document
- * presence chips on SSE-enabled collections. No-op when `options.admin === false`.
+ * presence chips on SSE-enabled collections. No-op when `admin` is omitted or false.
  */
 export const registerAdmin = (args: { config: Config; options: ResolvedSSEOptions }): void => {
 	const { config, options } = args
