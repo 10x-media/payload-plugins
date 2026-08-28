@@ -1,7 +1,7 @@
 import { JobStatusCell as JobStatusCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { JobStatusHeader as JobStatusHeader_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { JobTitleCell as JobTitleCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
-import { JobInputField as JobInputField_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { JobInputFieldServer as JobInputFieldServer_58547d93a961407e3e8c8637352c625e } from '@10x-media/jobs/rsc'
 import { RelativeTimeCell as RelativeTimeCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { AttemptsCell as AttemptsCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { JobErrorPanel as JobErrorPanel_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
@@ -15,13 +15,15 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 import { AttemptError as AttemptError_bea2b85bd652a07388ee578cefe40030 } from '../../../components/AttemptError'
 import { SleepInput as SleepInput_134999a48c4a57b1125ce51be66eb9aa } from '../../../components/SleepInput'
 import { SleepOutput as SleepOutput_fa6b4473e75b19832d665c6761f03c42 } from '../../../components/SleepOutput'
+import { ImportAthletesInput as ImportAthletesInput_860428aebf38d73a3f178f08e08892c3 } from '../../../components/ImportAthletesInput'
+import { SleepInputForm as SleepInputForm_e6f281711f36b5b95125d70a08916bab } from '../../../components/SleepInputForm'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
   "@10x-media/jobs/client#JobStatusCell": JobStatusCell_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#JobStatusHeader": JobStatusHeader_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#JobTitleCell": JobTitleCell_6d572934460331fb7409e85e4294174e,
-  "@10x-media/jobs/client#JobInputField": JobInputField_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/rsc#JobInputFieldServer": JobInputFieldServer_58547d93a961407e3e8c8637352c625e,
   "@10x-media/jobs/client#RelativeTimeCell": RelativeTimeCell_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#AttemptsCell": AttemptsCell_6d572934460331fb7409e85e4294174e,
   "@10x-media/jobs/client#JobErrorPanel": JobErrorPanel_6d572934460331fb7409e85e4294174e,
@@ -34,5 +36,7 @@ export const importMap = {
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "/components/AttemptError#AttemptError": AttemptError_bea2b85bd652a07388ee578cefe40030,
   "/components/SleepInput#SleepInput": SleepInput_134999a48c4a57b1125ce51be66eb9aa,
-  "/components/SleepOutput#SleepOutput": SleepOutput_fa6b4473e75b19832d665c6761f03c42
+  "/components/SleepOutput#SleepOutput": SleepOutput_fa6b4473e75b19832d665c6761f03c42,
+  "/components/ImportAthletesInput#ImportAthletesInput": ImportAthletesInput_860428aebf38d73a3f178f08e08892c3,
+  "/components/SleepInputForm#SleepInputForm": SleepInputForm_e6f281711f36b5b95125d70a08916bab
 }

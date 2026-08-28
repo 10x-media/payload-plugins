@@ -46,8 +46,22 @@ export default buildConfig({
 			// Demo of the log-slot seam: `sleep` gets server-rendered input and output,
 			// every task gets the client-rendered error card, and `inline` attempts keep
 			// the default JSON blocks so the contrast is visible in one document.
-			// `sleep` shows a hand-written example winning over the derived `{ ms: 0 }`.
-			input: { examples: { sleep: { ms: 1500 } } },
+			// The create-form matrix, one task per combination:
+			//   importAthletes  derived placeholder + custom editor
+			//   sleep           example placeholder + custom editor
+			//   sendDigest      example placeholder, JSON editor
+			//   runAutomation   derived placeholder, JSON editor (a workflow)
+			//   noop            no schema: JSON editor opens on {}
+			input: {
+				components: {
+					importAthletes: '/components/ImportAthletesInput#ImportAthletesInput',
+					sleep: '/components/SleepInputForm#SleepInputForm',
+				},
+				examples: {
+					sendDigest: { recipients: ['ops@example.com'], subject: 'Weekly digest' },
+					sleep: { ms: 1500 },
+				},
+			},
 			log: {
 				entryComponents: {
 					'*': { error: '/components/AttemptError#AttemptError' },

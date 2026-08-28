@@ -105,6 +105,7 @@ export interface Config {
       sleep: TaskSleep;
       noop: TaskNoop;
       importAthletes: TaskImportAthletes;
+      sendDigest: TaskSendDigest;
       inline: {
         input: unknown;
         output: unknown;
@@ -241,7 +242,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'sleep' | 'noop' | 'importAthletes';
+        taskSlug: 'inline' | 'sleep' | 'noop' | 'importAthletes' | 'sendDigest';
         taskID: string;
         input?:
           | {
@@ -275,7 +276,7 @@ export interface PayloadJob {
       }[]
     | null;
   workflowSlug?: 'runAutomation' | null;
-  taskSlug?: ('inline' | 'sleep' | 'noop' | 'importAthletes') | null;
+  taskSlug?: ('inline' | 'sleep' | 'noop' | 'importAthletes' | 'sendDigest') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -538,6 +539,17 @@ export interface TaskImportAthletes {
           to?: number | null;
         }[]
       | null;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSendDigest".
+ */
+export interface TaskSendDigest {
+  input: {
+    recipients?: string[] | null;
+    subject?: string | null;
   };
   output?: unknown;
 }

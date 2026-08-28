@@ -89,8 +89,22 @@ const importAthletesTask: E2ETask = {
 	handler: ({ job }) => ({ output: { received: job.input } }),
 }
 
-/** Sleep (drain e2e), noop, and the placeholder showcase. Sleep duration comes from `input.ms`. */
-export const e2eTasks: E2ETask[] = [sleepTask, noopTask, importAthletesTask]
+/** Has a schema and a hand-written example, but no custom editor: JSON opens on the example. */
+const sendDigestTask: E2ETask = {
+	slug: 'sendDigest',
+	label: 'Send digest',
+	inputSchema: [
+		{ name: 'recipients', type: 'text', hasMany: true },
+		{ name: 'subject', type: 'text' },
+	],
+	handler: ({ job }) => ({ output: { received: job.input } }),
+}
+
+/**
+ * Sleep (drain e2e), noop, and two placeholder showcases. Sleep duration comes
+ * from `input.ms`.
+ */
+export const e2eTasks: E2ETask[] = [sleepTask, noopTask, importAthletesTask, sendDigestTask]
 
 /**
  * Matches the seeded `workflowSlug: 'runAutomation'` jobs (see dev/helpers/seed.ts) so the

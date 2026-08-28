@@ -13,6 +13,7 @@ import { collectLogDependencies } from '../jobs/logSlotComponents'
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { collectInputDependencies } from './inputComponents'
 import { collectInputPlaceholders } from './inputPlaceholders'
 import { collectJobLabels, type JobLabelMaps } from './labelMaps'
 import { resolve } from './resolve'
@@ -35,7 +36,7 @@ const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
 const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
 const QUEUE_SELECT_FIELD = '@10x-media/jobs/client#QueueSelectField'
 const ATTEMPTS_CELL = '@10x-media/jobs/client#AttemptsCell'
-const INPUT_FIELD = '@10x-media/jobs/client#JobInputField'
+const INPUT_FIELD = '@10x-media/jobs/rsc#JobInputFieldServer'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
@@ -257,10 +258,11 @@ export const registerJobsEnhancements = (
 	// The log renderers are named in plugin options, not in a component slot the
 	// import-map generator walks, so they only reach the import map through here.
 	const logDependencies = collectLogDependencies(options.log?.entryComponents)
+	const inputDependencies = collectInputDependencies(options.input?.components)
 	if (Object.keys(logDependencies).length > 0) {
 		config.admin = {
 			...config.admin,
-			dependencies: { ...config.admin?.dependencies, ...logDependencies },
+			dependencies: { ...config.admin?.dependencies, ...logDependencies, ...inputDependencies },
 		}
 	}
 
@@ -295,7 +297,11 @@ export const registerJobsEnhancements = (
 		const placeholders = collectInputPlaceholders(config, options.input?.examples)
 		const fieldComponents: Record<string, PayloadComponent> = {
 			...FIELD_COMPONENTS,
-			input: { clientProps: { placeholders }, path: INPUT_FIELD },
+			input: {
+				clientProps: { placeholders },
+				path: INPUT_FIELD,
+				serverProps: { components: options.input?.components },
+			},
 			log: {
 				clientProps: { taskLabels: labels.taskLabels },
 				path: LOG_TIMELINE,

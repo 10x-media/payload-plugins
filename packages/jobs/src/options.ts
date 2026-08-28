@@ -1,6 +1,7 @@
 import type { CollectionConfig, Field, PayloadComponent } from 'payload'
 
 import type { JobLogEntryComponents } from './jobs/logSlotComponents'
+import type { JobInputComponents } from './plugin/inputComponents'
 import type { JobInputExamples } from './plugin/inputPlaceholders'
 import type { Override } from './plugin/resolve'
 import type { QueueControlOptions } from './queueControl/options'
@@ -50,11 +51,15 @@ export type JobsOptions = {
 	 */
 	log?: { entryComponents?: JobLogEntryComponents }
 	/**
-	 * Create-form placeholder for `input`. Derived from each task's and workflow's
-	 * `inputSchema` by default; `examples` replaces the derived object for a slug
-	 * with one written by hand, for values the derivation cannot invent.
+	 * The job's `input` on the create form. `examples` replaces the placeholder
+	 * derived from a slug's `inputSchema` with one written by hand, for values the
+	 * derivation cannot invent. `components` swaps the JSON editor for a custom
+	 * one per task or workflow slug (`'*'` for every slug, `false` to keep JSON);
+	 * the placeholder still applies, and the editor reads and writes the field
+	 * through `useField`. Paths are registered with `admin.dependencies`, so
+	 * adopters re-run `payload generate:importmap` after changing them.
 	 */
-	input?: { examples?: JobInputExamples }
+	input?: { components?: JobInputComponents; examples?: JobInputExamples }
 	/**
 	 * Components rendered between the search bar and the table. `false` removes our
 	 * queue-health bar; an array replaces it.
