@@ -65,7 +65,8 @@ const assignedTenantIds = (
 
 /**
  * Scope resolvers for `@payloadcms/plugin-multi-tenant`.
- * Reads the `payload-tenant` cookie, then the user's assigned tenants.
+ * Cookie is a selector among assigned tenants (or any tenant when the
+ * wildcard callback is true). Unassigned cookie values are refused.
  * Soft: uses `parseCookies` from `payload/shared`, no plugin import.
  */
 export const multiTenantScope = (options: MultiTenantScopeOptions = {}): SSEScopeOptions => {
@@ -77,14 +78,19 @@ export const multiTenantScope = (options: MultiTenantScopeOptions = {}): SSEScop
 
 	return {
 		resolveRequest: ({ req }) => {
+			const assigned = assignedTenantIds(req.user, userTenantsField, userTenantsRowField)
 			const fromCookie = cookieTenant(req, tenantsSlug)
-			if (fromCookie) return fromCookie
+			if (fromCookie) {
+				if (assigned.includes(fromCookie) || userHasAccessToAllTenants?.(req.user)) {
+					return fromCookie
+				}
+				return null
+			}
 
 			if (userHasAccessToAllTenants?.(req.user)) {
 				return SCOPE_WILDCARD
 			}
 
-			const assigned = assignedTenantIds(req.user, userTenantsField, userTenantsRowField)
 			if (assigned.length === 1) return assigned[0] ?? null
 			if (assigned.length > 1) return assigned
 			return null

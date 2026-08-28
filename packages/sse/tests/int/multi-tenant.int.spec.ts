@@ -96,4 +96,14 @@ describeForDb('sse multiTenantScope adapter', { dbs: ['mongo'] }, (db) => {
 		ac.abort()
 		await reader.cancel().catch(() => {})
 	})
+
+	it('refuses the stream when the payload-tenant cookie is a tenant the user is not assigned to', async () => {
+		const res = await openStream({
+			booted,
+			token,
+			topics: 'posts',
+			headers: { Cookie: `payload-tenant=${tenantB}` },
+		})
+		expect(res.status).toBe(403)
+	})
 })

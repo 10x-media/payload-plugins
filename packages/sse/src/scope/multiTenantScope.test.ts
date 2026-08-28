@@ -21,14 +21,29 @@ const req = (opts: {
 	}) as unknown as PayloadRequest
 
 describe('multiTenantScope.resolveRequest', () => {
-	it('returns the payload-tenant cookie as a string', async () => {
+	it('returns the payload-tenant cookie when it matches an assigned tenant', async () => {
 		const { resolveRequest } = multiTenantScope()
-		expect(await resolveRequest({ req: req({ cookie: 'tenant-a' }) })).toBe('tenant-a')
+		expect(
+			await resolveRequest({
+				req: req({
+					cookie: 'tenant-a',
+					user: { id: 'u1', tenants: [{ tenant: 'tenant-a' }] },
+				}),
+			})
+		).toBe('tenant-a')
 	})
 
 	it('coerces a numeric cookie when the tenants collection uses number ids', async () => {
 		const { resolveRequest } = multiTenantScope()
-		expect(await resolveRequest({ req: req({ cookie: '42', idType: 'number' }) })).toBe('42')
+		expect(
+			await resolveRequest({
+				req: req({
+					cookie: '42',
+					idType: 'number',
+					user: { id: 'u1', tenants: [{ tenant: 42 }] },
+				}),
+			})
+		).toBe('42')
 	})
 
 	it('falls back to a single assigned tenant when the cookie is missing', async () => {
@@ -65,7 +80,21 @@ describe('multiTenantScope.resolveRequest', () => {
 		).toBe(SCOPE_WILDCARD)
 	})
 
-	it('prefers the cookie over assigned tenants and the wildcard', async () => {
+	it('returns the cookie as a selector when it is among assigned tenants, even if the user has the wildcard', async () => {
+		const { resolveRequest } = multiTenantScope({
+			userHasAccessToAllTenants: () => true,
+		})
+		expect(
+			await resolveRequest({
+				req: req({
+					cookie: 't1',
+					user: { id: 'root', tenants: [{ tenant: 't1' }] },
+				}),
+			})
+		).toBe('t1')
+	})
+
+	it('returns the cookie for a wildcard user even when it is not assigned', async () => {
 		const { resolveRequest } = multiTenantScope({
 			userHasAccessToAllTenants: () => true,
 		})
@@ -77,6 +106,18 @@ describe('multiTenantScope.resolveRequest', () => {
 				}),
 			})
 		).toBe('picked')
+	})
+
+	it('returns null when the cookie tenant is not assigned and the user has no wildcard', async () => {
+		const { resolveRequest } = multiTenantScope()
+		expect(
+			await resolveRequest({
+				req: req({
+					cookie: 'picked',
+					user: { id: 'u1', tenants: [{ tenant: 't1' }] },
+				}),
+			})
+		).toBeNull()
 	})
 
 	it('returns null when there is no cookie, no assigned tenants, and no wildcard', async () => {
