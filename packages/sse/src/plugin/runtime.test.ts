@@ -2,7 +2,7 @@ import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import type { EventBroker, RealtimeEvent } from '../broker/types'
-import { getRuntime, getSSE, type SSERuntime, setRuntime } from './runtime'
+import { createEmit, getRuntime, getSSE, type SSERuntime, setRuntime } from './runtime'
 
 const makeBroker = (): EventBroker & { published: RealtimeEvent[] } => {
 	const published: RealtimeEvent[] = []
@@ -21,13 +21,7 @@ const makeRuntime = (broker: EventBroker): SSERuntime => ({
 	collections: {},
 	heartbeatMs: 15_000,
 	destroy: async () => {},
-	emit: (event) => {
-		try {
-			broker.publish(event)
-		} catch {
-			// never throw
-		}
-	},
+	emit: createEmit(broker),
 })
 
 describe('SSE runtime', () => {
