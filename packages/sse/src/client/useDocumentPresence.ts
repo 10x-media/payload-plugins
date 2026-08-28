@@ -133,6 +133,7 @@ export const useDocumentPresence = (
 			void fetch(url, {
 				method: 'DELETE',
 				credentials: 'include',
+				keepalive: true,
 				headers,
 				body: JSON.stringify({ collection, id }),
 			}).catch(() => {})

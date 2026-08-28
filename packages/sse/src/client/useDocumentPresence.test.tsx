@@ -74,6 +74,7 @@ describe('useDocumentPresence', () => {
 				'/api/realtime/presence',
 				expect.objectContaining({
 					method: 'DELETE',
+					keepalive: true,
 					body: JSON.stringify({ collection: 'posts', id: '1' }),
 				})
 			)
