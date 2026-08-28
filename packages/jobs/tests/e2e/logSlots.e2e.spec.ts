@@ -9,10 +9,15 @@ import { findJobID, login } from './helpers'
 const attempt = (page: Page, n: number): Locator =>
 	page.locator('button[aria-expanded]').filter({ has: page.locator(`span:text-is("#${n}")`) })
 
-/** The collapsible panel of one attempt row: the button's next sibling. */
+/**
+ * The collapsible panel of one attempt row: the button's next sibling. The
+ * counter renders as `#{index + 1}`, which React server-renders as two text
+ * nodes around a separator comment, so the predicate matches on the span's whole
+ * string value rather than on `text()`, which would see only the leading `#`.
+ */
 const panel = (page: Page, n: number): Locator =>
 	page.locator(
-		`xpath=//button[@aria-expanded][.//span[normalize-space(text())="#${n}"]]/following-sibling::div`
+		`xpath=//button[@aria-expanded][.//span[normalize-space(.)="#${n}"]]/following-sibling::div`
 	)
 
 const expand = async (page: Page, n: number): Promise<Locator> => {
