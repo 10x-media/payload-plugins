@@ -37,12 +37,36 @@ describe('resolveSSEOptions', () => {
 		expect(resolved.broker).toBe(broker)
 	})
 
-	it('stores presence and admin without using them', () => {
+	it('leaves presence off when omitted or false', () => {
+		expect(resolveSSEOptions({}).presence).toBe(false)
+		expect(resolveSSEOptions({ presence: false }).presence).toBe(false)
+	})
+
+	it('resolves presence true to defaults without email identify', () => {
+		const resolved = resolveSSEOptions({ presence: true })
+		expect(resolved.presence).not.toBe(false)
+		if (resolved.presence === false) {
+			throw new Error('expected presence enabled')
+		}
+		expect(resolved.presence.heartbeatMs).toBe(10_000)
+		expect(resolved.presence.leaseMs).toBe(30_000)
+		expect(resolved.presence.identify({ id: 7, email: 'a@t.dev' })).toEqual({
+			id: '7',
+			label: '7',
+		})
+	})
+
+	it('fills missing presence object fields and preserves admin', () => {
+		const identify = () => ({ id: 'x', label: 'X' })
 		const resolved = resolveSSEOptions({
-			presence: true,
+			presence: { heartbeatMs: 5_000, identify },
 			admin: { liveList: true },
 		})
-		expect(resolved.presence).toBe(true)
+		expect(resolved.presence).toEqual({
+			heartbeatMs: 5_000,
+			leaseMs: 30_000,
+			identify,
+		})
 		expect(resolved.admin).toEqual({ liveList: true })
 	})
 })

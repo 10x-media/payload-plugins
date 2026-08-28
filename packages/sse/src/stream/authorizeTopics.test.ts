@@ -148,10 +148,84 @@ describe('authorizeTopics', () => {
 		})
 		const collections = { posts: { thinEvents: true } }
 
-		for (const topic of ['posts:a:b', ':id', '', 'posts:']) {
+		for (const topic of ['posts:a:b', ':id', '', 'posts:', 'presence:posts', 'foo:posts:1']) {
 			const result = await authorizeTopics({ req, topics: [topic], collections })
 			expect(result, topic).toEqual({ ok: false, status: 403, message: expect.any(String) })
 		}
+	})
+
+	it('authorizes presence:{collection}:{id} as thin with the same read rules', async () => {
+		const result = await authorizeTopics({
+			req: makeReq({
+				collections: {
+					posts: { config: { slug: 'posts', access: { read: () => true } } },
+				},
+			}),
+			topics: ['presence:posts:abc'],
+			collections: { posts: { thinEvents: false } },
+		})
+		expect(result).toEqual({
+			ok: true,
+			topics: [
+				{
+					topic: 'presence:posts:abc',
+					collection: 'posts',
+					docId: 'abc',
+					mode: 'thin',
+				},
+			],
+		})
+	})
+
+	it('refuses presence topics when access.read is false', async () => {
+		const result = await authorizeTopics({
+			req: makeReq({
+				collections: {
+					posts: { config: { slug: 'posts', access: { read: () => false } } },
+				},
+			}),
+			topics: ['presence:posts:abc'],
+			collections: {},
+		})
+		expect(result).toEqual({ ok: false, status: 403, message: expect.any(String) })
+	})
+
+	it('applies Where access to presence:{collection}:{id}', async () => {
+		const where = { owner: { equals: 'me' } }
+		const count = vi.fn(async (args: { where?: unknown }) => {
+			const whereJson = JSON.stringify(args.where)
+			return { totalDocs: whereJson.includes('"abc"') ? 1 : 0 }
+		})
+		const req = makeReq({
+			collections: {
+				posts: { config: { slug: 'posts', access: { read: () => where } } },
+			},
+			count,
+		})
+
+		const owned = await authorizeTopics({
+			req,
+			topics: ['presence:posts:abc'],
+			collections: {},
+		})
+		expect(owned).toEqual({
+			ok: true,
+			topics: [
+				{
+					topic: 'presence:posts:abc',
+					collection: 'posts',
+					docId: 'abc',
+					mode: 'thin',
+				},
+			],
+		})
+
+		const unowned = await authorizeTopics({
+			req,
+			topics: ['presence:posts:other'],
+			collections: {},
+		})
+		expect(unowned).toEqual({ ok: false, status: 403, message: expect.any(String) })
 	})
 
 	it('sets mode to enriched when thinEvents is false', async () => {

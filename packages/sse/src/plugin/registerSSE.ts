@@ -4,6 +4,8 @@ import { InProcessBroker } from '../broker/InProcessBroker'
 import { createAfterChangeHook } from '../hooks/createAfterChangeHook'
 import { createAfterDeleteHook } from '../hooks/createAfterDeleteHook'
 import type { ResolvedSSEOptions } from '../options'
+import { makePresenceHandler, PRESENCE_PATH } from '../presence/makePresenceHandler'
+import { createPresenceStore } from '../presence/store'
 import { makeStreamHandler, STREAM_PATH } from '../stream/makeStreamHandler'
 import { createEmit, getRuntime, type SSERuntime, setRuntime } from './runtime'
 
@@ -56,16 +58,44 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 		},
 	}
 
-	config.endpoints = [...(config.endpoints ?? []), streamEndpoint]
+	const endpoints: Endpoint[] = [...(config.endpoints ?? []), streamEndpoint]
+
+	if (options.presence !== false) {
+		const presenceHandler: Endpoint['handler'] = (req) => {
+			const runtime = getRuntime(req.payload)
+			if (!runtime || runtime.presence === false) {
+				return Response.json({ message: 'presence not enabled' }, { status: 503 })
+			}
+			return makePresenceHandler({
+				store: runtime.presence.store,
+				broker: runtime.broker,
+				identify: runtime.presence.identify,
+			})(req)
+		}
+		endpoints.push(
+			{ method: 'post', path: PRESENCE_PATH, handler: presenceHandler },
+			{ method: 'delete', path: PRESENCE_PATH, handler: presenceHandler }
+		)
+	}
+
+	config.endpoints = endpoints
 
 	const prevOnInit = config.onInit
 	config.onInit = async (payload: Payload) => {
 		const broker = options.broker ?? new InProcessBroker()
 		const emit = createEmit(broker)
+		const presence =
+			options.presence === false
+				? false
+				: {
+						...options.presence,
+						store: createPresenceStore(payload.kv, { leaseMs: options.presence.leaseMs }),
+					}
 		const runtime: SSERuntime = {
 			broker,
 			collections: options.collections,
 			heartbeatMs: options.heartbeatMs,
+			presence,
 			destroy: async () => {
 				await broker.destroy()
 			},

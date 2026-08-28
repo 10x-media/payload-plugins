@@ -2,6 +2,7 @@ export type { EventBroker, RealtimeEvent, ThinRealtimeEvent } from '../broker/ty
 export type {
 	CollectionSSEConfig,
 	PresenceOptions,
+	ResolvedPresenceOptions,
 	SSEOperation,
 	SSEPluginOptions,
 	SSEPluginOptions as PluginOptions,

@@ -58,6 +58,11 @@ export const usePayloadSubscription = (
 
 	useEffect(() => {
 		void topicsKey
+		if (topicsRef.current.length === 0) {
+			setStatus('closed')
+			return
+		}
+
 		let disposed = false
 		let retryMs = DEFAULT_RETRY_MS
 		let reconnectTimer: ReturnType<typeof setTimeout> | undefined

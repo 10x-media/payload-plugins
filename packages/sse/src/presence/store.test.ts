@@ -1,0 +1,75 @@
+import { inMemoryKVAdapter } from 'payload'
+import { describe, expect, it, vi } from 'vitest'
+
+import { createPresenceStore } from './store'
+
+const makeKv = () => inMemoryKVAdapter().init({} as never)
+
+describe('createPresenceStore', () => {
+	it('join then get lists the peer', async () => {
+		const kv = makeKv()
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
+		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
+			{ id: 'u1', label: 'Alice', expiresAt: 31_000 },
+		])
+	})
+
+	it('join upserts a second user alongside the first', async () => {
+		const kv = makeKv()
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u2', label: 'Bob' } })
+		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
+			{ id: 'u1', label: 'Alice', expiresAt: 31_000 },
+			{ id: 'u2', label: 'Bob', expiresAt: 31_000 },
+		])
+	})
+
+	it('heartbeat refreshes expiresAt for an existing peer', async () => {
+		const kv = makeKv()
+		let now = 1_000
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => now })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
+		now = 10_000
+		await store.heartbeat({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
+		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
+			{ id: 'u1', label: 'Alice', expiresAt: 40_000 },
+		])
+	})
+
+	it('get prunes expired peers and deletes the key when empty', async () => {
+		const kv = makeKv()
+		let now = 1_000
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => now })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
+		now = 31_000
+		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([])
+		expect(await kv.get('sse:presence:posts:1')).toBeNull()
+	})
+
+	it('leave removes a peer and deletes the key when empty', async () => {
+		const kv = makeKv()
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u2', label: 'Bob' } })
+		await store.leave({ collection: 'posts', id: '1', peerId: 'u1' })
+		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
+			{ id: 'u2', label: 'Bob', expiresAt: 31_000 },
+		])
+		await store.leave({ collection: 'posts', id: '1', peerId: 'u2' })
+		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([])
+		expect(await kv.get('sse:presence:posts:1')).toBeNull()
+	})
+
+	it('never calls kv.keys', async () => {
+		const kv = makeKv()
+		const keys = vi.spyOn(kv, 'keys')
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'A' } })
+		await store.heartbeat({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'A' } })
+		await store.get({ collection: 'posts', id: '1' })
+		await store.leave({ collection: 'posts', id: '1', peerId: 'u1' })
+		expect(keys).not.toHaveBeenCalled()
+	})
+})

@@ -1,5 +1,12 @@
 'use client'
 
+export { DocumentPresence } from '../admin/DocumentPresence'
+export {
+	type PresencePeerPublic,
+	type UseDocumentPresenceOptions,
+	type UseDocumentPresenceResult,
+	useDocumentPresence,
+} from '../client/useDocumentPresence'
 export {
 	type UsePayloadDocumentOptions,
 	usePayloadDocument,

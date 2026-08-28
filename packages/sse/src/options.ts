@@ -9,10 +9,18 @@ export type CollectionSSEConfig = {
 	thinEvents?: boolean
 }
 
+export type PresenceIdentify = (user: unknown) => { id: string; label: string }
+
 export type PresenceOptions = {
 	heartbeatMs?: number
 	leaseMs?: number
-	identify?: (user: unknown) => { id: string; label: string }
+	identify?: PresenceIdentify
+}
+
+export type ResolvedPresenceOptions = {
+	heartbeatMs: number
+	leaseMs: number
+	identify: PresenceIdentify
 }
 
 export type SSEPluginOptions = {
@@ -33,7 +41,8 @@ export type ResolvedCollectionSSEConfig = {
 
 export type ResolvedSSEOptions = {
 	collections: Record<string, ResolvedCollectionSSEConfig>
-	presence: boolean | PresenceOptions | undefined
+	/** Resolved presence config when enabled; `false` when omit/false. */
+	presence: ResolvedPresenceOptions | false
 	admin: boolean | { liveList?: boolean; presence?: boolean } | undefined
 	heartbeatMs: number
 	broker: EventBroker | undefined
@@ -41,6 +50,25 @@ export type ResolvedSSEOptions = {
 }
 
 const DEFAULT_EVENTS: SSEOperation[] = ['create', 'update', 'delete']
+
+const defaultIdentify: PresenceIdentify = (user) => {
+	const id = String((user as { id: unknown }).id)
+	return { id, label: id }
+}
+
+const resolvePresence = (
+	presence: boolean | PresenceOptions | undefined
+): ResolvedPresenceOptions | false => {
+	if (presence === undefined || presence === false) {
+		return false
+	}
+	const opts = presence === true ? {} : presence
+	return {
+		heartbeatMs: opts.heartbeatMs ?? 10_000,
+		leaseMs: opts.leaseMs ?? 30_000,
+		identify: opts.identify ?? defaultIdentify,
+	}
+}
 
 const resolveCollection = (cfg: true | CollectionSSEConfig): ResolvedCollectionSSEConfig => {
 	if (cfg === true) {
@@ -59,7 +87,7 @@ export const resolveSSEOptions = (options: SSEPluginOptions): ResolvedSSEOptions
 	}
 	return {
 		collections,
-		presence: options.presence,
+		presence: resolvePresence(options.presence),
 		admin: options.admin,
 		heartbeatMs: options.heartbeatMs ?? 15_000,
 		broker: options.broker,

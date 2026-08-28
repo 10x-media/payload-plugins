@@ -32,9 +32,11 @@ export { SSE_SKIP } from './hooks/createAfterChangeHook'
 export type {
 	CollectionSSEConfig,
 	PresenceOptions,
+	ResolvedPresenceOptions,
 	SSEPluginOptions,
 	SSEPluginOptions as PluginOptions,
 	SSEPluginOptions as SsePluginOptions,
 } from './options'
 export { getRuntime, getSSE } from './plugin/runtime'
+export { PRESENCE_PATH } from './presence/makePresenceHandler'
 export { STREAM_PATH } from './stream/makeStreamHandler'

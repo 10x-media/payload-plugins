@@ -21,7 +21,7 @@ const MAX_TOPICS = 32
 
 const parseTopic = (
 	raw: string
-): { ok: true; collection: string; docId?: string } | { ok: false } => {
+): { ok: true; collection: string; docId?: string; presence?: true } | { ok: false } => {
 	if (!raw) return { ok: false }
 	const segments = raw.split(':')
 	if (segments.length === 1) {
@@ -33,6 +33,12 @@ const parseTopic = (
 		const [collection, docId] = segments
 		if (!collection || !docId) return { ok: false }
 		return { ok: true, collection, docId }
+	}
+	if (segments.length === 3 && segments[0] === 'presence') {
+		const collection = segments[1]
+		const docId = segments[2]
+		if (!collection || !docId) return { ok: false }
+		return { ok: true, collection, docId, presence: true }
 	}
 	return { ok: false }
 }
@@ -63,7 +69,7 @@ export const authorizeTopics = async (
 			return { ok: false, status: 403, message: `invalid topic: ${topic}` }
 		}
 
-		const { collection: slug, docId } = parsed
+		const { collection: slug, docId, presence } = parsed
 		const collection = req.payload.collections[slug]
 		if (!collection) {
 			return { ok: false, status: 403, message: `unknown collection: ${slug}` }
@@ -77,8 +83,11 @@ export const authorizeTopics = async (
 			return { ok: false, status: 403, message: `forbidden topic: ${topic}` }
 		}
 
-		const mode: AuthorizedTopic['mode'] =
-			collections[slug]?.thinEvents === false ? 'enriched' : 'thin'
+		const mode: AuthorizedTopic['mode'] = presence
+			? 'thin'
+			: collections[slug]?.thinEvents === false
+				? 'enriched'
+				: 'thin'
 
 		if (accessResult === true) {
 			authorized.push(

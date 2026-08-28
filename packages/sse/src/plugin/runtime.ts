@@ -1,11 +1,18 @@
 import type { Payload } from 'payload'
 
 import type { EventBroker, RealtimeEvent, SSEOperation } from '../broker/types'
+import type { ResolvedPresenceOptions } from '../options'
+import type { PresenceStore } from '../presence/store'
+
+export type SSEPresenceRuntime = ResolvedPresenceOptions & {
+	store: PresenceStore
+}
 
 export type SSERuntime = {
 	broker: EventBroker
 	collections: Record<string, { thinEvents: boolean; events: SSEOperation[] }>
 	heartbeatMs: number
+	presence: SSEPresenceRuntime | false
 	destroy: () => Promise<void>
 	emit: (event: RealtimeEvent) => void
 }
