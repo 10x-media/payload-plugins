@@ -172,7 +172,7 @@ describeForDb('sse scope: Where-wide gate and cross-tenant refuse', { dbs: ['mon
 		expect(presence.status).toBe(403)
 	})
 
-	it('lets a same-scope delete through the wide topic', async () => {
+	it('lets a same-scope delete through the wide topic without the document id', async () => {
 		const ac = new AbortController()
 		const res = await openStream({
 			booted,
@@ -193,7 +193,8 @@ describeForDb('sse scope: Where-wide gate and cross-tenant refuse', { dbs: ['mon
 		})
 
 		const body = await readUntil(reader, (buf) => buf.includes('"operation":"delete"'))
-		expect(body).toContain(`"docId":"${String(ownedT1.id)}"`)
+		expect(body).toContain('"event":"delete"')
+		expect(body).not.toContain(`"docId":"${String(ownedT1.id)}"`)
 		ac.abort()
 		await reader.cancel().catch(() => {})
 	})

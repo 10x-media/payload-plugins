@@ -50,7 +50,10 @@ const prepareFrame = async (args: {
 	const publicEvent: RealtimeEvent = { ...event, topic: topic.topic }
 
 	if (topic.gate === 'per-event') {
-		if (isDelete(event)) return publicEvent
+		if (isDelete(event)) {
+			const { docId: _docId, data: _data, ...rest } = publicEvent
+			return rest
+		}
 		if (!event.docId || !event.collection) return publicEvent
 		if (topic.mode === 'enriched') {
 			return enrichForUser({

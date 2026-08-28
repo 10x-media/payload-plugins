@@ -413,7 +413,7 @@ describe('makeStreamHandler', () => {
 		await reader.cancel().catch(() => {})
 	})
 
-	it('drops gated thin events the subscriber cannot read and lets deletes through', async () => {
+	it('drops gated thin events the subscriber cannot read and delivers deletes without docId', async () => {
 		const listeners = new Map<string, (event: RealtimeEvent) => void>()
 		const broker: EventBroker = {
 			publish: vi.fn(),
@@ -486,7 +486,7 @@ describe('makeStreamHandler', () => {
 
 		await readUntil((s) => s.includes('"operation":"delete"'))
 		expect(buf).toContain('"docId":"owned"')
-		expect(buf).toContain('"docId":"gone"')
+		expect(buf).not.toContain('"docId":"gone"')
 		expect(buf).not.toContain('"docId":"other"')
 		ac.abort()
 		await reader.cancel().catch(() => {})
