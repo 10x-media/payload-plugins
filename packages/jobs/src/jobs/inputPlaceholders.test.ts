@@ -74,6 +74,7 @@ describe('derivePlaceholder', () => {
 			{ name: 'target', type: 'relationship', relationTo: ['pages', 'posts'] },
 			{ name: 'targets', type: 'relationship', relationTo: ['pages', 'posts'], hasMany: true },
 			{ name: 'cover', type: 'upload', relationTo: 'media' },
+			{ name: 'files', type: 'upload', relationTo: ['media', 'docs'], hasMany: true },
 		]
 		expect(derivePlaceholder(fields)).toEqual({
 			tenant: '<tenants id>',
@@ -81,6 +82,7 @@ describe('derivePlaceholder', () => {
 			target: { relationTo: 'pages', value: '<pages id>' },
 			targets: [{ relationTo: 'pages', value: '<pages id>' }],
 			cover: '<media id>',
+			files: [{ relationTo: 'media', value: '<media id>' }],
 		})
 	})
 
@@ -111,12 +113,19 @@ describe('derivePlaceholder', () => {
 				],
 			},
 			{ name: 'none', type: 'blocks', blocks: [] },
+			{
+				name: 'refs',
+				type: 'blocks',
+				blocks: [],
+				blockReferences: ['shared', { slug: 'local', fields: [{ name: 'on', type: 'checkbox' }] }],
+			},
 		]
 		expect(derivePlaceholder(fields)).toEqual({
 			collections: { events: false, persons: false },
 			ranges: [{ from: 0, to: 0 }],
 			steps: [{ blockType: 'wait', ms: 0 }],
 			none: [],
+			refs: [{ blockType: 'local', on: false }],
 		})
 	})
 
@@ -133,6 +142,7 @@ describe('derivePlaceholder', () => {
 				],
 			},
 			{ type: 'ui', name: 'preview', admin: { components: {} } },
+			{ name: 'children', type: 'join', collection: 'pages', on: 'parent' },
 		]
 		expect(derivePlaceholder(fields)).toEqual({
 			a: '',

@@ -1,25 +1,21 @@
 import type { AdminComponent, AdminDependencies, PayloadComponent } from 'payload'
+import { parsePayloadComponent } from 'payload/shared'
 
 /**
  * Flatten a `PayloadComponent` to the string path `admin.dependencies` accepts.
- * Payload parses that path back into `path#exportName`, which is exactly the key
- * `getFromImportMap` looks up at render time, so an explicit `exportName` has to
- * be folded in here or the two would disagree.
+ * The generator parses that path back into `path#exportName`, which is the key
+ * `getFromImportMap` looks up at render time, so both sides go through Payload's
+ * own parser and cannot disagree.
  */
 const toAdminComponent = (component: PayloadComponent): AdminComponent | undefined => {
-	if (component === false) {
+	const parsed = parsePayloadComponent(component)
+	if (!parsed) {
 		return undefined
 	}
-	if (typeof component === 'string') {
-		return { path: component, type: 'component' }
-	}
-	const { clientProps, exportName, path, serverProps } = component
-	if (typeof path !== 'string') {
-		return undefined
-	}
+	const { clientProps, serverProps } = typeof component === 'object' ? component : {}
 	return {
 		...(clientProps ? { clientProps } : {}),
-		path: exportName ? `${path}#${exportName}` : path,
+		path: `${parsed.path}#${parsed.exportName}`,
 		...(serverProps ? { serverProps } : {}),
 		type: 'component',
 	}
@@ -33,7 +29,7 @@ const toAdminComponent = (component: PayloadComponent): AdminComponent | undefin
  */
 export const collectComponentDependencies = (
 	prefix: string,
-	entries: [string, false | PayloadComponent | undefined][]
+	entries: [string, PayloadComponent | undefined][]
 ): AdminDependencies =>
 	Object.fromEntries(
 		entries.flatMap(([name, component]) => {

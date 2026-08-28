@@ -55,6 +55,14 @@ describe('collectInputDependencies', () => {
 		})
 	})
 
+	it('lets an explicit exportName win over one in the path, as Payload does at render time', () => {
+		expect(
+			collectInputDependencies({ sleep: { exportName: 'Form', path: '/components/Sleep#Old' } })
+		).toEqual({
+			'@10x-media/jobs:input:sleep': { path: '/components/Sleep#Form', type: 'component' },
+		})
+	})
+
 	it('is empty without components', () => {
 		expect(collectInputDependencies(undefined)).toEqual({})
 	})
@@ -62,6 +70,7 @@ describe('collectInputDependencies', () => {
 
 describe('renderedKey', () => {
 	it('keeps a task and a workflow sharing a slug apart', () => {
-		expect(renderedKey('task', 'sync')).not.toBe(renderedKey('workflow', 'sync'))
+		expect(renderedKey('task', 'sync')).toBe('task:sync')
+		expect(renderedKey('workflow', 'sync')).toBe('workflow:sync')
 	})
 })

@@ -57,7 +57,9 @@ jobs({ queues: ['emails', 'exports'] })
 
 Picking a task or workflow on the create form fills `input` with a placeholder derived from that entry's `inputSchema`. An entry with no schema fills `{}`.
 
-Every task and workflow keeps its own draft while the form is open: switching away parks what you typed, switching back restores it, and a slug you pick for the first time opens on its placeholder. Nothing typed for one task leaks into another. A draft that is not valid JSON is not kept. Clearing the selection resets the field to `{}`. Existing jobs are not touched: their inputs are read-only.
+Every task and workflow keeps its own draft while the form is open: switching away parks what you typed, switching back restores it, and a slug you pick for the first time opens on its placeholder. Nothing typed for one task leaks into another. A draft that is not valid JSON, or an empty object, is not kept: the slug reopens on its placeholder. Clearing the selection resets the field to `{}`. Existing jobs are not touched: their inputs are read-only.
+
+The placeholder is a value, not a hint: what you leave in the editor is what the job receives, `"<users id>"` included.
 
 A field with a static `defaultValue` contributes that. Otherwise:
 
@@ -68,6 +70,7 @@ A field with a static `defaultValue` contributes that. Otherwise:
 | `checkbox` | `false` |
 | `select`, `radio` | the first option |
 | `relationship`, `upload` | `"<collection id>"`, naming `relationTo` |
+| polymorphic `relationship`, `upload` | `{ relationTo: "<first collection>", value: "<its id>" }` |
 | `json`, `richText` | `{}` |
 | `point` | `[0, 0]` |
 | any `hasMany` field | one element of the above, e.g. `["<people id>"]` |
@@ -75,7 +78,7 @@ A field with a static `defaultValue` contributes that. Otherwise:
 | `blocks` | one row of the first block, with its `blockType` |
 | `row`, `collapsible`, unnamed `tabs` and groups | their fields, flattened into the parent |
 
-The derivation cannot invent meaningful values, only shapes. For a slug whose placeholder should carry real ones, write them yourself; they are merged over the derived object, so keys you omit keep their derived value:
+The derivation cannot invent meaningful values, only shapes. For a slug whose placeholder should carry real ones, write them yourself; they are merged over the derived object, so top-level keys you omit keep their derived value:
 
 ```ts title="payload.config.ts"
 jobs({

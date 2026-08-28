@@ -85,7 +85,7 @@ export const collectLogDependencies = (
 	collectComponentDependencies(
 		'@10x-media/jobs:log',
 		Object.entries(components ?? {}).flatMap(([taskSlug, slots]) =>
-			JOB_LOG_SLOTS.map((slot): [string, false | PayloadComponent | undefined] => [
+			JOB_LOG_SLOTS.map((slot): [string, PayloadComponent | undefined] => [
 				`${taskSlug}:${slot}`,
 				slots[slot],
 			])

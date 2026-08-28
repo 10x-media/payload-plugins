@@ -8,7 +8,7 @@ import { collectComponentDependencies } from './componentDependencies'
  * JSON field, wildcard included. Slugs a task and a workflow share resolve to the
  * same component.
  */
-export type JobInputComponents = Record<string, false | PayloadComponent>
+export type JobInputComponents = Record<string, PayloadComponent>
 
 /** Props handed to a custom `input` editor. It reads and writes the field through `useField({ path })`. */
 export type JobInputComponentProps = {

@@ -45,7 +45,9 @@ const sampleFor = (field: Field): unknown => {
 		case 'array':
 			return [derivePlaceholder(field.fields)]
 		case 'blocks': {
-			const block = field.blocks[0]
+			const block = (field.blockReferences ?? field.blocks).find(
+				(entry) => typeof entry !== 'string'
+			)
 			return block ? [{ blockType: block.slug, ...derivePlaceholder(block.fields) }] : []
 		}
 		case 'group':

@@ -11,13 +11,11 @@ import { useTranslation } from '../translations/useTranslation'
 import { extractErrorMessage } from './extractErrorMessage'
 import { formatDuration } from './formatDuration'
 import { formatRelativeTime } from './formatRelativeTime'
+import { hasKeys } from './hasKeys'
 import type { JobLogEntry, JobLogRenderedEntries, JobLogRenderedSlots } from './logSlotComponents'
 import { logRowKey } from './logSlotComponents'
 
 const DEFAULT_DATE_FORMAT = 'MMMM do yyyy, h:mm a'
-
-const hasKeys = (value: unknown): boolean =>
-	typeof value === 'object' && value !== null && Object.keys(value).length > 0
 
 const Chevron = ({ open }: { open: boolean }) => (
 	<svg

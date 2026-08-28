@@ -5,6 +5,7 @@ import type { JSONFieldClientProps } from 'payload'
 import type { FC, ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 
+import { hasKeys } from './hasKeys'
 import { renderedKey } from './inputComponents'
 import type { JobInputPlaceholders } from './inputPlaceholders'
 
@@ -13,10 +14,6 @@ type JobInputFieldProps = JSONFieldClientProps & {
 	/** Custom editors pre-rendered by `JobInputFieldServer`, keyed by `renderedKey`. */
 	rendered?: Record<string, ReactNode>
 }
-
-/** The JSON editor parks unparsable text as a string; restoring it through form state would JSON-encode it, so only objects with keys count. */
-const isDraft = (value: unknown): value is Record<string, unknown> =>
-	typeof value === 'object' && value !== null && Object.keys(value).length > 0
 
 const slugOf = (value: unknown): string | undefined =>
 	typeof value === 'string' && value ? value : undefined
@@ -49,8 +46,10 @@ export const JobInputField: FC<JobInputFieldProps> = (props) => {
 	useEffect(() => {
 		if (id || selected === shown.current) return
 		if (shown.current !== undefined) {
+			// The JSON editor parks unparsable text as a string, which would not
+			// survive a round trip through form state; an empty object is no draft.
 			const parked = getDataByPath(path)
-			if (isDraft(parked)) drafts.current.set(shown.current, parked)
+			if (hasKeys(parked)) drafts.current.set(shown.current, parked)
 			else drafts.current.delete(shown.current)
 		}
 		shown.current = selected
