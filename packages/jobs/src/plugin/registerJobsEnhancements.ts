@@ -8,13 +8,12 @@ import {
 	type LabelFunction,
 	type PayloadComponent,
 } from 'payload'
-
+import { collectInputDependencies } from '../jobs/inputComponents'
+import { collectInputPlaceholders } from '../jobs/inputPlaceholders'
 import { collectLogDependencies } from '../jobs/logSlotComponents'
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
-import { collectInputDependencies } from './inputComponents'
-import { collectInputPlaceholders } from './inputPlaceholders'
 import { collectJobLabels, type JobLabelMaps } from './labelMaps'
 import { resolve } from './resolve'
 import {
@@ -255,14 +254,17 @@ export const registerJobsEnhancements = (
 	options: JobsOptions,
 	extraQueues: string[] = []
 ): void => {
-	// The log renderers are named in plugin options, not in a component slot the
-	// import-map generator walks, so they only reach the import map through here.
-	const logDependencies = collectLogDependencies(options.log?.entryComponents)
-	const inputDependencies = collectInputDependencies(options.input?.components)
-	if (Object.keys(logDependencies).length > 0) {
+	// The log renderers and input editors are named in plugin options, not in a
+	// component slot the import-map generator walks, so they only reach the import
+	// map through here.
+	const dependencies = {
+		...collectLogDependencies(options.log?.entryComponents),
+		...collectInputDependencies(options.input?.components),
+	}
+	if (Object.keys(dependencies).length > 0) {
 		config.admin = {
 			...config.admin,
-			dependencies: { ...config.admin?.dependencies, ...logDependencies, ...inputDependencies },
+			dependencies: { ...config.admin?.dependencies, ...dependencies },
 		}
 	}
 

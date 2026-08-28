@@ -1,8 +1,7 @@
 import type { CollectionConfig, Field, PayloadComponent } from 'payload'
-
+import type { JobInputComponents } from './jobs/inputComponents'
+import type { JobInputExamples } from './jobs/inputPlaceholders'
 import type { JobLogEntryComponents } from './jobs/logSlotComponents'
-import type { JobInputComponents } from './plugin/inputComponents'
-import type { JobInputExamples } from './plugin/inputPlaceholders'
 import type { Override } from './plugin/resolve'
 import type { QueueControlOptions } from './queueControl/options'
 import type { ReliabilityOptions } from './reliability/options'
@@ -51,8 +50,8 @@ export type JobsOptions = {
 	 */
 	log?: { entryComponents?: JobLogEntryComponents }
 	/**
-	 * The job's `input` on the create form. `examples` replaces the placeholder
-	 * derived from a slug's `inputSchema` with one written by hand, for values the
+	 * The job's `input` on the create form. `examples` merges hand-written values
+	 * over the placeholder derived from a slug's `inputSchema`, for values the
 	 * derivation cannot invent. `components` swaps the JSON editor for a custom
 	 * one per task or workflow slug (`'*'` for every slug, `false` to keep JSON);
 	 * the placeholder still applies, and the editor reads and writes the field

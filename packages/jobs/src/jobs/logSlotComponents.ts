@@ -1,6 +1,7 @@
 import type { AdminDependencies, PayloadComponent } from 'payload'
 import type { ReactNode } from 'react'
-import { collectComponentDependencies } from '../plugin/componentDependencies'
+
+import { collectComponentDependencies } from './componentDependencies'
 
 /** Blocks inside an expanded log-attempt row that accept a custom renderer. */
 export type JobLogSlot = 'error' | 'input' | 'output'

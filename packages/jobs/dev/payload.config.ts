@@ -43,9 +43,6 @@ export default buildConfig({
 	jobs: { tasks: e2eTasks, workflows: e2eWorkflows },
 	plugins: [
 		jobs({
-			// Demo of the log-slot seam: `sleep` gets server-rendered input and output,
-			// every task gets the client-rendered error card, and `inline` attempts keep
-			// the default JSON blocks so the contrast is visible in one document.
 			// The create-form matrix, one task per combination:
 			//   importAthletes  derived placeholder + custom editor
 			//   sleep           example placeholder + custom editor
@@ -62,6 +59,9 @@ export default buildConfig({
 					sleep: { ms: 1500 },
 				},
 			},
+			// Demo of the log-slot seam: `sleep` gets server-rendered input and output,
+			// every task gets the client-rendered error card, and `inline` attempts keep
+			// the default JSON blocks so the contrast is visible in one document.
 			log: {
 				entryComponents: {
 					'*': { error: '/components/AttemptError#AttemptError' },

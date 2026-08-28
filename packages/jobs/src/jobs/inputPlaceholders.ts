@@ -1,4 +1,5 @@
 import type { Config, Field } from 'payload'
+import { fieldAffectsData, fieldIsPresentationalOnly, tabHasName } from 'payload/shared'
 
 /** Create-form placeholders for `input`, keyed by task and workflow slug. */
 export type JobInputPlaceholders = {
@@ -6,7 +7,7 @@ export type JobInputPlaceholders = {
 	workflows: Record<string, Record<string, unknown>>
 }
 
-/** A hand-written placeholder per slug, replacing the one derived from `inputSchema`. */
+/** Hand-written placeholder values per slug, merged over the ones derived from `inputSchema`. */
 export type JobInputExamples = Record<string, Record<string, unknown>>
 
 const relationSample = (relationTo: string | string[]): unknown => {
@@ -17,12 +18,11 @@ const relationSample = (relationTo: string | string[]): unknown => {
 	return { relationTo: first, value: `<${first} id>` }
 }
 
-/**
- * The sample value for one named field. Arrays and `hasMany` fields carry one
- * element so the placeholder shows the element's shape, not just that a list goes
- * there; a relationship names the collection it expects an id from.
- */
+/** Lists carry one element so the placeholder shows the element's shape. */
 const sampleFor = (field: Field): unknown => {
+	if ('defaultValue' in field && field.defaultValue !== undefined) {
+		if (typeof field.defaultValue !== 'function') return field.defaultValue
+	}
 	switch (field.type) {
 		case 'number':
 			return 0
@@ -44,8 +44,10 @@ const sampleFor = (field: Field): unknown => {
 			return [0, 0]
 		case 'array':
 			return [derivePlaceholder(field.fields)]
-		case 'blocks':
-			return []
+		case 'blocks': {
+			const block = field.blocks[0]
+			return block ? [{ blockType: block.slug, ...derivePlaceholder(block.fields) }] : []
+		}
 		case 'group':
 			return derivePlaceholder(field.fields)
 		default:
@@ -55,36 +57,26 @@ const sampleFor = (field: Field): unknown => {
 
 type Entry = [string, unknown]
 
-/**
- * The entries one field contributes: layout-only containers (rows, collapsibles,
- * unnamed groups and tabs) hand their fields' entries up; named groups and tabs
- * contribute one nested object.
- */
 const entriesOf = (field: Field): Entry[] => {
-	if (field.type === 'ui' || field.type === 'join') return []
+	if (fieldIsPresentationalOnly(field) || field.type === 'join') return []
 	if (field.type === 'tabs') {
 		return field.tabs.flatMap((tab): Entry[] =>
-			'name' in tab && typeof tab.name === 'string' && tab.name
-				? [[tab.name, derivePlaceholder(tab.fields)]]
-				: tab.fields.flatMap(entriesOf)
+			tabHasName(tab) ? [[tab.name, derivePlaceholder(tab.fields)]] : tab.fields.flatMap(entriesOf)
 		)
 	}
-	if (field.type === 'row' || field.type === 'collapsible') return field.fields.flatMap(entriesOf)
-	if (!('name' in field) || typeof field.name !== 'string' || !field.name) {
-		return field.type === 'group' ? field.fields.flatMap(entriesOf) : []
+	if (!fieldAffectsData(field)) {
+		return 'fields' in field ? field.fields.flatMap(entriesOf) : []
 	}
 	const sample = sampleFor(field)
-	return [[field.name, 'hasMany' in field && field.hasMany ? [sample] : sample]]
+	const many = 'hasMany' in field && field.hasMany && !Array.isArray(sample)
+	return [[field.name, many ? [sample] : sample]]
 }
 
 /** The placeholder object an `inputSchema` describes. */
 export const derivePlaceholder = (fields: Field[] = []): Record<string, unknown> =>
 	Object.fromEntries(fields.flatMap(entriesOf))
 
-/**
- * Placeholders for every configured task and workflow. An explicit example for a
- * slug wins over the derived object; an entry without `inputSchema` derives `{}`.
- */
+/** Placeholders for every configured task and workflow, with a slug's example merged over the derived object. */
 export const collectInputPlaceholders = (
 	config: Config,
 	examples: JobInputExamples = {}
@@ -93,7 +85,7 @@ export const collectInputPlaceholders = (
 		Object.fromEntries(
 			entries.map((entry) => [
 				entry.slug,
-				examples[entry.slug] ?? derivePlaceholder(entry.inputSchema),
+				{ ...derivePlaceholder(entry.inputSchema), ...examples[entry.slug] },
 			])
 		)
 	return {

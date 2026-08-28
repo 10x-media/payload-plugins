@@ -282,6 +282,62 @@ describeForDb('jobs log slot components', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
+describeForDb('jobs input editors', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: jobs({
+				input: {
+					components: {
+						sendEmail: '/components/SendEmailInput#SendEmailInput',
+						syncCrm: false,
+					},
+					examples: { sendEmail: { to: 'ops@example.com' } },
+				},
+			}),
+			db,
+			configOverrides: {
+				jobs: {
+					tasks: [{ ...sendEmailTask, inputSchema: [{ name: 'to', type: 'text' }] }, syncCrmTask],
+					workflows: [onboardingWorkflow],
+				},
+			},
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('renders the input field through the server component, carrying editors and placeholders', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		const input = cfg && deepFieldByName(cfg.fields, 'input')
+		const component = input?.admin?.components?.Field
+		expect(component).toMatchObject({
+			path: '@10x-media/jobs/rsc#JobInputFieldServer',
+			clientProps: {
+				placeholders: {
+					tasks: { sendEmail: { to: 'ops@example.com' }, syncCrm: {} },
+					workflows: { onboarding: {} },
+				},
+			},
+			serverProps: {
+				components: { sendEmail: '/components/SendEmailInput#SendEmailInput', syncCrm: false },
+			},
+		})
+	})
+
+	it('registers the editors as admin dependencies without any log renderer configured', () => {
+		expect(booted.payload.config.admin.dependencies).toEqual({
+			'@10x-media/jobs:input:sendEmail': {
+				path: '/components/SendEmailInput#SendEmailInput',
+				type: 'component',
+			},
+		})
+	})
+})
+
 describeForDb('jobs log slot components off', { dbs: ['mongo'] }, (db) => {
 	it('adds no admin dependencies when no renderers are configured', async () => {
 		const booted = await bootPayload({

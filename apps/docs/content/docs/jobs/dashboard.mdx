@@ -55,11 +55,11 @@ jobs({ queues: ['emails', 'exports'] })
 
 ## Create form: input placeholder
 
-Picking a task or workflow on the create form fills `input` with a placeholder derived from that entry's `inputSchema`, so the expected shape is on screen instead of in your head. An entry with no schema fills `{}`.
+Picking a task or workflow on the create form fills `input` with a placeholder derived from that entry's `inputSchema`. An entry with no schema fills `{}`.
 
-Every task and workflow keeps its own draft while the form is open: switching away parks what you typed, switching back restores it, and a slug you pick for the first time opens on its placeholder. Nothing typed for one task leaks into another. Clearing the selection empties the field. Existing jobs are not touched: their inputs are read-only.
+Every task and workflow keeps its own draft while the form is open: switching away parks what you typed, switching back restores it, and a slug you pick for the first time opens on its placeholder. Nothing typed for one task leaks into another. A draft that is not valid JSON is not kept. Clearing the selection resets the field to `{}`. Existing jobs are not touched: their inputs are read-only.
 
-Values come from the field types, and a list carries one element so its shape shows too:
+A field with a static `defaultValue` contributes that. Otherwise:
 
 | Field | Placeholder |
 |---|---|
@@ -68,17 +68,20 @@ Values come from the field types, and a list carries one element so its shape sh
 | `checkbox` | `false` |
 | `select`, `radio` | the first option |
 | `relationship`, `upload` | `"<collection id>"`, naming `relationTo` |
+| `json`, `richText` | `{}` |
+| `point` | `[0, 0]` |
 | any `hasMany` field | one element of the above, e.g. `["<people id>"]` |
 | `group` | a nested object; `array` one row of one |
+| `blocks` | one row of the first block, with its `blockType` |
 | `row`, `collapsible`, unnamed `tabs` and groups | their fields, flattened into the parent |
 
-The derivation cannot invent meaningful values, only shapes. For a slug whose placeholder should carry real ones, write it yourself; it replaces the derived object whole:
+The derivation cannot invent meaningful values, only shapes. For a slug whose placeholder should carry real ones, write them yourself; they are merged over the derived object, so keys you omit keep their derived value:
 
 ```ts title="payload.config.ts"
 jobs({
   input: {
     examples: {
-      atosSync: { phases: ['persons'], limit: 100, personCodes: [], runImages: false },
+      atosSync: { phases: ['persons'], limit: 100 },
     },
   },
 })
@@ -158,7 +161,7 @@ All dashboard options live at the top level of the plugin options:
 | `cells` | `Record<string, PayloadComponent \| false>` | built-ins | Per-field list-cell overrides, keyed by job field name. `false` keeps Payload's default cell. |
 | `status` | `PayloadComponent \| false` | built-in | Replace or remove the derived Status column. |
 | `log.entryComponents` | `Record<string, Partial<Record<JobLogSlot, PayloadComponent \| false>>>` | `{}` | Custom renderers for the blocks inside an expanded log-attempt row, keyed by task slug (`'*'` for every task). See [Custom log blocks](#custom-log-blocks). |
-| `input.examples` | `Record<string, Record<string, unknown>>` | `{}` | Hand-written create-form placeholders for `input`, keyed by task or workflow slug, replacing the one derived from `inputSchema`. See [Create form: input placeholder](#create-form-input-placeholder). |
+| `input.examples` | `Record<string, Record<string, unknown>>` | `{}` | Hand-written create-form placeholder values for `input`, keyed by task or workflow slug, merged over the ones derived from `inputSchema`. See [Create form: input placeholder](#create-form-input-placeholder). |
 | `input.components` | `Record<string, PayloadComponent \| false>` | `{}` | Custom editors for `input` on the create form, keyed by task or workflow slug (`'*'` for every slug). See [Custom input editors](#custom-input-editors). |
 | `beforeListTable` | `PayloadComponent[] \| false` | health bar | Replace or remove the components above the list. |
 | `healthBarCap` | `number \| false` | `100` | Per-status count cap; `false` shows exact counts. |
