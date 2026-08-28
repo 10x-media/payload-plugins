@@ -1,17 +1,17 @@
 'use client'
 
-import { Link, useConfig, useListQuery } from '@payloadcms/ui'
+import { Link, useConfig } from '@payloadcms/ui'
 import type { DefaultCellComponentProps } from 'payload'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { usePayloadList } from '../client/usePayloadList'
+import { subscribeListFlash } from './listFlash'
 import './tokens.css'
 
 const FLASH_MS = 600
 
 /**
- * List cell that subscribes to collection SSE mutations, refetches the list on
- * each generation bump, and flashes the cell value.
+ * List cell that flashes when LiveListSync signals a collection mutation.
+ * Does not open an EventSource; one stream lives on LiveListSync per list.
  */
 export const LiveListBadge = ({
 	cellData,
@@ -21,28 +21,23 @@ export const LiveListBadge = ({
 	rowData,
 }: DefaultCellComponentProps) => {
 	const { config } = useConfig()
-	const listQuery = useListQuery()
 	const collection = collectionSlug ?? ''
-	const { generation } = usePayloadList({ collection })
 	const [flash, setFlash] = useState(false)
-	const prevGeneration = useRef(generation)
 
 	useEffect(() => {
-		if (!collection || generation === prevGeneration.current) {
-			prevGeneration.current = generation
-			return
+		if (!collection) return
+		let timer: number | undefined
+		const unsubscribe = subscribeListFlash((slug) => {
+			if (slug !== collection) return
+			setFlash(true)
+			if (timer != null) window.clearTimeout(timer)
+			timer = window.setTimeout(() => setFlash(false), FLASH_MS)
+		})
+		return () => {
+			unsubscribe()
+			if (timer != null) window.clearTimeout(timer)
 		}
-		prevGeneration.current = generation
-
-		if (typeof listQuery.refineListData === 'function') {
-			// Re-apply the current page so ListQuery rewrites search params / refetches.
-			void listQuery.refineListData({ page: listQuery.query?.page ?? 1 })
-		}
-
-		setFlash(true)
-		const timer = window.setTimeout(() => setFlash(false), FLASH_MS)
-		return () => window.clearTimeout(timer)
-	}, [collection, generation, listQuery])
+	}, [collection])
 
 	const display = cellData == null ? '' : String(cellData)
 	const content = (

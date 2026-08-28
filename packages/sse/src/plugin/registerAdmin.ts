@@ -1,15 +1,23 @@
-import type { CollectionConfig, Config, Field, PayloadComponent } from 'payload'
+import type { CollectionConfig, Config, CustomComponent, Field, PayloadComponent } from 'payload'
 
 import type { ResolvedSSEOptions } from '../options'
 
 /** List cell path resolved through the package export map by the import map. */
 export const LIVE_LIST_CELL_PATH = '@10x-media/sse/client#LiveListBadge'
 
+/** One-per-list SSE sync path resolved through the package export map. */
+export const LIVE_LIST_SYNC_PATH = '@10x-media/sse/client#LiveListSync'
+
 /** Edit-view presence chip path resolved through the package export map. */
 export const DOCUMENT_PRESENCE_PATH = '@10x-media/sse/client#DocumentPresence'
 
 const documentPresenceComponent = (): PayloadComponent<never, never> => ({
 	path: DOCUMENT_PRESENCE_PATH,
+})
+
+const liveListSyncComponent = (collection: string): CustomComponent<{ collection: string }> => ({
+	clientProps: { collection },
+	path: LIVE_LIST_SYNC_PATH,
 })
 
 const isNamedField = (field: Field): field is Field & { name: string } =>
@@ -30,31 +38,43 @@ const pickLiveListTarget = (fields: Field[]): Field | undefined => {
 	return fields.find((field) => isNamedField(field))
 }
 
-const withLiveListCell = (collection: CollectionConfig): CollectionConfig => {
+const withLiveList = (collection: CollectionConfig): CollectionConfig => {
 	const fields = collection.fields ?? []
 	const target = pickLiveListTarget(fields)
-	if (!target || !isNamedField(target)) return collection
-	if (fieldHasCell(target)) return collection
+	const admin = collection.admin ?? {}
+	const components = admin.components ?? {}
+	const hostBeforeTable = components.beforeListTable ?? []
 
-	const targetName = target.name
-	const nextFields: Field[] = fields.map((field) => {
-		if (!isNamedField(field) || field.name !== targetName) return field
-		const admin = 'admin' in field && field.admin ? field.admin : {}
-		const components = 'components' in admin && admin.components ? admin.components : {}
-		return {
-			...field,
-			admin: {
-				...admin,
-				components: {
-					...components,
-					Cell: LIVE_LIST_CELL_PATH,
+	let nextFields = fields
+	if (target && isNamedField(target) && !fieldHasCell(target)) {
+		const targetName = target.name
+		nextFields = fields.map((field) => {
+			if (!isNamedField(field) || field.name !== targetName) return field
+			const fieldAdmin = 'admin' in field && field.admin ? field.admin : {}
+			const fieldComponents =
+				'components' in fieldAdmin && fieldAdmin.components ? fieldAdmin.components : {}
+			return {
+				...field,
+				admin: {
+					...fieldAdmin,
+					components: {
+						...fieldComponents,
+						Cell: LIVE_LIST_CELL_PATH,
+					},
 				},
-			},
-		} as Field
-	})
+			} as Field
+		})
+	}
 
 	return {
 		...collection,
+		admin: {
+			...admin,
+			components: {
+				...components,
+				beforeListTable: [...hostBeforeTable, liveListSyncComponent(collection.slug)],
+			},
+		},
 		fields: nextFields,
 	}
 }
@@ -96,8 +116,8 @@ const resolveAdminFlags = (
 }
 
 /**
- * Mount live-list cells and document presence chips on SSE-enabled collections.
- * No-op when `options.admin === false`.
+ * Mount LiveListSync (one stream per list), live-list cells, and document
+ * presence chips on SSE-enabled collections. No-op when `options.admin === false`.
  */
 export const registerAdmin = (args: { config: Config; options: ResolvedSSEOptions }): void => {
 	const { config, options } = args
@@ -116,7 +136,7 @@ export const registerAdmin = (args: { config: Config; options: ResolvedSSEOption
 
 		let next = collection
 		if (flags.liveList) {
-			next = withLiveListCell(next)
+			next = withLiveList(next)
 		}
 		if (flags.presence) {
 			next = withDocumentPresence(next)

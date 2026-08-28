@@ -52,8 +52,8 @@ test('list still updates after stream abort then restore', async ({ page }) => {
 	await expect(page.getByText(blockedTitle)).toHaveCount(0)
 
 	await page.unroute('**/api/realtime/stream**')
-	await page.reload()
-	await openCollectionList(page, 'posts')
+	// Server SSE retry is 3000ms; stay on the same list page and wait for reconnect.
+	await page.waitForTimeout(4_000)
 
 	const restoredTitle = `restored-${Date.now()}`
 	await createDoc(page, 'posts', { title: restoredTitle })

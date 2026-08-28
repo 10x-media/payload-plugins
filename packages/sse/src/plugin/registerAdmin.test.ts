@@ -2,7 +2,12 @@ import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import type { ResolvedSSEOptions } from '../options'
-import { DOCUMENT_PRESENCE_PATH, LIVE_LIST_CELL_PATH, registerAdmin } from './registerAdmin'
+import {
+	DOCUMENT_PRESENCE_PATH,
+	LIVE_LIST_CELL_PATH,
+	LIVE_LIST_SYNC_PATH,
+	registerAdmin,
+} from './registerAdmin'
 
 const baseOptions = (): ResolvedSSEOptions => ({
 	collections: {
@@ -36,17 +41,26 @@ const titleCell = (config: Config): unknown => {
 	return title.admin?.components?.Cell
 }
 
+const beforeListTable = (config: Config): unknown[] => {
+	const posts = config.collections?.find((c) => c.slug === 'posts')
+	return posts?.admin?.components?.beforeListTable ?? []
+}
+
 const beforeControls = (config: Config): unknown[] => {
 	const posts = config.collections?.find((c) => c.slug === 'posts')
 	return posts?.admin?.components?.edit?.beforeDocumentControls ?? []
 }
 
 describe('registerAdmin', () => {
-	it('attaches LiveListBadge Cell and DocumentPresence for SSE collections', () => {
+	it('attaches LiveListBadge Cell, LiveListSync beforeListTable, and DocumentPresence', () => {
 		const config = postsConfig()
 		registerAdmin({ config, options: baseOptions() })
 
 		expect(titleCell(config)).toBe(LIVE_LIST_CELL_PATH)
+		expect(beforeListTable(config)).toContainEqual({
+			clientProps: { collection: 'posts' },
+			path: LIVE_LIST_SYNC_PATH,
+		})
 		expect(beforeControls(config)).toContainEqual({ path: DOCUMENT_PRESENCE_PATH })
 	})
 
@@ -55,10 +69,11 @@ describe('registerAdmin', () => {
 		registerAdmin({ config, options: { ...baseOptions(), admin: false } })
 
 		expect(titleCell(config)).toBeUndefined()
+		expect(beforeListTable(config)).toEqual([])
 		expect(beforeControls(config)).toEqual([])
 	})
 
-	it('skips Cell when admin.liveList is false', () => {
+	it('skips Cell and beforeListTable when admin.liveList is false', () => {
 		const config = postsConfig()
 		registerAdmin({
 			config,
@@ -66,6 +81,7 @@ describe('registerAdmin', () => {
 		})
 
 		expect(titleCell(config)).toBeUndefined()
+		expect(beforeListTable(config)).toEqual([])
 		expect(beforeControls(config)).toContainEqual({ path: DOCUMENT_PRESENCE_PATH })
 	})
 
@@ -77,6 +93,10 @@ describe('registerAdmin', () => {
 		})
 
 		expect(titleCell(config)).toBe(LIVE_LIST_CELL_PATH)
+		expect(beforeListTable(config)).toContainEqual({
+			clientProps: { collection: 'posts' },
+			path: LIVE_LIST_SYNC_PATH,
+		})
 		expect(beforeControls(config)).toEqual([])
 	})
 
@@ -88,10 +108,14 @@ describe('registerAdmin', () => {
 		})
 
 		expect(titleCell(config)).toBe(LIVE_LIST_CELL_PATH)
+		expect(beforeListTable(config)).toContainEqual({
+			clientProps: { collection: 'posts' },
+			path: LIVE_LIST_SYNC_PATH,
+		})
 		expect(beforeControls(config)).toEqual([])
 	})
 
-	it('skips LiveListBadge when the target field already has a Cell', () => {
+	it('skips LiveListBadge when the target field already has a Cell, still mounts LiveListSync', () => {
 		const config = {
 			collections: [
 				{
@@ -110,5 +134,9 @@ describe('registerAdmin', () => {
 		registerAdmin({ config, options: baseOptions() })
 
 		expect(titleCell(config)).toBe('host#ExistingCell')
+		expect(beforeListTable(config)).toContainEqual({
+			clientProps: { collection: 'posts' },
+			path: LIVE_LIST_SYNC_PATH,
+		})
 	})
 })
