@@ -39,7 +39,8 @@ describe('InProcessBroker', () => {
 	})
 
 	it('does not throw to the publisher when a subscriber throws, and still delivers to others', () => {
-		const broker = new InProcessBroker()
+		const error = vi.fn()
+		const broker = new InProcessBroker({ error })
 		const second = vi.fn()
 		broker.subscribe('posts', () => {
 			throw new Error('listener boom')
@@ -50,6 +51,7 @@ describe('InProcessBroker', () => {
 		expect(() => broker.publish(event)).not.toThrow()
 		expect(second).toHaveBeenCalledOnce()
 		expect(second).toHaveBeenCalledWith(event)
+		expect(error).toHaveBeenCalled()
 	})
 
 	it('destroy drops all listeners; pre-destroy subscribers miss post-destroy publishes', async () => {

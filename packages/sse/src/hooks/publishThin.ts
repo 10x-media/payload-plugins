@@ -7,11 +7,12 @@ import { SCOPE_WILDCARD, type SSEScopeOptions } from '../scope/types'
 const publishOne = (args: {
 	broker: { publish: (event: RealtimeEvent) => void }
 	event: RealtimeEvent
+	log?: { error: (message: string, err?: unknown) => void }
 }): void => {
 	try {
 		args.broker.publish(args.event)
-	} catch {
-		// Hook must never fail the write
+	} catch (err) {
+		args.log?.error('@10x-media/sse: publish failed', err)
 	}
 }
 
@@ -46,6 +47,7 @@ export const publishThin = async (args: {
 	for (const topic of topics) {
 		publishOne({
 			broker,
+			log: req.payload.logger,
 			event: {
 				id: `${timestamp}:${collection}:${docId}:${operation}:${topic}`,
 				topic,

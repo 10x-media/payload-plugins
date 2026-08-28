@@ -1,5 +1,5 @@
 import type { Payload } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { EventBroker, RealtimeEvent } from '../broker/types'
 import { createEmit, getRuntime, getSSE, type SSERuntime, setRuntime } from './runtime'
@@ -39,9 +39,14 @@ describe('SSE runtime', () => {
 	})
 
 	it('getSSE returns emit that publishes without throwing', () => {
-		const payload = {} as Payload
+		const payload = {
+			logger: { error: vi.fn() },
+		} as unknown as Payload
 		const broker = makeBroker()
-		const runtime = makeRuntime(broker)
+		const runtime: SSERuntime = {
+			...makeRuntime(broker),
+			emit: createEmit(broker, payload.logger),
+		}
 		setRuntime(payload, runtime)
 
 		const { emit } = getSSE(payload)
@@ -58,6 +63,7 @@ describe('SSE runtime', () => {
 			throw new Error('boom')
 		}
 		expect(() => emit(event)).not.toThrow()
+		expect(payload.logger.error).toHaveBeenCalled()
 	})
 
 	it('getSSE throws when runtime is missing', () => {

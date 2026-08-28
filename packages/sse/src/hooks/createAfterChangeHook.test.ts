@@ -1,5 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { EventBroker, RealtimeEvent } from '../broker/types'
 import { getRuntime, type SSERuntime, setRuntime } from '../plugin/runtime'
@@ -201,6 +201,31 @@ describe('createAfterChangeHook', () => {
 			expect(event.collection).toBe('posts')
 			expect(event.docId).toBe('abc')
 		}
+	})
+
+	it('logs when the broker throws and still lets the write succeed', async () => {
+		const error = vi.fn()
+		const payload = { logger: { error } } as unknown as Payload
+		const broker = {
+			publish: vi.fn().mockImplementation(() => {
+				throw new Error('bus down')
+			}),
+			subscribe: vi.fn(),
+		}
+		setRuntime(payload, makeRuntime(broker as never))
+		const hook = createAfterChangeHook({ collection: 'posts', events: ['create'] })
+		const req = { payload, context: {} } as unknown as PayloadRequest
+
+		await expect(
+			hook({
+				doc: { id: 'abc' },
+				operation: 'create',
+				req,
+				collection: { slug: 'posts' },
+			} as Parameters<typeof hook>[0]),
+		).resolves.toEqual({ id: 'abc' })
+
+		expect(error).toHaveBeenCalled()
 	})
 
 	it('skips collection-wide publish when resolveDoc returns null', async () => {

@@ -97,8 +97,8 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 	const prevOnInit = config.onInit
 	config.onInit = async (payload: Payload) => {
 		const ownsBroker = options.broker === undefined
-		const broker = options.broker ?? new InProcessBroker()
-		const emit = createEmit(broker)
+		const broker = options.broker ?? new InProcessBroker(payload.logger)
+		const emit = createEmit(broker, payload.logger)
 		const presence =
 			options.presence === false
 				? false

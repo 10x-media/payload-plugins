@@ -45,12 +45,14 @@ export const getSSE = (payload: Payload): { emit: SSERuntime['emit'] } => {
 	return { emit: runtime.emit }
 }
 
+type ErrorLog = { error: (message: string, err?: unknown) => void }
+
 export const createEmit =
-	(broker: EventBroker): SSERuntime['emit'] =>
+	(broker: EventBroker, log?: ErrorLog): SSERuntime['emit'] =>
 	(event) => {
 		try {
 			broker.publish(event)
-		} catch {
-			// emit must never throw to the caller
+		} catch (err) {
+			log?.error('@10x-media/sse: emit failed', err)
 		}
 	}

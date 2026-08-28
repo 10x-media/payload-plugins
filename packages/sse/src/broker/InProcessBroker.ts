@@ -1,7 +1,14 @@
 import type { EventBroker, RealtimeEvent } from './types'
 
+type ErrorLog = { error: (message: string, err?: unknown) => void }
+
 export class InProcessBroker implements EventBroker {
 	#listeners = new Map<string, Set<(event: RealtimeEvent) => void>>()
+	#log?: ErrorLog
+
+	constructor(log?: ErrorLog) {
+		this.#log = log
+	}
 
 	publish(event: RealtimeEvent): void {
 		const listeners = this.#listeners.get(event.topic)
@@ -9,8 +16,8 @@ export class InProcessBroker implements EventBroker {
 		for (const callback of listeners) {
 			try {
 				callback(event)
-			} catch {
-				// Listener errors must not throw out of publish or block peers.
+			} catch (err) {
+				this.#log?.error('@10x-media/sse: subscriber failed', err)
 			}
 		}
 	}
