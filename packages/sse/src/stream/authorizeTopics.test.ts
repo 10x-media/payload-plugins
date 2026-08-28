@@ -7,7 +7,7 @@ type FakeCollection = {
 	config: {
 		slug: string
 		access?: {
-			read?: (args: { req: PayloadRequest }) => unknown
+			read?: boolean | ((args: { req: PayloadRequest }) => unknown)
 		}
 	}
 }
@@ -61,6 +61,19 @@ describe('authorizeTopics', () => {
 			req: makeReq({
 				collections: {
 					posts: { config: { slug: 'posts', access: { read: () => false } } },
+				},
+			}),
+			topics: ['posts'],
+			collections: { posts: { thinEvents: true } },
+		})
+		expect(result).toEqual({ ok: false, status: 403, message: expect.any(String) })
+	})
+
+	it('returns 403 when access.read is the boolean false', async () => {
+		const result = await authorizeTopics({
+			req: makeReq({
+				collections: {
+					posts: { config: { slug: 'posts', access: { read: false } } },
 				},
 			}),
 			topics: ['posts'],

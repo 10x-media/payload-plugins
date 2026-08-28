@@ -71,7 +71,7 @@ export const authorizeTopics = async (
 
 		const readAccess = collection.config.access?.read
 		const accessResult: unknown =
-			typeof readAccess === 'function' ? await readAccess({ req }) : true
+			typeof readAccess === 'function' ? await readAccess({ req }) : (readAccess ?? true)
 
 		if (accessResult === false) {
 			return { ok: false, status: 403, message: `forbidden topic: ${topic}` }

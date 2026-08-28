@@ -130,10 +130,11 @@ describe('makeStreamHandler', () => {
 		await heartbeatPromise
 		expect(buf).toContain(': heartbeat')
 
-		const beforeAbort = buf
+		const timersBeforeAbort = vi.getTimerCount()
+		expect(timersBeforeAbort).toBeGreaterThan(0)
 		ac.abort()
-		await vi.advanceTimersByTimeAsync(5000)
-		expect(buf).toBe(beforeAbort)
+		await Promise.resolve()
+		expect(vi.getTimerCount()).toBeLessThan(timersBeforeAbort)
 		expect(broker.unsubscribes.every((u) => u.mock.calls.length >= 1)).toBe(true)
 	})
 
