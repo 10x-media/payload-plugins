@@ -57,9 +57,9 @@ jobs({ queues: ['emails', 'exports'] })
 
 Picking a task or workflow on the create form fills `input` with a placeholder derived from that entry's `inputSchema`. An entry with no schema fills `{}`.
 
-Every task and workflow keeps its own draft while the form is open: switching away parks what you typed, switching back restores it, and a slug you pick for the first time opens on its placeholder. Nothing typed for one task leaks into another. A draft that is not valid JSON, or an empty object, is not kept: the slug reopens on its placeholder. Clearing the selection resets the field to `{}`. Existing jobs are not touched: their inputs are read-only.
+Every task and workflow keeps its own draft while the form is open: switching away parks what you typed, switching back restores it, and a slug you pick for the first time opens on its placeholder. A draft that is not valid JSON, or an empty object, is not kept: the slug reopens on its placeholder. Clearing the selection resets the field to `{}`. Existing jobs are not touched: their inputs are read-only.
 
-The placeholder is a value, not a hint: what you leave in the editor is what the job receives, `"<users id>"` included.
+The placeholder is a real value: what you leave in the editor is what the job receives, `"<users id>"` included.
 
 A field with a static `defaultValue` contributes that. Otherwise:
 
@@ -92,7 +92,7 @@ jobs({
 
 ## Custom input editors
 
-`input.components` swaps the JSON editor for a component of yours, keyed by task or workflow slug. The placeholder above still applies, and the editor is swapped as the selection changes: a slug with an entry gets its editor, every other slug keeps the JSON field.
+`input.components` swaps the JSON editor for a component of yours, keyed by task or workflow slug. The placeholder above still applies, and the editor is swapped as the selection changes.
 
 ```ts title="payload.config.ts"
 jobs({
@@ -118,7 +118,7 @@ Your component receives `JobInputComponentProps`, exported from `@10x-media/jobs
 | `placeholder` | `Record<string, unknown> \| undefined` | What the create form would have pre-filled for this slug: the derived object, or its `input.examples` entry. |
 | `readOnly` | `boolean \| undefined` | Set on an existing job, whose inputs are locked. |
 
-The editor must be a client component: it writes to the form. It owns no state of its own; every control reads the job's `input` through `useField` and writes a patched object back, which is also how the pre-filled placeholder reaches it:
+The editor must be a client module. Every control reads the job's `input` through `useField` and writes a patched object back, which is also how the pre-filled placeholder reaches it:
 
 ```tsx title="components/ImportAthletesInput.tsx"
 'use client'
@@ -150,7 +150,7 @@ export const ImportAthletesInput = ({ path, readOnly }: JobInputComponentProps) 
 }
 ```
 
-Paths resolve through the import map. They live in plugin options rather than in a field slot the generator walks, so the plugin registers them under `admin.dependencies` for you, and you re-run `payload generate:importmap` after adding or changing one. A path the import map cannot resolve falls back to the JSON field, and Payload logs a console error naming the missing key.
+Paths resolve through the import map, registered under `admin.dependencies` as for [custom log blocks](#custom-log-blocks): re-run `payload generate:importmap` after adding or changing one. A path it cannot resolve falls back to the JSON field.
 
 ## Options
 
