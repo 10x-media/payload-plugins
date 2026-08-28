@@ -136,7 +136,18 @@ export const usePayloadSubscription = (
 					signal: abortController.signal,
 				})
 
-				if (!response.ok || !response.body) {
+				if (!response.ok) {
+					if (!disposed) {
+						if (response.status >= 400 && response.status < 500) {
+							setStatus('closed')
+						} else {
+							scheduleReconnect()
+						}
+					}
+					return
+				}
+
+				if (!response.body) {
 					if (!disposed) {
 						scheduleReconnect()
 					}

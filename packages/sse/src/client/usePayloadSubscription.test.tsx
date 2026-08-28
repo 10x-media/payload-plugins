@@ -191,6 +191,27 @@ describe('usePayloadSubscription (bearer / fetch)', () => {
 		unmount()
 	})
 
+	it('closes on 401 and does not reconnect', async () => {
+		vi.useFakeTimers()
+		const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }))
+		vi.stubGlobal('fetch', fetchMock)
+
+		const { result } = renderHook(() => usePayloadSubscription({ topics: ['posts'], token: 'bad' }))
+
+		await act(async () => {
+			await Promise.resolve()
+		})
+
+		expect(result.current.status).toBe('closed')
+		expect(fetchMock).toHaveBeenCalledTimes(1)
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(10_000)
+		})
+
+		expect(fetchMock).toHaveBeenCalledTimes(1)
+	})
+
 	it('aborts fetch on unmount', async () => {
 		let aborted = false
 		const body = new ReadableStream<Uint8Array>({
