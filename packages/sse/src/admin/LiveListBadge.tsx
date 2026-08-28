@@ -27,8 +27,10 @@ export const LiveListBadge = ({
 	useEffect(() => {
 		if (!collection) return
 		let timer: number | undefined
-		const unsubscribe = subscribeListFlash((slug) => {
-			if (slug !== collection) return
+		const rowId = rowData?.id == null ? undefined : String(rowData.id)
+		const unsubscribe = subscribeListFlash((signal) => {
+			if (signal.collection !== collection) return
+			if (signal.docId == null || rowId == null || signal.docId !== rowId) return
 			setFlash(true)
 			if (timer != null) window.clearTimeout(timer)
 			timer = window.setTimeout(() => setFlash(false), FLASH_MS)
@@ -37,7 +39,7 @@ export const LiveListBadge = ({
 			unsubscribe()
 			if (timer != null) window.clearTimeout(timer)
 		}
-	}, [collection])
+	}, [collection, rowData?.id])
 
 	const display = cellData == null ? '' : String(cellData)
 	const content = (

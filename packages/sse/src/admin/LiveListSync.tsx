@@ -19,7 +19,7 @@ export const LiveListSync = ({ collection: collectionProp }: LiveListSyncProps) 
 	const listQuery = useListQuery()
 	const router = useRouter()
 	const collection = collectionProp ?? ''
-	const { generation } = usePayloadList({ collection })
+	const { generation, lastEvent } = usePayloadList({ collection })
 	const prevGeneration = useRef(generation)
 
 	useEffect(() => {
@@ -34,8 +34,8 @@ export const LiveListSync = ({ collection: collectionProp }: LiveListSyncProps) 
 		}
 
 		router.refresh()
-		emitListFlash(collection)
-	}, [collection, generation, listQuery, router])
+		emitListFlash({ collection, docId: lastEvent?.docId })
+	}, [collection, generation, lastEvent, listQuery, router])
 
 	return null
 }
