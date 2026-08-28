@@ -1,4 +1,4 @@
 {
 	"extends": "@10x-media/tsconfig/plugin.json",
-	"include": ["src/**/*", "tests/**/*"]
+	"include": ["src/**/*", "tests/**/*", "vitest.setup.ts"]
 }
