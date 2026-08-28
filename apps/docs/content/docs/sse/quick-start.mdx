@@ -38,6 +38,7 @@ export default buildConfig({
 | `scope` | Omit/`false` off. `true` uses `multiTenantScope()`; or `{ resolveRequest, resolveDoc }`. |
 | `broker` | Custom `EventBroker` for multi-instance. Default is in-process. |
 | `heartbeatMs` | Stream comment heartbeat interval (default 15s). |
+| `maxConnectionsPerUser` | Concurrent streams per user (default 8). Over the cap returns 429. |
 
 Regenerate the import map after installing so admin components resolve:
 

@@ -29,6 +29,8 @@ export default buildConfig({
 
 `scope: true` is `multiTenantScope()` with defaults (`tenants` collection, `tenant` field, `payload-tenant` cookie). The adapter does not import the tenant plugin. It reads the cookie through `parseCookies` from `payload/shared`.
 
+The cookie is a **selector** among tenants the user already belongs to. When `userHasAccessToAllTenants` is true, any cookie value is accepted. Otherwise the cookie must be in the user's assigned tenants. An unassigned value makes `resolveRequest` return `null`, and the stream responds **403**. The cookie is not a capability.
+
 Place `multiTenantPlugin` after other plugins, as its own docs recommend. SSE resolves the scope at request time (`onInit` / connect), so it still works when the tenant field is added after the SSE plugin runs. If `scope` is off and an opted-in collection has a relationship to `tenants`, SSE logs a warning at `onInit`.
 
 ## Custom resolvers
@@ -70,7 +72,7 @@ Without scoping, a collection whose `access.read` returns a Where object **refus
 
 With scoping on, `{slug}` is allowed. Each event is checked against the subscriber's own read access before it is written to the stream (`payload.count` for thin, `findByID` with `overrideAccess: false` for enriched). Denied frames are dropped, not sent as thin events.
 
-**Delete caveat.** A delete cannot be `count`ed (the row is gone). Deletes on a scoped wide topic are delivered to every subscriber of that scope. A Where that is narrower than the tenant (for example owner-only inside one tenant) will still see the delete. Document topics stay exact.
+**Gated deletes.** A delete cannot be `count`ed (the row is gone). On a scoped collection-wide topic the stream still delivers the delete, but with `docId` and `data` removed. Subscribers learn that something in the collection changed, not which id. Document topics `{slug}:{id}` are authorized at connect and keep their id. The admin list refreshes off the event type alone, so id-less deletes still bump the list without flashing a row.
 
 ## `getSSE(payload).emit`
 
@@ -92,6 +94,10 @@ getSSE(payload).emit({
 
 The stream rewrites the public topic back to `posts` before it reaches the client.
 
+## Multi-instance
+
+The default broker is in-process. Presence leases live in Payload KV. Join, leave, heartbeat, and prune serialize **per document per process**. Two Node processes joining the same document at the same time can still overwrite each other: `KVAdapter` has no compare-and-swap. A host-supplied `broker` fans stream events across nodes. It does not make presence KV atomic. Treat overlapping cross-node joins as eventually consistent.
+
 ## Security
 
-Derive `resolveRequest` from `req.user` or a signed cookie. A header the client can set lets a caller claim another tenant's channel. See [Security](/sse/security).
+Derive `resolveRequest` from `req.user` or a signed cookie. The shipped `payload-tenant` cookie only selects among assigned tenants. A header the client can set is not a substitute for membership. See [Security](/sse/security).
