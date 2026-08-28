@@ -115,7 +115,7 @@ Your component receives `JobInputComponentProps`, exported from `@10x-media/jobs
 | `path` | `string` | The `input` field's form path. Read and write the value through `useField({ path })`. |
 | `slug` | `string` | The selected task or workflow slug. |
 | `kind` | `'task' \| 'workflow'` | Which of the two the slug names. |
-| `placeholder` | `Record<string, unknown> \| undefined` | What the create form would have pre-filled for this slug: the derived object, or its `input.examples` entry. |
+| `placeholder` | `Record<string, unknown> \| undefined` | What the create form would have pre-filled for this slug: the derived object, with its `input.examples` entry merged over it. |
 | `readOnly` | `boolean \| undefined` | Set on an existing job, whose inputs are locked. |
 
 The editor must be a client module. Every control reads the job's `input` through `useField` and writes a patched object back, which is also how the pre-filled placeholder reaches it:
@@ -134,7 +134,7 @@ export const ImportAthletesInput = ({ path, readOnly }: JobInputComponentProps) 
     <>
       <TextInput
         label="Limit"
-        onChange={(e) => patch({ limit: Number(e.target.value) || 0 })}
+        onChange={(e) => patch({ limit: e.target.value === '' ? undefined : Number(e.target.value) })}
         path={`${path}.limit`}
         readOnly={readOnly}
         value={String(input.limit ?? '')}

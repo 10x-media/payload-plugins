@@ -59,7 +59,7 @@ export const ImportAthletesInput = ({ path, placeholder, readOnly }: JobInputCom
 			<TextInput
 				label="Limit"
 				onChange={(event: ChangeEvent<HTMLInputElement>) =>
-					patch({ limit: Number(event.target.value) || 0 })
+					patch({ limit: event.target.value === '' ? undefined : Number(event.target.value) })
 				}
 				path={`${path}.limit`}
 				readOnly={readOnly}

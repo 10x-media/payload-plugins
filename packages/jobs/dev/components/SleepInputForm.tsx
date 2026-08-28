@@ -17,7 +17,7 @@ export const SleepInputForm = ({ path, placeholder, readOnly }: JobInputComponen
 			<TextInput
 				label="Sleep for (ms)"
 				onChange={(event: ChangeEvent<HTMLInputElement>) =>
-					setValue({ ms: Number(event.target.value) || 0 })
+					setValue({ ms: event.target.value === '' ? undefined : Number(event.target.value) })
 				}
 				path={`${path}.ms`}
 				readOnly={readOnly}
