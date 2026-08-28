@@ -109,6 +109,9 @@ export const authorizeTopics = async (
 		}
 
 		const { collection: slug, docId, presence } = parsed
+		if (!(slug in collections)) {
+			return { ok: false, status: 403, message: `collection not enabled for sse: ${slug}` }
+		}
 		const collection = req.payload.collections[slug]
 		if (!collection) {
 			return { ok: false, status: 403, message: `unknown collection: ${slug}` }

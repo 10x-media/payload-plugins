@@ -56,6 +56,20 @@ describe('authorizeTopics', () => {
 		expect(result).toEqual({ ok: false, status: 403, message: expect.any(String) })
 	})
 
+	it('returns 403 for a Payload collection that is not opted into the plugin', async () => {
+		const result = await authorizeTopics({
+			req: makeReq({
+				collections: {
+					posts: { config: { slug: 'posts', access: { read: () => true } } },
+					users: { config: { slug: 'users', access: { read: () => true } } },
+				},
+			}),
+			topics: ['users'],
+			collections: { posts: { thinEvents: true } },
+		})
+		expect(result).toEqual({ ok: false, status: 403, message: expect.any(String) })
+	})
+
 	it('returns 403 when access.read returns false', async () => {
 		const result = await authorizeTopics({
 			req: makeReq({
@@ -206,7 +220,7 @@ describe('authorizeTopics', () => {
 		const owned = await authorizeTopics({
 			req,
 			topics: ['presence:posts:abc'],
-			collections: {},
+			collections: { posts: { thinEvents: true } },
 		})
 		expect(owned).toEqual({
 			ok: true,
@@ -223,7 +237,7 @@ describe('authorizeTopics', () => {
 		const unowned = await authorizeTopics({
 			req,
 			topics: ['presence:posts:other'],
-			collections: {},
+			collections: { posts: { thinEvents: true } },
 		})
 		expect(unowned).toEqual({ ok: false, status: 403, message: expect.any(String) })
 	})

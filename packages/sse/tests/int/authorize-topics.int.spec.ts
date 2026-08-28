@@ -101,6 +101,15 @@ describeForDb('sse authorize topics int', { dbs: ['mongo'] }, (db) => {
 		expect(res.status).toBe(403)
 	})
 
+	it('returns 403 for a Payload collection that is not opted into sse', async () => {
+		const res = await handler()({
+			user: owner,
+			url: 'http://localhost/api/realtime/stream?topics=users',
+			payload: booted.payload,
+		} as unknown as PayloadRequest)
+		expect(res.status).toBe(403)
+	})
+
 	it('refuses Where-scoped collection-wide topic but allows an owned document topic', async () => {
 		const refuseWide = await authorizeTopics({
 			req: reqFor(owner),
