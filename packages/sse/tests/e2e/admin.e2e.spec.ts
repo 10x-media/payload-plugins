@@ -48,12 +48,14 @@ test('list still updates after stream abort then restore', async ({ page }) => {
 
 	const blockedTitle = `blocked-${Date.now()}`
 	await createDoc(page, 'posts', { title: blockedTitle })
-	await page.waitForTimeout(1_500)
 	await expect(page.getByText(blockedTitle)).toHaveCount(0)
 
+	const streamReconnect = page.waitForResponse(
+		(res) => res.url().includes('/api/realtime/stream') && res.ok(),
+		{ timeout: 15_000 }
+	)
 	await page.unroute('**/api/realtime/stream**')
-	// Server SSE retry is 3000ms; stay on the same list page and wait for reconnect.
-	await page.waitForTimeout(4_000)
+	await streamReconnect
 
 	const restoredTitle = `restored-${Date.now()}`
 	await createDoc(page, 'posts', { title: restoredTitle })

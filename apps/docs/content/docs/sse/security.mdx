@@ -52,5 +52,4 @@ When `thinEvents: false`, the stream enriches with `findByID` using `overrideAcc
 - Require auth on the stream (already enforced).
 - Prefer Where-scoped `read` when collection-wide id leakage is unacceptable. Enable `scope` for multi-tenant installs so `{slug}` stays usable under a Where.
 - Treat thin events as public signals of "something changed for this id", not as a redaction layer.
-- Treat thin events as public signals of "something changed for this id", not as a redaction layer.
 - Keep `identify` free of email by default.

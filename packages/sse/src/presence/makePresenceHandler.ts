@@ -1,13 +1,12 @@
 import type { PayloadHandler } from 'payload'
 
 import type { EventBroker, RealtimeEvent } from '../broker/types'
+import type { PresenceIdentify } from '../options'
 import type { SSEScopeOptions } from '../scope/types'
 import { authorizeTopics } from '../stream/authorizeTopics'
 import type { PresencePeer, PresenceStore } from './store'
 
 export const PRESENCE_PATH = '/realtime/presence'
-
-export type PresenceIdentify = (user: unknown) => { id: string; label: string }
 
 export type PresenceHandlerDeps = {
 	store: PresenceStore

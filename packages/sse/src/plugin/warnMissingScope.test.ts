@@ -12,6 +12,15 @@ describe('collectionHasTenantRelationship', () => {
 		expect(collectionHasTenantRelationship(collection)).toBe(true)
 	})
 
+	it('detects a relationship to a custom tenants slug', () => {
+		const collection = {
+			slug: 'posts',
+			fields: [{ name: 'org', type: 'relationship', relationTo: 'orgs' }],
+		} as CollectionConfig
+		expect(collectionHasTenantRelationship(collection, 'orgs')).toBe(true)
+		expect(collectionHasTenantRelationship(collection)).toBe(false)
+	})
+
 	it('returns false when there is no tenant relationship', () => {
 		const collection = {
 			slug: 'posts',
@@ -56,6 +65,33 @@ describe('warnMissingScope', () => {
 		} as unknown as Payload
 
 		warnMissingScope({ payload, sourceSlugs: ['posts'], scopeEnabled: true })
+		expect(warn).not.toHaveBeenCalled()
+	})
+
+	it('warns using the configured tenantsSlug', () => {
+		const warn = vi.fn()
+		const payload = {
+			logger: { warn },
+			collections: {
+				posts: {
+					config: {
+						slug: 'posts',
+						fields: [{ name: 'org', type: 'relationship', relationTo: 'orgs' }],
+					},
+				},
+			},
+		} as unknown as Payload
+
+		warnMissingScope({
+			payload,
+			sourceSlugs: ['posts'],
+			scopeEnabled: false,
+			tenantsSlug: 'orgs',
+		})
+		expect(warn).toHaveBeenCalledOnce()
+
+		warn.mockClear()
+		warnMissingScope({ payload, sourceSlugs: ['posts'], scopeEnabled: false })
 		expect(warn).not.toHaveBeenCalled()
 	})
 })

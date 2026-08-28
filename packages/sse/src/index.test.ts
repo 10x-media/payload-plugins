@@ -22,6 +22,6 @@ describe('sse factory', () => {
 		) as Config
 		const i18n = out.i18n?.translations as Record<string, Record<string, Record<string, string>>>
 		expect(i18n.de?.sse?.pluginName).toBe('Beispiel')
-		expect(i18n.en?.sse?.pluginName).toBe('Sse')
+		expect(i18n.en?.sse?.pluginName).toBe('SSE')
 	})
 })

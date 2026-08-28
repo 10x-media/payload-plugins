@@ -6,6 +6,6 @@ import { keys, type TranslationKey } from './keys'
  * unknown key a type error. `translations/index.ts` nests these for Payload.
  */
 export const en: Record<TranslationKey, string> = {
-	[keys.pluginName]: 'Sse',
+	[keys.pluginName]: 'SSE',
 	[keys.alsoViewing]: 'also viewing',
 }

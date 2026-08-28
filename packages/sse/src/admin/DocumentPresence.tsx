@@ -5,6 +5,7 @@ import { useAuth, useDocumentInfo } from '@payloadcms/ui'
 import { useDocumentPresence } from '../client/useDocumentPresence'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
+import './tokens.css'
 
 const initialsFor = (label: string): string => {
 	const parts = label.trim().split(/\s+/).filter(Boolean)
@@ -42,40 +43,10 @@ export const DocumentPresence = () => {
 	}
 
 	return (
-		<div
-			style={{
-				alignItems: 'center',
-				display: 'flex',
-				gap: '0.5rem',
-				color: 'var(--theme-elevation-800)',
-				fontSize: '0.8125rem',
-			}}
-		>
-			<ul
-				style={{
-					display: 'flex',
-					gap: '0.25rem',
-					listStyle: 'none',
-					margin: 0,
-					padding: 0,
-				}}
-			>
+		<div className="sse-document-presence">
+			<ul className="sse-document-presence-list">
 				{others.map((peer) => (
-					<li
-						key={peer.id}
-						title={peer.label}
-						style={{
-							alignItems: 'center',
-							background: 'var(--theme-elevation-150)',
-							borderRadius: '999px',
-							display: 'inline-flex',
-							fontWeight: 600,
-							height: '1.75rem',
-							justifyContent: 'center',
-							minWidth: '1.75rem',
-							padding: '0 0.4rem',
-						}}
-					>
+					<li className="sse-document-presence-chip" key={peer.id} title={peer.label}>
 						{initialsFor(peer.label)}
 					</li>
 				))}

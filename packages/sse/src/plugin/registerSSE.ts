@@ -125,6 +125,7 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 			payload,
 			sourceSlugs,
 			scopeEnabled: options.scope !== false,
+			tenantsSlug: options.scope === false ? undefined : options.scope.tenantsSlug,
 		})
 
 		const prevDestroy = payload.destroy.bind(payload)

@@ -22,4 +22,5 @@ export type ResolveDocScope = (args: {
 export type SSEScopeOptions = {
 	resolveRequest: ResolveRequestScope
 	resolveDoc: ResolveDocScope
+	tenantsSlug?: string
 }

@@ -147,3 +147,10 @@ describe('multiTenantScope.resolveDoc', () => {
 		expect(await resolveDoc({ doc: { id: 'p1' } })).toBeNull()
 	})
 })
+
+describe('multiTenantScope.tenantsSlug', () => {
+	it('exposes the configured tenants collection slug', () => {
+		expect(multiTenantScope().tenantsSlug).toBe('tenants')
+		expect(multiTenantScope({ tenantsSlug: 'orgs' }).tenantsSlug).toBe('orgs')
+	})
+})

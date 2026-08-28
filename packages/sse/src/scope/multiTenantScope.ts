@@ -77,6 +77,7 @@ export const multiTenantScope = (options: MultiTenantScopeOptions = {}): SSEScop
 	const userHasAccessToAllTenants = options.userHasAccessToAllTenants
 
 	return {
+		tenantsSlug,
 		resolveRequest: ({ req }) => {
 			const assigned = assignedTenantIds(req.user, userTenantsField, userTenantsRowField)
 			const fromCookie = cookieTenant(req, tenantsSlug)
