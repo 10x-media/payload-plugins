@@ -12,6 +12,7 @@
 		"admin-wiki",
 		"undo-redo",
 		"automations",
-		"dual-session"
+		"dual-session",
+		"sse"
 	]
 }

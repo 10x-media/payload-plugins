@@ -1,0 +1,41 @@
+---
+title: SSE
+description: Server-Sent Events for opted-in Payload collections, viewer presence, and live admin list updates.
+---
+
+`@10x-media/sse` pushes create, update, and delete notifications for opted-in collections over Server-Sent Events. Clients subscribe to topics, receive thin (or optionally enriched) events, and refetch the document when they need fresh data.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { sse } from '@10x-media/sse'
+
+export default buildConfig({
+  plugins: [
+    sse({
+      collections: { posts: true },
+    }),
+  ],
+})
+```
+
+## What it is
+
+A thin realtime layer on top of Payload: collection hooks publish to an event broker, an authenticated stream endpoint fans events out to subscribers, optional presence tracks who is viewing a document, and optional admin components keep list views and presence chips live.
+
+## What it is not
+
+**No event log.** This plugin does not store history. The collection document is the source of truth. Reconnect means refetch, not replay.
+
+**Not document locking.** Payload already locks documents. This plugin only adds **viewers** (presence). It does not replace or extend locks.
+
+**No job progress percentage.** `payload-jobs` has no progress value. There is no percentage UI.
+
+## Architecture
+
+Events are **thin by default**: id, collection, operation, timestamp. Clients treat them as a signal to refetch. Set `thinEvents: false` on a collection to enrich with `findByID` under the subscriber's access (`overrideAccess: false`).
+
+The default broker is **in-process**. That is correct for a single Node process. A multi-instance deployment needs a host-supplied `broker` implementing `EventBroker`, or other nodes' clients are only as fresh as their refetch interval. The broker is a seam, not a built-in Redis or pub/sub product.
+
+## Next
+
+[Quick start](/sse/quick-start) for install and hooks, then [security](/sse/security) for the access model.

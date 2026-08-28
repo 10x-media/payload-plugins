@@ -1,17 +1,21 @@
 # @10x-media/sse
 
-Server-Sent Events, presence, and live admin updates for Payload.
+Server-Sent Events for opted-in Payload collections: live list updates, viewer presence, and thin realtime notifications. The collection document is the source of truth. This plugin stores no event log. Reconnect means refetch, not replay.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/sse?style=flat-square)](https://www.npmjs.com/package/@10x-media/sse)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-> Beta scaffold: this plugin currently returns the Payload config unchanged. Replace this note and the feature list below as you add behavior.
-
 ## Features
 
-- Replace with 3-6 one-line bullets covering what the plugin adds.
-- Typed translations with per-key overrides via `@10x-media/sse/i18n`.
+- **Opt-in collections** publish create, update, and delete over SSE (thin id-only events by default).
+- **No event log.** The Payload document is the source of truth. Reconnect means refetch, not replay.
+- **In-process broker by default.** Multi-instance needs a host-supplied `broker` implementing `EventBroker`, or other nodes' clients are only as fresh as their refetch interval.
+- **Viewer presence** (optional): who is looking at a document. Document locking stays Payload's feature; this plugin only adds viewers.
+- **Live admin list** flashes rows when documents change.
+- **Client hooks** via `@10x-media/sse/client` (`usePayloadDocument`, `usePayloadList`, `useDocumentPresence`, `usePayloadSubscription`).
+- **`getSSE(payload).emit`** for custom realtime events from your server code.
+- **No job progress UI.** `payload-jobs` has no progress value, so there is no percentage display.
 
 ## Quick start
 
@@ -25,7 +29,36 @@ import { buildConfig } from 'payload'
 import { sse } from '@10x-media/sse'
 
 export default buildConfig({
-  plugins: [sse({})],
+  plugins: [
+    sse({
+      collections: { posts: true },
+      presence: true,
+      admin: true,
+    }),
+  ],
+})
+```
+
+Stream URL (authenticated): `/api/realtime/stream?topics=posts` or `posts:docId`. Client hooks:
+
+```ts
+import {
+  usePayloadDocument,
+  usePayloadList,
+  useDocumentPresence,
+} from '@10x-media/sse/client'
+```
+
+Emit from the server:
+
+```ts
+import { getSSE } from '@10x-media/sse'
+
+getSSE(payload).emit({
+  id: 'custom-1',
+  topic: 'posts',
+  event: 'update',
+  timestamp: Date.now(),
 })
 ```
 
@@ -35,8 +68,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/sse):
 
 - [Overview](https://docs.10xmedia.de/sse)
 - [Quick start](https://docs.10xmedia.de/sse/quick-start)
-
-Add the plugin's docs tree under `apps/docs/content/docs/sse/` and list its pages here. Long-form documentation lives on the docs site, not in this README.
+- [Security model](https://docs.10xmedia.de/sse/security)
 
 ## License
 

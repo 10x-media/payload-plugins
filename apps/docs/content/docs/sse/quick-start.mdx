@@ -1,0 +1,120 @@
+---
+title: Quick start
+description: Install SSE, opt collections in, subscribe from the client, and enable presence or live admin lists.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/sse
+```
+
+## Configure
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { sse } from '@10x-media/sse'
+
+export default buildConfig({
+  // ...
+  plugins: [
+    sse({
+      collections: {
+        posts: true,
+        // or: posts: { thinEvents: false, events: ['create', 'update', 'delete'] },
+      },
+      presence: true,
+      admin: true,
+    }),
+  ],
+})
+```
+
+| Option | Meaning |
+|---|---|
+| `collections` | Opt-in map. `true` enables create/update/delete with thin events. |
+| `presence` | `true` / object enables viewer presence; omit or `false` disables. |
+| `admin` | `true` enables live list + presence chips; or `{ liveList?, presence? }`. |
+| `broker` | Custom `EventBroker` for multi-instance. Default is in-process. |
+| `heartbeatMs` | Stream comment heartbeat interval (default 15s). |
+
+Regenerate the import map after installing so admin components resolve:
+
+```bash
+pnpm generate:importmap
+```
+
+(or your project's usual `payload generate:importmap`).
+
+## Stream URL
+
+Authenticated GET:
+
+```
+/api/realtime/stream?topics=posts
+/api/realtime/stream?topics=posts:abc123
+/api/realtime/stream?topics=posts,posts:abc123
+```
+
+Topics are comma-separated. Empty topics return 400; at most 32 topics. Anonymous requests return 401. See [Security](/sse/security).
+
+## Client hooks
+
+```ts
+import {
+  usePayloadDocument,
+  usePayloadList,
+  useDocumentPresence,
+  usePayloadSubscription,
+} from '@10x-media/sse/client'
+```
+
+- **`usePayloadDocument({ collection, id })`**: document topic; bumps `revision` on thin events, sets `doc` when enriched.
+- **`usePayloadList({ collection })`**: collection topic; bumps `generation` on create/update/delete so you refetch the list.
+- **`useDocumentPresence({ collection, id })`**: join/leave and peer list for viewers.
+- **`usePayloadSubscription({ topics, onEvent })`**: low-level EventSource wrapper.
+
+Pass `token` when the browser cannot rely on cookies alone.
+
+## Presence
+
+```ts
+sse({
+  collections: { posts: true },
+  presence: {
+    heartbeatMs: 10_000,
+    leaseMs: 30_000,
+    identify: (user) => ({ id: String(user.id), label: String(user.id) }),
+  },
+})
+```
+
+Default `identify` uses the user id as both id and label. Do not default to email. Endpoints: `POST` / `DELETE` `/api/realtime/presence` with `{ collection, id }`.
+
+## Admin live list
+
+With `admin: true` (or `admin: { liveList: true }`), opted-in collection list views sync over SSE and flash changed rows. Presence chips appear on the edit view when admin presence is on. Document locking remains Payload's feature; chips are viewers only.
+
+## Emit from the server
+
+```ts
+import { getSSE } from '@10x-media/sse'
+
+const { emit } = getSSE(payload)
+emit({
+  id: crypto.randomUUID(),
+  topic: 'posts',
+  event: 'update',
+  collection: 'posts',
+  docId: 'abc',
+  timestamp: Date.now(),
+})
+```
+
+## Multi-instance
+
+The default broker is in-process. Supply your own `broker` implementing `EventBroker` (`publish`, `subscribe`, `destroy`) so events cross nodes. Without that, other nodes' clients are only as fresh as their refetch interval.
+
+## Next
+
+Read the [security model](/sse/security) before exposing the stream to untrusted clients.

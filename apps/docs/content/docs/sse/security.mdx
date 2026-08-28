@@ -1,0 +1,47 @@
+---
+title: Security model
+description: Topic authorization, thin vs enriched events, and presence identity rules.
+---
+
+The stream is authenticated. Everything below is connect-time topic authorization and what each event mode is allowed to leak.
+
+## Authentication
+
+`GET /api/realtime/stream` requires a logged-in user (`req.user`). Anonymous requests return **401**. Presence `POST` / `DELETE` likewise require auth.
+
+## Topics
+
+| Rule | Result |
+|---|---|
+| Empty `topics` query | **400** |
+| More than **32** topics | **400** |
+| Unknown collection or invalid topic shape | **403** |
+
+Topic shapes: `{slug}`, `{slug}:{id}`, `presence:{slug}:{id}`.
+
+## AccessResult: boolean vs Where
+
+For each topic the plugin runs the collection's `access.read`:
+
+- **`false`**: topic refused (**403**).
+- **`true`**: topic allowed (collection-wide or document-scoped).
+- **Where object**: collection-wide `{slug}` and presence without a matching id path are **refused**. For `{slug}:{id}` (and `presence:{slug}:{id}`), the plugin `count`s with `and: [where, { id: { equals: docId } }]` and `overrideAccess: false`. Zero matches → **403**.
+
+## Thin is not a security tier
+
+Thin events still carry collection and document ids. If `access.read` is `true` and a client subscribes collection-wide, those ids are visible on every create/update/delete. Thin only omits the document body; it does not hide membership of the collection.
+
+## Enrichment
+
+When `thinEvents: false`, the stream enriches with `findByID` using `overrideAccess: false`. Subscribers only receive a `doc` payload when that find succeeds under their access. Thin updates still go out when enrichment is skipped or denied.
+
+## Presence identity
+
+`presence.identify` maps `req.user` to `{ id, label }` for the peer list. The default uses the user **id** for both fields. Do **not** default `identify` to email (or other PII). Override only when you intentionally want a display label, and keep it non-sensitive if peers can see it.
+
+## Checklist
+
+- Require auth on the stream (already enforced).
+- Prefer Where-scoped `read` when collection-wide id leakage is unacceptable.
+- Treat thin events as public signals of "something changed for this id", not as a redaction layer.
+- Keep `identify` free of email by default.
