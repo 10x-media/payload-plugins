@@ -14,6 +14,10 @@ export type StreamHandlerDeps = {
 	collections: Record<string, { thinEvents: boolean }>
 	heartbeatMs: number
 	scope?: SSEScopeOptions | false
+	/** Concurrent streams per user id. Default 8. */
+	maxConnectionsPerUser?: number
+	/** Shared across handler instances so the cap survives per-request factories. */
+	connections?: Map<string, number>
 }
 
 const parseTopicsParam = (url: string | undefined): string[] => {
@@ -91,7 +95,14 @@ const prepareFrame = async (args: {
  * emits retry + ready, heartbeats, and broker events until `req.signal` aborts.
  */
 export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
-	const { broker, collections, heartbeatMs, scope = false } = deps
+	const {
+		broker,
+		collections,
+		heartbeatMs,
+		scope = false,
+		maxConnectionsPerUser = 8,
+		connections = new Map<string, number>(),
+	} = deps
 
 	return async (req) => {
 		if (!req.user) {
@@ -102,6 +113,21 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 		const auth = await authorizeTopics({ req, topics: topicNames, collections, scope })
 		if (!auth.ok) {
 			return Response.json({ message: auth.message }, { status: auth.status })
+		}
+
+		const userId = String((req.user as { id: unknown }).id)
+		const open = connections.get(userId) ?? 0
+		if (open >= maxConnectionsPerUser) {
+			return Response.json({ message: 'too many connections' }, { status: 429 })
+		}
+		connections.set(userId, open + 1)
+		let released = false
+		const release = () => {
+			if (released) return
+			released = true
+			const next = (connections.get(userId) ?? 1) - 1
+			if (next <= 0) connections.delete(userId)
+			else connections.set(userId, next)
 		}
 
 		const signal = (req as unknown as Request).signal as AbortSignal | undefined
@@ -125,6 +151,7 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 				const teardown = () => {
 					if (closed) return
 					closed = true
+					release()
 					enrichChain = Promise.resolve()
 					if (heartbeat !== undefined) {
 						clearInterval(heartbeat)
@@ -179,6 +206,7 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 			},
 			cancel() {
 				closed = true
+				release()
 				if (heartbeat !== undefined) {
 					clearInterval(heartbeat)
 					heartbeat = undefined

@@ -549,4 +549,48 @@ describe('makeStreamHandler', () => {
 		ac.abort()
 		await reader.cancel().catch(() => {})
 	})
+
+	it('returns 429 when the same user exceeds maxConnectionsPerUser', async () => {
+		const handler = makeStreamHandler({
+			broker: makeBroker(),
+			collections: { posts: { thinEvents: true } },
+			heartbeatMs: 60_000,
+			maxConnectionsPerUser: 1,
+		})
+		const firstAc = new AbortController()
+		const first = await handler(
+			authReq({ user: { id: 'cap-user' }, signal: firstAc.signal })
+		)
+		expect(first.status).toBe(200)
+
+		const second = await handler(authReq({ user: { id: 'cap-user' } }))
+		expect(second.status).toBe(429)
+
+		firstAc.abort()
+		await first.body?.cancel().catch(() => {})
+	})
+
+	it('releases a slot so a later connect succeeds after abort', async () => {
+		const handler = makeStreamHandler({
+			broker: makeBroker(),
+			collections: { posts: { thinEvents: true } },
+			heartbeatMs: 60_000,
+			maxConnectionsPerUser: 1,
+		})
+		const firstAc = new AbortController()
+		const first = await handler(
+			authReq({ user: { id: 'cap-user-2' }, signal: firstAc.signal })
+		)
+		expect(first.status).toBe(200)
+		firstAc.abort()
+		await first.body?.cancel().catch(() => {})
+
+		const thirdAc = new AbortController()
+		const third = await handler(
+			authReq({ user: { id: 'cap-user-2' }, signal: thirdAc.signal })
+		)
+		expect(third.status).toBe(200)
+		thirdAc.abort()
+		await third.body?.cancel().catch(() => {})
+	})
 })

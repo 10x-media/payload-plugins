@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { resolveSSEOptions } from './options'
 
 describe('resolveSSEOptions', () => {
-	it('defaults heartbeatMs to 15000', () => {
-		const resolved = resolveSSEOptions({})
-		expect(resolved.heartbeatMs).toBe(15_000)
+	it('defaults maxConnectionsPerUser to 8', () => {
+		expect(resolveSSEOptions({}).maxConnectionsPerUser).toBe(8)
+	})
+
+	it('preserves custom maxConnectionsPerUser', () => {
+		expect(resolveSSEOptions({ maxConnectionsPerUser: 3 }).maxConnectionsPerUser).toBe(3)
 	})
 
 	it('normalizes true collection entries to thinEvents true and all events', () => {

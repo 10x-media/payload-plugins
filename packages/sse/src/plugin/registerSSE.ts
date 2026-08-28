@@ -14,6 +14,7 @@ import { warnMissingScope } from './warnMissingScope'
 export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions }): void => {
 	const { config, options } = args
 	const sourceSlugs = Object.keys(options.collections)
+	const connections = new Map<string, number>()
 
 	config.collections ??= []
 	for (let i = 0; i < config.collections.length; i++) {
@@ -59,6 +60,8 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 				collections,
 				heartbeatMs: runtime.heartbeatMs,
 				scope: runtime.scope,
+				maxConnectionsPerUser: options.maxConnectionsPerUser,
+				connections,
 			})(req)
 		},
 	}

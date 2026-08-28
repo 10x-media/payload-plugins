@@ -34,6 +34,8 @@ export type SSEPluginOptions = {
 	admin?: boolean | { liveList?: boolean; presence?: boolean }
 	/** Stream comment heartbeat interval. Default 15_000. */
 	heartbeatMs?: number
+	/** Concurrent SSE streams per user. Default 8. Over the cap returns 429. */
+	maxConnectionsPerUser?: number
 	broker?: EventBroker
 	/**
 	 * Tenant/site boundary for collection-wide topics. Omit/`false` off.
@@ -53,6 +55,7 @@ export type ResolvedSSEOptions = {
 	presence: ResolvedPresenceOptions | false
 	admin: boolean | { liveList?: boolean; presence?: boolean } | undefined
 	heartbeatMs: number
+	maxConnectionsPerUser: number
 	broker: EventBroker | undefined
 	translations: TranslationsOption | undefined
 	/** Resolved scope resolvers when enabled; `false` when omit/false. */
@@ -110,6 +113,7 @@ export const resolveSSEOptions = (options: SSEPluginOptions): ResolvedSSEOptions
 		presence: resolvePresence(options.presence),
 		admin: options.admin,
 		heartbeatMs: options.heartbeatMs ?? 15_000,
+		maxConnectionsPerUser: options.maxConnectionsPerUser ?? 8,
 		broker: options.broker,
 		translations: options.translations,
 		scope: resolveScope(options.scope),

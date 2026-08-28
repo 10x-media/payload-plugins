@@ -10,6 +10,7 @@ const resolvedOptions = (broker: ResolvedSSEOptions['broker']): ResolvedSSEOptio
 	presence: false,
 	admin: undefined,
 	heartbeatMs: 15_000,
+	maxConnectionsPerUser: 8,
 	broker,
 	translations: undefined,
 	scope: false,
