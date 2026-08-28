@@ -13,6 +13,7 @@ import { collectLogDependencies } from '../jobs/logSlotComponents'
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { collectInputPlaceholders } from './inputPlaceholders'
 import { collectJobLabels, type JobLabelMaps } from './labelMaps'
 import { resolve } from './resolve'
 import {
@@ -34,6 +35,7 @@ const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
 const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
 const QUEUE_SELECT_FIELD = '@10x-media/jobs/client#QueueSelectField'
 const ATTEMPTS_CELL = '@10x-media/jobs/client#AttemptsCell'
+const INPUT_FIELD = '@10x-media/jobs/client#JobInputField'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
@@ -290,8 +292,10 @@ export const registerJobsEnhancements = (
 		// `payload.jobs.queue()` may target.
 		const slugs = collectJobSelectSlugs(config, extraQueues)
 		const labels = collectJobLabels(config)
+		const placeholders = collectInputPlaceholders(config, options.input?.examples)
 		const fieldComponents: Record<string, PayloadComponent> = {
 			...FIELD_COMPONENTS,
+			input: { clientProps: { placeholders }, path: INPUT_FIELD },
 			log: {
 				clientProps: { taskLabels: labels.taskLabels },
 				path: LOG_TIMELINE,

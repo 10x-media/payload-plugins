@@ -53,6 +53,37 @@ The select's options come from automatic queue discovery, so you rarely need to 
 jobs({ queues: ['emails', 'exports'] })
 ```
 
+## Create form: input placeholder
+
+Picking a task or workflow on the create form fills `input` with a placeholder derived from that entry's `inputSchema`, so the expected shape is on screen instead of in your head. An entry with no schema fills `{}`.
+
+The placeholder is written only while the field is blank or still holds the placeholder the previous pick put there; anything you typed survives switching tasks, and clearing the selection empties the field under the same rule. Existing jobs are not touched: their inputs are read-only.
+
+Values come from the field types, and a list carries one element so its shape shows too:
+
+| Field | Placeholder |
+|---|---|
+| `text`, `textarea`, `email`, `code`, `date` | `""` |
+| `number` | `0` |
+| `checkbox` | `false` |
+| `select`, `radio` | the first option |
+| `relationship`, `upload` | `"<collection id>"`, naming `relationTo` |
+| any `hasMany` field | one element of the above, e.g. `["<people id>"]` |
+| `group` | a nested object; `array` one row of one |
+| `row`, `collapsible`, unnamed `tabs` and groups | their fields, flattened into the parent |
+
+The derivation cannot invent meaningful values, only shapes. For a slug whose placeholder should carry real ones, write it yourself; it replaces the derived object whole:
+
+```ts title="payload.config.ts"
+jobs({
+  input: {
+    examples: {
+      atosSync: { phases: ['persons'], limit: 100, personCodes: [], runImages: false },
+    },
+  },
+})
+```
+
 ## Options
 
 All dashboard options live at the top level of the plugin options:
@@ -65,6 +96,7 @@ All dashboard options live at the top level of the plugin options:
 | `cells` | `Record<string, PayloadComponent \| false>` | built-ins | Per-field list-cell overrides, keyed by job field name. `false` keeps Payload's default cell. |
 | `status` | `PayloadComponent \| false` | built-in | Replace or remove the derived Status column. |
 | `log.entryComponents` | `Record<string, Partial<Record<JobLogSlot, PayloadComponent \| false>>>` | `{}` | Custom renderers for the blocks inside an expanded log-attempt row, keyed by task slug (`'*'` for every task). See [Custom log blocks](#custom-log-blocks). |
+| `input.examples` | `Record<string, Record<string, unknown>>` | `{}` | Hand-written create-form placeholders for `input`, keyed by task or workflow slug, replacing the one derived from `inputSchema`. See [Create form: input placeholder](#create-form-input-placeholder). |
 | `beforeListTable` | `PayloadComponent[] \| false` | health bar | Replace or remove the components above the list. |
 | `healthBarCap` | `number \| false` | `100` | Per-status count cap; `false` shows exact counts. |
 | `queues` | `string[]` | `[]` | Extra queue names for the admin queue select, on top of the sources auto-discovered from config. |

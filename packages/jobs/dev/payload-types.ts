@@ -104,6 +104,7 @@ export interface Config {
     tasks: {
       sleep: TaskSleep;
       noop: TaskNoop;
+      importAthletes: TaskImportAthletes;
       inline: {
         input: unknown;
         output: unknown;
@@ -240,7 +241,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'sleep' | 'noop';
+        taskSlug: 'inline' | 'sleep' | 'noop' | 'importAthletes';
         taskID: string;
         input?:
           | {
@@ -274,7 +275,7 @@ export interface PayloadJob {
       }[]
     | null;
   workflowSlug?: 'runAutomation' | null;
-  taskSlug?: ('inline' | 'sleep' | 'noop') | null;
+  taskSlug?: ('inline' | 'sleep' | 'noop' | 'importAthletes') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -503,7 +504,9 @@ export interface CollectionsWidget {
  * via the `definition` "TaskSleep".
  */
 export interface TaskSleep {
-  input?: unknown;
+  input: {
+    ms: number;
+  };
   output?: unknown;
 }
 /**
@@ -516,10 +519,37 @@ export interface TaskNoop {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskImportAthletes".
+ */
+export interface TaskImportAthletes {
+  input: {
+    disciplines?: ('sprint' | 'slalom')[] | null;
+    athleteCodes?: string[] | null;
+    limit?: number | null;
+    dryRun?: boolean | null;
+    notify?: (string | null) | User;
+    source?: {
+      url?: string | null;
+      since?: string | null;
+    };
+    ranges?:
+      | {
+          from?: number | null;
+          to?: number | null;
+        }[]
+      | null;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "WorkflowRunAutomation".
  */
 export interface WorkflowRunAutomation {
-  input?: unknown;
+  input: {
+    automation?: string | null;
+    dryRun?: boolean | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

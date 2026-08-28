@@ -1,4 +1,6 @@
 export type {
+	JobInputExamples,
+	JobInputPlaceholders,
 	JobLogEntry,
 	JobLogEntryComponents,
 	JobLogSlot,

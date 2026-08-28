@@ -90,6 +90,7 @@ export type {
 	JobsPluginOptions,
 	JobsPluginOptions as PluginOptions,
 } from './options'
+export type { JobInputExamples, JobInputPlaceholders } from './plugin/inputPlaceholders'
 export {
 	multiNodePreset,
 	serverlessPreset,

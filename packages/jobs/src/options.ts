@@ -1,6 +1,7 @@
 import type { CollectionConfig, Field, PayloadComponent } from 'payload'
 
 import type { JobLogEntryComponents } from './jobs/logSlotComponents'
+import type { JobInputExamples } from './plugin/inputPlaceholders'
 import type { Override } from './plugin/resolve'
 import type { QueueControlOptions } from './queueControl/options'
 import type { ReliabilityOptions } from './reliability/options'
@@ -48,6 +49,12 @@ export type JobsOptions = {
 	 * `payload generate:importmap` after changing them.
 	 */
 	log?: { entryComponents?: JobLogEntryComponents }
+	/**
+	 * Create-form placeholder for `input`. Derived from each task's and workflow's
+	 * `inputSchema` by default; `examples` replaces the derived object for a slug
+	 * with one written by hand, for values the derivation cannot invent.
+	 */
+	input?: { examples?: JobInputExamples }
 	/**
 	 * Components rendered between the search bar and the table. `false` removes our
 	 * queue-health bar; an array replaces it.

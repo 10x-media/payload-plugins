@@ -46,6 +46,8 @@ export default buildConfig({
 			// Demo of the log-slot seam: `sleep` gets server-rendered input and output,
 			// every task gets the client-rendered error card, and `inline` attempts keep
 			// the default JSON blocks so the contrast is visible in one document.
+			// `sleep` shows a hand-written example winning over the derived `{ ms: 0 }`.
+			input: { examples: { sleep: { ms: 1500 } } },
 			log: {
 				entryComponents: {
 					'*': { error: '/components/AttemptError#AttemptError' },
