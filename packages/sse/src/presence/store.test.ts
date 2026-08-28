@@ -62,6 +62,36 @@ describe('createPresenceStore', () => {
 		expect(await kv.get('sse:presence:posts:1')).toBeNull()
 	})
 
+	it('overlapping joins on the same document keep both peers', async () => {
+		const data = new Map<string, unknown>()
+		const kv = {
+			get: async (key: string) => {
+				await new Promise((resolve) => setTimeout(resolve, 5))
+				return data.get(key) ?? null
+			},
+			set: async (key: string, value: unknown) => {
+				data.set(key, value)
+			},
+			delete: async (key: string) => {
+				data.delete(key)
+			},
+			has: async (key: string) => data.has(key),
+			keys: async () => [...data.keys()],
+			clear: async () => {
+				data.clear()
+			},
+		}
+		const store = createPresenceStore(kv as never, { leaseMs: 30_000, now: () => 1_000 })
+
+		await Promise.all([
+			store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } }),
+			store.join({ collection: 'posts', id: '1', peer: { id: 'u2', label: 'Bob' } }),
+		])
+
+		const peers = await store.get({ collection: 'posts', id: '1' })
+		expect(peers.map((peer) => peer.id).sort()).toEqual(['u1', 'u2'])
+	})
+
 	it('never calls kv.keys', async () => {
 		const kv = makeKv()
 		const keys = vi.spyOn(kv, 'keys')
