@@ -336,6 +336,18 @@ describeForDb('jobs input editors', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 	})
+
+	it('leaves the log row fields of the same name alone, timeline territory', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		const log = cfg && deepFieldByName(cfg.fields, 'log')
+		const rowFields = log && 'fields' in log ? log.fields : []
+		expect(rowFields.length).toBeGreaterThan(0)
+		for (const name of ['input', 'error']) {
+			const field = fieldByName(rowFields, name)
+			expect(field).toBeDefined()
+			expect(field?.admin?.components?.Field).toBeUndefined()
+		}
+	})
 })
 
 describeForDb('jobs log slot components off', { dbs: ['mongo'] }, (db) => {

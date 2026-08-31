@@ -8,6 +8,7 @@ import {
 	type LabelFunction,
 	type PayloadComponent,
 } from 'payload'
+import { fieldAffectsData, tabHasName } from 'payload/shared'
 import { collectInputDependencies } from '../jobs/inputComponents'
 import { collectInputPlaceholders } from '../jobs/inputPlaceholders'
 import { collectLogDependencies } from '../jobs/logSlotComponents'
@@ -184,8 +185,15 @@ type EnhanceContext = {
 	lockRecord: boolean
 }
 
-/** Recursively relabel fields, apply cell overrides, and lock the record, descending into tabs. */
-const enhanceFields = (fields: Field[], ctx: EnhanceContext): Field[] =>
+/**
+ * Recursively relabel fields, apply cell overrides, and lock the record, descending
+ * into tabs. Field components stay on the fields the document form actually renders:
+ * `log` rows carry an `input`, an `output` and an `error` of their own, and our
+ * timeline draws those from the attempt's raw values, so a nested match would
+ * pre-render an editor nothing mounts. Presentational containers keep the level
+ * (`error` and `log` sit inside an unnamed tab); a named tab, group or array drops it.
+ */
+const enhanceFields = (fields: Field[], ctx: EnhanceContext, ownFields = true): Field[] =>
 	fields.map((field): Field => {
 		let next = field
 		const name = fieldName(field)
@@ -196,7 +204,7 @@ const enhanceFields = (fields: Field[], ctx: EnhanceContext): Field[] =>
 		if (ctx.lockRecord && name) {
 			next = lockField(next, name)
 		}
-		if (name && ctx.fieldComponents[name]) {
+		if (ownFields && name && ctx.fieldComponents[name]) {
 			next = {
 				...next,
 				admin: {
@@ -210,11 +218,14 @@ const enhanceFields = (fields: Field[], ctx: EnhanceContext): Field[] =>
 				...next,
 				tabs: next.tabs.map((tab) => ({
 					...tab,
-					fields: enhanceFields(tab.fields, ctx),
+					fields: enhanceFields(tab.fields, ctx, ownFields && !tabHasName(tab)),
 				})),
 			} as Field
 		} else if ('fields' in next) {
-			next = { ...next, fields: enhanceFields(next.fields, ctx) } as Field
+			next = {
+				...next,
+				fields: enhanceFields(next.fields, ctx, ownFields && !fieldAffectsData(next)),
+			} as Field
 		}
 		return next
 	})
