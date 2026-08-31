@@ -40,6 +40,7 @@ export const publishThin = async (args: {
 	const { collection, docId, operation, doc, req, broker, scope } = args
 	const timestamp = Date.now()
 	const actorId = actorIdFromUser(req.user)
+	const docTopic = `${collection}:${docId}`
 
 	let scopeId: string | null = null
 	if (scope) {
@@ -53,7 +54,7 @@ export const publishThin = async (args: {
 		}
 	}
 
-	const topics: string[] = [`${collection}:${docId}`]
+	const topics: string[] = [docTopic]
 	if (scope) {
 		if (scopeId) {
 			topics.push(scopedTopic(scopeId, collection))
@@ -73,14 +74,14 @@ export const publishThin = async (args: {
 			log: req.payload.logger,
 			event: {
 				// Never embed docId: gated deletes strip docId/data but keep `id` on the wire.
-				id: `${timestamp}:${collection}:${operation}:${topic}`,
+				id: `${timestamp}:${collection}:${operation}:${topic}:${crypto.randomUUID()}`,
 				topic,
 				event: operation,
 				collection,
 				docId,
 				operation,
 				timestamp,
-				...(actorId ? { actorId } : {}),
+				...(actorId && topic === docTopic ? { actorId } : {}),
 				...(scopeId ? { scope: scopeId } : {}),
 			},
 		})

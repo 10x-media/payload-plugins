@@ -151,8 +151,10 @@ const withDocumentConflict = (collection: CollectionConfig): CollectionConfig =>
  * chips, and the stale-while-dirty banner on SSE-enabled collections. No-op when
  * liveList, presence, and conflict are all off.
  *
- * Payload 3.85 has no `edit.beforeDocument` slot. The banner is prepended to
- * `beforeDocumentControls` and CSS takes a full row above the chips.
+ * Payload 3.85 has no `edit.beforeDocument` slot. DocumentConflict still
+ * registers on `beforeDocumentControls` so its hooks run, then portals the
+ * banner after `.doc-controls`. That slot is the fixed-height nowrap save
+ * toolbar, not a page banner.
  */
 export const registerAdmin = (args: { config: Config; options: ResolvedSSEOptions }): void => {
 	const { config, options } = args

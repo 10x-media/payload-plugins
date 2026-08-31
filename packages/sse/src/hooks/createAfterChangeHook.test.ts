@@ -91,7 +91,7 @@ describe('createAfterChangeHook', () => {
 		expect(broker.published.map((e) => e.topic).sort()).toEqual(['posts', 'posts:42'])
 	})
 
-	it('sets actorId from req.user.id on list and doc topics', async () => {
+	it('sets actorId from req.user.id on the document topic only', async () => {
 		const hook = createAfterChangeHook({ collection: 'posts', events: ['update'] })
 		const doc = { id: 'abc' }
 		const req = { payload, context: {}, user: { id: 'u1' } } as unknown as PayloadRequest
@@ -104,9 +104,8 @@ describe('createAfterChangeHook', () => {
 		} as Parameters<typeof hook>[0])
 
 		expect(broker.published).toHaveLength(2)
-		for (const event of broker.published) {
-			expect(event.actorId).toBe('u1')
-		}
+		expect(broker.published.find((event) => event.topic === 'posts:abc')?.actorId).toBe('u1')
+		expect(broker.published.find((event) => event.topic === 'posts')?.actorId).toBeUndefined()
 	})
 
 	it('stringifies numeric req.user.id as actorId', async () => {
@@ -120,7 +119,33 @@ describe('createAfterChangeHook', () => {
 			collection: { slug: 'posts' },
 		} as Parameters<typeof hook>[0])
 
-		expect(broker.published.every((event) => event.actorId === '7')).toBe(true)
+		expect(broker.published.find((event) => event.topic === 'posts:abc')?.actorId).toBe('7')
+		expect(broker.published.find((event) => event.topic === 'posts')?.actorId).toBeUndefined()
+	})
+
+	it('gives each publish a unique id when Date.now is stable', async () => {
+		const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+		try {
+			const hook = createAfterChangeHook({ collection: 'posts', events: ['update'] })
+			const req = { payload, context: {}, user: { id: 'u1' } } as unknown as PayloadRequest
+			const args = {
+				doc: { id: 'abc' },
+				operation: 'update' as const,
+				req,
+				collection: { slug: 'posts' },
+			} as Parameters<typeof hook>[0]
+
+			await hook(args)
+			await hook(args)
+
+			const docIds = broker.published
+				.filter((event) => event.topic === 'posts:abc')
+				.map((event) => event.id)
+			expect(docIds).toHaveLength(2)
+			expect(new Set(docIds).size).toBe(2)
+		} finally {
+			now.mockRestore()
+		}
 	})
 
 	it('skips when operation is not in events', async () => {

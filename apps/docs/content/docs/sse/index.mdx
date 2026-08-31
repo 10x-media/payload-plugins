@@ -32,7 +32,7 @@ A thin realtime layer on top of Payload: collection hooks publish to an event br
 
 ## Architecture
 
-Events are **thin by default**: id, collection, operation, timestamp, and optional `actorId` (the writer's user id when `req.user` is present). Clients treat them as a signal to refetch. Set `thinEvents: false` on a collection to enrich with `findByID` under the subscriber's access (`overrideAccess: false`).
+Events are **thin by default**: id, collection, operation, timestamp, and optional `actorId` on the document topic (the writer's user id when `req.user` is present). Clients treat them as a signal to refetch. Set `thinEvents: false` on a collection to enrich with `findByID` under the subscriber's access (`overrideAccess: false`).
 
 The default broker is **in-process**. That is correct for a single Node process. A multi-instance deployment needs a host-supplied `broker` implementing `EventBroker`, or other nodes' clients are only as fresh as their refetch interval. The broker is a seam, not a built-in Redis or pub/sub product.
 

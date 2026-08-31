@@ -59,6 +59,8 @@ test('dirty editor sees a conflict banner when another user saves', async ({ bro
 	const bannerCopy =
 		'Someone else saved this document. Reload to see their version, or keep editing'
 	await expect(page.getByText(bannerCopy)).toBeVisible({ timeout: 20_000 })
+	await expect(page.locator('.doc-controls__controls .sse-document-conflict')).toHaveCount(0)
+	await expect(page.locator('#action-save')).toBeInViewport()
 
 	await page.getByRole('button', { name: 'Keep editing' }).click()
 	await expect(page.getByText(bannerCopy)).toHaveCount(0)

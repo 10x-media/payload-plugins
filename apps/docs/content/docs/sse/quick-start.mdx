@@ -105,7 +105,7 @@ Admin chips bind `mode` to form dirty: first keystroke publishes `editing` over 
 
 With `admin: true` (or `admin: { liveList: true }`), opted-in collection list views sync over SSE and flash changed rows. Presence chips appear on the edit view when admin presence is on. Chips show viewing vs editing. They are not a lock.
 
-When `admin.conflict` is on (the default whenever admin is on), a dirty edit form shows a banner if someone else updates or deletes that document. Reload dumps local form state. Keep editing dismisses the banner; save still last-write-wins. A clean form does not auto-refetch. Autosave writes do not publish, so they do not trip the banner. The banner mounts first in `edit.beforeDocumentControls` (Payload 3.85 has no `beforeDocument` slot).
+When `admin.conflict` is on (the default whenever admin is on), a dirty edit form shows a banner if someone else updates or deletes that document. Reload dumps local form state. Keep editing dismisses the banner; save still last-write-wins. A clean form does not auto-refetch. Autosave writes do not publish, so they do not trip the banner. The component registers on `edit.beforeDocumentControls` so it can run on the edit view, then portals the banner below Payload's save toolbar (that slot is a fixed-height nowrap bar). Another tab of the **same user** is treated as your own write and does not banner. Reconnect does not replay, so a write while the stream is down can be missed. Presence plus conflict uses two SSE connections per edit view; raise `maxConnectionsPerUser` if you open many tabs.
 
 ## Emit from the server
 

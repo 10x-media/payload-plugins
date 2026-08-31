@@ -71,7 +71,7 @@ describe('createAfterDeleteHook', () => {
 		}
 	})
 
-	it('sets actorId from req.user.id on delete events', async () => {
+	it('sets actorId from req.user.id on the document topic only', async () => {
 		const hook = createAfterDeleteHook({ collection: 'posts', events: ['delete'] })
 		const req = { payload, context: {}, user: { id: 'u1' } } as unknown as PayloadRequest
 
@@ -81,7 +81,8 @@ describe('createAfterDeleteHook', () => {
 			collection: { slug: 'posts' },
 		} as Parameters<typeof hook>[0])
 
-		expect(broker.published.every((event) => event.actorId === 'u1')).toBe(true)
+		expect(broker.published.find((event) => event.topic === 'posts:gone')?.actorId).toBe('u1')
+		expect(broker.published.find((event) => event.topic === 'posts')?.actorId).toBeUndefined()
 	})
 
 	it('skips when delete is not in events', async () => {
