@@ -45,7 +45,7 @@ describe('resolveSSEOptions', () => {
 		expect(resolveSSEOptions({ presence: false }).presence).toBe(false)
 	})
 
-	it('resolves presence true to defaults without email identify', () => {
+	it('resolves presence true to defaults with name then email then id as label', () => {
 		const resolved = resolveSSEOptions({ presence: true })
 		expect(resolved.presence).not.toBe(false)
 		if (resolved.presence === false) {
@@ -53,9 +53,28 @@ describe('resolveSSEOptions', () => {
 		}
 		expect(resolved.presence.heartbeatMs).toBe(10_000)
 		expect(resolved.presence.leaseMs).toBe(30_000)
+		expect(resolved.presence.profile).toBe('none')
+		expect(resolved.presence.identify({ id: 7, name: 'Ada', email: 'a@t.dev' })).toEqual({
+			id: '7',
+			label: 'Ada',
+		})
 		expect(resolved.presence.identify({ id: 7, email: 'a@t.dev' })).toEqual({
 			id: '7',
+			label: 'a@t.dev',
+		})
+		expect(resolved.presence.identify({ id: 7 })).toEqual({
+			id: '7',
 			label: '7',
+		})
+	})
+
+	it('defaults presence.profile to none and preserves drawer or newTab', () => {
+		expect(resolveSSEOptions({ presence: true }).presence).toMatchObject({ profile: 'none' })
+		expect(resolveSSEOptions({ presence: { profile: 'drawer' } }).presence).toMatchObject({
+			profile: 'drawer',
+		})
+		expect(resolveSSEOptions({ presence: { profile: 'newTab' } }).presence).toMatchObject({
+			profile: 'newTab',
 		})
 	})
 
@@ -69,6 +88,7 @@ describe('resolveSSEOptions', () => {
 			heartbeatMs: 5_000,
 			leaseMs: 30_000,
 			identify,
+			profile: 'none',
 		})
 		expect(resolved.admin).toEqual({ liveList: true })
 	})

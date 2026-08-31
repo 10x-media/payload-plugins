@@ -32,6 +32,7 @@ export { SSE_SKIP } from './hooks/createAfterChangeHook'
 export type {
 	CollectionSSEConfig,
 	PresenceOptions,
+	PresenceProfile,
 	ResolvedPresenceOptions,
 	SSEPluginOptions,
 	SSEPluginOptions as PluginOptions,

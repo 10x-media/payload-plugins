@@ -34,6 +34,7 @@ export default buildConfig({
 |---|---|
 | `collections` | Opt-in map. `true` enables create/update/delete with thin events. |
 | `presence` | `true` / object enables viewer presence; omit or `false` disables. |
+| `presence.profile` | Admin chip click: `none` (default), `drawer`, or `newTab`. Hover always shows the identify label. |
 | `admin` | Omit/`false` off. `true` enables live list + presence chips; or `{ liveList?, presence? }`. |
 | `scope` | Omit/`false` off. `true` uses `multiTenantScope()`; or `{ resolveRequest, resolveDoc }`. |
 | `broker` | Custom `EventBroker` for multi-instance. Default is in-process. |
@@ -86,12 +87,15 @@ sse({
   presence: {
     heartbeatMs: 10_000,
     leaseMs: 30_000,
-    identify: (user) => ({ id: String(user.id), label: String(user.id) }),
+    profile: 'drawer',
+    identify: (user) => ({ id: String(user.id), label: String(user.name ?? user.id) }),
   },
 })
 ```
 
-Default `identify` uses the user id as both id and label. Do not default to email. Endpoints: `POST` / `DELETE` `/api/realtime/presence` with `{ collection, id }`.
+Default `identify` label is `name`, then `email`, then `id`. A custom `identify` still wins. Endpoints: `POST` / `DELETE` `/api/realtime/presence` with `{ collection, id }`.
+
+`presence.profile` is admin-only. Omit or `none` keeps chips as hover-only. `drawer` opens the viewer's user document in Payload's document drawer. `newTab` opens `{adminRoute}/collections/{usersSlug}/{peer.id}`. If `users.read` is self-only, drawer and new-tab return 403. That is host ACL.
 
 ## Admin live list
 

@@ -1,6 +1,6 @@
-import type { CollectionConfig, Config, CustomComponent, Field, PayloadComponent } from 'payload'
+import type { CollectionConfig, Config, CustomComponent, Field } from 'payload'
 
-import type { ResolvedSSEOptions } from '../options'
+import type { PresenceProfile, ResolvedSSEOptions } from '../options'
 
 /** List cell path resolved through the package export map by the import map. */
 export const LIVE_LIST_CELL_PATH = '@10x-media/sse/client#LiveListBadge'
@@ -11,7 +11,10 @@ export const LIVE_LIST_SYNC_PATH = '@10x-media/sse/client#LiveListSync'
 /** Edit-view presence chip path resolved through the package export map. */
 export const DOCUMENT_PRESENCE_PATH = '@10x-media/sse/client#DocumentPresence'
 
-const documentPresenceComponent = (): PayloadComponent<never, never> => ({
+const documentPresenceComponent = (
+	profile: PresenceProfile
+): CustomComponent<{ profile: PresenceProfile }> => ({
+	clientProps: { profile },
 	path: DOCUMENT_PRESENCE_PATH,
 })
 
@@ -79,7 +82,10 @@ const withLiveList = (collection: CollectionConfig): CollectionConfig => {
 	}
 }
 
-const withDocumentPresence = (collection: CollectionConfig): CollectionConfig => {
+const withDocumentPresence = (
+	collection: CollectionConfig,
+	profile: PresenceProfile
+): CollectionConfig => {
 	const admin = collection.admin ?? {}
 	const components = admin.components ?? {}
 	const edit = components.edit ?? {}
@@ -93,7 +99,7 @@ const withDocumentPresence = (collection: CollectionConfig): CollectionConfig =>
 					...edit,
 					beforeDocumentControls: [
 						...(edit.beforeDocumentControls ?? []),
-						documentPresenceComponent(),
+						documentPresenceComponent(profile),
 					],
 				},
 			},
@@ -138,8 +144,8 @@ export const registerAdmin = (args: { config: Config; options: ResolvedSSEOption
 		if (flags.liveList) {
 			next = withLiveList(next)
 		}
-		if (flags.presence) {
-			next = withDocumentPresence(next)
+		if (flags.presence && options.presence !== false) {
+			next = withDocumentPresence(next, options.presence.profile)
 		}
 		config.collections[i] = next
 	}

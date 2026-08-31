@@ -48,7 +48,7 @@ export default buildConfig({
 	plugins: [
 		sse({
 			collections: { posts: true },
-			presence: true,
+			presence: { profile: 'drawer' },
 			admin: true,
 		}),
 	],

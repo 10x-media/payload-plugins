@@ -14,16 +14,21 @@ export type CollectionSSEConfig = {
 
 export type PresenceIdentify = (user: unknown) => { id: string; label: string }
 
+export type PresenceProfile = 'none' | 'drawer' | 'newTab'
+
 export type PresenceOptions = {
 	heartbeatMs?: number
 	leaseMs?: number
 	identify?: PresenceIdentify
+	/** Admin chip click. Default `none`. Hover always shows `identify` label. */
+	profile?: PresenceProfile
 }
 
 export type ResolvedPresenceOptions = {
 	heartbeatMs: number
 	leaseMs: number
 	identify: PresenceIdentify
+	profile: PresenceProfile
 }
 
 export type SSEPluginOptions = {
@@ -65,8 +70,11 @@ export type ResolvedSSEOptions = {
 const DEFAULT_EVENTS: SSEOperation[] = ['create', 'update', 'delete']
 
 const defaultIdentify: PresenceIdentify = (user) => {
-	const id = String((user as { id: unknown }).id)
-	return { id, label: id }
+	const record = user as { id: unknown; name?: unknown; email?: unknown }
+	const id = String(record.id)
+	const name = typeof record.name === 'string' ? record.name.trim() : ''
+	const email = typeof record.email === 'string' ? record.email.trim() : ''
+	return { id, label: name || email || id }
 }
 
 const resolvePresence = (
@@ -80,6 +88,7 @@ const resolvePresence = (
 		heartbeatMs: opts.heartbeatMs ?? 10_000,
 		leaseMs: opts.leaseMs ?? 30_000,
 		identify: opts.identify ?? defaultIdentify,
+		profile: opts.profile ?? 'none',
 	}
 }
 

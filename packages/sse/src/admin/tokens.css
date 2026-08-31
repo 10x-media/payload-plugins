@@ -39,3 +39,20 @@
 	min-width: 1.75rem;
 	padding: 0 0.4rem;
 }
+
+.sse-document-presence-chip--clickable {
+	cursor: pointer;
+	padding: 0;
+}
+
+.sse-document-presence-chip button {
+	background: none;
+	border: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	font-weight: inherit;
+	height: 1.75rem;
+	min-width: 1.75rem;
+	padding: 0 0.4rem;
+}

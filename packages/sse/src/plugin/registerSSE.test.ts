@@ -78,6 +78,7 @@ describe('registerSSE', () => {
 				presence: {
 					heartbeatMs: 10_000,
 					leaseMs: 30_000,
+					profile: 'none',
 					identify: (user) => ({
 						id: String((user as { id: unknown }).id),
 						label: String((user as { id: unknown }).id),

@@ -16,6 +16,7 @@ const baseOptions = (): ResolvedSSEOptions => ({
 	presence: {
 		heartbeatMs: 10_000,
 		leaseMs: 30_000,
+		profile: 'none',
 		identify: (user) => ({ id: String((user as { id: unknown }).id), label: 'x' }),
 	},
 	admin: true,
@@ -63,7 +64,10 @@ describe('registerAdmin', () => {
 			clientProps: { collection: 'posts' },
 			path: LIVE_LIST_SYNC_PATH,
 		})
-		expect(beforeControls(config)).toContainEqual({ path: DOCUMENT_PRESENCE_PATH })
+		expect(beforeControls(config)).toContainEqual({
+			clientProps: { profile: 'none' },
+			path: DOCUMENT_PRESENCE_PATH,
+		})
 	})
 
 	it('registers nothing when admin is omitted', () => {
@@ -93,7 +97,10 @@ describe('registerAdmin', () => {
 
 		expect(titleCell(config)).toBeUndefined()
 		expect(beforeListTable(config)).toEqual([])
-		expect(beforeControls(config)).toContainEqual({ path: DOCUMENT_PRESENCE_PATH })
+		expect(beforeControls(config)).toContainEqual({
+			clientProps: { profile: 'none' },
+			path: DOCUMENT_PRESENCE_PATH,
+		})
 	})
 
 	it('skips DocumentPresence when plugin presence is off', () => {
@@ -124,6 +131,25 @@ describe('registerAdmin', () => {
 			path: LIVE_LIST_SYNC_PATH,
 		})
 		expect(beforeControls(config)).toEqual([])
+	})
+
+	it('passes drawer profile to DocumentPresence clientProps', () => {
+		const config = postsConfig()
+		const presence = baseOptions().presence
+		if (presence === false) {
+			throw new Error('expected presence enabled')
+		}
+		registerAdmin({
+			config,
+			options: {
+				...baseOptions(),
+				presence: { ...presence, profile: 'drawer' },
+			},
+		})
+		expect(beforeControls(config)).toContainEqual({
+			clientProps: { profile: 'drawer' },
+			path: DOCUMENT_PRESENCE_PATH,
+		})
 	})
 
 	it('skips LiveListBadge when the target field already has a Cell, still mounts LiveListSync', () => {

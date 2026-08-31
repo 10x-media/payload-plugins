@@ -50,7 +50,7 @@ When `thinEvents: false`, the stream enriches with `findByID` using `overrideAcc
 
 ## Presence identity
 
-`presence.identify` maps `req.user` to `{ id, label }` for the peer list. The default uses the user **id** for both fields. Do **not** default `identify` to email (or other PII). Override only when you intentionally want a display label, and keep it non-sensitive if peers can see it.
+`presence.identify` maps `req.user` to `{ id, label }` for the peer list. The default label is `name`, then `email`, then `id`. Peers see that label on hover. Override `identify` when you do not want email (or other PII) on the wire. `presence.profile` (`drawer` / `newTab`) opens the viewer's user document by id. If `users.read` is self-only, that click 403s. Host ACL.
 
 ## Checklist
 
@@ -59,4 +59,4 @@ When `thinEvents: false`, the stream enriches with `findByID` using `overrideAcc
 - Cap concurrent streams per user (`maxConnectionsPerUser`, **429** over the limit).
 - Prefer Where-scoped `read` when collection-wide id leakage is unacceptable. Enable `scope` for multi-tenant installs so `{slug}` stays usable under a Where.
 - Treat thin events as public signals of "something changed for this id", not as a redaction layer.
-- Keep `identify` free of email by default.
+- Override `identify` if you do not want email (the default label fallback) visible to peers.
