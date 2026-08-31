@@ -35,11 +35,13 @@ export default buildConfig({
 | `collections` | Opt-in map. `true` enables create/update/delete with thin events. |
 | `presence` | `true` / object enables viewer presence; omit or `false` disables. |
 | `presence.profile` | Admin chip click: `none` (default), `drawer`, or `newTab`. Hover always shows the identify label. |
-| `admin` | Omit/`false` off. `true` enables live list + presence chips; or `{ liveList?, presence? }`. |
+| `admin` | Omit/`false` off. `true` enables live list + presence chips; or `{ liveList?, presence? }`. `liveList` may be `{ field: 'title' }` to pick the Cell target. |
 | `scope` | Omit/`false` off. `true` uses `multiTenantScope()`; or `{ resolveRequest, resolveDoc }`. |
 | `broker` | Custom `EventBroker` for multi-instance. Default is in-process. |
-| `heartbeatMs` | Stream comment heartbeat interval (default 15s). |
-| `maxConnectionsPerUser` | Concurrent streams per user (default 8). Over the cap returns 429. |
+| `heartbeatMs` | Stream comment heartbeat interval (default 15s, floor 1s). |
+| `maxConnectionsPerUser` | Concurrent streams per user **per process** (default 8). Over the cap returns 429. |
+
+Autosave writes (`req.query.autosave`) do not publish. Draft editors that need live fan-out should save without the autosave query.
 
 Regenerate the import map after installing so admin components resolve:
 

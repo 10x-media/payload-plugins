@@ -194,7 +194,9 @@ describeForDb('sse scope: Where-wide gate and cross-tenant refuse', { dbs: ['mon
 
 		const body = await readUntil(reader, (buf) => buf.includes('"operation":"delete"'))
 		expect(body).toContain('"event":"delete"')
-		expect(body).not.toContain(`"docId":"${String(ownedT1.id)}"`)
+		const deleteFrame = body.split('\n\n').find((chunk) => chunk.includes('"operation":"delete"'))
+		expect(deleteFrame).toBeDefined()
+		expect(deleteFrame).not.toContain(String(ownedT1.id))
 		ac.abort()
 		await reader.cancel().catch(() => {})
 	})

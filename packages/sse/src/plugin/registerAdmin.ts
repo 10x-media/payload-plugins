@@ -1,6 +1,6 @@
 import type { CollectionConfig, Config, CustomComponent, Field } from 'payload'
 
-import type { PresenceProfile, ResolvedSSEOptions } from '../options'
+import type { LiveListAdminOptions, PresenceProfile, ResolvedSSEOptions } from '../options'
 
 /** List cell path resolved through the package export map by the import map. */
 export const LIVE_LIST_CELL_PATH = '@10x-media/sse/client#LiveListBadge'
@@ -10,6 +10,8 @@ export const LIVE_LIST_SYNC_PATH = '@10x-media/sse/client#LiveListSync'
 
 /** Edit-view presence chip path resolved through the package export map. */
 export const DOCUMENT_PRESENCE_PATH = '@10x-media/sse/client#DocumentPresence'
+
+const LIVE_LIST_SCALAR_TYPES = new Set(['text', 'number', 'email', 'date', 'checkbox'])
 
 const documentPresenceComponent = (
 	profile: PresenceProfile
@@ -31,19 +33,31 @@ const fieldHasCell = (field: Field): boolean => {
 	return field.admin.components.Cell != null
 }
 
+const isLiveListScalar = (field: Field): boolean =>
+	'type' in field && typeof field.type === 'string' && LIVE_LIST_SCALAR_TYPES.has(field.type)
+
 /**
- * Prefer an explicit `id` field; otherwise the first named field in the
- * collection's top-level `fields` array.
+ * Prefer an explicit `field` option, then an `id` field, then the first named
+ * scalar (`text`/`number`/`email`/`date`/`checkbox`). Non-scalars are skipped
+ * so `String(cellData)` does not produce `[object Object]`.
  */
-const pickLiveListTarget = (fields: Field[]): Field | undefined => {
+const pickLiveListTarget = (fields: Field[], liveList: LiveListAdminOptions): Field | undefined => {
+	if (liveList.field) {
+		const named = fields.find((field) => isNamedField(field) && field.name === liveList.field)
+		if (named && isLiveListScalar(named)) return named
+		return undefined
+	}
 	const idField = fields.find((field) => isNamedField(field) && field.name === 'id')
-	if (idField) return idField
-	return fields.find((field) => isNamedField(field))
+	if (idField && isLiveListScalar(idField)) return idField
+	return fields.find((field) => isNamedField(field) && isLiveListScalar(field))
 }
 
-const withLiveList = (collection: CollectionConfig): CollectionConfig => {
+const withLiveList = (
+	collection: CollectionConfig,
+	liveList: LiveListAdminOptions
+): CollectionConfig => {
 	const fields = collection.fields ?? []
-	const target = pickLiveListTarget(fields)
+	const target = pickLiveListTarget(fields, liveList)
 	const admin = collection.admin ?? {}
 	const components = admin.components ?? {}
 	const hostBeforeTable = components.beforeListTable ?? []
@@ -107,28 +121,14 @@ const withDocumentPresence = (
 	}
 }
 
-const resolveAdminFlags = (
-	admin: ResolvedSSEOptions['admin'],
-	presenceEnabled: boolean
-): { liveList: boolean; presence: boolean } => {
-	if (admin === false || admin === undefined) {
-		return { liveList: false, presence: false }
-	}
-	const opts = admin === true ? {} : admin
-	return {
-		liveList: opts.liveList !== false,
-		presence: presenceEnabled && opts.presence !== false,
-	}
-}
-
 /**
  * Mount LiveListSync (one stream per list), live-list cells, and document
- * presence chips on SSE-enabled collections. No-op when `admin` is omitted or false.
+ * presence chips on SSE-enabled collections. No-op when both flags are off.
  */
 export const registerAdmin = (args: { config: Config; options: ResolvedSSEOptions }): void => {
 	const { config, options } = args
-	const flags = resolveAdminFlags(options.admin, options.presence !== false)
-	if (!flags.liveList && !flags.presence) {
+	const { liveList, presence } = options.admin
+	if (liveList === false && !presence) {
 		return
 	}
 
@@ -141,10 +141,10 @@ export const registerAdmin = (args: { config: Config; options: ResolvedSSEOption
 		}
 
 		let next = collection
-		if (flags.liveList) {
-			next = withLiveList(next)
+		if (liveList !== false) {
+			next = withLiveList(next, liveList)
 		}
-		if (flags.presence && options.presence !== false) {
+		if (presence && options.presence !== false) {
 			next = withDocumentPresence(next, options.presence.profile)
 		}
 		config.collections[i] = next

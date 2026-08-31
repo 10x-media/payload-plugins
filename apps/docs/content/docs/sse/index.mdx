@@ -36,6 +36,12 @@ Events are **thin by default**: id, collection, operation, timestamp. Clients tr
 
 The default broker is **in-process**. That is correct for a single Node process. A multi-instance deployment needs a host-supplied `broker` implementing `EventBroker`, or other nodes' clients are only as fresh as their refetch interval. The broker is a seam, not a built-in Redis or pub/sub product.
 
+## Deployment topology
+
+SSE holds an HTTP response open for the life of the subscription. Run it on a **persistent Node process** (long-lived server, container, or VM). On serverless platforms (for example Vercel), the function `maxDuration` ends the stream; clients reconnect with exponential backoff. Expect a reconnect cycle for every open tab when duration is short, and remember `maxConnectionsPerUser` is **per process**, not global across instances.
+
+Client reconnect uses exponential backoff with jitter (floored by the server `retry:` value, capped at 60s). Unrecoverable **4xx** responses stop retrying.
+
 ## Next
 
 [Quick start](/sse/quick-start) for install and hooks, then [security](/sse/security) for the access model. Multi-tenant hosts should read [Multi-tenancy](/sse/multi-tenancy) before enabling collection-wide topics under a Where `access.read`.

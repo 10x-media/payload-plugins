@@ -18,6 +18,13 @@ export type UsePayloadSubscriptionOptions = {
 
 const DEFAULT_URL = '/api/realtime/stream'
 const DEFAULT_RETRY_MS = 3000
+const MAX_RETRY_MS = 60_000
+
+/** Exponential backoff with full jitter, floored by the server `retry:` value. */
+const backoffDelay = (attempt: number, floorMs: number): number => {
+	const base = Math.min(floorMs * 2 ** attempt, MAX_RETRY_MS)
+	return base / 2 + Math.random() * (base / 2)
+}
 
 function parseEventData(raw: string | undefined, eventName?: string): RealtimeEvent | null {
 	if (!raw) {
@@ -45,6 +52,8 @@ export const usePayloadSubscription = (
 	const topicsRef = useRef(topics)
 	topicsRef.current = topics
 
+	// Effect re-subscribes when the topic *set* changes; reads topics via ref so
+	// a new array identity with the same members does not tear down the stream.
 	const topicsKey = topics.join(',')
 
 	useEffect(() => {
@@ -55,7 +64,8 @@ export const usePayloadSubscription = (
 		}
 
 		let disposed = false
-		let retryMs = DEFAULT_RETRY_MS
+		let retryFloorMs = DEFAULT_RETRY_MS
+		let attempt = 0
 		let reconnectTimer: ReturnType<typeof setTimeout> | undefined
 		let abortController: AbortController | null = null
 
@@ -66,6 +76,7 @@ export const usePayloadSubscription = (
 			setLastEvent(event)
 			onEventRef.current?.(event)
 			if (event.event === 'ready') {
+				attempt = 0
 				setStatus('open')
 			}
 		}
@@ -82,11 +93,13 @@ export const usePayloadSubscription = (
 				return
 			}
 			setStatus('connecting')
+			const delay = backoffDelay(attempt, retryFloorMs)
+			attempt += 1
 			reconnectTimer = setTimeout(() => {
 				if (!disposed) {
 					connect()
 				}
-			}, retryMs)
+			}, delay)
 		}
 
 		const connect = async () => {
@@ -133,7 +146,7 @@ export const usePayloadSubscription = (
 				const decoder = new TextDecoder()
 				const parser = createSseParser((frame) => {
 					if (frame.retry !== undefined) {
-						retryMs = frame.retry
+						retryFloorMs = frame.retry
 					}
 					handleRaw(frame.data, frame.event)
 				})

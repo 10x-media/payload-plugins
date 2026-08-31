@@ -31,15 +31,31 @@ export type ResolvedPresenceOptions = {
 	profile: PresenceProfile
 }
 
+export type LiveListAdminOptions = {
+	/** Prefer this field for the live-list Cell. Must be a scalar type. */
+	field?: string
+}
+
+export type AdminOptions = {
+	liveList?: boolean | LiveListAdminOptions
+	presence?: boolean
+}
+
+export type ResolvedAdminOptions = {
+	/** `false` disables; object enables (optional `field` for the Cell target). */
+	liveList: false | LiveListAdminOptions
+	presence: boolean
+}
+
 export type SSEPluginOptions = {
 	disabled?: boolean
 	translations?: TranslationsOption
 	collections?: Record<string, true | CollectionSSEConfig>
 	presence?: boolean | PresenceOptions
-	admin?: boolean | { liveList?: boolean; presence?: boolean }
-	/** Stream comment heartbeat interval. Default 15_000. */
+	admin?: boolean | AdminOptions
+	/** Stream comment heartbeat interval. Default 15_000. Floor 1_000. */
 	heartbeatMs?: number
-	/** Concurrent SSE streams per user. Default 8. Over the cap returns 429. */
+	/** Concurrent SSE streams per user. Default 8. Floor 1. Over the cap returns 429. */
 	maxConnectionsPerUser?: number
 	broker?: EventBroker
 	/**
@@ -58,7 +74,7 @@ export type ResolvedSSEOptions = {
 	collections: Record<string, ResolvedCollectionSSEConfig>
 	/** Resolved presence config when enabled; `false` when omit/false. */
 	presence: ResolvedPresenceOptions | false
-	admin: boolean | { liveList?: boolean; presence?: boolean } | undefined
+	admin: ResolvedAdminOptions
 	heartbeatMs: number
 	maxConnectionsPerUser: number
 	broker: EventBroker | undefined
@@ -85,8 +101,8 @@ const resolvePresence = (
 	}
 	const opts = presence === true ? {} : presence
 	return {
-		heartbeatMs: opts.heartbeatMs ?? 10_000,
-		leaseMs: opts.leaseMs ?? 30_000,
+		heartbeatMs: Math.max(1_000, opts.heartbeatMs ?? 10_000),
+		leaseMs: Math.max(1_000, opts.leaseMs ?? 30_000),
 		identify: opts.identify ?? defaultIdentify,
 		profile: opts.profile ?? 'none',
 	}
@@ -100,6 +116,28 @@ const resolveScope = (scope: boolean | SSEScopeOptions | undefined): SSEScopeOpt
 		return multiTenantScope()
 	}
 	return scope
+}
+
+const resolveLiveList = (
+	liveList: boolean | LiveListAdminOptions | undefined
+): false | LiveListAdminOptions => {
+	if (liveList === false) return false
+	if (liveList === undefined || liveList === true) return {}
+	return liveList
+}
+
+const resolveAdmin = (
+	admin: boolean | AdminOptions | undefined,
+	presenceEnabled: boolean
+): ResolvedAdminOptions => {
+	if (admin === false || admin === undefined) {
+		return { liveList: false, presence: false }
+	}
+	const opts = admin === true ? {} : admin
+	return {
+		liveList: resolveLiveList(opts.liveList),
+		presence: presenceEnabled && opts.presence !== false,
+	}
 }
 
 const resolveCollection = (cfg: true | CollectionSSEConfig): ResolvedCollectionSSEConfig => {
@@ -117,12 +155,13 @@ export const resolveSSEOptions = (options: SSEPluginOptions): ResolvedSSEOptions
 	for (const [slug, cfg] of Object.entries(options.collections ?? {})) {
 		collections[slug] = resolveCollection(cfg)
 	}
+	const presence = resolvePresence(options.presence)
 	return {
 		collections,
-		presence: resolvePresence(options.presence),
-		admin: options.admin,
-		heartbeatMs: options.heartbeatMs ?? 15_000,
-		maxConnectionsPerUser: options.maxConnectionsPerUser ?? 8,
+		presence,
+		admin: resolveAdmin(options.admin, presence !== false),
+		heartbeatMs: Math.max(1_000, options.heartbeatMs ?? 15_000),
+		maxConnectionsPerUser: Math.max(1, options.maxConnectionsPerUser ?? 8),
 		broker: options.broker,
 		translations: options.translations,
 		scope: resolveScope(options.scope),

@@ -19,7 +19,7 @@ const baseOptions = (): ResolvedSSEOptions => ({
 		profile: 'none',
 		identify: (user) => ({ id: String((user as { id: unknown }).id), label: 'x' }),
 	},
-	admin: true,
+	admin: { liveList: {}, presence: true },
 	heartbeatMs: 15_000,
 	maxConnectionsPerUser: 8,
 	broker: undefined,
@@ -37,11 +37,11 @@ const postsConfig = (): Config =>
 		],
 	}) as Config
 
-const titleCell = (config: Config): unknown => {
+const fieldCell = (config: Config, name: string): unknown => {
 	const posts = config.collections?.find((c) => c.slug === 'posts')
-	const title = posts?.fields?.find((f) => 'name' in f && f.name === 'title')
-	if (!title || !('admin' in title)) return undefined
-	return title.admin?.components?.Cell
+	const field = posts?.fields?.find((f) => 'name' in f && f.name === name)
+	if (!field || !('admin' in field)) return undefined
+	return field.admin?.components?.Cell
 }
 
 const beforeListTable = (config: Config): unknown[] => {
@@ -59,7 +59,7 @@ describe('registerAdmin', () => {
 		const config = postsConfig()
 		registerAdmin({ config, options: baseOptions() })
 
-		expect(titleCell(config)).toBe(LIVE_LIST_CELL_PATH)
+		expect(fieldCell(config, 'title')).toBe(LIVE_LIST_CELL_PATH)
 		expect(beforeListTable(config)).toContainEqual({
 			clientProps: { collection: 'posts' },
 			path: LIVE_LIST_SYNC_PATH,
@@ -70,20 +70,14 @@ describe('registerAdmin', () => {
 		})
 	})
 
-	it('registers nothing when admin is omitted', () => {
+	it('registers nothing when admin flags are both off', () => {
 		const config = postsConfig()
-		registerAdmin({ config, options: { ...baseOptions(), admin: undefined } })
+		registerAdmin({
+			config,
+			options: { ...baseOptions(), admin: { liveList: false, presence: false } },
+		})
 
-		expect(titleCell(config)).toBeUndefined()
-		expect(beforeListTable(config)).toEqual([])
-		expect(beforeControls(config)).toEqual([])
-	})
-
-	it('registers nothing when admin is false', () => {
-		const config = postsConfig()
-		registerAdmin({ config, options: { ...baseOptions(), admin: false } })
-
-		expect(titleCell(config)).toBeUndefined()
+		expect(fieldCell(config, 'title')).toBeUndefined()
 		expect(beforeListTable(config)).toEqual([])
 		expect(beforeControls(config)).toEqual([])
 	})
@@ -92,10 +86,10 @@ describe('registerAdmin', () => {
 		const config = postsConfig()
 		registerAdmin({
 			config,
-			options: { ...baseOptions(), admin: { liveList: false } },
+			options: { ...baseOptions(), admin: { liveList: false, presence: true } },
 		})
 
-		expect(titleCell(config)).toBeUndefined()
+		expect(fieldCell(config, 'title')).toBeUndefined()
 		expect(beforeListTable(config)).toEqual([])
 		expect(beforeControls(config)).toContainEqual({
 			clientProps: { profile: 'none' },
@@ -103,29 +97,14 @@ describe('registerAdmin', () => {
 		})
 	})
 
-	it('skips DocumentPresence when plugin presence is off', () => {
-		const config = postsConfig()
-		registerAdmin({
-			config,
-			options: { ...baseOptions(), presence: false, admin: true },
-		})
-
-		expect(titleCell(config)).toBe(LIVE_LIST_CELL_PATH)
-		expect(beforeListTable(config)).toContainEqual({
-			clientProps: { collection: 'posts' },
-			path: LIVE_LIST_SYNC_PATH,
-		})
-		expect(beforeControls(config)).toEqual([])
-	})
-
 	it('skips DocumentPresence when admin.presence is false', () => {
 		const config = postsConfig()
 		registerAdmin({
 			config,
-			options: { ...baseOptions(), admin: { presence: false } },
+			options: { ...baseOptions(), admin: { liveList: {}, presence: false } },
 		})
 
-		expect(titleCell(config)).toBe(LIVE_LIST_CELL_PATH)
+		expect(fieldCell(config, 'title')).toBe(LIVE_LIST_CELL_PATH)
 		expect(beforeListTable(config)).toContainEqual({
 			clientProps: { collection: 'posts' },
 			path: LIVE_LIST_SYNC_PATH,
@@ -170,10 +149,54 @@ describe('registerAdmin', () => {
 
 		registerAdmin({ config, options: baseOptions() })
 
-		expect(titleCell(config)).toBe('host#ExistingCell')
+		expect(fieldCell(config, 'title')).toBe('host#ExistingCell')
 		expect(beforeListTable(config)).toContainEqual({
 			clientProps: { collection: 'posts' },
 			path: LIVE_LIST_SYNC_PATH,
 		})
+	})
+
+	it('does not put a Cell on a richText first field', () => {
+		const config = {
+			collections: [
+				{
+					slug: 'posts',
+					fields: [{ name: 'body', type: 'richText' }],
+				},
+			],
+		} as Config
+
+		registerAdmin({ config, options: baseOptions() })
+
+		expect(fieldCell(config, 'body')).toBeUndefined()
+		expect(beforeListTable(config)).toContainEqual({
+			clientProps: { collection: 'posts' },
+			path: LIVE_LIST_SYNC_PATH,
+		})
+	})
+
+	it('targets admin.liveList.field when supplied', () => {
+		const config = {
+			collections: [
+				{
+					slug: 'posts',
+					fields: [
+						{ name: 'id', type: 'text' },
+						{ name: 'title', type: 'text' },
+					],
+				},
+			],
+		} as Config
+
+		registerAdmin({
+			config,
+			options: {
+				...baseOptions(),
+				admin: { liveList: { field: 'title' }, presence: false },
+			},
+		})
+
+		expect(fieldCell(config, 'id')).toBeUndefined()
+		expect(fieldCell(config, 'title')).toBe(LIVE_LIST_CELL_PATH)
 	})
 })

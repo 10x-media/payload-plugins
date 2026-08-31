@@ -23,10 +23,14 @@ export type StreamHandlerDeps = {
 const parseTopicsParam = (url: string | undefined): string[] => {
 	const raw = new URL(url ?? '', 'http://localhost').searchParams.get('topics')
 	if (raw === null || raw.trim() === '') return []
-	return raw
-		.split(',')
-		.map((t) => t.trim())
-		.filter((t) => t.length > 0)
+	return [
+		...new Set(
+			raw
+				.split(',')
+				.map((t) => t.trim())
+				.filter((t) => t.length > 0)
+		),
+	]
 }
 
 const readyEvent = (topics: AuthorizedTopic[]): RealtimeEvent<{ topics: AuthorizedTopic[] }> => ({
@@ -56,7 +60,10 @@ const prepareFrame = async (args: {
 	if (topic.gate === 'per-event') {
 		if (isDelete(event)) {
 			const { docId: _docId, data: _data, ...rest } = publicEvent
-			return rest
+			return {
+				...rest,
+				id: `${event.timestamp}:${event.collection}:delete:${topic.topic}`,
+			}
 		}
 		if (!event.docId || !event.collection) return publicEvent
 		if (topic.mode === 'enriched') {
@@ -184,7 +191,10 @@ export const makeStreamHandler = (deps: StreamHandlerDeps): PayloadHandler => {
 									if (closed || frame == null) return
 									enqueue(encodeEvent(frame))
 								})
-								.catch(() => {
+								.catch((err) => {
+									req.payload.logger.error(
+										`@10x-media/sse: frame preparation failed: ${err instanceof Error ? err.message : String(err)}`
+									)
 									teardown()
 								})
 						})

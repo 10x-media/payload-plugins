@@ -92,7 +92,10 @@ export const authorizeTopics = async (
 	if (scope) {
 		try {
 			selection = await scope.resolveRequest({ req })
-		} catch {
+		} catch (err) {
+			req.payload.logger.error(
+				`@10x-media/sse: scope.resolveRequest threw: ${err instanceof Error ? err.message : String(err)}`
+			)
 			selection = null
 		}
 		if (selection === null) {

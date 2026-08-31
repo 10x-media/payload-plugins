@@ -20,6 +20,7 @@ const makeRuntime = (broker: EventBroker): SSERuntime => ({
 	broker,
 	collections: {},
 	heartbeatMs: 15_000,
+	maxConnectionsPerUser: 8,
 	presence: false,
 	scope: false,
 	destroy: async () => {},

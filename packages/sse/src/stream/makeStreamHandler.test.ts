@@ -74,6 +74,7 @@ const authReq = (opts: {
 			},
 			count: opts.count ?? vi.fn(async () => ({ totalDocs: 0 })),
 			findByID: opts.findByID ?? vi.fn(async () => null),
+			logger: { error: vi.fn(), warn: vi.fn() },
 		},
 		...(opts.signal ? { signal: opts.signal } : {}),
 	} as unknown as PayloadRequest
@@ -475,18 +476,20 @@ describe('makeStreamHandler', () => {
 			timestamp: 2,
 		})
 		emit({
-			id: '3',
+			id: '1717000000000:posts:gone:delete:t1::posts',
 			topic: 't1::posts',
 			event: 'delete',
 			collection: 'posts',
 			docId: 'gone',
 			operation: 'delete',
-			timestamp: 3,
+			timestamp: 1_717_000_000_000,
 		})
 
 		await readUntil((s) => s.includes('"operation":"delete"'))
+		const deleteFrame = buf.split('\n\n').find((chunk) => chunk.includes('"operation":"delete"'))
+		expect(deleteFrame).toBeDefined()
+		expect(deleteFrame).not.toContain('gone')
 		expect(buf).toContain('"docId":"owned"')
-		expect(buf).not.toContain('"docId":"gone"')
 		expect(buf).not.toContain('"docId":"other"')
 		ac.abort()
 		await reader.cancel().catch(() => {})
@@ -586,5 +589,26 @@ describe('makeStreamHandler', () => {
 		expect(third.status).toBe(200)
 		thirdAc.abort()
 		await third.body?.cancel().catch(() => {})
+	})
+
+	it('dedupes duplicate topics before subscribe', async () => {
+		const broker = makeBroker()
+		const ac = new AbortController()
+		const res = await makeStreamHandler({
+			broker,
+			collections: { posts: { thinEvents: true } },
+			heartbeatMs: 60_000,
+		})(
+			authReq({
+				user: { id: '1' },
+				signal: ac.signal,
+				url: 'http://localhost/api/realtime/stream?topics=posts,posts,posts',
+			})
+		)
+		expect(res.status).toBe(200)
+		expect(broker.subscribe).toHaveBeenCalledTimes(1)
+		expect(broker.subscribe).toHaveBeenCalledWith('posts', expect.any(Function))
+		ac.abort()
+		await res.body?.cancel().catch(() => {})
 	})
 })

@@ -22,7 +22,9 @@ Topic shapes: `{slug}`, `{slug}:{id}`, `presence:{slug}:{id}`. Only collections 
 
 ## Connection cap
 
-Each authenticated user may hold `maxConnectionsPerUser` concurrent streams (default **8**). The next connect returns **429** (`too many connections`) and does not subscribe. Override with `sse({ maxConnectionsPerUser: 16 })`. The slot is released on teardown and on abort.
+Each authenticated user may hold `maxConnectionsPerUser` concurrent streams (default **8**) **per Node process**. The next connect on that process returns **429** (`too many connections`) and does not subscribe. Override with `sse({ maxConnectionsPerUser: 16 })`. The slot is released on teardown and on abort. With N app instances the effective ceiling is roughly `N × maxConnectionsPerUser` for the same user.
+
+Duplicate topic names in the query are deduped before the 32-topic cap and before `broker.subscribe`.
 
 ## AccessResult: boolean vs Where
 
@@ -35,8 +37,10 @@ For each topic the plugin runs the collection's `access.read`:
 When `scope` is on (`true` or a resolver object):
 
 - `resolveRequest` returning `null` → **403** for the whole connect.
-- Collection-wide `{slug}` under a Where is **allowed**. The stream **drops** events the subscriber cannot read (`count` for thin, `findByID` deny for enriched). Deletes on that channel skip the count (the row is gone) and are delivered **without** `docId` or `data`.
+- Collection-wide `{slug}` under a Where is **allowed**. The stream **drops** events the subscriber cannot read (`count` for thin, `findByID` deny for enriched). Deletes on that channel skip the count (the row is gone) and are delivered **without** `docId`, `data`, or a document id in the event `id` field.
 - Broker keys for `{slug}` become `{scope}::{slug}`. The client still sends `topics=posts`. See [Multi-tenancy](/sse/multi-tenancy).
+
+Authorization is evaluated **at connect**. Role or membership changes take effect on the next reconnect. Bound stream lifetime (or client reconnect) if you need faster revocation.
 
 ## Thin is not a security tier
 
@@ -56,7 +60,7 @@ When `thinEvents: false`, the stream enriches with `findByID` using `overrideAcc
 
 - Require auth on the stream (already enforced).
 - Restrict stream topics to collections in the plugin map (already enforced).
-- Cap concurrent streams per user (`maxConnectionsPerUser`, **429** over the limit).
+- Cap concurrent streams per user per process (`maxConnectionsPerUser`, **429** over the limit).
 - Prefer Where-scoped `read` when collection-wide id leakage is unacceptable. Enable `scope` for multi-tenant installs so `{slug}` stays usable under a Where.
 - Treat thin events as public signals of "something changed for this id", not as a redaction layer.
 - Override `identify` if you do not want email (the default label fallback) visible to peers.
