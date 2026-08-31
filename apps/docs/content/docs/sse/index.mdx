@@ -26,7 +26,7 @@ A thin realtime layer on top of Payload: collection hooks publish to an event br
 
 **No event log.** This plugin does not store history. The collection document is the source of truth. Reconnect means refetch, not replay.
 
-**Not document locking.** Payload already locks documents. This plugin only adds **viewers** (presence). It does not replace or extend locks.
+**Not document locking.** Presence chips show who is viewing or editing. That is advisory. Two people can still save; last write wins. Payload's `lockDocuments` is separate. This plugin does not write `payload-locked-documents` and does not block save. If you want chips without Payload's lock modal, set `lockDocuments: false` on the collection.
 
 **No job progress percentage.** `payload-jobs` has no progress value. There is no percentage UI.
 

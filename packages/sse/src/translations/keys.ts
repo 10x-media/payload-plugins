@@ -6,6 +6,8 @@
 export const keys = {
 	pluginName: 'sse:pluginName',
 	alsoViewing: 'sse:alsoViewing',
+	editing: 'sse:editing',
+	isEditing: 'sse:isEditing',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

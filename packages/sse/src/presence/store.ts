@@ -1,8 +1,11 @@
 import type { KVAdapter } from 'payload'
 
+export type PresenceMode = 'viewing' | 'editing'
+
 export type PresencePeer = {
 	id: string
 	label: string
+	mode: PresenceMode
 	expiresAt: number
 }
 
@@ -15,12 +18,12 @@ export type PresenceStore = {
 	join: (args: {
 		collection: string
 		id: string
-		peer: { id: string; label: string }
+		peer: { id: string; label: string; mode?: PresenceMode }
 	}) => Promise<PresencePeer[]>
 	heartbeat: (args: {
 		collection: string
 		id: string
-		peer: { id: string; label: string }
+		peer: { id: string; label: string; mode?: PresenceMode }
 	}) => Promise<PresencePeer[]>
 	leave: (args: { collection: string; id: string; peerId: string }) => Promise<PresencePeer[]>
 }
@@ -80,11 +83,17 @@ export const createPresenceStore = (
 	const upsert = async (args: {
 		collection: string
 		id: string
-		peer: { id: string; label: string }
+		peer: { id: string; label: string; mode?: PresenceMode }
 	}): Promise<PresencePeer[]> => {
 		const current = await read(args.collection, args.id)
+		const existing = current.find((peer) => peer.id === args.peer.id)
 		const expiresAt = now() + opts.leaseMs
-		const next: PresencePeer = { id: args.peer.id, label: args.peer.label, expiresAt }
+		const next: PresencePeer = {
+			id: args.peer.id,
+			label: args.peer.label,
+			mode: args.peer.mode ?? existing?.mode ?? 'viewing',
+			expiresAt,
+		}
 		const without = current.filter((peer) => peer.id !== args.peer.id)
 		return write(args.collection, args.id, [...without, next])
 	}

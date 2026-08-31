@@ -1,9 +1,22 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
+import { keys } from '../translations/keys'
 import { DocumentPresence } from './DocumentPresence'
 
-const openDrawer = vi.fn()
+const { openDrawer, presenceHook, state } = vi.hoisted(() => {
+	const peers: Array<{ id: string; label: string; mode: 'viewing' | 'editing' }> = [
+		{ id: 'self', label: 'Me', mode: 'viewing' },
+		{ id: 'u2', label: 'Ada Lovelace', mode: 'viewing' },
+	]
+	return {
+		openDrawer: vi.fn(),
+		presenceHook: vi.fn(),
+		state: {
+			formModified: false,
+			peers,
+		},
+	}
+})
 
 vi.mock('@payloadcms/ui', () => ({
 	useAuth: () => ({ user: { id: 'self' } }),
@@ -19,26 +32,35 @@ vi.mock('@payloadcms/ui', () => ({
 		() => null,
 		{ openDrawer, closeDrawer: vi.fn() },
 	],
+	useFormModified: () => state.formModified,
 }))
 
 vi.mock('../client/useDocumentPresence', () => ({
-	useDocumentPresence: () => ({
-		self: { id: 'self', label: 'Me' },
-		peers: [
-			{ id: 'self', label: 'Me' },
-			{ id: 'u2', label: 'Ada Lovelace' },
-		],
-		status: 'open',
-	}),
+	useDocumentPresence: (...args: unknown[]) => {
+		presenceHook(...args)
+		return {
+			self: { id: 'self', label: 'Me', mode: 'viewing' },
+			peers: state.peers,
+			status: 'open',
+		}
+	},
 }))
 
 vi.mock('../translations/useTranslation', () => ({
-	useTranslation: () => ({ t: (key: string) => key }),
+	useTranslation: () => ({
+		t: (key: string, vars?: { name?: string }) => (vars?.name ? `${key}:${vars.name}` : key),
+	}),
 }))
 
 afterEach(() => {
 	cleanup()
 	openDrawer.mockClear()
+	presenceHook.mockClear()
+	state.formModified = false
+	state.peers = [
+		{ id: 'self', label: 'Me', mode: 'viewing' },
+		{ id: 'u2', label: 'Ada Lovelace', mode: 'viewing' },
+	]
 	vi.unstubAllGlobals()
 })
 
@@ -48,6 +70,37 @@ describe('DocumentPresence', () => {
 		const chip = screen.getByTitle('Ada Lovelace')
 		expect(chip.tagName).toBe('LI')
 		expect(chip.querySelector('button')).toBeNull()
+		expect(chip.className).not.toContain('sse-document-presence-chip--editing')
+		expect(screen.getByText(keys.alsoViewing)).toBeTruthy()
+	})
+
+	it('marks an editing peer and switches the caption', () => {
+		state.peers = [
+			{ id: 'self', label: 'Me', mode: 'viewing' },
+			{ id: 'u2', label: 'Ada Lovelace', mode: 'editing' },
+		]
+		render(<DocumentPresence profile="none" />)
+		const chip = screen.getByTitle(`Ada Lovelace (${keys.editing})`)
+		expect(chip.className).toContain('sse-document-presence-chip--editing')
+		expect(screen.getByText(`${keys.isEditing}:Ada Lovelace`)).toBeTruthy()
+	})
+
+	it('POSTs viewing by default and editing when the form is modified', () => {
+		render(<DocumentPresence profile="none" />)
+		expect(presenceHook).toHaveBeenCalledWith(
+			'posts',
+			'post-1',
+			expect.objectContaining({ mode: 'viewing' })
+		)
+		cleanup()
+		presenceHook.mockClear()
+		state.formModified = true
+		render(<DocumentPresence profile="none" />)
+		expect(presenceHook).toHaveBeenCalledWith(
+			'posts',
+			'post-1',
+			expect.objectContaining({ mode: 'editing' })
+		)
 	})
 
 	it('opens the user admin document in a new tab when profile is newTab', () => {

@@ -76,7 +76,7 @@ import {
 
 - **`usePayloadDocument({ collection, id })`**: document topic; bumps `revision` on thin events, sets `doc` when enriched.
 - **`usePayloadList({ collection })`**: collection topic; bumps `generation` on create/update/delete so you refetch the list.
-- **`useDocumentPresence(collection, id)`**: join/leave and peer list for viewers.
+- **`useDocumentPresence(collection, id, { mode })`**: join/leave and peer list. `mode` is `viewing` or `editing` (advisory).
 - **`usePayloadSubscription({ topics, onEvent })`**: low-level fetch SSE wrapper.
 
 Pass `token` when the browser cannot rely on cookies alone.
@@ -95,13 +95,15 @@ sse({
 })
 ```
 
-Default `identify` label is `name`, then `email`, then `id`. A custom `identify` still wins. Endpoints: `POST` / `DELETE` `/api/realtime/presence` with `{ collection, id }`.
+Default `identify` label is `name`, then `email`, then `id`. A custom `identify` still wins. Endpoints: `POST` / `DELETE` `/api/realtime/presence` with `{ collection, id, mode? }`. `mode` is `viewing` (default) or `editing`. Omit `mode` on heartbeat to keep the current value.
+
+Admin chips bind `mode` to form dirty: first keystroke publishes `editing` over SSE so other open tabs update immediately. The chip ring and row copy (`also viewing` vs `{name} is editing`) are awareness only. They do not lock the form or reject save. Two saves can still overwrite. Payload `lockDocuments` is unchanged; turn it off on the collection if you do not want its modal on top of the chips.
 
 `presence.profile` is admin-only. Omit or `none` keeps chips as hover-only. `drawer` opens the viewer's user document in Payload's document drawer. `newTab` opens `{adminRoute}/collections/{usersSlug}/{peer.id}`. If `users.read` is self-only, drawer and new-tab return 403. That is host ACL.
 
 ## Admin live list
 
-With `admin: true` (or `admin: { liveList: true }`), opted-in collection list views sync over SSE and flash changed rows. Presence chips appear on the edit view when admin presence is on. Document locking remains Payload's feature; chips are viewers only.
+With `admin: true` (or `admin: { liveList: true }`), opted-in collection list views sync over SSE and flash changed rows. Presence chips appear on the edit view when admin presence is on. Chips show viewing vs editing. They are not a lock.
 
 ## Emit from the server
 

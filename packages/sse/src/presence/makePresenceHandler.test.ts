@@ -130,7 +130,7 @@ describe('makePresenceHandler', () => {
 		)
 		expect(res.status).toBe(200)
 		const json = (await res.json()) as { peers: unknown[] }
-		expect(json.peers).toEqual([{ id: 'u1', label: 'u1' }])
+		expect(json.peers).toEqual([{ id: 'u1', label: 'u1', mode: 'viewing' }])
 		expect(JSON.stringify(json)).not.toContain('email')
 		expect(broker.published).toHaveLength(1)
 		expect(broker.published[0]).toMatchObject({
@@ -229,5 +229,60 @@ describe('makePresenceHandler', () => {
 			makeReq({ user: { id: 'u1' }, body: { collection: 'posts', id: '1' } })
 		)
 		expect(res.status).toBe(200)
+	})
+
+	it('POST without mode returns viewing and POST editing publishes mode', async () => {
+		const broker = makeBroker()
+		const handler = makePresenceHandler(
+			defaultDeps({
+				broker,
+				identify: (user) => ({
+					id: String((user as { id: string }).id),
+					label: String((user as { id: string }).id),
+				}),
+			})
+		)
+
+		const join = await handler(
+			makeReq({ user: { id: 'u1' }, body: { collection: 'posts', id: '1' } })
+		)
+		expect(((await join.json()) as { peers: Array<{ mode: string }> }).peers).toEqual([
+			{ id: 'u1', label: 'u1', mode: 'viewing' },
+		])
+
+		const edit = await handler(
+			makeReq({
+				user: { id: 'u1' },
+				body: { collection: 'posts', id: '1', mode: 'editing' },
+			})
+		)
+		const edited = (await edit.json()) as { peers: Array<{ mode: string }> }
+		expect(edited.peers).toEqual([{ id: 'u1', label: 'u1', mode: 'editing' }])
+		expect(broker.published.at(-1)?.data).toEqual({
+			peers: [{ id: 'u1', label: 'u1', mode: 'editing' }],
+		})
+	})
+
+	it('POST heartbeat without mode keeps editing', async () => {
+		const handler = makePresenceHandler(
+			defaultDeps({
+				identify: (user) => ({
+					id: String((user as { id: string }).id),
+					label: 'x',
+				}),
+			})
+		)
+		await handler(
+			makeReq({
+				user: { id: 'u1' },
+				body: { collection: 'posts', id: '1', mode: 'editing' },
+			})
+		)
+		const res = await handler(
+			makeReq({ user: { id: 'u1' }, body: { collection: 'posts', id: '1' } })
+		)
+		expect(((await res.json()) as { peers: Array<{ mode: string }> }).peers[0]?.mode).toBe(
+			'editing'
+		)
 	})
 })

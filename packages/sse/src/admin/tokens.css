@@ -45,6 +45,10 @@
 	padding: 0;
 }
 
+.sse-document-presence-chip--editing {
+	box-shadow: 0 0 0 2px var(--theme-success-500);
+}
+
 .sse-document-presence-chip button {
 	background: none;
 	border: none;

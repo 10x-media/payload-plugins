@@ -23,15 +23,25 @@ export type PresenceHandlerDeps = {
 type PresenceBody = {
 	collection?: unknown
 	id?: unknown
+	mode?: unknown
 }
 
-const publicPeers = (peers: PresencePeer[]): Array<{ id: string; label: string }> =>
-	peers.map(({ id, label }) => ({ id, label }))
+const publicPeers = (
+	peers: PresencePeer[]
+): Array<{ id: string; label: string; mode: PresencePeer['mode'] }> =>
+	peers.map(({ id, label, mode }) => ({ id, label, mode }))
+
+const parseMode = (value: unknown): PresencePeer['mode'] | undefined => {
+	if (value === 'viewing' || value === 'editing') {
+		return value
+	}
+	return undefined
+}
 
 const parseBody = async (req: {
 	json?: () => Promise<unknown>
 	url?: string
-}): Promise<{ collection: string; id: string } | null> => {
+}): Promise<{ collection: string; id: string; mode?: PresencePeer['mode'] } | null> => {
 	let body: PresenceBody = {}
 	try {
 		const parsed = await req.json?.()
@@ -57,7 +67,7 @@ const parseBody = async (req: {
 	if (!collection || !id) {
 		return null
 	}
-	return { collection, id }
+	return { collection, id, mode: parseMode(body.mode) }
 }
 
 const publishSafe = (broker: EventBroker, event: RealtimeEvent, log?: ErrorLog): void => {
@@ -130,8 +140,12 @@ export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler =
 		const peers = await store.join({
 			collection: target.collection,
 			id: target.id,
-			peer: self,
+			peer: { ...self, mode: target.mode },
 		})
+		const publicSelf = publicPeers(peers).find((peer) => peer.id === self.id) ?? {
+			...self,
+			mode: target.mode ?? 'viewing',
+		}
 		publishSafe(
 			broker,
 			{
@@ -145,6 +159,6 @@ export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler =
 			},
 			log
 		)
-		return Response.json({ peers: publicPeers(peers), self })
+		return Response.json({ peers: publicPeers(peers), self: publicSelf })
 	}
 }

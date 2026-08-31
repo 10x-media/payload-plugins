@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { RealtimeEvent } from '../broker/types'
+import type { PresenceMode } from '../presence/store'
 import { type SubscriptionStatus, usePayloadSubscription } from './usePayloadSubscription'
 
-export type PresencePeerPublic = { id: string; label: string }
+export type { PresenceMode }
+
+export type PresencePeerPublic = { id: string; label: string; mode: PresenceMode }
 
 export type UseDocumentPresenceOptions = {
 	token?: string
@@ -15,6 +18,8 @@ export type UseDocumentPresenceOptions = {
 	heartbeatMs?: number
 	/** Stream URL for the presence topic subscription. */
 	streamUrl?: string
+	/** Advisory viewer vs editor. Omit on heartbeat to keep the server mode. */
+	mode?: PresenceMode
 }
 
 export type UseDocumentPresenceResult = {
@@ -35,13 +40,22 @@ const peersFromEvent = (event: RealtimeEvent): PresencePeerPublic[] | null => {
 	if (!Array.isArray(peers)) {
 		return null
 	}
-	return peers.filter(
-		(peer): peer is PresencePeerPublic =>
-			typeof peer === 'object' &&
-			peer !== null &&
-			typeof (peer as PresencePeerPublic).id === 'string' &&
-			typeof (peer as PresencePeerPublic).label === 'string'
-	)
+	return peers.flatMap((peer) => {
+		if (typeof peer !== 'object' || peer === null) {
+			return []
+		}
+		const candidate = peer as { id?: unknown; label?: unknown; mode?: unknown }
+		if (typeof candidate.id !== 'string' || typeof candidate.label !== 'string') {
+			return []
+		}
+		return [
+			{
+				id: candidate.id,
+				label: candidate.label,
+				mode: candidate.mode === 'editing' ? 'editing' : 'viewing',
+			} satisfies PresencePeerPublic,
+		]
+	})
 }
 
 /**
@@ -52,7 +66,13 @@ export const useDocumentPresence = (
 	id: string,
 	opts: UseDocumentPresenceOptions = {}
 ): UseDocumentPresenceResult => {
-	const { token, url = DEFAULT_PRESENCE_URL, heartbeatMs = DEFAULT_HEARTBEAT_MS, streamUrl } = opts
+	const {
+		token,
+		url = DEFAULT_PRESENCE_URL,
+		heartbeatMs = DEFAULT_HEARTBEAT_MS,
+		streamUrl,
+		mode,
+	} = opts
 	const [peers, setPeers] = useState<PresencePeerPublic[]>([])
 	const [self, setSelf] = useState<PresencePeerPublic | null>(null)
 	const tokenRef = useRef(token)
@@ -67,11 +87,12 @@ export const useDocumentPresence = (
 			if (tokenRef.current) {
 				headers.Authorization = `Bearer ${tokenRef.current}`
 			}
+			const body = mode === undefined ? { collection, id } : { collection, id, mode }
 			const res = await fetch(url, {
 				method: 'POST',
 				credentials: 'include',
 				headers,
-				body: JSON.stringify({ collection, id }),
+				body: JSON.stringify(body),
 				signal,
 			})
 			if (!res.ok) {
@@ -82,7 +103,7 @@ export const useDocumentPresence = (
 				self?: PresencePeerPublic
 			}
 		},
-		[collection, id, url]
+		[collection, id, url, mode]
 	)
 
 	useEffect(() => {

@@ -11,7 +11,7 @@ describe('createPresenceStore', () => {
 		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
 		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
 		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
-			{ id: 'u1', label: 'Alice', expiresAt: 31_000 },
+			{ id: 'u1', label: 'Alice', mode: 'viewing', expiresAt: 31_000 },
 		])
 	})
 
@@ -21,8 +21,8 @@ describe('createPresenceStore', () => {
 		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
 		await store.join({ collection: 'posts', id: '1', peer: { id: 'u2', label: 'Bob' } })
 		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
-			{ id: 'u1', label: 'Alice', expiresAt: 31_000 },
-			{ id: 'u2', label: 'Bob', expiresAt: 31_000 },
+			{ id: 'u1', label: 'Alice', mode: 'viewing', expiresAt: 31_000 },
+			{ id: 'u2', label: 'Bob', mode: 'viewing', expiresAt: 31_000 },
 		])
 	})
 
@@ -34,7 +34,7 @@ describe('createPresenceStore', () => {
 		now = 10_000
 		await store.heartbeat({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
 		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
-			{ id: 'u1', label: 'Alice', expiresAt: 40_000 },
+			{ id: 'u1', label: 'Alice', mode: 'viewing', expiresAt: 40_000 },
 		])
 	})
 
@@ -55,7 +55,7 @@ describe('createPresenceStore', () => {
 		await store.join({ collection: 'posts', id: '1', peer: { id: 'u2', label: 'Bob' } })
 		await store.leave({ collection: 'posts', id: '1', peerId: 'u1' })
 		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
-			{ id: 'u2', label: 'Bob', expiresAt: 31_000 },
+			{ id: 'u2', label: 'Bob', mode: 'viewing', expiresAt: 31_000 },
 		])
 		await store.leave({ collection: 'posts', id: '1', peerId: 'u2' })
 		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([])
@@ -101,5 +101,57 @@ describe('createPresenceStore', () => {
 		await store.get({ collection: 'posts', id: '1' })
 		await store.leave({ collection: 'posts', id: '1', peerId: 'u1' })
 		expect(keys).not.toHaveBeenCalled()
+	})
+
+	it('join defaults mode to viewing', async () => {
+		const kv = makeKv()
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
+		await store.join({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
+		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
+			{ id: 'u1', label: 'Alice', mode: 'viewing', expiresAt: 31_000 },
+		])
+	})
+
+	it('join with editing sets mode', async () => {
+		const kv = makeKv()
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
+		await store.join({
+			collection: 'posts',
+			id: '1',
+			peer: { id: 'u1', label: 'Alice', mode: 'editing' },
+		})
+		expect((await store.get({ collection: 'posts', id: '1' }))[0]?.mode).toBe('editing')
+	})
+
+	it('heartbeat without mode keeps editing', async () => {
+		const kv = makeKv()
+		let now = 1_000
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => now })
+		await store.join({
+			collection: 'posts',
+			id: '1',
+			peer: { id: 'u1', label: 'Alice', mode: 'editing' },
+		})
+		now = 10_000
+		await store.heartbeat({ collection: 'posts', id: '1', peer: { id: 'u1', label: 'Alice' } })
+		expect(await store.get({ collection: 'posts', id: '1' })).toEqual([
+			{ id: 'u1', label: 'Alice', mode: 'editing', expiresAt: 40_000 },
+		])
+	})
+
+	it('heartbeat with viewing clears editing', async () => {
+		const kv = makeKv()
+		const store = createPresenceStore(kv, { leaseMs: 30_000, now: () => 1_000 })
+		await store.join({
+			collection: 'posts',
+			id: '1',
+			peer: { id: 'u1', label: 'Alice', mode: 'editing' },
+		})
+		await store.heartbeat({
+			collection: 'posts',
+			id: '1',
+			peer: { id: 'u1', label: 'Alice', mode: 'viewing' },
+		})
+		expect((await store.get({ collection: 'posts', id: '1' }))[0]?.mode).toBe('viewing')
 	})
 })

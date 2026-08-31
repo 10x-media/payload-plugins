@@ -8,4 +8,6 @@ import { keys, type TranslationKey } from './keys'
 export const en: Record<TranslationKey, string> = {
 	[keys.pluginName]: 'SSE',
 	[keys.alsoViewing]: 'also viewing',
+	[keys.editing]: 'editing',
+	[keys.isEditing]: '{{name}} is editing',
 }

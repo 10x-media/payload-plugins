@@ -160,8 +160,8 @@ describe('useDocumentPresence', () => {
 
 		await waitFor(() => {
 			expect(result.current.peers).toEqual([
-				{ id: 'u1', label: 'u1' },
-				{ id: 'u2', label: 'Bob' },
+				{ id: 'u1', label: 'u1', mode: 'viewing' },
+				{ id: 'u2', label: 'Bob', mode: 'viewing' },
 			])
 		})
 	})
@@ -204,5 +204,37 @@ describe('useDocumentPresence', () => {
 		expect(result.current.peers).toEqual([])
 		expect(methods.filter((m) => m === 'POST')).toHaveLength(1)
 		expect(methods.filter((m) => m === 'DELETE')).toHaveLength(1)
+	})
+
+	it('POSTs mode when provided', async () => {
+		const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+			const method = init?.method ?? 'GET'
+			if (method === 'POST') {
+				return new Response(
+					JSON.stringify({
+						peers: [{ id: 'u1', label: 'u1', mode: 'editing' }],
+						self: { id: 'u1', label: 'u1', mode: 'editing' },
+					}),
+					{ status: 200 }
+				)
+			}
+			if (method === 'DELETE') {
+				return new Response(JSON.stringify({ peers: [] }), { status: 200 })
+			}
+			return hangStream()
+		})
+		vi.stubGlobal('fetch', fetchMock)
+
+		renderHook(() => useDocumentPresence('posts', '1', { mode: 'editing' }))
+
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalledWith(
+				'/api/realtime/presence',
+				expect.objectContaining({
+					method: 'POST',
+					body: JSON.stringify({ collection: 'posts', id: '1', mode: 'editing' }),
+				})
+			)
+		})
 	})
 })

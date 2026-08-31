@@ -4,6 +4,7 @@ export { DocumentPresence } from '../admin/DocumentPresence'
 export { LiveListBadge } from '../admin/LiveListBadge'
 export { LiveListSync } from '../admin/LiveListSync'
 export {
+	type PresenceMode,
 	type PresencePeerPublic,
 	type UseDocumentPresenceOptions,
 	type UseDocumentPresenceResult,
