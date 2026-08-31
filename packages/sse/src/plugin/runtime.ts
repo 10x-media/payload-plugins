@@ -13,6 +13,7 @@ export type SSERuntime = {
 	broker: EventBroker
 	collections: Record<string, { thinEvents: boolean; events: SSEOperation[] }>
 	heartbeatMs: number
+	maxConnectionsPerUser: number
 	presence: SSEPresenceRuntime | false
 	scope: SSEScopeOptions | false
 	destroy: () => Promise<void>
@@ -21,8 +22,8 @@ export type SSERuntime = {
 
 /**
  * Stored on the Payload instance (not a module WeakMap) so the runtime survives
- * the separate `.` and `/rsc` bundles a consumer loads. `Symbol.for` keys into
- * the cross-realm global symbol registry.
+ * the separate `.`, `/client`, and `/i18n` bundles a consumer may load.
+ * `Symbol.for` keys into the cross-realm global symbol registry.
  */
 const RUNTIME_KEY = Symbol.for('@10x-media/sse/runtime')
 

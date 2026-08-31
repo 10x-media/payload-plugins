@@ -32,15 +32,25 @@ export const publishThin = async (args: {
 	if (scope) {
 		try {
 			scopeId = await scope.resolveDoc({ doc, req })
-		} catch {
+		} catch (err) {
+			req.payload.logger.error(
+				`@10x-media/sse: scope.resolveDoc threw: ${err instanceof Error ? err.message : String(err)}`
+			)
 			scopeId = null
 		}
 	}
 
 	const topics: string[] = [`${collection}:${docId}`]
-	if (scope && scopeId) {
-		topics.push(scopedTopic(scopeId, collection), scopedTopic(SCOPE_WILDCARD, collection))
-	} else if (!scope) {
+	if (scope) {
+		if (scopeId) {
+			topics.push(scopedTopic(scopeId, collection))
+		} else {
+			req.payload.logger.warn(
+				`@10x-media/sse: no scope resolved for ${collection}:${docId}; publishing to wildcard only`
+			)
+		}
+		topics.push(scopedTopic(SCOPE_WILDCARD, collection))
+	} else {
 		topics.push(collection)
 	}
 
@@ -49,7 +59,8 @@ export const publishThin = async (args: {
 			broker,
 			log: req.payload.logger,
 			event: {
-				id: `${timestamp}:${collection}:${docId}:${operation}:${topic}`,
+				// Never embed docId: gated deletes strip docId/data but keep `id` on the wire.
+				id: `${timestamp}:${collection}:${operation}:${topic}`,
 				topic,
 				event: operation,
 				collection,

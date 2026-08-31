@@ -23,6 +23,7 @@ const makeRuntime = (broker: EventBroker): SSERuntime => ({
 	broker,
 	collections: { posts: { thinEvents: true, events: ['create', 'update', 'delete'] } },
 	heartbeatMs: 15_000,
+	maxConnectionsPerUser: 8,
 	presence: false,
 	scope: false,
 	destroy: async () => {},
@@ -228,8 +229,10 @@ describe('createAfterChangeHook', () => {
 		expect(error).toHaveBeenCalled()
 	})
 
-	it('skips collection-wide publish when resolveDoc returns null', async () => {
-		setRuntime(payload, {
+	it('publishes the doc topic and wildcard when resolveDoc returns null', async () => {
+		const warn = vi.fn()
+		const scopedPayload = { logger: { error: vi.fn(), warn } } as unknown as Payload
+		setRuntime(scopedPayload, {
 			...makeRuntime(broker),
 			scope: {
 				resolveRequest: () => 't1',
@@ -237,7 +240,7 @@ describe('createAfterChangeHook', () => {
 			},
 		})
 		const hook = createAfterChangeHook({ collection: 'posts', events: ['create'] })
-		const req = { payload, context: {} } as unknown as PayloadRequest
+		const req = { payload: scopedPayload, context: {} } as unknown as PayloadRequest
 
 		await hook({
 			doc: { id: 'abc' },
@@ -246,6 +249,7 @@ describe('createAfterChangeHook', () => {
 			collection: { slug: 'posts' },
 		} as Parameters<typeof hook>[0])
 
-		expect(broker.published.map((e) => e.topic)).toEqual(['posts:abc'])
+		expect(broker.published.map((e) => e.topic).sort()).toEqual(['*::posts', 'posts:abc'])
+		expect(warn).toHaveBeenCalled()
 	})
 })

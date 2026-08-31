@@ -267,4 +267,38 @@ describe('usePayloadSubscription (bearer / fetch)', () => {
 		unmount()
 		expect(aborted).toBe(true)
 	})
+
+	it('backs off between reconnects under repeated 503', async () => {
+		vi.useFakeTimers()
+		vi.spyOn(Math, 'random').mockReturnValue(0)
+		const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 503 }))
+		vi.stubGlobal('fetch', fetchMock)
+
+		renderHook(() => usePayloadSubscription({ topics: ['posts'] }))
+
+		await act(async () => {
+			await Promise.resolve()
+		})
+		expect(fetchMock).toHaveBeenCalledTimes(1)
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(1_499)
+		})
+		expect(fetchMock).toHaveBeenCalledTimes(1)
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(1)
+		})
+		expect(fetchMock).toHaveBeenCalledTimes(2)
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(2_999)
+		})
+		expect(fetchMock).toHaveBeenCalledTimes(2)
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(1)
+		})
+		expect(fetchMock).toHaveBeenCalledTimes(3)
+	})
 })

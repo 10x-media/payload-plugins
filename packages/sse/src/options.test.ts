@@ -11,6 +11,11 @@ describe('resolveSSEOptions', () => {
 		expect(resolveSSEOptions({ maxConnectionsPerUser: 3 }).maxConnectionsPerUser).toBe(3)
 	})
 
+	it('clamps maxConnectionsPerUser and heartbeatMs to floors', () => {
+		expect(resolveSSEOptions({ maxConnectionsPerUser: 0 }).maxConnectionsPerUser).toBe(1)
+		expect(resolveSSEOptions({ heartbeatMs: 0 }).heartbeatMs).toBe(1_000)
+	})
+
 	it('normalizes true collection entries to thinEvents true and all events', () => {
 		const resolved = resolveSSEOptions({ collections: { posts: true } })
 		expect(resolved.collections.posts).toEqual({
@@ -59,7 +64,7 @@ describe('resolveSSEOptions', () => {
 		})
 	})
 
-	it('fills missing presence object fields and preserves admin', () => {
+	it('fills missing presence object fields and resolves admin', () => {
 		const identify = () => ({ id: 'x', label: 'X' })
 		const resolved = resolveSSEOptions({
 			presence: { heartbeatMs: 5_000, identify },
@@ -70,7 +75,24 @@ describe('resolveSSEOptions', () => {
 			leaseMs: 30_000,
 			identify,
 		})
-		expect(resolved.admin).toEqual({ liveList: true })
+		expect(resolved.admin).toEqual({ liveList: {}, presence: true })
+	})
+
+	it('resolves admin true with presence off to liveList only', () => {
+		expect(resolveSSEOptions({ admin: true }).admin).toEqual({
+			liveList: {},
+			presence: false,
+		})
+		expect(resolveSSEOptions({ admin: true, presence: true }).admin).toEqual({
+			liveList: {},
+			presence: true,
+		})
+	})
+
+	it('resolves admin.liveList field object', () => {
+		expect(
+			resolveSSEOptions({ admin: { liveList: { field: 'title' } }, presence: true }).admin
+		).toEqual({ liveList: { field: 'title' }, presence: true })
 	})
 
 	it('leaves scope off when omitted or false', () => {

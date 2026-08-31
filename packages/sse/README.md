@@ -10,7 +10,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 - **Opt-in collections** publish create, update, and delete over SSE (thin id-only events by default).
 - **No event log.** The Payload document is the source of truth. Reconnect means refetch, not replay.
-- **In-process broker by default.** Multi-instance needs a host-supplied `broker` implementing `EventBroker`, or other nodes' clients are only as fresh as their refetch interval.
+- **In-process broker by default.** Multi-instance needs a host-supplied `broker` implementing `EventBroker`, or other nodes' clients are only as fresh as their refetch interval. Long-lived Node is required; serverless function duration caps terminate streams (clients reconnect with backoff).
 - **Viewer presence** (optional): who is looking at a document. Document locking stays Payload's feature; this plugin only adds viewers.
 - **Live admin list** flashes rows when documents change.
 - **Client hooks** via `@10x-media/sse/client` (`usePayloadDocument`, `usePayloadList`, `useDocumentPresence`, `usePayloadSubscription`).

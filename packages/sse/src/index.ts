@@ -13,9 +13,12 @@ declare module 'payload' {
 /**
  * SSE plugin for Payload v3. Registers collection hooks, the realtime stream
  * endpoint, and a per-payload runtime exposed via `getSSE`.
+ * Runs after collection-adding plugins (`order: 90`) so it can patch their
+ * collections; before automations (`order: 100`).
  */
 export const sse = definePlugin<SSEPluginOptions>({
 	slug: '@10x-media/sse',
+	order: 90,
 	plugin: ({ config, plugins: _plugins, ...options }): Config => {
 		if (options.disabled === true) {
 			return config
@@ -30,15 +33,18 @@ export const sse = definePlugin<SSEPluginOptions>({
 export type { EventBroker, RealtimeEvent, SSEOperation, ThinRealtimeEvent } from './broker/types'
 export { SSE_SKIP } from './hooks/createAfterChangeHook'
 export type {
+	AdminOptions,
 	CollectionSSEConfig,
+	LiveListAdminOptions,
+	PresenceIdentify,
 	PresenceOptions,
+	ResolvedAdminOptions,
 	ResolvedPresenceOptions,
 	SSEPluginOptions,
 	SSEPluginOptions as PluginOptions,
-	SSEPluginOptions as SsePluginOptions,
 	SSEScopeOptions,
 } from './options'
-export { getRuntime, getSSE } from './plugin/runtime'
+export { getSSE } from './plugin/runtime'
 export { PRESENCE_PATH } from './presence/makePresenceHandler'
 export type { MultiTenantScopeOptions } from './scope/multiTenantScope'
 export { multiTenantScope } from './scope/multiTenantScope'

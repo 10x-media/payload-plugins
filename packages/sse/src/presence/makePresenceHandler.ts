@@ -8,6 +8,8 @@ import type { PresencePeer, PresenceStore } from './store'
 
 export const PRESENCE_PATH = '/realtime/presence'
 
+type ErrorLog = { error: (message: string, err?: unknown) => void }
+
 export type PresenceHandlerDeps = {
 	store: PresenceStore
 	broker: EventBroker
@@ -15,6 +17,7 @@ export type PresenceHandlerDeps = {
 	/** Plugin opted-in collections; presence is refused outside this map. */
 	collections: Record<string, { thinEvents: boolean }>
 	scope?: SSEScopeOptions | false
+	log?: ErrorLog
 }
 
 type PresenceBody = {
@@ -57,11 +60,11 @@ const parseBody = async (req: {
 	return { collection, id }
 }
 
-const publishSafe = (broker: EventBroker, event: RealtimeEvent): void => {
+const publishSafe = (broker: EventBroker, event: RealtimeEvent, log?: ErrorLog): void => {
 	try {
 		broker.publish(event)
-	} catch {
-		// Publish must not fail the HTTP response.
+	} catch (err) {
+		log?.error('@10x-media/sse: presence publish failed', err)
 	}
 }
 
@@ -69,7 +72,7 @@ const publishSafe = (broker: EventBroker, event: RealtimeEvent): void => {
  * Authenticated POST (join/heartbeat) and DELETE (leave) for document presence leases.
  */
 export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler => {
-	const { store, broker, identify, collections, scope = false } = deps
+	const { store, broker, identify, collections, scope = false, log } = deps
 
 	return async (req) => {
 		if (!req.user) {
@@ -108,15 +111,19 @@ export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler =
 				id: target.id,
 				peerId: self.id,
 			})
-			publishSafe(broker, {
-				id: `${topic}:leave:${self.id}:${Date.now()}`,
-				topic,
-				event: 'presence:leave',
-				collection: target.collection,
-				docId: target.id,
-				timestamp: Date.now(),
-				data: { peers: publicPeers(peers) },
-			})
+			publishSafe(
+				broker,
+				{
+					id: `${topic}:leave:${self.id}:${Date.now()}`,
+					topic,
+					event: 'presence:leave',
+					collection: target.collection,
+					docId: target.id,
+					timestamp: Date.now(),
+					data: { peers: publicPeers(peers) },
+				},
+				log
+			)
 			return Response.json({ peers: publicPeers(peers) })
 		}
 
@@ -125,15 +132,19 @@ export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler =
 			id: target.id,
 			peer: self,
 		})
-		publishSafe(broker, {
-			id: `${topic}:join:${self.id}:${Date.now()}`,
-			topic,
-			event: 'presence:join',
-			collection: target.collection,
-			docId: target.id,
-			timestamp: Date.now(),
-			data: { peers: publicPeers(peers) },
-		})
+		publishSafe(
+			broker,
+			{
+				id: `${topic}:join:${self.id}:${Date.now()}`,
+				topic,
+				event: 'presence:join',
+				collection: target.collection,
+				docId: target.id,
+				timestamp: Date.now(),
+				data: { peers: publicPeers(peers) },
+			},
+			log
+		)
 		return Response.json({ peers: publicPeers(peers), self })
 	}
 }

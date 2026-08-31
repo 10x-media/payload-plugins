@@ -1,12 +1,15 @@
 export type { EventBroker, RealtimeEvent, ThinRealtimeEvent } from '../broker/types'
 export type {
+	AdminOptions,
 	CollectionSSEConfig,
+	LiveListAdminOptions,
+	PresenceIdentify,
 	PresenceOptions,
+	ResolvedAdminOptions,
 	ResolvedPresenceOptions,
 	SSEOperation,
 	SSEPluginOptions,
 	SSEPluginOptions as PluginOptions,
-	SSEPluginOptions as SsePluginOptions,
 	SSEScopeOptions,
 } from '../options'
 export type { MultiTenantScopeOptions } from '../scope/multiTenantScope'

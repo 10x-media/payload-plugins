@@ -60,7 +60,7 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 				collections,
 				heartbeatMs: runtime.heartbeatMs,
 				scope: runtime.scope,
-				maxConnectionsPerUser: options.maxConnectionsPerUser,
+				maxConnectionsPerUser: runtime.maxConnectionsPerUser,
 				connections,
 			})(req)
 		},
@@ -84,6 +84,7 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 				identify: runtime.presence.identify,
 				collections,
 				scope: runtime.scope,
+				log: req.payload.logger,
 			})(req)
 		}
 		endpoints.push(
@@ -110,6 +111,7 @@ export const registerSSE = (args: { config: Config; options: ResolvedSSEOptions 
 			broker,
 			collections: options.collections,
 			heartbeatMs: options.heartbeatMs,
+			maxConnectionsPerUser: options.maxConnectionsPerUser,
 			presence,
 			scope: options.scope,
 			destroy: async () => {
