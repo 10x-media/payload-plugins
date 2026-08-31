@@ -1,6 +1,6 @@
 ---
 title: SSE
-description: Server-Sent Events for opted-in Payload collections, viewer presence, and live admin list updates.
+description: Server-Sent Events for opted-in Payload collections, viewer presence, live admin list updates, and dirty-document conflict warnings.
 ---
 
 `@10x-media/sse` pushes create, update, and delete notifications for opted-in collections over Server-Sent Events. Clients subscribe to topics, receive thin (or optionally enriched) events, and refetch the document when they need fresh data.
@@ -20,19 +20,19 @@ export default buildConfig({
 
 ## What it is
 
-A thin realtime layer on top of Payload: collection hooks publish to an event broker, an authenticated stream endpoint fans events out to subscribers, optional presence tracks who is viewing a document, and optional admin components keep list views and presence chips live.
+A thin realtime layer on top of Payload: collection hooks publish to an event broker, an authenticated stream endpoint fans events out to subscribers, optional presence tracks who is viewing a document, and optional admin components keep list views, presence chips, and stale-while-dirty banners live.
 
 ## What it is not
 
 **No event log.** This plugin does not store history. The collection document is the source of truth. Reconnect means refetch, not replay.
 
-**Not document locking.** Presence chips show who is viewing or editing. That is advisory. Two people can still save; last write wins. Payload's `lockDocuments` is separate. This plugin does not write `payload-locked-documents` and does not block save. If you want chips without Payload's lock modal, set `lockDocuments: false` on the collection.
+**Not document locking.** Presence chips show who is viewing or editing. The conflict banner warns when someone else saved while your form is dirty. Both are advisory. Two people can still save; last write wins. Payload's `lockDocuments` is separate. This plugin does not write `payload-locked-documents` and does not block save. If you want chips without Payload's lock modal, set `lockDocuments: false` on the collection.
 
 **No job progress percentage.** `payload-jobs` has no progress value. There is no percentage UI.
 
 ## Architecture
 
-Events are **thin by default**: id, collection, operation, timestamp. Clients treat them as a signal to refetch. Set `thinEvents: false` on a collection to enrich with `findByID` under the subscriber's access (`overrideAccess: false`).
+Events are **thin by default**: id, collection, operation, timestamp, and optional `actorId` (the writer's user id when `req.user` is present). Clients treat them as a signal to refetch. Set `thinEvents: false` on a collection to enrich with `findByID` under the subscriber's access (`overrideAccess: false`).
 
 The default broker is **in-process**. That is correct for a single Node process. A multi-instance deployment needs a host-supplied `broker` implementing `EventBroker`, or other nodes' clients are only as fresh as their refetch interval. The broker is a seam, not a built-in Redis or pub/sub product.
 

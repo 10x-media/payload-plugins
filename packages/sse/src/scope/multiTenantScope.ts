@@ -1,4 +1,4 @@
-import type { PayloadRequest } from 'payload'
+import type { CollectionSlug, PayloadRequest } from 'payload'
 import { isNumber, parseCookies } from 'payload/shared'
 
 import { SCOPE_WILDCARD, type SSEScopeOptions } from './types'
@@ -27,7 +27,7 @@ const extractId = (value: unknown): string | null => {
 }
 
 const tenantsIdType = (req: PayloadRequest, tenantsSlug: string): 'text' | 'number' => {
-	const custom = req.payload.collections[tenantsSlug]?.customIDType
+	const custom = req.payload.collections[tenantsSlug as CollectionSlug]?.customIDType
 	if (custom === 'number' || custom === 'text') return custom
 	const fallback = req.payload.db.defaultIDType
 	return fallback === 'number' ? 'number' : 'text'

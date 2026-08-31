@@ -1,4 +1,4 @@
-import type { PayloadHandler, PayloadRequest } from 'payload'
+import type { CollectionSlug, PayloadHandler, PayloadRequest } from 'payload'
 
 import type { EventBroker, RealtimeEvent } from '../broker/types'
 import { toBrokerChannels } from '../scope/resolveScope'
@@ -76,7 +76,7 @@ const prepareFrame = async (args: {
 			})
 		}
 		const counted = await req.payload.count({
-			collection: event.collection,
+			collection: event.collection as CollectionSlug,
 			where: { id: { equals: event.docId } },
 			req,
 			overrideAccess: false,

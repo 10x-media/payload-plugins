@@ -1,8 +1,16 @@
 'use client'
 
+export { DocumentConflict } from '../admin/DocumentConflict'
 export { DocumentPresence } from '../admin/DocumentPresence'
 export { LiveListBadge } from '../admin/LiveListBadge'
 export { LiveListSync } from '../admin/LiveListSync'
+export {
+	type DocumentConflictOperation,
+	type DocumentConflictState,
+	type UseDocumentConflictOptions,
+	type UseDocumentConflictResult,
+	useDocumentConflict,
+} from '../client/useDocumentConflict'
 export {
 	type PresenceMode,
 	type PresencePeerPublic,

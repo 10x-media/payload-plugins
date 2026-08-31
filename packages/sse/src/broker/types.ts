@@ -8,6 +8,8 @@ export type ThinRealtimeEvent = {
 	docId?: string
 	operation?: SSEOperation
 	timestamp: number
+	/** Writer user id when `req.user` has an id. Omitted for Local API / jobs. */
+	actorId?: string
 	/** Concrete scope this event was published under. Absent when scoping is off. */
 	scope?: string
 }

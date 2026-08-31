@@ -95,24 +95,34 @@ describe('resolveSSEOptions', () => {
 			identify,
 			profile: 'none',
 		})
-		expect(resolved.admin).toEqual({ liveList: {}, presence: true })
+		expect(resolved.admin).toEqual({ liveList: {}, presence: true, conflict: true })
 	})
 
-	it('resolves admin true with presence off to liveList only', () => {
+	it('resolves admin true with presence off to liveList and conflict', () => {
 		expect(resolveSSEOptions({ admin: true }).admin).toEqual({
 			liveList: {},
 			presence: false,
+			conflict: true,
 		})
 		expect(resolveSSEOptions({ admin: true, presence: true }).admin).toEqual({
 			liveList: {},
 			presence: true,
+			conflict: true,
+		})
+	})
+
+	it('resolves admin.conflict false when explicitly disabled', () => {
+		expect(resolveSSEOptions({ admin: { conflict: false } }).admin).toEqual({
+			liveList: {},
+			presence: false,
+			conflict: false,
 		})
 	})
 
 	it('resolves admin.liveList field object', () => {
 		expect(
 			resolveSSEOptions({ admin: { liveList: { field: 'title' } }, presence: true }).admin
-		).toEqual({ liveList: { field: 'title' }, presence: true })
+		).toEqual({ liveList: { field: 'title' }, presence: true, conflict: true })
 	})
 
 	it('leaves scope off when omitted or false', () => {

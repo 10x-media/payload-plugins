@@ -249,6 +249,20 @@ describe('useDocumentPresence', () => {
 		})
 
 		expect(methods.filter((m) => m === 'DELETE')).toHaveLength(0)
+
+		rerender({ mode: 'viewing' })
+
+		await waitFor(() => {
+			expect(
+				fetchMock.mock.calls.some(
+					(c) =>
+						c[1]?.method === 'POST' &&
+						c[1]?.body === JSON.stringify({ collection: 'posts', id: '1', mode: 'viewing' })
+				)
+			).toBe(true)
+		})
+		expect(methods.filter((m) => m === 'DELETE')).toHaveLength(0)
+
 		unmount()
 		await waitFor(() => {
 			expect(methods.filter((m) => m === 'DELETE')).toHaveLength(1)

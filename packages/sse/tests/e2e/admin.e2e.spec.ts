@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { ADMIN, createDoc, login, openCollectionList, openDoc, VIEWER } from './helpers'
+import { ADMIN, createDoc, login, openCollectionList, openDoc, updateDoc, VIEWER } from './helpers'
 
 test('admin panel loads with sse plugin enabled', async ({ page }) => {
 	const response = await page.goto('/admin')
@@ -36,6 +36,29 @@ test('presence chip shows the other viewer', async ({ browser, page }) => {
 	await openDoc(pageB, 'posts', id)
 
 	await expect(page.getByText('also viewing')).toBeVisible({ timeout: 20_000 })
+
+	await contextB.close()
+})
+
+test('dirty editor sees a conflict banner when another user saves', async ({ browser, page }) => {
+	await login(page, ADMIN)
+
+	const title = `conflict-${Date.now()}`
+	const id = await createDoc(page, 'posts', { title })
+	await openDoc(page, 'posts', id)
+
+	const titleInput = page.locator('#field-title')
+	await expect(titleInput).toBeVisible({ timeout: 15_000 })
+	await titleInput.fill(`${title}-dirty`)
+
+	const contextB = await browser.newContext()
+	const pageB = await contextB.newPage()
+	await login(pageB, VIEWER)
+	await updateDoc({ page: pageB, collection: 'posts', id, data: { title: `${title}-remote` } })
+
+	await expect(
+		page.getByText('Someone else saved this document. Reload to see their version, or keep editing')
+	).toBeVisible({ timeout: 20_000 })
 
 	await contextB.close()
 })

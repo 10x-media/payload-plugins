@@ -22,6 +22,17 @@ export const createDoc = async (
 	return String(doc.id)
 }
 
+export const updateDoc = async (args: {
+	page: Page
+	collection: string
+	id: string
+	data: Record<string, unknown>
+}): Promise<void> => {
+	const { page, collection, id, data } = args
+	const res = await page.request.patch(`/api/${collection}/${id}`, { data })
+	if (!res.ok()) throw new Error(`update ${collection}/${id} failed: ${await res.text()}`)
+}
+
 export const openCollectionList = async (page: Page, collection: string): Promise<void> => {
 	await page.goto(`/admin/collections/${collection}`)
 	await expect(page.locator('table, .table, [class*="list"]').first()).toBeVisible({

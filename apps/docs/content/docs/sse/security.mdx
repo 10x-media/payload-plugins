@@ -44,7 +44,7 @@ Authorization is evaluated **at connect**. Role or membership changes take effec
 
 ## Thin is not a security tier
 
-Thin events still carry collection and document ids. If `access.read` is `true` and a client subscribes collection-wide, those ids are visible on every create/update/delete. Thin only omits the document body; it does not hide membership of the collection.
+Thin events still carry collection and document ids, and may carry `actorId` (the writer's user id when the write had `req.user`). If `access.read` is `true` and a client subscribes collection-wide, those ids are visible on every create/update/delete. Thin only omits the document body; it does not hide membership of the collection. `actorId` is the same class of identifier as presence peer ids, not an email.
 
 ## Enrichment
 
@@ -56,7 +56,7 @@ When `thinEvents: false`, the stream enriches with `findByID` using `overrideAcc
 
 `presence.identify` maps `req.user` to `{ id, label }` for the peer list. The default label is `name`, then `email`, then `id`. Peers see that label on hover. Override `identify` when you do not want email (or other PII) on the wire. `presence.profile` (`drawer` / `newTab`) opens the viewer's user document by id. If `users.read` is self-only, that click 403s. Host ACL.
 
-Peer `mode` (`viewing` / `editing`) is not a lock. It does not change who can save.
+Peer `mode` (`viewing` / `editing`) is not a lock. It does not change who can save. The dirty-document conflict banner is also advisory: it does not reject save.
 
 ## Checklist
 
@@ -64,5 +64,5 @@ Peer `mode` (`viewing` / `editing`) is not a lock. It does not change who can sa
 - Restrict stream topics to collections in the plugin map (already enforced).
 - Cap concurrent streams per user per process (`maxConnectionsPerUser`, **429** over the limit).
 - Prefer Where-scoped `read` when collection-wide id leakage is unacceptable. Enable `scope` for multi-tenant installs so `{slug}` stays usable under a Where.
-- Treat thin events as public signals of "something changed for this id", not as a redaction layer.
+- Treat thin events as public signals of "something changed for this id", not as a redaction layer. `actorId` is the writer user id when present.
 - Override `identify` if you do not want email (the default label fallback) visible to peers.

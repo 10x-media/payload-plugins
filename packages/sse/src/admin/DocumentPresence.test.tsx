@@ -48,7 +48,10 @@ vi.mock('../client/useDocumentPresence', () => ({
 
 vi.mock('../translations/useTranslation', () => ({
 	useTranslation: () => ({
-		t: (key: string, vars?: { name?: string }) => (vars?.name ? `${key}:${vars.name}` : key),
+		t: (key: string, vars?: { name?: string; other?: string; count?: number }) => {
+			if (!vars) return key
+			return [key, vars.name, vars.other, vars.count].filter((part) => part != null).join(':')
+		},
 	}),
 }))
 
@@ -83,6 +86,24 @@ describe('DocumentPresence', () => {
 		const chip = screen.getByTitle(`Ada Lovelace (${keys.editing})`)
 		expect(chip.className).toContain('sse-document-presence-chip--editing')
 		expect(screen.getByText(`${keys.isEditing}:Ada Lovelace`)).toBeTruthy()
+	})
+
+	it('captions two editors and N others', () => {
+		state.peers = [
+			{ id: 'self', label: 'Me', mode: 'viewing' },
+			{ id: 'u2', label: 'Ada Lovelace', mode: 'editing' },
+			{ id: 'u3', label: 'Bob', mode: 'editing' },
+		]
+		const { rerender } = render(<DocumentPresence profile="none" />)
+		expect(screen.getByText(`${keys.areEditing}:Ada Lovelace:Bob`)).toBeTruthy()
+		state.peers = [
+			{ id: 'self', label: 'Me', mode: 'viewing' },
+			{ id: 'u2', label: 'Ada Lovelace', mode: 'editing' },
+			{ id: 'u3', label: 'Bob', mode: 'editing' },
+			{ id: 'u4', label: 'Cara', mode: 'editing' },
+		]
+		rerender(<DocumentPresence profile="none" />)
+		expect(screen.getByText(`${keys.areEditingMany}:Ada Lovelace:2`)).toBeTruthy()
 	})
 
 	it('POSTs viewing by default and editing when the form is modified', () => {

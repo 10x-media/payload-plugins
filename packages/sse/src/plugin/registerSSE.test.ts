@@ -8,7 +8,7 @@ import { registerSSE } from './registerSSE'
 const resolvedOptions = (broker: ResolvedSSEOptions['broker']): ResolvedSSEOptions => ({
 	collections: {},
 	presence: false,
-	admin: { liveList: false, presence: false },
+	admin: { liveList: false, presence: false, conflict: false },
 	heartbeatMs: 15_000,
 	maxConnectionsPerUser: 8,
 	broker,

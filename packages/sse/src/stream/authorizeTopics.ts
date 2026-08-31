@@ -1,4 +1,4 @@
-import type { PayloadRequest, Where } from 'payload'
+import type { CollectionSlug, PayloadRequest, Where } from 'payload'
 
 import { SCOPE_WILDCARD, type ScopeSelection, type SSEScopeOptions } from '../scope/types'
 
@@ -115,7 +115,7 @@ export const authorizeTopics = async (
 		if (!(slug in collections)) {
 			return { ok: false, status: 403, message: `collection not enabled for sse: ${slug}` }
 		}
-		const collection = req.payload.collections[slug]
+		const collection = req.payload.collections[slug as CollectionSlug]
 		if (!collection) {
 			return { ok: false, status: 403, message: `unknown collection: ${slug}` }
 		}
@@ -165,7 +165,7 @@ export const authorizeTopics = async (
 		}
 
 		const counted = await req.payload.count({
-			collection: slug,
+			collection: slug as CollectionSlug,
 			where: {
 				and: [accessResult, { id: { equals: docId } }],
 			},

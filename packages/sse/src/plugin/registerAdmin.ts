@@ -11,6 +11,9 @@ export const LIVE_LIST_SYNC_PATH = '@10x-media/sse/client#LiveListSync'
 /** Edit-view presence chip path resolved through the package export map. */
 export const DOCUMENT_PRESENCE_PATH = '@10x-media/sse/client#DocumentPresence'
 
+/** Edit-view stale-while-dirty banner path resolved through the package export map. */
+export const DOCUMENT_CONFLICT_PATH = '@10x-media/sse/client#DocumentConflict'
+
 const LIVE_LIST_SCALAR_TYPES = new Set(['text', 'number', 'email', 'date', 'checkbox'])
 
 const documentPresenceComponent = (
@@ -121,14 +124,40 @@ const withDocumentPresence = (
 	}
 }
 
+const withDocumentConflict = (collection: CollectionConfig): CollectionConfig => {
+	const admin = collection.admin ?? {}
+	const components = admin.components ?? {}
+	const edit = components.edit ?? {}
+	return {
+		...collection,
+		admin: {
+			...admin,
+			components: {
+				...components,
+				edit: {
+					...edit,
+					beforeDocumentControls: [
+						{ path: DOCUMENT_CONFLICT_PATH } satisfies CustomComponent,
+						...(edit.beforeDocumentControls ?? []),
+					],
+				},
+			},
+		},
+	}
+}
+
 /**
- * Mount LiveListSync (one stream per list), live-list cells, and document
- * presence chips on SSE-enabled collections. No-op when both flags are off.
+ * Mount LiveListSync (one stream per list), live-list cells, document presence
+ * chips, and the stale-while-dirty banner on SSE-enabled collections. No-op when
+ * liveList, presence, and conflict are all off.
+ *
+ * Payload 3.85 has no `edit.beforeDocument` slot. The banner is prepended to
+ * `beforeDocumentControls` and CSS takes a full row above the chips.
  */
 export const registerAdmin = (args: { config: Config; options: ResolvedSSEOptions }): void => {
 	const { config, options } = args
-	const { liveList, presence } = options.admin
-	if (liveList === false && !presence) {
+	const { liveList, presence, conflict } = options.admin
+	if (liveList === false && !presence && !conflict) {
 		return
 	}
 
@@ -146,6 +175,9 @@ export const registerAdmin = (args: { config: Config; options: ResolvedSSEOption
 		}
 		if (presence && options.presence !== false) {
 			next = withDocumentPresence(next, options.presence.profile)
+		}
+		if (conflict) {
+			next = withDocumentConflict(next)
 		}
 		config.collections[i] = next
 	}

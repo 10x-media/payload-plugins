@@ -4,6 +4,18 @@ import type { RealtimeEvent, SSEOperation } from '../broker/types'
 import { scopedTopic } from '../scope/resolveScope'
 import { SCOPE_WILDCARD, type SSEScopeOptions } from '../scope/types'
 
+const actorIdFromUser = (user: unknown): string | undefined => {
+	if (user === null || user === undefined || typeof user !== 'object' || !('id' in user)) {
+		return undefined
+	}
+	const id = (user as { id: unknown }).id
+	if (id === null || id === undefined) {
+		return undefined
+	}
+	const value = String(id)
+	return value.length > 0 ? value : undefined
+}
+
 const publishOne = (args: {
 	broker: { publish: (event: RealtimeEvent) => void }
 	event: RealtimeEvent
@@ -27,6 +39,7 @@ export const publishThin = async (args: {
 }): Promise<void> => {
 	const { collection, docId, operation, doc, req, broker, scope } = args
 	const timestamp = Date.now()
+	const actorId = actorIdFromUser(req.user)
 
 	let scopeId: string | null = null
 	if (scope) {
@@ -67,6 +80,7 @@ export const publishThin = async (args: {
 				docId,
 				operation,
 				timestamp,
+				...(actorId ? { actorId } : {}),
 				...(scopeId ? { scope: scopeId } : {}),
 			},
 		})

@@ -12,8 +12,9 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **No event log.** The Payload document is the source of truth. Reconnect means refetch, not replay.
 - **In-process broker by default.** Multi-instance needs a host-supplied `broker` implementing `EventBroker`, or other nodes' clients are only as fresh as their refetch interval. Long-lived Node is required; serverless function duration caps terminate streams (clients reconnect with backoff).
 - **Viewer presence** (optional): who is looking at a document, and whether they are viewing or editing. Advisory only; not a lock. Document locking stays Payload's `lockDocuments`.
+- **Dirty-document conflict banner** (admin, default on): warns when someone else saved or deleted the open document while the form is dirty. Reload or keep editing. Does not block save.
 - **Live admin list** flashes rows when documents change.
-- **Client hooks** via `@10x-media/sse/client` (`usePayloadDocument`, `usePayloadList`, `useDocumentPresence`, `usePayloadSubscription`).
+- **Client hooks** via `@10x-media/sse/client` (`usePayloadDocument`, `usePayloadList`, `useDocumentPresence`, `useDocumentConflict`, `usePayloadSubscription`).
 - **`getSSE(payload).emit`** for custom realtime events from your server code.
 - **Scope** (optional): namespaces collection-wide topics per tenant. `scope: true` ships a `@payloadcms/plugin-multi-tenant` adapter; client topic strings do not change.
 - **No job progress UI.** `payload-jobs` has no progress value, so there is no percentage display.
@@ -48,8 +49,11 @@ import {
   usePayloadDocument,
   usePayloadList,
   useDocumentPresence,
+  useDocumentConflict,
 } from '@10x-media/sse/client'
 ```
+
+`useDocumentConflict` returns `{ conflict, dismiss }` for custom admin UIs (`DocumentConflictState`).
 
 Emit from the server:
 

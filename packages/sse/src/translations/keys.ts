@@ -8,6 +8,12 @@ export const keys = {
 	alsoViewing: 'sse:alsoViewing',
 	editing: 'sse:editing',
 	isEditing: 'sse:isEditing',
+	areEditing: 'sse:areEditing',
+	areEditingMany: 'sse:areEditingMany',
+	conflictUpdated: 'sse:conflictUpdated',
+	conflictDeleted: 'sse:conflictDeleted',
+	conflictReload: 'sse:conflictReload',
+	conflictKeepEditing: 'sse:conflictKeepEditing',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

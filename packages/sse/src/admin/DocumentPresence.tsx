@@ -39,6 +39,25 @@ const chipClassName = (peer: PresencePeerPublic, extra?: string): string =>
 const chipTitle = (peer: PresencePeerPublic, editingLabel: string): string =>
 	peer.mode === 'editing' ? `${peer.label} (${editingLabel})` : peer.label
 
+const captionForOthers = (
+	others: PresencePeerPublic[],
+	t: ReturnType<typeof useTranslation>['t']
+): string => {
+	const editors = others.filter((peer) => peer.mode === 'editing')
+	const first = editors[0]
+	const second = editors[1]
+	if (!first) {
+		return t(keys.alsoViewing)
+	}
+	if (!second) {
+		return t(keys.isEditing, { name: first.label })
+	}
+	if (editors.length === 2) {
+		return t(keys.areEditing, { name: first.label, other: second.label })
+	}
+	return t(keys.areEditingMany, { name: first.label, count: editors.length - 1 })
+}
+
 export type DocumentPresenceProps = {
 	profile?: PresenceProfile
 }
@@ -122,8 +141,6 @@ export const DocumentPresence = ({ profile = 'none' }: DocumentPresenceProps) =>
 		return null
 	}
 
-	const editor = others.find((peer) => peer.mode === 'editing')
-
 	return (
 		<div className="sse-document-presence">
 			<ul className="sse-document-presence-list">
@@ -152,7 +169,7 @@ export const DocumentPresence = ({ profile = 'none' }: DocumentPresenceProps) =>
 					return <PresenceChipNone editingLabel={editingLabel} key={peer.id} peer={peer} />
 				})}
 			</ul>
-			<span>{editor ? t(keys.isEditing, { name: editor.label }) : t(keys.alsoViewing)}</span>
+			<span>{captionForOthers(others, t)}</span>
 		</div>
 	)
 }

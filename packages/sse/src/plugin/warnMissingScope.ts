@@ -1,4 +1,4 @@
-import type { CollectionConfig, Field, Payload } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field, Payload } from 'payload'
 
 const TENANTS_SLUG = 'tenants'
 
@@ -7,7 +7,10 @@ const walkFields = (fields: Field[] | undefined, tenantsSlug: string): boolean =
 	for (const field of fields) {
 		if (field.type === 'relationship' && 'relationTo' in field) {
 			const rel = field.relationTo
-			if (rel === tenantsSlug || (Array.isArray(rel) && rel.includes(tenantsSlug))) {
+			if (
+				rel === tenantsSlug ||
+				(Array.isArray(rel) && rel.includes(tenantsSlug as CollectionSlug))
+			) {
 				return true
 			}
 		}
@@ -46,7 +49,7 @@ export const warnMissingScope = (args: {
 	if (args.scopeEnabled) return
 	const tenantsSlug = args.tenantsSlug ?? TENANTS_SLUG
 	for (const slug of args.sourceSlugs) {
-		const collection = args.payload.collections?.[slug]?.config
+		const collection = args.payload.collections?.[slug as CollectionSlug]?.config
 		if (!collection) continue
 		if (!collectionHasTenantRelationship(collection, tenantsSlug)) continue
 		args.payload.logger.warn(

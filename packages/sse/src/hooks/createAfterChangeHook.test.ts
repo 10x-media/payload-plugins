@@ -68,6 +68,7 @@ describe('createAfterChangeHook', () => {
 			expect(event.docId).toBe('abc')
 			expect(event.operation).toBe('create')
 			expect(event.data).toBeUndefined()
+			expect(event.actorId).toBeUndefined()
 			expect(typeof event.id).toBe('string')
 			expect(typeof event.timestamp).toBe('number')
 		}
@@ -88,6 +89,38 @@ describe('createAfterChangeHook', () => {
 		expect(broker.published).toHaveLength(2)
 		expect(broker.published[0]?.operation).toBe('update')
 		expect(broker.published.map((e) => e.topic).sort()).toEqual(['posts', 'posts:42'])
+	})
+
+	it('sets actorId from req.user.id on list and doc topics', async () => {
+		const hook = createAfterChangeHook({ collection: 'posts', events: ['update'] })
+		const doc = { id: 'abc' }
+		const req = { payload, context: {}, user: { id: 'u1' } } as unknown as PayloadRequest
+
+		await hook({
+			doc,
+			operation: 'update',
+			req,
+			collection: { slug: 'posts' },
+		} as Parameters<typeof hook>[0])
+
+		expect(broker.published).toHaveLength(2)
+		for (const event of broker.published) {
+			expect(event.actorId).toBe('u1')
+		}
+	})
+
+	it('stringifies numeric req.user.id as actorId', async () => {
+		const hook = createAfterChangeHook({ collection: 'posts', events: ['create'] })
+		const req = { payload, context: {}, user: { id: 7 } } as unknown as PayloadRequest
+
+		await hook({
+			doc: { id: 'abc' },
+			operation: 'create',
+			req,
+			collection: { slug: 'posts' },
+		} as Parameters<typeof hook>[0])
+
+		expect(broker.published.every((event) => event.actorId === '7')).toBe(true)
 	})
 
 	it('skips when operation is not in events', async () => {

@@ -1,4 +1,4 @@
-import type { PayloadRequest } from 'payload'
+import type { CollectionSlug, PayloadRequest } from 'payload'
 
 import type { RealtimeEvent } from '../broker/types'
 
@@ -20,7 +20,7 @@ export const enrichForUser = async (args: {
 	const denied = (): RealtimeEvent | null => (onDeny === 'drop' ? null : event)
 	try {
 		const doc = await req.payload.findByID({
-			collection,
+			collection: collection as CollectionSlug,
 			id: docId,
 			req,
 			depth: 0,

@@ -39,12 +39,15 @@ export type LiveListAdminOptions = {
 export type AdminOptions = {
 	liveList?: boolean | LiveListAdminOptions
 	presence?: boolean
+	/** Advisory stale-while-dirty banner on the edit view. Default on when admin is on. */
+	conflict?: boolean
 }
 
 export type ResolvedAdminOptions = {
 	/** `false` disables; object enables (optional `field` for the Cell target). */
 	liveList: false | LiveListAdminOptions
 	presence: boolean
+	conflict: boolean
 }
 
 export type SSEPluginOptions = {
@@ -131,12 +134,13 @@ const resolveAdmin = (
 	presenceEnabled: boolean
 ): ResolvedAdminOptions => {
 	if (admin === false || admin === undefined) {
-		return { liveList: false, presence: false }
+		return { liveList: false, presence: false, conflict: false }
 	}
 	const opts = admin === true ? {} : admin
 	return {
 		liveList: resolveLiveList(opts.liveList),
 		presence: presenceEnabled && opts.presence !== false,
+		conflict: opts.conflict !== false,
 	}
 }
 

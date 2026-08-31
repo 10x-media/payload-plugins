@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ResolvedSSEOptions } from '../options'
 import {
+	DOCUMENT_CONFLICT_PATH,
 	DOCUMENT_PRESENCE_PATH,
 	LIVE_LIST_CELL_PATH,
 	LIVE_LIST_SYNC_PATH,
@@ -19,7 +20,7 @@ const baseOptions = (): ResolvedSSEOptions => ({
 		profile: 'none',
 		identify: (user) => ({ id: String((user as { id: unknown }).id), label: 'x' }),
 	},
-	admin: { liveList: {}, presence: true },
+	admin: { liveList: {}, presence: true, conflict: true },
 	heartbeatMs: 15_000,
 	maxConnectionsPerUser: 8,
 	broker: undefined,
@@ -64,17 +65,23 @@ describe('registerAdmin', () => {
 			clientProps: { collection: 'posts' },
 			path: LIVE_LIST_SYNC_PATH,
 		})
-		expect(beforeControls(config)).toContainEqual({
-			clientProps: { profile: 'none' },
-			path: DOCUMENT_PRESENCE_PATH,
-		})
+		expect(beforeControls(config)).toEqual([
+			{ path: DOCUMENT_CONFLICT_PATH },
+			{
+				clientProps: { profile: 'none' },
+				path: DOCUMENT_PRESENCE_PATH,
+			},
+		])
 	})
 
-	it('registers nothing when admin flags are both off', () => {
+	it('registers nothing when liveList, presence, and conflict are off', () => {
 		const config = postsConfig()
 		registerAdmin({
 			config,
-			options: { ...baseOptions(), admin: { liveList: false, presence: false } },
+			options: {
+				...baseOptions(),
+				admin: { liveList: false, presence: false, conflict: false },
+			},
 		})
 
 		expect(fieldCell(config, 'title')).toBeUndefined()
@@ -82,11 +89,40 @@ describe('registerAdmin', () => {
 		expect(beforeControls(config)).toEqual([])
 	})
 
+	it('mounts DocumentConflict when only conflict is on', () => {
+		const config = postsConfig()
+		registerAdmin({
+			config,
+			options: {
+				...baseOptions(),
+				admin: { liveList: false, presence: false, conflict: true },
+			},
+		})
+
+		expect(fieldCell(config, 'title')).toBeUndefined()
+		expect(beforeListTable(config)).toEqual([])
+		expect(beforeControls(config)).toEqual([{ path: DOCUMENT_CONFLICT_PATH }])
+	})
+
+	it('skips DocumentConflict when admin.conflict is false', () => {
+		const config = postsConfig()
+		registerAdmin({
+			config,
+			options: {
+				...baseOptions(),
+				admin: { liveList: {}, presence: false, conflict: false },
+			},
+		})
+
+		expect(beforeControls(config)[0]).not.toEqual({ path: DOCUMENT_CONFLICT_PATH })
+		expect(fieldCell(config, 'title')).toBe(LIVE_LIST_CELL_PATH)
+	})
+
 	it('skips Cell and beforeListTable when admin.liveList is false', () => {
 		const config = postsConfig()
 		registerAdmin({
 			config,
-			options: { ...baseOptions(), admin: { liveList: false, presence: true } },
+			options: { ...baseOptions(), admin: { liveList: false, presence: true, conflict: true } },
 		})
 
 		expect(fieldCell(config, 'title')).toBeUndefined()
@@ -101,7 +137,7 @@ describe('registerAdmin', () => {
 		const config = postsConfig()
 		registerAdmin({
 			config,
-			options: { ...baseOptions(), admin: { liveList: {}, presence: false } },
+			options: { ...baseOptions(), admin: { liveList: {}, presence: false, conflict: true } },
 		})
 
 		expect(fieldCell(config, 'title')).toBe(LIVE_LIST_CELL_PATH)
@@ -109,7 +145,7 @@ describe('registerAdmin', () => {
 			clientProps: { collection: 'posts' },
 			path: LIVE_LIST_SYNC_PATH,
 		})
-		expect(beforeControls(config)).toEqual([])
+		expect(beforeControls(config)).toEqual([{ path: DOCUMENT_CONFLICT_PATH }])
 	})
 
 	it('passes drawer profile to DocumentPresence clientProps', () => {
@@ -192,7 +228,7 @@ describe('registerAdmin', () => {
 			config,
 			options: {
 				...baseOptions(),
-				admin: { liveList: { field: 'title' }, presence: false },
+				admin: { liveList: { field: 'title' }, presence: false, conflict: false },
 			},
 		})
 
