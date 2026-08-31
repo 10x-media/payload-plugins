@@ -303,6 +303,12 @@
 	background: #ede9fe;
 	color: #5b21b6;
 }
+/* Every payloadAPI value, including ones only a third-party plugin knows. The rules
+   below override it for the values that have a colour of their own. */
+.al-badge--api {
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-500);
+}
 .al-badge--api-rest {
 	background: #ccfbf1;
 	color: #115e59;
@@ -310,10 +316,6 @@
 .al-badge--api-graphql {
 	background: #fce7f3;
 	color: #9d174d;
-}
-.al-badge--api-local {
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-500);
 }
 [data-theme="dark"] .al-badge--create {
 	background: #14532d;

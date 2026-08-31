@@ -10,6 +10,22 @@ export const OPERATION_LABELS: Record<string, string> = {
 	update: 'Update',
 }
 
+/**
+ * Badge modifier for a `payloadAPI` value. The stored value is free text and may come
+ * from any plugin, so anything outside `[a-z0-9]` folds to a dash to keep the class
+ * name valid. Values without a dedicated rule fall back to the base `al-badge--api`.
+ */
+export const apiBadgeClass = (payloadAPI: string): string =>
+	`al-badge--api-${payloadAPI.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+
+/**
+ * Label for a `payloadAPI` value, falling back to the value itself. Own keys only: the
+ * value is free text, so an inherited property name would otherwise resolve to something
+ * off `Object.prototype` and be handed to React as a child.
+ */
+export const apiLabel = (payloadAPI: string, labels: Record<string, string>): string =>
+	(Object.hasOwn(labels, payloadAPI) ? labels[payloadAPI] : undefined) ?? payloadAPI
+
 export const displayUser = (user: unknown, userTitleFields: Record<string, string>): string => {
 	if (!user) return '—'
 	if (typeof user === 'string' || typeof user === 'number') return String(user)

@@ -52,6 +52,12 @@ describe('buildAuditLogsCollection', () => {
 		)
 	})
 
+	it('stores payloadAPI as free text, so a value no core release knows cannot fail a write', () => {
+		const api = field(buildAuditLogsCollection().fields, 'payloadAPI')
+		expect(api?.type).toBe('text')
+		expect(api && 'options' in api).toBe(false)
+	})
+
 	it('points the user field wherever the host authenticates', () => {
 		const single = field(buildAuditLogsCollection(true, 'admins').fields, 'user')
 		expect(single && 'relationTo' in single && single.relationTo).toBe('admins')

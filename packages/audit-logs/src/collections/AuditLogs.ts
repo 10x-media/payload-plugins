@@ -97,15 +97,20 @@ export const buildAuditLogsCollection = (
 				index: true,
 			},
 			{
-				// 'GraphQL' | 'local' | 'REST', useful to distinguish server-side vs user-initiated changes
-				// Note that changes from admin panel are always from REST api
+				/**
+				 * Which API the audited request came in through, useful to tell server-side
+				 * changes from user-initiated ones. Changes from the admin panel always
+				 * arrive as REST.
+				 *
+				 * Free text, not a select. Core sets `REST`, `GraphQL` or `local`, but a
+				 * plugin may augment `PayloadRequest` and set its own, the way
+				 * `@payloadcms/plugin-mcp` sets `MCP`. A select would put that value behind
+				 * a Mongo enum and a Postgres enum column, so an unrecognised one would
+				 * fail the log write and take the audited operation down with it. Hosts
+				 * label the values they expect through `logs.payloadAPIs`.
+				 */
 				name: 'payloadAPI',
-				type: 'select',
-				options: [
-					{ label: 'REST', value: 'REST' },
-					{ label: 'GraphQL', value: 'GraphQL' },
-					{ label: 'Local', value: 'local' },
-				],
+				type: 'text',
 				admin: {
 					position: 'sidebar',
 				},

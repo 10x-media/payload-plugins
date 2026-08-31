@@ -9,15 +9,16 @@ import { useTranslation } from '../translations/useTranslation'
 import { DiffViewer } from './DiffViewer'
 import { FormattedDate } from './FormattedDate'
 import type { AuditLogDoc } from './types'
-import { displayUser, GLOBAL_SENTINEL, OPERATION_LABELS } from './utils'
+import { apiBadgeClass, apiLabel, displayUser, GLOBAL_SENTINEL, OPERATION_LABELS } from './utils'
 
 type Props = {
 	adminRoute: string
 	doc: AuditLogDoc
+	payloadAPILabels: Record<string, string>
 	userTitleFields: Record<string, string>
 }
 
-export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
+export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: Props) {
 	const { t } = useTranslation()
 	const [expanded, setExpanded] = useState(false)
 	const searchParams = useSearchParams()
@@ -70,10 +71,8 @@ export function LogRow({ adminRoute, doc, userTitleFields }: Props) {
 
 				<span className="al-row__badges">
 					{doc.payloadAPI && (
-						<span
-							className={`al-badge al-badge--api al-badge--api-${doc.payloadAPI.toLowerCase()}`}
-						>
-							{doc.payloadAPI}
+						<span className={`al-badge al-badge--api ${apiBadgeClass(doc.payloadAPI)}`}>
+							{apiLabel(doc.payloadAPI, payloadAPILabels)}
 						</span>
 					)}
 					{doc.locale && <span className="al-badge al-badge--locale">{doc.locale}</span>}

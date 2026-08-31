@@ -34,6 +34,8 @@ export type {
 	GlobalAuditOptions,
 	MultiTenancyConfig,
 	OverrideFunction,
+	PayloadAPIOption,
+	PayloadAPIOptionObject,
 	RedactedValue,
 	ShouldLogFunction,
 	ViewAccess,

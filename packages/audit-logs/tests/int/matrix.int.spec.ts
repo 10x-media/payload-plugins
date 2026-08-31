@@ -69,6 +69,21 @@ describeForDb('auditLogs cross-db', {}, (db) => {
 		expect(log?.user).toBeTruthy()
 	})
 
+	// The reason `payloadAPI` is free text rather than a select. A third-party plugin sets
+	// `req.payloadAPI` to a value no core release lists, and an enum column would reject the
+	// write on both adapters, taking the audited operation down with it.
+	it('stores a payloadAPI value core never defines', async () => {
+		const doc = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'From MCP' },
+			req: { ...req, payloadAPI: 'MCP' } as unknown as PayloadRequest,
+		})
+
+		const [log] = await readLogs(booted.payload, { documentId: { equals: String(doc.id) } })
+
+		expect(log?.payloadAPI).toBe('MCP')
+	})
+
 	it('has an id and both timestamps, none of which the plugin sets', async () => {
 		const doc = await booted.payload.create({
 			collection: 'posts',

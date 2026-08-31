@@ -78,6 +78,7 @@ auditLogs({
     ipAddress: false,
     userAgent: false,
     group: true,
+    payloadAPIs: ['MCP'],
     access: { read: ({ req }) => Boolean(req.user) },
     view: { defaultLimit: 50, path: '/change-history' },
     override: (collection) => ({ ...collection, admin: { ...collection.admin, group: 'Ops' } }),
@@ -91,11 +92,28 @@ auditLogs({
 | `ipAddress` | `boolean` | `true` | Store the requester's IP. |
 | `userAgent` | `boolean` | `true` | Store the requester's user agent. |
 | `group` | `boolean \| { contextKey?: string }` | off | Add an indexed `group` field, filled from `req.context[contextKey]`. Default key `auditGroup`. |
+| `payloadAPIs` | `(string \| { label, value })[]` | none | Extra `payloadAPI` values to label in the view, on top of `REST`, `GraphQL` and `local`. |
 | `access` | `{ create?, read?, update?, delete? }` | all denied | Access for the collection's own REST and GraphQL endpoints. |
 | `view` | `false \| { path?, defaultLimit?, access?, forceWhere? }` | on | The custom view. See [the admin view](/audit-logs/admin-view). |
 | `override` | `(collection) => CollectionConfig` | none | Modify the generated collection. The slug is always forced back to `audit-logs`. |
 
 All four access rules default to denying everything. The plugin's own writes never go through them, so the log fills up regardless; the rules only govern the public API. Open `read` if something outside the admin needs to query entries.
+
+### payloadAPIs
+
+`payloadAPI` records which API the audited request came in through, and is stored as free
+text: core sets `REST`, `GraphQL` or `local`, and a plugin may set anything else, the way
+`@payloadcms/plugin-mcp` sets `MCP`. Any value is recorded without configuration; this
+option labels the ones you expect in the view.
+
+```ts
+logs: {
+  payloadAPIs: ['MCP', { label: 'Server-side', value: 'local' }],
+}
+```
+
+A bare string is used as its own label. An entry naming a built-in value relabels it in
+place rather than adding a duplicate.
 
 ### group
 

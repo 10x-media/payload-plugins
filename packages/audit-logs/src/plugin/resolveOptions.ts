@@ -6,6 +6,8 @@ import type {
 	AuditOptions,
 	CollectionAuditLogConfig,
 	GlobalAuditOptions,
+	PayloadAPIOption,
+	PayloadAPIOptionObject,
 	ShouldLogFunction,
 } from '../types'
 
@@ -125,3 +127,39 @@ export const resolveAuthConfig = (
 		login: auth.login ?? true,
 	}
 }
+
+/**
+ * The values Payload core itself assigns: `REST` and `GraphQL` in `createPayloadRequest`,
+ * `local` in `createLocalReq`. Plugins add their own by augmenting `PayloadRequest`, so
+ * this list can never be complete. That is why the stored `payloadAPI` field is free
+ * text and this list drives labelling only, never validation.
+ */
+export const BUILT_IN_PAYLOAD_APIS: PayloadAPIOptionObject[] = [
+	{ label: 'REST', value: 'REST' },
+	{ label: 'GraphQL', value: 'GraphQL' },
+	{ label: 'Local', value: 'local' },
+]
+
+/**
+ * Built-ins first, host additions after. Keyed by value, so an entry naming a built-in
+ * relabels it in place rather than producing a duplicate.
+ */
+export const resolvePayloadAPIOptions = (
+	extra: PayloadAPIOption[] = []
+): PayloadAPIOptionObject[] => {
+	const byValue = new Map<string, PayloadAPIOptionObject>()
+
+	for (const option of [...BUILT_IN_PAYLOAD_APIS, ...extra]) {
+		const resolved = typeof option === 'string' ? { label: option, value: option } : option
+		byValue.set(resolved.value, resolved)
+	}
+
+	return [...byValue.values()]
+}
+
+/**
+ * What the view needs off the options: a value is rendered through this map, and falls
+ * back to itself when the host never declared it.
+ */
+export const payloadAPILabels = (extra: PayloadAPIOption[] = []): Record<string, string> =>
+	Object.fromEntries(resolvePayloadAPIOptions(extra).map(({ label, value }) => [value, label]))

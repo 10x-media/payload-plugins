@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildParams, displayUser, formatValue, isLongValue } from './utils'
+import {
+	apiBadgeClass,
+	apiLabel,
+	buildParams,
+	displayUser,
+	formatValue,
+	isLongValue,
+} from './utils'
 
 describe('displayUser', () => {
 	it('shows a dash when nobody is recorded', () => {
@@ -94,5 +101,39 @@ describe('buildParams', () => {
 		expect(buildParams({ dateFrom: '2026-01-01', dateTo: '2026-02-01' })).toBe(
 			'dateFrom=2026-01-01&dateTo=2026-02-01'
 		)
+	})
+})
+
+describe('apiBadgeClass', () => {
+	it('lowercases the value core sets', () => {
+		expect(apiBadgeClass('REST')).toBe('al-badge--api-rest')
+		expect(apiBadgeClass('GraphQL')).toBe('al-badge--api-graphql')
+		expect(apiBadgeClass('local')).toBe('al-badge--api-local')
+	})
+
+	it('names a value core never defines', () => {
+		expect(apiBadgeClass('MCP')).toBe('al-badge--api-mcp')
+	})
+
+	// The field is free text, so nothing stops a plugin storing a value with a space or a
+	// quote in it, and that must not escape into the class attribute.
+	it('folds anything that would not survive in a class name', () => {
+		expect(apiBadgeClass('MCP Server')).toBe('al-badge--api-mcp-server')
+		expect(apiBadgeClass('a"b')).toBe('al-badge--api-a-b')
+	})
+})
+
+describe('apiLabel', () => {
+	it('uses the label the host declared', () => {
+		expect(apiLabel('MCP', { MCP: 'MCP Server' })).toBe('MCP Server')
+	})
+
+	it('shows an undeclared value as it was stored', () => {
+		expect(apiLabel('MCP', {})).toBe('MCP')
+	})
+
+	it('does not reach an inherited property', () => {
+		expect(apiLabel('constructor', {})).toBe('constructor')
+		expect(apiLabel('toString', {})).toBe('toString')
 	})
 })

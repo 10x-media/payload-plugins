@@ -4,11 +4,13 @@ import {
 	DEFAULT_AUDIT_LOG_OPERATIONS,
 	isPolymorphicRelationTo,
 	mergeWithDefaults,
+	payloadAPILabels,
 	resolveAuditLogConfig,
 	resolveAuthConfig,
 	resolveFieldOptions,
 	resolveGlobalAuditLogConfig,
 	resolveHookPath,
+	resolvePayloadAPIOptions,
 } from './resolveOptions'
 
 describe('isPolymorphicRelationTo', () => {
@@ -148,6 +150,54 @@ describe('resolveAuthConfig', () => {
 		expect(resolveAuthConfig({ auth: { forgotPassword: false } })).toEqual({
 			forgotPassword: false,
 			login: true,
+		})
+	})
+})
+
+describe('resolvePayloadAPIOptions', () => {
+	it('offers the three APIs core sets on every request', () => {
+		expect(resolvePayloadAPIOptions()).toEqual([
+			{ label: 'REST', value: 'REST' },
+			{ label: 'GraphQL', value: 'GraphQL' },
+			{ label: 'Local', value: 'local' },
+		])
+	})
+
+	it('appends a bare string as its own label', () => {
+		expect(resolvePayloadAPIOptions(['MCP'])).toContainEqual({ label: 'MCP', value: 'MCP' })
+	})
+
+	it('takes a label alongside the value', () => {
+		expect(resolvePayloadAPIOptions([{ label: 'MCP Server', value: 'MCP' }])).toContainEqual({
+			label: 'MCP Server',
+			value: 'MCP',
+		})
+	})
+
+	it('lets a host relabel a built-in rather than duplicating it', () => {
+		const options = resolvePayloadAPIOptions([{ label: 'Server-side', value: 'local' }])
+		expect(options.filter((option) => option.value === 'local')).toEqual([
+			{ label: 'Server-side', value: 'local' },
+		])
+	})
+
+	it('keeps the last of two entries sharing a value', () => {
+		expect(resolvePayloadAPIOptions(['MCP', { label: 'MCP Server', value: 'MCP' }])).toContainEqual(
+			{
+				label: 'MCP Server',
+				value: 'MCP',
+			}
+		)
+	})
+})
+
+describe('payloadAPILabels', () => {
+	it('maps every resolved value to its label', () => {
+		expect(payloadAPILabels(['MCP'])).toEqual({
+			REST: 'REST',
+			GraphQL: 'GraphQL',
+			local: 'Local',
+			MCP: 'MCP',
 		})
 	})
 })

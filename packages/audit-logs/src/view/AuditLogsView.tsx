@@ -3,6 +3,7 @@ import { Gutter } from '@payloadcms/ui'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug, Params, PopulateType, Where } from 'payload'
 import { parseCookies } from 'payload'
+import { payloadAPILabels } from '../plugin/resolveOptions'
 import { keys } from '../translations'
 import { asTranslate } from '../translations/server'
 import type { AuditPluginConfig } from '../types'
@@ -256,6 +257,7 @@ export async function AuditLogsView({
 					totalDocs={result.totalDocs}
 					totalPages={result.totalPages}
 					userTitleFields={userTitleFields}
+					payloadAPILabels={payloadAPILabels(pluginOptions.logs?.payloadAPIs)}
 					debugMode={pluginOptions.debug === true && Boolean(pluginOptions.retention)}
 					hasArchive={Boolean(pluginOptions.retention?.archive)}
 				/>

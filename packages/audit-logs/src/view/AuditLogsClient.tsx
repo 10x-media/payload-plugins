@@ -29,6 +29,7 @@ export function AuditLogsClient({
 	lockedTenantId,
 	tenantOptions,
 	userTitleFields,
+	payloadAPILabels,
 	debugMode,
 	hasArchive,
 }: AuditLogsClientProps) {
@@ -141,6 +142,7 @@ export function AuditLogsClient({
 							adminRoute={adminRoute}
 							doc={doc as unknown as AuditLogDoc}
 							key={String(doc.id)}
+							payloadAPILabels={payloadAPILabels}
 							userTitleFields={userTitleFields}
 						/>
 					))

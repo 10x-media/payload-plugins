@@ -314,7 +314,7 @@ export interface AuditLog {
   documentId?: string | null;
   user?: (string | null) | User;
   locale?: string | null;
-  payloadAPI?: ('REST' | 'GraphQL' | 'local') | null;
+  payloadAPI?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
   changedPaths?: string[] | null;

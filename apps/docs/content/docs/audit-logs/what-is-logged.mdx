@@ -13,7 +13,7 @@ description: The shape of an entry, how the diff is built, and everything delibe
   documentId?:  string       // the document id; for globals, the global slug
   user?:        relationship // req.user at the time of the write
   locale?:      string
-  payloadAPI:   'REST' | 'GraphQL' | 'local'
+  payloadAPI?:  string       // 'REST' | 'GraphQL' | 'local', or whatever a plugin sets
   ipAddress?:   string
   userAgent?:   string
   changedPaths: string[]     // indexed, so this is what you filter on
@@ -25,6 +25,11 @@ description: The shape of an entry, how the diff is built, and everything delibe
 ```
 
 `changedPaths` is indexed and `diff` is not, which is why every query in [querying](/audit-logs/querying) filters on the former.
+
+`payloadAPI` is free text. Payload core sets `REST`, `GraphQL` or `local`, and a plugin may
+set its own value: `@payloadcms/plugin-mcp` sets `MCP` on every request it serves. Declare
+the values you expect through [`logs.payloadAPIs`](/audit-logs/configuration#payloadapis)
+to give them a label in the view.
 
 ## When no entry is written
 

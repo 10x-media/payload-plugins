@@ -6,7 +6,8 @@ export type AuditLogDoc = {
 	documentId?: string
 	user?: unknown
 	locale?: string
-	payloadAPI?: 'GraphQL' | 'REST' | 'local'
+	/** Free text: core sets REST, GraphQL or local, a plugin may set anything else. */
+	payloadAPI?: string
 	ipAddress?: string
 	userAgent?: string
 	changedPaths?: string[]
@@ -50,6 +51,8 @@ export type AuditLogsClientProps = {
 	totalDocs: number
 	totalPages: number
 	userTitleFields: Record<string, string>
+	/** Value to label for the `payloadAPI` badge, built from `logs.payloadAPIs`. */
+	payloadAPILabels: Record<string, string>
 	/** Show debug job-trigger buttons (only when debug:true and retention is configured). */
 	debugMode?: boolean
 	/** Whether the archive job is configured (controls visibility of the Archive button). */

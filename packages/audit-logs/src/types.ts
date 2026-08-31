@@ -458,6 +458,12 @@ export type GlobalAuditOptions =
  */
 export type AuditFieldDefaultOptions = Omit<AuditFieldAutomaticOptions, 'isManual'>
 
+/** One entry of `logs.payloadAPIs`, resolved to `{ label, value }`. */
+export type PayloadAPIOptionObject = { label: string; value: string }
+
+/** A `logs.payloadAPIs` entry. A bare string is used as both value and label. */
+export type PayloadAPIOption = PayloadAPIOptionObject | string
+
 export type MultiTenancyConfig = {
 	/**
 	 * The slug of the tenants collection. Matches `tenantsSlug` in the multi-tenant plugin.
@@ -548,6 +554,21 @@ export type AuditPluginConfig = {
 		 * })
 		 */
 		override?: (collection: CollectionConfig) => CollectionConfig
+		/**
+		 * Extra values for the `payloadAPI` field, shown in the audit logs view.
+		 *
+		 * `payloadAPI` records which API the audited request came in through. Core sets
+		 * `'REST'`, `'GraphQL'` or `'local'`, but a plugin may augment `PayloadRequest` and
+		 * set its own, the way `@payloadcms/plugin-mcp` sets `'MCP'`. The field is stored as
+		 * free text precisely so an unknown value can never fail the write, and these entries
+		 * only give the view something better than the raw value to render.
+		 *
+		 * A bare string is its own label. Naming a built-in value relabels it in place.
+		 *
+		 * @example
+		 * payloadAPIs: ['MCP', { label: 'Server-side', value: 'local' }]
+		 */
+		payloadAPIs?: PayloadAPIOption[]
 		/**
 		 * Whether to collect the requester's IP address and store it on each audit log entry.
 		 * Set to `false` if you do not want IP addresses stored (e.g. for GDPR compliance).
