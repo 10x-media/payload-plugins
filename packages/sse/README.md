@@ -19,6 +19,8 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Scope** (optional): namespaces collection-wide topics per tenant. `scope: true` ships a `@payloadcms/plugin-multi-tenant` adapter; client topic strings do not change.
 - **No job progress UI.** `payload-jobs` has no progress value, so there is no percentage display.
 
+Local playground: `pnpm dev sse`, then open `/` (client SDK) and `/admin`.
+
 ## Quick start
 
 ```bash

@@ -2,6 +2,12 @@ import { expect, test } from '@playwright/test'
 
 import { ADMIN, createDoc, login, openCollectionList, openDoc, updateDoc, VIEWER } from './helpers'
 
+test('frontend playground loads', async ({ page }) => {
+	const response = await page.goto('/')
+	expect(response?.status()).toBeLessThan(500)
+	await expect(page.locator('body')).toBeVisible()
+})
+
 test('admin panel loads with sse plugin enabled', async ({ page }) => {
 	const response = await page.goto('/admin')
 	expect(response?.status()).toBeLessThan(500)
