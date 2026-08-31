@@ -3,6 +3,7 @@
 export { AttemptsCell } from '../jobs/AttemptsCell'
 export { JobDocDescription } from '../jobs/JobDocDescription'
 export { JobErrorPanel } from '../jobs/JobErrorPanel'
+export { JobInputField } from '../jobs/JobInputField'
 export { JobLogTimeline } from '../jobs/JobLogTimeline'
 export { JobStatusCell } from '../jobs/JobStatusCell'
 export { JobStatusHeader } from '../jobs/JobStatusHeader'

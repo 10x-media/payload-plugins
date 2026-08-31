@@ -76,6 +76,8 @@ export { type DrainDeps, type DrainOptions, type DrainResult, drainWorker } from
 export { type CreateWorkerArgs, createWorker, type Worker } from './execution/worker'
 export type { JobStatus, JobStatusInput } from './jobs/deriveJobStatus'
 export { deriveJobStatus } from './jobs/deriveJobStatus'
+export type { JobInputComponentProps, JobInputComponents } from './jobs/inputComponents'
+export type { JobInputExamples } from './jobs/inputPlaceholders'
 export type {
 	JobLogEntry,
 	JobLogEntryComponents,

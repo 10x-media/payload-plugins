@@ -23,6 +23,7 @@ type E2ETask = TaskConfig<{ input: object; output: object }>
 const sleepTask: E2ETask = {
 	slug: 'sleep',
 	label: 'Sleep',
+	inputSchema: [{ name: 'ms', type: 'number', required: true }],
 	handler: async ({ job }) => {
 		const ms = Number((job.input as { ms?: number })?.ms ?? 100)
 		await new Promise((resolve) => {
@@ -46,8 +47,64 @@ const noopTask: E2ETask = {
 	handler: () => ({ output: {} }),
 }
 
-/** A sleep task (drain e2e) and a noop task. Sleep duration comes from `input.ms`. */
-export const e2eTasks: E2ETask[] = [sleepTask, noopTask]
+/**
+ * Exercises the create-form input placeholder across field kinds: scalars, a
+ * select and a text list, a relationship, a group and an array. The handler only
+ * echoes what it got.
+ */
+const importAthletesTask: E2ETask = {
+	slug: 'importAthletes',
+	label: 'Import athletes',
+	inputSchema: [
+		{
+			name: 'disciplines',
+			type: 'select',
+			hasMany: true,
+			options: [
+				{ label: 'Canoe sprint', value: 'sprint' },
+				{ label: 'Canoe slalom', value: 'slalom' },
+			],
+		},
+		{ name: 'athleteCodes', type: 'text', hasMany: true },
+		{ name: 'limit', type: 'number' },
+		{ name: 'dryRun', type: 'checkbox' },
+		{ name: 'notify', type: 'relationship', relationTo: 'users' },
+		{
+			name: 'source',
+			type: 'group',
+			fields: [
+				{ name: 'url', type: 'text' },
+				{ name: 'since', type: 'date' },
+			],
+		},
+		{
+			name: 'ranges',
+			type: 'array',
+			fields: [
+				{ name: 'from', type: 'number' },
+				{ name: 'to', type: 'number' },
+			],
+		},
+	],
+	handler: ({ job }) => ({ output: { received: job.input } }),
+}
+
+/** Has a schema and a hand-written example, but no custom editor: JSON opens on the example. */
+const sendDigestTask: E2ETask = {
+	slug: 'sendDigest',
+	label: 'Send digest',
+	inputSchema: [
+		{ name: 'recipients', type: 'text', hasMany: true },
+		{ name: 'subject', type: 'text' },
+	],
+	handler: ({ job }) => ({ output: { received: job.input } }),
+}
+
+/**
+ * Sleep (drain e2e), noop, and two placeholder showcases. Sleep duration comes
+ * from `input.ms`.
+ */
+export const e2eTasks: E2ETask[] = [sleepTask, noopTask, importAthletesTask, sendDigestTask]
 
 /**
  * Matches the seeded `workflowSlug: 'runAutomation'` jobs (see dev/helpers/seed.ts) so the
@@ -59,6 +116,10 @@ export const e2eWorkflows: WorkflowConfig[] = [
 	{
 		slug: 'runAutomation',
 		label: 'Run automation',
+		inputSchema: [
+			{ name: 'automation', type: 'text' },
+			{ name: 'dryRun', type: 'checkbox' },
+		],
 		handler: async ({ inlineTask }) => {
 			await inlineTask('1', { task: () => ({ output: {} }) })
 		},

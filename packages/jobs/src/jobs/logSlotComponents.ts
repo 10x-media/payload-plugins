@@ -1,5 +1,7 @@
-import type { AdminComponent, AdminDependencies, PayloadComponent } from 'payload'
+import type { AdminDependencies, PayloadComponent } from 'payload'
 import type { ReactNode } from 'react'
+
+import { collectComponentDependencies } from './componentDependencies'
 
 /** Blocks inside an expanded log-attempt row that accept a custom renderer. */
 export type JobLogSlot = 'error' | 'input' | 'output'
@@ -73,47 +75,19 @@ export const resolveSlotComponent = (
 }
 
 /**
- * Flatten a `PayloadComponent` to the string path `admin.dependencies` accepts.
- * Payload parses that path back into `path#exportName`, which is exactly the key
- * `getFromImportMap` looks up at render time, so an explicit `exportName` has to
- * be folded in here or the two would disagree.
- */
-const toAdminComponent = (component: PayloadComponent): AdminComponent | undefined => {
-	if (component === false) {
-		return undefined
-	}
-	if (typeof component === 'string') {
-		return { path: component, type: 'component' }
-	}
-	const { clientProps, exportName, path, serverProps } = component
-	if (typeof path !== 'string') {
-		return undefined
-	}
-	return {
-		...(clientProps ? { clientProps } : {}),
-		path: exportName ? `${path}#${exportName}` : path,
-		...(serverProps ? { serverProps } : {}),
-		type: 'component',
-	}
-}
-
-/**
  * Import-map entries for every configured renderer. The paths live in plugin
  * options rather than in a component slot the import-map generator walks, so
  * without this registration `generate:importmap` would never see them.
  */
 export const collectLogDependencies = (
 	components: JobLogEntryComponents | undefined
-): AdminDependencies => {
-	const dependencies: AdminDependencies = {}
-	for (const [taskSlug, slots] of Object.entries(components ?? {})) {
-		for (const slot of JOB_LOG_SLOTS) {
-			const component = slots[slot]
-			const dependency = component === undefined ? undefined : toAdminComponent(component)
-			if (dependency) {
-				dependencies[`@10x-media/jobs:log:${taskSlug}:${slot}`] = dependency
-			}
-		}
-	}
-	return dependencies
-}
+): AdminDependencies =>
+	collectComponentDependencies(
+		'@10x-media/jobs:log',
+		Object.entries(components ?? {}).flatMap(([taskSlug, slots]) =>
+			JOB_LOG_SLOTS.map((slot): [string, PayloadComponent | undefined] => [
+				`${taskSlug}:${slot}`,
+				slots[slot],
+			])
+		)
+	)

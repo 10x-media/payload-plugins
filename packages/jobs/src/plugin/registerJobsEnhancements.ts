@@ -8,7 +8,9 @@ import {
 	type LabelFunction,
 	type PayloadComponent,
 } from 'payload'
-
+import { fieldAffectsData, tabHasName } from 'payload/shared'
+import { collectInputDependencies } from '../jobs/inputComponents'
+import { collectInputPlaceholders } from '../jobs/inputPlaceholders'
 import { collectLogDependencies } from '../jobs/logSlotComponents'
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
@@ -34,6 +36,7 @@ const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
 const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
 const QUEUE_SELECT_FIELD = '@10x-media/jobs/client#QueueSelectField'
 const ATTEMPTS_CELL = '@10x-media/jobs/client#AttemptsCell'
+const INPUT_FIELD = '@10x-media/jobs/rsc#JobInputFieldServer'
 
 /** Stored field that titles the document: the workflow or task the job runs. */
 const TITLE_FIELD: Field = {
@@ -182,8 +185,15 @@ type EnhanceContext = {
 	lockRecord: boolean
 }
 
-/** Recursively relabel fields, apply cell overrides, and lock the record, descending into tabs. */
-const enhanceFields = (fields: Field[], ctx: EnhanceContext): Field[] =>
+/**
+ * Recursively relabel fields, apply cell overrides, and lock the record, descending
+ * into tabs. Field components stay on the fields the document form actually renders:
+ * `log` rows carry an `input`, an `output` and an `error` of their own, and our
+ * timeline draws those from the attempt's raw values, so a nested match would
+ * pre-render an editor nothing mounts. Presentational containers keep the level
+ * (`error` and `log` sit inside an unnamed tab); a named tab, group or array drops it.
+ */
+const enhanceFields = (fields: Field[], ctx: EnhanceContext, ownFields = true): Field[] =>
 	fields.map((field): Field => {
 		let next = field
 		const name = fieldName(field)
@@ -194,7 +204,7 @@ const enhanceFields = (fields: Field[], ctx: EnhanceContext): Field[] =>
 		if (ctx.lockRecord && name) {
 			next = lockField(next, name)
 		}
-		if (name && ctx.fieldComponents[name]) {
+		if (ownFields && name && ctx.fieldComponents[name]) {
 			next = {
 				...next,
 				admin: {
@@ -208,11 +218,14 @@ const enhanceFields = (fields: Field[], ctx: EnhanceContext): Field[] =>
 				...next,
 				tabs: next.tabs.map((tab) => ({
 					...tab,
-					fields: enhanceFields(tab.fields, ctx),
+					fields: enhanceFields(tab.fields, ctx, ownFields && !tabHasName(tab)),
 				})),
 			} as Field
 		} else if ('fields' in next) {
-			next = { ...next, fields: enhanceFields(next.fields, ctx) } as Field
+			next = {
+				...next,
+				fields: enhanceFields(next.fields, ctx, ownFields && !fieldAffectsData(next)),
+			} as Field
 		}
 		return next
 	})
@@ -252,13 +265,17 @@ export const registerJobsEnhancements = (
 	options: JobsOptions,
 	extraQueues: string[] = []
 ): void => {
-	// The log renderers are named in plugin options, not in a component slot the
-	// import-map generator walks, so they only reach the import map through here.
-	const logDependencies = collectLogDependencies(options.log?.entryComponents)
-	if (Object.keys(logDependencies).length > 0) {
+	// The log renderers and input editors are named in plugin options, not in a
+	// component slot the import-map generator walks, so they only reach the import
+	// map through here.
+	const dependencies = {
+		...collectLogDependencies(options.log?.entryComponents),
+		...collectInputDependencies(options.input?.components),
+	}
+	if (Object.keys(dependencies).length > 0) {
 		config.admin = {
 			...config.admin,
-			dependencies: { ...config.admin?.dependencies, ...logDependencies },
+			dependencies: { ...config.admin?.dependencies, ...dependencies },
 		}
 	}
 
@@ -290,8 +307,14 @@ export const registerJobsEnhancements = (
 		// `payload.jobs.queue()` may target.
 		const slugs = collectJobSelectSlugs(config, extraQueues)
 		const labels = collectJobLabels(config)
+		const placeholders = collectInputPlaceholders(config, options.input?.examples)
 		const fieldComponents: Record<string, PayloadComponent> = {
 			...FIELD_COMPONENTS,
+			input: {
+				clientProps: { placeholders },
+				path: INPUT_FIELD,
+				serverProps: { components: options.input?.components },
+			},
 			log: {
 				clientProps: { taskLabels: labels.taskLabels },
 				path: LOG_TIMELINE,
