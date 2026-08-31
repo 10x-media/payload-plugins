@@ -94,4 +94,5 @@ export const uk: Record<TranslationKey, string> = {
 	// Auth events
 	[keys.authEventLogin]: 'Вхід',
 	[keys.authEventForgotPassword]: 'Забув пароль',
+	[keys.authEventFailedLogin]: 'Невдалий вхід',
 }

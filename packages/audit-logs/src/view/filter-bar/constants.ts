@@ -7,8 +7,3 @@ export const OPERATION_OPTIONS: SelectOption[] = [
 	{ label: 'Auth', value: 'auth' },
 	{ label: 'Custom', value: 'custom' },
 ]
-
-export const AUTH_EVENT_OPTIONS: SelectOption[] = [
-	{ label: 'Login', value: 'login' },
-	{ label: 'Forgot password', value: 'forgot_password' },
-]

@@ -122,6 +122,7 @@ export function SingleValueEditor({
 					const authEventOptions = [
 						{ label: t(keys.authEventLogin), value: 'login' },
 						{ label: t(keys.authEventForgotPassword), value: 'forgot_password' },
+						{ label: t(keys.authEventFailedLogin), value: 'failed_login' },
 					]
 					return (
 						<ReactSelect

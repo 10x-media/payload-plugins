@@ -94,4 +94,5 @@ export const en: Record<TranslationKey, string> = {
 	// Auth events
 	[keys.authEventLogin]: 'Login',
 	[keys.authEventForgotPassword]: 'Forgot password',
+	[keys.authEventFailedLogin]: 'Failed login',
 }

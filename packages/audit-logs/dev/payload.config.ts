@@ -69,7 +69,7 @@ export default buildConfig({
 				'order-events': { auditLog: true },
 				// Auth events only. Document edits stay out, which is the common shape for
 				// an auth collection: password hashes and login counters would flood the log.
-				users: { auth: true },
+				users: { auth: { login: true, forgotPassword: true, failedLogin: true } },
 			},
 			globals: {
 				'site-settings': true,

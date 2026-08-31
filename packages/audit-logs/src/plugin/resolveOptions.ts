@@ -5,6 +5,7 @@ import type {
 	AuditFieldOptions,
 	AuditOptions,
 	CollectionAuditLogConfig,
+	FailedLoginOptions,
 	GlobalAuditOptions,
 	PayloadAPIOption,
 	PayloadAPIOptionObject,
@@ -113,16 +114,26 @@ export const resolveAuditLogConfig = (
  * Login and password-reset logging is opt-in per collection, exactly like every other
  * option: `true` enables both events, an object picks between them, anything else is off.
  */
+export type ResolvedAuthConfig = {
+	/** Off unless named. `true` covers the two events that follow a request Payload accepted. */
+	failedLogin: FailedLoginOptions | false
+	forgotPassword: boolean
+	login: boolean
+}
+
 export const resolveAuthConfig = (
 	auditOptions: AuditOptions | undefined
-): { forgotPassword: boolean; login: boolean } | false => {
+): false | ResolvedAuthConfig => {
 	if (auditOptions === undefined) return false
-	if (auditOptions === true) return { forgotPassword: true, login: true }
+	if (auditOptions === true) return { failedLogin: false, forgotPassword: true, login: true }
 
 	const { auth } = auditOptions
 	if (!auth) return false
-	if (auth === true) return { forgotPassword: true, login: true }
+	if (auth === true) return { failedLogin: false, forgotPassword: true, login: true }
+
+	const { failedLogin } = auth
 	return {
+		failedLogin: failedLogin === true ? {} : (failedLogin ?? false),
 		forgotPassword: auth.forgotPassword ?? true,
 		login: auth.login ?? true,
 	}

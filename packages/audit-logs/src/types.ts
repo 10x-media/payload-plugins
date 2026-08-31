@@ -258,14 +258,15 @@ export type CollectionAuditLogConfig = {
 	/**
 	 * Controls how draft saves are handled when the collection has `versions.drafts` enabled.
 	 *
-	 * - `'log'`, log every save, including autosave drafts (default)
 	 * - `'ignore'`, skip draft saves entirely (but always log `create`); on publish, diff is
-	 *   computed against the last published version (via `findVersions`) rather than the last draft
+	 *   computed against the last published version (via `findVersions`) rather than the last
+	 *   draft (default)
+	 * - `'log'`, log every save, including autosave drafts
 	 *
 	 * Can also be set as a top-level plugin default via `AuditPluginConfig.drafts`.
 	 * Per-collection value takes precedence.
 	 *
-	 * @default 'log'
+	 * @default 'ignore'
 	 */
 	drafts?: 'ignore' | 'log'
 	/**
@@ -398,16 +399,51 @@ type AuditFieldsOptions =
  * - `true`, enable both `auditFields` and `auditLog` with defaults
  * - object, opt-in: only what is explicitly set is enabled
  */
+/** As much as Payload will say about why it refused a login. */
+export type FailedLoginReason = 'invalid_credentials' | 'locked' | 'unverified'
+
+/**
+ * Decides whether one refused login becomes a row. Returning `false` drops it, which is
+ * the seam for collapsing a burst into one entry, or for alerting instead of recording.
+ */
+export type FailedLoginShouldLogFunction = (args: {
+	/** The email or username submitted, capped in length. Undefined when neither was sent. */
+	identifier: string | undefined
+	reason: FailedLoginReason
+	req: PayloadRequest
+}) => boolean | Promise<boolean>
+
+export type FailedLoginOptions = {
+	shouldLog?: FailedLoginShouldLogFunction
+}
+
 /**
  * Login and password-reset logging for an auth-enabled collection.
  *
- * - `true`, log both events
+ * - `true`, log logins and password resets
  * - `false` or omitted, log neither
  * - object, pick per event
+ *
+ * `failedLogin` is never part of `true` and has to be named. The other two follow a
+ * request that already succeeded, while a refused login is a write anyone on the internet
+ * can trigger, at any rate they can send.
  */
 export type AuthEventsOptions =
 	| boolean
 	| {
+			/**
+			 * Refused login attempts, recorded as `eventType: 'failed_login'`.
+			 *
+			 * Payload answers the same way whether or not the account exists, so the entry
+			 * carries no user, only the submitted identifier and the reason.
+			 *
+			 * - `true`, record every refused attempt
+			 * - object, the same plus a `shouldLog` filter
+			 *
+			 * Read the security note in the docs before enabling this on a public-facing
+			 * auth collection.
+			 */
+			failedLogin?: boolean | FailedLoginOptions
 			forgotPassword?: boolean
 			login?: boolean
 	  }

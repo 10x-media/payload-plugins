@@ -28,12 +28,16 @@ description: The full option surface, from per-collection opt-in to the audit-lo
 posts: {
   auditFields: true,   // true | false | { createdBy?, lastModifiedBy? }
   auditLog: true,      // true | false | CollectionAuditLogConfig
-  auth: true,          // true | false | { login?, forgotPassword? }
+  auth: true,          // true | false | { login?, forgotPassword?, failedLogin? }
 }
 ```
 
 `auth` only means anything on a collection with `auth` enabled in Payload. It logs
 logins and password resets, and like everything else here it is off until asked for.
+
+`failedLogin` is the exception to `true` covering everything: it stays off unless named,
+because it is a write an anonymous caller can trigger. See
+[refused logins](/audit-logs/what-is-logged#refused-logins).
 
 An omitted key is off. `auditFields: true` without `auditLog` gives you the two columns and no log; `auditLog: true` without `auditFields` gives you the log and no extra columns.
 

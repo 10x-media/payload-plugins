@@ -65,6 +65,8 @@ export type {
 	GlobalAuditOptions,
 	MultiTenancyConfig,
 	OverrideFunction,
+	PayloadAPIOption,
+	PayloadAPIOptionObject,
 	ShouldLogFunction,
 	ViewAccess,
 } from './types'

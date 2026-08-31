@@ -92,4 +92,6 @@ export type AuditLogDoc = {
 	group?: string
 	archivedAt?: string
 	payloadAPI?: string
+	ipAddress?: string
+	userAgent?: string
 }

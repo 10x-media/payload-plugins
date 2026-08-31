@@ -94,6 +94,29 @@ test.describe('signed in', () => {
 		await expect(row.locator('.al-diff')).not.toContainText('sk-two')
 	})
 
+	/**
+	 * The only tier that exercises the real path. A refused login is recorded from the
+	 * collection's `afterError` hook, which Payload calls from its REST error handler, so
+	 * nothing below an actual HTTP request reaches it.
+	 */
+	test('a refused login is recorded without naming a user', async ({ page }) => {
+		const attempt = await page.request.post('/api/users/login', {
+			data: { email: 'intruder@example.com', password: 'wrong-password' },
+			failOnStatusCode: false,
+		})
+		expect(attempt.status()).toBe(401)
+
+		await gotoLogs(page, '?eventType=failed_login')
+
+		const row = rows(page).first()
+		await expect(row.locator('.al-badge--op')).toHaveText('failed_login')
+		await expect(row.locator('.al-row__user')).toHaveText('—')
+
+		await rowSummary(row).click()
+		await expect(row).toContainText('intruder@example.com')
+		await expect(row).not.toContainText('wrong-password')
+	})
+
 	test('a global entry is labelled by its slug', async ({ page }) => {
 		await gotoLogs(page, '?global=site-settings')
 

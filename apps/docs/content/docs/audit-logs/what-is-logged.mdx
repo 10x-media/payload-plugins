@@ -157,9 +157,67 @@ auditLogs({
 
 `auth: true` records both events. A collection you never list records neither, which matters when the config has a customer-facing auth collection alongside the admin one: logging every storefront login is rarely what anybody wanted.
 
-Only successful events are recorded. A failed login throws before the hook runs, so it never reaches the log.
-
 The forgot-password entry stores the submitted email in `metadata`. The hook only fires when the account exists, so this is not a way to enumerate addresses.
+
+### Refused logins
+
+`failedLogin` records attempts Payload turned away, as `eventType: 'failed_login'`. It is not part of `auth: true` and has to be named:
+
+```ts title="payload.config.ts"
+collections: {
+  admins: { auth: { login: true, failedLogin: true } },
+}
+```
+
+The entry carries no user. Payload answers the same way whether the account exists or the password was wrong, so there is nobody to point at. What it does carry is the caller's IP, the user agent, and `metadata`:
+
+```ts
+metadata: {
+  identifier: 'intruder@example.com',   // the email or username submitted, capped at 256 chars
+  reason: 'invalid_credentials',        // or 'locked', or 'unverified'
+}
+```
+
+`reason: 'locked'` is the account hitting `maxLoginAttempts`. The submitted password is never read.
+
+Only REST is covered. The entry is written from the collection's `afterError` hook, which Payload calls from its REST error handler, so attempts through GraphQL or `payload.login()` produce no entry.
+
+<Callout type="warn">
+  This is the one audited write anyone on the internet can trigger. Payload 3 has no built-in rate limiting, and `maxLoginAttempts` only counts against accounts that exist, so attempts against addresses you never registered are never throttled. One request is one row, at whatever rate the caller can send. Put a rate limiter in front of `/api/*/login`, or use `shouldLog` below, before enabling this on a public auth collection. The identifiers recorded also belong to people who may not be your users, which is worth a line in your privacy policy.
+</Callout>
+
+`shouldLog` decides whether an attempt becomes a row. Returning `false` drops it, which is where a burst gets collapsed:
+
+```ts title="payload.config.ts"
+const recent = new Map<string, number>()
+
+collections: {
+  admins: {
+    auth: {
+      failedLogin: {
+        shouldLog: ({ identifier, req }) => {
+          const key = `${identifier}:${req.headers.get('x-forwarded-for') ?? ''}`
+          const last = recent.get(key) ?? 0
+          if (Date.now() - last < 60_000) return false
+          recent.set(key, Date.now())
+          return true
+        },
+      },
+    },
+  },
+}
+```
+
+That keeps one row per identifier and IP per minute. The map lives in one process, so a deployment running several instances gets that limit per instance; back it with Redis if you need the real number.
+
+The same seam works for alerting instead of recording:
+
+```ts
+shouldLog: async ({ identifier, reason }) => {
+  if (reason === 'locked') await notifySecurityChannel({ identifier })
+  return false
+}
+```
 
 ## Globals
 

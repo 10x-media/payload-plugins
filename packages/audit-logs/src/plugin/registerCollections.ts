@@ -1,6 +1,10 @@
 import type { CollectionConfig, CollectionSlug, Config } from 'payload'
 
-import { afterForgotPasswordAuditLog, afterLoginAuditLog } from '../hooks/afterAuthCollection'
+import {
+	afterErrorFailedLoginAuditLog,
+	afterForgotPasswordAuditLog,
+	afterLoginAuditLog,
+} from '../hooks/afterAuthCollection'
 import { afterChangeCollectionAuditLog } from '../hooks/afterChangeCollection'
 import { afterDeleteCollectionAuditLog } from '../hooks/afterDeleteCollection'
 import { beforeChangeCollectionAuditField } from '../hooks/beforeChangeCollection'
@@ -12,7 +16,7 @@ import { resolveAuditLogConfig, resolveAuthConfig } from './resolveOptions'
 
 type CollectionHooks = NonNullable<CollectionConfig['hooks']>
 
-/** Attaches login and forgot-password logging when the collection asked for it. */
+/** Attaches login, forgot-password and refused-login logging when the collection asked for it. */
 const withAuthHooks = ({
 	auditOptions,
 	ctx,
@@ -44,6 +48,12 @@ const withAuthHooks = ({
 		next.afterForgotPassword = [
 			...(next.afterForgotPassword ?? []),
 			afterForgotPasswordAuditLog(authOptions),
+		]
+	}
+	if (authConfig.failedLogin) {
+		next.afterError = [
+			...(next.afterError ?? []),
+			afterErrorFailedLoginAuditLog({ ...authOptions, failedLogin: authConfig.failedLogin }),
 		]
 	}
 	return next

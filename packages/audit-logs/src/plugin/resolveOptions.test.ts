@@ -132,8 +132,16 @@ describe('resolveAuthConfig', () => {
 	})
 
 	it('true enables both events', () => {
-		expect(resolveAuthConfig(true)).toEqual({ forgotPassword: true, login: true })
-		expect(resolveAuthConfig({ auth: true })).toEqual({ forgotPassword: true, login: true })
+		expect(resolveAuthConfig(true)).toEqual({
+			failedLogin: false,
+			forgotPassword: true,
+			login: true,
+		})
+		expect(resolveAuthConfig({ auth: true })).toEqual({
+			failedLogin: false,
+			forgotPassword: true,
+			login: true,
+		})
 	})
 
 	it('is off when the collection is listed without auth', () => {
@@ -144,12 +152,43 @@ describe('resolveAuthConfig', () => {
 
 	it('an object opts out of one event and leaves the other on', () => {
 		expect(resolveAuthConfig({ auth: { login: false } })).toEqual({
+			failedLogin: false,
 			forgotPassword: true,
 			login: false,
 		})
 		expect(resolveAuthConfig({ auth: { forgotPassword: false } })).toEqual({
+			failedLogin: false,
 			forgotPassword: false,
 			login: true,
+		})
+	})
+
+	// Unlike the other two, this one is an unauthenticated write path, so `auth: true`
+	// must not quietly turn it on.
+	it('leaves failed logins off unless they are asked for by name', () => {
+		expect(resolveAuthConfig(true)).toMatchObject({ failedLogin: false })
+		expect(resolveAuthConfig({ auth: true })).toMatchObject({ failedLogin: false })
+		expect(resolveAuthConfig({ auth: { login: true } })).toMatchObject({ failedLogin: false })
+	})
+
+	it('true is shorthand for the empty options object', () => {
+		expect(resolveAuthConfig({ auth: { failedLogin: true } })).toEqual({
+			failedLogin: {},
+			forgotPassword: true,
+			login: true,
+		})
+	})
+
+	it('carries the host filter through', () => {
+		const shouldLog = () => false
+		expect(resolveAuthConfig({ auth: { failedLogin: { shouldLog } } })).toMatchObject({
+			failedLogin: { shouldLog },
+		})
+	})
+
+	it('false is off, like everywhere else', () => {
+		expect(resolveAuthConfig({ auth: { failedLogin: false } })).toMatchObject({
+			failedLogin: false,
 		})
 	})
 })

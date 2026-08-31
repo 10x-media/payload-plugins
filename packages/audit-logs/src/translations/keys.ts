@@ -76,6 +76,7 @@ export const keys = {
 
 	authEventLogin: 'auditLogs:authEventLogin',
 	authEventForgotPassword: 'auditLogs:authEventForgotPassword',
+	authEventFailedLogin: 'auditLogs:authEventFailedLogin',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
