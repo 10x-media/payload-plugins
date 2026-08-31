@@ -28,7 +28,9 @@
 		"@10x-media/folder-picker": "0.0.0",
 		"@10x-media/folder-picker-dev": "0.0.0",
 		"@10x-media/dual-session": "0.0.0",
-		"@10x-media/dual-session-dev": "0.0.0"
+		"@10x-media/dual-session-dev": "0.0.0",
+		"@10x-media/audit-logs": "0.0.0",
+		"@10x-media/audit-logs-dev": "0.0.0"
 	},
 	"changesets": [
 		"admin-wiki-block-chips",
@@ -72,6 +74,9 @@
 		"analytics-uniques-breakdowns",
 		"analytics-widget-foundation",
 		"analytics-write-buffer",
+		"audit-logs-extensible-payload-api",
+		"audit-logs-failed-login",
+		"audit-logs-initial-beta",
 		"color-linked-alpha",
 		"dual-session-initial-beta",
 		"dual-session-role-split",
