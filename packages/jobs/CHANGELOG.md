@@ -1,5 +1,13 @@
 # @10x-media/jobs
 
+## 0.1.0-beta.8
+
+### Minor Changes
+
+- The create form pre-fills `input` from the selected task's or workflow's `inputSchema`: a field with a static `defaultValue` contributes that, otherwise scalars get an empty value of their kind, a `hasMany` field, an array or blocks one sample element, a relationship the name of the collection it expects an id from, and groups nest. Each task and workflow keeps its own draft while the form is open, so switching parks and restores what was typed; clearing the selection resets the field to `{}`; existing jobs are not touched. `input.examples` merges hand-written top-level values over the derived placeholder of a slug. The field renders through `JobInputField`, exported from `@10x-media/jobs/client`; new type `JobInputExamples`.
+
+  `input.components` swaps that JSON editor for a component of yours per task or workflow slug, with `'*'` for every slug and `false` to keep JSON. The editor receives `JobInputComponentProps` (`path`, `slug`, `kind`, `placeholder`, `readOnly`) and reads and writes the field through `useField`, so the pre-filled placeholder reaches it and the selection switches editors live. `JobInputFieldServer` (exported from `@10x-media/jobs/rsc`) wraps `JobInputField` and resolves the paths against the import map; they are registered with `admin.dependencies`, so adopters re-run `payload generate:importmap` after changing one. New types: `JobInputComponents` and `JobInputComponentProps`.
+
 ## 0.1.0-beta.7
 
 ### Minor Changes
