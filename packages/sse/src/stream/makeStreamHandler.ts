@@ -59,7 +59,7 @@ const prepareFrame = async (args: {
 
 	if (topic.gate === 'per-event') {
 		if (isDelete(event)) {
-			const { docId: _docId, data: _data, ...rest } = publicEvent
+			const { docId: _docId, data: _data, actorId: _actorId, ...rest } = publicEvent
 			return {
 				...rest,
 				id: `${event.timestamp}:${event.collection}:delete:${topic.topic}`,

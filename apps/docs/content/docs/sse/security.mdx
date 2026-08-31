@@ -37,14 +37,14 @@ For each topic the plugin runs the collection's `access.read`:
 When `scope` is on (`true` or a resolver object):
 
 - `resolveRequest` returning `null` → **403** for the whole connect.
-- Collection-wide `{slug}` under a Where is **allowed**. The stream **drops** events the subscriber cannot read (`count` for thin, `findByID` deny for enriched). Deletes on that channel skip the count (the row is gone) and are delivered **without** `docId`, `data`, or a document id in the event `id` field.
+- Collection-wide `{slug}` under a Where is **allowed**. The stream **drops** events the subscriber cannot read (`count` for thin, `findByID` deny for enriched). Deletes on that channel skip the count (the row is gone) and are delivered **without** `docId`, `data`, `actorId`, or a document id in the event `id` field.
 - Broker keys for `{slug}` become `{scope}::{slug}`. The client still sends `topics=posts`. See [Multi-tenancy](/sse/multi-tenancy).
 
 Authorization is evaluated **at connect**. Role or membership changes take effect on the next reconnect. Bound stream lifetime (or client reconnect) if you need faster revocation.
 
 ## Thin is not a security tier
 
-Thin events still carry collection and document ids, and may carry `actorId` (the writer's user id when the write had `req.user`). If `access.read` is `true` and a client subscribes collection-wide, those ids are visible on every create/update/delete. Thin only omits the document body; it does not hide membership of the collection. `actorId` is the same class of identifier as presence peer ids, not an email.
+Thin events still carry collection and document ids, and may carry `actorId` (the writer's user id when the write had `req.user`). If `access.read` is `true` and a client subscribes collection-wide, those ids are visible on every create/update/delete. Thin only omits the document body; it does not hide membership of the collection. `actorId` is the same class of identifier as presence peer ids, not an email. Gated collection-wide deletes strip `actorId` with `docId`.
 
 ## Enrichment
 

@@ -56,9 +56,15 @@ test('dirty editor sees a conflict banner when another user saves', async ({ bro
 	await login(pageB, VIEWER)
 	await updateDoc({ page: pageB, collection: 'posts', id, data: { title: `${title}-remote` } })
 
-	await expect(
-		page.getByText('Someone else saved this document. Reload to see their version, or keep editing')
-	).toBeVisible({ timeout: 20_000 })
+	const bannerCopy =
+		'Someone else saved this document. Reload to see their version, or keep editing'
+	await expect(page.getByText(bannerCopy)).toBeVisible({ timeout: 20_000 })
+
+	await page.getByRole('button', { name: 'Keep editing' }).click()
+	await expect(page.getByText(bannerCopy)).toHaveCount(0)
+
+	await updateDoc({ page: pageB, collection: 'posts', id, data: { title: `${title}-remote-2` } })
+	await expect(page.getByText(bannerCopy)).toBeVisible({ timeout: 20_000 })
 
 	await contextB.close()
 })

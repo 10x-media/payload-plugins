@@ -72,7 +72,7 @@ Without scoping, a collection whose `access.read` returns a Where object **refus
 
 With scoping on, `{slug}` is allowed. Each event is checked against the subscriber's own read access before it is written to the stream (`payload.count` for thin, `findByID` with `overrideAccess: false` for enriched). Denied frames are dropped, not sent as thin events.
 
-**Gated deletes.** A delete cannot be `count`ed (the row is gone). On a scoped collection-wide topic the stream still delivers the delete, but with `docId` and `data` removed, and with an event `id` that does not embed the document primary key. Subscribers learn that something in the collection changed, not which id. Document topics `{slug}:{id}` are authorized at connect and keep their id. The admin list refreshes off the event type alone, so id-less deletes still bump the list without flashing a row.
+**Gated deletes.** A delete cannot be `count`ed (the row is gone). On a scoped collection-wide topic the stream still delivers the delete, but with `docId`, `data`, and `actorId` removed, and with an event `id` that does not embed the document primary key. Subscribers learn that something in the collection changed, not which id or who wrote it. Document topics `{slug}:{id}` are authorized at connect and keep their id. The admin list refreshes off the event type alone, so id-less deletes still bump the list without flashing a row.
 
 When `resolveDoc` returns `null` (missing tenant on the document, or a throwing resolver), the plugin still publishes to `*::{slug}` so wildcard admins see the change, logs a warning, and skips the concrete `{scope}::{slug}` channel.
 
