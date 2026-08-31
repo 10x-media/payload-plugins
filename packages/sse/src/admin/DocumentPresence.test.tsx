@@ -86,16 +86,15 @@ describe('DocumentPresence', () => {
 	})
 
 	it('POSTs viewing by default and editing when the form is modified', () => {
-		render(<DocumentPresence profile="none" />)
+		const { rerender } = render(<DocumentPresence profile="none" />)
 		expect(presenceHook).toHaveBeenCalledWith(
 			'posts',
 			'post-1',
 			expect.objectContaining({ mode: 'viewing' })
 		)
-		cleanup()
 		presenceHook.mockClear()
 		state.formModified = true
-		render(<DocumentPresence profile="none" />)
+		rerender(<DocumentPresence profile="none" />)
 		expect(presenceHook).toHaveBeenCalledWith(
 			'posts',
 			'post-1',

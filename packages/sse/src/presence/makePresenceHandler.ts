@@ -41,7 +41,12 @@ const parseMode = (value: unknown): PresencePeer['mode'] | undefined => {
 const parseBody = async (req: {
 	json?: () => Promise<unknown>
 	url?: string
-}): Promise<{ collection: string; id: string; mode?: PresencePeer['mode'] } | null> => {
+}): Promise<{
+	collection: string
+	id: string
+	mode?: PresencePeer['mode']
+	modeInvalid: boolean
+} | null> => {
 	let body: PresenceBody = {}
 	try {
 		const parsed = await req.json?.()
@@ -67,7 +72,9 @@ const parseBody = async (req: {
 	if (!collection || !id) {
 		return null
 	}
-	return { collection, id, mode: parseMode(body.mode) }
+	const parsedMode = parseMode(body.mode)
+	const modeInvalid = body.mode !== undefined && parsedMode === undefined
+	return { collection, id, mode: parsedMode, modeInvalid }
 }
 
 const publishSafe = (broker: EventBroker, event: RealtimeEvent, log?: ErrorLog): void => {
@@ -92,6 +99,10 @@ export const makePresenceHandler = (deps: PresenceHandlerDeps): PayloadHandler =
 		const target = await parseBody(req)
 		if (!target) {
 			return Response.json({ message: 'collection and id are required' }, { status: 400 })
+		}
+
+		if ((req.method ?? 'POST').toUpperCase() !== 'DELETE' && target.modeInvalid) {
+			return Response.json({ message: 'mode must be viewing or editing' }, { status: 400 })
 		}
 
 		if (!(target.collection in collections)) {

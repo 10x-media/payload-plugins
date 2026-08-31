@@ -285,4 +285,15 @@ describe('makePresenceHandler', () => {
 			'editing'
 		)
 	})
+
+	it('returns 400 when mode is present and not viewing or editing', async () => {
+		const handler = makePresenceHandler(defaultDeps())
+		const res = await handler(
+			makeReq({
+				user: { id: 'u1' },
+				body: { collection: 'posts', id: '1', mode: 'locking' },
+			})
+		)
+		expect(res.status).toBe(400)
+	})
 })

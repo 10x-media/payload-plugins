@@ -41,21 +41,24 @@ const peersFromEvent = (event: RealtimeEvent): PresencePeerPublic[] | null => {
 		return null
 	}
 	return peers.flatMap((peer) => {
-		if (typeof peer !== 'object' || peer === null) {
-			return []
-		}
-		const candidate = peer as { id?: unknown; label?: unknown; mode?: unknown }
-		if (typeof candidate.id !== 'string' || typeof candidate.label !== 'string') {
-			return []
-		}
-		return [
-			{
-				id: candidate.id,
-				label: candidate.label,
-				mode: candidate.mode === 'editing' ? 'editing' : 'viewing',
-			} satisfies PresencePeerPublic,
-		]
+		const next = publicPeerFromUnknown(peer)
+		return next ? [next] : []
 	})
+}
+
+const publicPeerFromUnknown = (peer: unknown): PresencePeerPublic | null => {
+	if (typeof peer !== 'object' || peer === null) {
+		return null
+	}
+	const candidate = peer as { id?: unknown; label?: unknown; mode?: unknown }
+	if (typeof candidate.id !== 'string' || typeof candidate.label !== 'string') {
+		return null
+	}
+	return {
+		id: candidate.id,
+		label: candidate.label,
+		mode: candidate.mode === 'editing' ? 'editing' : 'viewing',
+	}
 }
 
 /**
@@ -77,6 +80,23 @@ export const useDocumentPresence = (
 	const [self, setSelf] = useState<PresencePeerPublic | null>(null)
 	const tokenRef = useRef(token)
 	tokenRef.current = token
+	const modeRef = useRef(mode)
+	modeRef.current = mode
+
+	const applyPresenceJson = useCallback((json: { peers?: unknown; self?: unknown }) => {
+		if (Array.isArray(json.peers)) {
+			setPeers(
+				json.peers.flatMap((peer) => {
+					const next = publicPeerFromUnknown(peer)
+					return next ? [next] : []
+				})
+			)
+		}
+		const nextSelf = publicPeerFromUnknown(json.self)
+		if (nextSelf) {
+			setSelf(nextSelf)
+		}
+	}, [])
 
 	const heartbeat = useCallback(
 		async (signal?: AbortSignal) => {
@@ -87,7 +107,9 @@ export const useDocumentPresence = (
 			if (tokenRef.current) {
 				headers.Authorization = `Bearer ${tokenRef.current}`
 			}
-			const body = mode === undefined ? { collection, id } : { collection, id, mode }
+			const currentMode = modeRef.current
+			const body =
+				currentMode === undefined ? { collection, id } : { collection, id, mode: currentMode }
 			const res = await fetch(url, {
 				method: 'POST',
 				credentials: 'include',
@@ -99,11 +121,11 @@ export const useDocumentPresence = (
 				return null
 			}
 			return (await res.json()) as {
-				peers?: PresencePeerPublic[]
-				self?: PresencePeerPublic
+				peers?: unknown
+				self?: unknown
 			}
 		},
-		[collection, id, url, mode]
+		[collection, id, url]
 	)
 
 	useEffect(() => {
@@ -120,12 +142,7 @@ export const useDocumentPresence = (
 			try {
 				const json = await heartbeat(abortController.signal)
 				if (disposed || !json) return
-				if (Array.isArray(json.peers)) {
-					setPeers(json.peers)
-				}
-				if (json.self) {
-					setSelf(json.self)
-				}
+				applyPresenceJson(json)
 			} catch (err) {
 				if (err instanceof DOMException && err.name === 'AbortError') {
 					return
@@ -159,7 +176,27 @@ export const useDocumentPresence = (
 				body: JSON.stringify({ collection, id }),
 			}).catch(() => {})
 		}
-	}, [collection, id, url, heartbeatMs, heartbeat])
+	}, [collection, id, url, heartbeatMs, heartbeat, applyPresenceJson])
+
+	const prevModeRef = useRef(mode)
+	useEffect(() => {
+		if (!collection || !id) {
+			return
+		}
+		if (prevModeRef.current === mode) {
+			return
+		}
+		prevModeRef.current = mode
+		let cancelled = false
+		void heartbeat().then((json) => {
+			if (!cancelled && json) {
+				applyPresenceJson(json)
+			}
+		})
+		return () => {
+			cancelled = true
+		}
+	}, [collection, id, mode, heartbeat, applyPresenceJson])
 
 	const { status } = usePayloadSubscription({
 		topics: collection && id ? [`presence:${collection}:${id}`] : [],
