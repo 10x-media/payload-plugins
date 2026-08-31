@@ -82,6 +82,7 @@ export const useDocumentPresence = (
 	tokenRef.current = token
 	const modeRef = useRef(mode)
 	modeRef.current = mode
+	const leaseAbortRef = useRef<AbortController | null>(null)
 
 	const applyPresenceJson = useCallback((json: { peers?: unknown; self?: unknown }) => {
 		if (Array.isArray(json.peers)) {
@@ -136,6 +137,7 @@ export const useDocumentPresence = (
 		let disposed = false
 		let interval: ReturnType<typeof setInterval> | undefined
 		const abortController = new AbortController()
+		leaseAbortRef.current = abortController
 
 		const run = async () => {
 			if (disposed) return
@@ -158,6 +160,9 @@ export const useDocumentPresence = (
 		return () => {
 			disposed = true
 			abortController.abort()
+			if (leaseAbortRef.current === abortController) {
+				leaseAbortRef.current = null
+			}
 			if (interval !== undefined) {
 				clearInterval(interval)
 			}
@@ -188,11 +193,17 @@ export const useDocumentPresence = (
 		}
 		prevModeRef.current = mode
 		let cancelled = false
-		void heartbeat().then((json) => {
-			if (!cancelled && json) {
-				applyPresenceJson(json)
-			}
-		})
+		void heartbeat(leaseAbortRef.current?.signal)
+			.then((json) => {
+				if (!cancelled && json) {
+					applyPresenceJson(json)
+				}
+			})
+			.catch((err) => {
+				if (err instanceof DOMException && err.name === 'AbortError') {
+					return
+				}
+			})
 		return () => {
 			cancelled = true
 		}

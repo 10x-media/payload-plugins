@@ -287,7 +287,19 @@ describe('makePresenceHandler', () => {
 	})
 
 	it('returns 400 when mode is present and not viewing or editing', async () => {
-		const handler = makePresenceHandler(defaultDeps())
+		const deps = defaultDeps({
+			identify: (user) => ({
+				id: String((user as { id: string }).id),
+				label: 'x',
+			}),
+		})
+		const handler = makePresenceHandler(deps)
+		await handler(
+			makeReq({
+				user: { id: 'u1' },
+				body: { collection: 'posts', id: '1', mode: 'editing' },
+			})
+		)
 		const res = await handler(
 			makeReq({
 				user: { id: 'u1' },
@@ -295,5 +307,7 @@ describe('makePresenceHandler', () => {
 			})
 		)
 		expect(res.status).toBe(400)
+		const peers = await deps.store.get({ collection: 'posts', id: '1' })
+		expect(peers).toEqual([expect.objectContaining({ id: 'u1', mode: 'editing' })])
 	})
 })

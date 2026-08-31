@@ -255,6 +255,60 @@ describe('useDocumentPresence', () => {
 		})
 	})
 
+	it('aborts in-flight mode POST on unmount so a late join cannot resurrect the lease', async () => {
+		const methods: string[] = []
+		let modeSignal: AbortSignal | undefined
+		const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+			const method = init?.method ?? 'GET'
+			methods.push(method)
+			if (method === 'POST') {
+				const postCount = methods.filter((m) => m === 'POST').length
+				if (postCount === 1) {
+					return new Response(
+						JSON.stringify({
+							peers: [{ id: 'u1', label: 'u1', mode: 'viewing' }],
+							self: { id: 'u1', label: 'u1', mode: 'viewing' },
+						}),
+						{ status: 200 }
+					)
+				}
+				modeSignal = init?.signal ?? undefined
+				return new Promise<Response>((_resolve, reject) => {
+					init?.signal?.addEventListener('abort', () => {
+						reject(new DOMException('Aborted', 'AbortError'))
+					})
+				})
+			}
+			if (method === 'DELETE') {
+				return new Response(JSON.stringify({ peers: [] }), { status: 200 })
+			}
+			return hangStream()
+		})
+		vi.stubGlobal('fetch', fetchMock)
+
+		const { rerender, unmount } = renderHook(
+			({ mode }: { mode: 'viewing' | 'editing' }) => useDocumentPresence('posts', '1', { mode }),
+			{ initialProps: { mode: 'viewing' as 'viewing' | 'editing' } }
+		)
+
+		await waitFor(() => {
+			expect(methods.filter((m) => m === 'POST')).toHaveLength(1)
+		})
+
+		rerender({ mode: 'editing' })
+
+		await waitFor(() => {
+			expect(methods.filter((m) => m === 'POST')).toHaveLength(2)
+		})
+
+		unmount()
+
+		await waitFor(() => {
+			expect(methods.filter((m) => m === 'DELETE')).toHaveLength(1)
+		})
+		expect(modeSignal?.aborted).toBe(true)
+	})
+
 	it('POSTs mode when provided', async () => {
 		const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
 			const method = init?.method ?? 'GET'
