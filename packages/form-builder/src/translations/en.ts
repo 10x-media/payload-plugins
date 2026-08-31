@@ -211,6 +211,11 @@ export const en: Record<TranslationKey, string> = {
 	[keys.configActions]: 'Actions',
 	[keys.fieldTypeConsent]: 'Consent',
 	[keys.consentConfigSource]: 'Source',
+	[keys.consentConfigDisplay]: 'Display',
+	[keys.consentConfigDisplayDescription]:
+		'A checkbox the visitor ticks, or a passive notice where submitting the form is the consent.',
+	[keys.consentDisplayCheckbox]: 'Checkbox',
+	[keys.consentDisplayNotice]: 'Notice',
 	[keys.consentConfigSourceDescription]:
 		'The statement the visitor agrees to. Its wording and policy page live with the source, so an edit there applies to every form using it.',
 	[keys.consentSourcesField]: 'Consent sources',
@@ -219,6 +224,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.consentSourcePlural]: 'Consent sources',
 	[keys.consentSourceLabel]: 'Name',
 	[keys.consentSourceStatement]: 'Statement',
+	[keys.consentSourceNoticeStatement]: 'Notice statement',
+	[keys.consentSourceNoticeStatementDescription]:
+		'Shown by consent fields displayed as a notice ("By subscribing, you agree..."). Empty falls back to the statement.',
 	[keys.consentSourcePage]: 'Statement source',
 	[keys.consentSourcePageDescription]:
 		'Must be set if you want form submissions to save a reference to your policy.',
@@ -294,6 +302,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fileRemove]: 'Remove',
 	[keys.spamRateLimited]: 'You have sent too many requests. Please try again later.',
 	[keys.spamRejected]: 'Your submission could not be processed.',
+	[keys.submissionActionFailedFlag]: 'Action failed',
+	[keys.submissionActionFailed]:
+		'Your submission could not be completed. Please try again in a moment.',
 	[keys.spamCaptchaFailed]: 'Captcha verification failed. Please try again.',
 	[keys.contextInvalid]: 'This form could not be verified. Please reload the page and try again.',
 	[keys.collectionFormSingular]: 'Form',
@@ -370,6 +381,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.formMultistep]: 'Multi-step',
 	[keys.formPollEnabled]: 'Poll',
 	[keys.formPersistSubmissions]: 'Store submissions',
+	[keys.formConsentRetentionNotice]:
+		'This form does not store submissions, so consent proofs are discarded once actions have run. Keep this setup only when the consent record lives elsewhere, such as a double opt-in provider.',
 	[keys.formClose]: 'Close',
 	[keys.formSuccess]: 'Thank you.',
 	[keys.formSubmitFailed]: 'Submission failed',

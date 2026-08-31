@@ -130,6 +130,16 @@
 	margin-top: calc(var(--base) * 1.75);
 }
 
+/* Consumer slots. Spacing to the guides and nothing else: what renders inside
+   belongs to the project, and the wrapper is skipped when a slot is empty. */
+.wiki-index__slot--before-table {
+	margin-bottom: calc(var(--base) * 1.5);
+}
+
+.wiki-index__slot--after-table {
+	margin-top: calc(var(--base) * 1.75);
+}
+
 .wiki-index__heading {
 	align-items: baseline;
 	color: var(--theme-elevation-650);

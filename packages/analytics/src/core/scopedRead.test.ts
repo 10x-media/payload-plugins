@@ -7,6 +7,7 @@ import { resolveReadContext } from './scopedRead'
 
 const runtimeWith = (overrides: Partial<AnalyticsRuntime> = {}): AnalyticsRuntime => ({
 	registry: createRegistry([memoryAdapter()]),
+	configAdapterIds: new Set(),
 	bindings: {},
 	engine: { read: async (adapter, query) => adapter.query(query, {}) },
 	ttl: { aggregate: 3600, realtime: 300 },
@@ -99,8 +100,8 @@ describe('resolveReadContext platform gating', () => {
 		expect(ctx.ok).toBe(false)
 	})
 
-	it('gates a scoped read through a platform adapter that cannot filter by scope', async () => {
-		const runtime = runtimeWith({ platformAdapterId: 'memory' })
+	it('gates a scoped read through a shared config adapter that cannot filter by scope', async () => {
+		const runtime = runtimeWith({ configAdapterIds: new Set(['memory']) })
 		const denied = await resolveReadContext({ runtime, req: anonReq, scope: 't1' })
 		expect(denied.ok).toBe(false)
 		const allowed = await resolveReadContext({ runtime, req: userReq, scope: 't1' })
@@ -110,9 +111,19 @@ describe('resolveReadContext platform gating', () => {
 		}
 	})
 
-	it('lets a scope-filtering platform adapter serve scoped reads ungated', async () => {
+	it('gates the config adapter even when it is not the designated platform adapter', async () => {
+		const runtime = runtimeWith({
+			configAdapterIds: new Set(['memory']),
+			platformAdapterId: 'other',
+		})
+		const denied = await resolveReadContext({ runtime, req: anonReq, scope: 't1' })
+		expect(denied.ok).toBe(false)
+	})
+
+	it('lets a scope-filtering (native) config adapter serve scoped reads ungated', async () => {
 		const runtime = runtimeWith({
 			registry: createRegistry([scopedAdapter()]),
+			configAdapterIds: new Set(['memory']),
 			platformAdapterId: 'memory',
 		})
 		const ctx = await resolveReadContext({ runtime, req: anonReq, scope: 't1' })
@@ -122,8 +133,8 @@ describe('resolveReadContext platform gating', () => {
 		}
 	})
 
-	it('leaves scoped reads through non-platform adapters ungated', async () => {
-		const runtime = runtimeWith({ platformAdapterId: 'other' })
+	it('leaves scoped reads through a runtime (non-config) adapter ungated', async () => {
+		const runtime = runtimeWith({ configAdapterIds: new Set() })
 		const ctx = await resolveReadContext({ runtime, req: anonReq, scope: 't1' })
 		expect(ctx.ok).toBe(true)
 		if (ctx.ok) {
@@ -131,8 +142,8 @@ describe('resolveReadContext platform gating', () => {
 		}
 	})
 
-	it('leaves null-scope reads through the platform adapter ungated', async () => {
-		const runtime = runtimeWith({ platformAdapterId: 'memory' })
+	it('leaves null-scope reads through the config adapter ungated', async () => {
+		const runtime = runtimeWith({ configAdapterIds: new Set(['memory']) })
 		const ctx = await resolveReadContext({ runtime, req: anonReq })
 		expect(ctx.ok).toBe(true)
 		if (ctx.ok) {

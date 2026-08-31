@@ -1,0 +1,121 @@
+---
+title: Frontends and clients
+description: Setups where the website is not this Next app, and callers that send no Referer.
+---
+
+## Do you need the plugin at all
+
+The shared cookie belongs to the origin Payload is served from, not to whoever calls it. So the question is never where the frontend lives, it is whether one browser jar can end up holding both sessions.
+
+| Setup | Plugin needed |
+| --- | --- |
+| Website and admin panel both on this Next app | Yes |
+| Website on another framework or another domain, one Payload behind both | Yes |
+| Website consumes Payload only through a mobile or desktop app | No |
+| Two separate Payload instances | No |
+
+A frontend on `shop.example.com` talking to Payload on `cms.example.com` changes nothing: the login response sets the cookie on `cms.example.com`, and `cms.example.com/admin` reads and overwrites that same cookie.
+
+### Getting the cookie to travel at all
+
+Cross-origin costs you four separate settings, and each one fails differently:
+
+- **`credentials: 'include'` on every fetch.** Without it the browser sends no cookie and receives none, and the response still looks fine.
+- **The exact origin in `config.cors`.** Payload only adds `Access-Control-Allow-Credentials: true` for an origin it finds in that list. `cors: '*'` answers with `Access-Control-Allow-Origin: '*'` and no credentials header, which the browser refuses to use with cookies.
+- **`sameSite: 'None'` plus `secure`, but only when the two are cross-*site*.** Different registrable domains, `shop.example` and `cms.example`, need it. Subdomains of one registrable domain, `shop.example.com` and `cms.example.com`, are same-site, and the default `Lax` still travels between them.
+- **A `csrf` entry, if you configure `csrf` at all.** The gate is an allowlist: leave it empty and every origin passes, fill it and an origin missing from it is rejected. Cross-origin is exactly when you want it filled.
+
+Two Payload instances do isolate, because there are two cookies on two origins.
+
+## The proxy is not a frontend concern
+
+In Payload v3 the REST handlers are Next route handlers, so `/api` is served by the Next app whatever the website is built with. The proxy runs there, on every REST call, including the ones a Nuxt or SvelteKit page makes.
+
+So a website on another framework, served from the same origin through path routing, needs nothing extra:
+
+```
+example.com/admin   -> Next (Payload)
+example.com/api     -> Next (Payload)
+example.com/*       -> Nuxt
+```
+
+A browser on `example.com/products` fetching `/api/customers/me` sends `Referer: https://example.com/products`, which is not under `/admin`, so the call is `frontend`. Same on separate origins, where `Sec-Fetch-Site` marks the referring page as not yours.
+
+What actually needs handling is not the framework. It is callers that send no `Referer`.
+
+## Mobile and desktop apps
+
+Use the token, not the cookie. `/api/customers/login` returns one:
+
+```ts
+const { token } = await (await fetch('/api/customers/login', { ... })).json()
+
+await fetch('/api/orders', {
+  headers: { Authorization: `JWT ${token}` },
+})
+```
+
+An `Authorization` header outranks every cookie, so these requests never touch scopes, cookie CSRF checks or the proxy. Store the token the way the platform expects and treat it as the session.
+
+This is also why an app-only Payload does not need the plugin: with no cookie in play there is nothing to isolate. A [role-split](/dual-session/role-split) collection changes nothing here either, because both halves log in through the same route and get the same kind of token.
+
+## Server-side rendering
+
+An SSR server rendering a page for a signed-in visitor is the one caller that genuinely acts on someone else's cookie. It has the visitor's `Cookie` header and no `Referer` of its own.
+
+The simplest way through is to stop using the cookie as a cookie. Read the isolated token out of the incoming request and send it as a token:
+
+```ts
+// Nuxt, SvelteKit, Astro, Remix: any server handler with the incoming request
+const token = parseCookie(request.headers.get('Cookie'))['payload-customers-token']
+
+const me = await fetch(`${PAYLOAD_URL}/api/customers/me`, {
+  headers: token ? { Authorization: `JWT ${token}` } : {},
+})
+```
+
+The cookie name is `` `${cookiePrefix}-${slug}-token` `` unless you set `cookieName`. Inside Payload, `resolveIsolatedCookieName` returns it, though on a [role-split](/dual-session/role-split) collection that call needs the user, because the name depends on which half they are in.
+
+Forwarding the `Cookie` header instead also works, and then the request is subject to the scope rule and to Payload's cookie CSRF gate:
+
+- send a `Referer` from your frontend so the call resolves to `frontend`. Server runtimes are not browsers, so nothing stops you setting it
+- send an `Origin` your `csrf` config allows, if you have configured `csrf`. With no `Origin` and no `Sec-Fetch-Site`, the gate rejects cookie auth
+- do not cache the response
+
+Leaving both off is not fatal: with no scope and no admin session, `adminSessionPriority` lets the frontend cookie through. It fails for visitors who also hold an admin session, which usually means it works everywhere except on your own machine.
+
+### With a role-split collection, read both cookies
+
+Reading one cookie name is enough when the collection is isolated whole. On a [role-split](/dual-session/role-split) collection it is not: staff sessions live in the shared cookie, so an SSR server that only looks at `payload-users-token` renders every editor as a signed-out visitor on the website.
+
+Try the isolated cookie first, then fall back to the shared one:
+
+```ts
+const cookies = parseCookie(request.headers.get('Cookie'))
+const token = cookies['payload-users-token'] ?? cookies['payload-token']
+
+const me = await fetch(`${PAYLOAD_URL}/api/users/me`, {
+  headers: token ? { Authorization: `JWT ${token}` } : {},
+})
+```
+
+That order matters and is the same ranking the plugin applies in the browser: a visitor holding both is the website visitor on the website. Forwarding the `Cookie` header wholesale needs no such handling, because the scope rule already decides between the two.
+
+## Browsers that send no Referer
+
+A frontend on another origin behind `Referrer-Policy: no-referrer` cannot send a `Referer`, and page scripts cannot set one: it is a forbidden header in browsers. Attribute those calls by something you do control, with a header the frontend adds to every request:
+
+```ts title="proxy.ts"
+export default createAuthScopeProxy({
+  resolveScope: (request) =>
+    request.headers.get('x-app-client') === 'storefront' ? 'frontend' : undefined,
+})
+```
+
+Returning `undefined` falls through to the default rule, so the admin panel keeps working normally.
+
+Any client can send that header. What it buys them is their own frontend session on a request that would otherwise have gone unattributed, which is not a privilege they lacked. Keep it that way by not deriving anything else from the header.
+
+## Next
+
+[One collection, two sessions](/dual-session/role-split) if your auth collections are really one collection with roles, [Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what none of this covers.

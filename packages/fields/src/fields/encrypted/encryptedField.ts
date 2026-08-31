@@ -1,5 +1,7 @@
-import type { Field, RichTextField, TextField } from 'payload'
+import type { CheckboxField, Field, RichTextField, TextField } from 'payload'
 import { validateKeysConfig } from './crypto/keys'
+import { normalizeGenerate } from './generateSecret'
+import { normalizeHint } from './hint'
 import {
 	makeAfterReadHook,
 	makeBeforeChangeHook,
@@ -7,6 +9,7 @@ import {
 	makeRichTextDecryptHook,
 	makeRichTextSealHook,
 	makeRichTextValidate,
+	makeSetIndicatorHook,
 } from './hooks'
 import { clampMaskDots } from './maskDots'
 import {
@@ -145,6 +148,10 @@ export const encryptedField = (
 	options: EncryptedFieldOptions = {}
 ): Field[] => {
 	const {
+		aadScope,
+		clearable,
+		generate,
+		hint,
 		keys,
 		maskDots: maskDotsOption,
 		onDecryptFailure,
@@ -153,11 +160,59 @@ export const encryptedField = (
 		queryable = false,
 	} = options
 	const maskDots = clampMaskDots(maskDotsOption)
+	const writeOnly = protection === 'writeOnly'
 	if (keys) {
 		validateKeysConfig(keys)
 	}
+	// Checked here rather than at first write: buildAad rejects a dotted
+	// component at seal time, and an empty scope would silently fall back to the
+	// slug the option exists to escape.
+	if (aadScope !== undefined && (aadScope === '' || aadScope.includes('.'))) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': aadScope must be a non-empty string without '.' ('.' separates AAD components, so a dotted scope would make the binding ambiguous)`
+		)
+	}
 	const hasMany = 'hasMany' in source && source.hasMany === true
 	const unique = 'unique' in source && source.unique === true
+	const required = 'required' in source && source.required === true
+	if (!writeOnly && (hint || generate || clearable !== undefined)) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': hint, generate, and clearable require protection 'writeOnly'`
+		)
+	}
+	if (hint && hasMany) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': hint is not supported with hasMany (one hint cannot identify many values)`
+		)
+	}
+	if (hint && source.type !== 'text' && source.type !== 'email') {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': hint is only supported for text and email fields (a hint slices leading/trailing characters)`
+		)
+	}
+	if (generate && source.type !== 'text') {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': generate is only supported for text fields`
+		)
+	}
+	if (clearable === true && required) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': clearable cannot be enabled on a required field (clearing it could never save)`
+		)
+	}
+	const normalizedHint = hint ? normalizeHint(hint, source.name) : undefined
+	const normalizedGenerate = generate ? normalizeGenerate(generate, source.name) : undefined
+	const resolvedClearable = writeOnly ? (clearable ?? !required) : false
+	if (writeOnly && queryable) {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': protection 'writeOnly' cannot be combined with queryable (the blind index is an equality oracle: anyone with list access could probe guesses of the secret)`
+		)
+	}
+	if (writeOnly && source.type === 'richText') {
+		throw new Error(
+			`@10x-media/fields: encryptedField '${source.name}': protection 'writeOnly' is not supported for richText (editing rich text requires the client to see it; use 'masked' instead)`
+		)
+	}
 	if (queryable && hasMany) {
 		throw new Error(
 			`@10x-media/fields: encryptedField '${source.name}': queryable is not supported with hasMany`
@@ -175,6 +230,7 @@ export const encryptedField = (
 	}
 
 	const marker: EncryptedFieldMarker = {
+		aadScope,
 		bidxName: queryable ? `${source.name}_bidx` : undefined,
 		fieldName: source.name,
 		hasMany,
@@ -183,7 +239,11 @@ export const encryptedField = (
 		normalize: source.type === 'email' ? 'email' : 'standard',
 		onDecryptFailure,
 		queryable,
+		setName: writeOnly ? `${source.name}_set` : undefined,
+		hint: normalizedHint,
+		hintName: normalizedHint ? `${source.name}_hint` : undefined,
 		sourceType: source.type,
+		writeOnly,
 	}
 
 	// richText returns a virtual editor field plus a hidden ciphertext sibling.
@@ -239,11 +299,31 @@ export const encryptedField = (
 			components: {
 				...(sourceAdmin?.components ?? {}),
 				Field: {
-					clientProps: { componentKey: source.type, fieldPatch, maskDots, protection },
+					clientProps: {
+						componentKey: source.type,
+						fieldPatch,
+						maskDots,
+						protection,
+						...(writeOnly
+							? {
+									clearable: resolvedClearable,
+									...(normalizedGenerate ? { generate: normalizedGenerate } : {}),
+								}
+							: {}),
+					},
 					path: '@10x-media/fields/client#ProtectedField',
 				},
-				...(protection === 'masked'
-					? { Cell: { clientProps: { maskDots }, path: '@10x-media/fields/rsc#ProtectedCell' } }
+				...(protection !== 'none'
+					? {
+							Cell: {
+								clientProps: {
+									maskDots,
+									...(writeOnly ? { setName: marker.setName } : {}),
+									...(marker.hintName ? { hintName: marker.hintName } : {}),
+								},
+								path: '@10x-media/fields/rsc#ProtectedCell',
+							},
+						}
 					: {}),
 			},
 		},
@@ -259,6 +339,35 @@ export const encryptedField = (
 
 	if (overrides) {
 		stored = overrides({ field: stored })
+	}
+
+	// Write-only reads strip the stored field from every response, so the admin
+	// (and any API consumer) learns set-ness from this virtual sibling instead: a
+	// never-persisted checkbox computed from the sealed sibling's presence. This
+	// is the mode's one deliberate leak, existence only. admin.hidden keeps it in
+	// form state (Payload renders it as a hidden input) without displaying it.
+	if (writeOnly) {
+		const setField: CheckboxField = {
+			name: marker.setName as string,
+			type: 'checkbox',
+			admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+			hooks: { afterRead: [makeSetIndicatorHook(marker.fieldName)] },
+			virtual: true,
+		}
+		if (!marker.hintName) {
+			return [stored, setField]
+		}
+		// The hint is real stored data (derived at seal time in the same
+		// beforeChange that encrypts, so the two can never drift) and is the
+		// identification surface API consumers and the admin read; it is
+		// deliberately NOT stripped from responses.
+		const hintField: TextField = {
+			name: marker.hintName,
+			type: 'text',
+			admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+			...(marker.localized ? { localized: true } : {}),
+		}
+		return [stored, setField, hintField]
 	}
 
 	if (!queryable) {

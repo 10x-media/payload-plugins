@@ -1,0 +1,137 @@
+---
+title: Limits
+description: What the plugin does not cover, and the edges to check before you ship it.
+---
+
+## GraphQL auth is not isolated
+
+The plugin replaces REST endpoints. Payload's GraphQL resolvers for `login`, `refreshToken` and `resetPassword` call `generatePayloadCookie` directly, and `me` reads the shared cookie through `extractJWT`. None of that is reachable from a collection config.
+
+So on an isolated collection:
+
+- a GraphQL `login` writes the **shared** cookie, overwriting the admin session
+- a GraphQL `me` reads the shared cookie, so it only ever sees the admin session
+- sessions minted through REST are invisible to GraphQL, because they live in a cookie it does not read
+
+**Use REST for auth on isolated collections.** GraphQL for everything else is unaffected, because it authenticates from whatever `req.user` already resolved to.
+
+## Authorization headers win
+
+Payload carries two unrelated credentials in the `Authorization` header, and an isolated cookie yields to both.
+
+**A JWT**, the `token` that `/api/customers/login` returns. It travels as `Authorization: JWT …`, as `Authorization: Bearer …`, or in the cookie, and `auth.jwtOrder` decides which is read first. The default is `['JWT', 'Bearer', 'cookie']`, so a header beats a cookie.
+
+**An API key**, which looks like `Authorization: customers API-Key …` and is handled by a separate strategy. `jwtOrder` does not govern it.
+
+So a request holding an isolated cookie *and* either of those resolves from the header. A frontend that sends an unrelated bearer token on every call therefore suppresses its cookie session, exactly as it would without the plugin. Schemes Payload does not extract from, such as `Basic`, are ignored.
+
+This is the behaviour [mobile and desktop clients](/dual-session/clients#mobile-and-desktop-apps) should lean on: a token in the header is never subject to scopes or cookie CSRF checks.
+
+Reordering `jwtOrder` to put `cookie` first makes the cookie beat `JWT` and `Bearer`. It has no effect on API keys, which win regardless.
+
+## Live preview needs a decision
+
+The admin panel's preview iframe loads a frontend URL, so the default rule scopes it `frontend`. An editor logged in as both an admin and a customer therefore gets the customer's view inside preview: no drafts, or a 403.
+
+The plugin does not detect this case. Two ways out:
+
+**Route preview through your own endpoint** and set the admin session for it explicitly. Preview is already a dedicated route in most projects, so this keeps the scope explicit.
+
+**Or force the scope in the proxy**, if your preview URLs are recognisable:
+
+```ts
+createAuthScopeProxy({
+  resolveScope: (request) =>
+    request.nextUrl.pathname.startsWith('/preview') ? 'admin' : undefined,
+})
+```
+
+Remember that fetches *from* the preview page carry the preview URL as `Referer`, so they need the same treatment.
+
+## Local API has no headers
+
+`payload.find()` in a server component, a cron job or a job handler has no request behind it, so there is no cookie and no scope. That is unchanged by this plugin: pass `req` or `user` explicitly, as you would anyway.
+
+For `payload.auth({ headers })` in a server component, pass the incoming headers and, if you need a specific answer, set the scope header yourself.
+
+## Cached RSC and ISR
+
+A cached page that calls `payload.auth()` freezes whichever user rendered it. That is true without this plugin too, but two parallel sessions make it likelier to bite. Mark auth-dependent pages `export const dynamic = 'force-dynamic'`.
+
+## The first deploy logs isolated users out
+
+Sessions move from `payload-token` to `payload-customers-token`, and the browser's old cookie no longer matches a name anything reads. Every isolated session ends once, at the deploy. Admin sessions are untouched.
+
+The same happens if you change `cookieName` later. Toggling `disabled` looks the same from the browser but is not: those sessions are only unreadable while it is on, not revoked, and they come back if you flip it off before they expire.
+
+## Other plugins that touch auth
+
+<Callout type="warn">
+**Assume conflict, and check before you install both.** This plugin works by replacing a collection's auth endpoints and by owning where that collection's cookie is written. Another plugin doing either of those things to the same collection will collide, and the collision is usually silent, a cookie written to the wrong name or an endpoint that never runs, rather than an error you can see.
+</Callout>
+
+None of the `@10x-media` plugins touch auth, so this is about third-party ones: OAuth and social login, magic links, passkeys, SSO, 2FA, impersonation, anything advertising "authentication".
+
+### What survives and what does not
+
+| What the other plugin does | Result |
+| --- | --- |
+| Only reads `req.user`, for access control, audit trails, field UI | **Fine.** Nothing here changes what `req.user` is once it has resolved. |
+| Adds an auth **strategy** and nothing else | **Fine.** A collection's declared strategies run ahead of this plugin's, so it keeps first refusal on every request. |
+| Writes the session cookie itself, via `generatePayloadCookie` | **Broken.** See below. |
+| Declares `/login`, `/logout`, `/refresh-token` or `/me` on an isolated collection | **One of the two silently loses.** See below. |
+| Parses `${cookiePrefix}-token` itself to authorize an isolated collection | **Broken.** It reads the admin's session and authorizes it against the wrong collection. Scopes never see that decision, so nothing here can correct it. |
+| Replaces `auth.strategies` wholesale after this plugin ran | **Broken.** This plugin appends its strategy; an assignment drops it, and the isolated cookie stops authenticating anything. |
+| Changes `admin.user`, `cookiePrefix`, or a collection's `auth.cookies` after this plugin ran | **Broken.** Cookie names and the admin-collection guard are resolved at config time, from the config as it stood when `dualSession` ran. |
+
+### A plugin that writes the cookie
+
+This is the common one. An OAuth or magic-link callback ends by minting a token and calling `generatePayloadCookie`, which writes the shared `${cookiePrefix}-token`. On an isolated collection that both bypasses the isolation and overwrites whatever admin session the visitor was holding, the exact bug this plugin exists to fix.
+
+Nothing here can intercept it. The call happens inside the other plugin's route, which this plugin never sees.
+
+The only fix is a seam in that plugin: if it lets you supply the `Set-Cookie` step, or exposes a hook after the token is minted, use [`generateIsolatedAuthCookie`](/dual-session/custom-auth) there. If it does not, that collection cannot be isolated.
+
+### A plugin that declares auth endpoints
+
+`handleEndpoints` matches the first declared endpoint that fits, and plugins run in array order. So on a collection both plugins touch:
+
+- the other plugin listed **before** `dualSession` wins the route, and the isolated cookie is never written
+- listed **after**, `dualSession` wins, and the other plugin's endpoint never runs
+
+Ordering picks which one loses, not whether one does. If the other plugin's `/login` is the point of installing it, it has to win, and that collection cannot be isolated.
+
+### Checking a plugin in two minutes
+
+In its source, look for:
+
+1. `generatePayloadCookie`, which writes the shared cookie. Conflict.
+2. `path: '/login'` (or `/logout`, `/refresh-token`, `/me`) on a collection you isolate. Endpoint conflict.
+3. `parseCookies` or `extractJWT` used to authorize, which reads the shared cookie. Conflict.
+4. `auth.strategies = [...]` rather than appending, which drops this plugin's strategy.
+
+None of those, and it only adds strategies or reads `req.user`? It composes.
+
+### If it does conflict
+
+**Leave that collection alone.** The other plugin's collection stays on the shared cookie and the rest are still isolated. You lose dual sessions for that one collection, not the plugin.
+
+**Or move the conflict off it.** Two auth collections, one owned by each plugin, is a config change rather than a compromise.
+
+**Or drive the cookie yourself.** If the other plugin's value is its identity proof rather than its routes, keep the strategy and write the cookie with [`generateIsolatedAuthCookie`](/dual-session/custom-auth) from your own callback.
+
+## `endpoints: false`
+
+Payload answers 501 for every route on such a collection, so there are no auth endpoints to replace. The plugin warns, keeps the collection, and registers its strategy, so the cookie can still be established with [`generateIsolatedAuthCookie`](/dual-session/custom-auth) from a route that does exist.
+
+## Unverified users
+
+Core's JWT strategy falls through to `admin.autoLogin` when a user fails the `verify` check, which on an isolated collection would hand back the *admin* user. The plugin returns no user instead. Only observable if you use `autoLogin`.
+
+## A changed role does not revoke anything
+
+On a collection [split by role](/dual-session/role-split), promoting a member to editor does not move their live session. Reading a session never re-runs the predicate, because roles come from the document rather than from the token, so re-checking would buy nothing for security and would log out everyone whose role just changed. They sign in again and land in the right half.
+
+`/refresh-token` is the exception, and it is deliberate: it asks the predicate about the user it just loaded, so it writes the replacement token into whichever half that user belongs in now. It does not expire the cookie it moved out of, so the browser can hold two live cookies for one user until the older token expires.
+
+Neither of those grants anything on its own. `access.admin` and your access functions run against the live document on every request, so a demoted editor still holding a shared cookie is still refused by the panel. If you need existing sessions actually gone, clear that user's `sessions` array. See [Refresh is a write](/dual-session/role-split#refresh-is-a-write-so-it-does-re-check).

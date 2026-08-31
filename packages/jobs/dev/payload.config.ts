@@ -43,6 +43,18 @@ export default buildConfig({
 	jobs: { tasks: e2eTasks, workflows: e2eWorkflows },
 	plugins: [
 		jobs({
+			// Demo of the log-slot seam: `sleep` gets server-rendered input and output,
+			// every task gets the client-rendered error card, and `inline` attempts keep
+			// the default JSON blocks so the contrast is visible in one document.
+			log: {
+				entryComponents: {
+					'*': { error: '/components/AttemptError#AttemptError' },
+					sleep: {
+						input: '/components/SleepInput#SleepInput',
+						output: '/components/SleepOutput#SleepOutput',
+					},
+				},
+			},
 			queueControl: { queues: ['default', 'emails', 'webhooks'] },
 			reliability: RELIABILITY_OPTIONS,
 		}),

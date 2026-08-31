@@ -1,42 +1,22 @@
-import {
-	BoldFeature,
-	InlineCodeFeature,
-	InlineToolbarFeature,
-	ItalicFeature,
-	LinkFeature,
-	lexicalEditor,
-	ParagraphFeature,
-	UnderlineFeature,
-} from '@payloadcms/richtext-lexical'
-import type { Block, CollectionSlug } from 'payload'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import type { Block } from 'payload'
 
+import type { WikiEditorFeature } from '../options'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import { CALLOUT_BLOCK_SLUG } from './constants'
 
-/**
- * Minimal nested editor for the callout body: inline formatting and external
- * links only, so callouts cannot recursively nest blocks, uploads, or video.
- */
-const calloutBodyEditor = () =>
-	lexicalEditor({
-		features: () => [
-			ParagraphFeature(),
-			BoldFeature(),
-			ItalicFeature(),
-			UnderlineFeature(),
-			InlineCodeFeature(),
-			LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
-			InlineToolbarFeature(),
-		],
-	})
+export type BuildCalloutBlockArgs = {
+	/** Features of the body editor. The caller is what leaves the callout out of them. */
+	bodyFeatures: () => WikiEditorFeature[]
+}
 
 /**
  * The plugin's built-in callout block. The slug is prefixed so it can never
  * collide with a consumer project's own blocks; the same slug keys the
  * renderer in `GuideArticle` and the seed's GitHub-alert transformer output.
  */
-export const buildCalloutBlock = (): Block => ({
+export const buildCalloutBlock = ({ bodyFeatures }: BuildCalloutBlockArgs): Block => ({
 	slug: CALLOUT_BLOCK_SLUG,
 	interfaceName: 'WikiCalloutBlock',
 	labels: {
@@ -64,7 +44,7 @@ export const buildCalloutBlock = (): Block => ({
 			name: 'body',
 			type: 'richText',
 			label: labelForKey(keys.calloutBodyLabel),
-			editor: calloutBodyEditor(),
+			editor: lexicalEditor({ features: bodyFeatures }),
 		},
 	],
 })

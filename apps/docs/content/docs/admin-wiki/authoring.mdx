@@ -39,17 +39,25 @@ Enabled:
 
 - Paragraphs, headings `h2` to `h4`, bold, italic, underline, strikethrough, inline code
 - Ordered and unordered lists, blockquotes, horizontal rules, alignment, indentation
-- Links, **external URLs only**. To link another guide, use the guide link block
+- Links, **external URLs only**; guide-to-guide links are a feature of their own beside them
 - Uploads, scoped to the `wiki-media` collection
 - Fixed and inline toolbars
 
 Headings start at `h2`; the guide title is the `h1` on the page and in the drawer.
 
+## Guide links
+
+A guide link wraps text the way a link does, rather than sitting in the sentence as a chip: select the words, press the guide-link button in either toolbar, and pick the target from the guides list. The words stay yours to edit afterwards.
+
+With the cursor inside a guide link, a small panel names the guide it points at and offers the two things there are to do: point it at a different guide, or take the link off and keep the text. The toolbar button is lit while the cursor is in a link, and pressing it there removes the link as well.
+
+The link stores the target guide's id and nothing else. A reader clicking one opens that guide in a drawer stacked on the current one, so following a reference never leaves the page; a link whose target was deleted degrades to dimmed plain text, and the sentence still reads.
+
+The words are content, not a rendering of the target's title. Renaming a guide therefore leaves the links pointing at it saying what their authors wrote, which is usually what a sentence needs, and occasionally something to go back and reword.
+
 ## Built-in blocks
 
-**Callout.** Four variants: info, tip, warning, danger. The body is itself rich text (inline formatting and external links), so a callout can hold lists and links but cannot nest blocks or uploads.
-
-**Guide link** (inline). Links one guide to another by relationship, with an optional label. The label defaults to the target guide's title, resolved at read time, so renaming a guide updates every reference to it.
+**Callout.** Four variants: info, tip, warning, danger. The body is a [nested editor](#the-editor-inside-your-own-block): inline formatting, links, lists, images, video, and the blocks you marked [`nestable`](#your-own-blocks).
 
 **Video embed.** Only when [video is enabled](#video). Takes a YouTube or Vimeo watch, share, or short URL and validates it at authoring time; the reader gets a privacy-friendly embed (`youtube-nocookie.com`, Vimeo with `dnt=1`).
 
@@ -86,6 +94,146 @@ adminWiki({
 ```
 
 The renderer receives the block node's field values as `fields`, and is registered as an admin dependency so importmap generation finds it. A renderer declared but missing from the import map renders a visible placeholder and logs a warning, rather than dropping the block silently.
+
+`nestable: true` also offers the block inside a [nested editor](#the-editor-inside-your-own-block), a callout body among them. Blocks are not nestable by default, inline blocks are:
+
+```ts
+blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock', nestable: true }],
+inlineBlocks: [{ block: heroChip, component: '/components/HeroChip#HeroChip', nestable: false }],
+```
+
+### Inline blocks
+
+For a block that sits inside a sentence, a chip or a status badge, use `inlineBlocks`:
+
+```ts title="payload.config.ts"
+import { statusChipBlock } from './blocks/statusChip'
+
+adminWiki({
+  editor: {
+    inlineBlocks: [{ block: statusChipBlock, component: '/components/StatusChip#StatusChip' }],
+  },
+})
+```
+
+Its renderer has to return inline-level JSX.
+
+## Your own features
+
+A block covers content that sits in the document as a unit. For everything else a lexical feature can do (a custom node, a toolbar item, a keyboard shortcut, a markdown transform), pass the feature itself:
+
+```ts
+import { MyFeature } from './lexical/MyFeature'
+
+adminWiki({
+  editor: {
+    features: [MyFeature({ /* ... */ })],
+  },
+})
+```
+
+An array is appended to the plugin's own features. A feature's client half is resolved through the import map like any other, so nothing has to be declared twice.
+
+The function form is handed the plugin's features as `defaultFeatures` and returns the whole list, which is the way to reorder or drop one. It runs once per editor, `nested` telling a [nested body](#the-editor-inside-your-own-block) apart from the guide body:
+
+```ts
+adminWiki({
+  editor: {
+    features: ({ defaultFeatures }) => [
+      ...defaultFeatures.filter((feature) => feature.key !== 'align'),
+      MyFeature(),
+    ],
+  },
+})
+```
+
+<Callout type="warn">
+  The list you return is the editor. Dropping `wikiGuideLink` takes guide links with it, and dropping `blocks` takes the callout, the video embed, and your own blocks. The plugin does not put anything back.
+</Callout>
+
+Features reach the seed as well: `seedWiki` builds the same editor the collection uses, so markdown converts through your features too.
+
+## Your own converters
+
+Reach for converters when a feature contributes a node type of its own; a block already carries its renderer as `component`.
+
+Point the plugin at a client module exporting a `JSXConvertersFunction`, the same shape as the `converters` prop on Payload's [`RichText`](https://payloadcms.com/docs/rich-text/converting-jsx):
+
+```tsx title="wikiConverters.tsx"
+'use client'
+import type { JSXConvertersFunction } from '@payloadcms/richtext-lexical/react'
+
+export const wikiConverters: JSXConvertersFunction = ({ defaultConverters }) => ({
+  ...defaultConverters,
+  myNode: ({ node, nodesToJSX }) => <MyNode>{nodesToJSX({ nodes: node.children })}</MyNode>,
+})
+```
+
+```ts title="payload.config.ts"
+adminWiki({
+  editor: { converters: '/components/wikiConverters#wikiConverters' },
+})
+```
+
+It must be a client module.
+
+<Callout type="warn">
+  `blocks` and `inlineBlocks` are nested maps, replaced whole. Returning `{ ...defaultConverters, blocks: { mine } }` drops the callout, the video embed and every consumer block; spread `defaultConverters.blocks` too.
+</Callout>
+
+Converters apply wherever the plugin renders a guide: the wiki view, the surface drawers, and a callout body.
+
+## The editor inside your own block
+
+A block with a `richText` field of its own can run the wiki editor there. `nested: true` drops the callout and headings, then the document furniture a framed body has no use for: blockquotes, horizontal rules, indentation and the fixed toolbar. Lists, images, video and your `nestable` blocks stay.
+
+Everything else comes from the arguments, so hand it the same object you hand `adminWiki` as `editor`, plus the collection slugs, which live beside `editor` rather than inside it:
+
+```ts title="blocks/accordion.ts"
+import { wikiFeatures } from '@10x-media/admin-wiki'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+
+import { wikiEditorOptions } from '../wikiEditorOptions'
+
+export const accordionBlock = {
+  slug: 'accordion',
+  fields: [
+    { name: 'title', type: 'text' },
+    {
+      name: 'body',
+      type: 'richText',
+      editor: lexicalEditor({
+        features: () =>
+          wikiFeatures({
+            ...wikiEditorOptions,
+            mediaSlug: 'wiki-media',
+            nested: true,
+            pagesSlug: 'wiki-pages',
+          }),
+      }),
+    },
+  ],
+}
+```
+
+<Callout type="warn">
+  A block whose own body runs `wikiFeatures` must not also appear in `blocks` with `nestable: true`. That makes the block reachable from inside itself, and Payload follows the two into each other while sanitizing the config, so the app never finishes booting.
+</Callout>
+
+`mediaSlug` and `pagesSlug` are required, because an editor pointing at collections you renamed through [`slugs`](/admin-wiki/configuration) would look exactly like one you configured. `blocks`, `inlineBlocks` and `video` still default to empty, so an editor missing yours is silent.
+
+To render the field, take `converters` and `nodesToJSX` beside `fields`:
+
+```tsx title="components/Accordion.tsx"
+'use client'
+
+export const Accordion = ({ converters, fields, nodesToJSX }) => (
+  <details>
+    <summary>{fields.title as string}</summary>
+    {nodesToJSX?.({ converters, nodes: fields.body.root.children })}
+  </details>
+)
+```
 
 ## Wiki media
 

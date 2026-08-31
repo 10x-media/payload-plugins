@@ -62,6 +62,45 @@ describe('adminWiki factory', () => {
 		expect(withoutView.collections?.[0]?.admin?.components?.views).toBeUndefined()
 	})
 
+	it('registers the wiki view slot components as import map dependencies', () => {
+		const out = adminWiki({
+			wikiView: {
+				components: {
+					afterTable: [{ path: '/components/Footer', exportName: 'Footer' }],
+					beforeControls: ['/components/Export#ExportButton'],
+					beforeTable: [{ path: '/components/Notice#Notice', clientProps: { tone: 'warn' } }],
+				},
+			},
+		})(fakeConfig()) as Config
+		// The generator reads the export after `#` and defaults to the default
+		// export, so an `exportName` has to be folded into the registered path.
+		expect(Object.values(out.admin?.dependencies ?? {})).toEqual([
+			{ path: '/components/Footer#Footer', type: 'component' },
+			{ path: '/components/Export#ExportButton', type: 'component' },
+			{ path: '/components/Notice#Notice', type: 'component' },
+		])
+		expect(getWikiRegistry(out)?.wikiView).toMatchObject({
+			components: { beforeControls: ['/components/Export#ExportButton'] },
+		})
+	})
+
+	it('registers block, inline block and converter modules as import map dependencies', () => {
+		const out = adminWiki({
+			editor: {
+				blocks: [{ block: { slug: 'tip', fields: [] }, component: '/components/Tip#Tip' }],
+				converters: '/wiki/converters#wikiConverters',
+				inlineBlocks: [{ block: { slug: 'chip', fields: [] }, component: '/components/Chip#Chip' }],
+			},
+		})(fakeConfig()) as Config
+		// Converters register as Payload's `function` kind, not `component`: the
+		// generator emits the same import, but they are never rendered.
+		expect(Object.values(out.admin?.dependencies ?? {})).toEqual([
+			{ path: '/components/Tip#Tip', type: 'component' },
+			{ path: '/components/Chip#Chip', type: 'component' },
+			{ path: '/wiki/converters#wikiConverters', type: 'function' },
+		])
+	})
+
 	it('offers only covered entities in the collection and global target pickers', () => {
 		const cfg = {
 			collections: [
@@ -95,6 +134,41 @@ describe('adminWiki factory', () => {
 			clientProps: { slugs: [] },
 			path: '@10x-media/admin-wiki/client#WikiTargetBlocks',
 		})
+	})
+
+	it('adds the custom target list only when custom targets are declared', () => {
+		const targetNames = (config: Config): string[] => {
+			const pages = config.collections?.find((collection) => collection.slug === 'wiki-pages')
+			const tabs = pages?.fields[0] as { tabs: { fields: Field[] }[] }
+			return (tabs.tabs[1]?.fields ?? []).flatMap((field) => ('name' in field ? [field.name] : []))
+		}
+		expect(targetNames(adminWiki({})(fakeConfig()) as Config)).not.toContain('targetCustom')
+
+		const withCustom = adminWiki({
+			customTargets: [{ key: 'dashboard', label: 'Dashboard' }, 'traffic'],
+		})(fakeConfig()) as Config
+		expect(targetNames(withCustom)).toContain('targetCustom')
+
+		const pages = withCustom.collections?.find((collection) => collection.slug === 'wiki-pages')
+		const tabs = pages?.fields[0] as { tabs: { fields: Field[] }[] }
+		const customField = tabs.tabs[1]?.fields.find(
+			(field) => 'name' in field && field.name === 'targetCustom'
+		) as unknown as { admin: { components: { Field: { clientProps: unknown; path: string } } } }
+		expect(customField.admin.components.Field).toEqual({
+			clientProps: {
+				targets: [
+					{ key: 'dashboard', label: 'Dashboard' },
+					{ key: 'traffic', label: 'traffic' },
+				],
+			},
+			path: '@10x-media/admin-wiki/client#WikiTargetCustom',
+		})
+	})
+
+	it('counts declared custom targets as valid target keys', () => {
+		const out = adminWiki({ customTargets: ['dashboard'] })(fakeConfig()) as Config
+		expect(getWikiRegistry(out)?.validTargetKeys).toContain('custom:dashboard')
+		expect(getWikiRegistry(out)?.validTargetKeys).not.toContain('custom:traffic')
 	})
 
 	it('offers only covered blocks in the block target picker', () => {

@@ -1,5 +1,23 @@
 # @10x-media/analytics
 
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- Scope-aware widget pickers. A new authenticated `GET /api/analytics/sources` endpoint lists the adapters visible to the requesting scope (config adapters plus the scope's runtime providers) with their capabilities, and the widget `dataSource` and `metric` selects now render through client components that consume it: a tenant's own providers finally appear in pickers, labeled by the provider document's name (a generated label stands in when unset), and the metric list narrows to what the selected source can actually serve. Without JavaScript or when the endpoint is unreachable the pickers fall back to the config-time option lists, and stored values the endpoint no longer lists keep the previous behavior of degrading at read time.
+
+  The sources endpoint response now carries a top-level `defaultId` and a `kind: 'config' | 'runtime'` per source, and serialized capabilities are a deliberate allowlist (`metrics`, `dimensions`, `realtime`, `realtimeWindowMinutes`, `perPageQuery`, `comparison`, `minGranularity`, `maxLookbackDays`); adapter internals such as rate limits and TTL recommendations are no longer on the wire. New client reuse surface: `useAnalyticsSources` and the `WireSource` type from `@10x-media/analytics/client`, `SerializedCapabilities` from `/types`, and a `sourceFieldPath` prop on `MetricSelectField` for custom widgets. The widget data source default now follows `defaultAdapter`, and the realtime poller builds its URL from the configured API route instead of a hardcoded `/api`.
+
+- **Breaking:** fail-closed defaults for scoped installs. With a `scopeResolver` configured, `access.platformRead` now defaults to deny instead of any authenticated user; configure it (for example a role check) so platform admins can read cross-scope and manage every tenant's provider documents. Scoped reads through a shared config adapter that cannot filter by scope are now gated behind `platformRead` even when the adapter is not designated as `platformAdapter`; a tenant's own runtime providers are never gated. A `scopeResolver` returning an empty string is now treated as the install-wide scope (fail closed) everywhere, matching ingest and registry semantics. `providers.collection.scopeField` must be a top-level field name; a dotted path now throws at config build. The provider collection's admin duplicate action is disabled (a duplicate could never carry the write-only credentials). Unscoped installs are unchanged.
+
+## 0.1.0-beta.4
+
+### Minor Changes
+
+- **Breaking:** runtime provider adapters now carry per-document instance ids (`posthog:<docId>`) instead of the plain provider id, so one scope can run several projects of the same provider type. The replace-by-id override rule is gone: runtime adapters append to the scope registry alongside config adapters (config adapters win id collisions), and a tenant preferring their own project selects it as the widget data source. Stored widget `dataSource` values and sync-tier `source` rows that referenced a runtime provider by its old plain id no longer resolve; reselect the source in affected widgets and expect new `source` values in `analytics-daily`. A sync tier filtered to a runtime provider's old plain id via sync.adapters no longer matches it; instance ids are per-document, so filter on config adapter ids or drop the filter. The adapter label shown in pickers is the provider document's `name`.
+
+- **Breaking:** tenant-safe provider store. The `analytics-providers` collection now has scope-aware default access (a tenant only sees and manages their own provider documents; unscoped installs are unchanged), stamps the document scope server-side, requires a `name`, and stores credentials encrypted at rest via `@10x-media/fields` (write-only: secrets never leave the server; a short hint identifies the stored key). `@10x-media/fields` is a new optional peer dependency, required when `providers.collection` is enabled. The secret masking flow (`__redacted__` round-trip) is gone. Existing plaintext credentials keep working and seal on next save; bulk-encrypt with `encryptExistingData` from `@10x-media/fields/encrypted`. The plugin factory is also now async, breaking only for programmatic callers that invoke the plugin function directly outside `buildConfig` (which already awaits plugins).
+
 ## 0.1.0-beta.3
 
 ### Patch Changes

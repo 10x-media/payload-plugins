@@ -1,4 +1,11 @@
-import type { Config, Field, SelectField, Widget, WidgetWidth } from 'payload'
+import type {
+	Config,
+	Field,
+	SelectField,
+	SelectFieldSingleValidation,
+	Widget,
+	WidgetWidth,
+} from 'payload'
 import { type CapabilityRequirement, satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, MetricKey } from '../core/contract'
 import { dateRangeField } from '../fields/dateRange/field'
@@ -29,6 +36,8 @@ export interface RegisterWidgetsArgs {
 	disabled: string[]
 	register: CustomWidgetDef[]
 	localizeText?: boolean
+	/** The plugin's configured defaultAdapter, when set; falls back to the first adapter. */
+	defaultId?: string
 }
 
 interface WidgetDef {
@@ -90,8 +99,16 @@ const metricSelectField = (
 		...(defaultValue !== undefined ? { defaultValue } : {}),
 		label: labelForKey(keys.widgetFieldMetric),
 		options,
-		// A required metric has no meaningful cleared state.
-		admin: { isClearable: false },
+		admin: {
+			// A required metric has no meaningful cleared state.
+			isClearable: false,
+			components: {
+				Field: {
+					path: '@10x-media/analytics/client#MetricSelectField',
+					...(extra ? { clientProps: { requires: extra } } : {}),
+				},
+			},
+		},
 		...(args.multiProvider ? { filterOptions } : {}),
 	}
 }
@@ -121,10 +138,19 @@ const dataSourceField = (args: RegisterWidgetsArgs): Field => ({
 	name: 'dataSource',
 	type: 'select',
 	label: labelForKey(keys.widgetFieldDataSource),
-	defaultValue: args.adapters[0]?.id,
-	// Clearing would leave no source; the widget always reads through one.
-	admin: { isClearable: false },
+	defaultValue: args.defaultId ?? args.adapters[0]?.id,
+	admin: {
+		// Clearing would leave no source; the widget always reads through one.
+		isClearable: false,
+		components: { Field: { path: '@10x-media/analytics/client#SourceSelectField' } },
+	},
 	options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
+	// Payload's select validator rejects any value absent from `options`, but runtime
+	// (DB-registered) provider ids are only known per request, not at config time.
+	validate: ((value) =>
+		value === undefined || value === null || (typeof value === 'string' && value.length > 0)
+			? true
+			: 'invalid data source') as SelectFieldSingleValidation,
 })
 
 const customRangeField = (): Field =>

@@ -13,6 +13,11 @@ jobs:
   snapshot:
     if: github.event.label.name == 'snapshot'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Unfiltered `pnpm build` is the same eleven concurrent `next build`s as ci.yml's
+    # bundle gates, and the short commands forward extra args to the task, not to turbo.
+    env:
+      TURBO_CONCURRENCY: '3'
     permissions:
       contents: read
       pull-requests: write

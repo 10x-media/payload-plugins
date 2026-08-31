@@ -9,7 +9,7 @@ import {
 	SearchIcon,
 	useConfig,
 } from '@payloadcms/ui'
-import { useCallback, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useMemo, useState } from 'react'
 
 import type { WikiTargetEntry } from '../../shared/targetKeys'
 import { chipTargetKeys, describeTargets } from '../../shared/targetLabels'
@@ -21,8 +21,15 @@ import { useWikiTargets } from '../WikiProvider/WikiProvider'
 import './wiki-view.css'
 
 export type WikiIndexClientProps = {
+	/**
+	 * The `afterTable` slot, already rendered by the server view. Server
+	 * components cannot be resolved from here, so they arrive as nodes.
+	 */
+	afterTable?: ReactNode
 	/** Admin-prefixed wiki index URL guide links are built from. */
 	baseUrl: string
+	/** The `beforeTable` slot, rendered by the server view. */
+	beforeTable?: ReactNode
 	/** Published guides in presentation order (featured first). */
 	entries: WikiTargetEntry[]
 }
@@ -51,10 +58,15 @@ const matches = (entry: WikiTargetEntry, query: string): boolean =>
  * to whole surfaces: picking among those surfaces is the entire query a reader
  * can express.
  */
-export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
+export const WikiIndexClient = ({
+	afterTable,
+	baseUrl,
+	beforeTable,
+	entries,
+}: WikiIndexClientProps) => {
 	const { t } = useTranslation()
 	const { config } = useConfig()
-	const { blockLabels } = useWikiTargets()
+	const { blockChips, blockLabels, customLabels } = useWikiTargets()
 	const [query, setQuery] = useState('')
 	const [selectedTargets, setSelectedTargets] = useState<string[]>([])
 	const [filtersOpen, setFiltersOpen] = useState(false)
@@ -63,22 +75,27 @@ export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 
 	const onSearchChange = useCallback((search: string) => setQuery(search ?? ''), [])
 
-	/** Every surface some guide covers, labelled and sorted for the pill row. */
+	/**
+	 * Every surface some guide covers, labelled and sorted for the pill row. The
+	 * filters offer exactly what the chips show: a pill for a surface no row
+	 * displays would filter the list by something invisible.
+	 */
 	const targetOptions = useMemo(() => {
 		const unique = new Set<string>()
 		for (const entry of linkable) {
-			for (const key of chipTargetKeys(entry.targetKeys)) {
+			for (const key of chipTargetKeys(entry.targetKeys, { blocks: blockChips })) {
 				unique.add(key)
 			}
 		}
 		return describeTargets([...unique], {
 			blockLabels,
 			collections: config.collections,
+			customLabels,
 			globals: config.globals,
 		})
 			.map((target) => ({ key: `${target.kind}:${target.value}`, label: target.label }))
 			.sort((a, b) => a.label.localeCompare(b.label))
-	}, [blockLabels, config.collections, config.globals, linkable])
+	}, [blockChips, blockLabels, config.collections, config.globals, customLabels, linkable])
 
 	const toggleTarget = useCallback(
 		(key: string) =>
@@ -95,10 +112,16 @@ export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 				(entry) =>
 					(trimmed.length === 0 || matches(entry, trimmed)) &&
 					(selectedTargets.length === 0 ||
-						chipTargetKeys(entry.targetKeys).some((key) => selectedTargets.includes(key)))
+						chipTargetKeys(entry.targetKeys, { blocks: blockChips }).some((key) =>
+							selectedTargets.includes(key)
+						))
 			)
 		: linkable
 	const featured = linkable.filter((entry) => entry.featured)
+
+	/** Wraps a slot's content for spacing, and renders nothing when it is empty. */
+	const renderSlot = (node: ReactNode, name: 'after-table' | 'before-table') =>
+		node ? <div className={`wiki-index__slot wiki-index__slot--${name}`}>{node}</div> : null
 
 	const renderRow = (entry: WikiTargetEntry) => (
 		<li className="wiki-index__row" key={entry.id}>
@@ -118,11 +141,13 @@ export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 	if (linkable.length === 0) {
 		return (
 			<div className="wiki-index">
+				{renderSlot(beforeTable, 'before-table')}
 				<div className="wiki-index__empty">
 					<BookIcon className="wiki-index__empty-icon" />
 					<p className="wiki-index__empty-title">{t(keys.wikiEmpty)}</p>
 					<p className="wiki-index__empty-hint">{t(keys.wikiEmptyHint)}</p>
 				</div>
+				{renderSlot(afterTable, 'after-table')}
 			</div>
 		)
 	}
@@ -162,6 +187,7 @@ export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 					</AnimateHeight>
 				) : null}
 			</div>
+			{renderSlot(beforeTable, 'before-table')}
 			{!isFiltering && featured.length > 0 ? (
 				<section className="wiki-index__section">
 					<h2 className="wiki-index__heading">{t(keys.wikiFeaturedHeading)}</h2>
@@ -203,6 +229,7 @@ export const WikiIndexClient = ({ baseUrl, entries }: WikiIndexClientProps) => {
 					<ul className="wiki-index__list">{listed.map(renderRow)}</ul>
 				)}
 			</section>
+			{renderSlot(afterTable, 'after-table')}
 		</div>
 	)
 }

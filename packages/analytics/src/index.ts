@@ -3,10 +3,13 @@ import { type Config, definePlugin, type PayloadRequest } from 'payload'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
+import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
+import { makeSourcesHandler, SOURCES_PATH } from './plugin/sourcesEndpoint'
 import { warmTask } from './plugin/warmTask'
+import type { BuildSecretField } from './providers/collection'
 import { buildProvidersCollection } from './providers/collection'
 import {
 	collectionProvidersSource,
@@ -28,7 +31,7 @@ declare module 'payload' {
 
 export const analytics = definePlugin<AnalyticsPluginOptions>({
 	slug: '@10x-media/analytics',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: async ({ config, plugins: _plugins, ...options }): Promise<Config> => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -57,18 +60,48 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			resolveRegistry = scoped.resolver
 			invalidateProviders = scoped.invalidate
 		}
+		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
 		if (resolved.providers.collection.enabled) {
+			const { encryptedField, withEncryptedQueryRewrite } = await import(
+				'@10x-media/fields/encrypted'
+			).catch((err: unknown) => {
+				if (isModuleNotFoundError(err)) {
+					throw new Error(
+						'analytics: providers.collection requires @10x-media/fields (peer). Install it: pnpm add @10x-media/fields'
+					)
+				}
+				throw err
+			})
+			const encryption = resolved.providers.collection.encryption
+			const buildSecret: BuildSecretField = (source) =>
+				encryptedField(source, {
+					protection: 'writeOnly',
+					aadScope: '10x-analytics:providers',
+					...(source.type === 'text' ? { hint: { suffix: 4 } } : {}),
+					...(encryption?.keys ? { keys: encryption.keys } : {}),
+				})
+			const providersCollection = buildProvidersCollection({
+				slug: resolved.providers.collection.slug,
+				access: resolved.providers.collection.access,
+				overrides: resolved.providers.collection.overrides,
+				onChange: () => invalidateProviders(),
+				scoped: resolved.scoped,
+				scopeField: resolved.providers.collection.scopeField,
+				resolveScope,
+				platformRead: resolved.access.platformRead,
+				buildSecret,
+			})
+			// Always wrap, even though a consumer's own @10x-media/fields plugin (if
+			// registered) may wrap this collection again later: double application is
+			// inert here (writeOnly forbids queryable, so there are no blind-index
+			// markers to rewrite and the response strip is an idempotent delete),
+			// while skipping would leak ciphertext whenever fields() runs before this
+			// collection exists (e.g. an earlier plugin `order`).
 			config.collections = [
 				...(config.collections ?? []),
-				buildProvidersCollection({
-					slug: resolved.providers.collection.slug,
-					access: resolved.providers.collection.access,
-					overrides: resolved.providers.collection.overrides,
-					onChange: () => invalidateProviders(),
-				}),
+				withEncryptedQueryRewrite(providersCollection),
 			]
 		}
-		const resolveScope = async (req: PayloadRequest) => resolved.scopeResolver({ req })
 		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {
 			const opt = resolved.reportingTimezone
 			if (opt === undefined) {
@@ -104,13 +137,22 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				{ method: 'get', path: DOCUMENT_PATH, handler: makeDocumentHandler() },
 			]
 		}
+		config.endpoints = [
+			...(config.endpoints ?? []),
+			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
+		]
 		if (resolved.widgets.enabled) {
+			const multiProvider =
+				registry.isMultiProvider() ||
+				resolved.providers.collection.enabled ||
+				Boolean(resolved.providers.resolve)
 			registerWidgets(config, {
 				adapters: resolved.adapters,
-				multiProvider: registry.isMultiProvider(),
+				multiProvider,
 				disabled: resolved.widgets.disabled,
 				register: resolved.widgets.register,
 				localizeText: resolved.widgets.localizeText,
+				defaultId: resolved.defaultAdapter,
 			})
 		}
 		if (resolved.cache.warm.enabled) {
@@ -141,6 +183,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		// The runtime is installed before the app's own onInit runs so consumer init code
 		// (seeding, cache warming, sync passes) can already read through the plugin.
 		config.onInit = async (payload) => {
+			if (resolved.providers.collection.enabled) {
+				const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
+				await validateEncryptedBoot(payload, resolved.providers.collection.encryption?.keys)
+			}
 			const engine = createEngine({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },
@@ -152,6 +198,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveScope,
 				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
+				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
 				engine,

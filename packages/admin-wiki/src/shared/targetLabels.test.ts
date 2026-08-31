@@ -4,6 +4,7 @@ import { chipTargetKeys, describeTarget, describeTargets, parseTargetKey } from 
 
 const sources = {
 	collections: [{ labels: { singular: 'Post' }, slug: 'posts' }, { slug: 'products' }],
+	customLabels: { dashboard: 'Dashboard' },
 	globals: [{ label: 'Site settings', slug: 'settings' }],
 }
 
@@ -13,6 +14,13 @@ describe('parseTargetKey', () => {
 		expect(parseTargetKey('field:collection:posts.hero.title')).toEqual({
 			kind: 'field',
 			value: 'collection:posts.hero.title',
+		})
+	})
+
+	it('parses a custom target', () => {
+		expect(parseTargetKey('custom:dashboard.attention')).toEqual({
+			kind: 'custom',
+			value: 'dashboard.attention',
 		})
 	})
 
@@ -77,6 +85,17 @@ describe('describeTargets', () => {
 	})
 })
 
+describe('describeTarget, custom kind', () => {
+	it('uses the declared label, and the bare key when none was declared', () => {
+		expect(describeTarget('custom:dashboard', sources)?.label).toBe('Dashboard')
+		expect(describeTarget('custom:traffic', sources)).toEqual({
+			kind: 'custom',
+			label: 'traffic',
+			value: 'traffic',
+		})
+	})
+})
+
 describe('chipTargetKeys', () => {
 	it('drops field targets and keeps everything else', () => {
 		expect(
@@ -89,8 +108,22 @@ describe('chipTargetKeys', () => {
 		).toEqual(['collection:posts', 'global:settings', 'block:heroBanner'])
 	})
 
+	it('keeps custom targets, which stand in for the entities they name', () => {
+		expect(chipTargetKeys(['custom:dashboard', 'field:collection:posts.title'])).toEqual([
+			'custom:dashboard',
+		])
+	})
+
+	it('drops block targets only when asked to', () => {
+		const keys = ['collection:posts', 'block:heroBanner', 'global:settings']
+		expect(chipTargetKeys(keys, { blocks: false })).toEqual(['collection:posts', 'global:settings'])
+		expect(chipTargetKeys(keys, { blocks: true })).toEqual(keys)
+		expect(chipTargetKeys(keys, {})).toEqual(keys)
+	})
+
 	it('tolerates undefined and unparseable keys', () => {
 		expect(chipTargetKeys(undefined)).toEqual([])
 		expect(chipTargetKeys(['nonsense'])).toEqual(['nonsense'])
+		expect(chipTargetKeys(['nonsense'], { blocks: false })).toEqual(['nonsense'])
 	})
 })

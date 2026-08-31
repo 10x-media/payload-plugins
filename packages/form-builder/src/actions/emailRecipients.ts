@@ -249,7 +249,8 @@ export const buildRecipientField = (
 				Field: {
 					path: RECIPIENTS_FIELD_REF,
 					clientProps: {
-						...(opts.endpoint ? { endpoint: opts.endpoint } : {}),
+						// The departments option set is request-scoped, so it loads before the first save.
+						...(opts.endpoint ? { endpoint: opts.endpoint, scope: 'request' } : {}),
 						...(opts.recipients?.allowCustom === false ? { allowCustom: false } : {}),
 						...(opts.recipients?.fieldTokens === false ? { fieldTokens: false } : {}),
 						...(opts.recipients?.tokenFieldTypes

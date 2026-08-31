@@ -1,3 +1,4 @@
+import { REALTIME_PATH } from '../plugin/paths'
 import type { RealtimePoint } from './readForWidgetRealtime'
 
 export interface PollConfig {
@@ -11,6 +12,10 @@ export interface RealtimeChartPoint {
 	value: number
 	display: string
 }
+
+/** Build the realtime endpoint's base URL from the app's configured API route, not a hardcoded `/api`. */
+export const buildRealtimeEndpoint = (serverURL: string | undefined, apiRoute: string): string =>
+	`${serverURL ?? ''}${apiRoute}${REALTIME_PATH}`
 
 /** Build the realtime endpoint path + query string for a poll. */
 export const buildPollPath = (endpoint: string, config: PollConfig): string => {

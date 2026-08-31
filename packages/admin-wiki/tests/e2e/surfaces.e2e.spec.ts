@@ -93,6 +93,64 @@ test.describe('wiki surfaces', () => {
 		await expect(page.locator('.wiki-guide-article')).toContainText('Write the draft')
 	})
 
+	test('renders an inline block in the sentence and the consumer link converter', async ({
+		page,
+	}) => {
+		await page.goto('/admin/wiki')
+		await page.locator('.wiki-index__card-title', { hasText: 'Editor features tour' }).click()
+
+		const article = page.locator('.wiki-guide-article')
+		// The chip is seeded mid-paragraph, so a renderer returning block-level JSX
+		// would break the sentence apart rather than sit inside it.
+		const chip = article.locator('.dev-status-chip').first()
+		await expect(chip).toBeVisible()
+		await expect(chip.locator('xpath=ancestor::p')).toHaveCount(1)
+
+		// options.editor.converters replaces the plugin's own link converter.
+		await expect(article.locator('a[data-dev-converter="link"]').first()).toBeVisible()
+
+		// The same function wraps the plugin's callout converter, so both survive:
+		// the wrapper is the project's, the callout inside it is the plugin's.
+		const wrapped = article.locator('[data-dev-converter="wikiCallout"]').first()
+		await expect(wrapped.locator('.wiki-callout')).toBeVisible()
+
+		// A block renderer resolved from the import map, the other half of the seam.
+		await expect(article.locator('[data-dev-renderer="devTip"]').first()).toBeVisible()
+	})
+
+	test('surfaces a custom target on the dev app custom view', async ({ page }) => {
+		// Nothing in the config describes this view, so its guide is attached to a
+		// declared custom key rather than to anything the walker found.
+		await page.goto('/admin/dashboard')
+
+		const trigger = page.locator('.wiki-field-help__trigger').first()
+		await expect(trigger).toHaveText('Reading the dashboard')
+
+		await trigger.click()
+		await openPopup(page).locator('.wiki-field-help__item-open').click()
+		await expect(page.locator('.wiki-guide-article')).toContainText('custom admin view')
+	})
+
+	test('chips a custom target under its declared label on the wiki index', async ({ page }) => {
+		await page.goto('/admin/wiki')
+
+		const row = page.locator('.wiki-index__row', { hasText: 'Reading the dashboard' }).first()
+		await expect(row.locator('.wiki-target-chips__chip--custom')).toHaveText('Dashboard')
+	})
+
+	test('renders the dev app components in all three wiki index slots', async ({ page }) => {
+		await page.goto('/admin/wiki')
+
+		// The dev app wires a client component into the header actions and into
+		// the slot below the list, and a server component above it: the server one
+		// counts drafts, which only the server props can reach.
+		await expect(
+			page.locator('.wiki-view__header-actions a', { hasText: 'Dev link' })
+		).toBeVisible()
+		await expect(page.locator('.wiki-index__slot--before-table')).toContainText('in draft')
+		await expect(page.locator('.wiki-index__slot--after-table')).toContainText('guides listed')
+	})
+
 	test('offers a write affordance on an unguided field once edit mode is on', async ({ page }) => {
 		postId = await createDoc(page, 'posts', { title: 'Edit mode' })
 

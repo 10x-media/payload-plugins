@@ -17,6 +17,12 @@ export type EntityLabelSources = {
 	/** Singular label per block slug, collected by the config walker. */
 	blockLabels?: Record<string, string>
 	collections?: LabelledEntity[]
+	/**
+	 * Label per declared custom target key, already resolved for the reader's
+	 * admin language. A key with no entry falls back to the key itself, which is
+	 * what a host wrote in its config and recognizes.
+	 */
+	customLabels?: Record<string, string>
 	globals?: LabelledEntity[]
 }
 
@@ -34,6 +40,7 @@ export type DescribedTarget = ParsedTargetKey & {
 const KINDS: Record<string, WikiTargetType> = {
 	block: 'block',
 	collection: 'collection',
+	custom: 'custom',
 	field: 'field',
 	global: 'global',
 }
@@ -114,9 +121,9 @@ export const fieldOwnerLabel = (
 }
 
 /**
- * Describe one target key for display. Collections, globals, and blocks resolve
- * to their configured labels; a field target resolves the owner half of its path
- * the same way, so it reads "Post · branding.color" rather than the stored
+ * Describe one target key for display. Collections, globals, blocks, and custom
+ * targets resolve to their configured labels; a field target resolves the owner
+ * half of its path the same way, so it reads "Post · branding.color" rather than the stored
  * `collection:posts.branding.color`, and "Hero banner · headline" for a field
  * inside a block. A block whose label is keyed by locale is not in `blockLabels`
  * and falls back to its slug, which is what an author typed and recognizes.
@@ -134,6 +141,8 @@ export const describeTarget = (
 			return { ...parsed, label: sources.blockLabels?.[parsed.value] ?? parsed.value }
 		case 'collection':
 			return { ...parsed, label: findLabel(sources.collections, parsed.value) ?? parsed.value }
+		case 'custom':
+			return { ...parsed, label: sources.customLabels?.[parsed.value] ?? parsed.value }
 		case 'global':
 			return { ...parsed, label: findLabel(sources.globals, parsed.value) ?? parsed.value }
 		case 'field': {
@@ -155,14 +164,32 @@ export const describeTargets = (keys: string[], sources: EntityLabelSources): De
 		return described ? [described] : []
 	})
 
+/** Which kinds a caller wants chipped; blocks are the only optional one. */
+export type ChipKindOptions = {
+	/** Keep `block:` targets. Defaults to true, matching the plugin default. */
+	blocks?: boolean
+}
+
 /**
- * The target keys worth showing as chips: everything except field targets.
+ * The target keys worth showing as chips: everything except field targets, and
+ * except blocks when the host turned those off. Custom targets chip like the
+ * entities they stand in for, which is the point of declaring one.
  *
  * A guide written about a form usually attaches to many of its fields, so field
  * chips both crowd out the entity chips beside them and say nothing a reader can
  * act on: "Post · branding.color" names a place they are already looking at, and
  * twelve of those name it twelve times. The field surfaces carry their own help,
  * which is where a field target earns its keep.
+ *
+ * Blocks are the same argument one step weaker, which is why they are a choice
+ * rather than a rule. A key that parses as nothing is kept: it is what an author
+ * typed, and hiding it would hide the mistake with it.
  */
-export const chipTargetKeys = (keys: string[] | undefined): string[] =>
-	(keys ?? []).filter((key) => parseTargetKey(key)?.kind !== 'field')
+export const chipTargetKeys = (keys: string[] | undefined, options?: ChipKindOptions): string[] =>
+	(keys ?? []).filter((key) => {
+		const kind = parseTargetKey(key)?.kind
+		if (kind === 'field') {
+			return false
+		}
+		return !(kind === 'block' && options?.blocks === false)
+	})

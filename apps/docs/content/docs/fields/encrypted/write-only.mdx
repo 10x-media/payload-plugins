@@ -1,0 +1,189 @@
+---
+title: Write-only secrets
+description: A protection mode for credentials, values that are written and used server-side but never returned to any API caller.
+---
+
+Masked fields decrypt on read; the dots are a presentation choice, and any authorized reader (or their network tab) receives the plaintext. That is right for most secrets, where authorized users legitimately need the value back. It is wrong for credentials: an SMTP password, a webhook signing secret, a third-party API key. Those are written once, consumed by server code, and no API caller ever needs to read them.
+
+`protection: 'writeOnly'` makes that contract structural instead of a convention you re-state with field access control on every field:
+
+```ts
+import { encryptedField } from '@10x-media/fields/encrypted'
+import type { GlobalConfig } from 'payload'
+
+const smtpSettings: GlobalConfig = {
+  slug: 'smtp-settings',
+  fields: [
+    { name: 'host', type: 'text' },
+    { name: 'user', type: 'text' },
+    ...encryptedField(
+      { name: 'password', type: 'text' },
+      { protection: 'writeOnly' },
+    ),
+  ],
+}
+```
+
+The three `protection` values form a ladder: `'none'` renders the value openly, `'masked'` (default) conceals it behind dots with a reveal toggle, and `'writeOnly'` additionally removes it from every read result. Works on collections and globals alike, for every supported type except `richText` (you cannot edit rich text you cannot see; use `'masked'` there).
+
+## What it guarantees
+
+- **No read result carries the value.** REST, GraphQL, and the Local API all omit the field; the read pipeline never decrypts it, and the response strip removes even the ciphertext. This holds for every caller, regardless of role or access control.
+- **Set-ness is exposed, and nothing else by default.** A virtual sibling `<name>_set` (boolean, never persisted) tells the admin UI and API consumers whether a value is stored. Configuring a [hint](#identification-hints) adds a second, equally deliberate exposure: a few identifying characters. Both are opt-outs of nothing; field access control on the siblings is yours to add if even existence is too much.
+- **Writes are unchanged, with one write-only guard.** Values seal in `beforeChange` like any encrypted field, plaintext validation still runs, `null` clears. An update that does not mention the field preserves the stored secret, and an empty string clears like `null`: sealing `''` would create a "set" credential that is empty, a state no caller could ever read back to diagnose.
+- **`queryable` is rejected.** A blind index answers equality, and equality on a secret is a guessing oracle for anyone who can filter a list view. The factory throws on the combination.
+
+## In the admin
+
+There is no reveal, because there is nothing to reveal: the plaintext never reaches the browser. Instead of a separate replace action, the control is one always-editable input, and a stored value is only a placeholder:
+
+- **Unset**: the plain native input. Type (or generate) a value and save.
+- **Set**: the input is empty with the hint, or a run of dots (`maskDots`), as its placeholder, rendered in the input's text color, since it stands for real stored data rather than a prompt. Typing stages a replacement that stays visible until the save succeeds, then the field folds back to its concealed face. Erasing staged text always returns to the state you were in when you started typing: the concealed face (keep), or, after an explicit clear, the removal notice; a mid-edit change of heart never silently flips your intent. Staged text is trimmed of surrounding whitespace when the input blurs, so a pasted trailing newline never becomes part of a secret nobody can read back to debug.
+- **Clear**: an `×` inside the input, exactly like a clearable select. With a replacement staged it discards the typed text; on a stored value it stages the removal, and the input then reads "Will be removed on save" in placeholder tone with an undo arrow beside it, so a pending deletion is never mistakable for an empty field or a kept secret. `clearable: false` removes the `×`, and `required` fields force it off, since clearing them could never save.
+- **Generate**: circular arrows beside the `×` when [configured](#generated-secrets).
+- **List view**: the lock badge with the hint (or dots) when set, an em dash when unset. The value itself is never in the list data.
+
+Every action lives inside the input row (or on the label line for structural types), so a write-only field is exactly the height of a native one.
+
+## Identification hints
+
+A write-only Stripe key raises "which key is configured here, test or live?" months later. `hint` answers it without exposure:
+
+```ts
+...encryptedField(
+  { name: 'stripeKey', type: 'text' },
+  { hint: { prefix: 4, suffix: 4 }, protection: 'writeOnly' },
+)
+```
+
+The hint is sliced from the plaintext **at seal time** in the same `beforeChange` that encrypts, stored beside the ciphertext in a `<name>_hint` sibling (as `sk_l····9d3f`, with a compact canonical gap), and returned in API responses. Reads never touch the plaintext to display it. The admin placeholder and the list cell render the gap as the field's `maskDots` run of bullets (`sk_l••••••••9d3f` by default), so a hinted value's concealed span looks exactly like every other masked run; the dot count stays cosmetic and says nothing about the hidden length.
+
+Guard rails, in the order they bite:
+
+- **`prefix + suffix` is capped at 32 characters.** Wide enough to clear a constant format prefix and still say something: `sk_live_` and `whsec_` identify the format, not the key, so a hint has to get past them before its characters distinguish anything.
+- **The value must keep at least as much hidden as the hint exposes.** This is the guard that matters, because a cap cannot know what it is slicing: 32 characters of a 128-character token is nothing, 32 of a 40-character one is most of it. A config sized for long tokens therefore stores no hint on a short value instead of exposing half of it, which lets one field serve a collection holding both.
+- **At least 8 characters stay hidden regardless**, since a short value is guessable at any ratio.
+- **Exposed ends containing the mask glyph `·` store no hint**, as that would blur where the concealed span starts.
+
+Text and email fields only, not `hasMany`. Do not configure hints on passwords (story: identify keys, never sample passwords); the guards protect against the worst of it, but the right amount of password to expose is zero.
+
+The bullet run is additive, never reduced by the hint: `maskDots` decides the run, the hint's ends wrap it, so `sk_live_51H8xQ····9d3fXQ` with the default 8 renders as `sk_live_51H8xQ••••••••9d3fXQ`. One count everywhere is what keeps a hinted value and a hint-less one reading as the same kind of concealed thing, and it keeps the run a pure presentation choice that says nothing about the value. A hint too wide for a narrow field clamps with an ellipsis, in the input and in the list cell, rather than borrowing space from the run.
+
+## Generated secrets
+
+For secrets your system issues rather than receives (webhook signing secrets, per-tenant API keys), `generate` adds the create-and-rotate action:
+
+```ts
+...encryptedField(
+  { name: 'webhookSecret', type: 'text' },
+  { generate: { length: 32, prefix: 'whsec_' }, protection: 'writeOnly' },
+)
+```
+
+`generate: true` uses the default (32 chars of crypto-random base62); the config form takes `length` (8-128), `prefix`, and `charset`. Generation happens client-side in the form with `crypto.getRandomValues`, so the value is visible, pre-selected, and copyable exactly until the save succeeds, and never again after: the reveal-once window of the GitHub-token model, with no server endpoint that ever returns plaintext. Regenerating later is the same action; combined with a hint, support can talk about "the key ending 9d3f" that nobody can read. A secret created through the API is one the caller supplied, which they therefore already know.
+
+## Reading it server-side
+
+Your own server code is the intended reader. Two exports from `@10x-media/fields/encrypted` make that read a deliberate act rather than a side effect of a document fetch:
+
+```ts
+import { readEncryptedField, decryptFieldValue } from '@10x-media/fields/encrypted'
+
+const secret = await readEncryptedField(payload, {
+  global: 'smtp-settings',   // or collection: 'tenants', id
+  path: 'password',          // dot paths reach into groups: 'smtp.password'
+})
+const password = await secret?.decrypt()  // null handle when unset
+```
+
+`readEncryptedField` fetches the stored ciphertext (bypassing the strip) and returns a handle: `ciphertext`, the raw wire string, and `decrypt()`, which resolves keys at call time. For a `hasMany` field the ciphertext is an array of wire strings and `decrypt()` resolves an array of decrypted values.
+
+The handle shape is deliberate. A transport factory that caches its settings can hold the ciphertext and decrypt per use, so plaintext exists only for the moment it is used and never sits in a cache:
+
+```ts
+let cached: { host: string; ciphertext: string } | null = null
+
+const sendMail = async (payload: Payload, message: Message) => {
+  if (!cached) {
+    const settings = await payload.findGlobal({ slug: 'smtp-settings' })
+    const secret = await readEncryptedField(payload, { global: 'smtp-settings', path: 'password' })
+    if (!secret) throw new Error('SMTP password not configured')
+    cached = { host: settings.host, ciphertext: secret.ciphertext as string }
+  }
+  const password = await decryptFieldValue(payload, {
+    global: 'smtp-settings',
+    path: 'password',
+    value: cached.ciphertext,
+  })
+  await transportFor(cached.host, password as string).send(message)
+}
+```
+
+`decryptFieldValue` is the primitive underneath: given the field path and a wire string, it resolves the field's keys and binding from your config and returns the plaintext. Both helpers work on any encrypted field, not only write-only ones, and both take a `locale` for localized fields.
+
+Neither helper checks access. They run with the server's full authority, which is what makes calling them the security decision: guard the call sites, and never forward the result to a client.
+
+Neither honours `onDecryptFailure` either. That policy shapes what a document read hands back, where returning `null` for one unreadable field beats failing the whole request. A deliberate read is the opposite case: the caller asked for this value and is about to use it, so a failure is raised rather than softened. Catch `UnknownKeyIdError` when a key has been dropped from the ring, `AuthenticationFailedError` for a wrong key or an edited wire string, and `CorruptPlaintextError` when a ciphertext authenticates but its contents are unusable, which no retry will fix.
+
+<Callout type="warn">
+A stored value that is not a wire string at all is returned unchanged rather than raised. That is what carries plaintext written before the field was adopted, so the [migration](/fields/encrypted/migration) can find it, and it means a column holding something unexpected hands you that value instead of an error. Validate what you get back before you use it as a credential.
+</Callout>
+
+### Reading inside a transaction
+
+Pass `req` when the read has to see writes the current operation has not committed yet, such as a secret generated by a hook earlier in the same save:
+
+```ts
+const secret = await readEncryptedField(payload, {
+  collection: 'tenants',
+  id: tenant.id,
+  path: 'apiKey',
+  req,
+})
+```
+
+Given a request, the read joins its transaction and its locale. Without one it runs on its own request, outside any transaction in progress, so a row written but not yet committed is simply not found. Either way the request comes back exactly as it was handed over.
+
+A request picks the transaction to read in, not which value comes back, so the locale is resolved deliberately: an explicit `locale` wins, then the request's. A request set to `locale: 'all'` is the exception. It asks for a `{ [locale]: value }` map, which a single handle cannot address, so the read falls back to the default locale, the same value it returns with no request at all. Pass `locale` explicitly to read a different one.
+
+### Reading many rows at once
+
+`readEncryptedField` runs one query per document, which is the wrong shape when a hook or a job needs the same field across every row a query returns, and the rest of each row along with it. Run your own query inside `withRawEncrypted` instead:
+
+```ts
+import { decryptFieldValue, withRawEncrypted } from '@10x-media/fields/encrypted'
+
+const subscriptions = await withRawEncrypted(req, () =>
+  payload.find({
+    collection: 'subscriptions',
+    depth: 0,
+    overrideAccess: true,
+    req,
+    where: { enabled: { equals: true } },
+  })
+)
+
+for (const subscription of subscriptions.docs) {
+  const secret = await decryptFieldValue(payload, {
+    collection: 'subscriptions',
+    path: 'signingSecret',
+    value: subscription.signingSecret as string,
+  })
+  await deliver(subscription, secret as string)
+}
+```
+
+Inside the window the response strip and the decrypt-on-read step both stand down, so each encrypted field arrives as its stored `pfe1.…` wire string and `decryptFieldValue` turns it back into plaintext. For a localized field, pass `locale` alongside `value` so the right binding is tried first; `signingSecret` above is not localized, so the path alone is enough. On the way out the request is restored to whatever it was, including a mode an outer window had set, so windows nest.
+
+Three things to know before you reach for it:
+
+- **The reads inside must be given the same `req`.** The mode travels on the request. A query that does not carry it is an ordinary read and the field will be missing.
+- **It covers every encrypted field the query touches**, not only the write-only one you came for. A masked field on the same document arrives sealed too, so decrypt the ones you go on to use.
+- **It is not a concurrency boundary.** An unrelated read on the same request that overlaps the window sees ciphertext as well, so do not deliberately run one alongside.
+
+## Caveats
+
+- **Existence is visible.** `<name>_set` appears in read results so the admin can render the set state. It says a value exists, nothing more. A configured hint additionally exposes its few characters, in responses and at rest (`<name>_hint` is a plaintext column by design; that is what makes it readable without decrypting).
+- **Version diffs show nothing readable.** Like every encrypted field, versions store ciphertext; a write-only field's history is a sequence of opaque values.
+- **Standalone usage degrades safely.** The response strip is attached by the `fields()` plugin (or `withEncryptedQueryRewrite` / `withEncryptedResponseStrip` if you wire collections and globals yourself). Without it, a write-only field still never decrypts on read; the worst a misconfigured read can expose is ciphertext.
+- **Switching modes is free.** `'masked'` and `'writeOnly'` share the same storage, so changing `protection` is a config edit, no migration.

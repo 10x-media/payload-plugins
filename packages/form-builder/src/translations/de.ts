@@ -219,6 +219,11 @@ export const de: Record<TranslationKey, string> = {
 	[keys.configActions]: 'Aktionen',
 	[keys.fieldTypeConsent]: 'Einwilligung',
 	[keys.consentConfigSource]: 'Quelle',
+	[keys.consentConfigDisplay]: 'Darstellung',
+	[keys.consentConfigDisplayDescription]:
+		'Eine Checkbox zum Ankreuzen oder ein passiver Hinweis, bei dem das Absenden die Einwilligung ist.',
+	[keys.consentDisplayCheckbox]: 'Checkbox',
+	[keys.consentDisplayNotice]: 'Hinweis',
 	[keys.consentConfigSourceDescription]:
 		'Die Erklärung, der Besucher zustimmen. Wortlaut und Rechtsseite gehören zur Quelle: eine Änderung dort gilt für jedes Formular, das sie nutzt.',
 	[keys.consentSourcesField]: 'Einwilligungsquellen',
@@ -228,6 +233,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.consentSourcePlural]: 'Einwilligungsquellen',
 	[keys.consentSourceLabel]: 'Name',
 	[keys.consentSourceStatement]: 'Erklärung',
+	[keys.consentSourceNoticeStatement]: 'Hinweis-Erklärung',
+	[keys.consentSourceNoticeStatementDescription]:
+		'Wird von Einwilligungsfeldern in Hinweis-Darstellung gezeigt ("Mit dem Abonnieren stimmen Sie ... zu"). Leer fällt auf die Erklärung zurück.',
 	[keys.consentSourcePage]: 'Erklärungsquelle',
 	[keys.consentSourcePageDescription]:
 		'Muss gesetzt sein, wenn Formulareinsendungen einen Verweis auf deine Richtlinie speichern sollen.',
@@ -306,6 +314,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fileRemove]: 'Entfernen',
 	[keys.spamRateLimited]: 'Du hast zu viele Anfragen gesendet. Bitte versuche es später erneut.',
 	[keys.spamRejected]: 'Deine Übermittlung konnte nicht verarbeitet werden.',
+	[keys.submissionActionFailedFlag]: 'Aktion fehlgeschlagen',
+	[keys.submissionActionFailed]:
+		'Deine Übermittlung konnte nicht abgeschlossen werden. Bitte versuche es gleich noch einmal.',
 	[keys.spamCaptchaFailed]: 'Captcha-Überprüfung fehlgeschlagen. Bitte versuche es erneut.',
 	[keys.contextInvalid]:
 		'Dieses Formular konnte nicht verifiziert werden. Bitte lade die Seite neu und versuche es erneut.',
@@ -385,6 +396,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.formMultistep]: 'Mehrstufig',
 	[keys.formPollEnabled]: 'Umfrage',
 	[keys.formPersistSubmissions]: 'Übermittlungen speichern',
+	[keys.formConsentRetentionNotice]:
+		'Dieses Formular speichert keine Übermittlungen, daher werden Einwilligungsnachweise nach den Aktionen verworfen. Behalte diese Kombination nur, wenn der Einwilligungsnachweis an anderer Stelle liegt, etwa bei einem Double-Opt-in-Anbieter.',
 	[keys.formClose]: 'Schließen',
 	[keys.formSuccess]: 'Vielen Dank.',
 	[keys.formSubmitFailed]: 'Übermittlung fehlgeschlagen',

@@ -12,7 +12,7 @@ description: Per-tenant analytics providers, a shared platform provider, and sco
 | `scopeResolver` | Maps each request to its scope (e.g. the tenant id). Reads, widget data, and native ingest all resolve through it. |
 | `providers.collection` | Opt-in admin collection where providers are configured at runtime (per scope). |
 | `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
-| `access.platformRead` | Gates cross-scope reads. Defaults to any authenticated admin user. |
+| `access.platformRead` | Gates cross-scope reads. Defaults to deny once `scopeResolver` is set; defaults to any authenticated admin user without it. |
 | `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
 | `posthogProxyRewrites` | Next.js rewrites for a first-party PostHog reverse proxy. |
 | `reportingTimezone` | Aligns daily boundaries to a timezone, per install or per tenant. See [Reporting timezone](/analytics/timezone). |
@@ -48,6 +48,8 @@ analytics({
 
 With a `scopeResolver` configured, the native engine adds an indexed `scope` column to its events and rollups: ingest stamps every event with the resolved scope, and every read filters by the request's scope. Enabling this on an **existing** native install requires a migration for the new column (`pnpm payload migrate:create` in your app).
 
+A `scopeResolver` must derive the scope from a trustworthy source, the authenticated `req.user` or a signed cookie like `plugin-multi-tenant`'s, never from a client-controlled header: anything a request can set itself lets a caller claim any other tenant's scope.
+
 ## 2. Register the provider collection per tenant
 
 `providers.collection` scaffolds an `analytics-providers` collection where providers (Plausible, Umami, GA4, PostHog) are configured from the admin UI. Register it with `plugin-multi-tenant` as a per-tenant global:
@@ -62,9 +64,26 @@ multiTenantPlugin({
 
 `isGlobal: true` turns the collection into a per-tenant "global": one document per tenant, and the list view goes straight to the tenant's own document. The tenant plugin adds its `tenant` field and scoped access automatically; `scopeField: 'tenant'` (from step 1) points the plugin's provider lookup at that field, so each tenant's enabled providers resolve for exactly that tenant's scope.
 
-A tenant configuring their own Plausible there gets it layered onto the static config adapters for their scope only. When a runtime provider shares an id with a config adapter (a tenant brings their own PostHog), the tenant's configuration wins for that scope. API keys are stored server-side and always come back masked; the internal adapter factory is the only reader that sees them.
+A tenant configuring their own Plausible there gets it layered onto the static config adapters for their scope only. Every runtime provider document gets its own instance id (`posthog:<docId>`) and appends to the scope's registry alongside the config adapters, so a tenant can run several projects of one provider type side by side. The provider document's `name` (a generated label stands in when unset) is the label shown in data-source pickers; a tenant preferring their own PostHog over the platform's selects it as the widget's data source. The data source and metric selects in dashboard widgets resolve their available options live through an authenticated `GET /api/analytics/sources` endpoint, cached per admin session, so a provider a tenant configures appears in their widget pickers without a redeploy, and only for their scope. Credentials are sealed with `@10x-media/fields` encryption (`writeOnly`: never readable back through any API, admin included; a 4-character hint identifies which key is currently stored); the internal adapter factory is the only reader that ever sees the decrypted value. `@10x-media/fields` is an optional peer of `@10x-media/analytics`, required once `providers.collection` is enabled; install it alongside. A dedicated key ring can be set with `providers: { collection: { encryption: { keys } } }`; left unset, the fields plugin's global `encrypted.keys` applies, and with neither configured the ring derives from the Payload secret. That derived ring is fine for a dev install; configure a dedicated key for anything beyond that.
 
 Without a tenant plugin, the same collection works standalone: the hidden `scope` text field binds a document to a scope (empty scope = the whole install), and `access` / `overrides` on `providers.collection` reshape anything.
+
+Default access is scope-aware: with a `scopeResolver` configured, a tenant can read, update, and delete only their own provider documents, and every create is stamped with the request's resolved scope server-side, so a tenant can neither create a document for another scope nor move one there. `access.platformRead` lifts both restrictions for platform admins, who see and manage every scope; scoped installs default it to deny, so configure it (for example a role check) or no one, including you, can see or manage another tenant's providers. Unscoped installs (no `scopeResolver`) keep the historical any-authenticated-admin-user behavior.
+
+The scope stamp runs as a `beforeChange` hook, so it applies to **every** write, including ones made with `overrideAccess: true`: hooks always run regardless of access control. A migration or seed script creating a provider document for another tenant needs a `req` for which `platformRead` resolves `true` (build one from a platform user, e.g. via `createLocalReq`), otherwise the stamp rejects the write.
+
+### Upgrading from plaintext credentials
+
+Rows saved before encryption was added keep working: decryption passes an already-plaintext value through untouched, and the document seals the next time it is saved from the admin UI. To seal everything in bulk without waiting on individual saves, run `encryptExistingData` once:
+
+```ts
+import { encryptExistingData } from '@10x-media/fields/encrypted'
+import { getPayload } from 'payload'
+import config from './payload.config'
+
+const payload = await getPayload({ config })
+await encryptExistingData(payload, { collections: ['analytics-providers'] })
+```
 
 ## 3. Platform analytics through a first-party proxy
 
@@ -97,7 +116,7 @@ The `scopeProperty: 'tenant'` on the platform adapter (step 1) closes the loop: 
 ## 4. Who sees what
 
 - A tenant request resolves its scope, so widgets, document stat fields, and the realtime endpoint read that tenant's data: native reads filter on the scope column, the platform PostHog filters on `scopeProperty`, and the tenant's own collection-configured providers are already tenant-specific.
-- Cross-scope reads are explicit: pass `scope: '*'` to a read (e.g. from a custom platform dashboard widget). They are gated by `access.platformRead`, which defaults to any authenticated admin user; tighten it to your host role:
+- Cross-scope reads are explicit: pass `scope: '*'` to a read (e.g. from a custom platform dashboard widget). They are gated by `access.platformRead`, which defaults to deny once `scopeResolver` is set; configure it to your host role:
 
 ```ts
 analytics({
@@ -108,7 +127,7 @@ analytics({
 })
 ```
 
-- A scoped read through a platform adapter that cannot filter by scope would expose cross-scope data, so it fails closed behind the same `platformRead` gate. Give the platform adapter a `scopeProperty` (or use native) to serve tenants without the gate.
+- A scoped read through any shared config adapter that cannot filter by scope, not only the one designated `platformAdapter`, would expose cross-scope data, so it fails closed behind the same `platformRead` gate. A tenant's own runtime providers (from `providers.collection` or `providers.resolve`) are never gated, since their credentials are the tenant's own. Give the platform adapter a `scopeProperty` (or use native) to serve tenants without the gate.
 
 ## Custom provider stores
 

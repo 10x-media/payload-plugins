@@ -41,6 +41,17 @@ export const encrypted: CollectionConfig = {
 		...encryptedField(
 			{
 				admin: {
+					description:
+						"text field. protection: 'writeOnly': never returned by any API; replace or clear, never reveal.",
+				},
+				name: 'webhookSecret',
+				type: 'text',
+			},
+			{ protection: 'writeOnly' }
+		),
+		...encryptedField(
+			{
+				admin: {
 					description: 'email field. Queryable + unique via the blind index (equals/in filtering).',
 				},
 				name: 'contactEmail',

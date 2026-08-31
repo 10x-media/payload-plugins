@@ -2,7 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Payload } from 'payload'
 import { seedWiki } from '../../src/index'
-import { devTipTransformer, embedTransformer } from './seedTransformers'
+import { devTipTransformer, embedTransformer, statusChipTransformer } from './seedTransformers'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
@@ -61,10 +61,20 @@ Standard formatting, lists, quotes, and links work as expected.
 
 > [!NOTE]
 > Callouts come in info, tip, warning, and danger variants.
+> A second line stays a second line, and a guide link works here too:
+> see {{wiki:guide:publishing-a-post}}.
 
 ### Consumer blocks
 
 :::tip This box is a consumer-supplied block, rendered by the dev app's own component.
+
+### Inline blocks
+
+An inline block sits in the sentence: this feature is {{chip:new:New}} and the old
+one is {{chip:deprecated:Deprecated}}, both rendered by the dev app's own component.
+
+Links render through the dev app's own converter, so [this one]({{wiki:guide:publishing-a-post}})
+carries an arrow the plugin never puts there.
 
 ## Video
 
@@ -72,7 +82,9 @@ Standard formatting, lists, quotes, and links work as expected.
 
 ## Linking guides
 
-Cross-reference other guides inline, like {{wiki:guide:publishing-a-post}}.
+Cross-reference other guides inline, like {{wiki:guide:publishing-a-post}}, or under
+[words of your own]({{wiki:guide:hero-banner-guide}}) when the guide's title does not
+read as part of the sentence.
 `
 
 const postFieldsGuide = `## Post fields
@@ -147,7 +159,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				{
 					content: {
 						markdown:
-							'The hero banner opens the page. Keep headings short and pick a background with enough contrast.\n\nSee {{wiki:guide:publishing-a-post}} for the publishing flow.',
+							'The hero banner opens the page. Keep headings short and pick a background with enough contrast.\n\nSee [the publishing flow]({{wiki:guide:publishing-a-post}}) for what happens next.',
 					},
 					slug: 'hero-banner-guide',
 					summary: 'How to use the hero banner block well.',
@@ -202,6 +214,16 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				},
 				{
 					content: {
+						markdown:
+							'The dashboard is a custom admin view, so nothing in the config describes it. Its guides hang off the `dashboard` key this app declares through `customTargets`, and the surface beside the heading is `WikiCustomHelp`.',
+					},
+					slug: 'reading-the-dashboard',
+					summary: 'What the dashboard numbers mean.',
+					targets: { custom: ['dashboard'] },
+					title: { de: 'Die Übersicht lesen', en: 'Reading the dashboard' },
+				},
+				{
+					content: {
 						markdown: 'This guide targets a field that no longer exists, on purpose.',
 					},
 					slug: 'orphaned-example',
@@ -218,7 +240,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 						key: 'diagram',
 					},
 				],
-				transformers: [devTipTransformer, embedTransformer],
+				transformers: [devTipTransformer, embedTransformer, statusChipTransformer],
 			}
 		)
 		payload.logger.info('Seeded wiki guides')

@@ -5,20 +5,52 @@ import type {
 	TextField,
 } from 'payload'
 import { describe, expect, it } from 'vitest'
+import type { BuildProvidersCollectionArgs, BuildSecretField } from './collection'
 import { buildProvidersCollection } from './collection'
+import { SECRET_PATHS } from './secrets'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
 	fields?.find((f) => 'name' in f && f.name === name)
 
-describe('buildProvidersCollection', () => {
-	const collection = buildProvidersCollection({ slug: 'analytics-providers', onChange: () => {} })
+/** Echoes the source field back with a marker so tests can assert delegation. */
+const fakeBuildSecret: BuildSecretField = (source) => [{ ...source, custom: { fake: source.type } }]
 
-	it('uses the given slug and admin-only access by default', () => {
+type TaggedField = Field & { custom?: { fake?: unknown } }
+
+/** Walks the built field tree and collects `<group>.<field>` paths for every field the fake buildSecret tagged. */
+const collectTaggedPaths = (fields: Field[] | undefined, prefix: string[] = []): string[] =>
+	(fields ?? []).flatMap((field) => {
+		const tagged = field as TaggedField
+		const path = 'name' in field && field.name ? [...prefix, field.name] : prefix
+		const own = tagged.custom?.fake ? [path.join('.')] : []
+		const nested = 'fields' in field ? collectTaggedPaths(field.fields, path) : []
+		return [...own, ...nested]
+	})
+
+const unscopedArgs: Pick<
+	BuildProvidersCollectionArgs,
+	'scoped' | 'scopeField' | 'resolveScope' | 'platformRead' | 'buildSecret'
+> = {
+	scoped: false,
+	scopeField: 'scope',
+	resolveScope: async () => null,
+	platformRead: async () => false,
+	buildSecret: fakeBuildSecret,
+}
+
+describe('buildProvidersCollection', () => {
+	const collection = buildProvidersCollection({
+		slug: 'analytics-providers',
+		onChange: () => {},
+		...unscopedArgs,
+	})
+
+	it('uses the given slug and admin-only access by default', async () => {
 		expect(collection.slug).toBe('analytics-providers')
 		const read = collection.access?.read
 		expect(typeof read).toBe('function')
-		expect(read?.({ req: { user: null } } as never)).toBe(false)
-		expect(read?.({ req: { user: { id: 1 } } } as never)).toBe(true)
+		expect(await read?.({ req: { user: null } } as never)).toBe(false)
+		expect(await read?.({ req: { user: { id: 1 } } } as never)).toBe(true)
 	})
 
 	it('has one conditional config group per provider', () => {
@@ -31,6 +63,10 @@ describe('buildProvidersCollection', () => {
 		}
 	})
 
+	it('disables duplicate (a duplicate could never carry the write-only credentials)', () => {
+		expect(collection.disableDuplicate).toBe(true)
+	})
+
 	it('keeps the scope field hidden, indexed text', () => {
 		const scope = named(collection.fields, 'scope') as TextField | undefined
 		expect(scope?.type).toBe('text')
@@ -38,13 +74,28 @@ describe('buildProvidersCollection', () => {
 		expect(scope?.admin?.hidden).toBe(true)
 	})
 
-	it('masks secret fields on read and preserves masked round-trips', () => {
+	it('delegates secret fields to buildSecret with the right source shape', () => {
 		const group = named(collection.fields, 'plausible')
 		const fields = group && 'fields' in group ? group.fields : []
 		const row = fields[0]
 		const apiKey = row && 'fields' in row ? named(row.fields, 'apiKey') : undefined
-		expect(apiKey && 'hooks' in apiKey && apiKey.hooks?.afterRead).toHaveLength(1)
-		expect(apiKey && 'hooks' in apiKey && apiKey.hooks?.beforeChange).toHaveLength(1)
+		expect(apiKey?.type).toBe('text')
+		expect((apiKey as { custom?: Record<string, unknown> } | undefined)?.custom).toEqual({
+			fake: 'text',
+		})
+
+		const ga4Group = named(collection.fields, 'ga4')
+		const ga4Fields = ga4Group && 'fields' in ga4Group ? ga4Group.fields : []
+		const privateKey = named(ga4Fields, 'privateKey')
+		expect(privateKey?.type).toBe('textarea')
+		expect((privateKey as { custom?: Record<string, unknown> } | undefined)?.custom).toEqual({
+			fake: 'textarea',
+		})
+	})
+
+	it('keeps SECRET_PATHS in parity with the collection secret fields', () => {
+		const taggedPaths = collectTaggedPaths(collection.fields)
+		expect(new Set(taggedPaths)).toEqual(new Set(SECRET_PATHS.map((s) => s.path)))
 	})
 
 	it('invokes onChange from afterChange and afterDelete hooks', async () => {
@@ -54,6 +105,7 @@ describe('buildProvidersCollection', () => {
 			onChange: () => {
 				calls++
 			},
+			...unscopedArgs,
 		})
 		const afterChange = withHook.hooks?.afterChange?.[0] as CollectionAfterChangeHook
 		const afterDelete = withHook.hooks?.afterDelete?.[0] as CollectionAfterDeleteHook
@@ -62,14 +114,15 @@ describe('buildProvidersCollection', () => {
 		expect(calls).toBe(2)
 	})
 
-	it('merges access overrides over the defaults per operation', () => {
+	it('merges access overrides over the defaults per operation', async () => {
 		const custom = buildProvidersCollection({
 			slug: 'analytics-providers',
 			access: { read: () => true },
 			onChange: () => {},
+			...unscopedArgs,
 		})
 		expect(custom.access?.read?.({ req: { user: null } } as never)).toBe(true)
-		expect(custom.access?.create?.({ req: { user: null } } as never)).toBe(false)
+		expect(await custom.access?.create?.({ req: { user: null } } as never)).toBe(false)
 	})
 
 	it('applies overrides last so anything can be reshaped', () => {
@@ -77,6 +130,7 @@ describe('buildProvidersCollection', () => {
 			slug: 'analytics-providers',
 			overrides: (c) => ({ ...c, admin: { ...c.admin, hidden: true } }),
 			onChange: () => {},
+			...unscopedArgs,
 		})
 		expect(custom.admin?.hidden).toBe(true)
 	})

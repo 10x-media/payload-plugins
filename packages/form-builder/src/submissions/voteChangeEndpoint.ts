@@ -5,12 +5,18 @@ import {
 	type Endpoint,
 	type PayloadRequest,
 } from 'payload'
+import { ESSENTIAL_ACTION_FAILED_CONTEXT_KEY } from '../actions/dispatchContext'
 import { pollConfigOf } from '../form/pollState'
+import { keys } from '../translations/keys'
+import { asTranslate } from '../translations/server'
 import { formIdOf } from './formIdOf'
 import { VOTE_CHANGE_CONTEXT_KEY, votedSubmissionIdFromCookie } from './votedCookie'
 
 const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 const FORMS_SLUG = 'forms'
+
+/** Marks the vote-submit endpoint in the sanitized endpoint list (`custom.formBuilder`). */
+export const VOTE_SUBMIT_ENDPOINT_TAG = 'vote-submit'
 
 const isComplete = (doc: { status?: unknown }): boolean =>
 	doc.status == null || doc.status === 'complete'
@@ -86,14 +92,35 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 		if (!target) {
 			const endpoints = req.payload.collections[FORM_SUBMISSIONS_SLUG]?.config.endpoints
 			const registered: Endpoint[] = Array.isArray(endpoints) ? endpoints : []
+			// Next root-POST match excluding our own tag (never handler identity: a host-wrapped
+			// handler would find itself and recurse). First-match mirrors handleEndpoints routing,
+			// so another plugin's interceptor still wins exactly as it would without us.
 			const stockCreate = registered.find(
 				(endpoint) =>
-					endpoint.method === 'post' && endpoint.path === '/' && endpoint.handler !== handler
+					endpoint.method === 'post' &&
+					endpoint.path === '/' &&
+					endpoint.custom?.formBuilder !== VOTE_SUBMIT_ENDPOINT_TAG
 			)
 			if (!stockCreate) {
 				throw new APIError('form-builder: stock create endpoint not found', 500)
 			}
-			return stockCreate.handler(req)
+			// A consumed fetch body stays non-null, so Payload's addDataAndFileToRequest wrapper
+			// would re-read it and 500; req.data/req.file are already populated, so hide the spent
+			// stream (defineProperty: `body` is a getter-only prototype accessor).
+			if (req.body) {
+				Object.defineProperty(req, 'body', { configurable: true, value: null })
+			}
+			const response = await stockCreate.handler(req)
+			// An essential action's failure is the submission's failure: the row is committed and kept
+			// (see dispatchActions), but the visitor must not be told it worked. 502 because the
+			// upstream the submission exists for rejected or never confirmed it.
+			if (req.context?.[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY] === true && response.ok) {
+				return Response.json(
+					{ errors: [{ message: asTranslate(req.t)(keys.submissionActionFailed) }] },
+					{ status: 502 }
+				)
+			}
+			return response
 		}
 		req.context[VOTE_CHANGE_CONTEXT_KEY] = target.submissionId
 		// Slug-agnostic cast (the `createSubmission` idiom): a host's generated types pin the
@@ -117,5 +144,5 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 		})
 		return Response.json({ doc, message: req.t('general:updatedSuccessfully') }, { status: 200 })
 	}
-	return { path: '/', method: 'post', handler, custom: { formBuilder: 'vote-submit' } }
+	return { path: '/', method: 'post', handler, custom: { formBuilder: VOTE_SUBMIT_ENDPOINT_TAG } }
 }

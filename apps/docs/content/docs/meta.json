@@ -8,9 +8,11 @@
 		"fields",
 		"jobs",
 		"webhooks",
+		"folder-picker",
 		"admin-wiki",
 		"undo-redo",
 		"audit-logs",
-		"automations"
+		"automations",
+		"dual-session"
 	]
 }

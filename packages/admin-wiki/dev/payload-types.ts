@@ -187,6 +187,10 @@ export interface Post {
         id?: string | null;
       }[]
     | null;
+  /**
+   * The URL segment for this post.
+   */
+  slug?: string | null;
   branding?: {
     accent?: string | null;
     icon?: string | null;
@@ -267,6 +271,7 @@ export interface WikiPage {
   targetGlobals?: string[] | null;
   targetFields?: string[] | null;
   targetBlocks?: string[] | null;
+  targetCustom?: string[] | null;
   tags?: string[] | null;
   slug?: string | null;
   featured?: boolean | null;
@@ -413,6 +418,7 @@ export interface PostsSelect<T extends boolean = true> {
             };
         id?: T;
       };
+  slug?: T;
   branding?:
     | T
     | {
@@ -476,6 +482,7 @@ export interface WikiPagesSelect<T extends boolean = true> {
   targetGlobals?: T;
   targetFields?: T;
   targetBlocks?: T;
+  targetCustom?: T;
   tags?: T;
   slug?: T;
   featured?: T;
@@ -610,6 +617,16 @@ export interface CollectionsWidget {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "WikiVideoEmbedBlock".
+ */
+export interface WikiVideoEmbedBlock {
+  url: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'wikiVideoEmbed';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "WikiCalloutBlock".
  */
 export interface WikiCalloutBlock {
@@ -632,27 +649,6 @@ export interface WikiCalloutBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'wikiCallout';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "WikiVideoEmbedBlock".
- */
-export interface WikiVideoEmbedBlock {
-  url: string;
-  id?: string | null;
-  blockName?: string | null;
-  blockType: 'wikiVideoEmbed';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "WikiGuideLinkBlock".
- */
-export interface WikiGuideLinkBlock {
-  guide: string | WikiPage;
-  label?: string | null;
-  id?: string | null;
-  blockName?: string | null;
-  blockType: 'wikiGuideLink';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

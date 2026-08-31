@@ -1,12 +1,13 @@
 import type { PayloadHandler } from 'payload'
 import type { MetricKey } from '../core/contract'
 import { readForWidgetRealtime } from '../widgets/readForWidgetRealtime'
+import { REALTIME_PATH } from './paths'
+
+export { REALTIME_PATH }
 
 const ALLOWED_METRICS: MetricKey[] = ['visitors', 'pageviews']
 const ALLOWED_WINDOWS = [5, 15, 30, 60]
 const DEFAULT_WINDOW = 30
-
-export const REALTIME_PATH = '/analytics/realtime'
 
 /**
  * Authenticated GET handler for the realtime widget poller. Reads + clamps the query

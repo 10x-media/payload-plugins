@@ -1,5 +1,47 @@
 # @10x-media/form-builder
 
+## 0.1.0-beta.22
+
+### Minor Changes
+
+- Two retention gaps made visible. A non-persisting form that carries a consent field now shows an admin sidebar notice saying the consent proof is discarded with the pruned row, since that combination is only right when the consent record lives elsewhere (a double opt-in provider); it stays a notice, not a save error, because that setup is legitimate. And submissions kept after an essential action failed are now stamped `actionFailed: true` (indexed, read-only), so an operator can filter the accumulated rows, replay the addresses once the provider recovers, and clear them.
+
+## 0.1.0-beta.21
+
+### Minor Changes
+
+- Two submit/validate fixes. Actions can declare `essential: true` on `defineAction`: an essential action runs inline before the response (never queued, bounded by the dispatch deadline), its failure or timeout turns the submit into an error the visitor sees with a translated plugin message, the remaining actions are skipped, and the submission is kept even on a `persistSubmissions: false` form so a failed provider handoff never loses what the visitor sent. Fire-and-forget actions are unchanged. And blurring a pristine field no longer reveals its required error: reveal now needs the field to be dirty (changed since mount or the last reset) or its step submitted, which also stops a freshly reset form from showing errors when clicked.
+
+## 0.1.0-beta.20
+
+### Minor Changes
+
+- Consent fields gain a Display setting: `checkbox` (the default, unchanged) or `notice`, which renders the statement as passive prose with no control, for flows where submitting is the opt-in ("By subscribing, you agree to our privacy policy"). The server records `agreed: true` on a notice proof regardless of the client payload, `required` is ignored for notices, and the proof carries `display: 'notice'` so audits distinguish the two. `consentSourcesField` rows gain a `noticeStatement` rich text beside `statement`, so one source phrases each presentation naturally while keeping one policy, one version, and one id in every proof; a notice field falls back to `statement` when it is empty. Whichever wording renders is exactly what the proof snapshots, selected through one shared function on both paths.
+
+## 0.1.0-beta.19
+
+### Minor Changes
+
+- The from-address and department selects now load their options while a form is still being created, instead of sitting empty until the first save. Both option sets are request-scoped (they depend on who is asking, not on the form document), so their endpoints now live at id-less paths (`GET /api/forms/from-addresses`, `GET /api/forms/departments`); the old `/:id/`-prefixed routes still answer on the same handlers for anything that hardcoded them. `EndpointOptionsSelect` and `RecipientsSelect` gain a `scope: 'document' | 'request'` clientProp (default `'document'`, unchanged behaviour) so a host field backed by its own request-scoped endpoint can opt into the same create-mode loading. Document-scoped selects (poll options, consent sources) are unaffected.
+
+## 0.1.0-beta.18
+
+### Minor Changes
+
+- Add `email.fromSources`: senders resolved at send time, for hosts where the from-address is tenant identity rather than per-form configuration. A source stores a stable namespaced value (e.g. `tenant:default`) on the action and re-resolves the actual address on every send with the same run-time arguments a recipient source gets, so a tenant that changes its from-address changes it for every saved form at once. Sources appear in the existing From select ahead of the `fromAddresses` literals; literals keep today's behaviour exactly, including never touching a source at send.
+
+## 0.1.0-beta.17
+
+### Minor Changes
+
+- Add `renderResults` to `<Poll>`: a render prop that replaces the built-in `<FormResults>` wherever the poll shows results (after voting, when closed, and for a recorded outcome). It receives the exact `FormResultsProps` the default rendering gets, so hosts can draw result rows from their own data, keyed by each bucket's option value, or wrap `<FormResults>` in their own layout. Omitting the prop changes nothing.
+
+## 0.1.0-beta.16
+
+### Patch Changes
+
+- Fix every REST submission returning 500 on beta.15. The vote-change endpoint delegates ordinary creates to Payload's stock create handler, which re-parses the request body the endpoint had already consumed; a consumed fetch body stays non-null, so the second read threw "Body is unusable". The endpoint now hides the spent stream before delegating (the parsed `data`/`file` are already on the request), and finds the stock handler by its own endpoint tag instead of handler identity, so a host-wrapped handler can no longer recurse. Local API submissions were never affected.
+
 ## 0.1.0-beta.15
 
 ### Minor Changes

@@ -11,6 +11,7 @@ import { buildConfig, type CollectionConfig } from 'payload'
 import { adminWiki } from '../src/index'
 import { ctaBlock } from './blocks/cta'
 import { heroBannerBlock } from './blocks/heroBanner'
+import { statusChipBlock } from './blocks/statusChip'
 import { tipBlock } from './blocks/tipBlock'
 import { posts } from './collections/posts'
 import { products } from './collections/products'
@@ -58,7 +59,17 @@ export default buildConfig({
 	plugins: [
 		fields({ icon: { adapters: [lucideAdapter()], defaultLibrary: 'lucide' } }),
 		adminWiki({
-			editor: { blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }] },
+			// Both forms: an object with a localized label, and the string shorthand.
+			customTargets: [
+				{ key: 'dashboard', label: { de: 'Übersicht', en: 'Dashboard' } },
+				{ key: 'dashboard.attention', label: 'Dashboard · Needs attention' },
+				'traffic',
+			],
+			editor: {
+				blocks: [{ block: tipBlock, component: '/components/TipBlock#TipBlock' }],
+				converters: '/components/wikiConverters#wikiConverters',
+				inlineBlocks: [{ block: statusChipBlock, component: '/components/StatusChip#StatusChip' }],
+			},
 			exclude: { collections: ['users'] },
 			// video: { playerComponent: '/components/DevVideoPlayer#DevVideoPlayer' },
 			video: true,
@@ -89,6 +100,14 @@ export default buildConfig({
 			triggers: {
 				list: { slot: 'afterListTable' },
 			},
+			// Exercises all three index slots, server and client components both.
+			wikiView: {
+				components: {
+					afterTable: ['/components/WikiSlotsClient#DevWikiFooter'],
+					beforeControls: ['/components/WikiSlotsClient#DevWikiHeaderLink'],
+					beforeTable: ['/components/WikiSlots#DevWikiNotice'],
+				},
+			},
 		}),
 	],
 	telemetry: false,
@@ -97,6 +116,15 @@ export default buildConfig({
 	},
 	typescript: { autoGenerate },
 	admin: {
+		components: {
+			views: {
+				devDashboard: {
+					Component: '/components/DevDashboard#DevDashboard',
+					exact: true,
+					path: '/dashboard',
+				},
+			},
+		},
 		importMap: {
 			autoGenerate,
 			baseDir: path.resolve(dirname),

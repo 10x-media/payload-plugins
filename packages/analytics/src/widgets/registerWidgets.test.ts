@@ -78,6 +78,97 @@ describe('registerWidgets', () => {
 		])
 	})
 
+	it('defaults the data-source field to the first adapter when defaultId is unset', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native(), memoryAdapter()],
+			multiProvider: true,
+			disabled: [],
+			register: [],
+		})
+		const field = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'dataSource')
+		expect(field && 'defaultValue' in field && field.defaultValue).toBe('native')
+	})
+
+	it('defaults the data-source field to defaultId when set', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native(), memoryAdapter()],
+			multiProvider: true,
+			disabled: [],
+			register: [],
+			defaultId: 'memory',
+		})
+		const field = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'dataSource')
+		expect(field && 'defaultValue' in field && field.defaultValue).toBe('memory')
+	})
+
+	it('renders the data-source field through SourceSelectField', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native(), memoryAdapter()],
+			multiProvider: true,
+			disabled: [],
+			register: [],
+		})
+		const field = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'dataSource')
+		expect(field?.admin?.components?.Field).toEqual({
+			path: '@10x-media/analytics/client#SourceSelectField',
+		})
+	})
+
+	it('accepts an unset or runtime data-source value; rejects an empty string', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native(), memoryAdapter()],
+			multiProvider: true,
+			disabled: [],
+			register: [],
+		})
+		const field = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === 'analytics-metric')
+			?.fields?.find((f) => 'name' in f && f.name === 'dataSource')
+		if (field?.type !== 'select' || !field.validate) {
+			throw new Error('dataSource select with validate not registered')
+		}
+		const validate = field.validate as (value: unknown) => unknown
+		expect(validate(undefined)).toBe(true)
+		expect(validate(null)).toBe(true)
+		// A runtime (DB-registered) provider id, absent from the config-time options list.
+		expect(validate('runtime-provider')).toBe(true)
+		expect(validate('')).not.toBe(true)
+	})
+
+	it('renders the metric field through MetricSelectField, passing extra requirements as clientProps', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			disabled: [],
+			register: [],
+		})
+		const metricField = metricFieldOf(config)
+		expect(metricField?.admin?.components?.Field).toEqual({
+			path: '@10x-media/analytics/client#MetricSelectField',
+		})
+		const realtimeMetricField = metricFieldOf(config, 'analytics-realtime')
+		expect(realtimeMetricField?.admin?.components?.Field).toEqual({
+			path: '@10x-media/analytics/client#MetricSelectField',
+			clientProps: { requires: { realtime: true } },
+		})
+		const breakdownMetricField = metricFieldOf(config, 'analytics-breakdown-pages')
+		expect(breakdownMetricField?.admin?.components?.Field).toEqual({
+			path: '@10x-media/analytics/client#MetricSelectField',
+			clientProps: { requires: { dimensions: ['page'] } },
+		})
+	})
+
 	it('narrows the metric picker to the selected data source via filterOptions', () => {
 		const eventsOnly: AnalyticsAdapter = {
 			id: 'events-only',

@@ -1,5 +1,37 @@
 # @10x-media/fields
 
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- New `aadScope` option on `encryptedField` pins the first component of the ciphertext's AAD binding, which otherwise is the collection or global slug. The slug is the right binding until it can change: a plugin-owned collection whose slug the consumer configures, or a collection renamed with its data kept in place, turns every stored value into an authentication failure that no utility can recover, because reads resolve the binding from the current slug too. A pinned scope survives the rename.
+
+  The scope flows through every construction site (sealing, document reads, `decryptFieldValue`, `readEncryptedField`, key rotation, the removal utility), must not contain `.` (the AAD component separator; rejected at the factory), and should be unique per logical schema. Decide it before data exists: changing it later is the re-keying event it exists to prevent.
+
+- `readEncryptedField` now takes a `req`. Given one, the read joins that request's transaction and locale, so a secret written earlier in the same operation is visible to the code that needs it; without one the read still runs on its own request, outside any transaction in progress. The request is restored exactly as it was handed over.
+
+  New `withRawEncrypted(req, read)` for recovering an encrypted field across many rows. `readEncryptedField` issues one query per document, which is the wrong shape for a hook or a job that needs the same secret on every row a query returns, and the rest of each row with it. Inside the window the write-only response strip and the decrypt-on-read step both stand down, so the caller's own `find` returns each encrypted field as its stored wire string for `decryptFieldValue`. The previous mode is restored on the way out, so windows nest, and the request's dataloader is isolated for the duration: its cache key does not include the context, so a related document pulled in at `depth > 0` would otherwise be cached as ciphertext and served that way to an ordinary read later in the same request.
+
+  `CorruptPlaintextError` is now exported alongside the other decrypt failures, so a caller can tell authenticated-but-corrupt data (non-retryable) from a wrong key or a malformed wire string.
+
+  Encrypted field scans are cached per schema. `decryptFieldValue` walks the field tree to find its marker, so decrypting a page of rows used to repeat that walk once per row.
+
+- An encrypted field's identification `hint` may now expose up to 32 characters, up from 8. Every credential format in use carries a constant prefix (`sk_live_`, `whsec_`, `ghp_`, `xoxb-`), and a budget of 8 was spent on that prefix before reaching anything that identifies a particular key.
+
+  The cap was doing a job it cannot do, so the real guard is now the value being sliced rather than the config asking for the slice: a hint is stored only when the plaintext keeps at least as many characters hidden as the hint exposes, and at least 8 hidden characters regardless. One field can therefore serve a collection holding both long tokens and short ones, hinting the first and declining the second instead of exposing half of it. No configuration valid before this release changes behaviour, since 8 exposed already required 8 hidden.
+
+  The bullet run stays exactly `maskDots` wide, with the hint's ends added around it, so a hinted value shows the same run as every other concealed span and the count remains a pure presentation choice. A hint too wide for a narrow field clamps with an ellipsis, in the input and in the list cell, with the lock badge held at its size.
+
+  `admin.width` and `admin.style` now reach encrypted fields. A custom Field component short-circuits the path where Payload applies them, so an encrypted field in a row ignored its width while a native sibling honoured it, and the two rendered at different widths.
+
+- Add `protection: 'writeOnly'` to `encryptedField`: a mode for credentials that are written and used server-side but never returned to any API caller. Read results (REST, GraphQL, Local API) omit the field entirely; a virtual `<name>_set` sibling exposes set-ness only. The admin renders one always-editable input at native height: a stored value is only a placeholder, typing stages a replacement, an isClearable-style `×` clears (with undo), and `clearable`/`required` govern the `×`. `queryable` and `richText` are rejected on write-only fields.
+
+  Two write-only companions: `hint` stores an identification slice (`sk_l····9d3f`) beside the ciphertext at seal time, shown in the admin, list cells, and API responses as `<name>_hint`, capped and length-guarded so it can identify a key but never reconstruct a short secret. `generate` adds a crypto-random generate/rotate action (default 32-char base62, configurable length/prefix/charset) whose value is visible and copyable exactly until the save succeeds, the GitHub-token reveal-once model.
+
+  New server-side helpers `readEncryptedField` and `decryptFieldValue` make reading a stored secret a deliberate act: fetch a handle with cacheable ciphertext and on-demand `decrypt()`, or decrypt a cached wire string given only the field path. Both work on every encrypted field, collections and globals, with locale support.
+
+  The response strip now also covers globals, closing a gap where a global's encrypted richText ciphertext sibling (and blind-index hashes) surfaced in read results. Boot key validation now scans globals too.
+
 ## 0.1.0-beta.4
 
 ### Patch Changes

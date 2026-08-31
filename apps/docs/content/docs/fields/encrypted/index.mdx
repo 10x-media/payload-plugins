@@ -13,7 +13,7 @@ fields: [
 ]
 ```
 
-`encryptedField(source, options?)` takes the field config you would have written as its first argument, and encryption options (`queryable`, `protection`, `maskDots`, `keys`, `onDecryptFailure`, `overrides`) as its second. It returns an array (the stored field, plus a blind-index sibling when `queryable`), so spread it into `fields`.
+`encryptedField(source, options?)` takes the field config you would have written as its first argument, and encryption options (`queryable`, `protection`, `maskDots`, `keys`, `onDecryptFailure`, `overrides`, plus the write-only companions `hint`, `generate`, and `clearable`) as its second. It returns an array (the stored field, plus a blind-index sibling when `queryable`), so spread it into `fields`.
 
 Values are encrypted with AES-256-GCM before they reach the database and decrypted on read. The database column holds an opaque versioned string on every adapter (Mongo and Postgres behave identically); your API and admin see plaintext, your database, backups, and dumps do not. With no configuration, keys derive from `PAYLOAD_SECRET`; production setups should configure [explicit keys](/fields/encrypted/key-management).
 
@@ -27,7 +27,7 @@ Some types trade queryability for confidentiality (encrypted `point` loses geo q
 
 Every encrypted field renders as its native Payload variant with a fixed run of dots while concealed, plus an inline eye toggle (the same pattern as Payload's password and API-key fields) that swaps in the real, editable native component on reveal. Editing the revealed component and saving re-encrypts the value. The eye sits inside the input for `text`, `email`, and `number`; in the top-right corner for `textarea`; and on the label row for `checkbox`, `select`, `radio`, `date`, `code`, `json`, `point`, and `richText`.
 
-`protection` (in the options argument) chooses whether to mask at all: `'masked'` (default) conceals behind dots with the reveal toggle; `'none'` renders the native component directly, value visible, no mask. A `'masked'` field with no stored value renders as the plain native control, since there is nothing to conceal, and starts masking only once it holds a value, so new documents and empty forms look fully native. In the list view, a `'masked'` field renders a lock badge with dots and never exposes the decrypted value; a `'none'` field shows its value there too, matching its unmasked editor.
+`protection` (in the options argument) is a three-step ladder: `'none'` renders the native component directly, value visible, no mask; `'masked'` (default) conceals behind dots with the reveal toggle; `'writeOnly'` goes further and strips the field from every read result, so the value can be written and replaced but never read back through any API ([write-only secrets](/fields/encrypted/write-only)). A `'masked'` field with no stored value renders as the plain native control, since there is nothing to conceal, and starts masking only once it holds a value, so new documents and empty forms look fully native. In the list view, a `'masked'` field renders a lock badge with dots and never exposes the decrypted value; a `'none'` field shows its value there too, matching its unmasked editor.
 
 `maskDots` sets how many dots show while concealed (default `8`, clamped to `1`-`64`). The count is cosmetic and decoupled from the real value length, which stays unknown until reveal, so a known-length secret can advertise its shape without exposing it:
 

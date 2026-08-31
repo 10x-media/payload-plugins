@@ -1,7 +1,11 @@
+export type { WikiFeaturesArgs } from '../editor/wikiEditor'
 export type {
 	AdminWikiPluginOptions,
 	WikiAccessOptions,
+	WikiChipsOptions,
 	WikiCollectionOverride,
+	WikiCustomTargetLabel,
+	WikiCustomTargetOption,
 	WikiEditorBlockOption,
 	WikiEditorOptions,
 	WikiHiddenOptions,
@@ -10,5 +14,14 @@ export type {
 	WikiSlugsOptions,
 	WikiTriggersOptions,
 	WikiVideoOptions,
+	WikiViewComponents,
+	WikiViewOptions,
+	WikiViewSlot,
+	WikiViewSlotClientProps,
+	WikiViewSlotServerProps,
 } from '../options'
-export type { ResolvedWikiOptions } from '../plugin/resolveOptions'
+export type {
+	ResolvedWikiCustomTarget,
+	ResolvedWikiOptions,
+	ResolvedWikiViewOptions,
+} from '../plugin/resolveOptions'

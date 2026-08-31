@@ -1,5 +1,9 @@
 import type { CollectionConfig, PayloadRequest } from 'payload'
-import { type FromAddressesResolver, resolveFromAddressesRequest } from '../actions/fromAddresses'
+import {
+	type FromAddressesResolver,
+	type FromAddressSourceRegistry,
+	resolveFromAddressesRequest,
+} from '../actions/fromAddresses'
 import {
 	type FormResultsAccess,
 	resolveFormResultsRequest,
@@ -19,8 +23,10 @@ type FormsEndpointDeps = {
 	pollVotesEnabled: boolean
 	/** The plugin `consent.sources` option; present registers the `/:id/consent-sources` endpoint. */
 	consentSources?: ConsentSourcesResolver
-	/** The plugin `email.fromAddresses` option; present registers the `/:id/from-addresses` endpoint. */
+	/** The plugin `email.fromAddresses` option; this or `fromSources` present registers the `/:id/from-addresses` endpoint. */
 	fromAddresses?: FromAddressesResolver
+	/** The plugin `email.fromSources` option; served ahead of the resolver's literals. */
+	fromSources?: FromAddressSourceRegistry
 	/** The plugin `email.departments` option; present registers the `/:id/departments` endpoint. */
 	departments?: DepartmentEmailsResolver
 }
@@ -32,12 +38,22 @@ type FormsEndpointDeps = {
  * (anonymous callers get a 403 from the helper, not here). Extracted from `buildFormsCollection`
  * so the collection builder stays focused on field and hook composition.
  */
+/** A request-scoped GET route at its id-less path plus the legacy doc-scoped path, one handler. */
+const requestScopedRoutes = (
+	name: string,
+	handler: (req: PayloadRequest) => Promise<Response>
+): Exclude<CollectionConfig['endpoints'], false | undefined> => [
+	{ path: `/${name}`, method: 'get', handler },
+	{ path: `/:id/${name}`, method: 'get', handler },
+]
+
 export const buildFormsEndpoints = ({
 	resultsAccess,
 	pollResultsTypes,
 	pollVotesEnabled,
 	consentSources,
 	fromAddresses,
+	fromSources,
 	departments,
 }: FormsEndpointDeps): Exclude<CollectionConfig['endpoints'], false | undefined> => [
 	{
@@ -105,41 +121,29 @@ export const buildFormsEndpoints = ({
 				},
 			]
 		: []),
-	// The route id is unused: the from-addresses set is request-scoped (e.g. per tenant), not
-	// per-form. Registered as a doc-scoped route only so the admin field can reuse
-	// EndpointOptionsSelect unmodified (see buildFromField).
-	...(fromAddresses
-		? [
-				{
-					path: '/:id/from-addresses',
-					method: 'get' as const,
-					handler: async (req: PayloadRequest) => {
-						const { status, body } = await resolveFromAddressesRequest({
-							isAuthed: Boolean(req.user),
-							req,
-							resolver: fromAddresses,
-						})
-						return Response.json(body, { status })
-					},
-				},
-			]
+	// The from-addresses and departments sets are request-scoped (e.g. per tenant), never per-form.
+	// Each lives at the id-less path the selects call (which is what lets their options load while
+	// a form is still being created), with the legacy `/:id/` route kept on the same handler for
+	// integrators that hardcoded it.
+	...(fromAddresses || fromSources
+		? requestScopedRoutes('from-addresses', async (req: PayloadRequest) => {
+				const { status, body } = await resolveFromAddressesRequest({
+					isAuthed: Boolean(req.user),
+					req,
+					resolver: fromAddresses,
+					sources: fromSources,
+				})
+				return Response.json(body, { status })
+			})
 		: []),
-	// Same request-scoped, id-unused shape as from-addresses: registered doc-scoped only so the
-	// recipient selects can fetch it (see RecipientsSelect / buildRecipientField).
 	...(departments
-		? [
-				{
-					path: '/:id/departments',
-					method: 'get' as const,
-					handler: async (req: PayloadRequest) => {
-						const { status, body } = await resolveDepartmentsRequest({
-							isAuthed: Boolean(req.user),
-							req,
-							resolver: departments,
-						})
-						return Response.json(body, { status })
-					},
-				},
-			]
+		? requestScopedRoutes('departments', async (req: PayloadRequest) => {
+				const { status, body } = await resolveDepartmentsRequest({
+					isAuthed: Boolean(req.user),
+					req,
+					resolver: departments,
+				})
+				return Response.json(body, { status })
+			})
 		: []),
 ]

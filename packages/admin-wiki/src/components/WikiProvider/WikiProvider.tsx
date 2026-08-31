@@ -1,5 +1,6 @@
 'use client'
 
+import type { JSXConverterArgs, JSXConvertersFunction } from '@payloadcms/richtext-lexical/react'
 import { useAuth, useConfig, useTranslation } from '@payloadcms/ui'
 import {
 	type ComponentType,
@@ -14,7 +15,10 @@ import {
 } from 'react'
 
 import type { WikiWriteAffordanceMode } from '../../options'
+import type { ResolvedWikiCustomTarget } from '../../plugin/resolveOptions'
 import type { WikiGuideDoc, WikiTargetEntry, WikiTargetsResponse } from '../../shared/targetKeys'
+import { buildGuideConverters } from '../GuideArticle/guideConverters'
+import { resolveClientLabel } from '../TargetSelect/clientBlocks'
 import type { WikiMediaDoc } from '../Video/useWikiMediaDoc'
 
 const REFRESH_AFTER_MS = 60_000
@@ -40,20 +44,34 @@ const writeStoredEditMode = (enabled: boolean): void => {
 }
 
 /** A consumer block renderer: receives the block node's field values. */
-export type WikiBlockRenderer = ComponentType<{ fields: Record<string, unknown> }>
+/**
+ * A consumer block renderer. `converters` and `nodesToJSX` come straight from the
+ * lexical converter args, so a block holding its own rich text field can render it:
+ * `nodesToJSX({ converters, nodes: fields.body.root.children })`.
+ */
+export type WikiBlockRenderer = ComponentType<{
+	converters?: JSXConverterArgs['converters']
+	fields: Record<string, unknown>
+	nodesToJSX?: JSXConverterArgs['nodesToJSX']
+}>
 
 /** A video player replacing the default HTML5 one; receives the media doc. */
 export type WikiVideoPlayerComponent = ComponentType<{ media: WikiMediaDoc }>
 
 export type WikiTargetsContextValue = {
+	/** Whether the "Covers" chips include the blocks a guide covers. */
+	blockChips: boolean
 	/** Singular label per block slug, for chips that would otherwise show a slug. */
 	blockLabels: Record<string, string>
-	/** Consumer block renderers resolved from the import map, keyed by slug. */
-	blockRenderers: Record<string, WikiBlockRenderer>
 	/** The reader's evaluated create permission (drives "write this guide"). */
 	canCreate: boolean
 	/** The reader's evaluated update permission (drives edit shortcuts). */
 	canUpdate: boolean
+	/**
+	 * Label per declared custom target key, resolved for the reader's admin
+	 * language, for the chips that would otherwise show a bare key.
+	 */
+	customLabels: Record<string, string>
 	/**
 	 * Whether "write this guide" affordances should render: create permission
 	 * resolved true AND the configured `writeAffordances` mode allows it here.
@@ -63,6 +81,12 @@ export type WikiTargetsContextValue = {
 	editMode: boolean
 	/** Guides attached to a target key; empty array when none. */
 	entriesFor: (key: string) => WikiTargetEntry[]
+	/**
+	 * Converters for one guide. Takes the heading ids of the document being
+	 * rendered: they are assigned per document, so the map cannot be built ahead
+	 * of one.
+	 */
+	guideConverters: (idsByNode: Map<object, string>) => JSXConvertersFunction
 	/** Lazily load one guide's full document, cached per id and locale. */
 	loadGuide: (id: number | string) => Promise<null | WikiGuideDoc>
 	loading: boolean
@@ -87,13 +111,15 @@ export type WikiTargetsContextValue = {
 const EMPTY: WikiTargetEntry[] = []
 
 const WikiTargetsContext = createContext<WikiTargetsContextValue>({
+	blockChips: true,
 	blockLabels: {},
-	blockRenderers: {},
 	canCreate: false,
 	canUpdate: false,
 	canWrite: false,
+	customLabels: {},
 	editMode: false,
 	entriesFor: () => EMPTY,
+	guideConverters: (idsByNode) => buildGuideConverters({}, {}, idsByNode),
 	loadGuide: () => Promise.resolve(null),
 	loading: false,
 	locale: null,
@@ -105,10 +131,17 @@ const WikiTargetsContext = createContext<WikiTargetsContextValue>({
 	writeAffordancesToggleable: false,
 })
 
+/** Stable identity for the common case, so the label memo has nothing to redo. */
+const NO_CUSTOM_TARGETS: ResolvedWikiCustomTarget[] = []
+
 export type WikiProviderProps = {
+	blockChips?: boolean
 	blockLabels?: Record<string, string>
 	blockRenderers?: Record<string, WikiBlockRenderer>
 	children?: ReactNode
+	converters?: JSXConvertersFunction
+	customTargets?: ResolvedWikiCustomTarget[]
+	inlineBlockRenderers?: Record<string, WikiBlockRenderer>
 	pagesSlug?: string
 	videoPlayer?: WikiVideoPlayerComponent
 	wikiView?: boolean
@@ -121,9 +154,13 @@ export type WikiProviderProps = {
  * guide-existence with a synchronous map lookup and never fetch per field.
  */
 export const WikiProvider = ({
+	blockChips = true,
 	blockLabels,
 	blockRenderers,
 	children,
+	converters,
+	customTargets = NO_CUSTOM_TARGETS,
+	inlineBlockRenderers,
 	pagesSlug = 'wiki-pages',
 	videoPlayer,
 	wikiView = false,
@@ -224,17 +261,46 @@ export const WikiProvider = ({
 
 	const canCreate = data?.canCreate ?? false
 
+	// A declared label may be keyed by admin language, so it resolves here rather
+	// than at config time, where there is no request to read a language from.
+	const customLabels = useMemo(
+		() =>
+			Object.fromEntries(
+				customTargets.map((target) => [
+					target.key,
+					resolveClientLabel(target.label, i18n.language, target.key),
+				])
+			),
+		[customTargets, i18n.language]
+	)
+
+	const guideConverters = useMemo(
+		() =>
+			(idsByNode: Map<object, string>): JSXConvertersFunction =>
+			(args) => {
+				const base = buildGuideConverters(
+					blockRenderers ?? {},
+					inlineBlockRenderers ?? {},
+					idsByNode
+				)(args)
+				return converters?.({ defaultConverters: base }) ?? base
+			},
+		[blockRenderers, converters, inlineBlockRenderers]
+	)
+
 	const value = useMemo<WikiTargetsContextValue>(
 		() => ({
+			blockChips,
 			blockLabels: blockLabels ?? {},
-			blockRenderers: blockRenderers ?? {},
 			canCreate,
 			canUpdate: data?.canUpdate ?? false,
 			canWrite:
 				canCreate &&
 				(writeAffordances === 'always' || (writeAffordances === 'editMode' && editMode)),
+			customLabels,
 			editMode,
 			entriesFor: (key) => data?.targets[key] ?? EMPTY,
+			guideConverters,
 			loadGuide,
 			loading,
 			locale,
@@ -251,11 +317,13 @@ export const WikiProvider = ({
 			writeAffordancesToggleable: canCreate && writeAffordances === 'editMode',
 		}),
 		[
+			blockChips,
 			blockLabels,
-			blockRenderers,
 			canCreate,
+			customLabels,
 			data,
 			editMode,
+			guideConverters,
 			load,
 			loadGuide,
 			loading,

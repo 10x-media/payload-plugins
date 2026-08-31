@@ -20,6 +20,7 @@ export default buildConfig({
         featuredOrder: 1,
         targets: {
           collections: ['posts'],
+          custom: ['dashboard'],
           fields: ['collection:posts.title'],
         },
         content: { markdown: '## Write the draft\n\nGive the post a clear **title**.' },
@@ -33,7 +34,7 @@ export default buildConfig({
 
 Guides are keyed by `slug`. A re-run updates the existing guide rather than creating a second one, so calling it on every boot is safe.
 
-Targets are always written in full, all four lists, so dropping a target from a seed definition clears it rather than leaving it behind. `publish: false` leaves the guide as a draft; the default is published.
+Targets are always written in full, every list, so dropping a target from a seed definition clears it rather than leaving it behind. `publish: false` leaves the guide as a draft; the default is published.
 
 ## Content
 
@@ -59,13 +60,26 @@ After conversion, the lexical state passes through a pipeline. Three transformer
 
 `[!NOTE]` maps to info, `[!TIP]` to tip, `[!WARNING]` and `[!IMPORTANT]` to warning, `[!CAUTION]` to danger. An unrecognized marker stays a plain blockquote, and only top-level blockquotes are considered.
 
-**Guide links.** An inline `{{wiki:guide:<slug>}}` placeholder becomes a guide-link inline block:
+**Guide links.** A `{{wiki:guide:<slug>}}` placeholder becomes a guide link, in either of the two forms markdown offers. As a link target the words are yours; on its own the link carries the target guide's title:
 
 ```md
+See [the publishing flow]({{wiki:guide:publishing-a-post}}) for what happens next.
+
 Layout blocks are covered in {{wiki:guide:hero-banner-guide}}.
 ```
 
+The title used by the bare form is the one in the seed definition, resolved for the locale being written, so a localized guide links its German title in the German pass.
+
+It is written into the link as ordinary text, once, at seed time. A guide renamed in the admin afterwards does not change the wording of links pointing at it; re-running the seed with the new title in the definition does.
+
 Slugs resolve against every guide in the same seed run, forward references included, so guides may link to each other regardless of definition order. An unknown slug throws.
+
+Placeholders inside a callout are rewritten too, so a cross-reference reads where it usually belongs:
+
+```md
+> [!TIP]
+> Read {{wiki:guide:publishing-a-post}} before you touch this.
+```
 
 **Media placeholders.** A paragraph containing only `{{wiki:media:<key>}}` becomes an upload node, and `{{wiki:video:<key>}}` becomes a video node, both pointing at media declared in the same run:
 
@@ -88,7 +102,9 @@ await seedWiki(payload, guides, {
 })
 ```
 
-A transformer receives the state and a context holding `guideIdsBySlug` and the seeded `media` handles, and returns the state to pass on.
+A transformer receives the state and a context holding `guideIdsBySlug`, `guideTitlesBySlug` (the same guides' titles, resolved for the locale being written), and the seeded `media` handles, and returns the state to pass on.
+
+Once the pipeline has run, a `{{wiki:...}}` placeholder left anywhere in the content fails the seed, naming the guide and the placeholder. There is no shape in which one is meant to survive: it would either print as literal text or, in the link form, become a link pointing at a URL that goes nowhere. The two ways to strand one are a `{{wiki:media:...}}` that does not stand alone in a top-level paragraph, and a placeholder inside a block a consumer transformer created, since those run last. Inline code is exempt, so a guide can spell the syntax out while documenting it.
 
 ## Your own fields
 

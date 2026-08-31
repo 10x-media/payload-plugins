@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/analytics-dev",
-	"version": "0.0.1-beta.3",
+	"version": "0.0.1-beta.5",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -31,6 +31,7 @@
 		"react-dom": "catalog:"
 	},
 	"devDependencies": {
+		"@10x-media/fields": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",

@@ -166,4 +166,35 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 		payload.logger.info('Seeded encrypted showcase document')
 	}
+
+	const storiesCount = await payload.count({ collection: 'write-only-stories' })
+	if (storiesCount.totalDocs === 0) {
+		// Every credential set, so each story's SET state renders: hint or dots
+		// placeholder plus the inline actions. Values are realistic shapes (the
+		// stripe key deliberately avoids the sk_live_ pattern, which GitHub push
+		// protection blocks even as a fixture) so hints like sk_d····9d3f render.
+		await payload.create({
+			collection: 'write-only-stories',
+			data: {
+				dbPassword: 'correct-horse-battery-staple',
+				label: 'Acme integrations (all credentials set)',
+				rotationSecret: 'rot_5f8a2b9c1d4e7f0a3b6c9d2e5f8a1b4c',
+				smtpPassword: 'smtp-P@ssw0rd-from-provider',
+				stripeKey: 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f',
+				tenantApiKey: 'tnnt_9f3e2d1c0b4a5968a7b6c5d4e3f29d3f',
+				webhookSecret: 'whsec_0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d',
+			},
+		})
+		// Everything unset except the required rotation secret (a required field
+		// cannot exist unset), so each optional story's UNSET state renders: the
+		// plain native input, no dots, no actions, an em dash in the list cell.
+		await payload.create({
+			collection: 'write-only-stories',
+			data: {
+				label: 'Fresh tenant (nothing configured yet)',
+				rotationSecret: 'rot_fresh0b4a5968a7b6c5d4e3f2571c',
+			},
+		})
+		payload.logger.info('Seeded write-only user-story showcase')
+	}
 }

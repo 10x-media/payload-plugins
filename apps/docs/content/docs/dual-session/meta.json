@@ -1,0 +1,13 @@
+{
+	"title": "Dual Session",
+	"pages": [
+		"index",
+		"quick-start",
+		"role-split",
+		"scopes",
+		"clients",
+		"custom-auth",
+		"configuration",
+		"limits"
+	]
+}

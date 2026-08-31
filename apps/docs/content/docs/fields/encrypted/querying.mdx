@@ -12,7 +12,7 @@ encryptedField(
 )
 ```
 
-`unique` is a field property (first argument); `queryable` is an encryption option (second argument). Blind indexing is available only for `text`, `email`, and `number` fields, the scalar types the index can key on.
+`unique` is a field property (first argument); `queryable` is an encryption option (second argument). Blind indexing is available only for `text`, `email`, and `number` fields, the scalar types the index can key on. It is rejected on [`protection: 'writeOnly'`](/fields/encrypted/write-only) fields: equality lookup on a never-readable secret is a guessing oracle.
 
 ## How it works
 

@@ -21,62 +21,106 @@
 	color: var(--theme-elevation-800);
 }
 
-/* Attached eye segment, mirroring Payload's API-key toggle button. Background is
-   the input's own --theme-input-bg (not an elevation step) so the segment reads
-   as part of the input; the only seam is the input's right border, which the
-   segment continues around its top, right, and bottom. Height is a literal 40px
-   to match the native input: Payload compiles its formInput mixin to literal px,
-   while var(--base) is rem-derived and shrinks below 1024px, so a base-derived
-   height renders ~37px next to a 40px input. The doubled class outranks Payload's
-   own `.btn { height: base(2) }`, which otherwise wins by cascade order. */
+/* Attached action buttons (eye and write-only actions): borderless indicators
+   inside the bordered cluster wrap (below), react-select style, muted until
+   hovered. The doubled class outranks Payload's own `.btn { height: base(2) }`,
+   which otherwise wins by cascade order. */
 .tenx-protected-field__eye.tenx-protected-field__eye--attached {
-	align-self: stretch;
-	height: 40px;
-	margin: 0 0 0 -1px;
+	height: 100%;
+	margin: 0;
 	padding: 0 calc(var(--base) / 2);
-	border: 1px solid var(--theme-elevation-150);
-	border-left: 0;
-	border-radius: var(--style-radius-s);
-	border-top-left-radius: 0;
-	border-bottom-left-radius: 0;
-	background: var(--theme-input-bg);
+	border: 0;
+	border-radius: 0;
+	background: none;
 	box-shadow: none;
-	color: var(--theme-elevation-800);
-	transition: border-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
+	color: var(--theme-elevation-500);
+	transition: color 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
 .tenx-protected-field__eye--attached:hover {
-	background: var(--theme-elevation-100);
+	background: none;
+	color: var(--theme-elevation-800);
 }
 
-/* Hover or focus lights the input and eye together, so the focus border never
-   cuts off at the seam. Payload shifts an input border to elevation-250 on hover
-   and elevation-400 on focus; mirror that onto the eye and drive both from the
-   row, so focusing either half highlights the whole control as one. */
-.tenx-protected-field__attached-row:hover input,
-.tenx-protected-field__attached-row:hover .tenx-protected-field__eye--attached {
-	border-color: var(--theme-elevation-250);
+/* Neighbouring actions halve their facing paddings: icons sit close while
+   every pixel of the cluster stays clickable, the hit boundary just moves to
+   the midpoint. Outer edges keep the full padding. */
+.tenx-protected-field__eye-wrap--attached .tenx-protected-field__eye:not(:first-child) {
+	padding-left: calc(var(--base) / 4);
 }
 
-.tenx-protected-field__attached-row:focus-within input,
-.tenx-protected-field__attached-row:focus-within .tenx-protected-field__eye--attached {
-	border-color: var(--theme-elevation-400);
+.tenx-protected-field__eye-wrap--attached .tenx-protected-field__eye:not(:last-child) {
+	padding-right: calc(var(--base) / 4);
 }
 
-/* Attached placement: input row with the eye appended as a flex segment. */
-.tenx-protected-field__attached-row {
-	display: flex;
-	align-items: center;
-}
-
-.tenx-protected-field--attached .tenx-protected-field__attached-row input {
-	border-top-right-radius: 0;
-	border-bottom-right-radius: 0;
-}
-
+/* The cluster is a plain flex container: no border, no background of its own.
+   ALL chrome lives on the row (below), so the icons literally sit inside the
+   input's box and no state can ever render them behind a different border. */
 .tenx-protected-field__eye-wrap--attached {
 	display: flex;
 	align-self: stretch;
+	align-items: center;
+}
+
+/* Attached placement: the ROW is the input. It carries the single border,
+   radius, background, shadow, and formInput's exact transition set; the
+   native input inside is stripped of all chrome (rule below), so there is
+   exactly one border around input text and action icons alike, and no
+   combination of states can ever make them differ. */
+.tenx-protected-field__attached-row {
+	display: flex;
+	align-items: center;
+	height: 40px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+	transition-property: border, box-shadow, background-color;
+	transition-duration: 100ms, 100ms, 500ms;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+/* The row border follows the input's states, replicating formInput's own
+   precedence: hover lights it (the browser sets :hover on the input while
+   its <label> is hovered, and :has() reads that off the input, so hovering
+   an action never lights the border), focus outranks hover (declared later,
+   specificity flattened by :where), and focus-within keeps the control lit
+   while an action button holds focus, the way a clearable select keeps its
+   ring through an indicator click. The row's own shadow deepens on input
+   hover exactly as formInput's inputShadow does. */
+.tenx-protected-field__attached-row:where(:has(input:hover)) {
+	border-color: var(--theme-elevation-250);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+}
+
+.tenx-protected-field__attached-row:where(:focus-within) {
+	border-color: var(--theme-elevation-400);
+}
+
+/* The native input inside the row loses every piece of its own chrome; its
+   hover/focus/active styles from formInput now paint nothing, so they cannot
+   disagree with the row. height 100% (38px inside the bordered 40px row)
+   keeps the control at native input height. */
+.tenx-protected-field--attached .tenx-protected-field__attached-row input {
+	height: 100%;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+/* Validation error, mirrored from Payload's light/darkInputError mixins onto
+   the row (the input's own error chrome is stripped with the rest). Declared
+   last and more specific than the state rules, so error wins over hover and
+   focus exactly as it does on a native input. */
+html[data-theme="light"] .tenx-protected-field--attached.error .tenx-protected-field__attached-row {
+	border-color: var(--theme-error-500);
+	background-color: var(--theme-error-50);
+}
+
+html[data-theme="dark"] .tenx-protected-field--attached.error .tenx-protected-field__attached-row {
+	border-color: var(--theme-error-400);
+	background-color: var(--theme-error-100);
 }
 
 /* Corner placement: eye pinned to the top-right of the textarea wrap. */
@@ -118,9 +162,60 @@
 	display: none;
 }
 
-/* Concealed dots. */
+/* Write-only: one always-editable input; a stored value is only a placeholder
+   (hint or dots), and every action is an attached segment or label-row icon,
+   so the field never grows past its native height. */
+.tenx-protected-field__wo-input {
+	flex: 1 1 auto;
+	width: 100%;
+	/* Flex min-width:auto would refuse to shrink below the placeholder's width
+	   and push the attached actions out of narrow containers. */
+	min-width: 0;
+	/* A rendered hint can be wider than a narrow field; browsers clip the
+	   placeholder flush by default, which reads as a value that ends there.
+	   On the input, not ::placeholder: that is where browsers read it from
+	   for placeholder text. */
+	text-overflow: ellipsis;
+}
+
+/* With a stored value, the "placeholder" is not a prompt but the concealed
+   face of real data, so it renders in the input's TEXT color, exactly as
+   typed characters would. Only the unset state shows a true placeholder,
+   which keeps formInput's native muted styling untouched. */
+.tenx-protected-field__wo-input--set::placeholder {
+	color: var(--theme-elevation-800);
+	font-size: 1rem;
+	letter-spacing: 0.15em;
+}
+
+/* Corner placement (textarea) rows its actions horizontally where the eye sits. */
+.tenx-protected-field__actions--corner {
+	display: flex;
+	gap: 2px;
+}
+
+/* Staged-removal notice in the structural face: a prompt about a pending
+   action, so it carries placeholder tone, unmistakably distinct from the
+   text-colored concealed dots. */
+.tenx-protected-field__wo-face-msg {
+	color: var(--theme-elevation-400);
+}
+
+/* Structural face box: an input-rhythm well the label-row dots sit in. */
+.tenx-protected-field__wo-face-box {
+	display: flex;
+	align-items: center;
+	min-height: 40px;
+	padding: 0 calc(var(--base) * 0.75);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+}
+
+/* Concealed dots stand in for real stored data, so they carry the input's
+   text color, not a muted placeholder tone. */
 .tenx-protected-field__dots {
-	color: var(--theme-elevation-500);
+	color: var(--theme-elevation-800);
 	letter-spacing: 0.15em;
 	user-select: none;
 	white-space: nowrap;
@@ -128,7 +223,7 @@
 
 .tenx-protected-field__masked-input,
 .tenx-protected-field__masked-textarea {
-	color: var(--theme-elevation-500);
+	color: var(--theme-elevation-800);
 	letter-spacing: 0.15em;
 	cursor: default;
 }

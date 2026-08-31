@@ -68,6 +68,7 @@ pnpm migrate:fresh <name>                        # drop tables + apply all
 pnpm lint [name] / pnpm lint:fix [name]
 pnpm typecheck [name]
 pnpm format
+pnpm check:template                     # template/package parity for verbatim-shared files
 
 # Scaffolding + release
 pnpm new                                # scaffold a new plugin (interactive)
@@ -82,6 +83,10 @@ pnpm clean:processes                    # kill them
 
 Migrations live at `packages/<plugin>/dev/migrations/`. Each plugin's `dev/payload.config.ts` sets `db.migrationDir` accordingly. Use `pnpm migrate:create <plugin> <migration-name>` in real projects, exactly mirroring Payload v3's standard workflow.
 
+### Worktree dev servers
+
+`pnpm dev <name>` run from a git worktree derives a stable, unique port from the worktree directory name (band 4100-4999) and prints it with the URL; the primary checkout keeps :3000 and the `.claude/launch.json` 31xx ports. Agents: follow the `worktree-dev` skill. In short: run `PAYLOAD_SKIP_AUTOGEN=1 pnpm dev <name>` in the background from the worktree, attach the browser via `preview_start` with the printed URL (never a launch.json name, which boots the primary checkout's code), and never add worktree entries to the primary's launch.json.
+
 ## Test tiers (Payload-aligned)
 
 Modeled after Payload's own monorepo test pattern: Mongo runs in-memory via `mongodb-memory-server` (matches Payload exactly); Postgres always runs in a real container via `testcontainers` (`postgres:16`). There is intentionally **no in-process Postgres** option; Payload's tests use real Postgres in Docker and we follow that pattern.
@@ -95,6 +100,18 @@ Modeled after Payload's own monorepo test pattern: Mongo runs in-memory via `mon
 | E2E | Production build + Playwright + docker compose | `pnpm test:e2e <name>` |
 
 Postgres-touching tiers (matrix, container, e2e) require Docker locally and on CI. This mirrors Payload's own monorepo test pattern (Mongo in-memory, Postgres in real Docker).
+
+### Bundle isolation gates (`test:dist`)
+
+Only `@10x-media/fields` defines a `test:dist` script, but the turbo task declares `dependsOn: ["build"]`, and turbo schedules that dependency in every package that lacks the parent task. `pnpm test:dist` therefore runs **eleven `next build`s** (ten dev apps plus `apps/docs`) alongside the one real gate. Check the fan-out before you change it:
+
+```bash
+pnpm exec turbo run test:dist --dry=json
+```
+
+Unbounded that peaked at 67 node processes and more than 16 GB on a 4-vCPU CI runner, which swapped the runner to death and surfaced as a `build` job cancelled with no error at all. CI caps it with `--concurrency=3`. Keep that cap, and keep every `packages/*/dev/helpers/memoryDb.ts` returning its placeholder URI under `NEXT_PHASE === 'phase-production-build'` so no dev app spawns a mongod while collecting page data. `tooling/plugin-template` carries the same file and `pnpm check:template` fails if they diverge, so edit the template first and copy it over the packages.
+
+Unfiltered `pnpm build` has the same eleven-way fan-out. The short commands forward extra args to the task rather than to turbo, so cap it with the env var instead: `TURBO_CONCURRENCY=3 pnpm build`.
 
 ## Docs showcase clips
 
@@ -112,6 +129,14 @@ Scenes are linted and typechecked with the rest of the package. Whatever fixture
 4. Add tests in `packages/<slug>/tests/int/` (or co-located `src/**/*.test.ts` for units).
 5. `pnpm test <slug>`: verify smoke tests pass.
 6. `pnpm changeset`: record the release entry.
+
+### Template parity
+
+Most of `tooling/plugin-template` is a starting point each plugin rewrites, but a few files are meant to stay byte-identical everywhere: the Payload route and layout boilerplate, `dev/next.config.ts`, `dev/helpers/memoryDb.ts`, `src/plugin/registerTranslations.ts` and `src/translations/useTranslation.ts`. `pnpm check:template` enforces that list (`TRACKED` in `scripts/check-template.ts`) and runs in the `lint` job.
+
+The template is copied once at `pnpm new` and never consulted again, so a fix applied only to the generated packages never reaches it. That is how the `memoryDb.ts` production-build guard diverged for six weeks while four plugins were scaffolded without it. **Edit the template first, then copy it over the packages.** A long-lived branch that scaffolds a new plugin will go red here after any tracked file changes on `main`; rebasing and recopying the template is the fix.
+
+Tracked files are compared byte for byte, so they cannot contain `{{placeholder}}` tokens; the check says so explicitly if one appears.
 
 ## Release flow
 

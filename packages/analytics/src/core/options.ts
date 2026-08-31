@@ -1,3 +1,4 @@
+import type { KeysConfig } from '@10x-media/fields/encrypted'
 import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import { PROVIDERS_SLUG } from '../providers/collection'
@@ -53,6 +54,13 @@ export type ProvidersCollectionOptions = {
 	scopeField?: string
 	overrides?: (collection: CollectionConfig) => CollectionConfig
 	access?: Partial<CollectionConfig['access']>
+	/**
+	 * Dedicated key ring for the stored provider credentials. Unset, the
+	 * fields plugin's global `encrypted.keys` applies, and with neither the
+	 * ring derives from the Payload secret. Configure a dedicated key for
+	 * anything beyond a dev install.
+	 */
+	encryption?: { keys?: KeysConfig }
 }
 
 export type ProvidersOptions = {
@@ -67,8 +75,10 @@ export type PlatformReadAccess = (args: { req: PayloadRequest }) => boolean | Pr
 export type AnalyticsAccessOptions = {
 	/**
 	 * Gates cross-scope reads: explicit `scope: '*'` reads, and scoped reads through
-	 * a platform adapter that cannot filter by scope. Defaults to any authenticated
-	 * admin-panel user.
+	 * a shared config adapter that cannot filter by scope. Scoped installs
+	 * (`scopeResolver` configured) default to deny; configure it, for example a role
+	 * check, so platform admins can read cross-scope and manage every tenant's
+	 * providers. Unscoped installs default to any authenticated admin-panel user.
 	 */
 	platformRead?: PlatformReadAccess
 }
@@ -162,6 +172,7 @@ export interface ResolvedOptions {
 			scopeField: string
 			overrides?: (collection: CollectionConfig) => CollectionConfig
 			access?: Partial<CollectionConfig['access']>
+			encryption?: { keys?: KeysConfig }
 		}
 		resolve?: ProvidersResolve
 	}
@@ -258,9 +269,20 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 							scopeField: collectionOpt.scopeField ?? DEFAULT_SCOPE_FIELD,
 							overrides: collectionOpt.overrides,
 							access: collectionOpt.access,
+							encryption: collectionOpt.encryption,
 						}
 					: { enabled: false, slug: PROVIDERS_SLUG, scopeField: DEFAULT_SCOPE_FIELD },
 		resolve: options.providers?.resolve,
+	}
+	if (providers.collection.enabled) {
+		if (providers.collection.scopeField.trim() === '') {
+			throw new Error('analytics: providers.collection.scopeField must be a non-empty field name')
+		}
+		if (providers.collection.scopeField.includes('.')) {
+			throw new Error(
+				'analytics: providers.collection.scopeField must be a top-level field name (no dots); the scope stamp writes it as a flat key'
+			)
+		}
 	}
 	const syncOpt = options.sync
 	const sync =
@@ -288,14 +310,18 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 						lookbackDays: DEFAULT_SYNC_LOOKBACK,
 						hidden: true,
 					}
+	const scoped = options.scopeResolver !== undefined
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
 		scopeResolver: options.scopeResolver ?? (() => null),
-		scoped: options.scopeResolver !== undefined,
+		scoped,
 		reportingTimezone: options.reportingTimezone,
 		platformAdapter: options.platformAdapter,
-		access: { platformRead: options.access?.platformRead ?? (({ req }) => Boolean(req.user)) },
+		access: {
+			platformRead:
+				options.access?.platformRead ?? (scoped ? () => false : ({ req }) => Boolean(req.user)),
+		},
 		providers,
 		bindings: resolveBindings(options.collections),
 		cache: {

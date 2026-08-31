@@ -54,6 +54,26 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 			expect(fromAddressesEndpoint()).toBeDefined()
 		})
 
+		it('registers the id-less route the selects call, sharing the legacy doc-scoped path', async () => {
+			const endpoints = booted.payload.collections.forms?.config.endpoints as
+				| Array<{ path: string; handler: (req: PayloadRequest) => Promise<Response> }>
+				| undefined
+			const idless = endpoints?.find((endpoint) => endpoint.path === '/from-addresses')
+			expect(idless).toBeDefined()
+			const { createLocalReq } = await import('payload')
+			const authed = await createLocalReq(
+				{ req: { user: { id: 1, collection: 'users', tenant: 'acme' } } as never },
+				booted.payload
+			)
+			const response = await idless?.handler(authed)
+			expect(response?.status).toBe(200)
+			const body = (await response?.json()) as { options?: unknown }
+			expect(body.options).toEqual(tenantOptions.acme)
+
+			const anonymous = await createLocalReq({}, booted.payload)
+			expect((await idless?.handler(anonymous))?.status).toBe(403)
+		})
+
 		it('returns 403 for an anonymous request to the endpoint', async () => {
 			const response = await fromAddressesEndpoint()?.handler({
 				user: undefined,
@@ -119,6 +139,90 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 					req: { user: { id: 1, collection: 'users' } } as never,
 				})
 			).rejects.toThrow()
+		})
+	})
+
+	describe('with fromSources set', () => {
+		let booted: BootedPayload
+		const resolveCalls: Array<{ formId: unknown }> = []
+
+		beforeAll(async () => {
+			booted = await bootPayload({
+				plugin: formBuilder({
+					email: {
+						fromSources: {
+							tenant: {
+								value: 'tenant:default',
+								label: 'Tenant default',
+								resolve: (args) => {
+									resolveCalls.push({ formId: args.form.id })
+									return 'Acme <hello@acme.example>'
+								},
+							},
+						},
+					},
+				}),
+				db,
+			})
+		})
+
+		afterAll(async () => {
+			await booted.stop()
+		})
+
+		it('registers the endpoint and serves the source entry without a resolver', async () => {
+			const endpoints = booted.payload.collections.forms?.config.endpoints as
+				| Array<{ path: string; handler: (req: PayloadRequest) => Promise<Response> }>
+				| undefined
+			const endpoint = endpoints?.find((entry) => entry.path === '/:id/from-addresses')
+			expect(endpoint).toBeDefined()
+			const { createLocalReq } = await import('payload')
+			const req = await createLocalReq(
+				{ req: { user: { id: 1, collection: 'users' } } as never },
+				booted.payload
+			)
+			const response = await endpoint?.handler(req)
+			expect(response?.status).toBe(200)
+			const body = (await response?.json()) as { options?: unknown }
+			expect(body.options).toEqual([{ label: 'Tenant default', value: 'tenant:default' }])
+		})
+
+		it('stores the source value and sends with the freshly resolved address', async () => {
+			const form = await booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Tenant form',
+					fields: [{ blockType: 'email', name: 'email', label: 'Email' }],
+					actions: [
+						{
+							blockType: 'emailTeam',
+							to: 'team@x.com',
+							from: 'tenant:default',
+							subject: 'Hi',
+							body: '',
+						},
+					],
+				},
+			})
+
+			const sends: Array<Record<string, unknown>> = []
+			const original = booted.payload.sendEmail
+			booted.payload.sendEmail = (async (message: Record<string, unknown>) => {
+				sends.push(message)
+			}) as typeof booted.payload.sendEmail
+			try {
+				await booted.payload.create({
+					collection: 'form-submissions',
+					depth: 0,
+					data: { form: form.id, values: [{ field: 'email', value: 'visitor@x.com' }] },
+				})
+			} finally {
+				booted.payload.sendEmail = original
+			}
+
+			expect(sends).toHaveLength(1)
+			expect(sends[0]?.from).toBe('Acme <hello@acme.example>')
+			expect(resolveCalls.at(-1)?.formId).toBe(form.id)
 		})
 	})
 

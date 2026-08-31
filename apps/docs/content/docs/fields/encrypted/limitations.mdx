@@ -26,6 +26,8 @@ Authenticated encryption binds each ciphertext to its `collection.field` slot (s
 
 Field-level encryption is not a defense against an attacker who already has database write access and stays within one field. Pair it with access control and database write restrictions.
 
+The binding's first component is the slug by default, which makes renaming a collection whose data stays in place a re-keying event: every stored value fails authentication under the new name. A field whose collection slug is configurable (plugin-owned collections) should pin the component instead; see [aadScope](/fields/encrypted/key-management#pinning-the-aad-scope).
+
 ## Blind-index leakage
 
 A [blind index](/fields/encrypted/querying) is deterministic by necessity, which is a real information leak to anyone with database read access:
@@ -51,7 +53,7 @@ The default `onDecryptFailure` policy is `'throw'`. Because decryption happens i
 
 ## Masked is visual only
 
-Masking is a client-side presentation choice. `afterRead` decrypts server-side, so an authorized admin's browser receives the plaintext regardless of masking; the dots stop casual on-screen display, not an authorized reader (or their network tab). Because the admin form round-trips plaintext, saving a document re-seals its encrypted fields with fresh IVs even when the content did not change, which records a new version on versioned collections.
+Masking is a client-side presentation choice. `afterRead` decrypts server-side, so an authorized admin's browser receives the plaintext regardless of masking; the dots stop casual on-screen display, not an authorized reader (or their network tab). Because the admin form round-trips plaintext, saving a document re-seals its encrypted fields with fresh IVs even when the content did not change, which records a new version on versioned collections. When no reader should ever get the value back, use [`protection: 'writeOnly'`](/fields/encrypted/write-only) instead; its own trade-offs (an existence indicator in responses, no reveal, server-side reads through an explicit helper) are documented on that page.
 
 ## Storage and API surface
 

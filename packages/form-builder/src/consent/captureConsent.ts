@@ -3,6 +3,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { hasDraftsEnabled } from 'payload/shared'
 import { textOfBody } from '../actions/body/textOfBody'
 import type { FormFieldInstance } from '../submissions/types'
+import { consentDisplayOf, effectiveConsentStatement } from './effectiveStatement'
 import { resolvePublishedVersionRef } from './resolvePublishedVersionRef'
 import type { ConsentSourceEntry, ConsentSourcePage } from './types'
 
@@ -21,6 +22,8 @@ export type ConsentProof = {
 	statementHash?: string
 	/** Plain-text snapshot of the statement agreed to, for a human-readable audit. */
 	statementText?: string
+	/** Present only for a notice display, where submitting was the act of consent; absent means a ticked checkbox. */
+	display?: 'notice'
 	at: string
 }
 
@@ -64,17 +67,23 @@ export const captureConsent = async (args: {
 	const source = typeof args.field.source === 'string' ? args.field.source : ''
 	const entry = source ? args.entries.find((candidate) => candidate.id === source) : undefined
 	const snapshot = args.snapshot ?? 'both'
+	const display = consentDisplayOf(args.field)
 
 	// Capture the agreed wording (and the source label) onto every proof branch. Kept out of the two
-	// returns so a refusal and a page-less source are snapshotted the same as the happy path.
+	// returns so a refusal and a page-less source are snapshotted the same as the happy path. The
+	// wording is selected per the field's display through the same helper the render path uses, so
+	// the proof attests to the sentence the visitor saw.
 	const withSnapshot = (proof: ConsentProof): ConsentProof => {
+		if (display === 'notice') {
+			proof.display = 'notice'
+		}
 		if (!entry || snapshot === false) {
 			return proof
 		}
 		if (typeof entry.name === 'string' && entry.name.trim().length > 0) {
 			proof.name = entry.name.trim()
 		}
-		const text = textOfBody(entry.statement)
+		const text = textOfBody(effectiveConsentStatement(entry, display))
 		if (text.length > 0) {
 			if (snapshot === 'hash' || snapshot === 'both') {
 				proof.statementHash = createHash('sha256').update(text).digest('hex')

@@ -36,6 +36,7 @@ formBuilder({
         id: row.id,
         name: row.name,
         statement: row.statement,
+        noticeStatement: row.noticeStatement,
         // `page` is an id, so proofs survive a rename; `url` is your routing, only you know it.
         ...(row.page && {
           page: { relationTo: row.page.relationTo, id: row.page.value.id },
@@ -56,6 +57,7 @@ Each row is a `name`, the `statement`, and optionally a `page`:
 - **The row's own `id`**, Payload's auto-assigned array-row id, is the stable reference: forms store it and proofs record it. Nothing you author, so a rename or a reorder never orphans either.
 - **`name`** is shown when picking the source on a form, and it is the text of the policy link rendered beside the statement. A source with a link `url` but no `name` renders no link, since a link needs a human name to click.
 - **`statement`** is the sentence beside the checkbox, authored as rich text with your project's editor. Put the policy link inline. Pass `editor` to `consentSourcesField` to override it.
+- **`noticeStatement`** is the same consent phrased for a [notice display](#a-notice-instead-of-a-checkbox): "By subscribing, you agree to our privacy policy" where the checkbox reads "I accept the privacy policy". One source, one policy, one id in every proof; only the grammar differs per presentation. Empty falls back to `statement`. A resolver mapping rows to entries must forward it.
 - **`page`**, labeled "Statement source" in the admin, is the document the statement covers, and is what makes the proof provable. Always a polymorphic relationship, even when `relationTo` names one collection, because a proof needs the collection recorded alongside the id. Omit `relationTo` entirely and there is no page picker: statements only, and proofs with no page or version. Set it when you want a submission to save a reference to your policy.
 
 Only the array itself and `page` carry a description in the admin; `name` and `statement` are self-explanatory enough not to need one. `statement` and `name` are localized by default (`localized: false` opts out).
@@ -89,7 +91,15 @@ The statement renders as a sibling of the checkbox rather than wrapping it in a 
 
 ## Requiring it
 
-`required` on the field is what makes a consent mandatory, and it is enforced server-side: a `false` value is a present value, so the engine's shared required guard never fires on it and the field's own validator rejects an explicit refusal. Leave it off for marketing opt-ins and similar. Keep terms-of-service consent separate and required.
+`required` on the field is what makes a consent mandatory, and it is enforced server-side: a `false` value is a present value, so the engine's shared required guard never fires on it and the field's own validator rejects an explicit refusal. Leave it off for marketing opt-ins and similar. Keep terms-of-service consent separate and required. On a notice display `required` has nothing to gate (there is no control), so validation always passes and the setting is ignored.
+
+## A notice instead of a checkbox
+
+For a newsletter signup, the act of subscribing is the opt-in, so a box to tick reads wrong. The consent field's **Display** setting covers it: `checkbox` (the default, unchanged) or `notice`, which renders the statement as passive prose with no control. Submitting the form is the consent, and the server records `agreed: true` on the proof no matter what the client sent, so an audit reads the same for both displays.
+
+A notice field shows its source's `noticeStatement` when one is authored, falling back to `statement`. Whichever wording rendered is exactly what the proof snapshots: the render path and the proof path select the sentence through the same function, so the snapshot can never attest to words the visitor did not see. Notice proofs additionally carry `display: 'notice'`, so an audit can tell "submitted past a notice" from "ticked a box"; checkbox proofs keep their existing shape.
+
+There is deliberately no per-field wording override. A form that needs different words for an otherwise-standard consent should get its own source: the wording then carries its own id and version in every proof, instead of living loose on one form where nothing audits it.
 
 ## Proof
 
@@ -107,6 +117,8 @@ Each consent field produces a `ConsentProof` on the submission's `consent` array
 
 The source is re-resolved server-side at submit, so the proof reflects what the statement said then, not what the client rendered or claimed. A refusal is recorded, never dropped. If the resolver is down, the submission is rejected rather than recording an agreement the server cannot vouch for.
 
+The proof lives on the submission row, so a `persistSubmissions: false` form discards it when the row is [pruned](/form-builder/actions#pruning-submissions) after actions run. That combination is legitimate exactly when the consent record lives elsewhere, a double opt-in provider being the canonical case, and the admin sidebar shows a notice whenever a non-persisting form carries a consent field so nobody has to discover it from the pruning code. A form that needs its own provable consent must keep its submissions.
+
 ### Version capture
 
 `versionRef` is the published version document's own id, and appears only when the page's collection has **drafts** enabled. It needs no configuration: the plugin detects drafts per collection at submit.
@@ -121,4 +133,4 @@ Versions without drafts get no `versionRef` because there is no published/draft 
 
 ## Endpoint
 
-The source picker is backed by `GET /api/forms/:id/consent-sources`, registered only when `consent.sources` is set. It is authenticated (403 otherwise), scoped to the request, and fails closed with a 503 when the resolver throws. Like the other document-scoped selects, it stays empty until the form's first save: it needs a document id to resolve against.
+The source picker is backed by `GET /api/forms/:id/consent-sources`, registered only when `consent.sources` is set. It is authenticated (403 otherwise) and fails closed with a 503 when the resolver throws. Unlike the from-address and department selects, this one is genuinely document-scoped: the resolver receives the form itself (loaded under the caller's own read access, which is what keeps one tenant's editor from resolving against another tenant's form), so it stays empty until the form's first save gives it a document to resolve against.

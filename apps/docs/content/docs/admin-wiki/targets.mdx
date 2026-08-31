@@ -1,11 +1,11 @@
 ---
 title: Targeting
-description: How a guide declares which collections, globals, fields, and blocks it explains.
+description: How a guide declares which collections, globals, fields, blocks, and custom surfaces it explains.
 ---
 
-A guide stores what it is about in four string lists, and every surface in the admin resolves itself against them.
+A guide stores what it is about in string lists, and every surface in the admin resolves itself against them.
 
-## The four target kinds
+## The target kinds
 
 The **Targets** tab of a wiki page holds one list per kind:
 
@@ -15,12 +15,15 @@ The **Targets** tab of a wiki page holds one list per kind:
 | `targetGlobals` | Global | Bare slug | `settings` | Picking from the globals the plugin covers |
 | `targetFields` | Field | Owner-qualified schema path | `collection:posts.hero.title` | [Picking fields](#picking-fields) from a rendered form, typing a path, or a [write affordance](#prefilled-targets) |
 | `targetBlocks` | Block | Bare block slug | `heroBanner` | Picking from the blocks the plugin covers |
+| `targetCustom` | Custom | Bare declared key | `dashboard` | Picking from the keys you declared. [Only present](#custom-targets) when you declared any |
 
-One guide may fill all four, and any number of guides may name the same target. A surface with several guides shows them all, ordered featured-first, then by title.
+One guide may fill all of them, and any number of guides may name the same target. A surface with several guides shows them all, ordered featured-first, then by title.
 
 **Collections** and **Globals** are multi-selects. **Blocks** is a select whose menu is Payload's own block drawer, with thumbnails, groups, and search, so blocks are chosen by their label rather than by slug. All three list only what the plugin covers, so an [excluded](/admin-wiki/configuration#exclusions) entity cannot be targeted. Labels follow the reader's admin language wherever the entity declares one per locale.
 
 **Fields** is a grouped list. See [Picking fields](#picking-fields).
+
+**Custom targets** is a multi-select over the keys your config declares. See [Custom targets](#custom-targets).
 
 ## Field schema paths
 
@@ -74,7 +77,7 @@ block:panel.title             a field inside the block that field allows
 Two consequences worth knowing:
 
 - Targeting a block's field **in one collection only** is not expressible. If you need that, document the whole surface with a collection or field target on the enclosing form instead.
-- Block slugs are a global namespace here, exactly as they are for [whole-block targets](#the-four-target-kinds). If two different block configs share a slug, their fields merge under the one root and the plugin logs a warning on boot naming the slug and where each was found. Payload permits the collision (its duplicate check runs per blocks field, not across the config) and resolves it registry-first in parts of its own admin, so the wiki follows that precedence.
+- Block slugs are a global namespace here, exactly as they are for [whole-block targets](#the-target-kinds). If two different block configs share a slug, their fields merge under the one root and the plugin logs a warning on boot naming the slug and where each was found. Payload permits the collision (its duplicate check runs per blocks field, not across the config) and resolves it registry-first in parts of its own admin, so the wiki follows that precedence.
 
 ## Picking fields
 
@@ -135,6 +138,47 @@ The config walk finds blocks through fields of type `blocks`, plus everything in
 - Field paths such as `block:<slug>.<field>` work when typed into the Fields list, and the help surfaces render inside the editor.
 - Only the picker is unavailable: the block is absent from the block drawer's grid.
 
+## Custom targets
+
+The four kinds above are derived by walking your config. A screen the config does not describe is none of them: a view registered through `admin.components.views`, a panel inside one, a report. Declare those keys yourself and they become a target kind like any other.
+
+```ts
+adminWiki({
+  customTargets: [
+    { key: 'dashboard', label: { de: 'Übersicht', en: 'Dashboard' } },
+    { key: 'dashboard.attention', label: 'Dashboard · Needs attention' },
+    'traffic',
+  ],
+})
+```
+
+A key is a bare slug of your choosing. The plugin namespaces it to `custom:<key>` internally, so it can never collide with a collection, global, block, or field target, and you never type the namespace. The string shorthand declares a target labelled by its own key; an object takes a plain label or one per admin language. A key written with the namespace already on it (`custom:dashboard`) is accepted and stripped, blanks are dropped, and a key declared twice keeps its first label.
+
+Declaring at least one key adds the **Custom targets** list to the Targets tab, as a multi-select over exactly what you declared. Declaring none leaves the guide collection, and its database schema, exactly as it was: there is no field, no column, and no migration for a project that does not use this.
+
+Rendering the help surface takes one component, which needs nothing but the bare key:
+
+```tsx
+import { WikiCustomHelp } from '@10x-media/admin-wiki/client'
+
+export const Dashboard = () => (
+  <>
+    <h1>
+      Dashboard <WikiCustomHelp target="dashboard" />
+    </h1>
+    <section>
+      <h2>
+        Needs attention <WikiCustomHelp target="dashboard.attention" />
+      </h2>
+    </section>
+  </>
+)
+```
+
+It behaves exactly like the field surfaces: nothing renders until a guide targets that key, the trigger shows each guide's summary on hover and opens the full guide on click, and an unguided key offers a [write affordance](/admin-wiki/write-affordances) that opens a create drawer with the target already filled in. Custom targets also carry their label on the **Covers** chips, on the wiki index, and in its filters.
+
+A stored key you later stop declaring is reported by the [orphan banner](#orphaned-targets), the same way a deleted field is: the declaration is the only thing that makes a custom key valid, since nothing in the config describes what it names.
+
 ## Target keys
 
 Internally every target becomes one string, and that string is what surfaces listen on:
@@ -143,6 +187,7 @@ Internally every target becomes one string, and that string is what surfaces lis
 collection:posts
 global:settings
 block:heroBanner
+custom:dashboard
 field:collection:posts.title
 field:block:heroBanner.heading
 ```
@@ -151,10 +196,10 @@ Field keys carry a double prefix: `field:` plus the owner-qualified path the aut
 
 ## Targets are stored as plain strings
 
-All four lists are `text` fields with `hasMany`, not relationships and not `select` fields with stored options. Every picker is a UI over the same string storage. That has three consequences worth knowing:
+Every list is a `text` field with `hasMany`, not relationships and not `select` fields with stored options. Every picker is a UI over the same string storage. That has three consequences worth knowing:
 
 - A field guide can be written **before** the field exists, which is normal when documenting a form while it is still being built. The picker cannot offer a field that does not exist; the path input can.
-- A guide **survives** its surface being removed, renamed, or excluded. The value stays readable and removable in the picker, listed under its raw slug or in the **Unresolved** group; only the attachment is stale, and the content is still there to reattach.
+- A guide **survives** its surface being removed, renamed, excluded, or, for a custom target, undeclared. The value stays readable and removable in the picker, listed under its raw slug or in the **Unresolved** group; only the attachment is stale, and the content is still there to reattach.
 - Nothing in the wiki schema depends on the shape of your config, so a field moving never means a migration.
 
 The cost is that a typo in a field target attaches a guide to nothing, which the orphan banner catches.

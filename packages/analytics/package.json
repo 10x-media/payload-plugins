@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/analytics",
-	"version": "0.1.0-beta.3",
+	"version": "0.1.0-beta.5",
 	"description": "Adapter-based analytics for Payload: providers, a native engine, dashboard widgets, and portable fields.",
 	"license": "MIT",
 	"repository": {
@@ -120,6 +120,7 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@10x-media/fields": "^0.1.0-beta.5",
 		"@google-analytics/data": "^6.0.0",
 		"@payloadcms/db-postgres": "^3.82.0",
 		"@payloadcms/ui": "^3.83.0",
@@ -130,6 +131,9 @@
 		"react-dom": "^19.0.0"
 	},
 	"peerDependenciesMeta": {
+		"@10x-media/fields": {
+			"optional": true
+		},
 		"@google-analytics/data": {
 			"optional": true
 		},
@@ -141,6 +145,7 @@
 		}
 	},
 	"devDependencies": {
+		"@10x-media/fields": "workspace:*",
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
 		"@10x-media/tsdown-config": "workspace:*",

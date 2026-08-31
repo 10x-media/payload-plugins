@@ -117,10 +117,38 @@ The resolver runs per request against an authenticated endpoint, so a multi-tena
 
 The chosen `from` is validated against the resolver on save (an address outside the resolved set is a save error), but not re-checked when the action sends: the config is admin-authored, not visitor-controlled, so the stored value is trusted at send time. Leaving **From** empty keeps the adapter default, so adding the option changes nothing for forms that ignore it.
 
-Two costs come with the seam being server-resolved and failing closed:
+The **From** select loads from `GET /api/forms/from-addresses`, an id-less route: the option set depends on the request (who is asking, which tenant), not on the form document, so the addresses are there while the form is still being created. The **To** department select works the same way at `/api/forms/departments`. The old `/:id/`-prefixed paths still answer for anything that hardcoded them.
 
-- **The select is empty until the form's first save.** It loads from a document-scoped endpoint, and an unsaved form has no id to resolve against, so the addresses appear once the form exists. Save the form, then pick the sender.
+One cost comes with the seam being server-resolved and failing closed:
+
 - **A resolver that throws blocks saves.** Payload runs the validate on every save, not only when `from` changed, so while the resolver is down every save of a form whose email action has a **From** set is rejected, including edits that never touch the address. It surfaces as a translated "unavailable" save error rather than a raw stack, and a form with no **From** set still saves. This is the deliberate trade: failing open would persist a sender the host can no longer vouch for. A resolver that reaches a flaky upstream should cache or fall back internally instead of throwing.
+
+### Senders resolved at send time
+
+A literal from `fromAddresses` freezes when the form is saved. For a routing target that is the point; for a sender it can be wrong, because the sender is usually tenant identity rather than per-form configuration: a tenant that changes its from-address leaves every saved form sending the old one, with nothing telling the editor. `email.fromSources` covers that case. A source stores a stable, namespaced value on the action and resolves the actual address on every send:
+
+```ts title="payload.config.ts"
+formBuilder({
+  email: {
+    fromSources: {
+      tenant: {
+        value: 'tenant:default',
+        label: 'Tenant default sender',
+        resolve: async ({ form, payload }) => {
+          const tenant = await tenantOfForm(form, payload)
+          return tenant?.fromAddress ?? null
+        },
+      },
+    },
+  },
+})
+```
+
+Sources appear in the same **From** select, listed ahead of the `fromAddresses` literals, and either option can be set without the other. What the editor picks decides the behaviour: a source stores its `value` (`tenant:default` above, audit-stable in the saved form), a literal stores and sends the address as before and never touches a source.
+
+`resolve` receives the same run-time arguments as a [recipient source](#recipient-sources): the form, the submission's values and descriptors, the verified context, `payload`, and the request. Derive the tenant from the form document rather than the request where you can; on the queued path the request is the job runner's, while the form is the same document the action was saved on. The result is reduced to a single sender: anything past a line break is cut, a whole line that already reads as one sender passes through (`Name <addr@example.com>` form included, quoted display names with commas too), and a comma-joined list is clamped to its first entry. Returning `null` or an empty string sends with the adapter's default sender, and a throw fails the action rather than sending as an identity the host no longer vouches for; on the queued path that failure retries.
+
+The namespaced `value` is the whole trick: it cannot collide with a literal address, so the send path can tell "re-resolve this" from "send this" by a map lookup, with no flags stored on the form. Pick values like `tenant:default` and keep them stable. Renaming or removing a source orphans every form that stored its value: the stored string then reads as a literal, reaches the adapter as an invalid sender, and fails the send loudly, which is the intended failure mode, visible rather than silently sending as the wrong identity.
 
 ## Department routing
 
@@ -141,7 +169,7 @@ formBuilder({
 
 `departmentsField()` is the array you place on any collection or global you own (a settings global, a tenant document) to hold the addresses: each row is a `label` and an `email`, both localized by default, rendered as condensed flat rows with no per-row collapsible, added and removed with their own buttons. `resolveDepartmentOptions` reads that array back (fetch it at `locale: 'all'` so every locale's addresses are available in one call) and resolves each row for the request's locale with a current-locale -> default-locale -> next-available-locale fallback, so the locale logic never has to be reimplemented per host. Multi-tenancy needs no plugin support: place the field on a tenant-scoped document and scope the resolver's read by the tenant derived from `req`, exactly like `email.fromAddresses`.
 
-With `email.departments` set, **To** becomes a select backed by an authenticated `GET /api/forms/:id/departments` endpoint, validated on save against the resolver's current options (fails closed, the same trade-off as `fromAddresses`: a resolver outage blocks saving a form whose email action has a **To** set, rather than persisting a routing target the host can no longer vouch for). Leave `email.departments` unset and **To** stays the plain text field it always was.
+With `email.departments` set, **To** becomes a select backed by an authenticated `GET /api/forms/departments` endpoint (request-scoped and id-less, so the departments are pickable while the form is still being created), validated on save against the resolver's current options (fails closed, the same trade-off as `fromAddresses`: a resolver outage blocks saving a form whose email action has a **To** set, rather than persisting a routing target the host can no longer vouch for). Leave `email.departments` unset and **To** stays the plain text field it always was.
 
 Either way, **To** is localized: each admin locale stores its own address (or department choice), and a submission routes to the address stored for its own locale, exactly like the subject and body already do. This holds on the queued (job-runner) dispatch path too: the form is loaded at the submission's own stored locale, not the job runner's request locale, so a German visitor's submission still reaches the German department when the job that sends it runs with no locale of its own.
 
@@ -221,11 +249,30 @@ A custom action's `type` is registered as a Payload block whose slug is that typ
 
 ## Run model
 
-Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most five seconds for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission.
+Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most five seconds for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission, unless the action declared otherwise, below.
+
+### Essential actions
+
+Fire-and-forget is right for a notification: a failed email should not reject a submission that is already stored. It is wrong when the action is the point of the submission, a newsletter signup whose provider is the system of record. `essential: true` on `defineAction` declares that this action's failure is the submission's failure:
+
+```ts
+const subscribe = defineAction({
+  type: 'subscribe',
+  label: 'Subscribe',
+  essential: true,
+  run: async ({ values }) => {
+    await provider.subscribe(addressOf(values)) // a throw fails the submission
+  },
+})
+```
+
+An essential action runs inline before the response, never queued, still bounded by the dispatch deadline so a hanging provider cannot pin the request (outliving the deadline counts as failure; the work is not cancelled, so make the provider call idempotent if a retry could follow). On failure the visitor's submit returns an error with a translated plugin message, no per-form copy to author, and the remaining actions are skipped. The other actions keep today's fire-and-forget behaviour, running after the essential pass succeeds.
+
+One deliberate interaction with [pruning](#pruning-submissions): when an essential action fails on a `persistSubmissions: false` form, the submission is kept, not pruned. The reason not to persist is that the provider holds the record; if the provider never received it, the stored row is the only copy of what the visitor sent, and an operator can recover it. This gives a non-persisting form an unusual retention shape, successes leave nothing while failures accumulate, so every kept row is stamped `actionFailed: true` (indexed, read-only, hidden in the admin until set). Filter on it to find the rows once the provider is fixed, replay the addresses, and delete them; the plugin does not expire them for you, since only the host knows when the replay happened. Essentialness is declared on the action type, not per form, on purpose: whether a failed handoff may be silently swallowed is a property of the integration, and a per-form toggle would let an author accidentally demote it. The error surfaces through the REST submit path (what `<Form>` uses); a server-side `payload.create` gets the submission plus a logged failure, and the same context flag to inspect when a `req` is threaded. A failed-essential submission also emits no `submission.created` event, so a sink-driven automation never counts it as a completed signup.
 
 ## Pruning submissions
 
-Every form stores each submission by default. Uncheck **Store submissions** on a form (the `persistSubmissions` flag) and the plugin deletes the submission once its actions have run, for a pure signup form whose only job is to POST to a provider and leave no stored row. Deletion happens once, after the whole action pass, regardless of whether an individual action failed (every action still received the values first), so a failing action never strands the row. A pruned submission never appears in the submissions list or in poll and analytics counts, by intent. Pruning does not cascade to files: a non-persist form with a `file` field leaves its uploaded file in the uploads collection (newsletter signups have none). If the job runner is down, the submission is retained until the job eventually runs, never dropped unprocessed.
+Every form stores each submission by default. Uncheck **Store submissions** on a form (the `persistSubmissions` flag) and the plugin deletes the submission once its actions have run, for a pure signup form whose only job is to POST to a provider and leave no stored row. Deletion happens once, after the whole action pass, regardless of whether an individual fire-and-forget action failed (every action still received the values first), so a failing notification never strands the row. A failed [essential action](#essential-actions) is the exception: it keeps the row, because the provider never took the handoff. A pruned submission never appears in the submissions list or in poll and analytics counts, by intent. Pruning does not cascade to files: a non-persist form with a `file` field leaves its uploaded file in the uploads collection (newsletter signups have none). If the job runner is down, the submission is retained until the job eventually runs, never dropped unprocessed.
 
 ## Signed webhook verification
 

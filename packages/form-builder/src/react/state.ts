@@ -1,3 +1,4 @@
+import { consentDisplayOf } from '../consent/effectiveStatement'
 import { isNamedField } from '../fields/fieldKey'
 import type { FormFieldInstance } from '../submissions/types'
 
@@ -13,6 +14,12 @@ export type FormState = {
 	values: Record<string, unknown>
 	errors: FieldErrors
 	touched: Record<string, boolean>
+	/**
+	 * Fields whose value changed since mount or the last reset. Blur reveals a field's error only
+	 * once it is dirty (or its step was attempted), so focusing and leaving a pristine field says
+	 * nothing, and a reset makes every field pristine again.
+	 */
+	dirty: Record<string, boolean>
 	submitting: boolean
 	submitted: boolean
 	/**
@@ -52,6 +59,12 @@ export const seedFieldValues = (fields: FormFieldInstance[]): Record<string, unk
 					return [field.name, Array.from({ length: minRows }, () => ({}))]
 				}
 			}
+			// A notice-display consent has no control and the submit is the agreement, so its value
+			// is true from the start; the server coerces the same, keeping dependent conditions and
+			// calc in agreement across both engines.
+			if (field.blockType === 'consent' && consentDisplayOf(field) === 'notice') {
+				return [field.name, true]
+			}
 			return [field.name, undefined]
 		})
 	)
@@ -60,6 +73,7 @@ export const initialFormState = (values: Record<string, unknown>): FormState => 
 	values,
 	errors: {},
 	touched: {},
+	dirty: {},
 	submitting: false,
 	submitted: false,
 	attemptedSteps: new Set(),
@@ -110,6 +124,7 @@ export const formReducer = (state: FormState, action: FormAction): FormState => 
 				...state,
 				values: { ...state.values, [action.name]: action.value },
 				errors: restErrors,
+				dirty: state.dirty[action.name] ? state.dirty : { ...state.dirty, [action.name]: true },
 			}
 		}
 		case 'TOUCH':
@@ -139,6 +154,7 @@ export const formReducer = (state: FormState, action: FormAction): FormState => 
 				...state,
 				errors: reindexRepeaterKeys(state.errors, action.name, action.index),
 				touched: reindexRepeaterKeys(state.touched, action.name, action.index),
+				dirty: reindexRepeaterKeys(state.dirty, action.name, action.index),
 			}
 		case 'SUBMIT_START':
 			return { ...state, submitting: true, submitError: undefined }

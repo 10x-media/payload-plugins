@@ -9,6 +9,11 @@ export type WikiSeedTargets = {
 	/** Collection slugs, e.g. `posts`. */
 	collections?: string[]
 	/**
+	 * Bare custom target keys, e.g. `dashboard`, as declared through the
+	 * plugin's `customTargets` option and without the `custom:` namespace.
+	 */
+	custom?: string[]
+	/**
 	 * Owner-qualified field schema paths, e.g. `collection:posts.hero.title`,
 	 * `global:settings.siteName`, or `block:heroBanner.heading` for a field
 	 * inside a block.
@@ -31,6 +36,12 @@ export type WikiSeedContent = { lexical: SerializedEditorState } | { markdown: s
 export type WikiSeedContext = {
 	/** Every seeded guide's id by slug (resolved before content is written). */
 	guideIdsBySlug: Record<string, number | string>
+	/**
+	 * Every seeded guide's title by slug, resolved for the locale whose content is
+	 * being transformed, falling back to the default-locale title. This is what a
+	 * guide link with no text of its own is given to say.
+	 */
+	guideTitlesBySlug: Record<string, string>
 	/** Seeded media handles by media key. */
 	media: Record<string, { id: number | string; relationTo: string }>
 }

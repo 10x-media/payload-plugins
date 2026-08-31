@@ -1,4 +1,4 @@
-import { type Config, definePlugin } from 'payload'
+import { type Config, definePlugin, type PayloadComponent } from 'payload'
 
 import { buildWikiMediaCollection } from './collections/wikiMedia'
 import { buildWikiPagesCollection } from './collections/wikiPages'
@@ -9,6 +9,7 @@ import { registerTriggers } from './plugin/registerTriggers'
 import { setWikiRegistry } from './plugin/registry'
 import { resolveOptions } from './plugin/resolveOptions'
 import { walkAndInjectFieldHelp } from './plugin/walker'
+import { customTargetKey } from './shared/targetKeys'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -38,6 +39,24 @@ const WIKI_PAGE_META = {
 }
 
 /**
+ * Import-map key for one component reference. `admin.dependencies` takes a bare
+ * path string, and Payload reads the export after `#`, defaulting to the default
+ * export; a reference that spells its export in `exportName` instead would
+ * otherwise register under a key the runtime lookup never asks for.
+ */
+const componentImportPath = (component: PayloadComponent): string | undefined => {
+	if (component === false) {
+		return undefined
+	}
+	if (typeof component === 'string') {
+		return component
+	}
+	return component.exportName && !component.path.includes('#')
+		? `${component.path}#${component.exportName}`
+		: component.path
+}
+
+/**
  * Admin Wiki plugin for Payload v3: a living wiki inside the admin panel.
  * Registers the wiki collections (guide pages + media), the plugin registry,
  * and translations. Must run after any plugin that adds collections or fields,
@@ -56,7 +75,13 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		setWikiRegistry(config, {
 			...resolved,
 			blockLabels: walk.blockLabels,
-			validTargetKeys: walk.validTargetKeys,
+			// Custom targets resolve against the option rather than the config, which
+			// is the whole point of declaring one: the orphan banner then reports a
+			// key whose declaration was removed, exactly as it does a deleted field.
+			validTargetKeys: [
+				...walk.validTargetKeys,
+				...resolved.customTargets.map((target) => customTargetKey(target.key)),
+			],
 		})
 		const warnings = [...walk.warnings]
 		if (walk.injectedFieldCount === 0) {
@@ -102,19 +127,28 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		]
 		const consumerComponents = [
 			...resolved.editorBlocks.map((option) => option.component),
+			...resolved.editorInlineBlocks.map((option) => option.component),
 			...(resolved.video !== false && resolved.video.playerComponent
 				? [resolved.video.playerComponent]
 				: []),
+			...(resolved.wikiView === false
+				? []
+				: Object.values(resolved.wikiView.components)
+						.flat()
+						.map(componentImportPath)
+						.filter((path): path is string => path !== undefined)),
 		]
-		if (consumerComponents.length > 0) {
-			config.admin.dependencies = {
-				...config.admin.dependencies,
-				...Object.fromEntries(
-					consumerComponents.map((component) => [
-						`admin-wiki:${component}`,
-						{ path: component, type: 'component' as const },
-					])
-				),
+		config.admin.dependencies ??= {}
+		for (const component of consumerComponents) {
+			config.admin.dependencies[`admin-wiki:${component}`] = {
+				path: component,
+				type: 'component',
+			}
+		}
+		if (resolved.editorConverters !== undefined) {
+			config.admin.dependencies[`admin-wiki:${resolved.editorConverters}`] = {
+				path: resolved.editorConverters,
+				type: 'function',
 			}
 		}
 		if (resolved.wikiView) {
@@ -139,12 +173,18 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 })
 
 export { SUMMARY_MAX_LENGTH } from './collections/wikiPages'
+export { type WikiFeaturesArgs, wikiFeatures } from './editor/wikiEditor'
 export type {
 	AdminWikiPluginOptions,
 	AdminWikiPluginOptions as PluginOptions,
 	WikiAccessOptions,
+	WikiChipsOptions,
 	WikiCollectionOverride,
+	WikiCustomTargetLabel,
+	WikiCustomTargetOption,
 	WikiEditorBlockOption,
+	WikiEditorFeature,
+	WikiEditorFeaturesOption,
 	WikiEditorOptions,
 	WikiExcludeOptions,
 	WikiHiddenOptions,
@@ -155,6 +195,11 @@ export type {
 	WikiSlugsOptions,
 	WikiTriggersOptions,
 	WikiVideoOptions,
+	WikiViewComponents,
+	WikiViewOptions,
+	WikiViewSlot,
+	WikiViewSlotClientProps,
+	WikiViewSlotServerProps,
 	WikiWriteAffordanceMode,
 } from './options'
 export { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './plugin/exclude'
@@ -177,3 +222,14 @@ export type {
 	WikiSeedTargets,
 	WikiSeedTransformer,
 } from './seed/types'
+export {
+	blockTargetKey,
+	collectionTargetKey,
+	customTargetKey,
+	fieldTargetKey,
+	globalTargetKey,
+	targetFieldNameFor,
+	targetKeysForDoc,
+	type WikiTargetDoc,
+	type WikiTargetType,
+} from './shared/targetKeys'

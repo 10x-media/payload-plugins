@@ -29,6 +29,15 @@ export type ActionDefinition<TConfig extends Record<string, unknown> = Record<st
 	/** i18n-key or literal (resolved like a field label), or a per-locale record. */
 	label: string | Record<string, string>
 	config?: Field[]
+	/**
+	 * This action's failure is the submission's failure: it runs inline before the response (never
+	 * queued, bounded by the dispatch deadline), a throw or timeout turns the submit into an error
+	 * the visitor sees, the remaining actions are skipped, and the submission is kept even on a
+	 * `persistSubmissions: false` form so what the visitor sent is never lost. For an action that
+	 * IS the point of the submission (a signup provider that is the system of record); leave unset
+	 * for notifications and other fire-and-forget work.
+	 */
+	essential?: boolean
 	run: (args: ActionRunArgs<TConfig>) => Promise<void> | void
 }
 

@@ -53,6 +53,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.comparisonNoChange]: 'Keine Änderung',
 	[keys.providersCollectionSingular]: 'Analytics-Anbieter',
 	[keys.providersCollectionPlural]: 'Analytics-Anbieter',
+	[keys.providerFieldName]: 'Name',
 	[keys.providerFieldProvider]: 'Anbieter',
 	[keys.providerFieldEnabled]: 'Aktiviert',
 	[keys.providerFieldScope]: 'Bereich',
@@ -66,8 +67,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.providerFieldClientEmail]: 'Client-E-Mail',
 	[keys.providerFieldPrivateKey]: 'Privater Schlüssel',
 	[keys.providerFieldProjectId]: 'Projekt-ID',
-	[keys.providerSecretHelp]:
-		'Nach dem Speichern maskiert angezeigt; neuen Wert eingeben zum Ersetzen',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

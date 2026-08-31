@@ -4,6 +4,7 @@ export type {
 	HostnameResolver,
 	PathResolver,
 } from '../binding/types'
+export type { SerializedCapabilities } from '../core/capabilities'
 export * from '../core/contract'
 export type {
 	AnalyticsFieldsOptions,

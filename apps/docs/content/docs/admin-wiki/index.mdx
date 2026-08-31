@@ -20,7 +20,7 @@ That is the whole minimum config. The plugin registers two collections (guide pa
 
 ## The pieces
 
-A guide is a document in the `wiki-pages` collection with a title, a summary, rich text content, and four lists naming the surfaces it is about: collection slugs, global slugs, field schema paths, and block slugs. See [Targeting](/admin-wiki/targets).
+A guide is a document in the `wiki-pages` collection with a title, a summary, rich text content, and lists naming the surfaces it is about: collection slugs, global slugs, field schema paths, block slugs, and any custom keys you declared. See [Targeting](/admin-wiki/targets).
 
 Surfaces are injected during the plugin's config walk. Field help arrives as an `admin.components.Description`; block help and the document sidebar panel arrive as UI fields, so nothing reaches the database or your generated types. Every surface renders nothing when no guide targets it, so an undocumented admin looks exactly as it did before installing. See [Surfaces](/admin-wiki/surfaces).
 

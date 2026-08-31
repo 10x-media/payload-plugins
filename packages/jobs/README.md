@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/jobs
 
 An ops dashboard plus reliability, worker, and queue-control layers for Payload v3's built-in jobs queue. See what the queue is doing, recover jobs that die mid-run, run a proper worker process with graceful drain, and pause or drive the queue from the outside. Every layer is opt-in.
@@ -9,6 +11,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Features
 
 - **Dashboard**: a derived Status column, a queue-health bar, and error/log panels on the `payload-jobs` collection. On by default.
+- **Custom log blocks**: register your own renderer for an attempt's `input`, `output`, or `error`, per task slug or for every task.
 - **Reliability**: job leases, an orphan sweeper with dead-lettering, leader election with fence tokens, serverless staleness.
 - **Workers**: `createWorker` runs jobs as a standalone process and drains gracefully on SIGTERM.
 - **Queue control**: cluster-wide pause/resume plus hardened `queue-run`, `queue-sweep`, and `queue-status` endpoints with access guards.

@@ -90,6 +90,16 @@ describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db)
 		expect(departmentsEndpoint()).toBeDefined()
 	})
 
+	it('registers the id-less route the selects call, answering like the legacy path', async () => {
+		const endpoints = booted.payload.collections.forms?.config.endpoints as
+			| Array<{ path: string; handler: (req: PayloadRequest) => Promise<Response> }>
+			| undefined
+		const idless = endpoints?.find((endpoint) => endpoint.path === '/departments')
+		expect(idless).toBeDefined()
+		const response = await idless?.handler(authedReq('en'))
+		expect(response?.status).toBe(200)
+	})
+
 	it('returns 403 for an anonymous request to the endpoint', async () => {
 		const response = await departmentsEndpoint()?.handler({
 			user: undefined,

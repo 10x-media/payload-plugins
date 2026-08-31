@@ -39,7 +39,7 @@ export default buildConfig({
 | `analytics-breakdown-countries` | Countries. |
 | `analytics-realtime` | An "active now" count with a per-minute sparkline. |
 
-Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. The metric select lists only metrics the selected data source can serve (a breakdown widget also requires its dimension); a data source added at runtime falls back to the union of the configured adapters' metrics. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
+Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. The data source and metric selects render through client components that resolve the list of available adapters live from an authenticated `GET /api/analytics/sources` endpoint, cached per admin session. Runtime providers appear for their scope under the provider document's name (a generated label stands in when unset), and the metric list narrows to what the selected source can actually serve. Without JavaScript or when the endpoint is unreachable the pickers fall back to the config-time option lists, and stored values the endpoint no longer lists keep the previous behavior of degrading at read time. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
 
 The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoint every 15 seconds and registers only when a realtime-capable adapter (the native engine today) is configured.
 
@@ -117,3 +117,5 @@ export default async function TopSourcesWidget(props: WidgetServerProps) {
 ```
 
 Run `payload generate:importmap` after registering. The widget appears only when a configured adapter satisfies its `requires` gate, exactly like the built-ins.
+
+A custom widget's own config fields can reuse the same live pickers: `MetricSelectField` and `SourceSelectField` from `@10x-media/analytics/client`, or the `useAnalyticsSources` hook directly for a bespoke picker. `MetricSelectField` narrows against a sibling source field named `dataSource` by default; pass `sourceFieldPath` when a custom field layout names it something else.
