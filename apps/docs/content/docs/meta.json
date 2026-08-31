@@ -11,6 +11,7 @@
 		"folder-picker",
 		"admin-wiki",
 		"undo-redo",
+		"audit-logs",
 		"automations",
 		"dual-session"
 	]

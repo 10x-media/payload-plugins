@@ -1,0 +1,224 @@
+---
+title: What is logged
+description: The shape of an entry, how the diff is built, and everything deliberately kept out of it.
+---
+
+## An entry
+
+```ts
+{
+  operation:    'create' | 'update' | 'delete' | 'auth' | 'custom'
+  eventType?:   string       // auth sub-type, or your identifier for a custom event
+  relationTo:   string       // collection slug, or '__global__' for a global
+  documentId?:  string       // the document id; for globals, the global slug
+  user?:        relationship // req.user at the time of the write
+  locale?:      string
+  payloadAPI?:  string       // 'REST' | 'GraphQL' | 'local', or whatever a plugin sets
+  ipAddress?:   string
+  userAgent?:   string
+  changedPaths: string[]     // indexed, so this is what you filter on
+  diff:         Record<string, { before: unknown; after: unknown }>
+  snapshot?:    Record<string, unknown>
+  metadata?:    Record<string, unknown>  // custom events only
+  group?:       string
+}
+```
+
+`changedPaths` is indexed and `diff` is not, which is why every query in [querying](/audit-logs/querying) filters on the former.
+
+`payloadAPI` is free text. Payload core sets `REST`, `GraphQL` or `local`, and a plugin may
+set its own value: `@payloadcms/plugin-mcp` sets `MCP` on every request it serves. Declare
+the values you expect through [`logs.payloadAPIs`](/audit-logs/configuration#payloadapis)
+to give them a label in the view.
+
+## When no entry is written
+
+An update whose diff comes out empty writes nothing. That covers the obvious case of saving without changing anything, and the less obvious one where the only changed fields are in `excludeFields`.
+
+Creates and deletes always write, subject to `operations` and `shouldLog`.
+
+## The diff
+
+Flat, keyed by dot-notation path. Nested objects are recursed into, so each changed leaf is its own entry:
+
+```json
+{
+  "changedPaths": ["details.score", "status"],
+  "diff": {
+    "details.score": { "before": 92, "after": 87 },
+    "status": { "before": "active", "after": "disqualified" }
+  }
+}
+```
+
+A missing value is written as `null`, never `undefined`. `null` and absent are treated as equal, so a field that goes from unset to `null` produces no entry.
+
+### Arrays
+
+Plain arrays, and arrays of objects with no `id`, are replaced wholesale at the array path. There is no index-level tracking, and a reorder reads as a replacement:
+
+```json
+{ "tags": { "before": ["a", "b"], "after": ["b", "a"] } }
+```
+
+Payload's own array and blocks fields give each row an `id`, and the diff engine keys off it instead. That gives you a path per changed row rather than a dump of the whole array:
+
+```json
+{ "steps.abc.title": { "before": "Old", "after": "New" } }
+```
+
+An added row has `before: null` and the whole row as `after`; a removed row is the reverse. A reorder produces one `__order__` key holding the id sequence:
+
+```json
+{ "steps.__order__": { "before": ["abc", "xyz"], "after": ["xyz", "abc"] } }
+```
+
+`__order__` only appears when rows that exist on both sides change their relative position. Appending or removing does not produce it, because the row-level entries already say what happened.
+
+Nesting works at any depth: `sections.s1.blocks.b1.text`.
+
+### Relationships
+
+Relationship values are always reduced to plain ids before the diff is computed. That is not cosmetic. Payload returns `doc` populated at the request's depth in `afterChange` and `afterDelete`, while `previousDoc` is always depth 0, so a naive comparison reports a change on every save:
+
+```
+doc.author         = { id: 'abc', email: 'dev@example.com' }
+previousDoc.author = 'abc'
+```
+
+The plugin resolves both sides through the collection's field schema, so this produces no entry. When the id genuinely changes, the diff holds ids and nothing else:
+
+```json
+{
+  "author": { "before": "id-one", "after": "id-two" },
+  "tags": { "before": ["id-1", "id-2"], "after": ["id-1", "id-3"] }
+}
+```
+
+Polymorphic relationships are diffed as two paths, `field.relationTo` and `field.value`.
+
+Set `normalizeRelationships: false` to turn this off globally.
+
+<Callout type="warn">
+Without the schema, the engine falls back to guessing from the shape of the value. That misses cases in both directions: a false diff when both sides are populated objects with the same id, and a full populated blob stored where an id belongs. Only disable it if you specifically need populated objects preserved.
+</Callout>
+
+### Always excluded
+
+| Field | Why |
+|---|---|
+| `updatedAt` | Changes on every save, so it would appear in every diff and say nothing. |
+| `id` | Never changes. |
+| `hash`, `salt` | Auth credentials. Excluded automatically for any collection with `auth`. |
+| `join` fields | Virtual, not stored, and present in hook payloads only when selected. |
+
+### Rich text
+
+Lexical content is deeply nested JSON. The engine recurses into it until it reaches the array of nodes, and because Lexical nodes carry no `id`, that array falls under the rule above: it is stored as a whole-array replacement.
+
+One path comes out of it, `content.root.children`, and its value is the entire document body twice, before and after. Correcting a typo in a 20 KB article writes a 40 KB entry, and with autosave that happens while the editor is still typing.
+
+Exclude the field unless you need it:
+
+```ts
+auditLog: { excludeFields: ['content'] }
+```
+
+That drops it from the log entirely, including the fact that it changed.
+
+## Snapshots
+
+`snapshotOnCreate` stores the whole created document in `snapshot` rather than writing a null-to-value diff entry for every field. On a wide collection that is both smaller and far easier to read.
+
+`snapshotOnDelete` stores the document as it was when deleted, which is what makes partial recovery possible: the log entry outlives the document.
+
+Snapshots go through the same relationship normalization as diffs, so `{ author: { id: 'abc', email: '...' } }` is stored as `{ author: 'abc' }`, at any nesting depth. Anonymized fields are redacted inside snapshots too.
+
+## Drafts
+
+With `drafts: 'ignore'` (the default) draft updates are skipped, and on publish the plugin fetches the last published version and diffs against that. The entry then reads as "what changed between these two publishes" rather than "what changed since the last autosave".
+
+With `drafts: 'log'` every save is an entry, autosaved drafts included. On a collection with autosave that is a row every few seconds while somebody types, so reach for it only when the draft history itself is what you are auditing.
+
+A create is logged either way. A document coming into existence is a real event, whether or not it starts as a draft.
+
+## Auth events
+
+Logins and password reset requests are recorded as `operation: 'auth'`, with `eventType` set to `login` or `forgot_password`. They are opted into on the collection, next to everything else about it:
+
+```ts title="payload.config.ts"
+auditLogs({
+  collections: {
+    admins: { auditLog: true, auth: true },
+    editors: { auth: { login: true, forgotPassword: false } },
+  },
+})
+```
+
+`auth: true` records both events. A collection you never list records neither, which matters when the config has a customer-facing auth collection alongside the admin one: logging every storefront login is rarely what anybody wanted.
+
+The forgot-password entry stores the submitted email in `metadata`. The hook only fires when the account exists, so this is not a way to enumerate addresses.
+
+### Refused logins
+
+`failedLogin` records attempts Payload turned away, as `eventType: 'failed_login'`. It is not part of `auth: true` and has to be named:
+
+```ts title="payload.config.ts"
+collections: {
+  admins: { auth: { login: true, failedLogin: true } },
+}
+```
+
+The entry carries no user. Payload answers the same way whether the account exists or the password was wrong, so there is nobody to point at. What it does carry is the caller's IP, the user agent, and `metadata`:
+
+```ts
+metadata: {
+  identifier: 'intruder@example.com',   // the email or username submitted, capped at 256 chars
+  reason: 'invalid_credentials',        // or 'locked', or 'unverified'
+}
+```
+
+`reason: 'locked'` is the account hitting `maxLoginAttempts`. The submitted password is never read.
+
+Only REST is covered. The entry is written from the collection's `afterError` hook, which Payload calls from its REST error handler, so attempts through GraphQL or `payload.login()` produce no entry.
+
+<Callout type="warn">
+  This is the one audited write anyone on the internet can trigger. Payload 3 has no built-in rate limiting, and `maxLoginAttempts` only counts against accounts that exist, so attempts against addresses you never registered are never throttled. One request is one row, at whatever rate the caller can send. Put a rate limiter in front of `/api/*/login`, or use `shouldLog` below, before enabling this on a public auth collection. The identifiers recorded also belong to people who may not be your users, which is worth a line in your privacy policy.
+</Callout>
+
+`shouldLog` decides whether an attempt becomes a row. Returning `false` drops it, which is where a burst gets collapsed:
+
+```ts title="payload.config.ts"
+const recent = new Map<string, number>()
+
+collections: {
+  admins: {
+    auth: {
+      failedLogin: {
+        shouldLog: ({ identifier, req }) => {
+          const key = `${identifier}:${req.headers.get('x-forwarded-for') ?? ''}`
+          const last = recent.get(key) ?? 0
+          if (Date.now() - last < 60_000) return false
+          recent.set(key, Date.now())
+          return true
+        },
+      },
+    },
+  },
+}
+```
+
+That keeps one row per identifier and IP per minute. The map lives in one process, so a deployment running several instances gets that limit per instance; back it with Redis if you need the real number.
+
+The same seam works for alerting instead of recording:
+
+```ts
+shouldLog: async ({ identifier, reason }) => {
+  if (reason === 'locked') await notifySecurityChannel({ identifier })
+  return false
+}
+```
+
+## Globals
+
+Globals only ever update, so there is no create or delete entry. They are stored with `relationTo: '__global__'` and the global slug in `documentId`, which keeps the collection index usable and is what the view's global filter matches on.

@@ -1,0 +1,131 @@
+'use client'
+
+import { Button, ReactSelect } from '@payloadcms/ui'
+import { useCallback, useState } from 'react'
+import { keys } from '../../translations/keys'
+import { useTranslation } from '../../translations/useTranslation'
+import { PayloadDocSelect } from './PayloadDocSelect'
+import type { EditorProps, SelectOption } from './types'
+
+type Props = EditorProps & {
+	userTitleFields: Record<string, string>
+}
+
+export function UserFilterEditor({ onClose, setStaged, staged, userTitleFields }: Props) {
+	const { t } = useTranslation()
+	const authSlugs = Object.keys(userTitleFields)
+	const [selectedCollection, setSelectedCollection] = useState<string>(
+		staged.userCollection ?? (authSlugs.length === 1 ? (authSlugs[0] ?? '') : '')
+	)
+	const [manualId, setManualId] = useState('')
+
+	const activeCollection = selectedCollection || (authSlugs.length === 1 ? authSlugs[0] : undefined)
+	const currentIds = staged.userIds ?? []
+
+	const addId = useCallback(
+		(id: string) => {
+			if (currentIds.includes(id)) return
+			setStaged((f) => ({
+				...f,
+				userIds: [...(f.userIds ?? []), id],
+				...(authSlugs.length > 1 && activeCollection ? { userCollection: activeCollection } : {}),
+			}))
+		},
+		[currentIds, activeCollection, authSlugs.length, setStaged]
+	)
+
+	const removeId = useCallback(
+		(id: string) => {
+			setStaged((f) => {
+				const newIds = (f.userIds ?? []).filter((i) => i !== id)
+				const next = { ...f, userIds: newIds.length ? newIds : undefined }
+				if (!newIds.length) delete next.userCollection
+				return next
+			})
+		},
+		[setStaged]
+	)
+
+	const commitManual = useCallback(() => {
+		if (manualId.trim()) {
+			addId(manualId.trim())
+			setManualId('')
+		}
+	}, [manualId, addId])
+
+	const collectionOptions: SelectOption[] = authSlugs.map((s) => ({ label: s, value: s }))
+
+	return (
+		<div className="al-filterpopover__editor" data-popup-prevent-close>
+			<div className="al-filterpopover__editor-label">{t(keys.filterUser)}</div>
+
+			{currentIds.length > 0 && (
+				<div className="al-filterpopover__tags">
+					{currentIds.map((id) => (
+						<span className="al-filterpopover__tag" key={id}>
+							#{id.slice(-8)}
+							<button
+								type="button"
+								className="al-filterpopover__tag-remove"
+								onClick={() => removeId(id)}
+							>
+								×
+							</button>
+						</span>
+					))}
+				</div>
+			)}
+
+			{authSlugs.length > 1 && (
+				<ReactSelect
+					onChange={(selected) => {
+						const opt = selected as SelectOption | null
+						setSelectedCollection(opt?.value ?? '')
+					}}
+					options={collectionOptions}
+					placeholder={t(keys.selectCollectionPlaceholder)}
+					value={collectionOptions.find((o) => o.value === selectedCollection) ?? undefined}
+				/>
+			)}
+
+			{activeCollection && (
+				<PayloadDocSelect
+					collection={activeCollection}
+					onSelect={addId}
+					titleField={userTitleFields[activeCollection] ?? 'id'}
+				/>
+			)}
+
+			<div className="al-filterpopover__divider">{t(keys.orEnterId)}</div>
+			<div className="al-filterpopover__input-row">
+				<div className="field-type text" style={{ flex: '1 1 auto' }}>
+					<div className="field-type__wrap">
+						<input
+							// biome-ignore lint/a11y/noAutofocus: the input lives in a filter popup opened by an explicit user action, so focus follows the interaction rather than page load
+							autoFocus={authSlugs.length === 0}
+							onChange={(e) => setManualId(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter') commitManual()
+								if (e.key === 'Escape') onClose()
+							}}
+							placeholder={t(keys.userIdPlaceholder)}
+							type="text"
+							value={manualId}
+						/>
+					</div>
+				</div>
+				<Button buttonStyle="primary" margin={false} onClick={commitManual}>
+					{t(keys.add)}
+				</Button>
+			</div>
+
+			{currentIds.length > 0 && (
+				<div className="al-filterpopover__actions">
+					<Button margin={false} onClick={onClose}>
+						{t(keys.done)}
+					</Button>
+				</div>
+			)}
+		</div>
+	)
+}

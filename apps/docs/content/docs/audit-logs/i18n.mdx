@@ -1,0 +1,49 @@
+---
+title: i18n
+description: Override or localize the strings in the audit log view.
+---
+
+Every admin-facing string, the view title, the filter labels, the operation badges, the empty state, is a typed translation under the `auditLogs:` namespace. English, German and Ukrainian ship built in.
+
+Override or add a locale through the `translations` option:
+
+```ts title="payload.config.ts"
+import { auditLogs } from '@10x-media/audit-logs'
+import { keys } from '@10x-media/audit-logs/i18n'
+
+auditLogs({
+  collections: { posts: true },
+  translations: {
+    en: { [keys.title]: 'Change history' },
+    fr: {
+      [keys.title]: 'Historique des modifications',
+      [keys.filterUser]: 'Utilisateur',
+    },
+  },
+})
+```
+
+Overrides are merged per key, so naming one leaves the rest of that locale alone. A locale nobody shipped is simply added.
+
+`@10x-media/audit-logs/i18n` exports `keys`, the built-in `translations`, and the `TranslationKey` / `TranslationsOption` types. Misspell a key and the build fails, which is the point of the constant.
+
+## Field labels are not translations
+
+The `createdBy` and `lastModifiedBy` labels are Payload field labels, not plugin strings, so they go through Payload's own mechanism:
+
+```ts title="payload.config.ts"
+auditLogs({
+  defaults: {
+    createdBy: { label: { en: 'Created by', de: 'Erstellt von' } },
+    lastModifiedBy: { label: { en: 'Modified by', de: 'Geändert von' } },
+  },
+})
+```
+
+The same applies per collection through `auditFields.createdBy.label`.
+
+## What is not translated
+
+Values, not chrome. A collection slug, a changed path, a document id, an event type you invented for a custom event: all of them render as they are stored. They are data, and translating them would make the log disagree with the database.
+
+For merge order, adding locales, and app-level overrides, see [Translations](/concepts/translations). The pattern is identical in every plugin here.

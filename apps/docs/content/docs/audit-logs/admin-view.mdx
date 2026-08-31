@@ -1,0 +1,143 @@
+---
+title: Admin view
+description: The browsable log at /admin/audit-logs, its filters, and how to scope or re-mount it.
+---
+
+The plugin registers a custom admin view at `/admin/audit-logs`. It lists entries newest first, one row per entry, and expands a row to show its diff, snapshot, metadata and request details.
+
+The `audit-logs` collection itself is hidden from the navigation by default. The view is a better reading surface than a generic list: it renders the diff as a table rather than a JSON blob, and its filters know about the fields entries actually have. Set `logs.hidden: false` if you want the raw documents too.
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    view: {
+      path: '/audit-logs',
+      defaultLimit: 25,
+      access: ({ req }) => Boolean(req.user),
+    },
+  },
+})
+```
+
+Pass `view: false` to skip mounting it.
+
+## Filters
+
+Filters live in the URL, so any view state is a link you can share or bookmark.
+
+| Filter | Notes |
+|---|---|
+| Operation | Multi-select: create, update, delete, auth, custom. |
+| Collection | Multi-select over your collection slugs. |
+| Global | Multi-select over your global slugs. |
+| User | Search existing users, or paste an id, which is how you find the work of a deleted account. |
+| Event type | Auth sub-types (`login`, `forgot_password`) and your custom event identifiers. |
+| Changed path | Entries where one specific field changed. Backed by the index on `changedPaths`. |
+| Group | Present when `logs.group` is enabled. |
+| Date range | From and to. |
+
+An expanded row also links to the document the entry is about, and, when the entry has a group, to every other entry sharing it.
+
+## Two kinds of access
+
+`logs.view.access` decides who can open the view. It returns a boolean and receives only `req`, so it cannot narrow which entries are visible.
+
+`logs.access` governs the collection's REST and GraphQL endpoints and is unrelated. It denies everything by default:
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    view: { access: ({ req }) => req.user?.role === 'admin' },
+    access: { read: ({ req }) => req.user?.role === 'admin' },
+  },
+})
+```
+
+The plugin's own writes never go through access control, so tightening either of these stops reads, never recording.
+
+### Being turned away
+
+Payload skips its own auth redirect for custom admin views, so the plugin does it: opening the view without a session sends you to the login page, and opening it while signed in without permission sends you to the unauthorized page. Signing in returns you to the view with your filters intact, because the path and its query string travel along in `redirect`.
+
+## Scoping the view
+
+To narrow what a view can ever show, use `forceWhere`. It is merged with `AND` into every request the view makes and the user cannot remove it:
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    view: { forceWhere: { relationTo: { equals: 'orders' } } },
+  },
+})
+```
+
+That is a lock, not a default filter. For a starting filter the user can clear, link to the view with query parameters instead.
+
+## Mounting more than one
+
+`forceWhere` on `logs.view` configures the single built-in view. For several scoped views, or per-view access, mount the component yourself as an ordinary Payload admin view:
+
+```ts title="payload.config.ts"
+export default buildConfig({
+  admin: {
+    components: {
+      views: {
+        ordersAudit: {
+          Component: {
+            path: '@10x-media/audit-logs/rsc#AuditLogsView',
+            serverProps: {
+              pluginOptions,
+              forceWhere: { relationTo: { equals: 'orders' } },
+            },
+          },
+          path: '/audit-logs-orders',
+        },
+      },
+    },
+  },
+})
+```
+
+`pluginOptions` must be the same object you passed to `auditLogs()`: the view reads `logs.view` and `multiTenancy` out of it.
+
+A tenant-scoped view is registered for you when multi-tenancy is on. See [multi-tenancy](/audit-logs/multi-tenancy).
+
+## Debug buttons
+
+With `debug: true` and `retention` configured, the view grows two buttons that queue the archive and delete jobs immediately instead of waiting for their cron. They post to an endpoint the plugin mounts only under `debug`, and any logged-in user can press them, so keep it out of production.
+
+## Changing the collection
+
+`logs.override` receives the fully built `audit-logs` collection and returns your version. The slug is forced back afterwards, because the hooks, the view and the jobs all address it by name.
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    override: (collection) => ({
+      ...collection,
+      fields: [...collection.fields, { name: 'source', type: 'text' }],
+      hooks: {
+        ...collection.hooks,
+        afterChange: [
+          ...(collection.hooks?.afterChange ?? []),
+          async ({ doc }) => forwardToSiem(doc),
+        ],
+      },
+    }),
+  },
+})
+```
+
+<Callout type="warn">
+Removing a built-in field will not break writing: the entry is stored without it, on both adapters. It will break reading. Drop `changedPaths` and the changed-path filter goes with it, along with every query that depends on the index.
+</Callout>
+
+## How entries are written
+
+Entries normally go straight to the database adapter (`payload.db.create`) rather than through `payload.create`. The pipeline exists to validate input, check access and run hooks, and an audit entry needs none of that: the plugin builds every field itself, and the collection ships with no hooks of its own.
+
+That changes if your `override` attaches hooks. A direct write would skip them, so the plugin checks the finished collection for hooks and falls back to `payload.create` when it finds any. You do not configure this, and the example above keeps working.
+
+The gap is worth the branch. Over 200 000 documents on Mongo the audit overhead per document was a third of the pipeline's, and over 100 000 on Postgres it was under half. Memory matters more: the same runs through the pipeline retained 178 MB and 119 MB after a forced collection, writing directly retained under 2 MB. On a long migration that growth is what breaks first, well before write speed does.
+
+`createAuditEvent` always takes the pipeline. It is one deliberate call per business event rather than a hot path, so hooks firing there is what a host expects.
