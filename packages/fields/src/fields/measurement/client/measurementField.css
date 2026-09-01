@@ -177,7 +177,7 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 }
 
 .fields-measurement__unit-symbol {
-	color: var(--theme-elevation-500);
+	color: var(--theme-elevation-800);
 	font-size: 0.75rem;
 	text-transform: uppercase;
 }

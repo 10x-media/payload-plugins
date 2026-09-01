@@ -88,12 +88,28 @@ test.describe('measurement field', () => {
 		await pickUnit(page, 'weight', /^kg$/i)
 	})
 
-	// color-contrast is disabled: the unit badge/suffix ride the core elevation-500
-	// token for Payload's native secondary-text look, and Payload's own field
-	// description carries the same sub-threshold contrast independent of this plugin.
-	// color.e2e.spec.ts documents the identical tradeoff for its closed-row format
-	// badge. This guards structural a11y (roles, names) across every measurement field.
-	test('has no serious structural axe violations on the edit view', async ({ page }) => {
+	test('open unit panel has no serious or critical axe violations', async ({ page }) => {
+		await openShowcaseDoc(page)
+		await unitBadge(page, 'weight').click()
+		const panel = page.locator('.fields-measurement__unit-panel:visible')
+		await expect(panel).toBeVisible()
+		const results = await new AxeBuilder({ page })
+			.include('.fields-measurement__unit-panel')
+			.analyze()
+		const blocking = results.violations.filter(
+			(v) => v.impact === 'serious' || v.impact === 'critical'
+		)
+		expect(blocking).toEqual([])
+	})
+
+	// color-contrast is disabled: the closed row's only sub-threshold text is the small
+	// uppercase unit badge and compound suffix, styled with a core elevation token the
+	// plugin adopts for Payload's native look. This guards the closed row's structural
+	// a11y (roles, names); the open-panel scan above keeps color-contrast enforced on
+	// plugin-owned surfaces.
+	test('closed measurement field has no serious or critical structural axe violations', async ({
+		page,
+	}) => {
 		await openShowcaseDoc(page)
 		const results = await new AxeBuilder({ page })
 			.include('.fields-measurement')
