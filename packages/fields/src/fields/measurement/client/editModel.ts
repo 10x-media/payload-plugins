@@ -1,6 +1,7 @@
 import { convert, roundTo } from '../engine/convert'
 import { compose, decompose } from '../engine/format'
 import {
+	COMPOUNDS,
 	isCompoundUnit,
 	precisionFor,
 	type ScalarUnitId,
@@ -49,7 +50,9 @@ export const commitDrafts = (
 	const primary = parseDraft(drafts.primary)
 	if (primary === null) return null
 	if (isCompoundUnit(opts.displayUnit)) {
-		const minor = parseDraft(drafts.minor) ?? 0
+		const rawMinor = parseDraft(drafts.minor) ?? 0
+		const maxMinor = COMPOUNDS[opts.displayUnit].ratio - 0.001
+		const minor = Math.min(Math.max(rawMinor, 0), maxMinor)
 		return roundTo(
 			compose({ major: primary, minor }, opts.displayUnit, opts.storageUnit),
 			STORAGE_FRACTION_DIGITS

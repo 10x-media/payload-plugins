@@ -54,6 +54,16 @@ describe('commitDrafts', () => {
 		const drafts = draftsFor(81.646627, { displayUnit: 'lb', storageUnit: 'kg' })
 		expect(commitDrafts(drafts, { displayUnit: 'lb', storageUnit: 'kg' })).toBe(81.646627)
 	})
+	it('clamps an out-of-range minor to the unit ceiling before composing', () => {
+		expect(
+			commitDrafts({ minor: '24', primary: '5' }, { displayUnit: 'ft-in', storageUnit: 'cm' })
+		).toBeCloseTo(182.87746, 5)
+	})
+	it('clamps a negative minor to zero', () => {
+		expect(
+			commitDrafts({ minor: '-5', primary: '5' }, { displayUnit: 'ft-in', storageUnit: 'cm' })
+		).toBeCloseTo(152.4, 4)
+	})
 })
 
 describe('resolveDisplayUnit', () => {

@@ -219,6 +219,8 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 								aria-label={UNITS[compoundDef.minor].shortLabel}
 								className={`${baseClass}__input ${baseClass}__input--minor`}
 								inputMode="decimal"
+								max={compoundDef.ratio - 0.001}
+								min={0}
 								onBlur={onBlur}
 								onChange={onDraftChange('minor')}
 								readOnly={isReadOnly}
