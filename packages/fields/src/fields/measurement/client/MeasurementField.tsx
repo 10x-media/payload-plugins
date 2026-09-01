@@ -70,16 +70,19 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		units,
 	})
 
+	const fmtBound = useCallback(
+		(bound: number) => formatMeasurement(bound, { displayUnit, locale, precision, storageUnit }),
+		[displayUnit, locale, precision, storageUnit]
+	)
+
 	const memoizedValidate = useCallback<Validate<number | null | undefined>>(
 		(value, options) => {
 			if (typeof value === 'number' && !Number.isNaN(value)) {
-				const fmt = (bound: number) =>
-					formatMeasurement(bound, { displayUnit, locale, precision, storageUnit })
 				if (typeof min === 'number' && value < min) {
-					return t(keys.measurementBelowMin, { min: fmt(min) })
+					return t(keys.measurementBelowMin, { min: fmtBound(min) })
 				}
 				if (typeof max === 'number' && value > max) {
-					return t(keys.measurementAboveMax, { max: fmt(max) })
+					return t(keys.measurementAboveMax, { max: fmtBound(max) })
 				}
 			}
 			return number(value, {
@@ -91,7 +94,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 				type: 'number',
 			} as Parameters<typeof number>[1])
 		},
-		[displayUnit, locale, max, min, name, precision, required, storageUnit, t]
+		[fmtBound, max, min, name, required, t]
 	)
 
 	const {
@@ -112,6 +115,22 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		() => ({ displayUnit, precision, storageUnit }),
 		[displayUnit, precision, storageUnit]
 	)
+
+	// Payload's server-driven form-state refresh (conditional-logic revalidation on
+	// every change) can replace this field's errorMessage with the server's raw,
+	// storage-unit message before our own throttled client validate lands. Compute
+	// the unit-aware bound message independently and pass it straight to FieldError
+	// so display never depends on winning that race.
+	const boundsMessage = useMemo(() => {
+		if (numericValue === null) return undefined
+		if (typeof min === 'number' && numericValue < min) {
+			return t(keys.measurementBelowMin, { min: fmtBound(min) })
+		}
+		if (typeof max === 'number' && numericValue > max) {
+			return t(keys.measurementAboveMax, { max: fmtBound(max) })
+		}
+		return undefined
+	}, [numericValue, min, max, fmtBound, t])
 
 	const editingRef = useRef(false)
 	const [drafts, setDrafts] = useState<MeasurementDrafts>(() => draftsFor(numericValue, unitOpts))
@@ -176,7 +195,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 			<div className={`${fieldBaseClass}__wrap`}>
 				<RenderCustomComponent
 					CustomComponent={ErrorComponent}
-					Fallback={<FieldError path={path} showError={showError} />}
+					Fallback={<FieldError message={boundsMessage} path={path} showError={showError} />}
 				/>
 				{BeforeInput}
 				<div className={`${baseClass}__container`}>

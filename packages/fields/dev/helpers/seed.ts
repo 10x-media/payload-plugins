@@ -99,6 +99,30 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		}
 	}
 
+	const measurementCount = await payload.count({ collection: 'measurements' })
+	if (measurementCount.totalDocs === 0) {
+		await payload.create({
+			collection: 'measurements',
+			data: {
+				title: 'Showcase',
+				boundedWeight: 95.5,
+				distance: 42.195,
+				height: 180.34,
+				kgOnly: 70,
+				load: 20,
+				localizedDistance: 5,
+				poundsFirst: 81.646627,
+				readOnlyWeight: 81.646627,
+				speed: 37.5,
+				temperature: 36.6,
+				volume: 0.75,
+				weight: 81.646627,
+				wingspan: 183,
+			},
+		})
+		payload.logger.info('Seeded measurement showcase document')
+	}
+
 	const encryptedCount = await payload.count({ collection: 'encrypted' })
 	if (encryptedCount.totalDocs === 0) {
 		await payload.create({

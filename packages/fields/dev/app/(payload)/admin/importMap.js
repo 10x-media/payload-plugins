@@ -29,7 +29,10 @@ import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0
 import { ProtectedRichText as ProtectedRichText_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { IconCell as IconCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { IconFieldServer as IconFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { MeasurementCell as MeasurementCell_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
+import { MeasurementFieldServer as MeasurementFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { IconLibrarySelectServer as IconLibrarySelectServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { MeasurementUnitsProvider as MeasurementUnitsProvider_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { LucideAdapterIcon as LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
 import { LucideAdapterAssets as LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
@@ -77,7 +80,10 @@ export const importMap = {
   "@10x-media/fields/rsc#ProtectedRichText": ProtectedRichText_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#IconCell": IconCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#IconFieldServer": IconFieldServer_cf1583332d9c5fb967cd4249af29ce12,
+  "@10x-media/fields/client#MeasurementCell": MeasurementCell_02043ee4f38853ef8c4ef9fd50352514,
+  "@10x-media/fields/rsc#MeasurementFieldServer": MeasurementFieldServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#IconLibrarySelectServer": IconLibrarySelectServer_cf1583332d9c5fb967cd4249af29ce12,
+  "@10x-media/fields/client#MeasurementUnitsProvider": MeasurementUnitsProvider_02043ee4f38853ef8c4ef9fd50352514,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon": LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087,
   "@10x-media/fields/icon/adapters/lucide#LucideAdapterAssets": LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087,
