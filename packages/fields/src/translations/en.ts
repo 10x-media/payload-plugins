@@ -49,4 +49,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.generateValue]: 'Generate new value',
 	[keys.writeOnlyValue]: 'Write-only encrypted value',
 	[keys.secretNotSet]: 'Not set',
+	[keys.selectUnit]: 'Select unit',
+	[keys.measurementBelowMin]: 'Must be at least {{min}}',
+	[keys.measurementAboveMax]: 'Must be no more than {{max}}',
 }

@@ -50,4 +50,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.generateValue]: 'Neuen Wert generieren',
 	[keys.writeOnlyValue]: 'Nur schreibbarer verschlüsselter Wert',
 	[keys.secretNotSet]: 'Nicht gesetzt',
+	[keys.selectUnit]: 'Einheit wählen',
+	[keys.measurementBelowMin]: 'Muss mindestens {{min}} sein',
+	[keys.measurementAboveMax]: 'Darf höchstens {{max}} sein',
 }

@@ -1,4 +1,6 @@
 import type { Payload, PayloadRequest, StaticLabel } from 'payload'
+import type { UnitId } from './fields/measurement/engine/units'
+import type { MeasurementUsage } from './fields/measurement/engine/usages'
 
 /** Args passed to async per-document resolvers (color presets, icon availability). */
 export type FieldsResolverArgs = {
@@ -223,9 +225,15 @@ export type EncryptedGlobalConfig = {
 	onDecryptFailure?: DecryptFailurePolicy
 }
 
+/** Plugin-level defaults for measurementField(). Per-field options always win. */
+export type MeasurementGlobalConfig = {
+	defaultUnits?: Partial<Record<MeasurementUsage, UnitId>>
+}
+
 /** Normalized plugin options written to `config.custom['@10x-media/fields']`. */
 export type FieldsPluginRegistry = {
 	color?: ColorGlobalConfig
 	icon?: IconGlobalConfig
 	encrypted?: EncryptedGlobalConfig
+	measurement?: MeasurementGlobalConfig
 }
