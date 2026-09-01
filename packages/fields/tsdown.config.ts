@@ -16,6 +16,8 @@ export default definePluginBuild({
 		'exports/icon-adapters/radix': 'src/exports/icon-adapters/radix.ts',
 		'exports/icon-adapters/tabler': 'src/exports/icon-adapters/tabler.ts',
 		'exports/encrypted': 'src/exports/encrypted.ts',
+		'exports/measurement': 'src/exports/measurement.ts',
+		'exports/measurement-utils': 'src/exports/measurement-utils.ts',
 	},
 	copy: [
 		{ from: 'src/fields/color/client/colorField.css', to: 'dist/fields/color/client' },
@@ -24,6 +26,14 @@ export default definePluginBuild({
 		{
 			from: 'src/fields/encrypted/components/ProtectedField.css',
 			to: 'dist/fields/encrypted/components',
+		},
+		{
+			from: 'src/fields/measurement/client/measurementField.css',
+			to: 'dist/fields/measurement/client',
+		},
+		{
+			from: 'src/fields/measurement/client/measurementCell.css',
+			to: 'dist/fields/measurement/client',
 		},
 	],
 })

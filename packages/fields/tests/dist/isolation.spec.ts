@@ -11,7 +11,7 @@ if (process.env.REQUIRE_DIST === '1' && !hasDist) {
 	throw new Error('dist/ not found. Run `pnpm build fields` before `pnpm --filter @10x-media/fields test:dist`.')
 }
 
-type Family = 'color' | 'icon' | 'encrypted'
+type Family = 'color' | 'icon' | 'encrypted' | 'measurement'
 
 const familyEntries: Record<Family, string[]> = {
 	color: ['exports/color.js', 'exports/color-utils.js'],
@@ -24,6 +24,7 @@ const familyEntries: Record<Family, string[]> = {
 		'exports/icon-adapters/tabler.js',
 	],
 	encrypted: ['exports/encrypted.js'],
+	measurement: ['exports/measurement.js', 'exports/measurement-utils.js'],
 }
 
 const sharedEntries = [
@@ -34,7 +35,7 @@ const sharedEntries = [
 	'exports/i18n.js',
 ]
 
-const allFamilies: Family[] = ['color', 'icon', 'encrypted']
+const allFamilies: Family[] = ['color', 'icon', 'encrypted', 'measurement']
 
 /** Families whose engine has landed under dist/fields/<family>; grows as families ship. */
 const familiesWithSource: Family[] = allFamilies
@@ -156,6 +157,15 @@ describe.skipIf(!hasDist)('dist bundle isolation', () => {
 
 	it('frontend-safe color utils stay dependency-free of admin code', () => {
 		const offenders = [...importGraph('exports/color-utils.js')].filter(
+			(file) =>
+				file.startsWith(join(distDir, 'plugin') + sep) ||
+				file.startsWith(join(distDir, 'translations') + sep)
+		)
+		expect(offenders).toEqual([])
+	})
+
+	it('frontend-safe measurement utils stay dependency-free of admin code', () => {
+		const offenders = [...importGraph('exports/measurement-utils.js')].filter(
 			(file) =>
 				file.startsWith(join(distDir, 'plugin') + sep) ||
 				file.startsWith(join(distDir, 'translations') + sep)
