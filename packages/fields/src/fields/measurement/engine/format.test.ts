@@ -18,6 +18,15 @@ describe('decompose/compose', () => {
 		expect(decompose(0, 'cm', 'ft-in')).toEqual({ major: 0, minor: 0 })
 		expect(decompose(20, 'cm', 'ft-in')).toEqual({ major: 0, minor: 8 })
 	})
+	it('applies the sign to both compound parts and round-trips', () => {
+		expect(decompose(-200, 'cm', 'ft-in')).toEqual({ major: -6, minor: -7 })
+		expect(compose({ major: -6, minor: -7 }, 'ft-in', 'cm')).toBeCloseTo(-200.66, 2)
+	})
+	it('never emits negative zero', () => {
+		const parts = decompose(-20, 'cm', 'ft-in')
+		expect(parts).toEqual({ major: 0, minor: -8 })
+		expect(Object.is(parts.major, -0)).toBe(false)
+	})
 })
 
 describe('formatMeasurement', () => {

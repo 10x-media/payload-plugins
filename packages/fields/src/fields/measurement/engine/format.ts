@@ -35,7 +35,7 @@ export const decompose = (
 	const totalMinor = roundTo(Math.abs(convert(value, from, def.minor)), digits)
 	const major = Math.floor(totalMinor / def.ratio)
 	const minor = roundTo(totalMinor - major * def.ratio, digits)
-	return { major: sign * major, minor: sign === -1 && major === 0 ? sign * minor : minor }
+	return { major: sign * major + 0, minor: sign * minor + 0 }
 }
 
 export const compose = (
