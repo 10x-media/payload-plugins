@@ -68,4 +68,18 @@ describe('measurementField factory', () => {
 			measurementField({ defaultUnit: 'm', units: ['cm', 'ft-in'], usage: 'personHeight' })
 		).toThrow(/defaultUnit/i)
 	})
+	it('throws on a non-integer or out-of-range precision override', () => {
+		expect(() => measurementField({ precision: { kg: 1.5 }, usage: 'bodyWeight' })).toThrow(
+			/precision/i
+		)
+		expect(() => measurementField({ precision: { kg: -1 }, usage: 'bodyWeight' })).toThrow(
+			/precision/i
+		)
+		expect(() => measurementField({ precision: { kg: 101 }, usage: 'bodyWeight' })).toThrow(
+			/precision/i
+		)
+	})
+	it('accepts an in-range precision override', () => {
+		expect(() => measurementField({ precision: { kg: 3 }, usage: 'bodyWeight' })).not.toThrow()
+	})
 })

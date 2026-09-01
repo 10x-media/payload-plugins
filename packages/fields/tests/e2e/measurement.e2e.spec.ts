@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, type Page, test } from '@playwright/test'
+import { MEASUREMENT_PREFERENCE_KEY } from '../../src/exports/measurement'
 
 const FIXTURES = { collection: 'measurements', docTitle: 'Showcase' }
 
@@ -45,6 +46,12 @@ test.describe('measurement field', () => {
 		await login(page)
 	})
 
+	// Preference cleanup must survive a failing test, so it lives here rather
+	// than as trailing toggles inside each test.
+	test.afterEach(async ({ page }) => {
+		await page.request.delete(`/api/payload-preferences/${MEASUREMENT_PREFERENCE_KEY}`)
+	})
+
 	test('toggling one bodyWeight field flips its siblings and persists across reload', async ({
 		page,
 	}) => {
@@ -55,7 +62,6 @@ test.describe('measurement field', () => {
 		await expect(unitBadge(page, 'height')).not.toContainText(/lb/i)
 		await page.reload()
 		await expect(page.locator('#field-weight')).toHaveValue('180')
-		await pickUnit(page, 'weight', /^kg$/i)
 	})
 
 	test('compound ft-in entry stores canonical centimeters', async ({ page }) => {
@@ -75,7 +81,6 @@ test.describe('measurement field', () => {
 		const res = await page.request.get(`/api/${FIXTURES.collection}/${id}`)
 		const doc = (await res.json()) as { height: number }
 		expect(doc.height).toBeCloseTo(187.96, 1)
-		await pickUnit(page, 'height', /^cm$/i)
 	})
 
 	test('list cells render the preferred unit', async ({ page }) => {
@@ -84,8 +89,6 @@ test.describe('measurement field', () => {
 		const columns = encodeURIComponent(JSON.stringify(['title', 'weight']))
 		await page.goto(`/admin/collections/${FIXTURES.collection}?columns=${columns}`)
 		await expect(page.locator('.fields-measurement-cell').first()).toContainText(/lb/i)
-		await openShowcaseDoc(page)
-		await pickUnit(page, 'weight', /^kg$/i)
 	})
 
 	test('open unit panel has no serious or critical axe violations', async ({ page }) => {

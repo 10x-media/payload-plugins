@@ -92,8 +92,9 @@ export const COMPOUNDS: Record<CompoundUnitId, CompoundDef> = {
 	'st-lb': { major: 'st', minor: 'lb', ratio: 14 },
 }
 
-export const isCompoundUnit = (unit: UnitId): unit is CompoundUnitId => unit in COMPOUNDS
-export const isScalarUnit = (unit: string): unit is ScalarUnitId => unit in UNITS
+export const isCompoundUnit = (unit: UnitId): unit is CompoundUnitId =>
+	Object.hasOwn(COMPOUNDS, unit)
+export const isScalarUnit = (unit: string): unit is ScalarUnitId => Object.hasOwn(UNITS, unit)
 
 export const dimensionOf = (unit: UnitId): Dimension =>
 	isCompoundUnit(unit) ? UNITS[COMPOUNDS[unit].major].dimension : UNITS[unit].dimension

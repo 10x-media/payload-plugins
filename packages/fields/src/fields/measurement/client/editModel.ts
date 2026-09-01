@@ -52,7 +52,10 @@ export const commitDrafts = (
 	if (isCompoundUnit(opts.displayUnit)) {
 		const rawMinor = parseDraft(drafts.minor) ?? 0
 		const maxMinor = COMPOUNDS[opts.displayUnit].ratio - 0.001
-		const minor = Math.min(Math.max(rawMinor, 0), maxMinor)
+		// Clamp the magnitude only: decompose is sign-safe and negative drafts
+		// carry the sign on both parts, so zeroing a negative minor would corrupt
+		// the round-trip.
+		const minor = Math.sign(rawMinor) * Math.min(Math.abs(rawMinor), maxMinor)
 		return roundTo(
 			compose({ major: primary, minor }, opts.displayUnit, opts.storageUnit),
 			STORAGE_FRACTION_DIGITS

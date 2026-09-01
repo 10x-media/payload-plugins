@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { formatMeasurement, unitLabel } from '../engine/format'
-import { COMPOUNDS, isCompoundUnit, UNITS, type UnitId } from '../engine/units'
+import { COMPOUNDS, isCompoundUnit, type UnitId } from '../engine/units'
 import { resolveUnitForLocale } from '../engine/usages'
 import type { MeasurementResolvedClientOptions } from '../options'
 import { commitDrafts, draftsFor, type MeasurementDrafts, resolveDisplayUnit } from './editModel'
@@ -209,14 +209,15 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 								onBlur={onBlur}
 								onChange={onDraftChange('primary')}
 								readOnly={isReadOnly}
+								step="any"
 								type="number"
 								value={drafts.primary}
 							/>
 							<span aria-hidden="true" className={`${baseClass}__suffix`}>
-								{UNITS[compoundDef.major].shortLabel}
+								{unitLabel(compoundDef.major, locale, 'short')}
 							</span>
 							<input
-								aria-label={UNITS[compoundDef.minor].shortLabel}
+								aria-label={unitLabel(compoundDef.minor, locale, 'long')}
 								className={`${baseClass}__input ${baseClass}__input--minor`}
 								inputMode="decimal"
 								max={compoundDef.ratio - 0.001}
@@ -224,11 +225,12 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 								onBlur={onBlur}
 								onChange={onDraftChange('minor')}
 								readOnly={isReadOnly}
+								step="any"
 								type="number"
 								value={drafts.minor}
 							/>
 							<span aria-hidden="true" className={`${baseClass}__suffix`}>
-								{UNITS[compoundDef.minor].shortLabel}
+								{unitLabel(compoundDef.minor, locale, 'short')}
 							</span>
 						</span>
 					) : (

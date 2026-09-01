@@ -56,6 +56,15 @@ export const measurementField = (options: MeasurementFieldOptions): NumberField 
 			`measurementField(${name}): defaultUnit "${defaultUnit}" is not in this field's units (${units.join(', ')})`
 		)
 	}
+	for (const [unit, digits] of Object.entries(precision ?? {})) {
+		// Intl.NumberFormat rejects out-of-range maximumFractionDigits at render
+		// time; fail at config time instead.
+		if (!Number.isInteger(digits) || digits < 0 || digits > 100) {
+			throw new Error(
+				`measurementField(${name}): precision for "${unit}" must be an integer between 0 and 100, got ${digits}`
+			)
+		}
+	}
 
 	const measurementOptions: MeasurementClientOptions = {
 		storageUnit,

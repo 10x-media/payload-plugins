@@ -21,8 +21,7 @@ export const MeasurementCell: React.FC<MeasurementCellProps> = (props) => {
 	const { i18n } = useTranslation()
 	const context = useMeasurementUnits()
 	const [localeUnit, setLocaleUnit] = useState<UnitId | null>(null)
-	// Gated on the provider so cells without the plugin stay deterministic on
-	// the field default instead of flipping per browser locale like the edit view does.
+	// Gated on the provider: plugin-less cells stay on the field default, not the browser locale.
 	useEffect(() => {
 		if (context) setLocaleUnit(resolveUnitForLocale(navigator.language, usage))
 	}, [usage, context])

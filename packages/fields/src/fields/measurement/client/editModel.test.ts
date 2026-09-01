@@ -59,10 +59,16 @@ describe('commitDrafts', () => {
 			commitDrafts({ minor: '24', primary: '5' }, { displayUnit: 'ft-in', storageUnit: 'cm' })
 		).toBeCloseTo(182.87746, 5)
 	})
-	it('clamps a negative minor to zero', () => {
+	it('round-trips a negative compound value', () => {
+		const opts = { displayUnit: 'ft-in', storageUnit: 'cm' } as const
+		const drafts = draftsFor(-200.66, opts)
+		expect(drafts).toEqual({ minor: '-7', primary: '-6' })
+		expect(commitDrafts(drafts, opts)).toBeCloseTo(-200.66, 6)
+	})
+	it('clamps a negative minor magnitude to the unit ceiling', () => {
 		expect(
-			commitDrafts({ minor: '-5', primary: '5' }, { displayUnit: 'ft-in', storageUnit: 'cm' })
-		).toBeCloseTo(152.4, 4)
+			commitDrafts({ minor: '-24', primary: '-5' }, { displayUnit: 'ft-in', storageUnit: 'cm' })
+		).toBeCloseTo(-182.87746, 5)
 	})
 })
 
