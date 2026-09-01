@@ -63,7 +63,7 @@ Setting `defaultUnit` on a field (or `defaultUnits` for a usage in the plugin) i
 ## Limitations
 
 - The list view's filter input operates in storage units. Payload passes custom `Filter` components no props at all, so there is no viewer, locale, or preference to convert against; filtering "under 150" on a `personHeight` field filters on centimeters even for a viewer displaying feet and inches.
-- `fields({ measurement: { defaultUnits } })` reaches the edit view (resolved per request, server-side) but not the list view's cell, which falls back to the viewer's preference and then locale detection only.
+- `fields({ measurement: { defaultUnits } })` reaches the edit view (resolved per request, server-side) but not the list view's cell, which falls back to the viewer's preference, then the field's own `defaultUnit`, then locale detection.
 
 The list view cell renders the stored value converted to the resolved display unit.
 
