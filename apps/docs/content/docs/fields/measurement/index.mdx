@@ -1,0 +1,72 @@
+---
+title: Measurement field
+description: A number field that stores one canonical unit and lets every viewer edit and read in their own.
+---
+
+```ts
+import { measurementField } from '@10x-media/fields/measurement'
+
+measurementField({
+  usage: 'bodyWeight',          // preference bucket and unit family; drives every other default below
+  name: 'weight',                // defaults per usage: bodyWeight 'weight', personHeight 'height', distance 'distance', else the usage name
+  storageUnit: 'kg',             // unit the number is stored in; match existing data for zero-migration adoption
+  units: ['kg', 'lb', 'st-lb'],   // curated subset of the usage's selectable units; defaults to all of them
+  defaultUnit: 'kg',             // display fallback with no saved viewer preference; set explicitly, it suppresses locale detection
+  precision: { lb: 1 },          // per-unit display fraction digits, overriding the engine defaults
+  min: 20,                       // bounds in the storage unit, enforced by Payload's native number validation
+  max: 300,
+  label: 'Body weight',
+  required: true,
+  localized: false,
+  index: false,
+  overrides: ({ field }) => field,
+})
+```
+
+Eight usages ship built in: `bodyWeight` (kg, lb, st-lb), `personHeight` (cm, m, in, ft-in), `distance` (m, km, mi), `mass` (g, kg, oz, lb), `length` (mm, cm, m, km, in, ft, yd, mi), `volume` (ml, l, fl-oz, gal), `temperature` (c, f), `speed` (km/h, mph, m/s).
+
+## What's stored
+
+The field is a plain `number` column holding a canonical value in `storageUnit`, so it sorts, filters, and groups like any other number and needs no custom query logic. To adopt on an existing numeric column, set `storageUnit` to whatever unit that column already holds: no migration, no data rewrite. Storage is rounded to 6 fraction digits regardless of display precision.
+
+## The row and the unit menu
+
+The field row is a constant 40px: a numeric input plus a unit badge. With more than one selectable `unit`, the badge opens a popup listing every unit in `units`; picking one converts the displayed value in place, and the stored number is unaffected until the next edit. Changing a unit on one field changes every field sharing that usage on the page, because the preference is per usage, not per field.
+
+The picked unit persists to the viewer's own [payload-preferences](https://payloadcms.com/docs/admin/preferences) under one shared key, so it follows that editor across devices and sessions. Display unit resolves in this order:
+
+1. The viewer's saved preference for the field's `usage`.
+2. The field's own `defaultUnit`.
+3. The plugin's `fields({ measurement: { defaultUnits } })` for that `usage`.
+4. Locale detection from the browser's language: imperial for US and Liberia, UK units (stone and pounds for body weight) for Great Britain and Myanmar, metric everywhere else.
+5. Metric, as the final fallback.
+
+Setting `defaultUnit` on a field (or `defaultUnits` for a usage in the plugin) is an explicit choice and skips locale detection entirely, since it always wins over step 4. Leave both unset on most fields so a UK visitor sees stone and pounds without any config.
+
+## Compound entry
+
+`personHeight` and `bodyWeight` include a compound display unit, `ft-in` and `st-lb`: two inputs, major and minor, joined by static unit suffixes. Compound units are display-only. Storage is always a single scalar number in `storageUnit`; picking `ft-in` never changes what's on disk, only how the value is split for editing.
+
+## Options
+
+| Option | Default | Notes |
+|---|---|---|
+| `usage` | required | Preference bucket and unit family; see the eight usages above. |
+| `name` | per usage (see snippet) | |
+| `storageUnit` | per usage's `defaultStorageUnit` | Must be a scalar unit of the usage's dimension. Match existing data to adopt with zero migration. |
+| `units` | every unit the usage allows | Subset shown in the unit menu; the first entry is the floor `resolveDisplayUnit` falls back to. |
+| `defaultUnit` | none | Field-level display fallback. Setting it suppresses locale detection. |
+| `precision` | engine defaults per unit | `Partial<Record<UnitId, number>>`, overriding individual units' display fraction digits. |
+| `min` / `max` | none | Bounds in the storage unit, enforced by Payload's native number validation. The edit view converts the message to the display unit. |
+| `overrides` | none | `({ field }) => field` escape hatch with explicit spreads. |
+
+## Limitations
+
+- The list view's filter input operates in storage units. Payload passes custom `Filter` components no props at all, so there is no viewer, locale, or preference to convert against; filtering "under 150" on a `personHeight` field filters on centimeters even for a viewer displaying feet and inches.
+- `fields({ measurement: { defaultUnits } })` reaches the edit view (resolved per request, server-side) but not the list view's cell, which falls back to the viewer's preference and then locale detection only.
+
+The list view cell renders the stored value converted to the resolved display unit.
+
+## Frontend use
+
+The stored value is a plain number in `storageUnit`; convert and format it for your frontend with [`/measurement/utils`](/fields/measurement/utils), the same engine the field runs.

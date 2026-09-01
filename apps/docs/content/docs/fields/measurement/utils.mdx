@@ -1,0 +1,108 @@
+---
+title: Measurement utilities
+description: The zero-dependency conversion and formatting engine behind the field, exported for frontend use.
+---
+
+`@10x-media/fields/measurement/utils` is the conversion and formatting engine the field itself runs, exported standalone. It has no Payload imports, so it is safe in any bundle: server, client, worker.
+
+```ts
+import {
+  convert,
+  formatMeasurement,
+  decompose,
+  compose,
+  resolveUnitForLocale,
+  unitLabel,
+  precisionFor,
+  USAGES,
+  UNITS,
+} from '@10x-media/fields/measurement/utils'
+```
+
+## Format
+
+```ts
+formatMeasurement(4.5359, {
+  storageUnit: 'kg',
+  displayUnit: 'lb',
+  locale: 'en-US',
+})
+// '10 lb'
+```
+
+`formatMeasurement(value, options)` converts a stored value from `storageUnit` to `displayUnit` and formats it with `Intl.NumberFormat`, so unit names and number formatting localize for free. `unitDisplay` (`'short'` default, `'long'`, `'narrow'`) controls the unit form; `precision` overrides display fraction digits per unit. Displaying a compound unit (`ft-in`, `st-lb`) formats both parts and joins them with `Intl.ListFormat`.
+
+## Convert
+
+```ts
+convert(100, 'cm', 'm')  // 1
+convert(0, 'c', 'f')     // 32
+```
+
+`convert(value, from, to)` converts between two scalar units of the same dimension via that dimension's canonical unit (kg, m, l, celsius, m/s). Converting across dimensions, `convert(1, 'kg', 'm')`, throws.
+
+## Compound values
+
+```ts
+decompose(180.34, 'cm', 'ft-in')  // { major: 5, minor: 11 } (5 ft 11 in)
+compose({ major: 5, minor: 11 }, 'ft-in', 'cm')  // 180.34
+```
+
+`decompose(value, from, compound, minorDigits?)` splits a stored scalar into a compound unit's major/minor parts, rounding the minor part before deriving the major so a value like 5 ft 11.996 in carries to 6 ft 0 in instead of printing an impossible 5 ft 12 in. `compose(parts, compound, to)` is the inverse, folding major/minor parts back into a single scalar in `to`.
+
+## Locale resolution
+
+```ts
+resolveUnitForLocale('en-US', 'bodyWeight')  // 'lb'
+resolveUnitForLocale('en-GB', 'bodyWeight')  // 'st-lb'
+resolveUnitForLocale('de-DE', 'bodyWeight')  // 'kg'
+```
+
+`resolveUnitForLocale(locale, usage)` maps a BCP 47 locale to a display unit for a usage, off a five-entry table vendored from CLDR supplemental measurement data (no shipped `Intl` API exposes it): US system for the US and Liberia, UK system for Great Britain and Myanmar, metric everywhere else. This is the same function the field itself calls for its locale-detection fallback.
+
+## Usages and units
+
+Every `usage` and the units it allows, plus the storage unit `measurementField` defaults to:
+
+| Usage | Dimension | Units | Default storage unit |
+|---|---|---|---|
+| `bodyWeight` | mass | kg, lb, st-lb | kg |
+| `personHeight` | length | cm, m, in, ft-in | cm |
+| `distance` | length | m, km, mi | km |
+| `mass` | mass | g, kg, oz, lb | kg |
+| `length` | length | mm, cm, m, km, in, ft, yd, mi | cm |
+| `volume` | volume | ml, l, fl-oz, gal | l |
+| `temperature` | temperature | c, f | c |
+| `speed` | speed | km/h, mph, m/s | km/h |
+
+`UNITS` carries each scalar unit's dimension, conversion factor, `Intl.NumberFormat` unit identifier, and short symbol:
+
+| Unit | Dimension | Short label |
+|---|---|---|
+| `g`, `kg` | mass | g, kg |
+| `oz`, `lb`, `st` | mass | oz, lb, st |
+| `mm`, `cm`, `m`, `km` | length | mm, cm, m, km |
+| `in`, `ft`, `yd`, `mi` | length | in, ft, yd, mi |
+| `ml`, `l` | volume | ml, l |
+| `fl-oz`, `gal` | volume | fl oz, gal |
+| `c`, `f` | temperature | °C, °F |
+| `km/h`, `mph`, `m/s` | speed | km/h, mph, m/s |
+
+`precisionFor(unit, overrides?)` returns a unit's display fraction digits, the same lookup `formatMeasurement` uses internally.
+
+## Frontend example
+
+Formatting an athlete's stored `weight` (kg, the `bodyWeight` storage unit) per visitor locale, in a Next.js server component:
+
+```tsx
+import { headers } from 'next/headers'
+import { formatMeasurement, resolveUnitForLocale } from '@10x-media/fields/measurement/utils'
+
+export const AthleteWeight = async ({ weight }: { weight: number }) => {
+  const locale = (await headers()).get('accept-language')?.split(',')[0] ?? 'en-US'
+  const displayUnit = resolveUnitForLocale(locale, 'bodyWeight')
+  return <span>{formatMeasurement(weight, { storageUnit: 'kg', displayUnit, locale })}</span>
+}
+```
+
+A US visitor reads "154 lb", a UK visitor "11 st 0 lb", everyone else "70 kg", all from the one stored `70`.
