@@ -1,0 +1,183 @@
+.fields-measurement {
+	position: relative;
+}
+
+/* Mirrors Payload's formInput mixin (packages/ui/src/scss/vars.scss) so the composite
+   container reads as one native text input; focus rides :focus-within.
+   Dimensions are static px on purpose: Payload compiles scss base() to literal px
+   (native inputs stay 40px tall at every breakpoint), while the runtime --base var
+   is rem-based and shrinks with the responsive html font-size. Deriving from
+   var(--base) made this container 3px shorter than native inputs at <=1024px. */
+.fields-measurement__container {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	width: 100%;
+	height: 40px;
+	padding: 0 8px 0 6px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	color: var(--theme-elevation-800);
+	font-family: var(--font-body);
+	font-size: 1rem;
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+	transition-property: border, box-shadow, background-color;
+	transition-duration: 100ms, 100ms, 500ms;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+.fields-measurement__container:hover {
+	border-color: var(--theme-elevation-250);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+}
+
+.fields-measurement__container:focus-within {
+	border-color: var(--theme-elevation-400);
+	outline: 0;
+}
+
+html[data-theme="light"] .fields-measurement.error .fields-measurement__container {
+	background-color: var(--theme-error-50);
+	border-color: var(--theme-error-500);
+}
+
+html[data-theme="dark"] .fields-measurement.error .fields-measurement__container {
+	background-color: var(--theme-error-100);
+	border-color: var(--theme-error-400);
+}
+
+html[data-theme="dark"] .fields-measurement.error .fields-measurement__container:hover {
+	border-color: var(--theme-error-500);
+}
+
+.fields-measurement.read-only .fields-measurement__container,
+.fields-measurement.read-only .fields-measurement__container:hover {
+	border-color: var(--theme-elevation-150);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-400);
+	box-shadow: none;
+}
+
+.fields-measurement__compound {
+	display: flex;
+	flex: 1 1 auto;
+	min-width: 0;
+	align-items: center;
+	gap: 6px;
+	height: 100%;
+}
+
+.fields-measurement__input {
+	flex: 1 1 auto;
+	width: 100%;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: textfield;
+}
+
+.fields-measurement__input::-webkit-outer-spin-button,
+.fields-measurement__input::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.fields-measurement__input:focus {
+	outline: 0;
+}
+
+.fields-measurement__input::placeholder {
+	color: var(--theme-elevation-400);
+}
+
+.fields-measurement__suffix {
+	flex-shrink: 0;
+	color: var(--theme-elevation-500);
+	font-size: 0.85rem;
+}
+
+.fields-measurement__popup,
+.fields-measurement__popup .popup__trigger-wrap {
+	display: flex;
+	flex-shrink: 0;
+}
+
+.fields-measurement__unit-button {
+	display: flex;
+	flex-shrink: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+}
+
+.fields-measurement__unit-button:focus-visible {
+	outline: var(--accessibility-outline);
+	border-radius: var(--style-radius-s);
+}
+
+.fields-measurement__unit-badge {
+	flex-shrink: 0;
+	padding: 3px 6px;
+	border-radius: var(--style-radius-s);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-500);
+	font-size: 10px;
+	line-height: 1;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.fields-measurement__unit-button:hover .fields-measurement__unit-badge {
+	color: var(--theme-elevation-800);
+}
+
+.popup__scroll-container:has(> .fields-measurement__unit-panel) {
+	max-height: none;
+}
+
+.fields-measurement__unit-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 180px;
+	padding: 4px;
+}
+
+.fields-measurement__unit-option {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: var(--style-radius-s);
+	background: transparent;
+	color: var(--theme-elevation-800);
+	font-size: 0.85rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.fields-measurement__unit-option:hover {
+	background: var(--theme-elevation-100);
+}
+
+.fields-measurement__unit-option[aria-selected="true"] {
+	background: var(--theme-elevation-150);
+}
+
+.fields-measurement__unit-symbol {
+	color: var(--theme-elevation-500);
+	font-size: 0.75rem;
+	text-transform: uppercase;
+}
