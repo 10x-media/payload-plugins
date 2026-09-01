@@ -49,9 +49,14 @@ const heightOf = async (locator: Locator): Promise<number> => {
 	return Math.round(box.height)
 }
 
-/** Native Payload inputs and react-select controls render at 40px; allow 1px of rounding. */
+/**
+ * Native Payload inputs and react-select controls render at 40px; allow 1px of
+ * rounding. The attached row's unbordered native input is a documented exception
+ * (ProtectedField.css, `.tenx-protected-field__attached-row input`): height:100%
+ * of the 40px bordered row leaves it at 38px by design, so the floor admits that.
+ */
 const expectNativeFieldHeight = (height: number): void => {
-	expect(height).toBeGreaterThanOrEqual(39)
+	expect(height).toBeGreaterThanOrEqual(38)
 	expect(height).toBeLessThanOrEqual(41)
 }
 
