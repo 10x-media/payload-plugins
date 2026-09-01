@@ -60,14 +60,16 @@ describeForDb('measurement field integration', {}, (db) => {
 	})
 
 	it('sorts and filters on the canonical number', async () => {
+		// 'a' from the first test persists at ~81.646627; greater_than: 65 pulls it in
+		// alongside 'heavy' so the descending sort has two docs to actually order.
 		await booted.payload.create({ collection: 'athletes', data: { title: 'light', weight: 60 } })
 		await booted.payload.create({ collection: 'athletes', data: { title: 'heavy', weight: 100 } })
 		const result = await booted.payload.find({
 			collection: 'athletes',
 			sort: '-weight',
-			where: { weight: { greater_than: 90 } },
+			where: { weight: { greater_than: 65 } },
 		})
-		expect(result.docs.map((doc) => doc.title)).toEqual(['heavy'])
+		expect(result.docs.map((doc) => doc.title)).toEqual(['heavy', 'a'])
 	})
 
 	it('round-trips a preference doc under the plugin key', async () => {
