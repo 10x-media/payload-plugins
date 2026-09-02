@@ -4,7 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # TEMPORARY, drop before merging #172. For a pull_request event GitHub reads this file
+    # from the base branch, so listing the branch here lets a probe pull request target it
+    # and exercise the narrow scope: a diff against main would carry this file and take the
+    # CI-touching fallback, proving nothing.
+    branches: [main, ci/affected-only]
   workflow_dispatch:
 
 concurrency:
