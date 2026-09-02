@@ -140,7 +140,11 @@ Examples: `feat(jobs): add stuck-job sweeper`, `fix(harness): close the pg pool 
 1. Fork or branch from `main`.
 2. Make changes, run `pnpm lint <name>` and `pnpm typecheck <name>`, run the relevant test tier.
 3. Add a changeset (`pnpm changeset`) or apply the `no-release` label.
-4. Open a pull request. CI runs lint, typecheck, and tests; all must pass.
+4. Open a pull request. CI runs lint, typecheck, and tests; all must pass. It scopes each of those
+   to the packages your change reaches through the dependency graph, so a pull request touching one
+   plugin does not run the other ten. Changes to shared config, the root manifest, the
+   `pnpm-workspace.yaml` catalog, `.github/`, or `scripts/` fall back to the whole workspace, and so
+   does a manual `workflow_dispatch` run when you want the full suite on demand.
 5. PRs land on `main` as a **squash merge**: one commit per PR keeps `main` linear and maps each commit to one Changeset entry. Write the squash commit subject to follow the commit convention above (GitHub defaults the squash subject to the PR title, so title PRs the same way).
 
 For questions, open a [GitHub Discussion](https://github.com/10x-media/payload-plugins/discussions) rather than an issue.
