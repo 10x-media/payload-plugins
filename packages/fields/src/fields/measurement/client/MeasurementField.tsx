@@ -25,6 +25,15 @@ import './measurementField.css'
 
 const baseClass = 'fields-measurement'
 
+/**
+ * Compound inputs size to their value so "5 ft 11 in" reads as one left-aligned
+ * phrase. The half-ch keeps the caret off the edge; the clamp keeps an empty
+ * input clickable and a runaway draft from pushing the row into overflow.
+ */
+const draftWidth = (draft: string): React.CSSProperties => ({
+	width: `${Math.min(Math.max(draft.length, 2), 12) + 0.5}ch`,
+})
+
 export type MeasurementFieldProps = {
 	measurementOptions: MeasurementResolvedClientOptions
 } & NumberFieldClientProps
@@ -202,7 +211,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 					{isCompound && compoundDef ? (
 						<span className={`${baseClass}__compound`}>
 							<input
-								className={`${baseClass}__input`}
+								className={`${baseClass}__input ${baseClass}__input--compound`}
 								id={inputId}
 								inputMode="decimal"
 								name={path}
@@ -210,6 +219,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 								onChange={onDraftChange('primary')}
 								readOnly={isReadOnly}
 								step="any"
+								style={draftWidth(drafts.primary)}
 								type="number"
 								value={drafts.primary}
 							/>
@@ -218,7 +228,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 							</span>
 							<input
 								aria-label={unitLabel(compoundDef.minor, locale, 'long')}
-								className={`${baseClass}__input ${baseClass}__input--minor`}
+								className={`${baseClass}__input ${baseClass}__input--compound`}
 								inputMode="decimal"
 								max={compoundDef.ratio - 0.001}
 								min={0}
@@ -226,6 +236,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 								onChange={onDraftChange('minor')}
 								readOnly={isReadOnly}
 								step="any"
+								style={draftWidth(drafts.minor)}
 								type="number"
 								value={drafts.minor}
 							/>

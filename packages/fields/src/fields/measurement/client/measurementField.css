@@ -84,6 +84,13 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 	-moz-appearance: textfield;
 }
 
+/* Value-tracked width comes from an inline style; killing the grow keeps the
+   pair and its suffixes reading as one left-aligned phrase */
+.fields-measurement__input--compound {
+	flex: 0 1 auto;
+	min-width: 2ch;
+}
+
 .fields-measurement__input::-webkit-outer-spin-button,
 .fields-measurement__input::-webkit-inner-spin-button {
 	-webkit-appearance: none;
