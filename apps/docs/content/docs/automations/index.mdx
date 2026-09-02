@@ -13,7 +13,7 @@ Beta scaffold. The engine is not built yet. Installing the plugin today register
 
 - The `automations(options)` factory with `disabled`, `translations`, and `triggers` options.
 - A trigger catalog seam: the plugin runs last (`order: 100`) and resolves `triggers` after sibling plugins have contributed. [Webhooks](/webhooks) pushes a `webhook` trigger slug when both are installed. The resolved list is recorded on `config.custom` under the exported `AUTOMATIONS_CUSTOM_KEY`.
-- The standard subpath exports: `./types`, `./client`, `./i18n`. Translations follow the [shared pattern](/concepts/translations) (namespace `automations:`).
+- The standard subpath exports: `./types`, `./client`, `./i18n`. Translations follow the [shared pattern](/concepts/translations) (namespace `automations:`). Ten locales ship built in.
 
 ## Install
 

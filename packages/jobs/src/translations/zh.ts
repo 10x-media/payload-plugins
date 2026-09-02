@@ -1,0 +1,43 @@
+import { keys, type TranslationKey } from './keys'
+
+export const zh: Record<TranslationKey, string> = {
+	[keys.pluginName]: '作业',
+
+	[keys.statusQueued]: '排队中',
+	[keys.statusScheduled]: '已计划',
+	[keys.statusRetrying]: '重试中',
+	[keys.statusRunning]: '运行中',
+	[keys.statusSucceeded]: '已成功',
+	[keys.statusFailed]: '已失败',
+	[keys.statusCancelled]: '已取消',
+
+	[keys.fieldStatus]: '状态',
+	[keys.fieldWorkflow]: '工作流',
+	[keys.fieldTask]: '任务',
+	[keys.fieldJob]: '作业',
+	[keys.fieldQueue]: '队列',
+	[keys.fieldAttempts]: '尝试次数',
+	[keys.fieldCreated]: '创建时间',
+	[keys.fieldUpdated]: '更新时间',
+	[keys.fieldCompleted]: '完成时间',
+	[keys.fieldExecuted]: '执行时间',
+	[keys.fieldTaskId]: '任务 ID',
+	[keys.fieldInput]: '输入',
+	[keys.fieldOutput]: '输出',
+	[keys.fieldError]: '错误',
+	[keys.fieldId]: 'ID',
+	[keys.fieldStarted]: '开始时间',
+	[keys.fieldLeaseExpires]: '租约到期',
+	[keys.fieldScheduledFor]: '计划执行时间',
+
+	[keys.outcome]: '结果',
+	[keys.noAttempts]: '尚未记录任何尝试。',
+	[keys.copy]: '复制',
+	[keys.copied]: '已复制',
+	[keys.jobSingular]: '个作业',
+	[keys.jobPlural]: '个作业',
+	[keys.errorWorkflowTaskExclusive]: '一个作业只能运行工作流或任务，不能同时运行两者。',
+	[keys.cronBadge]: 'Cron',
+	[keys.attemptsTooltip]: '该作业的执行尝试次数，包括重试',
+	[keys.inlineStep]: '内联：{{id}}',
+}

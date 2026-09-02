@@ -3,7 +3,7 @@ title: i18n
 description: Override or localize the strings in the audit log view.
 ---
 
-Every admin-facing string, the view title, the filter labels, the operation badges, the empty state, is a typed translation under the `auditLogs:` namespace. English, German and Ukrainian ship built in.
+Every admin-facing string, the view title, the filter labels, the operation badges, the empty state, is a typed translation under the `auditLogs:` namespace. Ten locales ship built in: `en`, `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk` and `ar`.
 
 Override or add a locale through the `translations` option:
 
@@ -15,9 +15,9 @@ auditLogs({
   collections: { posts: true },
   translations: {
     en: { [keys.title]: 'Change history' },
-    fr: {
-      [keys.title]: 'Historique des modifications',
-      [keys.filterUser]: 'Utilisateur',
+    ja: {
+      [keys.title]: '変更履歴',
+      [keys.filterUser]: 'ユーザー',
     },
   },
 })

@@ -197,11 +197,11 @@ describe('dualSession factory', () => {
 	it('applies the translations option', () => {
 		const out = dualSession({
 			collections: [slug('customers')],
-			translations: { de: { [keys.pluginName]: 'Doppelte Sitzung' } },
+			translations: { de: { [keys.pluginName]: 'Zweifache Sitzung' } },
 		})(buildConfig()) as Config
 		const i18n = out.i18n?.translations as Record<string, Record<string, Record<string, string>>>
 
-		expect(i18n.de?.dualSession?.pluginName).toBe('Doppelte Sitzung')
+		expect(i18n.de?.dualSession?.pluginName).toBe('Zweifache Sitzung')
 		expect(i18n.en?.dualSession?.pluginName).toBe('Dual Session')
 	})
 })

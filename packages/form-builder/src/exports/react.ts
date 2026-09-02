@@ -125,7 +125,20 @@ export { buildRecallResolver } from '../recall/resolver'
 export { CAPTCHA_TOKEN_KEY, DEFAULT_HONEYPOT_FIELD } from '../spam/constants'
 export type { VotedSubmission } from '../submissions/resolveVotedSubmission'
 export type { FormFieldInstance, SubmissionValue } from '../submissions/types'
-export { bundles, de, en, type TranslationBundle } from '../translations'
+export {
+	ar,
+	bundles,
+	de,
+	en,
+	es,
+	fr,
+	id,
+	pt,
+	ru,
+	type TranslationBundle,
+	uk,
+	zh,
+} from '../translations'
 export { clientRuntimeKeys } from '../translations/clientRuntimeKeys'
 export { makeTranslate } from '../translations/makeTranslate'
 export { formatBytes } from '../uploads/formatBytes'

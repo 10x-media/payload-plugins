@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
+import { ar } from './ar'
 import { de } from './de'
 import { en } from './en'
+import { es } from './es'
+import { fr } from './fr'
+import { id } from './id'
 import { toNested, translations } from './index'
 import { keys } from './keys'
+import { pt } from './pt'
+import { ru } from './ru'
 import { uk } from './uk'
+import { zh } from './zh'
 
-const locales = { de, en, uk }
+const locales = { ar, de, en, es, fr, id, pt, ru, uk, zh }
 
 describe('translation keys', () => {
 	it('every declared key has an English string', () => {
