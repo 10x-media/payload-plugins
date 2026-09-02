@@ -13,6 +13,7 @@ onlyBuiltDependencies:
   - esbuild
   - mongodb-memory-server
 
+# PROBE for #172, never merged: a change to this file must fan out to every package.
 catalog:
   '@axe-core/playwright': ^4.11.3
   '@payloadcms/db-mongodb': 3.85.0
