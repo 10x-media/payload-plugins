@@ -37,9 +37,14 @@ base="${AFFECTED_BASE_SHA:-}"
 git cat-file -e "${base}^{commit}" 2>/dev/null ||
 	fallback "base ${base} is missing from this checkout (shallow clone, or force-pushed away)"
 
-# `grep -c` rather than `-q`: under `pipefail` a short-circuiting `-q` leaves git killed by
-# SIGPIPE, and the non-zero pipeline status would read as "no match" on the runs that matched.
-meta_changed=$(git diff --name-only "${base}...HEAD" | grep -Ec '^(\.github/|scripts/)' || true)
+# The file list is captured on its own line so a failing diff cannot pass for an empty one:
+# `cat-file` above proves the commit exists, not that it shares history with HEAD, and an
+# unrelated base makes `git diff` exit 128 while the guard below would read "CI untouched"
+# on exactly the run that most needs catching. Counting from a here-string rather than a
+# pipe keeps `grep`'s no-match exit off `pipefail` too.
+changed=$(git diff --name-only "${base}...HEAD") ||
+	fallback "git cannot diff ${base}...HEAD (unrelated history?)"
+meta_changed=$(grep -Ec '^(\.github/|scripts/)' <<<"$changed" || true)
 [ "$meta_changed" -eq 0 ] || fallback 'the change touches CI itself'
 
 echo "affected: comparing ${base}...HEAD"
