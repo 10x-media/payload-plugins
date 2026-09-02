@@ -22,7 +22,7 @@ analytics({
 })
 ```
 
-`@10x-media/analytics/i18n` exports `keys` (constants covering metrics, widget labels, breakdowns, timeframes, and field states), the built-in `translations` (ten locales: `en`, `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk` and `ar`), and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile.
+`@10x-media/analytics/i18n` exports `keys` (constants covering metrics, widget labels, breakdowns, timeframes, and field states), the built-in `translations`, and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile.
 
 Because [display-field labels](/analytics/display-fields#labels) default to these translations, overriding a metric's key here renames it everywhere at once; per-field `label`/`labels` options are the targeted alternative. Widget titles are editor-entered content, not translations; localize those with the [`widgets.localizeText` option](/analytics/widgets#options).
 

@@ -3,7 +3,7 @@ title: i18n
 description: Override or localize the Webhooks admin strings.
 ---
 
-Every admin-facing string (collection labels, field labels, delivery statuses, the redeliver button) is a typed translation under the `webhooks:` namespace. Ten locales ship built in: `en`, `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk` and `ar`. Override or extend through the `translations` option:
+Every admin-facing string (collection labels, field labels, delivery statuses, the redeliver button) is a typed translation under the `webhooks:` namespace. Several locales ship built in; the `translations` export names the current set. Override or extend through the `translations` option:
 
 ```ts title="payload.config.ts"
 import { webhooks } from '@10x-media/webhooks'

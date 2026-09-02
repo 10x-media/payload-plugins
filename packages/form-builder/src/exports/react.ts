@@ -133,6 +133,7 @@ export {
 	es,
 	fr,
 	id,
+	ko,
 	pt,
 	ru,
 	type TranslationBundle,

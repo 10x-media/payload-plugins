@@ -2,6 +2,6 @@
 '@10x-media/undo-redo': minor
 ---
 
-Eight more built-in locales alongside English and German.
+More built-in locales for the `undoRedo:` strings.
 
-- Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`. Every `undoRedo:` key is covered in each.
+- Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.

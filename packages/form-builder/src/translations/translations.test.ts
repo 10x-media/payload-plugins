@@ -10,6 +10,7 @@ import { fr } from './fr'
 import { id } from './id'
 import { bundles, translations } from './index'
 import { keys } from './keys'
+import { ko } from './ko'
 import { pt } from './pt'
 import { ru } from './ru'
 import { uk } from './uk'
@@ -18,7 +19,7 @@ import { zh } from './zh'
 const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 
 /** Every shipped locale but `en`, the table the others are checked against. */
-const locales = Object.entries({ ar, de, es, fr, id, pt, ru, uk, zh })
+const locales = Object.entries({ ar, de, es, fr, id, ko, pt, ru, uk, zh })
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.turbo'])
 

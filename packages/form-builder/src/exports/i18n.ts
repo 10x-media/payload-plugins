@@ -13,6 +13,7 @@ export {
 	fr,
 	id,
 	keys,
+	ko,
 	pt,
 	ru,
 	translations,

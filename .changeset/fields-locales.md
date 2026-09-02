@@ -2,6 +2,6 @@
 '@10x-media/fields': minor
 ---
 
-Eight more built-in locales alongside English and German.
+More built-in locales for the `fields:` strings.
 
-- Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`. Every `fields:` key is covered in each.
+- Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.

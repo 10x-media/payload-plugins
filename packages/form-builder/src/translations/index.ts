@@ -5,6 +5,7 @@ import { es } from './es'
 import { fr } from './fr'
 import { id } from './id'
 import type { TranslationKey } from './keys'
+import { ko } from './ko'
 import { pt } from './pt'
 import { ru } from './ru'
 import { uk } from './uk'
@@ -18,6 +19,7 @@ export { fr } from './fr'
 export { id } from './id'
 export type { TranslationKey } from './keys'
 export { keys } from './keys'
+export { ko } from './ko'
 export { pt } from './pt'
 export { ru } from './ru'
 export { uk } from './uk'
@@ -39,6 +41,7 @@ export const bundles: Record<string, TranslationBundle> = {
 	es,
 	fr,
 	id,
+	ko,
 	pt,
 	ru,
 	uk,

@@ -3,7 +3,7 @@ title: i18n
 description: Override or localize the admin wiki's UI strings, and how they relate to localized guide content.
 ---
 
-Every admin-facing string the plugin renders is a typed translation under the `adminWiki:` namespace: the collection and field labels, the drawer and view chrome, the callout variants, the edit-mode toggle, and the empty states. Ten locales ship built in: `en`, `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk` and `ar`. Override or extend through the `translations` option:
+Every admin-facing string the plugin renders is a typed translation under the `adminWiki:` namespace: the collection and field labels, the drawer and view chrome, the callout variants, the edit-mode toggle, and the empty states. Several locales ship built in; the `translations` export names the current set. Override or extend through the `translations` option:
 
 ```ts title="payload.config.ts"
 import { adminWiki } from '@10x-media/admin-wiki'

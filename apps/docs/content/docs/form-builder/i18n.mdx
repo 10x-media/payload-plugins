@@ -12,7 +12,7 @@ Two separate systems localize two separate things:
 
 ## Admin strings
 
-Field type names, rule labels and messages, action labels, and the rest of the authoring UI are typed translations under the `formBuilder:` namespace. Ten locales ship built in (`en`, `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk` and `ar`); override any of them, or add another locale, through the `translations` option:
+Field type names, rule labels and messages, action labels, and the rest of the authoring UI are typed translations under the `formBuilder:` namespace. Several locales ship built in; override any of them, or add another locale, through the `translations` option:
 
 ```ts title="payload.config.ts"
 import { formBuilder } from '@10x-media/form-builder'
@@ -26,7 +26,7 @@ formBuilder({
 })
 ```
 
-`@10x-media/form-builder/i18n` exports `keys`, the built-in `translations` map, the flat per-locale tables (`en`, `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`) plus `bundles`, `clientRuntimeKeys`, and the `TranslationKey` / `TranslationBundle` / `TranslationsOption` types. A typo'd key fails to compile. Merge semantics and app-level overrides are shared across plugins: see [Translations](/concepts/translations).
+`@10x-media/form-builder/i18n` exports `keys`, the built-in `translations` map, the flat per-locale tables plus `bundles`, `clientRuntimeKeys`, and the `TranslationKey` / `TranslationBundle` / `TranslationsOption` types. A typo'd key fails to compile. Merge semantics and app-level overrides are shared across plugins: see [Translations](/concepts/translations).
 
 ## Frontend strings
 
