@@ -113,6 +113,30 @@ Unbounded that peaked at 67 node processes and more than 16 GB on a 4-vCPU CI ru
 
 Unfiltered `pnpm build` has the same eleven-way fan-out. The short commands forward extra args to the task rather than to turbo, so cap it with the env var instead: `TURBO_CONCURRENCY=3 pnpm build`.
 
+## Affected scoping in CI
+
+`ci.yml` does not run the whole workspace on every push. Each of `lint`, `typecheck`, `build`, `test`, and `test-matrix` starts with a `scope` step (`scripts/ci-affected.sh`) that resolves the git range into `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` and emits `steps.scope.outputs.flag`, which is either `--affected` or empty. The turbo invocation interpolates that flag, so an empty one means the job runs everything.
+
+The base comes from the workflow-level `AFFECTED_BASE_SHA`: a pull request's base sha, a push's `before` sha, empty otherwise. Every job needs `fetch-depth: 0`; a shallow checkout has no base commit and takes the fallback.
+
+Scoping is by **package graph**, never by directory. A change to `jobs` also selects `automations`, because `automations` depends on it. `--filter` and `--affected` intersect rather than union, so `build` stays `--filter='./packages/*'` and simply narrows within it.
+
+**What forces the whole workspace**, and this is the part to keep intact when editing any of it:
+
+- A path in `globalDependencies` (`config/**`, `tsconfig.json`, `biome.json`, `.npmrc`, the root `package.json`, `pnpm-workspace.yaml`). Turbo fans those out to all 29 packages. The root manifest and the catalog are in that list *specifically* for this: without them a Payload bump in `pnpm-workspace.yaml`'s `catalog:` selects no packages at all and CI passes having tested nothing.
+- A change under `.github/` or `scripts/`, which `ci-affected.sh` special-cases. Those are not a build input of any package, so turbo cannot see them, and a pull request that rewrites CI would otherwise go green having run nothing.
+- `workflow_dispatch`, a first push to a branch, or a base commit that force-push removed.
+
+Verify a scoping change with `turbo ls`, which applies the filter without hashing (`--dry=json` also works but re-hashes the workspace, which is slow on Windows when a global dependency changed):
+
+```bash
+pnpm exec turbo ls --filter='...[<base>...<head>]'
+```
+
+`check:dist` runs as `--only-built`, skipping packages an affected build deliberately left without a `dist/`. `check:template` and `check:registry` stay unscoped: template drift is exactly the class of bug that hides in the packages a scoped run skips.
+
+Two consequences worth knowing. `main` keeps `cancel-in-progress: true`, so if a push cancels an in-flight run, the next run only covers its own commits rather than re-testing the backlog; the cancelled changes were still covered by their own pull request. And the `test` job's Mongo pre-cache step runs even when nothing is affected, so a docs-only pull request still pays for that download.
+
 ## Docs showcase clips
 
 A plugin may carry `packages/<slug>/videos/*.video.ts`: clipwright scenes driving that plugin's own dev app, rendered to MP4 for the docs site. They are showcases rather than tutorials, so they carry no captions and no audio, and the docs play them muted and looping through `<Video>` (`apps/docs/components/video.tsx`).

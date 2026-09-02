@@ -16,6 +16,13 @@ env:
   # Primary Node version for single-version jobs. The test matrix below pins the
   # versions to forward-test. Bump both together when moving to the next LTS.
   NODE_VERSION: '22'
+  # The commit each job's affected scope diffs HEAD against: a pull request's base, a
+  # push's previous tip, and empty for anything else (workflow_dispatch), which
+  # scripts/ci-affected.sh turns into a whole-workspace run. Resolved once here because a
+  # job-level env block cannot see another job's outputs without serializing on it.
+  AFFECTED_BASE_SHA: >-
+    ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha
+    || github.event.before }}
 
 jobs:
   lint:
@@ -23,13 +30,19 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - id: scope
+        name: Resolve affected scope
+        run: bash scripts/ci-affected.sh
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
+      - run: pnpm exec turbo run lint ${{ steps.scope.outputs.flag }}
+      # Cross-cutting invariants, cheap and unscoped: template drift is exactly the class of
+      # bug that hides in the packages an affected run skips.
       - name: Template parity (files every plugin carries verbatim)
         run: pnpm check:template
 
@@ -38,37 +51,49 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - id: scope
+        name: Resolve affected scope
+        run: bash scripts/ci-affected.sh
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+      - run: pnpm exec turbo run typecheck ${{ steps.scope.outputs.flag }}
 
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - id: scope
+        name: Resolve affected scope
+        run: bash scripts/ci-affected.sh
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec turbo run build --filter='./packages/*'
+      # `--filter` and `--affected` intersect rather than union, so this stays the published
+      # packages only, narrowed to the ones this change reaches through the graph.
+      - run: pnpm exec turbo run build --filter='./packages/*' ${{ steps.scope.outputs.flag }}
+      # --only-built skips the packages the line above deliberately did not build.
       - name: Verify published dist output (directives, externals, exports, publint)
-        run: pnpm check:dist
+        run: pnpm check:dist --only-built
       # turbo runs a task's `dependsOn` even where the task itself is missing, so this gate
-      # also runs all ten dev apps' and the docs site's `next build`. Unbounded that is
-      # eleven at once, which exhausts a 4-vCPU runner and returns as a bare cancel.
+      # also runs the affected dev apps' and the docs site's `next build`. Unscoped that is
+      # eleven at once, which exhausts a 4-vCPU runner and returns as a bare cancel, hence
+      # the concurrency cap even now that the scope is usually far smaller.
       - name: Bundle isolation gates
         run: |
           bash scripts/ci-resource-probe.sh 30 &
           probe=$!
           trap 'kill "$probe" 2>/dev/null || true' EXIT
-          pnpm exec turbo run test:dist --concurrency=3 --log-order=stream
+          pnpm exec turbo run test:dist --concurrency=3 --log-order=stream ${{ steps.scope.outputs.flag }}
       - name: Registry parity (rebuild shadcn registry, fail if drifted from source)
         run: pnpm check:registry
 
@@ -82,6 +107,10 @@ jobs:
         node: [22, 24]
     steps:
       - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - id: scope
+        name: Resolve affected scope
+        run: bash scripts/ci-affected.sh
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -92,13 +121,17 @@ jobs:
         run: >-
           pnpm --filter @10x-media/payload-test-harness exec node -e
           "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
-      - run: pnpm test
+      - run: pnpm exec turbo run test ${{ steps.scope.outputs.flag }}
 
   test-matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - id: scope
+        name: Resolve affected scope
+        run: bash scripts/ci-affected.sh
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -109,7 +142,7 @@ jobs:
         run: >-
           pnpm --filter @10x-media/payload-test-harness exec node -e
           "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
-      - run: pnpm test:matrix
+      - run: pnpm exec turbo run test:matrix ${{ steps.scope.outputs.flag }}
 
   # Heavier tiers run on demand (PR label or manual dispatch), not on every push,
   # so main stays fast. test-matrix already covers Postgres-in-Docker on push.
