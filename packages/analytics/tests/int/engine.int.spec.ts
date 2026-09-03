@@ -29,6 +29,7 @@ describeForDb('analytics engine integration', { dbs: ['mongo'] }, (db) => {
 			store: kvCacheStore(booted.payload.kv),
 			queue: { concurrency: 4 },
 			ttl: { aggregate: 60, realtime: 5 },
+			timeoutMs: 15_000,
 		})
 		const query: AnalyticsQuery = {
 			path: '/pricing',

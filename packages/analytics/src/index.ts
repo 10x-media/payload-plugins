@@ -196,6 +196,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },
 				ttl: resolved.cache.ttl,
+				timeoutMs: 15_000,
 			})
 			setRuntime(payload, {
 				registry,

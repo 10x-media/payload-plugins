@@ -2,13 +2,29 @@ export interface QueueOptions {
 	concurrency: number
 	maxRetries?: number
 	baseDelayMs?: number
+	/** Consulted per attempt in place of the maxRetries check when provided. */
+	shouldRetry?: (err: unknown, attempt: number) => boolean
 }
 
 export interface Queue {
-	run<T>(task: () => Promise<T>): Promise<T>
+	run<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T>
 }
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+/** Resolves after ms, or rethrows the original task error early if signal aborts first. */
+const wait = (ms: number, taskErr: unknown, signal?: AbortSignal): Promise<void> => {
+	if (!signal) return new Promise((r) => setTimeout(r, ms))
+	return new Promise<void>((resolve, reject) => {
+		const timer = setTimeout(() => {
+			signal.removeEventListener('abort', onAbort)
+			resolve()
+		}, ms)
+		const onAbort = () => {
+			clearTimeout(timer)
+			reject(taskErr)
+		}
+		signal.addEventListener('abort', onAbort, { once: true })
+	})
+}
 
 export function createQueue(opts: QueueOptions): Queue {
 	const maxRetries = opts.maxRetries ?? 0
@@ -31,26 +47,28 @@ export function createQueue(opts: QueueOptions): Queue {
 		pending.shift()?.()
 	}
 
-	const withRetry = async <T>(task: () => Promise<T>): Promise<T> => {
+	const withRetry = async <T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> => {
 		let attempt = 0
 		for (;;) {
 			try {
 				return await task()
 			} catch (err) {
-				if (attempt >= maxRetries) throw err
+				const canRetry = opts.shouldRetry ? opts.shouldRetry(err, attempt) : attempt < maxRetries
+				if (!canRetry) throw err
 				// Jitter derived from attempt count, not Math.random, to keep tests deterministic
 				const jitter = baseDelayMs * 0.5
-				await wait(baseDelayMs * 2 ** attempt + jitter * attempt)
+				await wait(baseDelayMs * 2 ** attempt + jitter * attempt, err, signal)
 				attempt++
 			}
 		}
 	}
 
 	return {
-		async run<T>(task: () => Promise<T>): Promise<T> {
+		async run<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+			if (signal?.aborted) throw signal.reason
 			await acquire()
 			try {
-				return await withRetry(task)
+				return await withRetry(task, signal)
 			} finally {
 				release()
 			}

@@ -30,4 +30,59 @@ describe('createQueue', () => {
 		await expect(q.run(fn)).rejects.toThrow('boom')
 		expect(fn).toHaveBeenCalledTimes(2) // initial + 1 retry
 	})
+
+	it('consults shouldRetry per attempt instead of maxRetries when provided', async () => {
+		const fn = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('one'))
+			.mockRejectedValueOnce(new Error('two'))
+			.mockResolvedValueOnce('ok')
+		const shouldRetry = vi.fn((_err: unknown, attempt: number) => attempt < 2)
+		const q = createQueue({ concurrency: 1, maxRetries: 0, baseDelayMs: 0, shouldRetry })
+		await expect(q.run(fn)).resolves.toBe('ok')
+		expect(fn).toHaveBeenCalledTimes(3)
+		expect(shouldRetry).toHaveBeenNthCalledWith(1, expect.any(Error), 0)
+		expect(shouldRetry).toHaveBeenNthCalledWith(2, expect.any(Error), 1)
+	})
+
+	it('stops retrying once shouldRetry returns false', async () => {
+		const fn = vi.fn().mockRejectedValue(new Error('fatal'))
+		const shouldRetry = vi.fn(() => false)
+		const q = createQueue({ concurrency: 1, maxRetries: 5, baseDelayMs: 0, shouldRetry })
+		await expect(q.run(fn)).rejects.toThrow('fatal')
+		expect(fn).toHaveBeenCalledTimes(1)
+	})
+
+	it('rethrows the original task error when the signal aborts mid-backoff', async () => {
+		vi.useFakeTimers()
+		try {
+			const taskErr = new Error('task failed')
+			const fn = vi.fn().mockRejectedValue(taskErr)
+			const q = createQueue({ concurrency: 1, maxRetries: 3, baseDelayMs: 1000 })
+			const controller = new AbortController()
+
+			const promise = q.run(fn, controller.signal)
+			const assertion = expect(promise).rejects.toBe(taskErr)
+
+			await vi.advanceTimersByTimeAsync(0) // let the first attempt reject
+			controller.abort(new Error('aborted for unrelated reason'))
+			await vi.advanceTimersByTimeAsync(1000)
+
+			await assertion
+			expect(fn).toHaveBeenCalledTimes(1)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('refuses to start when already aborted, throwing the abort reason', async () => {
+		const fn = vi.fn()
+		const q = createQueue({ concurrency: 1 })
+		const controller = new AbortController()
+		const reason = new Error('already aborted')
+		controller.abort(reason)
+
+		await expect(q.run(fn, controller.signal)).rejects.toBe(reason)
+		expect(fn).not.toHaveBeenCalled()
+	})
 })

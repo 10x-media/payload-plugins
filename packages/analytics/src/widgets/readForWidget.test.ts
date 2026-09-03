@@ -223,6 +223,7 @@ describe('readForWidget', () => {
 			store,
 			queue: { concurrency: 4 },
 			ttl: { aggregate: 60, realtime: 5 },
+			timeoutMs: 15_000,
 		})
 		const payload = {} as PayloadRequest['payload']
 		setRuntime(payload, {

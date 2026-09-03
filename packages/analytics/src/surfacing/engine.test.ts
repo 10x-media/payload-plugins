@@ -19,6 +19,7 @@ const setup = () => {
 		store,
 		queue: { concurrency: 4 },
 		ttl: { aggregate: 60, realtime: 5 },
+		timeoutMs: 15_000,
 	})
 	return { adapter, engine, store }
 }
@@ -67,38 +68,61 @@ describe('createEngine', () => {
 	})
 
 	it('serves a stale cache entry and calls onError once when the adapter fails', async () => {
-		const adapter = memoryAdapter()
-		adapter.record({ path: '/pricing', timestamp: new Date('2026-01-10') })
-		const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
-		let now = 0
-		store.now = () => now
-		const onError = vi.fn()
-		const engine = createEngine({
-			store,
-			queue: { concurrency: 4 },
-			ttl: { aggregate: 60, realtime: 5 },
-			onError,
-		})
+		vi.useFakeTimers()
+		try {
+			const adapter = memoryAdapter()
+			adapter.record({ path: '/pricing', timestamp: new Date('2026-01-10') })
+			const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+			let now = 0
+			store.now = () => now
+			const onError = vi.fn()
+			const engine = createEngine({
+				store,
+				queue: { concurrency: 4 },
+				ttl: { aggregate: 60, realtime: 5 },
+				timeoutMs: 15_000,
+				onError,
+			})
 
-		const warm = await engine.read(adapter, q)
-		expect(warm.meta.stale).toBeUndefined()
+			const warm = await engine.read(adapter, q)
+			expect(warm.meta.stale).toBeUndefined()
 
-		now = 61_000 // past the 60s ttl, still inside the stale window
-		const err = new Error('adapter down')
-		vi.spyOn(adapter, 'query').mockRejectedValueOnce(err)
-		const result = await engine.read(adapter, q)
+			now = 61_000 // past the 60s ttl, still inside the stale window
+			const err = new Error('adapter down')
+			// Non-HTTP failures get one retry, so keep rejecting through it.
+			vi.spyOn(adapter, 'query').mockRejectedValue(err)
+			const promise = engine.read(adapter, q)
+			const assertion = expect(promise).resolves.toMatchObject({ meta: { stale: true } })
 
-		expect(result.meta.stale).toBe(true)
-		expect(result.totals?.pageviews).toBe(warm.totals?.pageviews)
-		expect(onError).toHaveBeenCalledTimes(1)
-		expect(onError).toHaveBeenCalledWith(err, adapter.id)
+			await vi.advanceTimersByTimeAsync(1000)
+			const result = await promise
+			await assertion
+
+			expect(result.meta.stale).toBe(true)
+			expect(result.totals?.pageviews).toBe(warm.totals?.pageviews)
+			expect(onError).toHaveBeenCalledTimes(1)
+			expect(onError).toHaveBeenCalledWith(err, adapter.id)
+		} finally {
+			vi.useRealTimers()
+		}
 	})
 
 	it('rejects on a failing adapter with a cold cache', async () => {
-		const { adapter, engine } = setup()
-		const err = new Error('adapter down')
-		vi.spyOn(adapter, 'query').mockRejectedValueOnce(err)
-		await expect(engine.read(adapter, q)).rejects.toThrow('adapter down')
+		vi.useFakeTimers()
+		try {
+			const { adapter, engine } = setup()
+			const err = new Error('adapter down')
+			// Non-HTTP failures get one retry, so keep rejecting through it.
+			vi.spyOn(adapter, 'query').mockRejectedValue(err)
+			const promise = engine.read(adapter, q)
+			const assertion = expect(promise).rejects.toThrow('adapter down')
+
+			await vi.advanceTimersByTimeAsync(1000)
+
+			await assertion
+		} finally {
+			vi.useRealTimers()
+		}
 	})
 
 	it('never marks a successful read as stale', async () => {
@@ -129,5 +153,80 @@ describe('createEngine', () => {
 		await engine.read(adapter, { metrics: ['pageviews'], dateRange: { start, end } })
 		expect(received?.start.toISOString()).toBe(start.toISOString())
 		expect(received?.end.toISOString()).toBe(end.toISOString())
+	})
+
+	it('aborts a hung adapter after timeoutMs and rejects with a cold cache', async () => {
+		vi.useFakeTimers()
+		try {
+			let receivedSignal: AbortSignal | undefined
+			const adapter: AnalyticsAdapter = {
+				id: 'hung',
+				label: 'Hung',
+				capabilities: memoryAdapter().capabilities,
+				isConfigured: () => true,
+				// Mirrors a real fetch-based adapter: hangs until ctx.signal aborts, then rejects.
+				query: (_query, ctx) => {
+					receivedSignal = ctx.signal
+					return new Promise((_resolve, reject) => {
+						ctx.signal?.addEventListener('abort', () => reject(ctx.signal?.reason))
+					})
+				},
+			}
+			const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+			const engine = createEngine({
+				store,
+				queue: { concurrency: 4 },
+				ttl: { aggregate: 60, realtime: 5 },
+				timeoutMs: 15_000,
+			})
+
+			const promise = engine.read(adapter, q)
+			const assertion = expect(promise).rejects.toThrow('analytics: provider read timed out')
+
+			await vi.advanceTimersByTimeAsync(15_000)
+
+			await assertion
+			expect(receivedSignal).toBeDefined()
+			expect(receivedSignal?.aborted).toBe(true)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('stale-serves a hung adapter after timeoutMs when a warm cache entry exists', async () => {
+		vi.useFakeTimers()
+		try {
+			const adapter = memoryAdapter()
+			adapter.record({ path: '/pricing', timestamp: new Date('2026-01-10') })
+			const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+			let now = 0
+			store.now = () => now
+			const engine = createEngine({
+				store,
+				queue: { concurrency: 4 },
+				ttl: { aggregate: 60, realtime: 5 },
+				timeoutMs: 15_000,
+			})
+
+			const warm = await engine.read(adapter, q)
+			expect(warm.meta.stale).toBeUndefined()
+
+			now = 61_000
+			vi.spyOn(adapter, 'query').mockImplementation(
+				(_query, ctx) =>
+					new Promise((_resolve, reject) => {
+						ctx.signal?.addEventListener('abort', () => reject(ctx.signal?.reason))
+					})
+			)
+
+			const promise = engine.read(adapter, q)
+			const assertion = expect(promise).resolves.toMatchObject({ meta: { stale: true } })
+
+			await vi.advanceTimersByTimeAsync(15_000)
+
+			await assertion
+		} finally {
+			vi.useRealTimers()
+		}
 	})
 })
