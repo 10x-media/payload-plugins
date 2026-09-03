@@ -25,7 +25,7 @@ declare module 'payload' {
  * English literals rather than translation keys because Payload resolves view
  * metadata in `generateCustomViewMetadata`, which is handed only the config and
  * the view config: no `t`, and no route params either, which is why a guide page
- * cannot be titled after the guide it shows. Both shipped locales spell this
+ * cannot be titled after the guide it shows. Every shipped locale spells this
  * word the same, and the config's own `admin.meta.titleSuffix` still applies.
  */
 const WIKI_INDEX_META = {

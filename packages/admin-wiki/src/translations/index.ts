@@ -1,6 +1,7 @@
 import { de } from './de'
 import { en } from './en'
 import type { TranslationKey } from './keys'
+import { pt } from './pt'
 
 export type { TranslationKey } from './keys'
 export { keys } from './keys'
@@ -36,4 +37,5 @@ export const toNested = (flat: {
 export const translations = {
 	de: toNested(de),
 	en: toNested(en),
+	pt: toNested(pt),
 }
