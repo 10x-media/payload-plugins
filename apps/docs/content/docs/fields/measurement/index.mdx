@@ -27,7 +27,7 @@ Eight usages ship built in: `bodyWeight` (kg, lb, st-lb), `personHeight` (cm, m,
 
 ## What's stored
 
-The field is a plain `number` column holding a canonical value in `storageUnit`, so it sorts, filters, and groups like any other number and needs no custom query logic. To adopt on an existing numeric column, set `storageUnit` to whatever unit that column already holds: no migration, no data rewrite. Storage is rounded to 6 fraction digits regardless of display precision. The field stores a single number; `hasMany` is not supported.
+The field is a plain `number` column holding a canonical value in `storageUnit`, so it sorts, filters, and groups like any other number and needs no custom query logic. To adopt on an existing numeric column, set `storageUnit` to whatever unit that column already holds: no migration, no data rewrite. Storage is rounded to 6 fraction digits regardless of display precision, and non-numeric or NaN writes are rejected server-side on every database adapter. The field stores a single number; `hasMany` is not supported.
 
 ## The row and the unit menu
 
@@ -43,6 +43,8 @@ The picked unit persists to the viewer's own [payload-preferences](https://paylo
 
 Setting `defaultUnit` on a field (or `defaultUnits` for a usage in the plugin) is an explicit choice and skips locale detection entirely, since it always wins over step 4. Leave both unset on most fields so a UK visitor sees stone and pounds without any config.
 
+Preference persistence and the same-usage flip are wired by the `fields()` plugin, which registers the unit preference provider. Standalone `measurementField()` still works, but a unit picked without the plugin lasts only for that field until the page reloads, and its list cells fall back to the field's `defaultUnit` (then the first configured unit) instead of locale detection.
+
 The list view cell renders the stored value converted to the resolved display unit.
 
 ## Compound entry
@@ -56,9 +58,9 @@ The list view cell renders the stored value converted to the resolved display un
 | `usage` | required | Preference bucket and unit family; see the eight usages above. |
 | `name` | per usage (see snippet) | |
 | `storageUnit` | per usage's `defaultStorageUnit` | Must be a scalar unit of the usage's dimension. Match existing data to adopt with zero migration. |
-| `units` | every unit the usage allows | Subset shown in the unit menu; the first entry is the floor `resolveDisplayUnit` falls back to. |
+| `units` | every unit the usage allows | Subset shown in the unit menu; the first entry is the final display fallback when nothing else resolves. |
 | `defaultUnit` | none | Field-level display fallback. Setting it suppresses locale detection. |
-| `precision` | engine defaults per unit | `Partial<Record<UnitId, number>>`, overriding individual units' display fraction digits. |
+| `precision` | engine defaults per unit | `Partial<Record<UnitId, number>>`, overriding individual units' display fraction digits. Integers 0 to 100; the factory throws otherwise. For compound units, key the compound id (`'ft-in'`), which controls the minor part's digits. |
 | `min` / `max` | none | Bounds in the storage unit, enforced by Payload's native number validation. The edit view converts the message to the display unit. |
 | `overrides` | none | `({ field }) => field` escape hatch with explicit spreads. |
 

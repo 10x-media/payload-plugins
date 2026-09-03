@@ -1,4 +1,5 @@
-import type { FieldHook, NumberField } from 'payload'
+import type { FieldHook, NumberField, NumberFieldSingleValidation } from 'payload'
+import { number } from 'payload/shared'
 import { roundTo } from './engine/convert'
 import { isScalarUnit, STORAGE_FRACTION_DIGITS, UNITS, type UnitId } from './engine/units'
 import { USAGES } from './engine/usages'
@@ -10,9 +11,25 @@ const roundStorageHook: FieldHook = ({ value }) => {
 }
 
 /**
+ * Payload coerces string input through parseFloat before validation, and its
+ * native number validation lets the resulting NaN through (typeof NaN is
+ * 'number'). Mongoose happens to reject NaN at the driver; Postgres stores
+ * NaN::numeric, which then sorts above every real value. Guard here, then
+ * defer to the native validator (Payload spreads the field into options, so
+ * min/max/required behave exactly as the default install).
+ */
+const validateMeasurement: NumberFieldSingleValidation = (value, options) => {
+	if (typeof value === 'number' && Number.isNaN(value)) {
+		return options.req.t('validation:enterNumber')
+	}
+	return number(value, options)
+}
+
+/**
  * Number field storing a canonical value in `storageUnit` while each admin user
- * edits and reads in their preferred unit. Validation stays Payload's native
- * number validation (min/max in storage units); the client converts at the edges.
+ * edits and reads in their preferred unit. Validation is Payload's native
+ * number validation plus a NaN guard (min/max in storage units); the client
+ * converts at the edges.
  */
 export const measurementField = (options: MeasurementFieldOptions): NumberField => {
 	const usageDef = USAGES[options.usage]
@@ -96,6 +113,7 @@ export const measurementField = (options: MeasurementFieldOptions): NumberField 
 			},
 		},
 		hooks: { beforeValidate: [roundStorageHook] },
+		validate: validateMeasurement,
 	}
 
 	return typeof overrides === 'function' ? overrides({ field: base }) : base

@@ -91,6 +91,25 @@ test.describe('measurement field', () => {
 		await expect(page.locator('.fields-measurement-cell').first()).toContainText(/lb/i)
 	})
 
+	test('scalar and compound rows match the native number field height', async ({ page }) => {
+		await openShowcaseDoc(page)
+		const nativeBox = await page.locator('#field-nativeNumber').boundingBox()
+		const container = (name: string) =>
+			page
+				.locator('.fields-measurement')
+				.filter({ has: page.locator(`#field-${name}`) })
+				.locator('.fields-measurement__container')
+		const scalarBox = await container('weight').boundingBox()
+		await pickUnit(page, 'height', /^ft in$/i)
+		const compoundBox = await container('height').boundingBox()
+		for (const box of [scalarBox, compoundBox]) {
+			expect(box?.height).toBeGreaterThanOrEqual(39)
+			expect(box?.height).toBeLessThanOrEqual(41)
+		}
+		expect(scalarBox?.height).toBe(nativeBox?.height)
+		expect(compoundBox?.height).toBe(nativeBox?.height)
+	})
+
 	test('open unit panel has no serious or critical axe violations', async ({ page }) => {
 		await openShowcaseDoc(page)
 		await unitBadge(page, 'weight').click()

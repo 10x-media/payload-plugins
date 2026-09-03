@@ -59,6 +59,15 @@ describeForDb('measurement field integration', {}, (db) => {
 		).rejects.toThrow()
 	})
 
+	it('rejects NaN, which native validation would let through to the column', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'athletes',
+				data: { title: 'nan', weight: Number.NaN },
+			})
+		).rejects.toThrow()
+	})
+
 	it('sorts and filters on the canonical number', async () => {
 		// Weights above 200 are unique to this test, so filter and descending
 		// order stay deterministic whatever else the suite created.

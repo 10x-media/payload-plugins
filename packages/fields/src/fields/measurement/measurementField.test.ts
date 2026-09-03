@@ -12,7 +12,13 @@ describe('measurementField factory', () => {
 		expect(field.admin?.components?.Cell).toMatchObject({
 			path: '@10x-media/fields/client#MeasurementCell',
 		})
-		expect(field.validate).toBeUndefined()
+		expect(typeof field.validate).toBe('function')
+	})
+	it('validate rejects NaN and defers everything else to the native validator', async () => {
+		const field = measurementField({ usage: 'bodyWeight' })
+		const options = { req: { t: (key: string) => key } } as never
+		expect(await field.validate?.(Number.NaN as never, options)).toBe('validation:enterNumber')
+		expect(await field.validate?.(80 as never, options)).toBe(true)
 	})
 	it('threads options into measurementOptions clientProps', () => {
 		const field = measurementField({ name: 'h', storageUnit: 'cm', usage: 'personHeight' })

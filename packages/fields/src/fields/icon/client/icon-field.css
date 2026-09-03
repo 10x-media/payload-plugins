@@ -408,7 +408,8 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
 	background: transparent;
 	border: none;
 	border-radius: var(--style-radius-s);
-	color: var(--theme-elevation-600);
+	/* 700, not 600: the small rail label needs 4.5:1 on the drawer background */
+	color: var(--theme-elevation-700);
 	font-family: inherit;
 	font-size: 0.875rem;
 	text-align: left;
@@ -527,6 +528,7 @@ html[data-theme="dark"] .tenx-icon-drawer__banner {
 	padding-top: calc(var(--base) * 0.5);
 	background: var(--theme-bg);
 	border-top: 1px solid var(--theme-elevation-100);
-	color: var(--theme-elevation-600);
+	/* 700, not 600: the small counter needs 4.5:1 on the drawer background */
+	color: var(--theme-elevation-700);
 	font-size: 0.75rem;
 }
