@@ -85,4 +85,24 @@ describe('createQueue', () => {
 		await expect(q.run(fn, controller.signal)).rejects.toBe(reason)
 		expect(fn).not.toHaveBeenCalled()
 	})
+
+	it('rethrows the task error immediately, without sleeping, when the signal aborted before backoff started', async () => {
+		vi.useFakeTimers()
+		try {
+			const taskErr = new Error('task failed')
+			const controller = new AbortController()
+			// Aborts during the attempt itself, so by the time withRetry reaches wait()
+			// the 'abort' event has already fired and a fresh listener would never see it.
+			const fn = vi.fn().mockImplementation(async () => {
+				controller.abort(new Error('aborted mid-attempt'))
+				throw taskErr
+			})
+			const q = createQueue({ concurrency: 1, maxRetries: 3, baseDelayMs: 1000 })
+
+			await expect(q.run(fn, controller.signal)).rejects.toBe(taskErr)
+			expect(fn).toHaveBeenCalledTimes(1)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
 })

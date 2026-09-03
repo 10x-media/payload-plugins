@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ProviderHttpError } from '../adapters/http/fetchJson'
-import { shouldRetryProviderError } from './retryPolicy'
+import { PROVIDER_READ_TIMEOUT_MESSAGE, shouldRetryProviderError } from './retryPolicy'
 
 describe('shouldRetryProviderError', () => {
 	it('retries a 429 twice then stops', () => {
@@ -29,7 +29,7 @@ describe('shouldRetryProviderError', () => {
 	})
 
 	it('never retries the engine timeout abort reason', () => {
-		const err = new Error('analytics: provider read timed out')
+		const err = new Error(PROVIDER_READ_TIMEOUT_MESSAGE)
 		expect(shouldRetryProviderError(err, 0)).toBe(false)
 	})
 

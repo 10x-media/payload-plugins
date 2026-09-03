@@ -4,7 +4,7 @@ import { DEFAULT_TIMEZONE, startOfDayInTz } from '../timeframe/tz'
 import type { CacheStore } from './cacheStore'
 import { createCoalescer } from './coalesce'
 import { createQueue, type QueueOptions } from './queue'
-import { shouldRetryProviderError } from './retryPolicy'
+import { PROVIDER_READ_TIMEOUT_MESSAGE, shouldRetryProviderError } from './retryPolicy'
 
 const DAY_MS = 86_400_000
 
@@ -69,15 +69,26 @@ export function createEngine(opts: EngineOptions): Engine {
 				let fresh: AnalyticsResult
 				const controller = new AbortController()
 				const timer = setTimeout(
-					() => controller.abort(new Error('analytics: provider read timed out')),
+					() => controller.abort(new Error(PROVIDER_READ_TIMEOUT_MESSAGE)),
 					opts.timeoutMs
 				)
 				timer.unref?.()
 				try {
-					fresh = await queue.run(
+					// Races the queued attempt itself, not just its backoff waits, so a signal-blind
+					// adapter (one that never checks ctx.signal) still bounds the read at timeoutMs.
+					// The orphaned attempt keeps its queue slot until the underlying client gives up;
+					// this only bounds how long read() waits for it.
+					const aborted = new Promise<never>((_resolve, reject) => {
+						controller.signal.addEventListener('abort', () => reject(controller.signal.reason), {
+							once: true,
+						})
+					})
+					const attempt = queue.run(
 						() => adapter.query(q, { signal: controller.signal }),
 						controller.signal
 					)
+					attempt.catch(() => {})
+					fresh = await Promise.race([attempt, aborted])
 				} catch (err) {
 					opts.onError?.(err, adapter.id)
 					const stale = await opts.store.getStale<AnalyticsResult>(key)

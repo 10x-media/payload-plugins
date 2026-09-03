@@ -4,6 +4,7 @@ import type { AnalyticsAdapter, AnalyticsQuery } from '../core/contract'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { kvCacheStore } from './cacheStore'
 import { createEngine } from './engine'
+import { PROVIDER_READ_TIMEOUT_MESSAGE } from './retryPolicy'
 
 const q: AnalyticsQuery = {
 	path: '/pricing',
@@ -181,7 +182,7 @@ describe('createEngine', () => {
 			})
 
 			const promise = engine.read(adapter, q)
-			const assertion = expect(promise).rejects.toThrow('analytics: provider read timed out')
+			const assertion = expect(promise).rejects.toThrow(PROVIDER_READ_TIMEOUT_MESSAGE)
 
 			await vi.advanceTimersByTimeAsync(15_000)
 
@@ -218,6 +219,69 @@ describe('createEngine', () => {
 						ctx.signal?.addEventListener('abort', () => reject(ctx.signal?.reason))
 					})
 			)
+
+			const promise = engine.read(adapter, q)
+			const assertion = expect(promise).resolves.toMatchObject({ meta: { stale: true } })
+
+			await vi.advanceTimersByTimeAsync(15_000)
+
+			await assertion
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('rejects at timeoutMs even when the adapter never checks ctx.signal (cold cache)', async () => {
+		vi.useFakeTimers()
+		try {
+			const adapter: AnalyticsAdapter = {
+				id: 'blind',
+				label: 'Blind',
+				capabilities: memoryAdapter().capabilities,
+				isConfigured: () => true,
+				// Truly signal-blind: never resolves, never listens to ctx.signal at all.
+				query: () => new Promise(() => {}),
+			}
+			const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+			const engine = createEngine({
+				store,
+				queue: { concurrency: 4 },
+				ttl: { aggregate: 60, realtime: 5 },
+				timeoutMs: 15_000,
+			})
+
+			const promise = engine.read(adapter, q)
+			const assertion = expect(promise).rejects.toThrow(PROVIDER_READ_TIMEOUT_MESSAGE)
+
+			await vi.advanceTimersByTimeAsync(15_000)
+
+			await assertion
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('stale-serves at timeoutMs even when the adapter never checks ctx.signal (warm cache)', async () => {
+		vi.useFakeTimers()
+		try {
+			const adapter = memoryAdapter()
+			adapter.record({ path: '/pricing', timestamp: new Date('2026-01-10') })
+			const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+			let now = 0
+			store.now = () => now
+			const engine = createEngine({
+				store,
+				queue: { concurrency: 4 },
+				ttl: { aggregate: 60, realtime: 5 },
+				timeoutMs: 15_000,
+			})
+
+			const warm = await engine.read(adapter, q)
+			expect(warm.meta.stale).toBeUndefined()
+
+			now = 61_000
+			// Truly signal-blind: never resolves, never listens to ctx.signal at all.
+			vi.spyOn(adapter, 'query').mockImplementation(() => new Promise(() => {}))
 
 			const promise = engine.read(adapter, q)
 			const assertion = expect(promise).resolves.toMatchObject({ meta: { stale: true } })

@@ -13,6 +13,9 @@ export interface Queue {
 /** Resolves after ms, or rethrows the original task error early if signal aborts first. */
 const wait = (ms: number, taskErr: unknown, signal?: AbortSignal): Promise<void> => {
 	if (!signal) return new Promise((r) => setTimeout(r, ms))
+	// An abort that already fired won't fire its event again, so a listener added
+	// after the fact never triggers; check the already-aborted case up front.
+	if (signal.aborted) return Promise.reject(taskErr)
 	return new Promise<void>((resolve, reject) => {
 		const timer = setTimeout(() => {
 			signal.removeEventListener('abort', onAbort)
