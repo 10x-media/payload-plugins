@@ -3,6 +3,7 @@ import { satisfiesCapabilities } from '../core/capabilities'
 import type {
 	AnalyticsAdapter,
 	AnalyticsFilter,
+	AnalyticsResult,
 	DateRange,
 	DimensionKey,
 	MetricKey,
@@ -89,16 +90,23 @@ export const readForWidgetBreakdown = async (
 	) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
-	const result = await runtime.engine.read(adapter, {
-		metrics: [metric],
-		dimensions: [dimension],
-		dateRange,
-		limit,
-		order: { metric, direction: 'desc' },
-		filters,
-		timezone: tz,
-		scope: ctx.queryScope,
-	})
+	let result: AnalyticsResult
+	try {
+		result = await runtime.engine.read(adapter, {
+			metrics: [metric],
+			dimensions: [dimension],
+			dateRange,
+			limit,
+			order: { metric, direction: 'desc' },
+			filters,
+			timezone: tz,
+			scope: ctx.queryScope,
+		})
+	} catch {
+		// No cache entry (fresh or stale) survived the failed read; degrade like an
+		// unsupported capability instead of throwing through the widget render tree.
+		return { status: 'unavailable', adapterId: adapter.id, ...base }
+	}
 	const rows = result.rows.map((row) => ({
 		label: row.dimensions?.[dimension] ?? '(none)',
 		value: row.metrics[metric] ?? 0,

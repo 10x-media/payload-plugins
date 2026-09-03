@@ -6,6 +6,8 @@ import { analytics } from '../../src/index'
 import { getRuntime } from '../../src/plugin/runtime'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { readForWidget } from '../../src/widgets/readForWidget'
+import { readForWidgetBreakdown } from '../../src/widgets/readForWidgetBreakdown'
+import { readForWidgetSeries } from '../../src/widgets/readForWidgetSeries'
 
 // A 4xx (non-429) ProviderHttpError never retries (see retryPolicy.ts), so one failNext()
 // call reliably fails the read. The default 500 status would retry twice and succeed on
@@ -80,6 +82,30 @@ describeForDb('analytics engine resilience', { dbs: ['mongo'] }, (db) => {
 			req: req(),
 			metrics: ['visitors'],
 			timeframe: 'last7days',
+			now: new Date('2026-01-31T00:00:00.000Z'),
+		})
+		expect(result.status).toBe('unavailable')
+	})
+
+	it('reports unavailable for a series read on a cold cache key with no stale entry', async () => {
+		mem.failNext(injectedFailure())
+		const result = await readForWidgetSeries({
+			req: req(),
+			metric: 'sessions',
+			timeframe: 'last7days',
+			now: new Date('2026-01-31T00:00:00.000Z'),
+		})
+		expect(result.status).toBe('unavailable')
+	})
+
+	it('reports unavailable for a breakdown read on a cold cache key with no stale entry', async () => {
+		mem.failNext(injectedFailure())
+		const result = await readForWidgetBreakdown({
+			req: req(),
+			metric: 'bounceRate',
+			dimension: 'device',
+			timeframe: 'last30days',
+			limit: 5,
 			now: new Date('2026-01-31T00:00:00.000Z'),
 		})
 		expect(result.status).toBe('unavailable')

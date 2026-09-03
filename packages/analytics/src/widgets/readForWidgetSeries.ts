@@ -3,6 +3,7 @@ import { satisfiesCapabilities } from '../core/capabilities'
 import type {
 	AnalyticsAdapter,
 	AnalyticsFilter,
+	AnalyticsResult,
 	AnalyticsRow,
 	DateRange,
 	MetricKey,
@@ -137,25 +138,33 @@ export const readForWidgetSeries = async (
 		runtime.comparison && adapter.capabilities.comparison
 			? (previousWindow(dateRange, tz) ?? undefined)
 			: undefined
-	const [result, previous] = await Promise.all([
-		runtime.engine.read(adapter, {
-			metrics: [metric],
-			dateRange,
-			granularity: 'day',
-			filters,
-			timezone: tz,
-			scope: ctx.queryScope,
-		}),
-		comparisonRange
-			? runtime.engine.read(adapter, {
-					metrics: [metric],
-					dateRange: comparisonRange,
-					filters,
-					timezone: tz,
-					scope: ctx.queryScope,
-				})
-			: undefined,
-	])
+	let result: AnalyticsResult
+	let previous: AnalyticsResult | undefined
+	try {
+		;[result, previous] = await Promise.all([
+			runtime.engine.read(adapter, {
+				metrics: [metric],
+				dateRange,
+				granularity: 'day',
+				filters,
+				timezone: tz,
+				scope: ctx.queryScope,
+			}),
+			comparisonRange
+				? runtime.engine.read(adapter, {
+						metrics: [metric],
+						dateRange: comparisonRange,
+						filters,
+						timezone: tz,
+						scope: ctx.queryScope,
+					})
+				: undefined,
+		])
+	} catch {
+		// No cache entry (fresh or stale) survived the failed read; degrade like an
+		// unsupported capability instead of throwing through the widget render tree.
+		return { status: 'unavailable', adapterId: adapter.id, ...base }
+	}
 	const previousTotal = previous ? previous.totals?.[metric] : undefined
 	return {
 		status: 'ok',
