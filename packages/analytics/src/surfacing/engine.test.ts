@@ -1,6 +1,6 @@
 import { inMemoryKVAdapter } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import type { AnalyticsAdapter, AnalyticsQuery } from '../core/contract'
+import type { AnalyticsAdapter, AnalyticsQuery, AnalyticsResult } from '../core/contract'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { kvCacheStore } from './cacheStore'
 import { createEngine } from './engine'
@@ -289,6 +289,116 @@ describe('createEngine', () => {
 			await vi.advanceTimersByTimeAsync(15_000)
 
 			await assertion
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('enforces a declared per-adapter rate limit across concurrent reads for distinct queries', async () => {
+		vi.useFakeTimers()
+		try {
+			const base = memoryAdapter()
+			base.record({ path: '/a', timestamp: new Date('2026-01-10') })
+			base.record({ path: '/b', timestamp: new Date('2026-01-10') })
+			base.record({ path: '/c', timestamp: new Date('2026-01-10') })
+			const adapter: AnalyticsAdapter = {
+				...base,
+				capabilities: { ...base.capabilities, rateLimit: { requestsPerMinute: 2 } },
+			}
+			const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+			const engine = createEngine({
+				store,
+				queue: { concurrency: 4 },
+				ttl: { aggregate: 60, realtime: 5 },
+				timeoutMs: 60_000, // longer than the 30s refill wait below
+			})
+
+			const settled: string[] = []
+			const track = (label: string, p: Promise<AnalyticsResult>): Promise<AnalyticsResult> =>
+				p.then((r) => {
+					settled.push(label)
+					return r
+				})
+
+			const a = track('a', engine.read(adapter, { ...q, path: '/a' }))
+			const b = track('b', engine.read(adapter, { ...q, path: '/b' }))
+			const c = track('c', engine.read(adapter, { ...q, path: '/c' }))
+
+			await vi.advanceTimersByTimeAsync(0)
+			expect(settled.sort()).toEqual(['a', 'b'])
+
+			await vi.advanceTimersByTimeAsync(29_999)
+			expect(settled).not.toContain('c')
+
+			await vi.advanceTimersByTimeAsync(1)
+			await c
+			expect(settled).toContain('c')
+
+			await Promise.all([a, b, c])
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('rejects at timeoutMs when it elapses while waiting on the adapter rate limiter (cold cache)', async () => {
+		vi.useFakeTimers()
+		try {
+			const base = memoryAdapter()
+			const adapter: AnalyticsAdapter = {
+				...base,
+				capabilities: { ...base.capabilities, rateLimit: { requestsPerMinute: 1 } },
+			}
+			const spy = vi.spyOn(adapter, 'query')
+			const { engine } = setup()
+
+			// Spends the adapter's single per-minute token so the next read must wait on it.
+			await engine.read(adapter, { ...q, path: '/warm' })
+			expect(spy).toHaveBeenCalledTimes(1)
+
+			const promise = engine.read(adapter, { ...q, path: '/blocked' })
+			const assertion = expect(promise).rejects.toThrow(PROVIDER_READ_TIMEOUT_MESSAGE)
+
+			await vi.advanceTimersByTimeAsync(15_000)
+
+			await assertion
+			// Still 1: the abort fired while waiting on the limiter, before the adapter was ever called.
+			expect(spy).toHaveBeenCalledTimes(1)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('stale-serves when timeoutMs elapses while waiting on the adapter rate limiter (warm cache)', async () => {
+		vi.useFakeTimers()
+		try {
+			const base = memoryAdapter()
+			base.record({ path: '/pricing', timestamp: new Date('2026-01-10') })
+			const adapter: AnalyticsAdapter = {
+				...base,
+				capabilities: { ...base.capabilities, rateLimit: { requestsPerMinute: 1 } },
+			}
+			const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+			let now = 0
+			store.now = () => now
+			const engine = createEngine({
+				store,
+				queue: { concurrency: 4 },
+				ttl: { aggregate: 60, realtime: 5 },
+				timeoutMs: 15_000,
+			})
+
+			const warm = await engine.read(adapter, q)
+			expect(warm.meta.stale).toBeUndefined()
+
+			now = 61_000 // past the 60s ttl; the single per-minute token stays spent
+			const spy = vi.spyOn(adapter, 'query')
+			const promise = engine.read(adapter, q)
+			const assertion = expect(promise).resolves.toMatchObject({ meta: { stale: true } })
+
+			await vi.advanceTimersByTimeAsync(15_000)
+
+			await assertion
+			expect(spy).not.toHaveBeenCalled()
 		} finally {
 			vi.useRealTimers()
 		}

@@ -4,6 +4,7 @@ import { DEFAULT_TIMEZONE, startOfDayInTz } from '../timeframe/tz'
 import type { CacheStore } from './cacheStore'
 import { createCoalescer } from './coalesce'
 import { createQueue, type QueueOptions } from './queue'
+import { limiterFor, type RateLimiter } from './rateLimiter'
 import { PROVIDER_READ_TIMEOUT_MESSAGE, shouldRetryProviderError } from './retryPolicy'
 
 const DAY_MS = 86_400_000
@@ -45,6 +46,7 @@ const emptyResult = (provider: string, q: AnalyticsQuery): AnalyticsResult => ({
 
 export function createEngine(opts: EngineOptions): Engine {
 	const coalesce = createCoalescer<AnalyticsResult>()
+	const limiters = new Map<string, RateLimiter>()
 	const queue = createQueue({
 		...opts.queue,
 		shouldRetry: shouldRetryProviderError,
@@ -83,10 +85,14 @@ export function createEngine(opts: EngineOptions): Engine {
 							once: true,
 						})
 					})
-					const attempt = queue.run(
-						() => adapter.query(q, { signal: controller.signal }),
-						controller.signal
-					)
+					const attempt = queue.run(async () => {
+						const release = await limiterFor(limiters, adapter).take(controller.signal)
+						try {
+							return await adapter.query(q, { signal: controller.signal })
+						} finally {
+							release()
+						}
+					}, controller.signal)
 					attempt.catch(() => {})
 					fresh = await Promise.race([attempt, aborted])
 				} catch (err) {
