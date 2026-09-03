@@ -27,6 +27,8 @@ export interface EngineOptions {
 	queue: QueueOptions
 	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
 	ttl: { aggregate?: number; realtime?: number }
+	/** Called once per failed adapter fetch, before falling back to a stale cache entry. */
+	onError?: (err: unknown, adapterId: string) => void
 }
 
 export interface Engine {
@@ -57,7 +59,15 @@ export function createEngine(opts: EngineOptions): Engine {
 				const cached = await opts.store.get<AnalyticsResult>(key)
 				if (cached) return cached
 
-				const fresh = await queue.run(() => adapter.query(q, {}))
+				let fresh: AnalyticsResult
+				try {
+					fresh = await queue.run(() => adapter.query(q, {}))
+				} catch (err) {
+					opts.onError?.(err, adapter.id)
+					const stale = await opts.store.getStale<AnalyticsResult>(key)
+					if (stale) return { ...stale, meta: { ...stale.meta, stale: true } }
+					throw err
+				}
 				const result: AnalyticsResult = clamped
 					? { ...fresh, meta: { ...fresh.meta, clamped: true } }
 					: fresh

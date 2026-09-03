@@ -66,6 +66,47 @@ describe('createEngine', () => {
 		expect(res.meta.clamped).toBe(true)
 	})
 
+	it('serves a stale cache entry and calls onError once when the adapter fails', async () => {
+		const adapter = memoryAdapter()
+		adapter.record({ path: '/pricing', timestamp: new Date('2026-01-10') })
+		const store = kvCacheStore(inMemoryKVAdapter().init({} as never))
+		let now = 0
+		store.now = () => now
+		const onError = vi.fn()
+		const engine = createEngine({
+			store,
+			queue: { concurrency: 4 },
+			ttl: { aggregate: 60, realtime: 5 },
+			onError,
+		})
+
+		const warm = await engine.read(adapter, q)
+		expect(warm.meta.stale).toBeUndefined()
+
+		now = 61_000 // past the 60s ttl, still inside the stale window
+		const err = new Error('adapter down')
+		vi.spyOn(adapter, 'query').mockRejectedValueOnce(err)
+		const result = await engine.read(adapter, q)
+
+		expect(result.meta.stale).toBe(true)
+		expect(result.totals?.pageviews).toBe(warm.totals?.pageviews)
+		expect(onError).toHaveBeenCalledTimes(1)
+		expect(onError).toHaveBeenCalledWith(err, adapter.id)
+	})
+
+	it('rejects on a failing adapter with a cold cache', async () => {
+		const { adapter, engine } = setup()
+		const err = new Error('adapter down')
+		vi.spyOn(adapter, 'query').mockRejectedValueOnce(err)
+		await expect(engine.read(adapter, q)).rejects.toThrow('adapter down')
+	})
+
+	it('never marks a successful read as stale', async () => {
+		const { adapter, engine } = setup()
+		const result = await engine.read(adapter, q)
+		expect(result.meta.stale).toBeUndefined()
+	})
+
 	it('does not clamp when maxLookbackDays is null', async () => {
 		let received: { start: Date; end: Date } | undefined
 		const adapter: AnalyticsAdapter = {

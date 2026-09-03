@@ -87,7 +87,14 @@ export interface AnalyticsRow {
 export interface AnalyticsResult {
 	rows: AnalyticsRow[]
 	totals?: Partial<Record<MetricKey, number>>
-	meta: { provider: string; sampled?: boolean; clamped?: boolean; fetchedAt: string }
+	meta: {
+		provider: string
+		sampled?: boolean
+		clamped?: boolean
+		fetchedAt: string
+		/** Served from an expired cache entry because the live refresh failed. */
+		stale?: boolean
+	}
 }
 
 export interface RateLimitDescriptor {
