@@ -59,12 +59,21 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 	box-shadow: none;
 }
 
+/* Each value hugs its unit; the wider gap separates the pairs, so the row
+   reads "5 ft  11 in" rather than evenly scattered tokens */
 .fields-measurement__compound {
 	display: flex;
 	flex: 1 1 auto;
 	min-width: 0;
 	align-items: center;
-	gap: 6px;
+	gap: 12px;
+	height: 100%;
+}
+
+.fields-measurement__part {
+	display: flex;
+	align-items: center;
+	gap: 3px;
 	height: 100%;
 }
 

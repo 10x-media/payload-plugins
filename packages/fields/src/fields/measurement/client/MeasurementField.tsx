@@ -210,38 +210,42 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 				<div className={`${baseClass}__container`}>
 					{isCompound && compoundDef ? (
 						<span className={`${baseClass}__compound`}>
-							<input
-								className={`${baseClass}__input ${baseClass}__input--compound`}
-								id={inputId}
-								inputMode="decimal"
-								name={path}
-								onBlur={onBlur}
-								onChange={onDraftChange('primary')}
-								readOnly={isReadOnly}
-								step="any"
-								style={draftWidth(drafts.primary)}
-								type="number"
-								value={drafts.primary}
-							/>
-							<span aria-hidden="true" className={`${baseClass}__suffix`}>
-								{unitLabel(compoundDef.major, locale, 'short')}
+							<span className={`${baseClass}__part`}>
+								<input
+									className={`${baseClass}__input ${baseClass}__input--compound`}
+									id={inputId}
+									inputMode="decimal"
+									name={path}
+									onBlur={onBlur}
+									onChange={onDraftChange('primary')}
+									readOnly={isReadOnly}
+									step="any"
+									style={draftWidth(drafts.primary)}
+									type="number"
+									value={drafts.primary}
+								/>
+								<span aria-hidden="true" className={`${baseClass}__suffix`}>
+									{unitLabel(compoundDef.major, locale, 'short')}
+								</span>
 							</span>
-							<input
-								aria-label={unitLabel(compoundDef.minor, locale, 'long')}
-								className={`${baseClass}__input ${baseClass}__input--compound`}
-								inputMode="decimal"
-								max={compoundDef.ratio - 0.001}
-								min={0}
-								onBlur={onBlur}
-								onChange={onDraftChange('minor')}
-								readOnly={isReadOnly}
-								step="any"
-								style={draftWidth(drafts.minor)}
-								type="number"
-								value={drafts.minor}
-							/>
-							<span aria-hidden="true" className={`${baseClass}__suffix`}>
-								{unitLabel(compoundDef.minor, locale, 'short')}
+							<span className={`${baseClass}__part`}>
+								<input
+									aria-label={unitLabel(compoundDef.minor, locale, 'long')}
+									className={`${baseClass}__input ${baseClass}__input--compound`}
+									inputMode="decimal"
+									max={compoundDef.ratio - 0.001}
+									min={0}
+									onBlur={onBlur}
+									onChange={onDraftChange('minor')}
+									readOnly={isReadOnly}
+									step="any"
+									style={draftWidth(drafts.minor)}
+									type="number"
+									value={drafts.minor}
+								/>
+								<span aria-hidden="true" className={`${baseClass}__suffix`}>
+									{unitLabel(compoundDef.minor, locale, 'short')}
+								</span>
 							</span>
 						</span>
 					) : (
