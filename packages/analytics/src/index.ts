@@ -196,7 +196,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },
 				ttl: resolved.cache.ttl,
-				timeoutMs: 15_000,
+				timeoutMs: resolved.cache.timeoutMs,
+				onError: (err, adapterId) => {
+					payload.logger?.warn(`analytics: read failed for adapter "${adapterId}": ${String(err)}`)
+				},
 			})
 			setRuntime(payload, {
 				registry,

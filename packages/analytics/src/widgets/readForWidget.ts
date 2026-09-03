@@ -1,6 +1,12 @@
 import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
-import type { AnalyticsAdapter, AnalyticsFilter, DateRange, MetricKey } from '../core/contract'
+import type {
+	AnalyticsAdapter,
+	AnalyticsFilter,
+	AnalyticsResult,
+	DateRange,
+	MetricKey,
+} from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
@@ -78,24 +84,32 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		runtime.comparison && adapter.capabilities.comparison
 			? (previousWindow(dateRange, tz) ?? undefined)
 			: undefined
-	const [result, previous] = await Promise.all([
-		runtime.engine.read(adapter, {
-			metrics,
-			dateRange,
-			filters,
-			timezone: tz,
-			scope: ctx.queryScope,
-		}),
-		comparisonRange
-			? runtime.engine.read(adapter, {
-					metrics,
-					dateRange: comparisonRange,
-					filters,
-					timezone: tz,
-					scope: ctx.queryScope,
-				})
-			: undefined,
-	])
+	let result: AnalyticsResult
+	let previous: AnalyticsResult | undefined
+	try {
+		;[result, previous] = await Promise.all([
+			runtime.engine.read(adapter, {
+				metrics,
+				dateRange,
+				filters,
+				timezone: tz,
+				scope: ctx.queryScope,
+			}),
+			comparisonRange
+				? runtime.engine.read(adapter, {
+						metrics,
+						dateRange: comparisonRange,
+						filters,
+						timezone: tz,
+						scope: ctx.queryScope,
+					})
+				: undefined,
+		])
+	} catch {
+		// No cache entry (fresh or stale) survived the failed read; degrade like an
+		// unsupported capability instead of throwing through the widget render tree.
+		return { status: 'unavailable', adapterId: adapter.id, ...base }
+	}
 	const previousMetrics = previous ? (previous.totals ?? {}) : undefined
 	return {
 		status: 'ok',

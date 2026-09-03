@@ -11,6 +11,7 @@ const DEFAULT_SYNC_CRON = '0 */6 * * *'
 const DEFAULT_SYNC_COLLECTION = 'analytics-daily'
 const DEFAULT_SYNC_LOOKBACK = 3
 const DEFAULT_SCOPE_FIELD = 'scope'
+const DEFAULT_TIMEOUT_MS = 15_000
 
 /**
  * Maps a request to its analytics boundary (tenant id, site key). Null means the
@@ -118,7 +119,12 @@ export type AnalyticsPluginOptions = {
 	 * augmented, each slug's resolvers receive that collection's typed document.
 	 */
 	collections?: { [TSlug in CollectionSlug]?: AnalyticsBinding<TSlug> }
-	cache?: { ttl?: { aggregate?: number; realtime?: number }; warm?: boolean | { cron?: string } }
+	cache?: {
+		ttl?: { aggregate?: number; realtime?: number }
+		warm?: boolean | { cron?: string }
+		/** Per-read provider timeout in ms, spanning retries and limiter waits. Default 15000. */
+		timeoutMs?: number
+	}
 	widgets?:
 		| boolean
 		| {
@@ -181,6 +187,7 @@ export interface ResolvedOptions {
 		/** Undefined when unset: adapter recommendedTtl is the fallback, an explicit value wins. */
 		ttl: { aggregate?: number; realtime?: number }
 		warm: { enabled: boolean; cron: string }
+		timeoutMs: number
 	}
 	widgets: {
 		enabled: boolean
@@ -332,6 +339,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 				realtime: options.cache?.ttl?.realtime,
 			},
 			warm,
+			timeoutMs: options.cache?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
 		},
 		widgets,
 		sync,

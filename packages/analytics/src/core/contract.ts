@@ -101,7 +101,12 @@ export interface RateLimitDescriptor {
 	requestsPerMinute?: number
 	requestsPerHour?: number
 	maxConcurrent?: number
+	/**
+	 * Describes the provider's quota model for documentation; the limiter always
+	 * throttles by request count regardless of this value.
+	 */
 	quotaModel?: 'requests' | 'tokens'
+	/** Documents whether reads consume the provider's write/ingest quota too. */
 	readsCountAsUsage?: boolean
 }
 
