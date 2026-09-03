@@ -10,6 +10,8 @@ const caps: AnalyticsCapabilities = {
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews', 'visitors']),
 	dimensions: new Set(['page', 'referrer']),
+	filters: new Set(['page']),
+	filterOperators: new Set(['eq']),
 	batchPageReport: true,
 	rateLimit: null,
 	recommendedTtl: { realtime: 300, aggregate: 3600 },
@@ -28,6 +30,20 @@ describe('satisfiesCapabilities', () => {
 	it('passes with empty requirements', () => {
 		expect(satisfiesCapabilities(caps, {})).toBe(true)
 	})
+	it('passes when every required filter dimension is in caps.filters', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['page'] })).toBe(true)
+	})
+	it('fails when a required filter dimension is missing from caps.filters', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['referrer'] })).toBe(false)
+	})
+	it('passes when every required filter operator is in caps.filterOperators', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['page'], filterOperators: ['eq'] })).toBe(true)
+	})
+	it('fails when a required filter operator is missing from caps.filterOperators', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['page'], filterOperators: ['matches'] })).toBe(
+			false
+		)
+	})
 })
 
 describe('serializeCapabilities', () => {
@@ -41,6 +57,8 @@ describe('serializeCapabilities', () => {
 			maxLookbackDays: null,
 			metrics: new Set(['pageviews', 'visitors']),
 			dimensions: new Set(['page']),
+			filters: new Set(['page']),
+			filterOperators: new Set(['eq', 'contains']),
 			batchPageReport: true,
 			rateLimit: null,
 			recommendedTtl: { realtime: 10, aggregate: 300 },
@@ -48,6 +66,8 @@ describe('serializeCapabilities', () => {
 		const wire = serializeCapabilities(caps)
 		expect(wire.metrics).toEqual(['pageviews', 'visitors'])
 		expect(wire.dimensions).toEqual(['page'])
+		expect(wire.filters).toEqual(['page'])
+		expect(wire.filterOperators).toEqual(['eq', 'contains'])
 		expect(wire.realtime).toBe(true)
 		expect(wire.realtimeWindowMinutes).toBe(60)
 		expect(JSON.parse(JSON.stringify(wire))).toEqual(wire)
@@ -62,6 +82,8 @@ describe('serializeCapabilities', () => {
 			maxLookbackDays: 30,
 			metrics: new Set(),
 			dimensions: new Set(),
+			filters: new Set(),
+			filterOperators: new Set(['eq']),
 			batchPageReport: false,
 			rateLimit: { requestsPerHour: 600 },
 			recommendedTtl: { realtime: 300, aggregate: 3600 },
@@ -72,6 +94,8 @@ describe('serializeCapabilities', () => {
 			[
 				'comparison',
 				'dimensions',
+				'filters',
+				'filterOperators',
 				'maxLookbackDays',
 				'metrics',
 				'minGranularity',
@@ -80,6 +104,7 @@ describe('serializeCapabilities', () => {
 			].sort()
 		)
 		expect(wire.metrics).toEqual([])
+		expect(wire.filters).toEqual([])
 		expect((wire as Record<string, unknown>).rateLimit).toBeUndefined()
 		expect((wire as Record<string, unknown>).recommendedTtl).toBeUndefined()
 		expect((wire as Record<string, unknown>).batchPageReport).toBeUndefined()
@@ -95,6 +120,8 @@ describe('serializeCapabilities', () => {
 			maxLookbackDays: null,
 			metrics: new Set(),
 			dimensions: new Set(),
+			filters: new Set(),
+			filterOperators: new Set(['eq']),
 			batchPageReport: true,
 			rateLimit: null,
 			recommendedTtl: { realtime: 300, aggregate: 3600 },

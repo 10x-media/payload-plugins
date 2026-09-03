@@ -9,7 +9,7 @@ import type {
 	MetricKey,
 } from '../../core/contract'
 import { fetchJson } from '../http/fetchJson'
-import { dayIso } from '../series'
+import { dayIso, hourIso } from '../series'
 
 export interface PosthogConfig {
 	/** PostHog project id (numeric). */
@@ -66,6 +66,11 @@ const posthogDimensions: ReadonlySet<DimensionKey> = new Set(
 const sqlString = (value: string): string =>
 	`'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 
+// ILIKE treats % and _ as wildcards and backslash as its own escape char; backslash-escape
+// backslash first (so a raw \ in the value doesn't get read as escaping the next char),
+// then % and _, before the whole thing is wrapped in % ... % and quoted.
+const escapeLikeValue = (value: string): string => value.replace(/[\\%_]/g, (c) => `\\${c}`)
+
 const sqlDateTimeLiteral = (d: Date): string =>
 	sqlString(d.toISOString().slice(0, 19).replace('T', ' '))
 
@@ -83,10 +88,12 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		perPageQuery: true,
 		realtime: false,
 		comparison: false,
-		minGranularity: 'day',
+		minGranularity: 'hour',
 		maxLookbackDays,
 		metrics: posthogMetrics,
 		dimensions: posthogDimensions,
+		filters: posthogDimensions,
+		filterOperators: new Set(['eq', 'contains', 'matches']),
 		batchPageReport: true,
 		rateLimit: { requestsPerMinute: 240, requestsPerHour: 2400 },
 		recommendedTtl: { realtime: 300, aggregate: 3600 },
@@ -101,9 +108,14 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const breakdownDim = (q.dimensions ?? []).find((d) => DIMENSION_SQL[d])
-			// A total-events metric or an event-name breakdown must scan every event, not
-			// just pageviews; those reads switch to conditional aggregation.
-			const scanAllEvents = q.metrics.includes('events') || breakdownDim === 'event'
+			// A total-events metric, an event-name breakdown, or a filter on the event
+			// dimension must scan every event, not just pageviews (a `$pageview` WHERE
+			// clause combined with an `event = 'x'` filter would be self-contradictory and
+			// zero every metric); those reads switch to conditional aggregation.
+			const scanAllEvents =
+				q.metrics.includes('events') ||
+				breakdownDim === 'event' ||
+				(q.filters ?? []).some((f) => f.dimension === 'event' && DIMENSION_SQL[f.dimension])
 			const metricSql = scanAllEvents ? METRIC_SQL_ALL : METRIC_SQL_PAGEVIEW
 			const wanted = q.metrics.filter((m) => metricSql[m])
 			const exprs = [...new Set(wanted.map((m) => metricSql[m] as string))]
@@ -125,6 +137,21 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				// Bracket property access with escaped literals: neither the configured
 				// property name nor the scope value can break out of the HogQL string.
 				where.push(`properties[${sqlString(config.scopeProperty)}] = ${sqlString(q.scope)}`)
+			}
+			// Capability gating (filters/filterOperators) is the real contract upstream; an
+			// unsupported dimension is dropped here as the safety net so it never throws.
+			for (const filter of q.filters ?? []) {
+				const expr = DIMENSION_SQL[filter.dimension]
+				if (!expr) {
+					continue
+				}
+				if (filter.operator === 'eq') {
+					where.push(`${expr} = ${sqlString(filter.value)}`)
+				} else if (filter.operator === 'contains') {
+					where.push(`${expr} ILIKE ${sqlString(`%${escapeLikeValue(filter.value)}%`)}`)
+				} else if (filter.operator === 'matches') {
+					where.push(`match(${expr}, ${sqlString(filter.value)})`)
+				}
 			}
 			const selectMetrics = exprs.map((expr, i) => `${expr} AS m${i}`)
 
@@ -166,6 +193,21 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				const rows: AnalyticsRow[] = []
 				for (const row of seriesData.results) {
 					const ts = dayIso(String(row[0] ?? ''))
+					if (ts) {
+						rows.push({ timestamp: ts, metrics: readRow(row, 1) })
+					}
+				}
+				return { rows, totals, meta: { provider: 'posthog', fetchedAt } }
+			}
+
+			if (q.granularity === 'hour' && !breakdownDim) {
+				// Same timezone-bucketing rationale as the day branch above, at hour resolution.
+				const hourExpr = `toStartOfHour(timestamp, ${sqlString(q.timezone ?? 'UTC')})`
+				const seriesSql = `SELECT ${hourExpr} AS hour, ${selectMetrics.join(', ')} FROM events WHERE ${where.join(' AND ')} GROUP BY hour ORDER BY hour`
+				const [seriesData, totals] = await Promise.all([runSql(seriesSql), fetchTotals()])
+				const rows: AnalyticsRow[] = []
+				for (const row of seriesData.results) {
+					const ts = hourIso(String(row[0] ?? ''))
 					if (ts) {
 						rows.push({ timestamp: ts, metrics: readRow(row, 1) })
 					}

@@ -10,6 +10,8 @@ const caps = (minGranularity: Granularity): AnalyticsCapabilities => ({
 	maxLookbackDays: null,
 	metrics: new Set(),
 	dimensions: new Set(),
+	filters: new Set(),
+	filterOperators: new Set(['eq']),
 	batchPageReport: false,
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },

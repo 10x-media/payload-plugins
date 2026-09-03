@@ -1,5 +1,5 @@
 export type { CapabilityRequirement } from '../core/capabilities'
-export type { DateRange, DimensionKey, MetricKey } from '../core/contract'
+export type { AnalyticsFilter, DateRange, DimensionKey, MetricKey } from '../core/contract'
 export { AnalyticsPanelField } from '../fields/AnalyticsPanelField'
 export { AnalyticsStatField } from '../fields/AnalyticsStatField'
 export { formatMetricValue } from '../fields/format'

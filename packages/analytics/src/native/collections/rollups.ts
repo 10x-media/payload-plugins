@@ -3,9 +3,13 @@ import type { CollectionConfig, Field } from 'payload'
 export const ROLLUPS_SLUG = 'analytics-rollups'
 
 /**
- * Scoped installs add a required scope key ('' = the null scope) to every rollup
+ * `hostname` ('' = the hostname-less family) is part of the unique bucket on every
+ * native install: unfiltered reads hit the '' family and hostname-scoped reads hit the
+ * exact-hostname family, both kept per-bucket exact by dual emission in computeRollupDeltas.
+ * Scoped installs add a further required scope key ('' = the null scope) to every rollup
  * row and to the unique bucket index, so each scope accumulates its own buckets.
- * Existing native installs enabling scope need a migration for the new column.
+ * Existing native installs need a migration for the new hostname column (and, if
+ * enabling scope, the scope column too).
  */
 export const rollupsCollection = (scoped = false): CollectionConfig => ({
 	slug: ROLLUPS_SLUG,
@@ -17,6 +21,7 @@ export const rollupsCollection = (scoped = false): CollectionConfig => ({
 		{ name: 'path', type: 'text', required: true, index: true },
 		{ name: 'dimension', type: 'text', required: true, defaultValue: '' },
 		{ name: 'dimvalue', type: 'text', required: true, defaultValue: '' },
+		{ name: 'hostname', type: 'text', required: true, defaultValue: '' },
 		...(scoped
 			? [
 					{
@@ -38,9 +43,12 @@ export const rollupsCollection = (scoped = false): CollectionConfig => ({
 	indexes: [
 		scoped
 			? {
-					fields: ['granularity', 'period', 'path', 'dimension', 'dimvalue', 'scope'],
+					fields: ['granularity', 'period', 'path', 'dimension', 'dimvalue', 'hostname', 'scope'],
 					unique: true,
 				}
-			: { fields: ['granularity', 'period', 'path', 'dimension', 'dimvalue'], unique: true },
+			: {
+					fields: ['granularity', 'period', 'path', 'dimension', 'dimvalue', 'hostname'],
+					unique: true,
+				},
 	],
 })

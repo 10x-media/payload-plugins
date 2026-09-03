@@ -55,6 +55,8 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: umamiMetrics,
 		dimensions: umamiDimensions,
+		filters: new Set(),
+		filterOperators: new Set(['eq']),
 		batchPageReport: true,
 		rateLimit: null,
 		recommendedTtl: { realtime: 300, aggregate: 3600 },

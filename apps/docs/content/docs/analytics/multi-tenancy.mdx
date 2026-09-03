@@ -116,6 +116,7 @@ The `scopeProperty: 'tenant'` on the platform adapter (step 1) closes the loop: 
 ## 4. Who sees what
 
 - A tenant request resolves its scope, so widgets, document stat fields, and the realtime endpoint read that tenant's data: native reads filter on the scope column, the platform PostHog filters on `scopeProperty`, and the tenant's own collection-configured providers are already tenant-specific.
+- The [sync tier](/analytics/sync)'s `analytics-daily` rows are scope-bound the same way `analytics-providers` documents are: each row is stamped with the resolved scope at sync time, and reads through `payload.find` are scope-filtered unless the requesting user has `access.platformRead`. Before this, every synced row was readable by any authenticated admin regardless of tenant; a scoped install upgrading from an unscoped `sync` config should treat that as closed rather than assume it always worked this way.
 - Cross-scope reads are explicit: pass `scope: '*'` to a read (e.g. from a custom platform dashboard widget). They are gated by `access.platformRead`, which defaults to deny once `scopeResolver` is set; configure it to your host role:
 
 ```ts

@@ -81,6 +81,8 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: ga4Metrics,
 		dimensions: ga4Dimensions,
+		filters: ga4Dimensions,
+		filterOperators: new Set(['eq']),
 		batchPageReport: true,
 		rateLimit: { maxConcurrent: 10, quotaModel: 'tokens', readsCountAsUsage: true },
 		recommendedTtl: { realtime: 300, aggregate: 21600 },
@@ -148,6 +150,17 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 						fieldName: 'hostName',
 						stringFilter: { matchType: 'EXACT', value: q.hostname },
 					},
+				})
+			}
+			// Capability gating (filters/filterOperators) is the real contract upstream; an
+			// unsupported dimension or operator is dropped here as the safety net.
+			for (const filter of q.filters ?? []) {
+				const fieldName = DIMENSION_MAP[filter.dimension]
+				if (!fieldName || filter.operator !== 'eq') {
+					continue
+				}
+				filterExprs.push({
+					filter: { fieldName, stringFilter: { matchType: 'EXACT', value: filter.value } },
 				})
 			}
 			const dimensionFilter =

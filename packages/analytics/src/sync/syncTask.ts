@@ -8,7 +8,7 @@ export const SYNC_TASK_SLUG = 'analytics-sync'
 
 const DAY_MS = 86_400_000
 
-export type SyncRow = { source: string; date: Date; syncedAt: Date } & Partial<
+export type SyncRow = { source: string; date: Date; syncedAt: Date; scope: string } & Partial<
 	Record<SyncMetric, number>
 >
 
@@ -24,7 +24,11 @@ export interface SyncTaskOptions {
  * `date`, each present numeric metric is copied, absent metrics are omitted (stored null).
  * Returns null when the row has no usable timestamp, so a malformed row is skipped not written.
  */
-export const toSyncRow = (source: string, row: AnalyticsRow, syncedAt: Date): SyncRow | null => {
+export const toSyncRow = (
+	source: string,
+	row: AnalyticsRow,
+	opts: { syncedAt: Date; scope?: string }
+): SyncRow | null => {
 	if (!row.timestamp) {
 		return null
 	}
@@ -32,7 +36,7 @@ export const toSyncRow = (source: string, row: AnalyticsRow, syncedAt: Date): Sy
 	if (Number.isNaN(date.getTime())) {
 		return null
 	}
-	const doc: SyncRow = { source, date, syncedAt }
+	const doc: SyncRow = { source, date, syncedAt: opts.syncedAt, scope: opts.scope ?? '' }
 	for (const metric of METRIC_FIELDS) {
 		const value = row.metrics[metric]
 		if (typeof value === 'number') {
@@ -53,7 +57,11 @@ const upsertDailyRow = async (
 	const existing = await req.payload.find({
 		collection: collectionSlug as never,
 		where: {
-			and: [{ source: { equals: row.source } }, { date: { equals: row.date.toISOString() } }],
+			and: [
+				{ source: { equals: row.source } },
+				{ date: { equals: row.date.toISOString() } },
+				{ scope: { equals: row.scope } },
+			],
 		},
 		limit: 1,
 		depth: 0,
@@ -133,7 +141,7 @@ export const syncTask = (
 				continue
 			}
 			for (const row of result.rows) {
-				const doc = toSyncRow(adapter.id, row, now)
+				const doc = toSyncRow(adapter.id, row, { syncedAt: now, scope: scope ?? '' })
 				if (!doc) {
 					continue
 				}

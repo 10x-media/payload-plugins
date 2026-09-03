@@ -84,7 +84,14 @@ export async function bumpRollup(
 	}
 	// The conflict target must match the unique index exactly, which includes the
 	// scope column only in scoped installs (mirrored by a scope key on RollupKey).
-	const target = [table.granularity, table.period, table.path, table.dimension, table.dimvalue]
+	const target = [
+		table.granularity,
+		table.period,
+		table.path,
+		table.dimension,
+		table.dimvalue,
+		table.hostname,
+	]
 	if (key.scope !== undefined) {
 		target.push(table.scope)
 	}
