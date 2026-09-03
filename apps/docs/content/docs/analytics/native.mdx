@@ -63,7 +63,7 @@ On Postgres the unique index comes from migrations; nothing extra is needed once
 
 ## Filters and hour granularity
 
-`AnalyticsQuery.filters` narrows a read to matching raw events, honored on `page`, `country`, `region`, `city`, `device`, `source`, and `event` with the `eq` and `contains` operators (`contains` is case-insensitive on both Mongo and Postgres; a `matches` filter is dropped, since native has no regex engine over stored events). `granularity: 'hour'` buckets a series into UTC hours instead of days.
+`AnalyticsQuery.filters` narrows a read to matching raw events, honored on `page`, `country`, `region`, `city`, `device`, `source`, and `event` with the `eq` and `contains` operators (`contains` is case-insensitive on both Mongo and Postgres; on Postgres `%` and `_` in the value act as wildcards, while Mongo escapes them; a `matches` filter is dropped, since native has no regex engine over stored events). `granularity: 'hour'` buckets a series into UTC hours instead of days.
 
 Both a filtered read and an hour-granularity read bypass the day-bucketed rollups and aggregate raw events directly, so they are bounded by [retention](#retention-pruning): a range reaching further back than `retentionDays` is clamped, and the read is capped at the same 50,000-event window as realtime, past which `meta.sampled` reports `true`. An unfiltered, day-granularity read still comes from the exact rollup buckets and has no such cap. Hour buckets floor to the UTC hour regardless of `reportingTimezone`; day buckets stay timezone-aligned. `binding.hostname` (see [display fields](/analytics/display-fields)) filters both paths.
 

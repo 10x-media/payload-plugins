@@ -362,9 +362,7 @@ describe('posthog adapter', () => {
 			{}
 		)
 		const sql = body.query?.query ?? ''
-		// A bare `WHERE event = '$pageview'` clause combined with `event = 'signup'` would be
-		// self-contradictory and zero every metric, so the pageview-family metric must fall
-		// back to its conditional aggregate instead.
+		// An event filter must drop the pageview-scoped WHERE or every metric zeros out.
 		expect(sql).not.toContain("WHERE event = '$pageview'")
 		expect(sql).toContain("countIf(event = '$pageview') AS m0")
 		expect(sql).toContain("event = 'signup'")
@@ -385,8 +383,7 @@ describe('posthog adapter', () => {
 			}),
 			{}
 		)
-		// Raw value: a\b -> escapeLikeValue: a\\b (backslash doubled) -> sqlString doubles
-		// every backslash again for the HogQL string literal: a\\\\b.
+		// escapeLikeValue doubles the backslash, then sqlString doubles each again for the literal.
 		expect(body.query?.query).toContain("properties.$pathname ILIKE '%a\\\\\\\\b%'")
 	})
 

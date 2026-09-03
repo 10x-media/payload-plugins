@@ -145,7 +145,6 @@ describe('readForWidgetBreakdown', () => {
 			timeframe: 'last30days',
 			limit: 5,
 			now: NOW,
-			// caps() declares no filters at all.
 			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
 		})
 		expect(result.status).toBe('unavailable')

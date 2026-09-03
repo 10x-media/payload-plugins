@@ -48,8 +48,7 @@ export interface MemoryAnalyticsAdapter extends AnalyticsAdapter {
 export function memoryAdapter(): MemoryAnalyticsAdapter {
 	const events: MemoryEvent[] = []
 
-	// Only page (path) has a backing MemoryEvent field; a filter for any other
-	// declared dimension is dropped as unsupported, same as every other adapter.
+	// Only page has a backing MemoryEvent field; other declared dimensions drop as unsupported.
 	const matchesFilters = (e: MemoryEvent, q: AnalyticsQuery): boolean =>
 		(q.filters ?? []).every((filter) => {
 			if (filter.dimension !== 'page' || filter.operator !== 'eq') {

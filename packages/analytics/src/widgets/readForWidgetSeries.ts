@@ -122,7 +122,12 @@ export const readForWidgetSeries = async (
 	if (
 		!satisfiesCapabilities(adapter.capabilities, {
 			metrics: [metric],
-			...(filters && filters.length > 0 ? { filters: filters.map((f) => f.dimension) } : {}),
+			...(filters && filters.length > 0
+				? {
+						filters: filters.map((f) => f.dimension),
+						filterOperators: filters.map((f) => f.operator),
+					}
+				: {}),
 		}) ||
 		!supportsGranularity(adapter.capabilities, 'day')
 	) {

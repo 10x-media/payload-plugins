@@ -64,7 +64,12 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	if (
 		!satisfiesCapabilities(adapter.capabilities, {
 			metrics,
-			...(filters && filters.length > 0 ? { filters: filters.map((f) => f.dimension) } : {}),
+			...(filters && filters.length > 0
+				? {
+						filters: filters.map((f) => f.dimension),
+						filterOperators: filters.map((f) => f.operator),
+					}
+				: {}),
 		})
 	) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }

@@ -36,6 +36,14 @@ describe('satisfiesCapabilities', () => {
 	it('fails when a required filter dimension is missing from caps.filters', () => {
 		expect(satisfiesCapabilities(caps, { filters: ['referrer'] })).toBe(false)
 	})
+	it('passes when every required filter operator is in caps.filterOperators', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['page'], filterOperators: ['eq'] })).toBe(true)
+	})
+	it('fails when a required filter operator is missing from caps.filterOperators', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['page'], filterOperators: ['matches'] })).toBe(
+			false
+		)
+	})
 })
 
 describe('serializeCapabilities', () => {

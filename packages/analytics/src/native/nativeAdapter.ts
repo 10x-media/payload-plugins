@@ -103,7 +103,7 @@ async function queryEvents(
 			clamped = true
 		}
 	}
-	const where: Record<string, unknown> = {
+	const baseWhere: Record<string, unknown> = {
 		timestamp: {
 			greater_than_equal: start.toISOString(),
 			less_than_equal: q.dateRange.end.toISOString(),
@@ -111,8 +111,12 @@ async function queryEvents(
 		...(q.hostname ? { hostname: { equals: q.hostname } } : {}),
 		...(q.path ? { path: { equals: q.path } } : {}),
 		...ctx.scopeWhere(q),
-		...filtersToWhere(q.filters ?? []),
 	}
+	// filtersToWhere can also key off 'path' (a page filter); AND rather than spread so
+	// q.path and a page filter both constrain the query instead of one overwriting the other.
+	const filterWhere = filtersToWhere(q.filters ?? [])
+	const where: Record<string, unknown> =
+		Object.keys(filterWhere).length > 0 ? { and: [baseWhere, filterWhere] } : baseWhere
 	const { docs } = await payload.find({
 		collection: EVENTS_SLUG as never,
 		where: where as never,

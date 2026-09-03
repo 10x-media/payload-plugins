@@ -79,7 +79,12 @@ export const readForWidgetBreakdown = async (
 		!satisfiesCapabilities(adapter.capabilities, {
 			metrics: [metric],
 			dimensions: [dimension],
-			...(filters && filters.length > 0 ? { filters: filters.map((f) => f.dimension) } : {}),
+			...(filters && filters.length > 0
+				? {
+						filters: filters.map((f) => f.dimension),
+						filterOperators: filters.map((f) => f.operator),
+					}
+				: {}),
 		})
 	) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }

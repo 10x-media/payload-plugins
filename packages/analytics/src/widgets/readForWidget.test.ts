@@ -196,8 +196,21 @@ describe('readForWidget', () => {
 			metrics: ['pageviews'],
 			timeframe: 'last30days',
 			now: NOW,
-			// memoryAdapter's capabilities.filters only declares 'page'.
 			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
+		})
+		expect(result.status).toBe('unavailable')
+	})
+
+	it('returns unavailable when the dimension is supported but the operator is not', async () => {
+		const adapter = memoryAdapter()
+		adapter.record({ path: '/a', timestamp: new Date('2026-05-15T12:00:00Z') })
+		const result = await readForWidget({
+			req: reqWith([adapter]),
+			metrics: ['pageviews'],
+			timeframe: 'last30days',
+			now: NOW,
+			// memoryAdapter's capabilities.filterOperators only declares 'eq'.
+			filters: [{ dimension: 'page', operator: 'matches', value: '^/a$' }],
 		})
 		expect(result.status).toBe('unavailable')
 	})

@@ -228,4 +228,28 @@ describeForDb('native filtered reads and hour granularity', { dbs: ['mongo'] }, 
 		)
 		expect(scopedToOtherHost.totals).toEqual({ events: 0 })
 	})
+
+	it('ANDs q.path with a conflicting page filter instead of one overwriting the other', async () => {
+		const conflicting = await adapter.query(
+			{
+				metrics: ['pageviews'],
+				dateRange: RANGE,
+				path: '/a',
+				filters: [{ dimension: 'page', operator: 'eq', value: '/blog/intro' }],
+			},
+			{}
+		)
+		expect(conflicting.totals).toEqual({ pageviews: 0 })
+
+		const matching = await adapter.query(
+			{
+				metrics: ['pageviews'],
+				dateRange: RANGE,
+				path: '/a',
+				filters: [{ dimension: 'page', operator: 'eq', value: '/a' }],
+			},
+			{}
+		)
+		expect(matching.totals).toEqual({ pageviews: 2 })
+	})
 })

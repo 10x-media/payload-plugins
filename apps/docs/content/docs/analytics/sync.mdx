@@ -29,7 +29,7 @@ analytics({
 
 ## How it works
 
-When enabled, the plugin registers the collection (default slug `analytics-daily`) and a Payload task (`analytics-sync`). On its cron, the task reads each provider's last `lookbackDays` of daily metrics through the surfacing engine and upserts one row per `(source, date)`.
+When enabled, the plugin registers the collection (default slug `analytics-daily`) and a Payload task (`analytics-sync`). On its cron, the task reads each provider's last `lookbackDays` of daily metrics through the surfacing engine and upserts one row per `(source, date, scope)`.
 
 A unique `source + date + scope` index makes re-runs idempotent: recent days are refreshed as provider data finalizes rather than duplicated, which is also why the default looks back three days instead of one. Each row carries `source`, `date`, `scope`, `pageviews`, `visitors`, `sessions`, `avgDuration`, `bounceRate`, `events`, and `syncedAt`; metrics a provider does not report stay null. The collection is read-only (the job writes, users read) and hidden from the admin nav by default, since it is a query substrate for custom reporting rather than something to browse and edit; it stays fully queryable through the REST/local API, and `sync: { hidden: false }` surfaces it in the nav. The native engine is excluded, since its data already lives durably in `analytics-rollups`, and one provider failing is logged without aborting the others.
 

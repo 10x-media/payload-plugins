@@ -10,6 +10,7 @@ export interface CapabilityRequirement {
 	metrics?: MetricKey[]
 	dimensions?: DimensionKey[]
 	filters?: DimensionKey[]
+	filterOperators?: FilterOperator[]
 	realtime?: boolean
 	perPageQuery?: boolean
 }
@@ -23,6 +24,7 @@ export function satisfiesCapabilities(
 	if (req.metrics?.some((m) => !caps.metrics.has(m))) return false
 	if (req.dimensions?.some((d) => !caps.dimensions.has(d))) return false
 	if (req.filters?.some((d) => !caps.filters.has(d))) return false
+	if (req.filterOperators?.some((op) => !caps.filterOperators.has(op))) return false
 	return true
 }
 
