@@ -65,9 +65,6 @@ export function createEngine(opts: EngineOptions): Engine {
 			const q = clamped ? { ...query, dateRange: range } : query
 			const key = buildCacheKey(adapter.id, q)
 			return coalesce(key, async () => {
-				const cached = await opts.store.get<AnalyticsResult>(key)
-				if (cached) return cached
-
 				let fresh: AnalyticsResult
 				const controller = new AbortController()
 				const timer = setTimeout(
@@ -76,6 +73,9 @@ export function createEngine(opts: EngineOptions): Engine {
 				)
 				timer.unref?.()
 				try {
+					const cached = await opts.store.get<AnalyticsResult>(key)
+					if (cached) return cached
+
 					// Races the queued attempt itself, not just its backoff waits, so a signal-blind
 					// adapter (one that never checks ctx.signal) still bounds the read at timeoutMs.
 					// The orphaned attempt keeps its queue slot until the underlying client gives up;
@@ -97,8 +97,12 @@ export function createEngine(opts: EngineOptions): Engine {
 					fresh = await Promise.race([attempt, aborted])
 				} catch (err) {
 					opts.onError?.(err, adapter.id)
-					const stale = await opts.store.getStale<AnalyticsResult>(key)
-					if (stale) return { ...stale, meta: { ...stale.meta, stale: true } }
+					try {
+						const stale = await opts.store.getStale<AnalyticsResult>(key)
+						if (stale) return { ...stale, meta: { ...stale.meta, stale: true } }
+					} catch {
+						// A broken store fails getStale too; surface the original read error, not this one.
+					}
 					throw err
 				} finally {
 					clearTimeout(timer)

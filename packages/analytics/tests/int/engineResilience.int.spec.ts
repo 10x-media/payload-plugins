@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { ProviderHttpError } from '../../src/adapters/http/fetchJson'
 import { analytics } from '../../src/index'
 import { getRuntime } from '../../src/plugin/runtime'
+import { syncTask } from '../../src/sync/syncTask'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { readForWidget } from '../../src/widgets/readForWidget'
 import { readForWidgetBreakdown } from '../../src/widgets/readForWidgetBreakdown'
@@ -109,5 +110,76 @@ describeForDb('analytics engine resilience', { dbs: ['mongo'] }, (db) => {
 			now: new Date('2026-01-31T00:00:00.000Z'),
 		})
 		expect(result.status).toBe('unavailable')
+	})
+})
+
+describeForDb('analytics sync tier resilience', { dbs: ['mongo'] }, (db) => {
+	const mem = memoryAdapter()
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [mem], sync: true, cache: { ttl: { aggregate: 1 } } }),
+			db,
+		})
+		mem.record({ path: '/pricing', timestamp: new Date() })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const req = () => ({ payload: booted.payload }) as unknown as PayloadRequest
+
+	const runSync = async (): Promise<{ synced: number; failed: number }> => {
+		const task = syncTask({
+			cron: '0 */6 * * *',
+			lookbackDays: 3,
+			collectionSlug: 'analytics-daily',
+		})
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('sync handler must be a function')
+		}
+		const result = await handler({ req: req() } as unknown as Parameters<typeof handler>[0])
+		return (result as { output: { synced: number; failed: number } }).output
+	}
+
+	it('skips upserting a stale-served read: failed counts it and syncedAt does not advance', async () => {
+		const first = await runSync()
+		expect(first.failed).toBe(0)
+		expect(first.synced).toBeGreaterThan(0)
+
+		const before = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			where: { source: { equals: 'memory' } },
+			limit: 100,
+			overrideAccess: true,
+		})
+		const beforeSyncedAt = new Map(
+			(before.docs as unknown as Array<{ id: string | number; syncedAt: string }>).map((d) => [
+				d.id,
+				d.syncedAt,
+			])
+		)
+		expect(beforeSyncedAt.size).toBeGreaterThan(0)
+
+		// aggregate TTL above is 1s; sleeping past it with a real timer (bounded, ~2s) expires the
+		// cache entry without reaching into the cache store's clock, as engineResilience does above.
+		await new Promise((resolve) => setTimeout(resolve, 2_000))
+
+		mem.failNext(injectedFailure())
+		const second = await runSync()
+		expect(second.failed).toBeGreaterThanOrEqual(1)
+
+		const after = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			where: { source: { equals: 'memory' } },
+			limit: 100,
+			overrideAccess: true,
+		})
+		for (const doc of after.docs as unknown as Array<{ id: string | number; syncedAt: string }>) {
+			expect(doc.syncedAt).toBe(beforeSyncedAt.get(doc.id))
+		}
 	})
 })

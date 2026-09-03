@@ -108,6 +108,47 @@ describe('createEngine', () => {
 		}
 	})
 
+	it('rejects and calls onError once when the cache store itself fails', async () => {
+		const { adapter, store } = setup()
+		const err = new Error('kv down')
+		const spy = vi.spyOn(adapter, 'query')
+		const onError = vi.fn()
+		const brokenEngine = createEngine({
+			store: { ...store, get: vi.fn().mockRejectedValue(err) },
+			queue: { concurrency: 4 },
+			ttl: { aggregate: 60, realtime: 5 },
+			timeoutMs: 15_000,
+			onError,
+		})
+
+		await expect(brokenEngine.read(adapter, q)).rejects.toThrow('kv down')
+
+		expect(onError).toHaveBeenCalledTimes(1)
+		expect(onError).toHaveBeenCalledWith(err, adapter.id)
+		expect(spy).not.toHaveBeenCalled()
+	})
+
+	it('surfaces the original store error, not a secondary one, when getStale also fails', async () => {
+		const { adapter, store } = setup()
+		const err = new Error('kv get down')
+		const onError = vi.fn()
+		const brokenEngine = createEngine({
+			store: {
+				...store,
+				get: vi.fn().mockRejectedValue(err),
+				getStale: vi.fn().mockRejectedValue(new Error('kv getStale down too')),
+			},
+			queue: { concurrency: 4 },
+			ttl: { aggregate: 60, realtime: 5 },
+			timeoutMs: 15_000,
+			onError,
+		})
+
+		await expect(brokenEngine.read(adapter, q)).rejects.toThrow('kv get down')
+		expect(onError).toHaveBeenCalledTimes(1)
+		expect(onError).toHaveBeenCalledWith(err, adapter.id)
+	})
+
 	it('rejects on a failing adapter with a cold cache', async () => {
 		vi.useFakeTimers()
 		try {

@@ -140,6 +140,13 @@ export const syncTask = (
 				)
 				continue
 			}
+			if (result.meta.stale) {
+				failed++
+				req.payload.logger.warn(
+					`analytics sync: adapter "${adapter.id}" read was stale-served, skipping sync`
+				)
+				continue
+			}
 			for (const row of result.rows) {
 				const doc = toSyncRow(adapter.id, row, { syncedAt: now, scope: scope ?? '' })
 				if (!doc) {
