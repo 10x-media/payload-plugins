@@ -321,6 +321,8 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 						greater_than_equal: q.dateRange.start.toISOString(),
 						less_than_equal: q.dateRange.end.toISOString(),
 					},
+					...(q.hostname ? { hostname: { equals: q.hostname } } : {}),
+					...(q.path ? { path: { equals: q.path } } : {}),
 					...scopeWhere(q),
 				} as never,
 				// Newest-first under a hard cap: if a very busy site has more events than the

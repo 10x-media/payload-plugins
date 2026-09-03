@@ -14,17 +14,17 @@ const pageview = (overrides: Partial<EventLike> = {}): EventLike => ({
 describe('filtersToWhere', () => {
 	it('maps eq to equals on the mapped field', () => {
 		const filters: AnalyticsFilter[] = [{ dimension: 'device', operator: 'eq', value: 'mobile' }]
-		expect(filtersToWhere(filters)).toEqual({ device: { equals: 'mobile' } })
+		expect(filtersToWhere(filters)).toEqual({ and: [{ device: { equals: 'mobile' } }] })
 	})
 
 	it('maps contains to contains', () => {
 		const filters: AnalyticsFilter[] = [{ dimension: 'page', operator: 'contains', value: '/blog' }]
-		expect(filtersToWhere(filters)).toEqual({ path: { contains: '/blog' } })
+		expect(filtersToWhere(filters)).toEqual({ and: [{ path: { contains: '/blog' } }] })
 	})
 
 	it('maps the event dimension to the name field', () => {
 		const filters: AnalyticsFilter[] = [{ dimension: 'event', operator: 'eq', value: 'signup' }]
-		expect(filtersToWhere(filters)).toEqual({ name: { equals: 'signup' } })
+		expect(filtersToWhere(filters)).toEqual({ and: [{ name: { equals: 'signup' } }] })
 	})
 
 	it('drops unsupported operators as the safety net', () => {
@@ -37,14 +37,23 @@ describe('filtersToWhere', () => {
 		expect(filtersToWhere(filters)).toEqual({})
 	})
 
-	it('merges multiple filters into one where fragment', () => {
+	it('AND-composes multiple filters as separate fragments instead of merging by key', () => {
 		const filters: AnalyticsFilter[] = [
 			{ dimension: 'device', operator: 'eq', value: 'mobile' },
 			{ dimension: 'country', operator: 'eq', value: 'US' },
 		]
 		expect(filtersToWhere(filters)).toEqual({
-			device: { equals: 'mobile' },
-			country: { equals: 'US' },
+			and: [{ device: { equals: 'mobile' } }, { country: { equals: 'US' } }],
+		})
+	})
+
+	it('AND-composes two filters on the same field instead of the later one overwriting the earlier one', () => {
+		const filters: AnalyticsFilter[] = [
+			{ dimension: 'page', operator: 'eq', value: '/a' },
+			{ dimension: 'page', operator: 'eq', value: '/b' },
+		]
+		expect(filtersToWhere(filters)).toEqual({
+			and: [{ path: { equals: '/a' } }, { path: { equals: '/b' } }],
 		})
 	})
 

@@ -252,4 +252,34 @@ describeForDb('native filtered reads and hour granularity', { dbs: ['mongo'] }, 
 		)
 		expect(matching.totals).toEqual({ pageviews: 2 })
 	})
+
+	it('ANDs two eq filters on the same dimension instead of one overwriting the other', async () => {
+		const result = await adapter.query(
+			{
+				metrics: ['pageviews'],
+				dateRange: RANGE,
+				filters: [
+					{ dimension: 'page', operator: 'eq', value: '/a' },
+					{ dimension: 'page', operator: 'eq', value: '/blog/intro' },
+				],
+			},
+			{}
+		)
+		expect(result.totals).toEqual({ pageviews: 0 })
+	})
+
+	it('ANDs two composable contains filters on the same dimension', async () => {
+		const result = await adapter.query(
+			{
+				metrics: ['pageviews'],
+				dateRange: RANGE,
+				filters: [
+					{ dimension: 'page', operator: 'contains', value: 'blog' },
+					{ dimension: 'page', operator: 'contains', value: 'intro' },
+				],
+			},
+			{}
+		)
+		expect(result.totals).toEqual({ pageviews: 2 })
+	})
 })
