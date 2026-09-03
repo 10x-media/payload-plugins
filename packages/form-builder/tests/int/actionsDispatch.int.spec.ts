@@ -215,6 +215,19 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 		expect(events.some((event) => event.type === 'submission.created')).toBe(true)
 	})
 
+	it('surfaces the definite-failure message with a 502', async () => {
+		providerDown = true
+		try {
+			const form = await makeForm()
+			const { status, body } = await submitViaRest(form.id, 'refused@example.com')
+			expect(status).toBe(502)
+			const message = (body.errors as { message?: string }[] | undefined)?.[0]?.message
+			expect(message).toContain('could not be completed')
+		} finally {
+			providerDown = false
+		}
+	})
+
 	it('fails the response, keeps the row, and skips the rest when the provider rejects', async () => {
 		delivered.length = 0
 		events.length = 0
@@ -241,5 +254,165 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 		} finally {
 			providerDown = false
 		}
+	})
+})
+
+describeForDb('form-builder essential deadline breach', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+	const delivered: string[] = []
+	const events: FormEvent[] = []
+	const parked: { resolve: () => void; reject: (error: Error) => void }[] = []
+
+	const gate = defineAction({
+		type: 'gate',
+		label: 'Gate',
+		essential: true,
+		run: () =>
+			new Promise<void>((resolve, reject) => {
+				parked.push({ resolve, reject })
+			}),
+	})
+
+	const recorder = defineAction({
+		type: 'recorder',
+		label: 'Recorder',
+		run: () => {
+			delivered.push('recorder')
+		},
+	})
+
+	const checked = defineAction({
+		type: 'checked',
+		label: 'Checked',
+		config: [{ name: 'template', type: 'text' }],
+		validateConfig: (config) =>
+			typeof config.template === 'string' && config.template.includes('{{email}}')
+				? true
+				: 'template must reference {{email}}',
+		run: () => {},
+	})
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: formBuilder({
+				actions: { gate, recorder, checked },
+				dispatch: { deadlineMs: 200 },
+				events: { emit: (event) => void events.push(event) },
+			}),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const makeForm = () =>
+		booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Gated newsletter',
+				persistSubmissions: false,
+				fields: [{ blockType: 'email', name: 'email', label: 'Email' }],
+				actions: [{ blockType: 'gate' }, { blockType: 'recorder' }],
+			},
+		})
+
+	const submitViaRest = async (formId: number | string, email: string) => {
+		const endpoints = booted.payload.collections['form-submissions']?.config.endpoints
+		const endpoint = (Array.isArray(endpoints) ? endpoints : []).find(
+			(entry) => entry.method === 'post' && entry.path === '/'
+		)
+		if (!endpoint) throw new Error('no root POST endpoint registered')
+		const { createLocalReq } = await import('payload')
+		const req = await createLocalReq({}, booted.payload)
+		req.data = { form: formId, values: [{ field: 'email', value: email }] }
+		req.routeParams = { collection: 'form-submissions' }
+		const response = await endpoint.handler(req)
+		return { status: response.status, body: (await response.json()) as Record<string, unknown> }
+	}
+
+	const findRows = async (formId: number | string) =>
+		(
+			await booted.payload.find({
+				collection: 'form-submissions',
+				where: { form: { equals: formId } },
+				overrideAccess: true,
+				depth: 0,
+			})
+		).docs as { id: number | string; actionFailed?: boolean; actionUncertain?: boolean }[]
+
+	it('answers 504 with the uncertain message and stamps actionUncertain, not actionFailed', async () => {
+		parked.length = 0
+		events.length = 0
+		const form = await makeForm()
+		const { status, body } = await submitViaRest(form.id, 'slow@example.com')
+		expect(status).toBe(504)
+		const message = (body.errors as { message?: string }[] | undefined)?.[0]?.message
+		expect(message).toContain('could not confirm')
+		const rows = await findRows(form.id)
+		expect(rows).toHaveLength(1)
+		expect(rows[0]?.actionUncertain).toBe(true)
+		expect(rows[0]?.actionFailed).toBeFalsy()
+		expect(events.some((event) => event.type === 'submission.created')).toBe(false)
+		parked.pop()?.reject(new Error('cleanup'))
+	})
+
+	it('reconciles a late success: clears the stamp, emits, runs the rest, prunes', async () => {
+		parked.length = 0
+		events.length = 0
+		delivered.length = 0
+		const form = await makeForm()
+		const { status } = await submitViaRest(form.id, 'late-win@example.com')
+		expect(status).toBe(504)
+
+		parked.pop()?.resolve()
+		await vi.waitFor(async () => {
+			expect(events.some((event) => event.type === 'submission.created')).toBe(true)
+			expect(delivered).toContain('recorder')
+			expect(await findRows(form.id)).toHaveLength(0)
+		})
+	})
+
+	it('upgrades a late failure to the definite actionFailed stamp and keeps the row', async () => {
+		parked.length = 0
+		events.length = 0
+		const form = await makeForm()
+		const { status } = await submitViaRest(form.id, 'late-loss@example.com')
+		expect(status).toBe(504)
+
+		parked.pop()?.reject(new Error('provider rejected, late'))
+		await vi.waitFor(async () => {
+			const rows = await findRows(form.id)
+			expect(rows).toHaveLength(1)
+			expect(rows[0]?.actionFailed).toBe(true)
+			expect(rows[0]?.actionUncertain).toBe(false)
+		})
+		expect(events.some((event) => event.type === 'submission.created')).toBe(false)
+	})
+
+	it('refuses to save a form whose action config fails its validateConfig', async () => {
+		await expect(
+			booted.payload.create({
+				collection: 'forms',
+				data: {
+					title: 'Bad template',
+					fields: [{ blockType: 'email', name: 'email', label: 'Email' }],
+					actions: [{ blockType: 'checked', template: 'no token here' }],
+				},
+			})
+		).rejects.toThrow(/actions\.0|template must reference/)
+	})
+
+	it('saves a form whose action config passes its validateConfig', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Good template',
+				fields: [{ blockType: 'email', name: 'email', label: 'Email' }],
+				actions: [{ blockType: 'checked', template: 'Hello {{email}}' }],
+			},
+		})
+		expect(form.id).toBeDefined()
 	})
 })

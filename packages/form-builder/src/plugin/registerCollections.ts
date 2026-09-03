@@ -43,6 +43,8 @@ type RegisterCollectionsArgs = {
 	actionRegistry: ActionRegistry
 	richText?: RichTextBodyOption
 	hasJobsPlugin: boolean
+	/** Host override for the inline dispatch deadline (plugin option `dispatch.deadlineMs`). */
+	dispatchDeadlineMs?: number
 	events?: FormEventSink
 	uploads: UploadsOption
 	spam: ResolvedSpamConfig | false
@@ -81,6 +83,7 @@ export const registerCollections = ({
 	actionRegistry,
 	richText,
 	hasJobsPlugin,
+	dispatchDeadlineMs,
 	events,
 	uploads,
 	spam,
@@ -152,6 +155,7 @@ export const registerCollections = ({
 			richText,
 			events,
 			hasRunner,
+			dispatchDeadlineMs,
 			uploadSlug,
 			spam,
 			votedCookie,

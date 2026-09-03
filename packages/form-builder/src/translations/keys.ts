@@ -273,6 +273,8 @@ export const keys = {
 	spamRateLimited: 'formBuilder:spam.rateLimited',
 	submissionActionFailed: 'formBuilder:submission.actionFailed',
 	submissionActionFailedFlag: 'formBuilder:submission.actionFailedFlag',
+	submissionActionUncertain: 'formBuilder:submission.actionUncertain',
+	submissionActionUncertainFlag: 'formBuilder:submission.actionUncertainFlag',
 	spamRejected: 'formBuilder:spam.rejected',
 	spamCaptchaFailed: 'formBuilder:spam.captchaFailed',
 	contextInvalid: 'formBuilder:context.invalid',

@@ -305,6 +305,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.submissionActionFailedFlag]: 'Action failed',
 	[keys.submissionActionFailed]:
 		'Your submission could not be completed. Please try again in a moment.',
+	[keys.submissionActionUncertainFlag]: 'Action unconfirmed',
+	[keys.submissionActionUncertain]:
+		'We could not confirm your submission was completed. It may still go through; please wait a moment before trying again.',
 	[keys.spamCaptchaFailed]: 'Captcha verification failed. Please try again.',
 	[keys.contextInvalid]: 'This form could not be verified. Please reload the page and try again.',
 	[keys.collectionFormSingular]: 'Form',

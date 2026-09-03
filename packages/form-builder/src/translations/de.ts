@@ -317,6 +317,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.submissionActionFailedFlag]: 'Aktion fehlgeschlagen',
 	[keys.submissionActionFailed]:
 		'Deine Übermittlung konnte nicht abgeschlossen werden. Bitte versuche es gleich noch einmal.',
+	[keys.submissionActionUncertainFlag]: 'Aktion unbestätigt',
+	[keys.submissionActionUncertain]:
+		'Wir konnten nicht bestätigen, dass deine Übermittlung abgeschlossen wurde. Sie ist möglicherweise dennoch erfolgreich; bitte warte einen Moment, bevor du es erneut versuchst.',
 	[keys.spamCaptchaFailed]: 'Captcha-Überprüfung fehlgeschlagen. Bitte versuche es erneut.',
 	[keys.contextInvalid]:
 		'Dieses Formular konnte nicht verifiziert werden. Bitte lade die Seite neu und versuche es erneut.',

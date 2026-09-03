@@ -5,7 +5,10 @@ import {
 	type Endpoint,
 	type PayloadRequest,
 } from 'payload'
-import { ESSENTIAL_ACTION_FAILED_CONTEXT_KEY } from '../actions/dispatchContext'
+import {
+	ESSENTIAL_ACTION_FAILED_CONTEXT_KEY,
+	ESSENTIAL_ACTION_UNCERTAIN_CONTEXT_KEY,
+} from '../actions/dispatchContext'
 import { pollConfigOf } from '../form/pollState'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
@@ -112,13 +115,23 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 			}
 			const response = await stockCreate.handler(req)
 			// An essential action's failure is the submission's failure: the row is committed and kept
-			// (see dispatchActions), but the visitor must not be told it worked. 502 because the
-			// upstream the submission exists for rejected or never confirmed it.
-			if (req.context?.[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY] === true && response.ok) {
-				return Response.json(
-					{ errors: [{ message: asTranslate(req.t)(keys.submissionActionFailed) }] },
-					{ status: 502 }
-				)
+			// (see dispatchActions), but the visitor must not be told it worked. 502 for a definite
+			// refusal by the upstream the submission exists for; 504 when it never answered inside the
+			// deadline, because "we are not sure this completed" is a different fact from "this
+			// failed" and prompts waiting over retrying.
+			if (response.ok) {
+				if (req.context?.[ESSENTIAL_ACTION_UNCERTAIN_CONTEXT_KEY] === true) {
+					return Response.json(
+						{ errors: [{ message: asTranslate(req.t)(keys.submissionActionUncertain) }] },
+						{ status: 504 }
+					)
+				}
+				if (req.context?.[ESSENTIAL_ACTION_FAILED_CONTEXT_KEY] === true) {
+					return Response.json(
+						{ errors: [{ message: asTranslate(req.t)(keys.submissionActionFailed) }] },
+						{ status: 502 }
+					)
+				}
 			}
 			return response
 		}

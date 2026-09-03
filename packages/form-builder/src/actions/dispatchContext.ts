@@ -6,3 +6,10 @@
  * because both the dispatcher and the submit endpoint need it across an import cycle.
  */
 export const ESSENTIAL_ACTION_FAILED_CONTEXT_KEY = 'formBuilderEssentialActionFailed'
+
+/**
+ * Set instead of the failed key when the essential pass outlived its deadline: the work may still
+ * complete, so the visitor is told the outcome is unknown (504), not that it failed (502). The two
+ * are different facts and prompt different visitor behavior (wait vs retry).
+ */
+export const ESSENTIAL_ACTION_UNCERTAIN_CONTEXT_KEY = 'formBuilderEssentialActionUncertain'

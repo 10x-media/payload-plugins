@@ -457,3 +457,154 @@ describe('forms beforeValidate persist-off guard', () => {
 		expect(run(hookOf(false), { pollEnabled: false })).toBeTruthy()
 	})
 })
+
+describe('forms beforeValidate action config validation', () => {
+	const makeHook = (validateConfig?: unknown) => {
+		const registry = new Map([
+			[
+				'subscribe',
+				{
+					type: 'subscribe',
+					label: 'Subscribe',
+					config: [{ name: 'provider', type: 'text' }],
+					...(validateConfig ? { validateConfig } : {}),
+				},
+			],
+			['noop', { type: 'noop', label: 'Noop' }],
+		])
+		const collection = buildFormsCollection({
+			registry: resolveFieldTypes(buildDefaultFieldDefinitions(true)),
+			ruleRegistry: resolveValidationRules(defaultValidationRules),
+			actionRegistry: registry as never,
+		})
+		const hooks = collection.hooks?.beforeValidate ?? []
+		const hook = hooks[1]
+		if (!hook) {
+			throw new Error('missing action config beforeValidate hook')
+		}
+		return hook
+	}
+	const req = { t: (key: string) => key } as unknown as PayloadRequest
+
+	it('rejects a save whose action config fails its definition validateConfig', async () => {
+		const hook = makeHook((config: Record<string, unknown>) =>
+			config.provider === 'ok' ? true : 'unknown provider'
+		)
+		let thrown: unknown
+		await Promise.resolve(
+			hook({
+				data: { actions: [{ blockType: 'subscribe', provider: 'nope' }] },
+				req,
+			} as never)
+		).catch((error) => {
+			thrown = error
+		})
+		expect(thrown).toMatchObject({
+			data: { errors: [{ path: 'actions.0', message: 'unknown provider' }] },
+		})
+	})
+
+	it('collects every failing action into one error, indexed by position', async () => {
+		const hook = makeHook(() => 'always invalid')
+		let thrown: unknown
+		await Promise.resolve(
+			hook({
+				data: {
+					actions: [
+						{ blockType: 'noop' },
+						{ blockType: 'subscribe', provider: 'a' },
+						{ blockType: 'subscribe', provider: 'b' },
+					],
+				},
+				req,
+			} as never)
+		).catch((error) => {
+			thrown = error
+		})
+		expect(thrown).toMatchObject({
+			data: {
+				errors: [
+					{ path: 'actions.1', message: 'always invalid' },
+					{ path: 'actions.2', message: 'always invalid' },
+				],
+			},
+		})
+	})
+
+	it('passes the merged form data so cross-field checks see unchanged fields', async () => {
+		const seen: unknown[] = []
+		const hook = makeHook((_config: unknown, ctx: { data: Record<string, unknown> }) => {
+			seen.push(ctx.data.fields)
+			return true
+		})
+		await hook({
+			data: { actions: [{ blockType: 'subscribe' }] },
+			originalDoc: { fields: [{ blockType: 'text', name: 'email' }] },
+			req,
+		} as never)
+		expect(seen).toEqual([[{ blockType: 'text', name: 'email' }]])
+	})
+
+	it('deep-merges nested groups so a partial update does not erase stored siblings', async () => {
+		const seen: unknown[] = []
+		const hook = makeHook((_config: unknown, ctx: { data: Record<string, unknown> }) => {
+			seen.push(ctx.data.response)
+			return true
+		})
+		await hook({
+			data: { response: { type: 'redirect' }, actions: [{ blockType: 'subscribe' }] },
+			originalDoc: { response: { type: 'message', message: 'thanks' } },
+			req,
+		} as never)
+		expect(seen).toEqual([{ type: 'redirect', message: 'thanks' }])
+	})
+
+	it('replaces arrays wholesale and keeps explicit null from the delta', async () => {
+		const seen: unknown[] = []
+		const hook = makeHook((_config: unknown, ctx: { data: Record<string, unknown> }) => {
+			seen.push({ fields: ctx.data.fields, title: ctx.data.title })
+			return true
+		})
+		await hook({
+			data: {
+				fields: [{ blockType: 'text', name: 'only' }],
+				title: null,
+				actions: [{ blockType: 'subscribe' }],
+			},
+			originalDoc: {
+				fields: [
+					{ blockType: 'text', name: 'a' },
+					{ blockType: 'text', name: 'b' },
+				],
+				title: 'stored',
+			},
+			req,
+		} as never)
+		expect(seen).toEqual([{ fields: [{ blockType: 'text', name: 'only' }], title: null }])
+	})
+
+	it('validates the stored actions when a partial update does not send them', async () => {
+		const hook = makeHook(() => 'stale config')
+		let thrown: unknown
+		await Promise.resolve(
+			hook({
+				data: { title: 'renamed' },
+				originalDoc: { actions: [{ blockType: 'subscribe' }] },
+				req,
+			} as never)
+		).catch((error) => {
+			thrown = error
+		})
+		expect(thrown).toMatchObject({
+			data: { errors: [{ path: 'actions.0', message: 'stale config' }] },
+		})
+	})
+
+	it('accepts a save when validateConfig returns true or is not declared', async () => {
+		const hook = makeHook((config: Record<string, unknown>) =>
+			config.provider === 'ok' ? true : 'unknown provider'
+		)
+		const data = { actions: [{ blockType: 'subscribe', provider: 'ok' }, { blockType: 'noop' }] }
+		await expect(Promise.resolve(hook({ data, req } as never))).resolves.toBeTruthy()
+	})
+})
