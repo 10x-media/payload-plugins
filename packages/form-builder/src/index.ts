@@ -118,6 +118,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			actionRegistry,
 			richText: options.richText,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
+			dispatchDeadlineMs: options.dispatch?.deadlineMs,
 			events: options.events,
 			uploads,
 			spam,
@@ -158,8 +159,14 @@ export { serializeBody } from './actions/body/serializeBody'
 export { textOfBody } from './actions/body/textOfBody'
 export { renderAllValues, renderAllValuesTable } from './actions/body/wildcards'
 export { buildDefaultActionDefinitions, defaultActionDefinitions } from './actions/builtin'
-export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
-export { defineAction } from './actions/defineAction'
+export type {
+	ActionDefinition,
+	ActionRunArgs,
+	ActionValidateArgs,
+	AnyActionDefinition,
+} from './actions/defineAction'
+export { ActionError, defineAction } from './actions/defineAction'
+export { INLINE_DISPATCH_DEADLINE_MS } from './actions/dispatch'
 export type {
 	FromAddressesResolver,
 	FromAddressOption,

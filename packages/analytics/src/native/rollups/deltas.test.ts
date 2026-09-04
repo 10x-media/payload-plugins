@@ -6,7 +6,7 @@ const ev = (over: Partial<StoredEvent>): StoredEvent => ({
 	timestamp: new Date('2026-01-10T13:45:00Z'),
 	type: 'pageview',
 	path: '/p',
-	hostname: 'h',
+	hostname: '',
 	visitorHash: 'v',
 	sessionId: 's',
 	...over,
@@ -24,6 +24,7 @@ describe('computeRollupDeltas', () => {
 			path: '/p',
 			dimension: '',
 			dimvalue: '',
+			hostname: '',
 		})
 		expect(page?.inc).toEqual({ pageviews: 1, events: 0, durationMs: 500, samples: 1 })
 		expect(site?.inc).toEqual({ pageviews: 1, events: 0, durationMs: 500, samples: 1 })
@@ -47,6 +48,7 @@ describe('computeRollupDeltas', () => {
 			path: '',
 			dimension: 'country',
 			dimvalue: 'US',
+			hostname: '',
 		})
 		expect(country?.inc).toEqual({ pageviews: 1, events: 0, durationMs: 500, samples: 1 })
 	})
@@ -54,6 +56,31 @@ describe('computeRollupDeltas', () => {
 	it('omits the country bucket when geo is unavailable', () => {
 		const deltas = computeRollupDeltas(ev({}))
 		expect(deltas.some((d) => d.key.dimension === 'country')).toBe(false)
+	})
+
+	it('dual-emits a hostname-scoped clone of every bucket when hostname is set', () => {
+		const deltas = computeRollupDeltas(ev({ country: 'US', hostname: 'a.example' }))
+		// 3 buckets in the '' family (page, site, country) + 3 mirrored in the 'a.example' family.
+		expect(deltas).toHaveLength(6)
+		const withoutHostname = deltas.filter((d) => d.key.hostname === '')
+		const withHostname = deltas.filter((d) => d.key.hostname === 'a.example')
+		expect(withoutHostname).toHaveLength(3)
+		expect(withHostname).toHaveLength(3)
+		const bucketShape = (d: (typeof deltas)[number]) => ({
+			path: d.key.path,
+			dimension: d.key.dimension,
+			dimvalue: d.key.dimvalue,
+			inc: d.inc,
+		})
+		expect(withHostname.map(bucketShape).sort((a, b) => a.path.localeCompare(b.path))).toEqual(
+			withoutHostname.map(bucketShape).sort((a, b) => a.path.localeCompare(b.path))
+		)
+	})
+
+	it('emits only the hostname-less family when hostname is empty', () => {
+		const deltas = computeRollupDeltas(ev({ country: 'US', hostname: '' }))
+		expect(deltas).toHaveLength(3)
+		expect(deltas.every((d) => d.key.hostname === '')).toBe(true)
 	})
 
 	it('buckets into the reporting-timezone day at ingest', () => {
@@ -90,5 +117,44 @@ describe('computeRollupDeltas', () => {
 		expect(dims).toEqual(
 			expect.arrayContaining(['country:US', 'device:mobile', 'source:google.com'])
 		)
+	})
+
+	it('emits an event-name bucket for a custom event with name', () => {
+		const deltas = computeRollupDeltas(ev({ type: 'event', name: 'signup' }))
+		expect(deltas).toHaveLength(3)
+		const eventBucket = deltas.find((d) => d.key.dimension === 'event')
+		expect(eventBucket?.key).toEqual({
+			granularity: 'day',
+			period: new Date('2026-01-10T00:00:00Z'),
+			path: '',
+			dimension: 'event',
+			dimvalue: 'signup',
+			hostname: '',
+		})
+		expect(eventBucket?.inc).toEqual({ pageviews: 0, events: 1, durationMs: 0, samples: 1 })
+	})
+
+	it('does not emit an event bucket for a pageview', () => {
+		const deltas = computeRollupDeltas(ev({ type: 'pageview' }))
+		expect(deltas.some((d) => d.key.dimension === 'event')).toBe(false)
+	})
+
+	it('does not emit an event bucket for a nameless custom event', () => {
+		const deltas = computeRollupDeltas(ev({ type: 'event' }))
+		expect(deltas.some((d) => d.key.dimension === 'event')).toBe(false)
+	})
+
+	it('dual-emits the event-name bucket when hostname is set', () => {
+		const deltas = computeRollupDeltas(ev({ type: 'event', name: 'signup', hostname: 'a.example' }))
+		// 3 buckets in the '' family (page, site, event) + 3 mirrored in the 'a.example' family.
+		expect(deltas).toHaveLength(6)
+		const withoutHostname = deltas.filter((d) => d.key.hostname === '')
+		const withHostname = deltas.filter((d) => d.key.hostname === 'a.example')
+		expect(withoutHostname).toHaveLength(3)
+		expect(withHostname).toHaveLength(3)
+		const eventBucketWithout = withoutHostname.find((d) => d.key.dimension === 'event')
+		const eventBucketWith = withHostname.find((d) => d.key.dimension === 'event')
+		expect(eventBucketWithout?.key.dimvalue).toBe('signup')
+		expect(eventBucketWith?.key.dimvalue).toBe('signup')
 	})
 })

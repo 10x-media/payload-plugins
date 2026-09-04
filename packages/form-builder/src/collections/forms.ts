@@ -13,6 +13,7 @@ import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { buildActionBlocks } from '../actions/buildActionBlocks'
 import type { FromAddressesResolver, FromAddressSourceRegistry } from '../actions/fromAddresses'
 import type { ActionRegistry } from '../actions/registry'
+import type { ActionInstance } from '../actions/runActions'
 import type { FormResultsAccess } from '../aggregation/resolveResultsRequest'
 import { type CalcAllowed, normalizeCalc } from '../calc/normalizeCalc'
 import type { CalcSource } from '../calc/registry'
@@ -210,6 +211,32 @@ type BuildFormsCollectionArgs = {
 	overrides?: CollectionOverrides
 }
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+	if (value == null || typeof value !== 'object') {
+		return false
+	}
+	const proto = Object.getPrototypeOf(value)
+	return proto === Object.prototype || proto === null
+}
+
+/**
+ * Mirror how Payload persists a partial update: plain objects merge recursively (an unsent group
+ * sibling keeps its stored value), arrays and everything else are replaced by the delta, and an
+ * explicit `null` survives as null. A shallow spread would hand `validateConfig` a group missing
+ * the siblings the update did not send.
+ */
+const mergeSavedShape = (
+	original: Record<string, unknown>,
+	delta: Record<string, unknown>
+): Record<string, unknown> => {
+	const merged: Record<string, unknown> = { ...original }
+	for (const [key, value] of Object.entries(delta)) {
+		const base = merged[key]
+		merged[key] = isPlainObject(base) && isPlainObject(value) ? mergeSavedShape(base, value) : value
+	}
+	return merged
+}
+
 export const buildFormsCollection = ({
 	overrides,
 	registry,
@@ -392,6 +419,41 @@ export const buildFormsCollection = ({
 					}
 				}
 			}
+		}
+		return data
+	}
+
+	// Save-time seam for an action's own cross-field checks: each stored instance runs its
+	// definition's `validateConfig` against the merged form data, and every refusal lands on the
+	// action block itself (`actions.<index>`), not on whichever config field happens to be required.
+	// Stored actions are validated even when a partial update does not resend them, because the
+	// check may span the whole form (an action body referencing a field the update just deleted).
+	const actionConfigBeforeValidate: CollectionBeforeValidateHook = async ({
+		data,
+		originalDoc,
+		req,
+	}) => {
+		const instances = (data?.actions ?? originalDoc?.actions) as ActionInstance[] | undefined
+		if (!Array.isArray(instances) || instances.length === 0) {
+			return data
+		}
+		const merged = mergeSavedShape(
+			(originalDoc ?? {}) as Record<string, unknown>,
+			(data ?? {}) as Record<string, unknown>
+		)
+		const errors: { path: string; message: string }[] = []
+		for (const [index, instance] of instances.entries()) {
+			const validate = actionRegistry.get(instance.blockType)?.validateConfig
+			if (!validate) {
+				continue
+			}
+			const verdict = await validate(instance, { data: merged, req })
+			if (verdict !== true) {
+				errors.push({ path: `actions.${index}`, message: verdict })
+			}
+		}
+		if (errors.length > 0) {
+			throw new ValidationError({ collection: FORMS_SLUG, errors }, req.t)
 		}
 		return data
 	}
@@ -854,7 +916,11 @@ export const buildFormsCollection = ({
 		hooks: {
 			...(overrides?.hooks ?? {}),
 			// beforeValidate normalizes conditions and flow; consumer hooks run after
-			beforeValidate: [beforeValidate, ...(overrides?.hooks?.beforeValidate ?? [])],
+			beforeValidate: [
+				beforeValidate,
+				actionConfigBeforeValidate,
+				...(overrides?.hooks?.beforeValidate ?? []),
+			],
 			beforeChange: [pollOutcomeBeforeChange, ...(overrides?.hooks?.beforeChange ?? [])],
 			afterChange: [pollCloseAfterChange, ...(overrides?.hooks?.afterChange ?? [])],
 			afterRead: [

@@ -72,6 +72,8 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: plausibleMetrics,
 		dimensions: plausibleDimensions,
+		filters: plausibleDimensions,
+		filterOperators: new Set(['eq']),
 		batchPageReport: true,
 		rateLimit: { requestsPerHour: 600 },
 		recommendedTtl: { realtime: 300, aggregate: 3600 },
@@ -96,6 +98,15 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			}
 			if (q.hostname) {
 				filters.push(['is', 'event:hostname', [q.hostname]])
+			}
+			// Capability gating (filters/filterOperators) is the real contract upstream; an
+			// unsupported dimension or operator is dropped here as the safety net.
+			for (const filter of q.filters ?? []) {
+				const mapped = DIMENSION_MAP[filter.dimension]
+				if (!mapped || filter.operator !== 'eq') {
+					continue
+				}
+				filters.push(['is', mapped, [filter.value]])
 			}
 
 			const readRow = (row: { metrics: number[] }): Partial<Record<MetricKey, number>> => {

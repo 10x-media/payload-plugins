@@ -19,6 +19,7 @@ import { makeIngestHandler } from './ingest/endpoint'
 import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
 import { createWriteBuffer, type WriteBuffer } from './ingest/writeBuffer'
+import { aggregateEvents, type EventLike, filtersToWhere } from './query/eventAgg'
 import { buildRealtime, type RealtimeEvent } from './realtime/buildRealtime'
 import { pruneEventsTask } from './retention/pruneTask'
 import {
@@ -48,7 +49,13 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'events',
 	'avgDuration',
 ])
-const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'country', 'source', 'device'])
+const dimensions: ReadonlySet<DimensionKey> = new Set([
+	'page',
+	'country',
+	'source',
+	'device',
+	'event',
+])
 
 const REALTIME_EVENT_LIMIT = 50_000
 
@@ -57,13 +64,85 @@ const baseCapabilities: AnalyticsCapabilities = {
 	realtime: true,
 	realtimeWindowMinutes: 60,
 	comparison: true,
-	minGranularity: 'day',
+	minGranularity: 'hour',
 	maxLookbackDays: null,
 	metrics,
 	dimensions,
+	filters: new Set(['page', 'country', 'region', 'city', 'device', 'source', 'event']),
+	filterOperators: new Set(['eq', 'contains']),
 	batchPageReport: true,
 	rateLimit: null,
 	recommendedTtl: { realtime: 10, aggregate: 300 },
+}
+
+const DAY_MS = 86_400_000
+
+interface QueryEventsContext {
+	retentionDays?: number
+	scopeWhere: (q: AnalyticsQuery) => Record<string, unknown>
+}
+
+/**
+ * Filtered/hour-granularity reads bypass the day-bucketed rollups and aggregate raw
+ * events directly, under the same hard cap as `realtime()`. `retentionDays` clamps how
+ * far back the read can reach when it would otherwise ask for events the prune task has
+ * already deleted (or will delete before they're queryable).
+ */
+async function queryEvents(
+	payload: Payload,
+	q: AnalyticsQuery,
+	ctx: QueryEventsContext
+): Promise<AnalyticsResult> {
+	const fetchedAt = q.dateRange.end.toISOString()
+	let start = q.dateRange.start
+	let clamped = false
+	if (ctx.retentionDays && ctx.retentionDays > 0) {
+		const floor = new Date(Date.now() - ctx.retentionDays * DAY_MS)
+		if (start < floor) {
+			start = floor
+			clamped = true
+		}
+	}
+	const baseWhere: Record<string, unknown> = {
+		timestamp: {
+			greater_than_equal: start.toISOString(),
+			less_than_equal: q.dateRange.end.toISOString(),
+		},
+		...(q.hostname ? { hostname: { equals: q.hostname } } : {}),
+		...(q.path ? { path: { equals: q.path } } : {}),
+		...ctx.scopeWhere(q),
+	}
+	// filtersToWhere can also key off 'path' (a page filter); AND rather than spread so
+	// q.path and a page filter both constrain the query instead of one overwriting the other.
+	const filterWhere = filtersToWhere(q.filters ?? [])
+	const where: Record<string, unknown> =
+		Object.keys(filterWhere).length > 0 ? { and: [baseWhere, filterWhere] } : baseWhere
+	const { docs } = await payload.find({
+		collection: EVENTS_SLUG as never,
+		where: where as never,
+		// Newest-first under a hard cap, same tradeoff as realtime(): a very busy site
+		// with more events than the cap in range keeps its most recent activity.
+		limit: REALTIME_EVENT_LIMIT,
+		pagination: false,
+		depth: 0,
+		sort: '-timestamp',
+	})
+	const events = docs as unknown as EventLike[]
+	const dim = q.dimensions?.find((d) => dimensions.has(d))
+	const granularity =
+		q.granularity === 'hour' || q.granularity === 'day' ? q.granularity : undefined
+	const { rows, totals } = aggregateEvents(events, {
+		metrics: q.metrics,
+		dimension: dim,
+		granularity,
+		timezone: q.timezone,
+		order: q.order,
+		limit: q.limit,
+	})
+	const meta: AnalyticsResult['meta'] = { provider: 'native', fetchedAt }
+	if (clamped) meta.clamped = true
+	if (events.length >= REALTIME_EVENT_LIMIT) meta.sampled = true
+	return { rows, totals, meta }
 }
 
 export function native(options: NativeOptions = {}): NativeAdapter {
@@ -151,6 +230,9 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			if (!payloadRef) {
 				throw new Error('analytics: native adapter queried before init')
 			}
+			if ((q.filters && q.filters.length > 0) || q.granularity === 'hour') {
+				return queryEvents(payloadRef, q, { retentionDays: options.retentionDays, scopeWhere })
+			}
 			const fetchedAt = q.dateRange.end.toISOString()
 			const periodWhere = {
 				greater_than_equal: q.dateRange.start.toISOString(),
@@ -166,6 +248,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				granularity: { equals: 'day' },
 				dimension: { equals: '' },
 				path: { equals: totalsPath },
+				hostname: { equals: q.hostname ?? '' },
 				period: periodWhere,
 				...scopeWhere(q),
 			})
@@ -192,6 +275,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 							granularity: { equals: 'day' },
 							dimension: { equals: '' },
 							path: { not_equals: '' },
+							hostname: { equals: q.hostname ?? '' },
 							period: periodWhere,
 							...scopeWhere(q),
 						}
@@ -199,6 +283,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 							granularity: { equals: 'day' },
 							dimension: { equals: dim },
 							path: { equals: '' },
+							hostname: { equals: q.hostname ?? '' },
 							period: periodWhere,
 							...scopeWhere(q),
 						}

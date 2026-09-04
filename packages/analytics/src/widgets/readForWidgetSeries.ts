@@ -1,6 +1,12 @@
 import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
-import type { AnalyticsAdapter, AnalyticsRow, DateRange, MetricKey } from '../core/contract'
+import type {
+	AnalyticsAdapter,
+	AnalyticsFilter,
+	AnalyticsRow,
+	DateRange,
+	MetricKey,
+} from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
 import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
@@ -38,6 +44,7 @@ export interface ReadForWidgetSeriesArgs {
 	range?: DateRange
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	filters?: AnalyticsFilter[]
 }
 
 const MAX_SERIES_DAYS = 366
@@ -87,7 +94,7 @@ export const fillDailySeries = (args: {
 export const readForWidgetSeries = async (
 	args: ReadForWidgetSeriesArgs
 ): Promise<WidgetSeriesResult> => {
-	const { req, metric, timeframe, adapterId, now, range } = args
+	const { req, metric, timeframe, adapterId, now, range, filters } = args
 	const fallback = (status: WidgetReadStatus, id: string): WidgetSeriesResult => ({
 		status,
 		adapterId: id,
@@ -113,7 +120,15 @@ export const readForWidgetSeries = async (
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
 	}
 	if (
-		!satisfiesCapabilities(adapter.capabilities, { metrics: [metric] }) ||
+		!satisfiesCapabilities(adapter.capabilities, {
+			metrics: [metric],
+			...(filters && filters.length > 0
+				? {
+						filters: filters.map((f) => f.dimension),
+						filterOperators: filters.map((f) => f.operator),
+					}
+				: {}),
+		}) ||
 		!supportsGranularity(adapter.capabilities, 'day')
 	) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
@@ -127,6 +142,7 @@ export const readForWidgetSeries = async (
 			metrics: [metric],
 			dateRange,
 			granularity: 'day',
+			filters,
 			timezone: tz,
 			scope: ctx.queryScope,
 		}),
@@ -134,6 +150,7 @@ export const readForWidgetSeries = async (
 			? runtime.engine.read(adapter, {
 					metrics: [metric],
 					dateRange: comparisonRange,
+					filters,
 					timezone: tz,
 					scope: ctx.queryScope,
 				})

@@ -45,9 +45,11 @@ export interface DateRange {
 	end: Date
 }
 
+export type FilterOperator = 'eq' | 'contains' | 'matches'
+
 export interface AnalyticsFilter {
 	dimension: DimensionKey
-	operator: 'eq' | 'contains' | 'matches'
+	operator: FilterOperator
 	value: string
 }
 
@@ -105,6 +107,10 @@ export interface AnalyticsCapabilities {
 	maxLookbackDays: number | null
 	metrics: ReadonlySet<MetricKey>
 	dimensions: ReadonlySet<DimensionKey>
+	/** Dimensions the adapter can apply AnalyticsQuery.filters on; empty = filters unsupported. */
+	filters: ReadonlySet<DimensionKey>
+	/** Operators the adapter honors in filters; adapters ignore filters whose operator they lack. */
+	filterOperators: ReadonlySet<FilterOperator>
 	batchPageReport: boolean
 	rateLimit: RateLimitDescriptor | null
 	recommendedTtl: { realtime: number; aggregate: number }

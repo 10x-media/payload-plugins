@@ -22,6 +22,8 @@ const baseCaps = (minGranularity: Granularity = 'day'): AnalyticsCapabilities =>
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(),
+	filters: new Set(),
+	filterOperators: new Set(['eq']),
 	batchPageReport: false,
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },
@@ -161,6 +163,42 @@ describe('readForWidgetSeries', () => {
 			metric: 'pageviews',
 			timeframe: 'last7days',
 			now: NOW,
+		})
+		expect(result.status).toBe('unavailable')
+	})
+
+	it('forwards filters into the engine query', async () => {
+		let received: AnalyticsQuery | undefined
+		const adapter = seriesAdapter({
+			capabilities: { ...baseCaps(), filters: new Set(['page']) },
+			async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				received = q
+				return {
+					rows: [],
+					totals: { pageviews: 12 },
+					meta: { provider: 'native', fetchedAt: NOW.toISOString() },
+				}
+			},
+		})
+		const result = await readForWidgetSeries({
+			req: reqWith([adapter]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+			filters: [{ dimension: 'page', operator: 'eq', value: '/a' }],
+		})
+		expect(result.status).toBe('ok')
+		expect(received?.filters).toEqual([{ dimension: 'page', operator: 'eq', value: '/a' }])
+	})
+
+	it('returns unavailable when the adapter lacks the filter dimension', async () => {
+		const result = await readForWidgetSeries({
+			req: reqWith([seriesAdapter({ capabilities: baseCaps() })]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+			// baseCaps declares no filters at all.
+			filters: [{ dimension: 'page', operator: 'eq', value: '/a' }],
 		})
 		expect(result.status).toBe('unavailable')
 	})

@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { Config, Endpoint, PayloadRequest } from 'payload'
+import type { Config, Endpoint, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readForField } from '../../src/fields/readForDocument'
 import { analytics } from '../../src/index'
@@ -48,6 +48,33 @@ const seenOnly = (config: Config): Config => {
 	return config
 }
 
+/**
+ * Inserts one rollup row via the raw DB driver (mirroring `bumpRollup`'s access pattern),
+ * bypassing Payload's field validation so a genuine duplicate hits the storage-level unique
+ * index rather than the app-level `required` check on the '' sentinel dimension/hostname
+ * fields.
+ */
+const rawInsertRollup = async (payload: Payload, row: Record<string, unknown>): Promise<void> => {
+	if (payload.db.name === 'mongoose') {
+		const db = payload.db as unknown as {
+			collections: Record<string, { collection: { insertOne: (doc: object) => Promise<unknown> } }>
+		}
+		await db.collections[ROLLUPS_SLUG]?.collection.insertOne(row)
+		return
+	}
+	const db = payload.db as unknown as {
+		drizzle: { insert: (t: unknown) => { values: (v: unknown) => Promise<unknown> } }
+		tables: Record<string, Record<string, unknown>>
+		tableNameMap: Map<string, string>
+	}
+	const tableName = db.tableNameMap.get('analytics_rollups')
+	const table = tableName ? db.tables[tableName] : undefined
+	if (!table) {
+		throw new Error('analytics: drizzle table "analytics_rollups" not found')
+	}
+	await db.drizzle.insert(table).values(row)
+}
+
 describeForDb('native rollup atomic apply', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
@@ -64,6 +91,7 @@ describeForDb('native rollup atomic apply', {}, (db) => {
 			path: '/p',
 			dimension: '',
 			dimvalue: '',
+			hostname: '',
 		}
 		const delta = { key, inc: { pageviews: 1, events: 0, durationMs: 100, samples: 1 } }
 		await applyRollupDeltas(booted.payload, [delta])
@@ -96,6 +124,7 @@ describeForDb('native bumpRollup baseline', {}, (db) => {
 			path: '/baseline',
 			dimension: '',
 			dimvalue: '',
+			hostname: '',
 		}
 		await bumpRollup(booted.payload, key, { visitors: 1 })
 		const { docs } = await booted.payload.find({
@@ -766,11 +795,13 @@ describeForDb('analytics sync tier', {}, (db) => {
 			pageviews: number
 			visitors: number
 			date: string
+			scope: string
 		}>) {
 			expect(doc.source).toBe('memory')
 			expect(doc.pageviews).toBe(2)
 			expect(doc.visitors).toBe(2)
 			expect(doc.date).toBeTruthy()
+			expect(doc.scope).toBe('')
 		}
 	})
 
@@ -788,5 +819,152 @@ describeForDb('analytics sync tier', {}, (db) => {
 		})
 		expect(after.totalDocs).toBe(before.totalDocs)
 		expect(after.totalDocs).toBe(3)
+	})
+})
+
+describeForDb('native hostname family uniqueness', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const ingest = (path: string, hostname: string, ua: string) =>
+		makeIngestHandler(platformHeaderResolver)({
+			payload: booted.payload,
+			headers: new Headers({ 'content-type': 'application/json', 'user-agent': ua }),
+			json: async () => ({ type: 'pageview', path, hostname, durationMs: 100 }),
+		} as never)
+
+	it(`keeps per-hostname rollup buckets exact and separate from the merged family on ${db}`, async () => {
+		await ingest('/hf', 'a.example', 'UA-A1')
+		await ingest('/hf', 'b.example', 'UA-B1')
+
+		const rollups = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: '/hf' }, dimension: { equals: '' } },
+			pagination: false,
+			overrideAccess: true,
+		})
+		const byHostname = new Map(
+			(rollups.docs as unknown as Array<{ hostname: string; pageviews: number }>).map((d) => [
+				d.hostname,
+				d,
+			])
+		)
+		expect(byHostname.get('')?.pageviews).toBe(2)
+		expect(byHostname.get('a.example')?.pageviews).toBe(1)
+		expect(byHostname.get('b.example')?.pageviews).toBe(1)
+	})
+
+	it(`rejects a raw duplicate-bucket insert, proving the widened unique index on ${db}`, async () => {
+		const row = {
+			granularity: 'day',
+			period: new Date('2026-05-01T00:00:00Z'),
+			path: '/dup',
+			dimension: '',
+			dimvalue: '',
+			hostname: 'a.example',
+			pageviews: 1,
+			events: 0,
+			durationMs: 0,
+			visitors: 0,
+			sessions: 0,
+			samples: 0,
+		}
+		await rawInsertRollup(booted.payload, row)
+		await expect(rawInsertRollup(booted.payload, row)).rejects.toThrow()
+	})
+})
+
+describeForDb('analytics sync tier: scope coexistence', {}, (db) => {
+	const DAY = 86_400_000
+	const mem = memoryAdapter()
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native(), mem],
+				sync: true,
+				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+			}),
+			db,
+		})
+		mem.record({ path: '/p', timestamp: new Date(Date.now() - DAY), visitor: 'a' })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const reqFor = (tenant: string): PayloadRequest =>
+		({
+			payload: booted.payload,
+			headers: new Headers({ 'x-tenant': tenant }),
+		}) as unknown as PayloadRequest
+
+	const runSync = async (tenant: string): Promise<{ synced: number; failed: number }> => {
+		const task = syncTask({
+			cron: '0 */6 * * *',
+			lookbackDays: 3,
+			collectionSlug: 'analytics-daily',
+		})
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('sync handler must be a function')
+		}
+		const result = await handler({ req: reqFor(tenant) } as unknown as Parameters<
+			typeof handler
+		>[0])
+		return (result as { output: { synced: number; failed: number } }).output
+	}
+
+	it(`upserts one row per scope, coexisting for the same (source, date) on ${db}`, async () => {
+		await runSync('t1')
+		await runSync('t2')
+		const docs = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			limit: 100,
+			overrideAccess: true,
+		})
+		const byScope = new Map(
+			(docs.docs as unknown as Array<{ scope: string; source: string; pageviews: number }>).map(
+				(d) => [d.scope, d]
+			)
+		)
+		expect(byScope.get('t1')?.pageviews).toBe(1)
+		expect(byScope.get('t2')?.pageviews).toBe(1)
+	})
+
+	it(`is idempotent per scope: re-run updates in place with no duplicates on ${db}`, async () => {
+		const before = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			limit: 0,
+			overrideAccess: true,
+		})
+		await runSync('t1')
+		const after = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			limit: 0,
+			overrideAccess: true,
+		})
+		expect(after.totalDocs).toBe(before.totalDocs)
+	})
+
+	it(`a tenant's find with overrideAccess: false returns only their scope's rows on ${db}`, async () => {
+		const { docs } = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			limit: 100,
+			overrideAccess: false,
+			user: { id: 'u1' },
+			req: { headers: new Headers({ 'x-tenant': 't1' }) } as unknown as PayloadRequest,
+		})
+		expect(docs.length).toBeGreaterThan(0)
+		expect((docs as unknown as Array<{ scope: string }>).every((d) => d.scope === 't1')).toBe(true)
 	})
 })

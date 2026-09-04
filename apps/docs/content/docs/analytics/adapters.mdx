@@ -20,7 +20,7 @@ Adapters ship as code-split subpaths, so a site bundles only what it imports. Ea
 
 ## The capabilities model
 
-Each adapter declares an `AnalyticsCapabilities` object: which `metrics` and `dimensions` it supports, whether it can query per page (`perPageQuery`) or in `realtime`, its `maxLookbackDays`, rate-limit hints, and recommended cache TTLs.
+Each adapter declares an `AnalyticsCapabilities` object: which `metrics` and `dimensions` it supports, which of those `dimensions` also accept an `AnalyticsQuery.filters` entry (`filters`) and with which operators (`filterOperators`, from `eq` / `contains` / `matches`), whether it can query per page (`perPageQuery`) or in `realtime`, its `maxLookbackDays`, rate-limit hints, and recommended cache TTLs.
 
 Every surface is gated by it:
 
@@ -31,6 +31,21 @@ Every surface is gated by it:
 Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
 
 An unconfigured adapter (missing credentials) degrades to an empty state and makes no network calls.
+
+## Filters
+
+`AnalyticsQuery.filters` narrows a read to rows matching one or more `{ dimension, operator, value }` entries. A widget or field requesting a filter dimension no configured adapter declares in `filters` is gated the same way an unsupported metric or dimension is; the read helpers drop into an unavailable state rather than silently ignoring the filter.
+
+| Adapter | Filterable dimensions | Operators |
+|---|---|---|
+| native | `page`, `country`, `region`, `city`, `device`, `source`, `event` | `eq`, `contains` |
+| PostHog | `page`, `event` | `eq`, `contains`, `matches` |
+| Plausible | `page`, `source`, `referrer`, `device`, `browser`, `os`, `country`, `region`, `city`, `utmSource`, `utmMedium`, `utmCampaign` | `eq` |
+| GA4 | `page`, `referrer`, `source`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq` |
+| Umami | none | none |
+| `memoryAdapter` (testing) | `page` | `eq` |
+
+`contains` is case-insensitive everywhere it's supported. On native it goes through Payload's own `contains` operator: case-insensitive on both Mongo and Postgres, but the two DBs differ on what a raw `%` or `_` in the filter value does. Mongo regex-escapes the value first, so it always matches as a literal substring; Postgres wraps it in an ILIKE pattern without escaping it, so `%`/`_` act as SQL wildcards there. PostHog's `contains` escapes wildcard characters in the value itself before building its `ILIKE` pattern, so a `%` or `_` matches literally regardless of DB.
 
 ## Plausible
 
@@ -102,4 +117,4 @@ A deterministic in-memory adapter for tests and local development, with wide dec
 
 ## Writing your own adapter
 
-Implement `AnalyticsAdapter` from `@10x-media/analytics/types`: an `id`, a `label`, honest `capabilities`, `isConfigured()`, and `query(query, ctx)` returning rows and totals. Optional extras: `realtime(query, ctx)` for the realtime widget, and `register(config)` to add collections or endpoints (the native engine uses this hook). Declare only capabilities you actually serve; the plugin trusts them.
+Implement `AnalyticsAdapter` from `@10x-media/analytics/types`: an `id`, a `label`, honest `capabilities`, `isConfigured()`, and `query(query, ctx)` returning rows and totals. Optional extras: `realtime(query, ctx)` for the realtime widget, and `register(config)` to add collections or endpoints (the native engine uses this hook). `capabilities.filters` and `capabilities.filterOperators` are required fields, even if empty (`new Set()`) for an adapter that honors no `AnalyticsQuery.filters` entry at all. Declare only capabilities you actually serve; the plugin trusts them.

@@ -76,6 +76,54 @@ describe('plausible adapter', () => {
 		])
 	})
 
+	it('declares filters as the mapped-dimension key set, eq-only', () => {
+		const caps = plausible({ siteId: 's', apiKey: 'k' }).capabilities
+		expect(caps.filters).toEqual(caps.dimensions)
+		expect(caps.filterOperators).toEqual(new Set(['eq']))
+	})
+
+	it('appends an eq filter to the filters array', async () => {
+		let captured: { filters?: unknown } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({
+					results: [{ metrics: [1, 1, 1], dimensions: [] }],
+					meta: {},
+					query: {},
+				})
+			})
+		)
+		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
+		await adapter.query(q({ filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }] }), {})
+		expect(captured.filters).toEqual([['is', 'visit:country', ['DE']]])
+	})
+
+	it('drops a filter for an unmapped dimension or unsupported operator', async () => {
+		let captured: { filters?: unknown } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({
+					results: [{ metrics: [1, 1, 1], dimensions: [] }],
+					meta: {},
+					query: {},
+				})
+			})
+		)
+		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
+		await adapter.query(
+			q({
+				filters: [
+					{ dimension: 'event', operator: 'eq', value: 'signup' },
+					{ dimension: 'country', operator: 'contains', value: 'DE' },
+				],
+			}),
+			{}
+		)
+		expect(captured.filters).toBeUndefined()
+	})
+
 	it('maps a page-dimension breakdown to rows', async () => {
 		server.use(
 			http.post('https://plausible.io/api/v2/query', () =>

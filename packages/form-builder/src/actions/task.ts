@@ -121,9 +121,14 @@ export const runActionsForSubmission = async (args: {
 	// so a silently undelivered email/webhook is visible instead of the submission looking successful.
 	for (const result of results) {
 		if (!result.ok) {
-			payload.logger?.error(
-				`@10x-media/form-builder: action "${result.type}" failed for submission ${String(submission.id)}: ${result.error ?? 'unknown error'}`
-			)
+			const message = `@10x-media/form-builder: action "${result.type}" failed for submission ${String(submission.id)}: ${result.error ?? 'unknown error'}`
+			// Pino's (mergeObject, message) form: an ActionError's structured detail lands as a
+			// queryable log field instead of being concatenated into the message.
+			if (result.detail !== undefined) {
+				payload.logger?.error({ detail: result.detail }, message)
+			} else {
+				payload.logger?.error(message)
+			}
 		}
 	}
 	// A form can opt out of storing submissions (a pure signup that only POSTs to a provider): prune the

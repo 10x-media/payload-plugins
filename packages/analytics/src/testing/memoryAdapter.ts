@@ -33,6 +33,8 @@ const capabilities: AnalyticsCapabilities = {
 	maxLookbackDays: null,
 	metrics,
 	dimensions,
+	filters: new Set(['page']),
+	filterOperators: new Set(['eq']),
 	batchPageReport: true,
 	rateLimit: null,
 	recommendedTtl: { realtime: 300, aggregate: 3600 },
@@ -46,8 +48,18 @@ export interface MemoryAnalyticsAdapter extends AnalyticsAdapter {
 export function memoryAdapter(): MemoryAnalyticsAdapter {
 	const events: MemoryEvent[] = []
 
+	// Only page has a backing MemoryEvent field; other declared dimensions drop as unsupported.
+	const matchesFilters = (e: MemoryEvent, q: AnalyticsQuery): boolean =>
+		(q.filters ?? []).every((filter) => {
+			if (filter.dimension !== 'page' || filter.operator !== 'eq') {
+				return true
+			}
+			return e.path === filter.value
+		})
+
 	const inRange = (e: MemoryEvent, q: AnalyticsQuery): boolean => {
 		if (q.path && e.path !== q.path) return false
+		if (!matchesFilters(e, q)) return false
 		return e.timestamp >= q.dateRange.start && e.timestamp <= q.dateRange.end
 	}
 

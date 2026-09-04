@@ -1,8 +1,16 @@
-import type { AnalyticsCapabilities, DimensionKey, Granularity, MetricKey } from './contract'
+import type {
+	AnalyticsCapabilities,
+	DimensionKey,
+	FilterOperator,
+	Granularity,
+	MetricKey,
+} from './contract'
 
 export interface CapabilityRequirement {
 	metrics?: MetricKey[]
 	dimensions?: DimensionKey[]
+	filters?: DimensionKey[]
+	filterOperators?: FilterOperator[]
 	realtime?: boolean
 	perPageQuery?: boolean
 }
@@ -15,6 +23,8 @@ export function satisfiesCapabilities(
 	if (req.perPageQuery && !caps.perPageQuery) return false
 	if (req.metrics?.some((m) => !caps.metrics.has(m))) return false
 	if (req.dimensions?.some((d) => !caps.dimensions.has(d))) return false
+	if (req.filters?.some((d) => !caps.filters.has(d))) return false
+	if (req.filterOperators?.some((op) => !caps.filterOperators.has(op))) return false
 	return true
 }
 
@@ -22,6 +32,8 @@ export function satisfiesCapabilities(
 export type SerializedCapabilities = {
 	metrics: MetricKey[]
 	dimensions: DimensionKey[]
+	filters: DimensionKey[]
+	filterOperators: FilterOperator[]
 	realtime: boolean
 	realtimeWindowMinutes?: number
 	perPageQuery: boolean
@@ -33,6 +45,8 @@ export type SerializedCapabilities = {
 export const serializeCapabilities = (caps: AnalyticsCapabilities): SerializedCapabilities => ({
 	metrics: [...caps.metrics],
 	dimensions: [...caps.dimensions],
+	filters: [...caps.filters],
+	filterOperators: [...caps.filterOperators],
 	realtime: caps.realtime,
 	...(caps.realtimeWindowMinutes !== undefined
 		? { realtimeWindowMinutes: caps.realtimeWindowMinutes }

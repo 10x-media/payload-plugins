@@ -6,7 +6,7 @@ import type { RollupDelta, RollupKey } from './deltas'
 import { insertIfNew } from './insertIfNew'
 
 export function bucketKey(key: RollupKey): string {
-	const base = `${key.granularity}|${key.period.toISOString()}|${key.path}|${key.dimension}|${key.dimvalue}`
+	const base = `${key.granularity}|${key.period.toISOString()}|${key.path}|${key.dimension}|${key.dimvalue}|${key.hostname}`
 	return key.scope !== undefined ? `${base}|${key.scope}` : base
 }
 

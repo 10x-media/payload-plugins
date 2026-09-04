@@ -9,8 +9,9 @@ describe('bucketKey', () => {
 			path: '/p',
 			dimension: 'country',
 			dimvalue: 'US',
+			hostname: '',
 		}
-		expect(bucketKey(key)).toBe('day|2026-01-10T00:00:00.000Z|/p|country|US')
+		expect(bucketKey(key)).toBe('day|2026-01-10T00:00:00.000Z|/p|country|US|')
 	})
 
 	it('distinguishes the path-level bucket from a dimension bucket', () => {
@@ -18,9 +19,23 @@ describe('bucketKey', () => {
 			granularity: 'day' as const,
 			period: new Date('2026-01-10T00:00:00Z'),
 			path: '/p',
+			hostname: '',
 		}
 		expect(bucketKey({ ...base, dimension: '', dimvalue: '' })).not.toBe(
 			bucketKey({ ...base, dimension: 'country', dimvalue: 'US' })
+		)
+	})
+
+	it('distinguishes the hostname-less family from a hostname-scoped family', () => {
+		const base = {
+			granularity: 'day' as const,
+			period: new Date('2026-01-10T00:00:00Z'),
+			path: '/p',
+			dimension: '',
+			dimvalue: '',
+		}
+		expect(bucketKey({ ...base, hostname: '' })).not.toBe(
+			bucketKey({ ...base, hostname: 'a.example' })
 		)
 	})
 })

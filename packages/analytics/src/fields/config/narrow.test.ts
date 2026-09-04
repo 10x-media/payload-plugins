@@ -18,6 +18,8 @@ const source = (
 		maxLookbackDays: null,
 		metrics: metrics as WireSource['capabilities']['metrics'],
 		dimensions: [],
+		filters: [],
+		filterOperators: ['eq'],
 		...extra,
 	},
 })

@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
-import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
+import type { AnalyticsAdapter, AnalyticsFilter, DateRange, MetricKey } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
@@ -29,10 +29,11 @@ export interface ReadForWidgetArgs {
 	range?: DateRange
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	filters?: AnalyticsFilter[]
 }
 
 export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetReadResult> => {
-	const { req, metrics, timeframe, adapterId, now, range } = args
+	const { req, metrics, timeframe, adapterId, now, range, filters } = args
 	const emptyMetrics = {} as Partial<Record<MetricKey, number>>
 
 	const runtime = getRuntime(req.payload)
@@ -60,7 +61,17 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	if (!adapter.isConfigured()) {
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
 	}
-	if (!satisfiesCapabilities(adapter.capabilities, { metrics })) {
+	if (
+		!satisfiesCapabilities(adapter.capabilities, {
+			metrics,
+			...(filters && filters.length > 0
+				? {
+						filters: filters.map((f) => f.dimension),
+						filterOperators: filters.map((f) => f.operator),
+					}
+				: {}),
+		})
+	) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
 	const comparisonRange =
@@ -68,11 +79,18 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 			? (previousWindow(dateRange, tz) ?? undefined)
 			: undefined
 	const [result, previous] = await Promise.all([
-		runtime.engine.read(adapter, { metrics, dateRange, timezone: tz, scope: ctx.queryScope }),
+		runtime.engine.read(adapter, {
+			metrics,
+			dateRange,
+			filters,
+			timezone: tz,
+			scope: ctx.queryScope,
+		}),
 		comparisonRange
 			? runtime.engine.read(adapter, {
 					metrics,
 					dateRange: comparisonRange,
+					filters,
 					timezone: tz,
 					scope: ctx.queryScope,
 				})
