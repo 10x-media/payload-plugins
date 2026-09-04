@@ -45,4 +45,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.generateValue]: 'Générer une nouvelle valeur',
 	[keys.writeOnlyValue]: 'Valeur chiffrée en écriture seule',
 	[keys.secretNotSet]: 'Non définie',
+	[keys.selectUnit]: "Sélectionner l'unité",
+	[keys.measurementBelowMin]: 'Doit être au moins {{min}}',
+	[keys.measurementAboveMax]: 'Ne doit pas dépasser {{max}}',
 }

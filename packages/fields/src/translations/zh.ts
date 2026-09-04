@@ -44,4 +44,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.generateValue]: '生成新值',
 	[keys.writeOnlyValue]: '只写加密值',
 	[keys.secretNotSet]: '未设置',
+	[keys.selectUnit]: '选择单位',
+	[keys.measurementBelowMin]: '不得少于 {{min}}',
+	[keys.measurementAboveMax]: '不得超过 {{max}}',
 }

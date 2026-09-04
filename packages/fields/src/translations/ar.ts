@@ -44,4 +44,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.generateValue]: 'إنشاء قيمة جديدة',
 	[keys.writeOnlyValue]: 'قيمة مشفرة للكتابة فقط',
 	[keys.secretNotSet]: 'غير محدد',
+	[keys.selectUnit]: 'اختيار الوحدة',
+	[keys.measurementBelowMin]: 'يجب ألا يقل عن {{min}}',
+	[keys.measurementAboveMax]: 'يجب ألا يزيد عن {{max}}',
 }

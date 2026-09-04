@@ -44,4 +44,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.generateValue]: 'Згенерувати нове значення',
 	[keys.writeOnlyValue]: 'Зашифроване значення лише для запису',
 	[keys.secretNotSet]: 'Не задано',
+	[keys.selectUnit]: 'Вибрати одиницю',
+	[keys.measurementBelowMin]: 'Має бути не менше {{min}}',
+	[keys.measurementAboveMax]: 'Має бути не більше {{max}}',
 }
