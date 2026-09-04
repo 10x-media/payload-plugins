@@ -306,6 +306,9 @@ export const id: Record<TranslationKey, string> = {
 	[keys.spamRejected]: 'Kiriman Anda tidak dapat diproses.',
 	[keys.submissionActionFailedFlag]: 'Tindakan gagal',
 	[keys.submissionActionFailed]: 'Kiriman Anda tidak dapat diselesaikan. Coba lagi sesaat lagi.',
+	[keys.submissionActionUncertainFlag]: 'Tindakan belum dipastikan',
+	[keys.submissionActionUncertain]:
+		'Kami tidak dapat memastikan kiriman Anda selesai. Kiriman mungkin tetap diproses; tunggu sesaat sebelum mencoba lagi.',
 	[keys.spamCaptchaFailed]: 'Verifikasi captcha gagal. Silakan coba lagi.',
 	[keys.contextInvalid]:
 		'Formulir ini tidak dapat diverifikasi. Muat ulang halaman lalu coba lagi.',

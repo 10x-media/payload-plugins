@@ -314,6 +314,9 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.submissionActionFailedFlag]: 'Action échouée',
 	[keys.submissionActionFailed]:
 		"Votre envoi n'a pas pu aboutir. Veuillez réessayer dans un instant.",
+	[keys.submissionActionUncertainFlag]: 'Action non confirmée',
+	[keys.submissionActionUncertain]:
+		"Nous n'avons pas pu confirmer que votre envoi a abouti. Il se peut qu'il aboutisse malgré tout ; veuillez patienter un instant avant de réessayer.",
 	[keys.spamCaptchaFailed]: 'La vérification du captcha a échoué. Veuillez réessayer.',
 	[keys.contextInvalid]: "Ce formulaire n'a pas pu être vérifié. Rechargez la page et réessayez.",
 	[keys.collectionFormSingular]: 'Formulaire',

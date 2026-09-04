@@ -297,6 +297,9 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.spamRejected]: 'تعذرت معالجة إرسالك.',
 	[keys.submissionActionFailedFlag]: 'فشل الإجراء',
 	[keys.submissionActionFailed]: 'تعذر إتمام إرسالك. يرجى المحاولة بعد لحظات.',
+	[keys.submissionActionUncertainFlag]: 'إجراء غير مؤكد',
+	[keys.submissionActionUncertain]:
+		'تعذر علينا تأكيد إتمام إرسالك. قد يكتمل رغم ذلك؛ يرجى الانتظار لحظات قبل المحاولة مرة أخرى.',
 	[keys.spamCaptchaFailed]: 'فشل التحقق من الكابتشا. يرجى المحاولة مرة أخرى.',
 	[keys.contextInvalid]: 'تعذر التحقق من هذا النموذج. يرجى إعادة تحميل الصفحة والمحاولة مرة أخرى.',
 	[keys.collectionFormSingular]: 'نموذج',

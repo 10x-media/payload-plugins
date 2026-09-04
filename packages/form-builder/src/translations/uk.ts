@@ -307,6 +307,9 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.submissionActionFailedFlag]: 'Дію не виконано',
 	[keys.submissionActionFailed]:
 		'Вашу заявку не вдалося завершити. Будь ласка, спробуйте трохи пізніше.',
+	[keys.submissionActionUncertainFlag]: 'Дію не підтверджено',
+	[keys.submissionActionUncertain]:
+		'Не вдалося підтвердити, що вашу заявку завершено. Можливо, її все ж буде оброблено; будь ласка, зачекайте трохи, перш ніж повторювати спробу.',
 	[keys.spamCaptchaFailed]: 'Перевірка капчі не вдалася. Будь ласка, спробуйте знову.',
 	[keys.contextInvalid]:
 		'Цю форму не вдалося підтвердити. Будь ласка, перезавантажте сторінку та спробуйте знову.',

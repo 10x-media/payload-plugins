@@ -304,6 +304,9 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.spamRejected]: 'Не удалось обработать вашу отправку.',
 	[keys.submissionActionFailedFlag]: 'Действие не выполнено',
 	[keys.submissionActionFailed]: 'Не удалось завершить вашу отправку. Попробуйте через мгновение.',
+	[keys.submissionActionUncertainFlag]: 'Действие не подтверждено',
+	[keys.submissionActionUncertain]:
+		'Не удалось подтвердить, что ваша отправка завершена. Возможно, она всё же будет обработана; подождите немного, прежде чем повторять попытку.',
 	[keys.spamCaptchaFailed]: 'Проверка капчи не пройдена. Попробуйте ещё раз.',
 	[keys.contextInvalid]: 'Не удалось проверить эту форму. Обновите страницу и попробуйте снова.',
 	[keys.collectionFormSingular]: 'Форма',

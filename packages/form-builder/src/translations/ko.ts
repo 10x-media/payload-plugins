@@ -294,6 +294,9 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.spamRejected]: '제출을 처리하지 못했습니다.',
 	[keys.submissionActionFailedFlag]: '작업 실패',
 	[keys.submissionActionFailed]: '제출을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+	[keys.submissionActionUncertainFlag]: '작업 미확인',
+	[keys.submissionActionUncertain]:
+		'제출이 완료되었는지 확인하지 못했습니다. 그래도 처리되었을 수 있으니 잠시 기다린 후 다시 시도해 주세요.',
 	[keys.spamCaptchaFailed]: '캡차 인증에 실패했습니다. 다시 시도해 주세요.',
 	[keys.contextInvalid]:
 		'이 양식을 확인하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.',

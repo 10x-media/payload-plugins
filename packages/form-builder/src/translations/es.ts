@@ -307,6 +307,9 @@ export const es: Record<TranslationKey, string> = {
 	[keys.spamRejected]: 'No se pudo procesar su envío.',
 	[keys.submissionActionFailedFlag]: 'Acción fallida',
 	[keys.submissionActionFailed]: 'No se pudo completar su envío. Inténtelo dentro de un momento.',
+	[keys.submissionActionUncertainFlag]: 'Acción sin confirmar',
+	[keys.submissionActionUncertain]:
+		'No pudimos confirmar que su envío se completara. Puede que se procese de todos modos; espere un momento antes de volver a intentarlo.',
 	[keys.spamCaptchaFailed]: 'La verificación del captcha falló. Inténtelo de nuevo.',
 	[keys.contextInvalid]:
 		'No se pudo verificar este formulario. Recargue la página e inténtelo de nuevo.',

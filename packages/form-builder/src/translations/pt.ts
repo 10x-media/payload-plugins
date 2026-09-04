@@ -305,6 +305,9 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.submissionActionFailedFlag]: 'Falha na ação',
 	[keys.submissionActionFailed]:
 		'Não foi possível concluir o seu envio. Tente novamente em instantes.',
+	[keys.submissionActionUncertainFlag]: 'Ação por confirmar',
+	[keys.submissionActionUncertain]:
+		'Não foi possível confirmar que o seu envio foi concluído. Ainda assim, pode ter sido processado; aguarde um momento antes de tentar novamente.',
 	[keys.spamCaptchaFailed]: 'A verificação do captcha falhou. Tente novamente.',
 	[keys.contextInvalid]:
 		'Não foi possível verificar este formulário. Recarregue a página e tente novamente.',

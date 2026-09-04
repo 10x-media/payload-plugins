@@ -282,6 +282,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.spamRejected]: '无法处理您的提交。',
 	[keys.submissionActionFailedFlag]: '动作执行失败',
 	[keys.submissionActionFailed]: '您的提交未能完成。请稍后重试。',
+	[keys.submissionActionUncertainFlag]: '动作未确认',
+	[keys.submissionActionUncertain]: '无法确认您的提交是否已完成。它仍可能成功；请稍候片刻再重试。',
 	[keys.spamCaptchaFailed]: '验证码校验失败。请重试。',
 	[keys.contextInvalid]: '无法验证此表单。请重新加载页面后重试。',
 	[keys.collectionFormSingular]: '表单',
