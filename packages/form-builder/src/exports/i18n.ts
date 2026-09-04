@@ -4,5 +4,20 @@ export type {
 	TranslationKey as FormBuilderTranslationKeys,
 	TranslationsOption,
 } from '../translations'
-export { bundles, de, en, keys, translations } from '../translations'
+export {
+	ar,
+	bundles,
+	de,
+	en,
+	es,
+	fr,
+	id,
+	keys,
+	ko,
+	pt,
+	ru,
+	translations,
+	uk,
+	zh,
+} from '../translations'
 export { clientRuntimeKeys } from '../translations/clientRuntimeKeys'

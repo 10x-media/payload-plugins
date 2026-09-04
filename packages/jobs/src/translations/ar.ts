@@ -1,0 +1,43 @@
+import { keys, type TranslationKey } from './keys'
+
+export const ar: Record<TranslationKey, string> = {
+	[keys.pluginName]: 'الوظائف',
+
+	[keys.statusQueued]: 'في قائمة الانتظار',
+	[keys.statusScheduled]: 'مجدولة',
+	[keys.statusRetrying]: 'إعادة المحاولة',
+	[keys.statusRunning]: 'قيد التشغيل',
+	[keys.statusSucceeded]: 'ناجحة',
+	[keys.statusFailed]: 'فاشلة',
+	[keys.statusCancelled]: 'ملغاة',
+
+	[keys.fieldStatus]: 'الحالة',
+	[keys.fieldWorkflow]: 'سير العمل',
+	[keys.fieldTask]: 'المهمة',
+	[keys.fieldJob]: 'الوظيفة',
+	[keys.fieldQueue]: 'قائمة الانتظار',
+	[keys.fieldAttempts]: 'المحاولات',
+	[keys.fieldCreated]: 'تم الإنشاء',
+	[keys.fieldUpdated]: 'تم التحديث',
+	[keys.fieldCompleted]: 'تم الإكمال',
+	[keys.fieldExecuted]: 'تم التنفيذ',
+	[keys.fieldTaskId]: 'معرّف المهمة',
+	[keys.fieldInput]: 'المدخلات',
+	[keys.fieldOutput]: 'المخرجات',
+	[keys.fieldError]: 'الخطأ',
+	[keys.fieldId]: 'المعرّف',
+	[keys.fieldStarted]: 'تم البدء',
+	[keys.fieldLeaseExpires]: 'انتهاء صلاحية الحجز',
+	[keys.fieldScheduledFor]: 'مجدولة في',
+
+	[keys.outcome]: 'النتيجة',
+	[keys.noAttempts]: 'لم تُسجَّل أي محاولات بعد.',
+	[keys.copy]: 'نسخ',
+	[keys.copied]: 'تمّ النسخ',
+	[keys.jobSingular]: 'وظيفة',
+	[keys.jobPlural]: 'وظائف',
+	[keys.errorWorkflowTaskExclusive]: 'تنفّذ الوظيفة سير عمل أو مهمة، وليس كليهما.',
+	[keys.cronBadge]: 'Cron',
+	[keys.attemptsTooltip]: 'محاولات تنفيذ هذه الوظيفة، بما في ذلك عمليات إعادة المحاولة',
+	[keys.inlineStep]: 'مضمّن: {{id}}',
+}

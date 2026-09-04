@@ -1,0 +1,43 @@
+import { keys, type TranslationKey } from './keys'
+
+export const fr: Record<TranslationKey, string> = {
+	[keys.pluginName]: 'Jobs',
+
+	[keys.statusQueued]: "En file d'attente",
+	[keys.statusScheduled]: 'Planifié',
+	[keys.statusRetrying]: 'Nouvelle tentative',
+	[keys.statusRunning]: 'En cours',
+	[keys.statusSucceeded]: 'Réussi',
+	[keys.statusFailed]: 'Échoué',
+	[keys.statusCancelled]: 'Annulé',
+
+	[keys.fieldStatus]: 'Statut',
+	[keys.fieldWorkflow]: 'Workflow',
+	[keys.fieldTask]: 'Tâche',
+	[keys.fieldJob]: 'Job',
+	[keys.fieldQueue]: "File d'attente",
+	[keys.fieldAttempts]: 'Tentatives',
+	[keys.fieldCreated]: 'Créé',
+	[keys.fieldUpdated]: 'Mis à jour',
+	[keys.fieldCompleted]: 'Terminé',
+	[keys.fieldExecuted]: 'Exécuté',
+	[keys.fieldTaskId]: 'ID de tâche',
+	[keys.fieldInput]: 'Entrée',
+	[keys.fieldOutput]: 'Sortie',
+	[keys.fieldError]: 'Erreur',
+	[keys.fieldId]: 'ID',
+	[keys.fieldStarted]: 'Démarré',
+	[keys.fieldLeaseExpires]: 'Expiration du bail',
+	[keys.fieldScheduledFor]: 'Planifié pour',
+
+	[keys.outcome]: 'Résultat',
+	[keys.noAttempts]: 'Aucune tentative enregistrée pour le moment.',
+	[keys.copy]: 'Copier',
+	[keys.copied]: 'Copié',
+	[keys.jobSingular]: 'job',
+	[keys.jobPlural]: 'jobs',
+	[keys.errorWorkflowTaskExclusive]: 'Un job exécute un workflow ou une tâche, pas les deux.',
+	[keys.cronBadge]: 'Cron',
+	[keys.attemptsTooltip]: "Tentatives d'exécution de ce job, y compris les nouvelles tentatives",
+	[keys.inlineStep]: 'en ligne : {{id}}',
+}

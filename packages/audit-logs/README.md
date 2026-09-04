@@ -21,7 +21,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Multi-tenant aware**, with a tenant-scoped view alongside the global one, matching `@payloadcms/plugin-multi-tenant` defaults.
 - **A browsable admin view** with filters on collection, global, operation, user, changed path, event type and date range, all held in the URL.
 - **Typed reads**: `typedDiff<T>` and `typedSnapshot<T>` restore precise types to Payload's wide JSON fields.
-- **Typed translations** with per-key overrides via `@10x-media/audit-logs/i18n`, shipping `en`, `de` and `uk`.
+- **Typed translations** with per-key overrides via `@10x-media/audit-logs/i18n`.
 
 ## Quick start
 

@@ -2,12 +2,24 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { ar } from './ar'
 import { de } from './de'
 import { en } from './en'
+import { es } from './es'
+import { fr } from './fr'
+import { id } from './id'
 import { bundles, translations } from './index'
 import { keys } from './keys'
+import { ko } from './ko'
+import { pt } from './pt'
+import { ru } from './ru'
+import { uk } from './uk'
+import { zh } from './zh'
 
 const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
+
+/** Every shipped locale but `en`, the table the others are checked against. */
+const locales = Object.entries({ ar, de, es, fr, id, ko, pt, ru, uk, zh })
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.turbo'])
 
@@ -81,25 +93,27 @@ describe('form-builder translations', () => {
 		}
 	})
 
-	it('has a non-empty de string for every key', () => {
+	it.each(locales)('has a non-empty %s string for every key', (_locale, table) => {
 		for (const key of Object.values(keys)) {
-			expect(typeof de[key]).toBe('string')
-			expect(de[key].length).toBeGreaterThan(0)
+			expect(typeof table[key]).toBe('string')
+			expect(table[key].length).toBeGreaterThan(0)
 		}
 	})
 
-	it('preserves every {token} from en in the matching de string', () => {
+	it.each(locales)('preserves every {token} from en in the %s string', (_locale, table) => {
 		const tokenPattern = /\{(\w+)\}/g
 		for (const key of Object.values(keys)) {
 			const enTokens = [...en[key].matchAll(tokenPattern)].map((match) => match[1]).sort()
-			const deTokens = [...de[key].matchAll(tokenPattern)].map((match) => match[1]).sort()
-			expect(deTokens).toEqual(enTokens)
+			const tokens = [...table[key].matchAll(tokenPattern)].map((match) => match[1]).sort()
+			expect(tokens).toEqual(enTokens)
 		}
 	})
 
 	it('nests strings under the formBuilder namespace', () => {
 		expect(translations.en?.formBuilder).toBeDefined()
-		expect(translations.de?.formBuilder).toBeDefined()
+		for (const [locale] of locales) {
+			expect(translations[locale]?.formBuilder).toBeDefined()
+		}
 	})
 
 	it('ships a complete bundle for every registered locale (a host fallback cannot leak a key)', () => {

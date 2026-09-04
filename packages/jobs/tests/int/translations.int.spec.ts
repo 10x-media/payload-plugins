@@ -29,6 +29,7 @@ describeForDb('jobs i18n registration', { dbs: ['mongo'] }, (db) => {
 		expect(en?.statusSucceeded).toBe('Succeeded')
 		expect(en?.fieldQueue).toBe('Queue')
 		expect(en?.noAttempts).toBe('No attempts recorded yet.')
+		expect(namespace(booted, 'uk')?.pluginName).toBe('Завдання')
 	})
 
 	it('keeps translations option locales through config sanitization', () => {
