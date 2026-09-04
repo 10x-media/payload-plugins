@@ -33,7 +33,7 @@ export type MeasurementFieldOptions = {
 export type MeasurementClientOptions = {
 	usage: MeasurementUsage
 	storageUnit: ScalarUnitId
-	units: UnitId[]
+	units: readonly UnitId[]
 	defaultUnit?: UnitId
 	precision?: Partial<Record<UnitId, number>>
 }

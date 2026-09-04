@@ -70,7 +70,7 @@ export const resolveDisplayUnit = (args: {
 	defaultUnit?: UnitId
 	registryDefault?: UnitId
 	localeUnit?: UnitId | null
-	units: UnitId[]
+	units: readonly UnitId[]
 }): UnitId => {
 	const candidates = [args.preferenceUnit, args.defaultUnit, args.registryDefault, args.localeUnit]
 	for (const candidate of candidates) {

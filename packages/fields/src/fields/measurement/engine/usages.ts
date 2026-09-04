@@ -1,4 +1,4 @@
-import type { Dimension, ScalarUnitId, UnitId } from './units'
+import type { CoreDimension, Dimension, ScalarUnitId, UnitId } from './units'
 
 export type MeasurementUsage =
 	| 'bodyWeight'
@@ -14,7 +14,7 @@ export type MeasurementSystem = 'metric' | 'uk' | 'us'
 
 export type UsageDef = {
 	dimension: Dimension
-	units: UnitId[]
+	units: readonly UnitId[]
 	defaultStorageUnit: ScalarUnitId
 	defaultName: string
 	defaults: Record<MeasurementSystem, UnitId>
@@ -77,6 +77,15 @@ export const USAGES: Record<MeasurementUsage, UsageDef> = {
 		defaultName: 'speed',
 		defaults: { metric: 'km/h', us: 'mph', uk: 'mph' },
 	},
+} as const satisfies Record<MeasurementUsage, UsageDef>
+
+/** Final fallback in the resolution chain: locale-system default per built-in dimension. */
+export const DIMENSION_LOCALE_DEFAULTS: Record<CoreDimension, Record<MeasurementSystem, UnitId>> = {
+	mass: { metric: 'kg', uk: 'lb', us: 'lb' },
+	length: { metric: 'cm', uk: 'in', us: 'in' },
+	volume: { metric: 'l', uk: 'l', us: 'fl-oz' },
+	temperature: { metric: 'c', uk: 'c', us: 'f' },
+	speed: { metric: 'km/h', uk: 'mph', us: 'mph' },
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { dimensionOf, isScalarUnit, UNITS } from './units'
-import { resolveUnitForLocale, systemForLocale, USAGES } from './usages'
+import { DIMENSION_LOCALE_DEFAULTS, resolveUnitForLocale, systemForLocale, USAGES } from './usages'
 
 describe('usage registry', () => {
 	it('every usage default and storage unit belongs to its own unit list and dimension', () => {
@@ -11,6 +11,22 @@ describe('usage registry', () => {
 				expect(dimensionOf(unit), `${usage}:${unit}`).toBe(def.dimension)
 			for (const unit of Object.values(def.defaults)) expect(def.units).toContain(unit)
 		}
+	})
+})
+
+describe('DIMENSION_LOCALE_DEFAULTS', () => {
+	it('every default unit belongs to its own dimension', () => {
+		for (const [dimension, defaults] of Object.entries(DIMENSION_LOCALE_DEFAULTS)) {
+			for (const [system, unit] of Object.entries(defaults))
+				expect(dimensionOf(unit), `${dimension}:${system}`).toBe(dimension)
+		}
+	})
+	it('matches the locked mass/length/volume/temperature/speed defaults', () => {
+		expect(DIMENSION_LOCALE_DEFAULTS.mass).toEqual({ metric: 'kg', us: 'lb', uk: 'lb' })
+		expect(DIMENSION_LOCALE_DEFAULTS.length).toEqual({ metric: 'cm', us: 'in', uk: 'in' })
+		expect(DIMENSION_LOCALE_DEFAULTS.volume).toEqual({ metric: 'l', us: 'fl-oz', uk: 'l' })
+		expect(DIMENSION_LOCALE_DEFAULTS.temperature).toEqual({ metric: 'c', us: 'f', uk: 'c' })
+		expect(DIMENSION_LOCALE_DEFAULTS.speed).toEqual({ metric: 'km/h', us: 'mph', uk: 'mph' })
 	})
 })
 

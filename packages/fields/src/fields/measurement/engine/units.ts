@@ -1,4 +1,5 @@
-export type Dimension = 'length' | 'mass' | 'speed' | 'temperature' | 'volume'
+export type CoreDimension = 'length' | 'mass' | 'speed' | 'temperature' | 'volume'
+export type Dimension = CoreDimension | (string & {})
 
 export type ScalarUnitId =
 	| 'c'
@@ -46,7 +47,7 @@ export type CompoundDef = { major: ScalarUnitId; minor: ScalarUnitId; ratio: num
 const LB = 0.45359237
 const IN = 0.0254
 
-export const UNITS: Record<ScalarUnitId, UnitDef> = {
+export const UNITS = {
 	g: { dimension: 'mass', factor: 0.001, intlUnit: 'gram', shortLabel: 'g' },
 	kg: { dimension: 'mass', factor: 1, intlUnit: 'kilogram', shortLabel: 'kg' },
 	oz: { dimension: 'mass', factor: LB / 16, intlUnit: 'ounce', shortLabel: 'oz' },
@@ -85,12 +86,12 @@ export const UNITS: Record<ScalarUnitId, UnitDef> = {
 	},
 	mph: { dimension: 'speed', factor: 0.44704, intlUnit: 'mile-per-hour', shortLabel: 'mph' },
 	'm/s': { dimension: 'speed', factor: 1, intlUnit: 'meter-per-second', shortLabel: 'm/s' },
-}
+} as const satisfies Record<ScalarUnitId, UnitDef>
 
-export const COMPOUNDS: Record<CompoundUnitId, CompoundDef> = {
+export const COMPOUNDS = {
 	'ft-in': { major: 'ft', minor: 'in', ratio: 12 },
 	'st-lb': { major: 'st', minor: 'lb', ratio: 14 },
-}
+} as const satisfies Record<CompoundUnitId, CompoundDef>
 
 export const isCompoundUnit = (unit: UnitId): unit is CompoundUnitId =>
 	Object.hasOwn(COMPOUNDS, unit)
@@ -98,6 +99,32 @@ export const isScalarUnit = (unit: string): unit is ScalarUnitId => Object.hasOw
 
 export const dimensionOf = (unit: UnitId): Dimension =>
 	isCompoundUnit(unit) ? UNITS[COMPOUNDS[unit].major].dimension : UNITS[unit].dimension
+
+/** Scalar unit ids whose dimension is (a member of) D. */
+export type ScalarOfDimension<D extends CoreDimension> = {
+	[K in ScalarUnitId]: (typeof UNITS)[K]['dimension'] extends D ? K : never
+}[ScalarUnitId]
+
+/** Compound unit ids whose major scalar's dimension is (a member of) D. */
+type CompoundOfDimension<D extends CoreDimension> = {
+	[K in CompoundUnitId]: (typeof UNITS)[(typeof COMPOUNDS)[K]['major']]['dimension'] extends D
+		? K
+		: never
+}[CompoundUnitId]
+
+/** Every unit (scalar or compound) selectable for D: scalars of D plus compounds whose major is D. */
+export type UnitOfDimension<D extends CoreDimension> = ScalarOfDimension<D> | CompoundOfDimension<D>
+
+/** Built-in scalars and compounds belonging to a dimension, compounds keyed by their major. */
+export const unitsOfDimension = (dimension: string): UnitId[] => {
+	const scalars = (Object.keys(UNITS) as ScalarUnitId[]).filter(
+		(id) => UNITS[id].dimension === dimension
+	)
+	const compounds = (Object.keys(COMPOUNDS) as CompoundUnitId[]).filter(
+		(id) => UNITS[COMPOUNDS[id].major].dimension === dimension
+	)
+	return [...scalars, ...compounds]
+}
 
 /** Values round-trip through display without visible drift at these precisions. */
 export const DISPLAY_PRECISION: Record<ScalarUnitId, number> = {

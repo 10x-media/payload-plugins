@@ -1,4 +1,4 @@
-import { type ScalarUnitId, UNITS } from './units'
+import { type ScalarUnitId, UNITS, type UnitDef } from './units'
 
 export const roundTo = (value: number, digits: number): number => {
 	const p = 10 ** digits
@@ -8,8 +8,8 @@ export const roundTo = (value: number, digits: number): number => {
 /** Converts between two scalar units of the same dimension via the dimension canonical. */
 export const convert = (value: number, from: ScalarUnitId, to: ScalarUnitId): number => {
 	if (from === to) return value
-	const f = UNITS[from]
-	const t = UNITS[to]
+	const f: UnitDef = UNITS[from]
+	const t: UnitDef = UNITS[to]
 	if (f.dimension !== t.dimension) {
 		throw new Error(
 			`Cannot convert ${from} (${f.dimension}) to ${to} (${t.dimension}): dimension mismatch`
