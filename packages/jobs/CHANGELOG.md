@@ -1,5 +1,13 @@
 # @10x-media/jobs
 
+## 0.1.0-beta.9
+
+### Minor Changes
+
+- More built-in locales for the `jobs:` strings.
+
+  - Added: `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.
+
 ## 0.1.0-beta.8
 
 ### Minor Changes

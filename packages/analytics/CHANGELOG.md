@@ -1,5 +1,20 @@
 # @10x-media/analytics
 
+## 1.0.0-beta.6
+
+### Minor Changes
+
+- More built-in locales for the `analytics:` strings.
+
+  - Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.
+
+- **Breaking:** the query contract grows real filters and finer granularity, and two schemas change. `AnalyticsCapabilities` now requires `filters` and `filterOperators` declarations (custom adapters must add them). `AnalyticsQuery.filters` is honored by native (from raw events, retention-bounded, `eq`/`contains`), PostHog (`eq`/`contains`/`matches` via HogQL), Plausible and GA4 (`eq`), and the widget read helpers accept a `filters` option gated by capability. Native gains the `event` name dimension and `hour` granularity (UTC hour buckets from raw events). Native rollups are now keyed by hostname: deltas write both a hostname-less and a per-hostname bucket family, so `binding.hostname` finally filters native reads with exact unique counts; existing installs must run a migration adding the `hostname` column (backfill `''`) and, on Postgres, rebuilding the rollup unique index to include it: until that index is rebuilt, every native rollup write fails outright on migrate-mode Postgres, not just colliding ones (rebuild DDL is in the native docs). Distinct counting resets once within the deploy-day bucket because ledger keys changed shape. The sync collection gains a required `scope` column (backfill `''`, unique key now source+date+scope) and its read access is scope-filtered in scoped installs, closing a would-be cross-tenant read of synced daily metrics. Migrate-mode Postgres installs must rebuild that unique index too, exactly like the rollups index above; both rebuilds are documented in the native docs' upgrade note.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/fields@0.1.0-beta.6
+
 ## 0.1.0-beta.5
 
 ### Minor Changes

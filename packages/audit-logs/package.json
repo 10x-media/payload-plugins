@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/audit-logs",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.1",
 	"description": "Allows you to keep audit logs of any database changes",
 	"license": "MIT",
 	"repository": {

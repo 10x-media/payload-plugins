@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/fields",
-	"version": "0.1.0-beta.5",
+	"version": "0.1.0-beta.6",
 	"description": "Reusable admin fields for Payload: color picker, icon picker, encrypted fields, and more",
 	"license": "MIT",
 	"repository": {
