@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/jobs",
-	"version": "0.1.0-beta.8",
+	"version": "0.1.0-beta.9",
 	"description": "Jobs ops dashboard, execution helpers, and reliability tooling for Payload",
 	"license": "MIT",
 	"repository": {

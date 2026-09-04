@@ -1,5 +1,13 @@
 # @10x-media/fields
 
+## 0.1.0-beta.6
+
+### Minor Changes
+
+- More built-in locales for the `fields:` strings.
+
+  - Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.
+
 ## 0.1.0-beta.5
 
 ### Minor Changes

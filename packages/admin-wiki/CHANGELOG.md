@@ -1,5 +1,13 @@
 # @10x-media/admin-wiki
 
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- More built-in locales for the `adminWiki:` strings.
+
+  - Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.
+
 ## 0.1.0-beta.4
 
 ### Minor Changes

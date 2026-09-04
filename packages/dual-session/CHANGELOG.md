@@ -1,5 +1,13 @@
 # @10x-media/dual-session
 
+## 0.1.0-beta.1
+
+### Minor Changes
+
+- More built-in locales for the `dualSession:` strings.
+
+  - Added: `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.
+
 ## 0.1.0-beta.0
 
 ### Minor Changes

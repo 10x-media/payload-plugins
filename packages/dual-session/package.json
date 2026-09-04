@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/dual-session",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.1",
 	"description": "Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist.",
 	"license": "MIT",
 	"repository": {
