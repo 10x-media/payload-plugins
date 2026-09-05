@@ -251,6 +251,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	}, [])
 
 	const isUnitInteractive = units.length > 1 && !isReadOnly
+	const placeholderText = typeof placeholder === 'string' ? placeholder : undefined
 
 	const renderUnitPanel = ({ close }: { close: () => void }) => (
 		<div aria-label={t(keys.selectUnit)} className={`${baseClass}__unit-panel`} role="listbox">
@@ -284,7 +285,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 			<Popup
 				button={
 					<>
-						<span aria-hidden="true" className={`${baseClass}__unit-chip`}>
+						<span className={`${baseClass}__unit-chip`}>
 							<span className={`${baseClass}__unit-label`}>{shortLabel}</span>
 							{unitChevron}
 						</span>
@@ -377,11 +378,11 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 								name={path}
 								onBlur={onBlur}
 								onChange={onDraftChange('primary')}
-								placeholder={typeof placeholder === 'string' ? placeholder : undefined}
+								placeholder={placeholderText}
 								readOnly={isReadOnly}
 								ref={primaryInputRef}
 								step="any"
-								style={draftWidth(drafts.primary)}
+								style={draftWidth(drafts.primary || placeholderText || '')}
 								type="number"
 								value={drafts.primary}
 							/>

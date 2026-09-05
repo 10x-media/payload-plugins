@@ -144,10 +144,6 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 	color: var(--theme-elevation-800);
 }
 
-.fields-measurement__unit-label {
-	white-space: nowrap;
-}
-
 .fields-measurement__chevron {
 	flex-shrink: 0;
 	width: 8px;

@@ -16,6 +16,7 @@ export type {
 	CustomDimensionDef,
 	CustomUnitDef,
 	MeasurementCustomConfig,
+	MeasurementEngine,
 } from '../fields/measurement/engine/registry'
 export { createEngine } from '../fields/measurement/engine/registry'
 export type {

@@ -58,7 +58,7 @@ Display unit resolves in this order, skipping any candidate the field doesn't of
 
 Setting `fallbackUnit` (or `defaultUnits` for a bucket in the plugin) is an explicit choice that outranks locale detection. Leave both unset on most fields so a UK visitor sees stone and pounds without any config; the shipped presets already carry the right `localeDefaults` for that (step 4 wins before the generic dimension table in step 5).
 
-Preference persistence and the same-bucket flip are wired by the `fields()` plugin, which registers the unit preference provider. Standalone `measurementField()` still works, but a unit picked without the plugin lasts only for that field until the page reloads, and its list cells fall back through steps 2, 4, and 5 above instead of a saved preference.
+Preference persistence and the same-bucket flip are wired by the `fields()` plugin, which registers the unit preference provider. Standalone `measurementField()` still works, but a unit picked without the plugin lasts only for that field until the page reloads, and its list cells skip locale detection entirely: they fall back through the field's `fallbackUnit` (step 2), then straight to its first configured unit (step 6), never reaching steps 4 or 5.
 
 ## What's stored
 
