@@ -106,6 +106,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			data: {
 				title: 'Showcase',
 				boundedWeight: 95.5,
+				cutout: 508,
 				distance: 42.195,
 				height: 180.34,
 				kgOnly: 70,
@@ -113,6 +114,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				localizedDistance: 5,
 				poundsFirst: 81.646627,
 				readOnlyWeight: 81.646627,
+				sailing: 18.52,
 				speed: 37.5,
 				temperature: 36.6,
 				volume: 0.75,

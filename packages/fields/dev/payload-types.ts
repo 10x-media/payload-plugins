@@ -325,6 +325,14 @@ export interface Measurement {
   boundedWeight: number;
   readOnlyWeight?: number | null;
   localizedDistance?: number | null;
+  /**
+   * Free-form: inches only, stored in millimetres, its own preference bucket
+   */
+  cutout?: number | null;
+  /**
+   * Free-form with a custom unit (nmi, 1 nmi = 1852 m). No Intl unit for nmi, so it formats as a plain decimal plus shortLabel
+   */
+  sailing?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -579,6 +587,8 @@ export interface MeasurementsSelect<T extends boolean = true> {
   boundedWeight?: T;
   readOnlyWeight?: T;
   localizedDistance?: T;
+  cutout?: T;
+  sailing?: T;
   updatedAt?: T;
   createdAt?: T;
 }

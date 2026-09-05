@@ -44,5 +44,33 @@ export const measurements: CollectionConfig = {
 			overrides: ({ field }) => ({ ...field, admin: { ...field.admin, readOnly: true } }),
 		}),
 		measurementField({ ...presets.distance, localized: true, name: 'localizedDistance' }),
+		measurementField({
+			units: ['in', 'ft-in'],
+			storageUnit: 'mm',
+			preferenceKey: 'cutout',
+			overrides: ({ field }) => ({
+				...field,
+				admin: {
+					...field.admin,
+					description: 'Free-form: inches only, stored in millimetres, its own preference bucket',
+				},
+			}),
+		}),
+		measurementField({
+			units: ['km', 'mi', 'nmi'],
+			storageUnit: 'km',
+			preferenceKey: 'sailing',
+			custom: {
+				units: { nmi: { dimension: 'length', factor: 1852, intlUnit: null, shortLabel: 'nmi' } },
+			},
+			overrides: ({ field }) => ({
+				...field,
+				admin: {
+					...field.admin,
+					description:
+						'Free-form with a custom unit (nmi, 1 nmi = 1852 m). No Intl unit for nmi, so it formats as a plain decimal plus shortLabel',
+				},
+			}),
+		}),
 	],
 }
