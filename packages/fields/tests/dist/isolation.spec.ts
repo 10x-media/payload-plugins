@@ -172,4 +172,14 @@ describe.skipIf(!hasDist)('dist bundle isolation', () => {
 		)
 		expect(offenders).toEqual([])
 	})
+
+	it('measurement utils never reach the measurement client graph', () => {
+		// The client field/cell components pull in React and Payload admin types;
+		// measurement-utils is the frontend-safe surface and must stay pure of them.
+		const clientPrefix = join(distDir, 'fields', 'measurement', 'client') + sep
+		const offenders = [...importGraph('exports/measurement-utils.js')].filter((file) =>
+			file.startsWith(clientPrefix)
+		)
+		expect(offenders).toEqual([])
+	})
 })

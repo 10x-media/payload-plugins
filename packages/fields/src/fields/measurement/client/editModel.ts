@@ -1,23 +1,9 @@
 import { roundTo } from '../engine/convert'
-import { DIMENSION_LOCALE_DEFAULTS, type MeasurementSystem } from '../engine/locale'
 import type { MeasurementEngine } from '../engine/registry'
 import { COMPOUNDS, type MeasurementUnitId, STORAGE_FRACTION_DIGITS } from '../engine/units'
 
-/** Widened for lookup by any field dimension, including custom dimensions the table has no entry for. */
-const dimensionLocaleDefaults: Partial<
-	Record<string, Record<MeasurementSystem, MeasurementUnitId>>
-> = DIMENSION_LOCALE_DEFAULTS
-
-/** Locale step of the resolution chain: field-declared defaults first, then the per-dimension table. */
-const localeCandidatesFor = (args: {
-	dimension: string
-	system: MeasurementSystem
-	localeDefaults?: Partial<Record<MeasurementSystem, MeasurementUnitId>>
-}): MeasurementUnitId[] =>
-	[
-		args.localeDefaults?.[args.system],
-		dimensionLocaleDefaults[args.dimension]?.[args.system],
-	].filter((unit): unit is MeasurementUnitId => typeof unit === 'string')
+/** Re-exported so MeasurementField/MeasurementCell keep one import site for the edit model. */
+export { resolveDisplayUnit } from '../engine/locale'
 
 export type MeasurementDrafts = { primary: string; minor: string }
 
@@ -86,36 +72,4 @@ export const draftsFor = (value: number | null, opts: UnitContext): MeasurementD
 		if (commitDrafts(candidate, opts) === target) return candidate
 	}
 	return draftAt(maxDigits)
-}
-
-/** First candidate the field actually offers wins; the field's first unit is the floor. */
-export const resolveDisplayUnit = (args: {
-	dimension: string
-	preferenceUnit?: MeasurementUnitId | null
-	fallbackUnit?: MeasurementUnitId
-	registryDefault?: MeasurementUnitId
-	/** Null until the browser locale is read post-hydration, which skips both locale steps. */
-	system?: MeasurementSystem | null
-	localeDefaults?: Partial<Record<MeasurementSystem, MeasurementUnitId>>
-	units: readonly MeasurementUnitId[]
-}): MeasurementUnitId => {
-	const localeCandidates = args.system
-		? localeCandidatesFor({
-				dimension: args.dimension,
-				localeDefaults: args.localeDefaults,
-				system: args.system,
-			})
-		: []
-	const candidates = [
-		args.preferenceUnit,
-		args.fallbackUnit,
-		args.registryDefault,
-		...localeCandidates,
-	]
-	for (const candidate of candidates) {
-		if (candidate && args.units.includes(candidate)) return candidate
-	}
-	const first = args.units[0]
-	if (!first) throw new Error('resolveDisplayUnit: empty units list')
-	return first
 }

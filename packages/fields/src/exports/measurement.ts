@@ -1,4 +1,3 @@
-export { resolveDisplayUnit } from '../fields/measurement/client/editModel'
 export { convert, roundTo } from '../fields/measurement/engine/convert'
 export type { FormatMeasurementOptions } from '../fields/measurement/engine/format'
 export {
@@ -8,7 +7,11 @@ export {
 	unitLabel,
 } from '../fields/measurement/engine/format'
 export type { MeasurementSystem } from '../fields/measurement/engine/locale'
-export { DIMENSION_LOCALE_DEFAULTS, systemForLocale } from '../fields/measurement/engine/locale'
+export {
+	DIMENSION_LOCALE_DEFAULTS,
+	resolveDisplayUnit,
+	systemForLocale,
+} from '../fields/measurement/engine/locale'
 export type {
 	CustomDimensionDef,
 	CustomUnitDef,
