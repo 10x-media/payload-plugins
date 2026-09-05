@@ -23,11 +23,15 @@ const openShowcaseDoc = async (page: Page): Promise<string> => {
 	return doc.id
 }
 
+// Compound fields render two unit triggers (major + minor suffix); either one opens
+// the same popup over the same options, so .first() keeps every call a single match
+// under Playwright's strict mode regardless of whether the field is scalar or compound.
 const unitBadge = (page: Page, name: string) =>
 	page
 		.locator('.fields-measurement')
 		.filter({ has: page.locator(`#field-${name}`) })
-		.locator('.fields-measurement__unit-button')
+		.locator('.fields-measurement__unit-trigger')
+		.first()
 
 // The unit menu can hold both a scalar and a compound sharing the same substring
 // (e.g. "lb" and "st lb"), so options are matched by the short-symbol span's exact
@@ -83,6 +87,38 @@ test.describe('measurement field', () => {
 		expect(doc.height).toBeCloseTo(187.96, 1)
 	})
 
+	test('a faithful draft survives a display-unit switch without truncation', async ({ page }) => {
+		const id = await openShowcaseDoc(page)
+		await pickUnit(page, 'height', /^in$/i)
+		await page.locator('#field-height').fill('71')
+		const saved = page.waitForResponse(
+			(r) => r.url().includes(`/api/${FIXTURES.collection}`) && r.request().method() === 'PATCH'
+		)
+		await page.locator('#action-save').click()
+		expect((await saved).ok()).toBeTruthy()
+		await pickUnit(page, 'height', /^cm$/i)
+		await expect(page.locator('#field-height')).toHaveValue('180.34')
+		// Switching the display unit never calls setValue (it only updates the saved
+		// preference), so the form stays unmodified and Payload's own SaveButton stays
+		// disabled: there is no code path left that could resave a truncated draft.
+		await expect(page.locator('#action-save')).toBeDisabled()
+		const res = await page.request.get(`/api/${FIXTURES.collection}/${id}`)
+		const doc = (await res.json()) as { height: number }
+		expect(doc.height).toBeCloseTo(180.34, 6)
+	})
+
+	test('clicking dead space in a scalar container focuses its input', async ({ page }) => {
+		await openShowcaseDoc(page)
+		const container = page
+			.locator('.fields-measurement')
+			.filter({ has: page.locator('#field-weight') })
+			.locator('.fields-measurement__container')
+		const box = await container.boundingBox()
+		if (!box) throw new Error('weight container has no bounding box')
+		await page.mouse.click(box.x + box.width - 10, box.y + box.height / 2)
+		await expect(page.locator('#field-weight')).toBeFocused()
+	})
+
 	test('list cells render the preferred unit', async ({ page }) => {
 		await openShowcaseDoc(page)
 		await pickUnit(page, 'weight', /^lb$/i)
@@ -125,7 +161,7 @@ test.describe('measurement field', () => {
 	})
 
 	// color-contrast is disabled: the closed row's only sub-threshold text is the small
-	// uppercase unit badge and compound suffix, styled with a core elevation token the
+	// unit chip label and compound suffix chip, styled with a core elevation token the
 	// plugin adopts for Payload's native look. This guards the closed row's structural
 	// a11y (roles, names); the open-panel scan above keeps color-contrast enforced on
 	// plugin-owned surfaces.

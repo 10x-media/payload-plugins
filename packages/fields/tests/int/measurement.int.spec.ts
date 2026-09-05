@@ -21,6 +21,12 @@ const athletes: CollectionConfig = {
 		measurementField({ ...presets.bodyWeight }),
 		measurementField({ ...presets.personHeight }),
 		measurementField({ ...presets.distance, max: 100, min: 1, name: 'bounded' }),
+		measurementField({
+			name: 'cutout',
+			preferenceKey: 'cutout',
+			storageUnit: 'mm',
+			units: ['in', 'ft-in'],
+		}),
 	],
 }
 
@@ -101,8 +107,47 @@ describeForDb('measurement field integration', {}, (db) => {
 		})
 		const found = await booted.payload.find({
 			collection: 'payload-preferences',
-			where: { key: { equals: MEASUREMENT_PREFERENCE_KEY } },
+			where: {
+				and: [
+					{ key: { equals: MEASUREMENT_PREFERENCE_KEY } },
+					{ 'user.value': { equals: user.id } },
+				],
+			},
 		})
 		expect(found.docs[0]?.value).toEqual({ bodyWeight: 'lb' })
+	})
+
+	it('stores a free-form field canonically in its declared storage unit', async () => {
+		const doc = await booted.payload.create({
+			collection: 'athletes',
+			data: { cutout: 500, title: 'cutout-storage' },
+		})
+		expect(doc.cutout).toBe(500)
+	})
+
+	it('round-trips a free-form preferenceKey bucket independent of bodyWeight', async () => {
+		const user = await booted.payload.create({
+			collection: 'users',
+			data: { email: 'cutout-units@test.dev', password: 'password' },
+		})
+		await booted.payload.create({
+			collection: 'payload-preferences',
+			data: {
+				key: MEASUREMENT_PREFERENCE_KEY,
+				user: { relationTo: 'users', value: user.id },
+				value: { bodyWeight: 'kg', cutout: 'in' },
+			},
+			user,
+		})
+		const found = await booted.payload.find({
+			collection: 'payload-preferences',
+			where: {
+				and: [
+					{ key: { equals: MEASUREMENT_PREFERENCE_KEY } },
+					{ 'user.value': { equals: user.id } },
+				],
+			},
+		})
+		expect(found.docs[0]?.value).toEqual({ bodyWeight: 'kg', cutout: 'in' })
 	})
 })

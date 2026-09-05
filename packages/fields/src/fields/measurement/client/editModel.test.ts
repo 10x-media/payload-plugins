@@ -128,6 +128,9 @@ describe('resolveDisplayUnit', () => {
 		expect(resolveDisplayUnit({ ...base, fallbackUnit: 'kg', preferenceUnit: 'mi' })).toBe('kg')
 	})
 	it('walks preference, fallback, registry default, field locale defaults', () => {
+		expect(resolveDisplayUnit({ ...base, fallbackUnit: 'st-lb', registryDefault: 'lb' })).toBe(
+			'st-lb'
+		)
 		expect(
 			resolveDisplayUnit({
 				...base,
