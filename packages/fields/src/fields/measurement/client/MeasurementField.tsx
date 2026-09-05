@@ -26,13 +26,33 @@ import './measurementField.css'
 const baseClass = 'fields-measurement'
 
 /**
- * Compound inputs size to their value so "5 ft 11 in" reads as one left-aligned
- * phrase. The half-ch keeps the caret off the edge; the clamp keeps an empty
- * input clickable and a runaway draft from pushing the row into overflow.
+ * Every value input sizes to its content so "5 ft 11 in" (or a lone scalar)
+ * reads as one left-aligned phrase. The half-ch keeps the caret off the edge;
+ * the clamp keeps an empty input clickable and a runaway draft from pushing
+ * the row into overflow.
  */
 const draftWidth = (draft: string): React.CSSProperties => ({
 	width: `${Math.min(Math.max(draft.length, 2), 12) + 0.5}ch`,
 })
+
+const unitChevron = (
+	<svg
+		aria-hidden="true"
+		className={`${baseClass}__chevron`}
+		focusable="false"
+		viewBox="0 0 10 6"
+		xmlns="http://www.w3.org/2000/svg"
+	>
+		<path
+			d="M1 1L5 5L9 1"
+			fill="none"
+			stroke="currentColor"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			strokeWidth="1.4"
+		/>
+	</svg>
+)
 
 export type MeasurementFieldProps = {
 	measurementOptions: MeasurementResolvedClientOptions
@@ -199,6 +219,89 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	const inputId = `field-${path?.replace(/\./g, '__')}`
 	const styles = useMemo(() => mergeFieldStyles(field), [field])
 
+	const primaryInputRef = useRef<HTMLInputElement>(null)
+	const minorInputRef = useRef<HTMLInputElement>(null)
+
+	// Dead-space mousedown focuses the nearest input like a native control; preventDefault
+	// stops an already-focused input from blurring, so we never steal focus from it.
+	const focusNearestInput = useCallback((event: React.MouseEvent<HTMLElement>) => {
+		if (event.target !== event.currentTarget) return
+		event.preventDefault()
+		const active = document.activeElement
+		if (active === primaryInputRef.current || active === minorInputRef.current) return
+		const inputs = [primaryInputRef.current, minorInputRef.current].filter(
+			(input): input is HTMLInputElement => input !== null
+		)
+		const [first, ...rest] = inputs
+		if (!first) return
+		const distanceFrom = (input: HTMLInputElement) => {
+			const rect = input.getBoundingClientRect()
+			return Math.abs(event.clientX - (rect.left + rect.width / 2))
+		}
+		let nearest = first
+		let nearestDistance = distanceFrom(first)
+		for (const input of rest) {
+			const distance = distanceFrom(input)
+			if (distance < nearestDistance) {
+				nearestDistance = distance
+				nearest = input
+			}
+		}
+		nearest.focus()
+	}, [])
+
+	const isUnitInteractive = units.length > 1 && !isReadOnly
+
+	const renderUnitPanel = ({ close }: { close: () => void }) => (
+		<div aria-label={t(keys.selectUnit)} className={`${baseClass}__unit-panel`} role="listbox">
+			{units.map((unit) => (
+				<button
+					aria-selected={unit === displayUnit}
+					className={`${baseClass}__unit-option`}
+					key={unit}
+					onClick={() => {
+						selectUnit(unit)
+						close()
+					}}
+					role="option"
+					type="button"
+				>
+					<span>{engine.unitLabel(unit, locale, 'long')}</span>
+					<span className={`${baseClass}__unit-symbol`}>
+						{engine.unitLabel(unit, locale, 'short')}
+					</span>
+				</button>
+			))}
+		</div>
+	)
+
+	const renderUnitChip = (unit: MeasurementUnitId) => {
+		const shortLabel = engine.unitLabel(unit, locale, 'short')
+		if (!isUnitInteractive) {
+			return <span className={`${baseClass}__unit-static`}>{shortLabel}</span>
+		}
+		return (
+			<Popup
+				button={
+					<>
+						<span aria-hidden="true" className={`${baseClass}__unit-chip`}>
+							<span className={`${baseClass}__unit-label`}>{shortLabel}</span>
+							{unitChevron}
+						</span>
+						<span className={`${baseClass}__sr-only`}>{t(keys.selectUnit)}</span>
+					</>
+				}
+				buttonClassName={`${baseClass}__unit-trigger`}
+				buttonType="default"
+				caret={false}
+				className={`${baseClass}__popup`}
+				render={renderUnitPanel}
+				size="fit-content"
+				verticalAlign="bottom"
+			/>
+		)
+	}
+
 	return (
 		<div
 			className={[
@@ -224,107 +327,66 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 					Fallback={<FieldError message={boundsMessage} path={path} showError={showError} />}
 				/>
 				{BeforeInput}
-				<div className={`${baseClass}__container`}>
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: mousedown only refocuses an inner input, it adds no control and changes no semantics */}
+				<div className={`${baseClass}__container`} onMouseDown={focusNearestInput}>
 					{isCompound && compoundDef ? (
-						<span className={`${baseClass}__compound`}>
+						// biome-ignore lint/a11y/noStaticElementInteractions: same as the container, refocuses whichever inner input is nearest
+						<span className={`${baseClass}__compound`} onMouseDown={focusNearestInput}>
 							<span className={`${baseClass}__part`}>
 								<input
-									className={`${baseClass}__input ${baseClass}__input--compound`}
+									className={`${baseClass}__input`}
 									id={inputId}
 									inputMode="decimal"
 									name={path}
 									onBlur={onBlur}
 									onChange={onDraftChange('primary')}
 									readOnly={isReadOnly}
+									ref={primaryInputRef}
 									step="any"
 									style={draftWidth(drafts.primary)}
 									type="number"
 									value={drafts.primary}
 								/>
-								<span aria-hidden="true" className={`${baseClass}__suffix`}>
-									{engine.unitLabel(compoundDef.major, locale, 'short')}
-								</span>
+								{renderUnitChip(compoundDef.major)}
 							</span>
 							<span className={`${baseClass}__part`}>
 								<input
 									aria-label={engine.unitLabel(compoundDef.minor, locale, 'long')}
-									className={`${baseClass}__input ${baseClass}__input--compound`}
+									className={`${baseClass}__input`}
 									inputMode="decimal"
 									max={compoundDef.ratio - 0.001}
 									min={0}
 									onBlur={onBlur}
 									onChange={onDraftChange('minor')}
 									readOnly={isReadOnly}
+									ref={minorInputRef}
 									step="any"
 									style={draftWidth(drafts.minor)}
 									type="number"
 									value={drafts.minor}
 								/>
-								<span aria-hidden="true" className={`${baseClass}__suffix`}>
-									{engine.unitLabel(compoundDef.minor, locale, 'short')}
-								</span>
+								{renderUnitChip(compoundDef.minor)}
 							</span>
 						</span>
 					) : (
-						<input
-							className={`${baseClass}__input`}
-							id={inputId}
-							inputMode="decimal"
-							name={path}
-							onBlur={onBlur}
-							onChange={onDraftChange('primary')}
-							placeholder={typeof placeholder === 'string' ? placeholder : undefined}
-							readOnly={isReadOnly}
-							step="any"
-							type="number"
-							value={drafts.primary}
-						/>
-					)}
-					{units.length > 1 && !isReadOnly ? (
-						<Popup
-							button={
-								<span className={`${baseClass}__unit-badge`}>
-									{engine.unitLabel(displayUnit, locale, 'short')}
-								</span>
-							}
-							buttonClassName={`${baseClass}__unit-button`}
-							buttonType="custom"
-							caret={false}
-							className={`${baseClass}__popup`}
-							horizontalAlign="right"
-							render={({ close }) => (
-								<div
-									aria-label={t(keys.selectUnit)}
-									className={`${baseClass}__unit-panel`}
-									role="listbox"
-								>
-									{units.map((unit) => (
-										<button
-											aria-selected={unit === displayUnit}
-											className={`${baseClass}__unit-option`}
-											key={unit}
-											onClick={() => {
-												selectUnit(unit)
-												close()
-											}}
-											role="option"
-											type="button"
-										>
-											<span>{engine.unitLabel(unit, locale, 'long')}</span>
-											<span className={`${baseClass}__unit-symbol`}>
-												{engine.unitLabel(unit, locale, 'short')}
-											</span>
-										</button>
-									))}
-								</div>
-							)}
-							size="fit-content"
-							verticalAlign="bottom"
-						/>
-					) : (
-						<span className={`${baseClass}__unit-badge ${baseClass}__unit-badge--static`}>
-							{engine.unitLabel(displayUnit, locale, 'short')}
-						</span>
+						<>
+							<input
+								className={`${baseClass}__input`}
+								id={inputId}
+								inputMode="decimal"
+								name={path}
+								onBlur={onBlur}
+								onChange={onDraftChange('primary')}
+								placeholder={typeof placeholder === 'string' ? placeholder : undefined}
+								readOnly={isReadOnly}
+								ref={primaryInputRef}
+								step="any"
+								style={draftWidth(drafts.primary)}
+								type="number"
+								value={drafts.primary}
+							/>
+							{renderUnitChip(displayUnit)}
+						</>
 					)}
 				</div>
 				{AfterInput}

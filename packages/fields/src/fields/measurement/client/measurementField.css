@@ -77,10 +77,11 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 	height: 100%;
 }
 
+/* Width comes from an inline style tracking the draft's length, so every value
+   (scalar or compound part) hugs its digits instead of stretching the row */
 .fields-measurement__input {
-	flex: 1 1 auto;
-	width: 100%;
-	min-width: 0;
+	flex: 0 1 auto;
+	min-width: 2ch;
 	height: 100%;
 	padding: 0;
 	border: 0;
@@ -91,13 +92,6 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 	appearance: none;
 	-webkit-appearance: none;
 	-moz-appearance: textfield;
-}
-
-/* Value-tracked width comes from an inline style; killing the grow keeps the
-   pair and its suffixes reading as one left-aligned phrase */
-.fields-measurement__input--compound {
-	flex: 0 1 auto;
-	min-width: 2ch;
 }
 
 .fields-measurement__input::-webkit-outer-spin-button,
@@ -114,47 +108,72 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 	color: var(--theme-elevation-400);
 }
 
-.fields-measurement__suffix {
-	flex-shrink: 0;
-	color: var(--theme-elevation-500);
-	font-size: 0.85rem;
-}
-
 .fields-measurement__popup,
 .fields-measurement__popup .popup__trigger-wrap {
 	display: flex;
 	flex-shrink: 0;
 }
 
-.fields-measurement__unit-button {
-	display: flex;
+/* The trigger is a real button so it keeps native focus/keyboard semantics; the
+   visible chip is aria-hidden and a sr-only span next to it carries the name */
+.fields-measurement__unit-trigger {
+	display: inline-flex;
 	flex-shrink: 0;
+	align-items: center;
 	padding: 0;
 	border: 0;
 	background: transparent;
 	cursor: pointer;
 }
 
-.fields-measurement__unit-button:focus-visible {
+.fields-measurement__unit-trigger:focus-visible {
 	outline: var(--accessibility-outline);
 	border-radius: var(--style-radius-s);
 }
 
-.fields-measurement__unit-badge {
-	flex-shrink: 0;
-	padding: 3px 6px;
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-100);
+.fields-measurement__unit-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
 	color: var(--theme-elevation-500);
-	font-size: 10px;
-	line-height: 1;
-	letter-spacing: 0.05em;
-	text-transform: uppercase;
+	font-size: 0.85rem;
 	white-space: nowrap;
 }
 
-.fields-measurement__unit-button:hover .fields-measurement__unit-badge {
+.fields-measurement__unit-trigger:hover .fields-measurement__unit-chip {
 	color: var(--theme-elevation-800);
+}
+
+.fields-measurement__unit-label {
+	white-space: nowrap;
+}
+
+.fields-measurement__chevron {
+	flex-shrink: 0;
+	width: 8px;
+	height: 8px;
+}
+
+.fields-measurement__sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border-width: 0;
+}
+
+/* Single-unit and read-only fields get the muted label with no caret and no
+   pointer cursor, since there is nothing to open */
+.fields-measurement__unit-static {
+	flex-shrink: 0;
+	color: var(--theme-elevation-500);
+	font-size: 0.85rem;
+	white-space: nowrap;
+	cursor: default;
 }
 
 .popup__scroll-container:has(> .fields-measurement__unit-panel) {
@@ -179,7 +198,7 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 	border-radius: var(--style-radius-s);
 	background: transparent;
 	color: var(--theme-elevation-800);
-	font-size: 0.85rem;
+	font-size: 1rem;
 	text-align: start;
 	cursor: pointer;
 }
