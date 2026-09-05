@@ -1,7 +1,7 @@
 import type { NumberField } from 'payload'
+import type { MeasurementSystem } from './engine/locale'
 import type { MeasurementCustomConfig } from './engine/registry'
 import type { DimOf, MeasurementUnitId, ScalarUnitId, UnitOfDimension } from './engine/units'
-import type { MeasurementSystem } from './engine/usages'
 
 /** payload-preferences key holding the flat per-bucket unit map. */
 export const MEASUREMENT_PREFERENCE_KEY = '10x-fields-measurement'

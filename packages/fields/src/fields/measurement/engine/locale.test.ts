@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { DIMENSION_LOCALE_DEFAULTS, systemForLocale } from './locale'
 import { dimensionOf } from './units'
-import { DIMENSION_LOCALE_DEFAULTS, localeDefaultUnit, systemForLocale } from './usages'
 
 describe('DIMENSION_LOCALE_DEFAULTS', () => {
 	it('every default unit belongs to its own dimension', () => {
@@ -36,26 +36,5 @@ describe('systemForLocale (vendored CLDR measurementData)', () => {
 	})
 	it('falls back to metric on garbage', () => {
 		expect(systemForLocale('not-a-locale-!!')).toBe('metric')
-	})
-})
-
-describe('localeDefaultUnit', () => {
-	it('prefers the field defaults over the dimension table', () => {
-		const localeDefaults = { metric: 'kg', uk: 'st-lb', us: 'lb' } as const
-		expect(localeDefaultUnit({ dimension: 'mass', locale: 'en-GB', localeDefaults })).toBe('st-lb')
-		expect(localeDefaultUnit({ dimension: 'mass', locale: 'de-DE', localeDefaults })).toBe('kg')
-	})
-	it('falls back to the dimension table', () => {
-		expect(localeDefaultUnit({ dimension: 'mass', locale: 'en-GB' })).toBe('lb')
-		expect(localeDefaultUnit({ dimension: 'length', locale: 'en-US' })).toBe('in')
-		expect(localeDefaultUnit({ dimension: 'volume', locale: 'de-DE' })).toBe('l')
-	})
-	it('falls back partially when the field covers only some systems', () => {
-		expect(
-			localeDefaultUnit({ dimension: 'length', locale: 'en-US', localeDefaults: { metric: 'm' } })
-		).toBe('in')
-	})
-	it('returns null for a custom dimension with no field defaults', () => {
-		expect(localeDefaultUnit({ dimension: 'pressure', locale: 'en-US' })).toBeNull()
 	})
 })

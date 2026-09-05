@@ -8,6 +8,7 @@ import {
 	scalarLongLabelFor,
 	unitLabel as unitLabelBuiltIn,
 } from './format'
+import { DIMENSION_LOCALE_DEFAULTS } from './locale'
 import {
 	COMPOUND_MINOR_PRECISION,
 	COMPOUNDS,
@@ -18,7 +19,6 @@ import {
 	UNITS,
 	unitsOfDimension as unitsOfDimensionBuiltIn,
 } from './units'
-import { DIMENSION_LOCALE_DEFAULTS } from './usages'
 
 export type CustomUnitDef = {
 	dimension: string
@@ -79,6 +79,8 @@ const mergeUnits = (custom?: MeasurementCustomConfig): Record<string, MergedUnit
 		if (Object.hasOwn(UNITS, id) || Object.hasOwn(COMPOUNDS, id)) {
 			throw new Error(`Custom unit "${id}" collides with a built-in unit id`)
 		}
+		// Unreachable while customUnits is a plain object (keys are already unique), but
+		// kept as a guard against a future custom-unit source that permits duplicates.
 		if (Object.hasOwn(units, id)) {
 			throw new Error(`Custom unit "${id}" collides with another custom unit id`)
 		}

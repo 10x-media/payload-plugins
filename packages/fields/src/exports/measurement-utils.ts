@@ -1,3 +1,4 @@
+export { resolveDisplayUnit } from '../fields/measurement/client/editModel'
 export { convert, roundTo } from '../fields/measurement/engine/convert'
 export type { FormatMeasurementOptions } from '../fields/measurement/engine/format'
 export {
@@ -6,12 +7,23 @@ export {
 	formatMeasurement,
 	unitLabel,
 } from '../fields/measurement/engine/format'
+export type { MeasurementSystem } from '../fields/measurement/engine/locale'
+export { DIMENSION_LOCALE_DEFAULTS, systemForLocale } from '../fields/measurement/engine/locale'
+export type {
+	CustomDimensionDef,
+	CustomUnitDef,
+	MeasurementCustomConfig,
+} from '../fields/measurement/engine/registry'
+export { createEngine } from '../fields/measurement/engine/registry'
 export type {
 	CompoundUnitId,
+	CoreDimension,
 	Dimension,
 	MeasurementUnitId,
+	ScalarOfDimension,
 	ScalarUnitId,
 	UnitId,
+	UnitOfDimension,
 } from '../fields/measurement/engine/units'
 export {
 	COMPOUNDS,
@@ -22,12 +34,7 @@ export {
 	precisionFor,
 	STORAGE_FRACTION_DIGITS,
 	UNITS,
+	unitsOfDimension,
 } from '../fields/measurement/engine/units'
-export type { MeasurementSystem } from '../fields/measurement/engine/usages'
-export {
-	DIMENSION_LOCALE_DEFAULTS,
-	localeDefaultUnit,
-	systemForLocale,
-} from '../fields/measurement/engine/usages'
 export type { MeasurementPreset, MeasurementUsage } from '../fields/measurement/presets'
 export { presets } from '../fields/measurement/presets'

@@ -1,7 +1,23 @@
 import { roundTo } from '../engine/convert'
+import { DIMENSION_LOCALE_DEFAULTS, type MeasurementSystem } from '../engine/locale'
 import type { MeasurementEngine } from '../engine/registry'
 import { COMPOUNDS, type MeasurementUnitId, STORAGE_FRACTION_DIGITS } from '../engine/units'
-import { localeDefaultUnits, type MeasurementSystem } from '../engine/usages'
+
+/** Widened for lookup by any field dimension, including custom dimensions the table has no entry for. */
+const dimensionLocaleDefaults: Partial<
+	Record<string, Record<MeasurementSystem, MeasurementUnitId>>
+> = DIMENSION_LOCALE_DEFAULTS
+
+/** Locale step of the resolution chain: field-declared defaults first, then the per-dimension table. */
+const localeCandidatesFor = (args: {
+	dimension: string
+	system: MeasurementSystem
+	localeDefaults?: Partial<Record<MeasurementSystem, MeasurementUnitId>>
+}): MeasurementUnitId[] =>
+	[
+		args.localeDefaults?.[args.system],
+		dimensionLocaleDefaults[args.dimension]?.[args.system],
+	].filter((unit): unit is MeasurementUnitId => typeof unit === 'string')
 
 export type MeasurementDrafts = { primary: string; minor: string }
 
@@ -84,7 +100,7 @@ export const resolveDisplayUnit = (args: {
 	units: readonly MeasurementUnitId[]
 }): MeasurementUnitId => {
 	const localeCandidates = args.system
-		? localeDefaultUnits({
+		? localeCandidatesFor({
 				dimension: args.dimension,
 				localeDefaults: args.localeDefaults,
 				system: args.system,

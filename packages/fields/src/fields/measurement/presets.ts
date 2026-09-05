@@ -1,5 +1,5 @@
+import type { MeasurementSystem } from './engine/locale'
 import type { ScalarUnitId, UnitId } from './engine/units'
-import type { MeasurementSystem } from './engine/usages'
 
 /** Spreadable bundle of measurementField options: storage, offered units, preference bucket, name. */
 export type MeasurementPreset = {
