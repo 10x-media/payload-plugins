@@ -11,10 +11,10 @@ import {
   formatMeasurement,
   decompose,
   compose,
-  resolveUnitForLocale,
-  unitLabel,
-  precisionFor,
-  USAGES,
+  resolveDisplayUnit,
+  systemForLocale,
+  createEngine,
+  unitsOfDimension,
   UNITS,
 } from '@10x-media/fields/measurement/utils'
 ```
@@ -30,7 +30,7 @@ formatMeasurement(4.5359, {
 // '10 lb'
 ```
 
-`formatMeasurement(value, options)` converts a stored value from `storageUnit` to `displayUnit` and formats it with `Intl.NumberFormat`, so unit names and number formatting localize for free. `unitDisplay` (`'short'` default, `'long'`, `'narrow'`) controls the unit form; `precision` overrides display fraction digits per unit. Displaying a compound unit (`ft-in`, `st-lb`) formats both parts and joins them with `Intl.ListFormat`.
+`formatMeasurement(value, options)` converts a stored value from `storageUnit` to `displayUnit` and formats it with `Intl.NumberFormat`, so unit names and number formatting localize for free. `unitDisplay` (`'short'` default, `'long'`, `'narrow'`) controls the unit form; `precision` overrides display fraction digits per unit. Displaying a compound unit (`ft-in`, `st-lb`) formats both parts and joins them with `Intl.ListFormat`. This top-level function only knows the built-in units; call `createEngine(custom).formatMeasurement` for a field with `custom` units (see below).
 
 ## Convert
 
@@ -53,29 +53,44 @@ compose({ major: 5, minor: 11 }, 'ft-in', 'cm')  // 180.34
 ## Locale resolution
 
 ```ts
-resolveUnitForLocale('en-US', 'bodyWeight')  // 'lb'
-resolveUnitForLocale('en-GB', 'bodyWeight')  // 'st-lb'
-resolveUnitForLocale('de-DE', 'bodyWeight')  // 'kg'
+systemForLocale('en-US')  // 'us'
+systemForLocale('en-GB')  // 'uk'
+systemForLocale('de-DE')  // 'metric'
 ```
 
-`resolveUnitForLocale(locale, usage)` maps a BCP 47 locale to a display unit for a usage, off a five-entry table vendored from CLDR supplemental measurement data (no shipped `Intl` API exposes it): US system for the US and Liberia, UK system for Great Britain and Myanmar, metric everywhere else. This is the same function the field itself calls for its locale-detection fallback.
+`systemForLocale(locale)` maps a BCP 47 locale to a measurement system, off a five-entry table vendored from CLDR supplemental measurement data (no shipped `Intl` API exposes it): US system for the US and Liberia, UK system for Great Britain and Myanmar, metric everywhere else.
 
-## Usages and units
+```ts
+import { presets } from '@10x-media/fields/measurement'
 
-Every `usage` and the units it allows, plus the storage unit `measurementField` defaults to:
+resolveDisplayUnit({
+  dimension: 'mass',
+  system: systemForLocale('en-GB'),
+  localeDefaults: presets.bodyWeight.localeDefaults,
+  units: presets.bodyWeight.units,
+})
+// 'st-lb'
+```
 
-| Usage | Dimension | Units | Default storage unit |
-|---|---|---|---|
-| `bodyWeight` | mass | kg, lb, st-lb | kg |
-| `personHeight` | length | cm, m, in, ft-in | cm |
-| `distance` | length | m, km, mi | km |
-| `mass` | mass | g, kg, oz, lb | kg |
-| `length` | length | mm, cm, m, km, in, ft, yd, mi | cm |
-| `volume` | volume | ml, l, fl-oz, gal | l |
-| `temperature` | temperature | c, f | c |
-| `speed` | speed | km/h, mph, m/s | km/h |
+`resolveDisplayUnit(args)` is the exact resolution chain the field itself runs: `preferenceUnit`, then `fallbackUnit`, then `registryDefault`, then `localeDefaults[system]`, then `DIMENSION_LOCALE_DEFAULTS[dimension][system]`, then `units[0]` as the floor. Every argument except `dimension` and `units` is optional, so a frontend recipe that only needs locale-based resolution passes `system` and `localeDefaults` (or leans on the built-in table alone). `DIMENSION_LOCALE_DEFAULTS` is exported directly for the five built-in dimensions (mass, length, volume, temperature, speed); a custom dimension has no entry there and falls through to `units[0]` once `localeDefaults` is exhausted.
 
-`UNITS` carries each scalar unit's dimension, conversion factor, `Intl.NumberFormat` unit identifier, and short symbol:
+## Dimensions and units
+
+`unitsOfDimension(dimension)` lists every built-in unit (scalar and compound) of a dimension:
+
+```ts
+unitsOfDimension('mass')  // ['g', 'kg', 'oz', 'lb', 'st', 'st-lb']
+```
+
+| Dimension | Units |
+|---|---|
+| mass | g, kg, oz, lb, st, st-lb |
+| length | mm, cm, m, km, in, ft, yd, mi, ft-in |
+| volume | ml, l, fl-oz, gal |
+| temperature | c, f |
+| speed | km/h, mph, m/s |
+
+`UNITS` carries each built-in scalar unit's dimension, conversion factor, `Intl.NumberFormat` unit identifier, and short symbol:
 
 | Unit | Dimension | Short label |
 |---|---|---|
@@ -90,17 +105,59 @@ Every `usage` and the units it allows, plus the storage unit `measurementField` 
 
 `precisionFor(unit, overrides?)` returns a unit's display fraction digits, the same lookup `formatMeasurement` uses internally.
 
+## Custom units: createEngine
+
+Every function above only knows the built-in units. A field (or a frontend rendering one) with `custom` units needs an engine built over the same config:
+
+```ts
+import { createEngine } from '@10x-media/fields/measurement/utils'
+
+const engine = createEngine({
+  units: {
+    nmi: { dimension: 'length', factor: 1852, intlUnit: null, shortLabel: 'nmi' },
+  },
+})
+
+engine.convert(1852, 'm', 'nmi')  // 1
+engine.formatMeasurement(2778, { storageUnit: 'm', displayUnit: 'nmi', locale: 'en-US' })
+// '1.5 nmi', the plain-decimal + shortLabel fallback since nmi has no intlUnit
+```
+
+`createEngine(custom?)` merges the built-in tables with `custom.units` and `custom.dimensions` and returns `{ convert, decompose, compose, formatMeasurement, unitLabel, precisionFor, dimensionOf, isScalarUnit, isCompoundUnit, unitsOfDimension }`, the same shape the top-level functions wrap. Called with no argument it's byte-identical to the built-in functions; it's how the field itself gets a zero-custom fast path.
+
+A whole custom dimension works the same way, declaring one custom unit as the canonical (`factor: 1`, no `offset`):
+
+```ts
+const pressure = createEngine({
+  units: {
+    pa: { dimension: 'pressure', factor: 1, intlUnit: null, shortLabel: 'Pa' },
+    bar: { dimension: 'pressure', factor: 100000, intlUnit: null, shortLabel: 'bar' },
+  },
+  dimensions: { pressure: { canonicalUnit: 'pa' } },
+})
+
+pressure.convert(100000, 'pa', 'bar')  // 1
+```
+
+Custom unit and dimension ids can't collide with a built-in one, and a custom dimension's `canonicalUnit` must be a custom unit declared for that dimension with `factor: 1` and no `offset`; `createEngine` throws otherwise. Compound units (`ft-in`, `st-lb`) stay built-in, so `decompose`/`compose` on a custom storage unit bridge through the compound's built-in major unit.
+
 ## Frontend example
 
-Formatting an athlete's stored `weight` (kg, the `bodyWeight` storage unit) per visitor locale, in a Next.js server component:
+Formatting an athlete's stored `weight` (kg, the `bodyWeight` preset's storage unit) per visitor locale, in a Next.js server component:
 
 ```tsx
 import { headers } from 'next/headers'
-import { formatMeasurement, resolveUnitForLocale } from '@10x-media/fields/measurement/utils'
+import { presets } from '@10x-media/fields/measurement'
+import { formatMeasurement, resolveDisplayUnit, systemForLocale } from '@10x-media/fields/measurement/utils'
 
 export const AthleteWeight = async ({ weight }: { weight: number }) => {
   const locale = (await headers()).get('accept-language')?.split(',')[0] ?? 'en-US'
-  const displayUnit = resolveUnitForLocale(locale, 'bodyWeight')
+  const displayUnit = resolveDisplayUnit({
+    dimension: 'mass',
+    localeDefaults: presets.bodyWeight.localeDefaults,
+    system: systemForLocale(locale),
+    units: presets.bodyWeight.units,
+  })
   return <span>{formatMeasurement(weight, { storageUnit: 'kg', displayUnit, locale })}</span>
 }
 ```
