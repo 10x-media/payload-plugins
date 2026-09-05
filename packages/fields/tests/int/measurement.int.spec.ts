@@ -120,9 +120,9 @@ describeForDb('measurement field integration', {}, (db) => {
 	it('stores a free-form field canonically in its declared storage unit', async () => {
 		const doc = await booted.payload.create({
 			collection: 'athletes',
-			data: { cutout: 500, title: 'cutout-storage' },
+			data: { cutout: 500.12345678, title: 'cutout-storage' },
 		})
-		expect(doc.cutout).toBe(500)
+		expect(doc.cutout).toBe(500.123457)
 	})
 
 	it('round-trips a free-form preferenceKey bucket independent of bodyWeight', async () => {

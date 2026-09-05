@@ -100,8 +100,21 @@ test.describe('measurement field', () => {
 		await expect(page.locator('#field-height')).toHaveValue('180.34')
 		// Switching the display unit never calls setValue (it only updates the saved
 		// preference), so the form stays unmodified and Payload's own SaveButton stays
-		// disabled: there is no code path left that could resave a truncated draft.
+		// disabled: there is no code path yet that could resave a truncated draft.
 		await expect(page.locator('#action-save')).toBeDisabled()
+		// Dirty an unrelated field (reverted before saving, so the doc premise holds for
+		// later tests) to force a real resave: this carries the faithful cm draft through
+		// a full-document PATCH alongside unrelated churn, not just the isolated commit above.
+		const nativeInput = page.locator('#field-nativeNumber')
+		const originalNative = await nativeInput.inputValue()
+		await nativeInput.fill('42')
+		await nativeInput.fill(originalNative)
+		await expect(page.locator('#action-save')).toBeEnabled()
+		const resaved = page.waitForResponse(
+			(r) => r.url().includes(`/api/${FIXTURES.collection}`) && r.request().method() === 'PATCH'
+		)
+		await page.locator('#action-save').click()
+		expect((await resaved).ok()).toBeTruthy()
 		const res = await page.request.get(`/api/${FIXTURES.collection}/${id}`)
 		const doc = (await res.json()) as { height: number }
 		expect(doc.height).toBeCloseTo(180.34, 6)
