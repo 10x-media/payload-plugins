@@ -9,6 +9,7 @@ export {
 export type {
 	CompoundUnitId,
 	Dimension,
+	MeasurementUnitId,
 	ScalarUnitId,
 	UnitId,
 } from '../fields/measurement/engine/units'

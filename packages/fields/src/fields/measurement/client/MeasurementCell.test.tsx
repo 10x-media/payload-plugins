@@ -46,6 +46,28 @@ describe('MeasurementCell', () => {
 		)
 		expect(screen.getByText(/81\.6\s?kg/)).toBeDefined()
 	})
+	it('formats a custom unit through the field engine', () => {
+		render(
+			<MeasurementCell
+				cellData={3704}
+				measurementOptions={{
+					custom: {
+						units: {
+							nmi: { dimension: 'length', factor: 1852, intlUnit: null, shortLabel: 'nmi' },
+						},
+					},
+					dimension: 'length',
+					fallbackUnit: 'nmi',
+					preferenceKey: 'seaDistance',
+					storageUnit: 'm',
+					units: ['m', 'nmi'],
+				}}
+				// biome-ignore lint/suspicious/noExplicitAny: test spread of empty object
+				{...({} as any)}
+			/>
+		)
+		expect(screen.getByText('2 nmi')).toBeDefined()
+	})
 	it('formats in the context unit when the provider has one', () => {
 		mockContext.mockReturnValueOnce({ ready: true, setUnit: () => {}, units: { bodyWeight: 'lb' } })
 		render(

@@ -1,7 +1,7 @@
 import { convertUnit, roundTo } from './convert'
 import {
-	compose,
-	decompose,
+	compose as composeBuiltIn,
+	decompose as decomposeBuiltIn,
 	type FormattableUnit,
 	formatMeasurement as formatMeasurementBuiltIn,
 	formatScalarValue,
@@ -13,6 +13,7 @@ import {
 	COMPOUNDS,
 	type CompoundUnitId,
 	DISPLAY_PRECISION,
+	isScalarUnit as isBuiltInScalarUnit,
 	type ScalarUnitId,
 	UNITS,
 	unitsOfDimension as unitsOfDimensionBuiltIn,
@@ -116,7 +117,7 @@ const mergeUnits = (custom?: MeasurementCustomConfig): Record<string, MergedUnit
 /**
  * Builds a measurement engine over the built-in units merged with a serializable custom
  * config. Compound units (ft-in, st-lb) are always built-in: custom units are scalar-only,
- * so decompose/compose delegate straight to the built-in implementation unchanged.
+ * so decompose/compose run on the built-in table, bridged for a custom storage unit.
  */
 export const createEngine = (custom?: MeasurementCustomConfig) => {
 	const units = mergeUnits(custom)
@@ -131,6 +132,30 @@ export const createEngine = (custom?: MeasurementCustomConfig) => {
 		convertUnit(units, value, from, to)
 
 	const isScalarUnit = (unit: string): boolean => Object.hasOwn(units, unit)
+
+	// Compound units are built-in and split on the built-in table, so a custom
+	// storage unit is bridged through the compound's own major unit.
+	// biome-ignore lint/complexity/useMaxParams: mirrors the built-in decompose signature
+	const decompose = (
+		value: number,
+		from: string,
+		compound: CompoundUnitId,
+		minorDigits?: number
+	): { major: number; minor: number } => {
+		if (isBuiltInScalarUnit(from)) return decomposeBuiltIn(value, from, compound, minorDigits)
+		const bridge = COMPOUNDS[compound].major
+		return decomposeBuiltIn(convert(value, from, bridge), bridge, compound, minorDigits)
+	}
+
+	const compose = (
+		parts: { major: number; minor: number },
+		compound: CompoundUnitId,
+		to: string
+	): number => {
+		if (isBuiltInScalarUnit(to)) return composeBuiltIn(parts, compound, to)
+		const bridge = COMPOUNDS[compound].major
+		return convert(composeBuiltIn(parts, compound, bridge), bridge, to)
+	}
 
 	const dimensionOf = (unit: string): string =>
 		isCompoundUnitId(unit) ? UNITS[COMPOUNDS[unit].major].dimension : getUnit(unit).dimension
@@ -157,11 +182,16 @@ export const createEngine = (custom?: MeasurementCustomConfig) => {
 	const formatMeasurement = (value: number, opts: EngineFormatMeasurementOptions): string => {
 		const { displayUnit, locale, precision, storageUnit, unitDisplay = 'short' } = opts
 		if (isCompoundUnitId(displayUnit)) {
-			return formatMeasurementBuiltIn(value, {
-				...opts,
-				storageUnit: storageUnit as ScalarUnitId,
-				displayUnit,
-			})
+			const bridge = COMPOUNDS[displayUnit].major
+			const builtInStorage = isBuiltInScalarUnit(storageUnit)
+			return formatMeasurementBuiltIn(
+				builtInStorage ? value : convert(value, storageUnit, bridge),
+				{
+					...opts,
+					storageUnit: builtInStorage ? storageUnit : bridge,
+					displayUnit,
+				}
+			)
 		}
 		const digits = precisionFor(displayUnit, precision)
 		return formatScalarValue(roundTo(convert(value, storageUnit, displayUnit), digits), {

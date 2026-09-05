@@ -29,6 +29,12 @@ export type CompoundUnitId = 'ft-in' | 'st-lb'
 export type UnitId = CompoundUnitId | ScalarUnitId
 
 /**
+ * Any unit id an engine may know: the built-ins, plus whatever a field declares in
+ * `custom`. Keeps built-in ids autocompleting while custom ids stay assignable.
+ */
+export type MeasurementUnitId = UnitId | (string & {})
+
+/**
  * canonical = value * factor + offset, per dimension canonical (kg, m, l,
  * celsius, m/s). Factors are the exact statute definitions where one exists.
  */

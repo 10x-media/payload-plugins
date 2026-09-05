@@ -48,6 +48,16 @@ describe('createEngine: custom units', () => {
 		expect(units).toContain('nmi')
 		expect(units).toContain('cm')
 	})
+	it('splits and rebuilds a compound display over a custom storage unit', () => {
+		const parts = engine.decompose(1, 'nmi', 'ft-in')
+		expect(parts).toEqual({ major: 6076, minor: 1 })
+		expect(engine.compose(parts, 'ft-in', 'nmi')).toBeCloseTo(1, 4)
+	})
+	it('formats a compound display over a custom storage unit', () => {
+		expect(
+			engine.formatMeasurement(1, { displayUnit: 'ft-in', locale: 'en-US', storageUnit: 'nmi' })
+		).toBe('6,076 ft 1 in')
+	})
 })
 
 describe('createEngine: custom dimensions', () => {

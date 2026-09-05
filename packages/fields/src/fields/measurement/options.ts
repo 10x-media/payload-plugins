@@ -1,13 +1,13 @@
 import type { NumberField } from 'payload'
 import type { MeasurementCustomConfig } from './engine/registry'
-import type { DimOf, ScalarUnitId, UnitId, UnitOfDimension } from './engine/units'
+import type { DimOf, MeasurementUnitId, ScalarUnitId, UnitOfDimension } from './engine/units'
 import type { MeasurementSystem } from './engine/usages'
 
 /** payload-preferences key holding the flat per-bucket unit map. */
 export const MEASUREMENT_PREFERENCE_KEY = '10x-fields-measurement'
 
 /** Saved display units, keyed by each field's `preferenceKey`. */
-export type MeasurementUnitsPreference = Partial<Record<string, UnitId>>
+export type MeasurementUnitsPreference = Partial<Record<string, MeasurementUnitId>>
 
 type CommonFieldOptions<U extends string> = {
 	name?: string
@@ -51,22 +51,26 @@ export type MeasurementCustomFieldOptions = CommonFieldOptions<string> & {
 
 export type AnyMeasurementFieldOptions = MeasurementCustomFieldOptions | MeasurementFieldOptions
 
-/** Serializable options shipped to both the Field and Cell components. */
+/**
+ * Serializable options shipped to both the Field and Cell components. Unit ids stay
+ * widened here: the components rebuild the field's engine from `custom` and resolve
+ * every id through it, so a custom id is as valid as a built-in one.
+ */
 export type MeasurementClientOptions = {
-	storageUnit: ScalarUnitId
-	units: readonly UnitId[]
+	storageUnit: MeasurementUnitId
+	units: readonly MeasurementUnitId[]
 	preferenceKey: string
 	dimension: string
-	localeDefaults?: Partial<Record<MeasurementSystem, UnitId>>
-	fallbackUnit?: UnitId
-	precision?: Partial<Record<UnitId, number>>
+	localeDefaults?: Partial<Record<MeasurementSystem, MeasurementUnitId>>
+	fallbackUnit?: MeasurementUnitId
+	precision?: Partial<Record<MeasurementUnitId, number>>
 	custom?: MeasurementCustomConfig
 }
 
 /** What MeasurementFieldServer hands the client after per-request resolution. */
 export type MeasurementResolvedClientOptions = MeasurementClientOptions & {
 	/** The viewer's saved unit for this bucket, read server-side for a flash-free first paint. */
-	initialUnit?: UnitId
+	initialUnit?: MeasurementUnitId
 	/** Plugin-registry default for this bucket. */
-	registryDefault?: UnitId
+	registryDefault?: MeasurementUnitId
 }

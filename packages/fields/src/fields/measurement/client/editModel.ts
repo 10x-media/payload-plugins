@@ -1,41 +1,19 @@
-import { convert, roundTo } from '../engine/convert'
-import { compose, decompose } from '../engine/format'
-import {
-	COMPOUNDS,
-	isCompoundUnit,
-	precisionFor,
-	type ScalarUnitId,
-	STORAGE_FRACTION_DIGITS,
-	type UnitId,
-} from '../engine/units'
+import { roundTo } from '../engine/convert'
+import type { MeasurementEngine } from '../engine/registry'
+import { COMPOUNDS, type MeasurementUnitId, STORAGE_FRACTION_DIGITS } from '../engine/units'
+import { localeDefaultUnits, type MeasurementSystem } from '../engine/usages'
 
 export type MeasurementDrafts = { primary: string; minor: string }
 
 type UnitContext = {
-	storageUnit: ScalarUnitId
-	displayUnit: UnitId
-	precision?: Partial<Record<UnitId, number>>
+	/** Bound over the field's custom units, so custom ids convert and format like built-ins. */
+	engine: MeasurementEngine
+	storageUnit: MeasurementUnitId
+	displayUnit: MeasurementUnitId
+	precision?: Partial<Record<MeasurementUnitId, number>>
 }
 
 const numberToDraft = (value: number): string => String(value)
-
-export const draftsFor = (value: number | null, opts: UnitContext): MeasurementDrafts => {
-	if (typeof value !== 'number' || Number.isNaN(value)) return { minor: '', primary: '' }
-	if (isCompoundUnit(opts.displayUnit)) {
-		const parts = decompose(
-			value,
-			opts.storageUnit,
-			opts.displayUnit,
-			precisionFor(opts.displayUnit, opts.precision)
-		)
-		return { minor: numberToDraft(parts.minor), primary: numberToDraft(parts.major) }
-	}
-	const digits = precisionFor(opts.displayUnit, opts.precision)
-	return {
-		minor: '',
-		primary: numberToDraft(roundTo(convert(value, opts.storageUnit, opts.displayUnit), digits)),
-	}
-}
 
 const parseDraft = (raw: string): number | null => {
 	if (raw.trim() === '') return null
@@ -45,34 +23,79 @@ const parseDraft = (raw: string): number | null => {
 
 export const commitDrafts = (
 	drafts: MeasurementDrafts,
-	opts: Pick<UnitContext, 'displayUnit' | 'storageUnit'>
+	opts: Pick<UnitContext, 'displayUnit' | 'engine' | 'storageUnit'>
 ): number | null => {
+	const { displayUnit, engine, storageUnit } = opts
 	const primary = parseDraft(drafts.primary)
 	if (primary === null) return null
-	if (isCompoundUnit(opts.displayUnit)) {
+	if (engine.isCompoundUnit(displayUnit)) {
 		const rawMinor = parseDraft(drafts.minor) ?? 0
-		const maxMinor = COMPOUNDS[opts.displayUnit].ratio - 0.001
+		const maxMinor = COMPOUNDS[displayUnit].ratio - 0.001
 		// Clamp the magnitude only: decompose is sign-safe and negative drafts
 		// carry the sign on both parts, so zeroing a negative minor would corrupt
 		// the round-trip.
 		const minor = Math.sign(rawMinor) * Math.min(Math.abs(rawMinor), maxMinor)
 		return roundTo(
-			compose({ major: primary, minor }, opts.displayUnit, opts.storageUnit),
+			engine.compose({ major: primary, minor }, displayUnit, storageUnit),
 			STORAGE_FRACTION_DIGITS
 		)
 	}
-	return roundTo(convert(primary, opts.displayUnit, opts.storageUnit), STORAGE_FRACTION_DIGITS)
+	return roundTo(engine.convert(primary, displayUnit, storageUnit), STORAGE_FRACTION_DIGITS)
+}
+
+/**
+ * Shortest drafts that commit back to the stored value: display precision first,
+ * then one more fraction digit at a time up to storage precision. An editable
+ * draft that silently truncates the stored value would write the truncation back
+ * on the next save, so faithfulness outranks prettiness.
+ */
+export const draftsFor = (value: number | null, opts: UnitContext): MeasurementDrafts => {
+	if (typeof value !== 'number' || Number.isNaN(value)) return { minor: '', primary: '' }
+	const { displayUnit, engine, precision, storageUnit } = opts
+	const draftAt = (digits: number): MeasurementDrafts => {
+		if (engine.isCompoundUnit(displayUnit)) {
+			const parts = engine.decompose(value, storageUnit, displayUnit, digits)
+			return { minor: numberToDraft(parts.minor), primary: numberToDraft(parts.major) }
+		}
+		const converted = roundTo(engine.convert(value, storageUnit, displayUnit), digits)
+		return { minor: '', primary: numberToDraft(converted) }
+	}
+
+	// Digits past storage precision never survive a save, so that is where escalation stops.
+	const displayDigits = engine.precisionFor(displayUnit, precision)
+	const maxDigits = Math.max(displayDigits, STORAGE_FRACTION_DIGITS)
+	const target = roundTo(value, STORAGE_FRACTION_DIGITS)
+	for (let digits = displayDigits; digits < maxDigits; digits++) {
+		const candidate = draftAt(digits)
+		if (commitDrafts(candidate, opts) === target) return candidate
+	}
+	return draftAt(maxDigits)
 }
 
 /** First candidate the field actually offers wins; the field's first unit is the floor. */
 export const resolveDisplayUnit = (args: {
-	preferenceUnit?: UnitId | null
-	fallbackUnit?: UnitId
-	registryDefault?: UnitId
-	localeUnit?: UnitId | null
-	units: readonly UnitId[]
-}): UnitId => {
-	const candidates = [args.preferenceUnit, args.fallbackUnit, args.registryDefault, args.localeUnit]
+	dimension: string
+	preferenceUnit?: MeasurementUnitId | null
+	fallbackUnit?: MeasurementUnitId
+	registryDefault?: MeasurementUnitId
+	/** Null until the browser locale is read post-hydration, which skips both locale steps. */
+	system?: MeasurementSystem | null
+	localeDefaults?: Partial<Record<MeasurementSystem, MeasurementUnitId>>
+	units: readonly MeasurementUnitId[]
+}): MeasurementUnitId => {
+	const localeCandidates = args.system
+		? localeDefaultUnits({
+				dimension: args.dimension,
+				localeDefaults: args.localeDefaults,
+				system: args.system,
+			})
+		: []
+	const candidates = [
+		args.preferenceUnit,
+		args.fallbackUnit,
+		args.registryDefault,
+		...localeCandidates,
+	]
 	for (const candidate of candidates) {
 		if (candidate && args.units.includes(candidate)) return candidate
 	}

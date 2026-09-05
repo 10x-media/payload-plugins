@@ -2,13 +2,13 @@
 import { usePreferences } from '@payloadcms/ui'
 import type React from 'react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import type { UnitId } from '../engine/units'
+import type { MeasurementUnitId } from '../engine/units'
 import { MEASUREMENT_PREFERENCE_KEY, type MeasurementUnitsPreference } from '../options'
 
 export type MeasurementUnitsContextValue = {
 	ready: boolean
 	units: MeasurementUnitsPreference
-	setUnit: (preferenceKey: string, unit: UnitId) => void
+	setUnit: (preferenceKey: string, unit: MeasurementUnitId) => void
 }
 
 const Context = createContext<MeasurementUnitsContextValue | null>(null)
@@ -45,7 +45,7 @@ export const MeasurementUnitsProvider: React.FC<{ children: React.ReactNode }> =
 	}, [getPreference])
 
 	const setUnit = useCallback(
-		(preferenceKey: string, unit: UnitId) => {
+		(preferenceKey: string, unit: MeasurementUnitId) => {
 			setUnits((current) => ({ ...current, [preferenceKey]: unit }))
 			void setPreference(MEASUREMENT_PREFERENCE_KEY, { [preferenceKey]: unit }, true)
 		},

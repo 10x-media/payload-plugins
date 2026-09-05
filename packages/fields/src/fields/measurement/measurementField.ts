@@ -147,10 +147,7 @@ export function measurementField(options: AnyMeasurementFieldOptions): NumberFie
 	}
 	if (precision !== undefined) assertPrecision({ dimension, engine, name, precision })
 
-	// Custom unit ids are plain strings while the admin components are still typed
-	// against the built-in tables. Narrowed once here; the engine-backed client
-	// seam that drops the cast lands with the resolution-chain work.
-	const measurementOptions = {
+	const measurementOptions: MeasurementClientOptions = {
 		dimension,
 		preferenceKey,
 		storageUnit,
@@ -159,7 +156,7 @@ export function measurementField(options: AnyMeasurementFieldOptions): NumberFie
 		...(fallbackUnit !== undefined ? { fallbackUnit } : {}),
 		...(precision !== undefined ? { precision } : {}),
 		...(custom !== undefined ? { custom } : {}),
-	} as MeasurementClientOptions
+	}
 
 	const base: NumberField = {
 		name,

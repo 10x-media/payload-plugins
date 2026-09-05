@@ -15,9 +15,9 @@ import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
-import { formatMeasurement, unitLabel } from '../engine/format'
-import { COMPOUNDS, isCompoundUnit, type UnitId } from '../engine/units'
-import { localeDefaultUnit } from '../engine/usages'
+import { createEngine, defaultEngine } from '../engine/registry'
+import { COMPOUNDS, type MeasurementUnitId } from '../engine/units'
+import { type MeasurementSystem, systemForLocale } from '../engine/usages'
 import type { MeasurementResolvedClientOptions } from '../options'
 import { commitDrafts, draftsFor, type MeasurementDrafts, resolveDisplayUnit } from './editModel'
 import { useMeasurementUnits } from './MeasurementUnitsProvider'
@@ -55,6 +55,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		readOnly: readOnlyFromProps,
 	} = props
 	const {
+		custom,
 		dimension,
 		fallbackUnit,
 		initialUnit,
@@ -68,29 +69,36 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	const { i18n, t } = useTranslation()
 	const locale = i18n.language
 
+	// Every conversion, label and precision lookup runs through this, so the
+	// field's custom units behave exactly like the built-in ones.
+	const engine = useMemo(() => (custom ? createEngine(custom) : defaultEngine), [custom])
+
 	const context = useMeasurementUnits()
 	// Standalone fallback when the plugin (and so the provider) is absent
-	const [localUnit, setLocalUnit] = useState<UnitId | null>(initialUnit ?? null)
+	const [localUnit, setLocalUnit] = useState<MeasurementUnitId | null>(initialUnit ?? null)
 	// navigator is read post-hydration only, or SSR markup would mismatch
-	const [localeUnit, setLocaleUnit] = useState<UnitId | null>(null)
+	const [system, setSystem] = useState<MeasurementSystem | null>(null)
 	useEffect(() => {
-		setLocaleUnit(localeDefaultUnit({ dimension, locale: navigator.language, localeDefaults }))
-	}, [dimension, localeDefaults])
+		setSystem(systemForLocale(navigator.language))
+	}, [])
 
 	const preferenceUnit = context
 		? (context.units[preferenceKey] ?? (context.ready ? null : (initialUnit ?? null)))
 		: localUnit
 	const displayUnit = resolveDisplayUnit({
+		dimension,
 		fallbackUnit,
-		localeUnit,
+		localeDefaults,
 		preferenceUnit,
 		registryDefault,
+		system,
 		units,
 	})
 
 	const fmtBound = useCallback(
-		(bound: number) => formatMeasurement(bound, { displayUnit, locale, precision, storageUnit }),
-		[displayUnit, locale, precision, storageUnit]
+		(bound: number) =>
+			engine.formatMeasurement(bound, { displayUnit, locale, precision, storageUnit }),
+		[displayUnit, engine, locale, precision, storageUnit]
 	)
 
 	const memoizedValidate = useCallback<Validate<number | null | undefined>>(
@@ -130,8 +138,8 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 
 	const numericValue = typeof value === 'number' && !Number.isNaN(value) ? value : null
 	const unitOpts = useMemo(
-		() => ({ displayUnit, precision, storageUnit }),
-		[displayUnit, precision, storageUnit]
+		() => ({ displayUnit, engine, precision, storageUnit }),
+		[displayUnit, engine, precision, storageUnit]
 	)
 
 	// Payload's server-driven form-state refresh (conditional-logic revalidation on
@@ -178,7 +186,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	}, [numericValue, unitOpts])
 
 	const selectUnit = useCallback(
-		(unit: UnitId) => {
+		(unit: MeasurementUnitId) => {
 			editingRef.current = false
 			if (context) context.setUnit(preferenceKey, unit)
 			else setLocalUnit(unit)
@@ -186,7 +194,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		[context, preferenceKey]
 	)
 
-	const isCompound = isCompoundUnit(displayUnit)
+	const isCompound = engine.isCompoundUnit(displayUnit)
 	const compoundDef = isCompound ? COMPOUNDS[displayUnit] : null
 	const inputId = `field-${path?.replace(/\./g, '__')}`
 	const styles = useMemo(() => mergeFieldStyles(field), [field])
@@ -234,12 +242,12 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 									value={drafts.primary}
 								/>
 								<span aria-hidden="true" className={`${baseClass}__suffix`}>
-									{unitLabel(compoundDef.major, locale, 'short')}
+									{engine.unitLabel(compoundDef.major, locale, 'short')}
 								</span>
 							</span>
 							<span className={`${baseClass}__part`}>
 								<input
-									aria-label={unitLabel(compoundDef.minor, locale, 'long')}
+									aria-label={engine.unitLabel(compoundDef.minor, locale, 'long')}
 									className={`${baseClass}__input ${baseClass}__input--compound`}
 									inputMode="decimal"
 									max={compoundDef.ratio - 0.001}
@@ -253,7 +261,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 									value={drafts.minor}
 								/>
 								<span aria-hidden="true" className={`${baseClass}__suffix`}>
-									{unitLabel(compoundDef.minor, locale, 'short')}
+									{engine.unitLabel(compoundDef.minor, locale, 'short')}
 								</span>
 							</span>
 						</span>
@@ -276,7 +284,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 						<Popup
 							button={
 								<span className={`${baseClass}__unit-badge`}>
-									{unitLabel(displayUnit, locale, 'short')}
+									{engine.unitLabel(displayUnit, locale, 'short')}
 								</span>
 							}
 							buttonClassName={`${baseClass}__unit-button`}
@@ -302,9 +310,9 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 											role="option"
 											type="button"
 										>
-											<span>{unitLabel(unit, locale, 'long')}</span>
+											<span>{engine.unitLabel(unit, locale, 'long')}</span>
 											<span className={`${baseClass}__unit-symbol`}>
-												{unitLabel(unit, locale, 'short')}
+												{engine.unitLabel(unit, locale, 'short')}
 											</span>
 										</button>
 									))}
@@ -315,7 +323,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 						/>
 					) : (
 						<span className={`${baseClass}__unit-badge ${baseClass}__unit-badge--static`}>
-							{unitLabel(displayUnit, locale, 'short')}
+							{engine.unitLabel(displayUnit, locale, 'short')}
 						</span>
 					)}
 				</div>
