@@ -61,6 +61,30 @@ const scalarFormatter = (
 		unitDisplay,
 	})
 
+/** Minimal shape formatting needs, so createEngine can format custom units alongside built-ins. */
+export type FormattableUnit = { intlUnit: string | null; shortLabel: string }
+
+export type ScalarFormatOptions = {
+	unit: FormattableUnit
+	locale: string
+	digits: number
+	unitDisplay: 'long' | 'narrow' | 'short'
+}
+
+/** intlUnit null means the unit has no ECMA-402 identifier: fall back to plain decimal + shortLabel. */
+export const formatScalarValue = (value: number, opts: ScalarFormatOptions): string => {
+	const { digits, locale, unit, unitDisplay } = opts
+	if (unit.intlUnit === null) {
+		return `${new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value)} ${unit.shortLabel}`
+	}
+	return new Intl.NumberFormat(locale, {
+		maximumFractionDigits: digits,
+		style: 'unit',
+		unit: unit.intlUnit,
+		unitDisplay,
+	}).format(value)
+}
+
 const joinParts = (parts: string[], locale: string): string => {
 	try {
 		return new Intl.ListFormat(locale, { style: 'narrow', type: 'unit' }).format(parts)
@@ -89,20 +113,28 @@ export const formatMeasurement = (value: number, opts: FormatMeasurementOptions)
 		return joinParts([majorText, minorText], locale)
 	}
 	const digits = precisionFor(displayUnit, precision)
-	return scalarFormatter(displayUnit, locale, digits, unitDisplay).format(
-		roundTo(convert(value, storageUnit, displayUnit), digits)
-	)
+	return formatScalarValue(roundTo(convert(value, storageUnit, displayUnit), digits), {
+		digits,
+		locale,
+		unit: UNITS[displayUnit],
+		unitDisplay,
+	})
 }
 
-const scalarLongLabel = (unit: ScalarUnitId, locale: string): string => {
+/** intlUnit null means the unit has no ECMA-402 identifier: fall back to the shortLabel as-is. */
+export const scalarLongLabelFor = (unit: FormattableUnit, locale: string): string => {
+	if (unit.intlUnit === null) return unit.shortLabel
 	const parts = new Intl.NumberFormat(locale, {
 		style: 'unit',
-		unit: UNITS[unit].intlUnit,
+		unit: unit.intlUnit,
 		unitDisplay: 'long',
 	}).formatToParts(2)
 	const unitPart = parts.find((part) => part.type === 'unit')
-	return unitPart?.value ?? UNITS[unit].shortLabel
+	return unitPart?.value ?? unit.shortLabel
 }
+
+const scalarLongLabel = (unit: ScalarUnitId, locale: string): string =>
+	scalarLongLabelFor(UNITS[unit], locale)
 
 /** Picker label for a unit. Long labels come from Intl so they localize for free. */
 export const unitLabel = (unit: UnitId, locale: string, style: 'long' | 'short'): string => {
