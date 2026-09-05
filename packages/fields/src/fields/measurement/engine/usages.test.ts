@@ -1,18 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { dimensionOf, isScalarUnit, UNITS } from './units'
-import { DIMENSION_LOCALE_DEFAULTS, resolveUnitForLocale, systemForLocale, USAGES } from './usages'
-
-describe('usage registry', () => {
-	it('every usage default and storage unit belongs to its own unit list and dimension', () => {
-		for (const [usage, def] of Object.entries(USAGES)) {
-			expect(isScalarUnit(def.defaultStorageUnit), usage).toBe(true)
-			expect(UNITS[def.defaultStorageUnit].dimension).toBe(def.dimension)
-			for (const unit of def.units)
-				expect(dimensionOf(unit), `${usage}:${unit}`).toBe(def.dimension)
-			for (const unit of Object.values(def.defaults)) expect(def.units).toContain(unit)
-		}
-	})
-})
+import { dimensionOf } from './units'
+import { DIMENSION_LOCALE_DEFAULTS, localeDefaultUnit, systemForLocale } from './usages'
 
 describe('DIMENSION_LOCALE_DEFAULTS', () => {
 	it('every default unit belongs to its own dimension', () => {
@@ -51,14 +39,23 @@ describe('systemForLocale (vendored CLDR measurementData)', () => {
 	})
 })
 
-describe('resolveUnitForLocale', () => {
-	it('gives UK body weight in stones and pounds, height in feet and inches, distance in miles', () => {
-		expect(resolveUnitForLocale('en-GB', 'bodyWeight')).toBe('st-lb')
-		expect(resolveUnitForLocale('en-GB', 'personHeight')).toBe('ft-in')
-		expect(resolveUnitForLocale('en-GB', 'distance')).toBe('mi')
+describe('localeDefaultUnit', () => {
+	it('prefers the field defaults over the dimension table', () => {
+		const localeDefaults = { metric: 'kg', uk: 'st-lb', us: 'lb' } as const
+		expect(localeDefaultUnit({ dimension: 'mass', locale: 'en-GB', localeDefaults })).toBe('st-lb')
+		expect(localeDefaultUnit({ dimension: 'mass', locale: 'de-DE', localeDefaults })).toBe('kg')
 	})
-	it('gives US pounds and German metric', () => {
-		expect(resolveUnitForLocale('en-US', 'bodyWeight')).toBe('lb')
-		expect(resolveUnitForLocale('de-DE', 'bodyWeight')).toBe('kg')
+	it('falls back to the dimension table', () => {
+		expect(localeDefaultUnit({ dimension: 'mass', locale: 'en-GB' })).toBe('lb')
+		expect(localeDefaultUnit({ dimension: 'length', locale: 'en-US' })).toBe('in')
+		expect(localeDefaultUnit({ dimension: 'volume', locale: 'de-DE' })).toBe('l')
+	})
+	it('falls back partially when the field covers only some systems', () => {
+		expect(
+			localeDefaultUnit({ dimension: 'length', locale: 'en-US', localeDefaults: { metric: 'm' } })
+		).toBe('in')
+	})
+	it('returns null for a custom dimension with no field defaults', () => {
+		expect(localeDefaultUnit({ dimension: 'pressure', locale: 'en-US' })).toBeNull()
 	})
 })

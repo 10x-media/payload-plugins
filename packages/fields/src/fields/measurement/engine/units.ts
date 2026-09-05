@@ -100,6 +100,9 @@ export const isScalarUnit = (unit: string): unit is ScalarUnitId => Object.hasOw
 export const dimensionOf = (unit: UnitId): Dimension =>
 	isCompoundUnit(unit) ? UNITS[COMPOUNDS[unit].major].dimension : UNITS[unit].dimension
 
+/** Dimension of a built-in scalar unit, literal when S is one and the full union otherwise. */
+export type DimOf<S extends ScalarUnitId> = (typeof UNITS)[S]['dimension']
+
 /** Scalar unit ids whose dimension is (a member of) D. */
 export type ScalarOfDimension<D extends CoreDimension> = {
 	[K in ScalarUnitId]: (typeof UNITS)[K]['dimension'] extends D ? K : never

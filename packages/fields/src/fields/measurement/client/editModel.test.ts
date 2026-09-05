@@ -78,9 +78,9 @@ describe('resolveDisplayUnit', () => {
 		expect(resolveDisplayUnit({ preferenceUnit: 'lb', units: [...units] })).toBe('lb')
 	})
 	it('skips a preference the field does not offer', () => {
-		expect(resolveDisplayUnit({ defaultUnit: 'kg', preferenceUnit: 'mi', units: [...units] })).toBe(
-			'kg'
-		)
+		expect(
+			resolveDisplayUnit({ fallbackUnit: 'kg', preferenceUnit: 'mi', units: [...units] })
+		).toBe('kg')
 	})
 	it('walks preference, field default, registry default, locale, first unit', () => {
 		expect(resolveDisplayUnit({ localeUnit: 'st-lb', units: [...units] })).toBe('st-lb')

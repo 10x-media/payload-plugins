@@ -67,12 +67,12 @@ export const commitDrafts = (
 /** First candidate the field actually offers wins; the field's first unit is the floor. */
 export const resolveDisplayUnit = (args: {
 	preferenceUnit?: UnitId | null
-	defaultUnit?: UnitId
+	fallbackUnit?: UnitId
 	registryDefault?: UnitId
 	localeUnit?: UnitId | null
 	units: readonly UnitId[]
 }): UnitId => {
-	const candidates = [args.preferenceUnit, args.defaultUnit, args.registryDefault, args.localeUnit]
+	const candidates = [args.preferenceUnit, args.fallbackUnit, args.registryDefault, args.localeUnit]
 	for (const candidate of candidates) {
 		if (candidate && args.units.includes(candidate)) return candidate
 	}

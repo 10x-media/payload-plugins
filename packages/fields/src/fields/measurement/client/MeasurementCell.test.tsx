@@ -13,7 +13,12 @@ vi.mock('./MeasurementUnitsProvider', () => ({ useMeasurementUnits: () => mockCo
 
 const { MeasurementCell } = await import('./MeasurementCell')
 
-const options = { storageUnit: 'kg', units: ['kg', 'lb', 'st-lb'], usage: 'bodyWeight' } as const
+const options = {
+	dimension: 'mass',
+	preferenceKey: 'bodyWeight',
+	storageUnit: 'kg',
+	units: ['kg', 'lb', 'st-lb'],
+} as const
 
 describe('MeasurementCell', () => {
 	afterEach(() => {

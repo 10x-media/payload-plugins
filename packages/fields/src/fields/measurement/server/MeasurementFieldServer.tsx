@@ -16,18 +16,18 @@ type MeasurementFieldServerComponentProps = {
 export const MeasurementFieldServer = async (props: MeasurementFieldServerComponentProps) => {
 	const { clientField, measurementOptions, path, permissions, readOnly, req } = props
 	const userUnits = await getUserMeasurementUnits(req)
+	const { preferenceKey } = measurementOptions
 	const registryDefault = getFieldsRegistry(req.payload.config)?.measurement?.defaultUnits?.[
-		measurementOptions.usage
+		preferenceKey
 	]
+	const initialUnit = userUnits?.[preferenceKey]
 	return (
 		<MeasurementField
 			field={clientField}
 			measurementOptions={{
 				...measurementOptions,
 				...(registryDefault !== undefined ? { registryDefault } : {}),
-				...(userUnits?.[measurementOptions.usage] !== undefined
-					? { initialUnit: userUnits[measurementOptions.usage] }
-					: {}),
+				...(initialUnit !== undefined ? { initialUnit } : {}),
 			}}
 			path={path}
 			permissions={permissions}

@@ -1,7 +1,11 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { MEASUREMENT_PREFERENCE_KEY, measurementField } from '../../src/exports/measurement'
+import {
+	MEASUREMENT_PREFERENCE_KEY,
+	measurementField,
+	presets,
+} from '../../src/exports/measurement'
 import { fields } from '../../src/index'
 
 const users: CollectionConfig = {
@@ -14,9 +18,9 @@ const athletes: CollectionConfig = {
 	slug: 'athletes',
 	fields: [
 		{ name: 'title', type: 'text' },
-		measurementField({ usage: 'bodyWeight' }),
-		measurementField({ name: 'height', storageUnit: 'cm', usage: 'personHeight' }),
-		measurementField({ max: 100, min: 1, name: 'bounded', usage: 'distance' }),
+		measurementField({ ...presets.bodyWeight }),
+		measurementField({ ...presets.personHeight }),
+		measurementField({ ...presets.distance, max: 100, min: 1, name: 'bounded' }),
 	],
 }
 

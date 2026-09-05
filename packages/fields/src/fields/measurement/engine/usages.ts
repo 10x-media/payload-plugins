@@ -1,83 +1,6 @@
-import type { CoreDimension, Dimension, ScalarUnitId, UnitId } from './units'
-
-export type MeasurementUsage =
-	| 'bodyWeight'
-	| 'distance'
-	| 'length'
-	| 'mass'
-	| 'personHeight'
-	| 'speed'
-	| 'temperature'
-	| 'volume'
+import type { CoreDimension, UnitId } from './units'
 
 export type MeasurementSystem = 'metric' | 'uk' | 'us'
-
-export type UsageDef = {
-	dimension: Dimension
-	units: readonly UnitId[]
-	defaultStorageUnit: ScalarUnitId
-	defaultName: string
-	defaults: Record<MeasurementSystem, UnitId>
-}
-
-export const USAGES: Record<MeasurementUsage, UsageDef> = {
-	bodyWeight: {
-		dimension: 'mass',
-		units: ['kg', 'lb', 'st-lb'],
-		defaultStorageUnit: 'kg',
-		defaultName: 'weight',
-		defaults: { metric: 'kg', us: 'lb', uk: 'st-lb' },
-	},
-	personHeight: {
-		dimension: 'length',
-		units: ['cm', 'm', 'in', 'ft-in'],
-		defaultStorageUnit: 'cm',
-		defaultName: 'height',
-		defaults: { metric: 'cm', us: 'ft-in', uk: 'ft-in' },
-	},
-	distance: {
-		dimension: 'length',
-		units: ['m', 'km', 'mi'],
-		defaultStorageUnit: 'km',
-		defaultName: 'distance',
-		defaults: { metric: 'km', us: 'mi', uk: 'mi' },
-	},
-	mass: {
-		dimension: 'mass',
-		units: ['g', 'kg', 'oz', 'lb'],
-		defaultStorageUnit: 'kg',
-		defaultName: 'mass',
-		defaults: { metric: 'kg', us: 'lb', uk: 'lb' },
-	},
-	length: {
-		dimension: 'length',
-		units: ['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi'],
-		defaultStorageUnit: 'cm',
-		defaultName: 'length',
-		defaults: { metric: 'cm', us: 'in', uk: 'in' },
-	},
-	volume: {
-		dimension: 'volume',
-		units: ['ml', 'l', 'fl-oz', 'gal'],
-		defaultStorageUnit: 'l',
-		defaultName: 'volume',
-		defaults: { metric: 'l', us: 'fl-oz', uk: 'l' },
-	},
-	temperature: {
-		dimension: 'temperature',
-		units: ['c', 'f'],
-		defaultStorageUnit: 'c',
-		defaultName: 'temperature',
-		defaults: { metric: 'c', us: 'f', uk: 'c' },
-	},
-	speed: {
-		dimension: 'speed',
-		units: ['km/h', 'mph', 'm/s'],
-		defaultStorageUnit: 'km/h',
-		defaultName: 'speed',
-		defaults: { metric: 'km/h', us: 'mph', uk: 'mph' },
-	},
-} as const satisfies Record<MeasurementUsage, UsageDef>
 
 /** Final fallback in the resolution chain: locale-system default per built-in dimension. */
 export const DIMENSION_LOCALE_DEFAULTS: Record<CoreDimension, Record<MeasurementSystem, UnitId>> = {
@@ -109,5 +32,18 @@ export const systemForLocale = (locale: string): MeasurementSystem => {
 	return 'metric'
 }
 
-export const resolveUnitForLocale = (locale: string, usage: MeasurementUsage): UnitId =>
-	USAGES[usage].defaults[systemForLocale(locale)]
+const BY_DIMENSION: Partial<Record<string, Record<MeasurementSystem, UnitId>>> =
+	DIMENSION_LOCALE_DEFAULTS
+
+/**
+ * Locale step of the display-unit chain: the field's own defaults first, then the
+ * per-dimension table. Null for a custom dimension the field gave no defaults for.
+ */
+export const localeDefaultUnit = (args: {
+	dimension: string
+	locale: string
+	localeDefaults?: Partial<Record<MeasurementSystem, UnitId>>
+}): UnitId | null => {
+	const system = systemForLocale(args.locale)
+	return args.localeDefaults?.[system] ?? BY_DIMENSION[args.dimension]?.[system] ?? null
+}

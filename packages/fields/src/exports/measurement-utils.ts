@@ -22,5 +22,11 @@ export {
 	STORAGE_FRACTION_DIGITS,
 	UNITS,
 } from '../fields/measurement/engine/units'
-export type { MeasurementSystem, MeasurementUsage } from '../fields/measurement/engine/usages'
-export { resolveUnitForLocale, systemForLocale, USAGES } from '../fields/measurement/engine/usages'
+export type { MeasurementSystem } from '../fields/measurement/engine/usages'
+export {
+	DIMENSION_LOCALE_DEFAULTS,
+	localeDefaultUnit,
+	systemForLocale,
+} from '../fields/measurement/engine/usages'
+export type { MeasurementPreset, MeasurementUsage } from '../fields/measurement/presets'
+export { presets } from '../fields/measurement/presets'

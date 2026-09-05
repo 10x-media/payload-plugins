@@ -17,7 +17,7 @@ import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { formatMeasurement, unitLabel } from '../engine/format'
 import { COMPOUNDS, isCompoundUnit, type UnitId } from '../engine/units'
-import { resolveUnitForLocale } from '../engine/usages'
+import { localeDefaultUnit } from '../engine/usages'
 import type { MeasurementResolvedClientOptions } from '../options'
 import { commitDrafts, draftsFor, type MeasurementDrafts, resolveDisplayUnit } from './editModel'
 import { useMeasurementUnits } from './MeasurementUnitsProvider'
@@ -54,8 +54,17 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		path: pathFromProps,
 		readOnly: readOnlyFromProps,
 	} = props
-	const { defaultUnit, initialUnit, precision, registryDefault, storageUnit, units, usage } =
-		measurementOptions
+	const {
+		dimension,
+		fallbackUnit,
+		initialUnit,
+		localeDefaults,
+		precision,
+		preferenceKey,
+		registryDefault,
+		storageUnit,
+		units,
+	} = measurementOptions
 	const { i18n, t } = useTranslation()
 	const locale = i18n.language
 
@@ -65,14 +74,14 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	// navigator is read post-hydration only, or SSR markup would mismatch
 	const [localeUnit, setLocaleUnit] = useState<UnitId | null>(null)
 	useEffect(() => {
-		setLocaleUnit(resolveUnitForLocale(navigator.language, usage))
-	}, [usage])
+		setLocaleUnit(localeDefaultUnit({ dimension, locale: navigator.language, localeDefaults }))
+	}, [dimension, localeDefaults])
 
 	const preferenceUnit = context
-		? (context.units[usage] ?? (context.ready ? null : (initialUnit ?? null)))
+		? (context.units[preferenceKey] ?? (context.ready ? null : (initialUnit ?? null)))
 		: localUnit
 	const displayUnit = resolveDisplayUnit({
-		defaultUnit,
+		fallbackUnit,
 		localeUnit,
 		preferenceUnit,
 		registryDefault,
@@ -171,10 +180,10 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	const selectUnit = useCallback(
 		(unit: UnitId) => {
 			editingRef.current = false
-			if (context) context.setUnit(usage, unit)
+			if (context) context.setUnit(preferenceKey, unit)
 			else setLocalUnit(unit)
 		},
-		[context, usage]
+		[context, preferenceKey]
 	)
 
 	const isCompound = isCompoundUnit(displayUnit)

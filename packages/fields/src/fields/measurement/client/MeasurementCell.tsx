@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from '../../../translations/useTranslation'
 import { formatMeasurement } from '../engine/format'
 import type { UnitId } from '../engine/units'
-import { resolveUnitForLocale } from '../engine/usages'
+import { localeDefaultUnit } from '../engine/usages'
 import type { MeasurementClientOptions } from '../options'
 import { resolveDisplayUnit } from './editModel'
 import { useMeasurementUnits } from './MeasurementUnitsProvider'
@@ -17,21 +17,23 @@ export type MeasurementCellProps = {
 
 export const MeasurementCell: React.FC<MeasurementCellProps> = (props) => {
 	const { cellData, measurementOptions } = props
-	const { defaultUnit, precision, storageUnit, units, usage } = measurementOptions
+	const { dimension, fallbackUnit, localeDefaults, precision, preferenceKey, storageUnit, units } =
+		measurementOptions
 	const { i18n } = useTranslation()
 	const context = useMeasurementUnits()
 	const [localeUnit, setLocaleUnit] = useState<UnitId | null>(null)
 	// Gated on the provider: plugin-less cells stay on the field default, not the browser locale.
 	useEffect(() => {
-		if (context) setLocaleUnit(resolveUnitForLocale(navigator.language, usage))
-	}, [usage, context])
+		if (context)
+			setLocaleUnit(localeDefaultUnit({ dimension, locale: navigator.language, localeDefaults }))
+	}, [context, dimension, localeDefaults])
 
 	if (typeof cellData !== 'number' || Number.isNaN(cellData)) return null
 
 	const displayUnit = resolveDisplayUnit({
-		defaultUnit,
+		fallbackUnit,
 		localeUnit,
-		preferenceUnit: context?.units[usage] ?? null,
+		preferenceUnit: context?.units[preferenceKey] ?? null,
 		units,
 	})
 	return (

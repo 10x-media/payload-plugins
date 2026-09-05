@@ -3,13 +3,12 @@ import { usePreferences } from '@payloadcms/ui'
 import type React from 'react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { UnitId } from '../engine/units'
-import type { MeasurementUsage } from '../engine/usages'
 import { MEASUREMENT_PREFERENCE_KEY, type MeasurementUnitsPreference } from '../options'
 
 export type MeasurementUnitsContextValue = {
 	ready: boolean
 	units: MeasurementUnitsPreference
-	setUnit: (usage: MeasurementUsage, unit: UnitId) => void
+	setUnit: (preferenceKey: string, unit: UnitId) => void
 }
 
 const Context = createContext<MeasurementUnitsContextValue | null>(null)
@@ -18,7 +17,7 @@ const isPreference = (value: unknown): value is MeasurementUnitsPreference =>
 	typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /**
- * Reactive layer over payload-preferences for the per-usage display units.
+ * Reactive layer over payload-preferences for the per-bucket display units.
  * Payload's own usePreferences is ref-backed and never re-renders consumers,
  * so this provider holds the map in state: one toggle re-renders every
  * measurement field and cell on the page, then persists with merge mode.
@@ -46,9 +45,9 @@ export const MeasurementUnitsProvider: React.FC<{ children: React.ReactNode }> =
 	}, [getPreference])
 
 	const setUnit = useCallback(
-		(usage: MeasurementUsage, unit: UnitId) => {
-			setUnits((current) => ({ ...current, [usage]: unit }))
-			void setPreference(MEASUREMENT_PREFERENCE_KEY, { [usage]: unit }, true)
+		(preferenceKey: string, unit: UnitId) => {
+			setUnits((current) => ({ ...current, [preferenceKey]: unit }))
+			void setPreference(MEASUREMENT_PREFERENCE_KEY, { [preferenceKey]: unit }, true)
 		},
 		[setPreference]
 	)
