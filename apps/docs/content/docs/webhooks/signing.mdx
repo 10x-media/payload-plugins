@@ -1,67 +1,219 @@
 ---
 title: Signing and secrets
-description: Reveal-once secrets, request headers, and verifying signatures in your receiver.
+description: Standard Webhooks signatures, write-only secrets, rotation, and verifying in your receiver.
 ---
 
-When a subscription has a secret, every delivery is signed so your receiver can prove the request came from your Payload instance and was not replayed with a different body.
+Every delivery from a subscription with a secret is signed, so your receiver can prove the request came from your Payload instance and was not replayed with a different body.
 
-## Secrets are reveal-once
+The scheme is [Standard Webhooks](https://www.standardwebhooks.com/), which means you can verify with an off-the-shelf library instead of hand-rolling it.
 
-Creating a subscription in the admin auto-generates a 48-character hex secret (24 random bytes). The create response shows it in full, exactly once. Every later read, through the admin, REST, or GraphQL, returns `__redacted__`, so the secret cannot leak through a screen share, an API response, or an export after that first look. The raw value is still used server-side to sign deliveries, but it never leaves the server again.
+## The signature scheme
 
-To rotate a secret, delete the subscription and create a new one. [Code subscriptions](/webhooks/subscriptions#code-subscriptions) supply their secret from your environment instead.
+The signed message is the delivery id, the timestamp, and the exact request body, joined by dots:
 
-<Callout type="warn">
-Secrets are currently stored unencrypted at rest. Encryption at rest is planned. Treat database access as secret access.
-</Callout>
+```
+${webhook-id}.${webhook-timestamp}.${rawBody}
+```
+
+That message is HMAC-SHA256'd and base64 encoded. Binding the id and timestamp into the MAC is what lets receivers reject replays and stale requests.
+
+The HMAC key is **not** the secret string. Strip the `whsec_` prefix and base64-decode the remainder; those bytes are the key. Every Standard Webhooks library does this for you.
+
+## Secret format
+
+Secrets look like this:
+
+```
+whsec_9ILRk4RIQ1cGqDbXxLKvcRs1kK5N5Qq5j1CQ5R1c2wA=
+```
+
+`whsec_` is a fixed prefix, and everything after it is base64. Generated secrets carry 32 random bytes. You can supply your own on create or on rotation; it is normalized to exactly one prefix and must decode to at least 16 bytes.
+
+The admin form's **Generate** action produces a secret the same shape, from 44 characters of base62. It runs in the browser, so the value is visible and copyable until you save and never again.
+
+The Signing secret field appears on the **create** form only. Once a subscription exists, [rotation](#rotation) is the single way to change its secret, and the **Rotate secret** button is its only control: a stored secret cannot be edited in place, because doing so with no grace window would break every receiver still holding the old one.
 
 ## Request headers
-
-Every delivery carries:
 
 ```
 Content-Type: application/json
 User-Agent: 10x-media-webhooks
-X-Webhook-Id: <delivery-id>
+webhook-id: msg_<delivery-id>
+webhook-timestamp: <unix-seconds>
+webhook-signature: v1,<base64>     (only when the subscription has a secret)
 X-Webhook-Event: posts.created
-X-Webhook-Timestamp: <unix-seconds>
-X-Webhook-Signature: v1=<hex>        (only when the subscription has a secret)
 ```
 
-Plus any custom headers configured on the subscription.
+`webhook-id`, `webhook-timestamp`, and `webhook-signature` are the standard's own header names. `X-Webhook-Event` is ours, kept because routing on the event name before verifying is convenient.
 
-## The signature scheme
+`webhook-id` is the delivery row's id behind an opaque `msg_` prefix, stable across retries and the value receivers should dedupe on. The prefix is there because on a SQL adapter the row id is a sequential integer, which would tell every receiver how many deliveries you send and makes a poor dedupe key for anyone consuming webhooks from more than one source. It is covered by the MAC, so verify against the header exactly as sent.
 
-The signature is HMAC-SHA256 over `${timestamp}.${rawBody}`, hex-encoded, where `timestamp` is the value of `X-Webhook-Timestamp` and `rawBody` is the exact request body string. Binding the timestamp into the MAC lets receivers reject stale replays.
+Custom headers configured on a subscription are sent too, except that six names are reserved: the four above plus `Content-Type` and `User-Agent`. The plugin sets all six and a custom header cannot overwrite them. The body is always JSON, so a subscription that relabelled `Content-Type` would mislabel every delivery it sends with nothing for the receiver to notice it by; a code subscription that sets any reserved name fails at config build rather than being silently dropped.
 
-## Verifying in your receiver
+<Callout type="warn">
+Verify against the **raw request body**, byte for byte. Parsing JSON and re-serializing it changes whitespace and key order, and the MAC will not match. Read the body as text first, verify, then parse.
+</Callout>
 
-Read the raw body before any JSON parsing, compute the expected signature, and compare in constant time:
+## Verifying with a library
+
+This is the recommended path. Interoperability is the main reason for adopting the standard, so use the implementation your language already has rather than writing your own:
 
 ```ts title="receiver.ts"
+import { Webhook } from 'standardwebhooks'
+
+const wh = new Webhook(process.env.WEBHOOK_SECRET!) // the whsec_... value
+
+export async function POST(req: Request) {
+  const raw = await req.text()
+  try {
+    const payload = wh.verify(raw, {
+      'webhook-id': req.headers.get('webhook-id')!,
+      'webhook-timestamp': req.headers.get('webhook-timestamp')!,
+      'webhook-signature': req.headers.get('webhook-signature')!,
+    })
+    // payload is the parsed body, already verified
+    return Response.json({ ok: true })
+  } catch {
+    return new Response('bad signature', { status: 400 })
+  }
+}
+```
+
+The library checks the signature and enforces a five-minute timestamp tolerance for you, and understands the multi-signature header emitted during rotation.
+
+## Verifying by hand
+
+If you cannot add a dependency, this is the equivalent. Note the constant-time comparison and the length check before it, since `timingSafeEqual` throws on mismatched lengths:
+
+```ts title="verify.ts"
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export function verifyWebhook(args: {
-  secret: string
-  timestamp: string   // X-Webhook-Timestamp
-  rawBody: string     // the unparsed request body
-  signature: string   // X-Webhook-Signature
+  secret: string        // whsec_...
+  id: string            // webhook-id
+  timestamp: string     // webhook-timestamp
+  rawBody: string       // the unparsed request body
+  signatureHeader: string // webhook-signature
   toleranceSeconds?: number
 }): boolean {
-  const { secret, timestamp, rawBody, signature, toleranceSeconds = 300 } = args
+  const { secret, id, timestamp, rawBody, signatureHeader } = args
+  const tolerance = args.toleranceSeconds ?? 300
 
   const age = Math.abs(Date.now() / 1000 - Number(timestamp))
-  if (!Number.isFinite(age) || age > toleranceSeconds) return false
+  if (!Number.isFinite(age) || age > tolerance) return false
 
-  const expected = `v1=${createHmac('sha256', secret)
-    .update(`${timestamp}.${rawBody}`)
-    .digest('hex')}`
+  const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64')
+  const expected = createHmac('sha256', key)
+    .update(`${id}.${timestamp}.${rawBody}`)
+    .digest('base64')
 
-  const a = Buffer.from(signature)
-  const b = Buffer.from(expected)
-  return a.length === b.length && timingSafeEqual(a, b)
+  // The header may carry several space-separated signatures during a rotation.
+  return signatureHeader.split(' ').some((part) => {
+    const [version, signature] = part.split(',')
+    if (version !== 'v1' || !signature) return false
+    const a = Buffer.from(signature)
+    const b = Buffer.from(expected)
+    return a.length === b.length && timingSafeEqual(a, b)
+  })
 }
 ```
+
+Four details that are easy to get wrong:
+
+- **Decode the secret.** `Buffer.from(secret, 'base64')` after stripping the prefix, not the prefix-stripped string itself.
+- **Accept any listed signature.** During rotation the header holds more than one; matching only the first breaks mid-rotation.
+- **Check the version tag.** Only compare entries tagged `v1`. Ignoring the tag means a future scheme's signature would be checked as if it were `v1` rather than skipped.
+- **Compare in constant time.** Never `===` on signatures, and check lengths before `timingSafeEqual`.
+
+## Secrets are write-only
+
+Creating a subscription without a secret generates one and returns it exactly once, on that create response, under its own key:
+
+```json
+{
+  "doc": { "id": "...", "name": "CRM", "secret_set": true, "secret_hint": "····kqA=" },
+  "generatedSecret": "whsec_..."
+}
+```
+
+It is `generatedSecret` rather than `secret` because the `secret` field is **write-only**: it is stripped from every read result, the create response included, through the admin, REST, and GraphQL alike. Supplying your own secret on create returns nothing, since you already hold it.
+
+What a read does carry is `secret_set`, a boolean saying whether a secret is stored, and `secret_hint`, the last six characters of the value. Six, because on a signing secret every character is key material rather than an identifier: the hint is there to tell two keys apart and nothing more.
+
+Secrets are [encrypted at rest](/webhooks/security#secrets-at-rest); the database holds a sealed value, not the string you copied. To use one server-side, read it deliberately:
+
+```ts
+import { readEncryptedField } from '@10x-media/fields/encrypted'
+
+const handle = await readEncryptedField(payload, {
+  collection: 'webhook-subscriptions',
+  id: subscriptionId,
+  path: 'secret',
+})
+const secret = await handle?.decrypt()
+```
+
+## Two different things are called rotation
+
+They are unrelated, and confusing them is easy:
+
+- **Secret rotation**, below, issues a new *signing* secret for one subscription and keeps the old one valid for a grace period. It is what you do after an exposure, or on a schedule your receivers agreed to. Receivers are affected.
+- **[Encryption key rotation](/webhooks/security#rotating-the-encryption-key)** re-seals what is already stored under a new *encryption* key. It changes nothing a receiver can observe: the signing secrets themselves are unchanged.
+
+## Rotation
+
+Rotating the signing secret. For the encryption key, see [above](#two-different-things-are-called-rotation).
+
+Rotate a secret without recreating the subscription, from the **Rotate secret** button on the subscription, or:
+
+```bash
+curl -X POST https://example.com/api/webhook-subscriptions/<id>/rotate-secret \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+The response carries the new secret once:
+
+```json
+{
+  "id": "<id>",
+  "secret": "whsec_...",
+  "previousSecretExpiresAt": "2026-01-02T00:00:00.000Z"
+}
+```
+
+Both fields of the body are optional: `secret` supplies your own value instead of a generated one, and `graceSeconds` overrides the configured grace period for this rotation. A malformed body, an out-of-range `graceSeconds`, or an unusable `secret` returns 400 and changes nothing. A concurrent rotation of the same subscription returns 409; retry it.
+
+The endpoint runs the subscriptions collection's own `update` access for the target document, so tightening or tenant-scoping that access governs rotation too.
+
+During the grace period every delivery is signed with **both** secrets, and the header carries both, space separated:
+
+```
+webhook-signature: v1,<new-signature> v1,<old-signature>
+```
+
+A receiver that accepts any listed signature (the library does; the hand-rolled example above does) keeps working while you roll the new secret out. When the window closes the old secret stops signing, and anything still holding it starts failing.
+
+The default grace period is 24 hours. Change it globally:
+
+```ts title="payload.config.ts"
+webhooks({
+  collections: { posts: true },
+  secretRotation: { graceSeconds: 3600 },
+})
+```
+
+`graceSeconds: 0` retires the old secret immediately, with no overlap. The maximum is 30 days: rotation usually follows an exposure, and an unbounded window would keep the compromised secret signing. Values outside the range are rejected rather than clamped, on the config and on the request.
+
+<Callout type="warn">
+**Only the most recently retired secret is kept.** There is one previous-secret slot, so rotating twice inside an open window ends the first secret's grace period early: after the second rotation, deliveries carry the newest secret and the one it replaced, and anything still holding the original starts failing. If you rotate by mistake, roll forward by distributing the secret you were just given rather than rotating again to "undo" it.
+</Callout>
+
+Expiry is evaluated when a delivery is signed, from a timestamp stored on the subscription. There is no scheduled job to miss, so the window is correct across restarts and the old secret stops the moment it lapses.
+
+## Code subscriptions
+
+[Code subscriptions](/webhooks/subscriptions#code-subscriptions) supply their secret from your environment. It must be in `whsec_` form, and a malformed one fails at startup rather than at delivery time, so a bad value cannot quietly produce signatures nothing can verify. They do not participate in rotation; change the environment variable and redeploy.
 
 <Callout>
 This scheme is intentionally different from Form Builder's `signedWebhook` action, which signs the body alone under an `X-Form-Signature` header. A receiver cannot mistake one for the other.

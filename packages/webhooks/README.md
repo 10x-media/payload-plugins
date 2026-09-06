@@ -13,7 +13,9 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Opt-in collections** with per-collection operations, `previousData` on updates, and a `transform` to reshape or redact payloads.
 - **Two subscription sources**: admin-managed records and hard-coded code subscriptions, merged at delivery time.
 - **Delivery modes**: queued through Payload jobs (retries, timeouts) or inline; `auto` detects whether a runner exists.
-- **HMAC-SHA256 signing** with reveal-once secrets and id/event/timestamp headers on every request.
+- **[Standard Webhooks](https://www.standardwebhooks.com/) signing**: HMAC-SHA256 over `${id}.${timestamp}.${body}`, base64, under `webhook-signature`, so receivers verify with an off-the-shelf library.
+- **Write-only secrets**, AES-256-GCM encrypted at rest via `@10x-media/fields`, shown once and stripped from every read.
+- **Secret rotation** with a grace period that signs with both secrets until receivers have switched over.
 - **Delivery log** with status, response code, duration, the exact body sent, and one-click redelivery.
 - **Jobs family interop**: installing `@10x-media/jobs` switches delivery to the queue automatically.
 - **Typed translations** with per-key overrides via `@10x-media/webhooks/i18n`.
@@ -21,8 +23,10 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/webhooks
+pnpm add @10x-media/webhooks @10x-media/fields
 ```
+
+`@10x-media/fields` is a peer dependency: signing secrets are stored through its encrypted field, whose admin components resolve through your import map. You do not have to register the `fields()` plugin.
 
 ```ts
 // payload.config.ts
@@ -41,7 +45,7 @@ export default buildConfig({
 })
 ```
 
-Then create a subscription in the admin (**Webhooks** group), copy its reveal-once secret to your receiver, and write to an opted-in collection.
+Then create a subscription in the admin (**Webhooks** group), copy its signing secret to your receiver before saving, and write to an opted-in collection.
 
 ## Documentation
 

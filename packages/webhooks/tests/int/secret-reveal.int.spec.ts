@@ -3,15 +3,16 @@ import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { SECRET_MASK } from '../../src/constants'
+import { GENERATED_SECRET_KEY, SECRET_PREFIX } from '../../src/constants'
 import { webhooks } from '../../src/index'
+import { secretKey } from '../../src/secrets/format'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
 type Hit = { headers: IncomingHttpHeaders; body: string }
 
-const RAW_SECRET = /^[0-9a-f]{48}$/
-const SIGNATURE = /^v1=([0-9a-f]{64})$/
+const RAW_SECRET = /^whsec_[A-Za-z0-9+/]+={0,2}$/
+const SIGNATURE = /^v1,([A-Za-z0-9+/]+={0,2})$/
 
 describe('subscription secret reveal-once', () => {
 	let booted: BootedPayload
@@ -49,29 +50,34 @@ describe('subscription secret reveal-once', () => {
 		await new Promise<void>((r) => sink.close(() => r()))
 	})
 
-	it('reveals the raw secret once on create, masks it on later reads, and signs with the raw value', async () => {
+	it('reveals the generated secret once on create, hides it on later reads, and signs with it', async () => {
 		hits = []
 		const created = await booted.payload.create({
 			collection: 'webhook-subscriptions',
 			data: { name: 'reveal', url: sinkUrl, enabled: true, events: ['posts.created'] },
 			overrideAccess: true,
 		})
-		const rawSecret = String(created.secret)
+		const rawSecret = String(created[GENERATED_SECRET_KEY])
 		expect(rawSecret).toMatch(RAW_SECRET)
+		// The field itself is stripped from every read, the create response included, so the reveal
+		// rides on a key of its own.
+		expect(created.secret).toBeUndefined()
 
 		const reread = await booted.payload.findByID({
 			collection: 'webhook-subscriptions',
 			id: String(created.id),
 			overrideAccess: true,
 		})
-		expect(reread.secret).toBe(SECRET_MASK)
-		expect(reread.secret).not.toBe(rawSecret)
+		expect(reread.secret).toBeUndefined()
+		expect(reread[GENERATED_SECRET_KEY]).toBeUndefined()
+		expect(JSON.stringify(reread)).not.toContain(rawSecret.slice(SECRET_PREFIX.length))
 
 		const listed = await booted.payload.find({
 			collection: 'webhook-subscriptions',
 			overrideAccess: true,
 		})
-		expect(listed.docs.every((d) => d.secret === SECRET_MASK)).toBe(true)
+		expect(listed.docs.every((d) => d.secret === undefined)).toBe(true)
+		expect(JSON.stringify(listed.docs)).not.toContain(rawSecret.slice(SECRET_PREFIX.length))
 
 		await booted.payload.create({
 			collection: 'posts',
@@ -84,22 +90,24 @@ describe('subscription secret reveal-once', () => {
 			throw new Error('no delivery captured')
 		}
 
-		const header = hit.headers['x-webhook-signature']
-		const timestamp = hit.headers['x-webhook-timestamp']
+		const header = hit.headers['webhook-signature']
+		const timestamp = hit.headers['webhook-timestamp']
+		const deliveryId = hit.headers['webhook-id']
 		expect(typeof header).toBe('string')
 		expect(typeof timestamp).toBe('string')
+		expect(typeof deliveryId).toBe('string')
 		const match = SIGNATURE.exec(String(header))
 		expect(match).not.toBeNull()
 		const received = match?.[1] ?? ''
 
-		const expectedRaw = createHmac('sha256', rawSecret)
-			.update(`${timestamp}.${hit.body}`)
-			.digest('hex')
+		const expectedRaw = createHmac('sha256', secretKey(rawSecret))
+			.update(`${deliveryId}.${timestamp}.${hit.body}`)
+			.digest('base64')
 		expect(received).toBe(expectedRaw)
 
-		const expectedMasked = createHmac('sha256', SECRET_MASK)
-			.update(`${timestamp}.${hit.body}`)
-			.digest('hex')
-		expect(received).not.toBe(expectedMasked)
+		const expectedAscii = createHmac('sha256', rawSecret.slice(SECRET_PREFIX.length))
+			.update(`${deliveryId}.${timestamp}.${hit.body}`)
+			.digest('base64')
+		expect(received).not.toBe(expectedAscii)
 	})
 })

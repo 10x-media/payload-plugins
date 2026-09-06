@@ -6,8 +6,10 @@ description: Install the plugin, opt a collection in, and deliver your first web
 ## Install
 
 ```bash
-pnpm add @10x-media/webhooks
+pnpm add @10x-media/webhooks @10x-media/fields
 ```
+
+`@10x-media/fields` is a peer dependency: signing secrets are stored through its encrypted field, whose admin components resolve through your import map, and under pnpm an app cannot import a transitive dependency. You do not have to register the `fields()` plugin.
 
 ## Configure
 
@@ -33,7 +35,7 @@ The plugin adds a **Webhooks** group to the admin with two collections: **Subscr
 
 ## Create a subscription
 
-In the admin, create a Subscription: a name, the receiver URL, and which events it listens to (`posts.created`, `posts.updated`, `posts.deleted`). Saving generates a 48-character signing secret and shows it once, on that create response only. Copy it to your receiver now; it is masked forever after. See [Signing](/webhooks/signing).
+In the admin, create a Subscription: a name, the receiver URL, and which events it listens to (`posts.created`, `posts.updated`, `posts.deleted`). Use **Generate** for the signing secret, or paste your own in `whsec_...` form; either way, copy it to your receiver before you save. It is encrypted at rest and never shown again. An API create with no secret gets one generated and returned once, as `generatedSecret` on the create response. See [Signing](/webhooks/signing).
 
 ## Verify
 
@@ -51,6 +53,33 @@ Create a `posts` document. The plugin's `afterChange` hook records a delivery an
 ```
 
 Open **Webhook Deliveries** in the admin: the row shows the event, status (`success`, or `failed`/`dead` on errors), HTTP response code, and duration. The **Redeliver** button replays the exact payload.
+
+## Verify the signature
+
+Deliveries are signed with [Standard Webhooks](https://www.standardwebhooks.com/), so your receiver can use an off-the-shelf verifier:
+
+```ts title="receiver.ts"
+import { Webhook } from 'standardwebhooks'
+
+const wh = new Webhook(process.env.WEBHOOK_SECRET!) // the whsec_... value
+
+export async function POST(req: Request) {
+  const raw = await req.text() // the raw body, before any JSON parsing
+  try {
+    const payload = wh.verify(raw, {
+      'webhook-id': req.headers.get('webhook-id') ?? '',
+      'webhook-timestamp': req.headers.get('webhook-timestamp') ?? '',
+      'webhook-signature': req.headers.get('webhook-signature') ?? '',
+    })
+    // payload is the parsed body, already verified
+    return Response.json({ ok: true })
+  } catch {
+    return new Response('bad signature', { status: 400 })
+  }
+}
+```
+
+`verify` **throws** on a bad signature or a timestamp outside its five-minute tolerance, so catch it and answer 400. Without the `try`, a forged or stale request becomes an unhandled 500, which is harder to tell apart from your own bugs. See [Signing](/webhooks/signing) for the scheme itself and for verifying without a library.
 
 ## If nothing is delivered
 
