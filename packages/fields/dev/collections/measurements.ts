@@ -72,5 +72,33 @@ export const measurements: CollectionConfig = {
 				},
 			}),
 		}),
+		measurementField({
+			...presets.mass,
+			name: 'labSample',
+			precision: 'exact',
+			overrides: ({ field }) => ({
+				...field,
+				admin: {
+					...field.admin,
+					description:
+						'Exact mode: free entry (no quantize), faithful drafts, cells read back at full storage precision',
+				},
+			}),
+		}),
+		measurementField({
+			name: 'shippingWeight',
+			preferenceKey: 'shippingWeight',
+			storageUnit: 'g',
+			units: ['g', 'kg'],
+			precision: { mode: 'readable', storage: 0 },
+			overrides: ({ field }) => ({
+				...field,
+				admin: {
+					...field.admin,
+					description:
+						'Readable mode with storage rounded to whole grams: the granularity contract runs on every write, regardless of what produced the number',
+				},
+			}),
+		}),
 	],
 }

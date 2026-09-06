@@ -45,6 +45,7 @@ describe('measurementField factory', () => {
 		expect(clientOptions(field)).toEqual({
 			dimension: 'length',
 			localeDefaults: { metric: 'cm', us: 'ft-in', uk: 'ft-in' },
+			precision: { display: { cm: 1 } },
 			preferenceKey: 'personHeight',
 			storageUnit: 'cm',
 			units: ['cm', 'm', 'in', 'ft-in'],

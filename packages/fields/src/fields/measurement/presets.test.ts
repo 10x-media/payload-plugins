@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { dimensionOf, isScalarUnit, UNITS } from './engine/units'
+import type { MeasurementPreset } from './presets'
 import { presets } from './presets'
 
 describe('presets', () => {
@@ -24,5 +25,14 @@ describe('presets', () => {
 			['temperature', 'temperature'],
 			['speed', 'speed'],
 		])
+	})
+	it('gives personHeight a cm display override so a half-centimetre entry survives readable quantize', () => {
+		expect(presets.personHeight.precision).toEqual({ display: { cm: 1 } })
+	})
+	it('leaves every other preset with no precision override', () => {
+		for (const [key, preset] of Object.entries(presets) as [string, MeasurementPreset][]) {
+			if (key === 'personHeight') continue
+			expect(preset.precision, key).toBeUndefined()
+		}
 	})
 })

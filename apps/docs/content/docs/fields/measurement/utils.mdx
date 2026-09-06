@@ -30,7 +30,7 @@ formatMeasurement(4.5359, {
 // '10 lb'
 ```
 
-`formatMeasurement(value, options)` converts a stored value from `storageUnit` to `displayUnit` and formats it with `Intl.NumberFormat`, so unit names and number formatting localize for free. `unitDisplay` (`'short'` default, `'long'`, `'narrow'`) controls the unit form; `precision` overrides display fraction digits per unit. Displaying a compound unit (`ft-in`, `st-lb`) formats both parts and joins them with `Intl.ListFormat`. This top-level function only knows the built-in units; call `createEngine(custom).formatMeasurement` for a field with `custom` units (see below).
+`formatMeasurement(value, options)` converts a stored value from `storageUnit` to `displayUnit` and formats it with `Intl.NumberFormat`, so unit names and number formatting localize for free. `unitDisplay` (`'short'` default, `'long'`, `'narrow'`) controls the unit form; `precision` overrides display fraction digits per unit (a plain `Partial<Record<UnitId, number>>`, independent from the field's own `precision` modes covered in [Precision](/fields/measurement#precision), which resolve a mode's knobs down to this same shape before calling in). Displaying a compound unit (`ft-in`, `st-lb`) formats both parts and joins them with `Intl.ListFormat`. This top-level function only knows the built-in units; call `createEngine(custom).formatMeasurement` for a field with `custom` units (see below).
 
 ## Convert
 

@@ -27,6 +27,13 @@ const athletes: CollectionConfig = {
 			storageUnit: 'mm',
 			units: ['in', 'ft-in'],
 		}),
+		measurementField({
+			name: 'shippingWeight',
+			preferenceKey: 'shippingWeight',
+			storageUnit: 'g',
+			units: ['g', 'kg'],
+			precision: { storage: 0 },
+		}),
 	],
 }
 
@@ -115,6 +122,14 @@ describeForDb('measurement field integration', {}, (db) => {
 			},
 		})
 		expect(found.docs[0]?.value).toEqual({ bodyWeight: 'lb' })
+	})
+
+	it('rounds a write to a field-declared storage granularity through the real API', async () => {
+		const doc = await booted.payload.create({
+			collection: 'athletes',
+			data: { shippingWeight: 3400.7, title: 'storage-zero' },
+		})
+		expect(doc.shippingWeight).toBe(3401)
 	})
 
 	it('stores a free-form field canonically in its declared storage unit', async () => {

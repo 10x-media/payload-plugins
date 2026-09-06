@@ -87,7 +87,9 @@ test.describe('measurement field', () => {
 		expect(doc.height).toBeCloseTo(187.96, 1)
 	})
 
-	test('a faithful draft survives a display-unit switch without truncation', async ({ page }) => {
+	test('the dirty guard: a readable-mode draft can paint truncated, but an untouched input never commits it', async ({
+		page,
+	}) => {
 		const id = await openShowcaseDoc(page)
 		await pickUnit(page, 'height', /^in$/i)
 		await page.locator('#field-height').fill('71')
@@ -97,14 +99,19 @@ test.describe('measurement field', () => {
 		await page.locator('#action-save').click()
 		expect((await saved).ok()).toBeTruthy()
 		await pickUnit(page, 'height', /^cm$/i)
-		await expect(page.locator('#field-height')).toHaveValue('180.34')
+		// personHeight's cm display digits are 1 (precision.display.cm), and readable
+		// mode's default draft policy is 'display' (no faithful escalation), so the
+		// stored 180.34 paints as the truncated 180.3, not the full-precision value.
+		await expect(page.locator('#field-height')).toHaveValue('180.3')
 		// Switching the display unit never calls setValue (it only updates the saved
 		// preference), so the form stays unmodified and Payload's own SaveButton stays
 		// disabled: there is no code path yet that could resave a truncated draft.
 		await expect(page.locator('#action-save')).toBeDisabled()
 		// Dirty an unrelated field (reverted before saving, so the doc premise holds for
-		// later tests) to force a real resave: this carries the faithful cm draft through
-		// a full-document PATCH alongside unrelated churn, not just the isolated commit above.
+		// later tests) to force a real resave: this carries the untouched, truncated-looking
+		// height draft through a full-document PATCH alongside unrelated churn, not just the
+		// isolated commit above. The dirty guard means the height input was never typed into,
+		// so it commits the exact stored value, never the '180.3' it happens to display.
 		const nativeInput = page.locator('#field-nativeNumber')
 		const originalNative = await nativeInput.inputValue()
 		await nativeInput.fill('42')
@@ -118,6 +125,39 @@ test.describe('measurement field', () => {
 		const res = await page.request.get(`/api/${FIXTURES.collection}/${id}`)
 		const doc = (await res.json()) as { height: number }
 		expect(doc.height).toBeCloseTo(180.34, 6)
+	})
+
+	test('exact mode paints a faithful full-precision draft, never a rounded preview', async ({
+		page,
+	}) => {
+		await openShowcaseDoc(page)
+		// labSample (mass, precision: 'exact') is seeded at 12.345678 kg: exact mode's
+		// draft policy escalates fraction digits until the draft round-trips the exact
+		// stored value, so the input shows the full value rather than kg's 1-digit
+		// readable-mode display precision. Pin the display unit to kg (the storage
+		// unit) so the assertion is independent of locale-based unit resolution.
+		await pickUnit(page, 'labSample', /^kg$/i)
+		await expect(page.locator('#field-labSample')).toHaveValue('12.345678')
+	})
+
+	test('quantize rounds a typed value at display digits, in the entry unit, before it commits', async ({
+		page,
+	}) => {
+		const id = await openShowcaseDoc(page)
+		// distance has no field-level precision override, so it runs readable mode's
+		// default: entry 'quantize'. km displays at 1 digit, so 71.437 quantizes to
+		// 71.4 in the entry unit before converting (here a no-op conversion, since the
+		// storage unit is also km) rather than committing the raw typed value.
+		await pickUnit(page, 'distance', /^km$/i)
+		await page.locator('#field-distance').fill('71.437')
+		const saved = page.waitForResponse(
+			(r) => r.url().includes(`/api/${FIXTURES.collection}`) && r.request().method() === 'PATCH'
+		)
+		await page.locator('#action-save').click()
+		expect((await saved).ok()).toBeTruthy()
+		const res = await page.request.get(`/api/${FIXTURES.collection}/${id}`)
+		const doc = (await res.json()) as { distance: number }
+		expect(doc.distance).toBeCloseTo(71.4, 6)
 	})
 
 	test('clicking dead space in a scalar container focuses its input', async ({ page }) => {

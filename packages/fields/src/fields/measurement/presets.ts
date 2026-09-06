@@ -1,4 +1,5 @@
 import type { MeasurementSystem } from './engine/locale'
+import type { MeasurementPrecision } from './engine/precision'
 import type { ScalarUnitId, UnitId } from './engine/units'
 
 /** Spreadable bundle of measurementField options: storage, offered units, preference bucket, name. */
@@ -9,6 +10,7 @@ export type MeasurementPreset = {
 	preferenceKey: string
 	name: string
 	localeDefaults: Partial<Record<MeasurementSystem, UnitId>>
+	precision?: MeasurementPrecision
 }
 
 /**
@@ -29,6 +31,9 @@ export const presets = {
 		preferenceKey: 'personHeight',
 		name: 'height',
 		localeDefaults: { metric: 'cm', us: 'ft-in', uk: 'ft-in' },
+		// Readable mode's default cm display is 0 digits; a half-centimetre entry
+		// (182.5) needs 1 to survive entry quantization without rounding to a whole cm.
+		precision: { display: { cm: 1 } },
 	},
 	distance: {
 		storageUnit: 'km',

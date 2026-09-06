@@ -333,6 +333,14 @@ export interface Measurement {
    * Free-form with a custom unit (nmi, 1 nmi = 1852 m). No Intl unit for nmi, so it formats as a plain decimal plus shortLabel
    */
   sailing?: number | null;
+  /**
+   * Exact mode: free entry (no quantize), faithful drafts, cells read back at full storage precision
+   */
+  labSample?: number | null;
+  /**
+   * Readable mode with storage rounded to whole grams: the granularity contract runs on every write, even one entered exactly
+   */
+  shippingWeight?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -589,6 +597,8 @@ export interface MeasurementsSelect<T extends boolean = true> {
   localizedDistance?: T;
   cutout?: T;
   sailing?: T;
+  labSample?: T;
+  shippingWeight?: T;
   updatedAt?: T;
   createdAt?: T;
 }
