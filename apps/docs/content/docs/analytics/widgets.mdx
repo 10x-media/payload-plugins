@@ -5,6 +5,8 @@ description: Analytics widgets for Payload's Modular Dashboard, plus a public AP
 
 The plugin registers widgets into Payload's Modular Dashboard (`admin.dashboard.widgets`); they are the site-wide view, with [display fields](/analytics/display-fields) as the per-document counterpart. Each widget is capability-gated: if no configured adapter can answer its metric or dimension, it is not registered at all, so dead tiles never appear and nobody can configure a widget no data source could answer.
 
+That gate is closed only for a config-time adapter union. An install with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled (`providers.collection` or `providers.resolve`) is open-world instead: every built-in widget registers and every metric select offers every metric, since a tenant's own runtime adapter can serve capabilities no config-time adapter declares. The per-request `GET /api/analytics/sources` endpoint and the client pickers described below still narrow to what each request's actual sources support; a widget or metric that no source in that request can serve simply degrades to an unavailable read, the same outcome a config-gated install shows by never registering the widget at all.
+
 <Callout>
 The Modular Dashboard is an experimental Payload feature. After configuring widgets, run `payload generate:importmap` so their server components resolve in the admin.
 </Callout>
@@ -41,7 +43,7 @@ export default buildConfig({
 
 Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. The data source and metric selects render through client components that resolve the list of available adapters live from an authenticated `GET /api/analytics/sources` endpoint, cached per admin session. Runtime providers appear for their scope under the provider document's name (a generated label stands in when unset), and the metric list narrows to what the selected source can actually serve. Without JavaScript or when the endpoint is unreachable the pickers fall back to the config-time option lists, and stored values the endpoint no longer lists keep the previous behavior of degrading at read time. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
 
-The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoint every 15 seconds and registers only when a realtime-capable adapter (the native engine today) is configured.
+The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoint every 15 seconds and registers when a realtime-capable adapter (the native engine today) is configured, or, per the open-world rule above, whenever runtime providers are enabled at all.
 
 Trend widgets render a real daily series for every provider that has one; where a provider has no per-day source for a metric (Umami's visitors, for example), the headline stays correct and the series is empty. Headline totals are range-correct: distinct metrics like visitors are never summed across days.
 
