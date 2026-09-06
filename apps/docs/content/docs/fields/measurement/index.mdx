@@ -21,11 +21,11 @@ measurementField({
 })
 ```
 
-Eight presets ship built in: `bodyWeight` (kg, lb, st-lb), `personHeight` (cm, m, in, ft-in), `distance` (m, km, mi), `mass` (g, kg, oz, lb), `length` (mm, cm, m, km, in, ft, yd, mi), `volume` (ml, l, fl-oz, gal), `temperature` (c, f), `speed` (km/h, mph, m/s). Spread one into `measurementField()` and override whatever the field needs; every option after the spread narrows to the preset's dimension, so TypeScript rejects a unit from the wrong family.
+The field stores one number in a canonical unit and lets each viewer edit and read it in their own. Eight presets cover the common cases: `bodyWeight` (kg, lb, st-lb), `personHeight` (cm, m, in, ft-in), `distance` (m, km, mi), `mass` (g, kg, oz, lb), `length` (mm, cm, m, km, in, ft, yd, mi), `volume` (ml, l, fl-oz, gal), `temperature` (c, f), `speed` (km/h, mph, m/s). Spread one into `measurementField()` and override whatever the field needs; every option after the spread narrows to the preset's dimension, so TypeScript rejects a unit from the wrong family.
 
 ## Free-form fields
 
-There is no `usage` gate: any field can declare `storageUnit` and `units` directly, and units are constrained only by dimension, not by a fixed catalog.
+A field isn't limited to the eight presets. Any field can declare `storageUnit` and `units` directly, with units constrained only by dimension, not by a fixed catalog.
 
 ```ts
 measurementField({
@@ -72,7 +72,7 @@ The edit view calls it with the request that rendered the page; list cells call 
 
 Preference persistence and the same-bucket flip are wired by the `fields()` plugin, which registers the unit preference provider. Standalone `measurementField()` still works, but a unit picked without the plugin lasts only for that field until the page reloads, and its list cells skip locale detection entirely: they fall back through the field's `fallbackUnit` (step 2), then straight to its first configured unit (step 6), never reaching steps 4 or 5.
 
-Passing `fields({ measurement: { persistPreferences: false } })` makes the provider session-only: it skips both the read on mount and every write, so a kiosk or shared-account admin session never touches `payload-preferences` for measurement units. Every field sharing a `preferenceKey` still flips together for that session, the toggle just doesn't outlive the tab.
+Passing `fields({ measurement: { persistPreferences: false } })` makes the provider session-only: it skips both the read on mount and every write, so a kiosk or shared-account admin session never touches `payload-preferences` for measurement units. The bucket flip described above still applies each session; it doesn't outlive the tab.
 
 ## What's stored
 
@@ -82,15 +82,15 @@ The factory also stamps its resolved config onto `field.custom['@10x-media/field
 
 ## Faithful drafts
 
-The editable input always shows what's actually stored, not a rounded preview of it. Switching a field's display unit shows the shortest draft that writes the same stored value back: display precision first, then one more fraction digit at a time up to the 6-digit storage precision. A value entered in the current unit always round-trips exactly, since it was never converted. Rounding for display only happens in read-only contexts, list cells and `formatMeasurement`, never in the field the viewer is editing. Each part of a compound value (`ft-in`, `st-lb`) is faithful independently.
+The editable input always shows what's stored, not a rounded preview of it. Switching a field's display unit shows the shortest draft that writes the same stored value back: display precision first, then one more fraction digit at a time up to the 6-digit storage precision. A value entered in the current unit always round-trips exactly, since it was never converted. Rounding for display only happens in read-only contexts, list cells and `formatMeasurement`, never in the field the viewer is editing. Each part of a compound value (`ft-in`, `st-lb`) is faithful independently.
 
-## The row and the unit menu
+## Row and unit menu
 
-The field row is a constant 40px: a numeric input with the unit adjacent to it, as a clickable chip. With more than one unit in `units`, the chip itself is the trigger: it shows a small caret, highlights on hover, and opens a popup listing every unit (checkmark on the current one). Picking one converts the displayed value in place and calls the same bucket-wide preference update described above; the stored number is unaffected until the next edit. With only one unit configured, or when the field is read-only, the chip renders as a static muted label instead: no caret, no hover state, not clickable, since there's nothing to open. Clicking empty space inside the row focuses whichever input is nearest, the way a native control would.
+The field row is a constant 40px: a numeric input with the unit adjacent to it, as a clickable chip. With more than one unit in `units`, the chip itself is the trigger: it shows a small caret, highlights on hover, and opens a unit menu listing every unit (checkmark on the current one). Picking one converts the displayed value in place and calls the same bucket-wide preference update described above; the stored number is unaffected until the next edit. With only one unit configured, or when the field is read-only, the chip renders as a static muted label instead: no caret, no hover state, not clickable, since there's nothing to open. Clicking empty space inside the row focuses whichever input is nearest, the way a native control would.
 
 ## Compound entry
 
-`personHeight` and `bodyWeight` include a compound display unit, `ft-in` and `st-lb`: two inputs, major and minor, each with its own unit chip as the trigger for the same popup. Compound units are display-only. Storage is always a single scalar number in `storageUnit`; picking `ft-in` never changes what's on disk, only how the value is split for editing.
+`personHeight` and `bodyWeight` include a compound display unit, `ft-in` and `st-lb`: two inputs, major and minor, each with its own unit chip opening an identical unit menu. Compound units are display-only. Storage is always a single scalar number in `storageUnit`; picking `ft-in` never changes what's on disk, only how the value is split for editing.
 
 ## Custom units and dimensions
 
@@ -111,7 +111,7 @@ measurementField({
 
 `CustomUnitDef` is `{ dimension, factor, offset?, intlUnit, shortLabel, longLabel?, precision? }`: linear (or affine, with `offset`) against the dimension's canonical unit, same as the built-ins. `CustomDimensionDef` is `{ canonicalUnit }`, naming one of `custom.units` with `factor: 1` and no `offset` as that dimension's canonical. Both travel with the field's `clientProps` as plain data, so the client rebuilds the same engine without a bundle of conversion code shipping separately. Custom unit and dimension ids can't collide with a built-in one; the factory throws at config time if they do.
 
-`intlUnit: null` means the unit has no ECMA-402 identifier for `Intl.NumberFormat`'s `style: 'unit'`. Formatting falls back to a plain localized decimal plus `shortLabel` (`"1.5 nmi"` rather than an `Intl`-rendered unit string), and the unit picker's long label falls back to `longLabel`, then `shortLabel`.
+`intlUnit: null` means the unit has no ECMA-402 identifier for `Intl.NumberFormat`'s `style: 'unit'`. Formatting falls back to a plain localized decimal plus `shortLabel` (`"1.5 nmi"` rather than an `Intl`-rendered unit string), and the unit menu's long label falls back to `longLabel`, then `shortLabel`.
 
 `shortLabel` and `longLabel` each accept either a plain string, used for every locale, or a `LocalizedLabel` map keyed by locale (`{ en: 'nmi', de: 'sm' }`). Resolution tries the exact admin locale, then its language prefix (`de` for `de-AT`), then the map's `en` entry, then whichever value comes first, so a partial map never renders blank. Built-in units with an `intlUnit` never consult this map: their short and long labels are always derived from `Intl.NumberFormat` per locale.
 
@@ -124,7 +124,7 @@ This is new: pairing errors (a `dimension` referencing nothing built-in or decla
 | Option | Default | Notes |
 |---|---|---|
 | `storageUnit` | required (or from a spread preset) | Unit the number is stored in. Must be a scalar unit. Match existing data to adopt with zero migration. |
-| `units` | every built-in unit of the storage unit's dimension | Offered in the unit picker; narrows to the dimension when `storageUnit` is a literal. The first entry is the final display fallback when nothing else resolves. |
+| `units` | every built-in unit of the storage unit's dimension | Offered in the unit menu; narrows to the dimension when `storageUnit` is a literal. The first entry is the final display fallback when nothing else resolves. |
 | `preferenceKey` | shipped presets carry their own; free-form defaults to the dimension name | Preference bucket shared with every field using the same key. |
 | `name` | `preferenceKey` (presets also carry their own) | |
 | `fallbackUnit` | none | Field-level display fallback, ahead of the plugin and locale defaults. Must be in `units`. |
@@ -137,8 +137,8 @@ This is new: pairing errors (a `dimension` referencing nothing built-in or decla
 ## Limitations
 
 - The list view's filter input operates in storage units. Payload passes custom `Filter` components no props at all, so there is no viewer, locale, or preference to convert against; filtering "under 150" on a `personHeight` field filters on centimeters even for a viewer displaying feet and inches.
-- The list view's cell is a server component, so `fields({ measurement: { defaultUnits } })` reaches it too, not just the edit view. It still can't read the viewer's saved preference server-side though: Payload's cell components carry no request or user, only `payload` and `i18n`, so that step of the resolution chain is left to the client provider once it mounts.
-- The field stores a single number; `hasMany` is not supported.
+- The list view's cell is a server component, so `fields({ measurement: { defaultUnits } })` reaches it too, not only the edit view. It still can't read the viewer's saved preference server-side though: Payload's cell components carry no request or user, only `payload` and `i18n`, so that step of the resolution chain is left to the client provider once it mounts.
+- The field stores a single number, as covered above; `hasMany` is not supported.
 - Reciprocal conversions (value inverts rather than scales, e.g. frequency/period) and a client-supplied conversion function are not supported by `custom`. Both are future work; today's custom units are linear or affine only.
 
 ## Frontend use
