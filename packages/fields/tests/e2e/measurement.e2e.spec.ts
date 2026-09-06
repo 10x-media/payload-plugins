@@ -23,9 +23,9 @@ const openShowcaseDoc = async (page: Page): Promise<string> => {
 	return doc.id
 }
 
-// Compound fields render two unit triggers (major + minor suffix); either one opens
-// the same popup over the same options, so .first() keeps every call a single match
-// under Playwright's strict mode regardless of whether the field is scalar or compound.
+// One kebab per field, scalar or compound, is the only unit trigger today; .first()
+// is defensive rather than load-bearing, so a future layout adding a second trigger
+// still resolves to a single match under Playwright's strict mode.
 const unitBadge = (page: Page, name: string) =>
 	page
 		.locator('.fields-measurement')

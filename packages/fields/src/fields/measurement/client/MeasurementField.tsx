@@ -127,8 +127,13 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	// digits; force the same numerals here so "min 5" and "5" agree in RTL/native-digit
 	// locales (Arabic, Persian). The input itself stays native-digit for display. Exact
 	// mode uses the same storage-digit override as the cell, so error text and cell
-	// text always agree.
-	const displayPrecision = exactModePrecisionOverride(resolvedPrecision, displayUnit)
+	// text always agree. Memoized: exact mode builds a fresh object every call, and an
+	// unmemoized value here fed draftOpts -> the resync effect -> setDrafts in a loop
+	// that never settled.
+	const displayPrecision = useMemo(
+		() => exactModePrecisionOverride(resolvedPrecision, displayUnit),
+		[resolvedPrecision, displayUnit]
+	)
 	const fmtBound = useCallback(
 		(bound: number) => {
 			try {
@@ -223,6 +228,12 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	// exact stored value, so commits diff the typed value against this baseline
 	// rather than against the exact decompose.
 	const paintedDraftsRef = useRef<MeasurementDrafts>(drafts)
+	// The stored value the painted drafts were derived from, frozen at the same
+	// resync points as paintedDraftsRef. A mid-edit setValue call updates Payload's
+	// live form value (and so `numericValue`) before the viewer blurs; diffing the
+	// next keystroke's delta against that advanced value, instead of this frozen
+	// snapshot, would re-apply an already-committed delta on top of itself.
+	const paintedStoredRef = useRef<number | null>(numericValue)
 	// Which part the viewer has actually typed into since the last resync: an
 	// untouched part must commit the value it already holds, never whatever the
 	// display-policy draft happens to show for it.
@@ -232,6 +243,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 			const resynced = draftsFor(numericValue, draftOpts)
 			setDrafts(resynced)
 			paintedDraftsRef.current = resynced
+			paintedStoredRef.current = numericValue
 			setDirty(CLEAN)
 		}
 	}, [numericValue, draftOpts])
@@ -249,11 +261,11 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 					dirty: nextDirty,
 					entry: resolvedPrecision.entry,
 					paintedDrafts: paintedDraftsRef.current,
-					storedValue: numericValue,
+					storedValue: paintedStoredRef.current,
 				})
 			)
 		},
-		[dirty, drafts, draftOpts, numericValue, resolvedPrecision.entry, setValue]
+		[dirty, drafts, draftOpts, resolvedPrecision.entry, setValue]
 	)
 
 	const onBlur = useCallback(() => {
@@ -261,6 +273,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		const resynced = draftsFor(numericValue, draftOpts)
 		setDrafts(resynced)
 		paintedDraftsRef.current = resynced
+		paintedStoredRef.current = numericValue
 		setDirty(CLEAN)
 	}, [numericValue, draftOpts])
 
@@ -282,10 +295,14 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	const primaryInputRef = useRef<HTMLInputElement>(null)
 	const minorInputRef = useRef<HTMLInputElement>(null)
 
-	// Dead-space mousedown focuses the nearest input like a native control; preventDefault
-	// stops an already-focused input from blurring, so we never steal focus from it.
+	// Dead-space (or the passive unit suffix, e.g. "in") mousedown focuses the nearest
+	// input like a native control; preventDefault stops an already-focused input from
+	// blurring, so we never steal focus from it. The suffix is never inside the unit
+	// trigger button, so this never intercepts opening the unit popup.
 	const focusNearestInput = useCallback((event: React.MouseEvent<HTMLElement>) => {
-		if (event.target !== event.currentTarget) return
+		const target = event.target as HTMLElement
+		const isUnitSuffix = target.closest(`.${baseClass}__unit-static`) !== null
+		if (target !== event.currentTarget && !isUnitSuffix) return
 		event.preventDefault()
 		const active = document.activeElement
 		if (active === primaryInputRef.current || active === minorInputRef.current) return

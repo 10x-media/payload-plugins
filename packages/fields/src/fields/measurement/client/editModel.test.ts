@@ -308,6 +308,97 @@ describe('commitDrafts', () => {
 				).toBeCloseTo(value, 5)
 			}
 		})
+
+		it('agrees with a single-shot commit when the same frozen baseline backs two sequential keystrokes', () => {
+			// The caller (MeasurementField) must diff against the value the baseline was
+			// captured from, not whatever the live stored value has advanced to after an
+			// earlier commit in the same edit session: re-decomposing an already-advanced
+			// total re-applies the first keystroke's delta on top of itself.
+			const painted = draftsFor(stored, { ...opts, draft: 'display' })
+			const commitAgainstFrozenBaseline = (primary: string) =>
+				commitDrafts(
+					{ minor: painted.minor, primary },
+					{
+						...opts,
+						dirty: { minor: false, primary: true },
+						paintedDrafts: painted,
+						storedValue: stored,
+					}
+				)
+			const afterFirstKeystroke = commitAgainstFrozenBaseline('7')
+			const afterSecondKeystroke = commitAgainstFrozenBaseline('75')
+			const singleShot = commitAgainstFrozenBaseline('75')
+			expect(afterSecondKeystroke).toBe(singleShot)
+			expect(afterFirstKeystroke).not.toBe(afterSecondKeystroke)
+		})
+
+		it('rejects the double-application bug: diffing against an already-advanced stored value overshoots', () => {
+			const painted = draftsFor(stored, { ...opts, draft: 'display' })
+			const correct = commitDrafts(
+				{ minor: painted.minor, primary: '75' },
+				{
+					...opts,
+					dirty: { minor: false, primary: true },
+					paintedDrafts: painted,
+					storedValue: stored,
+				}
+			)
+			// Simulates the bug directly: the first keystroke's own committed result fed
+			// back in as storedValue for the second, instead of the frozen 182.5 baseline.
+			const afterFirstKeystroke = commitDrafts(
+				{ minor: painted.minor, primary: '7' },
+				{
+					...opts,
+					dirty: { minor: false, primary: true },
+					paintedDrafts: painted,
+					storedValue: stored,
+				}
+			) as number
+			const buggy = commitDrafts(
+				{ minor: painted.minor, primary: '75' },
+				{
+					...opts,
+					dirty: { minor: false, primary: true },
+					paintedDrafts: painted,
+					storedValue: afterFirstKeystroke,
+				}
+			)
+			expect(buggy).not.toBe(correct)
+		})
+	})
+
+	describe('untouched minor fallback with no stored baseline (asymmetry fix)', () => {
+		it('falls back to the painted minor draft, never a bare 0, when both parts are dirty is false and nothing is stored', () => {
+			// A brand new, never-saved field: no storedValue to decompose. Untouched
+			// major already fell back to its own draft; minor used to hardcode 0,
+			// silently dropping whatever the viewer had painted there (e.g. after a
+			// clear-then-retype on the other part).
+			expect(
+				commitDrafts(
+					{ minor: 'stale', primary: '5' },
+					{
+						dirty: { minor: false, primary: true },
+						displayUnit: 'ft-in',
+						engine,
+						paintedDrafts: { minor: '11', primary: '5' },
+						storageUnit: 'cm',
+					}
+				)
+			).toBe(180.34)
+		})
+		it('still lands on 0 when no painted baseline exists at all', () => {
+			expect(
+				commitDrafts(
+					{ minor: 'stale', primary: '5' },
+					{
+						dirty: { minor: false, primary: true },
+						displayUnit: 'ft-in',
+						engine,
+						storageUnit: 'cm',
+					}
+				)
+			).toBeCloseTo(152.4, 6)
+		})
 	})
 
 	describe('storage digits parameter', () => {

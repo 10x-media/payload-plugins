@@ -56,6 +56,12 @@ const parseDraft = (raw: string): number | null => {
 	return Number.isFinite(parsed) ? parsed : null
 }
 
+// draftsFor/commitDrafts default to 'faithful'/'free'/ALL_DIRTY when a caller omits
+// them, i.e. the shape of 'exact' mode, not the engine's own 'readable' default: the
+// component always threads its resolved precision explicitly, so these bare defaults
+// exist only for a caller invoking editModel directly (tests, or an embedder outside
+// the component), and preserve the single behavior this module had before precision
+// modes existed.
 const ALL_DIRTY: DirtyDrafts = { primary: true, minor: true }
 
 export const commitDrafts = (drafts: MeasurementDrafts, opts: CommitOptions): number | null => {
@@ -142,7 +148,11 @@ export const commitDrafts = (drafts: MeasurementDrafts, opts: CommitOptions): nu
 					? roundTo(clampedRaw, engine.precisionFor(displayUnit, precision))
 					: clampedRaw
 		} else {
-			minor = stored ? stored.minor : 0
+			// No stored value to derive an exact minor from (a brand new, never-saved
+			// field): fall back to the painted baseline, matching major's own fallback,
+			// never a bare 0 (a cleared-then-retyped major would otherwise commit with
+			// its minor silently zeroed).
+			minor = stored ? stored.minor : (parseDraft(paintedDrafts?.minor ?? '') ?? 0)
 		}
 
 		return roundTo(engine.compose({ major, minor }, displayUnit, storageUnit), storageDigits)
