@@ -1,5 +1,5 @@
 import type { NumberField } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { FIELDS_REGISTRY_KEY } from '../../plugin/registry'
 import type { MeasurementCustomConfig } from './engine/registry'
 import { measurementField } from './measurementField'
@@ -95,6 +95,27 @@ describe('measurementField factory', () => {
 		})
 		expect(hook?.({ req, value: 249.6 } as never)).toBe(250)
 	})
+	it('degrades to the field-only layer and logs when the registry precision is malformed', () => {
+		// A field knob other than storage, so the merge before validation still
+		// carries the registry's bad storage value through to resolvePrecision.
+		const field = measurementField({ ...presets.bodyWeight, precision: { entry: 'free' } })
+		const hook = field.hooks?.beforeValidate?.[0]
+		const error = vi.fn()
+		const req = {
+			payload: {
+				config: {
+					custom: {
+						[FIELDS_REGISTRY_KEY]: { measurement: { precision: { storage: 15 } } },
+					},
+				},
+				logger: { error },
+			},
+		} as never
+		// Falls back to the field-only layer, which declares no storage of its own,
+		// so rounding lands on the engine default (6 digits).
+		expect(hook?.({ req, value: 249.6666666666 } as never)).toBe(249.666667)
+		expect(error).toHaveBeenCalledTimes(1)
+	})
 	it('passes min/max/required/localized/index through', () => {
 		const field = measurementField({ ...presets.bodyWeight, max: 250, min: 30, required: true })
 		expect(field.min).toBe(30)
@@ -170,6 +191,10 @@ describe('measurementField factory', () => {
 	it('threads the field-declared precision layer unresolved into clientProps', () => {
 		const field = measurementField({ ...presets.bodyWeight, precision: { storage: 0 } })
 		expect(clientOptions(field)?.precision).toEqual({ storage: 0 })
+	})
+	it('threads a bare precision mode string into clientProps unchanged', () => {
+		const field = measurementField({ ...presets.bodyWeight, precision: 'exact' })
+		expect(clientOptions(field)?.precision).toBe('exact')
 	})
 	it('throws on a preference key that is empty or not a single path segment', () => {
 		for (const preferenceKey of ['', '  ', 'body weight', 'body/weight']) {

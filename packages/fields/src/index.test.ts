@@ -79,4 +79,15 @@ describe('fields factory', () => {
 			clientProps: { persist: false },
 		})
 	})
+
+	it('throws at plugin build on a malformed measurement.precision', () => {
+		expect(() => fields({ measurement: { precision: { storage: 15 } } })(fakeConfig())).toThrow(
+			/measurement\.precision/
+		)
+	})
+
+	it('accepts a valid measurement.precision', () => {
+		const out = fields({ measurement: { precision: 'exact' } })(fakeConfig()) as Config
+		expect(getFieldsRegistry(asSanitized(out))?.measurement?.precision).toBe('exact')
+	})
 })

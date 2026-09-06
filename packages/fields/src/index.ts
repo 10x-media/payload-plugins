@@ -6,6 +6,7 @@ import {
 	withEncryptedResponseStrip,
 } from './fields/encrypted/queryRewrite'
 import { registerIcon } from './fields/icon/plugin'
+import { resolvePrecision } from './fields/measurement/engine/precision'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setFieldsRegistry } from './plugin/registry'
 import type { TranslationsOption } from './translations'
@@ -57,6 +58,17 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
 		registry.encrypted = options.encrypted
 	}
 	if (options.measurement) {
+		// Fails fast at plugin build, before any field's beforeValidate hook can run
+		// against it, instead of throwing on every write once the app is live.
+		if (options.measurement.precision !== undefined) {
+			try {
+				resolvePrecision([options.measurement.precision])
+			} catch (error) {
+				throw new Error(
+					`fields plugin: measurement.precision is invalid: ${(error as Error).message}`
+				)
+			}
+		}
 		registry.measurement = options.measurement
 	}
 	return registry

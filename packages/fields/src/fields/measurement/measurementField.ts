@@ -1,8 +1,7 @@
 import type { FieldHook, NumberField, NumberFieldSingleValidation } from 'payload'
 import { number } from 'payload/shared'
-import { getFieldsRegistry } from '../../plugin/registry'
 import { roundTo } from './engine/convert'
-import { type MeasurementPrecision, type PrecisionMode, resolvePrecision } from './engine/precision'
+import type { MeasurementPrecision, PrecisionMode } from './engine/precision'
 import { createEngine, type MeasurementEngine } from './engine/registry'
 import type { ScalarUnitId } from './engine/units'
 import {
@@ -12,6 +11,7 @@ import {
 	type MeasurementCustomFieldOptions,
 	type MeasurementFieldOptions,
 } from './options'
+import { resolvePrecisionSafe } from './server/resolvePrecisionSafe'
 
 /**
  * Storage digits may come from the plugin registry, so this resolves per request
@@ -23,8 +23,7 @@ const buildRoundStorageHook = (
 ): FieldHook => {
 	return ({ req, value }) => {
 		if (typeof value !== 'number' || Number.isNaN(value)) return value
-		const registryPrecision = getFieldsRegistry(req.payload.config)?.measurement?.precision
-		const { storage } = resolvePrecision([registryPrecision, fieldPrecision])
+		const { storage } = resolvePrecisionSafe({ fieldPrecision, payload: req.payload })
 		return roundTo(value, storage)
 	}
 }
