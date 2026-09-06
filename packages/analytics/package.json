@@ -119,6 +119,9 @@
 		"migrate:fresh": "pnpm --filter @10x-media/analytics-dev migrate:fresh",
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
+	"dependencies": {
+		"path-to-regexp": "6.3.0"
+	},
 	"peerDependencies": {
 		"@10x-media/fields": "^0.1.0-beta.6",
 		"@google-analytics/data": "^6.0.0",

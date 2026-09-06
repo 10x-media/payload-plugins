@@ -346,6 +346,10 @@ importers:
         version: 5.9.3
 
   packages/analytics:
+    dependencies:
+      path-to-regexp:
+        specifier: 6.3.0
+        version: 6.3.0
     devDependencies:
       '@10x-media/fields':
         specifier: workspace:*

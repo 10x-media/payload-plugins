@@ -14,6 +14,8 @@ export interface AnalyticsRuntime {
 	resolveTimezone?: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	/** Id of the config adapter shared by every scope, when one is designated. */
 	platformAdapterId?: string
+	/** `capture.slots` overrides naming the adapter that fills each capture slot. */
+	captureSlots?: { global?: string; tenant?: string }
 	/** True when the app configured a scopeResolver (scoped install); mirrors `resolved.scoped`. */
 	scoped?: boolean
 	/**
@@ -28,6 +30,8 @@ export interface AnalyticsRuntime {
 	engine: Engine
 	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
 	ttl: { aggregate?: number; realtime?: number }
+	/** `cache.timeoutMs`: the per-read provider deadline, reused as the capture proxy's. */
+	timeoutMs: number
 	/** Widget period-over-period comparison; false skips the previous-window read. */
 	comparison: boolean
 }

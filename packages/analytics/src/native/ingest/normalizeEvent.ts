@@ -1,4 +1,5 @@
 import type { GeoResolver } from '../geo/geoResolver'
+import { clientIpFromHeaders } from './clientIp'
 import { classifyDevice, type DeviceType } from './device'
 import { deriveSource } from './source'
 import { dailyVisitorHash, deriveSessionId } from './visitorHash'
@@ -59,11 +60,7 @@ export async function normalizeEvent({
 	timezone,
 }: NormalizeArgs): Promise<StoredEvent> {
 	const geo = await geoResolver(headers)
-	const ip = (
-		headers.get('x-forwarded-for')?.split(',')[0] ??
-		headers.get('x-real-ip') ??
-		''
-	).trim()
+	const ip = clientIpFromHeaders(headers) ?? ''
 	const ua = headers.get('user-agent') ?? ''
 	const visitorHash = dailyVisitorHash({ ip, ua, site: raw.hostname, salt })
 	const hourBucket = now.toISOString().slice(0, 13)

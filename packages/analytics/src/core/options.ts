@@ -90,6 +90,17 @@ export type AnalyticsAccessOptions = {
 	platformRead?: PlatformReadAccess
 }
 
+export type AnalyticsCaptureOptions = {
+	/**
+	 * Which adapter fills each capture slot, overriding the defaults: `global` is the
+	 * designated `platformAdapter`, or the single config adapter when only one is
+	 * configured; `tenant` is the resolved scope's default adapter. A `global` id must
+	 * name a config adapter; a `tenant` id may also name a runtime provider instance,
+	 * so it is resolved per request rather than validated at config time.
+	 */
+	slots?: { global?: string; tenant?: string }
+}
+
 export type AnalyticsPluginOptions = {
 	disabled?: boolean
 	/**
@@ -126,6 +137,7 @@ export type AnalyticsPluginOptions = {
 	 */
 	platformAdapter?: string
 	access?: AnalyticsAccessOptions
+	capture?: AnalyticsCaptureOptions
 	/**
 	 * Per-collection bindings, keyed by collection slug. With generated types
 	 * augmented, each slug's resolvers receive that collection's typed document.
@@ -185,6 +197,7 @@ export interface ResolvedOptions {
 	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
 	access: { platformRead: PlatformReadAccess }
+	capture: { slots: { global?: string; tenant?: string } }
 	providers: {
 		collection: {
 			enabled: boolean
@@ -246,6 +259,10 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		!options.adapters.some((a) => a.id === options.platformAdapter)
 	) {
 		throw new Error(`analytics: unknown platform adapter "${options.platformAdapter}"`)
+	}
+	const globalSlot = options.capture?.slots?.global
+	if (globalSlot !== undefined && !options.adapters.some((a) => a.id === globalSlot)) {
+		throw new Error(`analytics: unknown global capture slot adapter "${globalSlot}"`)
 	}
 	const widgets =
 		options.widgets === false
@@ -343,6 +360,12 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		access: {
 			platformRead:
 				options.access?.platformRead ?? (scoped ? () => false : ({ req }) => Boolean(req.user)),
+		},
+		capture: {
+			slots: {
+				global: options.capture?.slots?.global,
+				tenant: options.capture?.slots?.tenant,
+			},
 		},
 		providers,
 		bindings: resolveBindings(options.collections),

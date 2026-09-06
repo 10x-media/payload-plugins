@@ -1,5 +1,6 @@
 import { type Config, definePlugin, type PayloadRequest } from 'payload'
 
+import { proxyEndpoints } from './capture/proxyEndpoint'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
@@ -147,6 +148,11 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			...(config.endpoints ?? []),
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
 		]
+		// A runtime provider's capture support is unknown at config time, so providers
+		// alone are enough to mount the proxy; every slot is still resolved per request.
+		if (resolved.adapters.some((a) => a.capture) || providersEnabled) {
+			config.endpoints = [...config.endpoints, ...proxyEndpoints()]
+		}
 		if (resolved.widgets.enabled) {
 			const multiProvider = registry.isMultiProvider() || providersEnabled
 			registerWidgets(config, {
@@ -215,12 +221,14 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveScope,
 				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
+				captureSlots: resolved.capture.slots,
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,
+				timeoutMs: resolved.cache.timeoutMs,
 				comparison: resolved.widgets.comparison,
 			})
 			await prevOnInit?.(payload)
@@ -238,6 +246,7 @@ export type {
 export { PLATFORM_SCOPE } from './core/contract'
 export type {
 	AnalyticsAccessOptions,
+	AnalyticsCaptureOptions,
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
 	PlatformReadAccess,
