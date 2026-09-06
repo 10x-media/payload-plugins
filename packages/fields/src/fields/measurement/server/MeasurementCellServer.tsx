@@ -1,5 +1,7 @@
 import type { DefaultServerCellComponentProps } from 'payload'
+import { getFieldsRegistry } from '../../../plugin/registry'
 import { MeasurementCell } from '../client/MeasurementCell'
+import { resolvePrecision } from '../engine/precision'
 import { MEASUREMENT_CUSTOM_KEY, type MeasurementClientOptions } from '../options'
 import { resolveRegistryDefault } from './resolveRegistryDefault'
 
@@ -45,6 +47,8 @@ export const MeasurementCellServer = (props: MeasurementCellServerComponentProps
 		preferenceKey: measurementOptions.preferenceKey,
 		req: undefined,
 	})
+	const registryPrecision = getFieldsRegistry(payload.config)?.measurement?.precision
+	const precision = resolvePrecision([registryPrecision, measurementOptions.precision])
 	return (
 		<MeasurementCell
 			cellData={cellData}
@@ -56,6 +60,7 @@ export const MeasurementCellServer = (props: MeasurementCellServerComponentProps
 			linkURL={linkURL}
 			measurementOptions={{
 				...measurementOptions,
+				precision,
 				...(registryDefault !== undefined ? { registryDefault } : {}),
 			}}
 			rowData={rowData}

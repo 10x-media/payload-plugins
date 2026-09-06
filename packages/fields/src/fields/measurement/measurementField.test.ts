@@ -1,5 +1,6 @@
 import type { NumberField } from 'payload'
 import { describe, expect, it } from 'vitest'
+import { FIELDS_REGISTRY_KEY } from '../../plugin/registry'
 import type { MeasurementCustomConfig } from './engine/registry'
 import { measurementField } from './measurementField'
 import { MEASUREMENT_CUSTOM_KEY, type MeasurementClientOptions } from './options'
@@ -11,6 +12,10 @@ const clientOptions = (field: NumberField): MeasurementClientOptions | undefined
 	return (component.clientProps as { measurementOptions: MeasurementClientOptions })
 		.measurementOptions
 }
+
+/** A hook only ever needs `req.payload.config` to read the plugin registry. */
+const reqWithRegistry = (custom?: Record<string, unknown>) =>
+	({ payload: { config: { custom } } }) as never
 
 const nauticalMile: MeasurementCustomConfig = {
 	units: { nmi: { dimension: 'length', factor: 1852, intlUnit: null, shortLabel: 'nmi' } },
@@ -68,13 +73,27 @@ describe('measurementField factory', () => {
 			units: ['g', 'kg', 'oz', 'lb', 'st', 'st-lb'],
 		})
 	})
-	it('rounds numeric writes to storage precision via beforeValidate', () => {
+	it('rounds numeric writes to the default storage precision via beforeValidate', () => {
 		const field = measurementField({ ...presets.bodyWeight })
 		const hook = field.hooks?.beforeValidate?.[0]
+		const req = reqWithRegistry()
 		// biome-ignore lint/correctness/noPrecisionLoss: testing rounding behavior with floating point edge case
-		expect(hook?.({ value: 81.64662660000001 } as never)).toBe(81.646627)
-		expect(hook?.({ value: 'junk' } as never)).toBe('junk')
-		expect(hook?.({ value: null } as never)).toBe(null)
+		expect(hook?.({ req, value: 81.64662660000001 } as never)).toBe(81.646627)
+		expect(hook?.({ req, value: 'junk' } as never)).toBe('junk')
+		expect(hook?.({ req, value: null } as never)).toBe(null)
+	})
+	it('rounds writes to a field-declared storage granularity', () => {
+		const field = measurementField({ ...presets.bodyWeight, precision: { storage: 0 } })
+		const hook = field.hooks?.beforeValidate?.[0]
+		expect(hook?.({ req: reqWithRegistry(), value: 249.6 } as never)).toBe(250)
+	})
+	it('rounds writes to the plugin registry storage default when the field declares none', () => {
+		const field = measurementField({ ...presets.bodyWeight })
+		const hook = field.hooks?.beforeValidate?.[0]
+		const req = reqWithRegistry({
+			[FIELDS_REGISTRY_KEY]: { measurement: { precision: { storage: 0 } } },
+		})
+		expect(hook?.({ req, value: 249.6 } as never)).toBe(250)
 	})
 	it('passes min/max/required/localized/index through', () => {
 		const field = measurementField({ ...presets.bodyWeight, max: 250, min: 30, required: true })
@@ -110,21 +129,47 @@ describe('measurementField factory', () => {
 		const field = measurementField({ ...presets.bodyWeight, fallbackUnit: 'lb' })
 		expect(clientOptions(field)?.fallbackUnit).toBe('lb')
 	})
-	it('throws on a non-integer or out-of-range precision override', () => {
+	it('throws on a non-integer or out-of-range precision.display override', () => {
 		for (const digits of [1.5, -1, 101]) {
-			expect(() => measurementField({ ...presets.bodyWeight, precision: { kg: digits } })).toThrow(
-				/precision/
+			expect(() =>
+				measurementField({ ...presets.bodyWeight, precision: { display: { kg: digits } } })
+			).toThrow(/precision/)
+		}
+	})
+	it('throws when a precision.display key is not a unit of the dimension', () => {
+		expect(() =>
+			// @ts-expect-error cm is a length unit, so the mass narrowing rejects it
+			measurementField({ ...presets.bodyWeight, precision: { display: { cm: 1 } } })
+		).toThrow(/precision/)
+	})
+	it('accepts an in-range precision.display override', () => {
+		expect(() =>
+			measurementField({ ...presets.bodyWeight, precision: { display: { kg: 3 } } })
+		).not.toThrow()
+	})
+	it('accepts a bare precision mode string', () => {
+		expect(() => measurementField({ ...presets.bodyWeight, precision: 'exact' })).not.toThrow()
+	})
+	it('throws on an unknown precision mode string', () => {
+		expect(() => measurementField({ ...presets.bodyWeight, precision: 'blurry' as never })).toThrow(
+			/precision/
+		)
+	})
+	it('accepts storage 0 as a valid granularity', () => {
+		expect(() =>
+			measurementField({ ...presets.bodyWeight, precision: { storage: 0 } })
+		).not.toThrow()
+	})
+	it('throws on a non-integer or out-of-range precision.storage', () => {
+		for (const storage of [1.5, -1, 13]) {
+			expect(() => measurementField({ ...presets.bodyWeight, precision: { storage } })).toThrow(
+				/precision\.storage/
 			)
 		}
 	})
-	it('throws when a precision key is not a unit of the dimension', () => {
-		expect(() =>
-			// @ts-expect-error cm is a length unit, so the mass narrowing rejects it
-			measurementField({ ...presets.bodyWeight, precision: { cm: 1 } })
-		).toThrow(/precision/)
-	})
-	it('accepts an in-range precision override', () => {
-		expect(() => measurementField({ ...presets.bodyWeight, precision: { kg: 3 } })).not.toThrow()
+	it('threads the field-declared precision layer unresolved into clientProps', () => {
+		const field = measurementField({ ...presets.bodyWeight, precision: { storage: 0 } })
+		expect(clientOptions(field)?.precision).toEqual({ storage: 0 })
 	})
 	it('throws on a preference key that is empty or not a single path segment', () => {
 		for (const preferenceKey of ['', '  ', 'body weight', 'body/weight']) {

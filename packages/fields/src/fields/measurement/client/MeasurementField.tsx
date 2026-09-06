@@ -113,20 +113,26 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	// Bound messages sit next to a type=number input, which always renders Latin
 	// digits; force the same numerals here so "min 5" and "5" agree in RTL/native-digit
 	// locales (Arabic, Persian). The input itself stays native-digit for display.
+	const displayPrecision = precision?.display
 	const fmtBound = useCallback(
 		(bound: number) => {
 			try {
 				return engine.formatMeasurement(bound, {
 					displayUnit,
 					locale: `${locale}-u-nu-latn`,
-					precision,
+					precision: displayPrecision,
 					storageUnit,
 				})
 			} catch {
-				return engine.formatMeasurement(bound, { displayUnit, locale, precision, storageUnit })
+				return engine.formatMeasurement(bound, {
+					displayUnit,
+					locale,
+					precision: displayPrecision,
+					storageUnit,
+				})
 			}
 		},
-		[displayUnit, engine, locale, precision, storageUnit]
+		[displayUnit, engine, locale, displayPrecision, storageUnit]
 	)
 
 	const memoizedValidate = useCallback<Validate<number | null | undefined>>(
@@ -166,8 +172,8 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 
 	const numericValue = typeof value === 'number' && !Number.isNaN(value) ? value : null
 	const unitOpts = useMemo(
-		() => ({ displayUnit, engine, precision, storageUnit }),
-		[displayUnit, engine, precision, storageUnit]
+		() => ({ displayUnit, engine, precision: displayPrecision, storageUnit }),
+		[displayUnit, engine, displayPrecision, storageUnit]
 	)
 
 	// Payload's server-driven form-state refresh (conditional-logic revalidation on

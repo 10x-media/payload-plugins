@@ -1,5 +1,6 @@
 import type { NumberField } from 'payload'
 import type { MeasurementSystem } from './engine/locale'
+import type { MeasurementPrecision, PrecisionMode, ResolvedPrecision } from './engine/precision'
 import type { MeasurementCustomConfig } from './engine/registry'
 import type { DimOf, MeasurementUnitId, ScalarUnitId, UnitOfDimension } from './engine/units'
 
@@ -11,6 +12,11 @@ export const MEASUREMENT_CUSTOM_KEY = '@10x-media/fields'
 
 /** Saved display units, keyed by each field's `preferenceKey`. */
 export type MeasurementUnitsPreference = Partial<Record<string, MeasurementUnitId>>
+
+/** `MeasurementPrecision` with `display` narrowed to a field's own unit union. */
+export type MeasurementPrecisionFor<U extends string> = Omit<MeasurementPrecision, 'display'> & {
+	display?: Partial<Record<U, number>>
+}
 
 type CommonFieldOptions<U extends string> = {
 	name?: string
@@ -29,8 +35,13 @@ type CommonFieldOptions<U extends string> = {
 	fallbackUnit?: U
 	/** Locale-system defaults for this field, ahead of the per-dimension table. */
 	localeDefaults?: Partial<Record<MeasurementSystem, U>>
-	/** Per-unit display fraction digits, overriding the engine defaults. */
-	precision?: Partial<Record<U, number>>
+	/**
+	 * `'readable'` (default) quantizes entry and repaints drafts from the display
+	 * unit; `'exact'` keeps entry free and repaints from the stored value. Pass a
+	 * `MeasurementPrecisionFor` object to override individual knobs, including
+	 * per-unit display fraction digits via `display`.
+	 */
+	precision?: MeasurementPrecisionFor<U> | PrecisionMode
 	overrides?: (args: { field: NumberField }) => NumberField
 }
 
@@ -66,14 +77,17 @@ export type MeasurementClientOptions = {
 	dimension: string
 	localeDefaults?: Partial<Record<MeasurementSystem, MeasurementUnitId>>
 	fallbackUnit?: MeasurementUnitId
-	precision?: Partial<Record<MeasurementUnitId, number>>
+	/** The field-declared layer, unresolved: still needs merging with the plugin-registry default. */
+	precision?: MeasurementPrecision | PrecisionMode
 	custom?: MeasurementCustomConfig
 }
 
 /** What MeasurementFieldServer hands the client after per-request resolution. */
-export type MeasurementResolvedClientOptions = MeasurementClientOptions & {
+export type MeasurementResolvedClientOptions = Omit<MeasurementClientOptions, 'precision'> & {
 	/** The viewer's saved unit for this bucket, read server-side for a flash-free first paint. */
 	initialUnit?: MeasurementUnitId
 	/** Plugin-registry default for this bucket. */
 	registryDefault?: MeasurementUnitId
+	/** Merged against the plugin-registry default, so the client only ever sees a final answer. */
+	precision?: ResolvedPrecision
 }

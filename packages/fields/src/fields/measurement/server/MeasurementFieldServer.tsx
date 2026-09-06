@@ -1,5 +1,7 @@
 import type { NumberFieldServerProps } from 'payload'
+import { getFieldsRegistry } from '../../../plugin/registry'
 import { MeasurementField } from '../client/MeasurementField'
+import { resolvePrecision } from '../engine/precision'
 import { MEASUREMENT_CUSTOM_KEY, type MeasurementClientOptions } from '../options'
 import { getUserMeasurementUnits } from './getUserUnits'
 import { resolveRegistryDefault } from './resolveRegistryDefault'
@@ -29,11 +31,14 @@ export const MeasurementFieldServer = async (props: MeasurementFieldServerCompon
 	const { preferenceKey } = measurementOptions
 	const registryDefault = resolveRegistryDefault({ payload: req.payload, preferenceKey, req })
 	const initialUnit = userUnits?.[preferenceKey]
+	const registryPrecision = getFieldsRegistry(req.payload.config)?.measurement?.precision
+	const precision = resolvePrecision([registryPrecision, measurementOptions.precision])
 	return (
 		<MeasurementField
 			field={clientField}
 			measurementOptions={{
 				...measurementOptions,
+				precision,
 				...(registryDefault !== undefined ? { registryDefault } : {}),
 				...(initialUnit !== undefined ? { initialUnit } : {}),
 			}}

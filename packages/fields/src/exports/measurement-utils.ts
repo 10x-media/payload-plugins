@@ -14,6 +14,12 @@ export {
 	systemForLocale,
 } from '../fields/measurement/engine/locale'
 export type {
+	MeasurementPrecision,
+	PrecisionMode,
+	ResolvedPrecision,
+} from '../fields/measurement/engine/precision'
+export { resolvePrecision } from '../fields/measurement/engine/precision'
+export type {
 	CustomDimensionDef,
 	CustomUnitDef,
 	EngineFormatMeasurementOptions,
@@ -43,6 +49,9 @@ export {
 	UNITS,
 	unitsOfDimension,
 } from '../fields/measurement/engine/units'
-export type { AnyMeasurementFieldOptions } from '../fields/measurement/options'
+export type {
+	AnyMeasurementFieldOptions,
+	MeasurementPrecisionFor,
+} from '../fields/measurement/options'
 export type { MeasurementPreset, MeasurementUsage } from '../fields/measurement/presets'
 export { presets } from '../fields/measurement/presets'

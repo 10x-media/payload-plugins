@@ -1,4 +1,5 @@
 import type { Payload, PayloadRequest, StaticLabel } from 'payload'
+import type { MeasurementPrecision, PrecisionMode } from './fields/measurement/engine/precision'
 import type { MeasurementUnitId } from './fields/measurement/engine/units'
 
 /** Args passed to async per-document resolvers (color presets, icon availability). */
@@ -240,6 +241,8 @@ export type MeasurementGlobalConfig = {
 	defaultUnits?: Partial<Record<string, MeasurementUnitId>> | MeasurementDefaultUnitsResolver
 	/** Session-only preference mode for kiosks and shared accounts: skips both reads and writes. Defaults to true. */
 	persistPreferences?: boolean
+	/** Precision default for every measurementField(), ahead of the engine's own default. A field's own `precision` always wins. */
+	precision?: MeasurementPrecision | PrecisionMode
 }
 
 /** Normalized plugin options written to `config.custom['@10x-media/fields']`. */

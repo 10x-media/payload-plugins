@@ -59,7 +59,7 @@ export const MeasurementCell: React.FC<MeasurementCellProps> = (props) => {
 			{engine.formatMeasurement(cellData, {
 				displayUnit,
 				locale: i18n.language,
-				precision,
+				precision: precision?.display,
 				storageUnit,
 			})}
 		</span>

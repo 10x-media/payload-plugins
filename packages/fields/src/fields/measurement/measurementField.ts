@@ -1,8 +1,10 @@
 import type { FieldHook, NumberField, NumberFieldSingleValidation } from 'payload'
 import { number } from 'payload/shared'
+import { getFieldsRegistry } from '../../plugin/registry'
 import { roundTo } from './engine/convert'
+import { type MeasurementPrecision, type PrecisionMode, resolvePrecision } from './engine/precision'
 import { createEngine, type MeasurementEngine } from './engine/registry'
-import { type ScalarUnitId, STORAGE_FRACTION_DIGITS } from './engine/units'
+import type { ScalarUnitId } from './engine/units'
 import {
 	type AnyMeasurementFieldOptions,
 	MEASUREMENT_CUSTOM_KEY,
@@ -11,9 +13,20 @@ import {
 	type MeasurementFieldOptions,
 } from './options'
 
-const roundStorageHook: FieldHook = ({ value }) => {
-	if (typeof value !== 'number' || Number.isNaN(value)) return value
-	return roundTo(value, STORAGE_FRACTION_DIGITS)
+/**
+ * Storage digits may come from the plugin registry, so this resolves per request
+ * rather than once at field-build time. `fieldPrecision` is the field's own
+ * (unresolved) layer, stamped once when the field was built.
+ */
+const buildRoundStorageHook = (
+	fieldPrecision: MeasurementPrecision | PrecisionMode | undefined
+): FieldHook => {
+	return ({ req, value }) => {
+		if (typeof value !== 'number' || Number.isNaN(value)) return value
+		const registryPrecision = getFieldsRegistry(req.payload.config)?.measurement?.precision
+		const { storage } = resolvePrecision([registryPrecision, fieldPrecision])
+		return roundTo(value, storage)
+	}
 }
 
 /**
@@ -65,27 +78,71 @@ const assertUnits = (args: {
 	}
 }
 
+const isPrecisionMode = (mode: unknown): mode is PrecisionMode =>
+	mode === 'readable' || mode === 'exact'
+
+/**
+ * Validates the field's own (unresolved) precision layer at config time, so a bad
+ * value fails fast rather than surfacing later from `resolvePrecision`. Storage
+ * range is re-checked there too, once merged with the plugin registry's layer;
+ * `display` digits stay factory-only, since only the factory has unit context.
+ */
 const assertPrecision = (args: {
 	engine: MeasurementEngine
 	dimension: string
 	name: string
-	precision: Partial<Record<string, number>>
+	precision: MeasurementPrecision | PrecisionMode
 }): void => {
 	const { dimension, engine, name, precision } = args
-	for (const [unit, digits] of Object.entries(precision)) {
+	if (typeof precision === 'string') {
+		if (!isPrecisionMode(precision)) {
+			throw new Error(
+				`measurementField(${name}): precision "${precision}" must be "readable" or "exact"`
+			)
+		}
+		return
+	}
+	const { display, draft, entry, mode, storage } = precision
+	if (mode !== undefined && !isPrecisionMode(mode)) {
+		throw new Error(
+			`measurementField(${name}): precision.mode "${mode}" must be "readable" or "exact"`
+		)
+	}
+	if (entry !== undefined && entry !== 'quantize' && entry !== 'free') {
+		throw new Error(
+			`measurementField(${name}): precision.entry "${entry}" must be "quantize" or "free"`
+		)
+	}
+	if (draft !== undefined && draft !== 'display' && draft !== 'faithful') {
+		throw new Error(
+			`measurementField(${name}): precision.draft "${draft}" must be "display" or "faithful"`
+		)
+	}
+	if (
+		storage !== undefined &&
+		(typeof storage !== 'number' || !Number.isInteger(storage) || storage < 0 || storage > 12)
+	) {
+		throw new Error(
+			`measurementField(${name}): precision.storage must be an integer between 0 and 12, got ${storage}`
+		)
+	}
+	if (display === undefined) return
+	for (const [unit, digits] of Object.entries(display)) {
 		if (!engine.isScalarUnit(unit) && !engine.isCompoundUnit(unit)) {
-			throw new Error(`measurementField(${name}): precision key "${unit}" is not a known unit`)
+			throw new Error(
+				`measurementField(${name}): precision.display key "${unit}" is not a known unit`
+			)
 		}
 		if (engine.dimensionOf(unit) !== dimension) {
 			throw new Error(
-				`measurementField(${name}): precision key "${unit}" is not a unit of ${dimension}`
+				`measurementField(${name}): precision.display key "${unit}" is not a unit of ${dimension}`
 			)
 		}
 		// Intl.NumberFormat rejects out-of-range maximumFractionDigits at render
 		// time; fail at config time instead.
 		if (typeof digits !== 'number' || !Number.isInteger(digits) || digits < 0 || digits > 100) {
 			throw new Error(
-				`measurementField(${name}): precision for "${unit}" must be an integer between 0 and 100, got ${digits}`
+				`measurementField(${name}): precision.display for "${unit}" must be an integer between 0 and 100, got ${digits}`
 			)
 		}
 	}
@@ -181,7 +238,7 @@ export function measurementField(options: AnyMeasurementFieldOptions): NumberFie
 			},
 		},
 		custom: { [MEASUREMENT_CUSTOM_KEY]: measurementOptions },
-		hooks: { beforeValidate: [roundStorageHook] },
+		hooks: { beforeValidate: [buildRoundStorageHook(precision)] },
 		validate: validateMeasurement,
 	}
 
