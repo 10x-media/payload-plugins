@@ -56,8 +56,9 @@ const isSafeUpstream = (url: URL): boolean => url.protocol === 'https:' || url.p
 
 // encodeURIComponent escapes every RFC 3986 sub-delim plus ':' and '@', all of which are
 // legal inside a path segment, so a vendor URL would not round-trip byte for byte. Restore
-// exactly those; '/', '?' and '#' stay escaped because they would change the URL's shape.
-const PATH_SAFE_ESCAPES = /%(24|26|2B|2C|3A|3B|3D|40)/gi
+// exactly those; '/', '?' and '#' stay escaped because they would change the URL's shape,
+// and ';' because some upstreams read it as a matrix-param separator.
+const PATH_SAFE_ESCAPES = /%(24|26|2B|2C|3A|3D|40)/gi
 
 const encodeSegment = (segment: string): string =>
 	encodeURIComponent(segment).replace(PATH_SAFE_ESCAPES, (_, hex: string) =>

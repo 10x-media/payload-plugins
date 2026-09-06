@@ -64,8 +64,9 @@ const proxyLimits = (runtime: AnalyticsRuntime) => ({
  * `capture.proxy.routes` templates, so an unfilled slot, an adapter without capture, or
  * a path outside the declared routes is a 404 and nothing leaves the server. Credentials
  * (`cookie`, `authorization`) never go upstream and `set-cookie` never comes back; a
- * body over `capture.proxy.maxBodyBytes` is refused with 413 before anything is
- * forwarded; upstream failures answer 502 without echoing the URL or the error.
+ * body over `capture.proxy.maxBodyBytes` is refused with 413 and one that dies in
+ * transit with 400, both before anything is forwarded; upstream failures answer 502
+ * without echoing the URL or the error.
  */
 export const makeProxyHandler = (): PayloadHandler => async (req) => {
 	const method = (req.method ?? 'get').toUpperCase()
@@ -105,10 +106,10 @@ export const makeProxyHandler = (): PayloadHandler => async (req) => {
 	let body: ArrayBuffer | undefined
 	if (method === 'POST') {
 		const read = await readCappedBody(req, limits.maxBodyBytes)
-		if (read === null) {
-			return empty(413)
+		if (!read.ok) {
+			return empty(read.reason === 'too-large' ? 413 : 400)
 		}
-		body = read
+		body = read.body
 	}
 	// The deadline covers time-to-headers only. AbortSignal.timeout would keep running
 	// against the body stream and truncate a slow but healthy download.

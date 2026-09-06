@@ -235,6 +235,28 @@ describeForDb('analytics capture proxy endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(fetched).toEqual([])
 	})
 
+	it('400s a body that dies in transit, rather than surfacing a 500', async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(new Uint8Array(10).fill(65))
+			},
+			pull(controller) {
+				controller.error(new Error('client went away'))
+			},
+		})
+		const res = await request('POST', '/analytics/p/global/e', {
+			body: stream,
+			headers: { 'content-type': 'text/plain' },
+			// @ts-expect-error duplex is required for a stream body and absent from lib.dom
+			duplex: 'half',
+		})
+		expect(res.status).toBe(400)
+		expect(await res.text()).toBe('')
+		expect(fetched).toEqual([])
+	})
+
 	it('forwards a body just under the cap', async () => {
 		const fetched: Fetched[] = []
 		server.use(...recordUpstream(fetched))

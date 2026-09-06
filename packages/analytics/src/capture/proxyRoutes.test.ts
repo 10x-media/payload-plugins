@@ -78,8 +78,14 @@ describe('matchProxyRoute', () => {
 	})
 
 	it('leaves legal path characters unescaped so a vendor URL round-trips', () => {
-		expect(href(posthogRoutes, '/static/a,b=c+d@e:f;g$h&i.js')).toBe(
-			'https://us-assets.i.posthog.com/static/a,b=c+d@e:f;g$h&i.js'
+		expect(href(posthogRoutes, '/static/a,b=c+d@e:f$g&h.js')).toBe(
+			'https://us-assets.i.posthog.com/static/a,b=c+d@e:f$g&h.js'
+		)
+	})
+
+	it('keeps a semicolon escaped, which some upstreams read as a matrix param', () => {
+		expect(href(posthogRoutes, '/static/a;jsessionid=1.js')).toBe(
+			'https://us-assets.i.posthog.com/static/a%3Bjsessionid=1.js'
 		)
 	})
 
