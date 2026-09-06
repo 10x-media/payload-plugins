@@ -12,8 +12,9 @@ export { SOURCES_PATH }
  * tenant can never enumerate another tenant's sources. On a scoped install, a
  * request that resolves no scope at all is ambiguous, not install-wide, so it
  * answers empty rather than leaking the static config registry, unless
- * `platformRead` grants it. Resolution failures degrade to the static config
- * registry the same way reads do.
+ * `platformRead` grants it. On resolution failure, an unscoped install falls
+ * back to the static config registry; a scoped install answers empty, since a
+ * failed resolution is indistinguishable from a forged one.
  */
 export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
@@ -38,6 +39,9 @@ export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 		return Response.json({ defaultId: registry.default().id, sources })
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: sources listing failed: ${String(err)}`)
+		if (runtime.scoped) {
+			return Response.json({ defaultId: null, sources: [] })
+		}
 		const sources = runtime.registry.all().map((a) => ({
 			id: a.id,
 			label: a.label,

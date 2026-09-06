@@ -117,15 +117,15 @@ test('@tenancy a forged tenant cookie cannot read another tenant', async ({
 		.context()
 		.addCookies([{ name: 'payload-tenant', value: String(betaId), url: baseURL ?? page.url() }])
 
-	// The dev scopeResolver throws for a tenant alpha does not belong to; the sources
-	// endpoint degrades to the static config registry, never a tenant's providers.
+	// The dev scopeResolver throws for a tenant alpha does not belong to; on this scoped
+	// install a failed resolution is indistinguishable from a forged one, so the sources
+	// endpoint answers empty rather than falling back to the config registry.
 	const sourcesRes = await page.request.get('/api/analytics/sources')
 	expect(sourcesRes.ok()).toBeTruthy()
 	const { sources } = (await sourcesRes.json()) as {
 		sources: Array<SourceEntry & { kind: string }>
 	}
-	expect(sources.some((s) => s.label === 'Beta Plausible')).toBe(false)
-	expect(sources.some((s) => s.kind === 'runtime')).toBe(false)
+	expect(sources).toEqual([])
 
 	// The same failure degrades the server-rendered dashboard read to unavailable, so no
 	// pageviews number renders; beta's never does.
