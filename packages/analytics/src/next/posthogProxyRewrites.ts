@@ -1,3 +1,6 @@
+import { posthog } from '../adapters/posthog/posthog'
+import { captureRewrites } from './captureRewrites'
+
 export type PosthogProxyRegion = 'eu' | 'us'
 
 /** One Next.js rewrite entry (the shape `next.config` `rewrites()` returns). */
@@ -8,12 +11,6 @@ export type PosthogProxyRewritesOptions = {
 	path?: string
 	/** PostHog Cloud region. Default 'eu'. */
 	region?: PosthogProxyRegion
-}
-
-const normalizePath = (path: string): string => {
-	const withLeading = path.startsWith('/') ? path : `/${path}`
-	const trimmed = withLeading.replace(/\/+$/, '')
-	return trimmed === '' ? '/' : trimmed
 }
 
 /**
@@ -36,17 +33,17 @@ const normalizePath = (path: string): string => {
  * ```
  *
  * Point the snippet at it with `api_host: '/ph'` (plus `ui_host` for the region).
+ *
+ * @deprecated Use `captureRewrites` with a `posthog()` adapter instance instead: this
+ * helper is now a thin wrapper over it, kept only so existing `next.config` files don't
+ * break. `captureRewrites` also covers Plausible, Umami, and any adapter that mixes
+ * PostHog with another vendor across multiple mount paths.
  */
 export const posthogProxyRewrites = (
 	options: PosthogProxyRewritesOptions = {}
 ): PosthogProxyRewrite[] => {
 	const region = options.region ?? 'eu'
-	const path = normalizePath(options.path ?? '/ph')
-	const assets = `https://${region}-assets.i.posthog.com`
-	const ingest = `https://${region}.i.posthog.com`
-	return [
-		{ source: `${path}/static/:path*`, destination: `${assets}/static/:path*` },
-		{ source: `${path}/array/:path*`, destination: `${assets}/array/:path*` },
-		{ source: `${path}/:path*`, destination: `${ingest}/:path*` },
-	]
+	const path = options.path ?? '/ph'
+	const adapter = posthog({ projectId: '', apiKey: '', region })
+	return captureRewrites([{ path, adapter }])
 }
