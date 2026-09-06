@@ -64,6 +64,8 @@ Preference persistence and the same-bucket flip are wired by the `fields()` plug
 
 The field is a plain `number` column holding a canonical value in `storageUnit`, so it sorts, filters, and groups like any other number and needs no custom query logic. To adopt on an existing numeric column, set `storageUnit` to whatever unit that column already holds: no migration, no data rewrite. Storage is rounded to 6 fraction digits regardless of display precision, and non-numeric or NaN writes are rejected server-side on every database adapter. The field stores a single number; `hasMany` is not supported.
 
+The factory also stamps its resolved config onto `field.custom['@10x-media/fields']`, so tooling and a second app reading the same collection can discover `storageUnit`, `units`, and `preferenceKey` without re-declaring the field. Two apps sharing a database must still declare the same `storageUnit` themselves: the field only round-trips whatever is on disk, it does not reconcile a mismatch between apps.
+
 ## Faithful drafts
 
 The editable input always shows what's actually stored, not a rounded preview of it. Switching a field's display unit shows the shortest draft that writes the same stored value back: display precision first, then one more fraction digit at a time up to the 6-digit storage precision. A value entered in the current unit always round-trips exactly, since it was never converted. Rounding for display only happens in read-only contexts, list cells and `formatMeasurement`, never in the field the viewer is editing. Each part of a compound value (`ft-in`, `st-lb`) is faithful independently.

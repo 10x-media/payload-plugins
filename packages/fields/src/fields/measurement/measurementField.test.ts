@@ -2,7 +2,7 @@ import type { NumberField } from 'payload'
 import { describe, expect, it } from 'vitest'
 import type { MeasurementCustomConfig } from './engine/registry'
 import { measurementField } from './measurementField'
-import type { MeasurementClientOptions } from './options'
+import { MEASUREMENT_CUSTOM_KEY, type MeasurementClientOptions } from './options'
 import { presets } from './presets'
 
 const clientOptions = (field: NumberField): MeasurementClientOptions | undefined => {
@@ -159,5 +159,20 @@ describe('measurementField factory', () => {
 				storageUnit: 'kg',
 			})
 		).toThrow(/measurementField\(odd\).*collides/)
+	})
+	it('stamps the resolved config onto field.custom for discovery by tooling', () => {
+		const field = measurementField({ ...presets.bodyWeight })
+		expect(field.custom?.[MEASUREMENT_CUSTOM_KEY]).toEqual(clientOptions(field))
+	})
+	it('overrides can extend custom while the stamp survives via spread', () => {
+		const field = measurementField({
+			...presets.bodyWeight,
+			overrides: ({ field: f }) => ({
+				...f,
+				custom: { ...f.custom, myTooling: { note: 'extra' } },
+			}),
+		})
+		expect(field.custom?.[MEASUREMENT_CUSTOM_KEY]).toEqual(clientOptions(field))
+		expect(field.custom?.myTooling).toEqual({ note: 'extra' })
 	})
 })

@@ -6,6 +6,9 @@ import type { DimOf, MeasurementUnitId, ScalarUnitId, UnitOfDimension } from './
 /** payload-preferences key holding the flat per-bucket unit map. */
 export const MEASUREMENT_PREFERENCE_KEY = '10x-fields-measurement'
 
+/** field.custom key the factory stamps its resolved config under, for tooling and secondary apps. */
+export const MEASUREMENT_CUSTOM_KEY = '@10x-media/fields'
+
 /** Saved display units, keyed by each field's `preferenceKey`. */
 export type MeasurementUnitsPreference = Partial<Record<string, MeasurementUnitId>>
 

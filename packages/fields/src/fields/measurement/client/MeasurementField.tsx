@@ -115,9 +115,22 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		units,
 	})
 
+	// Bound messages sit next to a type=number input, which always renders Latin
+	// digits; force the same numerals here so "min 5" and "5" agree in RTL/native-digit
+	// locales (Arabic, Persian). The input itself stays native-digit for display.
 	const fmtBound = useCallback(
-		(bound: number) =>
-			engine.formatMeasurement(bound, { displayUnit, locale, precision, storageUnit }),
+		(bound: number) => {
+			try {
+				return engine.formatMeasurement(bound, {
+					displayUnit,
+					locale: `${locale}-u-nu-latn`,
+					precision,
+					storageUnit,
+				})
+			} catch {
+				return engine.formatMeasurement(bound, { displayUnit, locale, precision, storageUnit })
+			}
+		},
 		[displayUnit, engine, locale, precision, storageUnit]
 	)
 

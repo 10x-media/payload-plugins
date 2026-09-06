@@ -58,9 +58,21 @@ type MergedUnit = FormattableUnit & {
 
 const CORE_DIMENSIONS = new Set<string>(Object.keys(DIMENSION_LOCALE_DEFAULTS))
 
+const ALLOWED_CUSTOM_CONFIG_KEYS = new Set<string>(['units', 'dimensions'])
+
 const isCompoundUnitId = (unit: string): unit is CompoundUnitId => Object.hasOwn(COMPOUNDS, unit)
 
 const mergeUnits = (custom?: MeasurementCustomConfig): Record<string, MergedUnit> => {
+	if (custom !== undefined) {
+		for (const key of Object.keys(custom)) {
+			if (!ALLOWED_CUSTOM_CONFIG_KEYS.has(key)) {
+				throw new Error(
+					`Custom config key "${key}" is not recognized; only "units" and "dimensions" are allowed`
+				)
+			}
+		}
+	}
+
 	const customUnits = custom?.units ?? {}
 	const customDimensions = custom?.dimensions ?? {}
 

@@ -3,11 +3,12 @@ import { number } from 'payload/shared'
 import { roundTo } from './engine/convert'
 import { createEngine, type MeasurementEngine } from './engine/registry'
 import { type ScalarUnitId, STORAGE_FRACTION_DIGITS } from './engine/units'
-import type {
-	AnyMeasurementFieldOptions,
-	MeasurementClientOptions,
-	MeasurementCustomFieldOptions,
-	MeasurementFieldOptions,
+import {
+	type AnyMeasurementFieldOptions,
+	MEASUREMENT_CUSTOM_KEY,
+	type MeasurementClientOptions,
+	type MeasurementCustomFieldOptions,
+	type MeasurementFieldOptions,
 } from './options'
 
 const roundStorageHook: FieldHook = ({ value }) => {
@@ -179,6 +180,7 @@ export function measurementField(options: AnyMeasurementFieldOptions): NumberFie
 				},
 			},
 		},
+		custom: { [MEASUREMENT_CUSTOM_KEY]: measurementOptions },
 		hooks: { beforeValidate: [roundStorageHook] },
 		validate: validateMeasurement,
 	}

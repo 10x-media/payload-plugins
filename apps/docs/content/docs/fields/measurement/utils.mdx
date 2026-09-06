@@ -61,7 +61,7 @@ systemForLocale('de-DE')  // 'metric'
 `systemForLocale(locale)` maps a BCP 47 locale to a measurement system, off a five-entry table vendored from CLDR supplemental measurement data (no shipped `Intl` API exposes it): US system for the US and Liberia, UK system for Great Britain and Myanmar, metric everywhere else.
 
 ```ts
-import { presets } from '@10x-media/fields/measurement'
+import { presets } from '@10x-media/fields/measurement/utils'
 
 resolveDisplayUnit({
   dimension: 'mass',
@@ -147,8 +147,12 @@ Formatting an athlete's stored `weight` (kg, the `bodyWeight` preset's storage u
 
 ```tsx
 import { headers } from 'next/headers'
-import { presets } from '@10x-media/fields/measurement'
-import { formatMeasurement, resolveDisplayUnit, systemForLocale } from '@10x-media/fields/measurement/utils'
+import {
+  formatMeasurement,
+  presets,
+  resolveDisplayUnit,
+  systemForLocale,
+} from '@10x-media/fields/measurement/utils'
 
 export const AthleteWeight = async ({ weight }: { weight: number }) => {
   const locale = (await headers()).get('accept-language')?.split(',')[0] ?? 'en-US'

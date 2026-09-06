@@ -15,14 +15,16 @@ export {
 export type {
 	CustomDimensionDef,
 	CustomUnitDef,
+	EngineFormatMeasurementOptions,
 	MeasurementCustomConfig,
 	MeasurementEngine,
 } from '../fields/measurement/engine/registry'
-export { createEngine } from '../fields/measurement/engine/registry'
+export { createEngine, defaultEngine } from '../fields/measurement/engine/registry'
 export type {
 	CompoundUnitId,
 	CoreDimension,
 	Dimension,
+	DimOf,
 	MeasurementUnitId,
 	ScalarOfDimension,
 	ScalarUnitId,
@@ -42,6 +44,7 @@ export {
 } from '../fields/measurement/engine/units'
 export { measurementField } from '../fields/measurement/measurementField'
 export {
+	type AnyMeasurementFieldOptions,
 	MEASUREMENT_PREFERENCE_KEY,
 	type MeasurementClientOptions,
 	type MeasurementCustomFieldOptions,

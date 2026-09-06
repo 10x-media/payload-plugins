@@ -138,6 +138,14 @@ describe('createEngine: validation', () => {
 			})
 		).toThrow(/must have factor 1 and no offset/)
 	})
+	it('throws on an unrecognized top-level custom config key', () => {
+		expect(() =>
+			createEngine({
+				// @ts-expect-error exercising an unknown key at the config boundary
+				extra: { anything: true },
+			})
+		).toThrow(/"extra".*not recognized/)
+	})
 	it('throws when a custom dimension canonicalUnit declares an offset', () => {
 		expect(() =>
 			createEngine({
