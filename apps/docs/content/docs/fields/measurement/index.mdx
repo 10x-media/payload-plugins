@@ -86,11 +86,11 @@ The editable input always shows what's stored, not a rounded preview of it. Swit
 
 ## Row and unit menu
 
-The field row is a constant 40px: a numeric input with the unit adjacent to it, as a clickable chip. With more than one unit in `units`, the chip itself is the trigger: it shows a small caret, highlights on hover, and opens a unit menu listing every unit (checkmark on the current one). Picking one converts the displayed value in place and calls the same bucket-wide preference update described above; the stored number is unaffected until the next edit. With only one unit configured, or when the field is read-only, the chip renders as a static muted label instead: no caret, no hover state, not clickable, since there's nothing to open. Clicking empty space inside the row focuses whichever input is nearest, the way a native control would.
+The field row is a constant 40px: value and unit sit together on the left as one phrase, and a vertical three-dot menu button sits at the row's right edge. With more than one unit in `units`, that button opens the unit menu (checkmark on the current unit); picking one converts the displayed value in place and calls the same bucket-wide preference update described above, while the stored number stays unaffected until the next edit. The unit text itself is a passive muted suffix, never a control. With only one unit configured, or when the field is read-only, the menu button disappears entirely. Clicking empty space inside the row focuses whichever input is nearest, the way a native control would.
 
 ## Compound entry
 
-`personHeight` and `bodyWeight` include a compound display unit, `ft-in` and `st-lb`: two inputs, major and minor, each with its own unit chip opening an identical unit menu. Compound units are display-only. Storage is always a single scalar number in `storageUnit`; picking `ft-in` never changes what's on disk, only how the value is split for editing.
+`personHeight` and `bodyWeight` include a compound display unit, `ft-in` and `st-lb`: two inputs, major and minor, each hugging its own unit suffix, with the row's single menu button switching the whole pair. Compound units are display-only. Storage is always a single scalar number in `storageUnit`; picking `ft-in` never changes what's on disk, only how the value is split for editing.
 
 ## Custom units and dimensions
 

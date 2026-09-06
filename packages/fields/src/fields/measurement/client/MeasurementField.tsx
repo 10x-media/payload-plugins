@@ -35,22 +35,17 @@ const draftWidth = (draft: string): React.CSSProperties => ({
 	width: `${Math.min(Math.max(draft.length, 2), 12) + 0.5}ch`,
 })
 
-const unitChevron = (
+const unitKebab = (
 	<svg
 		aria-hidden="true"
-		className={`${baseClass}__chevron`}
+		className={`${baseClass}__kebab`}
 		focusable="false"
-		viewBox="0 0 10 6"
+		viewBox="0 0 4 16"
 		xmlns="http://www.w3.org/2000/svg"
 	>
-		<path
-			d="M1 1L5 5L9 1"
-			fill="none"
-			stroke="currentColor"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			strokeWidth="1.4"
-		/>
+		<circle cx="2" cy="2" fill="currentColor" r="1.6" />
+		<circle cx="2" cy="8" fill="currentColor" r="1.6" />
+		<circle cx="2" cy="14" fill="currentColor" r="1.6" />
 	</svg>
 )
 
@@ -289,26 +284,30 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		</div>
 	)
 
-	const renderUnitChip = (unit: MeasurementUnitId) => {
-		const shortLabel = engine.unitLabel(unit, locale, 'short')
-		if (!isUnitInteractive) {
-			return <span className={`${baseClass}__unit-static`}>{shortLabel}</span>
-		}
+	const renderUnitSuffix = (unit: MeasurementUnitId) => (
+		<span className={`${baseClass}__unit-static`}>{engine.unitLabel(unit, locale, 'short')}</span>
+	)
+
+	// One kebab per field, pinned to the row's right edge; the unit text itself
+	// stays a passive suffix so value and unit read as a single phrase.
+	const renderMenuTrigger = () => {
+		if (!isUnitInteractive) return null
+		const shortLabel = engine.unitLabel(displayUnit, locale, 'short')
 		return (
 			<Popup
 				button={
 					<>
-						<span className={`${baseClass}__unit-chip`}>
-							<span className={`${baseClass}__unit-label`}>{shortLabel}</span>
-							{unitChevron}
+						{unitKebab}
+						<span className={`${baseClass}__sr-only`}>
+							{t(keys.selectUnit)}: {shortLabel}
 						</span>
-						<span className={`${baseClass}__sr-only`}>{t(keys.selectUnit)}</span>
 					</>
 				}
 				buttonClassName={`${baseClass}__unit-trigger`}
 				buttonType="default"
 				caret={false}
 				className={`${baseClass}__popup`}
+				horizontalAlign="right"
 				render={renderUnitPanel}
 				size="fit-content"
 				verticalAlign="bottom"
@@ -361,7 +360,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 									type="number"
 									value={drafts.primary}
 								/>
-								{renderUnitChip(compoundDef.major)}
+								{renderUnitSuffix(compoundDef.major)}
 							</span>
 							<span className={`${baseClass}__part`}>
 								<input
@@ -379,7 +378,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 									type="number"
 									value={drafts.minor}
 								/>
-								{renderUnitChip(compoundDef.minor)}
+								{renderUnitSuffix(compoundDef.minor)}
 							</span>
 						</span>
 					) : (
@@ -399,9 +398,10 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 								type="number"
 								value={drafts.primary}
 							/>
-							{renderUnitChip(displayUnit)}
+							{renderUnitSuffix(displayUnit)}
 						</>
 					)}
+					{renderMenuTrigger()}
 				</div>
 				{AfterInput}
 				<RenderCustomComponent
