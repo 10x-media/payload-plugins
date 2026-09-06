@@ -172,7 +172,7 @@ export function measurementField(options: AnyMeasurementFieldOptions): NumberFie
 			components: {
 				Cell: {
 					clientProps: { measurementOptions },
-					path: '@10x-media/fields/client#MeasurementCell',
+					path: '@10x-media/fields/rsc#MeasurementCellServer',
 				},
 				Field: {
 					clientProps: { measurementOptions },

@@ -1,8 +1,8 @@
 import type { NumberFieldServerProps } from 'payload'
-import { getFieldsRegistry } from '../../../plugin/registry'
 import { MeasurementField } from '../client/MeasurementField'
 import { MEASUREMENT_CUSTOM_KEY, type MeasurementClientOptions } from '../options'
 import { getUserMeasurementUnits } from './getUserUnits'
+import { resolveRegistryDefault } from './resolveRegistryDefault'
 
 type MeasurementFieldServerComponentProps = {
 	measurementOptions?: MeasurementClientOptions
@@ -27,9 +27,7 @@ export const MeasurementFieldServer = async (props: MeasurementFieldServerCompon
 	}
 	const userUnits = await getUserMeasurementUnits(req)
 	const { preferenceKey } = measurementOptions
-	const registryDefault = getFieldsRegistry(req.payload.config)?.measurement?.defaultUnits?.[
-		preferenceKey
-	]
+	const registryDefault = resolveRegistryDefault({ payload: req.payload, preferenceKey, req })
 	const initialUnit = userUnits?.[preferenceKey]
 	return (
 		<MeasurementField

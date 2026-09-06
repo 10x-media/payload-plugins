@@ -5,13 +5,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '../../../translations/useTranslation'
 import { type MeasurementSystem, systemForLocale } from '../engine/locale'
 import { createEngine, defaultEngine } from '../engine/registry'
-import type { MeasurementClientOptions } from '../options'
+import type { MeasurementResolvedClientOptions } from '../options'
 import { resolveDisplayUnit } from './editModel'
 import { useMeasurementUnits } from './MeasurementUnitsProvider'
 import './measurementCell.css'
 
 export type MeasurementCellProps = {
-	measurementOptions: MeasurementClientOptions
+	measurementOptions: MeasurementResolvedClientOptions
 } & DefaultCellComponentProps
 
 export const MeasurementCell: React.FC<MeasurementCellProps> = (props) => {
@@ -23,6 +23,7 @@ export const MeasurementCell: React.FC<MeasurementCellProps> = (props) => {
 		localeDefaults,
 		precision,
 		preferenceKey,
+		registryDefault,
 		storageUnit,
 		units,
 	} = measurementOptions
@@ -42,6 +43,7 @@ export const MeasurementCell: React.FC<MeasurementCellProps> = (props) => {
 		fallbackUnit,
 		localeDefaults,
 		preferenceUnit: context?.units[preferenceKey] ?? null,
+		registryDefault,
 		system,
 		units,
 	})

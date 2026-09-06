@@ -58,7 +58,21 @@ Display unit resolves in this order, skipping any candidate the field doesn't of
 
 Setting `fallbackUnit` (or `defaultUnits` for a bucket in the plugin) is an explicit choice that outranks locale detection. Leave both unset on most fields so a UK visitor sees stone and pounds without any config; the shipped presets already carry the right `localeDefaults` for that (step 4 wins before the generic dimension table in step 5).
 
+`defaultUnits` also accepts a resolver function instead of a plain map, for per-request (tenant-aware) policy:
+
+```ts
+fields({
+  measurement: {
+    defaultUnits: ({ req, preferenceKey }) => tenantUnitFor(req?.user, preferenceKey),
+  },
+})
+```
+
+The edit view calls it with the request that rendered the page; list cells call it with `req` undefined, since Payload's cell components carry no request at all. A resolver that throws degrades to no default rather than breaking the render, logging the error through `payload.logger`. Reciprocal unit kinds and a client-supplied conversion function (see [Custom units and dimensions](#custom-units-and-dimensions)) remain future work; this resolver only changes which default unit is chosen, not how units convert.
+
 Preference persistence and the same-bucket flip are wired by the `fields()` plugin, which registers the unit preference provider. Standalone `measurementField()` still works, but a unit picked without the plugin lasts only for that field until the page reloads, and its list cells skip locale detection entirely: they fall back through the field's `fallbackUnit` (step 2), then straight to its first configured unit (step 6), never reaching steps 4 or 5.
+
+Passing `fields({ measurement: { persistPreferences: false } })` makes the provider session-only: it skips both the read on mount and every write, so a kiosk or shared-account admin session never touches `payload-preferences` for measurement units. Every field sharing a `preferenceKey` still flips together for that session, the toggle just doesn't outlive the tab.
 
 ## What's stored
 
@@ -123,7 +137,7 @@ This is new: pairing errors (a `dimension` referencing nothing built-in or decla
 ## Limitations
 
 - The list view's filter input operates in storage units. Payload passes custom `Filter` components no props at all, so there is no viewer, locale, or preference to convert against; filtering "under 150" on a `personHeight` field filters on centimeters even for a viewer displaying feet and inches.
-- `fields({ measurement: { defaultUnits } })` reaches the edit view (resolved per request, server-side) but not the list view's cell, which falls back to the viewer's preference, then the field's own `fallbackUnit`, then locale detection.
+- The list view's cell is a server component, so `fields({ measurement: { defaultUnits } })` reaches it too, not just the edit view. It still can't read the viewer's saved preference server-side though: Payload's cell components carry no request or user, only `payload` and `i18n`, so that step of the resolution chain is left to the client provider once it mounts.
 - The field stores a single number; `hasMany` is not supported.
 - Reciprocal conversions (value inverts rather than scales, e.g. frequency/period) and a client-supplied conversion function are not supported by `custom`. Both are future work; today's custom units are linear or affine only.
 

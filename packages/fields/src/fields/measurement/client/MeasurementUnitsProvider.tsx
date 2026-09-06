@@ -22,12 +22,18 @@ const isPreference = (value: unknown): value is MeasurementUnitsPreference =>
  * so this provider holds the map in state: one toggle re-renders every
  * measurement field and cell on the page, then persists with merge mode.
  */
-export const MeasurementUnitsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const MeasurementUnitsProvider: React.FC<{
+	children: React.ReactNode
+	/** Kiosk/shared-account mode: skips both the preference fetch and writes, state stays session-only. Defaults to true. */
+	persist?: boolean
+}> = ({ children, persist = true }) => {
 	const { getPreference, setPreference } = usePreferences()
 	const [units, setUnits] = useState<MeasurementUnitsPreference>({})
-	const [ready, setReady] = useState(false)
+	// No fetch to wait for when session-only, so first paint is already the final state.
+	const [ready, setReady] = useState(() => !persist)
 
 	useEffect(() => {
+		if (!persist) return
 		let cancelled = false
 		getPreference<MeasurementUnitsPreference | null>(MEASUREMENT_PREFERENCE_KEY)
 			.then((stored) => {
@@ -42,14 +48,14 @@ export const MeasurementUnitsProvider: React.FC<{ children: React.ReactNode }> =
 		return () => {
 			cancelled = true
 		}
-	}, [getPreference])
+	}, [getPreference, persist])
 
 	const setUnit = useCallback(
 		(preferenceKey: string, unit: MeasurementUnitId) => {
 			setUnits((current) => ({ ...current, [preferenceKey]: unit }))
-			void setPreference(MEASUREMENT_PREFERENCE_KEY, { [preferenceKey]: unit }, true)
+			if (persist) void setPreference(MEASUREMENT_PREFERENCE_KEY, { [preferenceKey]: unit }, true)
 		},
-		[setPreference]
+		[persist, setPreference]
 	)
 
 	const value = useMemo(() => ({ ready, setUnit, units }), [ready, setUnit, units])

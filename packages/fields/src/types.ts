@@ -224,10 +224,22 @@ export type EncryptedGlobalConfig = {
 	onDecryptFailure?: DecryptFailurePolicy
 }
 
+/** Per-request policy for registry defaults; list cells call it with `req` undefined (Cell components carry no request). */
+export type MeasurementDefaultUnitsResolver = (args: {
+	req: PayloadRequest | undefined
+	preferenceKey: string
+}) => MeasurementUnitId | undefined
+
 /** Plugin-level defaults for measurementField(). Per-field options always win. */
 export type MeasurementGlobalConfig = {
-	/** Keyed by each field's `preferenceKey`, which defaults to its dimension. */
-	defaultUnits?: Partial<Record<string, MeasurementUnitId>>
+	/**
+	 * Keyed by each field's `preferenceKey`, which defaults to its dimension. Or a
+	 * resolver function for per-request (tenant-aware) policy; a throwing resolver
+	 * degrades to no default rather than breaking the render.
+	 */
+	defaultUnits?: Partial<Record<string, MeasurementUnitId>> | MeasurementDefaultUnitsResolver
+	/** Session-only preference mode for kiosks and shared accounts: skips both reads and writes. Defaults to true. */
+	persistPreferences?: boolean
 }
 
 /** Normalized plugin options written to `config.custom['@10x-media/fields']`. */

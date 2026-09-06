@@ -25,7 +25,7 @@ describe('measurementField factory', () => {
 			path: '@10x-media/fields/rsc#MeasurementFieldServer',
 		})
 		expect(field.admin?.components?.Cell).toMatchObject({
-			path: '@10x-media/fields/client#MeasurementCell',
+			path: '@10x-media/fields/rsc#MeasurementCellServer',
 		})
 		expect(typeof field.validate).toBe('function')
 	})

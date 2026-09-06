@@ -11,5 +11,7 @@ Add `measurementField()`: a number field storing a canonical value in one storag
 - The stored value is a plain number column: native sort, filter, and group-by, and zero-migration adoption on an existing numeric column by matching `storageUnit` to what's already there.
 - `min`/`max` are expressed in the storage unit and enforced by Payload's native number validation; the edit view shows bounds converted to the display unit.
 - `@10x-media/fields/measurement/utils` exports the conversion and formatting engine (`convert`, `formatMeasurement`, `decompose`/`compose`, `resolveDisplayUnit`, `systemForLocale`, `createEngine`, `unitLabel`, `unitsOfDimension`, `UNITS`) standalone for frontend use.
+- The list view's cell is now a server component too, so `fields({ measurement: { defaultUnits } })` reaches list cells the same way it reaches the edit view; `defaultUnits` also accepts a per-request resolver function for tenant-aware policy, called with `req` undefined from cells since Payload's cell components carry no request.
+- `fields({ measurement: { persistPreferences: false } })` makes the unit preference provider session-only, for kiosk or shared-account admins: it skips both the read on mount and every write.
 
 Additive: new measurement field family; no changes to existing families or stored data.

@@ -55,4 +55,4 @@ export {
 } from '../fields/measurement/options'
 export type { MeasurementPreset, MeasurementUsage } from '../fields/measurement/presets'
 export { presets } from '../fields/measurement/presets'
-export type { MeasurementGlobalConfig } from '../types'
+export type { MeasurementDefaultUnitsResolver, MeasurementGlobalConfig } from '../types'

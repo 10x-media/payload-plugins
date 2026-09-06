@@ -71,4 +71,23 @@ describe('MeasurementUnitsProvider', () => {
 		act(() => resolve({ bodyWeight: 'kg', personHeight: 'ft-in' }))
 		await waitFor(() => expect(screen.getByRole('button').textContent).toBe('ready:lb'))
 	})
+	it('persist=false skips the preference fetch and is ready immediately', () => {
+		render(
+			<MeasurementUnitsProvider persist={false}>
+				<Probe />
+			</MeasurementUnitsProvider>
+		)
+		expect(screen.getByRole('button').textContent).toBe('ready:unset')
+		expect(getPreference).not.toHaveBeenCalled()
+	})
+	it('persist=false keeps toggles session-only, never writing them', () => {
+		render(
+			<MeasurementUnitsProvider persist={false}>
+				<Probe />
+			</MeasurementUnitsProvider>
+		)
+		act(() => screen.getByRole('button').click())
+		expect(screen.getByRole('button').textContent).toBe('ready:lb')
+		expect(setPreference).not.toHaveBeenCalled()
+	})
 })

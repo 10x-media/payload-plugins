@@ -85,7 +85,10 @@ export const fields = definePlugin<FieldsPluginOptions>({
 		config.admin = config.admin ?? {}
 		config.admin.components = config.admin.components ?? {}
 		config.admin.components.providers = config.admin.components.providers ?? []
-		config.admin.components.providers.push('@10x-media/fields/client#MeasurementUnitsProvider')
+		config.admin.components.providers.push({
+			clientProps: { persist: options.measurement?.persistPreferences !== false },
+			path: '@10x-media/fields/client#MeasurementUnitsProvider',
+		})
 		// Transparently rewrite equals/in on queryable encrypted fields to their
 		// blind-index siblings; a no-op for collections that have none. Globals
 		// take no where, so they get the response strip alone.
@@ -121,6 +124,7 @@ export type {
 	IconMeta,
 	IconRenderStrategy,
 	KeysConfig,
+	MeasurementDefaultUnitsResolver,
 	MeasurementGlobalConfig,
 } from './types'
 export type { FieldsPluginOptions as PluginOptions }

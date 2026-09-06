@@ -23,6 +23,7 @@ const options = {
 describe('MeasurementCell', () => {
 	afterEach(() => {
 		cleanup()
+		mockContext.mockReset().mockReturnValue(null)
 	})
 	it('renders nothing for non-numeric data', () => {
 		const { container } = render(
@@ -79,5 +80,30 @@ describe('MeasurementCell', () => {
 			/>
 		)
 		expect(screen.getByText(/180\s?lb/)).toBeDefined()
+	})
+	it('falls back to registryDefault ahead of locale detection with no preference', () => {
+		render(
+			<MeasurementCell
+				cellData={81.646627}
+				measurementOptions={{ ...options, registryDefault: 'st-lb', units: [...options.units] }}
+				// biome-ignore lint/suspicious/noExplicitAny: test spread of empty object
+				{...({} as any)}
+			/>
+		)
+		expect(screen.getByText(/12\s?st/)).toBeDefined()
+	})
+	it('a saved preference still outranks registryDefault', () => {
+		// mockReturnValue (not -Once): the effect that reads locale re-renders the
+		// component, calling the mocked hook a second time in this same test.
+		mockContext.mockReturnValue({ ready: true, setUnit: () => {}, units: { bodyWeight: 'kg' } })
+		render(
+			<MeasurementCell
+				cellData={81.646627}
+				measurementOptions={{ ...options, registryDefault: 'st-lb', units: [...options.units] }}
+				// biome-ignore lint/suspicious/noExplicitAny: test spread of empty object
+				{...({} as any)}
+			/>
+		)
+		expect(screen.getByText(/81\.6\s?kg/)).toBeDefined()
 	})
 })
