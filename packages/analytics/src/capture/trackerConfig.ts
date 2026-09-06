@@ -4,6 +4,7 @@ import { DEFAULT_AUTO_CAPTURE, defaultConsentFor, type ResolvedAutoCapture } fro
 import type { Goal, TrackerGoal } from '../goals/types'
 import { INGEST_PATH, PROXY_PATH } from '../plugin/paths'
 import type { AnalyticsRuntime } from '../plugin/runtime'
+import { normalizeMountPath } from './mountPath'
 import { CAPTURE_SLOTS, type CaptureSlot, resolveSlotAdapter } from './slots'
 
 export interface TrackerSlotConfig {
@@ -68,7 +69,8 @@ export const resolveTrackerConfig = async (args: {
 		if (!adapter || !capture) {
 			continue
 		}
-		const path = runtime.capturePaths?.[slot] ?? `${base}${PROXY_PATH}/${slot}`
+		const override = runtime.capturePaths?.[slot]
+		const path = override ? normalizeMountPath(override) : `${base}${PROXY_PATH}/${slot}`
 		const kind = capture.client.kind
 		try {
 			slots.push({
@@ -91,6 +93,6 @@ export const resolveTrackerConfig = async (args: {
 		slots,
 		autoCapture: runtime.autoCapture ?? DEFAULT_AUTO_CAPTURE,
 		goals: trackerGoals(runtime.goals),
-		ingestPath: `${base}${INGEST_PATH}`,
+		ingestPath: `${base}${runtime.ingestPath ?? INGEST_PATH}`,
 	}
 }

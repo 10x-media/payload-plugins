@@ -368,25 +368,49 @@ describe('resolveOptions capture.consent', () => {
 			resolveOptions({ adapters, capture: { consent: { adapters: { nope: 'none' } } } })
 		).toThrow(/unknown consent adapter "nope"/i)
 	})
+	it('accepts a runtime provider instance id, which config time cannot know', () => {
+		const consent = resolveOptions({
+			adapters,
+			capture: { consent: { adapters: { 'posthog:abc123': 'none' } } },
+		}).capture.consent
+		expect(consent('tenant', 'posthog:abc123', 'posthog')).toBe('none')
+		expect(consent('tenant', 'posthog:other', 'posthog')).toBe('required')
+	})
+})
+
+describe('resolveOptions capture.slots', () => {
+	const adapters = [memoryAdapter()]
+	it('throws when the global slot names an adapter the config does not carry', () => {
+		expect(() => resolveOptions({ adapters, capture: { slots: { global: 'nope' } } })).toThrow(
+			/unknown global capture slot adapter "nope"/i
+		)
+	})
+	it('accepts an unknown tenant slot id, resolved per request against the scope registry', () => {
+		const slots = resolveOptions({ adapters, capture: { slots: { tenant: 'posthog:abc123' } } })
+			.capture.slots
+		expect(slots.tenant).toBe('posthog:abc123')
+	})
 })
 
 describe('resolveOptions capture.autoCapture', () => {
 	const adapters = [memoryAdapter()]
-	it('turns every auto-capture listener on by default', () => {
+	it('turns every auto-capture listener on by default, except scroll depth', () => {
 		expect(resolveOptions({ adapters }).capture.autoCapture).toEqual({
-			scrollDepth: true,
+			scrollDepth: false,
 			outboundLinks: true,
 			fileDownloads: true,
 			goalAttribute: true,
 		})
 	})
 	it('overrides one toggle without disturbing the rest', () => {
-		const auto = resolveOptions({ adapters, capture: { autoCapture: { scrollDepth: false } } })
-			.capture.autoCapture
+		const auto = resolveOptions({
+			adapters,
+			capture: { autoCapture: { scrollDepth: true, fileDownloads: false } },
+		}).capture.autoCapture
 		expect(auto).toEqual({
-			scrollDepth: false,
+			scrollDepth: true,
 			outboundLinks: true,
-			fileDownloads: true,
+			fileDownloads: false,
 			goalAttribute: true,
 		})
 	})

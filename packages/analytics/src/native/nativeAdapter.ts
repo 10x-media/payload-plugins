@@ -183,11 +183,14 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		return docs as unknown as RollupDoc[]
 	}
 
+	const ingest = { path: options.ingestPath ?? INGEST_PATH }
+
 	return {
 		id: 'native',
 		label: 'Native (Payload)',
 		capabilities,
 		capture: nativeCapture,
+		ingest,
 		isConfigured: () => true,
 		flush: () => buffer?.flush() ?? Promise.resolve(),
 		register(config: Config, context) {
@@ -205,7 +208,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				...(config.endpoints ?? []),
 				{
 					method: 'post',
-					path: options.ingestPath ?? INGEST_PATH,
+					path: ingest.path,
 					handler: makeIngestHandler(geoResolver, () => buffer, {
 						scope: scoped ? context?.resolveScope : undefined,
 						timezone: context?.resolveTimezone,

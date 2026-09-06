@@ -147,10 +147,26 @@ describe('resolveTrackerConfig paths', () => {
 		expect(config.slots[0]?.snippet.scripts[0]?.src).toBe('/ph/static/array.js')
 	})
 
+	it('normalizes an override the way the Next rewrites helper mounts it', async () => {
+		for (const override of ['/ph/', 'ph', 'ph//']) {
+			const runtime = runtimeWith([posthogSlot()], { capturePaths: { global: override } })
+			const config = await resolveTrackerConfig({ runtime, req: req() })
+			expect(config.slots[0]?.path).toBe('/ph')
+		}
+	})
+
 	it('carries the native ingest path whether or not a native slot is filled', async () => {
 		const runtime = runtimeWith([posthogSlot()])
 		const config = await resolveTrackerConfig({ runtime, req: req() })
 		expect(config.ingestPath).toBe('/api/analytics/ingest')
+	})
+
+	it("follows the native adapter's own ingest mount when it moved", async () => {
+		const runtime = runtimeWith([native({ ingestPath: '/custom/ingest' })], {
+			ingestPath: '/custom/ingest',
+		})
+		const config = await resolveTrackerConfig({ runtime, req: req() })
+		expect(config.ingestPath).toBe('/api/custom/ingest')
 	})
 })
 
@@ -180,10 +196,10 @@ describe('resolveTrackerConfig consent', () => {
 describe('resolveTrackerConfig autoCapture and goals', () => {
 	const signup: Goal = { slug: 'signup', name: 'Signup', match: { kind: 'goal' } }
 
-	it('defaults every auto-capture toggle on', async () => {
+	it('defaults every auto-capture toggle on but scroll depth', async () => {
 		const config = await resolveTrackerConfig({ runtime: runtimeWith([native()]), req: req() })
 		expect(config.autoCapture).toEqual({
-			scrollDepth: true,
+			scrollDepth: false,
 			outboundLinks: true,
 			fileDownloads: true,
 			goalAttribute: true,

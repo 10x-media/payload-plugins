@@ -111,8 +111,9 @@ export type CaptureConsentOption =
 	| {
 			slots?: Partial<Record<CaptureSlot, ConsentMode>>
 			/**
-			 * Keyed by config adapter id, validated at config time. A runtime provider's id
-			 * is unknown then, so cover those with the resolver form instead.
+			 * Keyed by adapter id. A bare id must name a config adapter; a runtime provider
+			 * instance id (`<provider>:<instance>`) is taken on trust, since the providers it
+			 * comes from are only resolved per request.
 			 */
 			adapters?: Record<string, ConsentMode>
 	  }
@@ -318,8 +319,9 @@ export interface ResolvedOptions {
 	}
 }
 
+/** Scroll depth is the one listener off by default: it fires on every page, for every visitor. */
 export const DEFAULT_AUTO_CAPTURE: ResolvedAutoCapture = {
-	scrollDepth: true,
+	scrollDepth: false,
 	outboundLinks: true,
 	fileDownloads: true,
 	goalAttribute: true,
@@ -347,7 +349,9 @@ const resolveConsent = (
 		return (slot, adapterId) => option({ slot, adapterId })
 	}
 	for (const id of Object.keys(option?.adapters ?? {})) {
-		if (!adapters.some((a) => a.id === id)) {
+		// A runtime provider instance id is `<provider>:<instance>` and only exists once a
+		// scope resolves, so it cannot be checked here; a bare id must name a config adapter.
+		if (!id.includes(':') && !adapters.some((a) => a.id === id)) {
 			throw new Error(`analytics: unknown consent adapter "${id}"`)
 		}
 	}

@@ -228,6 +228,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				consentFor: resolved.capture.consent,
 				autoCapture: resolved.capture.autoCapture,
 				goals: resolved.goals,
+				ingestPath: resolved.adapters.find((a) => a.ingest)?.ingest?.path,
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,

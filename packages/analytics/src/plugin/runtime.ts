@@ -33,6 +33,11 @@ export interface AnalyticsRuntime {
 	/** Config goals; the tracker receives their slug and match only. */
 	goals?: Goal[]
 	/**
+	 * Where the ingest endpoint listens, relative to `routes.api`, lifted at init from the
+	 * adapter that registered one. Absent runtimes fall back to the default mount.
+	 */
+	ingestPath?: string
+	/**
 	 * `capture.proxy` limits for the runtime capture proxy. Deliberately separate from
 	 * `cache.timeoutMs`: that is a per-read provider deadline for authenticated dashboard
 	 * queries, this is a public request path with entirely different traffic.

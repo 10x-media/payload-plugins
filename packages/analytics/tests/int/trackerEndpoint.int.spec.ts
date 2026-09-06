@@ -27,7 +27,7 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 		booted = await bootPayload({
 			db,
 			plugin: analytics({
-				adapters: [native()],
+				adapters: [native({ ingestPath: '/analytics/collect' })],
 				scopeResolver: ({ req }) => {
 					const host = req.host?.split(':')[0] ?? null
 					if (host === 'boom.test') {
@@ -66,15 +66,17 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 		return (await res.json()) as TrackerConfig
 	}
 
+	// The ingest mount is moved deliberately: the config must follow the native adapter's
+	// own endpoint rather than restating the default path.
 	it('answers an anonymous request with the global slot and the ingest path', async () => {
 		const config = await body()
 		expect(config.slots.map((s) => [s.slot, s.adapterId, s.kind])).toEqual([
 			['global', 'native', 'native'],
 		])
 		expect(config.slots[0]?.requiresConsent).toBe(false)
-		expect(config.ingestPath).toBe('/api/analytics/ingest')
+		expect(config.ingestPath).toBe('/api/analytics/collect')
 		expect(config.autoCapture).toEqual({
-			scrollDepth: true,
+			scrollDepth: false,
 			outboundLinks: true,
 			fileDownloads: true,
 			goalAttribute: true,

@@ -40,4 +40,9 @@ describe('native capture', () => {
 		expect(capture?.client).toEqual({ kind: 'native' })
 		expect(JSON.parse(JSON.stringify(capture?.client))).toEqual({ kind: 'native' })
 	})
+
+	it('declares where its ingest endpoint listens, default and overridden', () => {
+		expect(native().ingest).toEqual({ path: '/analytics/ingest' })
+		expect(native({ ingestPath: '/custom/ingest' }).ingest).toEqual({ path: '/custom/ingest' })
+	})
 })

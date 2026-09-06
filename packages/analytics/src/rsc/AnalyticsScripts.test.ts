@@ -53,7 +53,9 @@ describe('AnalyticsScripts', () => {
 	})
 
 	it('leaves the inline init unescaped, so the snippet still parses', () => {
-		expect(render({ config: config() })).toContain('{api_host:"/api/analytics/p/tenant"')
+		const html = render({ config: config() })
+		expect(html).toContain('{api_host:"/api/analytics/p/tenant"')
+		expect(html).toContain('ui_host:"https://us.posthog.com"')
 	})
 
 	it('puts the nonce on every script it renders', () => {

@@ -159,6 +159,12 @@ export interface AnalyticsAdapter {
 	readonly capabilities: AnalyticsCapabilities
 	/** Browser-tracker proxying/boot descriptor. Absent when the adapter has no client-side script (GA4). */
 	readonly capture?: CaptureSupport
+	/**
+	 * Where this adapter's own ingest endpoint listens, relative to `routes.api`, for the
+	 * adapters that register one (the native engine). Server-side only: the tracker learns
+	 * the path from `TrackerConfig.ingestPath`, and this object is never serialized.
+	 */
+	readonly ingest?: { path: string }
 	isConfigured(): boolean
 	query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
 	realtime?(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>

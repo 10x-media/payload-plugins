@@ -1,3 +1,4 @@
+import { normalizeMountPath } from '../capture/mountPath'
 import type { AnalyticsAdapter } from '../core/contract'
 
 /** One Next.js rewrite entry (the shape `next.config` `rewrites()` returns). */
@@ -11,12 +12,6 @@ export interface CaptureRewriteMount {
 	/** Base path this adapter's proxy is mounted at, e.g. '/ph' or '/api/analytics/p/global'. */
 	path: string
 	adapter: AnalyticsAdapter
-}
-
-const normalizeMountPath = (path: string): string => {
-	const withLeading = path.startsWith('/') ? path : `/${path}`
-	const trimmed = withLeading.replace(/\/+$/, '')
-	return trimmed === '' ? '/' : trimmed
 }
 
 const assertNotRoot = (path: string): void => {
