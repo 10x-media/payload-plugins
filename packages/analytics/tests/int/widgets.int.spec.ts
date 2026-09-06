@@ -1,7 +1,10 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import type { Endpoint } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
+import { REALTIME_PATH } from '../../src/plugin/realtimeEndpoint'
+import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
 interface InspectedField {
 	name?: string
@@ -144,6 +147,40 @@ describeForDb(
 			const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
 			const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
 			expect(fieldNames).toContain('dataSource')
+		})
+	}
+)
+
+describeForDb(
+	'analytics dashboard widgets, open-world gating with providers.collection',
+	{ dbs: ['mongo'] },
+	(db) => {
+		let booted: BootedPayload
+
+		beforeAll(async () => {
+			// memoryAdapter has no realtime() method (despite capabilities.realtime: true),
+			// so the endpoint registers here only because providers.collection makes the
+			// gate open-world, not because the config adapter itself qualifies.
+			booted = await bootPayload({
+				plugin: analytics({ adapters: [memoryAdapter()], providers: { collection: true } }),
+				db,
+			})
+		})
+
+		afterAll(async () => {
+			await booted.stop()
+		})
+
+		it('registers the realtime endpoint even though the only config adapter has no realtime handler', () => {
+			const endpoint = (booted.payload.config.endpoints ?? []).find(
+				(e): e is Endpoint => typeof e === 'object' && e.path === REALTIME_PATH
+			)
+			expect(endpoint).toBeDefined()
+		})
+
+		it('registers the realtime widget even though the only config adapter has no realtime handler', () => {
+			const slugs = registeredWidgets(booted).map((w) => w.slug)
+			expect(slugs).toContain('analytics-realtime')
 		})
 	}
 )

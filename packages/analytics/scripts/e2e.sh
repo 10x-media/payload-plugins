@@ -27,5 +27,8 @@ pnpm --filter @10x-media/analytics build
 echo "Building dev app..."
 pnpm --filter @10x-media/analytics-dev build
 
-echo "Running Playwright e2e..."
-pnpm --filter @10x-media/analytics exec playwright test "$@"
+echo "Running Playwright e2e (TENANCY=off)..."
+TENANCY=off E2E_REUSE_SERVER=0 pnpm --filter @10x-media/analytics exec playwright test --grep-invert @tenancy "$@"
+
+echo "Running Playwright e2e (TENANCY=on)..."
+TENANCY=on E2E_REUSE_SERVER=0 pnpm --filter @10x-media/analytics exec playwright test --grep @tenancy "$@"

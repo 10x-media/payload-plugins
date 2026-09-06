@@ -1,9 +1,11 @@
 import type { PayloadRequest, TaskConfig, WidgetInstance } from 'payload'
 import type { DateRange, DimensionKey, MetricKey } from '../core/contract'
+import type { ScopesResolver } from '../core/options'
+import { resolveScopeList } from '../core/scopeList'
 import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { breakdownSpecBySlug } from '../widgets/breakdownTypes'
 import { resolveCustomRange } from '../widgets/range'
-import { readForWidget } from '../widgets/readForWidget'
+import { readForWidget, type WidgetReadStatus } from '../widgets/readForWidget'
 import { readForWidgetBreakdown } from '../widgets/readForWidgetBreakdown'
 import { readForWidgetSeries } from '../widgets/readForWidgetSeries'
 import { WIDGET_METRICS, type WidgetRange } from '../widgets/types'
@@ -160,8 +162,19 @@ const resolveLayout = async (
 	}
 }
 
-/** Run one target's read; returns true when the read served data (status `ok`). */
-const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Promise<boolean> => {
+interface TargetRunResult {
+	status: WidgetReadStatus
+	adapterId: string
+}
+
+/** Run one target's read for one scope; the caller decides how to count/log the status. */
+const runTarget = async (args: {
+	target: WarmTarget
+	req: PayloadRequest
+	now: Date
+	scope: string | null
+}): Promise<TargetRunResult> => {
+	const { target, req, now, scope } = args
 	if (target.kind === 'metric') {
 		const result = await readForWidget({
 			req,
@@ -170,8 +183,9 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 			adapterId: target.adapterId,
 			now,
 			range: target.range,
+			scope,
 		})
-		return result.status === 'ok'
+		return { status: result.status, adapterId: result.adapterId }
 	}
 	if (target.kind === 'series') {
 		const result = await readForWidgetSeries({
@@ -181,8 +195,9 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 			adapterId: target.adapterId,
 			now,
 			range: target.range,
+			scope,
 		})
-		return result.status === 'ok'
+		return { status: result.status, adapterId: result.adapterId }
 	}
 	const result = await readForWidgetBreakdown({
 		req,
@@ -193,8 +208,9 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 		adapterId: target.adapterId,
 		now,
 		range: target.range,
+		scope,
 	})
-	return result.status === 'ok'
+	return { status: result.status, adapterId: result.adapterId }
 }
 
 /**
@@ -203,27 +219,49 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
  * from `layout` (the app's `defaultLayout`, captured at registration and resolved here);
  * each read is isolated so one failing provider does not abort the rest. Most valuable
  * for slow or rate-limited provider adapters; native reads are cheap and harmless to warm.
+ * With `scopes` configured, every target runs once per tenant scope (plus the install-wide
+ * scope) so a multi-tenant install warms every tenant's dashboard, not just the null one.
  */
 export const warmTask = (
 	cron: string,
-	layout: WarmLayout
+	layout: WarmLayout,
+	scopes?: ScopesResolver
 ): TaskConfig<{ input: Record<string, never>; output: { warmed: number; failed: number } }> => ({
 	slug: WARM_TASK_SLUG,
 	handler: async ({ req }) => {
 		const targets = deriveWarmTargets(await resolveLayout(layout, req))
+		if (targets.length === 0) {
+			return { output: { warmed: 0, failed: 0 } }
+		}
+		const scopeList = await resolveScopeList(scopes, req.payload)
 		const now = new Date()
 		let warmed = 0
 		let failed = 0
-		for (const target of targets) {
-			try {
-				if (await runTarget(target, req, now)) {
-					warmed++
+		// A tenant-pass target that degrades (e.g. a shared config adapter gated for
+		// that scope) is not a failure, but a silent one leaves `warmed` unexplainably
+		// short of `scopes x targets`; warn once per (scope, adapter) so it is visible.
+		const warnedGated = new Set<string>()
+		for (const scope of scopeList) {
+			for (const target of targets) {
+				try {
+					const result = await runTarget({ target, req, now, scope })
+					if (result.status === 'ok') {
+						warmed++
+					} else if (scope !== null) {
+						const key = `${scope} ${result.adapterId}`
+						if (!warnedGated.has(key)) {
+							warnedGated.add(key)
+							req.payload.logger.warn(
+								`analytics warm-cache: scope "${scope}" adapter "${result.adapterId}" returned "${result.status}", skipping`
+							)
+						}
+					}
+				} catch (err) {
+					failed++
+					req.payload.logger.warn(
+						`analytics warm-cache: ${target.kind} read for "${target.metric}" (scope "${scope ?? ''}") failed: ${String(err)}`
+					)
 				}
-			} catch (err) {
-				failed++
-				req.payload.logger.warn(
-					`analytics warm-cache: ${target.kind} read for "${target.metric}" failed: ${String(err)}`
-				)
 			}
 		}
 		return { output: { warmed, failed } }

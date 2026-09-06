@@ -4,16 +4,18 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
-import { analytics, analyticsTab } from '../src/index'
-import { native } from '../src/native/nativeAdapter'
-import { devMemoryAdapter } from './helpers/adapters'
+import { analyticsTab } from '../src/index'
+import { singleFragment } from './config/single'
+import { tenancyFragment } from './config/tenancy'
 import { startMemoryMongo } from './helpers/memoryDb'
-import { DEV_REPORTING_TIMEZONE, seedDev } from './helpers/seed'
+import { seedDev } from './helpers/seed'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
+const tenancy = process.env.TENANCY === 'on'
+const fragment = tenancy ? tenancyFragment : singleFragment
 
 const users: CollectionConfig = {
 	slug: 'users',
@@ -60,96 +62,15 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users, pages],
-	plugins: [
-		analytics({
-			adapters: [native(), devMemoryAdapter],
-			cache: { warm: true },
-			// Surface analytics-daily in the dev nav so the sync tier is inspectable
-			// (hidden by default in real installs).
-			sync: { hidden: false },
-			reportingTimezone: DEV_REPORTING_TIMEZONE,
-			collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
-			providers: { collection: true },
-			widgets: {
-				register: [
-					{
-						slug: 'dev-custom-sources',
-						component: '/components/DevCustomWidget#default',
-						label: 'Custom: Top sources',
-						requires: { dimensions: ['source'] },
-					},
-				],
-			},
-		}),
-	],
+	collections: [users, pages, ...fragment.collections],
+	plugins: fragment.plugins,
 	telemetry: false,
 	onInit: async (payload) => {
-		await seedDev(payload)
+		await seedDev(payload, { tenancy })
 	},
 	typescript: { autoGenerate },
 	admin: {
 		importMap: { autoGenerate, baseDir: path.resolve(dirname) },
-		dashboard: {
-			widgets: [],
-			defaultLayout: [
-				{
-					widgetSlug: 'analytics-realtime',
-					width: 'small',
-					data: { metric: 'visitors', windowMinutes: '30' },
-				},
-				{
-					widgetSlug: 'analytics-trend',
-					width: 'large',
-					data: { metric: 'pageviews', timeframe: 'last30days' },
-				},
-				{
-					widgetSlug: 'analytics-trend',
-					width: 'large',
-					data: { metric: 'visitors', timeframe: 'last30days' },
-				},
-				{
-					widgetSlug: 'analytics-metric',
-					width: 'small',
-					data: { metric: 'pageviews', timeframe: 'last30days' },
-				},
-				{
-					widgetSlug: 'analytics-metric',
-					width: 'small',
-					data: { metric: 'visitors', timeframe: 'last30days' },
-				},
-				{
-					widgetSlug: 'analytics-metric',
-					width: 'small',
-					data: { metric: 'sessions', timeframe: 'last30days' },
-				},
-				{
-					widgetSlug: 'analytics-metric',
-					width: 'small',
-					data: { metric: 'avgDuration', timeframe: 'last30days' },
-				},
-				{
-					widgetSlug: 'analytics-breakdown-pages',
-					width: 'medium',
-					data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
-				},
-				{
-					widgetSlug: 'analytics-breakdown-sources',
-					width: 'medium',
-					data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
-				},
-				{
-					widgetSlug: 'analytics-breakdown-devices',
-					width: 'medium',
-					data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
-				},
-				{
-					widgetSlug: 'analytics-breakdown-countries',
-					width: 'medium',
-					data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
-				},
-				{ widgetSlug: 'dev-custom-sources', width: 'medium', data: {} },
-			],
-		},
+		dashboard: fragment.dashboard,
 	},
 })

@@ -36,6 +36,11 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			return config
 		}
 		const resolved = resolveOptions(options)
+		// A tenant's own runtime adapter (providers.collection or providers.resolve) has
+		// capabilities unknown at config time, so it opens the widget/endpoint gates that
+		// otherwise key off the config-adapter capability union.
+		const providersEnabled =
+			resolved.providers.collection.enabled || Boolean(resolved.providers.resolve)
 		const defaultLayout = config.admin?.dashboard?.defaultLayout
 		registerTranslations(config, options.translations)
 		const registry = createRegistry(resolved.adapters, resolved.defaultAdapter)
@@ -124,7 +129,8 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			adapter.register?.(config, { scoped: resolved.scoped, resolveScope, resolveTimezone })
 		}
 		if (
-			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function')
+			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function') ||
+			providersEnabled
 		) {
 			config.endpoints = [
 				...(config.endpoints ?? []),
@@ -142,13 +148,11 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
 		]
 		if (resolved.widgets.enabled) {
-			const multiProvider =
-				registry.isMultiProvider() ||
-				resolved.providers.collection.enabled ||
-				Boolean(resolved.providers.resolve)
+			const multiProvider = registry.isMultiProvider() || providersEnabled
 			registerWidgets(config, {
 				adapters: resolved.adapters,
 				multiProvider,
+				providersEnabled,
 				disabled: resolved.widgets.disabled,
 				register: resolved.widgets.register,
 				localizeText: resolved.widgets.localizeText,
@@ -158,7 +162,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		if (resolved.cache.warm.enabled) {
 			config.jobs = {
 				...config.jobs,
-				tasks: [...(config.jobs?.tasks ?? []), warmTask(resolved.cache.warm.cron, defaultLayout)],
+				tasks: [
+					...(config.jobs?.tasks ?? []),
+					warmTask(resolved.cache.warm.cron, defaultLayout, resolved.scopes),
+				],
 			}
 		}
 		if (resolved.sync.enabled) {
@@ -180,6 +187,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 						lookbackDays: resolved.sync.lookbackDays,
 						collectionSlug: resolved.sync.collectionSlug,
 						adapterIds: resolved.sync.adapters,
+						scopes: resolved.scopes,
 					}),
 				],
 			}
@@ -207,6 +215,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveScope,
 				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
+				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
@@ -236,6 +245,7 @@ export type {
 	ProvidersOptions,
 	ProvidersResolve,
 	ScopeResolver,
+	ScopesResolver,
 	TimezoneResolver,
 } from './core/options'
 export type {

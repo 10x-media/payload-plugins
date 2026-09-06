@@ -37,6 +37,8 @@ analytics({
 
 The job registers a Payload task (`analytics-warm-cache`) whose work list derives from your `admin.dashboard.defaultLayout`: each metric, trend, and breakdown widget becomes one warm read with the same metric, timeframe, and data source it renders. The realtime widget is skipped (the live poller keeps it warm), as is any custom widget whose read shape the plugin cannot know. One provider failure is logged and does not abort the rest.
 
+On a [multi-tenant](/analytics/multi-tenancy) install, configure `scopes` to fan the same work list out per tenant: every target runs once for the install-wide scope (unchanged) plus once per scope `scopes()` returns, each pass resolving that tenant's own runtime providers. Without `scopes`, warming stays install-wide only, even with `providers.collection` enabled. See [Cron tiers](/analytics/multi-tenancy#5-cron-tiers).
+
 Warming is off by default because it spends provider API quota on a schedule. It pays off most for provider-backed dashboards; the native engine is fast enough that warming it is harmless but low value.
 
 <Callout>

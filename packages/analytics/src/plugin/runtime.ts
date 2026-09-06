@@ -14,6 +14,8 @@ export interface AnalyticsRuntime {
 	resolveTimezone?: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	/** Id of the config adapter shared by every scope, when one is designated. */
 	platformAdapterId?: string
+	/** True when the app configured a scopeResolver (scoped install); mirrors `resolved.scoped`. */
+	scoped?: boolean
 	/**
 	 * Ids of the config-time adapters shared by every scope (the ones passed to
 	 * `adapters` in plugin options). Runtime provider adapters (resolved per scope

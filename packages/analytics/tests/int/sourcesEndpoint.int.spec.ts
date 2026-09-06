@@ -15,6 +15,8 @@ const scopeByEmail: Record<string, string | null> = {
 	'c@t.dev': 'tenant-c',
 }
 
+const BROKEN_EMAIL = 'broken@t.dev'
+
 const login = async (payload: Payload, email: string) => {
 	const password = 'test-pass-1234'
 	await payload.create({ collection: 'access-users', data: { email, password } })
@@ -29,6 +31,7 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 	let userA: Awaited<ReturnType<typeof login>>
 	let userB: Awaited<ReturnType<typeof login>>
 	let userC: Awaited<ReturnType<typeof login>>
+	let userBroken: Awaited<ReturnType<typeof login>>
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -36,8 +39,11 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [memoryAdapter()],
-				scopeResolver: ({ req }) =>
-					scopeByEmail[(req.user as { email?: string })?.email ?? ''] ?? null,
+				scopeResolver: ({ req }) => {
+					const email = (req.user as { email?: string })?.email ?? ''
+					if (email === BROKEN_EMAIL) throw new Error('scope resolution boom')
+					return scopeByEmail[email] ?? null
+				},
 				access: { platformRead: () => false },
 				providers: { collection: true },
 			}),
@@ -45,6 +51,7 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 		userA = await login(booted.payload, 'a@t.dev')
 		userB = await login(booted.payload, 'b@t.dev')
 		userC = await login(booted.payload, 'c@t.dev')
+		userBroken = await login(booted.payload, BROKEN_EMAIL)
 	}, 240_000)
 
 	afterAll(async () => {
@@ -127,5 +134,62 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 		} finally {
 			await booted.payload.delete({ collection: SLUG as never, id: doc.id, overrideAccess: true })
 		}
+	})
+
+	it('answers empty when scope resolution throws, rather than falling back to the config registry', async () => {
+		const res = await handler(reqFor(userBroken))
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as SourcesBody
+		expect(body.defaultId).toBeNull()
+		expect(body.sources).toEqual([])
+	})
+})
+
+describeForDb('analytics sources endpoint - null scope gating', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+	let tenantUser: Awaited<ReturnType<typeof login>>
+	let platformUser: Awaited<ReturnType<typeof login>>
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			collections: [accessUsers],
+			db,
+			plugin: analytics({
+				adapters: [memoryAdapter()],
+				scopeResolver: () => null,
+				access: {
+					platformRead: ({ req }) =>
+						(req.user as { email?: string } | null)?.email === 'platform@t.dev',
+				},
+			}),
+		})
+		tenantUser = await login(booted.payload, 'tenant@t.dev')
+		platformUser = await login(booted.payload, 'platform@t.dev')
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const handler = makeSourcesHandler()
+	const reqFor = (user: unknown): PayloadRequest =>
+		({ user, payload: booted.payload }) as unknown as PayloadRequest
+
+	type SourcesBody = { defaultId: string | null; sources: unknown[] }
+
+	it('answers empty for a tenant user whose resolver yields no scope', async () => {
+		const res = await handler(reqFor(tenantUser))
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as SourcesBody
+		expect(body.defaultId).toBeNull()
+		expect(body.sources).toEqual([])
+	})
+
+	it('answers the full registry for a platformRead-granted user', async () => {
+		const res = await handler(reqFor(platformUser))
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as SourcesBody
+		expect(body.defaultId).toBe('memory')
+		expect(body.sources.length).toBeGreaterThan(0)
 	})
 })

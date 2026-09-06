@@ -17,7 +17,7 @@ import { bumpRollup } from '../../src/native/rollups/bumpRollup'
 import { computeRollupDeltas } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
-import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
 import { startOfDayInTz } from '../../src/timeframe/tz'
 import { readForWidget } from '../../src/widgets/readForWidget'
 
@@ -881,79 +881,119 @@ describeForDb('native hostname family uniqueness', {}, (db) => {
 	})
 })
 
-describeForDb('analytics sync tier: scope coexistence', {}, (db) => {
+describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 	const DAY = 86_400_000
-	const mem = memoryAdapter()
 	let booted: BootedPayload
+	let memRoot: MemoryAnalyticsAdapter
+	let memT1: MemoryAnalyticsAdapter
+	let memT2: MemoryAnalyticsAdapter
+	let memShared: MemoryAnalyticsAdapter
 
 	beforeAll(async () => {
+		memRoot = { ...memoryAdapter(), id: 'memory:root' }
+		memT1 = { ...memoryAdapter(), id: 'memory:t1' }
+		memT2 = { ...memoryAdapter(), id: 'memory:t2' }
+		// A CONFIG adapter (declared in `adapters`, not resolved per scope) that never
+		// declares scopedQueries: it cannot narrow its own query to one tenant, so the
+		// sync loop must only pull it for the install-wide (null) pass.
+		memShared = { ...memoryAdapter(), id: 'shared' }
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [native(), mem],
+				adapters: [native(), memShared],
 				sync: true,
 				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				scopes: () => ['t1', 't2'],
+				providers: {
+					resolve: ({ scope }) => {
+						if (scope === 't1') return [memT1]
+						if (scope === 't2') return [memT2]
+						return [memRoot]
+					},
+				},
 			}),
 			db,
 		})
-		mem.record({ path: '/p', timestamp: new Date(Date.now() - DAY), visitor: 'a' })
+		const t = new Date(Date.now() - DAY)
+		memRoot.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memRoot.record({ path: '/p', timestamp: t, visitor: 'b' })
+		memT1.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memT2.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memT2.record({ path: '/p', timestamp: t, visitor: 'b' })
+		memT2.record({ path: '/p', timestamp: t, visitor: 'c' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'b' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'c' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'd' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'e' })
 	})
 
 	afterAll(async () => {
 		await booted.stop()
 	})
 
-	const reqFor = (tenant: string): PayloadRequest =>
-		({
-			payload: booted.payload,
-			headers: new Headers({ 'x-tenant': tenant }),
-		}) as unknown as PayloadRequest
+	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
 
-	const runSync = async (tenant: string): Promise<{ synced: number; failed: number }> => {
+	const runSync = async (): Promise<{ synced: number; failed: number }> => {
 		const task = syncTask({
 			cron: '0 */6 * * *',
 			lookbackDays: 3,
 			collectionSlug: 'analytics-daily',
+			scopes: () => ['t1', 't2'],
 		})
 		const handler = task.handler
 		if (typeof handler !== 'function') {
 			throw new Error('sync handler must be a function')
 		}
-		const result = await handler({ req: reqFor(tenant) } as unknown as Parameters<
-			typeof handler
-		>[0])
+		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
 		return (result as { output: { synced: number; failed: number } }).output
 	}
 
-	it(`upserts one row per scope, coexisting for the same (source, date) on ${db}`, async () => {
-		await runSync('t1')
-		await runSync('t2')
+	it(`syncs one row per scope, each reading that scope's own resolved provider on ${db}`, async () => {
+		const out = await runSync()
+		expect(out.failed).toBe(0)
+		expect(out.synced).toBe(4)
 		const docs = await booted.payload.find({
 			collection: 'analytics-daily' as never,
 			limit: 100,
 			overrideAccess: true,
 		})
 		const byScope = new Map(
-			(docs.docs as unknown as Array<{ scope: string; source: string; pageviews: number }>).map(
-				(d) => [d.scope, d]
-			)
+			(docs.docs as unknown as Array<{ scope: string; source: string; pageviews: number }>)
+				.filter((d) => d.source !== 'shared')
+				.map((d) => [d.scope, d])
 		)
+		expect(byScope.get('')?.pageviews).toBe(2)
 		expect(byScope.get('t1')?.pageviews).toBe(1)
-		expect(byScope.get('t2')?.pageviews).toBe(1)
+		expect(byScope.get('t2')?.pageviews).toBe(3)
 	})
 
-	it(`is idempotent per scope: re-run updates in place with no duplicates on ${db}`, async () => {
+	it(`only ever syncs a shared (non-scoped) config adapter into the install-wide scope on ${db}`, async () => {
+		const docs = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			where: { source: { equals: 'shared' } },
+			limit: 100,
+			overrideAccess: true,
+		})
+		const rows = docs.docs as unknown as Array<{ scope: string; pageviews: number }>
+		expect(rows).toHaveLength(1)
+		expect(rows[0]?.scope).toBe('')
+		expect(rows[0]?.pageviews).toBe(5)
+	})
+
+	it(`is idempotent across scopes: a second run updates in place with no duplicates on ${db}`, async () => {
 		const before = await booted.payload.find({
 			collection: 'analytics-daily' as never,
 			limit: 0,
 			overrideAccess: true,
 		})
-		await runSync('t1')
+		await runSync()
 		const after = await booted.payload.find({
 			collection: 'analytics-daily' as never,
 			limit: 0,
 			overrideAccess: true,
 		})
 		expect(after.totalDocs).toBe(before.totalDocs)
+		expect(after.totalDocs).toBe(4)
 	})
 
 	it(`a tenant's find with overrideAccess: false returns only their scope's rows on ${db}`, async () => {
@@ -966,5 +1006,63 @@ describeForDb('analytics sync tier: scope coexistence', {}, (db) => {
 		})
 		expect(docs.length).toBeGreaterThan(0)
 		expect((docs as unknown as Array<{ scope: string }>).every((d) => d.scope === 't1')).toBe(true)
+	})
+})
+
+describeForDb('analytics sync tier: per-scope resolution isolation', {}, (db) => {
+	const DAY = 86_400_000
+	let booted: BootedPayload
+	let memT2: MemoryAnalyticsAdapter
+
+	beforeAll(async () => {
+		memT2 = { ...memoryAdapter(), id: 'memory:t2' }
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native()],
+				sync: true,
+				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				scopes: () => ['t1', 't2'],
+				providers: {
+					resolve: ({ scope }) => {
+						if (scope === 't1') throw new Error('boom')
+						if (scope === 't2') return [memT2]
+						return []
+					},
+				},
+			}),
+			db,
+		})
+		const t = new Date(Date.now() - DAY)
+		memT2.record({ path: '/p', timestamp: t, visitor: 'a' })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
+
+	it(`a registry resolution failure for one scope does not abort the others on ${db}`, async () => {
+		const task = syncTask({
+			cron: '0 */6 * * *',
+			lookbackDays: 3,
+			collectionSlug: 'analytics-daily',
+			scopes: () => ['t1', 't2'],
+		})
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('sync handler must be a function')
+		}
+		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
+		const out = (result as { output: { synced: number; failed: number } }).output
+		expect(out.failed).toBeGreaterThanOrEqual(1)
+		expect(out.synced).toBeGreaterThanOrEqual(1)
+		const docs = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			where: { scope: { equals: 't2' } },
+			limit: 100,
+			overrideAccess: true,
+		})
+		expect(docs.docs.length).toBeGreaterThanOrEqual(1)
 	})
 })
