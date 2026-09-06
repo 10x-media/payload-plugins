@@ -1,9 +1,10 @@
 export { convert, roundTo } from '../fields/measurement/engine/convert'
-export type { FormatMeasurementOptions } from '../fields/measurement/engine/format'
+export type { FormatMeasurementOptions, LocalizedLabel } from '../fields/measurement/engine/format'
 export {
 	compose,
 	decompose,
 	formatMeasurement,
+	resolveLocalizedLabel,
 	unitLabel,
 } from '../fields/measurement/engine/format'
 export type { MeasurementSystem } from '../fields/measurement/engine/locale'

@@ -5,7 +5,9 @@ import {
 	type FormattableUnit,
 	formatMeasurement as formatMeasurementBuiltIn,
 	formatScalarValue,
+	type LocalizedLabel,
 	scalarLongLabelFor,
+	scalarShortLabelFor,
 	unitLabel as unitLabelBuiltIn,
 } from './format'
 import { DIMENSION_LOCALE_DEFAULTS } from './locale'
@@ -26,7 +28,10 @@ export type CustomUnitDef = {
 	offset?: number
 	/** ECMA-402 unit identifier, or null when there is none: formatting falls back to plain decimal + shortLabel. */
 	intlUnit: string | null
-	shortLabel: string
+	/** A plain string applies to every locale; a map resolves exact locale, then language prefix, then 'en'. */
+	shortLabel: LocalizedLabel
+	/** Long-form label, same resolution as shortLabel. Defaults to shortLabel when omitted. */
+	longLabel?: LocalizedLabel
 	/** Display fraction digits for this unit. Defaults to 2 when omitted. */
 	precision?: number
 }
@@ -107,6 +112,7 @@ const mergeUnits = (custom?: MeasurementCustomConfig): Record<string, MergedUnit
 			offset: def.offset,
 			intlUnit: def.intlUnit,
 			shortLabel: def.shortLabel,
+			longLabel: def.longLabel,
 			precision: def.precision ?? 2,
 		}
 	}
@@ -190,7 +196,7 @@ export const createEngine = (custom?: MeasurementCustomConfig) => {
 	const unitLabel = (unit: string, locale: string, style: 'long' | 'short'): string => {
 		if (isCompoundUnitId(unit)) return unitLabelBuiltIn(unit, locale, style)
 		const def = getUnit(unit)
-		return style === 'short' ? def.shortLabel : scalarLongLabelFor(def, locale)
+		return style === 'short' ? scalarShortLabelFor(def, locale) : scalarLongLabelFor(def, locale)
 	}
 
 	const formatMeasurement = (value: number, opts: EngineFormatMeasurementOptions): string => {

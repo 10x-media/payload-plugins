@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest'
-import { compose, decompose, formatMeasurement, unitLabel } from './format'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+	compose,
+	decompose,
+	formatMeasurement,
+	formatScalarValue,
+	resolveLocalizedLabel,
+	unitLabel,
+} from './format'
 
 describe('decompose/compose', () => {
 	it('decomposes cm to feet and inches with carry', () => {
@@ -77,5 +84,54 @@ describe('unitLabel', () => {
 	it('short labels are the static symbols', () => {
 		expect(unitLabel('kg', 'en-US', 'short')).toBe('kg')
 		expect(unitLabel('ft-in', 'en-US', 'short')).toBe('ft in')
+	})
+	it('derives short labels per locale for built-in units with an intlUnit', () => {
+		expect(unitLabel('lb', 'en-US', 'short')).toBe('lb')
+		expect(unitLabel('kg', 'de-DE', 'short')).toBe('kg')
+		const ru = unitLabel('lb', 'ru-RU', 'short')
+		expect(ru).not.toBe('lb')
+		expect(ru.length).toBeGreaterThan(0)
+	})
+	it('falls back to shortLabel when a custom unit has no intlUnit', () => {
+		expect(
+			formatScalarValue(1.5, {
+				digits: 1,
+				locale: 'en-US',
+				unit: { intlUnit: null, shortLabel: 'nmi' },
+				unitDisplay: 'short',
+			})
+		).toBe('1.5 nmi')
+	})
+})
+
+describe('resolveLocalizedLabel', () => {
+	it('passes a plain string through unchanged', () => {
+		expect(resolveLocalizedLabel('nmi', 'de-AT')).toBe('nmi')
+	})
+	it('resolves the exact locale', () => {
+		expect(resolveLocalizedLabel({ 'de-AT': 'sm-at', en: 'nmi' }, 'de-AT')).toBe('sm-at')
+	})
+	it('falls back to the language prefix', () => {
+		expect(resolveLocalizedLabel({ de: 'sm', en: 'nmi' }, 'de-AT')).toBe('sm')
+	})
+	it('falls back to the en entry', () => {
+		expect(resolveLocalizedLabel({ en: 'nmi', fr: 'mn' }, 'de-AT')).toBe('nmi')
+	})
+	it('falls back to the first value when no candidate matches', () => {
+		expect(resolveLocalizedLabel({ fr: 'mn' }, 'de-AT')).toBe('mn')
+	})
+})
+
+describe('formatter caching', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+	it('reuses one Intl.NumberFormat instance across identical calls', () => {
+		const ctorSpy = vi.spyOn(Intl, 'NumberFormat')
+		const first = formatMeasurement(10, { displayUnit: 'kg', locale: 'en-US', storageUnit: 'kg' })
+		const callsAfterFirst = ctorSpy.mock.calls.length
+		const second = formatMeasurement(20, { displayUnit: 'kg', locale: 'en-US', storageUnit: 'kg' })
+		expect(second).not.toBe(first)
+		expect(ctorSpy.mock.calls.length).toBe(callsAfterFirst)
 	})
 })

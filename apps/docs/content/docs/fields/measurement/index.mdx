@@ -95,9 +95,11 @@ measurementField({
 })
 ```
 
-`CustomUnitDef` is `{ dimension, factor, offset?, intlUnit, shortLabel, precision? }`: linear (or affine, with `offset`) against the dimension's canonical unit, same as the built-ins. `CustomDimensionDef` is `{ canonicalUnit }`, naming one of `custom.units` with `factor: 1` and no `offset` as that dimension's canonical. Both travel with the field's `clientProps` as plain data, so the client rebuilds the same engine without a bundle of conversion code shipping separately. Custom unit and dimension ids can't collide with a built-in one; the factory throws at config time if they do.
+`CustomUnitDef` is `{ dimension, factor, offset?, intlUnit, shortLabel, longLabel?, precision? }`: linear (or affine, with `offset`) against the dimension's canonical unit, same as the built-ins. `CustomDimensionDef` is `{ canonicalUnit }`, naming one of `custom.units` with `factor: 1` and no `offset` as that dimension's canonical. Both travel with the field's `clientProps` as plain data, so the client rebuilds the same engine without a bundle of conversion code shipping separately. Custom unit and dimension ids can't collide with a built-in one; the factory throws at config time if they do.
 
-`intlUnit: null` means the unit has no ECMA-402 identifier for `Intl.NumberFormat`'s `style: 'unit'`. Formatting falls back to a plain localized decimal plus `shortLabel` (`"1.5 nmi"` rather than an `Intl`-rendered unit string), and the unit picker's long label falls back to `shortLabel` too.
+`intlUnit: null` means the unit has no ECMA-402 identifier for `Intl.NumberFormat`'s `style: 'unit'`. Formatting falls back to a plain localized decimal plus `shortLabel` (`"1.5 nmi"` rather than an `Intl`-rendered unit string), and the unit picker's long label falls back to `longLabel`, then `shortLabel`.
+
+`shortLabel` and `longLabel` each accept either a plain string, used for every locale, or a `LocalizedLabel` map keyed by locale (`{ en: 'nmi', de: 'sm' }`). Resolution tries the exact admin locale, then its language prefix (`de` for `de-AT`), then the map's `en` entry, then whichever value comes first, so a partial map never renders blank. Built-in units with an `intlUnit` never consult this map: their short and long labels are always derived from `Intl.NumberFormat` per locale.
 
 Compound units (`ft-in`, `st-lb`) are always built-in: custom units are scalar-only. A field can still store in a custom unit and display a compound one, or the reverse; the engine bridges through the compound's built-in major unit, converting your custom storage value into it before splitting into major/minor. The nautical-mile example above works the same way if you add `'ft-in'` to `units`.
 

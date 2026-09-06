@@ -43,6 +43,10 @@ describe('createEngine: custom units', () => {
 	it('defaults precision to 2 when omitted', () => {
 		expect(engine.precisionFor('nmi')).toBe(2)
 	})
+	it('resolves a plain-string shortLabel the same for every locale', () => {
+		expect(engine.unitLabel('nmi', 'en-US', 'short')).toBe('nmi')
+		expect(engine.unitLabel('nmi', 'de-DE', 'short')).toBe('nmi')
+	})
 	it('lists the custom unit alongside built-ins for its dimension', () => {
 		const units = engine.unitsOfDimension('length')
 		expect(units).toContain('nmi')
@@ -57,6 +61,40 @@ describe('createEngine: custom units', () => {
 		expect(
 			engine.formatMeasurement(1, { displayUnit: 'ft-in', locale: 'en-US', storageUnit: 'nmi' })
 		).toBe('6,076 ft 1 in')
+	})
+})
+
+describe('createEngine: localized custom labels', () => {
+	const custom: MeasurementCustomConfig = {
+		units: {
+			nmi: {
+				dimension: 'length',
+				factor: 1852,
+				intlUnit: null,
+				longLabel: { 'de-AT': 'Seemeile (AT)', de: 'Seemeile', en: 'nautical mile' },
+				shortLabel: { de: 'sm', en: 'nmi', fr: 'mn' },
+			},
+		},
+	}
+	const engine = createEngine(custom)
+
+	it('resolves the exact locale entry', () => {
+		expect(engine.unitLabel('nmi', 'fr', 'short')).toBe('mn')
+	})
+	it('falls back to the language prefix', () => {
+		expect(engine.unitLabel('nmi', 'de-AT', 'short')).toBe('sm')
+		expect(engine.unitLabel('nmi', 'de-AT', 'long')).toBe('Seemeile (AT)')
+	})
+	it('falls back to the en entry when neither exact nor prefix match', () => {
+		expect(engine.unitLabel('nmi', 'ja-JP', 'short')).toBe('nmi')
+	})
+	it('falls back to the first value when there is no en entry', () => {
+		const noEnglish = createEngine({
+			units: {
+				nmi: { dimension: 'length', factor: 1852, intlUnit: null, shortLabel: { fr: 'mn' } },
+			},
+		})
+		expect(noEnglish.unitLabel('nmi', 'ja-JP', 'short')).toBe('mn')
 	})
 })
 
