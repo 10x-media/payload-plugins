@@ -1,6 +1,8 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { ResolvedBinding } from '../binding/types'
+import type { ConsentPolicy, ResolvedAutoCapture } from '../core/options'
 import type { AdapterRegistry, RegistryResolver, ResolveRegistryArgs } from '../core/registry'
+import type { Goal } from '../goals/types'
 import type { Engine } from '../surfacing/engine'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 
@@ -16,6 +18,20 @@ export interface AnalyticsRuntime {
 	platformAdapterId?: string
 	/** `capture.slots` overrides naming the adapter that fills each capture slot. */
 	captureSlots?: { global?: string; tenant?: string }
+	/**
+	 * `capture.paths` overrides for a slot's mount. Unset, the tracker config derives the
+	 * runtime proxy mount; set when the slot is served through Next rewrites instead.
+	 */
+	capturePaths?: { global?: string; tenant?: string }
+	/**
+	 * Whether a slot's tracker waits for consent, evaluated per request-resolved adapter.
+	 * Absent runtimes fall back to the default: no gate for native, one for a vendor.
+	 */
+	consentFor?: ConsentPolicy
+	/** Browser auto-capture toggles handed to the tracker; absent runtimes default all on. */
+	autoCapture?: ResolvedAutoCapture
+	/** Config goals; the tracker receives their slug and match only. */
+	goals?: Goal[]
 	/**
 	 * `capture.proxy` limits for the runtime capture proxy. Deliberately separate from
 	 * `cache.timeoutMs`: that is a per-read provider deadline for authenticated dashboard

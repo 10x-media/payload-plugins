@@ -2,9 +2,12 @@ import type { KeysConfig } from '@10x-media/fields/encrypted'
 import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import { DEFAULT_PROXY_MAX_BODY_BYTES, DEFAULT_PROXY_TIMEOUT_MS } from '../capture/proxyEndpoint'
+import type { CaptureSlot } from '../capture/slots'
+import { GOAL_SLUG_PATTERN, type Goal } from '../goals/types'
 import { PROVIDERS_SLUG } from '../providers/collection'
 import type { TranslationsOption } from '../translations'
 import type { CustomWidgetDef } from '../widgets/customWidget'
+import type { CaptureClientKind } from './capture'
 import type { AnalyticsAdapter } from './contract'
 
 const DEFAULT_WARM_CRON = '*/30 * * * *'
@@ -91,6 +94,48 @@ export type AnalyticsAccessOptions = {
 	platformRead?: PlatformReadAccess
 }
 
+export type ConsentMode = 'none' | 'required'
+
+/** Per-slot consent decision, evaluated against the slot's resolved adapter. */
+export type ConsentResolver = (args: { slot: CaptureSlot; adapterId: string }) => ConsentMode
+
+/**
+ * A bare mode applies to every slot; a resolver decides per request-resolved adapter; the
+ * object form maps ids and slots, with an adapter entry winning over a slot entry. Every
+ * form overrides the default, which is `none` for the cookieless native tracker and
+ * `required` for a vendor's.
+ */
+export type CaptureConsentOption =
+	| ConsentMode
+	| ConsentResolver
+	| {
+			slots?: Partial<Record<CaptureSlot, ConsentMode>>
+			/**
+			 * Keyed by config adapter id, validated at config time. A runtime provider's id
+			 * is unknown then, so cover those with the resolver form instead.
+			 */
+			adapters?: Record<string, ConsentMode>
+	  }
+
+/** The normalized policy the runtime evaluates; `kind` carries the adapter's tracker family. */
+export type ConsentPolicy = (
+	slot: CaptureSlot,
+	adapterId: string,
+	kind: CaptureClientKind
+) => ConsentMode
+
+export type AutoCaptureOptions = {
+	scrollDepth?: boolean
+	outboundLinks?: boolean
+	fileDownloads?: boolean
+	goalAttribute?: boolean
+}
+
+export type ResolvedAutoCapture = Required<AutoCaptureOptions>
+
+/** Goals as config: the array form, or the object form 1b grows a collection source on. */
+export type AnalyticsGoalsOptions = { defaults?: Goal[] }
+
 export type AnalyticsCaptureOptions = {
 	/**
 	 * Which adapter fills each capture slot, overriding the defaults: `global` is the
@@ -100,6 +145,16 @@ export type AnalyticsCaptureOptions = {
 	 * so it is resolved per request rather than validated at config time.
 	 */
 	slots?: { global?: string; tenant?: string }
+	/**
+	 * Mount each slot's snippet points at. Defaults to the runtime proxy endpoint
+	 * (`<routes.api>/analytics/p/<slot>`); set it when the slot is served through Next
+	 * rewrites instead, passing the same path `captureRewrites` was mounted at.
+	 */
+	paths?: { global?: string; tenant?: string }
+	/** Whether a slot's tracker waits for consent. Native defaults to no gate, vendors to one. */
+	consent?: CaptureConsentOption
+	/** Browser auto-capture listeners, all on by default. */
+	autoCapture?: AutoCaptureOptions
 	/** Limits for the public runtime capture proxy, separate from the read-path `cache`. */
 	proxy?: {
 		/**
@@ -153,6 +208,11 @@ export type AnalyticsPluginOptions = {
 	access?: AnalyticsAccessOptions
 	capture?: AnalyticsCaptureOptions
 	/**
+	 * Conversion goals the tracker and the native ingest match events against. Slugs must
+	 * be unique and kebab-case; only the slug and its match reach the browser.
+	 */
+	goals?: Goal[] | AnalyticsGoalsOptions
+	/**
 	 * Per-collection bindings, keyed by collection slug. With generated types
 	 * augmented, each slug's resolvers receive that collection's typed document.
 	 */
@@ -199,6 +259,14 @@ export type AnalyticsPluginOptions = {
 		  }
 }
 
+export interface ResolvedCapture {
+	slots: { global?: string; tenant?: string }
+	paths: { global?: string; tenant?: string }
+	consent: ConsentPolicy
+	autoCapture: ResolvedAutoCapture
+	proxy: { timeoutMs: number; maxBodyBytes: number }
+}
+
 export interface ResolvedOptions {
 	adapters: AnalyticsAdapter[]
 	defaultAdapter?: string
@@ -211,10 +279,9 @@ export interface ResolvedOptions {
 	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
 	access: { platformRead: PlatformReadAccess }
-	capture: {
-		slots: { global?: string; tenant?: string }
-		proxy: { timeoutMs: number; maxBodyBytes: number }
-	}
+	capture: ResolvedCapture
+	/** Config goals, validated; 1b layers collection-sourced goals on top of these. */
+	goals: Goal[]
 	providers: {
 		collection: {
 			enabled: boolean
@@ -249,6 +316,58 @@ export interface ResolvedOptions {
 		/** True hides the analytics-daily collection from the admin nav (default). */
 		hidden: boolean
 	}
+}
+
+export const DEFAULT_AUTO_CAPTURE: ResolvedAutoCapture = {
+	scrollDepth: true,
+	outboundLinks: true,
+	fileDownloads: true,
+	goalAttribute: true,
+}
+
+const resolveAutoCapture = (option: AutoCaptureOptions | undefined): ResolvedAutoCapture => ({
+	scrollDepth: option?.scrollDepth ?? DEFAULT_AUTO_CAPTURE.scrollDepth,
+	outboundLinks: option?.outboundLinks ?? DEFAULT_AUTO_CAPTURE.outboundLinks,
+	fileDownloads: option?.fileDownloads ?? DEFAULT_AUTO_CAPTURE.fileDownloads,
+	goalAttribute: option?.goalAttribute ?? DEFAULT_AUTO_CAPTURE.goalAttribute,
+})
+
+/** Cookieless native capture needs no consent gate; a vendor's tracker does. */
+export const defaultConsentFor = (kind: CaptureClientKind): ConsentMode =>
+	kind === 'native' ? 'none' : 'required'
+
+const resolveConsent = (
+	option: CaptureConsentOption | undefined,
+	adapters: AnalyticsAdapter[]
+): ConsentPolicy => {
+	if (option === 'none' || option === 'required') {
+		return () => option
+	}
+	if (typeof option === 'function') {
+		return (slot, adapterId) => option({ slot, adapterId })
+	}
+	for (const id of Object.keys(option?.adapters ?? {})) {
+		if (!adapters.some((a) => a.id === id)) {
+			throw new Error(`analytics: unknown consent adapter "${id}"`)
+		}
+	}
+	return (slot, adapterId, kind) =>
+		option?.adapters?.[adapterId] ?? option?.slots?.[slot] ?? defaultConsentFor(kind)
+}
+
+const resolveGoals = (option: AnalyticsPluginOptions['goals']): Goal[] => {
+	const goals = Array.isArray(option) ? option : (option?.defaults ?? [])
+	const seen = new Set<string>()
+	for (const goal of goals) {
+		if (!GOAL_SLUG_PATTERN.test(goal.slug)) {
+			throw new Error(`analytics: goal slug "${goal.slug}" must be kebab-case`)
+		}
+		if (seen.has(goal.slug)) {
+			throw new Error(`analytics: duplicate goal slug "${goal.slug}"`)
+		}
+		seen.add(goal.slug)
+	}
+	return goals
 }
 
 const resolveBindings = (
@@ -383,11 +502,18 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 				global: options.capture?.slots?.global,
 				tenant: options.capture?.slots?.tenant,
 			},
+			paths: {
+				global: options.capture?.paths?.global,
+				tenant: options.capture?.paths?.tenant,
+			},
+			consent: resolveConsent(options.capture?.consent, options.adapters),
+			autoCapture: resolveAutoCapture(options.capture?.autoCapture),
 			proxy: {
 				timeoutMs: options.capture?.proxy?.timeoutMs ?? DEFAULT_PROXY_TIMEOUT_MS,
 				maxBodyBytes: options.capture?.proxy?.maxBodyBytes ?? DEFAULT_PROXY_MAX_BODY_BYTES,
 			},
 		},
+		goals: resolveGoals(options.goals),
 		providers,
 		bindings: resolveBindings(options.collections),
 		cache: {

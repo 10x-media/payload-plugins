@@ -10,6 +10,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../core/contract'
+import { INGEST_PATH } from '../plugin/paths'
 import { EVENTS_SLUG, eventsCollection } from './collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from './collections/rollups'
 import { seenCollection } from './collections/seen'
@@ -204,7 +205,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				...(config.endpoints ?? []),
 				{
 					method: 'post',
-					path: options.ingestPath ?? '/analytics/ingest',
+					path: options.ingestPath ?? INGEST_PATH,
 					handler: makeIngestHandler(geoResolver, () => buffer, {
 						scope: scoped ? context?.resolveScope : undefined,
 						timezone: context?.resolveTimezone,

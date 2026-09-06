@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Goal } from '../goals/types'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { resolveOptions } from './options'
 
@@ -315,5 +316,114 @@ describe('resolveOptions bindings', () => {
 		expect(() => resolveOptions({ adapters: [adapter], collections: { pages: {} } })).toThrow(
 			/pages.*path.*pathField/i
 		)
+	})
+})
+
+describe('resolveOptions capture.paths', () => {
+	const adapters = [memoryAdapter()]
+	it('leaves both slot paths unset so the resolver derives the proxy mount', () => {
+		expect(resolveOptions({ adapters }).capture.paths).toEqual({})
+	})
+	it('carries per-slot path overrides through', () => {
+		const r = resolveOptions({ adapters, capture: { paths: { tenant: '/ph' } } })
+		expect(r.capture.paths).toEqual({ tenant: '/ph' })
+	})
+})
+
+describe('resolveOptions capture.consent', () => {
+	const adapters = [memoryAdapter()]
+	it('defaults native to none and every vendor kind to required', () => {
+		const consent = resolveOptions({ adapters }).capture.consent
+		expect(consent('global', 'native', 'native')).toBe('none')
+		expect(consent('tenant', 'ph', 'posthog')).toBe('required')
+		expect(consent('tenant', 'pl', 'plausible')).toBe('required')
+	})
+	it('lets a bare mode force every slot, native included', () => {
+		const consent = resolveOptions({ adapters, capture: { consent: 'required' } }).capture.consent
+		expect(consent('global', 'native', 'native')).toBe('required')
+	})
+	it('passes the slot and adapter id to a resolver form', () => {
+		const consent = resolveOptions({
+			adapters,
+			capture: {
+				consent: ({ slot, adapterId }) =>
+					slot === 'tenant' && adapterId === 'ph' ? 'none' : 'required',
+			},
+		}).capture.consent
+		expect(consent('tenant', 'ph', 'posthog')).toBe('none')
+		expect(consent('global', 'ph', 'posthog')).toBe('required')
+	})
+	it('resolves an adapter entry over a slot entry over the kind default', () => {
+		const consent = resolveOptions({
+			adapters,
+			capture: { consent: { slots: { tenant: 'none' }, adapters: { memory: 'required' } } },
+		}).capture.consent
+		expect(consent('tenant', 'memory', 'posthog')).toBe('required')
+		expect(consent('tenant', 'other', 'posthog')).toBe('none')
+		expect(consent('global', 'other', 'posthog')).toBe('required')
+		expect(consent('global', 'other', 'native')).toBe('none')
+	})
+	it('throws when a consent entry names an adapter the config does not carry', () => {
+		expect(() =>
+			resolveOptions({ adapters, capture: { consent: { adapters: { nope: 'none' } } } })
+		).toThrow(/unknown consent adapter "nope"/i)
+	})
+})
+
+describe('resolveOptions capture.autoCapture', () => {
+	const adapters = [memoryAdapter()]
+	it('turns every auto-capture listener on by default', () => {
+		expect(resolveOptions({ adapters }).capture.autoCapture).toEqual({
+			scrollDepth: true,
+			outboundLinks: true,
+			fileDownloads: true,
+			goalAttribute: true,
+		})
+	})
+	it('overrides one toggle without disturbing the rest', () => {
+		const auto = resolveOptions({ adapters, capture: { autoCapture: { scrollDepth: false } } })
+			.capture.autoCapture
+		expect(auto).toEqual({
+			scrollDepth: false,
+			outboundLinks: true,
+			fileDownloads: true,
+			goalAttribute: true,
+		})
+	})
+})
+
+describe('resolveOptions goals', () => {
+	const adapters = [memoryAdapter()]
+	const signup: Goal = { slug: 'signup', name: 'Signup', match: { kind: 'goal' } }
+	const purchase: Goal = {
+		slug: 'purchase',
+		name: 'Purchase',
+		match: { kind: 'event', name: 'purchase' },
+		value: { prop: 'total' },
+		currency: 'EUR',
+	}
+	it('defaults to no goals', () => {
+		expect(resolveOptions({ adapters }).goals).toEqual([])
+	})
+	it('accepts the array form', () => {
+		expect(resolveOptions({ adapters, goals: [signup, purchase] }).goals).toEqual([
+			signup,
+			purchase,
+		])
+	})
+	it('accepts the object form, whose collection source arrives later', () => {
+		expect(resolveOptions({ adapters, goals: { defaults: [signup] } }).goals).toEqual([signup])
+	})
+	it('throws on a duplicate slug', () => {
+		expect(() =>
+			resolveOptions({ adapters, goals: [signup, { ...signup, name: 'Other' }] })
+		).toThrow(/duplicate goal slug "signup"/i)
+	})
+	it('throws on a slug that is not kebab-case', () => {
+		for (const slug of ['Sign Up', 'sign_up', '-signup', 'signup-']) {
+			expect(() => resolveOptions({ adapters, goals: [{ ...signup, slug }] })).toThrow(
+				/kebab-case/i
+			)
+		}
 	})
 })

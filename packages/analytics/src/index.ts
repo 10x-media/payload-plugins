@@ -1,6 +1,7 @@
 import { type Config, definePlugin, type PayloadRequest } from 'payload'
 
 import { proxyEndpoints } from './capture/proxyEndpoint'
+import { trackerEndpoint } from './capture/trackerEndpoint'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
@@ -151,7 +152,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		// A runtime provider's capture support is unknown at config time, so providers
 		// alone are enough to mount the proxy; every slot is still resolved per request.
 		if (resolved.adapters.some((a) => a.capture) || providersEnabled) {
-			config.endpoints = [...config.endpoints, ...proxyEndpoints()]
+			config.endpoints = [...config.endpoints, ...proxyEndpoints(), trackerEndpoint()]
 		}
 		if (resolved.widgets.enabled) {
 			const multiProvider = registry.isMultiProvider() || providersEnabled
@@ -222,7 +223,11 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
 				captureSlots: resolved.capture.slots,
+				capturePaths: resolved.capture.paths,
 				captureProxy: resolved.capture.proxy,
+				consentFor: resolved.capture.consent,
+				autoCapture: resolved.capture.autoCapture,
+				goals: resolved.goals,
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
@@ -247,8 +252,13 @@ export { PLATFORM_SCOPE } from './core/contract'
 export type {
 	AnalyticsAccessOptions,
 	AnalyticsCaptureOptions,
+	AnalyticsGoalsOptions,
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
+	AutoCaptureOptions,
+	CaptureConsentOption,
+	ConsentMode,
+	ConsentResolver,
 	PlatformReadAccess,
 	ProvidersCollectionOptions,
 	ProvidersOptions,
@@ -272,6 +282,7 @@ export {
 	analyticsTab,
 	analyticsTabsField,
 } from './fields/factories'
+export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'
 export { analyticsDefaultWidgets } from './widgets/defaults'
