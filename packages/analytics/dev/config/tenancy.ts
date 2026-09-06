@@ -50,6 +50,8 @@ export const tenancyFragment: DevConfigFragment = {
 			collections: sharedBindings,
 			providers: { collection: { scopeField: 'tenant' } },
 			widgets: sharedWidgets,
+			// Dev-only shortcut: attributing by the admin's tenant-selector cookie. A real
+			// install must resolve ingest scope from the request's hostname or site key.
 			scopeResolver: ({ req }) => {
 				const t = getTenantFromCookie(req.headers, req.payload.db.defaultIDType)
 				return t === null ? null : String(t)

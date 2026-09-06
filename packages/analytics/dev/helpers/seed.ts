@@ -51,9 +51,9 @@ const pageviewsForDay = (day: number): number =>
 
 /**
  * Builds a deterministic span of pageview events. `scale` multiplies the daily volume
- * (tenancy mode gives alpha and beta different scales so their traffic is visibly
- * different); `scope` stamps every event for a scoped tenant, omitted for the
- * install-wide pass so those events land in the unscoped native buckets.
+ * (alpha and beta get different scales in tenancy mode); `scope` stamps every event.
+ * A scoped install has no scope-less bucket family (rollups make `scope` required,
+ * '' = null scope), so omitting it is only correct for a genuinely unscoped install.
  */
 const buildSeedEvents = (
 	now: Date,
@@ -266,7 +266,9 @@ export const seedDev = async (
 	}
 
 	const events = [
-		...buildSeedEvents(new Date()),
+		// Tenancy mode is a scoped install, so even the install-wide pass needs the
+		// explicit null-scope stamp ('') rather than an absent scope key.
+		...buildSeedEvents(new Date(), tenants ? { scope: '' } : {}),
 		...(tenants
 			? buildSeedEvents(new Date(), { scale: ALPHA_SCALE, scope: String(tenants.alpha.id) })
 			: []),
