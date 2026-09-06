@@ -129,3 +129,52 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 		}
 	})
 })
+
+describeForDb('analytics sources endpoint - null scope gating', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+	let tenantUser: Awaited<ReturnType<typeof login>>
+	let platformUser: Awaited<ReturnType<typeof login>>
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			collections: [accessUsers],
+			db,
+			plugin: analytics({
+				adapters: [memoryAdapter()],
+				scopeResolver: () => null,
+				access: {
+					platformRead: ({ req }) =>
+						(req.user as { email?: string } | null)?.email === 'platform@t.dev',
+				},
+			}),
+		})
+		tenantUser = await login(booted.payload, 'tenant@t.dev')
+		platformUser = await login(booted.payload, 'platform@t.dev')
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const handler = makeSourcesHandler()
+	const reqFor = (user: unknown): PayloadRequest =>
+		({ user, payload: booted.payload }) as unknown as PayloadRequest
+
+	type SourcesBody = { defaultId: string | null; sources: unknown[] }
+
+	it('answers empty for a tenant user whose resolver yields no scope', async () => {
+		const res = await handler(reqFor(tenantUser))
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as SourcesBody
+		expect(body.defaultId).toBeNull()
+		expect(body.sources).toEqual([])
+	})
+
+	it('answers the full registry for a platformRead-granted user', async () => {
+		const res = await handler(reqFor(platformUser))
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as SourcesBody
+		expect(body.defaultId).toBe('memory')
+		expect(body.sources.length).toBeGreaterThan(0)
+	})
+})

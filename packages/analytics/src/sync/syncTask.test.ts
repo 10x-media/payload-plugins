@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AnalyticsRow } from '../core/contract'
-import { toSyncRow } from './syncTask'
+import { matchesAdapterFilter, toSyncRow } from './syncTask'
 
 const now = new Date('2026-06-24T12:00:00.000Z')
 
@@ -51,5 +51,21 @@ describe('toSyncRow', () => {
 		const doc = toSyncRow('x', row as AnalyticsRow, { syncedAt: now })
 		expect(doc?.pageviews).toBe(5)
 		expect(doc && 'visitors' in doc).toBe(false)
+	})
+})
+
+describe('matchesAdapterFilter', () => {
+	it('is unfiltered when adapterIds is unset', () => {
+		expect(matchesAdapterFilter(undefined, 'plausible:abc')).toBe(true)
+	})
+
+	it('matches a runtime instance id by its provider prefix', () => {
+		expect(matchesAdapterFilter(['plausible'], 'plausible:abc')).toBe(true)
+		expect(matchesAdapterFilter(['plausible'], 'posthog:def')).toBe(false)
+	})
+
+	it('matches a config adapter id exactly', () => {
+		expect(matchesAdapterFilter(['plausible'], 'plausible')).toBe(true)
+		expect(matchesAdapterFilter(['plausible'], 'umami')).toBe(false)
 	})
 })

@@ -29,17 +29,31 @@ export interface ResolveReadContextArgs {
  * Resolve one read's scope and adapter: explicit scope wins over the request's
  * resolved scope, the registry is resolved per scope, then the adapter is picked
  * by id (or the registry default). Cross-scope reads fail closed behind
- * `platformRead`: an explicit `'*'` scope always, and any scoped read through a
- * shared config adapter that cannot narrow the query to one scope, whether or
- * not it is the designated platform adapter. A tenant's own runtime adapters
- * are never gated. Any resolution failure (unknown adapter id, a throwing
- * scopeResolver or provider lookup) degrades to `{ ok: false }` so read paths
- * render their unavailable state instead of throwing.
+ * `platformRead`: an explicit `'*'` scope always, any scoped read through a
+ * shared config adapter that cannot narrow the query to one scope (whether or
+ * not it is the designated platform adapter), and, on a scoped install, a
+ * request that resolves no scope at all. That last case is ambiguous rather
+ * than intentionally install-wide (a tenant's scopeResolver returning null
+ * usually means "no tenant selected", not "read everything"), so it fails
+ * closed the same way. An explicit `scope: null` override bypasses that gate:
+ * it is the trusted server-side caller's path (cron passes, tests), never a
+ * request's own resolution. A tenant's own runtime adapters are never gated.
+ * Any resolution failure (unknown adapter id, a throwing scopeResolver or
+ * provider lookup) degrades to `{ ok: false }` so read paths render their
+ * unavailable state instead of throwing.
  */
 export const resolveReadContext = async (args: ResolveReadContextArgs): Promise<ReadContext> => {
 	const { runtime, req, adapterId } = args
 	try {
 		const scope = args.scope !== undefined ? args.scope : await resolveScopeFor(runtime, req)
+		if (
+			runtime.scoped &&
+			args.scope === undefined &&
+			scope === null &&
+			!(await platformReadFor(runtime, req))
+		) {
+			return { ok: false }
+		}
 		const registryScope = scope === PLATFORM_SCOPE ? null : scope
 		const registry = await resolveRegistryFor(runtime, {
 			payload: req.payload,

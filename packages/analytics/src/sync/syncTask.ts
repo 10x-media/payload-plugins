@@ -18,6 +18,7 @@ export interface SyncTaskOptions {
 	cron: string
 	lookbackDays: number
 	collectionSlug: string
+	/** Entries match a config adapter id exactly, and a runtime provider instance (`<provider>:<docId>`) by its provider type. */
 	adapterIds?: string[]
 	/** Tenant scopes to fan out over, in addition to the install-wide scope every run already covers. */
 	scopes?: ScopesResolver
@@ -48,6 +49,23 @@ export const toSyncRow = (
 		}
 	}
 	return doc
+}
+
+/**
+ * True when `adapterIds` is unset, or `adapterId` is listed exactly, or (for a
+ * runtime instance id shaped `<provider>:<docId>`) its provider type is listed.
+ */
+export const matchesAdapterFilter = (
+	adapterIds: string[] | undefined,
+	adapterId: string
+): boolean => {
+	if (!adapterIds) {
+		return true
+	}
+	if (adapterIds.includes(adapterId)) {
+		return true
+	}
+	return adapterIds.includes(adapterId.split(':')[0] ?? adapterId)
 }
 
 const startOfUtcDay = (d: Date): Date =>
@@ -120,7 +138,7 @@ export const syncTask = (
 				if (adapter.id === 'native') {
 					continue
 				}
-				if (opts.adapterIds && !opts.adapterIds.includes(adapter.id)) {
+				if (!matchesAdapterFilter(opts.adapterIds, adapter.id)) {
 					continue
 				}
 				// A shared config adapter that cannot narrow its query to one tenant would

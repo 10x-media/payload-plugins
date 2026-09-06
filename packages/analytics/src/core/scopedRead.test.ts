@@ -151,3 +151,34 @@ describe('resolveReadContext platform gating', () => {
 		}
 	})
 })
+
+describe('resolveReadContext scoped-install null-scope gating', () => {
+	const userReq = { payload: {}, user: { id: 1 } } as unknown as PayloadRequest
+
+	it('fails closed when a scoped install resolves no scope and platformRead denies', async () => {
+		const runtime = runtimeWith({ scoped: true, platformRead: () => false })
+		const ctx = await resolveReadContext({ runtime, req: userReq })
+		expect(ctx.ok).toBe(false)
+	})
+
+	it('stays ok when a scoped install resolves no scope but platformRead grants', async () => {
+		const runtime = runtimeWith({ scoped: true, platformRead: () => true })
+		const ctx = await resolveReadContext({ runtime, req: userReq })
+		expect(ctx.ok).toBe(true)
+		if (ctx.ok) {
+			expect(ctx.scope).toBeNull()
+		}
+	})
+
+	it('bypasses the gate for an explicit null scope regardless of platformRead', async () => {
+		const runtime = runtimeWith({ scoped: true, platformRead: () => false })
+		const ctx = await resolveReadContext({ runtime, req: userReq, scope: null })
+		expect(ctx.ok).toBe(true)
+	})
+
+	it('leaves an unscoped install ungated for a null resolution', async () => {
+		const runtime = runtimeWith({ platformRead: () => false })
+		const ctx = await resolveReadContext({ runtime, req: userReq })
+		expect(ctx.ok).toBe(true)
+	})
+})

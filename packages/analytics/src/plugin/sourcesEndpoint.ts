@@ -1,7 +1,7 @@
 import type { PayloadHandler } from 'payload'
 import { serializeCapabilities } from '../core/capabilities'
 import { SOURCES_PATH } from './paths'
-import { getRuntime, resolveRegistryFor, resolveScopeFor } from './runtime'
+import { getRuntime, platformReadFor, resolveRegistryFor, resolveScopeFor } from './runtime'
 
 export { SOURCES_PATH }
 
@@ -9,8 +9,11 @@ export { SOURCES_PATH }
  * Authenticated GET listing the adapters visible to the requesting scope, with
  * serialized capabilities for client-side pickers. Always answers for the
  * caller's own resolved scope; there is deliberately no scope parameter, so a
- * tenant can never enumerate another tenant's sources. Resolution failures
- * degrade to the static config registry the same way reads do.
+ * tenant can never enumerate another tenant's sources. On a scoped install, a
+ * request that resolves no scope at all is ambiguous, not install-wide, so it
+ * answers empty rather than leaking the static config registry, unless
+ * `platformRead` grants it. Resolution failures degrade to the static config
+ * registry the same way reads do.
  */
 export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
@@ -22,6 +25,9 @@ export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 	}
 	try {
 		const scope = await resolveScopeFor(runtime, req)
+		if (runtime.scoped && scope === null && !(await platformReadFor(runtime, req))) {
+			return Response.json({ defaultId: null, sources: [] })
+		}
 		const registry = await resolveRegistryFor(runtime, { payload: req.payload, req, scope })
 		const sources = registry.all().map((a) => ({
 			id: a.id,
