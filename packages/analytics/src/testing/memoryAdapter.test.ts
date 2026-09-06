@@ -46,6 +46,47 @@ describe('memoryAdapter', () => {
 		expect(result.totals?.pageviews).toBe(1)
 	})
 
+	it('failNext makes the next query() call reject, then resets to normal behavior', async () => {
+		const a = memoryAdapter()
+		a.record({ path: '/pricing', timestamp: new Date('2026-01-10') })
+		a.failNext()
+
+		await expect(
+			a.query(
+				{
+					metrics: ['pageviews'],
+					dateRange: { start: new Date('2026-01-01'), end: new Date('2026-01-31') },
+				},
+				{}
+			)
+		).rejects.toThrow('memory: injected failure')
+
+		const result = await a.query(
+			{
+				metrics: ['pageviews'],
+				dateRange: { start: new Date('2026-01-01'), end: new Date('2026-01-31') },
+			},
+			{}
+		)
+		expect(result.totals?.pageviews).toBe(1)
+	})
+
+	it('failNext accepts a custom error', async () => {
+		const a = memoryAdapter()
+		const custom = new Error('boom')
+		a.failNext(custom)
+
+		await expect(
+			a.query(
+				{
+					metrics: ['pageviews'],
+					dateRange: { start: new Date('2026-01-01'), end: new Date('2026-01-31') },
+				},
+				{}
+			)
+		).rejects.toThrow('boom')
+	})
+
 	it('drops a filter for a dimension it cannot serve instead of throwing', async () => {
 		const a = memoryAdapter()
 		a.record({ path: '/pricing', timestamp: new Date('2026-01-10') })

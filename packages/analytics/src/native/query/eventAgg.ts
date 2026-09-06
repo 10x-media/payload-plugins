@@ -40,9 +40,12 @@ const FILTER_OPERATOR: Record<'eq' | 'contains', string> = { eq: 'equals', conta
  * this is just the safety net so a stray unsupported filter never throws.
  * `contains` is case-insensitive on both DBs; on Postgres its value is a raw ILIKE
  * pattern (`%`/`_` act as wildcards), while Mongo regex-escapes the value first.
+ * One fragment per filter under `and`, not merged by key: two filters on the same field
+ * (e.g. two `eq` values) must both constrain the query rather than the later one silently
+ * overwriting the earlier one.
  */
 export const filtersToWhere = (filters: AnalyticsFilter[]): Record<string, unknown> => {
-	const where: Record<string, unknown> = {}
+	const fragments: Record<string, unknown>[] = []
 	for (const filter of filters) {
 		const field = EVENT_FIELD[filter.dimension]
 		if (!field || filter.operator === 'matches') {
@@ -52,9 +55,9 @@ export const filtersToWhere = (filters: AnalyticsFilter[]): Record<string, unkno
 		if (!op) {
 			continue
 		}
-		where[field] = { ...(where[field] as object | undefined), [op]: filter.value }
+		fragments.push({ [field]: { [op]: filter.value } })
 	}
-	return where
+	return fragments.length > 0 ? { and: fragments } : {}
 }
 
 interface Bucket {

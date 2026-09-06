@@ -15,6 +15,8 @@ export const satisfiesSerialized = (
 	if (req.perPageQuery && !caps.perPageQuery) return false
 	if (req.metrics?.some((m) => !caps.metrics.includes(m))) return false
 	if (req.dimensions?.some((d) => !caps.dimensions.includes(d))) return false
+	if (req.filters?.some((d) => !caps.filters.includes(d))) return false
+	if (req.filterOperators?.some((op) => !caps.filterOperators.includes(op))) return false
 	return true
 }
 

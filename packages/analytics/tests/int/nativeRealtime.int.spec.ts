@@ -47,4 +47,35 @@ describeForDb('native realtime', { dbs: ['mongo'] }, (db) => {
 		expect(result?.totals).toEqual({ visitors: 2, pageviews: 3 })
 		expect(result?.meta.provider).toBe('native')
 	})
+
+	it('narrows to a single host when q.hostname is set on a realtime read', async () => {
+		const now = new Date('2026-06-24T13:00:00.000Z')
+		const at = (minAgo: number) => new Date(now.getTime() - minAgo * 60_000).toISOString()
+		const rows = [
+			{ visitorHash: 'd', hostname: 'h', minAgo: 1 },
+			{ visitorHash: 'e', hostname: 'h2', minAgo: 1 },
+		]
+		for (const r of rows) {
+			await booted.payload.create({
+				collection: EVENTS_SLUG as never,
+				data: {
+					timestamp: at(r.minAgo),
+					type: 'pageview',
+					path: '/p',
+					hostname: r.hostname,
+					visitorHash: r.visitorHash,
+					sessionId: r.visitorHash,
+				} as never,
+			})
+		}
+		const dateRange = { start: new Date(now.getTime() - 10 * 60_000), end: now }
+		const combined = await adapter.realtime?.({ metrics: ['pageviews'], dateRange }, {})
+		expect(combined?.totals).toEqual({ pageviews: 2 })
+
+		const scopedToH = await adapter.realtime?.(
+			{ metrics: ['pageviews'], dateRange, hostname: 'h' },
+			{}
+		)
+		expect(scopedToH?.totals).toEqual({ pageviews: 1 })
+	})
 })

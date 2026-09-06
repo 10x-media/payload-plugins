@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WireSource } from './fetchSources'
-import { narrowMetricOptions } from './narrow'
+import { narrowMetricOptions, satisfiesSerialized } from './narrow'
 
 const source = (
 	id: string,
@@ -73,5 +73,26 @@ describe('narrowMetricOptions', () => {
 			requires: { dimensions: ['country'] },
 		})
 		expect(out.map((o) => o.value)).toEqual(['pageviews'])
+	})
+})
+
+describe('satisfiesSerialized', () => {
+	const caps = source('x', ['pageviews']).capabilities
+
+	it('fails a filters requirement the source cannot serve', () => {
+		expect(satisfiesSerialized(caps, { filters: ['country'] })).toBe(false)
+	})
+
+	it('passes a filters requirement the source can serve', () => {
+		const withFilters = { ...caps, filters: ['country'] as never }
+		expect(satisfiesSerialized(withFilters, { filters: ['country'] })).toBe(true)
+	})
+
+	it('fails a filterOperators requirement the source cannot serve', () => {
+		expect(satisfiesSerialized(caps, { filterOperators: ['contains'] })).toBe(false)
+	})
+
+	it('passes a filterOperators requirement the source can serve', () => {
+		expect(satisfiesSerialized(caps, { filterOperators: ['eq'] })).toBe(true)
 	})
 })

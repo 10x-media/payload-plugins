@@ -1,3 +1,4 @@
+import { ProviderHttpError } from '../adapters/http/fetchJson'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -43,10 +44,13 @@ const capabilities: AnalyticsCapabilities = {
 export interface MemoryAnalyticsAdapter extends AnalyticsAdapter {
 	record(event: MemoryEvent): void
 	reset(): void
+	/** Test seam for engine resilience: the next query() call rejects with err, then resets. */
+	failNext(err?: Error): void
 }
 
 export function memoryAdapter(): MemoryAnalyticsAdapter {
 	const events: MemoryEvent[] = []
+	let pendingFailure: Error | undefined
 
 	// Only page has a backing MemoryEvent field; other declared dimensions drop as unsupported.
 	const matchesFilters = (e: MemoryEvent, q: AnalyticsQuery): boolean =>
@@ -74,7 +78,15 @@ export function memoryAdapter(): MemoryAnalyticsAdapter {
 		reset: () => {
 			events.length = 0
 		},
+		failNext: (err) => {
+			pendingFailure = err ?? new ProviderHttpError(500, 'memory', 'memory: injected failure')
+		},
 		async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+			if (pendingFailure) {
+				const err = pendingFailure
+				pendingFailure = undefined
+				throw err
+			}
 			const matched = events.filter((e) => inRange(e, q))
 			const countVisitors = (list: MemoryEvent[]): number =>
 				new Set(list.map((e) => e.visitor ?? e.path + e.timestamp.toDateString())).size

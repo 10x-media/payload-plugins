@@ -50,6 +50,13 @@ describe('resolveOptions', () => {
 	it('throws when no adapters are supplied', () => {
 		expect(() => resolveOptions({ adapters: [] })).toThrow(/at least one adapter/i)
 	})
+	it('defaults cache.timeoutMs to 15000', () => {
+		expect(resolveOptions({ adapters: [memoryAdapter()] }).cache.timeoutMs).toBe(15_000)
+	})
+	it('keeps an explicit cache.timeoutMs override', () => {
+		const r = resolveOptions({ adapters: [memoryAdapter()], cache: { timeoutMs: 5_000 } })
+		expect(r.cache.timeoutMs).toBe(5_000)
+	})
 })
 
 describe('resolveOptions providers', () => {

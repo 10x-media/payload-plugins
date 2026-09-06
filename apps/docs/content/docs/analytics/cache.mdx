@@ -42,3 +42,49 @@ Warming is off by default because it spends provider API quota on a schedule. It
 <Callout>
 The warm task runs through Payload's jobs runner. Enable cron `autoRun`, run a [worker](/jobs/workers), or invoke the queue from an external scheduler, or the schedule never fires. The same applies to [sync](/analytics/sync) and retention pruning.
 </Callout>
+
+## Resilience
+
+Every provider read runs under a timeout, retries transient failures with backoff, respects the adapter's declared rate limits, and can serve a stale cached result rather than fail outright.
+
+### Timeout
+
+```ts
+analytics({
+  adapters: [/* ... */],
+  cache: {
+    timeoutMs: 15000, // default; per-read budget in ms
+  },
+})
+```
+
+`cache.timeoutMs` bounds one adapter read end to end, including any retries and time spent waiting on the rate limiter. Past the budget, the in-flight request is aborted and the read fails over to a stale cache entry if one is available, otherwise it degrades to an empty or unavailable state.
+
+### Retry policy
+
+A failed read retries only when the failure looks transient. The policy is fixed and not configurable:
+
+| Failure | Retries |
+|---|---|
+| HTTP 429 or 5xx | Up to 2, with exponential backoff |
+| Other HTTP 4xx | None (treated as a caller bug) |
+| Aborted (timeout) | None |
+| Non-HTTP (network error) | 1 |
+
+### Rate limiting
+
+Each adapter declares its own provider rate limits through `capabilities.rateLimit`, and the engine throttles reads per adapter with a token bucket so a burst of dashboard reads never exceeds what the provider allows:
+
+| Adapter | Limit |
+|---|---|
+| PostHog | 240 requests/minute, 2400 requests/hour |
+| Plausible | 600 requests/hour |
+| GA4 | 10 concurrent requests |
+| Umami, native | None declared |
+
+A limiter waits for a free slot rather than rejecting outright; that wait counts against `cache.timeoutMs`.
+
+### Stale-while-error
+
+When a cache entry expires and the refresh fails, the engine falls back to serving that expired entry rather than surfacing the failure, as long as the entry is still within a 24 hour stale window. The result carries `meta.stale: true` so callers can distinguish a fresh read from a stale one. Past the 24 hour window, or with no cached entry at all, the read degrades to an unavailable state instead. Every failed refresh is logged with the adapter id, never the underlying credentials.
+
