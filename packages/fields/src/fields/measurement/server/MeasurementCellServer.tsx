@@ -1,4 +1,4 @@
-import type { ClientField, DefaultServerCellComponentProps } from 'payload'
+import type { DefaultServerCellComponentProps } from 'payload'
 import { MeasurementCell } from '../client/MeasurementCell'
 import { MEASUREMENT_CUSTOM_KEY, type MeasurementClientOptions } from '../options'
 import { resolveRegistryDefault } from './resolveRegistryDefault'
@@ -12,6 +12,10 @@ type MeasurementCellServerComponentProps = {
  * the edit view. Payload's cell props carry no `req` (packages/payload/src/admin/elements/Cell.ts),
  * so the viewer's saved preference still can't be read here; the client provider
  * still supplies that reactively once it mounts.
+ *
+ * `field` and `onClick` are never forwarded to the client cell: the sanitized
+ * server Field carries functions (our hooks/validate, Payload's own sanitize-installed
+ * validate), and React's flight serializer throws on functions in client props.
  */
 export const MeasurementCellServer = (props: MeasurementCellServerComponentProps) => {
 	const {
@@ -23,7 +27,6 @@ export const MeasurementCellServer = (props: MeasurementCellServerComponentProps
 		field,
 		link,
 		linkURL,
-		onClick,
 		payload,
 		rowData,
 		viewType,
@@ -49,16 +52,12 @@ export const MeasurementCellServer = (props: MeasurementCellServerComponentProps
 			collectionSlug={collectionSlug}
 			columnIndex={columnIndex}
 			customCellProps={customCellProps}
-			// The server cell props carry the sanitized Field, not ClientField; MeasurementCell
-			// never reads this prop, it only drives off measurementOptions.
-			field={field as unknown as ClientField}
 			link={link}
 			linkURL={linkURL}
 			measurementOptions={{
 				...measurementOptions,
 				...(registryDefault !== undefined ? { registryDefault } : {}),
 			}}
-			onClick={onClick}
 			rowData={rowData}
 			viewType={viewType}
 		/>

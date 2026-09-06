@@ -1,5 +1,5 @@
 'use client'
-import type { DefaultCellComponentProps } from 'payload'
+import type { ClientField, DefaultCellComponentProps } from 'payload'
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '../../../translations/useTranslation'
@@ -10,9 +10,16 @@ import { resolveDisplayUnit } from './editModel'
 import { useMeasurementUnits } from './MeasurementUnitsProvider'
 import './measurementCell.css'
 
+/**
+ * `field` and `onClick` are excluded and re-added as optional: the RSC cell only
+ * carries the server-sanitized Field (which serializes functions Payload attaches,
+ * e.g. hooks/validate), never a ClientField, and no onClick handler crosses the
+ * flight boundary. This cell reads neither, so both stay optional rather than forced.
+ */
 export type MeasurementCellProps = {
 	measurementOptions: MeasurementResolvedClientOptions
-} & DefaultCellComponentProps
+	field?: ClientField
+} & Omit<DefaultCellComponentProps, 'field' | 'onClick'>
 
 export const MeasurementCell: React.FC<MeasurementCellProps> = (props) => {
 	const { cellData, measurementOptions } = props
