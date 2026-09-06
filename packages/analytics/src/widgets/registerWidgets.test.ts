@@ -4,6 +4,7 @@ import type { AnalyticsAdapter, DimensionKey, MetricKey } from '../core/contract
 import { native } from '../native/nativeAdapter'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { findMetricField, registerWidgets, widgetIsSupported } from './registerWidgets'
+import { WIDGET_METRICS } from './types'
 
 const bareConfig = (): Config => ({}) as Config
 
@@ -30,6 +31,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -42,6 +44,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: ['analytics-metric'],
 			register: [],
 		})
@@ -54,6 +57,7 @@ describe('registerWidgets', () => {
 		registerWidgets(single, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -61,6 +65,7 @@ describe('registerWidgets', () => {
 		registerWidgets(multi, {
 			adapters: [native(), memoryAdapter()],
 			multiProvider: true,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -83,6 +88,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native(), memoryAdapter()],
 			multiProvider: true,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -97,6 +103,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native(), memoryAdapter()],
 			multiProvider: true,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 			defaultId: 'memory',
@@ -112,6 +119,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native(), memoryAdapter()],
 			multiProvider: true,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -128,6 +136,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native(), memoryAdapter()],
 			multiProvider: true,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -150,6 +159,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -181,6 +191,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native(), eventsOnly],
 			multiProvider: true,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -216,6 +227,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [visitorsOnly],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -237,6 +249,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [scrollOnly],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -256,6 +269,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [noPageviews],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -269,6 +283,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -301,6 +316,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [pagePageviews],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -325,6 +341,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [pageOnly],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -343,6 +360,7 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [
 				'analytics-metric',
 				'analytics-trend',
@@ -367,6 +385,7 @@ describe('registerWidgets', () => {
 		registerWidgets(plain, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
@@ -374,6 +393,7 @@ describe('registerWidgets', () => {
 		registerWidgets(localized, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 			localizeText: true,
@@ -393,10 +413,81 @@ describe('registerWidgets', () => {
 		registerWidgets(config, {
 			adapters: [native()],
 			multiProvider: false,
+			providersEnabled: false,
 			disabled: [],
 			register: [],
 		})
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).toEqual(expect.arrayContaining(['host-widget', 'analytics-metric']))
+	})
+
+	it('with providersEnabled, registers the realtime widget and every breakdown widget alongside a single native adapter', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: true,
+			disabled: [],
+			register: [],
+		})
+		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugs).toEqual(
+			expect.arrayContaining([
+				'analytics-realtime',
+				'analytics-breakdown-pages',
+				'analytics-breakdown-sources',
+				'analytics-breakdown-devices',
+				'analytics-breakdown-countries',
+			])
+		)
+	})
+
+	it('with providersEnabled, the metric select lists every WIDGET_METRICS candidate (native lacks bounceRate)', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: true,
+			disabled: [],
+			register: [],
+		})
+		const metricField = metricFieldOf(config)
+		const values =
+			metricField && 'options' in metricField
+				? (metricField.options as { value: string }[]).map((o) => o.value)
+				: []
+		expect(values).toEqual(WIDGET_METRICS)
+	})
+
+	it('with providersEnabled, registers a widget even when no adapter satisfies its requirement', () => {
+		const noRealtimeNoDims: AnalyticsAdapter = {
+			id: 'limited',
+			label: 'Limited',
+			capabilities: {
+				...native().capabilities,
+				realtime: false,
+				dimensions: new Set<DimensionKey>(),
+			},
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'limited', fetchedAt: '' } }),
+		}
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [noRealtimeNoDims],
+			multiProvider: false,
+			providersEnabled: true,
+			disabled: [],
+			register: [],
+		})
+		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugs).toEqual(
+			expect.arrayContaining([
+				'analytics-realtime',
+				'analytics-breakdown-pages',
+				'analytics-breakdown-sources',
+				'analytics-breakdown-devices',
+				'analytics-breakdown-countries',
+			])
+		)
 	})
 })

@@ -33,6 +33,14 @@ const staticLabel = (key: TranslationKey): Record<string, string> => ({
 export interface RegisterWidgetsArgs {
 	adapters: AnalyticsAdapter[]
 	multiProvider: boolean
+	/**
+	 * True when a tenant's own runtime adapter can exist (`providers.collection` or
+	 * `providers.resolve`). Such an adapter's capabilities are unknown at config time, so
+	 * gating on the config-adapter union would impose a false ceiling: widgets and metric
+	 * options open up, and the per-request sources endpoint plus client pickers narrow per
+	 * request instead.
+	 */
+	providersEnabled: boolean
 	disabled: string[]
 	register: CustomWidgetDef[]
 	localizeText?: boolean
@@ -64,7 +72,10 @@ export const widgetIsSupported = (
  * `dataSource`'s capabilities; an id not known at config time (a runtime/DB provider)
  * keeps the union. The default clamps to the first option when the preferred metric is
  * not servable, and options can come out empty for exotic adapter sets, which
- * {@link registerWidgets} treats as "skip this widget".
+ * {@link registerWidgets} treats as "skip this widget". When `providersEnabled`, the
+ * config-adapter filter is skipped entirely: a tenant's own runtime adapter may serve
+ * metrics no config adapter does, so every candidate is offered and `filterOptions` alone
+ * narrows once a `dataSource` is picked.
  */
 const metricSelectField = (
 	candidates: MetricKey[],
@@ -77,9 +88,11 @@ const metricSelectField = (
 	const { extra, preferredDefault = 'pageviews' } = opts
 	const supports = (adapter: AnalyticsAdapter, metric: MetricKey): boolean =>
 		satisfiesCapabilities(adapter.capabilities, { ...extra, metrics: [metric] })
-	const options = candidates
-		.filter((m) => args.adapters.some((a) => supports(a, m)))
-		.map((m) => ({ value: m, label: staticLabel(METRIC_KEYS[m]) }))
+	const options = (
+		args.providersEnabled
+			? candidates
+			: candidates.filter((m) => args.adapters.some((a) => supports(a, m)))
+	).map((m) => ({ value: m, label: staticLabel(METRIC_KEYS[m]) }))
 	const defaultValue = options.some((o) => o.value === preferredDefault)
 		? preferredDefault
 		: options[0]?.value
@@ -263,7 +276,7 @@ export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void
 		if (args.disabled.includes(def.slug)) {
 			continue
 		}
-		if (!widgetIsSupported(def.requires, args.adapters)) {
+		if (!args.providersEnabled && !widgetIsSupported(def.requires, args.adapters)) {
 			continue
 		}
 		const fields = def.fields(args)
