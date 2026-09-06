@@ -16,7 +16,11 @@ export const resolveScopeList = async (
 	}
 	let raw: string[]
 	try {
-		raw = await scopes({ payload })
+		const result = await scopes({ payload })
+		if (!Array.isArray(result)) {
+			throw new Error('scopes() must resolve to an array of scope ids')
+		}
+		raw = result
 	} catch (err) {
 		payload.logger.warn(
 			`analytics: scopes() failed, falling back to the install-wide scope: ${String(err)}`

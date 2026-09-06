@@ -44,4 +44,12 @@ describe('resolveScopeList', () => {
 		expect(list).toEqual([null])
 		expect(warn).toHaveBeenCalledTimes(1)
 	})
+
+	it('degrades to [null] and warns when the resolver resolves to a non-array', async () => {
+		const warn = vi.fn()
+		const scopes = () => undefined as unknown as string[]
+		const list = await resolveScopeList(scopes, { logger: { warn } } as unknown as Payload)
+		expect(list).toEqual([null])
+		expect(warn).toHaveBeenCalledTimes(1)
+	})
 })

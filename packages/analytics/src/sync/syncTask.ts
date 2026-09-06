@@ -123,6 +123,16 @@ export const syncTask = (
 				if (opts.adapterIds && !opts.adapterIds.includes(adapter.id)) {
 					continue
 				}
+				// A shared config adapter that cannot narrow its query to one tenant would
+				// otherwise return install-wide totals here, which then get stamped as this
+				// scope's row; skip it for every tenant pass, same as the read path's gate.
+				if (
+					scope !== null &&
+					runtime.configAdapterIds.has(adapter.id) &&
+					!adapter.capabilities.scopedQueries
+				) {
+					continue
+				}
 				if (!adapter.isConfigured() || !supportsGranularity(adapter.capabilities, 'day')) {
 					continue
 				}

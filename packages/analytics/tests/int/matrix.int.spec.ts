@@ -887,14 +887,19 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 	let memRoot: MemoryAnalyticsAdapter
 	let memT1: MemoryAnalyticsAdapter
 	let memT2: MemoryAnalyticsAdapter
+	let memShared: MemoryAnalyticsAdapter
 
 	beforeAll(async () => {
 		memRoot = { ...memoryAdapter(), id: 'memory:root' }
 		memT1 = { ...memoryAdapter(), id: 'memory:t1' }
 		memT2 = { ...memoryAdapter(), id: 'memory:t2' }
+		// A CONFIG adapter (declared in `adapters`, not resolved per scope) that never
+		// declares scopedQueries: it cannot narrow its own query to one tenant, so the
+		// sync loop must only pull it for the install-wide (null) pass.
+		memShared = { ...memoryAdapter(), id: 'shared' }
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [native()],
+				adapters: [native(), memShared],
 				sync: true,
 				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
 				scopes: () => ['t1', 't2'],
@@ -915,6 +920,11 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 		memT2.record({ path: '/p', timestamp: t, visitor: 'a' })
 		memT2.record({ path: '/p', timestamp: t, visitor: 'b' })
 		memT2.record({ path: '/p', timestamp: t, visitor: 'c' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'b' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'c' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'd' })
+		memShared.record({ path: '/p', timestamp: t, visitor: 'e' })
 	})
 
 	afterAll(async () => {
@@ -941,20 +951,33 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 	it(`syncs one row per scope, each reading that scope's own resolved provider on ${db}`, async () => {
 		const out = await runSync()
 		expect(out.failed).toBe(0)
-		expect(out.synced).toBe(3)
+		expect(out.synced).toBe(4)
 		const docs = await booted.payload.find({
 			collection: 'analytics-daily' as never,
 			limit: 100,
 			overrideAccess: true,
 		})
 		const byScope = new Map(
-			(docs.docs as unknown as Array<{ scope: string; source: string; pageviews: number }>).map(
-				(d) => [d.scope, d]
-			)
+			(docs.docs as unknown as Array<{ scope: string; source: string; pageviews: number }>)
+				.filter((d) => d.source !== 'shared')
+				.map((d) => [d.scope, d])
 		)
 		expect(byScope.get('')?.pageviews).toBe(2)
 		expect(byScope.get('t1')?.pageviews).toBe(1)
 		expect(byScope.get('t2')?.pageviews).toBe(3)
+	})
+
+	it(`only ever syncs a shared (non-scoped) config adapter into the install-wide scope on ${db}`, async () => {
+		const docs = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			where: { source: { equals: 'shared' } },
+			limit: 100,
+			overrideAccess: true,
+		})
+		const rows = docs.docs as unknown as Array<{ scope: string; pageviews: number }>
+		expect(rows).toHaveLength(1)
+		expect(rows[0]?.scope).toBe('')
+		expect(rows[0]?.pageviews).toBe(5)
 	})
 
 	it(`is idempotent across scopes: a second run updates in place with no duplicates on ${db}`, async () => {
@@ -970,7 +993,7 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 			overrideAccess: true,
 		})
 		expect(after.totalDocs).toBe(before.totalDocs)
-		expect(after.totalDocs).toBe(3)
+		expect(after.totalDocs).toBe(4)
 	})
 
 	it(`a tenant's find with overrideAccess: false returns only their scope's rows on ${db}`, async () => {

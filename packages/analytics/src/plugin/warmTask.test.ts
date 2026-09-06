@@ -155,12 +155,14 @@ describe('deriveWarmTargets', () => {
 })
 
 describe('warmTask handler scope fan-out', () => {
-	const req = { payload: { logger: { warn: vi.fn() } } } as unknown as PayloadRequest
+	const warn = vi.fn()
+	const req = { payload: { logger: { warn } } } as unknown as PayloadRequest
 
 	beforeEach(() => {
-		readForWidget.mockReset().mockResolvedValue({ status: 'ok' })
-		readForWidgetSeries.mockReset().mockResolvedValue({ status: 'ok' })
-		readForWidgetBreakdown.mockReset().mockResolvedValue({ status: 'ok' })
+		warn.mockReset()
+		readForWidget.mockReset().mockResolvedValue({ status: 'ok', adapterId: 'memory' })
+		readForWidgetSeries.mockReset().mockResolvedValue({ status: 'ok', adapterId: 'memory' })
+		readForWidgetBreakdown.mockReset().mockResolvedValue({ status: 'ok', adapterId: 'memory' })
 	})
 
 	const runHandler = async (scopes?: () => string[]) => {
@@ -197,5 +199,52 @@ describe('warmTask handler scope fan-out', () => {
 			.mockResolvedValueOnce({ status: 'ok' })
 		const output = await runHandler(() => ['t1', 't2'])
 		expect(output).toEqual({ warmed: 2, failed: 1 })
+	})
+
+	it('never calls scopes() when the layout derives no targets', async () => {
+		const scopes = vi.fn(() => ['t1', 't2'])
+		const task = warmTask('*/30 * * * *', [] as unknown as WidgetInstance[], scopes)
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('warm handler must be a function')
+		}
+		const result = await handler({ req } as unknown as Parameters<typeof handler>[0])
+		expect(scopes).not.toHaveBeenCalled()
+		expect((result as { output: { warmed: number; failed: number } }).output).toEqual({
+			warmed: 0,
+			failed: 0,
+		})
+	})
+
+	it('warns exactly once when a tenant-pass target degrades to a non-ok status', async () => {
+		readForWidget.mockResolvedValue({ status: 'unavailable', adapterId: 'plausible' })
+		const output = await runHandler(() => ['t1'])
+		expect(output).toEqual({ warmed: 0, failed: 0 })
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn.mock.calls[0]?.[0]).toContain('t1')
+		expect(warn.mock.calls[0]?.[0]).toContain('plausible')
+	})
+
+	it('does not warn for a null-scope (install-wide) pass that degrades', async () => {
+		readForWidget.mockResolvedValue({ status: 'unavailable', adapterId: 'plausible' })
+		const output = await runHandler()
+		expect(output).toEqual({ warmed: 0, failed: 0 })
+		expect(warn).not.toHaveBeenCalled()
+	})
+
+	it('throttles the degrade warning to once per (scope, adapter) pair', async () => {
+		readForWidget.mockResolvedValue({ status: 'unavailable', adapterId: 'plausible' })
+		readForWidgetSeries.mockResolvedValue({ status: 'unavailable', adapterId: 'plausible' })
+		const widgets = layout([
+			{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', timeframe: 'last30days' } },
+			{ widgetSlug: 'analytics-trend', data: { metric: 'pageviews', timeframe: 'last7days' } },
+		])
+		const task = warmTask('*/30 * * * *', widgets as unknown as WidgetInstance[], () => ['t1'])
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('warm handler must be a function')
+		}
+		await handler({ req } as unknown as Parameters<typeof handler>[0])
+		expect(warn).toHaveBeenCalledTimes(1)
 	})
 })
