@@ -1,0 +1,215 @@
+.fields-measurement {
+	position: relative;
+}
+
+/* Mirrors Payload's formInput mixin (packages/ui/src/scss/vars.scss) so the composite
+   container reads as one native text input; focus rides :focus-within.
+   Dimensions are static px on purpose: Payload compiles scss base() to literal px
+   (native inputs stay 40px tall at every breakpoint), while the runtime --base var
+   is rem-based and shrinks with the responsive html font-size. Deriving from
+   var(--base) made this container 3px shorter than native inputs at <=1024px. */
+.fields-measurement__container {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	width: 100%;
+	height: 40px;
+	padding: 0 8px 0 6px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	color: var(--theme-elevation-800);
+	font-family: var(--font-body);
+	font-size: 1rem;
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+	transition-property: border, box-shadow, background-color;
+	transition-duration: 100ms, 100ms, 500ms;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+.fields-measurement__container:hover {
+	border-color: var(--theme-elevation-250);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+}
+
+.fields-measurement__container:focus-within {
+	border-color: var(--theme-elevation-400);
+	outline: 0;
+}
+
+html[data-theme="light"] .fields-measurement.error .fields-measurement__container {
+	background-color: var(--theme-error-50);
+	border-color: var(--theme-error-500);
+}
+
+html[data-theme="dark"] .fields-measurement.error .fields-measurement__container {
+	background-color: var(--theme-error-100);
+	border-color: var(--theme-error-400);
+}
+
+html[data-theme="dark"] .fields-measurement.error .fields-measurement__container:hover {
+	border-color: var(--theme-error-500);
+}
+
+.fields-measurement.read-only .fields-measurement__container,
+.fields-measurement.read-only .fields-measurement__container:hover {
+	border-color: var(--theme-elevation-150);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-400);
+	box-shadow: none;
+}
+
+/* Each value hugs its unit; the wider gap separates the pairs, so the row
+   reads "5 ft  11 in" rather than evenly scattered tokens */
+.fields-measurement__compound {
+	display: flex;
+	flex: 1 1 auto;
+	min-width: 0;
+	align-items: center;
+	gap: 12px;
+	height: 100%;
+}
+
+.fields-measurement__part {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	height: 100%;
+}
+
+/* Width comes from an inline style tracking the draft's length, so every value
+   (scalar or compound part) hugs its digits instead of stretching the row */
+.fields-measurement__input {
+	flex: 0 1 auto;
+	min-width: 2ch;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: textfield;
+}
+
+.fields-measurement__input::-webkit-outer-spin-button,
+.fields-measurement__input::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.fields-measurement__input:focus {
+	outline: 0;
+}
+
+.fields-measurement__input::placeholder {
+	color: var(--theme-elevation-400);
+}
+
+/* margin-left auto pins the kebab to the row's right edge, away from the
+   value-unit phrase on the left */
+.fields-measurement__popup {
+	margin-left: auto;
+}
+
+.fields-measurement__popup,
+.fields-measurement__popup .popup__trigger-wrap {
+	display: flex;
+	flex-shrink: 0;
+}
+
+/* The trigger is a real button so it keeps native focus/keyboard semantics; the
+   kebab is aria-hidden and a sr-only span next to it carries the name */
+.fields-measurement__unit-trigger {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--style-radius-s);
+	background: transparent;
+	color: var(--theme-elevation-500);
+	cursor: pointer;
+}
+
+.fields-measurement__unit-trigger:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-800);
+}
+
+.fields-measurement__unit-trigger:focus-visible {
+	outline: var(--accessibility-outline);
+}
+
+.fields-measurement__kebab {
+	flex-shrink: 0;
+	width: 4px;
+	height: 14px;
+}
+
+.fields-measurement__sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border-width: 0;
+}
+
+/* The unit is always a passive suffix hugging its value; interactivity lives
+   on the kebab at the row's right edge (absent when there is nothing to open) */
+.fields-measurement__unit-static {
+	flex-shrink: 0;
+	color: var(--theme-elevation-500);
+	font-size: 0.85rem;
+	white-space: nowrap;
+	cursor: default;
+}
+
+.popup__scroll-container:has(> .fields-measurement__unit-panel) {
+	max-height: none;
+}
+
+.fields-measurement__unit-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 180px;
+	padding: 4px;
+}
+
+.fields-measurement__unit-option {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: var(--style-radius-s);
+	background: transparent;
+	color: var(--theme-elevation-800);
+	font-size: 1rem;
+	text-align: start;
+	cursor: pointer;
+}
+
+.fields-measurement__unit-option:hover {
+	background: var(--theme-elevation-100);
+}
+
+.fields-measurement__unit-option[aria-selected="true"] {
+	background: var(--theme-elevation-150);
+}
+
+.fields-measurement__unit-symbol {
+	color: var(--theme-elevation-800);
+	font-size: 0.75rem;
+}

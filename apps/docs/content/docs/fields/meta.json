@@ -1,4 +1,12 @@
 {
 	"title": "Fields",
-	"pages": ["index", "quick-start", "color", "icon", "encrypted", "building-your-own"]
+	"pages": [
+		"index",
+		"quick-start",
+		"color",
+		"icon",
+		"encrypted",
+		"measurement",
+		"building-your-own"
+	]
 }

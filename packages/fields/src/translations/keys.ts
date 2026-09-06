@@ -47,6 +47,9 @@ export const keys = {
 	generateValue: 'fields:generateValue',
 	writeOnlyValue: 'fields:writeOnlyValue',
 	secretNotSet: 'fields:secretNotSet',
+	selectUnit: 'fields:selectUnit',
+	measurementBelowMin: 'fields:measurementBelowMin',
+	measurementAboveMax: 'fields:measurementAboveMax',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

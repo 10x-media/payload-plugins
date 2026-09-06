@@ -44,4 +44,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.generateValue]: 'Buat nilai baru',
 	[keys.writeOnlyValue]: 'Nilai terenkripsi hanya-tulis',
 	[keys.secretNotSet]: 'Belum diatur',
+	[keys.selectUnit]: 'Pilih satuan',
+	[keys.measurementBelowMin]: 'Harus minimal {{min}}',
+	[keys.measurementAboveMax]: 'Tidak boleh melebihi {{max}}',
 }

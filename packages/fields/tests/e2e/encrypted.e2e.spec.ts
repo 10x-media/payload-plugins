@@ -148,10 +148,16 @@ test.describe('encrypted field', () => {
 	}) => {
 		await openShowcaseDoc(page)
 
-		// Attached text: the concealed dots input and the appended eye segment are both 40px.
+		// Attached text: the masked input and its eye both sit at height:100% inside the
+		// bordered 40px row (ProtectedField.css, `.tenx-protected-field__attached-row`),
+		// so both render at 38px by design; only these two checks get the wider floor.
 		const text = protectedField(page, FIXTURES.fullName.label)
-		expectNativeFieldHeight(await heightOf(text.locator('.tenx-protected-field__masked-input')))
-		expectNativeFieldHeight(await heightOf(eyeOf(text)))
+		const maskedHeight = await heightOf(text.locator('.tenx-protected-field__masked-input'))
+		expect(maskedHeight).toBeGreaterThanOrEqual(38)
+		expect(maskedHeight).toBeLessThanOrEqual(41)
+		const eyeHeight = await heightOf(eyeOf(text))
+		expect(eyeHeight).toBeGreaterThanOrEqual(38)
+		expect(eyeHeight).toBeLessThanOrEqual(41)
 
 		// Select: the concealed masked face and the revealed native react-select control are
 		// both 40px, so the field does not grow taller when the eye reveals it.

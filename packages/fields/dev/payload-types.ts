@@ -70,6 +70,7 @@ export interface Config {
     colors: Color;
     encrypted: Encrypted;
     icons: Icon;
+    measurements: Measurement;
     'write-only-stories': WriteOnlyStory;
     tenants: Tenant;
     users: User;
@@ -83,6 +84,7 @@ export interface Config {
     colors: ColorsSelect<false> | ColorsSelect<true>;
     encrypted: EncryptedSelect<false> | EncryptedSelect<true>;
     icons: IconsSelect<false> | IconsSelect<true>;
+    measurements: MeasurementsSelect<false> | MeasurementsSelect<true>;
     'write-only-stories': WriteOnlyStoriesSelect<false> | WriteOnlyStoriesSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
@@ -300,6 +302,49 @@ export interface Tenant {
   createdAt: string;
 }
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "measurements".
+ */
+export interface Measurement {
+  id: string;
+  title: string;
+  nativeNumber?: number | null;
+  weight?: number | null;
+  /**
+   * Compound ft+in entry when toggled imperial
+   */
+  height?: number | null;
+  distance?: number | null;
+  load?: number | null;
+  wingspan?: number | null;
+  volume?: number | null;
+  temperature?: number | null;
+  speed?: number | null;
+  poundsFirst?: number | null;
+  kgOnly?: number | null;
+  boundedWeight: number;
+  readOnlyWeight?: number | null;
+  localizedDistance?: number | null;
+  /**
+   * Free-form: inches only, stored in millimetres, its own preference bucket
+   */
+  cutout?: number | null;
+  /**
+   * Free-form with a custom unit (nmi, 1 nmi = 1852 m). No Intl unit for nmi, so it formats as a plain decimal plus shortLabel
+   */
+  sailing?: number | null;
+  /**
+   * Exact mode: free entry (no quantize), faithful drafts, cells read back at full storage precision
+   */
+  labSample?: number | null;
+  /**
+   * Readable mode with storage rounded to whole grams: the granularity contract runs on every write, regardless of what produced the number
+   */
+  shippingWeight?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * One field per write-only user story. The input is always editable: a stored value is only a placeholder (hint or dots), typing stages a replacement, emptying the input keeps the stored value, and every action lives inside the input row.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -322,6 +367,16 @@ export interface WriteOnlyStory {
   rotationSecret: string;
   rotationSecret_set?: boolean | null;
   rotationSecret_hint?: string | null;
+  stripeLiveKey?: string;
+  stripeLiveKey_set?: boolean | null;
+  stripeLiveKey_hint?: string | null;
+  /**
+   * Native neighbour at the same width, for comparison: both inputs must be the same height and the same width, and the encrypted one must not push this one out of the row.
+   */
+  rowNeighbour?: string | null;
+  longLivedToken?: string;
+  longLivedToken_set?: boolean | null;
+  longLivedToken_hint?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -385,6 +440,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'icons';
         value: string | Icon;
+      } | null)
+    | ({
+        relationTo: 'measurements';
+        value: string | Measurement;
       } | null)
     | ({
         relationTo: 'write-only-stories';
@@ -518,6 +577,33 @@ export interface IconsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "measurements_select".
+ */
+export interface MeasurementsSelect<T extends boolean = true> {
+  title?: T;
+  nativeNumber?: T;
+  weight?: T;
+  height?: T;
+  distance?: T;
+  load?: T;
+  wingspan?: T;
+  volume?: T;
+  temperature?: T;
+  speed?: T;
+  poundsFirst?: T;
+  kgOnly?: T;
+  boundedWeight?: T;
+  readOnlyWeight?: T;
+  localizedDistance?: T;
+  cutout?: T;
+  sailing?: T;
+  labSample?: T;
+  shippingWeight?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "write-only-stories_select".
  */
 export interface WriteOnlyStoriesSelect<T extends boolean = true> {
@@ -536,6 +622,13 @@ export interface WriteOnlyStoriesSelect<T extends boolean = true> {
   rotationSecret?: T;
   rotationSecret_set?: T;
   rotationSecret_hint?: T;
+  stripeLiveKey?: T;
+  stripeLiveKey_set?: T;
+  stripeLiveKey_hint?: T;
+  rowNeighbour?: T;
+  longLivedToken?: T;
+  longLivedToken_set?: T;
+  longLivedToken_hint?: T;
   updatedAt?: T;
   createdAt?: T;
 }

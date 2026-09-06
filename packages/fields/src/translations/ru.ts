@@ -44,4 +44,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.generateValue]: 'Сгенерировать новое значение',
 	[keys.writeOnlyValue]: 'Зашифрованное значение только для записи',
 	[keys.secretNotSet]: 'Не задано',
+	[keys.selectUnit]: 'Выбрать единицу',
+	[keys.measurementBelowMin]: 'Должно быть не менее {{min}}',
+	[keys.measurementAboveMax]: 'Должно быть не более {{max}}',
 }

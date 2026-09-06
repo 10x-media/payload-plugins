@@ -44,4 +44,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.generateValue]: 'Generar un valor nuevo',
 	[keys.writeOnlyValue]: 'Valor cifrado de solo escritura',
 	[keys.secretNotSet]: 'No definido',
+	[keys.selectUnit]: 'Seleccionar unidad',
+	[keys.measurementBelowMin]: 'Debe ser al menos {{min}}',
+	[keys.measurementAboveMax]: 'No debe superar {{max}}',
 }

@@ -45,4 +45,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.generateValue]: '새 값 생성',
 	[keys.writeOnlyValue]: '쓰기 전용 암호화 값',
 	[keys.secretNotSet]: '설정되지 않음',
+	[keys.selectUnit]: '단위 선택',
+	[keys.measurementBelowMin]: '{{min}} 이상이어야 합니다',
+	[keys.measurementAboveMax]: '{{max}} 이하여야 합니다',
 }

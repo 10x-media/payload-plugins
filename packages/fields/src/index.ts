@@ -6,6 +6,7 @@ import {
 	withEncryptedResponseStrip,
 } from './fields/encrypted/queryRewrite'
 import { registerIcon } from './fields/icon/plugin'
+import { resolvePrecision } from './fields/measurement/engine/precision'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setFieldsRegistry } from './plugin/registry'
 import type { TranslationsOption } from './translations'
@@ -14,6 +15,7 @@ import type {
 	EncryptedGlobalConfig,
 	FieldsPluginRegistry,
 	IconGlobalConfig,
+	MeasurementGlobalConfig,
 } from './types'
 
 export type FieldsPluginOptions = {
@@ -35,6 +37,8 @@ export type FieldsPluginOptions = {
 	icon?: IconGlobalConfig
 	/** Global defaults for encryptedField(). Per-field options always win. */
 	encrypted?: EncryptedGlobalConfig
+	/** Global defaults for measurementField(). Per-field options always win. */
+	measurement?: MeasurementGlobalConfig
 }
 
 declare module 'payload' {
@@ -52,6 +56,20 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
 	// slugs and the default library before writing the normalized slice.
 	if (options.encrypted) {
 		registry.encrypted = options.encrypted
+	}
+	if (options.measurement) {
+		// Fails fast at plugin build, before any field's beforeValidate hook can run
+		// against it, instead of throwing on every write once the app is live.
+		if (options.measurement.precision !== undefined) {
+			try {
+				resolvePrecision([options.measurement.precision])
+			} catch (error) {
+				throw new Error(
+					`fields plugin: measurement.precision is invalid: ${(error as Error).message}`
+				)
+			}
+		}
+		registry.measurement = options.measurement
 	}
 	return registry
 }
@@ -76,6 +94,13 @@ export const fields = definePlugin<FieldsPluginOptions>({
 		// registers their client components in admin.dependencies. A no-op when no
 		// adapters are configured, leaving registry.icon unset.
 		registerIcon(config, options.icon)
+		config.admin = config.admin ?? {}
+		config.admin.components = config.admin.components ?? {}
+		config.admin.components.providers = config.admin.components.providers ?? []
+		config.admin.components.providers.push({
+			clientProps: { persist: options.measurement?.persistPreferences !== false },
+			path: '@10x-media/fields/client#MeasurementUnitsProvider',
+		})
 		// Transparently rewrite equals/in on queryable encrypted fields to their
 		// blind-index siblings; a no-op for collections that have none. Globals
 		// take no where, so they get the response strip alone.
@@ -111,5 +136,7 @@ export type {
 	IconMeta,
 	IconRenderStrategy,
 	KeysConfig,
+	MeasurementDefaultUnitsResolver,
+	MeasurementGlobalConfig,
 } from './types'
 export type { FieldsPluginOptions as PluginOptions }

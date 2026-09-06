@@ -95,6 +95,16 @@
 			"development": "./src/exports/encrypted.ts",
 			"types": "./src/exports/encrypted.ts",
 			"default": "./dist/exports/encrypted.js"
+		},
+		"./measurement": {
+			"development": "./src/exports/measurement.ts",
+			"types": "./src/exports/measurement.ts",
+			"default": "./dist/exports/measurement.js"
+		},
+		"./measurement/utils": {
+			"development": "./src/exports/measurement-utils.ts",
+			"types": "./src/exports/measurement-utils.ts",
+			"default": "./dist/exports/measurement-utils.js"
 		}
 	},
 	"files": [
@@ -264,6 +274,16 @@
 				"types": "./dist/exports/encrypted.d.ts",
 				"import": "./dist/exports/encrypted.js",
 				"default": "./dist/exports/encrypted.js"
+			},
+			"./measurement": {
+				"types": "./dist/exports/measurement.d.ts",
+				"import": "./dist/exports/measurement.js",
+				"default": "./dist/exports/measurement.js"
+			},
+			"./measurement/utils": {
+				"types": "./dist/exports/measurement-utils.d.ts",
+				"import": "./dist/exports/measurement-utils.js",
+				"default": "./dist/exports/measurement-utils.js"
 			}
 		}
 	}

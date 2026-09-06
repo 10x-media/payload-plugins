@@ -64,4 +64,30 @@ describe('fields factory', () => {
 		const out = fields({ disabled: true })(fakeConfig()) as Config
 		expect(getFieldsRegistry(asSanitized(out))).toBeUndefined()
 	})
+
+	it('registers the measurement provider with persist true by default', () => {
+		const out = fields({})(fakeConfig()) as Config
+		expect(out.admin?.components?.providers?.[0]).toMatchObject({
+			clientProps: { persist: true },
+			path: '@10x-media/fields/client#MeasurementUnitsProvider',
+		})
+	})
+
+	it('registers the measurement provider with persist false when persistPreferences is off', () => {
+		const out = fields({ measurement: { persistPreferences: false } })(fakeConfig()) as Config
+		expect(out.admin?.components?.providers?.[0]).toMatchObject({
+			clientProps: { persist: false },
+		})
+	})
+
+	it('throws at plugin build on a malformed measurement.precision', () => {
+		expect(() => fields({ measurement: { precision: { storage: 15 } } })(fakeConfig())).toThrow(
+			/measurement\.precision/
+		)
+	})
+
+	it('accepts a valid measurement.precision', () => {
+		const out = fields({ measurement: { precision: 'exact' } })(fakeConfig()) as Config
+		expect(getFieldsRegistry(asSanitized(out))?.measurement?.precision).toBe('exact')
+	})
 })
