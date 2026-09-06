@@ -338,7 +338,7 @@ export interface Measurement {
    */
   labSample?: number | null;
   /**
-   * Readable mode with storage rounded to whole grams: the granularity contract runs on every write, even one entered exactly
+   * Readable mode with storage rounded to whole grams: the granularity contract runs on every write, regardless of what produced the number
    */
   shippingWeight?: number | null;
   updatedAt: string;

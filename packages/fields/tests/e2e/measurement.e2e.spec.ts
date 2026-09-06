@@ -168,8 +168,16 @@ test.describe('measurement field', () => {
 			.locator('.fields-measurement__container')
 		const box = await container.boundingBox()
 		if (!box) throw new Error('weight container has no bounding box')
-		await page.mouse.click(box.x + box.width - 10, box.y + box.height / 2)
+		// The kebab trigger is flush against the right edge (8px container padding
+		// plus its own 24px width, so it owns the rightmost ~32px); the horizontal
+		// midpoint sits well clear of both the value/unit phrase on the left and the
+		// trigger on the right, landing on genuine dead space.
+		await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
 		await expect(page.locator('#field-weight')).toBeFocused()
+		// If the click had landed on the trigger instead, a panel would be visible
+		// (every field's panel stays mounted, toggling only :visible) and the test
+		// would pass for the wrong reason; assert none opened.
+		await expect(page.locator('.fields-measurement__unit-panel:visible')).toHaveCount(0)
 	})
 
 	test('list cells render the preferred unit', async ({ page }) => {
