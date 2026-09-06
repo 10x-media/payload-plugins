@@ -1008,3 +1008,61 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 		expect((docs as unknown as Array<{ scope: string }>).every((d) => d.scope === 't1')).toBe(true)
 	})
 })
+
+describeForDb('analytics sync tier: per-scope resolution isolation', {}, (db) => {
+	const DAY = 86_400_000
+	let booted: BootedPayload
+	let memT2: MemoryAnalyticsAdapter
+
+	beforeAll(async () => {
+		memT2 = { ...memoryAdapter(), id: 'memory:t2' }
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native()],
+				sync: true,
+				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				scopes: () => ['t1', 't2'],
+				providers: {
+					resolve: ({ scope }) => {
+						if (scope === 't1') throw new Error('boom')
+						if (scope === 't2') return [memT2]
+						return []
+					},
+				},
+			}),
+			db,
+		})
+		const t = new Date(Date.now() - DAY)
+		memT2.record({ path: '/p', timestamp: t, visitor: 'a' })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
+
+	it(`a registry resolution failure for one scope does not abort the others on ${db}`, async () => {
+		const task = syncTask({
+			cron: '0 */6 * * *',
+			lookbackDays: 3,
+			collectionSlug: 'analytics-daily',
+			scopes: () => ['t1', 't2'],
+		})
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('sync handler must be a function')
+		}
+		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
+		const out = (result as { output: { synced: number; failed: number } }).output
+		expect(out.failed).toBeGreaterThanOrEqual(1)
+		expect(out.synced).toBeGreaterThanOrEqual(1)
+		const docs = await booted.payload.find({
+			collection: 'analytics-daily' as never,
+			where: { scope: { equals: 't2' } },
+			limit: 100,
+			overrideAccess: true,
+		})
+		expect(docs.docs.length).toBeGreaterThanOrEqual(1)
+	})
+})

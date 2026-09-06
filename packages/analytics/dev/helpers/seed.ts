@@ -240,17 +240,18 @@ export const seedDev = async (
 ): Promise<void> => {
 	const { tenancy = false } = opts
 
-	const userCount = await payload.count({ collection: 'users' })
-	if (userCount.totalDocs === 0) {
-		await payload.create({
+	const existingDevAdmin = (
+		await payload.find({ collection: 'users', where: { email: { equals: DEV_EMAIL } }, limit: 1 })
+	).docs[0] as { id: string | number } | undefined
+	const platformAdmin: { id: string | number } =
+		existingDevAdmin ??
+		((await payload.create({
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
-		})
+		})) as unknown as { id: string | number })
+	if (!existingDevAdmin) {
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
-	const platformAdmin = (
-		await payload.find({ collection: 'users', where: { email: { equals: DEV_EMAIL } }, limit: 1 })
-	).docs[0] as { id: string | number }
 
 	const pageCount = await payload.count({ collection: 'pages' as never })
 	if (pageCount.totalDocs === 0) {

@@ -133,7 +133,16 @@ export const syncTask = (
 		let failed = 0
 		const scopeList = await resolveScopeList(opts.scopes, req.payload)
 		for (const scope of scopeList) {
-			const registry = await resolveRegistryFor(runtime, { payload: req.payload, req, scope })
+			let registry: Awaited<ReturnType<typeof resolveRegistryFor>>
+			try {
+				registry = await resolveRegistryFor(runtime, { payload: req.payload, req, scope })
+			} catch (err) {
+				failed++
+				req.payload.logger.warn(
+					`analytics sync: registry resolution failed for scope "${scope ?? 'install-wide'}": ${String(err)}`
+				)
+				continue
+			}
 			for (const adapter of registry.all()) {
 				if (adapter.id === 'native') {
 					continue
