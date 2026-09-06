@@ -1,4 +1,5 @@
 import type { Config, Payload } from 'payload'
+import type { CaptureSupport } from '../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -76,6 +77,14 @@ const baseCapabilities: AnalyticsCapabilities = {
 }
 
 const DAY_MS = 86_400_000
+
+// The tracker itself is the client (an RSC renders TrackerBoot), so there is nothing to
+// proxy or inject; the ingest path is carried by the tracker config resolver instead.
+const nativeCapture: CaptureSupport = {
+	proxy: { routes: [] },
+	snippet: () => ({ scripts: [] }),
+	client: { kind: 'native' },
+}
 
 interface QueryEventsContext {
 	retentionDays?: number
@@ -177,6 +186,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		id: 'native',
 		label: 'Native (Payload)',
 		capabilities,
+		capture: nativeCapture,
 		isConfigured: () => true,
 		flush: () => buffer?.flush() ?? Promise.resolve(),
 		register(config: Config, context) {

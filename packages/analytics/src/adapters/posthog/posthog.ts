@@ -1,3 +1,4 @@
+import type { CaptureSupport } from '../../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -14,7 +15,7 @@ import { dayIso, hourIso } from '../series'
 export interface PosthogConfig {
 	/** PostHog project id (numeric). */
 	projectId: string
-	/** Personal API key with the "Query Read" scope (phx_...). */
+	/** Personal API key with the "Query Read" scope (phx_...). Never exposed to the browser. */
 	apiKey: string
 	/** API host. Defaults to US Cloud; EU is https://eu.posthog.com, self-host is your instance URL. */
 	host?: string
@@ -26,9 +27,54 @@ export interface PosthogConfig {
 	 * read filters on it. Both the property name and value are escaped literals.
 	 */
 	scopeProperty?: string
+	/** Cloud region for the proxied capture routes. Derived from `host` when omitted. */
+	region?: 'us' | 'eu'
+	/**
+	 * The public browser key (phc_...) sent to `posthog.init`. Distinct from `apiKey`,
+	 * the private Query API key, which must never reach the client. Required for
+	 * `capture` to boot the tracker; without it the snippet inits with an empty token.
+	 */
+	projectToken?: string
 }
 
 const US_CLOUD = 'https://us.posthog.com'
+
+const resolveRegion = (config: PosthogConfig): 'us' | 'eu' => {
+	if (config.region) {
+		return config.region
+	}
+	return config.host?.includes('eu.posthog.com') ? 'eu' : 'us'
+}
+
+function buildCapture(config: PosthogConfig): CaptureSupport {
+	const region = resolveRegion(config)
+	const token = config.projectToken ?? ''
+	return {
+		proxy: {
+			trailingSlashes: true,
+			routes: [
+				{
+					source: '/static/:p*',
+					upstream: `https://${region}-assets.i.posthog.com/static/:p*`,
+				},
+				{
+					source: '/array/:p*',
+					upstream: `https://${region}-assets.i.posthog.com/array/:p*`,
+				},
+				{ source: '/:p*', upstream: `https://${region}.i.posthog.com/:p*` },
+			],
+		},
+		snippet: ({ path }) => ({
+			scripts: [
+				{ src: `${path}/static/array.js`, async: true },
+				{
+					inline: `window.posthog.init(${JSON.stringify(token)},{api_host:${JSON.stringify(path)},ui_host:${JSON.stringify(`https://${region}.posthog.com`)}})`,
+				},
+			],
+		}),
+		client: { kind: 'posthog', token },
+	}
+}
 
 // Pageview-scoped expressions, used when the read filters the WHERE to `$pageview`.
 // visits and sessions share the distinct-session expression and are deduped before the
@@ -104,6 +150,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		id: 'posthog',
 		label: 'PostHog',
 		capabilities,
+		capture: buildCapture(config),
 		isConfigured: () => Boolean(config.projectId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()

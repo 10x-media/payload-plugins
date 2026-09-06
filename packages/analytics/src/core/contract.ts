@@ -1,4 +1,5 @@
 import type { Config, PayloadRequest } from 'payload'
+import type { CaptureSupport } from './capture'
 
 /**
  * Explicit cross-scope read marker: pass as a read's `scope` to aggregate over every
@@ -156,6 +157,8 @@ export interface AnalyticsAdapter {
 	readonly id: string
 	readonly label: string
 	readonly capabilities: AnalyticsCapabilities
+	/** Browser-tracker proxying/boot descriptor. Absent when the adapter has no client-side script (GA4). */
+	readonly capture?: CaptureSupport
 	isConfigured(): boolean
 	query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
 	realtime?(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>

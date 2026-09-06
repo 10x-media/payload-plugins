@@ -27,3 +27,17 @@ describe('native adapter', () => {
 		expect(typeof native({ geoDbPath: '/nonexistent/GeoLite2-City.mmdb' }).query).toBe('function')
 	})
 })
+
+describe('native capture', () => {
+	it('declares no proxy routes and no snippet scripts', () => {
+		const capture = native().capture
+		expect(capture?.proxy.routes).toEqual([])
+		expect(capture?.snippet({ path: '/na' })).toEqual({ scripts: [] })
+	})
+
+	it('client is just the native kind, no ingestPath', () => {
+		const capture = native({ ingestPath: '/custom/ingest' }).capture
+		expect(capture?.client).toEqual({ kind: 'native' })
+		expect(JSON.parse(JSON.stringify(capture?.client))).toEqual({ kind: 'native' })
+	})
+})

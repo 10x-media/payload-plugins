@@ -1,3 +1,4 @@
+import type { CaptureSupport } from '../../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -18,6 +19,42 @@ export interface PlausibleConfig {
 	host?: string
 	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
 	maxLookbackDays?: number | null
+	/** Site domain for the legacy script tag (`data-domain`). Takes priority over `scriptId`. */
+	domain?: string
+	/** Per-site tracker id (`pa-<id>.js`) for the newer per-site script model. */
+	scriptId?: string
+}
+
+function buildCapture(config: PlausibleConfig): CaptureSupport {
+	const base = config.host ?? 'https://plausible.io'
+	const scripts = (path: string) => {
+		if (config.domain) {
+			return [
+				{
+					src: `${path}/js/script.js`,
+					defer: true,
+					attrs: { 'data-domain': config.domain, 'data-api': `${path}/api/event` },
+				},
+			]
+		}
+		if (config.scriptId) {
+			return [
+				{ src: `${path}/js/pa-${config.scriptId}.js`, async: true },
+				{ inline: `plausible.init({endpoint:${JSON.stringify(`${path}/api/event`)}})` },
+			]
+		}
+		return []
+	}
+	return {
+		proxy: {
+			routes: [
+				{ source: '/js/:script*', upstream: `${base}/js/:script*` },
+				{ source: '/api/event', upstream: `${base}/api/event` },
+			],
+		},
+		snippet: ({ path }) => ({ scripts: scripts(path) }),
+		client: { kind: 'plausible' },
+	}
 }
 
 const METRIC_MAP: Partial<Record<MetricKey, string>> = {
@@ -83,6 +120,7 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 		id: 'plausible',
 		label: 'Plausible',
 		capabilities,
+		capture: buildCapture(config),
 		isConfigured: () => Boolean(config.siteId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()

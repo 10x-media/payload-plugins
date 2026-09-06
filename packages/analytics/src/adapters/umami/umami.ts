@@ -1,3 +1,4 @@
+import type { CaptureSupport } from '../../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -24,6 +25,31 @@ export interface UmamiConfig {
 }
 
 const CLOUD_BASE = 'https://api.umami.is/v1'
+const CLOUD_SCRIPT = 'https://cloud.umami.is/script.js'
+const CLOUD_SEND = 'https://gateway.umami.is/api/send'
+
+function buildCapture(config: UmamiConfig): CaptureSupport {
+	const scriptUpstream = config.host ? `${config.host}/script.js` : CLOUD_SCRIPT
+	const sendUpstream = config.host ? `${config.host}/api/send` : CLOUD_SEND
+	return {
+		proxy: {
+			routes: [
+				{ source: '/script.js', upstream: scriptUpstream },
+				{ source: '/api/send', upstream: sendUpstream },
+			],
+		},
+		snippet: ({ path }) => ({
+			scripts: [
+				{
+					src: `${path}/script.js`,
+					defer: true,
+					attrs: { 'data-website-id': config.websiteId, 'data-host-url': path },
+				},
+			],
+		}),
+		client: { kind: 'umami' },
+	}
+}
 
 const umamiMetrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
 	'pageviews',
@@ -87,6 +113,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		id: 'umami',
 		label: 'Umami',
 		capabilities,
+		capture: buildCapture(config),
 		isConfigured: () => Boolean(config.websiteId && (config.apiKey || config.token)),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()

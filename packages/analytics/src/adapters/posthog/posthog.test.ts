@@ -524,3 +524,84 @@ describe('posthog scopeProperty', () => {
 		expect(noProperty.get()).not.toContain('acme')
 	})
 })
+
+describe('posthog capture', () => {
+	it('derives region us from the default host and builds the three proxy routes', () => {
+		const capture = posthog({ projectId: '123', apiKey: 'phx_k', projectToken: 'phc_abc' }).capture
+		expect(capture?.proxy.trailingSlashes).toBe(true)
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/static/:p*', upstream: 'https://us-assets.i.posthog.com/static/:p*' },
+			{ source: '/array/:p*', upstream: 'https://us-assets.i.posthog.com/array/:p*' },
+			{ source: '/:p*', upstream: 'https://us.i.posthog.com/:p*' },
+		])
+	})
+
+	it('derives region eu from an eu.posthog.com host', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			host: 'https://eu.posthog.com',
+			projectToken: 'phc_abc',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/static/:p*', upstream: 'https://eu-assets.i.posthog.com/static/:p*' },
+			{ source: '/array/:p*', upstream: 'https://eu-assets.i.posthog.com/array/:p*' },
+			{ source: '/:p*', upstream: 'https://eu.i.posthog.com/:p*' },
+		])
+	})
+
+	it('honors an explicit region over the host-derived one', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			region: 'eu',
+			projectToken: 'phc_abc',
+		}).capture
+		expect(capture?.proxy.routes[0]?.upstream).toBe('https://eu-assets.i.posthog.com/static/:p*')
+	})
+
+	it('renders the array.js loader plus an init snippet with the project token and host', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			projectToken: 'phc_abc',
+		}).capture
+		const snippet = capture?.snippet({ path: '/ph' })
+		expect(snippet?.scripts).toEqual([
+			{ src: '/ph/static/array.js', async: true },
+			{
+				inline: 'window.posthog.init("phc_abc",{api_host:"/ph",ui_host:"https://us.posthog.com"})',
+			},
+		])
+	})
+
+	it('renders the eu ui_host in the init snippet', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			region: 'eu',
+			projectToken: 'phc_abc',
+		}).capture
+		const snippet = capture?.snippet({ path: '/ph' })
+		expect(snippet?.scripts[1]?.inline).toContain('ui_host:"https://eu.posthog.com"')
+	})
+
+	it('still declares capture with an empty token when projectToken is absent', () => {
+		const capture = posthog({ projectId: '123', apiKey: 'phx_k' }).capture
+		expect(capture).toBeDefined()
+		const snippet = capture?.snippet({ path: '/ph' })
+		expect(snippet?.scripts[1]?.inline).toContain('window.posthog.init("",')
+	})
+
+	it('client carries only the public project token, never the private apiKey', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_super_secret',
+			projectToken: 'phc_public',
+		}).capture
+		expect(capture?.client).toEqual({ kind: 'posthog', token: 'phc_public' })
+		const roundTripped = JSON.parse(JSON.stringify(capture?.client))
+		expect(roundTripped).toEqual({ kind: 'posthog', token: 'phc_public' })
+		expect(JSON.stringify(capture?.client)).not.toContain('phx_super_secret')
+	})
+})

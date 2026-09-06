@@ -194,3 +194,70 @@ describe('plausible adapter', () => {
 		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, avgDuration: 35000 })
 	})
 })
+
+describe('plausible capture', () => {
+	it('builds the two proxy routes against the cloud host by default', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k' }).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/js/:script*', upstream: 'https://plausible.io/js/:script*' },
+			{ source: '/api/event', upstream: 'https://plausible.io/api/event' },
+		])
+	})
+
+	it('builds the two proxy routes against a self-hosted host', () => {
+		const capture = plausible({
+			siteId: 'example.com',
+			apiKey: 'k',
+			host: 'https://p.acme.io',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/js/:script*', upstream: 'https://p.acme.io/js/:script*' },
+			{ source: '/api/event', upstream: 'https://p.acme.io/api/event' },
+		])
+	})
+
+	it('renders the legacy script tag when domain is set', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k', domain: 'example.com' }).capture
+		expect(capture?.snippet({ path: '/pl' })).toEqual({
+			scripts: [
+				{
+					src: '/pl/js/script.js',
+					defer: true,
+					attrs: { 'data-domain': 'example.com', 'data-api': '/pl/api/event' },
+				},
+			],
+		})
+	})
+
+	it('renders the per-site script plus init when scriptId is set and domain is absent', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k', scriptId: 'abc123' }).capture
+		expect(capture?.snippet({ path: '/pl' })).toEqual({
+			scripts: [
+				{ src: '/pl/js/pa-abc123.js', async: true },
+				{ inline: 'plausible.init({endpoint:"/pl/api/event"})' },
+			],
+		})
+	})
+
+	it('prefers the legacy tag when both domain and scriptId are set', () => {
+		const capture = plausible({
+			siteId: 'example.com',
+			apiKey: 'k',
+			domain: 'example.com',
+			scriptId: 'abc123',
+		}).capture
+		expect(capture?.snippet({ path: '/pl' }).scripts).toHaveLength(1)
+		expect(capture?.snippet({ path: '/pl' }).scripts[0]?.src).toBe('/pl/js/script.js')
+	})
+
+	it('renders no scripts when neither domain nor scriptId is set', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k' }).capture
+		expect(capture?.snippet({ path: '/pl' })).toEqual({ scripts: [] })
+	})
+
+	it('client carries only the kind, no site credentials', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'secret-key' }).capture
+		expect(capture?.client).toEqual({ kind: 'plausible' })
+		expect(JSON.parse(JSON.stringify(capture?.client))).toEqual({ kind: 'plausible' })
+	})
+})

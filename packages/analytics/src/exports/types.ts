@@ -5,6 +5,7 @@ export type {
 	PathResolver,
 } from '../binding/types'
 export type { SerializedCapabilities } from '../core/capabilities'
+export * from '../core/capture'
 export * from '../core/contract'
 export type {
 	AnalyticsFieldsOptions,
