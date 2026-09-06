@@ -55,7 +55,6 @@ const reqWith = (adapters: AnalyticsAdapter[]): PayloadRequest => {
 		bindings: {},
 		engine: { read: async (adapter, query) => adapter.query(query, {}) },
 		ttl: { aggregate: 3600, realtime: 300 },
-		timeoutMs: 15_000,
 		comparison: true,
 	})
 	return { payload } as PayloadRequest

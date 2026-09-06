@@ -16,6 +16,12 @@ export interface AnalyticsRuntime {
 	platformAdapterId?: string
 	/** `capture.slots` overrides naming the adapter that fills each capture slot. */
 	captureSlots?: { global?: string; tenant?: string }
+	/**
+	 * `capture.proxy` limits for the runtime capture proxy. Deliberately separate from
+	 * `cache.timeoutMs`: that is a per-read provider deadline for authenticated dashboard
+	 * queries, this is a public request path with entirely different traffic.
+	 */
+	captureProxy?: { timeoutMs: number; maxBodyBytes: number }
 	/** True when the app configured a scopeResolver (scoped install); mirrors `resolved.scoped`. */
 	scoped?: boolean
 	/**
@@ -30,8 +36,6 @@ export interface AnalyticsRuntime {
 	engine: Engine
 	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
 	ttl: { aggregate?: number; realtime?: number }
-	/** `cache.timeoutMs`: the per-read provider deadline, reused as the capture proxy's. */
-	timeoutMs: number
 	/** Widget period-over-period comparison; false skips the previous-window read. */
 	comparison: boolean
 }

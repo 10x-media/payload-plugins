@@ -1,6 +1,7 @@
 import type { KeysConfig } from '@10x-media/fields/encrypted'
 import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
+import { DEFAULT_PROXY_MAX_BODY_BYTES, DEFAULT_PROXY_TIMEOUT_MS } from '../capture/proxyEndpoint'
 import { PROVIDERS_SLUG } from '../providers/collection'
 import type { TranslationsOption } from '../translations'
 import type { CustomWidgetDef } from '../widgets/customWidget'
@@ -99,6 +100,19 @@ export type AnalyticsCaptureOptions = {
 	 * so it is resolved per request rather than validated at config time.
 	 */
 	slots?: { global?: string; tenant?: string }
+	/** Limits for the public runtime capture proxy, separate from the read-path `cache`. */
+	proxy?: {
+		/**
+		 * Deadline for the upstream response headers, in ms. Default 10000. The body
+		 * download is not on the clock, so a large tracker bundle streams to completion.
+		 */
+		timeoutMs?: number
+		/**
+		 * Largest proxied request body, in bytes. Default 1 MiB, which clears a PostHog
+		 * batch carrying session-replay data. Anything larger is refused with 413.
+		 */
+		maxBodyBytes?: number
+	}
 }
 
 export type AnalyticsPluginOptions = {
@@ -197,7 +211,10 @@ export interface ResolvedOptions {
 	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
 	access: { platformRead: PlatformReadAccess }
-	capture: { slots: { global?: string; tenant?: string } }
+	capture: {
+		slots: { global?: string; tenant?: string }
+		proxy: { timeoutMs: number; maxBodyBytes: number }
+	}
 	providers: {
 		collection: {
 			enabled: boolean
@@ -365,6 +382,10 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 			slots: {
 				global: options.capture?.slots?.global,
 				tenant: options.capture?.slots?.tenant,
+			},
+			proxy: {
+				timeoutMs: options.capture?.proxy?.timeoutMs ?? DEFAULT_PROXY_TIMEOUT_MS,
+				maxBodyBytes: options.capture?.proxy?.maxBodyBytes ?? DEFAULT_PROXY_MAX_BODY_BYTES,
 			},
 		},
 		providers,

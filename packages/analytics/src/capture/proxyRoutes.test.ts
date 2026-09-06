@@ -5,7 +5,6 @@ import {
 	buildUpstreamHeaders,
 	FORWARDED_REQUEST_HEADERS,
 	matchProxyRoute,
-	STRIPPED_RESPONSE_HEADERS,
 } from './proxyRoutes'
 
 const posthogRoutes: ProxyRoute[] = [
@@ -19,7 +18,8 @@ const plausibleRoutes: ProxyRoute[] = [
 	{ source: '/api/event', upstream: 'https://plausible.io/api/event' },
 ]
 
-const href = (routes: ProxyRoute[], path: string) => matchProxyRoute(routes, path)?.upstreamUrl.href
+const href = (routes: ProxyRoute[], path: string, trailingSlashes?: boolean) =>
+	matchProxyRoute(routes, path, { trailingSlashes })?.upstreamUrl.href
 
 describe('matchProxyRoute', () => {
 	it('maps a single wildcard segment onto the upstream template', () => {
@@ -41,8 +41,26 @@ describe('matchProxyRoute', () => {
 		expect(href(posthogRoutes, '/e')).toBe('https://us.i.posthog.com/e')
 	})
 
-	it('preserves a trailing slash, which PostHog capture endpoints require', () => {
-		expect(href(posthogRoutes, '/e/')).toBe('https://us.i.posthog.com/e/')
+	it('preserves a trailing slash when the descriptor declares trailingSlashes', () => {
+		expect(href(posthogRoutes, '/e/', true)).toBe('https://us.i.posthog.com/e/')
+		expect(href(posthogRoutes, '/static/x/', true)).toBe(
+			'https://us-assets.i.posthog.com/static/x/'
+		)
+	})
+
+	it('normalizes a trailing slash away when the descriptor does not declare it', () => {
+		expect(href(posthogRoutes, '/e/')).toBe('https://us.i.posthog.com/e')
+		expect(href(plausibleRoutes, '/api/event/')).toBe('https://plausible.io/api/event')
+	})
+
+	it('matches both slash forms under either setting', () => {
+		expect(href(plausibleRoutes, '/api/event', true)).toBe('https://plausible.io/api/event')
+		expect(href(plausibleRoutes, '/api/event/', true)).toBe('https://plausible.io/api/event/')
+		expect(href(plausibleRoutes, '/api/event')).toBe('https://plausible.io/api/event')
+	})
+
+	it('leaves a bare mount alone rather than inventing a slash-only path', () => {
+		expect(href(posthogRoutes, '/', true)).toBe('https://us.i.posthog.com/')
 	})
 
 	it('matches the bare mount against a catch-all route', () => {
@@ -57,6 +75,12 @@ describe('matchProxyRoute', () => {
 		expect(matchProxyRoute(plausibleRoutes, '/etc/passwd')).toBeNull()
 		expect(matchProxyRoute(plausibleRoutes, '/api/event/extra')).toBeNull()
 		expect(matchProxyRoute([], '/anything')).toBeNull()
+	})
+
+	it('leaves legal path characters unescaped so a vendor URL round-trips', () => {
+		expect(href(posthogRoutes, '/static/a,b=c+d@e:f;g$h&i.js')).toBe(
+			'https://us-assets.i.posthog.com/static/a,b=c+d@e:f;g$h&i.js'
+		)
 	})
 
 	it('keeps a percent-encoded separator inside one segment', () => {
@@ -74,6 +98,23 @@ describe('matchProxyRoute', () => {
 	it('refuses dot segments rather than letting the upstream path collapse', () => {
 		expect(matchProxyRoute(posthogRoutes, '/static/../../admin')).toBeNull()
 		expect(matchProxyRoute(posthogRoutes, '/static/./array.js')).toBeNull()
+	})
+
+	it('skips a route whose upstream names a param the source never produces', () => {
+		const routes: ProxyRoute[] = [
+			{ source: '/js/:script*', upstream: 'https://x.test/js/:missing' },
+			{ source: '/js/:script*', upstream: 'https://y.test/js/:script*' },
+		]
+		expect(href(routes, '/js/a.js')).toBe('https://y.test/js/a.js')
+	})
+
+	it('returns null rather than throwing when every route fails to compile', () => {
+		expect(
+			matchProxyRoute(
+				[{ source: '/js/:script*', upstream: 'https://x.test/js/:missing' }],
+				'/js/a.js'
+			)
+		).toBeNull()
 	})
 
 	it('refuses a non-http upstream template', () => {
@@ -134,8 +175,22 @@ describe('buildUpstreamHeaders', () => {
 		expect(buildUpstreamHeaders(incoming, '').has('x-forwarded-for')).toBe(false)
 	})
 
-	it('never trusts the incoming forwarding chain', () => {
-		expect(buildUpstreamHeaders(incoming, '9.9.9.9').get('x-forwarded-for')).toBe('9.9.9.9')
+	it('never passes the incoming forwarding chain through', () => {
+		const out = buildUpstreamHeaders(incoming, null)
+		expect(out.get('x-forwarded-for')).toBeNull()
+		expect(JSON.stringify([...out])).not.toContain('1.2.3.4')
+	})
+
+	it('forwards the conditional headers so proxied assets can revalidate', () => {
+		const out = buildUpstreamHeaders(
+			new Headers({
+				'if-none-match': 'W/"abc"',
+				'if-modified-since': 'Wed, 21 Oct 2015 07:28:00 GMT',
+			}),
+			null
+		)
+		expect(out.get('if-none-match')).toBe('W/"abc"')
+		expect(out.get('if-modified-since')).toBe('Wed, 21 Oct 2015 07:28:00 GMT')
 	})
 
 	it('forwards vendor-specific extras a descriptor declares', () => {
@@ -178,9 +233,7 @@ describe('buildDownstreamHeaders', () => {
 
 	it('strips set-cookie', () => {
 		expect(buildDownstreamHeaders(upstream).has('set-cookie')).toBe(false)
-		for (const name of STRIPPED_RESPONSE_HEADERS) {
-			expect(buildDownstreamHeaders(upstream).has(name)).toBe(false)
-		}
+		expect(buildDownstreamHeaders(upstream).getSetCookie()).toEqual([])
 	})
 
 	it('drops content-encoding and content-length, which no longer describe the decoded body', () => {

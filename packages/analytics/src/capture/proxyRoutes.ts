@@ -10,6 +10,8 @@ export const FORWARDED_REQUEST_HEADERS = [
 	'user-agent',
 	'origin',
 	'referer',
+	'if-none-match',
+	'if-modified-since',
 ]
 
 /**
@@ -41,14 +43,26 @@ export const FORWARDED_RESPONSE_HEADERS = [
 	'vary',
 ]
 
-/** Belt-and-suspenders over the response allowlist: these can never reach the client. */
-export const STRIPPED_RESPONSE_HEADERS = ['set-cookie', 'set-cookie2']
-
 export interface ProxyMatch {
 	upstreamUrl: URL
 }
 
+export interface MatchProxyRouteOptions {
+	/** `ProxyDescriptor.trailingSlashes`: keep a request's trailing slash upstream. */
+	trailingSlashes?: boolean
+}
+
 const isSafeUpstream = (url: URL): boolean => url.protocol === 'https:' || url.protocol === 'http:'
+
+// encodeURIComponent escapes every RFC 3986 sub-delim plus ':' and '@', all of which are
+// legal inside a path segment, so a vendor URL would not round-trip byte for byte. Restore
+// exactly those; '/', '?' and '#' stay escaped because they would change the URL's shape.
+const PATH_SAFE_ESCAPES = /%(24|26|2B|2C|3A|3B|3D|40)/gi
+
+const encodeSegment = (segment: string): string =>
+	encodeURIComponent(segment).replace(PATH_SAFE_ESCAPES, (_, hex: string) =>
+		String.fromCharCode(Number.parseInt(hex, 16))
+	)
 
 const paramSegments = (value: unknown): string[] =>
 	Array.isArray(value) ? value.map(String) : typeof value === 'string' ? [value] : []
@@ -65,7 +79,11 @@ const hasDotSegment = (params: Record<string, unknown>): boolean =>
  * the caller answers 404: an upstream URL only ever comes from a descriptor template,
  * never from the request.
  */
-export const matchProxyRoute = (routes: ProxyRoute[], path: string): ProxyMatch | null => {
+export const matchProxyRoute = (
+	routes: ProxyRoute[],
+	path: string,
+	options: MatchProxyRouteOptions = {}
+): ProxyMatch | null => {
 	for (const route of routes) {
 		let template: URL
 		try {
@@ -84,11 +102,19 @@ export const matchProxyRoute = (routes: ProxyRoute[], path: string): ProxyMatch 
 		if (hasDotSegment(params)) {
 			return null
 		}
-		const compiled = compile(template.pathname, { encode: encodeURIComponent })(params)
+		let compiled: string
+		try {
+			compiled = compile(template.pathname, { encode: encodeSegment })(params)
+		} catch {
+			// A template naming a param its source never produces is a broken descriptor,
+			// not a request the client can fix: skip it rather than throwing a public 500.
+			continue
+		}
+		// path-to-regexp drops the trailing slash a wildcard consumed. Only a descriptor
+		// that asks for it gets it back, because only PostHog's capture endpoints need it.
+		const keepSlash =
+			options.trailingSlashes === true && path.endsWith('/') && !compiled.endsWith('/')
 		const upstreamUrl = new URL(template.href)
-		// path-to-regexp drops the trailing slash the wildcard consumed; PostHog's capture
-		// endpoints are served only with it.
-		const keepSlash = path.endsWith('/') && !compiled.endsWith('/')
 		upstreamUrl.pathname = compiled === '' ? '/' : `${compiled}${keepSlash ? '/' : ''}`
 		return { upstreamUrl }
 	}
@@ -122,13 +148,10 @@ export const buildUpstreamHeaders = (
 	return out
 }
 
-/** The headers the client sees: the response allowlist, with cookies stripped. */
+/** The headers the client sees: the response allowlist, so `set-cookie` can never pass. */
 export const buildDownstreamHeaders = (upstream: Headers): Headers => {
 	const out = new Headers()
 	for (const name of FORWARDED_RESPONSE_HEADERS) {
-		if (STRIPPED_RESPONSE_HEADERS.includes(name)) {
-			continue
-		}
 		const value = upstream.get(name)
 		if (value !== null) {
 			out.set(name, value)

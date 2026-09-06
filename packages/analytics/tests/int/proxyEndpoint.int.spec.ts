@@ -66,7 +66,10 @@ describeForDb('analytics capture proxy endpoint', { dbs: ['mongo'] }, (db) => {
 	beforeAll(async () => {
 		booted = await bootPayload({
 			db,
-			plugin: analytics({ adapters: [vendorAdapter()], cache: { timeoutMs: 300 } }),
+			plugin: analytics({
+				adapters: [vendorAdapter()],
+				capture: { proxy: { timeoutMs: 300, maxBodyBytes: 1024 } },
+			}),
 		})
 	}, 240_000)
 
@@ -190,12 +193,104 @@ describeForDb('analytics capture proxy endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(fetched[0]?.headers['content-type']).toBe('application/json')
 	})
 
-	it('forwards OPTIONS', async () => {
+	it('answers OPTIONS locally rather than forwarding a preflight', async () => {
 		const fetched: Fetched[] = []
 		server.use(...recordUpstream(fetched))
 		const res = await request('OPTIONS', '/analytics/p/global/e')
+		expect(res.status).toBe(204)
+		expect(res.headers.get('allow')).toBe('GET, POST, OPTIONS')
+		expect(await res.text()).toBe('')
+		expect(fetched).toEqual([])
+	})
+
+	it('413s a body over the cap without forwarding any of it', async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		const res = await request('POST', '/analytics/p/global/e', {
+			body: 'x'.repeat(2048),
+			headers: { 'content-type': 'text/plain' },
+		})
+		expect(res.status).toBe(413)
+		expect(await res.text()).toBe('')
+		expect(fetched).toEqual([])
+	})
+
+	it('413s an oversize chunked body, which declares no content-length', async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(new Uint8Array(600).fill(65))
+				controller.enqueue(new Uint8Array(600).fill(65))
+				controller.close()
+			},
+		})
+		const res = await request('POST', '/analytics/p/global/e', {
+			body: stream,
+			headers: { 'content-type': 'text/plain' },
+			// @ts-expect-error duplex is required for a stream body and absent from lib.dom
+			duplex: 'half',
+		})
+		expect(res.status).toBe(413)
+		expect(fetched).toEqual([])
+	})
+
+	it('forwards a body just under the cap', async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		const payload = 'x'.repeat(1000)
+		const res = await request('POST', '/analytics/p/global/e', {
+			body: payload,
+			headers: { 'content-type': 'text/plain' },
+		})
 		expect(res.status).toBe(200)
-		expect(fetched[0]?.url).toBe(`${INGEST}/e`)
+		expect(fetched[0]?.body).toBe(payload)
+	})
+
+	it('passes a 304 through with its etag, so proxied assets revalidate', async () => {
+		const fetched: Fetched[] = []
+		server.use(
+			http.get(`${ASSETS}/static/array.js`, ({ request }) => {
+				fetched.push({ url: request.url, headers: {}, body: '' })
+				expect(request.headers.get('if-none-match')).toBe('W/"v1"')
+				return new HttpResponse(null, { status: 304, headers: { etag: 'W/"v1"' } })
+			})
+		)
+		const res = await request('GET', '/analytics/p/global/static/array.js', {
+			headers: { 'if-none-match': 'W/"v1"' },
+		})
+		expect(res.status).toBe(304)
+		expect(res.headers.get('etag')).toBe('W/"v1"')
+		expect(fetched).toHaveLength(1)
+	})
+
+	it('streams a body that outlives the timeout, because the deadline is time-to-headers', async () => {
+		server.use(
+			http.get(`${ASSETS}/static/slow.js`, () => {
+				const stream = new ReadableStream<Uint8Array>({
+					async start(controller) {
+						controller.enqueue(new TextEncoder().encode('head;'))
+						await delay(900)
+						controller.enqueue(new TextEncoder().encode('tail;'))
+						controller.close()
+					},
+				})
+				return new HttpResponse(stream, {
+					status: 200,
+					headers: { 'content-type': 'application/javascript' },
+				})
+			})
+		)
+		const res = await request('GET', '/analytics/p/global/static/slow.js')
+		expect(res.status).toBe(200)
+		expect(await res.text()).toBe('head;tail;')
+	})
+
+	it('keeps a path character path-to-regexp would otherwise escape', async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		await request('GET', '/analytics/p/global/static/a,b=c+d@e.js')
+		expect(fetched[0]?.url).toBe(`${ASSETS}/static/a,b=c+d@e.js`)
 	})
 
 	it('405s a method outside GET/POST/OPTIONS without touching the upstream', async () => {
@@ -207,6 +302,13 @@ describeForDb('analytics capture proxy endpoint', { dbs: ['mongo'] }, (db) => {
 			expect(await res.text()).toBe('')
 		}
 		expect(fetched).toEqual([])
+	})
+
+	it('normalizes a trailing slash away when the descriptor does not ask for it', async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		await request('GET', '/analytics/p/global/e/')
+		expect(fetched[0]?.url).toBe(`${INGEST}/e`)
 	})
 
 	it('404s an unknown slot with an empty body and no upstream call', async () => {
@@ -264,7 +366,10 @@ describeForDb('analytics capture proxy - undeclared paths', { dbs: ['mongo'] }, 
 						...memoryAdapter(),
 						capture: {
 							...vendorCapture,
-							proxy: { routes: [{ source: '/api/send', upstream: `${INGEST}/api/send` }] },
+							proxy: {
+								trailingSlashes: true,
+								routes: [{ source: '/api/send', upstream: `${INGEST}/api/send` }],
+							},
 						},
 					},
 				],
@@ -289,6 +394,14 @@ describeForDb('analytics capture proxy - undeclared paths', { dbs: ['mongo'] }, 
 		const res = await request('/analytics/p/global/api/send')
 		expect(res.status).toBe(200)
 		expect(fetched[0]?.url).toBe(`${INGEST}/api/send`)
+	})
+
+	it("keeps the trailing slash the descriptor's trailingSlashes flag asks for", async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		const res = await request('/analytics/p/global/api/send/')
+		expect(res.status).toBe(200)
+		expect(fetched[0]?.url).toBe(`${INGEST}/api/send/`)
 	})
 
 	it('404s every path outside the declared routes, with no upstream call at all', async () => {

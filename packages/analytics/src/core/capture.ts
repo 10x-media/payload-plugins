@@ -8,6 +8,13 @@ export interface ProxyRoute {
 export interface ProxyDescriptor {
 	routes: ProxyRoute[]
 	forwardHeaders?: string[]
+	/**
+	 * The vendor serves some paths only with a trailing slash (PostHog's capture
+	 * endpoints). Both slash forms always match; this decides what reaches the vendor:
+	 * true keeps the request's trailing slash on the upstream path, absent or false
+	 * normalizes it away. Next apps proxying such a vendor through rewrites also need
+	 * `skipTrailingSlashRedirect: true`.
+	 */
 	trailingSlashes?: boolean
 }
 

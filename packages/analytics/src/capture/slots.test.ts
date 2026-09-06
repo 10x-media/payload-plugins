@@ -27,7 +27,6 @@ const runtimeWith = (partial: Partial<AnalyticsRuntime>): AnalyticsRuntime => {
 		bindings: {},
 		engine: {} as AnalyticsRuntime['engine'],
 		ttl: {},
-		timeoutMs: 15_000,
 		comparison: true,
 		...partial,
 	}

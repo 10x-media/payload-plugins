@@ -222,13 +222,13 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
 				captureSlots: resolved.capture.slots,
+				captureProxy: resolved.capture.proxy,
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,
-				timeoutMs: resolved.cache.timeoutMs,
 				comparison: resolved.widgets.comparison,
 			})
 			await prevOnInit?.(payload)

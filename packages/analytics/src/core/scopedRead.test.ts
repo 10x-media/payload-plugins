@@ -11,7 +11,6 @@ const runtimeWith = (overrides: Partial<AnalyticsRuntime> = {}): AnalyticsRuntim
 	bindings: {},
 	engine: { read: async (adapter, query) => adapter.query(query, {}) },
 	ttl: { aggregate: 3600, realtime: 300 },
-	timeoutMs: 15_000,
 	comparison: true,
 	...overrides,
 })
