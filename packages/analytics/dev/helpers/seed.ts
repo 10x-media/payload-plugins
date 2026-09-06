@@ -4,18 +4,14 @@ import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { syncTask } from '../../src/sync/syncTask'
 import { startOfDayInTz } from '../../src/timeframe/tz'
+import { DEV_REPORTING_TIMEZONE } from '../config/shared'
+import { tenancyScopes } from '../config/tenancy'
 import { devMemoryAdapter } from './adapters'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
-
-/**
- * Shared with the plugin's `reportingTimezone` in `payload.config.ts`. Seeding bypasses
- * the ingest endpoint (no request to resolve a timezone from), so events carry the zone
- * explicitly; otherwise their rollups bucket on UTC days and a "Today" read aligned to
- * this zone misses them.
- */
-export const DEV_REPORTING_TIMEZONE = 'America/New_York'
+const ALPHA_EMAIL = 'alpha@10xmedia.de'
+const BETA_EMAIL = 'beta@10xmedia.de'
 
 const SEED_PATHS = ['/', '/about', '/pricing', '/blog', '/contact']
 const SEED_COUNTRIES = ['US', 'DE', 'GB', 'FR']
@@ -35,6 +31,10 @@ const SEED_DAYS = 730
 /** The recent span carrying realistic day-to-day traffic and the dimension breakdowns. */
 const SEED_DENSE_DAYS = 180
 
+/** Tenancy mode: alpha runs roughly 3x beta's volume so the isolation is visually obvious. */
+const ALPHA_SCALE = 3
+const BETA_SCALE = 1
+
 /**
  * Traffic decays with age and wobbles day to day, so each window is measurably busier than
  * the one before it and no comparison lands on a flat 0%. Beyond the dense span the seed
@@ -49,10 +49,20 @@ const pageviewsForDay = (day: number): number =>
 			? 1
 			: 0
 
-const buildSeedEvents = (now: Date): StoredEvent[] => {
+/**
+ * Builds a deterministic span of pageview events. `scale` multiplies the daily volume
+ * (tenancy mode gives alpha and beta different scales so their traffic is visibly
+ * different); `scope` stamps every event for a scoped tenant, omitted for the
+ * install-wide pass so those events land in the unscoped native buckets.
+ */
+const buildSeedEvents = (
+	now: Date,
+	opts: { scale?: number; scope?: string } = {}
+): StoredEvent[] => {
+	const scale = opts.scale ?? 1
 	const events: StoredEvent[] = []
 	for (let day = 0; day < SEED_DAYS; day++) {
-		const pageviewsToday = pageviewsForDay(day)
+		const pageviewsToday = Math.max(0, Math.round(pageviewsForDay(day) * scale))
 		for (let i = 0; i < pageviewsToday; i++) {
 			// Pair consecutive pageviews onto one visitor (and drift the window across days)
 			// so visitors stay realistically below pageviews rather than one-to-one.
@@ -69,6 +79,7 @@ const buildSeedEvents = (now: Date): StoredEvent[] => {
 				device: SEED_DEVICES[(day + i) % SEED_DEVICES.length],
 				source: SEED_SOURCES[(day + i) % SEED_SOURCES.length],
 				timezone: DEV_REPORTING_TIMEZONE,
+				...(opts.scope !== undefined ? { scope: opts.scope } : {}),
 			})
 		}
 	}
@@ -121,14 +132,114 @@ const seedMemoryAdapter = (events: StoredEvent[]): void => {
 	}
 }
 
+interface TenantDoc {
+	id: string | number
+	slug: string
+}
+
+const SEED_TENANTS = [
+	{ slug: 'alpha', name: 'Alpha' },
+	{ slug: 'beta', name: 'Beta' },
+] as const
+
+/** Seeds the `tenants` collection, idempotent, and resolves the alpha/beta docs either way. */
+const seedTenants = async (payload: Payload): Promise<{ alpha: TenantDoc; beta: TenantDoc }> => {
+	const tenantCount = await payload.count({ collection: 'tenants' as never })
+	if (tenantCount.totalDocs === 0) {
+		for (const tenant of SEED_TENANTS) {
+			await payload.create({
+				collection: 'tenants' as never,
+				data: { name: tenant.name, slug: tenant.slug } as never,
+			})
+		}
+		payload.logger.info(`Seeded tenants: ${SEED_TENANTS.map((t) => t.slug).join(', ')}`)
+	}
+	const found = (await payload.find({ collection: 'tenants' as never, pagination: false }))
+		.docs as unknown as TenantDoc[]
+	const alpha = found.find((t) => t.slug === 'alpha')
+	const beta = found.find((t) => t.slug === 'beta')
+	if (!alpha || !beta) {
+		throw new Error('analytics dev seed: alpha/beta tenants missing after seeding')
+	}
+	return { alpha, beta }
+}
+
+/** Assigns `alpha@`/`beta@` to their tenant via the multi-tenant plugin's `tenants` array field. */
+const seedTenantUsers = async (
+	payload: Payload,
+	tenants: { alpha: TenantDoc; beta: TenantDoc }
+): Promise<void> => {
+	const assignments: Array<{ email: string; tenant: string | number }> = [
+		{ email: ALPHA_EMAIL, tenant: tenants.alpha.id },
+		{ email: BETA_EMAIL, tenant: tenants.beta.id },
+	]
+	for (const { email, tenant } of assignments) {
+		const existing = await payload.count({
+			collection: 'users',
+			where: { email: { equals: email } },
+		})
+		if (existing.totalDocs === 0) {
+			await payload.create({
+				collection: 'users',
+				data: { email, password: DEV_PASSWORD, tenants: [{ tenant }] } as never,
+			})
+			payload.logger.info(`Seeded tenant admin: ${email} / ${DEV_PASSWORD}`)
+		}
+	}
+}
+
+const SEED_PROVIDERS = [
+	{ tenantKey: 'alpha', name: 'Alpha Plausible', siteId: 'alpha.example.com' },
+	{ tenantKey: 'beta', name: 'Beta Plausible', siteId: 'beta.example.com' },
+] as const
+
+/**
+ * One enabled placeholder Plausible provider per tenant, so the source picker and the
+ * Analytics Providers admin view have something to show. Dummy credentials: reads through
+ * this provider fail and degrade, which is fine for a demo of the provider surface itself.
+ * Stamped as the platform admin (`dev@10xmedia.de`) so the stampScope hook accepts the
+ * explicit `tenant` value instead of trying to resolve one from a (cookie-less) seed req.
+ */
+const seedTenantProviders = async (
+	payload: Payload,
+	tenants: { alpha: TenantDoc; beta: TenantDoc },
+	platformAdmin: { id: string | number }
+): Promise<void> => {
+	const count = await payload.count({ collection: 'analytics-providers' as never })
+	if (count.totalDocs > 0) {
+		return
+	}
+	for (const { tenantKey, name, siteId } of SEED_PROVIDERS) {
+		await payload.create({
+			collection: 'analytics-providers' as never,
+			data: {
+				name,
+				provider: 'plausible',
+				enabled: true,
+				tenant: tenants[tenantKey].id,
+				plausible: { siteId, apiKey: 'dev-dummy-api-key' },
+			} as never,
+			user: platformAdmin as never,
+		})
+	}
+	payload.logger.info(`Seeded analytics-providers: ${SEED_PROVIDERS.map((p) => p.name).join(', ')}`)
+}
+
 /**
  * Seed the dev Payload app: an admin user to log in with, page documents matching the
  * seeded traffic paths (so the per-document Analytics tab shows real numbers), a
- * fortnight of sample pageviews in both the native engine and the memory provider,
- * and one sync pass so the analytics-daily collection has rows to inspect. Idempotent
- * (each block is skipped once its collection is populated).
+ * two-year span of sample pageviews in both the native engine and the memory provider,
+ * and one sync pass so the analytics-daily collection has rows to inspect. In tenancy
+ * mode, additionally seeds the `tenants` collection, a tenant-scoped admin per tenant,
+ * a scaled-volume traffic span per tenant, and one placeholder provider doc per tenant.
+ * Idempotent (each block is skipped once its collection is populated).
  */
-export const seedDev = async (payload: Payload): Promise<void> => {
+export const seedDev = async (
+	payload: Payload,
+	opts: { tenancy?: boolean } = {}
+): Promise<void> => {
+	const { tenancy = false } = opts
+
 	const userCount = await payload.count({ collection: 'users' })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
@@ -137,6 +248,9 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
+	const platformAdmin = (
+		await payload.find({ collection: 'users', where: { email: { equals: DEV_EMAIL } }, limit: 1 })
+	).docs[0] as { id: string | number }
 
 	const pageCount = await payload.count({ collection: 'pages' as never })
 	if (pageCount.totalDocs === 0) {
@@ -146,12 +260,29 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info(`Seeded ${SEED_PAGES.length} pages matching the traffic paths`)
 	}
 
-	const events = buildSeedEvents(new Date())
+	const tenants = tenancy ? await seedTenants(payload) : undefined
+	if (tenants) {
+		await seedTenantUsers(payload, tenants)
+	}
+
+	const events = [
+		...buildSeedEvents(new Date()),
+		...(tenants
+			? buildSeedEvents(new Date(), { scale: ALPHA_SCALE, scope: String(tenants.alpha.id) })
+			: []),
+		...(tenants
+			? buildSeedEvents(new Date(), { scale: BETA_SCALE, scope: String(tenants.beta.id) })
+			: []),
+	]
 	seedMemoryAdapter(events)
 	const eventCount = await payload.count({ collection: EVENTS_SLUG as never })
 	if (eventCount.totalDocs === 0) {
 		await flushSeedEvents(payload, events)
 		payload.logger.info(`Seeded ${events.length} analytics pageview events`)
+	}
+
+	if (tenants) {
+		await seedTenantProviders(payload, tenants, platformAdmin)
 	}
 
 	const dailyCount = await payload.count({ collection: 'analytics-daily' as never })
@@ -160,6 +291,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			cron: '0 */6 * * *',
 			lookbackDays: 14,
 			collectionSlug: 'analytics-daily',
+			scopes: tenancy ? tenancyScopes : undefined,
 		})
 		const handler = task.handler
 		if (typeof handler === 'function') {

@@ -1,6 +1,11 @@
 import { AnalyticsPanelField as AnalyticsPanelField_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
+import { WatchTenantCollection as WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
+import { TenantField as TenantField_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { ProtectedCell as ProtectedCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ProtectedField as ProtectedField_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
+import { GlobalViewRedirect as GlobalViewRedirect_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
+import { TenantSelector as TenantSelector_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
+import { TenantSelectionProvider as TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { AnalyticsMetricWidget as AnalyticsMetricWidget_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
 import { MetricSelectField as MetricSelectField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { DateRangeField as DateRangeField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
@@ -14,8 +19,13 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 /** @type import('payload').ImportMap */
 export const importMap = {
   "@10x-media/analytics/rsc#AnalyticsPanelField": AnalyticsPanelField_e33bd2cebc5cb3736daaf4c0c56bb68c,
+  "@payloadcms/plugin-multi-tenant/client#WatchTenantCollection": WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a,
+  "@payloadcms/plugin-multi-tenant/client#TenantField": TenantField_1d0591e3cf4f332c83a86da13a0de59a,
   "@10x-media/fields/rsc#ProtectedCell": ProtectedCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/client#ProtectedField": ProtectedField_02043ee4f38853ef8c4ef9fd50352514,
+  "@payloadcms/plugin-multi-tenant/rsc#GlobalViewRedirect": GlobalViewRedirect_d6d5f193a167989e2ee7d14202901e62,
+  "@payloadcms/plugin-multi-tenant/rsc#TenantSelector": TenantSelector_d6d5f193a167989e2ee7d14202901e62,
+  "@payloadcms/plugin-multi-tenant/rsc#TenantSelectionProvider": TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62,
   "@10x-media/analytics/rsc#AnalyticsMetricWidget": AnalyticsMetricWidget_e33bd2cebc5cb3736daaf4c0c56bb68c,
   "@10x-media/analytics/client#MetricSelectField": MetricSelectField_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/client#DateRangeField": DateRangeField_cf3604008f3ebbc369f9463262b1f9eb,

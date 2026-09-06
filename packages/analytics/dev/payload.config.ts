@@ -6,6 +6,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { analyticsTab } from '../src/index'
 import { singleFragment } from './config/single'
+import { tenancyFragment } from './config/tenancy'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -13,7 +14,8 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
-const fragment = singleFragment
+const tenancy = process.env.TENANCY === 'on'
+const fragment = tenancy ? tenancyFragment : singleFragment
 
 const users: CollectionConfig = {
 	slug: 'users',
@@ -64,7 +66,7 @@ export default buildConfig({
 	plugins: fragment.plugins,
 	telemetry: false,
 	onInit: async (payload) => {
-		await seedDev(payload)
+		await seedDev(payload, { tenancy })
 	},
 	typescript: { autoGenerate },
 	admin: {
