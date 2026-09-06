@@ -18,7 +18,11 @@ export interface UmamiConfig {
 	apiKey?: string
 	/** Self-hosted bearer token (from POST /api/auth/login). */
 	token?: string
-	/** API base URL. Defaults to Umami Cloud (https://api.umami.is/v1). Self-hosted is e.g. https://site/api. */
+	/**
+	 * API base URL. Defaults to Umami Cloud (https://api.umami.is/v1). Self-hosted is
+	 * e.g. https://site/api. Capture derives the app origin from this (a trailing `/api`
+	 * is stripped), so one `host` value serves both the Stats API and the tracker.
+	 */
 	host?: string
 	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
 	maxLookbackDays?: number | null
@@ -29,8 +33,9 @@ const CLOUD_SCRIPT = 'https://cloud.umami.is/script.js'
 const CLOUD_SEND = 'https://gateway.umami.is/api/send'
 
 function buildCapture(config: UmamiConfig): CaptureSupport {
-	const scriptUpstream = config.host ? `${config.host}/script.js` : CLOUD_SCRIPT
-	const sendUpstream = config.host ? `${config.host}/api/send` : CLOUD_SEND
+	const origin = config.host ? config.host.replace(/\/api\/?$/, '').replace(/\/+$/, '') : null
+	const scriptUpstream = origin ? `${origin}/script.js` : CLOUD_SCRIPT
+	const sendUpstream = origin ? `${origin}/api/send` : CLOUD_SEND
 	return {
 		proxy: {
 			routes: [

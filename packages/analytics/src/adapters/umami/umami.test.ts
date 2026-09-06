@@ -150,11 +150,39 @@ describe('umami capture', () => {
 		])
 	})
 
-	it('builds the two proxy routes against a self-hosted host', () => {
-		const capture = umami({ websiteId: 'w', token: 't', host: 'https://a.io/api' }).capture
+	it('builds the two proxy routes against the self-hosted app origin, stripping the /api suffix', () => {
+		const capture = umami({
+			websiteId: 'w',
+			token: 't',
+			host: 'https://analytics.example.com/api',
+		}).capture
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/script.js', upstream: 'https://a.io/api/script.js' },
-			{ source: '/api/send', upstream: 'https://a.io/api/api/send' },
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
+		])
+	})
+
+	it('derives the same origin from a host without the /api suffix', () => {
+		const capture = umami({
+			websiteId: 'w',
+			token: 't',
+			host: 'https://analytics.example.com',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
+		])
+	})
+
+	it('derives the same origin from a host with a trailing slash', () => {
+		const capture = umami({
+			websiteId: 'w',
+			token: 't',
+			host: 'https://analytics.example.com/api/',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
 		])
 	})
 
