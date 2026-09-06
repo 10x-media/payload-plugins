@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/analytics",
-	"version": "1.0.0-beta.6",
+	"version": "1.0.0-beta.7",
 	"description": "Adapter-based analytics for Payload: providers, a native engine, dashboard widgets, and portable fields.",
 	"license": "MIT",
 	"repository": {
@@ -120,7 +120,7 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@10x-media/fields": "^0.1.0-beta.6",
+		"@10x-media/fields": "^0.1.0-beta.7",
 		"@google-analytics/data": "^6.0.0",
 		"@payloadcms/db-postgres": "^3.82.0",
 		"@payloadcms/ui": "^3.83.0",
