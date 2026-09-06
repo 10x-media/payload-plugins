@@ -17,7 +17,7 @@ import { bumpRollup } from '../../src/native/rollups/bumpRollup'
 import { computeRollupDeltas } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
-import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
 import { startOfDayInTz } from '../../src/timeframe/tz'
 import { readForWidget } from '../../src/widgets/readForWidget'
 
@@ -881,52 +881,67 @@ describeForDb('native hostname family uniqueness', {}, (db) => {
 	})
 })
 
-describeForDb('analytics sync tier: scope coexistence', {}, (db) => {
+describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 	const DAY = 86_400_000
-	const mem = memoryAdapter()
 	let booted: BootedPayload
+	let memRoot: MemoryAnalyticsAdapter
+	let memT1: MemoryAnalyticsAdapter
+	let memT2: MemoryAnalyticsAdapter
 
 	beforeAll(async () => {
+		memRoot = { ...memoryAdapter(), id: 'memory:root' }
+		memT1 = { ...memoryAdapter(), id: 'memory:t1' }
+		memT2 = { ...memoryAdapter(), id: 'memory:t2' }
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [native(), mem],
+				adapters: [native()],
 				sync: true,
 				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				scopes: () => ['t1', 't2'],
+				providers: {
+					resolve: ({ scope }) => {
+						if (scope === 't1') return [memT1]
+						if (scope === 't2') return [memT2]
+						return [memRoot]
+					},
+				},
 			}),
 			db,
 		})
-		mem.record({ path: '/p', timestamp: new Date(Date.now() - DAY), visitor: 'a' })
+		const t = new Date(Date.now() - DAY)
+		memRoot.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memRoot.record({ path: '/p', timestamp: t, visitor: 'b' })
+		memT1.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memT2.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memT2.record({ path: '/p', timestamp: t, visitor: 'b' })
+		memT2.record({ path: '/p', timestamp: t, visitor: 'c' })
 	})
 
 	afterAll(async () => {
 		await booted.stop()
 	})
 
-	const reqFor = (tenant: string): PayloadRequest =>
-		({
-			payload: booted.payload,
-			headers: new Headers({ 'x-tenant': tenant }),
-		}) as unknown as PayloadRequest
+	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
 
-	const runSync = async (tenant: string): Promise<{ synced: number; failed: number }> => {
+	const runSync = async (): Promise<{ synced: number; failed: number }> => {
 		const task = syncTask({
 			cron: '0 */6 * * *',
 			lookbackDays: 3,
 			collectionSlug: 'analytics-daily',
+			scopes: () => ['t1', 't2'],
 		})
 		const handler = task.handler
 		if (typeof handler !== 'function') {
 			throw new Error('sync handler must be a function')
 		}
-		const result = await handler({ req: reqFor(tenant) } as unknown as Parameters<
-			typeof handler
-		>[0])
+		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
 		return (result as { output: { synced: number; failed: number } }).output
 	}
 
-	it(`upserts one row per scope, coexisting for the same (source, date) on ${db}`, async () => {
-		await runSync('t1')
-		await runSync('t2')
+	it(`syncs one row per scope, each reading that scope's own resolved provider on ${db}`, async () => {
+		const out = await runSync()
+		expect(out.failed).toBe(0)
+		expect(out.synced).toBe(3)
 		const docs = await booted.payload.find({
 			collection: 'analytics-daily' as never,
 			limit: 100,
@@ -937,23 +952,25 @@ describeForDb('analytics sync tier: scope coexistence', {}, (db) => {
 				(d) => [d.scope, d]
 			)
 		)
+		expect(byScope.get('')?.pageviews).toBe(2)
 		expect(byScope.get('t1')?.pageviews).toBe(1)
-		expect(byScope.get('t2')?.pageviews).toBe(1)
+		expect(byScope.get('t2')?.pageviews).toBe(3)
 	})
 
-	it(`is idempotent per scope: re-run updates in place with no duplicates on ${db}`, async () => {
+	it(`is idempotent across scopes: a second run updates in place with no duplicates on ${db}`, async () => {
 		const before = await booted.payload.find({
 			collection: 'analytics-daily' as never,
 			limit: 0,
 			overrideAccess: true,
 		})
-		await runSync('t1')
+		await runSync()
 		const after = await booted.payload.find({
 			collection: 'analytics-daily' as never,
 			limit: 0,
 			overrideAccess: true,
 		})
 		expect(after.totalDocs).toBe(before.totalDocs)
+		expect(after.totalDocs).toBe(3)
 	})
 
 	it(`a tenant's find with overrideAccess: false returns only their scope's rows on ${db}`, async () => {

@@ -1,5 +1,15 @@
-import { describe, expect, it } from 'vitest'
-import { deriveWarmTargets, type WarmWidgetInstance } from './warmTask'
+import type { PayloadRequest, WidgetInstance } from 'payload'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { readForWidget } = vi.hoisted(() => ({ readForWidget: vi.fn() }))
+const { readForWidgetSeries } = vi.hoisted(() => ({ readForWidgetSeries: vi.fn() }))
+const { readForWidgetBreakdown } = vi.hoisted(() => ({ readForWidgetBreakdown: vi.fn() }))
+
+vi.mock('../widgets/readForWidget', () => ({ readForWidget }))
+vi.mock('../widgets/readForWidgetSeries', () => ({ readForWidgetSeries }))
+vi.mock('../widgets/readForWidgetBreakdown', () => ({ readForWidgetBreakdown }))
+
+import { deriveWarmTargets, type WarmWidgetInstance, warmTask } from './warmTask'
 
 const layout = (widgets: WarmWidgetInstance[]): WarmWidgetInstance[] => widgets
 
@@ -141,5 +151,51 @@ describe('deriveWarmTargets', () => {
 			layout([{ widgetSlug: 'analytics-metric', data: { metric: 'not-a-real-metric' } }])
 		)
 		expect(target?.metric).toBe('pageviews')
+	})
+})
+
+describe('warmTask handler scope fan-out', () => {
+	const req = { payload: { logger: { warn: vi.fn() } } } as unknown as PayloadRequest
+
+	beforeEach(() => {
+		readForWidget.mockReset().mockResolvedValue({ status: 'ok' })
+		readForWidgetSeries.mockReset().mockResolvedValue({ status: 'ok' })
+		readForWidgetBreakdown.mockReset().mockResolvedValue({ status: 'ok' })
+	})
+
+	const runHandler = async (scopes?: () => string[]) => {
+		const widgets = layout([
+			{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', timeframe: 'last30days' } },
+		])
+		const task = warmTask('*/30 * * * *', widgets as unknown as WidgetInstance[], scopes)
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('warm handler must be a function')
+		}
+		const result = await handler({ req } as unknown as Parameters<typeof handler>[0])
+		return (result as { output: { warmed: number; failed: number } }).output
+	}
+
+	it('runs each target once for the install-wide scope when no scopes resolver is set', async () => {
+		const output = await runHandler()
+		expect(readForWidget).toHaveBeenCalledTimes(1)
+		expect(readForWidget.mock.calls[0]?.[0]).toMatchObject({ scope: null })
+		expect(output).toEqual({ warmed: 1, failed: 0 })
+	})
+
+	it('runs each target once per scope, passing scope through explicitly', async () => {
+		const output = await runHandler(() => ['t1', 't2'])
+		expect(readForWidget).toHaveBeenCalledTimes(3)
+		expect(readForWidget.mock.calls.map((call) => call[0]?.scope)).toEqual([null, 't1', 't2'])
+		expect(output).toEqual({ warmed: 3, failed: 0 })
+	})
+
+	it('counts a failure independently per scope', async () => {
+		readForWidget
+			.mockResolvedValueOnce({ status: 'ok' })
+			.mockRejectedValueOnce(new Error('boom'))
+			.mockResolvedValueOnce({ status: 'ok' })
+		const output = await runHandler(() => ['t1', 't2'])
+		expect(output).toEqual({ warmed: 2, failed: 1 })
 	})
 })

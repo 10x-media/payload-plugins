@@ -59,6 +59,19 @@ describe('resolveOptions', () => {
 	})
 })
 
+describe('resolveOptions scopes', () => {
+	const adapters = [memoryAdapter()]
+
+	it('leaves scopes undefined when the option is not set', () => {
+		expect(resolveOptions({ adapters }).scopes).toBeUndefined()
+	})
+
+	it('carries the scopes resolver through unchanged', () => {
+		const scopes = () => ['t1', 't2']
+		expect(resolveOptions({ adapters, scopes }).scopes).toBe(scopes)
+	})
+})
+
 describe('resolveOptions providers', () => {
 	const adapters = [memoryAdapter()]
 

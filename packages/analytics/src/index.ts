@@ -162,7 +162,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		if (resolved.cache.warm.enabled) {
 			config.jobs = {
 				...config.jobs,
-				tasks: [...(config.jobs?.tasks ?? []), warmTask(resolved.cache.warm.cron, defaultLayout)],
+				tasks: [
+					...(config.jobs?.tasks ?? []),
+					warmTask(resolved.cache.warm.cron, defaultLayout, resolved.scopes),
+				],
 			}
 		}
 		if (resolved.sync.enabled) {
@@ -184,6 +187,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 						lookbackDays: resolved.sync.lookbackDays,
 						collectionSlug: resolved.sync.collectionSlug,
 						adapterIds: resolved.sync.adapters,
+						scopes: resolved.scopes,
 					}),
 				],
 			}
@@ -240,6 +244,7 @@ export type {
 	ProvidersOptions,
 	ProvidersResolve,
 	ScopeResolver,
+	ScopesResolver,
 	TimezoneResolver,
 } from './core/options'
 export type {

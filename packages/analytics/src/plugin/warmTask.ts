@@ -1,5 +1,7 @@
 import type { PayloadRequest, TaskConfig, WidgetInstance } from 'payload'
 import type { DateRange, DimensionKey, MetricKey } from '../core/contract'
+import type { ScopesResolver } from '../core/options'
+import { resolveScopeList } from '../core/scopeList'
 import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { breakdownSpecBySlug } from '../widgets/breakdownTypes'
 import { resolveCustomRange } from '../widgets/range'
@@ -160,8 +162,14 @@ const resolveLayout = async (
 	}
 }
 
-/** Run one target's read; returns true when the read served data (status `ok`). */
-const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Promise<boolean> => {
+/** Run one target's read for one scope; returns true when the read served data (status `ok`). */
+const runTarget = async (args: {
+	target: WarmTarget
+	req: PayloadRequest
+	now: Date
+	scope: string | null
+}): Promise<boolean> => {
+	const { target, req, now, scope } = args
 	if (target.kind === 'metric') {
 		const result = await readForWidget({
 			req,
@@ -170,6 +178,7 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 			adapterId: target.adapterId,
 			now,
 			range: target.range,
+			scope,
 		})
 		return result.status === 'ok'
 	}
@@ -181,6 +190,7 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 			adapterId: target.adapterId,
 			now,
 			range: target.range,
+			scope,
 		})
 		return result.status === 'ok'
 	}
@@ -193,6 +203,7 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
 		adapterId: target.adapterId,
 		now,
 		range: target.range,
+		scope,
 	})
 	return result.status === 'ok'
 }
@@ -203,27 +214,33 @@ const runTarget = async (target: WarmTarget, req: PayloadRequest, now: Date): Pr
  * from `layout` (the app's `defaultLayout`, captured at registration and resolved here);
  * each read is isolated so one failing provider does not abort the rest. Most valuable
  * for slow or rate-limited provider adapters; native reads are cheap and harmless to warm.
+ * With `scopes` configured, every target runs once per tenant scope (plus the install-wide
+ * scope) so a multi-tenant install warms every tenant's dashboard, not just the null one.
  */
 export const warmTask = (
 	cron: string,
-	layout: WarmLayout
+	layout: WarmLayout,
+	scopes?: ScopesResolver
 ): TaskConfig<{ input: Record<string, never>; output: { warmed: number; failed: number } }> => ({
 	slug: WARM_TASK_SLUG,
 	handler: async ({ req }) => {
 		const targets = deriveWarmTargets(await resolveLayout(layout, req))
+		const scopeList = await resolveScopeList(scopes, req.payload)
 		const now = new Date()
 		let warmed = 0
 		let failed = 0
-		for (const target of targets) {
-			try {
-				if (await runTarget(target, req, now)) {
-					warmed++
+		for (const scope of scopeList) {
+			for (const target of targets) {
+				try {
+					if (await runTarget({ target, req, now, scope })) {
+						warmed++
+					}
+				} catch (err) {
+					failed++
+					req.payload.logger.warn(
+						`analytics warm-cache: ${target.kind} read for "${target.metric}" (scope "${scope ?? ''}") failed: ${String(err)}`
+					)
 				}
-			} catch (err) {
-				failed++
-				req.payload.logger.warn(
-					`analytics warm-cache: ${target.kind} read for "${target.metric}" failed: ${String(err)}`
-				)
 			}
 		}
 		return { output: { warmed, failed } }

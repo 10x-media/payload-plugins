@@ -34,6 +34,12 @@ export type TimezoneResolver = (args: {
 }) => string | null | Promise<string | null>
 
 /**
+ * Enumerates the tenant scopes the cron tiers (cache warming, sync) fan out over.
+ * Absent, each tier runs once for the install-wide scope.
+ */
+export type ScopesResolver = (args: { payload: Payload }) => string[] | Promise<string[]>
+
+/**
  * Escape hatch replacing the provider-collection lookup: return the runtime
  * adapters for a scope yourself (any store, any shape). Results are layered onto
  * the static config adapters exactly like collection-resolved ones, but are not
@@ -96,6 +102,12 @@ export type AnalyticsPluginOptions = {
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver?: ScopeResolver
+	/**
+	 * Enumerates the tenant scopes the cache-warming and sync cron tiers fan out
+	 * over, in addition to the install-wide (null) scope every tier already runs.
+	 * Unset, those tiers run once for the whole install, same as before.
+	 */
+	scopes?: ScopesResolver
 	/**
 	 * IANA reporting timezone that day boundaries (timeframe windows, series axes,
 	 * native rollup buckets) align to. Defaults to UTC. A string forces one timezone
@@ -167,6 +179,8 @@ export interface ResolvedOptions {
 	scopeResolver: ScopeResolver
 	/** True when the app configured a scopeResolver (scoped install). */
 	scoped: boolean
+	/** Raw scopes option; undefined runs the cron tiers install-wide only. */
+	scopes?: ScopesResolver
 	/** Raw reportingTimezone option; normalized into a resolver at init. */
 	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
@@ -323,6 +337,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		defaultAdapter: options.defaultAdapter,
 		scopeResolver: options.scopeResolver ?? (() => null),
 		scoped,
+		scopes: options.scopes,
 		reportingTimezone: options.reportingTimezone,
 		platformAdapter: options.platformAdapter,
 		access: {
