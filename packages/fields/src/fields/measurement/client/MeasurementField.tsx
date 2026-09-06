@@ -16,14 +16,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { type MeasurementSystem, systemForLocale } from '../engine/locale'
+import { resolvePrecision } from '../engine/precision'
 import { createEngine, defaultEngine } from '../engine/registry'
 import { COMPOUNDS, type MeasurementUnitId } from '../engine/units'
 import type { MeasurementResolvedClientOptions } from '../options'
-import { commitDrafts, draftsFor, type MeasurementDrafts, resolveDisplayUnit } from './editModel'
+import {
+	commitDrafts,
+	type DirtyDrafts,
+	draftsFor,
+	type MeasurementDrafts,
+	resolveDisplayUnit,
+} from './editModel'
 import { useMeasurementUnits } from './MeasurementUnitsProvider'
 import './measurementField.css'
 
 const baseClass = 'fields-measurement'
+
+/** MeasurementFieldServer always resolves and threads precision; this only covers a hand-authored Field with no server wrapper. */
+const DEFAULT_PRECISION = resolvePrecision([])
+
+const CLEAN: DirtyDrafts = { minor: false, primary: false }
 
 /**
  * Every value input sizes to its content so "5 ft 11 in" (or a lone scalar)
@@ -171,9 +183,17 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	const isReadOnly = Boolean(readOnlyFromProps || disabled || readOnlyFromAdmin)
 
 	const numericValue = typeof value === 'number' && !Number.isNaN(value) ? value : null
-	const unitOpts = useMemo(
-		() => ({ displayUnit, engine, precision: displayPrecision, storageUnit }),
-		[displayUnit, engine, displayPrecision, storageUnit]
+	const resolvedPrecision = precision ?? DEFAULT_PRECISION
+	const draftOpts = useMemo(
+		() => ({
+			displayUnit,
+			draft: resolvedPrecision.draft,
+			engine,
+			precision: displayPrecision,
+			storageDigits: resolvedPrecision.storage,
+			storageUnit,
+		}),
+		[displayUnit, engine, displayPrecision, resolvedPrecision, storageUnit]
 	)
 
 	// Payload's server-driven form-state refresh (conditional-logic revalidation on
@@ -193,35 +213,47 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	}, [numericValue, min, max, fmtBound, t])
 
 	const editingRef = useRef(false)
-	const [drafts, setDrafts] = useState<MeasurementDrafts>(() => draftsFor(numericValue, unitOpts))
+	const [drafts, setDrafts] = useState<MeasurementDrafts>(() => draftsFor(numericValue, draftOpts))
+	// Which part the viewer has actually typed into since the last resync: an
+	// untouched part must commit the value it already holds, never whatever the
+	// display-policy draft happens to show for it.
+	const [dirty, setDirty] = useState<DirtyDrafts>(CLEAN)
 	useEffect(() => {
-		if (!editingRef.current) setDrafts(draftsFor(numericValue, unitOpts))
-	}, [numericValue, unitOpts])
-
-	const commit = useCallback(
-		(next: MeasurementDrafts) => {
-			setDrafts(next)
-			setValue(commitDrafts(next, unitOpts))
-		},
-		[setValue, unitOpts]
-	)
+		if (!editingRef.current) {
+			setDrafts(draftsFor(numericValue, draftOpts))
+			setDirty(CLEAN)
+		}
+	}, [numericValue, draftOpts])
 
 	const onDraftChange = useCallback(
 		(part: keyof MeasurementDrafts) => (event: React.ChangeEvent<HTMLInputElement>) => {
 			editingRef.current = true
-			commit({ ...drafts, [part]: event.target.value })
+			const next = { ...drafts, [part]: event.target.value }
+			const nextDirty = { ...dirty, [part]: true }
+			setDrafts(next)
+			setDirty(nextDirty)
+			setValue(
+				commitDrafts(next, {
+					...draftOpts,
+					dirty: nextDirty,
+					entry: resolvedPrecision.entry,
+					storedValue: numericValue,
+				})
+			)
 		},
-		[commit, drafts]
+		[dirty, drafts, draftOpts, numericValue, resolvedPrecision.entry, setValue]
 	)
 
 	const onBlur = useCallback(() => {
 		editingRef.current = false
-		setDrafts(draftsFor(numericValue, unitOpts))
-	}, [numericValue, unitOpts])
+		setDrafts(draftsFor(numericValue, draftOpts))
+		setDirty(CLEAN)
+	}, [numericValue, draftOpts])
 
 	const selectUnit = useCallback(
 		(unit: MeasurementUnitId) => {
 			editingRef.current = false
+			setDirty(CLEAN)
 			if (context) context.setUnit(preferenceKey, unit)
 			else setLocalUnit(unit)
 		},

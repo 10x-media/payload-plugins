@@ -4,11 +4,15 @@ import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '../../../translations/useTranslation'
 import { type MeasurementSystem, systemForLocale } from '../engine/locale'
+import { resolvePrecision } from '../engine/precision'
 import { createEngine, defaultEngine } from '../engine/registry'
 import type { MeasurementResolvedClientOptions } from '../options'
 import { resolveDisplayUnit } from './editModel'
 import { useMeasurementUnits } from './MeasurementUnitsProvider'
 import './measurementCell.css'
+
+/** MeasurementCellServer always resolves and threads precision; this only covers a hand-authored Cell with no server wrapper. */
+const DEFAULT_PRECISION = resolvePrecision([])
 
 /**
  * `field` and `onClick` are excluded and re-added as optional: the RSC cell only
@@ -54,12 +58,20 @@ export const MeasurementCell: React.FC<MeasurementCellProps> = (props) => {
 		system,
 		units,
 	})
+	const resolvedPrecision = precision ?? DEFAULT_PRECISION
+	// Exact mode reads back at full storage fidelity instead of display digits. The
+	// override key is the unit id itself, so it works for a compound displayUnit too:
+	// precisionFor/formatMeasurement treat that key as the compound's minor digits.
+	const precisionOverride =
+		resolvedPrecision.mode === 'exact'
+			? { [displayUnit]: resolvedPrecision.storage }
+			: resolvedPrecision.display
 	return (
 		<span className="fields-measurement-cell">
 			{engine.formatMeasurement(cellData, {
 				displayUnit,
 				locale: i18n.language,
-				precision: precision?.display,
+				precision: precisionOverride,
 				storageUnit,
 			})}
 		</span>
