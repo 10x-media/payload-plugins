@@ -77,3 +77,17 @@ export const resolvePrecision = (
 		...(display !== undefined ? { display } : {}),
 	}
 }
+
+/**
+ * Exact mode reads back at full storage fidelity instead of display digits, for
+ * both cells and bound messages, so the two always agree. An explicit per-unit
+ * override for the display unit itself still wins, since the caller asked for it
+ * by name; every other unit's override (if any) passes through untouched.
+ */
+export const exactModePrecisionOverride = (
+	resolved: ResolvedPrecision,
+	displayUnit: string
+): Partial<Record<string, number>> | undefined =>
+	resolved.mode === 'exact'
+		? { ...resolved.display, [displayUnit]: resolved.display?.[displayUnit] ?? resolved.storage }
+		: resolved.display

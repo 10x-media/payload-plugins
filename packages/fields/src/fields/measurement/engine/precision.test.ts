@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePrecision } from './precision'
+import { exactModePrecisionOverride, resolvePrecision } from './precision'
 
 describe('resolvePrecision', () => {
 	it('defaults to readable with quantize entry, display drafts, and storage 6', () => {
@@ -56,5 +56,24 @@ describe('resolvePrecision', () => {
 	})
 	it('names the offending value in the storage error message', () => {
 		expect(() => resolvePrecision([{ storage: 99 }])).toThrow(/99/)
+	})
+})
+
+describe('exactModePrecisionOverride', () => {
+	it('passes the display overrides through untouched in readable mode', () => {
+		const resolved = resolvePrecision([{ display: { kg: 1 }, mode: 'readable' }])
+		expect(exactModePrecisionOverride(resolved, 'kg')).toEqual({ kg: 1 })
+	})
+	it('defaults the display unit to storage digits in exact mode', () => {
+		const resolved = resolvePrecision(['exact'])
+		expect(exactModePrecisionOverride(resolved, 'kg')).toEqual({ kg: 6 })
+	})
+	it('merges rather than replaces: an explicit override for the display unit still wins', () => {
+		const resolved = resolvePrecision([{ display: { kg: 1 }, mode: 'exact', storage: 4 }])
+		expect(exactModePrecisionOverride(resolved, 'kg')).toEqual({ kg: 1 })
+	})
+	it('keeps other units overrides alongside the storage-digit override for the display unit', () => {
+		const resolved = resolvePrecision([{ display: { lb: 2 }, mode: 'exact', storage: 4 }])
+		expect(exactModePrecisionOverride(resolved, 'kg')).toEqual({ kg: 4, lb: 2 })
 	})
 })

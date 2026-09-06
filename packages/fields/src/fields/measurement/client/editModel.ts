@@ -37,6 +37,15 @@ type CommitOptions = UnitContext & {
 	dirty?: DirtyDrafts
 	/** Current stored value, used to derive an untouched part's exact contribution. */
 	storedValue?: number | null
+	/**
+	 * The compound drafts as painted on screen immediately before this edit (not the
+	 * post-keystroke `drafts`). A display-digit repaint can carry (182.5 cm storage
+	 * splits exactly to 5 ft 11.850394 in but paints as 6 ft 0 in), so when exactly
+	 * one part is dirty, the edited part's contribution is computed as a delta off
+	 * this baseline rather than a full replace, which would otherwise bake the
+	 * painted carry into storage.
+	 */
+	paintedDrafts?: MeasurementDrafts
 }
 
 const numberToDraft = (value: number): string => String(value)
@@ -55,6 +64,7 @@ export const commitDrafts = (drafts: MeasurementDrafts, opts: CommitOptions): nu
 		dirty = ALL_DIRTY,
 		engine,
 		entry = 'free',
+		paintedDrafts,
 		precision,
 		storageDigits = STORAGE_FRACTION_DIGITS,
 		storageUnit,
@@ -63,13 +73,49 @@ export const commitDrafts = (drafts: MeasurementDrafts, opts: CommitOptions): nu
 
 	if (engine.isCompoundUnit(displayUnit)) {
 		const compound = COMPOUNDS[displayUnit]
-		// An untouched part contributes the value stored today, decomposed at storage
-		// precision, never the last-displayed draft string: that string can lag the
-		// stored value under 'display' draft policy or quantized entry.
-		const stored =
-			typeof storedValue === 'number'
-				? engine.decompose(storedValue, storageUnit, displayUnit, storageDigits)
-				: null
+		const hasStored = typeof storedValue === 'number'
+		const dirtyCount = (dirty.primary ? 1 : 0) + (dirty.minor ? 1 : 0)
+
+		// Delta path: exactly one part was touched and a painted baseline exists, so
+		// the untouched part's contribution comes entirely from the exact stored
+		// total (never its carried, display-precision draft), and the touched part
+		// contributes only the change the viewer actually typed, in minor units.
+		if (hasStored && dirtyCount === 1 && paintedDrafts) {
+			const exact = engine.decompose(storedValue as number, storageUnit, displayUnit, storageDigits)
+			const exactTotal = exact.major * compound.ratio + exact.minor
+
+			if (dirty.primary) {
+				let typedMajor = parseDraft(drafts.primary)
+				if (typedMajor === null) return null
+				if (entry === 'quantize') {
+					typedMajor = roundTo(typedMajor, engine.precisionFor(compound.major, precision))
+				}
+				const paintedMajor = parseDraft(paintedDrafts.primary) ?? exact.major
+				const newTotal = exactTotal + (typedMajor - paintedMajor) * compound.ratio
+				return roundTo(
+					engine.compose({ major: 0, minor: newTotal }, displayUnit, storageUnit),
+					storageDigits
+				)
+			}
+
+			const rawMinor = parseDraft(drafts.minor) ?? 0
+			const typedMinor =
+				entry === 'quantize'
+					? roundTo(rawMinor, engine.precisionFor(displayUnit, precision))
+					: rawMinor
+			const paintedMinor = parseDraft(paintedDrafts.minor) ?? 0
+			const newTotal = exactTotal + (typedMinor - paintedMinor)
+			return roundTo(
+				engine.compose({ major: 0, minor: newTotal }, displayUnit, storageUnit),
+				storageDigits
+			)
+		}
+
+		// Both parts dirty (an explicit full replace) or no baseline to diff
+		// against: compose the two parts directly, as before.
+		const stored = hasStored
+			? engine.decompose(storedValue as number, storageUnit, displayUnit, storageDigits)
+			: null
 
 		let major: number | null
 		if (dirty.primary) {
@@ -82,23 +128,24 @@ export const commitDrafts = (drafts: MeasurementDrafts, opts: CommitOptions): nu
 		}
 		if (major === null) return null
 
-		const rawMinor = dirty.minor ? (parseDraft(drafts.minor) ?? 0) : (stored?.minor ?? 0)
-		const minor =
-			dirty.minor && entry === 'quantize'
-				? roundTo(rawMinor, engine.precisionFor(displayUnit, precision))
-				: rawMinor
-		const maxMinor = compound.ratio - 0.001
-		// Clamp the magnitude only: decompose is sign-safe and negative drafts
-		// carry the sign on both parts, so zeroing a negative minor would corrupt
-		// the round-trip.
-		const clampedMinor = dirty.minor
-			? Math.sign(minor) * Math.min(Math.abs(minor), maxMinor)
-			: minor
+		let minor: number
+		if (dirty.minor) {
+			const rawMinor = parseDraft(drafts.minor) ?? 0
+			const maxMinor = compound.ratio - 0.001
+			// Clamp the raw typed magnitude (bounds a literal 24) before quantizing:
+			// a quantized value landing exactly on the ratio (11.96 -> 12) must be
+			// free to carry into the major via compose, matching decompose's own
+			// carry contract, so nothing clamps it back down afterward.
+			const clampedRaw = Math.sign(rawMinor) * Math.min(Math.abs(rawMinor), maxMinor)
+			minor =
+				entry === 'quantize'
+					? roundTo(clampedRaw, engine.precisionFor(displayUnit, precision))
+					: clampedRaw
+		} else {
+			minor = stored ? stored.minor : 0
+		}
 
-		return roundTo(
-			engine.compose({ major, minor: clampedMinor }, displayUnit, storageUnit),
-			storageDigits
-		)
+		return roundTo(engine.compose({ major, minor }, displayUnit, storageUnit), storageDigits)
 	}
 
 	if (!dirty.primary) return storedValue
@@ -143,9 +190,12 @@ export const draftsFor = (value: number | null, opts: UnitContext): MeasurementD
 	// Digits past storage precision never survive a save, so that is where escalation stops.
 	const maxDigits = Math.max(displayDigits, storageDigits)
 	const target = roundTo(value, storageDigits)
+	// A bare probe: never forward `opts` itself, so an entry/dirty/storedValue field
+	// a future CommitOptions caller happens to carry can never poison this check.
+	const probeOpts: UnitContext = { displayUnit, engine, precision, storageDigits, storageUnit }
 	for (let digits = displayDigits; digits < maxDigits; digits++) {
 		const candidate = draftAt(digits)
-		if (commitDrafts(candidate, opts) === target) return candidate
+		if (commitDrafts(candidate, probeOpts) === target) return candidate
 	}
 	return draftAt(maxDigits)
 }

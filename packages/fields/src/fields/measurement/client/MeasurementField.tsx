@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { type MeasurementSystem, systemForLocale } from '../engine/locale'
-import { resolvePrecision } from '../engine/precision'
+import { exactModePrecisionOverride, resolvePrecision } from '../engine/precision'
 import { createEngine, defaultEngine } from '../engine/registry'
 import { COMPOUNDS, type MeasurementUnitId } from '../engine/units'
 import type { MeasurementResolvedClientOptions } from '../options'
@@ -122,10 +122,13 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 		units,
 	})
 
+	const resolvedPrecision = precision ?? DEFAULT_PRECISION
 	// Bound messages sit next to a type=number input, which always renders Latin
 	// digits; force the same numerals here so "min 5" and "5" agree in RTL/native-digit
-	// locales (Arabic, Persian). The input itself stays native-digit for display.
-	const displayPrecision = precision?.display
+	// locales (Arabic, Persian). The input itself stays native-digit for display. Exact
+	// mode uses the same storage-digit override as the cell, so error text and cell
+	// text always agree.
+	const displayPrecision = exactModePrecisionOverride(resolvedPrecision, displayUnit)
 	const fmtBound = useCallback(
 		(bound: number) => {
 			try {
@@ -183,7 +186,6 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 	const isReadOnly = Boolean(readOnlyFromProps || disabled || readOnlyFromAdmin)
 
 	const numericValue = typeof value === 'number' && !Number.isNaN(value) ? value : null
-	const resolvedPrecision = precision ?? DEFAULT_PRECISION
 	const draftOpts = useMemo(
 		() => ({
 			displayUnit,
@@ -214,13 +216,22 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 
 	const editingRef = useRef(false)
 	const [drafts, setDrafts] = useState<MeasurementDrafts>(() => draftsFor(numericValue, draftOpts))
+	// The drafts as painted on screen immediately before the current edit, refreshed
+	// only at a resync (mount, external value, blur, unit switch) and never per
+	// keystroke. A carry-rounded display (182.5 cm storage paints as 6 ft 0 in even
+	// though the exact split is 5 ft 11.850394 in) must never be mistaken for the
+	// exact stored value, so commits diff the typed value against this baseline
+	// rather than against the exact decompose.
+	const paintedDraftsRef = useRef<MeasurementDrafts>(drafts)
 	// Which part the viewer has actually typed into since the last resync: an
 	// untouched part must commit the value it already holds, never whatever the
 	// display-policy draft happens to show for it.
 	const [dirty, setDirty] = useState<DirtyDrafts>(CLEAN)
 	useEffect(() => {
 		if (!editingRef.current) {
-			setDrafts(draftsFor(numericValue, draftOpts))
+			const resynced = draftsFor(numericValue, draftOpts)
+			setDrafts(resynced)
+			paintedDraftsRef.current = resynced
 			setDirty(CLEAN)
 		}
 	}, [numericValue, draftOpts])
@@ -237,6 +248,7 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 					...draftOpts,
 					dirty: nextDirty,
 					entry: resolvedPrecision.entry,
+					paintedDrafts: paintedDraftsRef.current,
 					storedValue: numericValue,
 				})
 			)
@@ -246,7 +258,9 @@ export const MeasurementField: React.FC<MeasurementFieldProps> = (props) => {
 
 	const onBlur = useCallback(() => {
 		editingRef.current = false
-		setDrafts(draftsFor(numericValue, draftOpts))
+		const resynced = draftsFor(numericValue, draftOpts)
+		setDrafts(resynced)
+		paintedDraftsRef.current = resynced
 		setDirty(CLEAN)
 	}, [numericValue, draftOpts])
 

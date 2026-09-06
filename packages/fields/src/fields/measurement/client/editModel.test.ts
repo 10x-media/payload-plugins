@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { roundTo } from '../engine/convert'
 import { createEngine, defaultEngine } from '../engine/registry'
 import { commitDrafts, draftsFor, resolveDisplayUnit } from './editModel'
 
@@ -104,6 +105,21 @@ describe('draftsFor', () => {
 				draftsFor(null, { displayUnit: 'kg', draft: 'display', engine, storageUnit: 'kg' })
 			).toEqual({ primary: '', minor: '' })
 		})
+	})
+
+	it('ignores foreign CommitOptions fields on its own options object when probing the round-trip', () => {
+		// The escalation probe must build its own bare UnitContext rather than forward
+		// `opts`: a caller sharing one object between draftsFor and commitDrafts could
+		// otherwise poison the round-trip check with an entry/dirty/storedValue field.
+		const clean = { displayUnit: 'ft-in', draft: 'faithful', engine, storageUnit: 'cm' } as const
+		const expected = draftsFor(180.5, clean)
+		const poisoned = {
+			...clean,
+			dirty: { minor: false, primary: false },
+			entry: 'quantize',
+			storedValue: 999,
+		} as const
+		expect(draftsFor(180.5, poisoned)).toEqual(expected)
 	})
 })
 
@@ -212,6 +228,85 @@ describe('commitDrafts', () => {
 					{ displayUnit: 'in', engine, entry: 'free', storageUnit: 'cm' }
 				)
 			).toBeCloseTo(181.44998, 5)
+		})
+		it('lets a quantized minor carry into the ratio instead of clamping it back down', () => {
+			// The unit ceiling clamp bounds a raw typed value (a literal 24); it must
+			// run before quantization, not after, or a legitimate carry like 11.96 -> 12
+			// gets clamped straight back down to 11.999 and 182.88 prints as 182.87746.
+			expect(
+				commitDrafts(
+					{ minor: '11.96', primary: '5' },
+					{ displayUnit: 'ft-in', engine, entry: 'quantize', storageUnit: 'cm' }
+				)
+			).toBe(182.88)
+		})
+	})
+
+	describe('carry-zone dirty guard (delta semantics)', () => {
+		const opts = { displayUnit: 'ft-in', engine, storageUnit: 'cm' } as const
+		const stored = 182.5
+
+		it('paints the carry: 182.5 cm (5 ft 11.850394 in exactly) displays as 6 ft 0 in', () => {
+			expect(draftsFor(stored, { ...opts, draft: 'display' })).toEqual({
+				minor: '0',
+				primary: '6',
+			})
+		})
+		it('typing feet 6 -> 7 adds one foot to the exact stored total, not to the painted 6', () => {
+			const painted = draftsFor(stored, { ...opts, draft: 'display' })
+			const exact = engine.decompose(stored, 'cm', 'ft-in', 6)
+			const exactTotal = exact.major * 12 + exact.minor
+			const expected = roundTo(engine.convert(exactTotal + 12, 'in', 'cm'), 6)
+			expect(
+				commitDrafts(
+					{ minor: painted.minor, primary: '7' },
+					{
+						...opts,
+						dirty: { minor: false, primary: true },
+						paintedDrafts: painted,
+						storedValue: stored,
+					}
+				)
+			).toBe(expected)
+		})
+		it('typing inches 0 -> 3 adds three inches to the exact stored total', () => {
+			const painted = draftsFor(stored, { ...opts, draft: 'display' })
+			const exact = engine.decompose(stored, 'cm', 'ft-in', 6)
+			const exactTotal = exact.major * 12 + exact.minor
+			const expected = roundTo(engine.convert(exactTotal + 3, 'in', 'cm'), 6)
+			expect(
+				commitDrafts(
+					{ minor: '3', primary: painted.primary },
+					{
+						...opts,
+						dirty: { minor: true, primary: false },
+						paintedDrafts: painted,
+						storedValue: stored,
+					}
+				)
+			).toBe(expected)
+		})
+		it('never leaks the display carry into a no-op edit, across the carry boundary (sweep)', () => {
+			for (let step = 0; step <= 200; step++) {
+				const value = roundTo(170 + step * 0.1, 6)
+				const painted = draftsFor(value, { ...opts, draft: 'display' })
+				expect(
+					commitDrafts(painted, {
+						...opts,
+						dirty: { minor: false, primary: true },
+						paintedDrafts: painted,
+						storedValue: value,
+					})
+				).toBeCloseTo(value, 5)
+				expect(
+					commitDrafts(painted, {
+						...opts,
+						dirty: { minor: true, primary: false },
+						paintedDrafts: painted,
+						storedValue: value,
+					})
+				).toBeCloseTo(value, 5)
+			}
 		})
 	})
 
