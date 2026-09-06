@@ -91,10 +91,66 @@ describe('captureRewrites', () => {
 			...captureRewrites([{ path: '/um', adapter: umami({ websiteId: '' }) }]),
 		]
 		expect(rewrites.length).toBeGreaterThan(0)
+		const paramNames = (value: string): string[] =>
+			[...value.matchAll(/:([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1] as string)
 		for (const { source, destination } of rewrites) {
 			expect(() => pathToRegexp(source)).not.toThrow()
 			const destinationPath = new URL(destination).pathname
 			expect(() => compile(destinationPath)).not.toThrow()
+			// Next refuses to build if a destination param isn't declared in the source.
+			const sourceParams = paramNames(source)
+			for (const name of paramNames(destination)) {
+				expect(sourceParams).toContain(name)
+			}
 		}
+	})
+
+	it('throws for a mount path that normalizes to the site root', () => {
+		const adapter = posthog({ projectId: '', apiKey: '' })
+		expect(() => captureRewrites([{ path: '/', adapter }])).toThrow(
+			'captureRewrites: mount path must not be the site root'
+		)
+		expect(() => captureRewrites([{ path: '', adapter }])).toThrow(
+			'captureRewrites: mount path must not be the site root'
+		)
+	})
+
+	it('throws when two mounts normalize to the same path', () => {
+		const posthogAdapter = posthog({ projectId: '', apiKey: '' })
+		const umamiAdapter = umami({ websiteId: '' })
+		expect(() =>
+			captureRewrites([
+				{ path: '/ph', adapter: posthogAdapter },
+				{ path: '/ph/', adapter: umamiAdapter },
+			])
+		).toThrow("captureRewrites: mount paths collide: '/ph' and '/ph'")
+	})
+
+	it('throws when one mount path is nested under another', () => {
+		const posthogAdapter = posthog({ projectId: '', apiKey: '' })
+		const umamiAdapter = umami({ websiteId: '' })
+		expect(() =>
+			captureRewrites([
+				{ path: '/ph', adapter: posthogAdapter },
+				{ path: '/ph/x', adapter: umamiAdapter },
+			])
+		).toThrow("captureRewrites: mount paths collide: '/ph' and '/ph/x'")
+	})
+
+	it('allows distinct sibling paths that merely share a prefix string', () => {
+		const posthogAdapter = posthog({ projectId: '', apiKey: '' })
+		const umamiAdapter = umami({ websiteId: '' })
+		expect(() =>
+			captureRewrites([
+				{ path: '/ph', adapter: posthogAdapter },
+				{ path: '/phx', adapter: umamiAdapter },
+			])
+		).not.toThrow()
+		expect(() =>
+			captureRewrites([
+				{ path: '/ph', adapter: posthogAdapter },
+				{ path: '/pl', adapter: umamiAdapter },
+			])
+		).not.toThrow()
 	})
 })
