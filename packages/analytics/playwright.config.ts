@@ -53,7 +53,7 @@ export default defineConfig({
 			DATABASE_URI_POSTGRES: `postgres://e2e:e2e@localhost:${pgPort}/${dbName}`,
 			// The providers collection's secret fields derive encryption keys from this when
 			// no explicit `fields()` keys config is present (single-tenant mode); the fields
-			// plugin requires >= 32 bytes of material.
+			// plugin requires at least 16 bytes of key material (32+ recommended).
 			PAYLOAD_SECRET: 'e2e-secret-material-32-bytes-minimum!!',
 			TENANCY: process.env.TENANCY ?? '',
 		},

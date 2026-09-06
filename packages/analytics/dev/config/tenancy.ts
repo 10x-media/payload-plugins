@@ -1,6 +1,6 @@
 import { fields } from '@10x-media/fields'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
-import { getTenantFromCookie } from '@payloadcms/plugin-multi-tenant/utilities'
+import { getTenantFromCookie, getUserTenantIDs } from '@payloadcms/plugin-multi-tenant/utilities'
 import type { CollectionConfig } from 'payload'
 import { analytics, type ScopesResolver } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
@@ -52,9 +52,19 @@ export const tenancyFragment: DevConfigFragment = {
 			widgets: sharedWidgets,
 			// Dev-only shortcut: attributing by the admin's tenant-selector cookie. A real
 			// install must resolve ingest scope from the request's hostname or site key.
+			// The validation below (the cookie must name one of the user's own tenants) is
+			// what a real install must also do: never trust a client-set value alone.
 			scopeResolver: ({ req }) => {
 				const t = getTenantFromCookie(req.headers, req.payload.db.defaultIDType)
-				return t === null ? null : String(t)
+				const email = (req.user as { email?: string } | undefined)?.email
+				if (!req.user || email === PLATFORM_EMAIL) {
+					return t === null ? null : String(t)
+				}
+				const tenantIds = getUserTenantIDs(req.user).map(String)
+				if (t !== null && tenantIds.includes(String(t))) {
+					return String(t)
+				}
+				throw new Error('analytics dev: tenant user has no valid tenant selected')
 			},
 			platformAdapter: devMemoryAdapter.id,
 			access: {
