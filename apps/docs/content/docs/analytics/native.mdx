@@ -12,25 +12,32 @@ import { native } from '@10x-media/analytics/adapters/native'
 analytics({ adapters: [native()] })
 ```
 
-Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`. Dimensions: `page`, `country`, `source`, `device`, `event`. Realtime is supported.
+Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`, `conversions`, `revenue`, `scrollDepth`. Dimensions: `page`, `country`, `source`, `device`, `event`, `goal`. Realtime is supported.
 
 ## The ingest endpoint
 
-`POST /api/analytics/ingest` (path configurable via `ingestPath`) accepts one event per request:
+`POST /api/analytics/ingest` (path configurable via `ingestPath`) accepts one event per request. The plugin's own [browser tracker](/analytics/capture) posts exactly this shape:
 
 ```ts
 interface RawEventInput {
-  type: 'pageview' | 'event'
+  type: 'pageview' | 'event' | 'goal'
   path: string          // required
   hostname: string      // required
-  name?: string         // event name, for type 'event'
+  name?: string         // event name, or the goal slug; required unless type is 'pageview'
   referrer?: string
   durationMs?: number
   props?: Record<string, unknown>
+  value?: number        // revenue for a goal completion, in `currency`
+  currency?: string     // ISO 4217
+  scrollDepth?: number  // deepest scroll on a pageview, 0-100
 }
 ```
 
-`type`, `path`, and `hostname` are required; anything else is optional. The server derives the rest at ingest time: device class from the user agent, traffic source from the referrer, geo from [resolvers](/analytics/geo), and a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days). The endpoint responds `202` on success and `400` on an invalid body.
+An event is rejected only on its required fields: a known `type`, a non-empty string `path` and `hostname`, and a non-empty string `name` on everything but a pageview. Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `name` is truncated to 128 characters (it is the `event` dimension's bucket key), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256.
+
+The server derives the rest at ingest time: device class from the user agent, traffic source from the referrer, geo from [resolvers](/analytics/geo), a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
+
+A `goal` event counts under `events`, never under `pageviews`, and is kept out of the `event` dimension breakdown: its name is a goal slug, and it appears under the `goal` dimension instead. `revenue` is summed as a plain number in the event's own currency, with no conversion; see the currency note on [Goals](/analytics/goals#how-native-reports-them). `scrollDepth` averages over the pageviews that actually reported one, tracked by its own sample counter so a pageview whose tracker never sent a depth does not drag the average down.
 
 Events are written atomically, via `$inc` on Mongo and `ON CONFLICT DO UPDATE` on Postgres, so concurrent ingestion is safe.
 
@@ -136,6 +143,48 @@ CREATE UNIQUE INDEX analytics_daily_source_date_scope_idx
 
 If your `sync` config sets a custom `collectionSlug`, adjust the `analytics-daily` table/collection name in both the migration snippet and the DDL above to match; the reference migration only knows the default slug.
 
+## Upgrading for goal metrics
+
+Goal support adds four required numeric counters to `analytics-rollups` (`conversions`, `revenue`, `scrollDepthSum`, `scrollSamples`, all defaulting to 0), four optional fields to `analytics-events` (`value`, `currency`, `scrollDepth`, `goals`), and the `goal` member of the events `type` select. Push-mode dev installs pick all of that up on the next boot; migrate-mode installs need a migration. This one mirrors the plugin's own:
+
+```ts
+import type { MigrateUpArgs } from '@payloadcms/db-mongodb'
+
+export async function up({ payload }: MigrateUpArgs): Promise<void> {
+  if (payload.db.name === 'mongoose') {
+    const db = payload.db as unknown as {
+      collections: Record<string, { collection: { updateMany: (f: object, u: object) => Promise<unknown> } }>
+    }
+    // One pass per counter, each matching only its own absence, so a row half-patched by
+    // an interrupted run is completed without resetting what it already carries.
+    for (const counter of ['conversions', 'revenue', 'scrollDepthSum', 'scrollSamples']) {
+      await db.collections['analytics-rollups']?.collection.updateMany(
+        { [counter]: { $exists: false } },
+        { $set: { [counter]: 0 } }
+      )
+    }
+    return
+  }
+  const db = payload.db as unknown as { drizzle: { execute: (q: string) => Promise<unknown> } }
+  for (const column of ['conversions', 'revenue', 'scroll_depth_sum', 'scroll_samples']) {
+    await db.drizzle.execute(
+      `ALTER TABLE analytics_rollups ADD COLUMN IF NOT EXISTS ${column} numeric NOT NULL DEFAULT 0`
+    )
+  }
+  await db.drizzle.execute(`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS value numeric`)
+  await db.drizzle.execute(`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS currency varchar`)
+  await db.drizzle.execute(`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS scroll_depth numeric`)
+  await db.drizzle.execute(`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS goals jsonb`)
+  await db.drizzle.execute(`ALTER TYPE enum_analytics_events_type ADD VALUE IF NOT EXISTS 'goal'`)
+}
+```
+
+Mongo needs only the rollup backfill: an absent event field is simply absent there. Every statement is idempotent, so running it against a schema that already has the columns is a no-op.
+
+Two Postgres details worth keeping if you hand-write your own version. The statements go through `payload.db.drizzle`, the pool handle, rather than the transaction-bound `db` argument, so each one autocommits; that is what keeps `ALTER TYPE ... ADD VALUE` out of an open transaction and lets the new enum member be usable straight away. And the migration is deliberately irreversible: Postgres cannot drop an enum member once it exists, so `down` does nothing.
+
+Rows written before the migration read back as zero rather than `NaN`, so an install that has not run it yet reports 0 conversions instead of breaking, but it cannot ingest a `goal` event on Postgres until the enum member exists.
+
 ## Options
 
 | Option | Type | Default | Description |
@@ -143,5 +192,5 @@ If your `sync` config sets a custom `collectionSlug`, adjust the `analytics-dail
 | `buffer` | `boolean \| { maxSize?, maxAgeMs? }` | off | In-memory write batching (50 events / 2000 ms). |
 | `geoDbPath` | `string` | none | Path to a MaxMind `.mmdb`; enables IP-level geo lookup. |
 | `geoResolver` | `GeoResolver` | platform headers (+ MaxMind when `geoDbPath` set) | Custom geo pipeline. |
-| `ingestPath` | `string` | `/analytics/ingest` | Beacon endpoint path (served under `/api`). |
+| `ingestPath` | `string` | `/analytics/ingest` | Beacon endpoint path (served under `/api`). The tracker config follows it, so the browser posts to the moved mount. |
 | `retentionDays` | `number` | keep forever | Nightly pruning window for raw events. |

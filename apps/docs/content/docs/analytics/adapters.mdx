@@ -32,6 +32,20 @@ Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDu
 
 An unconfigured adapter (missing credentials) degrades to an empty state and makes no network calls.
 
+## Capture support
+
+Reading and capturing are separate concerns. An adapter that declares `capture` can also fill a [capture slot](/analytics/capture#capture-slots): the browser tracker boots its snippet, and its tracker traffic is served through the [first-party proxy](/analytics/proxy) rather than the vendor domain. Read credentials are never part of it; only what the browser is allowed to see.
+
+| Adapter | Capture | Extra config it needs |
+|---|---|---|
+| native | Yes | None. The plugin's tracker posts straight to the ingest endpoint; nothing is proxied or injected. |
+| PostHog | Yes | `projectToken` (the public `phc_...` browser key, distinct from the read `apiKey`) and `region` (`us` / `eu`, derived from `host` when omitted). |
+| Plausible | Yes | `domain` for the legacy `data-domain` tag, or `scriptId` for the per-site `pa-<id>.js` model. `domain` wins when both are set; with neither, no snippet is emitted. |
+| Umami | Yes | None beyond `websiteId`. `host` doubles as the app origin for capture: a trailing `/api` is stripped, so one value serves the Stats API and the tracker. |
+| GA4 | No | Google's collection domains and consent mode make a clean first-party proxy impractical. Reads are unaffected. |
+
+The exact routes and snippets each one declares are on the [proxy page](/analytics/proxy#per-vendor-routes).
+
 ## Filters
 
 `AnalyticsQuery.filters` narrows a read to rows matching one or more `{ dimension, operator, value }` entries. A widget or field requesting a filter dimension no configured adapter declares in `filters` is gated the same way an unsupported metric or dimension is; the read helpers drop into an unavailable state rather than silently ignoring the filter.
@@ -55,7 +69,7 @@ import { plausible } from '@10x-media/analytics/adapters/plausible'
 plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY! })
 ```
 
-Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance. Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, scrollDepth, revenue. Durations are normalized to milliseconds. Default `maxLookbackDays: 730` (set `null` to disable clamping).
+Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance, and `domain` or `scriptId` to capture through it. Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, scrollDepth, revenue. Durations are normalized to milliseconds. Default `maxLookbackDays: 730` (set `null` to disable clamping).
 
 ## Umami
 
@@ -101,7 +115,7 @@ import { posthog } from '@10x-media/analytics/adapters/posthog'
 posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY! })
 ```
 
-Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown) and `event` (per-event-name breakdown). A binding `hostname` filters on `properties.$host`.
+Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope and never reaches the browser; capture takes the public `projectToken` (`phc_...`) instead. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default, and `region` pins the proxied capture hosts independently. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown) and `event` (per-event-name breakdown). A binding `hostname` filters on `properties.$host`.
 
 ## Testing: memoryAdapter
 

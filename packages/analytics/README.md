@@ -12,6 +12,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 - **One adapter contract** with a capabilities model; adapters ship as code-split subpaths (`@10x-media/analytics/adapters/*`) plus a `memoryAdapter` for tests.
 - **Native engine**: self-hosted, cookieless analytics in your own database, with atomic rollups, exact daily uniques, geo resolution (platform headers or MaxMind), retention pruning, and opt-in write batching.
+- **Capture**: a dependency-free browser tracker (`@10x-media/analytics/tracker`) with SPA pageviews, consent gating, auto-capture, and goals, booted from React (`@10x-media/analytics/react`) or a server component; capture-capable adapters are served through a first-party proxy so a vendor's SDK loads from your own origin.
 - **Dashboard widgets** for Payload's Modular Dashboard: metric, trend, four breakdowns, and realtime, all capability-gated, plus a public API for custom widgets.
 - **Display fields**: `analyticsStat`, `analyticsStatRow`, `analyticsFields`, `analyticsTab`, `analyticsTabsField` place per-document stats on your collections; typed per-collection bindings resolve each document's URL path.
 - **Caching** through `payload.kv` with request coalescing, plus an opt-in scheduled warm job.
@@ -47,7 +48,7 @@ export default buildConfig({
 })
 ```
 
-Run `payload generate:importmap`, send pageviews to `POST /api/analytics/ingest`, and the dashboard fills in.
+Run `payload generate:importmap`, render `<AnalyticsScripts config={await getTrackerConfig(payload, { headers: await headers() })} />` from `@10x-media/analytics/rsc` in your root layout, and the dashboard fills in.
 
 ## Documentation
 
@@ -57,6 +58,9 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/analytics):
 - [Quick start](https://docs.10xmedia.de/analytics/quick-start)
 - [Adapters](https://docs.10xmedia.de/analytics/adapters)
 - [Native engine](https://docs.10xmedia.de/analytics/native)
+- [Capture](https://docs.10xmedia.de/analytics/capture)
+- [Goals](https://docs.10xmedia.de/analytics/goals)
+- [First-party proxy](https://docs.10xmedia.de/analytics/proxy)
 - [Geo resolution](https://docs.10xmedia.de/analytics/geo)
 - [Display fields](https://docs.10xmedia.de/analytics/display-fields)
 - [Dashboard widgets](https://docs.10xmedia.de/analytics/widgets)

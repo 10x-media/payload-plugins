@@ -1,0 +1,179 @@
+---
+title: Capture
+description: Boot the browser tracker, fill capture slots, gate on consent, and send custom events.
+---
+
+The plugin ships its own browser tracker. It sends pageviews and events to whichever adapter fills each [capture slot](#capture-slots): the [native engine](/analytics/native) by default, or a vendor's real SDK loaded through your own origin via the [first-party proxy](/analytics/proxy).
+
+## Next.js
+
+Resolve the config on the server and render it in the root layout. That is the whole setup:
+
+```tsx title="app/layout.tsx"
+import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/rsc'
+import config from '@payload-config'
+import { headers } from 'next/headers'
+import { getPayload } from 'payload'
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const payload = await getPayload({ config })
+  const tracker = await getTrackerConfig(payload, { headers: await headers() })
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <AnalyticsScripts config={tracker} />
+      </body>
+    </html>
+  )
+}
+```
+
+`AnalyticsScripts` renders each slot's vendor snippet and then boots the tracker over it. Pass the incoming `headers()` so a scoped install's `scopeResolver` sees the same request it would over HTTP; the `host` header is what a hostname-scoped resolver reads (see [Multi-tenancy](/analytics/multi-tenancy#capture-slots-per-tenant)).
+
+## Plain HTML and other frameworks
+
+`initTracker` fetches the same config from the public tracker endpoint and boots from it:
+
+```ts title="analytics.ts"
+import { initTracker } from '@10x-media/analytics/tracker'
+
+await initTracker()
+```
+
+The package ships ES modules, so bundle that entry into your site (or serve it from a CDN and import it in a `<script type="module">`). `initTracker` defaults to `GET /api/analytics/tracker`; pass `endpoint` when the app moved Payload's `routes.api`. A failed fetch or a non-ok response yields a tracker whose calls do nothing, so a missing analytics config never breaks the page that awaited it. The `/tracker` subpath has zero runtime dependencies: no React, no Payload, no Node built-ins.
+
+`GET /api/analytics/tracker` is public, answers `Cache-Control: private, max-age=60` with `Vary: Host`, sets no cookie, and carries only what an adapter declared as public (`capture.client` and `capture.snippet`), never a query credential and never a goal's admin-facing name.
+
+## Capture slots
+
+An install fills at most two slots, in this order:
+
+| Slot | Filled by |
+|---|---|
+| `global` | `capture.slots.global`, else the designated `platformAdapter`, else the single config adapter when only one is configured. |
+| `tenant` | The request's resolved scope's default adapter, or `capture.slots.tenant`. Empty whenever no scope resolves. |
+
+One slot, one adapter, and one adapter fills at most one slot: when both slots resolve to the same adapter the global entry keeps it, so a scoped native install never posts every event twice. An adapter that declares no `capture` (GA4) fills nothing.
+
+A native-only install renders no snippet at all: the tracker itself is the client, posting to the ingest endpoint.
+
+```ts
+analytics({
+  adapters: [native(), posthog({ projectId, apiKey, projectToken: 'phc_...', region: 'eu' })],
+  capture: {
+    slots: { global: 'posthog', tenant: false },
+  },
+})
+```
+
+`false` disables a slot outright: nothing fills it, its proxy mount 404s, and the tracker config omits it. An unknown `global` id throws at config time; a `tenant` id may also name a runtime provider instance, so it is resolved per request instead.
+
+`capture.paths` moves a slot's mount off the runtime proxy, for installs serving it through Next rewrites instead. Pass the same path [`captureRewrites`](/analytics/proxy#next-rewrites) was mounted at.
+
+## Consent
+
+Native capture is cookieless and needs no gate, so it defaults to `none`. Every vendor defaults to `required`: its snippet is withheld from the server-rendered HTML and its events wait in a bounded in-memory queue until a decision arrives.
+
+```ts
+import { useAnalytics } from '@10x-media/analytics/react'
+
+const { consent } = useAnalytics()
+consent('granted') // loads the gated vendor scripts, then drains the queue in order
+consent('denied')  // clears the queue; the vendor script is never loaded
+```
+
+The decision persists in `localStorage` under `analytics:consent` and is read back on the next boot, so a returning visitor who already granted is not asked again by the tracker. Pass `persistConsent: false` to `createTracker`/`initTracker` to keep the decision to the current page: storage is then neither read nor written. A browser with storage disabled reads as "no decision" rather than throwing.
+
+Override the defaults per slot, per adapter id, or with a resolver:
+
+```ts
+capture: {
+  consent: 'required',                                  // every slot waits
+  // consent: { slots: { tenant: 'none' }, adapters: { posthog: 'required' } },
+  // consent: ({ slot, adapterId }) => (slot === 'global' ? 'none' : 'required'),
+}
+```
+
+An adapter entry wins over a slot entry, and both win over the per-family default. A bare adapter id must name a config adapter; a runtime provider instance id (`<provider>:<instance>`) is taken on trust, since those only exist once a scope resolves.
+
+## Auto-capture
+
+| Toggle | Default | Sends |
+|---|---|---|
+| `goalAttribute` | on | `data-analytics-goal` on click and form submit (see [Goals](/analytics/goals)). |
+| `outboundLinks` | on | `outbound_link` with `props.url` for a click on a link to another origin. |
+| `fileDownloads` | on | `file_download` with `props.url` for a link whose extension is a known file type. |
+| `scrollDepth` | **off** | `scroll_depth` with `props.depth` at 25/50/75/100, and the page's deepest position on the pageview. |
+
+```ts
+capture: { autoCapture: { scrollDepth: true, fileDownloads: false } }
+```
+
+Listeners are delegated: one `click` and one `submit` handler on `document`, both in the capture phase, so a handler that stops propagation (or a link that navigates away) cannot swallow them first, and the listener set never grows with the DOM. A link that is both outbound and a download reports both.
+
+Scroll thresholds are evaluated on scroll only, never on load or on a route change, so a fresh page cannot inherit the previous one's depth. With `scrollDepth` off, no scroll listener is attached and the pageview carries no `scrollDepth` key at all.
+
+Page tracking follows SPA navigation: `history.pushState`/`replaceState` are wrapped and `popstate` is listened for, and a pageview fires only when `location.pathname` actually changed, so a hash change or a same-path replace sends nothing.
+
+## React
+
+`<AnalyticsScripts />` already boots the tracker, so a component can call it without any provider:
+
+```tsx title="components/SignupButton.tsx"
+'use client'
+import { useAnalytics } from '@10x-media/analytics/react'
+
+export const SignupButton = () => {
+  const { track } = useAnalytics()
+  return <button onClick={() => track('signup', { plan: 'pro' })}>Sign up</button>
+}
+```
+
+The tracker is resolved per call, not per render, so a component that renders before the boot effect runs still works. A call that finds neither a provider nor a booted tracker throws, because a silently dead `track` is worse than a build-time mistake.
+
+Wrap the tree in `<AnalyticsProvider config={tracker}>` when you want the api to come from context instead, for example to pass a custom `loadScript`. Both take a lease on the same per-window tracker, so rendering `AnalyticsScripts` and `AnalyticsProvider` together never double counts, and neither does React StrictMode's double mount.
+
+`<TrackerBoot config nonce />` is the bare boot component `AnalyticsScripts` renders after the snippets. Render it directly when your app already emits the vendor snippets itself.
+
+## Custom events
+
+```ts
+track('signup', { plan: 'pro' })              // named event with flat props
+trackGoal('book-demo', { value: 500, currency: 'EUR' })
+```
+
+`props` are sanitized at native ingest: flat scalars only (string, finite number, boolean), at most 20 entries, keys up to 64 characters, string values truncated to 256. Anything else is dropped key by key and the event is still stored. Event names are capped at 128 characters, because the name is the `event` dimension's bucket key.
+
+Both calls fan out to every filled slot. Vendor sinks drop pageviews, because each vendor's own script tracks them.
+
+## Content Security Policy
+
+Pass your request nonce and every script the tracker renders or injects carries it:
+
+```tsx
+<AnalyticsScripts config={tracker} nonce={nonce} />
+```
+
+PostHog's stub injects `array.js` itself, so it copies the running inline's nonce onto that tag before inserting it; without that, a nonce CSP without `strict-dynamic` would pass the inline and block the bundle. Replace injection entirely (a consent manager, a framework script loader) with the `loadScript` seam on `AnalyticsProvider` or `createTracker`.
+
+## What the tracker sends to native
+
+One JSON object per event, `content-type: application/json`, `POST`ed to the config's `ingestPath` via `navigator.sendBeacon` with a `fetch(keepalive)` fallback. Undefined keys are absent.
+
+```jsonc
+{
+  "type": "pageview" | "event" | "goal",  // required
+  "name": "signup",        // event name, or the goal slug; absent on a pageview
+  "path": "/pricing",      // required
+  "hostname": "shop.test", // required
+  "referrer": "https://google.com/",  // absent when empty
+  "props": { "plan": "pro" },
+  "value": 49,             // goals only today
+  "currency": "EUR",       // goals only today
+  "durationMs": 4000,      // pageviews only, added at flush time
+  "scrollDepth": 75        // pageviews only, 0-100, only when scroll capture is on
+}
+```
+
+Events and goals post immediately. A pageview is buffered so it can carry `durationMs` and the page's deepest scroll, and is sent on the first of: the next navigation, `pagehide`, or 10 seconds. A tab killed without firing `pagehide` loses that one pageview rather than only its duration.
