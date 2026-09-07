@@ -29,7 +29,6 @@ import {
 	SettingsRailContext,
 	useSettingsOverlay,
 } from './context'
-import { DeleteDocumentButton } from './documentActions'
 import { DocumentPane } from './panes/DocumentPane'
 import { LazyPane } from './panes/LazyPane'
 import { ListPane } from './panes/ListPane'
@@ -323,20 +322,6 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 																onCreate={() => {
 																	settings.setTarget({ id: 'new', item: activeItem.slug })
 																}}
-															/>
-														) : null}
-														{activeItem?.type === 'collection' &&
-														settings.target.id &&
-														settings.target.id !== 'new' ? (
-															<DeleteDocumentButton
-																collectionSlug={activeItem.slug}
-																docID={settings.target.id}
-																key={`delete-${activeItem.slug}-${settings.target.id}`}
-																onDeleted={() => {
-																	settings.setFormModified(false)
-																	settings.setTarget({ item: activeItem.slug })
-																}}
-																panelSlug={slug}
 															/>
 														) : null}
 														<button

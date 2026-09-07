@@ -29,7 +29,7 @@ Slot components are rendered by the plugin's server provider, so a replacement m
 | `Rail` | the left rail | `overlayId`, `layout` |
 | `RailGroup` | one group heading and its rows | `group: { label }` |
 | `RailItem` | one row | `item: ManifestItem` |
-| `Header` | title, back, delete, close | `overlayId`, `layout` |
+| `Header` | title, back, create, close | `overlayId`, `layout` |
 | `Search` | the rail's search box | `overlayId`, `layout` |
 | `Empty` | the "nothing here" state | `overlayId`, `layout` |
 
@@ -41,10 +41,11 @@ the rail, so `RailGroup`, `RailItem` and `Search` are never reached. Reach for e
 you intend to draw that whole region yourself. The five composable slots
 (`RailGroup`, `RailItem`, `Header`, `Search`, `Empty`) combine freely.
 
-Replacing `Header` also means taking over what the default one draws: the back button, the
-Create button under [`mergeListHeader`](/settings-overlay/configuration), and the delete button
-for an open document. `useSettingsPanel()` gives you `canGoBack`, `goBack` and `requestClose`;
-the rest is yours to include or leave out.
+Replacing `Header` also means taking over what the default one draws: the back button and the
+Create button under [`mergeListHeader`](/settings-overlay/configuration).
+`useSettingsPanel()` gives you `canGoBack`, `goBack` and `requestClose`; the rest is yours to
+include or leave out. Document actions are not in the header, so a replacement does not lose
+them: they render inside the edit view itself.
 
 ## Hooks
 

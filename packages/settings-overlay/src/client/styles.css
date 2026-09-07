@@ -365,10 +365,6 @@
 	white-space: nowrap;
 }
 
-.settings-overlay__pane-header .settings-overlay__delete {
-	margin-inline-end: calc(var(--base) * 0.2);
-}
-
 .settings-overlay__icon-button {
 	display: inline-flex;
 	flex-shrink: 0;
@@ -505,6 +501,27 @@
  */
 .settings-overlay__pane-body .doc-controls {
 	top: 0;
+}
+
+/*
+ * The plugin's actions menu is appended to `beforeDocumentControls`, which renders at the start
+ * of the controls row. Ordering it last puts it where Payload's own menu sits, after save.
+ */
+.settings-overlay__doc-actions {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) / 2);
+	order: 1;
+}
+
+/*
+ * `disableActions` gates only the dots menu. Payload's restore and permanent-delete buttons
+ * render beside it, wired to a drawer context the pane cannot provide, so the panel replaces
+ * them from `client/documentActions.tsx` and the originals go.
+ */
+.settings-overlay__pane-body .doc-controls__controls > #action-restore,
+.settings-overlay__pane-body .doc-controls__controls > #action-permanently-delete {
+	display: none;
 }
 
 /* A component item brings its own spacing; everything else is Payload's. */

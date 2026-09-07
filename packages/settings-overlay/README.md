@@ -87,7 +87,7 @@ Full documentation lives at [the docs site](https://github.com/10x-media/payload
 Two pieces of this plugin work around Payload limitations rather than using an API meant for the job. Both are isolated to one file each, documented in place, and guarded by a test that fails when the workaround stops being necessary:
 
 - **`server/widgetDispatcher.tsx`** rides the built-in `render-widget` server function to render a lazy item on demand, because Payload has no config-level way to register a server function. `lazyTransport: 'server-function'` opts out of it and registers the plugin's own function instead, at the price of one edit to your generated layout.
-- **`client/documentActions.tsx`** carries its own delete button, because `@payloadcms/ui` exports `useDocumentDrawerContext` but not the provider that feeds it, so the edit view inside the panel has nobody to report a deletion to.
+- **`client/documentActions.tsx`** supplies the edit view's dots menu, because `@payloadcms/ui` exports `useDocumentDrawerContext` but not the provider that feeds it, so Payload's own menu has nobody to report a delete, duplicate or restore to. The menu is chrome only: each action is Payload's own component, given the panel's callbacks.
 
 ## License
 

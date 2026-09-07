@@ -186,6 +186,7 @@ export interface Tag {
   colour?: ('red' | 'green' | 'blue') | null;
   updatedAt: string;
   createdAt: string;
+  deletedAt?: string | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -388,6 +389,7 @@ export interface TagsSelect<T extends boolean = true> {
   colour?: T;
   updatedAt?: T;
   createdAt?: T;
+  deletedAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

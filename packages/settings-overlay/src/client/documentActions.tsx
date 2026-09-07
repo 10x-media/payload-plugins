@@ -1,102 +1,205 @@
 'use client'
 
-import { Button, ConfirmationModal, toast, useAuth, useConfig, useModal } from '@payloadcms/ui'
+import {
+	Popup,
+	PopupList,
+	useAuth,
+	useConfig,
+	useDocumentInfo,
+	useTranslation as usePayloadTranslation,
+} from '@payloadcms/ui'
+import { DeleteDocument } from '@payloadcms/ui/elements/DeleteDocument'
+import { DuplicateDocument } from '@payloadcms/ui/elements/DuplicateDocument'
+import { PermanentlyDeleteButton } from '@payloadcms/ui/elements/PermanentlyDeleteButton'
+import { RestoreButton } from '@payloadcms/ui/elements/RestoreButton'
 import { useQueryClient } from '@tanstack/react-query'
-import { formatAdminURL } from 'payload/shared'
+import type { TypeWithID } from 'payload'
 import type React from 'react'
 import { useCallback } from 'react'
 
-import { keys } from '../translations/keys'
-import { useTranslation } from '../translations/useTranslation'
+import { useSettingsOverlayEmbed, useSettingsOverlayOptional } from './context'
 import { overlayKeys } from './queries'
 
+const baseClass = 'settings-overlay__doc-actions'
+
 /**
- * WORKAROUND. Delete for the document open in the pane, as a header button with its own REST
- * call, because the edit view cannot report the deletion back.
+ * Delete, duplicate, restore and "create new" for the document open in the pane, appended to
+ * `beforeDocumentControls` of every collection an overlay lists.
  *
- * What is being worked around: the edit view reads its drawer callbacks (`onDelete`,
- * `onDuplicate`, `onSave`, `clearDoc`) from `DocumentDrawerCallbacksContext` through
- * `useDocumentDrawerContext`. `@payloadcms/ui` exports the hook but not the provider, and the
- * provider's module is unreachable through the package's export map (`./elements/*` resolves to
- * `dist/elements/*\/index.js`, which does not re-export it). Supplying our own context object is
- * not an option either: the edit view reads that specific context, so a `createContext()` of the
- * same shape is simply a different object it will never look at.
+ * Payload's own menu cannot be used here. The edit view reads `onDelete`, `onDuplicate`,
+ * `onRestore` and `clearDoc` from `DocumentDrawerCallbacksContext`, and `@payloadcms/ui` exports
+ * the hook but not the provider, so inside the pane those callbacks are all `undefined` and every
+ * action either navigates the admin away or silently does nothing. `renderDocumentArgs` therefore
+ * sets `disableActions`, which hides that menu.
  *
- * Consequences carried by the pane: `disableActions` hides the dots menu (in page mode it has
- * nobody to report to), deletion lives here instead, and a create is detected in `DocumentPane`
- * through `useDocumentEvents` rather than through `onSave`.
+ * The way back in is the direction the callbacks travel. Context flows from the pane into the
+ * rendered document, so rather than reading Payload's context this renders Payload's own action
+ * components with `redirectAfterX={false}` and `onX` bound to the panel. The logic of every
+ * action stays Payload's, including the trash-versus-permanent-delete branch and its confirmation
+ * copy; only the menu chrome is the plugin's.
  *
- * What replaces this: `DocumentDrawerContextProvider` becoming public. The canary in
- * `tests/int/payloadCanaries.int.spec.ts` fails when it does, and then this file and the
- * `disableActions` flag in `queries.ts` both go.
+ * Two consequences of `disableActions` that Payload does not gate are handled here rather than
+ * left broken. `PermanentlyDeleteButton` and `RestoreButton` render in the controls row outside
+ * the menu gate, and `render-document` never forwards `redirectAfterRestore`
+ * (`handleServerFunction.tsx` destructures only create, delete and duplicate), so Payload's own
+ * restore button would push the whole admin to the collection route. Both are replaced here and
+ * the originals are hidden in `styles.css`.
+ *
+ * Harmless on a normal page: with no panel open, or for a nested drawer opened from inside one,
+ * it renders nothing.
  */
-export const DeleteDocumentButton: React.FC<{
-	collectionSlug: string
-	docID: string
-	onDeleted: () => void
-	panelSlug: string
-}> = ({ collectionSlug, docID, onDeleted, panelSlug }) => {
-	const { permissions } = useAuth()
-	const { config } = useConfig()
-	const { openModal } = useModal()
+export const SettingsOverlayDocumentActions: React.FC = () => {
+	const embed = useSettingsOverlayEmbed()
+	const overlay = useSettingsOverlayOptional()
 	const queryClient = useQueryClient()
-	const { i18n, t } = useTranslation()
+	const { permissions } = useAuth()
+	const { config, getEntityConfig } = useConfig()
+	const { i18n } = usePayloadTranslation()
+	const { collectionSlug, hasDeletePermission, hasSavePermission, id, isTrashed } =
+		useDocumentInfo()
 
-	const deleteSlug = `${panelSlug}__delete`
-	const canDelete = permissions?.collections?.[collectionSlug]?.delete === true
+	const docID = embed?.docID
+	const itemSlug = embed?.itemSlug
+	const setFormModified = overlay?.setFormModified
+	const setTarget = embed?.setTarget
 
-	const handleDelete = useCallback(async () => {
-		try {
-			const response = await fetch(
-				formatAdminURL({ apiRoute: config.routes.api, path: `/${collectionSlug}/${docID}` }),
-				{
-					credentials: 'include',
-					headers: { 'Accept-Language': i18n.language },
-					method: 'DELETE',
-				}
-			)
-			if (response.status < 400) {
-				toast.success(t(keys.deleted))
-				queryClient.removeQueries({
-					queryKey: overlayKeys.document('collection', collectionSlug, docID),
-				})
-				void queryClient.invalidateQueries({ queryKey: overlayKeys.lists(collectionSlug) })
-				onDeleted()
-				return
-			}
-			const body = (await response.json().catch(() => null)) as {
-				errors?: { message?: string }[]
-			} | null
-			toast.error(body?.errors?.[0]?.message ?? t(keys.loadFailed))
-		} catch (error) {
-			toast.error(error instanceof Error ? error.message : t(keys.loadFailed))
+	// The pane's own document, and only that one. A document drawer opened from inside the pane
+	// carries this component too, and its actions belong to the drawer rather than to the panel.
+	const isPaneDocument = Boolean(
+		embed?.itemType === 'collection' && collectionSlug === itemSlug && id && String(id) === docID
+	)
+
+	const invalidateLists = useCallback(() => {
+		if (collectionSlug) {
+			void queryClient.invalidateQueries({ queryKey: overlayKeys.lists(collectionSlug) })
 		}
-	}, [collectionSlug, config.routes.api, docID, i18n.language, onDeleted, queryClient, t])
+	}, [collectionSlug, queryClient])
 
-	if (!canDelete) {
+	const onDelete = useCallback(() => {
+		if (collectionSlug) {
+			queryClient.removeQueries({
+				queryKey: overlayKeys.document('collection', collectionSlug, docID),
+			})
+		}
+		invalidateLists()
+		setFormModified?.(false)
+		if (itemSlug) {
+			setTarget?.({ item: itemSlug })
+		}
+	}, [collectionSlug, docID, invalidateLists, itemSlug, queryClient, setFormModified, setTarget])
+
+	const onDuplicate = useCallback(
+		({ doc }: { doc: TypeWithID }) => {
+			invalidateLists()
+			if (itemSlug) {
+				setTarget?.({ id: String(doc.id), item: itemSlug })
+			}
+		},
+		[invalidateLists, itemSlug, setTarget]
+	)
+
+	// Restoring leaves the pane on the same document, whose render still shows the trashed state.
+	const onRestore = useCallback(() => {
+		invalidateLists()
+		if (collectionSlug) {
+			void queryClient.invalidateQueries({
+				queryKey: overlayKeys.document('collection', collectionSlug, docID),
+			})
+		}
+	}, [collectionSlug, docID, invalidateLists, queryClient])
+
+	const onCreateNew = useCallback(() => {
+		if (itemSlug) {
+			setTarget?.({ id: 'new', item: itemSlug })
+		}
+	}, [itemSlug, setTarget])
+
+	if (!isPaneDocument || !collectionSlug || !id) {
 		return null
 	}
 
+	const collectionConfig = getEntityConfig({ collectionSlug })
+	const singularLabel = collectionConfig?.labels?.singular
+	const canCreate = permissions?.collections?.[collectionSlug]?.create === true
+	const canDelete = Boolean(hasDeletePermission) && !isTrashed
+	const canDuplicate = canCreate && collectionConfig?.disableDuplicate !== true && !isTrashed
+	const showCreate = canCreate && !isTrashed
+
 	return (
-		<>
-			<Button
-				buttonStyle="secondary"
-				className="settings-overlay__delete"
-				margin={false}
-				onClick={() => {
-					openModal(deleteSlug)
-				}}
-				size="small"
-			>
-				{t(keys.delete)}
-			</Button>
-			<ConfirmationModal
-				body={t(keys.deleteBody)}
-				confirmLabel={t(keys.deleteConfirm)}
-				heading={t(keys.deleteHeading)}
-				modalSlug={deleteSlug}
-				onConfirm={handleDelete}
-			/>
-		</>
+		<div className={baseClass}>
+			{isTrashed && hasDeletePermission ? (
+				<PermanentlyDeleteButton
+					buttonId="settings-overlay-permanently-delete"
+					collectionSlug={collectionSlug}
+					id={String(id)}
+					onDelete={onDelete}
+					redirectAfterDelete={false}
+					singularLabel={singularLabel}
+				/>
+			) : null}
+			{isTrashed && hasSavePermission ? (
+				<RestoreButton
+					buttonId="settings-overlay-restore"
+					collectionSlug={collectionSlug}
+					id={String(id)}
+					onRestore={onRestore}
+					redirectAfterRestore={false}
+					singularLabel={singularLabel}
+				/>
+			) : null}
+			{showCreate || canDuplicate || canDelete ? (
+				<Popup
+					button={
+						<div className="doc-controls__dots">
+							<div />
+							<div />
+							<div />
+						</div>
+					}
+					className="doc-controls__popup"
+					horizontalAlign="right"
+					size="large"
+					verticalAlign="bottom"
+				>
+					<PopupList.ButtonGroup>
+						{showCreate ? (
+							<PopupList.Button id="settings-overlay-create" onClick={onCreateNew}>
+								{i18n.t('general:createNew')}
+							</PopupList.Button>
+						) : null}
+						{canDuplicate ? (
+							<DuplicateDocument
+								id={id}
+								onDuplicate={onDuplicate}
+								redirectAfterDuplicate={false}
+								singularLabel={singularLabel}
+								slug={collectionSlug}
+							/>
+						) : null}
+						{canDuplicate && config.localization ? (
+							<DuplicateDocument
+								id={id}
+								onDuplicate={onDuplicate}
+								redirectAfterDuplicate={false}
+								selectLocales={true}
+								singularLabel={singularLabel}
+								slug={collectionSlug}
+							/>
+						) : null}
+						{canDelete ? (
+							<DeleteDocument
+								buttonId="settings-overlay-delete"
+								collectionSlug={collectionSlug}
+								id={String(id)}
+								onDelete={onDelete}
+								redirectAfterDelete={false}
+								singularLabel={singularLabel}
+								useAsTitle={collectionConfig?.admin?.useAsTitle}
+							/>
+						) : null}
+					</PopupList.ButtonGroup>
+				</Popup>
+			) : null}
+		</div>
 	)
 }

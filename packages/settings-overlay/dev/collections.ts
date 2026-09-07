@@ -24,6 +24,9 @@ export const tags: CollectionConfig = {
 		{ name: 'title', type: 'text', required: true },
 		{ name: 'colour', type: 'select', options: ['red', 'green', 'blue'] },
 	],
+	// Trash is on here so the panel's delete carries Payload's trash branch, and so its restore
+	// and permanent-delete buttons have something to act on.
+	trash: true,
 }
 
 /** A second grouped collection, so group ordering has something to order. */

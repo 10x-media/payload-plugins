@@ -22,6 +22,7 @@ export const LAZY_FUNCTION_NAME = '@10x-media/settings-overlay:render-item'
 export const PROVIDER_PATH = '@10x-media/settings-overlay/rsc#SettingsOverlayServer'
 export const DISPATCHER_PATH = '@10x-media/settings-overlay/rsc#SettingsOverlayItemDispatcher'
 export const REPORTER_PATH = '@10x-media/settings-overlay/client#SettingsFormModifiedReporter'
+export const ACTIONS_PATH = '@10x-media/settings-overlay/client#SettingsOverlayDocumentActions'
 export const BUTTON_PATH = '@10x-media/settings-overlay/client#SettingsOverlayButton'
 
 /** Prefix for the `admin.dependencies` entries the plugin creates for configured components. */

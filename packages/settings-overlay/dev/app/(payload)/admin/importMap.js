@@ -1,5 +1,6 @@
 import { WatchTenantCollection as WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { SettingsFormModifiedReporter as SettingsFormModifiedReporter_1fb8679bfe5063cdde30d578d88dd0b3 } from '@10x-media/settings-overlay/client'
+import { SettingsOverlayDocumentActions as SettingsOverlayDocumentActions_1fb8679bfe5063cdde30d578d88dd0b3 } from '@10x-media/settings-overlay/client'
 import { TenantField as TenantField_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { GlobalViewRedirect as GlobalViewRedirect_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { TenantSelector as TenantSelector_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
@@ -24,6 +25,7 @@ import { StudioSearch as StudioSearch_dd19464f51ceb101bf2f38139201a953 } from '.
 export const importMap = {
   "@payloadcms/plugin-multi-tenant/client#WatchTenantCollection": WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a,
   "@10x-media/settings-overlay/client#SettingsFormModifiedReporter": SettingsFormModifiedReporter_1fb8679bfe5063cdde30d578d88dd0b3,
+  "@10x-media/settings-overlay/client#SettingsOverlayDocumentActions": SettingsOverlayDocumentActions_1fb8679bfe5063cdde30d578d88dd0b3,
   "@payloadcms/plugin-multi-tenant/client#TenantField": TenantField_1d0591e3cf4f332c83a86da13a0de59a,
   "@payloadcms/plugin-multi-tenant/rsc#GlobalViewRedirect": GlobalViewRedirect_d6d5f193a167989e2ee7d14202901e62,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelector": TenantSelector_d6d5f193a167989e2ee7d14202901e62,

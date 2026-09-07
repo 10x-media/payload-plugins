@@ -105,6 +105,9 @@ export const documentQuery = (
  */
 export const renderDocumentArgs = (args: DocumentQueryArgs) => ({
 	collectionSlug: args.slug,
+	// Payload's dots menu reports delete, duplicate and restore through a drawer context the pane
+	// cannot provide, so it is hidden and `client/documentActions.tsx` renders those same actions
+	// wired to the panel instead.
 	disableActions: true,
 	docID: args.docID as unknown as string,
 	drawerSlug: args.panelSlug,
@@ -117,6 +120,8 @@ export const renderDocumentArgs = (args: DocumentQueryArgs) => ({
 	redirectAfterCreate: false,
 	redirectAfterDelete: false,
 	redirectAfterDuplicate: false,
+	// `handleServerFunction` forwards only the three above, so this one never reaches the view.
+	// It is set for the day it does; until then the actions menu passes the flag as a prop.
 	redirectAfterRestore: false,
 })
 

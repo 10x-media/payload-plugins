@@ -1,12 +1,17 @@
 import type { CollectionConfig, Config, GlobalConfig } from 'payload'
 
 import type { HiddenPredicate, HiddenPredicates } from '../types'
-import { REPORTER_PATH } from './constants'
+import { ACTIONS_PATH, REPORTER_PATH } from './constants'
 import type { ResolvedOverlay } from './resolveOptions'
 
 type Listed = { hide: boolean }
 
-const withReporter = (collection: CollectionConfig, hide: boolean): CollectionConfig => {
+/**
+ * A listed collection carries two plugin components in `beforeDocumentControls`: the
+ * form-modified reporter, and the document actions the panel needs because Payload's own menu
+ * has nobody to report to. Both render nothing outside a panel.
+ */
+const withPanelComponents = (collection: CollectionConfig, hide: boolean): CollectionConfig => {
 	const existing = collection.admin?.components?.edit?.beforeDocumentControls ?? []
 	return {
 		...collection,
@@ -17,13 +22,14 @@ const withReporter = (collection: CollectionConfig, hide: boolean): CollectionCo
 				...collection.admin?.components,
 				edit: {
 					...collection.admin?.components?.edit,
-					beforeDocumentControls: [...existing, REPORTER_PATH],
+					beforeDocumentControls: [...existing, REPORTER_PATH, ACTIONS_PATH],
 				},
 			},
 		},
 	}
 }
 
+/** A global has no delete, duplicate or restore, so it takes the reporter alone. */
 const withReporterGlobal = (global: GlobalConfig, hide: boolean): GlobalConfig => {
 	const existing = global.admin?.components?.elements?.beforeDocumentControls ?? []
 	return {
@@ -43,8 +49,9 @@ const withReporterGlobal = (global: GlobalConfig, hide: boolean): GlobalConfig =
 }
 
 /**
- * Hides every listed collection and global from the nav and its own route, and gives each a
- * form-modified reporter so the panel can confirm before discarding edits.
+ * Hides every listed collection and global from the nav and its own route, and appends the
+ * plugin's own `beforeDocumentControls` components: the form-modified reporter everywhere, and
+ * the document actions on collections.
  *
  * An entity may already gate itself with a function-valued `admin.hidden`. Overwriting that
  * with `true` would lose the rule, so the predicate is lifted out and returned for the
@@ -85,7 +92,7 @@ export const hideEntities = (
 		if (typeof collection.admin?.hidden === 'function') {
 			hiddenPredicates.collections[collection.slug] = collection.admin.hidden as HiddenPredicate
 		}
-		return withReporter(collection, listed.hide)
+		return withPanelComponents(collection, listed.hide)
 	})
 
 	const globals = (config.globals ?? []).map((global) => {

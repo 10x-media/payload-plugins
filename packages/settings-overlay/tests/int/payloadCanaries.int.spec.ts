@@ -2,9 +2,9 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Two assumptions this plugin makes about Payload's internals. Both are workarounds, and both
- * tests are written to fail when the workaround stops being necessary, so the reason to delete
- * the code arrives as a red test rather than as a memory.
+ * Three assumptions this plugin makes about Payload's internals. Each is written to fail when
+ * the assumption stops holding, so the reason to change the code arrives as a red test rather
+ * than as a memory.
  *
  * Both read the installed files rather than importing them: `@payloadcms/next` does not export
  * its own `package.json`, and importing `@payloadcms/ui` in Node pulls stylesheets a test runner
@@ -23,13 +23,36 @@ describe('payload canaries', () => {
 		expect(source).toContain('renderWidgetHandler')
 	})
 
-	it('DocumentDrawerContextProvider is still not exported, so the delete workaround stays', async () => {
+	it('DocumentDrawerContextProvider is still not exported, so the panel keeps its own menu', async () => {
 		const clientExports = await readDist('@payloadcms/ui/dist/exports/client/index.d.ts')
 
-		// When this flips, delete `client/documentActions.tsx`, drop `disableActions` from
-		// `renderDocumentArgs`, and let the edit view report delete and create through the drawer
-		// callbacks instead.
+		// The edit view reads its callbacks from a context only Payload can provide, so the pane
+		// renders with `disableActions` and `client/documentActions.tsx` supplies its own menu.
+		// When this flips, that file and the `disableActions` flag in `renderDocumentArgs` both go
+		// and the edit view reports delete, duplicate and restore through the drawer callbacks.
 		expect(clientExports).toContain('useDocumentDrawerContext')
 		expect(clientExports).not.toContain('DocumentDrawerContextProvider')
+	})
+
+	it('the action components the pane borrows are still reachable by subpath', async () => {
+		// `client/documentActions.tsx` imports these four from `@payloadcms/ui/elements/*` rather
+		// than reimplementing them, so their logic stays Payload's. A rename breaks the build; a
+		// dropped export map entry would not, which is what this checks.
+		const exportMap = JSON.parse(await readDist('@payloadcms/ui/package.json')) as {
+			exports: Record<string, unknown>
+		}
+
+		expect(exportMap.exports['./elements/*']).toBeDefined()
+
+		for (const element of [
+			'DeleteDocument',
+			'DuplicateDocument',
+			'PermanentlyDeleteButton',
+			'RestoreButton',
+		]) {
+			await expect(
+				readDist(`@payloadcms/ui/dist/elements/${element}/index.d.ts`)
+			).resolves.toContain(element)
+		}
 	})
 })

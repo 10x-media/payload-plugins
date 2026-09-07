@@ -5,11 +5,6 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.appearanceLabel]: 'Apparence',
 	[keys.back]: 'Retour',
 	[keys.close]: 'Fermer',
-	[keys.delete]: 'Supprimer',
-	[keys.deleteBody]: 'Ce document sera supprimé définitivement. Cette action est irréversible.',
-	[keys.deleteConfirm]: 'Supprimer',
-	[keys.deleteHeading]: 'Supprimer le document ?',
-	[keys.deleted]: 'Document supprimé',
 	[keys.discardBody]:
 		'Des modifications ne sont pas enregistrées. Quitter maintenant les abandonnera.',
 	[keys.discardConfirm]: 'Abandonner les modifications',

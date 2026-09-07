@@ -18,8 +18,9 @@ import { DocumentSkeleton } from '../skeletons'
  * render shows meanwhile. Every save reported for this collection invalidates its list renders,
  * so the list behind the back button is current.
  *
- * See `../documentActions.tsx` for why the view runs with `disableActions` and how creates are
- * detected; that is the part waiting on Payload.
+ * The view runs with `disableActions`; `../documentActions.tsx` puts delete, duplicate, restore
+ * and "create new" back. A save is still noticed through `useDocumentEvents`, which is the one
+ * document event Payload reports.
  */
 export const DocumentPane: React.FC<{
 	entity: 'collection' | 'global'

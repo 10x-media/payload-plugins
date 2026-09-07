@@ -10,6 +10,7 @@ export {
 	useSettingsOverlayEmbed,
 	useSettingsPanel,
 } from '../client/context'
+export { SettingsOverlayDocumentActions } from '../client/documentActions'
 export { SettingsFormModifiedReporter } from '../client/FormModifiedReporter'
 export { SettingsRailItem, SettingsRailItems } from '../client/Rail'
 export {

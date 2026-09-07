@@ -2,7 +2,12 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { settingsOverlay } from '../../src/index'
-import { DISPATCHER_WIDGET_SLUG, REGISTRY_KEY, REPORTER_PATH } from '../../src/plugin/constants'
+import {
+	ACTIONS_PATH,
+	DISPATCHER_WIDGET_SLUG,
+	REGISTRY_KEY,
+	REPORTER_PATH,
+} from '../../src/plugin/constants'
 import type { SettingsOverlayRegistry } from '../../src/plugin/registry'
 
 describeForDb('settingsOverlay loads', { dbs: ['mongo'] }, (db) => {
@@ -39,10 +44,10 @@ describeForDb('settingsOverlay loads', { dbs: ['mongo'] }, (db) => {
 		expect(booted.payload.collections.sites?.config.admin.hidden).toBeFalsy()
 	})
 
-	it('adds the form-modified reporter to the listed collection', () => {
+	it('adds the reporter and the actions menu to the listed collection', () => {
 		expect(
 			booted.payload.collections.tags?.config.admin.components?.edit?.beforeDocumentControls
-		).toContain(REPORTER_PATH)
+		).toEqual([REPORTER_PATH, ACTIONS_PATH])
 	})
 
 	it('parks the full config under custom, which never reaches the browser', () => {

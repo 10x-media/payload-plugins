@@ -2,7 +2,12 @@ import type { CollectionConfig, Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { settingsOverlay } from './index'
-import { DISPATCHER_WIDGET_SLUG, REGISTRY_KEY, REPORTER_PATH } from './plugin/constants'
+import {
+	ACTIONS_PATH,
+	DISPATCHER_WIDGET_SLUG,
+	REGISTRY_KEY,
+	REPORTER_PATH,
+} from './plugin/constants'
 import type { SettingsOverlayRegistry } from './plugin/registry'
 import { keys } from './translations'
 
@@ -88,7 +93,7 @@ describe('settingsOverlay factory', () => {
 		expect(b?.mergeListHeader).toBe(true)
 	})
 
-	it('hides listed entities and adds the form-modified reporter', () => {
+	it('hides listed entities and adds the plugin document controls', () => {
 		const out = run({
 			overlays: [
 				{
@@ -106,9 +111,14 @@ describe('settingsOverlay factory', () => {
 		const branding = out.globals?.find((entry) => entry.slug === 'branding')
 
 		expect(tags?.admin?.hidden).toBe(true)
-		expect(tags?.admin?.components?.edit?.beforeDocumentControls).toContain(REPORTER_PATH)
+		expect(tags?.admin?.components?.edit?.beforeDocumentControls).toEqual([
+			REPORTER_PATH,
+			ACTIONS_PATH,
+		])
 		expect(sites?.admin?.hidden).toBeUndefined()
 		expect(branding?.admin?.hidden).toBe(true)
+		// A global has no delete, duplicate or restore, so it takes the reporter alone.
+		expect(branding?.admin?.components?.elements?.beforeDocumentControls).toEqual([REPORTER_PATH])
 	})
 
 	it('leaves entities visible when hideEntities is false', () => {
