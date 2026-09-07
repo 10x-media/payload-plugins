@@ -112,6 +112,15 @@ describe('buildManifest', () => {
 		expect(manifest.groups[0]?.items[0]?.directDocID).toBe('doc-1')
 	})
 
+	it("normalises the resolver's 'create' to the token the panel writes into the URL", async () => {
+		const manifest = await build({
+			id: 'system',
+			items: [{ resolveDocID: () => 'create', slug: 'tags', type: 'collection' }],
+			label: 'System',
+		})
+		expect(manifest.groups[0]?.items[0]?.directDocID).toBe('new')
+	})
+
 	it('falls back to the list when resolveDocID returns null or throws', async () => {
 		const nulled = await build({
 			id: 'system',

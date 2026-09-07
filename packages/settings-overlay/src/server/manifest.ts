@@ -48,13 +48,19 @@ const isVisible = async (args: {
 const resolveDirectDocID = async (
 	item: CollectionItem,
 	req: PayloadRequest
-): Promise<'create' | string | undefined> => {
+): Promise<'new' | string | undefined> => {
 	if (!item.resolveDocID) {
 		return undefined
 	}
 	try {
 		const resolved = await item.resolveDocID({ item, req })
-		return resolved === null ? undefined : resolved
+		if (resolved === null) {
+			return undefined
+		}
+		// The resolver speaks Payload's route vocabulary, where the create form is `create`. The
+		// panel's is the URL it writes, where it is `new`. Translating here keeps both honest and
+		// means the browser only ever sees the token it acts on.
+		return resolved === 'create' ? 'new' : resolved
 	} catch (error) {
 		req.payload?.logger?.error({
 			err: error,

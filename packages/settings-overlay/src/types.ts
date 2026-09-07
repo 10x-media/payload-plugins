@@ -274,8 +274,12 @@ export type HiddenPredicates = {
 /** One rail row, resolved for one reader. Labels are already translated. */
 export type ManifestItem = {
 	badge?: BadgeConfig
-	/** For `collection` items whose `resolveDocID` says to open a document directly. */
-	directDocID?: 'create' | string
+	/**
+	 * For `collection` items whose `resolveDocID` says to open a document directly, or `'new'`
+	 * for the create form. A resolver returning Payload's `'create'` is normalised to `'new'`
+	 * here, which is the token the panel writes into the URL.
+	 */
+	directDocID?: 'new' | string
 	/** Present for `link` items. */
 	href?: string
 	keywords?: string[]
@@ -329,6 +333,12 @@ export type Target = {
  */
 export type SettingsOverlayEmbed = {
 	close: () => void
+	/**
+	 * Set when `resolveDocID` pointed this item straight at one document, so the panel shows a
+	 * form where a list would be. Such an item behaves like a global: there is no list to go back
+	 * to, and the document is not one of many.
+	 */
+	directDocID?: string
 	/** For a collection item: the open document's id, or `'new'`. */
 	docID?: string
 	itemSlug: string
