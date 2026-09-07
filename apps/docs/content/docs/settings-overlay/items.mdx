@@ -21,6 +21,8 @@ Every type also takes `label`, `group`, `icon`, `order`, `keywords`, `badge` and
 { type: 'collection', slug: 'tags' }
 ```
 
+![The Tags collection inside a panel: Payload's list with its search box, column and filter menus and sortable rows, under a pane header carrying the collection name and a Create New button](/images/settings-overlay/collection-view.png)
+
 Renders Payload's list view in drawer mode, and its edit view when a row is picked. Creating, filtering, sorting, grouping, drafts, uploads and relationship drawers all work as they do on a page.
 
 Delete, duplicate, restore from trash and "create new" sit in a dots menu on the edit view, as they do on a page, and act on the panel rather than navigating away from it. Delete honours trash when the collection has it, including the "delete permanently" option. The plugin appends the menu to the collection's `admin.components.edit.beforeDocumentControls`; if the collection already sets that, the plugin's entry is added after yours. Duplicating into selected locales is the one action the panel does not carry.

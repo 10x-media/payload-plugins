@@ -5,6 +5,8 @@ description: Files any Payload collection, global, admin view or component behin
 
 `@10x-media/settings-overlay` puts a collection, a global, a registered admin view or a component of your own behind a floating panel, and makes that panel addressable by URL. `?settings=system/tags/abc` opens the panel on that document. Copy the link, send it, it reopens the same thing.
 
+![A settings panel over the dashboard: a rail of rows on the left under a System heading, with Content and Appearance as collapsible groups and a count badge on Tags, and the Appearance row open on the right showing the language and admin theme controls](/images/settings-overlay/overview.png)
+
 ```ts title="payload.config.ts"
 import { buildConfig } from 'payload'
 import { settingsOverlay } from '@10x-media/settings-overlay'
@@ -65,4 +67,4 @@ A `component` may be a server or a client component. The plugin renders it the w
 - [Customization](/settings-overlay/customization): slots, hooks and the props each replacement gets.
 - [Embedded views](/settings-overlay/embedded-views): putting a registered admin view in the panel, and the one case that needs a bundler alias.
 - [Configuration](/settings-overlay/configuration): every option, in one place.
-- [i18n](/settings-overlay/i18n): the eleven bundled languages and how to override a string.
+- [i18n](/settings-overlay/i18n): the bundled locales and how to override a string.

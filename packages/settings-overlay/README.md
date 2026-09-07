@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/settings-overlay
 
 Files any Payload collection, global, registered admin view or component behind a floating panel, and makes that panel addressable by URL. `?settings=system/tags/abc` opens the panel on that document; copy the link, send it, it reopens the same thing.
@@ -16,7 +18,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **No round trip for what does not need one**: the rail and every eager component arrive with the page. Lists, documents and views are fetched on open.
 - **Replaceable pieces**: the rail, its rows and groups, the header, the search box and the whole panel are slots, each with exported prop types and the hooks a replacement needs.
 - **Collections that behave like globals**: `resolveDocID` opens one document instead of a list, which is what `@payloadcms/plugin-multi-tenant` globals need.
-- **Eleven languages** out of the box, overridable key by key.
+- **Typed translations** with per-key overrides via `@10x-media/settings-overlay/i18n`; several locales ship built in.
 
 ## Quick start
 

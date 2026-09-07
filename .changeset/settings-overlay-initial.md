@@ -10,6 +10,6 @@ The rail each reader sees is computed on the server: overlay and item access fun
 
 Inside a panel the edit view keeps its document actions: delete, duplicate, restore from trash and "create new" run Payload's own components against the panel rather than navigating the admin away.
 
-Also included: seven replaceable slots with typed props and the hooks that keep a replacement from being a fork, badges, stable group and item sorting, rail search, `resolveDocID` for collections that behave like globals (with a `tenantGlobalItem` helper for `@payloadcms/plugin-multi-tenant`), a bundled `appearanceItem` for theme and language, an opt-in template shim for embedding third-party admin views, and eleven languages.
+Also included: seven replaceable slots with typed props and the hooks that keep a replacement from being a fork, badges, stable group and item sorting, rail search, `resolveDocID` for collections that behave like globals (with a `tenantGlobalItem` helper for `@payloadcms/plugin-multi-tenant`), a bundled `appearanceItem` for theme and language, an opt-in template shim for embedding third-party admin views, and typed translations with several locales built in.
 
 Installation is one line in `payload.config.ts` plus `generate:importmap`. Nothing in `app/(payload)/layout.tsx` changes.

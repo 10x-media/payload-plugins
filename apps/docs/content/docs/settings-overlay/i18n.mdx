@@ -1,9 +1,9 @@
 ---
 title: i18n
-description: The bundled languages, and how to override a string or add a locale.
+description: Override or localize the settings overlay admin strings.
 ---
 
-Every admin-facing string the plugin draws, the close and back labels, the search placeholder, the discard confirmation, the empty and no-results states, is a typed translation under the `settingsOverlay:` namespace. Eleven locales ship built in: `ar`, `de`, `en`, `es`, `fr`, `id`, `ko`, `pt`, `ru`, `uk`, `zh`.
+Every admin-facing string the plugin draws, the close and back labels, the search placeholder, the discard confirmation, the empty and no-results states, is a typed translation under the `settingsOverlay:` namespace. Several locales ship built in; the `translations` export names the current set.
 
 Override or add one through the `translations` option:
 
@@ -52,7 +52,7 @@ import { keys } from '@10x-media/settings-overlay/i18n'
 { ...appearanceItem(), label: labelFromKey(keys.appearanceLabel) }
 ```
 
-`appearanceItem()` does this by default, so its row is translated in all eleven languages without you naming any of them.
+`appearanceItem()` does this by default, so its row follows the reader's locale without you naming any of them.
 
 ## The appearance row borrows Payload's strings
 
