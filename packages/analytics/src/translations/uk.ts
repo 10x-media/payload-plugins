@@ -31,6 +31,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: 'Топ джерел',
 	[keys.widgetBreakdownDevices]: 'Пристрої',
 	[keys.widgetBreakdownCountries]: 'Країни',
+	[keys.widgetBreakdownGoals]: 'Цілі',
 	[keys.widgetFieldLimit]: 'Рядків',
 	[keys.stateNoBreakdown]: 'Даних поки немає',
 	[keys.stateClamped]: 'Показано максимальний період, який підтримує провайдер',

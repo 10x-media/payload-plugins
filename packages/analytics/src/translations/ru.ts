@@ -31,6 +31,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: 'Топ источников',
 	[keys.widgetBreakdownDevices]: 'Устройства',
 	[keys.widgetBreakdownCountries]: 'Страны',
+	[keys.widgetBreakdownGoals]: 'Цели',
 	[keys.widgetFieldLimit]: 'Строк',
 	[keys.stateNoBreakdown]: 'Данных пока нет',
 	[keys.stateClamped]: 'Показан максимальный период, который поддерживает провайдер',

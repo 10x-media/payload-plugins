@@ -31,6 +31,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: 'Sources principales',
 	[keys.widgetBreakdownDevices]: 'Appareils',
 	[keys.widgetBreakdownCountries]: 'Pays',
+	[keys.widgetBreakdownGoals]: 'Objectifs',
 	[keys.widgetFieldLimit]: 'Lignes',
 	[keys.stateNoBreakdown]: 'Pas encore de données',
 	[keys.stateClamped]: 'Affichage de la période maximale prise en charge par le fournisseur',

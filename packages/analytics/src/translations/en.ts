@@ -36,6 +36,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: 'Top sources',
 	[keys.widgetBreakdownDevices]: 'Devices',
 	[keys.widgetBreakdownCountries]: 'Countries',
+	[keys.widgetBreakdownGoals]: 'Goals',
 	[keys.widgetFieldLimit]: 'Rows',
 	[keys.stateNoBreakdown]: 'No data yet',
 	[keys.stateClamped]: 'Showing the maximum range the provider supports',

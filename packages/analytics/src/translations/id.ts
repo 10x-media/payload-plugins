@@ -31,6 +31,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: 'Sumber teratas',
 	[keys.widgetBreakdownDevices]: 'Perangkat',
 	[keys.widgetBreakdownCountries]: 'Negara',
+	[keys.widgetBreakdownGoals]: 'Sasaran',
 	[keys.widgetFieldLimit]: 'Baris',
 	[keys.stateNoBreakdown]: 'Belum ada data',
 	[keys.stateClamped]: 'Menampilkan rentang maksimum yang didukung penyedia',

@@ -34,6 +34,7 @@ export const keys = {
 	widgetBreakdownSources: 'analytics:widgetBreakdownSources',
 	widgetBreakdownDevices: 'analytics:widgetBreakdownDevices',
 	widgetBreakdownCountries: 'analytics:widgetBreakdownCountries',
+	widgetBreakdownGoals: 'analytics:widgetBreakdownGoals',
 	widgetFieldLimit: 'analytics:widgetFieldLimit',
 	stateNoBreakdown: 'analytics:stateNoBreakdown',
 	stateClamped: 'analytics:stateClamped',

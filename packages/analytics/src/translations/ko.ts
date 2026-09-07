@@ -31,6 +31,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: '인기 유입 경로',
 	[keys.widgetBreakdownDevices]: '기기',
 	[keys.widgetBreakdownCountries]: '국가',
+	[keys.widgetBreakdownGoals]: '목표',
 	[keys.widgetFieldLimit]: '행 수',
 	[keys.stateNoBreakdown]: '아직 데이터가 없습니다',
 	[keys.stateClamped]: '제공자가 지원하는 최대 기간을 표시합니다',

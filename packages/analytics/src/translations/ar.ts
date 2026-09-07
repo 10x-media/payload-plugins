@@ -31,6 +31,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: 'أهم المصادر',
 	[keys.widgetBreakdownDevices]: 'الأجهزة',
 	[keys.widgetBreakdownCountries]: 'الدول',
+	[keys.widgetBreakdownGoals]: 'الأهداف',
 	[keys.widgetFieldLimit]: 'الصفوف',
 	[keys.stateNoBreakdown]: 'لا توجد بيانات بعد',
 	[keys.stateClamped]: 'يتم عرض أقصى نطاق يدعمه المزود',

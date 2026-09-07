@@ -31,6 +31,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: '热门来源',
 	[keys.widgetBreakdownDevices]: '设备',
 	[keys.widgetBreakdownCountries]: '国家/地区',
+	[keys.widgetBreakdownGoals]: '目标',
 	[keys.widgetFieldLimit]: '行数',
 	[keys.stateNoBreakdown]: '暂无数据',
 	[keys.stateClamped]: '已显示该提供商支持的最大时间范围',

@@ -32,6 +32,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.widgetBreakdownSources]: 'Top-Quellen',
 	[keys.widgetBreakdownDevices]: 'Geräte',
 	[keys.widgetBreakdownCountries]: 'Länder',
+	[keys.widgetBreakdownGoals]: 'Ziele',
 	[keys.widgetFieldLimit]: 'Zeilen',
 	[keys.stateNoBreakdown]: 'Noch keine Daten',
 	[keys.stateClamped]: 'Zeigt den maximalen Zeitraum des Anbieters',
