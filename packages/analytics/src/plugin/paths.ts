@@ -11,8 +11,8 @@ export const PROXY_PATH = '/analytics/p'
 /** Public tracker config, per-request scope. */
 export const TRACKER_PATH = '/analytics/tracker'
 /**
- * Mount of the native ingest endpoint, and the single source of the `ingestPath` the
- * tracker config hands the browser. `native({ ingestPath })` moves the endpoint without
- * moving the tracker config, so an override there needs the tracker pointed at it too.
+ * Default mount of the native ingest endpoint, and the fallback for the `ingestPath` the
+ * tracker config hands the browser. `native({ ingestPath })` moves both: the adapter
+ * declares the override through `ingest.path`, which the runtime lifts onto the config.
  */
 export const INGEST_PATH = '/analytics/ingest'

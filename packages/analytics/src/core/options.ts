@@ -160,7 +160,7 @@ export type AnalyticsCaptureOptions = {
 	paths?: { global?: string; tenant?: string }
 	/** Whether a slot's tracker waits for consent. Native defaults to no gate, vendors to one. */
 	consent?: CaptureConsentOption
-	/** Browser auto-capture listeners, all on by default. */
+	/** Browser auto-capture listeners, all on by default except `scrollDepth`. */
 	autoCapture?: AutoCaptureOptions
 	/** Limits for the public runtime capture proxy, separate from the read-path `cache`. */
 	proxy?: {
