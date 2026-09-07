@@ -19,9 +19,15 @@ export interface PlausibleConfig {
 	host?: string
 	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
 	maxLookbackDays?: number | null
-	/** Site domain for the legacy script tag (`data-domain`). Takes priority over `scriptId`. */
+	/**
+	 * Site domain for the legacy script tag (`data-domain`). Takes priority over `scriptId`.
+	 * The adapter declares `capture` only when one of the two is set.
+	 */
 	domain?: string
-	/** Per-site tracker id (`pa-<id>.js`) for the newer per-site script model. */
+	/**
+	 * Per-site tracker id (`pa-<id>.js`) for the newer per-site script model. The adapter
+	 * declares `capture` only when one of it and `domain` is set.
+	 */
 	scriptId?: string
 }
 
@@ -134,7 +140,7 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 		id: 'plausible',
 		label: 'Plausible',
 		capabilities,
-		capture: buildCapture(config),
+		...(config.domain || config.scriptId ? { capture: buildCapture(config) } : {}),
 		isConfigured: () => Boolean(config.siteId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()

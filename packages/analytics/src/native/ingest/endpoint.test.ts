@@ -6,12 +6,18 @@ import { makeIngestHandler } from './endpoint'
 import type { StoredEvent } from './normalizeEvent'
 import type { WriteBuffer } from './writeBuffer'
 
-const req = (body: unknown): PayloadRequest =>
-	({
-		headers: new Headers({ 'content-type': 'application/json' }),
-		json: async () => body,
-		payload: { kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined } },
-	}) as unknown as PayloadRequest
+/** A real Request, because the handler reads the body stream rather than `req.json()`. */
+const rawReq = (body: BodyInit, contentType = 'application/json'): PayloadRequest =>
+	Object.assign(
+		new Request('http://localhost/api/analytics/ingest', {
+			method: 'POST',
+			body,
+			headers: { 'content-type': contentType },
+		}),
+		{ payload: { kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined } } }
+	) as unknown as PayloadRequest
+
+const req = (body: unknown): PayloadRequest => rawReq(JSON.stringify(body))
 
 /** Captures what the handler would flush without touching a database. */
 const capture = (): { buffer: WriteBuffer<StoredEvent>; events: StoredEvent[] } => {
@@ -36,11 +42,35 @@ const handlerWith = (goals?: Goal[]) => {
 describe('makeIngestHandler validation', () => {
 	it('returns 400 for an invalid body', async () => {
 		const handler = makeIngestHandler(noopResolver)
-		const res = await handler({
-			headers: new Headers({ 'content-type': 'application/json' }),
-			json: async () => ({}),
-		} as never)
-		expect(res.status).toBe(400)
+		expect((await handler(req({}))).status).toBe(400)
+	})
+
+	it('400s unparseable JSON and a body that is neither object nor array', async () => {
+		const { handler } = handlerWith()
+		expect((await handler(rawReq('<html>nope</html>'))).status).toBe(400)
+		expect((await handler(rawReq(''))).status).toBe(400)
+		expect((await handler(rawReq('"pageview"'))).status).toBe(400)
+		expect((await handler(rawReq('7'))).status).toBe(400)
+		expect((await handler(rawReq('null'))).status).toBe(400)
+	})
+
+	it('413s a body over the ingest cap before parsing any of it', async () => {
+		const { handler, events } = handlerWith()
+		const oversized = JSON.stringify({
+			type: 'pageview',
+			path: '/x',
+			hostname: 'h',
+			props: { note: 'x'.repeat(70_000) },
+		})
+		expect((await handler(rawReq(oversized))).status).toBe(413)
+		expect(events).toEqual([])
+	})
+
+	it('reads a beacon body, which is sent as text/plain', async () => {
+		const { handler, events } = handlerWith()
+		const body = JSON.stringify({ type: 'pageview', path: '/beacon', hostname: 'h' })
+		expect((await handler(rawReq(body, 'text/plain;charset=UTF-8'))).status).toBe(202)
+		expect(events[0]?.path).toBe('/beacon')
 	})
 
 	it('accepts a goal event carrying a name', async () => {

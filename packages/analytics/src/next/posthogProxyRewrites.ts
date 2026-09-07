@@ -44,6 +44,8 @@ export const posthogProxyRewrites = (
 ): PosthogProxyRewrite[] => {
 	const region = options.region ?? 'eu'
 	const path = options.path ?? '/ph'
-	const adapter = posthog({ projectId: '', apiKey: '', region })
+	// A token is what makes an adapter declare capture, and only the capture descriptor's
+	// routes are read here; the placeholder never reaches a snippet or a browser.
+	const adapter = posthog({ projectId: '', apiKey: '', region, projectToken: 'rewrites-only' })
 	return captureRewrites([{ path, adapter }])
 }

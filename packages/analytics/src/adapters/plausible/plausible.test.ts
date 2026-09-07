@@ -197,7 +197,7 @@ describe('plausible adapter', () => {
 
 describe('plausible capture', () => {
 	it('builds the two proxy routes against the cloud host by default', () => {
-		const capture = plausible({ siteId: 'example.com', apiKey: 'k' }).capture
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k', domain: 'example.com' }).capture
 		expect(capture?.proxy.routes).toEqual([
 			{ source: '/js/:script*', upstream: 'https://plausible.io/js/:script*' },
 			{ source: '/api/event', upstream: 'https://plausible.io/api/event' },
@@ -209,6 +209,7 @@ describe('plausible capture', () => {
 			siteId: 'example.com',
 			apiKey: 'k',
 			host: 'https://p.acme.io',
+			domain: 'example.com',
 		}).capture
 		expect(capture?.proxy.routes).toEqual([
 			{ source: '/js/:script*', upstream: 'https://p.acme.io/js/:script*' },
@@ -255,13 +256,18 @@ describe('plausible capture', () => {
 		expect(capture?.snippet({ path: '/pl' }).scripts[0]?.src).toBe('/pl/js/script.js')
 	})
 
-	it('renders no scripts when neither domain nor scriptId is set', () => {
-		const capture = plausible({ siteId: 'example.com', apiKey: 'k' }).capture
-		expect(capture?.snippet({ path: '/pl' })).toEqual({ scripts: [] })
+	// Capture is public config: without a public script identity there is nothing to capture
+	// with, so a read-only install gets no proxy and no snippet rather than an empty one.
+	it('declares no capture when neither domain nor scriptId is set', () => {
+		expect(plausible({ siteId: 'example.com', apiKey: 'k' }).capture).toBeUndefined()
 	})
 
 	it('client carries only the kind, no site credentials', () => {
-		const capture = plausible({ siteId: 'example.com', apiKey: 'secret-key' }).capture
+		const capture = plausible({
+			siteId: 'example.com',
+			apiKey: 'secret-key',
+			domain: 'example.com',
+		}).capture
 		expect(capture?.client).toEqual({ kind: 'plausible' })
 		expect(JSON.parse(JSON.stringify(capture?.client))).toEqual({ kind: 'plausible' })
 	})

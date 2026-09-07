@@ -597,11 +597,10 @@ describe('posthog capture', () => {
 		expect(snippet?.scripts[0]?.inline).toContain('ui_host:"https://eu.posthog.com"')
 	})
 
-	it('still declares capture with an empty token when projectToken is absent', () => {
-		const capture = posthog({ projectId: '123', apiKey: 'phx_k' }).capture
-		expect(capture).toBeDefined()
-		const snippet = capture?.snippet({ path: '/ph' })
-		expect(snippet?.scripts[0]?.inline).toContain('posthog.init("",')
+	// Capture is public config: a dashboard-only install (projectId + apiKey) must not get a
+	// public forward proxy, nor a snippet initialised with an empty token.
+	it('declares no capture at all when projectToken is absent', () => {
+		expect(posthog({ projectId: '123', apiKey: 'phx_k' }).capture).toBeUndefined()
 	})
 
 	it('client carries only the public project token, never the private apiKey', () => {

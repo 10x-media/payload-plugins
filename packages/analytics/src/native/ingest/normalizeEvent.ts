@@ -76,11 +76,16 @@ const MAX_PROPS = 20
 const MAX_KEY_LENGTH = 64
 const MAX_VALUE_LENGTH = 256
 const MAX_NAME_LENGTH = 128
+const MAX_PATH_LENGTH = 512
+/** Longest legal DNS name. */
+const MAX_HOSTNAME_LENGTH = 253
+/** 24 hours. A longer duration is a broken clock, not a session. */
+const MAX_DURATION_MS = 86_400_000
 const CURRENCY = /^[A-Z]{3}$/
 
 /**
  * Optional wire fields are sanitized rather than rejected: a bad `value`, `currency`,
- * `scrollDepth`, or prop is dropped and the event is still ingested, so one malformed
+ * `scrollDepth`, `durationMs`, or prop is dropped and the event is still ingested, so one malformed
  * attribute never costs a pageview. Only the required fields (checked in the endpoint)
  * can fail an event.
  */
@@ -89,6 +94,16 @@ const nonNegative = (value: unknown): number | undefined =>
 
 const currencyCode = (value: unknown): string | undefined =>
 	typeof value === 'string' && CURRENCY.test(value) ? value : undefined
+
+/**
+ * Infinity would poison a rollup bucket's average for good, and a string would throw out of
+ * the write and take the whole buffered batch with it, so a duration outside the ceiling is
+ * dropped like any other malformed attribute.
+ */
+const duration = (value: unknown): number | undefined => {
+	const n = nonNegative(value)
+	return n === undefined || n > MAX_DURATION_MS ? undefined : n
+}
 
 /** The event name is a rollup bucket key (the `event` dimension), so it is length-capped. */
 const eventName = (value: unknown): string | undefined =>
@@ -138,32 +153,37 @@ export async function normalizeEvent({
 	const geo = await geoResolver(headers)
 	const ip = clientIpFromHeaders(headers) ?? ''
 	const ua = headers.get('user-agent') ?? ''
-	const visitorHash = dailyVisitorHash({ ip, ua, site: raw.hostname, salt })
+	// Both are unique-index bucket keys on the rollup and seen rows, so they are capped
+	// before anything derives from them: an uncapped path exceeds Mongo's index key limit.
+	const path = raw.path.slice(0, MAX_PATH_LENGTH)
+	const hostname = raw.hostname.slice(0, MAX_HOSTNAME_LENGTH)
+	const visitorHash = dailyVisitorHash({ ip, ua, site: hostname, salt })
 	const hourBucket = now.toISOString().slice(0, 13)
 	const props = sanitizeProps(raw.props)
 	const value = nonNegative(raw.value)
 	const scrollDepth = depth(raw.scrollDepth)
+	const durationMs = duration(raw.durationMs)
 	const name = eventName(raw.name)
 	// Match on the sanitized fields so a rejected value never reaches a goal's revenue.
 	const completions = goals?.length
-		? matchGoals({ type: raw.type, name, path: raw.path, props, value }, goals)
+		? matchGoals({ type: raw.type, name, path, props, value }, goals)
 		: []
 	return {
 		timestamp: now,
 		type: raw.type,
 		name,
-		path: raw.path,
-		hostname: raw.hostname,
+		path,
+		hostname,
 		referrer: raw.referrer,
 		device: classifyDevice(ua),
-		source: deriveSource(raw.referrer, raw.hostname),
+		source: deriveSource(raw.referrer, hostname),
 		country: geo.country,
 		region: geo.region,
 		city: geo.city,
 		visitorHash,
 		sessionId: deriveSessionId(visitorHash, hourBucket),
-		durationMs: raw.durationMs,
 		props,
+		...(durationMs !== undefined ? { durationMs } : {}),
 		...(value !== undefined ? { value } : {}),
 		...(currencyCode(raw.currency) !== undefined ? { currency: raw.currency } : {}),
 		...(scrollDepth !== undefined ? { scrollDepth } : {}),

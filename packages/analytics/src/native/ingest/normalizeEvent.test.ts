@@ -108,6 +108,34 @@ describe('normalizeEvent contract growth', () => {
 		expect(await depth(0)).toBe(0)
 	})
 
+	it('drops a durationMs that is not a finite, non-negative number', async () => {
+		const duration = async (durationMs: unknown) =>
+			(await build({ type: 'pageview', path: '/x', hostname: 'h', durationMs })).durationMs
+		expect(await duration(Number.POSITIVE_INFINITY)).toBeUndefined()
+		expect(await duration(JSON.parse('{"d":1e400}').d)).toBeUndefined()
+		expect(await duration(Number.NaN)).toBeUndefined()
+		expect(await duration(-1)).toBeUndefined()
+		expect(await duration('900')).toBeUndefined()
+		expect(await duration(900)).toBe(900)
+	})
+
+	it('drops a durationMs past the 24 hour ceiling', async () => {
+		const duration = async (durationMs: unknown) =>
+			(await build({ type: 'pageview', path: '/x', hostname: 'h', durationMs })).durationMs
+		expect(await duration(86_400_000)).toBe(86_400_000)
+		expect(await duration(86_400_001)).toBeUndefined()
+	})
+
+	it('caps path and hostname, which are unique-index bucket keys', async () => {
+		const ev = await build({
+			type: 'pageview',
+			path: `/${'p'.repeat(900)}`,
+			hostname: `${'h'.repeat(300)}.test`,
+		})
+		expect(ev.path).toHaveLength(512)
+		expect(ev.hostname).toHaveLength(253)
+	})
+
 	it('truncates the event name, which is a rollup bucket key', async () => {
 		const ev = await build({
 			type: 'event',

@@ -13,13 +13,14 @@ export { TRACKER_PATH }
  * breaking the page.
  *
  * The response is per-visitor and hostname-derived, never shared: `private` with a short
- * max-age, `Vary: Host`, and no cookie of its own.
+ * max-age, `Vary: Host, Cookie` (a `scopeResolver` may read `req.user` or a tenant cookie,
+ * which makes the body cookie-dependent), and no cookie of its own.
  */
 export const makeTrackerHandler = (): PayloadHandler => async (req) => {
 	const runtime = getRuntime(req.payload)
 	const config = runtime ? await resolveTrackerConfig({ runtime, req }) : emptyTrackerConfig(req)
 	return Response.json(config, {
-		headers: { 'cache-control': 'private, max-age=60', vary: 'Host' },
+		headers: { 'cache-control': 'private, max-age=60', vary: 'Host, Cookie' },
 	})
 }
 

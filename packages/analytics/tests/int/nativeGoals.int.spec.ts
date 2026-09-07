@@ -5,6 +5,7 @@ import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { native } from '../../src/native/nativeAdapter'
+import { ingestRequest } from './ingestRequest'
 
 const DAY_MS = 86_400_000
 
@@ -31,11 +32,7 @@ describeForDb('native goals: config goals through ingest to reads', { dbs: ['mon
 		if (!endpoint || typeof endpoint.handler !== 'function') {
 			throw new Error('ingest endpoint not registered')
 		}
-		const res = await endpoint.handler({
-			payload: booted.payload,
-			headers: new Headers({ 'content-type': 'application/json', 'user-agent': 'UA' }),
-			json: async () => ({ hostname: 'h', ...body }),
-		} as never)
+		const res = await endpoint.handler(ingestRequest(booted.payload, { hostname: 'h', ...body }))
 		expect(res.status).toBe(202)
 	}
 

@@ -17,6 +17,18 @@ interface Entry {
 const entries = new WeakMap<TrackerWindow, Entry>()
 
 /**
+ * The tracker a window already holds, or null. A peek, never a boot: a caller that has no
+ * config of its own (`useAnalytics` outside a provider) can reach the instance
+ * `<TrackerBoot />` or `<AnalyticsProvider>` acquired without taking a lease or creating a
+ * second one. An instance released this tick is still reachable until its teardown runs,
+ * and a destroyed tracker is inert rather than broken.
+ */
+export const liveTracker = (window?: TrackerWindow): Tracker | null => {
+	const win = window ?? (globalThis as { window?: TrackerWindow }).window
+	return win ? (entries.get(win)?.tracker ?? null) : null
+}
+
+/**
  * Hands out the one tracker a window is allowed to have, reference counted.
  *
  * React mounts an effect, tears it down, and mounts it again on the same commit under
@@ -30,18 +42,6 @@ const entries = new WeakMap<TrackerWindow, Entry>()
  * both be rendered without double-counting. The first holder's config wins for as long as
  * the tracker lives.
  */
-/**
- * The tracker a window already holds, or null. A peek, never a boot: a caller that has no
- * config of its own (`useAnalytics` outside a provider) can reach the instance
- * `<TrackerBoot />` or `<AnalyticsProvider>` acquired without taking a lease or creating a
- * second one. An instance released this tick is still reachable until its teardown runs,
- * and a destroyed tracker is inert rather than broken.
- */
-export const liveTracker = (window?: TrackerWindow): Tracker | null => {
-	const win = window ?? (globalThis as { window?: TrackerWindow }).window
-	return win ? (entries.get(win)?.tracker ?? null) : null
-}
-
 export const acquireTracker = (
 	config: TrackerConfig,
 	options: TrackerOptions = {}

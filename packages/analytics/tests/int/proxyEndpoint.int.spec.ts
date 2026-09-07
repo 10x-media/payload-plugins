@@ -3,6 +3,7 @@ import { delay, HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { handleEndpoints } from 'payload'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
+import { posthog } from '../../src/adapters/posthog/posthog'
 import type { CaptureSupport } from '../../src/core/capture'
 import type { AnalyticsAdapter } from '../../src/core/contract'
 import { analytics } from '../../src/index'
@@ -500,6 +501,43 @@ describeForDb('analytics capture proxy - tenant slot', { dbs: ['mongo'] }, (db) 
 		server.use(...recordUpstream(fetched))
 		const res = await request('/analytics/p/global/static/array.js')
 		expect(res.status).toBe(404)
+		expect(fetched).toEqual([])
+	})
+})
+
+// A dashboard-only PostHog install carries the private query key and nothing public, so it
+// must not get a public forward proxy to PostHog's ingest hosts.
+describeForDb('analytics capture proxy - read-only PostHog install', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	// The vendor adapter mounts the proxy; the global slot names the read-only PostHog one,
+	// so the route exists and the slot is what has to refuse it.
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({
+				adapters: [vendorAdapter(), posthog({ projectId: '123', apiKey: 'phx_private' })],
+				capture: { slots: { global: 'posthog' } },
+			}),
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('404s every proxy path for the global slot', async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		for (const path of ['/analytics/p/global/static/array.js', '/analytics/p/global/e']) {
+			const res = await handleEndpoints({
+				config: booted.payload.config,
+				payloadInstanceCacheKey: booted.cacheKey,
+				request: new Request(`${ORIGIN}/api${path}`),
+			})
+			expect(res.status).toBe(404)
+			expect(await res.text()).toBe('')
+		}
 		expect(fetched).toEqual([])
 	})
 })

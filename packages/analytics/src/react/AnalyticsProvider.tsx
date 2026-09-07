@@ -41,6 +41,10 @@ export interface AnalyticsProviderProps {
  *
  * The lease is taken lazily in the browser rather than during render, so server rendering
  * stays inert and React's double-invoked render cannot leak a second tracker.
+ *
+ * Whichever component boots the tracker first owns its options, so a `nonce` or
+ * `loadScript` passed to a provider that mounts after `<TrackerBoot />` is ignored: give
+ * them to whatever boots first, or render only one of the two.
  */
 export const AnalyticsProvider = ({
 	config,

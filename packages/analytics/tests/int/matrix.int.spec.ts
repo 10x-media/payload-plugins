@@ -21,6 +21,7 @@ import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
 import { startOfDayInTz } from '../../src/timeframe/tz'
 import { readForWidget } from '../../src/widgets/readForWidget'
+import { ingestRequest } from './ingestRequest'
 
 describeForDb('analytics cross-db', {}, (db) => {
 	let booted: BootedPayload
@@ -308,8 +309,18 @@ describeForDb('native goal rollups', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 
+	// Both assertions read the same two events, so they are ingested once here rather than
+	// by the first test, which would leave the second unable to run on its own.
 	beforeAll(async () => {
 		booted = await bootPayload({ plugin: analytics({ adapters: [adapter], goals }), db })
+		await ingest({ type: 'pageview', path: '/thank-you' })
+		await ingest({
+			type: 'goal',
+			name: 'purchase',
+			path: '/checkout',
+			value: 25.5,
+			currency: 'EUR',
+		})
 	})
 
 	afterAll(async () => {
@@ -323,11 +334,7 @@ describeForDb('native goal rollups', {}, (db) => {
 		if (!endpoint || typeof endpoint.handler !== 'function') {
 			throw new Error('ingest endpoint not registered')
 		}
-		const res = await endpoint.handler({
-			payload: booted.payload,
-			headers: new Headers({ 'content-type': 'application/json', 'user-agent': 'UA' }),
-			json: async () => ({ hostname: 'h', ...body }),
-		} as never)
+		const res = await endpoint.handler(ingestRequest(booted.payload, { hostname: 'h', ...body }))
 		expect(res.status).toBe(202)
 	}
 
@@ -342,15 +349,6 @@ describeForDb('native goal rollups', {}, (db) => {
 	}
 
 	it(`counts conversions and revenue site-wide and per goal on ${db}`, async () => {
-		await ingest({ type: 'pageview', path: '/thank-you' })
-		await ingest({
-			type: 'goal',
-			name: 'purchase',
-			path: '/checkout',
-			value: 25.5,
-			currency: 'EUR',
-		})
-
 		const site = await rollupRow({
 			path: { equals: '' },
 			dimension: { equals: '' },
@@ -411,15 +409,13 @@ describeForDb('analytics per-document read', {}, (db) => {
 	})
 
 	const ingest = (path: string) =>
-		makeIngestHandler(platformHeaderResolver)({
-			payload: booted.payload,
-			headers: new Headers({
-				'content-type': 'application/json',
-				'user-agent': 'UA',
-				'x-vercel-ip-country': 'US',
-			}),
-			json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 200 }),
-		} as never)
+		makeIngestHandler(platformHeaderResolver)(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path, hostname: 'h', durationMs: 200 },
+				{ 'x-vercel-ip-country': 'US' }
+			)
+		)
 
 	it(`reads per-document totals through the engine on ${db}`, async () => {
 		await ingest('/matrix-doc')
@@ -463,15 +459,13 @@ describeForDb('native scoped ingest and reads', {}, (db) => {
 		if (!endpoint || typeof endpoint.handler !== 'function') {
 			throw new Error('ingest endpoint not registered')
 		}
-		const headers = new Headers({ 'content-type': 'application/json', 'user-agent': ua })
-		if (tenant) {
-			headers.set('x-tenant', tenant)
-		}
-		const res = await endpoint.handler({
-			payload: booted.payload,
-			headers,
-			json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 100 }),
-		} as never)
+		const res = await endpoint.handler(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+				{ 'user-agent': ua, ...(tenant ? { 'x-tenant': tenant } : {}) }
+			)
+		)
 		expect(res.status).toBe(202)
 	}
 
@@ -589,11 +583,14 @@ describeForDb('native reporting timezone bucketing', {}, (db) => {
 		if (!endpoint || typeof endpoint.handler !== 'function') {
 			throw new Error('ingest endpoint not registered')
 		}
-		const res = await endpoint.handler({
-			payload: booted.payload,
-			headers: new Headers({ 'content-type': 'application/json', 'user-agent': 'UA' }),
-			json: async () => ({ type: 'pageview', path: '/tz', hostname: 'h', durationMs: 100 }),
-		} as never)
+		const res = await endpoint.handler(
+			ingestRequest(booted.payload, {
+				type: 'pageview',
+				path: '/tz',
+				hostname: 'h',
+				durationMs: 100,
+			})
+		)
 		expect(res.status).toBe(202)
 	}
 
@@ -650,15 +647,13 @@ describeForDb('reportingTimezone resolver (per-tenant)', {}, (db) => {
 		if (!endpoint || typeof endpoint.handler !== 'function') {
 			throw new Error('ingest endpoint not registered')
 		}
-		const res = await endpoint.handler({
-			payload: booted.payload,
-			headers: new Headers({
-				'content-type': 'application/json',
-				'user-agent': 'UA',
-				'x-tenant-id': tenantId,
-			}),
-			json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 100 }),
-		} as never)
+		const res = await endpoint.handler(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+				{ 'x-tenant-id': tenantId }
+			)
+		)
 		expect(res.status).toBe(202)
 	}
 
@@ -703,16 +698,14 @@ describeForDb('reportingTimezone resolver (per-tenant)', {}, (db) => {
 		if (!endpoint || typeof endpoint.handler !== 'function') {
 			throw new Error('ingest endpoint not registered')
 		}
-		const res = await endpoint.handler({
-			payload: booted.payload,
-			headers: new Headers({ 'content-type': 'application/json', 'user-agent': 'UA' }),
-			json: async () => ({
+		const res = await endpoint.handler(
+			ingestRequest(booted.payload, {
 				type: 'pageview',
 				path: '/tz-fallback',
 				hostname: 'h',
 				durationMs: 100,
-			}),
-		} as never)
+			})
+		)
 		expect(res.status).toBe(202)
 		const ts = await eventTimestampFor('/tz-fallback')
 		const period = await rollupPeriodFor('/tz-fallback')
@@ -751,15 +744,13 @@ describeForDb(
 			if (!endpoint || typeof endpoint.handler !== 'function') {
 				throw new Error('ingest endpoint not registered')
 			}
-			const headers = new Headers({ 'content-type': 'application/json', 'user-agent': 'UA' })
-			if (tenantId !== null) {
-				headers.set('x-tenant-id', tenantId)
-			}
-			const res = await endpoint.handler({
-				payload: booted.payload,
-				headers,
-				json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 100 }),
-			} as never)
+			const res = await endpoint.handler(
+				ingestRequest(
+					booted.payload,
+					{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+					tenantId !== null ? { 'x-tenant-id': tenantId } : {}
+				)
+			)
 			expect(res.status).toBe(202)
 		}
 
@@ -808,16 +799,14 @@ describeForDb(
 					(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
 				)
 				if (!endpoint || typeof endpoint.handler !== 'function') throw new Error('no endpoint')
-				const res = await endpoint.handler({
-					payload: booted2.payload,
-					headers: new Headers({ 'content-type': 'application/json', 'user-agent': 'UA' }),
-					json: async () => ({
+				const res = await endpoint.handler(
+					ingestRequest(booted2.payload, {
 						type: 'pageview',
 						path: '/tz-invalid',
 						hostname: 'h',
 						durationMs: 100,
-					}),
-				} as never)
+					})
+				)
 				expect(res.status).toBe(202)
 				const rollups = await booted2.payload.find({
 					collection: ROLLUPS_SLUG,
@@ -940,11 +929,13 @@ describeForDb('native hostname family uniqueness', {}, (db) => {
 	})
 
 	const ingest = (path: string, hostname: string, ua: string) =>
-		makeIngestHandler(platformHeaderResolver)({
-			payload: booted.payload,
-			headers: new Headers({ 'content-type': 'application/json', 'user-agent': ua }),
-			json: async () => ({ type: 'pageview', path, hostname, durationMs: 100 }),
-		} as never)
+		makeIngestHandler(platformHeaderResolver)(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path, hostname, durationMs: 100 },
+				{ 'user-agent': ua }
+			)
+		)
 
 	it(`keeps per-hostname rollup buckets exact and separate from the merged family on ${db}`, async () => {
 		await ingest('/hf', 'a.example', 'UA-A1')

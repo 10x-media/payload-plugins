@@ -4,6 +4,7 @@ import { analytics } from '../../src/index'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
+import { ingestRequest } from './ingestRequest'
 
 interface IngestOpts {
 	path?: string
@@ -14,17 +15,19 @@ interface IngestOpts {
 }
 
 const ingest = (booted: BootedPayload, opts: IngestOpts) =>
-	makeIngestHandler(platformHeaderResolver)({
-		payload: booted.payload,
-		headers: new Headers({ 'content-type': 'application/json', 'user-agent': opts.ua }),
-		json: async () => ({
-			type: opts.type ?? 'pageview',
-			...(opts.type === 'event' ? { path: '/' } : { path: opts.path ?? '/' }),
-			hostname: 'example.com',
-			referrer: opts.referrer,
-			...(opts.name ? { name: opts.name } : {}),
-		}),
-	} as never)
+	makeIngestHandler(platformHeaderResolver)(
+		ingestRequest(
+			booted.payload,
+			{
+				type: opts.type ?? 'pageview',
+				...(opts.type === 'event' ? { path: '/' } : { path: opts.path ?? '/' }),
+				hostname: 'example.com',
+				referrer: opts.referrer,
+				...(opts.name ? { name: opts.name } : {}),
+			},
+			{ 'user-agent': opts.ua }
+		)
+	)
 
 const DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120'
 const PHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile/15E148'

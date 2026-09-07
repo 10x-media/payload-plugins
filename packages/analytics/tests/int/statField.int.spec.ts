@@ -7,17 +7,16 @@ import { analytics } from '../../src/index'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
+import { ingestRequest } from './ingestRequest'
 
 const ingest = (booted: BootedPayload, path: string) =>
-	makeIngestHandler(platformHeaderResolver)({
-		payload: booted.payload,
-		headers: new Headers({
-			'content-type': 'application/json',
-			'user-agent': 'UA',
-			'x-vercel-ip-country': 'US',
-		}),
-		json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 100 }),
-	} as never)
+	makeIngestHandler(platformHeaderResolver)(
+		ingestRequest(
+			booted.payload,
+			{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+			{ 'x-vercel-ip-country': 'US' }
+		)
+	)
 
 const flatten = (node: ReactNode): string => {
 	if (node === null || node === undefined || typeof node === 'boolean') return ''

@@ -1,4 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
@@ -12,17 +13,16 @@ import { native } from '../../src/native/nativeAdapter'
 import { pruneEventsTask } from '../../src/native/retention/pruneTask'
 import { kvCacheStore } from '../../src/surfacing/cacheStore'
 import { createEngine } from '../../src/surfacing/engine'
+import { ingestRequest } from './ingestRequest'
 
 const ingest = (booted: BootedPayload, path: string) =>
-	makeIngestHandler(platformHeaderResolver)({
-		payload: booted.payload,
-		headers: new Headers({
-			'content-type': 'application/json',
-			'user-agent': 'UA',
-			'x-vercel-ip-country': 'US',
-		}),
-		json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 500 }),
-	} as never)
+	makeIngestHandler(platformHeaderResolver)(
+		ingestRequest(
+			booted.payload,
+			{ type: 'pageview', path, hostname: 'h', durationMs: 500 },
+			{ 'x-vercel-ip-country': 'US' }
+		)
+	)
 
 describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 	const adapter = native()
@@ -87,15 +87,13 @@ describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 			platformHeaderResolver,
 			maxmindResolver({ dbPath: '/nonexistent/GeoLite2-City.mmdb' })
 		)
-		const res = await makeIngestHandler(composed)({
-			payload: booted.payload,
-			headers: new Headers({
-				'content-type': 'application/json',
-				'user-agent': 'UA',
-				'x-vercel-ip-country': 'US',
-			}),
-			json: async () => ({ type: 'pageview', path: '/geo', hostname: 'h' }),
-		} as never)
+		const res = await makeIngestHandler(composed)(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path: '/geo', hostname: 'h' },
+				{ 'x-vercel-ip-country': 'US' }
+			)
+		)
 		expect(res.status).toBe(202)
 		const { docs } = await booted.payload.find({
 			collection: EVENTS_SLUG as never,
@@ -121,6 +119,69 @@ describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 		// Every request in this suite shares one visitor hash, so the US country bucket
 		// holds exactly one distinct visitor regardless of how many pages were hit.
 		expect(us?.metrics.visitors).toBe(1)
+	})
+})
+
+// The ingest endpoint is public and unauthenticated, so its input guards are asserted
+// through the real router rather than against the handler in isolation.
+describeForDb('native ingest through the router', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const post = (body: BodyInit, contentType = 'application/json') =>
+		handleEndpoints({
+			config: booted.payload.config,
+			payloadInstanceCacheKey: booted.cacheKey,
+			request: new Request('http://localhost:3000/api/analytics/ingest', {
+				method: 'POST',
+				body,
+				headers: { 'content-type': contentType, 'user-agent': 'UA' },
+			}),
+		})
+
+	it('400s a garbage body instead of throwing a 500', async () => {
+		for (const body of ['<html>nope</html>', '', '"pageview"', '[]']) {
+			const res = await post(body)
+			expect(res.status).toBe(400)
+		}
+	})
+
+	it('413s a body over the ingest cap', async () => {
+		const res = await post(
+			JSON.stringify({
+				type: 'pageview',
+				path: '/big',
+				hostname: 'h',
+				props: { note: 'x'.repeat(70_000) },
+			})
+		)
+		expect(res.status).toBe(413)
+		const { totalDocs } = await booted.payload.count({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/big' } } as never,
+		})
+		expect(totalDocs).toBe(0)
+	})
+
+	it('still ingests a valid event', async () => {
+		const res = await post(
+			JSON.stringify({ type: 'pageview', path: '/routed', hostname: 'h', durationMs: 300 })
+		)
+		expect(res.status).toBe(202)
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/routed' } },
+			pagination: false,
+		})
+		expect(docs).toHaveLength(1)
+		expect((docs[0] as { durationMs?: number } | undefined)?.durationMs).toBe(300)
 	})
 })
 
@@ -169,15 +230,13 @@ describeForDb('native write buffer', { dbs: ['mongo'] }, (db) => {
 		if (!ep) {
 			throw new Error('ingest endpoint not registered')
 		}
-		await ep.handler({
-			payload: booted.payload,
-			headers: new Headers({
-				'content-type': 'application/json',
-				'user-agent': 'UA',
-				'x-vercel-ip-country': 'US',
-			}),
-			json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 100 }),
-		} as never)
+		await ep.handler(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+				{ 'x-vercel-ip-country': 'US' }
+			)
+		)
 	}
 
 	it('holds ingests until flushed, then writes them in one batch', async () => {

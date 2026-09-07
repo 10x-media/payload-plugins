@@ -20,6 +20,13 @@ const captureVendor = () => ({
 /** Same slot id, no capture support at all: the slot must be absent, not broken. */
 const plainVendor = () => ({ ...memoryAdapter(), id: 'vendor', label: 'vendor' })
 
+/** Query credentials only: a dashboard-read provider declares no capture, so no slot. */
+const readOnlyVendor = () => ({
+	...posthog({ projectId: '1', apiKey: SECRET }),
+	id: 'vendor',
+	label: 'vendor',
+})
+
 describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 
@@ -41,7 +48,9 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 							? [captureVendor()]
 							: scope === 'site-b.test'
 								? [plainVendor()]
-								: [],
+								: scope === 'site-c.test'
+									? [readOnlyVendor()]
+									: [],
 				},
 				capture: { slots: { tenant: 'vendor' } },
 				goals: [{ slug: 'signup', name: 'Signup', match: { kind: 'goal' } }],
@@ -91,7 +100,8 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 	it('caches per host and sets no cookie', async () => {
 		const res = await request()
 		expect(res.headers.get('cache-control')).toBe('private, max-age=60')
-		expect(res.headers.get('vary')).toBe('Host')
+		// Cookie is in the Vary because a scopeResolver may read req.user or a tenant cookie.
+		expect(res.headers.get('vary')).toBe('Host, Cookie')
 		expect(res.headers.getSetCookie()).toEqual([])
 		expect(res.headers.get('set-cookie')).toBeNull()
 	})
@@ -110,6 +120,11 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 
 	it("omits the tenant slot when the scope's adapter declares no capture", async () => {
 		const config = await body('http://site-b.test')
+		expect(config.slots.map((s) => s.slot)).toEqual(['global'])
+	})
+
+	it('omits the tenant slot for a PostHog provider that has no public projectToken', async () => {
+		const config = await body('http://site-c.test')
 		expect(config.slots.map((s) => s.slot)).toEqual(['global'])
 	})
 

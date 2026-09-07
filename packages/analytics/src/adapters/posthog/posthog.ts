@@ -30,9 +30,10 @@ export interface PosthogConfig {
 	/** Cloud region for the proxied capture routes. Derived from `host` when omitted. */
 	region?: 'us' | 'eu'
 	/**
-	 * The public browser key (phc_...) sent to `posthog.init`. Distinct from `apiKey`,
-	 * the private Query API key, which must never reach the client. Required for
-	 * `capture` to boot the tracker; without it the snippet inits with an empty token.
+	 * The public browser key (phc_...) sent to `posthog.init`. Distinct from `apiKey`, the
+	 * private Query API key, which must never reach the client. The adapter declares
+	 * `capture` only when this is set: without it the install reads dashboards and captures
+	 * nothing, so it gets no public proxy and no snippet.
 	 */
 	projectToken?: string
 }
@@ -63,9 +64,8 @@ const resolveRegion = (config: PosthogConfig): 'us' | 'eu' => {
 const POSTHOG_STUB =
 	'!function(t,e){var o,n,p,r,c;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(c=t.currentScript&&(t.currentScript.nonce||t.currentScript.getAttribute("nonce")))&&(p.nonce=c,p.setAttribute("nonce",c)),(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],o="init capture register register_once identify group alias reset setPersonProperties captureException opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing getFeatureFlag isFeatureEnabled reloadFeatureFlags onFeatureFlags on debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);'
 
-function buildCapture(config: PosthogConfig): CaptureSupport {
+function buildCapture(config: PosthogConfig, token: string): CaptureSupport {
 	const region = resolveRegion(config)
-	const token = config.projectToken ?? ''
 	return {
 		proxy: {
 			trailingSlashes: true,
@@ -166,7 +166,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		id: 'posthog',
 		label: 'PostHog',
 		capabilities,
-		capture: buildCapture(config),
+		...(config.projectToken ? { capture: buildCapture(config, config.projectToken) } : {}),
 		isConfigured: () => Boolean(config.projectId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()

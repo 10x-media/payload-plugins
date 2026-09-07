@@ -9,7 +9,7 @@ import { posthogProxyRewrites } from './posthogProxyRewrites'
 
 describe('captureRewrites', () => {
 	it('maps PostHog routes in order, assets before the catch-all, for a custom path and region', () => {
-		const adapter = posthog({ projectId: '', apiKey: '', region: 'eu' })
+		const adapter = posthog({ projectId: '', apiKey: '', region: 'eu', projectToken: 'phc_t' })
 		expect(captureRewrites([{ path: '/px', adapter }])).toEqual([
 			{ source: '/px/static/:p*', destination: 'https://eu-assets.i.posthog.com/static/:p*' },
 			{ source: '/px/array/:p*', destination: 'https://eu-assets.i.posthog.com/array/:p*' },
@@ -18,14 +18,19 @@ describe('captureRewrites', () => {
 	})
 
 	it('targets the US hosts for region us', () => {
-		const adapter = posthog({ projectId: '', apiKey: '', region: 'us' })
+		const adapter = posthog({ projectId: '', apiKey: '', region: 'us', projectToken: 'phc_t' })
 		const rewrites = captureRewrites([{ path: '/ph', adapter }])
 		expect(rewrites[0]?.destination).toBe('https://us-assets.i.posthog.com/static/:p*')
 		expect(rewrites[2]?.destination).toBe('https://us.i.posthog.com/:p*')
 	})
 
 	it('maps both Plausible routes', () => {
-		const adapter = plausible({ siteId: '', apiKey: '', host: 'https://plausible.example.com' })
+		const adapter = plausible({
+			siteId: '',
+			apiKey: '',
+			host: 'https://plausible.example.com',
+			domain: 'example.com',
+		})
 		expect(captureRewrites([{ path: '/pa', adapter }])).toEqual([
 			{ source: '/pa/js/:script*', destination: 'https://plausible.example.com/js/:script*' },
 			{ source: '/pa/api/event', destination: 'https://plausible.example.com/api/event' },
@@ -54,7 +59,12 @@ describe('captureRewrites', () => {
 	})
 
 	it('concatenates two slots in the order given', () => {
-		const posthogAdapter = posthog({ projectId: '', apiKey: '', region: 'eu' })
+		const posthogAdapter = posthog({
+			projectId: '',
+			apiKey: '',
+			region: 'eu',
+			projectToken: 'phc_t',
+		})
 		const umamiAdapter = umami({ websiteId: '' })
 		const rewrites = captureRewrites([
 			{ path: '/ph', adapter: posthogAdapter },
@@ -77,7 +87,7 @@ describe('captureRewrites', () => {
 
 	it('matches posthogProxyRewrites output exactly when fed the same descriptor', () => {
 		for (const region of ['eu', 'us'] as const) {
-			const adapter = posthog({ projectId: '', apiKey: '', region })
+			const adapter = posthog({ projectId: '', apiKey: '', region, projectToken: 'phc_t' })
 			expect(captureRewrites([{ path: '/ph', adapter }])).toEqual(
 				posthogProxyRewrites({ path: '/ph', region })
 			)
@@ -86,8 +96,12 @@ describe('captureRewrites', () => {
 
 	it('produces source/destination pairs that compile with path-to-regexp', () => {
 		const rewrites = [
-			...captureRewrites([{ path: '/ph', adapter: posthog({ projectId: '', apiKey: '' }) }]),
-			...captureRewrites([{ path: '/pa', adapter: plausible({ siteId: '', apiKey: '' }) }]),
+			...captureRewrites([
+				{ path: '/ph', adapter: posthog({ projectId: '', apiKey: '', projectToken: 'phc_t' }) },
+			]),
+			...captureRewrites([
+				{ path: '/pa', adapter: plausible({ siteId: '', apiKey: '', domain: 'example.com' }) },
+			]),
 			...captureRewrites([{ path: '/um', adapter: umami({ websiteId: '' }) }]),
 		]
 		expect(rewrites.length).toBeGreaterThan(0)
