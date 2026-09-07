@@ -146,6 +146,17 @@ describe('goal attribute', () => {
 		expect(handlers.trackGoal).toHaveBeenCalledWith('signup', {})
 	})
 
+	it('treats a blank value as absent rather than zero', () => {
+		start()
+		document.body.innerHTML =
+			'<button id="a" data-analytics-goal="signup" data-analytics-value="">a</button><button id="b" data-analytics-goal="signup" data-analytics-value="  ">b</button>'
+		clickOn(document.getElementById('a') as HTMLElement)
+		clickOn(document.getElementById('b') as HTMLElement)
+
+		expect(handlers.trackGoal).toHaveBeenNthCalledWith(1, 'signup', {})
+		expect(handlers.trackGoal).toHaveBeenNthCalledWith(2, 'signup', {})
+	})
+
 	it('reports a form submit', () => {
 		start()
 		document.body.innerHTML =

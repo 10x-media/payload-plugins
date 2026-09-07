@@ -82,10 +82,23 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		void sink.ready().catch(() => undefined)
 	}
 
+	/**
+	 * Slots are isolated from each other and from the caller: a vendor global that throws,
+	 * or an event that cannot be serialized, must not skip the remaining slots or escape
+	 * into the host's click handler.
+	 */
+	const deliver = (sink: Sink, event: TrackerEvent) => {
+		try {
+			sink.send(event)
+		} catch {
+			// Dropped, like every other delivery failure.
+		}
+	}
+
 	const dispatch = (event: TrackerEvent) => {
 		for (const entry of entries) {
 			if (!entry.requiresConsent || state === 'granted') {
-				entry.sink.send(event)
+				deliver(entry.sink, event)
 			} else if (state !== 'denied') {
 				queue.push({ sink: entry.sink, event })
 			}
@@ -161,7 +174,7 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 				}
 			}
 			for (const queued of queue.drain()) {
-				queued.sink.send(queued.event)
+				deliver(queued.sink, queued.event)
 			}
 		},
 		destroy() {

@@ -1,4 +1,5 @@
 import { act, cleanup, render } from '@testing-library/react'
+import { StrictMode, useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
 import type { TrackerEvent } from '../tracker/types'
@@ -34,14 +35,18 @@ const config: TrackerConfig = {
 	ingestPath: '/api/analytics/ingest',
 }
 
+/** Lets the registry's deferred teardown macrotask run. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
 beforeEach(() => {
 	fetchMock.mockClear()
 	window.fetch = fetchMock as unknown as typeof fetch
 	window.localStorage.clear()
 })
 
-afterEach(() => {
+afterEach(async () => {
 	cleanup()
+	await settle()
 })
 
 describe('TrackerBoot', () => {
@@ -63,9 +68,33 @@ describe('TrackerBoot', () => {
 		expect(posted().filter((event) => event.type === 'pageview')).toHaveLength(1)
 	})
 
-	it('destroys its tracker on unmount', () => {
+	it('boots exactly one tracker under StrictMode', () => {
+		let effectRuns = 0
+		const Probe = () => {
+			useEffect(() => {
+				effectRuns += 1
+			}, [])
+			return null
+		}
+		render(
+			<StrictMode>
+				<Probe />
+				<TrackerBoot config={config} />
+			</StrictMode>
+		)
+
+		// Guards the test itself: without a double-invoked mount there is nothing to prove.
+		expect(effectRuns).toBe(2)
+		act(() => {
+			window.dispatchEvent(new Event('pagehide'))
+		})
+		expect(posted().filter((event) => event.type === 'pageview')).toHaveLength(1)
+	})
+
+	it('destroys its tracker on unmount', async () => {
 		const { unmount } = render(<TrackerBoot config={config} />)
 		unmount()
+		await settle()
 		fetchMock.mockClear()
 
 		act(() => {

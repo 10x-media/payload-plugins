@@ -1,5 +1,5 @@
 import { act, cleanup, render } from '@testing-library/react'
-import { useEffect } from 'react'
+import { StrictMode, useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
 import type { TrackerEvent } from '../tracker/types'
@@ -44,14 +44,18 @@ const Signup = () => {
 	return null
 }
 
+/** Lets the registry's deferred teardown macrotask run. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
 beforeEach(() => {
 	fetchMock.mockClear()
 	window.fetch = fetchMock as unknown as typeof fetch
 	window.localStorage.clear()
 })
 
-afterEach(() => {
+afterEach(async () => {
 	cleanup()
+	await settle()
 })
 
 describe('AnalyticsProvider', () => {
@@ -81,14 +85,59 @@ describe('AnalyticsProvider', () => {
 		expect(posted().filter((event) => event.type === 'pageview')).toHaveLength(1)
 	})
 
-	it('destroys the tracker on unmount', () => {
+	it('boots exactly one tracker under StrictMode', () => {
+		let effectRuns = 0
+		const Probe = () => {
+			useEffect(() => {
+				effectRuns += 1
+			}, [])
+			return null
+		}
+		render(
+			<StrictMode>
+				<AnalyticsProvider config={config}>
+					<Probe />
+				</AnalyticsProvider>
+			</StrictMode>
+		)
+
+		// Guards the test itself: without a double-invoked mount there is nothing to prove.
+		expect(effectRuns).toBe(2)
+		act(() => {
+			window.dispatchEvent(new Event('pagehide'))
+		})
+		expect(posted().filter((event) => event.type === 'pageview')).toHaveLength(1)
+	})
+
+	it('destroys the tracker on unmount', async () => {
 		const { unmount } = render(<AnalyticsProvider config={config}>{null}</AnalyticsProvider>)
 		unmount()
+		await settle()
 		fetchMock.mockClear()
 
 		act(() => {
 			window.dispatchEvent(new Event('pagehide'))
 		})
+
+		expect(fetchMock).not.toHaveBeenCalled()
+	})
+
+	it('never boots a fresh tracker after its own unmount', async () => {
+		const held: { api: ReturnType<typeof useAnalytics> | null } = { api: null }
+		const Probe = () => {
+			held.api = useAnalytics()
+			return null
+		}
+		const { unmount } = render(
+			<AnalyticsProvider config={config}>
+				<Probe />
+			</AnalyticsProvider>
+		)
+		unmount()
+		await settle()
+		fetchMock.mockClear()
+
+		held.api?.track('late')
 
 		expect(fetchMock).not.toHaveBeenCalled()
 	})

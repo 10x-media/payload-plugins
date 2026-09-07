@@ -10,7 +10,7 @@ import {
 	useRef,
 } from 'react'
 import type { TrackerConfig } from '../capture/trackerConfig'
-import { createTracker } from '../tracker/createTracker'
+import { acquireTracker, type TrackerLease } from '../tracker/registry'
 import type { LoadScript, Tracker } from '../tracker/types'
 
 /** The tracker surface a component gets from `useAnalytics`. */
@@ -33,13 +33,14 @@ export interface AnalyticsProviderProps {
 }
 
 /**
- * Creates the tracker once and shares it with the tree through `useAnalytics`. Use it when
- * components need to call `track`, `trackGoal`, or `consent` themselves; a page that only
- * needs pageviews and auto-capture can render `<AnalyticsScripts />` (which boots
- * `<TrackerBoot />`) and skip the provider. Never both: each boots its own tracker.
+ * Shares the window's tracker with the tree through `useAnalytics`. Use it when components
+ * need to call `track`, `trackGoal`, or `consent` themselves; a page that only needs
+ * pageviews and auto-capture can render `<AnalyticsScripts />` (which boots
+ * `<TrackerBoot />`) and skip the provider. Rendering both is fine: the tracker is leased
+ * from a per-window registry, so there is still only one.
  *
- * The tracker is created lazily in the browser rather than during render, so server
- * rendering stays inert and React's double-invoked render cannot leak a second one.
+ * The lease is taken lazily in the browser rather than during render, so server rendering
+ * stays inert and React's double-invoked render cannot leak a second tracker.
  */
 export const AnalyticsProvider = ({
 	config,
@@ -49,21 +50,25 @@ export const AnalyticsProvider = ({
 }: AnalyticsProviderProps): ReactElement => {
 	const boot = useRef({ config, nonce, loadScript })
 	boot.current = { config, nonce, loadScript }
-	const tracker = useRef<Tracker | null>(null)
+	const lease = useRef<TrackerLease | null>(null)
+	const unmounted = useRef(false)
 
 	const ensure = useCallback((): Tracker | null => {
-		if (!tracker.current && typeof window !== 'undefined') {
+		if (!lease.current && !unmounted.current && typeof window !== 'undefined') {
 			const { config: current, nonce: currentNonce, loadScript: currentLoad } = boot.current
-			tracker.current = createTracker(current, { nonce: currentNonce, loadScript: currentLoad })
+			lease.current = acquireTracker(current, { nonce: currentNonce, loadScript: currentLoad })
 		}
-		return tracker.current
+		return lease.current?.tracker ?? null
 	}, [])
 
 	useEffect(() => {
+		unmounted.current = false
 		ensure()
 		return () => {
-			tracker.current?.destroy()
-			tracker.current = null
+			// A stale `track` call held past unmount must not resurrect the tracker.
+			unmounted.current = true
+			lease.current?.release()
+			lease.current = null
 		}
 	}, [ensure])
 

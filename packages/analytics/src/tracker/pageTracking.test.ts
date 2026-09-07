@@ -66,6 +66,23 @@ describe('createPageTracking', () => {
 		expect(onChange).not.toHaveBeenCalled()
 	})
 
+	it('leaves a wrapper someone else installed after us alone', () => {
+		const original = window.history.pushState
+		const tracking = createPageTracking(window, vi.fn())
+		const ours = window.history.pushState
+		const theirs = (...args: Parameters<History['pushState']>) => {
+			ours.apply(window.history, args)
+		}
+		window.history.pushState = theirs
+		teardowns.push(() => {
+			window.history.pushState = original
+		})
+
+		tracking.destroy()
+
+		expect(window.history.pushState).toBe(theirs)
+	})
+
 	it('keeps the history methods working', () => {
 		start(vi.fn())
 		window.history.pushState({ id: 7 }, '', '/pricing')

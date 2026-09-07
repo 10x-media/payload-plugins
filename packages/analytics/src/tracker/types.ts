@@ -58,6 +58,8 @@ export interface Tracker {
 	track(name: string, props?: Record<string, unknown>): void
 	trackGoal(slug: string, opts?: { value?: number; currency?: string }): void
 	consent(state: ConsentState): void
+	/** Sends whatever is buffered right now, chiefly the open pageview and its duration. */
 	flush(): void
+	/** Flushes the buffered pageview, then detaches every listener and history patch. */
 	destroy(): void
 }

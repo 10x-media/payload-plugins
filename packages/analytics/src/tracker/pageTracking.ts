@@ -33,14 +33,22 @@ export const createPageTracking = (win: TrackerWindow, onChange: () => void): Pa
 			check()
 		}
 
-	history.pushState = wrap(pushState)
-	history.replaceState = wrap(replaceState)
+	const patchedPush = wrap(pushState)
+	const patchedReplace = wrap(replaceState)
+	history.pushState = patchedPush
+	history.replaceState = patchedReplace
 	win.addEventListener('popstate', check)
 
 	return {
 		destroy() {
-			history.pushState = pushState
-			history.replaceState = replaceState
+			// Only unwind our own wrapper: another library may have patched on top of it,
+			// and restoring the original underneath it would silently unhook that library.
+			if (history.pushState === patchedPush) {
+				history.pushState = pushState
+			}
+			if (history.replaceState === patchedReplace) {
+				history.replaceState = replaceState
+			}
 			win.removeEventListener('popstate', check)
 		},
 	}

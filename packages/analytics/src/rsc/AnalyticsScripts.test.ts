@@ -10,7 +10,7 @@ const posthogSnippet = () =>
 		path: '/api/analytics/p/tenant',
 	}) ?? { scripts: [] }
 
-const config = (): TrackerConfig => ({
+const config = (requiresConsent = false): TrackerConfig => ({
 	slots: [
 		{
 			slot: 'global',
@@ -28,7 +28,7 @@ const config = (): TrackerConfig => ({
 			path: '/api/analytics/p/tenant',
 			snippet: posthogSnippet(),
 			client: { kind: 'posthog', token: 'phc_public' },
-			requiresConsent: true,
+			requiresConsent,
 		},
 	],
 	autoCapture: {
@@ -64,6 +64,12 @@ describe('AnalyticsScripts', () => {
 		const nonced = html.match(/nonce="n0nce"/g) ?? []
 		expect(scripts.length).toBeGreaterThanOrEqual(2)
 		expect(nonced).toHaveLength(scripts.length)
+	})
+
+	it('renders no snippet for a slot that waits for consent', () => {
+		const html = render({ config: config(true) })
+
+		expect(html).toBe('')
 	})
 
 	it('renders nothing but the boot component for a native-only config', () => {

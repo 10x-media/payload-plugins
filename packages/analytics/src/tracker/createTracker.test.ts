@@ -263,6 +263,41 @@ describe('fan-out and teardown', () => {
 	})
 })
 
+describe('one failing slot never takes the others down', () => {
+	// A host that hands `track` a DOM node or any cyclic object makes the native sink's
+	// JSON.stringify throw: a real failure, synchronous, inside send.
+	const cyclic = (): Record<string, unknown> => {
+		const props: Record<string, unknown> = { plan: 'pro' }
+		props.self = props
+		return props
+	}
+
+	it('keeps dispatching to later slots when one throws', async () => {
+		const tracker = boot(configWith([nativeSlot, { ...posthogSlot, requiresConsent: false }]))
+		tracker.track('warmup')
+		await vi.waitFor(() => {
+			expect(capture).toHaveBeenCalledTimes(1)
+		})
+
+		expect(() => tracker.track('signup', cyclic())).not.toThrow()
+
+		expect(capture).toHaveBeenCalledTimes(2)
+		expect(capture.mock.calls[1]?.[0]).toBe('signup')
+	})
+
+	it('keeps draining the consent queue when one queued send throws', async () => {
+		const tracker = boot(configWith([{ ...nativeSlot, requiresConsent: true }, posthogSlot]))
+		tracker.track('signup', cyclic())
+
+		expect(() => tracker.consent('granted')).not.toThrow()
+
+		await vi.waitFor(() => {
+			expect(capture).toHaveBeenCalledTimes(1)
+		})
+		expect(capture.mock.calls[0]?.[0]).toBe('signup')
+	})
+})
+
 describe('a host without a window', () => {
 	it('returns a tracker that does nothing', () => {
 		vi.stubGlobal('window', undefined)

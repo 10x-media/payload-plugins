@@ -55,8 +55,10 @@ const isDownload = (url: URL): boolean => {
 }
 
 const goalPayload = (el: Element): { value?: number; currency?: string } => {
-	const raw = el.getAttribute(VALUE_ATTRIBUTE)
-	const value = raw === null ? Number.NaN : Number(raw)
+	// Blank is absent, not zero: `Number('')` is 0, and an unfilled template slot must not
+	// book a zero-revenue conversion.
+	const raw = el.getAttribute(VALUE_ATTRIBUTE)?.trim()
+	const value = raw ? Number(raw) : Number.NaN
 	const currency = el.getAttribute(CURRENCY_ATTRIBUTE)
 	return {
 		...(Number.isFinite(value) ? { value } : {}),

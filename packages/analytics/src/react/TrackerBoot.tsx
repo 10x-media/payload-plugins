@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { TrackerConfig } from '../capture/trackerConfig'
-import { createTracker } from '../tracker/createTracker'
+import { acquireTracker } from '../tracker/registry'
 
 export interface TrackerBootProps {
 	config: TrackerConfig
@@ -14,16 +14,16 @@ export interface TrackerBootProps {
  * Boots the browser tracker from a server-resolved config and renders nothing. This is the
  * RSC path: `<AnalyticsScripts />` renders it after the slot snippets, so a page gets
  * pageviews and auto-capture with no provider and no client state. Wrap the tree in
- * `<AnalyticsProvider>` instead when components need to call `track` themselves; rendering
- * both would boot two trackers.
+ * `<AnalyticsProvider>` as well when components need to call `track` themselves: both take
+ * a lease on the window's one tracker, so neither double-counts.
  */
 export const TrackerBoot = ({ config, nonce }: TrackerBootProps): null => {
 	const boot = useRef({ config, nonce })
 	boot.current = { config, nonce }
 
 	useEffect(() => {
-		const tracker = createTracker(boot.current.config, { nonce: boot.current.nonce })
-		return () => tracker.destroy()
+		const lease = acquireTracker(boot.current.config, { nonce: boot.current.nonce })
+		return () => lease.release()
 	}, [])
 
 	return null
