@@ -14,6 +14,7 @@ import {
 	useDocumentInfo,
 	useDocumentTitle,
 	useForm,
+	useFormModified,
 	useModal,
 	useTranslation as usePayloadTranslation,
 } from '@payloadcms/ui'
@@ -73,6 +74,7 @@ export const SettingsOverlayDocumentActions: React.FC = () => {
 	const { config, getEntityConfig } = useConfig()
 	const { openModal } = useModal()
 	const { setModified } = useForm()
+	const modified = useFormModified()
 	const { title } = useDocumentTitle()
 	const { i18n, t } = usePayloadTranslation()
 	const {
@@ -95,8 +97,13 @@ export const SettingsOverlayDocumentActions: React.FC = () => {
 
 	// The pane's own document, and only that one. A document drawer opened from inside the pane
 	// carries this component too, and its actions belong to the drawer rather than to the panel.
+	//
+	// An item pointed at one document by `resolveDocID` is excluded as well. It stands in for a
+	// global, so there is no list to delete back to and no second copy to make; Payload offers a
+	// global none of these actions either.
 	const isPaneDocument = Boolean(
 		embed?.itemType === 'collection' &&
+			!embed?.directDocID &&
 			collectionSlug === itemSlug &&
 			docID &&
 			docID === embed?.docID
@@ -362,7 +369,13 @@ export const SettingsOverlayDocumentActions: React.FC = () => {
 							<PopupList.Button
 								id="settings-overlay-duplicate"
 								onClick={() => {
-									openModal(duplicateSlug)
+									// Only edits in progress are worth a question, which is where Payload asks it
+									// too. An untouched document duplicates on the click.
+									if (modified) {
+										openModal(duplicateSlug)
+									} else {
+										void onDuplicate()
+									}
 								}}
 							>
 								{t('general:duplicate')}
@@ -381,11 +394,11 @@ export const SettingsOverlayDocumentActions: React.FC = () => {
 					</PopupList.ButtonGroup>
 				</Popup>
 			) : null}
-			{canDuplicate ? (
+			{canDuplicate && modified ? (
 				<ConfirmationModal
 					body={t('general:unsavedChangesDuplicate')}
 					confirmLabel={t('general:duplicateWithoutSaving')}
-					heading={t('general:duplicate')}
+					heading={t('general:unsavedChanges')}
 					modalSlug={duplicateSlug}
 					onConfirm={onDuplicate}
 				/>

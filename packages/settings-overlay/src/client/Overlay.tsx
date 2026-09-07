@@ -249,6 +249,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 						layout: overlay.layout,
 						overlayId: overlay.id,
 						setTarget: settings.setTarget,
+						...(activeItem.directDocID ? { directDocID: activeItem.directDocID } : {}),
 						...(settings.target.id ? { docID: settings.target.id } : {}),
 					}
 				: null,
