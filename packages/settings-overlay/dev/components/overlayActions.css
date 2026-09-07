@@ -1,0 +1,14 @@
+.dev-overlay-actions {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+}
+
+/* `SettingsOverlayButton` draws no chrome of its own, so the Pill inside is the whole button. */
+.dev-overlay-action {
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+	font: inherit;
+}

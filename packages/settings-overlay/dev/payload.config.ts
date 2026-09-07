@@ -54,6 +54,8 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	admin: {
 		components: {
+			// Top right of every page, so a screenshot can hide the sidebar and still open a panel.
+			actions: ['./components/OverlayActions#OverlayActions'],
 			beforeNavLinks: ['./components/OverlayLaunchers#OverlayLaunchers'],
 			views: {
 				devReport: {
