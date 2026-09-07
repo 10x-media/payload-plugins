@@ -12,4 +12,5 @@ export const id: Record<TranslationKey, string> = {
 	[keys.loadFailed]: 'Gagal memuat. Silakan coba lagi.',
 	[keys.noResults]: 'Tidak ada yang cocok.',
 	[keys.searchPlaceholder]: 'Cari',
+	[keys.widgetNotice]: 'Widget ini tidak dapat ditampilkan. Anda dapat menghapusnya dari dasbor.',
 }

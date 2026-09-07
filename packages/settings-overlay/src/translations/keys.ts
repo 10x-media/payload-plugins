@@ -19,6 +19,7 @@ export const keys = {
 	loadFailed: 'settingsOverlay:loadFailed',
 	noResults: 'settingsOverlay:noResults',
 	searchPlaceholder: 'settingsOverlay:searchPlaceholder',
+	widgetNotice: 'settingsOverlay:widgetNotice',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

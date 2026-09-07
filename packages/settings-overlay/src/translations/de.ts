@@ -12,4 +12,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.loadFailed]: 'Konnte nicht geladen werden. Bitte erneut versuchen.',
 	[keys.noResults]: 'Keine Treffer.',
 	[keys.searchPlaceholder]: 'Suchen',
+	[keys.widgetNotice]:
+		'Dieses Widget kann nicht angezeigt werden. Sie können es vom Dashboard entfernen.',
 }

@@ -12,4 +12,5 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.loadFailed]: 'تعذر تحميل هذا. يرجى المحاولة مرة أخرى.',
 	[keys.noResults]: 'لا توجد نتائج.',
 	[keys.searchPlaceholder]: 'بحث',
+	[keys.widgetNotice]: 'لا يمكن عرض هذه الأداة. يمكنك إزالتها من لوحة المعلومات.',
 }

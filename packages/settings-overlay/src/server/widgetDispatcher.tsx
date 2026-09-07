@@ -1,6 +1,8 @@
 import type { WidgetServerProps } from 'payload'
 import type React from 'react'
 
+import { keys } from '../translations/keys'
+import { asTranslate } from '../translations/server'
 import { type LazyItemRequest, renderLazyItem } from './renderLazyItem'
 
 /**
@@ -24,12 +26,23 @@ import { type LazyItemRequest, renderLazyItem } from './renderLazyItem'
  * `_internal_renderFieldHandler` and documented as breakable in minor releases, and it merges the
  * caller's partial into the process-global schema map with `clone: false`. A younger, explicitly
  * unstable API with a cross-request mutation hazard is a worse bet than a drawer row.
+ *
+ * Because it sits in that drawer, a reader can add it to their dashboard, where it arrives with no
+ * `widgetData`. That is not a failed request and must not read as one: it says what the widget is
+ * for and that it can be removed. Only a call that names an overlay goes on to the access checks,
+ * which then answer for real.
  */
 export const SettingsOverlayItemDispatcher = async (
 	props: WidgetServerProps
 ): Promise<React.ReactNode> => {
 	const { locale, permissions, req, widgetData } = props
 	const { itemSlug, overlayId, searchParams } = (widgetData ?? {}) as LazyItemRequest
+
+	if (!overlayId || !itemSlug) {
+		return (
+			<p className="settings-overlay__widget-notice">{asTranslate(req.t)(keys.widgetNotice)}</p>
+		)
+	}
 
 	return renderLazyItem({ itemSlug, locale, overlayId, permissions, req, searchParams })
 }

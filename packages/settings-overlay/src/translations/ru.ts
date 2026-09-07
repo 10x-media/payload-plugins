@@ -12,4 +12,5 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.loadFailed]: 'Не удалось загрузить. Попробуйте ещё раз.',
 	[keys.noResults]: 'Ничего не найдено.',
 	[keys.searchPlaceholder]: 'Поиск',
+	[keys.widgetNotice]: 'Этот виджет невозможно показать. Вы можете убрать его с панели управления.',
 }

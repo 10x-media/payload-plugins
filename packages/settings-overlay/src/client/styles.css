@@ -529,6 +529,20 @@
 	display: none;
 }
 
+/*
+ * The dispatcher widget on a dashboard that added it by hand. It renders outside any panel, so it
+ * cannot use the `--settings-overlay-*` properties, which are declared on `.settings-overlay`.
+ * Reads as an error, because from the dashboard that is what it is: a card that will never fill.
+ */
+.settings-overlay__widget-notice {
+	margin: 0;
+	padding: var(--base);
+	border: 1px solid var(--theme-error-250);
+	border-radius: var(--style-radius-m);
+	background: var(--theme-error-50);
+	color: var(--theme-error-750);
+}
+
 /* A component item brings its own spacing; everything else is Payload's. */
 .settings-overlay__empty {
 	margin: 0;

@@ -13,4 +13,6 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.loadFailed]: 'Le chargement a échoué. Veuillez réessayer.',
 	[keys.noResults]: 'Aucun résultat.',
 	[keys.searchPlaceholder]: 'Rechercher',
+	[keys.widgetNotice]:
+		'Ce widget ne peut pas être affiché. Vous pouvez le retirer du tableau de bord.',
 }
