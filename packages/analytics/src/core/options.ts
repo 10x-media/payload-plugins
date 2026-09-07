@@ -369,6 +369,14 @@ const resolveGoals = (option: AnalyticsPluginOptions['goals']): Goal[] => {
 		if (seen.has(goal.slug)) {
 			throw new Error(`analytics: duplicate goal slug "${goal.slug}"`)
 		}
+		const fixed = goal.value?.fixed
+		// Revenue is money: a negative or non-finite fixed value would be silently ignored at
+		// ingest, so it fails the boot instead.
+		if (fixed !== undefined && (!Number.isFinite(fixed) || fixed < 0)) {
+			throw new Error(
+				`analytics: goal "${goal.slug}" value.fixed must be a finite number >= 0, got ${String(fixed)}`
+			)
+		}
 		seen.add(goal.slug)
 	}
 	return goals

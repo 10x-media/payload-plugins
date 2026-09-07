@@ -75,6 +75,7 @@ export interface NormalizeArgs {
 const MAX_PROPS = 20
 const MAX_KEY_LENGTH = 64
 const MAX_VALUE_LENGTH = 256
+const MAX_NAME_LENGTH = 128
 const CURRENCY = /^[A-Z]{3}$/
 
 /**
@@ -88,6 +89,10 @@ const nonNegative = (value: unknown): number | undefined =>
 
 const currencyCode = (value: unknown): string | undefined =>
 	typeof value === 'string' && CURRENCY.test(value) ? value : undefined
+
+/** The event name is a rollup bucket key (the `event` dimension), so it is length-capped. */
+const eventName = (value: unknown): string | undefined =>
+	typeof value === 'string' ? value.slice(0, MAX_NAME_LENGTH) : undefined
 
 const depth = (value: unknown): number | undefined => {
 	const n = nonNegative(value)
@@ -138,14 +143,15 @@ export async function normalizeEvent({
 	const props = sanitizeProps(raw.props)
 	const value = nonNegative(raw.value)
 	const scrollDepth = depth(raw.scrollDepth)
+	const name = eventName(raw.name)
 	// Match on the sanitized fields so a rejected value never reaches a goal's revenue.
 	const completions = goals?.length
-		? matchGoals({ type: raw.type, name: raw.name, path: raw.path, props, value }, goals)
+		? matchGoals({ type: raw.type, name, path: raw.path, props, value }, goals)
 		: []
 	return {
 		timestamp: now,
 		type: raw.type,
-		name: raw.name,
+		name,
 		path: raw.path,
 		hostname: raw.hostname,
 		referrer: raw.referrer,

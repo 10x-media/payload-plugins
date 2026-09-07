@@ -68,6 +68,18 @@ describe('makeIngestHandler validation', () => {
 		expect((await handler(req({ type: 'pageview', path: '/p' }))).status).toBe(400)
 	})
 
+	it('400s a non-string path, hostname, or name rather than letting it reach matching', async () => {
+		const { handler } = handlerWith([
+			{ slug: 'thanks', name: 'Thanks', match: { kind: 'path', pattern: '/thank-you' } },
+		])
+		expect((await handler(req({ type: 'pageview', path: {}, hostname: 'h' }))).status).toBe(400)
+		expect((await handler(req({ type: 'pageview', path: ['/p'], hostname: 'h' }))).status).toBe(400)
+		expect((await handler(req({ type: 'pageview', path: '/p', hostname: 7 }))).status).toBe(400)
+		expect((await handler(req({ type: 'goal', name: {}, path: '/p', hostname: 'h' }))).status).toBe(
+			400
+		)
+	})
+
 	it('accepts a pageview with no name', async () => {
 		const { handler, events } = handlerWith()
 		expect((await handler(req({ type: 'pageview', path: '/p', hostname: 'h' }))).status).toBe(202)

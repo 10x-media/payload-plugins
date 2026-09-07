@@ -115,6 +115,24 @@ describe('matchGoals path globs', () => {
 	it('treats regex metacharacters in a pattern as literals', () => {
 		expect(hits('/pricing.html', '/pricingxhtml')).toBe(false)
 		expect(hits('/pricing.html', '/pricing.html')).toBe(true)
+		expect(hits('/a+b', '/ab')).toBe(false)
+		expect(hits('/a+b', '/a+b')).toBe(true)
+		expect(hits('/plans(new)', '/plansnew')).toBe(false)
+		expect(hits('/plans(new)', '/plans(new)')).toBe(true)
+		expect(hits('/a{2}', '/aa')).toBe(false)
+		expect(hits('/a|b', '/a')).toBe(false)
+		expect(hits('/a[b]', '/ab')).toBe(false)
+		expect(hits('/a^b$', '/a^b$')).toBe(true)
+	})
+
+	it('cuts a query string and a hash off the pattern too', () => {
+		// A pattern authored by pasting a URL keeps working: `?` must never survive into the
+		// regex as an optional-quantifier, which would make '/fo' match '/foo?'.
+		expect(hits('/thank-you?ref=x', '/thank-you')).toBe(true)
+		expect(hits('/thank-you?ref=x', '/thank-you?ref=y')).toBe(true)
+		expect(hits('/foo?', '/fo')).toBe(false)
+		expect(hits('/foo?', '/foo')).toBe(true)
+		expect(hits('/docs#intro', '/docs')).toBe(true)
 	})
 
 	it('matches the root path', () => {
@@ -158,6 +176,13 @@ describe('matchGoals value precedence', () => {
 		expect(
 			matchGoals(goalEvent({ props: { total: '19.5' } }), withValue({ prop: 'total' }))
 		).toEqual([{ slug: 'buy', value: 19.5 }])
+	})
+
+	it('refuses a negative value from any source and reports 0', () => {
+		expect(
+			matchGoals(goalEvent({ props: { total: -1000 } }), withValue({ prop: 'total' }))
+		).toEqual([{ slug: 'buy', value: 0 }])
+		expect(matchGoals(goalEvent({ value: -5 }), withValue())).toEqual([{ slug: 'buy', value: 0 }])
 	})
 
 	it('falls back to 0 for a non-numeric, missing, or non-finite prop', () => {

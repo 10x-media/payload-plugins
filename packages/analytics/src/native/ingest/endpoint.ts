@@ -25,11 +25,15 @@ const TYPES: ReadonlySet<string> = new Set<EventType>(['pageview', 'event', 'goa
  * Optional fields are sanitized in `normalizeEvent` and dropped when malformed, so one bad
  * attribute costs an attribute rather than the whole event.
  */
+const nonEmptyString = (value: unknown): boolean => typeof value === 'string' && value.length > 0
+
 const isValid = (raw: RawEventInput | undefined): boolean => {
-	if (!raw?.path || !raw?.hostname || !TYPES.has(raw.type)) {
+	// Types are checked, not just truthiness: a non-string path would otherwise reach goal
+	// matching and throw there rather than answering 400 here.
+	if (!raw || !TYPES.has(raw.type) || !nonEmptyString(raw.path) || !nonEmptyString(raw.hostname)) {
 		return false
 	}
-	return raw.type === 'pageview' || Boolean(raw.name)
+	return raw.type === 'pageview' || nonEmptyString(raw.name)
 }
 
 export const makeIngestHandler =

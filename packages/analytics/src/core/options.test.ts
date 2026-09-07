@@ -450,4 +450,16 @@ describe('resolveOptions goals', () => {
 			)
 		}
 	})
+	it('throws on a fixed value that is negative or not finite', () => {
+		for (const fixed of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(() => resolveOptions({ adapters, goals: [{ ...signup, value: { fixed } }] })).toThrow(
+				/goal "signup" value.fixed/i
+			)
+		}
+	})
+	it('accepts a fixed value of zero', () => {
+		expect(
+			resolveOptions({ adapters, goals: [{ ...signup, value: { fixed: 0 } }] }).goals[0]?.value
+		).toEqual({ fixed: 0 })
+	})
 })

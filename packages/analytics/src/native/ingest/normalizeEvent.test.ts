@@ -108,6 +108,21 @@ describe('normalizeEvent contract growth', () => {
 		expect(await depth(0)).toBe(0)
 	})
 
+	it('truncates the event name, which is a rollup bucket key', async () => {
+		const ev = await build({
+			type: 'event',
+			name: 'n'.repeat(500),
+			path: '/x',
+			hostname: 'h',
+		})
+		expect(ev.name).toHaveLength(128)
+	})
+
+	it('drops a non-string name', async () => {
+		const ev = await build({ type: 'pageview', path: '/x', hostname: 'h', name: 12 })
+		expect(ev.name).toBeUndefined()
+	})
+
 	it('keeps flat scalar props and drops the rest', async () => {
 		const ev = await build({
 			type: 'event',

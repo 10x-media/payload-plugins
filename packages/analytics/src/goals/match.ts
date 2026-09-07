@@ -24,15 +24,17 @@ const pathOnly = (path: string): string => {
 	return trimTrailingSlash(cut === -1 ? path : path.slice(0, cut))
 }
 
-const ESCAPE = /[.+^${}()|[\]\\]/g
+/** Every regex metacharacter except `*`, the one glob token this translates itself. */
+const ESCAPE = /[.+?^${}()|[\]\\]/g
 
 /**
  * Anchored, case-sensitive glob: `*` is exactly one non-empty path segment and `**` is one
  * or more segments at any depth, so `/docs/**` covers everything below `/docs` but not
- * `/docs` itself. A trailing slash is insignificant on both sides.
+ * `/docs` itself. A trailing slash is insignificant on both sides, and a pattern pasted
+ * from a URL gets the same query/hash cut as the path it is matched against.
  */
 const patternToRegExp = (pattern: string): RegExp => {
-	const body = trimTrailingSlash(pattern)
+	const body = pathOnly(pattern)
 		.replace(ESCAPE, '\\$&')
 		.split('**')
 		.map((part) => part.replace(/\*/g, '[^/]+'))
@@ -51,22 +53,23 @@ const matchesPath = (pattern: string, path: string): boolean => {
 	return re.test(pathOnly(path))
 }
 
-const finite = (value: unknown): number | undefined => {
+/** Revenue is money: a source only counts when it is a finite, non-negative number. */
+const amount = (value: unknown): number | undefined => {
 	const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value
-	return typeof n === 'number' && Number.isFinite(n) ? n : undefined
+	return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : undefined
 }
 
 const completionValue = (event: MatchableEvent, goal: Goal): number => {
-	const fromEvent = finite(event.value)
+	const fromEvent = amount(event.value)
 	if (fromEvent !== undefined) {
 		return fromEvent
 	}
-	const fixed = finite(goal.value?.fixed)
+	const fixed = amount(goal.value?.fixed)
 	if (fixed !== undefined) {
 		return fixed
 	}
 	const prop = goal.value?.prop
-	return (prop ? finite(event.props?.[prop]) : undefined) ?? 0
+	return (prop ? amount(event.props?.[prop]) : undefined) ?? 0
 }
 
 const completes = (event: MatchableEvent, goal: Goal): boolean => {

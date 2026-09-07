@@ -8,6 +8,10 @@ import type { MigrateDownArgs, MigrateUpArgs } from '@payloadcms/db-mongodb'
  * rollup backfill: absent event fields are simply absent there. Every statement is
  * idempotent, so a push-mode dev schema that already picked the columns up is unaffected.
  * Index DDL is left to Payload's own schema push, as in the query-contract migration.
+ *
+ * The Postgres statements deliberately go through `payload.db.drizzle` (the pool handle),
+ * not the transaction-bound argument: each autocommits, which is what keeps
+ * `ALTER TYPE ... ADD VALUE` safe rather than pinned inside an open transaction.
  */
 export async function up({ payload }: MigrateUpArgs): Promise<void> {
 	if (payload.db.name === 'mongoose') {
@@ -17,10 +21,14 @@ export async function up({ payload }: MigrateUpArgs): Promise<void> {
 				{ collection: { updateMany: (filter: object, update: object) => Promise<unknown> } }
 			>
 		}
-		await db.collections['analytics-rollups']?.collection.updateMany(
-			{ conversions: { $exists: false } },
-			{ $set: { conversions: 0, revenue: 0, scrollDepthSum: 0, scrollSamples: 0 } }
-		)
+		// One pass per counter, each matching only its own absence: a row half-patched by an
+		// interrupted run is completed without resetting the counters it already carries.
+		for (const counter of ['conversions', 'revenue', 'scrollDepthSum', 'scrollSamples']) {
+			await db.collections['analytics-rollups']?.collection.updateMany(
+				{ [counter]: { $exists: false } },
+				{ $set: { [counter]: 0 } }
+			)
+		}
 		return
 	}
 	const db = payload.db as unknown as { drizzle: { execute: (query: string) => Promise<unknown> } }
@@ -39,4 +47,5 @@ export async function up({ payload }: MigrateUpArgs): Promise<void> {
 	await db.drizzle.execute(`ALTER TYPE enum_analytics_events_type ADD VALUE IF NOT EXISTS 'goal'`)
 }
 
+/** Deliberately irreversible: Postgres cannot drop an enum member once it exists. */
 export async function down(_args: MigrateDownArgs): Promise<void> {}
