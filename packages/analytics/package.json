@@ -37,6 +37,16 @@
 			"types": "./src/exports/client.ts",
 			"default": "./dist/exports/client.js"
 		},
+		"./tracker": {
+			"development": "./src/exports/tracker.ts",
+			"types": "./src/exports/tracker.ts",
+			"default": "./dist/exports/tracker.js"
+		},
+		"./react": {
+			"development": "./src/exports/react.ts",
+			"types": "./src/exports/react.ts",
+			"default": "./dist/exports/react.js"
+		},
 		"./rsc": {
 			"development": "./src/exports/rsc.ts",
 			"types": "./src/exports/rsc.ts",
@@ -158,9 +168,11 @@
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
+		"@testing-library/react": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
+		"jsdom": "catalog:",
 		"maxmind": "^4.3.24",
 		"msw": "catalog:",
 		"payload": "catalog:",
@@ -189,6 +201,16 @@
 				"types": "./dist/exports/client.d.ts",
 				"import": "./dist/exports/client.js",
 				"default": "./dist/exports/client.js"
+			},
+			"./tracker": {
+				"types": "./dist/exports/tracker.d.ts",
+				"import": "./dist/exports/tracker.js",
+				"default": "./dist/exports/tracker.js"
+			},
+			"./react": {
+				"types": "./dist/exports/react.d.ts",
+				"import": "./dist/exports/react.js",
+				"default": "./dist/exports/react.js"
 			},
 			"./rsc": {
 				"types": "./dist/exports/rsc.d.ts",
