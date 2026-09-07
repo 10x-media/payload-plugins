@@ -48,23 +48,30 @@ const ingested = (page: Page): Promise<unknown> =>
 	)
 
 /**
- * Clicks the home page CTA and leaves for `/thank-you`, waiting out both writes: the goal
- * goes immediately, the pageview only on the navigation's `pagehide`. Waiting on the ingest
- * responses rather than polling a read is deliberate: an aggregate read is cached for the
- * adapter's TTL, so a read taken one moment too early would pin an empty answer in the
- * cache for minutes and no amount of retrying would recover it.
+ * Converts twice on the home page, then leaves for `/thank-you`. The two buttons cover both
+ * ways an event reaches the tracker: the CTA's `data-analytics-goal` attribute through
+ * auto-capture, and a `useAnalytics().track` call from a client component with no provider
+ * above it. Both go out immediately; the pageview only on the navigation's `pagehide`.
+ *
+ * Waiting on the ingest responses rather than polling a read is deliberate: an aggregate
+ * read is cached for the adapter's TTL, so a read taken one moment too early would pin an
+ * empty answer in the cache for minutes and no amount of retrying would recover it.
  */
 const visitAndConvert = async (page: Page, origin = ''): Promise<void> => {
 	await page.goto(`${origin}/`)
-	const goal = ingested(page)
-	await page.getByRole('button', { name: 'Book a demo' }).click()
-	await goal
+	for (const name of ['Book a demo', 'Sign up']) {
+		const sent = ingested(page)
+		await page.getByRole('button', { name }).click()
+		await sent
+	}
 	const pageview = ingested(page)
 	await page.goto(`${origin}/thank-you`)
 	await pageview
 }
 
-test('a frontend visit and a CTA click land as a pageview and a conversion', async ({ page }) => {
+test('a frontend visit and two goal clicks land as a pageview and conversions', async ({
+	page,
+}) => {
 	await visitAndConvert(page)
 
 	await login(page.request, PLATFORM)
@@ -72,7 +79,8 @@ test('a frontend visit and a CTA click land as a pageview and a conversion', asy
 	const read = await readDocument(page.request, home, 'pageviews,conversions')
 	expect(read.status).toBe('ok')
 	expect(read.metrics?.pageviews ?? 0).toBeGreaterThanOrEqual(1)
-	expect(read.metrics?.conversions ?? 0).toBeGreaterThanOrEqual(1)
+	// One per button: the attribute goal and the tracked `signup` event.
+	expect(read.metrics?.conversions ?? 0).toBeGreaterThanOrEqual(2)
 
 	const realtime = await page.request.get('/api/analytics/realtime?metric=pageviews')
 	expect(realtime.ok()).toBeTruthy()
@@ -118,11 +126,16 @@ test('@tenancy an anonymous visit is attributed to the hostname tenant', async (
 	await selectTenant(admin, idOf('alpha'))
 	const alphaRead = await readDocument(admin.request, home, 'pageviews,conversions')
 	expect(alphaRead.status).toBe('ok')
-	expect(alphaRead.metrics?.conversions ?? 0).toBeGreaterThanOrEqual(1)
+	expect(alphaRead.metrics?.conversions ?? 0).toBeGreaterThanOrEqual(2)
 
+	// Beta has its own seeded traffic on this path, so its pageviews are the proof the read
+	// reached data at all: a scope that answered with nothing would pass a bare `conversions
+	// === 0` vacuously.
 	await selectTenant(admin, idOf('beta'))
 	const betaRead = await readDocument(admin.request, home, 'pageviews,conversions')
 	expect(betaRead.status).toBe('ok')
-	expect(betaRead.metrics?.conversions ?? 0).toBe(0)
+	expect(betaRead.metrics).toBeDefined()
+	expect(betaRead.metrics?.pageviews ?? 0).toBeGreaterThanOrEqual(1)
+	expect(betaRead.metrics?.conversions).toBe(0)
 	await admin.close()
 })

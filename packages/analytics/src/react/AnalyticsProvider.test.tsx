@@ -144,7 +144,9 @@ describe('AnalyticsProvider', () => {
 })
 
 describe('useAnalytics', () => {
-	it('throws outside a provider', () => {
+	// Outside a provider the hook falls back to the window's booted tracker; with neither,
+	// the call throws. `Signup` tracks from an effect, so render surfaces it.
+	it('throws outside a provider when no tracker was booted either', () => {
 		const onError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		expect(() => render(<Signup />)).toThrow(/AnalyticsProvider/)

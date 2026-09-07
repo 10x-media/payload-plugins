@@ -1,6 +1,7 @@
 import config from '@payload-config'
 import Link from 'next/link'
 import { getPayload } from 'payload'
+import { SignupButton } from '../../components/SignupButton'
 import { pagePath } from '../../config/shared'
 
 export const dynamic = 'force-dynamic'
@@ -24,8 +25,9 @@ export default async function HomePage() {
 				<button data-analytics-goal="book-demo" type="button">
 					Book a demo
 				</button>{' '}
-				fires the <code>book-demo</code> goal; <Link href="/thank-you">/thank-you</Link> completes a
-				path goal just by being visited.
+				fires the <code>book-demo</code> goal from a markup attribute; <SignupButton /> tracks a
+				custom <code>signup</code> event through <code>useAnalytics</code>; and{' '}
+				<Link href="/thank-you">/thank-you</Link> completes a path goal just by being visited.
 			</p>
 			<ul>
 				{(pages.docs as Array<{ id: string; title?: string; slug: string }>).map((page) => (
