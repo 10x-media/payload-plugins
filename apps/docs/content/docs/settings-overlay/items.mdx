@@ -23,7 +23,9 @@ Every type also takes `label`, `group`, `icon`, `order`, `keywords`, `badge` and
 
 Renders Payload's list view in drawer mode, and its edit view when a row is picked. Creating, filtering, sorting, bulk actions, drafts, uploads and relationship drawers all work as they do on a page.
 
-The collection is hidden from the nav and from `/admin/collections/tags` unless the overlay sets `hideEntities: false`. An entity may live in one overlay only; listing it twice is a boot error.
+The collection is hidden from the nav and from `/admin/collections/tags` unless the overlay sets `hideEntities: false`.
+
+The same collection can appear in more than one overlay. Each panel has its own rail, its own URL and its own render cache, so they do not interfere. The one thing they must agree on is `hideEntities`: hiding belongs to the entity rather than to the panel, and two overlays asking for opposite things is a boot error naming both.
 
 ### `resolveDocID`
 
@@ -65,7 +67,7 @@ It reads the tenant cookie, finds that tenant's document, and creates the draft 
 { type: 'global', slug: 'branding' }
 ```
 
-The same edit view a global gets on its own route. Hidden from the nav on the same terms as a collection.
+The same edit view a global gets on its own route. Hidden from the nav on the same terms as a collection, and listable in several overlays on the same terms too.
 
 ## `component`
 

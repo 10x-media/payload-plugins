@@ -17,8 +17,36 @@ const fail = (message: string): never => {
  */
 export const validateOverlays = (overlays: ResolvedOverlay[], known: KnownEntities): void => {
 	const seenOverlayIds = new Set<string>()
-	const ownerByCollection = new Map<string, string>()
-	const ownerByGlobal = new Map<string, string>()
+	const collectionHiding = new Map<string, { hide: boolean; overlayId: string }>()
+	const globalHiding = new Map<string, { hide: boolean; overlayId: string }>()
+
+	/**
+	 * An entity may appear in several overlays: the rail, the URL and the render cache are all
+	 * keyed by overlay, so two panels can show the same collection without interfering.
+	 *
+	 * What cannot differ is `hideEntities`, because hiding is a property of the entity rather
+	 * than of the panel. Two overlays asking for opposite things is a contradiction with no
+	 * defensible resolution, so it is refused rather than silently decided.
+	 */
+	const checkHiding = (args: {
+		hide: boolean
+		kind: 'Collection' | 'Global'
+		overlayId: string
+		seen: Map<string, { hide: boolean; overlayId: string }>
+		slug: string
+	}): void => {
+		const { hide, kind, overlayId, seen, slug } = args
+		const previous = seen.get(slug)
+		if (previous && previous.hide !== hide) {
+			const [hidden, shown] = previous.hide
+				? [previous.overlayId, overlayId]
+				: [overlayId, previous.overlayId]
+			fail(
+				`${kind} "${slug}" is listed in overlays "${previous.overlayId}" and "${overlayId}" with different hideEntities values. "${hidden}" hides it from the nav and its own route, "${shown}" leaves it there, and an entity can only be one or the other. Set the same value on both.`
+			)
+		}
+		seen.set(slug, { hide, overlayId })
+	}
 
 	for (const overlay of overlays) {
 		if (!overlay.id) {
@@ -45,13 +73,13 @@ export const validateOverlays = (overlays: ResolvedOverlay[], known: KnownEntiti
 					if (!known.collectionSlugs.includes(item.slug)) {
 						fail(`Overlay "${overlay.id}" lists unknown collection "${item.slug}".`)
 					}
-					const owner = ownerByCollection.get(item.slug)
-					if (owner) {
-						fail(
-							`Collection "${item.slug}" is listed in overlays "${owner}" and "${overlay.id}"; an entity can live in one overlay only.`
-						)
-					}
-					ownerByCollection.set(item.slug, overlay.id)
+					checkHiding({
+						hide: overlay.hideEntities,
+						kind: 'Collection',
+						overlayId: overlay.id,
+						seen: collectionHiding,
+						slug: item.slug,
+					})
 					break
 				}
 				case 'component': {
@@ -64,13 +92,13 @@ export const validateOverlays = (overlays: ResolvedOverlay[], known: KnownEntiti
 					if (!known.globalSlugs.includes(item.slug)) {
 						fail(`Overlay "${overlay.id}" lists unknown global "${item.slug}".`)
 					}
-					const owner = ownerByGlobal.get(item.slug)
-					if (owner) {
-						fail(
-							`Global "${item.slug}" is listed in overlays "${owner}" and "${overlay.id}"; an entity can live in one overlay only.`
-						)
-					}
-					ownerByGlobal.set(item.slug, overlay.id)
+					checkHiding({
+						hide: overlay.hideEntities,
+						kind: 'Global',
+						overlayId: overlay.id,
+						seen: globalHiding,
+						slug: item.slug,
+					})
 					break
 				}
 				case 'link': {

@@ -236,6 +236,9 @@ export default buildConfig({
 							slug: 'keys',
 							type: 'collection',
 						},
+						// The same collection `system` lists. Both panels show it, each with its own rail,
+						// URL and render cache.
+						{ group: 'Account', label: 'Tags', slug: 'tags', type: 'collection' },
 						{ group: 'Account', href: '/', label: 'Billing', slug: 'billing', type: 'link' },
 						{ group: 'Account', href: '/', label: 'Plan', slug: 'plan', type: 'link' },
 					],

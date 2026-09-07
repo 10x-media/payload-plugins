@@ -65,13 +65,47 @@ describe('validateOverlays', () => {
 		).toThrow(/unknown global "nope"/)
 	})
 
-	it('rejects one entity claimed by two overlays', () => {
+	it('allows one entity in several overlays', () => {
 		expect(
 			check([
 				{ id: 'a', items: [{ slug: 'tags', type: 'collection' }], label: 'A' },
 				{ id: 'b', items: [{ slug: 'tags', type: 'collection' }], label: 'B' },
 			])
-		).toThrow(/listed in overlays "a" and "b"/)
+		).not.toThrow()
+
+		expect(
+			check([
+				{ id: 'a', items: [{ slug: 'branding', type: 'global' }], label: 'A' },
+				{ hideEntities: false, id: 'b', items: [], label: 'B' },
+				{ id: 'c', items: [{ slug: 'branding', type: 'global' }], label: 'C' },
+			])
+		).not.toThrow()
+	})
+
+	it('rejects two overlays that disagree on hiding the same entity', () => {
+		expect(
+			check([
+				{ id: 'a', items: [{ slug: 'tags', type: 'collection' }], label: 'A' },
+				{
+					hideEntities: false,
+					id: 'b',
+					items: [{ slug: 'tags', type: 'collection' }],
+					label: 'B',
+				},
+			])
+		).toThrow(/different hideEntities values/)
+
+		expect(
+			check([
+				{
+					hideEntities: false,
+					id: 'a',
+					items: [{ slug: 'branding', type: 'global' }],
+					label: 'A',
+				},
+				{ id: 'b', items: [{ slug: 'branding', type: 'global' }], label: 'B' },
+			])
+		).toThrow(/different hideEntities values/)
 	})
 
 	it('rejects a view whose key is not registered, and says why', () => {

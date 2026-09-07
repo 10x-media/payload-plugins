@@ -58,6 +58,9 @@ export const hideEntities = (
 	globals: Config['globals']
 	hiddenPredicates: HiddenPredicates
 } => {
+	// Keyed by slug, not by overlay: an entity may be listed in several, and hiding is a property
+	// of the entity. Boot validation has already refused any pair that disagrees on `hideEntities`,
+	// so whichever listing lands here last carries the same value as the rest.
 	const listedCollections = new Map<string, Listed>()
 	const listedGlobals = new Map<string, Listed>()
 
