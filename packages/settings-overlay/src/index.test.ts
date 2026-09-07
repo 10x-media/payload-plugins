@@ -56,7 +56,7 @@ describe('settingsOverlay factory', () => {
 		const registry = registryOf(out)
 		expect(registry.overlays).toHaveLength(1)
 		expect(registry.overlays[0]?.layout).toBe('compact')
-		expect(registry.overlays[0]?.hideEntities).toBe(true)
+		expect(registry.overlays[0]?.hideEntities).toBe(false)
 		expect(registry.overlays[0]?.addressable).toBe(true)
 	})
 
@@ -93,10 +93,11 @@ describe('settingsOverlay factory', () => {
 		expect(b?.mergeListHeader).toBe(true)
 	})
 
-	it('hides listed entities and adds the plugin document controls', () => {
+	it('hides listed entities when asked, and always adds the plugin document controls', () => {
 		const out = run({
 			overlays: [
 				{
+					hideEntities: true,
 					id: 'system',
 					items: [
 						{ slug: 'tags', type: 'collection' },
@@ -121,11 +122,10 @@ describe('settingsOverlay factory', () => {
 		expect(branding?.admin?.components?.elements?.beforeDocumentControls).toEqual([REPORTER_PATH])
 	})
 
-	it('leaves entities visible when hideEntities is false', () => {
+	it('leaves entities visible by default, because the panel is not a replacement view', () => {
 		const out = run({
 			overlays: [
 				{
-					hideEntities: false,
 					id: 'system',
 					items: [{ slug: 'tags', type: 'collection' }],
 					label: 'System',
@@ -143,7 +143,16 @@ describe('settingsOverlay factory', () => {
 			collections: [collection('tags', { hidden }), collection('sites')],
 		})
 		const out = run(
-			{ overlays: [{ id: 'system', items: [{ slug: 'tags', type: 'collection' }], label: 'S' }] },
+			{
+				overlays: [
+					{
+						hideEntities: true,
+						id: 'system',
+						items: [{ slug: 'tags', type: 'collection' }],
+						label: 'S',
+					},
+				],
+			},
 			config
 		)
 		expect(registryOf(out).hiddenPredicates.collections.tags).toBe(hidden)

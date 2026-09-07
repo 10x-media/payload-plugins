@@ -169,7 +169,30 @@ export type SettingsOverlayConfig = {
 	/** Extra class beside `settings-overlay` and `settings-overlay--<id>`. */
 	className?: string
 	components?: SettingsOverlayComponents
-	/** Hides listed collections and globals from the nav and their own routes. @default true */
+	/**
+	 * Hides every collection and global this overlay lists from the nav and from its own admin
+	 * route, so the panel is the only way in. It sets `admin.hidden` on the entity, which is all
+	 * it does; a function-valued `admin.hidden` the entity already had is kept and applied per
+	 * reader instead of being overwritten.
+	 *
+	 * Off by default, because the panel is not a replacement for the collection's own views. It
+	 * renders the list and the edit view in drawer mode, and Payload leaves several things out of
+	 * that mode:
+	 *
+	 * - no trash tab, so a trashed document cannot be found from the panel (opening one directly
+	 *   still offers restore and permanent delete);
+	 * - no bulk delete or bulk edit, because the list's selection actions are not rendered;
+	 * - no document tabs, so API, Versions and Live Preview are unreachable;
+	 * - no copy-to-locale, and no duplicate into selected locales.
+	 *
+	 * Turn it on when the entity is genuinely settings-shaped and none of that applies. Leaving it
+	 * off costs a nav entry and keeps the full views one click away.
+	 *
+	 * Hiding belongs to the entity rather than to the panel, so two overlays listing the same
+	 * entity must agree on this flag; disagreeing is a boot error naming both.
+	 *
+	 * @default false
+	 */
 	hideEntities?: boolean
 	/**
 	 * Folds a collection list's own header into the pane header: Payload's list title is hidden

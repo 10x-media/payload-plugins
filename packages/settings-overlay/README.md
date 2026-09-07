@@ -10,7 +10,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 - **Anything goes in the panel**: collections (list and edit), globals, registered admin views, your own components, and plain links.
 - **Deep links**: `?settings=<overlay>/<item>[/<id>]` survives a reload, a share, and the back button.
-- **One way in**: a listed collection or global is hidden from the nav and from its own route, so there is a single entry rather than two.
+- **One way in, when you want it**: `hideEntities` takes a listed collection or global out of the nav and off its own route. Off by default, because Payload's drawer mode omits the trash tab, bulk actions and the document tabs.
 - **Open it from anywhere**: `useSettingsOverlay()` and `<SettingsOverlayButton>` work in a field, a list action or a dashboard card.
 - **Access is decided on the server**: the rail each reader sees is computed for them. Items they cannot open never reach the browser.
 - **No round trip for what does not need one**: the rail and every eager component arrive with the page. Lists, documents and views are fetched on open.

@@ -85,7 +85,7 @@ describe('validateOverlays', () => {
 	it('rejects two overlays that disagree on hiding the same entity', () => {
 		expect(
 			check([
-				{ id: 'a', items: [{ slug: 'tags', type: 'collection' }], label: 'A' },
+				{ hideEntities: true, id: 'a', items: [{ slug: 'tags', type: 'collection' }], label: 'A' },
 				{
 					hideEntities: false,
 					id: 'b',
@@ -103,7 +103,7 @@ describe('validateOverlays', () => {
 					items: [{ slug: 'branding', type: 'global' }],
 					label: 'A',
 				},
-				{ id: 'b', items: [{ slug: 'branding', type: 'global' }], label: 'B' },
+				{ hideEntities: true, id: 'b', items: [{ slug: 'branding', type: 'global' }], label: 'B' },
 			])
 		).toThrow(/different hideEntities values/)
 	})

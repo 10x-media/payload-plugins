@@ -94,6 +94,7 @@ export default buildConfig({
 				{
 					icon: './components/icons#GearIcon',
 					id: 'system',
+					// mergeListHeader: false,
 					items: [
 						appearanceItem(),
 						{
@@ -119,6 +120,10 @@ export default buildConfig({
 					label: 'System',
 				},
 				{
+					// The only panel that hides what it lists, so both sides of `hideEntities` are on
+					// screen at once: `secrets` is reachable here and nowhere else, while the rest of
+					// the dev app keeps its nav entries.
+					hideEntities: true,
 					id: 'workspace',
 					// Grouped and searchable, to exercise the two together. Deliberate overlaps:
 					// "overview" matches one row in each of two groups, "keyboard" matches a label

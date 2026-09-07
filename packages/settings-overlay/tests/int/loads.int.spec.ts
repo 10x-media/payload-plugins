@@ -23,6 +23,7 @@ describeForDb('settingsOverlay loads', { dbs: ['mongo'] }, (db) => {
 			plugin: settingsOverlay({
 				overlays: [
 					{
+						hideEntities: true,
 						id: 'system',
 						items: [
 							{ slug: 'tags', type: 'collection' },

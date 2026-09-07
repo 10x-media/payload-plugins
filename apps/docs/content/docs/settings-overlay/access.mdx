@@ -65,4 +65,4 @@ Its headers are the real ones, so a `resolveDocID` can read a cookie. Everything
 
 ## The one thing to check yourself
 
-`hideEntities` removes a collection from the nav and from its route, but it is **not** access control. Payload's own access rules still decide whether the API will serve the document, and they should: a hidden route is not a locked one. Give the collection real `access` rules as you would anyway.
+`hideEntities`, when you turn it on, removes a collection from the nav and from its route, but it is **not** access control. Payload's own access rules still decide whether the API will serve the document, and they should: a hidden route is not a locked one. Give the collection real `access` rules as you would anyway.

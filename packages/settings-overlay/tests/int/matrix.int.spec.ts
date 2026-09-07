@@ -14,7 +14,12 @@ describeForDb('settingsOverlay cross-db', {}, (db) => {
 			db,
 			plugin: settingsOverlay({
 				overlays: [
-					{ id: 'system', items: [{ slug: 'tags', type: 'collection' }], label: 'System' },
+					{
+						hideEntities: true,
+						id: 'system',
+						items: [{ slug: 'tags', type: 'collection' }],
+						label: 'System',
+					},
 				],
 			}),
 		})

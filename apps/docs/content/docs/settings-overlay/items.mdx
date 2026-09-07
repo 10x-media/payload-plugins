@@ -21,13 +21,25 @@ Every type also takes `label`, `group`, `icon`, `order`, `keywords`, `badge` and
 { type: 'collection', slug: 'tags' }
 ```
 
-Renders Payload's list view in drawer mode, and its edit view when a row is picked. Creating, filtering, sorting, bulk actions, drafts, uploads and relationship drawers all work as they do on a page.
+Renders Payload's list view in drawer mode, and its edit view when a row is picked. Creating, filtering, sorting, grouping, drafts, uploads and relationship drawers all work as they do on a page.
 
 Delete, duplicate, restore from trash and "create new" sit in a dots menu on the edit view, as they do on a page, and act on the panel rather than navigating away from it. Delete honours trash when the collection has it, including the "delete permanently" option. The plugin appends the menu to the collection's `admin.components.edit.beforeDocumentControls`; if the collection already sets that, the plugin's entry is added after yours. Duplicating into selected locales is the one action the panel does not carry.
 
-The collection is hidden from the nav and from `/admin/collections/tags` unless the overlay sets `hideEntities: false`.
-
 The same collection can appear in more than one overlay. Each panel has its own rail, its own URL and its own render cache, so they do not interfere. The one thing they must agree on is `hideEntities`: hiding belongs to the entity rather than to the panel, and two overlays asking for opposite things is a boot error naming both.
+
+### What drawer mode leaves out
+
+A panel is not a replacement for the collection's own views. Payload renders less in drawer mode than on a page, and the plugin does not add it back:
+
+| Missing | Why |
+|---|---|
+| Trash tab | The list's view tabs render only outside a drawer, so a trashed document cannot be found from the panel. Open one by URL and restore and permanent delete are both offered. |
+| Bulk delete, bulk edit | The list's selection actions render only outside a drawer. |
+| API, Versions, Live Preview | The document header carries those tabs, and Payload skips the header when a `drawerSlug` is set. The Live Preview toggle is hidden in a drawer too. |
+| Copy to locale | It lives in Payload's own document menu, which the panel replaces. |
+| Duplicate into selected locales | Plain duplicate is there; the locale picker is not. |
+
+This is why [`hideEntities`](/settings-overlay/configuration) is off by default. Turn it on for an entity that is genuinely settings-shaped, where none of the above is ever wanted; leave it off and the full views stay one nav click away.
 
 ### `resolveDocID`
 
@@ -69,7 +81,7 @@ It reads the tenant cookie, finds that tenant's document, and creates the draft 
 { type: 'global', slug: 'branding' }
 ```
 
-The same edit view a global gets on its own route. Hidden from the nav on the same terms as a collection, and listable in several overlays on the same terms too.
+The same edit view a global gets on its own route, minus the document tabs, which Payload skips in drawer mode. Hidden from the nav on the same terms as a collection, and listable in several overlays on the same terms too.
 
 ## `component`
 
@@ -97,7 +109,7 @@ Both forms receive `settingsOverlayEmbed`: a client component reads it with `use
 
 A view already registered in `admin.components.views`, by yours or by another plugin. It receives the page props it was written for, so it works unchanged.
 
-Because it has a route of its own, the "one way in" rule does not apply and the plugin does not hide it. The key must exist when this plugin runs, so `settingsOverlay` goes **after** whatever registers the view; a missing key is a boot error naming both.
+A registered view keeps its own route either way: `hideEntities` covers collections and globals, and the plugin never hides a view. The key must exist when this plugin runs, so `settingsOverlay` goes **after** whatever registers the view; a missing key is a boot error naming both.
 
 A view that wraps itself in `DefaultTemplate` draws a second sidebar inside the panel unless it is told where it is. See [Embedded views](/settings-overlay/embedded-views).
 

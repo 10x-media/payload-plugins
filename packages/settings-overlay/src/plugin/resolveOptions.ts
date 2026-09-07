@@ -32,7 +32,7 @@ export const resolveOptions = (options: SettingsOverlayPluginOptions): ResolvedO
 			...overlay,
 			addressable: overlay.addressable ?? defaults.addressable ?? true,
 			components: { ...defaults.components, ...overlay.components },
-			hideEntities: overlay.hideEntities ?? defaults.hideEntities ?? true,
+			hideEntities: overlay.hideEntities ?? defaults.hideEntities ?? false,
 			layout: overlay.layout ?? defaults.layout ?? 'compact',
 			mergeListHeader: overlay.mergeListHeader ?? defaults.mergeListHeader ?? true,
 			searchable: overlay.searchable ?? defaults.searchable ?? false,
