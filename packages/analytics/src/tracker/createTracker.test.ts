@@ -285,6 +285,39 @@ describe('one failing slot never takes the others down', () => {
 		expect(capture.mock.calls[1]?.[0]).toBe('signup')
 	})
 
+	it('keeps flushing later slots when one flush throws', () => {
+		const original = Object.getOwnPropertyDescriptor(
+			window.Element.prototype,
+			'scrollHeight'
+		) as PropertyDescriptor
+		let firstRead = true
+		Object.defineProperty(document.documentElement, 'scrollHeight', {
+			configurable: true,
+			get() {
+				if (firstRead) {
+					firstRead = false
+					throw new Error('layout is gone')
+				}
+				return 1000
+			},
+		})
+		const tracker = boot(
+			configWith([nativeSlot, { ...nativeSlot, slot: 'tenant' }], {
+				autoCapture: {
+					scrollDepth: true,
+					outboundLinks: false,
+					fileDownloads: false,
+					goalAttribute: false,
+				},
+			})
+		)
+
+		expect(() => tracker.flush()).not.toThrow()
+
+		expect(posted()).toHaveLength(1)
+		Object.defineProperty(document.documentElement, 'scrollHeight', original)
+	})
+
 	it('keeps draining the consent queue when one queued send throws', async () => {
 		const tracker = boot(configWith([{ ...nativeSlot, requiresConsent: true }, posthogSlot]))
 		tracker.track('signup', cyclic())

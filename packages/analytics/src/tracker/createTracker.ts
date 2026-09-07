@@ -87,12 +87,16 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	 * or an event that cannot be serialized, must not skip the remaining slots or escape
 	 * into the host's click handler.
 	 */
-	const deliver = (sink: Sink, event: TrackerEvent) => {
+	const guard = (run: () => void) => {
 		try {
-			sink.send(event)
+			run()
 		} catch {
 			// Dropped, like every other delivery failure.
 		}
+	}
+
+	const deliver = (sink: Sink, event: TrackerEvent) => {
+		guard(() => sink.send(event))
 	}
 
 	const dispatch = (event: TrackerEvent) => {
@@ -135,7 +139,7 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 
 	const flush = () => {
 		for (const entry of entries) {
-			entry.sink.flush?.()
+			guard(() => entry.sink.flush?.())
 		}
 	}
 

@@ -25,17 +25,21 @@ interface VendorRealm {
 
 /**
  * Scripts run in jsdom's own realm, whose `window` is not the object this test file sees,
- * so the snippet hands its realm out through the shared document.
+ * so the snippet hands its realm out through the shared document. That realm outlives a
+ * single test, so its vendor globals are cleared before each one: a stub that finds itself
+ * already installed does nothing at all.
  */
-const scriptRealm = (): VendorRealm => {
+const bridgeRealm = (): VendorRealm => {
 	const bridge = document.createElement('script')
 	bridge.text = 'document.__realm = window'
 	document.head.appendChild(bridge)
 	return (document as unknown as { __realm: VendorRealm }).__realm
 }
 
-const runSnippet = async (snippet: CaptureSnippet) => {
-	const load = createScriptLoader(window)
+let realm: VendorRealm
+
+const runSnippet = async (snippet: CaptureSnippet, nonce?: string) => {
+	const load = createScriptLoader(window, nonce)
 	for (const script of snippet.scripts) {
 		const pending = load(script)
 		if (script.src) {
@@ -52,6 +56,10 @@ const runSnippet = async (snippet: CaptureSnippet) => {
 const scriptSources = (): Array<string | null> =>
 	[...document.querySelectorAll('script')].map((el) => el.getAttribute('src'))
 
+/** Attribute selectors do not match elements the script realm created, so scan instead. */
+const scriptWithSrc = (src: string): Element | undefined =>
+	[...document.querySelectorAll('script')].find((el) => el.getAttribute('src') === src)
+
 const sinkArgs = (realm: VendorRealm) => ({
 	slot: 'tenant' as const,
 	win: realm as unknown as TrackerWindow,
@@ -61,6 +69,9 @@ const sinkArgs = (realm: VendorRealm) => ({
 
 beforeEach(() => {
 	document.head.innerHTML = ''
+	realm = bridgeRealm()
+	realm.posthog = undefined
+	realm.plausible = undefined
 })
 
 describe('posthog snippet', () => {
@@ -70,7 +81,6 @@ describe('posthog snippet', () => {
 		) ?? { scripts: [] }
 
 	it('publishes a callable stub and injects array.js off the proxy path', async () => {
-		const realm = scriptRealm()
 		await runSnippet(snippet())
 
 		expect(typeof realm.posthog?.capture).toBe('function')
@@ -82,8 +92,23 @@ describe('posthog snippet', () => {
 		])
 	})
 
+	it('carries the CSP nonce of the inline onto the script it injects', async () => {
+		await runSnippet(snippet(), 'n0nce')
+
+		expect(scriptWithSrc('/api/analytics/p/tenant/static/array.js')?.getAttribute('nonce')).toBe(
+			'n0nce'
+		)
+	})
+
+	it('injects no nonce when the inline carries none', async () => {
+		await runSnippet(snippet())
+
+		expect(scriptWithSrc('/api/analytics/p/tenant/static/array.js')?.hasAttribute('nonce')).toBe(
+			false
+		)
+	})
+
 	it('queues a sink dispatch made before the SDK lands', async () => {
-		const realm = scriptRealm()
 		await runSnippet(snippet())
 
 		createPosthogSink(sinkArgs(realm)).send({
@@ -104,7 +129,6 @@ describe('plausible per-site snippet', () => {
 		}) ?? { scripts: [] }
 
 	it('publishes the queue stub and parks the endpoint for the tracker', async () => {
-		const realm = scriptRealm()
 		await runSnippet(snippet())
 
 		expect(typeof realm.plausible).toBe('function')
@@ -112,7 +136,6 @@ describe('plausible per-site snippet', () => {
 	})
 
 	it('queues a sink dispatch made before the tracker lands', async () => {
-		const realm = scriptRealm()
 		await runSnippet(snippet())
 
 		createPlausibleSink(sinkArgs(realm)).send({
@@ -132,8 +155,18 @@ describe('plausible per-site snippet', () => {
 		])
 	})
 
+	it('injects nothing of its own, so the rendered tag keeps its nonce', async () => {
+		await runSnippet(snippet(), 'n0nce')
+
+		// Unlike PostHog's, this stub only publishes globals: the loader tag is the only
+		// script, and it was nonced where it was created.
+		expect(scriptSources().filter(Boolean)).toEqual(['/api/analytics/p/tenant/js/pa-abc123.js'])
+		expect(scriptWithSrc('/api/analytics/p/tenant/js/pa-abc123.js')?.getAttribute('nonce')).toBe(
+			'n0nce'
+		)
+	})
+
 	it('leaves a tracker that won the race against the inline alone', async () => {
-		const realm = scriptRealm()
 		const realInit = () => undefined
 		const real = Object.assign(() => undefined, { init: realInit })
 		realm.plausible = real as unknown as VendorRealm['plausible']

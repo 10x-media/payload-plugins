@@ -577,6 +577,10 @@ describe('posthog capture', () => {
 			'p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js"'
 		)
 		expect(inline).toContain('"init capture register')
+		// The injected tag inherits the inline's nonce, or a nonce CSP blocks the bundle.
+		expect(inline).toContain(
+			'(c=t.currentScript&&(t.currentScript.nonce||t.currentScript.getAttribute("nonce")))&&(p.nonce=c,p.setAttribute("nonce",c))'
+		)
 		expect(
 			inline.endsWith('posthog.init("phc_abc",{api_host:"/ph",ui_host:"https://us.posthog.com"})')
 		).toBe(true)
